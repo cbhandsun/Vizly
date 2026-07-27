@@ -2,6 +2,7 @@ import React from 'react';
 import { Node, Edge, BackgroundVariant, ReactFlowInstance, SelectionMode, NodeTypes, EdgeTypes, NodeChange, EdgeChange, Connection, OnConnectStart, OnConnectEnd, ConnectionMode, ConnectionLineType, type IsValidConnection, type OnNodeDrag, type OnReconnect } from '@xyflow/react';
 import BaseReactFlow from '../shared/BaseReactFlow';
 import { useConnectionMicrointeractions } from './hooks/useConnectionMicrointeractions';
+import { shouldUseScopedDesignerDragPerformanceMode } from './hooks/designerSystemSyncPersistence';
 
 export interface FlowchartCanvasShellProps {
     nodes: Node[];
@@ -156,7 +157,9 @@ export const FlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> = React.m
             connectionMode={connectionMode}
             connectionLineStyle={connectionLineStyle}
             connectionLineType={ConnectionLineType.SmoothStep}
-            flowClassName={isDragging ? 'performance-mode' : undefined}
+            flowClassName={shouldUseScopedDesignerDragPerformanceMode(nodes.length, isDragging)
+                ? 'performance-mode'
+                : undefined}
             snapToGrid={snapEnabled}
             snapGrid={[12, 12]}
             isValidConnection={isValidConnection}

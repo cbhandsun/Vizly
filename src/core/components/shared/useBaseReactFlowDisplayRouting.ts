@@ -2,8 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Edge, Node } from '@xyflow/react';
 import {
   BASE_DISPLAY_ROUTING_VERSION,
-  computeBaseReactFlowDisplayEdgeEpoch,
-  computeBaseReactFlowDisplayCacheSignature,
   computeBaseReactFlowDisplayOutputRouteSignature,
   readBaseReactFlowDisplayEdgesCacheEntry,
   withDisplayAbsolutePositions,
@@ -35,8 +33,15 @@ import {
   canCommitBaseReactFlowDisplayResult,
   shouldRepairBaseReactFlowDisplayResult,
 } from './baseReactFlowDisplayCommitPolicy';
-import { computeBaseReactFlowDisplayGeometryDigest } from './baseReactFlowDisplayInputIdentity';
-import { createBaseReactFlowInteractiveFallbackEdges } from './baseReactFlowDisplayFallback';
+import {
+  resolveBaseReactFlowDragAwareDisplayEpoch,
+  resolveBaseReactFlowDragAwareInputIdentity,
+} from './baseReactFlowDragRoutingFreeze';
+import {
+  createBaseReactFlowInteractiveFallbackEdges,
+  createBaseReactFlowNodeDragFallbackEdges,
+  shouldUseBaseReactFlowNodeDragFallback,
+} from './baseReactFlowDisplayFallback';
 import { logBaseReactFlowEventBindingFailure } from './baseReactFlowLogging';
 import {
   createDisplayTerminalValidationSnapshot,
@@ -59,6 +64,9 @@ export type UseBaseReactFlowDisplayRoutingOptions = {
   smartEdgePadding: number;
   isLargeGraph: boolean;
   isNodeDragging: boolean;
+  isNodeDragFallbackPending: boolean;
+  nodeDragFallbackIds: readonly string[];
+  onNodeDragFallbackResolved: () => void;
 };
 
 export type UseBaseReactFlowDisplayRoutingResult = {
@@ -80,6 +88,9 @@ export const useBaseReactFlowDisplayRouting = ({
   smartEdgePadding,
   isLargeGraph,
   isNodeDragging,
+  isNodeDragFallbackPending,
+  nodeDragFallbackIds,
+  onNodeDragFallbackResolved,
 }: UseBaseReactFlowDisplayRoutingOptions): UseBaseReactFlowDisplayRoutingResult => {
   const displayEdgeWorkerRef = useRef<Worker | null>(null);
   const displayEdgeWorkerRequestSeqRef = useRef(0);
@@ -92,31 +103,27 @@ export const useBaseReactFlowDisplayRouting = ({
   }, []);
 
   const displayEdgeEpoch = useMemo(() => {
-    return computeBaseReactFlowDisplayEdgeEpoch({
+    return resolveBaseReactFlowDragAwareDisplayEpoch({
+      isNodeDragging,
       nodes: routingNodes,
       edges,
     });
-  }, [routingNodes, edges]);
+  }, [routingNodes, edges, isNodeDragging]);
 
-  const displayEdgeCacheSignature = useMemo(() => {
-    return computeBaseReactFlowDisplayCacheSignature({
+  const displayInputIdentity = useMemo(() => {
+    return resolveBaseReactFlowDragAwareInputIdentity({
+      isNodeDragging,
       nodes: routingNodes,
       edges,
       enableSmartEdges,
       smartEdgePadding,
       isLargeGraph,
     });
-  }, [edges, routingNodes, enableSmartEdges, smartEdgePadding, isLargeGraph]);
-
-  const inputGeometryDigest = useMemo(() => (
-    computeBaseReactFlowDisplayGeometryDigest({
-      nodes: routingNodes,
-      edges,
-      enableSmartEdges,
-      smartEdgePadding,
-      isLargeGraph,
-    })
-  ), [edges, routingNodes, enableSmartEdges, smartEdgePadding, isLargeGraph]);
+  }, [edges, routingNodes, enableSmartEdges, smartEdgePadding, isLargeGraph, isNodeDragging]);
+  const {
+    cacheSignature: displayEdgeCacheSignature,
+    geometryDigest: inputGeometryDigest,
+  } = displayInputIdentity;
 
   const displayQualityPolicy = useMemo(() => (
     resolveBaseReactFlowDisplayQualityPolicy({
@@ -595,6 +602,7 @@ export const useBaseReactFlowDisplayRouting = ({
           displayPatches: mergedTransactions.displayPatches,
           hardClean: resolvedWorkerResult.hardClean === true,
         });
+        onNodeDragFallbackResolved();
         if (
           resolvedWorkerResult.hardClean === true
           && cacheReplaySignature !== null
@@ -647,14 +655,13 @@ export const useBaseReactFlowDisplayRouting = ({
     inputGeometryDigest,
     isContainerReady,
     isNodeDragging,
+    onNodeDragFallbackResolved,
     routingGeometryReady,
   ]);
 
   const immediateDisplayEdges = useMemo(
-    () => displayQualityPolicy.mode === 'interactive'
-      ? createBaseReactFlowInteractiveFallbackEdges(edges)
-      : edges,
-    [displayQualityPolicy.mode, edges],
+    () => createBaseReactFlowInteractiveFallbackEdges(edges),
+    [edges],
   );
 
   const resolvedDisplayEdges = resolveBaseReactFlowDisplayedEdges({
@@ -666,8 +673,20 @@ export const useBaseReactFlowDisplayRouting = ({
     immediate: immediateDisplayEdges,
   });
 
+  const hasResolvedDisplayEdges = edges.length === 0 || resolvedDisplayEdges.length > 0;
+  const useNodeDragFallback = shouldUseBaseReactFlowNodeDragFallback({
+    isNodeDragging,
+    dragFallbackPending: isNodeDragFallbackPending,
+    hasResolvedEdges: hasResolvedDisplayEdges,
+    sourceEdgeCount: edges.length,
+  });
+  const nodeDragFallbackEdges = useMemo(
+    () => createBaseReactFlowNodeDragFallbackEdges(edges, nodeDragFallbackIds),
+    [edges, nodeDragFallbackIds],
+  );
+
   return {
-    edges: resolvedDisplayEdges,
+    edges: useNodeDragFallback ? nodeDragFallbackEdges : resolvedDisplayEdges,
     // BaseReactFlow is always canvas-owned, including the geometry bootstrap
     // window. Standalone custom edges retain the context default ('edge').
     routingOwner: 'canvas',

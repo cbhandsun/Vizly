@@ -12,9 +12,23 @@ const EXPENSIVE_INTERACTIVE_EDGE_TYPES = new Set([
   'smart-orthogonal',
 ]);
 
+const STALE_DURING_NODE_DRAG_EDGE_TYPES = new Set([
+  ...EXPENSIVE_INTERACTIVE_EDGE_TYPES,
+]);
+
+export const resolveBaseReactFlowNodeDragFallbackIds = (
+  primaryNodeId: string,
+  draggedNodes: readonly { id: string; selected?: boolean }[],
+): string[] => Array.from(new Set([
+  primaryNodeId,
+  ...draggedNodes
+    .filter(node => node.selected)
+    .map(node => node.id),
+]));
+
 /**
- * Keeps medium and large diagrams responsive while the bounded worker searches
- * for a final route. Built-in smooth-step edges avoid running obstacle routing
+ * Keeps every diagram visible and responsive while the worker searches for a
+ * final route. Built-in smooth-step edges avoid running obstacle routing
  * synchronously in every custom edge component during the pending window.
  */
 export const createBaseReactFlowInteractiveFallbackEdges = (
@@ -33,3 +47,45 @@ export const createBaseReactFlowInteractiveFallbackEdges = (
 
   return fallbackEdges ?? edges;
 };
+
+/**
+ * Uses endpoint-driven built-in paths while a node is moving or its final
+ * canvas route is being recomputed. Stable paths contain absolute points from
+ * the previous geometry and would otherwise appear detached from the node.
+ */
+export const createBaseReactFlowNodeDragFallbackEdges = (
+  edges: Edge[],
+  draggingNodeIds?: readonly string[],
+): Edge[] => {
+  let fallbackEdges: Edge[] | null = null;
+  const draggingIds = draggingNodeIds?.length
+    ? new Set(draggingNodeIds)
+    : null;
+
+  edges.forEach((edge, index) => {
+    if (draggingIds && !draggingIds.has(edge.source) && !draggingIds.has(edge.target)) return;
+    if (!edge.type || !STALE_DURING_NODE_DRAG_EDGE_TYPES.has(edge.type)) return;
+    if (!fallbackEdges) fallbackEdges = [...edges];
+    fallbackEdges[index] = {
+      ...edge,
+      type: 'smoothstep',
+    };
+  });
+
+  return fallbackEdges ?? edges;
+};
+
+export const shouldUseBaseReactFlowNodeDragFallback = ({
+  isNodeDragging,
+  dragFallbackPending,
+  hasResolvedEdges: _hasResolvedEdges,
+  sourceEdgeCount,
+}: {
+  isNodeDragging: boolean;
+  dragFallbackPending: boolean;
+  hasResolvedEdges: boolean;
+  sourceEdgeCount: number;
+}): boolean => (
+  sourceEdgeCount > 0
+  && (isNodeDragging || dragFallbackPending)
+);

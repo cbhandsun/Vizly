@@ -1,0 +1,462 @@
+/*
+ * Flowchart canvas visual states.
+ * Imported after the legacy designer styles so node and edge feedback has one
+ * predictable final layer without growing FlowchartDesigner.css further.
+ */
+
+.diagram-root {
+    --flow-visual-accent: var(--designer-accent, #4f46e5);
+    --flow-visual-accent-soft: color-mix(in srgb, var(--flow-visual-accent) 14%, transparent);
+    --flow-visual-accent-ring: color-mix(in srgb, var(--flow-visual-accent) 28%, transparent);
+    --flow-visual-success: var(--theme-success-main, #10b981);
+    --flow-visual-node-shadow:
+        0 1px 2px rgba(15, 23, 42, 0.05),
+        0 6px 18px -8px rgba(15, 23, 42, 0.22);
+    --flow-visual-node-shadow-hover:
+        0 2px 4px rgba(15, 23, 42, 0.07),
+        0 12px 26px -10px rgba(15, 23, 42, 0.26);
+    --flow-visual-edge-label-bg: rgba(255, 255, 255, 0.96);
+    --flow-visual-edge-label-border: rgba(100, 116, 139, 0.24);
+    --flow-visual-edge-label-text: #334155;
+}
+
+/* Nodes: preserve semantic fills while removing decorative glare and bounce. */
+.diagram-root .flowchart-node {
+    background-color: transparent;
+    background-image: none;
+    box-shadow: var(--flow-visual-node-shadow);
+    transform: none;
+    transition:
+        box-shadow 160ms ease,
+        filter 160ms ease,
+        opacity 160ms ease;
+}
+
+.diagram-root .flowchart-node:hover {
+    border-color: initial;
+    box-shadow: var(--flow-visual-node-shadow-hover);
+    transform: translateY(-1px);
+}
+
+.diagram-root .flowchart-node.shape-non-rect {
+    filter: drop-shadow(0 5px 9px rgba(15, 23, 42, 0.11));
+}
+
+.diagram-root .flowchart-node.shape-non-rect:hover {
+    filter: drop-shadow(0 8px 13px rgba(15, 23, 42, 0.16));
+}
+
+.diagram-root .flowchart-shape,
+.diagram-root .flowchart-shape-group .flowchart-shape-stroke {
+    filter: none;
+    transition:
+        stroke 150ms ease,
+        stroke-width 150ms ease,
+        fill 150ms ease;
+}
+
+.diagram-root .flowchart-node-content {
+    padding: 12px 16px;
+}
+
+.diagram-root .flowchart-node-title {
+    font-size: 13px;
+    font-weight: 650;
+    line-height: 1.4;
+    letter-spacing: 0;
+    padding-bottom: 6px;
+    margin-bottom: 6px;
+    border-bottom-color: color-mix(in srgb, var(--node-text, #334155) 14%, transparent);
+}
+
+.diagram-root .flowchart-node-body {
+    gap: 3px;
+}
+
+.diagram-root .flowchart-node-body-line {
+    color: color-mix(in srgb, var(--node-text, #334155) 82%, transparent);
+    font-size: 12px;
+    line-height: 1.5;
+    opacity: 1;
+}
+
+.diagram-root .flowchart-node.locked {
+    outline: 1px dashed color-mix(in srgb, var(--node-text, #475569) 38%, transparent);
+    outline-offset: 3px;
+}
+
+/* Selected and keyboard focus states stay static and readable at any zoom. */
+.diagram-root .react-flow__node.selected {
+    box-shadow:
+        0 0 0 2px var(--flow-visual-accent),
+        0 0 0 5px var(--flow-visual-accent-soft),
+        0 8px 22px -10px var(--flow-visual-accent-ring) !important;
+}
+
+.diagram-root .react-flow__node.selected::after {
+    display: none;
+    animation: none;
+}
+
+.diagram-root .flowchart-node:focus-visible {
+    outline: 2px solid var(--flow-visual-accent);
+    outline-offset: 4px;
+}
+
+.diagram-root .react-flow__node:has(.shape-non-rect).selected {
+    filter: drop-shadow(0 0 2px var(--flow-visual-accent-ring));
+}
+
+/* Domain/custom nodes use an inline card and four named source handles. */
+.diagram-root .react-flow__node-custom .diagram-node-glass {
+    box-shadow: var(--flow-visual-node-shadow) !important;
+    transition:
+        box-shadow 160ms ease,
+        transform 160ms ease;
+}
+
+.diagram-root .react-flow__node-custom:hover .diagram-node-glass {
+    box-shadow: var(--flow-visual-node-shadow-hover) !important;
+    transform: translateY(-1px);
+}
+
+/* Connection handles: small at rest, clear on intent, generous hit target. */
+.diagram-root .flowchart-handle {
+    width: 7px !important;
+    height: 7px !important;
+    background: var(--flow-visual-edge-label-bg) !important;
+    border: 1.5px solid color-mix(in srgb, var(--node-border, #64748b) 78%, #ffffff) !important;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.78);
+    opacity: 0;
+    transition:
+        opacity 120ms ease,
+        transform 140ms ease,
+        border-color 120ms ease,
+        box-shadow 120ms ease;
+}
+
+.diagram-root .flowchart-handle::after,
+.diagram-root .react-flow__handle::after {
+    width: 30px;
+    height: 30px;
+}
+
+.diagram-root .flowchart-node:hover .flowchart-handle,
+.diagram-root .flowchart-node.selected .flowchart-handle {
+    width: 10px !important;
+    height: 10px !important;
+    opacity: 1;
+}
+
+.diagram-root .flowchart-handle:hover {
+    width: 8px !important;
+    height: 8px !important;
+    background: #ffffff !important;
+    border: 2px solid var(--flow-visual-accent) !important;
+    box-shadow: 0 0 0 4px var(--flow-visual-accent-soft) !important;
+    transform: scale(1.35) !important;
+}
+
+.diagram-root .react-flow__node-custom .react-flow__handle.source:is(
+    [data-handleid='top'],
+    [data-handleid='right'],
+    [data-handleid='bottom'],
+    [data-handleid='left']
+) {
+    width: 7px !important;
+    height: 7px !important;
+    min-width: 7px;
+    min-height: 7px;
+    background: var(--flow-visual-edge-label-bg) !important;
+    border: 1.5px solid color-mix(in srgb, var(--flow-visual-accent) 72%, #ffffff) !important;
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.78);
+    opacity: 0;
+    z-index: 30;
+    transition:
+        opacity 120ms ease,
+        transform 140ms ease,
+        border-color 120ms ease,
+        box-shadow 120ms ease;
+}
+
+.diagram-root .react-flow__node-custom:hover .react-flow__handle.source:is(
+    [data-handleid='top'],
+    [data-handleid='right'],
+    [data-handleid='bottom'],
+    [data-handleid='left']
+),
+.diagram-root .react-flow__node-custom.selected .react-flow__handle.source:is(
+    [data-handleid='top'],
+    [data-handleid='right'],
+    [data-handleid='bottom'],
+    [data-handleid='left']
+) {
+    width: 10px !important;
+    height: 10px !important;
+    opacity: 1;
+}
+
+.diagram-root .react-flow__node-custom .react-flow__handle.source:is(
+    [data-handleid='top'],
+    [data-handleid='right'],
+    [data-handleid='bottom'],
+    [data-handleid='left']
+):hover {
+    background: #ffffff !important;
+    border: 2px solid var(--flow-visual-accent) !important;
+    box-shadow: 0 0 0 4px var(--flow-visual-accent-soft) !important;
+    transform: scale(1.25) !important;
+}
+
+.diagram-root .flowchart-quick-clone-btn {
+    width: 22px;
+    height: 22px;
+    color: var(--flow-visual-accent);
+    background: var(--flow-visual-edge-label-bg);
+    border: 1px solid var(--flow-visual-accent);
+    box-shadow:
+        0 3px 8px rgba(15, 23, 42, 0.13),
+        0 0 0 3px rgba(255, 255, 255, 0.72);
+}
+
+.diagram-root .flowchart-quick-clone-btn:hover {
+    color: #ffffff;
+    background: var(--flow-visual-accent);
+    box-shadow:
+        0 4px 10px color-mix(in srgb, var(--flow-visual-accent) 24%, transparent),
+        0 0 0 4px var(--flow-visual-accent-soft);
+}
+
+/* Connection intent belongs on the shape rather than a rectangular wrapper. */
+.diagram-root .react-flow__node.rf-connecting,
+.diagram-root .react-flow__node.rf-connectable,
+.diagram-root .react-flow__node.rf-connectable.rf-connect-preview {
+    border: 0 !important;
+    background: transparent;
+    box-shadow: none;
+}
+
+.diagram-root .react-flow__node.rf-connecting .flowchart-shape,
+.diagram-root .react-flow__node.rf-connecting .flowchart-shape-stroke {
+    stroke: var(--flow-visual-accent) !important;
+}
+
+.diagram-root .react-flow__node.rf-connectable .flowchart-shape,
+.diagram-root .react-flow__node.rf-connectable .flowchart-shape-stroke {
+    stroke: var(--flow-visual-success) !important;
+}
+
+.diagram-root .react-flow__node.rf-connectable .flowchart-handle {
+    width: 8px !important;
+    height: 8px !important;
+    background: #ffffff !important;
+    border: 2px solid var(--flow-visual-success) !important;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--flow-visual-success) 18%, transparent);
+    transform: none;
+}
+
+.diagram-root .react-flow__node.rf-connectable.rf-connect-preview .flowchart-handle {
+    opacity: 0.38 !important;
+}
+
+.diagram-root .react-flow__node.rf-connectable.rf-connect-preview.rf-connect-side-top .react-flow__handle-top.flowchart-handle,
+.diagram-root .react-flow__node.rf-connectable.rf-connect-preview.rf-connect-side-right .react-flow__handle-right.flowchart-handle,
+.diagram-root .react-flow__node.rf-connectable.rf-connect-preview.rf-connect-side-bottom .react-flow__handle-bottom.flowchart-handle,
+.diagram-root .react-flow__node.rf-connectable.rf-connect-preview.rf-connect-side-left .react-flow__handle-left.flowchart-handle {
+    width: 9px !important;
+    height: 9px !important;
+    opacity: 1 !important;
+    animation: none;
+    transform: scale(1.45);
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--flow-visual-success) 20%, transparent);
+}
+
+.diagram-root .react-flow__connection-path {
+    stroke: var(--flow-visual-accent);
+    stroke-width: 2;
+    stroke-linecap: round;
+}
+
+/* Edges: calm by default, stronger only for hover and selection. */
+.diagram-root .react-flow__edge-path {
+    opacity: 0.86;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition:
+        stroke 130ms ease,
+        stroke-width 130ms ease,
+        opacity 130ms ease,
+        filter 130ms ease;
+}
+
+.diagram-root .react-flow__edge-stablePath .react-flow__edge-path:not([style*='stroke:']) {
+    stroke: #94a3b8;
+    stroke-width: 1.35px;
+    filter: none !important;
+    opacity: 0.94;
+}
+
+.diagram-root .react-flow__edge:hover .react-flow__edge-path {
+    stroke: var(--flow-visual-accent) !important;
+    stroke-width: 2.25px !important;
+    filter: drop-shadow(0 1px 2px var(--flow-visual-accent-soft)) !important;
+    opacity: 1;
+}
+
+.diagram-root .react-flow__edge.selected .react-flow__edge-path {
+    stroke: var(--flow-visual-accent) !important;
+    stroke-width: 2.5px !important;
+    filter: drop-shadow(0 1px 2px var(--flow-visual-accent-ring)) !important;
+    opacity: 1;
+}
+
+.diagram-root .edge-glow-path {
+    opacity: 0 !important;
+}
+
+.diagram-root .react-flow__edge.selected .edge-glow-path {
+    opacity: 0.12 !important;
+}
+
+.diagram-root .edge-selected-flow {
+    animation: none;
+    opacity: 0.52;
+    stroke-dasharray: 3 5;
+}
+
+.diagram-root circle.custom-edge-updater {
+    fill: #ffffff;
+    stroke: var(--flow-visual-accent);
+    stroke-width: 1.5;
+    transition:
+        r 120ms ease,
+        fill 120ms ease,
+        opacity 120ms ease;
+}
+
+/* Edge labels share one quiet, compact treatment across SVG and HTML renderers. */
+.diagram-root .react-flow__edge-textbg {
+    fill: var(--flow-visual-edge-label-bg) !important;
+    stroke: var(--flow-visual-edge-label-border);
+    stroke-width: 1px;
+    filter: drop-shadow(0 1px 2px rgba(15, 23, 42, 0.08));
+    rx: 6;
+    ry: 6;
+}
+
+.diagram-root .react-flow__edge-text {
+    fill: var(--flow-visual-edge-label-text) !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    letter-spacing: 0;
+}
+
+.diagram-root .edge-label-container,
+.diagram-root .edge-label-premium,
+.diagram-root .stable-path-edge-label {
+    color: var(--flow-visual-edge-label-text) !important;
+    background: var(--flow-visual-edge-label-bg);
+    border: 1px solid var(--flow-visual-edge-label-border);
+    border-radius: 7px;
+    padding: 3px 8px;
+    box-shadow: 0 2px 6px -3px rgba(15, 23, 42, 0.22);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0;
+    line-height: 1.45;
+}
+
+.diagram-root .stable-path-edge-label {
+    padding: 2px 6px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.diagram-root .edge-label-premium:hover {
+    border-color: var(--flow-visual-accent-ring);
+    box-shadow:
+        0 3px 8px -3px rgba(15, 23, 42, 0.24),
+        0 0 0 3px var(--flow-visual-accent-soft);
+    transform: translateY(-1px);
+}
+
+.diagram-root .flowchart-resize-handle {
+    width: 9px !important;
+    height: 9px !important;
+    background: #ffffff !important;
+    border: 2px solid var(--flow-visual-accent) !important;
+    box-shadow: 0 0 0 3px var(--flow-visual-accent-soft);
+}
+
+.diagram-root .flowchart-resize-line {
+    border-color: var(--flow-visual-accent) !important;
+    border-width: 1px !important;
+}
+
+[data-theme='dark'] .diagram-root {
+    --flow-visual-accent: var(--designer-accent, #818cf8);
+    --flow-visual-node-shadow:
+        0 1px 2px rgba(0, 0, 0, 0.32),
+        0 8px 20px -10px rgba(0, 0, 0, 0.72);
+    --flow-visual-node-shadow-hover:
+        0 2px 5px rgba(0, 0, 0, 0.38),
+        0 14px 28px -12px rgba(0, 0, 0, 0.82);
+    --flow-visual-edge-label-bg: rgba(30, 41, 59, 0.96);
+    --flow-visual-edge-label-border: rgba(148, 163, 184, 0.28);
+    --flow-visual-edge-label-text: #e2e8f0;
+}
+
+[data-theme='dark'] .diagram-root .flowchart-node {
+    background-color: transparent !important;
+    background-image: none !important;
+}
+
+[data-theme='dark'] .diagram-root .flowchart-node-title {
+    border-bottom-color: color-mix(in srgb, var(--node-text, #e2e8f0) 18%, transparent);
+}
+
+[data-theme='dark'] .diagram-root .flowchart-node-body-line {
+    color: color-mix(in srgb, var(--node-text, #e2e8f0) 84%, transparent);
+}
+
+[data-theme='dark'] .diagram-root .flowchart-handle,
+[data-theme='dark'] .diagram-root .flowchart-quick-clone-btn,
+[data-theme='dark'] .diagram-root .react-flow__node-custom .react-flow__handle.source:is(
+    [data-handleid='top'],
+    [data-handleid='right'],
+    [data-handleid='bottom'],
+    [data-handleid='left']
+) {
+    background: var(--flow-visual-edge-label-bg) !important;
+    box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.8);
+}
+
+[data-theme='dark'] .diagram-root .react-flow__edge-path {
+    opacity: 0.9;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .diagram-root .flowchart-node,
+    .diagram-root .flowchart-shape,
+    .diagram-root .flowchart-shape-stroke,
+    .diagram-root .flowchart-handle,
+    .diagram-root .react-flow__node-custom .react-flow__handle.source,
+    .diagram-root .flowchart-quick-clone-btn,
+    .diagram-root .react-flow__edge-path,
+    .diagram-root .edge-selected-flow,
+    .diagram-root .edge-label-premium {
+        animation: none !important;
+        transition: none !important;
+    }
+
+    .diagram-root .flowchart-node:hover,
+    .diagram-root .react-flow__node-custom:hover .diagram-node-glass,
+    .diagram-root .edge-label-premium:hover {
+        transform: none;
+    }
+}

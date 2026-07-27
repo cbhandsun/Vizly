@@ -10,7 +10,7 @@
   right: 0;
   bottom: 0;
   z-index: 9999;
-  pointer-events: none;
+  pointer-events: auto;
   background: transparent;
   animation: presentationFadeIn 0.4s ease;
 }

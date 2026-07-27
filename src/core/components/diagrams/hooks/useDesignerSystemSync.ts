@@ -22,6 +22,7 @@ import {
     clearDesignerFreshSeedFlag,
     mergePresetExplicitEdgeHandles,
     recalculateAutosaveNodeSizes,
+    shouldUseGlobalDesignerPerformanceMode,
 } from './designerSystemSyncPersistence';
 import {
     analyzeDesignerCanvas,
@@ -428,12 +429,16 @@ export function useDesignerSystemSync({
     const performanceMode = useMemo(() => {
         return nodes.length > 300 || isDragging;
     }, [nodes.length, isDragging]);
+    const globalPerformanceMode = useMemo(
+        () => shouldUseGlobalDesignerPerformanceMode(nodes.length),
+        [nodes.length],
+    );
 
     useEffect(() => {
         if (typeof document !== 'undefined') {
-            document.documentElement.dataset.performance = performanceMode ? 'high' : 'normal';
+            document.documentElement.dataset.performance = globalPerformanceMode ? 'high' : 'normal';
         }
-    }, [performanceMode]);
+    }, [globalPerformanceMode]);
 
     const [autosaveEnabled, setAutosaveEnabled] = useState(false);
 

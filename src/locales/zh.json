@@ -4,6 +4,7 @@
         "search": "搜索",
         "save": "保存",
         "cancel": "取消",
+        "close": "关闭",
         "ok": "好的",
         "remoteDataInvalid": "远程图表数据格式不完整：{{reason}}",
         "remoteDataRepaired": "远程图表数据格式不完整，已自动修复：{{reason}}",
@@ -420,6 +421,9 @@
             "snapOff": "网格吸附：关",
             "historyWithCount": "历史记录 ({{count}})",
             "canvasSettings": "画布设置",
+            "minimap": "小地图",
+            "minimapLoading": "正在准备缩略图…",
+            "minimapEmpty": "画布暂无节点",
             "ruler": "标尺",
             "grid": "网格",
             "shortcuts": "快捷键",
@@ -632,6 +636,7 @@
             "basic": "基础形状",
             "components": "组件",
             "search": "搜索...",
+            "searchComponents": "搜索组件...",
             "flowControl": "流程控制",
             "dataIO": "数据与 I/O",
             "containers": "容器",
@@ -676,7 +681,11 @@
             "predefinedProcess": "预定义流程",
             "multiDocument": "多文档",
             "offPageConnector": "页外连接器",
-            "internalStorage": "内部存储"
+            "internalStorage": "内部存储",
+            "swimlane": "泳道",
+            "arrowTimeline": "箭头时间线",
+            "system": "系统",
+            "thirdParty": "第三方"
         }
     },
     "diagramViewer": {

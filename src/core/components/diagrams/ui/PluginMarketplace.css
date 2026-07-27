@@ -1,6 +1,7 @@
 /* ⭐ [GAP-12] Plugin Marketplace Styles */
 
 .marketplace-container {
+    position: relative;
     padding: 0;
     max-height: 70vh;
     overflow-y: auto;

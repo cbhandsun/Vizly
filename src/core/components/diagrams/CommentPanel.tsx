@@ -68,6 +68,7 @@ export const CommentPanel: React.FC = () => {
                 <Input
                     prefix={<FaSearch style={{ color: token.colorTextDescription }} />}
                     placeholder={t('comment.searchPlaceholder')}
+                    aria-label={t('comment.searchPlaceholder')}
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     allowClear
@@ -167,6 +168,7 @@ export const CommentPanel: React.FC = () => {
                                                     <Button 
                                                         size="small" 
                                                         type="text" 
+                                                        aria-label={item.isResolved ? t('comment.markUnresolved') : t('comment.markResolved')}
                                                         icon={<FaCheck />} 
                                                         onClick={(e) => toggleResolve(e, item.id, item.isResolved)}
                                                         className={item.isResolved ? 'text-green-500' : 'text-slate-400'}
@@ -176,6 +178,7 @@ export const CommentPanel: React.FC = () => {
                                                     <Button 
                                                         size="small" 
                                                         type="text" 
+                                                        aria-label={t('comment.delete')}
                                                         danger 
                                                         icon={<FaTrash />} 
                                                         onClick={(e) => handleDelete(e, item.id)}

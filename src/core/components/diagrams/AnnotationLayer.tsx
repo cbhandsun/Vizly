@@ -203,7 +203,9 @@ const AnnotationPin: React.FC<{
             {/* 图钉图标 */}
             {!isActive && (
                 <Tooltip title={text || '空批注'} placement="top">
-                    <div
+                    <button
+                        type="button"
+                        aria-label={`查看批注：${text || '空批注'}`}
                         onClick={onOpen}
                         style={{
                             width: 24,
@@ -219,6 +221,7 @@ const AnnotationPin: React.FC<{
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
+                            padding: 0,
                         }}
                         onMouseEnter={e => {
                             e.currentTarget.style.transform = 'rotate(-45deg) scale(1.2)';
@@ -236,7 +239,7 @@ const AnnotationPin: React.FC<{
                                 {(annotation.authorName || '?').charAt(0).toUpperCase()}
                             </div>
                         )}
-                    </div>
+                    </button>
                 </Tooltip>
             )}
 
@@ -261,8 +264,11 @@ const AnnotationPin: React.FC<{
                         {/* 颜色选择 */}
                         <div style={{ display: 'flex', gap: 3 }}>
                             {colors.map(c => (
-                                <div
+                                <button
+                                    type="button"
                                     key={c}
+                                    aria-label={`选择批注颜色 ${c}`}
+                                    aria-pressed={c === color}
                                     onClick={() => onChangeColor(c)}
                                     style={{
                                         width: 14,
@@ -271,6 +277,7 @@ const AnnotationPin: React.FC<{
                                         background: c,
                                         border: c === color ? '2px solid white' : '1px solid rgba(255,255,255,0.5)',
                                         cursor: 'pointer',
+                                        padding: 0,
                                     }}
                                 />
                             ))}
@@ -278,6 +285,7 @@ const AnnotationPin: React.FC<{
                         <Button
                             type="text"
                             size="small"
+                            aria-label="关闭批注编辑器"
                             icon={<CloseOutlined style={{ fontSize: 10, color: '#fff' }} />}
                             onClick={onClose}
                             style={{ width: 20, height: 20, minWidth: 20 }}
@@ -291,6 +299,7 @@ const AnnotationPin: React.FC<{
                             onChange={e => onEditTextChange(e.target.value)}
                             autoSize={{ minRows: 2, maxRows: 6 }}
                             placeholder="输入批注内容..."
+                            aria-label="批注内容"
                             style={{ fontSize: 12, marginBottom: 6 }}
                             onKeyDown={e => {
                                 if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
@@ -303,6 +312,7 @@ const AnnotationPin: React.FC<{
                                 <Tooltip title={resolved ? '标记未解决' : '标记已解决'}>
                                     <Button
                                         size="small"
+                                        aria-label={resolved ? '标记批注为未解决' : '标记批注为已解决'}
                                         type={resolved ? 'primary' : 'default'}
                                         icon={<CheckOutlined style={{ fontSize: 11 }} />}
                                         onClick={onToggleResolved}
@@ -312,6 +322,7 @@ const AnnotationPin: React.FC<{
                                 <Popconfirm title="删除此批注？" onConfirm={onDelete} okText="删除" cancelText="取消">
                                     <Button
                                         size="small"
+                                        aria-label="删除批注"
                                         danger
                                         icon={<DeleteOutlined style={{ fontSize: 11 }} />}
                                         style={{ width: 24, height: 24, minWidth: 24 }}
@@ -356,6 +367,7 @@ const AnnotationEditor: React.FC<{
             onChange={e => onChange(e.target.value)}
             autoSize={{ minRows: 2, maxRows: 4 }}
             placeholder="输入批注内容..."
+            aria-label="新批注内容"
             autoFocus={autoFocus}
             style={{ fontSize: 12, marginBottom: 6 }}
             onKeyDown={e => {

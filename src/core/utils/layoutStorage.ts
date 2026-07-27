@@ -66,10 +66,12 @@ export const writeDesignerRightSidebarWidth = (value: number): number =>
 
 export const readDesignerRightSidebarCollapsed = (): boolean => {
     try {
-        return localStorage.getItem(DESIGNER_RIGHT_SIDEBAR_COLLAPSED_STORAGE_KEY) === 'true';
+        const storedValue = localStorage.getItem(DESIGNER_RIGHT_SIDEBAR_COLLAPSED_STORAGE_KEY);
+        if (storedValue === 'false') return false;
+        return true;
     } catch (error) {
         logUiStorageReadFailure('layoutStorage', DESIGNER_RIGHT_SIDEBAR_COLLAPSED_STORAGE_KEY, error);
-        return false;
+        return true;
     }
 };
 

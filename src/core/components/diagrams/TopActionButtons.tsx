@@ -188,19 +188,19 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
         <div className="flex items-center gap-0.5">
             {onStartPresentation && !isMobile && (
                 <Tooltip title={t('designer.toolbar.presentationMode')}>
-                    <Button type="text" icon={<FaPlay className="text-[13px]" />} onClick={onStartPresentation} className={tbtn} />
+                    <Button type="text" aria-label={t('designer.toolbar.presentationMode')} icon={<FaPlay className="text-[13px]" />} onClick={onStartPresentation} className={tbtn} />
                 </Tooltip>
             )}
 
             {onShowDiff && !isMobile && (
                 <Tooltip title={t('designer.toolbar.diffView')}>
-                    <Button type="text" icon={<FaExchangeAlt className="text-[13px]" />} onClick={onShowDiff} className={tbtn} />
+                    <Button type="text" aria-label={t('designer.toolbar.diffView')} icon={<FaExchangeAlt className="text-[13px]" />} onClick={onShowDiff} className={tbtn} />
                 </Tooltip>
             )}
 
             {onShowHistory && (
                 <Tooltip title={t('designer.toolbar.historyPanel')}>
-                    <Button type="text" icon={<FaHistory className="text-[13px]" />} onClick={onShowHistory} className={tbtn} />
+                    <Button type="text" aria-label={t('designer.toolbar.historyPanel')} icon={<FaHistory className="text-[13px]" />} onClick={onShowHistory} className={tbtn} />
                 </Tooltip>
             )}
 
@@ -208,25 +208,25 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
 
             {onSaveToCloud && (
                 <Tooltip title={t('designer.toolbar.saveToCloud', '保存到云端')}>
-                    <Button type="text" icon={<FaCloudUploadAlt className="text-[13px]" />} onClick={onSaveToCloud} className={tbtn} />
+                    <Button type="text" aria-label={t('designer.toolbar.saveToCloud', '保存到云端')} icon={<FaCloudUploadAlt className="text-[13px]" />} onClick={onSaveToCloud} className={tbtn} />
                 </Tooltip>
             )}
 
             {onDirectSave && (
                 <Tooltip title={isDirectSaveDisabled ? t('designer.toolbar.saveDisabled') : t('designer.toolbar.directSave', '覆盖保存')}>
-                    <Button type="text" icon={<FaSave className="text-[13px]" />} onClick={onDirectSave} disabled={isDirectSaveDisabled} className={isDirectSaveDisabled ? "w-8 h-8 p-0 flex items-center justify-center border-none rounded-[6px] text-slate-300 dark:text-slate-600 cursor-not-allowed" : tbtn} />
+                    <Button type="text" aria-label={isDirectSaveDisabled ? t('designer.toolbar.saveDisabled') : t('designer.toolbar.directSave', '覆盖保存')} icon={<FaSave className="text-[13px]" />} onClick={onDirectSave} disabled={isDirectSaveDisabled} className={isDirectSaveDisabled ? "w-8 h-8 p-0 flex items-center justify-center border-none rounded-[6px] text-slate-300 dark:text-slate-600 cursor-not-allowed" : tbtn} />
                 </Tooltip>
             )}
 
             {onSmartOptimize && !isMobile && (
                 <Tooltip title={t('designer.toolbar.smartOptimize')}>
-                    <Button type="text" icon={<FaMagic className="text-[13px]" />} onClick={onSmartOptimize} className={tbtn} />
+                    <Button type="text" aria-label={t('designer.toolbar.smartOptimize')} icon={<FaMagic className="text-[13px]" />} onClick={onSmartOptimize} className={tbtn} />
                 </Tooltip>
             )}
 
             {onOpenSettings && (
                 <Tooltip title={t('designer.toolbar.settings', '设置')}>
-                    <Button type="text" icon={<FaCog className="text-[13px]" />} onClick={onOpenSettings} className={tbtn} />
+                    <Button type="text" aria-label={t('designer.toolbar.settings', '设置')} icon={<FaCog className="text-[13px]" />} onClick={onOpenSettings} className={tbtn} />
                 </Tooltip>
             )}
 
@@ -234,19 +234,19 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
 
             {onToggleAI && (
                 <Tooltip title={t('aiChat.title', 'AI 助手')}>
-                    <Button type="text" icon={<FaRobot className="text-[13px]" />} onClick={onToggleAI} className={aiChatActive ? tbtnActive : tbtn} />
+                    <Button type="text" aria-label={t('aiChat.title', 'AI 助手')} icon={<FaRobot className="text-[13px]" />} onClick={onToggleAI} className={aiChatActive ? tbtnActive : tbtn} />
                 </Tooltip>
             )}
 
             {!isSmallMobile && (
                 <Tooltip title={t('designer.toolbar.pluginManager')}>
-                    <Button type="text" icon={<ApiOutlined style={{ fontSize: 13 }} />} onClick={() => setPluginManagerVisible(true)} className={tbtn} />
+                    <Button type="text" aria-label={t('designer.toolbar.pluginManager')} icon={<ApiOutlined style={{ fontSize: 13 }} />} onClick={() => setPluginManagerVisible(true)} className={tbtn} />
                 </Tooltip>
             )}
 
             {setIsCommentMode && (
                 <Tooltip title={isCommentMode ? t('designer.toolbar.commentModeExit') : t('designer.toolbar.commentMode')}>
-                    <Button type="text" icon={<FaRegComment className="text-[13px]" />} onClick={() => setIsCommentMode(!isCommentMode)} className={isCommentMode ? tbtnActive : tbtn} />
+                    <Button type="text" aria-label={isCommentMode ? t('designer.toolbar.commentModeExit') : t('designer.toolbar.commentMode')} icon={<FaRegComment className="text-[13px]" />} onClick={() => setIsCommentMode(!isCommentMode)} className={isCommentMode ? tbtnActive : tbtn} />
                 </Tooltip>
             )}
 

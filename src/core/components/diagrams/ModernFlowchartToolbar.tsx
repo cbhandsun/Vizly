@@ -372,7 +372,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
     const CanvasSettingsContent = (
         <div className="p-1 min-w-[180px]">
             <div className="px-2 py-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                {t('toolbar.canvasSettings', 'Canvas Settings')}
+                {t('designer.toolbar.canvasSettings', '画布设置')}
             </div>
             <div className="flex flex-col gap-0.5">
                 <Button 
@@ -382,7 +382,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                     onClick={toggleMinimap}
                 >
                     <span className="flex items-center gap-2 text-[13px] text-slate-600 dark:text-slate-300">
-                        <FaMap className="text-[14px]" /> {t('toolbar.minimap', 'Minimap')}
+                        <FaMap className="text-[14px]" /> {t('designer.toolbar.minimap', '小地图')}
                     </span>
                     <div className={`w-2 h-2 rounded-full ${showMinimap ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-slate-300 dark:bg-slate-700'}`} />
                 </Button>
@@ -393,7 +393,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                     onClick={toggleRuler}
                 >
                     <span className="flex items-center gap-2 text-[13px] text-slate-600 dark:text-slate-300">
-                        <FaRuler className="text-[14px]" /> {t('toolbar.ruler', 'Ruler')}
+                        <FaRuler className="text-[14px]" /> {t('designer.toolbar.ruler', '标尺')}
                     </span>
                     <div className={`w-2 h-2 rounded-full ${showRuler ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-slate-300 dark:bg-slate-700'}`} />
                 </Button>
@@ -404,7 +404,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                     onClick={toggleGrid}
                 >
                     <span className="flex items-center gap-2 text-[13px] text-slate-600 dark:text-slate-300">
-                        <FaTh className="text-[14px]" /> {t('toolbar.grid', 'Grid')}
+                        <FaTh className="text-[14px]" /> {t('designer.toolbar.grid', '网格')}
                     </span>
                     <div className={`w-2 h-2 rounded-full ${showGrid ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-slate-300 dark:bg-slate-700'}`} />
                 </Button>
@@ -415,7 +415,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                     className="flex items-center gap-2 h-9 px-2 text-[13px] text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5"
                     onClick={onShowShortcuts}
                 >
-                    <FaKeyboard className="text-[14px]" /> {t('toolbar.shortcuts', 'Shortcuts')}
+                    <FaKeyboard className="text-[14px]" /> {t('designer.toolbar.shortcuts', '快捷键')}
                 </Button>
             </div>
         </div>
@@ -475,15 +475,15 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
             {!isMobile && !hideUndoRedoControls && (
                 <>
                     <Tooltip title={t('designer.toolbar.undo')}>
-                        <Button type="text" icon={<FaUndo size={13} />} onClick={onUndo} disabled={!canUndo} className={canUndo ? tbtn : tbtnDisabled} />
+                        <Button type="text" aria-label={t('designer.toolbar.undo')} icon={<FaUndo size={13} />} onClick={onUndo} disabled={!canUndo} className={canUndo ? tbtn : tbtnDisabled} />
                     </Tooltip>
                     {onShowHistory && screens.md && (
                         <Tooltip title={historyCount ? t('designer.toolbar.historyWithCount', { count: historyCount }) : t('designer.toolbar.historyPanel')}>
-                            <Button type="text" size="small" onClick={onShowHistory} className="w-4 h-8 p-0 border-none text-[8px] text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 bg-transparent flex items-center justify-center">▾</Button>
+                            <Button type="text" size="small" aria-label={t('designer.toolbar.historyPanel')} onClick={onShowHistory} className="w-4 h-8 p-0 border-none text-[8px] text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 bg-transparent flex items-center justify-center">▾</Button>
                         </Tooltip>
                     )}
                     <Tooltip title={t('designer.toolbar.redo')}>
-                        <Button type="text" icon={<FaRedo size={13} />} onClick={onRedo} disabled={!canRedo} className={canRedo ? tbtn : tbtnDisabled} />
+                        <Button type="text" aria-label={t('designer.toolbar.redo')} icon={<FaRedo size={13} />} onClick={onRedo} disabled={!canRedo} className={canRedo ? tbtn : tbtnDisabled} />
                     </Tooltip>
                     <div className={dividerCls} />
                 </>
@@ -493,13 +493,13 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
             {!hideZoomControls && (
                 <>
                     <Tooltip title={t('designer.toolbar.zoomIn')}>
-                        <Button type="text" icon={<FaSearchPlus size={13} />} onClick={onZoomIn} className={tbtn} />
+                        <Button type="text" aria-label={t('designer.toolbar.zoomIn')} icon={<FaSearchPlus size={13} />} onClick={onZoomIn} className={tbtn} />
                     </Tooltip>
                     <Tooltip title={t('designer.toolbar.zoomOut')}>
-                        <Button type="text" icon={<FaSearchMinus size={13} />} onClick={onZoomOut} className={tbtn} />
+                        <Button type="text" aria-label={t('designer.toolbar.zoomOut')} icon={<FaSearchMinus size={13} />} onClick={onZoomOut} className={tbtn} />
                     </Tooltip>
                     <Tooltip title={t('designer.toolbar.fitView')}>
-                        <Button type="text" icon={<FaCompressArrowsAlt size={13} />} onClick={onFitView} className={tbtn} />
+                        <Button type="text" aria-label={t('designer.toolbar.fitView')} icon={<FaCompressArrowsAlt size={13} />} onClick={onFitView} className={tbtn} />
                     </Tooltip>
                     {zoomPercent !== undefined && screens.lg && (
                         <span className="text-[11px] font-mono font-semibold text-slate-500 dark:text-slate-400 min-w-[32px] text-center tabular-nums">{zoomPercent}%</span>
@@ -513,12 +513,13 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                 <>
                     <Dropdown menu={{ items: layoutMenu, selectedKeys: selectedLayoutKeys, selectable: true }} placement="bottom">
                         <Tooltip title={t('designer.flowchart.layout.tooltip')}>
-                            <Button type="text" icon={<FaSitemap size={13} />} className={tbtn} />
+                            <Button type="text" aria-label={t('designer.flowchart.layout.tooltip')} icon={<FaSitemap size={13} />} className={tbtn} />
                         </Tooltip>
                     </Dropdown>
                     <Tooltip title={autoRouting ? t('designer.toolbar.autoRouting') + ' ' + onLabel : t('designer.toolbar.autoRouting') + ' ' + offLabel}>
                         <Button
                             type="text"
+                            aria-label={autoRouting ? t('designer.toolbar.autoRouting') + ' ' + onLabel : t('designer.toolbar.autoRouting') + ' ' + offLabel}
                             icon={<FaMagic size={13} />}
                             onClick={toggleAutoRouting}
                             className={autoRouting ? tbtnActive : tbtn}
@@ -535,6 +536,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                         <Tooltip title={snapToGrid ? t('designer.toolbar.snapOn') : t('designer.toolbar.snapOff')}>
                             <Button
                                 type="text"
+                                aria-label={snapToGrid ? t('designer.toolbar.snapOn') : t('designer.toolbar.snapOff')}
                                 onClick={onToggleSnap}
                                 icon={<FaMagnet className="text-[13px]" />}
                                 className={snapToGrid ? tbtnActive : tbtn}
@@ -546,6 +548,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                         <Tooltip title={t('toolbar.canvasSettings', '画布设置')}>
                             <Button
                                 type="text"
+                                aria-label={t('toolbar.canvasSettings', '画布设置')}
                                 icon={
                                     <div className="relative">
                                         <FaBorderAll className="text-[13px]" />
@@ -561,7 +564,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
 
                     <Dropdown menu={{ items: moreMenuItems }} placement="bottomRight" trigger={['click']}>
                         <Tooltip title={t('designer.toolbar.moreActions')}>
-                            <Button type="text" icon={<FaEllipsisH className="text-[13px]" />} className={tbtn} />
+                            <Button type="text" aria-label={t('designer.toolbar.moreActions')} icon={<FaEllipsisH className="text-[13px]" />} className={tbtn} />
                         </Tooltip>
                     </Dropdown>
                 </>

@@ -455,14 +455,15 @@ ${mermaid}
         {showControls && (
           <>
             <Tooltip title={t('export.backToTop')} getPopupContainer={(trigger) => (document.fullscreenElement as HTMLElement) || trigger.parentElement || document.body}>
-              <Button type="text" icon={<FaHome className="text-[13px]" />} onClick={handleBackToTop} disabled={isExporting} className="w-8 h-8 p-0 border-none flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] rounded-[6px] transition-colors" />
+              <Button type="text" aria-label={t('export.backToTop')} icon={<FaHome className="text-[13px]" />} onClick={handleBackToTop} disabled={isExporting} className="w-8 h-8 p-0 border-none flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] rounded-[6px] transition-colors" />
             </Tooltip>
             <Tooltip title={t('export.fitScreen')} getPopupContainer={(trigger) => (document.fullscreenElement as HTMLElement) || trigger.parentElement || document.body}>
-              <Button type="text" icon={<FaRuler className="text-[13px]" />} onClick={handleFitDiagram} disabled={isExporting} className="w-8 h-8 p-0 border-none flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] rounded-[6px] transition-colors" />
+              <Button type="text" aria-label={t('export.fitScreen')} icon={<FaRuler className="text-[13px]" />} onClick={handleFitDiagram} disabled={isExporting} className="w-8 h-8 p-0 border-none flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] rounded-[6px] transition-colors" />
             </Tooltip>
             <Tooltip title={isFullscreen ? t('export.exitFullScreen') : t('export.fullScreen')} getPopupContainer={(trigger) => (document.fullscreenElement as HTMLElement) || trigger.parentElement || document.body}>
               <Button
                 type="text"
+                aria-label={isFullscreen ? t('export.exitFullScreen') : t('export.fullScreen')}
                 icon={isFullscreen ? <FaCompress className="text-[13px]" /> : <FaExpand className="text-[13px]" />}
                 onClick={() => { onToggleFullscreen?.(); handleFs(); }}
                 disabled={isExporting}
@@ -482,6 +483,7 @@ ${mermaid}
           {variant === 'compact' ? (
             <Button
               type="text"
+              aria-label={t('common.export', '导出')}
               icon={<FaDownload className="text-[13px]" />}
               className="w-8 h-8 p-0 border-none flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] rounded-[6px] transition-colors"
               disabled={isExporting}

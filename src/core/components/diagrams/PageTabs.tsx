@@ -41,6 +41,8 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
         <>
             <style>{`.page-tabs-scrollbar-hide::-webkit-scrollbar { display: none; }`}</style>
             <div
+                role="tablist"
+                aria-label="页面"
                 style={{
                     position: 'absolute',
                     bottom: 0,
@@ -72,8 +74,17 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                     return (
                         <div
                             key={page.id}
+                            role="tab"
+                            tabIndex={isActive ? 0 : -1}
+                            aria-selected={isActive}
+                            aria-label={page.name}
                             onClick={() => !isEditing && onSwitchPage(page.id)}
                             onDoubleClick={() => handleStartRename(page)}
+                            onKeyDown={(event) => {
+                                if (isEditing || (event.key !== 'Enter' && event.key !== ' ')) return;
+                                event.preventDefault();
+                                onSwitchPage(page.id);
+                            }}
                             style={{
                                 position: 'relative',
                                 padding: '4px 24px 4px 10px',
@@ -99,6 +110,7 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                             {isEditing ? (
                                 <Input
                                     ref={inputRef}
+                                    aria-label={`重命名页面 ${page.name}`}
                                     size="small"
                                     value={editName}
                                     onChange={e => setEditName(e.target.value)}
@@ -121,22 +133,32 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                                     okText="删除"
                                     cancelText="取消"
                                 >
-                                    <CloseOutlined
-                                        onClick={e => e.stopPropagation()}
+                                    <button
+                                        type="button"
+                                        aria-label={`删除页面 ${page.name}`}
+                                        onClick={event => event.stopPropagation()}
                                         style={{
                                             position: 'absolute',
                                             right: 4,
                                             top: '50%',
                                             transform: 'translateY(-50%)',
-                                            fontSize: 8,
+                                            width: 16,
+                                            height: 16,
+                                            border: 0,
+                                            background: 'transparent',
                                             color: token.colorTextQuaternary,
-                                            padding: 2,
+                                            padding: 0,
                                             borderRadius: 2,
                                             transition: 'color 0.15s',
+                                            cursor: 'pointer',
+                                            display: 'grid',
+                                            placeItems: 'center',
                                         }}
                                         onMouseEnter={(e) => { e.currentTarget.style.color = token.colorError; }}
                                         onMouseLeave={(e) => { e.currentTarget.style.color = token.colorTextQuaternary; }}
-                                    />
+                                    >
+                                        <CloseOutlined style={{ fontSize: 8 }} />
+                                    </button>
                                 </Popconfirm>
                             )}
                         </div>
@@ -145,13 +167,17 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
 
                 {/* 添加页面按钮 */}
                 <Tooltip title="新建页面">
-                    <div
+                    <button
+                        type="button"
+                        aria-label="新建页面"
                         onClick={onAddPage}
                         style={{
                             padding: '4px 6px',
+                            border: 0,
                             borderRadius: 6,
                             cursor: 'pointer',
                             color: token.colorTextQuaternary,
+                            background: 'transparent',
                             transition: 'all 0.15s',
                             display: 'flex',
                             alignItems: 'center',
@@ -167,7 +193,7 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                         }}
                     >
                         <PlusOutlined style={{ fontSize: 12 }} />
-                    </div>
+                    </button>
                 </Tooltip>
             </div>
         </>

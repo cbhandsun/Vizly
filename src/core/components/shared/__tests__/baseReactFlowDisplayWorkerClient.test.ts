@@ -547,7 +547,7 @@ describe('baseReactFlowDisplayWorkerClient', () => {
     })).toEqual({ mode: 'full', timeoutMs: 60_000 });
   });
 
-  it('does not expose provisional edges before the final worker result is ready', () => {
+  it('keeps provisional edges visible before the final worker result is ready', () => {
     const immediate = [{ id: 'edge', source: 'source', target: 'target' }];
     expect(resolveBaseReactFlowDisplayedEdges({
       signature: 'graph-a',
@@ -556,7 +556,7 @@ describe('baseReactFlowDisplayWorkerClient', () => {
       deferred: null,
       cached: null,
       immediate,
-    })).toEqual([]);
+    })).toBe(immediate);
     const routed = [{
       ...immediate[0],
       data: { computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }] },
@@ -652,7 +652,7 @@ describe('baseReactFlowDisplayWorkerClient', () => {
       deferred,
       cached: null,
       immediate: latest,
-    })).toEqual([]);
+    })).toBe(latest);
     expect(resolveBaseReactFlowDisplayedEdges({
       signature: 'colliding-signature',
       geometryDigest: 'digest-a',

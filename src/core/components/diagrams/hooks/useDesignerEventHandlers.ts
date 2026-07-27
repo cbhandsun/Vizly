@@ -90,7 +90,7 @@ export function useDesignerEventHandlers({
         handleMatchSize,
         handleReverseEdge,
     } = useDiagramActions({
-        nodes, edges, setNodes, setEdges, selectedNodes, selectedEdges,
+        nodes, edges, nodesRef, edgesRef, setNodes, setEdges, selectedNodes, selectedEdges,
         takeSnapshot,
         reactFlowInstance,
         pluginCtx: pluginCtx ?? undefined,

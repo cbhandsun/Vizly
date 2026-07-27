@@ -8,6 +8,10 @@ import { dispatchDiagramControl } from '../../shared/diagramControl';
 import { applyLayout, forceDirectedLayout, treeLayout } from '../../../utils/LayoutAlgorithms';
 import { coerceDiagramId, getQueryOrHashParamFromLocation } from '../../../utils/inputBoundary';
 import { refreshDomainLayoutEdgeForRender } from './layoutEdgeRefresh';
+import {
+    preserveEdgesOnEmptyLayoutResult,
+    resolveLayoutSourceEdges,
+} from './layoutEdgeBoundary';
 import type { ILayoutStrategy } from '../../../types/layout-strategy';
 import type { LayoutOptions } from '../../../types/layout';
 import {
@@ -296,6 +300,7 @@ export function useLayoutStrategy({
     nodesRef,
     edgesRef,
     takeSnapshot,
+    reactFlowInstance,
     diagramId,
     loadLayoutPresetMap,
 }: UseLayoutStrategyParams) {
@@ -330,11 +335,15 @@ export function useLayoutStrategy({
 
         try {
             const rawNodes = nodesRef.current;
-            const allEdges = edgesRef.current;
 
             // 1. 自动传播折叠容器的折叠状态到子节点
             // 确保布局策略和后处理管线能够通过 data.hidden 正确过滤隐藏节点
             const allNodes = normalizeLayoutVisibilityNodes(rawNodes);
+            const allEdges = resolveLayoutSourceEdges(
+                edgesRef.current,
+                reactFlowInstance?.getEdges(),
+                new Set(allNodes.map(node => node.id)),
+            );
 
             // ═══ 前处理：过滤容器、转绝对坐标、清除 parentId ═══
             const nodeById = new Map(allNodes.map(n => [n.id, n]));
@@ -542,7 +551,13 @@ export function useLayoutStrategy({
                     );
                     // 域布局策略已完成所有位置计算，禁止后处理微调
                     // [FIX] Clear edges + cache BEFORE animation
-                    setEdges(sanitizeLayoutEdges(finalNodes, result.edges, dir));
+                    const finalNodeIds = new Set(finalNodes.map(node => node.id));
+                    const preservedResultEdges = preserveEdgesOnEmptyLayoutResult(
+                        layoutEdges,
+                        result.edges,
+                        finalNodeIds,
+                    );
+                    setEdges(sanitizeLayoutEdges(finalNodes, preservedResultEdges, dir));
                     EdgeRoutingCoordinator.getInstance().forceClearAllCaches();
                     await animateLayoutTransition(setNodes, finalNodes, { onComplete: twoStepFitView });
                     // [FIX] Post-animation safety clear
@@ -569,7 +584,7 @@ export function useLayoutStrategy({
         } catch (err) {
             logLayoutStrategyFailure(strategyName, err);
         }
-    }, [diagramId, loadLayoutPresetMap, setNodes, setEdges, takeSnapshot, nodesRef, edgesRef, twoStepFitView]);
+    }, [diagramId, loadLayoutPresetMap, reactFlowInstance, setNodes, setEdges, takeSnapshot, nodesRef, edgesRef, twoStepFitView]);
 
     return {
         handleStrategyLayout,

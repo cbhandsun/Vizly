@@ -1,5 +1,6 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 
 import { useReactFlow, type Node } from '@xyflow/react';
 import { extractValidNumber } from '../../utils/nodeValidation';
@@ -15,8 +16,15 @@ import { useMinimapOverlay } from './hooks/useMinimapOverlay';
 import { useMinimapNavigation } from './hooks/useMinimapNavigation';
 import type { Theme } from '../../themes/types/ThemeTypes';
 import { logFixedMiniMapFailure } from './fixedMiniMapLogging';
+import {
+  resolveFixedMiniMapMessage,
+  shouldFreezeFixedMiniMapDuringNodeDrag,
+  type FixedMiniMapMessage,
+} from './fixedMiniMapState';
 
 interface FixedMiniMapProps {
+  nodes: MinimapNode[];
+  isNodeDragging: boolean;
   style?: React.CSSProperties;
   zoomable?: boolean;
   pannable?: boolean;
@@ -61,10 +69,13 @@ const getStringValue = (value: unknown): string | undefined => (
 );
 
 const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
+  nodes,
+  isNodeDragging,
   style,
   zoomable = true,
   defaultSize = 'large'
 }) => {
+  const { t } = useTranslation();
   // 接入主题系统
   const [cfgState, cfgActions] = useConfigIntegration({ autoInitialize: true });
   const [currentTheme, setCurrentTheme] = useState<Theme | null>(() => cfgActions.getCurrentTheme() ?? null);
@@ -98,6 +109,19 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
   const anchorRef = useRef<HTMLDivElement>(null);
 
   const reactFlowInstance = useReactFlow<MinimapNode>();
+  const renderMiniMapMessage = (message: Exclude<FixedMiniMapMessage, null>) => (
+    <div style={{
+      width: '100%', height: '100%', backgroundColor: 'transparent',
+      borderBottomLeftRadius: '10px', borderBottomRightRadius: '10px',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: '11px', color: 'var(--color-slate-500, rgba(0,0,0,0.5))',
+      pointerEvents: 'none'
+    }}>
+      {message === 'empty'
+        ? t('designer.toolbar.minimapEmpty', '画布暂无节点')
+        : t('designer.toolbar.minimapLoading', '正在准备缩略图…')}
+    </div>
+  );
 
   // Overlay interactions controller
   const overlay = useMinimapOverlay(defaultSize, containerRef);
@@ -114,38 +138,21 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
   }, []); // 移除 reactFlowInstance 依赖
 
   // MiniMap 渲染就绪状态
-  const [miniMapReady, setMiniMapReady] = useState(false);
-  useEffect(() => {
-    let stopped = false;
-    const check = () => {
-      if (stopped) return;
-      const nodes = reactFlowInstance.getNodes?.() || [];
-      if (!nodes.length) {
-        setMiniMapReady(true);
-        requestAnimationFrame(check);
-        return;
+  const miniMapReady = useMemo(() => {
+    if (!nodes.length) return true;
+    let validCount = 0;
+    for (const node of nodes) {
+      const width = getNodeWidth(node);
+      const height = getNodeHeight(node);
+      const x = safeNumber(node.position?.x, NaN);
+      const y = safeNumber(node.position?.y, NaN);
+      if (width > 0 && height > 0 && isFinite(x) && isFinite(y)) {
+        validCount++;
       }
-      let validCount = 0;
-      for (const node of nodes) {
-        const width = getNodeWidth(node);
-        const height = getNodeHeight(node);
-        const x = safeNumber(node.position?.x, NaN);
-        const y = safeNumber(node.position?.y, NaN);
-        if (width > 0 && height > 0 && isFinite(x) && isFinite(y)) {
-          validCount++;
-        }
-      }
-      const threshold = Math.max(1, Math.ceil(nodes.length * 0.3));
-      if (validCount >= threshold) {
-        setMiniMapReady(true);
-        stopped = true;
-        return;
-      }
-      requestAnimationFrame(check);
-    };
-    check();
-    return () => { stopped = true; };
-  }, [reactFlowInstance]);
+    }
+    const threshold = Math.max(1, Math.ceil(nodes.length * 0.3));
+    return validCount >= threshold;
+  }, [nodes]);
 
   // Navigation controller
   const nav = useMinimapNavigation(anchorRef, minimapRef, viewportForRender, getUiScale);
@@ -288,7 +295,7 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
       {createPortal(
         <div
           ref={containerRef}
-          className={`fixed-minimap-container ${overlay.isMinimized ? 'minimized' : ''} ${overlay.isDragging ? 'dragging' : ''}`}
+          className={`fixed-minimap-container ${overlay.isMinimized ? 'minimized' : ''} ${overlay.isDragging ? 'dragging' : ''} ${isNodeDragging ? 'drag-frozen' : ''}`}
           style={containerStyle}
           onClick={overlay.isMinimized ? overlay.toggleMinimize : undefined}
           onMouseDown={!overlay.isMinimized ? (e) => {
@@ -336,7 +343,6 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
               >
                 {miniMapReady && minimapElement ? (
                   (() => {
-                    const nodes = reactFlowInstance.getNodes();
                     // [FIX] Build a lookup map and compute absolute positions by walking
                     // the parentId chain. internals.positionAbsolute is null at this
                     // call-site (getNodes() returns the external node array without
@@ -354,14 +360,14 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
                         maxX = Math.max(maxX, abs.x + w); maxY = Math.max(maxY, abs.y + h);
                       }
                     });
-                    if (minX === Infinity || minY === Infinity || maxX === -Infinity || maxY === -Infinity) {
-                      return (
-                        <div style={{
-                          width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          backgroundColor: 'transparent', borderBottomLeftRadius: '10px', borderBottomRightRadius: '10px',
-                          fontSize: 11, color: 'var(--color-slate-500, rgba(0,0,0,0.5))', pointerEvents: 'none'
-                        }}>初始化缩略图…</div>
-                      );
+                    const hasBounds = minX !== Infinity && minY !== Infinity && maxX !== -Infinity && maxY !== -Infinity;
+                    const message = resolveFixedMiniMapMessage({
+                      ready: miniMapReady,
+                      nodeCount: nodes.length,
+                      hasBounds,
+                    });
+                    if (message) {
+                      return renderMiniMapMessage(message);
                     }
                     const viewport = viewportForRender;
                     const renderUiScale = getUiScale();
@@ -442,11 +448,7 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
                     );
                   })()
                 ) : (
-                  <div style={{
-                    width: '100%', height: '100%', backgroundColor: 'transparent', borderBottomLeftRadius: '10px',
-                    borderBottomRightRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '11px', color: 'var(--color-slate-500, rgba(0,0,0,0.5))', pointerEvents: 'none'
-                  }}>初始化缩略图…</div>
+                  renderMiniMapMessage('loading')
                 )}
               </div>
             </>
@@ -458,4 +460,22 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
   );
 };
 
-export default FixedMiniMap;
+const areFixedMiniMapPropsEqual = (
+  previous: FixedMiniMapProps,
+  next: FixedMiniMapProps,
+): boolean => {
+  if (shouldFreezeFixedMiniMapDuringNodeDrag({
+    wasDragging: previous.isNodeDragging,
+    isDragging: next.isNodeDragging,
+  })) {
+    return true;
+  }
+  return previous.nodes === next.nodes
+    && previous.isNodeDragging === next.isNodeDragging
+    && previous.style === next.style
+    && previous.zoomable === next.zoomable
+    && previous.pannable === next.pannable
+    && previous.defaultSize === next.defaultSize;
+};
+
+export default React.memo(FixedMiniMap, areFixedMiniMapPropsEqual);

@@ -198,6 +198,48 @@ const digestValue = (value: unknown): string => {
   return `${type}:${text.length}:${text}`;
 };
 
+export type BaseReactFlowDisplayInputIdentityBundle = {
+  cacheSignature: string;
+  geometryDigest: string;
+};
+
+/**
+ * Computes the compact cache lookup key and its independent collision guard in
+ * one traversal. Large diagrams update their geometry on every drag frame; a
+ * shared visit avoids parsing every node, edge, and computed path twice.
+ */
+export const computeBaseReactFlowDisplayInputIdentityBundle = (
+  input: BaseReactFlowDisplayInputIdentity,
+): BaseReactFlowDisplayInputIdentityBundle => {
+  let cacheHash = 2166136261;
+  const hashes = [0x811c9dc5, 0x9e3779b9, 0x85ebca6b, 0xc2b2ae35];
+  const multipliers = [16777619, 2246822519, 3266489917, 668265263];
+  const feed = (value: unknown): void => {
+    const cacheText = String(value ?? '');
+    for (let index = 0; index < cacheText.length; index += 1) {
+      cacheHash ^= cacheText.charCodeAt(index);
+      cacheHash = Math.imul(cacheHash, 16777619);
+    }
+
+    const framed = digestValue(value);
+    for (let index = 0; index < framed.length; index += 1) {
+      const code = framed.charCodeAt(index);
+      for (let lane = 0; lane < hashes.length; lane += 1) {
+        hashes[lane] ^= code;
+        hashes[lane] = Math.imul(hashes[lane], multipliers[lane]);
+      }
+    }
+  };
+  visitBaseReactFlowDisplayInputIdentity(input, feed);
+  const digest = hashes
+    .map(hash => (hash >>> 0).toString(16).padStart(8, '0'))
+    .join('');
+  return {
+    cacheSignature: String(cacheHash >>> 0),
+    geometryDigest: `geometry-v1:${digest}`,
+  };
+};
+
 /** A fast independent 128-bit guard for the 32-bit cache lookup key. */
 export const computeBaseReactFlowDisplayGeometryDigest = (
   input: BaseReactFlowDisplayInputIdentity,
@@ -215,10 +257,9 @@ export const computeBaseReactFlowDisplayGeometryDigest = (
     }
   };
   visitBaseReactFlowDisplayInputIdentity(input, feed);
-  const digest = hashes
+  return `geometry-v1:${hashes
     .map(hash => (hash >>> 0).toString(16).padStart(8, '0'))
-    .join('');
-  return `geometry-v1:${digest}`;
+    .join('')}`;
 };
 
 export const isBaseReactFlowDisplayGeometryDigest = (value: unknown): value is string => (

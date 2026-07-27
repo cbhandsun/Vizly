@@ -6,6 +6,7 @@ import { useDesignerCanvasState } from './hooks/useDesignerCanvasState';
 import { useDesignerInteractions } from './hooks/useDesignerInteractions';
 import { useDesignerEventHandlers } from './hooks/useDesignerEventHandlers';
 import { useDesignerSystemSync } from './hooks/useDesignerSystemSync';
+import { computeFlowchartCollapsedStateHash } from './flowchartCollapsedState';
 import { DiagramComponentProps } from '../../types/diagram-components';
 import { useTranslation } from 'react-i18next';
 import { useComponentPerformance, useInteractionPerformance } from '../../hooks/usePerformanceMonitor';
@@ -16,6 +17,7 @@ import { useTopologyLinter } from '../../hooks/useTopologyLinter';
 import { useDiagramStore, useDiagramStore as useDiagramStoreStatic } from '../../store/useDiagramStore';
 import './FlowchartDesigner.css';
 import './ModernControls.css';
+import './FlowchartVisualPolish.css';
 
 import { useMobileInteractions } from '../../hooks/useMobileInteractions';
 import { useCollapsibleGroups } from './hooks/useCollapsibleGroups';
@@ -146,7 +148,10 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
     useComponentPerformance('FlowchartDesigner');
     useInteractionPerformance();
 
-    const { takeSnapshot, undo, redo, canUndo, canRedo, pastEntries, getPreviousState, jumpTo } = diagramHistory;
+    const {
+        takeSnapshot, notifyHistoryChanged, undo, redo, canUndo, canRedo,
+        pastEntries, getPreviousState, jumpTo,
+    } = diagramHistory;
     const [selectedNodes, setSelectedNodes] = useState<Node[]>([]);
     const [selectedEdges, setSelectedEdges] = useState<Edge[]>([]);
     const [isContextToolbarHidden] = useState(false);
@@ -244,7 +249,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
     const interactionsParams = useDesignerInteractions({
         nodes, edges, setNodes, setEdges,
         selectedNodes, setSelectedNodes,
-        takeSnapshot, reactFlowInstance,
+        takeSnapshot, notifyHistoryChanged, reactFlowInstance,
         isDragging, setIsDragging,
         activePlugin, pluginCtx,
         onNodesChange, onEdgesChange,
@@ -393,7 +398,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
     
     // 监听折叠状态变化，自动触发排版微调，让周围节点紧凑排列
     const collapsedHash = useMemo(() => {
-        return nodes.map(n => `${n.id}:${n.data?.collapsed ? '1' : '0'}`).join(';');
+        return computeFlowchartCollapsedStateHash(nodes);
     }, [nodes]);
 
     const initialCollapsedRef = useRef(collapsedHash);

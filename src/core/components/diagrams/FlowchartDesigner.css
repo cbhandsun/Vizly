@@ -1,4 +1,4 @@
-﻿/* src/components/diagrams/FlowchartDesigner.css */
+/* src/components/diagrams/FlowchartDesigner.css */
 
 /* ============================================
    缁熶竴璁捐鍣?UI / Glassmorphism Design Tokens (Hyper-Glass)
@@ -621,12 +621,6 @@ circle.custom-edge-updater {
     contain: strict;
 }
 
-/* 绂佺敤鎮仠鏁堟灉鍑忓皯閲嶆帓 */
-.react-flow.performance-mode .react-flow__node:hover {
-    transform: none;
-    /* filter: none; */
-}
-
 .react-flow.performance-mode .react-flow__node.selected {
     animation: none;
 }
@@ -678,24 +672,12 @@ circle.custom-edge-updater {
 
 /* 8. 鑷畾涔夎妭鐐圭被鍨嬬壒娈婃晥鏋?*/
 
-/* 鍒嗙粍鑺傜偣鎮仠鏁堟灉锛堣緝寮憋級 */
-.react-flow__node[data-type="titleGroup"]:hover,
-.react-flow__node[data-type="subGroup"]:hover {
-    transform: scale(1.005);
-    filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.1));
-}
-
 /* 9. 鎬ц兘浼樺寲 */
 
 /* GPU 鍔犻€?- 浠呭鎷栧姩涓殑鑺傜偣鍚敤 */
 /* 绉婚櫎浜嗗叏灞€ translateZ(0)锛?00涓妭鐐?= 100涓悎鎴愬眰 = 鍐呭瓨鍘嬪姏 */
 .react-flow__node.dragging {
     will-change: transform;
-}
-
-.diagram-dragging .react-flow__node:hover {
-    transform: none;
-    filter: none;
 }
 
 .diagram-dragging .react-flow__node.selected {
@@ -1692,7 +1674,6 @@ circle.custom-edge-updater {
    褰撹繛绾裤€佹嫋鎷芥椂锛屾寕杞藉湪 Body 涓婄殑 .performance-mode 浼氱敓鏁?
    ============================================ */
 body.performance-mode .react-flow__edge-path,
-body.performance-mode .react-flow__node,
 body.performance-mode .react-flow__viewport {
     transition: none !important;
     will-change: transform;
@@ -1724,8 +1705,6 @@ html[data-theme='dark'] body.performance-mode .modern-sidebar-container {
     border-radius: var(--node-radius, 10px) !important;
     box-shadow: 0 0 0 4px var(--theme-primary-main-alpha, rgba(59, 130, 246, 0.2)), 0 0 20px var(--theme-primary-main-alpha, rgba(59, 130, 246, 0.4)) !important;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
-    position: relative;
-    z-index: 100 !important;
 }
 
 /* 浼厓绱犵敤浜庢寚绀哄叿浣撶殑鎻掑叆浣嶇疆 (above, below, inside) */

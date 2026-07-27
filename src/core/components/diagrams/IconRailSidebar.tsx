@@ -17,6 +17,12 @@ import {
 import type { NodeTemplate } from './hooks/useNodeTemplates';
 import type { LayerConfig } from './hooks/useLayerManagement';
 import type { DataNode } from 'antd/es/tree';
+import { bindIconRailEscapeClose } from './iconRailKeyboard';
+import {
+    resolveNavigatorNodeLabel,
+    resolveNavigatorNodeTypeLabelKey,
+    resolveNavigatorSearchText,
+} from './navigatorNodePresentation';
 import './IconRailSidebar.css';
 
 const { Text } = Typography;
@@ -122,9 +128,8 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
 
         const filterTree = (nodesToFilter: NavigatorNode[]): NavigatorTreeNode[] => {
             return nodesToFilter.flatMap(item => {
-                const data = item.data as Partial<FlowchartNodeData>;
-                const label = typeof data.label === 'string' ? data.label : item.id;
-                const selfMatch = !term || label.toLowerCase().includes(term);
+                const label = resolveNavigatorNodeLabel(item);
+                const selfMatch = !term || resolveNavigatorSearchText(item).includes(term);
                 
                 const filteredChildren = filterTree(item.children || []);
                 const hasMatchingChildren = filteredChildren.length > 0;
@@ -213,11 +218,7 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
     // Esc 键关闭 Drawer
     useEffect(() => {
         if (!activePanel) return;
-        const onKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') { closeDrawer(); }
-        };
-        window.addEventListener('keydown', onKeyDown);
-        return () => window.removeEventListener('keydown', onKeyDown);
+        return bindIconRailEscapeClose(window, closeDrawer);
     }, [activePanel, closeDrawer]);
 
     // [O-2] Memoize rail button definitions — inline arrays rebuild on every render,
@@ -272,7 +273,10 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
                                         const treeNode = rawTreeNode as NavigatorTreeNode;
                                         const node = treeNode.node;
                                         const data = node.data as Partial<FlowchartNodeData>;
-                                        const label = data?.label || node.id;
+                                        const label = resolveNavigatorNodeLabel(node);
+                                        const typeLabel = t(
+                                            `designer.sidebar.${resolveNavigatorNodeTypeLabelKey(node.type)}`
+                                        );
                                         const icon = data?.icon;
                                         return (
                                             <div
@@ -297,7 +301,7 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
                                                     <Text strong style={{ fontSize: 12, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
                                                         {label}
                                                     </Text>
-                                                    <Text type="secondary" style={{ fontSize: 10, lineHeight: 1.2 }}>{node.type}</Text>
+                                                    <Text type="secondary" style={{ fontSize: 10, lineHeight: 1.2 }}>{typeLabel}</Text>
                                                 </Flex>
                                             </div>
                                         );
@@ -370,6 +374,8 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
                     <Tooltip key={btn.key} title={btn.label} placement="right">
                         <button
                             className={`icon-rail-btn ${activePanel === btn.key ? 'active' : ''}`}
+                            aria-label={btn.label}
+                            aria-pressed={activePanel === btn.key}
                             onClick={() => togglePanel(btn.key)}
                         >
                             {btn.icon}
@@ -384,6 +390,7 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
                 <Tooltip title={t('designer.sidebar.search')} placement="right">
                     <button
                         className={`icon-rail-btn ${activePanel === 'shapes' && searchTerm ? 'active' : ''}`}
+                        aria-label={t('designer.sidebar.search')}
                         onClick={() => {
                             if (activePanel !== 'shapes') togglePanel('shapes');
                             // Focus the search input after panel opens
@@ -443,7 +450,13 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
                                         </Tooltip>
                                     </>
                                 )}
-                                <Button type="text" size="small" icon={<FaTimes />} onClick={closeDrawer} />
+                                <Button
+                                    type="text"
+                                    size="small"
+                                    aria-label={t('common.close', '关闭')}
+                                    icon={<FaTimes />}
+                                    onClick={closeDrawer}
+                                />
                             </Flex>
                         </div>
                         <div className="side-drawer-body" onWheel={activePanel === 'shapes' ? panelZoom.onWheel : undefined}>

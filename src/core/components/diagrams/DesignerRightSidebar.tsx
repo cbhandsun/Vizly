@@ -10,10 +10,14 @@ import {
     writeDesignerRightSidebarCollapsed,
     writeDesignerRightSidebarWidth,
 } from '../../utils/layoutStorage';
+import {
+    shouldExpandDesignerRightSidebar,
+    shouldFreezeDesignerRightSidebarDuringDrag,
+} from './designerRightSidebarState';
 
 const PropertyPanel = React.lazy(() => import('./PropertyPanel'));
 
-interface DesignerRightSidebarProps {
+export interface DesignerRightSidebarProps {
     activeTab: 'property' | 'ai';
     onTabChange: (tab: 'property' | 'ai') => void;
     aiChatVisible: boolean;
@@ -63,6 +67,7 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
     const { t } = useTranslation();
     const { token } = theme.useToken();
     const hasSelection = selectedNodes.length > 0 || selectedEdges.length > 0;
+    const previousAiChatVisibleRef = React.useRef(aiChatVisible);
 
     // 折叠状态持久化
     const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
@@ -124,17 +129,30 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
         document.addEventListener('mouseup', onMouseUp);
     }, [panelWidth]);
 
-    // 选中节点时自动展开
+    // 选中节点或从顶栏打开 AI 时自动展开
     useEffect(() => {
-        if (hasSelection && isCollapsed) {
+        const previousAiChatVisible = previousAiChatVisibleRef.current;
+        previousAiChatVisibleRef.current = aiChatVisible;
+        if (shouldExpandDesignerRightSidebar({
+            isCollapsed,
+            hasSelection,
+            activeTab,
+            aiChatVisible,
+            previousAiChatVisible,
+        })) {
             const timer = window.setTimeout(() => {
                 setIsCollapsed(false);
             }, 0);
             return () => window.clearTimeout(timer);
         }
-    }, [hasSelection, isCollapsed]);
+    }, [activeTab, aiChatVisible, hasSelection, isCollapsed]);
 
-    const toggle = useCallback(() => setIsCollapsed(prev => !prev), []);
+    const toggle = useCallback(() => {
+        if (!isCollapsed && activeTab === 'ai' && aiChatVisible) {
+            setAiChatVisible(false);
+        }
+        setIsCollapsed(previous => !previous);
+    }, [activeTab, aiChatVisible, isCollapsed, setAiChatVisible]);
 
     // 通知父组件当前面板实际宽度（用 ref 避免依赖变化）
     const onWidthChangeRef = React.useRef(onWidthChange);
@@ -231,6 +249,7 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
                     >
                         <Button
                             type="text"
+                            aria-label={btn.label}
                             onClick={(e) => {
                                 e.stopPropagation();
                                 if (btn.key === 'ai' && onAiTabIntercept && !onAiTabIntercept()) {
@@ -289,6 +308,7 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
                 >
                     <Button
                         type="text"
+                        aria-label={isCollapsed ? '展开面板' : '收起面板'}
                         onClick={(e) => { e.stopPropagation(); toggle(); }}
                         icon={isCollapsed ? <FaChevronLeft /> : <FaChevronRight />}
                         style={{
@@ -384,6 +404,6 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
             )}
         </div>
     );
-});
+}, (previous, next) => shouldFreezeDesignerRightSidebarDuringDrag(previous, next));
 
 DesignerRightSidebar.displayName = 'DesignerRightSidebar';

@@ -744,6 +744,11 @@ export class DomainVerticalLayoutStrategy implements ILayoutStrategy {
       }
     }
 
+    // ===== 边路由管线（已提取至 shared/edgeRoutingPipeline.ts）=====
+    // 域宽终态归一化只改变容器，不移动业务节点。先锁定业务边路径，
+    // 避免扩展后的大容器参与障碍评估并吞掉可渲染路线。
+    const finalRoutedEdges = await runEdgeRoutingPipeline(updatedNodes, safeEdges, { layoutDirection: 'TB' });
+
     // ===== 最终几何包含保障（已提取至 shared/geometryGuard.ts）=====
     ensureDomainContainment(updatedNodes, 30);
     // 垂直堆叠的域必须共享最终最大宽度。放在 Dagre 重投影与包含扩展
@@ -754,8 +759,6 @@ export class DomainVerticalLayoutStrategy implements ILayoutStrategy {
       titleH + titleV + titleSafe + bottomSafe,
     );
 
-    // ===== 边路由管线（已提取至 shared/edgeRoutingPipeline.ts）=====
-    const finalRoutedEdges = await runEdgeRoutingPipeline(updatedNodes, safeEdges, { layoutDirection: 'TB' });
     return { nodes: updatedNodes, edges: finalRoutedEdges };
   }
 }

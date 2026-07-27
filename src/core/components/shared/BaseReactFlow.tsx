@@ -18,7 +18,6 @@ import { getLastViewport, setLastViewport, getUiScale } from './viewportStore';
 import { ElkEdge } from '../custom-edges/ElkEdge'; // 导入 ElkEdge
 import { StablePathEdge } from '../custom-edges/StablePathEdge'; // 导入稳定路径边组件
 import { enhancedTextMeasurement } from '../../utils/EnhancedTextMeasurement';
-import CanvasEdgeLayer from '../layers/CanvasEdgeLayer';
 import { CanvasRefEdge } from '../edges/CanvasRefEdge';
 import EditableEdge from '../custom-edges/EditableEdge'; // ⭐ Waypoint编辑Edge
 import {
@@ -46,6 +45,7 @@ import {
   normalizeBaseReactFlowRenderableNodes,
 } from './baseReactFlowRenderableNodes';
 import { useBaseReactFlowDisplayRouting } from './useBaseReactFlowDisplayRouting';
+import { resolveBaseReactFlowNodeDragFallbackIds } from './baseReactFlowDisplayFallback';
 import {
   bindBaseReactFlowWheelHandler,
   createBaseReactFlowWheelHandler,
@@ -72,6 +72,7 @@ import {
 import type { BaseReactFlowProps } from './baseReactFlowTypes';
 import { useBaseReactFlowFitController } from './useBaseReactFlowFitController';
 import { SmartEdgeRoutingOwnerContext } from '../custom-edges/smartEdgeRoutingOwnership';
+import { resolveBaseReactFlowRoutingComputation } from './baseReactFlowDragRoutingFreeze';
 
 // 模块级常量：避免在组件参数默认值中创建新引用
 const DEFAULT_VIEWPORT = { x: 0, y: 0, zoom: 1 };
@@ -164,9 +165,13 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [isNodeDragging, setIsNodeDragging] = useState(false);
+  const [isNodeDragFallbackPending, setIsNodeDragFallbackPending] = useState(false);
+  const [nodeDragFallbackIds, setNodeDragFallbackIds] = useState<readonly string[]>([]);
   const handleNodeDragStart = useCallback<NonNullable<BaseReactFlowProps['onNodeDragStart']>>(
     (event, node, draggedNodes) => {
       setIsNodeDragging(true);
+      setIsNodeDragFallbackPending(true);
+      setNodeDragFallbackIds(resolveBaseReactFlowNodeDragFallbackIds(node.id, draggedNodes));
       onNodeDragStart?.(event, node, draggedNodes);
     },
     [onNodeDragStart],
@@ -178,6 +183,10 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
     },
     [onNodeDragStop],
   );
+  const handleNodeDragFallbackResolved = useCallback(() => {
+    setIsNodeDragFallbackPending(false);
+    setNodeDragFallbackIds([]);
+  }, []);
 
   // 全局滚轮灵敏度（函数级注释）：从配置系统读取，用于主画布自定义缩放
   const globalSensitivity = useMemo(() => {
@@ -237,8 +246,15 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
   ), [renderNodes]);
   const visibleNodeIds = useMemo(() => visibleNodes.map(node => node.id), [visibleNodes]);
   const internalNodeGeometrySignature = useStore(useCallback((state) => (
-    computeBaseReactFlowInternalNodeGeometrySignature(visibleNodeIds, state.nodeLookup)
-  ), [visibleNodeIds]));
+    resolveBaseReactFlowRoutingComputation({
+      isNodeDragging,
+      pausedValue: 'node-drag-paused',
+      compute: () => computeBaseReactFlowInternalNodeGeometrySignature(
+        visibleNodeIds,
+        state.nodeLookup,
+      ),
+    })
+  ), [isNodeDragging, visibleNodeIds]));
   const internalFlowNodes = useMemo(() => {
     // The store signature is an explicit invalidation token for geometry held
     // outside React props; reading it keeps measured-node updates observable.
@@ -384,6 +400,9 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
     smartEdgePadding,
     isLargeGraph,
     isNodeDragging,
+    isNodeDragFallbackPending,
+    nodeDragFallbackIds,
+    onNodeDragFallbackResolved: handleNodeDragFallbackResolved,
   });
 
   const nodeInternalsRefreshKey = useMemo(
@@ -608,7 +627,6 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
           style={reactFlowStyle}
           className={flowClassName}
         >
-          {isLargeGraph && <CanvasEdgeLayer />}
           {!hideBackgroundDuringExport && showBackgroundGrid && (
             <Background
               color={backgroundGridColor}
@@ -619,6 +637,8 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
           {showControls && <Controls />}
           {showMiniMap && (
             <FixedMiniMap
+              nodes={routingNodes}
+              isNodeDragging={isNodeDragging}
               style={miniMapStyle}
               zoomable={miniMapZoomable}
               pannable={miniMapPannable}

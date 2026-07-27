@@ -152,14 +152,14 @@ export const ModernFlowchartSidebar: React.FC<FlowchartSidebarProps> = ({
             label: t('designer.sidebar.basic'),
             children: (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 6 }}>
-                    {renderDraggableItem('Circle', <ShapePreview shape="circle" />, 'flowchart', 'flowchart', { shape: 'ellipse', icon: 'circle' })}
-                    {renderDraggableItem('Rect', <ShapePreview shape="rectangle" />, 'flowchart', 'flowchart', { shape: 'rectangle', icon: 'square' })}
-                    {renderDraggableItem('Diamond', <ShapePreview shape="diamond" />, 'flowchart', 'flowchart', { shape: 'diamond', icon: 'question' })}
-                    {renderDraggableItem('Triangle', <ShapePreview shape="triangle" />, 'flowchart', 'flowchart', { shape: 'triangle', icon: 'play' })}
-                    {renderDraggableItem('Hexagon', <ShapePreview shape="hexagon" />, 'flowchart', 'flowchart', { shape: 'hexagon', icon: 'hexagon' })}
-                    {renderDraggableItem('Star', <ShapePreview shape="star" color="#F59E0B" />, 'flowchart', 'flowchart', { shape: 'star', icon: 'star', theme: { main: '#FFC107', border: '#FFB300', text: '#fff' } })}
-                    {renderDraggableItem('Pill', <ShapePreview shape="pill" />, 'flowchart', 'flowchart', { shape: 'pill', icon: 'play' })}
-                    {renderDraggableItem('Note', <ShapePreview shape="note" color="#F59E0B" />, 'flowchart', 'flowchart', { shape: 'note', icon: 'note', theme: { main: '#FFEB3B', border: '#FDD835', text: '#000' } })}
+                    {renderDraggableItem(t('propertyPanel.options.shape.circle'), <ShapePreview shape="circle" />, 'flowchart', 'flowchart', { shape: 'ellipse', icon: 'circle' })}
+                    {renderDraggableItem(t('propertyPanel.options.shape.rectangle'), <ShapePreview shape="rectangle" />, 'flowchart', 'flowchart', { shape: 'rectangle', icon: 'square' })}
+                    {renderDraggableItem(t('propertyPanel.options.shape.diamond'), <ShapePreview shape="diamond" />, 'flowchart', 'flowchart', { shape: 'diamond', icon: 'question' })}
+                    {renderDraggableItem(t('propertyPanel.options.shape.triangle'), <ShapePreview shape="triangle" />, 'flowchart', 'flowchart', { shape: 'triangle', icon: 'play' })}
+                    {renderDraggableItem(t('propertyPanel.options.shape.hexagon'), <ShapePreview shape="hexagon" />, 'flowchart', 'flowchart', { shape: 'hexagon', icon: 'hexagon' })}
+                    {renderDraggableItem(t('propertyPanel.options.shape.star'), <ShapePreview shape="star" color="#F59E0B" />, 'flowchart', 'flowchart', { shape: 'star', icon: 'star', theme: { main: '#FFC107', border: '#FFB300', text: '#fff' } })}
+                    {renderDraggableItem(t('propertyPanel.options.shape.pill'), <ShapePreview shape="pill" />, 'flowchart', 'flowchart', { shape: 'pill', icon: 'play' })}
+                    {renderDraggableItem(t('propertyPanel.options.shape.note'), <ShapePreview shape="note" color="#F59E0B" />, 'flowchart', 'flowchart', { shape: 'note', icon: 'note', theme: { main: '#FFEB3B', border: '#FDD835', text: '#000' } })}
                 </div>
             )
         },
@@ -203,7 +203,7 @@ export const ModernFlowchartSidebar: React.FC<FlowchartSidebarProps> = ({
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 6 }}>
                     {renderDraggableItem(t('designer.sidebar.domainGroup'), <FaLayerGroup style={{ color: '#3F51B5' }} />, 'titleGroup', 'titleGroup', { themeColor: '#3F51B5', domainClass: 'core' })}
                     {renderDraggableItem(t('designer.sidebar.subGroup'), <FaBox style={{ color: '#673AB7' }} />, 'subGroup', 'subGroup', { themeColor: '#673AB7' })}
-                    {renderDraggableItem('Swimlane', <FaStream style={{ color: '#6366f1' }} />, 'swimlane', 'swimlane', { label: 'Swimlane', direction: 'horizontal', lanes: [{ id: 'lane-1', label: '用户', color: '#3b82f6' }, { id: 'lane-2', label: '系统', color: '#10b981' }, { id: 'lane-3', label: '第三方', color: '#f59e0b' }] })}
+                    {renderDraggableItem(t('designer.sidebar.swimlane'), <FaStream style={{ color: '#6366f1' }} />, 'swimlane', 'swimlane', { label: t('designer.sidebar.swimlane'), direction: 'horizontal', lanes: [{ id: 'lane-1', label: t('designer.sidebar.user'), color: '#3b82f6' }, { id: 'lane-2', label: t('designer.sidebar.system'), color: '#10b981' }, { id: 'lane-3', label: t('designer.sidebar.thirdParty'), color: '#f59e0b' }] })}
                 </div>
             )
         },
@@ -233,7 +233,7 @@ export const ModernFlowchartSidebar: React.FC<FlowchartSidebarProps> = ({
                     {renderDraggableItem(t('designer.sidebar.connector'), <ShapePreview shape="circle" color="#E91E63" />, 'flowchart', 'flowchart', { shape: 'circle', icon: 'circle', theme: { main: '#E91E63', border: '#C2185B', text: '#fff' } })}
                     {renderDraggableItem(t('designer.sidebar.offPageConnector'), <ShapePreview shape="off-page" color="#673AB7" />, 'flowchart', 'flowchart', { shape: 'off-page', icon: 'arrow', theme: { main: '#673AB7', border: '#512DA8', text: '#fff' } })}
                     {renderDraggableItem(t('designer.sidebar.internalStorage'), <ShapePreview shape="internal-storage" color="#455A64" />, 'flowchart', 'flowchart', { shape: 'internal-storage', icon: 'database', theme: { main: '#455A64', border: '#37474F', text: '#fff' } })}
-                    {renderDraggableItem('Arrow Timeline', <FaChevronRight style={{ color: '#00BCD4' }} />, 'arrowTimeline', 'arrowTimeline', {})}
+                    {renderDraggableItem(t('designer.sidebar.arrowTimeline'), <FaChevronRight style={{ color: '#00BCD4' }} />, 'arrowTimeline', 'arrowTimeline', {})}
                 </div>
             )
         }

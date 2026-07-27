@@ -1,8 +1,57 @@
 import { describe, expect, it } from 'vitest';
 
+import type { Edge } from '@xyflow/react';
+
 import { estimateEdgeLabelRect, getEdgeLabelAutoOffset } from '../edgeLabelAvoidance';
+import { collectStablePathPeerPaths } from '../stablePathEdgePeerPaths';
 
 describe('edge label avoidance', () => {
+    it('skips peer-path traversal for unlabeled edges', () => {
+        const edges: Edge[] = [{
+            id: 'peer-edge',
+            source: 'a',
+            target: 'b',
+            data: {
+                computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
+            },
+        }];
+
+        expect(collectStablePathPeerPaths(edges, 'own-edge', false)).toEqual([]);
+    });
+
+    it('collects only valid paths from other edges when label avoidance is active', () => {
+        const edges: Edge[] = [
+            {
+                id: 'own-edge',
+                source: 'a',
+                target: 'b',
+                data: {
+                    computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
+                },
+            },
+            {
+                id: 'valid-peer',
+                source: 'b',
+                target: 'c',
+                data: {
+                    computedPath: [{ x: 40, y: 0 }, { x: 40, y: 100 }],
+                },
+            },
+            {
+                id: 'invalid-peer',
+                source: 'c',
+                target: 'd',
+                data: {
+                    computedPath: [{ x: Number.NaN, y: 0 }, { x: 80, y: 100 }],
+                },
+            },
+        ];
+
+        expect(collectStablePathPeerPaths(edges, 'own-edge', true)).toEqual([
+            [{ x: 40, y: 0 }, { x: 40, y: 100 }],
+        ]);
+    });
+
     it('moves generated labels away from peer edge paths', () => {
         const offset = getEdgeLabelAutoOffset(
             [{ x: 100, y: 0 }, { x: 100, y: 200 }],

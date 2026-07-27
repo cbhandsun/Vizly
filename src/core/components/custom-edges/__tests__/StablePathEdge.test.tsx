@@ -41,6 +41,10 @@ const renderStablePathEdge = (props: Record<string, unknown>) => {
 describe('StablePathEdge', () => {
   it('renders locked computed paths as strict M/L orthogonal SVG paths', () => {
     renderStablePathEdge({
+      sourceX: 10,
+      sourceY: 20,
+      targetX: 140,
+      targetY: 96.4,
       data: {
         computedPath: [
           { x: 10, y: 20 },
@@ -57,6 +61,10 @@ describe('StablePathEdge', () => {
 
   it('snaps small rendered endpoint drift back onto the dominant orthogonal axis', () => {
     renderStablePathEdge({
+      sourceX: 13,
+      sourceY: 476,
+      targetX: 16.0055,
+      targetY: 636.014,
       data: {
         computedPath: [
           { x: 13, y: 476 },
@@ -67,6 +75,25 @@ describe('StablePathEdge', () => {
 
     const path = screen.getByTestId('base-edge');
     expect(path.getAttribute('d')).toBe('M 13 476 L 13 636.014');
+  });
+
+  it('uses live endpoints when a node moves away from a precomputed path', () => {
+    renderStablePathEdge({
+      sourceX: 50,
+      sourceY: 60,
+      targetX: 130,
+      targetY: 100,
+      sourcePosition: 'bottom',
+      data: {
+        computedPath: [
+          { x: 0, y: 0 },
+          { x: 80, y: 40 },
+        ],
+      },
+    });
+
+    const path = screen.getByTestId('base-edge');
+    expect(path.getAttribute('d')).toBe('M 50 60 L 50 100 L 130 100');
   });
 
   it('uses an orthogonal M/L fallback instead of React Flow smoothstep curves', () => {

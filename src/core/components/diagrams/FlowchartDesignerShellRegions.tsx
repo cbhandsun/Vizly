@@ -30,6 +30,7 @@ export function FlowchartDesignerLeftSidebar({ model }: FlowchartDesignerRegionP
         layers,
         nodes,
         pluginCtx,
+        presentationActive,
         renameLayer,
         renameTemplate,
         reorderLayers,
@@ -42,7 +43,7 @@ export function FlowchartDesignerLeftSidebar({ model }: FlowchartDesignerRegionP
         toggleVisibility,
     } = model;
 
-    if (isSidebarHidden || activePlugin?.hideDefaultSidebar) return null;
+    if (presentationActive || isSidebarHidden || activePlugin?.hideDefaultSidebar) return null;
     const rawPluginPanels = resolveFlowchartPluginContribution(
         'sidebar',
         activePlugin?.contributeSidebarPanels && pluginCtx
@@ -89,6 +90,7 @@ export function FlowchartDesignerRightSidebarRegion({ model }: FlowchartDesigner
         isMobile,
         onAiTabIntercept,
         pluginCtx,
+        presentationActive,
         renderAIChatPanel,
         selectedEdges,
         selectedNodes,
@@ -99,6 +101,8 @@ export function FlowchartDesignerRightSidebarRegion({ model }: FlowchartDesigner
         updateEdgesBatch,
         updateNodesBatch,
     } = model;
+
+    if (presentationActive) return null;
 
     return (
         <DesignerRightSidebar
@@ -221,7 +225,7 @@ export function FlowchartDesignerOverlaysRegion({ model }: FlowchartDesignerRegi
                 onClose: () => onVersionHistoryClose?.(),
             })}
             <LaserPointer active={presentationActive && laserEnabled} />
-            {isMobile && (
+            {isMobile && !presentationActive && (
                 <MobileBottomDock
                     activeTab={mobilePropertyDrawerVisible ? 'property' : (activeRightTab === 'ai' ? 'ai' : null)}
                     selectedCount={selectedNodes.length + selectedEdges.length}

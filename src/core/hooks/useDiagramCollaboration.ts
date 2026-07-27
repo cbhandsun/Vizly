@@ -3,6 +3,47 @@ import { Node, Edge, XYPosition } from '@xyflow/react';
 import { useDiagramStore, CommentThread } from '../store/useDiagramStore';
 import { collaborationService } from '../services/CollaborationService';
 
+interface CollaborationSliceActions {
+    setNodes: (nodes: Node[]) => void;
+    setEdges: (edges: Edge[]) => void;
+    setComments: (comments: CommentThread[]) => void;
+}
+
+interface CollaborationMap<T> {
+    get: (id: string) => T | undefined;
+    set: (id: string, value: T) => unknown;
+    delete: (id: string) => unknown;
+    forEach: (callback: (value: T, id: string) => void) => void;
+}
+
+export const createDiagramCollaborationSliceSync = ({
+    setNodes,
+    setEdges,
+    setComments,
+}: CollaborationSliceActions) => ({
+    nodes: (nodes: Iterable<Node>) => setNodes(Array.from(nodes)),
+    edges: (edges: Iterable<Edge>) => setEdges(Array.from(edges)),
+    comments: (comments: Iterable<CommentThread>) => setComments(Array.from(comments)),
+});
+
+export const syncDiagramCollaborationMap = <T extends { id: string }>(
+    target: CollaborationMap<T>,
+    values: T[],
+): void => {
+    const nextIds = new Set(values.map(value => value.id));
+    values.forEach((value) => {
+        const current = target.get(value.id);
+        // React Flow preserves object identity for unchanged nodes and edges.
+        // Avoid serializing the entire graph on every single-node drag frame.
+        if (current !== value && JSON.stringify(current) !== JSON.stringify(value)) {
+            target.set(value.id, value);
+        }
+    });
+    target.forEach((_value, id) => {
+        if (!nextIds.has(id)) target.delete(id);
+    });
+};
+
 /**
  * 协同同步钩子 (Phase 9)
  * 将 Zustand 状态与 Yjs 共享类型进行双向绑定
@@ -10,6 +51,8 @@ import { collaborationService } from '../services/CollaborationService';
 export function useDiagramCollaboration(diagramId: string, enabled: boolean = true) {
     const setNodes = useDiagramStore(state => state.setNodes);
     const setEdges = useDiagramStore(state => state.setEdges);
+    const nodes = useDiagramStore(state => state.nodes);
+    const edges = useDiagramStore(state => state.edges);
     
     // 标记当前更新是否来自协同同步，防止死循环
     const isRemoteUpdateRef = useRef(false);
@@ -26,31 +69,36 @@ export function useDiagramCollaboration(diagramId: string, enabled: boolean = tr
         const yEdges = doc.getMap<Edge>('edges');
         const yComments = doc.getMap<CommentThread>('comments');
 
-        // 3. 监听远程变化 (Yjs -> State)
-        const observeHandler = () => {
+        const sliceSync = createDiagramCollaborationSliceSync({
+            setNodes,
+            setEdges,
+            setComments: useDiagramStore.getState().setComments,
+        });
+        const syncRemoteSlice = (sync: () => void) => {
             isRemoteUpdateRef.current = true;
-            
-            doc.transact(() => {
-                const remoteNodes = Array.from(yNodes.values());
-                const remoteEdges = Array.from(yEdges.values());
-                const remoteComments = Array.from(yComments.values());
-                
-                // 深度同步
-                setNodes(remoteNodes);
-                setEdges(remoteEdges);
-
-                // ⭐ Phase 11: 同步评论
-                useDiagramStore.getState().setComments(remoteComments);
-            }, 'remote');
-
+            sync();
             setTimeout(() => {
                 isRemoteUpdateRef.current = false;
             }, 0);
         };
+        // Each Yjs type owns one local state slice. A comment-only transaction
+        // must never replace nodes or edges with an unseeded remote map.
+        const observeNodes = (_event: unknown, transaction: { origin: unknown }) => {
+            if (transaction.origin === 'local-graph') return;
+            syncRemoteSlice(() => sliceSync.nodes(yNodes.values()));
+        };
+        const observeEdges = (_event: unknown, transaction: { origin: unknown }) => {
+            if (transaction.origin === 'local-graph') return;
+            syncRemoteSlice(() => sliceSync.edges(yEdges.values()));
+        };
+        const observeComments = (_event: unknown, transaction: { origin: unknown }) => {
+            if (transaction.origin === 'local-comments') return;
+            syncRemoteSlice(() => sliceSync.comments(yComments.values()));
+        };
 
-        yNodes.observe(observeHandler);
-        yEdges.observe(observeHandler);
-        yComments.observe(observeHandler);
+        yNodes.observe(observeNodes);
+        yEdges.observe(observeEdges);
+        yComments.observe(observeComments);
 
         // 4. 初始化本地数据到云端 (如果云端为空)
         const currentNodes = useDiagramStore.getState().nodes;
@@ -66,12 +114,27 @@ export function useDiagramCollaboration(diagramId: string, enabled: boolean = tr
         }
 
         return () => {
-            yNodes.unobserve(observeHandler);
-            yEdges.unobserve(observeHandler);
-            yComments.unobserve(observeHandler);
+            yNodes.unobserve(observeNodes);
+            yEdges.unobserve(observeEdges);
+            yComments.unobserve(observeComments);
             collaborationService.destroy();
         };
     }, [diagramId, enabled, setEdges, setNodes]);
+
+    // Broadcast graph edits as well as comments. Without this path the Yjs map
+    // retains the preset snapshot and a later provider update can roll back a
+    // local layout, grouping, or drag operation.
+    useEffect(() => {
+        if (!enabled || !diagramId || isRemoteUpdateRef.current) return;
+
+        const doc = collaborationService.getDoc();
+        const yNodes = doc.getMap<Node>('nodes');
+        const yEdges = doc.getMap<Edge>('edges');
+        doc.transact(() => {
+            syncDiagramCollaborationMap(yNodes, nodes);
+            syncDiagramCollaborationMap(yEdges, edges);
+        }, 'local-graph');
+    }, [diagramId, edges, enabled, nodes]);
 
     const comments = useDiagramStore(state => state.comments);
 
@@ -82,20 +145,7 @@ export function useDiagramCollaboration(diagramId: string, enabled: boolean = tr
         const doc = collaborationService.getDoc();
         const yComments = doc.getMap<CommentThread>('comments');
 
-        doc.transact(() => {
-            comments.forEach(c => {
-                const current = yComments.get(c.id);
-                if (JSON.stringify(current) !== JSON.stringify(c)) {
-                    yComments.set(c.id, c);
-                }
-            });
-
-            // 检查删除
-            const commentIds = new Set(comments.map(c => c.id));
-            yComments.forEach((_, id) => {
-                if (!commentIds.has(id)) yComments.delete(id);
-            });
-        }, 'local-comments');
+        doc.transact(() => syncDiagramCollaborationMap(yComments, comments), 'local-comments');
     }, [comments, enabled]);
 
     // 6. 光标同步

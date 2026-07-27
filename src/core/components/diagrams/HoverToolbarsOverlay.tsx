@@ -1,13 +1,17 @@
 import React, { useMemo } from 'react';
-import { Node, useViewport, type Edge, type NodeTypes } from '@xyflow/react';
+import { Node, useInternalNode, useViewport, type Edge, type NodeTypes } from '@xyflow/react';
 import { useDiagramStore } from '../../store/useDiagramStore';
 import { FloatingContextToolbar, type ToolbarFeature } from './FloatingContextToolbar';
 import { ContextualEdgeToolbar } from './ContextualEdgeToolbar';
 import { NodeDataUpdate, EdgeDataUpdate } from '../../types/diagram-updates';
+import { getEdgeToolbarScreenPosition } from './edgeToolbarPosition';
+import type { DiagramActionTarget } from './hooks/useDiagramActions';
+import { shouldShowNodeHoverToolbar } from './hoverToolbarVisibility';
 
 interface HoverToolbarsOverlayProps {
     quickAddMenuVisible: boolean;
     isContextToolbarHidden: boolean;
+    isDragging: boolean;
     isConnecting?: boolean;
     nodeTypes: NodeTypes;
     pluginCtx?: import('../../types/plugin').PluginContext;
@@ -19,9 +23,9 @@ interface HoverToolbarsOverlayProps {
     onUpdateNodes?: (updates: { id: string, position: { x: number, y: number } }[]) => void;
     
     // Commands
-    handleDeleteWithToast: () => void;
-    handleDuplicateWithToast: () => void;
-    handleLock: () => void;
+    handleDeleteWithToast: (target?: DiagramActionTarget) => void;
+    handleDuplicateWithToast: (target?: DiagramActionTarget) => void;
+    handleLock: (target?: DiagramActionTarget, locked?: boolean) => void;
     handleOpacity: (opacity: number) => void;
     handleBringToFront: (id?: string) => void;
     handleSendToBack: (id?: string) => void;
@@ -59,6 +63,7 @@ const readNodeToolbarMetadata = (nodeTypes: NodeTypes, node: Node | undefined): 
 export const HoverToolbarsOverlay: React.FC<HoverToolbarsOverlayProps> = ({
     quickAddMenuVisible,
     isContextToolbarHidden,
+    isDragging,
     isConnecting,
     updateNodesBatch,
     updateEdgesBatch,
@@ -79,21 +84,28 @@ export const HoverToolbarsOverlay: React.FC<HoverToolbarsOverlayProps> = ({
     const contextMenu = useDiagramStore((state) => state.contextMenu);
     const selectedNodes = useDiagramStore((state) => state.selectedNodes);
     const selectedEdges = useDiagramStore((state) => state.selectedEdges);
-    const isDragging = useDiagramStore((state) => state.isDragging);
     // 🚀 P3 性能优化: 移除全局 useViewport，防止缩放/平移导致所有工具栏和父组件 (HoverToolbarsOverlay) 60FPS 重渲染
     
     // Hide global toolbar if a mindmap node is selected because they have their own integrated tool island
     const isMindMapSelected = selectedNodes.some((node) => node.type === 'mindmap');
     const nodeToolbar = readNodeToolbarMetadata(nodeTypes, selectedNodes.length === 1 ? selectedNodes[0] : undefined);
+    const selectedNodeIds = useMemo(() => selectedNodes.map(node => node.id), [selectedNodes]);
 
     return (
         <>
-            {!contextMenu && !quickAddMenuVisible && !isDragging && !isConnecting && !isContextToolbarHidden && !isMindMapSelected && (
+            {shouldShowNodeHoverToolbar({
+                hasContextMenu: Boolean(contextMenu),
+                quickAddMenuVisible,
+                isDragging,
+                isConnecting: Boolean(isConnecting),
+                isContextToolbarHidden,
+                isMindMapSelected,
+            }) && (
                 <FloatingContextToolbar
                     selectedNodes={selectedNodes}
                     onUpdateNodes={onUpdateNodes!}
-                    onDelete={handleDeleteWithToast}
-                    onDuplicate={handleDuplicateWithToast}
+                    onDelete={() => handleDeleteWithToast(selectedNodeIds)}
+                    onDuplicate={() => handleDuplicateWithToast(selectedNodeIds)}
                     onChangeColor={(color) => {
                         // Real-time preview (disable snapshot to prevent flooding the undo/redo stack)
                         updateNodesBatch(selectedNodes.map((node) => node.id), {
@@ -115,7 +127,7 @@ export const HoverToolbarsOverlay: React.FC<HoverToolbarsOverlayProps> = ({
                         });
                     }}
 
-                    onLock={handleLock}
+                    onLock={(locked) => handleLock(selectedNodeIds, locked)}
                     onOpacity={handleOpacity}
                     onBringToFront={() => handleBringToFront(selectedNodes[0]?.id)}
                     onSendToBack={() => handleSendToBack(selectedNodes[0]?.id)}
@@ -132,9 +144,9 @@ export const HoverToolbarsOverlay: React.FC<HoverToolbarsOverlayProps> = ({
                                     React.createElement(nodeToolbar.ToolbarExtension, {
                                         node: selectedNodes[0],
                                         updateNodesBatch,
-                                        onDelete: handleDeleteWithToast,
-                                        onDuplicate: handleDuplicateWithToast,
-                                        onLock: handleLock
+                                        onDelete: () => handleDeleteWithToast(selectedNodeIds),
+                                        onDuplicate: () => handleDuplicateWithToast(selectedNodeIds),
+                                        onLock: () => handleLock(selectedNodeIds)
                                     })
                                 )}
                             </>
@@ -165,27 +177,13 @@ export const HoverToolbarsOverlay: React.FC<HoverToolbarsOverlayProps> = ({
 
 // 封装独立组件，将 useViewport () 的 60FPS 重绘隔离到尽可能小的 DOM 树中
 const IsolatedEdgeToolbar: React.FC<{ edge: Edge; onUpdateEdge: (id: string, updates: EdgeDataUpdate) => void }> = ({ edge, onUpdateEdge }) => {
-    const nodes = useDiagramStore((state) => state.nodes);
+    const sourceNode = useInternalNode(edge.source);
+    const targetNode = useInternalNode(edge.target);
     const viewport = useViewport();
 
     const position = useMemo(() => {
-        const sourceNode = nodes.find((node) => node.id === edge.source);
-        const targetNode = nodes.find((node) => node.id === edge.target);
-        if(!sourceNode || !targetNode) return null;
-
-        const sx = sourceNode.position.x + (sourceNode.measured?.width ?? 120) / 2;
-        const sy = sourceNode.position.y + (sourceNode.measured?.height ?? 60) / 2;
-        const tx = targetNode.position.x + (targetNode.measured?.width ?? 120) / 2;
-        const ty = targetNode.position.y + (targetNode.measured?.height ?? 60) / 2;
-
-        const mx = (sx + tx) / 2;
-        const my = (sy + ty) / 2;
-
-        const screenX = mx * viewport.zoom + viewport.x;
-        const screenY = my * viewport.zoom + viewport.y;
-
-        return { x: screenX, y: screenY };
-    }, [edge, viewport, nodes]);
+        return getEdgeToolbarScreenPosition(sourceNode, targetNode, viewport);
+    }, [sourceNode, targetNode, viewport]);
 
     if (!position) return null;
 

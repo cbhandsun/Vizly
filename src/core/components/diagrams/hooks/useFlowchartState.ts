@@ -32,7 +32,17 @@ export const useFlowchartState = (edgeMode: 'advanced-smart' | 'native' = 'advan
     }, [nodes, edges]);
 
     // History
-    const { takeSnapshot, undo, redo, canUndo, canRedo, pastEntries, jumpTo, getPreviousState } = useDiagramHistory(nodes, edges);
+    const {
+        takeSnapshot,
+        notifyHistoryChanged,
+        undo,
+        redo,
+        canUndo,
+        canRedo,
+        pastEntries,
+        jumpTo,
+        getPreviousState,
+    } = useDiagramHistory(nodes, edges);
 
     // Presets
     const preset = useDiagramStylePreset_v2();
@@ -186,6 +196,7 @@ export const useFlowchartState = (edgeMode: 'advanced-smart' | 'native' = 'advan
         onConnect,
         diagramHistory: {
             takeSnapshot,
+            notifyHistoryChanged,
             undo: handleUndo,
             redo: handleRedo,
             canUndo,

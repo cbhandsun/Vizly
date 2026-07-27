@@ -26,6 +26,7 @@ interface NodeSizeOptimizer {
 const CONTAINER_NODE_TYPES = new Set(['titleGroup', 'subGroup', 'swimlane', 'group']);
 const MAX_NODE_DIMENSION = 1_000_000;
 const MAX_DESCRIPTION_LENGTH = 10_000;
+const GLOBAL_PERFORMANCE_MODE_NODE_THRESHOLD = 300;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
@@ -172,3 +173,22 @@ export const recalculateAutosaveNodeSizes = async (
     };
   });
 };
+
+/**
+ * Global performance CSS changes invalidate the entire document. Keep them for
+ * genuinely high-density canvases; node dragging is handled by the scoped
+ * `.react-flow.performance-mode` class instead.
+ */
+export const shouldUseGlobalDesignerPerformanceMode = (nodeCount: number): boolean => (
+  Number.isFinite(nodeCount) && nodeCount > GLOBAL_PERFORMANCE_MODE_NODE_THRESHOLD
+);
+
+/**
+ * High-density canvases already keep document performance styles active.
+ * Toggling the scoped class as well would invalidate every visible node and
+ * edge at drag start/stop, which is more expensive than the styles it saves.
+ */
+export const shouldUseScopedDesignerDragPerformanceMode = (
+  nodeCount: number,
+  isDragging: boolean,
+): boolean => isDragging && !shouldUseGlobalDesignerPerformanceMode(nodeCount);
