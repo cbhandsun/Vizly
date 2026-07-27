@@ -72,6 +72,7 @@ export const isFinalWmsDisplayRoutingReady = (value) => (
   && (
     value.workerResolution === 'validated-candidate'
     || value.workerResolution === 'full-route'
+    || value.workerResolution === 'full-route-repaired'
     || value.workerResolution === 'repair'
   )
   && Number.isFinite(value.routeMs)

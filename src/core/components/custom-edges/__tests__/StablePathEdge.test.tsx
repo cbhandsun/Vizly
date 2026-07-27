@@ -5,6 +5,10 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { StablePathEdge } from '../StablePathEdge';
+import {
+  SmartEdgeRoutingOwnerContext,
+  type SmartEdgeRoutingOwner,
+} from '../smartEdgeRoutingOwnership';
 
 vi.mock('@xyflow/react', async () => {
   const ReactModule = await import('react');
@@ -18,23 +22,28 @@ vi.mock('@xyflow/react', async () => {
   };
 });
 
-const renderStablePathEdge = (props: Record<string, unknown>) => {
+const renderStablePathEdge = (
+  props: Record<string, unknown>,
+  routingOwner: SmartEdgeRoutingOwner = 'edge',
+) => {
   render(
-    <svg>
-      <StablePathEdge
-        id="edge-test"
-        sourceX={0}
-        sourceY={0}
-        targetX={80}
-        targetY={40}
-        selected={false}
-        sourcePosition={'right' as any}
-        targetPosition={'left' as any}
-        source="source"
-        target="target"
-        {...(props as any)}
-      />
-    </svg>,
+    <SmartEdgeRoutingOwnerContext.Provider value={routingOwner}>
+      <svg>
+        <StablePathEdge
+          id="edge-test"
+          sourceX={0}
+          sourceY={0}
+          targetX={80}
+          targetY={40}
+          selected={false}
+          sourcePosition={'right' as any}
+          targetPosition={'left' as any}
+          source="source"
+          target="target"
+          {...(props as any)}
+        />
+      </svg>
+    </SmartEdgeRoutingOwnerContext.Provider>,
   );
 };
 
@@ -94,6 +103,26 @@ describe('StablePathEdge', () => {
 
     const path = screen.getByTestId('base-edge');
     expect(path.getAttribute('d')).toBe('M 50 60 L 50 100 L 130 100');
+  });
+
+  it('preserves canvas-owned final paths when routed anchors differ from live handles', () => {
+    renderStablePathEdge({
+      sourceX: 1068.95,
+      sourceY: 651.7,
+      targetX: 1071.95,
+      targetY: 814.2,
+      sourcePosition: 'bottom',
+      targetPosition: 'top',
+      data: {
+        computedPath: [
+          { x: 1065, y: 652 },
+          { x: 1065, y: 812 },
+        ],
+      },
+    }, 'canvas');
+
+    const path = screen.getByTestId('base-edge');
+    expect(path.getAttribute('d')).toBe('M 1065 652 L 1065 812');
   });
 
   it('uses an orthogonal M/L fallback instead of React Flow smoothstep curves', () => {

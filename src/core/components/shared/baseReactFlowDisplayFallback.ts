@@ -14,6 +14,7 @@ const EXPENSIVE_INTERACTIVE_EDGE_TYPES = new Set([
 
 const STALE_DURING_NODE_DRAG_EDGE_TYPES = new Set([
   ...EXPENSIVE_INTERACTIVE_EDGE_TYPES,
+  'stablePath',
 ]);
 
 export const resolveBaseReactFlowNodeDragFallbackIds = (

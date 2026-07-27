@@ -104,6 +104,56 @@ describe('baseReactFlowDisplayWorkerProtocol', () => {
     })).toBeNull();
   });
 
+  it('parses bounded incremental requests and rejects incomplete change hints', () => {
+    const incrementalRequest = {
+      operation: 'incremental-route',
+      requestId: 'incremental-1',
+      edges: validRepairRequest.edges,
+      nodes,
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: false,
+      displayEdgeEpoch: 2,
+      qualityMode: 'full',
+      baselineInputSignature: '123',
+      baselineInputGeometryDigest: `geometry-v1:${'a'.repeat(32)}`,
+      baselineNodes: nodes,
+      baselineSourceEdges: validRepairRequest.edges,
+      baselinePatches: validRepairRequest.edges,
+      baselineOutputRouteSignature: `route-v2:1:2:${'b'.repeat(16)}`,
+      nextInputSignature: '456',
+      nextInputGeometryDigest: `geometry-v1:${'c'.repeat(32)}`,
+      changeSet: {
+        reason: 'node-drag',
+        changedNodeIds: ['source'],
+        changedEdgeIds: [],
+        topologyChanged: false,
+        geometryChanged: true,
+      },
+      mutableEdgeIds: ['edge'],
+      contextEdgeIds: [],
+    };
+    expect(parseDisplayEdgesWorkerRequest(incrementalRequest)).toMatchObject({
+      operation: 'incremental-route',
+      changeSet: {
+        reason: 'node-drag',
+        changedNodeIds: ['source'],
+      },
+      mutableEdgeIds: ['edge'],
+    });
+    expect(parseDisplayEdgesWorkerRequest({
+      ...incrementalRequest,
+      changeSet: {
+        ...incrementalRequest.changeSet,
+        changedNodeIds: ['source', 'source'],
+      },
+    })).toBeNull();
+    expect(parseDisplayEdgesWorkerRequest({
+      ...incrementalRequest,
+      baselineInputGeometryDigest: 'invalid',
+    })).toBeNull();
+  });
+
   it('validates graph shape, finite node geometry, and bounded dimensions', () => {
     expect(parseDisplayEdgesWorkerRequest(validRepairRequest)?.operation).toBe('repair');
     expect(parseDisplayEdgesWorkerRequest({
@@ -234,6 +284,81 @@ describe('baseReactFlowDisplayWorkerProtocol', () => {
       hardClean: true,
       routeResolution: 'repair',
     }, 'repair-1')).not.toBeNull();
+    expect(parseDisplayEdgesWorkerResponse({
+      requestId: 'route-1',
+      edges: validEdges,
+      hardClean: true,
+      routeResolution: 'full-route-repaired',
+      phaseTrace: [{
+        phase: 'measured-repair',
+        durationMs: 12.34,
+        candidateCount: 1,
+        changedEdgeCount: 1,
+        resolution: 'accepted',
+      }],
+    }, 'route-1')).not.toBeNull();
+    expect(parseDisplayEdgesWorkerResponse({
+      requestId: 'incremental-1',
+      edges: validEdges,
+      hardClean: true,
+      routeResolution: 'incremental-route',
+      affectedEdgeCount: 1,
+      fallbackLevel: 'none',
+      phaseTrace: [],
+    }, 'incremental-1')).toMatchObject({
+      affectedEdgeCount: 1,
+      fallbackLevel: 'none',
+    });
+    expect(parseDisplayEdgesWorkerResponse({
+      requestId: 'incremental-1',
+      edges: validEdges,
+      hardClean: true,
+      routeResolution: 'incremental-route',
+      affectedEdgeCount: -1,
+      fallbackLevel: 'none',
+      phaseTrace: [],
+    }, 'incremental-1')).toBeNull();
+    expect(parseDisplayEdgesWorkerResponse({
+      requestId: 'incremental-1',
+      phaseProgress: {
+        phase: 'local-route',
+        durationMs: 4,
+        candidateCount: 6,
+        changedEdgeCount: 6,
+        resolution: 'accepted',
+      },
+    }, 'incremental-1')).toMatchObject({
+      phaseProgress: {
+        phase: 'local-route',
+        candidateCount: 6,
+      },
+    });
+    expect(parseDisplayEdgesWorkerResponse({
+      requestId: 'route-1',
+      edges: validEdges,
+      hardClean: true,
+      routeResolution: 'full-route',
+      phaseTrace: [{
+        phase: 'unknown',
+        durationMs: 1,
+        candidateCount: 1,
+        changedEdgeCount: 1,
+        resolution: 'accepted',
+      }],
+    }, 'route-1')).toBeNull();
+    expect(parseDisplayEdgesWorkerResponse({
+      requestId: 'route-1',
+      edges: validEdges,
+      hardClean: true,
+      routeResolution: 'full-route',
+      phaseTrace: [{
+        phase: 'seed',
+        durationMs: Number.POSITIVE_INFINITY,
+        candidateCount: 1,
+        changedEdgeCount: 1,
+        resolution: 'accepted',
+      }],
+    }, 'route-1')).toBeNull();
     expect(parseDisplayEdgesWorkerResponse({
       requestId: 'repair-1',
       edges: validEdges,

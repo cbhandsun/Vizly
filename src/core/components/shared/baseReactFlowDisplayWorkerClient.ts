@@ -4,17 +4,24 @@ import {
   parseDisplayEdgesWorkerResponse,
   readDisplayEdgesWorkerRequestId,
   type DisplayEdgesWorkerRequest,
-  type DisplayEdgesWorkerResponse,
   type DisplayEdgesWorkerCandidateSource,
   type DisplayEdgesWorkerRouteResolution,
+  type DisplayRoutingFallbackLevel,
   type DisplayQualityMode,
 } from './baseReactFlowDisplayWorkerProtocol';
+import type { DisplayRoutingPhaseTrace } from './baseReactFlowDisplayRoutingTrace';
+import {
+  appendDisplayRoutingBoundedCandidate,
+  appendDisplayRoutingPhaseProgress,
+  updateDisplayRoutingDebugState,
+} from './baseReactFlowDisplayRoutingDebug';
 import { sanitizeBaseReactFlowPrecompiledRoutePatches } from './baseReactFlowPrecompiledRouteArtifact';
 import {
   createBaseReactFlowDisplayEdgePatches,
   doBaseReactFlowDisplayRoutesMatchExactly,
   mergeBaseReactFlowDisplayEdgePatches,
   sanitizeBaseReactFlowDisplayCachePatches,
+  sanitizeBaseReactFlowTrustedDisplayPatches,
 } from './baseReactFlowDisplayRoutingTransaction';
 import { createDisplayWorkerFinalQualityError } from './baseReactFlowDisplayWorkerFailure';
 import { projectBaseReactFlowDisplayWorkerInput } from './baseReactFlowDisplayWorkerProjection';
@@ -42,6 +49,9 @@ export type BaseReactFlowDisplayWorkerResult = {
   routeResolution: DisplayEdgesWorkerRouteResolution;
   /** Exact DTO edge baseline that produced the worker response. */
   projectedEdges: Edge[];
+  phaseTrace: DisplayRoutingPhaseTrace[];
+  affectedEdgeCount?: number;
+  fallbackLevel?: DisplayRoutingFallbackLevel;
 };
 type BaseReactFlowDisplayWorkerResponseResult = Omit<BaseReactFlowDisplayWorkerResult, 'projectedEdges'>;
 
@@ -62,28 +72,6 @@ export type DisplayQualityPolicy = {
 };
 
 type DisplayQualityCancel = () => void;
-type DisplayRoutingDebugState = {
-  stage?: string;
-  signature?: string;
-  nodeCount?: number;
-  edgeCount?: number;
-  requestId?: string;
-  updatedAt?: number;
-  scheduledAt?: number;
-  workerStartedAt?: number;
-  finalAppliedAt?: number;
-  cacheHitAt?: number;
-  routeMs?: number;
-  workerStartCount?: number;
-  workerAbortCount?: number;
-  error?: string;
-  boundedCandidate?: DisplayEdgesWorkerResponse['boundedCandidate'];
-  inputGeometryDigest?: string;
-  outputRouteSignature?: string;
-  routingVersion?: string;
-  workerResolution?: DisplayEdgesWorkerRouteResolution;
-  terminalDiagnostics?: unknown;
-};
 
 const DISPLAY_WORKER_TIMEOUT_MS = 60_000;
 const INTERACTIVE_DISPLAY_WORKER_TIMEOUT_MS = 12_000;
@@ -127,32 +115,6 @@ export const resolveBaseReactFlowDisplayQualityPolicy = ({
     mode: 'full',
     timeoutMs: DISPLAY_WORKER_TIMEOUT_MS,
   };
-};
-
-export const updateDisplayRoutingDebugState = (patch: DisplayRoutingDebugState): void => {
-  if (typeof window === 'undefined') return;
-  const host = window.location.hostname;
-  if (host !== 'localhost' && host !== '127.0.0.1' && host !== '::1') return;
-  const debugWindow = window as unknown as {
-    __vizlyBaseReactFlowDisplayRouting?: DisplayRoutingDebugState;
-  };
-  const nextState = {
-    ...(debugWindow.__vizlyBaseReactFlowDisplayRouting || {}),
-    ...patch,
-    updatedAt: Date.now(),
-  };
-  if (!Object.prototype.hasOwnProperty.call(patch, 'error')) {
-    delete nextState.error;
-  }
-  debugWindow.__vizlyBaseReactFlowDisplayRouting = nextState;
-  try {
-    document.documentElement.setAttribute(
-      'data-vizly-display-routing',
-      JSON.stringify(debugWindow.__vizlyBaseReactFlowDisplayRouting),
-    );
-  } catch {
-    // Debug-only mirror; rendering must not depend on it.
-  }
 };
 
 export const scheduleBaseReactFlowDisplayQuality = (
@@ -296,9 +258,18 @@ export const doesBaseReactFlowDisplayWorkerResolutionMatchOperation = (
   operation: DisplayEdgesWorkerRequest['operation'],
   routeResolution: DisplayEdgesWorkerRouteResolution,
 ): boolean => {
-  if (operation === 'route') return routeResolution === 'full-route';
+  if (operation === 'route') {
+    return routeResolution === 'full-route' || routeResolution === 'full-route-repaired';
+  }
   if (operation === 'repair') return routeResolution === 'repair';
-  return routeResolution === 'validated-candidate' || routeResolution === 'full-route';
+  if (operation === 'incremental-route') {
+    return routeResolution === 'incremental-route'
+      || routeResolution === 'full-route'
+      || routeResolution === 'full-route-repaired';
+  }
+  return routeResolution === 'validated-candidate'
+    || routeResolution === 'full-route'
+    || routeResolution === 'full-route-repaired';
 };
 
 const requestBaseReactFlowDisplayEdgesWorker = ({
@@ -360,11 +331,14 @@ const requestBaseReactFlowDisplayEdgesWorker = ({
         return;
       }
       if (response.boundedCandidate && !response.edges && !response.error) {
-        updateDisplayRoutingDebugState({
-          stage: 'worker-bounded-fallback',
-          requestId: request.requestId,
-          boundedCandidate: response.boundedCandidate,
-        });
+        appendDisplayRoutingBoundedCandidate(
+          response.boundedCandidate,
+          request.requestId,
+        );
+        return;
+      }
+      if (response.phaseProgress && !response.edges && !response.error) {
+        appendDisplayRoutingPhaseProgress(response.phaseProgress);
         return;
       }
       const responseEdges = Array.isArray(response.edges) ? response.edges : null;
@@ -375,6 +349,21 @@ const requestBaseReactFlowDisplayEdgesWorker = ({
           || !doesBaseReactFlowDisplayWorkerResolutionMatchOperation(
             request.operation,
             routeResolution,
+          )
+          || (
+            request.operation === 'incremental-route'
+              ? (
+                typeof response.affectedEdgeCount !== 'number'
+                || (
+                  routeResolution === 'incremental-route'
+                    ? response.fallbackLevel !== 'none'
+                    : response.fallbackLevel !== 'full'
+                )
+              )
+              : (
+                typeof response.affectedEdgeCount !== 'undefined'
+                || typeof response.fallbackLevel !== 'undefined'
+              )
           )
         ) {
           finish(() => {
@@ -434,6 +423,9 @@ const requestBaseReactFlowDisplayEdgesWorker = ({
           edges: responseEdges,
           hardClean: response.hardClean === true,
           routeResolution,
+          phaseTrace: response.phaseTrace ?? [],
+          affectedEdgeCount: response.affectedEdgeCount,
+          fallbackLevel: response.fallbackLevel,
         });
       });
     };
@@ -553,6 +545,94 @@ export const computeBaseReactFlowDisplayEdgesInWorker = async ({
       }
       : { ...routeRequest, operation: 'route' },
     qualityMode,
+    timeoutMs,
+    signal,
+  });
+  return { ...result, projectedEdges: projectedInput.edges };
+};
+
+export const computeBaseReactFlowDisplayEdgesIncrementallyInWorker = async ({
+  workerRef,
+  requestId,
+  edges,
+  nodes,
+  enableSmartEdges,
+  smartEdgePadding,
+  isLargeGraph,
+  displayEdgeEpoch,
+  baselineInputSignature,
+  baselineInputGeometryDigest,
+  baselineNodes,
+  baselineSourceEdges,
+  baselinePatches,
+  baselineOutputRouteSignature,
+  nextInputSignature,
+  nextInputGeometryDigest,
+  changeSet,
+  mutableEdgeIds,
+  contextEdgeIds,
+  timeoutMs = DISPLAY_WORKER_TIMEOUT_MS,
+  signal,
+}: {
+  workerRef: MutableRefObject<Worker | null>;
+  requestId: string;
+  edges: Edge[];
+  nodes: Node[];
+  enableSmartEdges: boolean;
+  smartEdgePadding: number;
+  isLargeGraph: boolean;
+  displayEdgeEpoch: number;
+  baselineInputSignature: string;
+  baselineInputGeometryDigest: string;
+  baselineNodes: Node[];
+  baselineSourceEdges: Edge[];
+  baselinePatches: Edge[];
+  baselineOutputRouteSignature: string;
+  nextInputSignature: string;
+  nextInputGeometryDigest: string;
+  changeSet: import('./baseReactFlowDisplayRoutingChangeSet').BaseReactFlowRoutingChangeSet;
+  mutableEdgeIds: string[];
+  contextEdgeIds: string[];
+  timeoutMs?: number;
+  signal?: AbortSignal;
+}): Promise<BaseReactFlowDisplayWorkerResult> => {
+  const projectedInput = projectBaseReactFlowDisplayWorkerInput({ edges, nodes });
+  const projectedBaseline = projectBaseReactFlowDisplayWorkerInput({
+    edges: baselineSourceEdges,
+    nodes: baselineNodes,
+  });
+  const safeBaselinePatches = sanitizeBaseReactFlowTrustedDisplayPatches(
+    projectedBaseline.edges,
+    baselinePatches,
+  );
+  if (!safeBaselinePatches) {
+    throw new Error('display-edge-worker-invalid-incremental-baseline');
+  }
+  const result = await requestBaseReactFlowDisplayEdgesWorker({
+    workerRef,
+    request: {
+      operation: 'incremental-route',
+      requestId,
+      edges: projectedInput.edges,
+      nodes: projectedInput.nodes,
+      enableSmartEdges,
+      smartEdgePadding,
+      isLargeGraph,
+      displayEdgeEpoch,
+      qualityMode: 'full',
+      baselineInputSignature,
+      baselineInputGeometryDigest,
+      baselineNodes: projectedBaseline.nodes,
+      baselineSourceEdges: projectedBaseline.edges,
+      baselinePatches: safeBaselinePatches,
+      baselineOutputRouteSignature,
+      nextInputSignature,
+      nextInputGeometryDigest,
+      changeSet,
+      mutableEdgeIds,
+      contextEdgeIds,
+    },
+    qualityMode: 'full',
     timeoutMs,
     signal,
   });

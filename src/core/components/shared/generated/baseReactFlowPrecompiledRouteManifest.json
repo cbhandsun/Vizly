@@ -1,9 +1,19 @@
 {
-  "schema": "vizly-precompiled-display-route-manifest-v1",
+  "schema": "vizly-precompiled-display-route-manifest-v2",
   "routingVersion": "2026-07-20-measured-terminal-hard-gates-v119",
-  "identitySourceHash": "source-v1:f57ef87c4a6951afd03a876fb8ebdf5ddd9fd9308fdf915cc97e9c19f894d167",
+  "identitySourceHash": "source-v1:c009080fcdf82e606d70db2f7f8ce3dbf144950f70770c7c884ae43758898c43",
   "entries": [
     {
+      "presetId": "logistics-architecture-v1",
+      "sourcePath": "src/data/standardized/LogisticsStandardData.json",
+      "artifactFile": "route-260383796.json",
+      "sourceHash": "source-v1:070569b411557fd5c080c8580c2c6bdc2534134ebddfa3e40a2cf5c1f25c1c44",
+      "inputSignature": "260383796",
+      "inputGeometryDigest": "geometry-v1:69d1b94c14981a3c285bbdd4cb3f69f8",
+      "outputRouteSignature": "route-v2:14:62:70f57d9ad8ea3ab4"
+    },
+    {
+      "presetId": "wms-process-flow-v1",
       "sourcePath": "src/data/standardized/WmsProcessFlowStandardData.json",
       "artifactFile": "route-466341211.json",
       "sourceHash": "source-v1:25907dec641afd53490cc910f19fbdadcd0c93b30d443e340272528f92f9ff42",

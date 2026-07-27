@@ -20,7 +20,7 @@ const ARTIFACT_DIR = resolve(GENERATED_DIR, 'precompiledRoutes');
 const MANIFEST_PATH = resolve(GENERATED_DIR, 'baseReactFlowPrecompiledRouteManifest.json');
 const LOADERS_PATH = resolve(GENERATED_DIR, 'baseReactFlowPrecompiledRouteLoaders.ts');
 const SCHEMA = 'vizly-precompiled-display-route-v1';
-const MANIFEST_SCHEMA = 'vizly-precompiled-display-route-manifest-v1';
+const MANIFEST_SCHEMA = 'vizly-precompiled-display-route-manifest-v2';
 const MAX_ARTIFACT_BYTES = 2_000_000;
 const ROUTING_VERSION_PATH = resolve(ROOT, 'src/core/routing/routingVersion.ts');
 const INPUT_IDENTITY_PATH = resolve(
@@ -86,7 +86,16 @@ const captureTarget = async (session, target, source, routingVersion) => {
   if (!preset || typeof preset.id !== 'string' || !preset.id) {
     throw new Error(`${target.sourcePath} does not contain a preset id`);
   }
-  const url = `${BASE_URL}/#/?diagram=${encodeURIComponent(preset.id)}`;
+  if (preset.id !== target.presetId) {
+    throw new Error(`${target.sourcePath} preset id does not match ${target.presetId}`);
+  }
+  await session.evaluate(`(() => {
+    window.__vizlyPrecompiledRouteRequest = null;
+    window.__vizlyPrecompiledRouteResponse = null;
+    return true;
+  })()`);
+  const url = `${BASE_URL}/?precompiledCapture=${encodeURIComponent(preset.id)}`
+    + `#/?diagram=${encodeURIComponent(preset.id)}`;
   await session.send('Page.navigate', { url });
   const deadline = Date.now() + readGenerationTimeoutMs();
   let captured = null;
@@ -135,6 +144,7 @@ const captureTarget = async (session, target, source, routingVersion) => {
     `Captured ${preset.id}: ${workerResolution}, workerStart=${routing.workerStartCount}, routeMs=${routing.routeMs}.`,
   );
   return {
+    presetId: preset.id,
     artifact: {
       schema: SCHEMA,
       routingVersion,
@@ -233,12 +243,18 @@ const main = async () => {
   const entries = [];
   const artifactContents = new Map();
   const signatures = new Set();
+  const presetIds = new Set();
   for (let index = 0; index < captures.length; index += 1) {
     const artifact = captures[index].artifact;
     if (signatures.has(artifact.inputSignature)) {
       throw new Error(`Duplicate precompiled route signature ${artifact.inputSignature}`);
     }
     signatures.add(artifact.inputSignature);
+    const presetId = captures[index].presetId;
+    if (presetIds.has(presetId)) {
+      throw new Error(`Duplicate precompiled route preset id ${presetId}`);
+    }
+    presetIds.add(presetId);
     const artifactFile = `route-${artifact.inputSignature}.json`;
     const artifactSource = renderPrecompiledRouteArtifact(artifact);
     if (Buffer.byteLength(artifactSource, 'utf8') > MAX_ARTIFACT_BYTES) {
@@ -246,6 +262,7 @@ const main = async () => {
     }
     artifactContents.set(artifactFile, artifactSource);
     entries.push({
+      presetId,
       sourcePath: PRECOMPILED_DISPLAY_ROUTE_TARGETS[index].sourcePath,
       artifactFile,
       sourceHash: artifact.sourceHash,

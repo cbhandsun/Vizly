@@ -23,6 +23,11 @@ import {
   type DisplayEdgesWorkerRequest,
   type DisplayEdgesWorkerResponse,
 } from './baseReactFlowDisplayWorkerProtocol';
+import {
+  startDisplayRoutingPhaseTrace,
+  type DisplayRoutingPhaseTrace,
+} from './baseReactFlowDisplayRoutingTrace';
+import { createBaseReactFlowIncrementalDisplayEdges } from './baseReactFlowDisplayIncrementalRoute';
 
 interface DisplayEdgesWorkerScope {
   postMessage: (response: DisplayEdgesWorkerResponse) => void;
@@ -55,18 +60,59 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
   request: DisplayEdgesWorkerRequest,
   onBoundedCandidate?: (report: BaseDisplayBoundedCandidateReport) => void,
 ): DisplayEdgesWorkerResponse => {
+  const phaseTrace: DisplayRoutingPhaseTrace[] = [];
+  const recordPhaseTrace = (trace: DisplayRoutingPhaseTrace): void => {
+    if (phaseTrace.length < 32) phaseTrace.push(trace);
+    postDisplayEdgesResponse({
+      requestId: request.requestId,
+      phaseProgress: trace,
+    });
+  };
   if (request.operation === 'repair') {
+    const repairTimer = startDisplayRoutingPhaseTrace({
+      phase: 'measured-repair',
+      candidateCount: request.edges.length,
+      onTrace: recordPhaseTrace,
+    });
     const repaired = repairBaseReactFlowMeasuredDisplayEdgesWithReport(
       request.edges,
       request.nodes,
     );
+    repairTimer.finish(repaired.report.hardClean ? 'accepted' : 'rejected', repaired.edges.length);
     return {
       requestId: request.requestId,
       edges: repaired.edges,
       hardClean: repaired.report.hardClean,
       routeResolution: 'repair',
+      phaseTrace,
     };
   }
+  let incrementalAffectedEdgeCount: number | undefined;
+  if (request.operation === 'incremental-route') {
+    const incremental = createBaseReactFlowIncrementalDisplayEdges({
+      request,
+      onPhaseTrace: recordPhaseTrace,
+      onBoundedCandidate,
+    });
+    incrementalAffectedEdgeCount = incremental.affectedEdgeCount;
+    if (incremental.edges) {
+      return {
+        requestId: request.requestId,
+        edges: incremental.edges,
+        hardClean: true,
+        routeResolution: 'incremental-route',
+        phaseTrace,
+        affectedEdgeCount: incremental.affectedEdgeCount,
+        fallbackLevel: 'none',
+      };
+    }
+  }
+  const incrementalFallbackMetadata = request.operation === 'incremental-route'
+    ? {
+      affectedEdgeCount: incrementalAffectedEdgeCount ?? 0,
+      fallbackLevel: 'full' as const,
+    }
+    : {};
   const safeCandidatePatches = request.operation === 'validate-or-route'
     && request.candidatePatches
     ? (request.candidateSource === 'precompiled'
@@ -79,18 +125,26 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
         ? mergeBaseReactFlowDisplayEdgePatches(request.edges, safeCandidatePatches)
         : null))
     : null;
+  const candidateTimer = startDisplayRoutingPhaseTrace({
+    phase: 'candidate-validation',
+    candidateCount: candidateEdges?.length ?? 0,
+    onTrace: recordPhaseTrace,
+  });
   if (
     candidateEdges
     && doesDisplayCandidateMatchSourceGraph(request.edges, candidateEdges)
     && baseReactFlowDisplayHardQualityIsClean(candidateEdges, request.nodes)
   ) {
+    candidateTimer.finish('hit');
     return {
       requestId: request.requestId,
       edges: candidateEdges,
       hardClean: true,
       routeResolution: 'validated-candidate',
+      phaseTrace,
     };
   }
+  candidateTimer.finish(candidateEdges ? 'rejected' : 'skip');
   const commonInput = {
     edges: request.edges,
     nodes: request.nodes,
@@ -100,12 +154,20 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
     displayEdgeEpoch: request.displayEdgeEpoch,
   };
   if (request.qualityMode === 'interactive') {
+    const interactiveTimer = startDisplayRoutingPhaseTrace({
+      phase: 'quality',
+      candidateCount: request.edges.length,
+      onTrace: recordPhaseTrace,
+    });
     const edges = createBaseReactFlowInteractiveDisplayEdges(commonInput);
+    interactiveTimer.finish('accepted', edges.length);
     return {
       requestId: request.requestId,
       edges,
       hardClean: baseReactFlowDisplayHardQualityIsClean(edges, request.nodes),
       routeResolution: 'full-route',
+      phaseTrace,
+      ...incrementalFallbackMetadata,
     };
   }
 
@@ -116,6 +178,7 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
   let exactReport: BaseReactFlowDisplayExactReport | undefined;
   const fullRouteEdges = createBaseReactFlowFullRouteEdges({
     ...commonInput,
+    onPhaseTrace: recordPhaseTrace,
     createPreDisplayFinalEdges: (preDisplayArgs) => {
       let boundedReport: BaseDisplayBoundedCandidateReport | undefined;
       const boundedEdges = createBaseReactFlowPreDisplayFinalEdges({
@@ -137,16 +200,44 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
       return boundedEdges;
     },
   });
+  const finalizerTimer = startDisplayRoutingPhaseTrace({
+    phase: 'finalizer',
+    candidateCount: fullRouteEdges.length,
+    onTrace: recordPhaseTrace,
+  });
   const finalized = finalizeBaseReactFlowDisplayEdgesWithReport(
     fullRouteEdges,
     request.nodes,
     exactReport,
   );
+  finalizerTimer.finish(finalized.report.hardClean ? 'accepted' : 'fallback', finalized.edges.length);
+  if (!finalized.report.hardClean) {
+    const repairTimer = startDisplayRoutingPhaseTrace({
+      phase: 'measured-repair',
+      candidateCount: finalized.edges.length,
+      onTrace: recordPhaseTrace,
+    });
+    const repaired = repairBaseReactFlowMeasuredDisplayEdgesWithReport(
+      finalized.edges,
+      request.nodes,
+    );
+    repairTimer.finish(repaired.report.hardClean ? 'accepted' : 'rejected', repaired.edges.length);
+    return {
+      requestId: request.requestId,
+      edges: repaired.edges,
+      hardClean: repaired.report.hardClean,
+      routeResolution: 'full-route-repaired',
+      phaseTrace,
+      ...incrementalFallbackMetadata,
+    };
+  }
   return {
     requestId: request.requestId,
     edges: finalized.edges,
     hardClean: finalized.report.hardClean,
     routeResolution: 'full-route',
+    phaseTrace,
+    ...incrementalFallbackMetadata,
   };
 };
 

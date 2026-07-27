@@ -1,0 +1,102 @@
+import type { DisplayGeometryBarrierResolution } from './baseReactFlowDisplayGeometryBarrier';
+import type { DisplayRoutingPhaseTrace } from './baseReactFlowDisplayRoutingTrace';
+import type {
+  DisplayEdgesWorkerResponse,
+  DisplayEdgesWorkerRouteResolution,
+  DisplayRoutingFallbackLevel,
+} from './baseReactFlowDisplayWorkerProtocol';
+
+type DisplayRoutingDebugState = {
+  stage?: string;
+  signature?: string;
+  nodeCount?: number;
+  edgeCount?: number;
+  requestId?: string;
+  updatedAt?: number;
+  scheduledAt?: number;
+  workerStartedAt?: number;
+  finalAppliedAt?: number;
+  cacheHitAt?: number;
+  routeMs?: number;
+  workerStartCount?: number;
+  workerAbortCount?: number;
+  error?: string;
+  boundedCandidate?: DisplayEdgesWorkerResponse['boundedCandidate'];
+  boundedCandidateTrace?: NonNullable<DisplayEdgesWorkerResponse['boundedCandidate']>[];
+  inputGeometryDigest?: string;
+  outputRouteSignature?: string;
+  routingVersion?: string;
+  workerResolution?: DisplayEdgesWorkerRouteResolution;
+  cacheTrustLevel?: 'runtime-committed' | 'external-candidate' | 'miss';
+  terminalDiagnostics?: unknown;
+  phaseTrace?: DisplayRoutingPhaseTrace[];
+  lastPhaseTrace?: DisplayRoutingPhaseTrace;
+  phaseProgressTrace?: DisplayRoutingPhaseTrace[];
+  affectedEdgeCount?: number;
+  fallbackLevel?: DisplayRoutingFallbackLevel;
+  geometryBarrierResolution?: DisplayGeometryBarrierResolution;
+  geometryBarrierMs?: number;
+  geometryBarrierSamples?: number;
+};
+
+type DisplayRoutingDebugWindow = Window & {
+  __vizlyBaseReactFlowDisplayRouting?: DisplayRoutingDebugState;
+};
+
+const readDisplayRoutingDebugWindow = (): DisplayRoutingDebugWindow | null => {
+  if (typeof window === 'undefined') return null;
+  const host = window.location.hostname;
+  if (host !== 'localhost' && host !== '127.0.0.1' && host !== '::1') return null;
+  return window as DisplayRoutingDebugWindow;
+};
+
+export const updateDisplayRoutingDebugState = (patch: DisplayRoutingDebugState): void => {
+  const debugWindow = readDisplayRoutingDebugWindow();
+  if (!debugWindow) return;
+  const nextState = {
+    ...(debugWindow.__vizlyBaseReactFlowDisplayRouting || {}),
+    ...patch,
+    updatedAt: Date.now(),
+  };
+  if (!Object.prototype.hasOwnProperty.call(patch, 'error')) delete nextState.error;
+  debugWindow.__vizlyBaseReactFlowDisplayRouting = nextState;
+  try {
+    document.documentElement.setAttribute(
+      'data-vizly-display-routing',
+      JSON.stringify(nextState),
+    );
+  } catch {
+    // Debug-only mirror; rendering must not depend on it.
+  }
+};
+
+export const appendDisplayRoutingPhaseProgress = (
+  trace: DisplayRoutingPhaseTrace,
+): void => {
+  const debugWindow = readDisplayRoutingDebugWindow();
+  if (!debugWindow) return;
+  const previous = debugWindow.__vizlyBaseReactFlowDisplayRouting?.phaseProgressTrace ?? [];
+  updateDisplayRoutingDebugState({
+    stage: 'worker-phase',
+    lastPhaseTrace: trace,
+    phaseProgressTrace: [...previous, trace].slice(-32),
+  });
+};
+
+export const appendDisplayRoutingBoundedCandidate = (
+  boundedCandidate: NonNullable<DisplayEdgesWorkerResponse['boundedCandidate']>,
+  requestId: string,
+): void => {
+  const debugWindow = readDisplayRoutingDebugWindow();
+  if (!debugWindow) return;
+  const boundedCandidateTrace = [
+    ...(debugWindow.__vizlyBaseReactFlowDisplayRouting?.boundedCandidateTrace ?? []),
+    boundedCandidate,
+  ].slice(-8);
+  updateDisplayRoutingDebugState({
+    stage: 'worker-bounded-fallback',
+    requestId,
+    boundedCandidate,
+    boundedCandidateTrace,
+  });
+};

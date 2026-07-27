@@ -20,7 +20,7 @@ import {
 import { parseDisplayEdgesWorkerResponse } from '../baseReactFlowDisplayWorkerProtocol';
 
 type WorkerHarnessRequest = {
-  operation: 'route' | 'repair' | 'validate-or-route';
+  operation: 'route' | 'repair' | 'validate-or-route' | 'incremental-route';
   requestId: string;
   candidateEdges?: Array<Record<string, unknown>> | null;
   candidatePatches?: Array<Record<string, unknown>> | null;
@@ -94,12 +94,19 @@ afterEach(() => {
 describe('baseReactFlowDisplayWorkerClient', () => {
   it.each([
     ['route', 'full-route', true],
+    ['route', 'full-route-repaired', true],
     ['route', 'validated-candidate', false],
     ['route', 'repair', false],
+    ['incremental-route', 'incremental-route', true],
+    ['incremental-route', 'full-route', true],
+    ['incremental-route', 'full-route-repaired', true],
+    ['incremental-route', 'validated-candidate', false],
     ['repair', 'repair', true],
     ['repair', 'full-route', false],
+    ['repair', 'full-route-repaired', false],
     ['validate-or-route', 'validated-candidate', true],
     ['validate-or-route', 'full-route', true],
+    ['validate-or-route', 'full-route-repaired', true],
     ['validate-or-route', 'repair', false],
   ] as const)(
     'binds %s requests to the %s resolution (%s)',
@@ -124,6 +131,12 @@ describe('baseReactFlowDisplayWorkerClient', () => {
       hardClean: true,
       routeResolution: 'repair',
     }, 'repair-1')).not.toBeNull();
+    expect(parseDisplayEdgesWorkerResponse({
+      requestId: 'route-1',
+      edges: validEdges,
+      hardClean: true,
+      routeResolution: 'full-route-repaired',
+    }, 'route-1')).not.toBeNull();
     expect(parseDisplayEdgesWorkerResponse({
       requestId: 'repair-1',
       edges: validEdges,
@@ -243,8 +256,9 @@ describe('baseReactFlowDisplayWorkerClient', () => {
     expect(workerRef.current).toBeNull();
   });
 
-  it('prewarms one worker and preserves trusted hard-clean response metadata', async () => {
+  it('accepts a single in-job repaired response from the prewarmed worker', async () => {
     const listeners = new Map<string, Set<EventListener>>();
+    let postedCount = 0;
     class TestWorker {
       addEventListener(type: string, listener: EventListener) {
         const entries = listeners.get(type) ?? new Set<EventListener>();
@@ -257,6 +271,7 @@ describe('baseReactFlowDisplayWorkerClient', () => {
       }
 
       postMessage(message: { requestId: string }) {
+        postedCount += 1;
         queueMicrotask(() => {
           for (const listener of listeners.get('message') ?? []) {
             listener({
@@ -264,7 +279,7 @@ describe('baseReactFlowDisplayWorkerClient', () => {
                 requestId: message.requestId,
                 edges: [{ id: 'edge', source: 'source', target: 'target' }],
                 hardClean: true,
-                routeResolution: 'full-route',
+                routeResolution: 'full-route-repaired',
               },
             } as MessageEvent);
           }
@@ -293,8 +308,10 @@ describe('baseReactFlowDisplayWorkerClient', () => {
     })).resolves.toMatchObject({
       edges: [{ id: 'edge', source: 'source', target: 'target' }],
       hardClean: true,
+      routeResolution: 'full-route-repaired',
     });
     expect(workerRef.current).toBe(warmedWorker);
+    expect(postedCount).toBe(1);
   });
 
   it('reuses the prewarmed worker for a route request and its repair-only follow-up', async () => {

@@ -1,6 +1,12 @@
 import type { Edge, Node } from '@xyflow/react';
 
 import type { BaseDisplayBoundedCandidateReport } from './baseReactFlowDisplayEvaluation';
+import {
+  DISPLAY_ROUTING_PHASE_NAMES,
+  DISPLAY_ROUTING_PHASE_RESOLUTIONS,
+  type DisplayRoutingPhaseTrace,
+} from './baseReactFlowDisplayRoutingTrace';
+import type { BaseReactFlowRoutingChangeSet } from './baseReactFlowDisplayRoutingChangeSet';
 
 const MAX_REQUEST_ID_LENGTH = 4_096;
 export const DISPLAY_WORKER_MAX_GRAPH_ITEMS = 10_000;
@@ -15,6 +21,21 @@ const MAX_OBJECT_KEYS = 120;
 const MAX_TOTAL_DATA_VALUES = 1_000_000;
 const MAX_STRING_LENGTH = 20_000;
 const MAX_QUALITY_METRIC = 1_000_000_000_000_000;
+const INPUT_SIGNATURE_PATTERN = /^\d{1,10}$/;
+const GEOMETRY_DIGEST_PATTERN = /^geometry-v1:[0-9a-f]{32}$/;
+const OUTPUT_ROUTE_SIGNATURE_PATTERN = /^route-v2:\d{1,3}:\d{1,6}:[0-9a-f]{16}$/;
+const ROUTING_CHANGE_REASONS = new Set([
+  'node-drag',
+  'node-resize',
+  'node-add',
+  'node-remove',
+  'edge-add',
+  'edge-remove',
+  'port-policy',
+  'container-change',
+  'layout',
+  'unknown',
+]);
 
 const DISPLAY_EDGE_KEYS = new Set([
   'id',
@@ -62,7 +83,12 @@ const QUALITY_KEYS = [
 
 export type DisplayQualityMode = 'full' | 'interactive';
 export type DisplayEdgesWorkerCandidateSource = 'persistent' | 'precompiled';
-export type DisplayEdgesWorkerRouteResolution = 'validated-candidate' | 'full-route' | 'repair';
+export type DisplayEdgesWorkerRouteResolution =
+  | 'validated-candidate'
+  | 'incremental-route'
+  | 'full-route'
+  | 'full-route-repaired'
+  | 'repair';
 
 export type DisplayEdgesWorkerRouteRequest = {
   operation: 'route';
@@ -95,10 +121,31 @@ export type DisplayEdgesWorkerRepairRequest = {
   nodes: Node[];
 };
 
+export type DisplayEdgesWorkerIncrementalRouteRequest = Omit<
+  DisplayEdgesWorkerRouteRequest,
+  'operation'
+> & {
+  operation: 'incremental-route';
+  baselineInputSignature: string;
+  baselineInputGeometryDigest: string;
+  baselineNodes: Node[];
+  baselineSourceEdges: Edge[];
+  baselinePatches: Edge[];
+  baselineOutputRouteSignature: string;
+  nextInputSignature: string;
+  nextInputGeometryDigest: string;
+  changeSet: BaseReactFlowRoutingChangeSet;
+  mutableEdgeIds: string[];
+  contextEdgeIds: string[];
+};
+
 export type DisplayEdgesWorkerRequest =
   | DisplayEdgesWorkerRouteRequest
   | DisplayEdgesWorkerValidateOrRouteRequest
+  | DisplayEdgesWorkerIncrementalRouteRequest
   | DisplayEdgesWorkerRepairRequest;
+
+export type DisplayRoutingFallbackLevel = 'none' | 'full';
 
 export type DisplayEdgesWorkerResponse = {
   requestId: string;
@@ -107,6 +154,10 @@ export type DisplayEdgesWorkerResponse = {
   routeResolution?: DisplayEdgesWorkerRouteResolution;
   error?: string;
   boundedCandidate?: BaseDisplayBoundedCandidateReport;
+  phaseTrace?: DisplayRoutingPhaseTrace[];
+  phaseProgress?: DisplayRoutingPhaseTrace;
+  affectedEdgeCount?: number;
+  fallbackLevel?: DisplayRoutingFallbackLevel;
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
@@ -301,6 +352,45 @@ export const readDisplayEdgesWorkerRequestId = (value: unknown): string | null =
   return isBoundedString(value.requestId, MAX_REQUEST_ID_LENGTH) ? value.requestId : null;
 };
 
+const parseBoundedIdentifierList = (value: unknown): string[] | null => {
+  if (!Array.isArray(value) || value.length > DISPLAY_WORKER_MAX_GRAPH_ITEMS) return null;
+  const identifiers = new Set<string>();
+  for (const item of value) {
+    if (!isBoundedString(item, MAX_IDENTIFIER_LENGTH) || identifiers.has(item)) return null;
+    identifiers.add(item);
+  }
+  return [...identifiers];
+};
+
+const parseRoutingChangeSet = (value: unknown): BaseReactFlowRoutingChangeSet | null => {
+  if (!isRecord(value)) return null;
+  const keys = Object.keys(value);
+  if (
+    keys.length !== 5
+    || !keys.every(key => (
+      key === 'reason'
+      || key === 'changedNodeIds'
+      || key === 'changedEdgeIds'
+      || key === 'topologyChanged'
+      || key === 'geometryChanged'
+    ))
+    || typeof value.reason !== 'string'
+    || !ROUTING_CHANGE_REASONS.has(value.reason)
+    || typeof value.topologyChanged !== 'boolean'
+    || typeof value.geometryChanged !== 'boolean'
+  ) return null;
+  const changedNodeIds = parseBoundedIdentifierList(value.changedNodeIds);
+  const changedEdgeIds = parseBoundedIdentifierList(value.changedEdgeIds);
+  if (!changedNodeIds || !changedEdgeIds) return null;
+  return {
+    reason: value.reason as BaseReactFlowRoutingChangeSet['reason'],
+    changedNodeIds,
+    changedEdgeIds,
+    topologyChanged: value.topologyChanged,
+    geometryChanged: value.geometryChanged,
+  };
+};
+
 /**
  * Treats worker messages as an external boundary. The main thread already
  * projects graph values before posting; this parser rejects malformed roots,
@@ -318,7 +408,11 @@ export const parseDisplayEdgesWorkerRequest = (
   if (value.operation === 'repair') {
     return { operation: 'repair', requestId, edges, nodes };
   }
-  if (value.operation !== 'route' && value.operation !== 'validate-or-route') return null;
+  if (
+    value.operation !== 'route'
+    && value.operation !== 'validate-or-route'
+    && value.operation !== 'incremental-route'
+  ) return null;
   if (typeof value.enableSmartEdges !== 'boolean') return null;
   if (typeof value.isLargeGraph !== 'boolean') return null;
   if (
@@ -341,6 +435,38 @@ export const parseDisplayEdgesWorkerRequest = (
     displayEdgeEpoch: value.displayEdgeEpoch as number,
     qualityMode: value.qualityMode,
   };
+  if (value.operation === 'incremental-route') {
+    const changeSet = parseRoutingChangeSet(value.changeSet);
+    const mutableEdgeIds = parseBoundedIdentifierList(value.mutableEdgeIds);
+    const contextEdgeIds = parseBoundedIdentifierList(value.contextEdgeIds);
+    if (
+      !INPUT_SIGNATURE_PATTERN.test(String(value.baselineInputSignature ?? ''))
+      || !GEOMETRY_DIGEST_PATTERN.test(String(value.baselineInputGeometryDigest ?? ''))
+      || !OUTPUT_ROUTE_SIGNATURE_PATTERN.test(String(value.baselineOutputRouteSignature ?? ''))
+      || !INPUT_SIGNATURE_PATTERN.test(String(value.nextInputSignature ?? ''))
+      || !GEOMETRY_DIGEST_PATTERN.test(String(value.nextInputGeometryDigest ?? ''))
+      || !isDisplayGraph(value.baselineSourceEdges, value.baselineNodes)
+      || !isDisplayEdgesWorkerEdgeList(value.baselinePatches)
+      || !changeSet
+      || !mutableEdgeIds
+      || !contextEdgeIds
+    ) return null;
+    return {
+      ...routeRequest,
+      operation: 'incremental-route',
+      baselineInputSignature: value.baselineInputSignature as string,
+      baselineInputGeometryDigest: value.baselineInputGeometryDigest as string,
+      baselineNodes: value.baselineNodes as Node[],
+      baselineSourceEdges: value.baselineSourceEdges as Edge[],
+      baselinePatches: value.baselinePatches,
+      baselineOutputRouteSignature: value.baselineOutputRouteSignature as string,
+      nextInputSignature: value.nextInputSignature as string,
+      nextInputGeometryDigest: value.nextInputGeometryDigest as string,
+      changeSet,
+      mutableEdgeIds,
+      contextEdgeIds,
+    };
+  }
   if (value.operation === 'validate-or-route') {
     if (value.candidateSource !== 'persistent' && value.candidateSource !== 'precompiled') {
       return null;
@@ -398,6 +524,40 @@ const isBoundedCandidate = (value: unknown): value is BaseDisplayBoundedCandidat
     ));
 };
 
+const isDisplayRoutingPhaseTrace = (value: unknown): value is DisplayRoutingPhaseTrace => {
+  if (!isRecord(value)) return false;
+  const keys = Object.keys(value);
+  return keys.length === 5
+    && keys.every(key => (
+      key === 'phase'
+      || key === 'durationMs'
+      || key === 'candidateCount'
+      || key === 'changedEdgeCount'
+      || key === 'resolution'
+    ))
+    && (DISPLAY_ROUTING_PHASE_NAMES as readonly unknown[]).includes(value.phase)
+    && (DISPLAY_ROUTING_PHASE_RESOLUTIONS as readonly unknown[]).includes(value.resolution)
+    && isFiniteNumber(value.durationMs)
+    && value.durationMs >= 0
+    && value.durationMs <= 600_000
+    && Number.isSafeInteger(value.candidateCount)
+    && (value.candidateCount as number) >= 0
+    && (value.candidateCount as number) <= 1_000_000
+    && Number.isSafeInteger(value.changedEdgeCount)
+    && (value.changedEdgeCount as number) >= 0
+    && (value.changedEdgeCount as number) <= 1_000_000;
+};
+
+const parseDisplayRoutingPhaseTrace = (
+  value: unknown,
+): DisplayRoutingPhaseTrace[] | null => (
+  Array.isArray(value)
+  && value.length <= 32
+  && value.every(isDisplayRoutingPhaseTrace)
+    ? value
+    : null
+);
+
 /** Validates a response before the main thread merges worker-owned geometry. */
 export const parseDisplayEdgesWorkerResponse = (
   value: unknown,
@@ -407,9 +567,21 @@ export const parseDisplayEdgesWorkerResponse = (
   const hasError = typeof value.error !== 'undefined';
   const hasBoundedCandidate = typeof value.boundedCandidate !== 'undefined';
   const hasEdges = typeof value.edges !== 'undefined';
-  if (Number(hasError) + Number(hasBoundedCandidate) + Number(hasEdges) !== 1) return null;
+  const hasPhaseProgress = typeof value.phaseProgress !== 'undefined';
+  if (
+    Number(hasError)
+    + Number(hasBoundedCandidate)
+    + Number(hasEdges)
+    + Number(hasPhaseProgress) !== 1
+  ) return null;
   if (hasError) {
-    if (typeof value.routeResolution !== 'undefined') return null;
+    if (
+      typeof value.routeResolution !== 'undefined'
+      || typeof value.phaseTrace !== 'undefined'
+      || typeof value.phaseProgress !== 'undefined'
+      || typeof value.affectedEdgeCount !== 'undefined'
+      || typeof value.fallbackLevel !== 'undefined'
+    ) return null;
     if (typeof value.error !== 'string') return null;
     return value.error.length > 0 && value.error.length <= 256
       ? { requestId: expectedRequestId, error: value.error }
@@ -419,17 +591,48 @@ export const parseDisplayEdgesWorkerResponse = (
     if (
       typeof value.hardClean !== 'undefined'
       || typeof value.routeResolution !== 'undefined'
+      || typeof value.phaseTrace !== 'undefined'
+      || typeof value.phaseProgress !== 'undefined'
+      || typeof value.affectedEdgeCount !== 'undefined'
+      || typeof value.fallbackLevel !== 'undefined'
     ) return null;
     return isBoundedCandidate(value.boundedCandidate)
       ? { requestId: expectedRequestId, boundedCandidate: value.boundedCandidate }
       : null;
   }
+  if (hasPhaseProgress) {
+    if (
+      typeof value.hardClean !== 'undefined'
+      || typeof value.routeResolution !== 'undefined'
+      || typeof value.phaseTrace !== 'undefined'
+      || typeof value.affectedEdgeCount !== 'undefined'
+      || typeof value.fallbackLevel !== 'undefined'
+    ) return null;
+    return isDisplayRoutingPhaseTrace(value.phaseProgress)
+      ? { requestId: expectedRequestId, phaseProgress: value.phaseProgress }
+      : null;
+  }
+  const phaseTrace = typeof value.phaseTrace === 'undefined'
+    ? []
+    : parseDisplayRoutingPhaseTrace(value.phaseTrace);
+  const hasIncrementalMetadata = typeof value.affectedEdgeCount !== 'undefined'
+    || typeof value.fallbackLevel !== 'undefined';
+  const incrementalMetadataIsValid = !hasIncrementalMetadata || (
+    Number.isSafeInteger(value.affectedEdgeCount)
+    && (value.affectedEdgeCount as number) >= 0
+    && (value.affectedEdgeCount as number) <= DISPLAY_WORKER_MAX_GRAPH_ITEMS
+    && (value.fallbackLevel === 'none' || value.fallbackLevel === 'full')
+  );
   if (
     !isDisplayEdgesWorkerEdgeList(value.edges)
+    || !phaseTrace
+    || !incrementalMetadataIsValid
     || typeof value.hardClean !== 'boolean'
     || (
       value.routeResolution !== 'validated-candidate'
+      && value.routeResolution !== 'incremental-route'
       && value.routeResolution !== 'full-route'
+      && value.routeResolution !== 'full-route-repaired'
       && value.routeResolution !== 'repair'
     )
   ) return null;
@@ -438,5 +641,12 @@ export const parseDisplayEdgesWorkerResponse = (
     edges: value.edges,
     hardClean: value.hardClean,
     routeResolution: value.routeResolution,
+    phaseTrace,
+    affectedEdgeCount: hasIncrementalMetadata
+      ? value.affectedEdgeCount as number
+      : undefined,
+    fallbackLevel: hasIncrementalMetadata
+      ? value.fallbackLevel as DisplayRoutingFallbackLevel
+      : undefined,
   };
 };

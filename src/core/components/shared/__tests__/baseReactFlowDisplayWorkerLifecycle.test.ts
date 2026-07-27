@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { Edge } from '@xyflow/react';
 
 import {
   computeBaseReactFlowDisplayEdgesInWorker,
@@ -12,7 +13,14 @@ import {
 } from '../baseReactFlowDisplayFallback';
 import {
   computeBaseReactFlowDisplayCacheSignature,
+  computeBaseReactFlowDisplayOutputRouteSignature,
 } from '../baseReactFlowDisplayEdgeCore';
+import {
+  clearBaseReactFlowDisplayCommittedSnapshots,
+  doesBaseReactFlowDisplayCommittedBaselineMatchIdentity,
+  readBaseReactFlowDisplayCommittedSnapshot,
+  writeBaseReactFlowDisplayCommittedSnapshot,
+} from '../baseReactFlowDisplayCommittedSnapshot';
 import {
   computeBaseReactFlowDisplayGeometryDigest,
   computeBaseReactFlowDisplayInputIdentityBundle,
@@ -22,6 +30,11 @@ import {
   shouldRepairBaseReactFlowDisplayResult,
 } from '../baseReactFlowDisplayCommitPolicy';
 import { resolveBaseReactFlowRoutingComputation } from '../baseReactFlowDragRoutingFreeze';
+import { createBaseReactFlowDisplayEdgePatches } from '../baseReactFlowDisplayRoutingTransaction';
+import {
+  createBaseReactFlowRoutingAffectedClosure,
+  createBaseReactFlowRoutingChangeSet,
+} from '../baseReactFlowDisplayRoutingChangeSet';
 
 const installWorkerHarness = () => {
   const terminate = vi.fn();
@@ -63,11 +76,142 @@ const installWorkerHarness = () => {
 };
 
 afterEach(() => {
+  clearBaseReactFlowDisplayCommittedSnapshots();
   vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
 describe('baseReactFlowDisplayWorker lifecycle', () => {
+  it('replays only a copy-isolated hard-clean runtime committed snapshot', () => {
+    const sourceEdges: Edge[] = [{
+      id: 'edge',
+      source: 'source',
+      target: 'target',
+      label: 'current label',
+      data: {
+        businessMetadata: { owner: 'current' },
+        computedPath: [{ x: 0, y: 0 }, { x: 20, y: 0 }],
+      },
+    }];
+    const routedEdges: Edge[] = [{
+      ...sourceEdges[0],
+      sourceHandle: 'right',
+      targetHandle: 'left',
+      data: {
+        ...(sourceEdges[0].data || {}),
+        computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
+      },
+    }];
+    const displayPatches = createBaseReactFlowDisplayEdgePatches(sourceEdges, routedEdges);
+    const outputRouteSignature = computeBaseReactFlowDisplayOutputRouteSignature(routedEdges);
+    expect(displayPatches).not.toBeNull();
+    expect(outputRouteSignature).not.toBeNull();
+    if (!displayPatches || !outputRouteSignature) {
+      throw new Error('expected a valid committed display snapshot');
+    }
+    expect(writeBaseReactFlowDisplayCommittedSnapshot({
+      inputSignature: '123',
+      inputGeometryDigest: `geometry-v1:${'a'.repeat(32)}`,
+      sourceEdges,
+      sourceNodes: [],
+      displayPatches,
+      outputRouteSignature,
+    })).toBe(true);
+
+    const mutablePath = (displayPatches?.[0].data as Record<string, unknown>)?.computedPath;
+    if (Array.isArray(mutablePath)) mutablePath[1] = { x: 999, y: 999 };
+    const firstHit = readBaseReactFlowDisplayCommittedSnapshot({
+      inputSignature: '123',
+      inputGeometryDigest: `geometry-v1:${'a'.repeat(32)}`,
+      sourceEdges,
+    });
+    expect((firstHit?.edges[0].data as Record<string, unknown>)?.computedPath).toEqual([
+      { x: 0, y: 0 },
+      { x: 100, y: 0 },
+    ]);
+    expect(firstHit?.edges[0].label).toBe('current label');
+    expect((firstHit?.edges[0].data as Record<string, unknown>)?.businessMetadata).toEqual({
+      owner: 'current',
+    });
+
+    const firstHitPath = (firstHit?.edges[0].data as Record<string, unknown>)?.computedPath;
+    if (Array.isArray(firstHitPath)) firstHitPath[1] = { x: 777, y: 777 };
+    const secondHit = readBaseReactFlowDisplayCommittedSnapshot({
+      inputSignature: '123',
+      inputGeometryDigest: `geometry-v1:${'a'.repeat(32)}`,
+      sourceEdges,
+    });
+    expect((secondHit?.edges[0].data as Record<string, unknown>)?.computedPath).toEqual([
+      { x: 0, y: 0 },
+      { x: 100, y: 0 },
+    ]);
+    expect(doesBaseReactFlowDisplayCommittedBaselineMatchIdentity(
+      secondHit?.baseline ?? null,
+      '123',
+      `geometry-v1:${'a'.repeat(32)}`,
+    )).toBe(true);
+    expect(doesBaseReactFlowDisplayCommittedBaselineMatchIdentity(
+      secondHit?.baseline ?? null,
+      '124',
+      `geometry-v1:${'a'.repeat(32)}`,
+    )).toBe(false);
+  });
+
+  it('rejects invalid committed identities and evicts the oldest bounded entry', () => {
+    const sourceEdges: Edge[] = [{
+      id: 'edge',
+      source: 'source',
+      target: 'target',
+      data: { computedPath: [{ x: 0, y: 0 }, { x: 20, y: 0 }] },
+    }];
+    const routedEdges: Edge[] = [{
+      ...sourceEdges[0],
+      data: { computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }] },
+    }];
+    const displayPatches = createBaseReactFlowDisplayEdgePatches(sourceEdges, routedEdges);
+    const outputRouteSignature = computeBaseReactFlowDisplayOutputRouteSignature(routedEdges);
+    if (!displayPatches || !outputRouteSignature) {
+      throw new Error('expected a valid committed display snapshot');
+    }
+    expect(writeBaseReactFlowDisplayCommittedSnapshot({
+      inputSignature: 'invalid',
+      inputGeometryDigest: `geometry-v1:${'a'.repeat(32)}`,
+      sourceEdges,
+      sourceNodes: [],
+      displayPatches,
+      outputRouteSignature,
+    })).toBe(false);
+    expect(writeBaseReactFlowDisplayCommittedSnapshot({
+      inputSignature: '1',
+      inputGeometryDigest: 'invalid-digest',
+      sourceEdges,
+      sourceNodes: [],
+      displayPatches,
+      outputRouteSignature,
+    })).toBe(false);
+
+    for (let index = 0; index < 17; index += 1) {
+      expect(writeBaseReactFlowDisplayCommittedSnapshot({
+        inputSignature: String(index + 1),
+        inputGeometryDigest: `geometry-v1:${index.toString(16).padStart(32, '0')}`,
+        sourceEdges,
+        sourceNodes: [],
+        displayPatches,
+        outputRouteSignature,
+      })).toBe(true);
+    }
+    expect(readBaseReactFlowDisplayCommittedSnapshot({
+      inputSignature: '1',
+      inputGeometryDigest: `geometry-v1:${'0'.repeat(32)}`,
+      sourceEdges,
+    })).toBeNull();
+    expect(readBaseReactFlowDisplayCommittedSnapshot({
+      inputSignature: '17',
+      inputGeometryDigest: `geometry-v1:${(16).toString(16).padStart(32, '0')}`,
+      sourceEdges,
+    })?.outputRouteSignature).toBe(outputRouteSignature);
+  });
+
   it('does not traverse routing inputs while a node is being dragged', () => {
     const compute = vi.fn(() => 'computed');
 
@@ -88,6 +232,80 @@ describe('baseReactFlowDisplayWorker lifecycle', () => {
       compute,
     })).toBe('computed');
     expect(compute).toHaveBeenCalledOnce();
+  });
+
+  it('keeps drag mutation incident-only while siblings remain frozen context', () => {
+    const baselineNodes = [
+      {
+        id: 'tms',
+        position: { x: 0, y: 0 },
+        measured: { width: 100, height: 60 },
+        data: {},
+      },
+      ...Array.from({ length: 6 }, (_, index) => ({
+        id: `target-${index}`,
+        position: { x: 300, y: index * 100 },
+        measured: { width: 100, height: 60 },
+        data: {},
+      })),
+      ...Array.from({ length: 6 }, (_, index) => ({
+        id: `peer-${index}`,
+        position: { x: 600, y: index * 100 },
+        measured: { width: 100, height: 60 },
+        data: {},
+      })),
+    ];
+    const nextNodes = baselineNodes.map(node => (
+      node.id === 'tms'
+        ? { ...node, position: { x: 40, y: 20 } }
+        : node
+    ));
+    const incidentEdges: Edge[] = Array.from({ length: 6 }, (_, index) => ({
+      id: `incident-${index}`,
+      source: 'tms',
+      target: `target-${index}`,
+      data: {
+        computedPath: [
+          { x: 100, y: 30 },
+          { x: 300, y: index * 100 + 30 },
+        ],
+      },
+    }));
+    const siblingEdges: Edge[] = Array.from({ length: 6 }, (_, index) => ({
+      id: `sibling-${index}`,
+      source: `peer-${index}`,
+      target: `target-${index}`,
+      data: {
+        computedPath: [
+          { x: 600, y: index * 100 + 30 },
+          { x: 400, y: index * 100 + 30 },
+        ],
+      },
+    }));
+    const allEdges = [...incidentEdges, ...siblingEdges];
+    const changeSet = createBaseReactFlowRoutingChangeSet({
+      previousNodes: baselineNodes,
+      previousEdges: allEdges,
+      nextNodes,
+      nextEdges: allEdges,
+      reasonHint: 'node-drag',
+    });
+    const closure = createBaseReactFlowRoutingAffectedClosure({
+      changeSet,
+      previousNodes: baselineNodes,
+      nextNodes,
+      baselineEdges: allEdges,
+      nextEdges: allEdges,
+    });
+
+    expect(changeSet).toMatchObject({
+      reason: 'node-drag',
+      changedNodeIds: ['tms'],
+      topologyChanged: false,
+      geometryChanged: true,
+    });
+    expect(closure.mutableEdgeIds).toEqual(incidentEdges.map(edge => edge.id).sort());
+    expect(closure.contextEdgeIds).toEqual(siblingEdges.map(edge => edge.id).sort());
   });
 
   it.each(['error', 'messageerror'] as const)(
@@ -433,7 +651,7 @@ describe('baseReactFlowDisplayWorker lifecycle', () => {
     });
   });
 
-  it('leaves stable routes on their self-updating renderer during node dragging', () => {
+  it('uses endpoint-driven fallback for stable routes during node dragging', () => {
     const stable = {
       id: 'stable',
       source: 'source',
@@ -450,7 +668,10 @@ describe('baseReactFlowDisplayWorker lifecycle', () => {
 
     const fallback = createBaseReactFlowNodeDragFallbackEdges([stable, plain]);
 
-    expect(fallback[0]).toBe(stable);
+    expect(fallback[0]).toEqual({
+      ...stable,
+      type: 'smoothstep',
+    });
     expect(fallback[1]).toBe(plain);
   });
 
