@@ -8,6 +8,7 @@ const node = (id: string, y: number, parentId?: string): Node => ({
     data: {},
     parentId,
 });
+
 describe('resolveFloatingContextToolbarOffset', () => {
     it('clears a nearby parent group header', () => {
         expect(resolveFloatingContextToolbarOffset([
