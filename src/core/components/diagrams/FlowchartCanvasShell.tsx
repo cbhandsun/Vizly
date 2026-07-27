@@ -123,8 +123,7 @@ export const FlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> = React.m
             onConnect={onConnect}
             onConnectStart={onConnectStart}
             onConnectEnd={onConnectEnd}
-            fitView
-            fitMode="fitAll"
+            fitMode="none"
             fitPadding={0.1}
             pinFit={false}
             style={{ width: '100%', height: '100%' }}

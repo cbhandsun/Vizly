@@ -17,4 +17,3 @@ export const resolveFloatingContextToolbarOffset = (
         ? GROUP_HEADER_CLEARANCE_OFFSET
         : DEFAULT_TOOLBAR_OFFSET;
 };
-

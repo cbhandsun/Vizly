@@ -137,4 +137,26 @@ describe('baseReactFlowRenderableNodes', () => {
     expect((merged[0] as any).measured.height).toBe(199);
     expect(merged[0].height).toBe(199);
   });
+
+  it('prefers current React Flow internals over a stale top-level absolute position', () => {
+    const source = {
+      id: 'node',
+      position: { x: 50, y: 50 },
+      positionAbsolute: { x: -474, y: -2024 },
+      measured: { width: 120, height: 60 },
+      data: {},
+    } as unknown as Node;
+    const internal = {
+      ...source,
+      positionAbsolute: { x: -474, y: -2024 },
+      internals: { positionAbsolute: { x: 50, y: 50 } },
+    } as unknown as Node;
+
+    const merged = mergeBaseReactFlowMeasuredNodes([source], [internal]);
+
+    expect(merged[0]).toMatchObject({
+      position: { x: 50, y: 50 },
+      positionAbsolute: { x: 50, y: 50 },
+    });
+  });
 });

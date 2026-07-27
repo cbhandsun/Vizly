@@ -42,6 +42,23 @@ describe('flowchart architecture boundaries', () => {
         expect(Number.isFinite(position.y)).toBe(true);
     });
 
+    it('places consecutive palette nodes beside existing center content', () => {
+        const first = resolveFlowchartPluginNodePosition({
+            viewport: { x: 0, y: 0, zoom: 1 },
+            containerWidth: 400,
+            containerHeight: 200,
+        });
+        const second = resolveFlowchartPluginNodePosition({
+            viewport: { x: 0, y: 0, zoom: 1 },
+            containerWidth: 400,
+            containerHeight: 200,
+            existingNodes: [{ position: first, width: 120, height: 60 }],
+        });
+
+        expect(first).toEqual({ x: 150, y: 75 });
+        expect(second).toEqual({ x: 298, y: 75 });
+    });
+
     it('keeps plugin renderer maps stable and lets plugins override defaults', () => {
         const loadPluginRenderers = vi.fn(() => ({ custom: 'plugin-custom', pluginNode: 'plugin-node' }));
         const resolveRenderers = createStableFlowchartRendererMapResolver(

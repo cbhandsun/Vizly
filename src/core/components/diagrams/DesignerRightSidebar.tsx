@@ -19,6 +19,7 @@ const PropertyPanel = React.lazy(() => import('./PropertyPanel'));
 
 export interface DesignerRightSidebarProps {
     activeTab: 'property' | 'ai';
+    diagramId?: string;
     onTabChange: (tab: 'property' | 'ai') => void;
     aiChatVisible: boolean;
     setAiChatVisible: (v: boolean) => void;
@@ -46,6 +47,7 @@ const RAIL_WIDTH = 44; // Matched with exact IconRailSidebar width
  */
 export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.memo(({
     activeTab,
+    diagramId,
     onTabChange,
     aiChatVisible,
     setAiChatVisible,
@@ -70,9 +72,22 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
     const previousAiChatVisibleRef = React.useRef(aiChatVisible);
 
     // 折叠状态持久化
-    const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
-        return readDesignerRightSidebarCollapsed();
+    const [collapsedState, setCollapsedState] = useState(() => {
+        return {
+            diagramId,
+            value: readDesignerRightSidebarCollapsed(),
+        };
     });
+    const isCollapsed = collapsedState.diagramId === diagramId ? collapsedState.value : true;
+    const setIsCollapsed = useCallback((update: React.SetStateAction<boolean>) => {
+        setCollapsedState(previous => {
+            const current = previous.diagramId === diagramId ? previous.value : true;
+            return {
+                diagramId,
+                value: typeof update === 'function' ? update(current) : update,
+            };
+        });
+    }, [diagramId]);
 
     useEffect(() => {
         writeDesignerRightSidebarCollapsed(isCollapsed);
@@ -145,14 +160,14 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
             }, 0);
             return () => window.clearTimeout(timer);
         }
-    }, [activeTab, aiChatVisible, hasSelection, isCollapsed]);
+    }, [activeTab, aiChatVisible, hasSelection, isCollapsed, setIsCollapsed]);
 
     const toggle = useCallback(() => {
         if (!isCollapsed && activeTab === 'ai' && aiChatVisible) {
             setAiChatVisible(false);
         }
         setIsCollapsed(previous => !previous);
-    }, [activeTab, aiChatVisible, isCollapsed, setAiChatVisible]);
+    }, [activeTab, aiChatVisible, isCollapsed, setAiChatVisible, setIsCollapsed]);
 
     // 通知父组件当前面板实际宽度（用 ref 避免依赖变化）
     const onWidthChangeRef = React.useRef(onWidthChange);

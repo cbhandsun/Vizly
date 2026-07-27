@@ -29,4 +29,3 @@ describe('resolveFloatingContextToolbarOffset', () => {
         ])).toBe(20);
     });
 });
-

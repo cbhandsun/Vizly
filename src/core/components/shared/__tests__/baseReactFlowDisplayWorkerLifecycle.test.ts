@@ -371,13 +371,18 @@ describe('baseReactFlowDisplayWorker lifecycle', () => {
   it('uses lightweight built-in paths for smart edges during interactive fallback', () => {
     const plain = { id: 'plain', source: 'source', target: 'target', type: 'straight' };
     const smart = { id: 'smart', source: 'source', target: 'target', type: 'advanced-smart-step' };
-    const input = [plain, smart];
+    const inheritedSmart = { id: 'inherited-smart', source: 'source', target: 'target' };
+    const input = [plain, smart, inheritedSmart];
     const fallback = createBaseReactFlowInteractiveFallbackEdges(input);
 
     expect(fallback).not.toBe(input);
     expect(fallback[0]).toBe(plain);
     expect(fallback[1]).toEqual({
       ...smart,
+      type: 'smoothstep',
+    });
+    expect(fallback[2]).toEqual({
+      ...inheritedSmart,
       type: 'smoothstep',
     });
     expect(createBaseReactFlowInteractiveFallbackEdges([plain])[0]).toBe(plain);

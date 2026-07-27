@@ -37,7 +37,11 @@ export const createBaseReactFlowInteractiveFallbackEdges = (
   let fallbackEdges: Edge[] | null = null;
 
   edges.forEach((edge, index) => {
-    if (!edge.type || !EXPENSIVE_INTERACTIVE_EDGE_TYPES.has(edge.type)) return;
+    // An omitted type inherits BaseReactFlow's advanced-smart-step default.
+    // Treat it as expensive too, otherwise a rejected worker can leave that
+    // custom edge rendering stale absolute route data from a previous geometry.
+    const effectiveType = edge.type ?? 'advanced-smart-step';
+    if (!EXPENSIVE_INTERACTIVE_EDGE_TYPES.has(effectiveType)) return;
     if (!fallbackEdges) fallbackEdges = [...edges];
     fallbackEdges[index] = {
       ...edge,

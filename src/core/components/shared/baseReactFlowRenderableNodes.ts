@@ -115,8 +115,8 @@ export const mergeBaseReactFlowMeasuredNodes = (
       ?? finiteNodeNumber(sourceMeasured?.height)
       ?? finiteNodeNumber(sourceNode.height);
     const position = internalNode.position ?? sourceNode.position;
-    const positionAbsolute = internalDisplayNode.positionAbsolute
-      ?? internalDisplayNode.internals?.positionAbsolute
+    const positionAbsolute = internalDisplayNode.internals?.positionAbsolute
+      ?? internalDisplayNode.positionAbsolute
       ?? sourceDisplayNode.positionAbsolute;
     const nextMeasured = width !== undefined || height !== undefined
       ? { width, height }

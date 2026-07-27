@@ -85,6 +85,7 @@ export function FlowchartDesignerRightSidebarRegion({ model }: FlowchartDesigner
         activePlugin,
         activeRightTab,
         aiChatVisible,
+        id,
         handleBeforeUpdate,
         isDraggingNode,
         isMobile,
@@ -107,6 +108,7 @@ export function FlowchartDesignerRightSidebarRegion({ model }: FlowchartDesigner
     return (
         <DesignerRightSidebar
             activeTab={activeRightTab}
+            diagramId={id}
             onTabChange={setActiveRightTab}
             aiChatVisible={aiChatVisible}
             setAiChatVisible={setAiChatVisible}

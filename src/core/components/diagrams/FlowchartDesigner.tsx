@@ -6,6 +6,7 @@ import { useDesignerCanvasState } from './hooks/useDesignerCanvasState';
 import { useDesignerInteractions } from './hooks/useDesignerInteractions';
 import { useDesignerEventHandlers } from './hooks/useDesignerEventHandlers';
 import { useDesignerSystemSync } from './hooks/useDesignerSystemSync';
+import { useDiagramScopedSelection } from './hooks/useDiagramScopedSelection';
 import { computeFlowchartCollapsedStateHash } from './flowchartCollapsedState';
 import { DiagramComponentProps } from '../../types/diagram-components';
 import { useTranslation } from 'react-i18next';
@@ -152,8 +153,12 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         takeSnapshot, notifyHistoryChanged, undo, redo, canUndo, canRedo,
         pastEntries, getPreviousState, jumpTo,
     } = diagramHistory;
-    const [selectedNodes, setSelectedNodes] = useState<Node[]>([]);
-    const [selectedEdges, setSelectedEdges] = useState<Edge[]>([]);
+    const {
+        selectedNodes,
+        selectedEdges,
+        setSelectedNodes,
+        setSelectedEdges,
+    } = useDiagramScopedSelection(id);
     const [isContextToolbarHidden] = useState(false);
     const handleBeforeUpdate = useCallback(() => {}, []);
     const handleFocusNode = useCallback((nodeId: string) => {
