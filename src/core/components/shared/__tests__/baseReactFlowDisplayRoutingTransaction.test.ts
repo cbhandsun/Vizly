@@ -130,7 +130,7 @@ describe('baseReactFlowDisplayRoutingTransaction', () => {
     expect(doBaseReactFlowDisplayRoutesMatchExactly(malformedIntent, malformedIntent)).toBe(false);
   });
 
-  it('preserves full-route patches when a hard-clean result has no repair delta', () => {
+  it('preserves one final worker transaction without requiring a repair delta', () => {
     const source = [{ id: 'edge', source: 'source', target: 'target', data: { label: 'old' } }];
     const workerEdges = [{
       ...source[0],
@@ -149,7 +149,6 @@ describe('baseReactFlowDisplayRoutingTransaction', () => {
     const merged = mergeBaseReactFlowDisplayRoutingTransactions({
       latestSourceEdges: latest,
       workerRoutingPatches: createBaseReactFlowDisplayEdgePatches(source, workerEdges)!,
-      repairRoutingPatches: createBaseReactFlowDisplayEdgePatches(workerEdges, workerEdges)!,
     });
 
     expect((merged?.edges[0].data as any).computedPath).toEqual([

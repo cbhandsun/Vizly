@@ -1,7 +1,7 @@
 /**
- * Generation accepts a single hard-clean route/validate response only. A later
- * `:repair` response has a different baseline and is rejected deliberately;
- * such a preset must first make its primary worker route hard-clean.
+ * Generation accepts one final hard-clean route/validate response. A standalone
+ * later `:repair` response remains invalid because it has a different request
+ * identity; an in-job full-route repair is represented by one final response.
  */
 export const isMatchingHardCleanDisplayWorkerResponse = (request, response) => (
   Boolean(request)
@@ -17,6 +17,7 @@ export const isMatchingHardCleanDisplayWorkerResponse = (request, response) => (
   && (
     response.routeResolution === 'validated-candidate'
     || response.routeResolution === 'full-route'
+    || response.routeResolution === 'full-route-repaired'
   )
   && Array.isArray(response.edges)
   && response.edges.length === request.edges.length
@@ -129,10 +130,15 @@ export const createPrecompiledDisplayRoutePatches = (sourceEdges, routedEdges) =
 export const renderPrecompiledDisplayRouteCaptureExpression = targetId => `(async () => {
   const isMatchingResponse = ${isMatchingHardCleanDisplayWorkerResponse.toString()};
   const createPatches = ${createPrecompiledDisplayRoutePatches.toString()};
+  const hashQueryIndex = window.location.hash.indexOf('?');
+  const activeTargetId = hashQueryIndex >= 0
+    ? new URLSearchParams(window.location.hash.slice(hashQueryIndex + 1)).get('diagram')
+    : null;
   const routing = window.__vizlyBaseReactFlowDisplayRouting || {};
   const request = window.__vizlyPrecompiledRouteRequest;
   const response = window.__vizlyPrecompiledRouteResponse;
-  if (routing.stage !== 'final-applied'
+  if (activeTargetId !== ${JSON.stringify(targetId)}
+    || routing.stage !== 'final-applied'
     || routing.workerAbortCount !== 0
     || routing.requestId !== request?.requestId
     || !isMatchingResponse(request, response)

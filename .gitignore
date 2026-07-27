@@ -35,7 +35,8 @@ test-results/
 # Local workspace artifacts
 .codex/
 .gemini
-docs
+docs/*
+!docs/edge-routing-session-plan.md
 scratch/
 .tmp-vizly-smoke-profile-*/
 thumbnails/

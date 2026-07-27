@@ -15,10 +15,14 @@ import {
 import {
   loadBaseReactFlowPrecompiledRouteCandidateFromRegistry,
 } from '../baseReactFlowPrecompiledRouteRegistry';
+import {
+  prefetchBaseReactFlowPrecompiledRouteFromRegistry,
+} from '../baseReactFlowPrecompiledRoutePrefetch';
 import { createBaseReactFlowDisplayEdgePatches } from '../baseReactFlowDisplayRoutingTransaction';
 import { GENERATED_BASE_REACT_FLOW_PRECOMPILED_ROUTE_LOADERS } from '../generated/baseReactFlowPrecompiledRouteLoaders';
 
 const SOURCE_HASH = `source-v1:${'a'.repeat(64)}`;
+const TEST_PRESET_ID = 'test-preset';
 
 type NodeWithResolvedPosition = Node & {
   positionAbsolute: { x: number; y: number };
@@ -111,6 +115,78 @@ describe('baseReactFlowPrecompiledRouteRegistry', () => {
       },
     )).resolves.toEqual(routedEdges);
     expect(load).toHaveBeenCalledOnce();
+  });
+
+  it('prefetches a known preset once without treating the preset id as route identity', async () => {
+    const load = vi.fn(async () => artifact);
+    const cache = new Map<string, Promise<boolean>>();
+    const registry = {
+      [TEST_PRESET_ID]: {
+        presetId: TEST_PRESET_ID,
+        sourceHash: SOURCE_HASH,
+        geometryDigest: inputGeometryDigest,
+        load,
+      },
+    };
+
+    await expect(prefetchBaseReactFlowPrecompiledRouteFromRegistry(
+      TEST_PRESET_ID,
+      registry,
+      cache,
+    )).resolves.toBe(true);
+    await expect(prefetchBaseReactFlowPrecompiledRouteFromRegistry(
+      TEST_PRESET_ID,
+      registry,
+      cache,
+    )).resolves.toBe(true);
+    await expect(prefetchBaseReactFlowPrecompiledRouteFromRegistry(
+      'unknown-preset',
+      registry,
+      cache,
+    )).resolves.toBe(false);
+    await expect(prefetchBaseReactFlowPrecompiledRouteFromRegistry(
+      '__proto__',
+      registry,
+      cache,
+    )).resolves.toBe(false);
+    await expect(prefetchBaseReactFlowPrecompiledRouteFromRegistry(
+      'x'.repeat(201),
+      registry,
+      cache,
+    )).resolves.toBe(false);
+    expect(load).toHaveBeenCalledOnce();
+
+    await expect(loadBaseReactFlowPrecompiledRouteCandidateFromRegistry(
+      { ...identityInput, inputSignature: '123' },
+      {},
+    )).resolves.toBeNull();
+  });
+
+  it('allows a failed preset prefetch to retry safely', async () => {
+    const load = vi.fn()
+      .mockRejectedValueOnce(new Error('transient chunk failure'))
+      .mockResolvedValueOnce(artifact);
+    const cache = new Map<string, Promise<boolean>>();
+    const registry = {
+      [TEST_PRESET_ID]: {
+        presetId: TEST_PRESET_ID,
+        sourceHash: SOURCE_HASH,
+        geometryDigest: inputGeometryDigest,
+        load,
+      },
+    };
+
+    await expect(prefetchBaseReactFlowPrecompiledRouteFromRegistry(
+      TEST_PRESET_ID,
+      registry,
+      cache,
+    )).resolves.toBe(false);
+    await expect(prefetchBaseReactFlowPrecompiledRouteFromRegistry(
+      TEST_PRESET_ID,
+      registry,
+      cache,
+    )).resolves.toBe(true);
+    expect(load).toHaveBeenCalledTimes(2);
   });
 
   it('replays the explicitly authorized router-owned trunk intent', async () => {

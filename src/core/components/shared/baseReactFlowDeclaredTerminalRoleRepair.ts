@@ -102,6 +102,7 @@ const buildTangentCoordinates = (
   role: TerminalRole,
   rect: DisplayRect,
   side: TerminalSide,
+  priorityTangents: readonly number[],
 ): number[] => {
   const oriented = role === 'source' ? path : [...path].reverse();
   const verticalSide = side === 'top' || side === 'bottom';
@@ -115,6 +116,7 @@ const buildTangentCoordinates = (
     .map(point => terminalTangent(point, side));
   return sortedUniqueNumbers([
     current,
+    ...priorityTangents,
     ...localCoordinates,
     (boundaryMinimum + boundaryMaximum) / 2,
     insetMinimum,
@@ -168,12 +170,19 @@ export const buildDeclaredTerminalRoleRepairPaths = (
   role: TerminalRole,
   rect: DisplayRect,
   side: TerminalSide,
+  priorityTangents: readonly number[] = [],
 ): DisplayPoint[][] => {
   if (path.length < 2) return [];
   const oriented = role === 'source'
     ? path.map(point => ({ ...point }))
     : [...path].reverse().map(point => ({ ...point }));
-  const tangents = buildTangentCoordinates(path, role, rect, side);
+  const tangents = buildTangentCoordinates(
+    path,
+    role,
+    rect,
+    side,
+    priorityTangents,
+  );
   const stubLengths = buildStubLengths(path, role, rect, side);
   const maximumReconnectIndex = Math.min(oriented.length - 1, MAX_RECONNECT_DEPTH);
   const seen = new Set<string>();

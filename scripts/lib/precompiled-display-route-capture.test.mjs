@@ -34,6 +34,12 @@ describe('precompiled display route capture', () => {
       edges: routed,
     })).toBe(true);
     expect(isMatchingHardCleanDisplayWorkerResponse(request, {
+      requestId: 'request-1',
+      hardClean: true,
+      routeResolution: 'full-route-repaired',
+      edges: routed,
+    })).toBe(true);
+    expect(isMatchingHardCleanDisplayWorkerResponse(request, {
       requestId: 'request-2',
       hardClean: true,
       routeResolution: 'full-route',

@@ -81,6 +81,13 @@ import { coerceClipboardData } from '@/core/utils/flowchartClipboard';
 const PLUGIN_EMPTY_CANVAS_IDS = new Set(['flowchart']);
 
 const loadFlowchartDesigner = async (pluginId?: string, presetId?: string) => {
+    if (presetId) {
+        void import('@/core/components/shared/baseReactFlowPrecompiledRoutePrefetch')
+            .then(
+                module => module.prefetchBaseReactFlowPrecompiledRoute(presetId),
+                () => false
+            );
+    }
     const [{ default: FlowchartDesigner }] = await Promise.all([
         import('@/core/components/diagrams/FlowchartDesigner'),
         ensureBuiltInPlugins(pluginId || 'flowchart'),

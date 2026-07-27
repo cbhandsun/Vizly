@@ -24,6 +24,11 @@ import * as fullRoutePipeline from '../baseReactFlowDisplayFullRoutePipeline';
 import * as measuredDisplayRepair from '../baseReactFlowDisplayMeasuredRepair';
 import * as outerPortTransaction from '../baseReactFlowDisplayOuterPortTransaction';
 import { getDisplayHardQualityGateReport } from '../baseReactFlowDisplayQualityGates';
+import { computeBaseReactFlowDisplayInputIdentityBundle } from '../baseReactFlowDisplayInputIdentity';
+import {
+  createBaseReactFlowRoutingAffectedClosure,
+  createBaseReactFlowRoutingChangeSet,
+} from '../baseReactFlowDisplayRoutingChangeSet';
 import * as renderTerminalSafety from '../baseReactFlowRenderTerminalSafety';
 import * as terminalPortRepair from '../baseReactFlowDisplayTerminalPortRepair';
 import {
@@ -128,12 +133,18 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
       qualityMode: 'full',
     });
 
-    expect(response).toEqual({
+    expect(response).toMatchObject({
       requestId: 'validate-clean-cache',
       edges,
       hardClean: true,
       routeResolution: 'validated-candidate',
     });
+    expect(response.phaseTrace).toEqual([
+      expect.objectContaining({
+        phase: 'candidate-validation',
+        resolution: 'hit',
+      }),
+    ]);
     expect(fullRouteSpy).not.toHaveBeenCalled();
   });
 
@@ -259,11 +270,219 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
     });
 
     expect(finalizeSpy).toHaveBeenCalledTimes(1);
-    expect(workerResponse).toEqual({
+    expect(workerResponse).toMatchObject({
       requestId: 'worker-direct-parity',
       edges: direct,
       hardClean: true,
       routeResolution: 'full-route',
+    });
+    expect(workerResponse.phaseTrace?.map(trace => trace.phase)).toEqual([
+      'candidate-validation',
+      'seed',
+      'quality',
+      'post-render',
+      'finalizer',
+    ]);
+  });
+
+  it('returns one final response when a full route needs measured repair', () => {
+    const uncleanEdges: Edge[] = [{
+      ...edges[0],
+      data: {
+        ...(edges[0].data || {}),
+        computedPath: [
+          { x: 100, y: 30 },
+          { x: 200, y: 80 },
+          { x: 300, y: 30 },
+        ],
+      },
+    }];
+    const uncleanReport = getDisplayHardQualityGateReport(uncleanEdges, nodes, 'polished');
+    const repairedReport = getDisplayHardQualityGateReport(edges, nodes, 'polished');
+    expect(uncleanReport.hardClean).toBe(false);
+    expect(repairedReport.hardClean).toBe(true);
+    vi.spyOn(fullRoutePipeline, 'createBaseReactFlowFullRouteEdges').mockReturnValue(uncleanEdges);
+    vi.spyOn(displayFinalizer, 'finalizeBaseReactFlowDisplayEdgesWithReport').mockReturnValue({
+      edges: uncleanEdges,
+      report: uncleanReport,
+    });
+    const repairSpy = vi.spyOn(
+      measuredDisplayRepair,
+      'repairBaseReactFlowMeasuredDisplayEdgesWithReport',
+    ).mockReturnValue({
+      edges,
+      report: repairedReport,
+    });
+
+    const response = computeBaseReactFlowDisplayEdgesWorkerResponse({
+      operation: 'route',
+      requestId: 'worker-full-route-repaired',
+      edges,
+      nodes,
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: false,
+      displayEdgeEpoch: 102,
+      qualityMode: 'full',
+    });
+
+    expect(repairSpy).toHaveBeenCalledOnce();
+    expect(repairSpy).toHaveBeenCalledWith(uncleanEdges, nodes);
+    expect(response).toMatchObject({
+      requestId: 'worker-full-route-repaired',
+      edges,
+      hardClean: true,
+      routeResolution: 'full-route-repaired',
+    });
+    expect(response.phaseTrace?.at(-1)).toMatchObject({
+      phase: 'measured-repair',
+      resolution: 'accepted',
+    });
+  });
+
+  it('routes only incident edges from a verified committed baseline', () => {
+    const baselineSourceEdges: Edge[] = edges.map(edge => ({
+      ...edge,
+      data: { ...(edge.data || {}) },
+    }));
+    const baselineRoutedEdges: Edge[] = baselineSourceEdges.map(edge => ({
+      ...edge,
+      data: { ...(edge.data || {}) },
+    }));
+    const nextNodes: Node[] = [
+      nodes[0],
+      { ...nodes[1], position: { x: 320, y: 0 } },
+    ];
+    const baselinePatches = createBaseReactFlowDisplayEdgePatches(
+      baselineSourceEdges,
+      baselineRoutedEdges,
+    );
+    const baselineOutputRouteSignature =
+      computeBaseReactFlowDisplayOutputRouteSignature(baselineRoutedEdges);
+    if (!baselinePatches || !baselineOutputRouteSignature) {
+      throw new Error('expected valid incremental baseline');
+    }
+    const baselineIdentity = computeBaseReactFlowDisplayInputIdentityBundle({
+      nodes,
+      edges: baselineSourceEdges,
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: false,
+    });
+    const nextIdentity = computeBaseReactFlowDisplayInputIdentityBundle({
+      nodes: nextNodes,
+      edges: baselineSourceEdges,
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: false,
+    });
+    const changeSet = createBaseReactFlowRoutingChangeSet({
+      previousNodes: nodes,
+      previousEdges: baselineSourceEdges,
+      nextNodes,
+      nextEdges: baselineSourceEdges,
+      reasonHint: 'node-drag',
+    });
+    const affectedClosure = createBaseReactFlowRoutingAffectedClosure({
+      changeSet,
+      previousNodes: nodes,
+      nextNodes,
+      baselineEdges: baselineRoutedEdges,
+      nextEdges: baselineSourceEdges,
+    });
+
+    const response = computeBaseReactFlowDisplayEdgesWorkerResponse({
+      operation: 'incremental-route',
+      requestId: 'incremental-route',
+      edges: baselineSourceEdges,
+      nodes: nextNodes,
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: false,
+      displayEdgeEpoch: 103,
+      qualityMode: 'full',
+      baselineInputSignature: baselineIdentity.cacheSignature,
+      baselineInputGeometryDigest: baselineIdentity.geometryDigest,
+      baselineNodes: nodes,
+      baselineSourceEdges,
+      baselinePatches,
+      baselineOutputRouteSignature,
+      nextInputSignature: nextIdentity.cacheSignature,
+      nextInputGeometryDigest: nextIdentity.geometryDigest,
+      changeSet,
+      mutableEdgeIds: affectedClosure.mutableEdgeIds,
+      contextEdgeIds: affectedClosure.contextEdgeIds,
+    });
+
+    expect(
+      response,
+      JSON.stringify({
+        phaseTrace: response.phaseTrace,
+        report: response.edges
+          ? getDisplayHardQualityGateReport(response.edges, nextNodes, 'polished')
+          : null,
+      }),
+    ).toMatchObject({
+      requestId: 'incremental-route',
+      hardClean: true,
+      routeResolution: 'incremental-route',
+      affectedEdgeCount: 1,
+      fallbackLevel: 'none',
+    });
+    expect(response.phaseTrace?.map(trace => trace.phase)).toEqual(expect.arrayContaining([
+      'incremental-closure',
+      'local-route',
+      'hard-gate',
+    ]));
+  });
+
+  it('falls back to the full route in the same job when incremental hints are stale', () => {
+    const baselineIdentity = computeBaseReactFlowDisplayInputIdentityBundle({
+      nodes,
+      edges,
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: false,
+    });
+    const baselinePatches = createBaseReactFlowDisplayEdgePatches(edges, edges);
+    const baselineOutputRouteSignature = computeBaseReactFlowDisplayOutputRouteSignature(edges);
+    if (!baselinePatches || !baselineOutputRouteSignature) {
+      throw new Error('expected valid incremental fallback baseline');
+    }
+    const response = computeBaseReactFlowDisplayEdgesWorkerResponse({
+      operation: 'incremental-route',
+      requestId: 'incremental-full-fallback',
+      edges,
+      nodes,
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: false,
+      displayEdgeEpoch: 104,
+      qualityMode: 'full',
+      baselineInputSignature: baselineIdentity.cacheSignature,
+      baselineInputGeometryDigest: baselineIdentity.geometryDigest,
+      baselineNodes: nodes,
+      baselineSourceEdges: edges,
+      baselinePatches,
+      baselineOutputRouteSignature,
+      nextInputSignature: baselineIdentity.cacheSignature,
+      nextInputGeometryDigest: baselineIdentity.geometryDigest,
+      changeSet: {
+        reason: 'node-drag',
+        changedNodeIds: ['source'],
+        changedEdgeIds: [],
+        topologyChanged: false,
+        geometryChanged: true,
+      },
+      mutableEdgeIds: ['edge'],
+      contextEdgeIds: [],
+    });
+
+    expect(response.hardClean).toBe(true);
+    expect(response.routeResolution).toMatch(/^full-route/);
+    expect(response).toMatchObject({
+      affectedEdgeCount: 0,
+      fallbackLevel: 'full',
     });
   });
 
@@ -687,7 +906,10 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
     for (const rejected of [obstacleHit, wrongHandleAxis, detached]) {
       expect(rejected.response.edges).toBeDefined();
       expect(rejected.response.edges).not.toEqual(rejected.candidate);
-      expect(rejected.response.routeResolution).toBe('full-route');
+      expect(typeof rejected.response.hardClean).toBe('boolean');
+      expect(['full-route', 'full-route-repaired']).toContain(
+        rejected.response.routeResolution,
+      );
     }
   });
 });

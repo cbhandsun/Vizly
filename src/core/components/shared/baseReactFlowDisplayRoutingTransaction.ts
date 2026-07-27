@@ -337,14 +337,16 @@ export const mergeBaseReactFlowDisplayRoutingTransactions = ({
 }: {
   latestSourceEdges: Edge[];
   workerRoutingPatches: Edge[];
-  repairRoutingPatches: Edge[];
+  repairRoutingPatches?: Edge[];
 }): { edges: Edge[]; displayPatches: Edge[]; cachePatches: Edge[] | null } | null => {
   const workerMergedEdges = mergeBaseReactFlowDisplayEdgePatches(
     latestSourceEdges,
     workerRoutingPatches,
   );
   if (!workerMergedEdges) return null;
-  const edges = mergeBaseReactFlowDisplayEdgePatches(workerMergedEdges, repairRoutingPatches);
+  const edges = repairRoutingPatches
+    ? mergeBaseReactFlowDisplayEdgePatches(workerMergedEdges, repairRoutingPatches)
+    : workerMergedEdges;
   if (!edges) return null;
   const rawDisplayPatches = createBaseReactFlowDisplayEdgePatches(latestSourceEdges, edges);
   if (!rawDisplayPatches) return null;

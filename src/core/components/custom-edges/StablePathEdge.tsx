@@ -11,6 +11,7 @@ import { BaseEdge, EdgeLabelRenderer, useStore, type EdgeProps } from '@xyflow/r
 import { getSmartLabelPosition } from '../../algorithms/smartEdgeUtils';
 import { getEdgeLabelAutoOffset } from './edgeLabelAvoidance';
 import { collectStablePathPeerPaths } from './stablePathEdgePeerPaths';
+import { useSmartEdgeRoutingOwner } from './smartEdgeRoutingOwnership';
 
 interface Point {
     x: number;
@@ -140,6 +141,7 @@ export const StablePathEdge = memo<EdgeProps>((props) => {
         labelStyle,
     } = props;
     const edgeData = data as StablePathEdgeData | undefined;
+    const routingOwner = useSmartEdgeRoutingOwner();
     // Subscribe to the stable edge-array reference. Returning a freshly mapped
     // array from the store selector made every edge re-render on every node move.
     const allEdges = useStore(state => state.edges);
@@ -163,12 +165,15 @@ export const StablePathEdge = memo<EdgeProps>((props) => {
     if (
         computedPath
         && computedPath.length >= 2
-        && isPathAttachedToLiveEndpoints(
-            computedPath,
-            sourceX,
-            sourceY,
-            targetX,
-            targetY,
+        && (
+            routingOwner === 'canvas'
+            || isPathAttachedToLiveEndpoints(
+                computedPath,
+                sourceX,
+                sourceY,
+                targetX,
+                targetY,
+            )
         )
     ) {
         renderPath = snapNearOrthogonalPoints(computedPath);

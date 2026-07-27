@@ -1,0 +1,70 @@
+import type { Edge, Node } from '@xyflow/react';
+
+import type {
+  BaseReactFlowDisplayCommittedSnapshotBaseline,
+} from './baseReactFlowDisplayCommittedSnapshot';
+import {
+  createBaseReactFlowRoutingAffectedClosure,
+  createBaseReactFlowRoutingChangeSet,
+  type BaseReactFlowRoutingAffectedClosure,
+  type BaseReactFlowRoutingChangeSet,
+} from './baseReactFlowDisplayRoutingChangeSet';
+import { mergeBaseReactFlowDisplayEdgePatches } from './baseReactFlowDisplayRoutingTransaction';
+
+export type BaseReactFlowDisplayIncrementalPlan = Readonly<{
+  baseline: BaseReactFlowDisplayCommittedSnapshotBaseline;
+  changeSet: BaseReactFlowRoutingChangeSet;
+  affectedClosure: BaseReactFlowRoutingAffectedClosure;
+}>;
+
+export const createBaseReactFlowDisplayIncrementalPlan = ({
+  baseline,
+  nextInputSignature,
+  nextInputGeometryDigest,
+  nextNodes,
+  nextEdges,
+  draggedNodeIds,
+}: {
+  baseline: BaseReactFlowDisplayCommittedSnapshotBaseline | null;
+  nextInputSignature: string;
+  nextInputGeometryDigest: string;
+  nextNodes: Node[];
+  nextEdges: Edge[];
+  draggedNodeIds: readonly string[];
+}): BaseReactFlowDisplayIncrementalPlan | null => {
+  if (
+    !baseline
+    || draggedNodeIds.length === 0
+    || (
+      baseline.inputSignature === nextInputSignature
+      && baseline.inputGeometryDigest === nextInputGeometryDigest
+    )
+  ) return null;
+  const baselineEdges = mergeBaseReactFlowDisplayEdgePatches(
+    baseline.sourceEdges,
+    baseline.displayPatches,
+  );
+  if (!baselineEdges) return null;
+  const changeSet = createBaseReactFlowRoutingChangeSet({
+    previousNodes: baseline.nodes,
+    previousEdges: baseline.sourceEdges,
+    nextNodes,
+    nextEdges,
+    reasonHint: 'node-drag',
+  });
+  if (
+    changeSet.topologyChanged
+    || !changeSet.geometryChanged
+    || !changeSet.changedNodeIds.some(nodeId => draggedNodeIds.includes(nodeId))
+  ) return null;
+  const affectedClosure = createBaseReactFlowRoutingAffectedClosure({
+    changeSet,
+    previousNodes: baseline.nodes,
+    nextNodes,
+    baselineEdges,
+    nextEdges,
+  });
+  return affectedClosure.mutableEdgeIds.length > 0
+    ? { baseline, changeSet, affectedClosure }
+    : null;
+};

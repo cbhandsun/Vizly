@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import logisticsStandardData from '../../../../data/standardized/LogisticsStandardData.json';
 import tmsStandardData from '../../../../data/standardized/TmsStandardData.json';
 import wmsProcessFlowStandardData from '../../../../data/standardized/WmsProcessFlowStandardData.json';
+import logisticsPrecompiledRoute from '../generated/precompiledRoutes/route-260383796.json';
 import { standardDataToCanvas } from '../../diagrams/designerUtils';
 import { calculateEdgePathQualityScore } from '../../../strategies/shared/edgeStrictCrossingGuard';
 import {
@@ -17,11 +18,19 @@ import {
 import {
   computeBaseReactFlowDisplayEdgeEpoch,
   computeBaseReactFlowDisplayOutputRouteSignature,
+  withDisplayAbsolutePositions,
 } from '../baseReactFlowDisplayEdgeCore';
+import { computeBaseReactFlowDisplayInputIdentityBundle } from '../baseReactFlowDisplayInputIdentity';
+import { getDisplayHardQualityGateReport } from '../baseReactFlowDisplayQualityGates';
 import { computeBaseReactFlowDisplayEdgesWorkerResponse } from '../baseReactFlowDisplayEdges.worker';
 import { projectBaseReactFlowDisplayWorkerInput } from '../baseReactFlowDisplayWorkerClient';
 import {
+  createBaseReactFlowRoutingAffectedClosure,
+  createBaseReactFlowRoutingChangeSet,
+} from '../baseReactFlowDisplayRoutingChangeSet';
+import {
   createBaseReactFlowDisplayEdgePatches,
+  mergeBaseReactFlowDisplayEdgePatches,
   mergeBaseReactFlowDisplayRoutingTransactions,
   resolveBaseReactFlowDisplayCacheReplaySignature,
 } from '../baseReactFlowDisplayRoutingTransaction';
@@ -260,20 +269,20 @@ describe('baseReactFlowDisplayEdges logistics regressions', () => {
     const canvas = await standardDataToCanvas(logisticsStandardData as any);
     const projected = projectBaseReactFlowDisplayWorkerInput(canvas);
     const browserMeasuredNodes: PositionedNode[] = [
-      { ...node('titlegroup-external', 953.4875, 0, 1715.4, 365), type: 'titleGroup', positionAbsolute: { x: 953.4875, y: 0 } },
-      { ...node('titlegroup-logistics', 0, 525, 2368.25, 1157), type: 'titleGroup', positionAbsolute: { x: 0, y: 525 } },
-      { ...node('titlegroup-data', 1547.6875, 1842, 547, 404), type: 'titleGroup', positionAbsolute: { x: 1547.6875, y: 1842 } },
-      { ...node('upstream', 32, 119, 303, 119), parentId: 'titlegroup-external', type: 'custom', positionAbsolute: { x: 985.4875, y: 119 } },
-      { ...node('l-oms', 1120.25, 80, 406, 197), parentId: 'titlegroup-logistics', type: 'custom', positionAbsolute: { x: 1120.25, y: 605 } },
-      { ...node('wms', 42, 437, 420, 236), parentId: 'titlegroup-logistics', type: 'custom', positionAbsolute: { x: 42, y: 962 } },
-      { ...node('wcs', 32, 833, 420, 236), parentId: 'titlegroup-logistics', type: 'custom', positionAbsolute: { x: 32, y: 1358 } },
-      { ...node('tms', 1113.25, 437, 420, 236), parentId: 'titlegroup-logistics', type: 'custom', positionAbsolute: { x: 1113.25, y: 962 } },
-      { ...node('customs', 1853.25, 456.5, 420, 197), parentId: 'titlegroup-logistics', type: 'custom', positionAbsolute: { x: 1853.25, y: 981.5 } },
-      { ...node('bms', 772, 852.5, 378, 197), parentId: 'titlegroup-logistics', type: 'custom', positionAbsolute: { x: 772, y: 1377.5 } },
-      { ...node('yms', 1470, 852.5, 389, 197), parentId: 'titlegroup-logistics', type: 'custom', positionAbsolute: { x: 1470, y: 1377.5 } },
-      { ...node('carrier-portal', 655, 80, 322, 197), parentId: 'titlegroup-external', type: 'custom', positionAbsolute: { x: 1608.4875, y: 80 } },
-      { ...node('visibility', 32, 80, 420, 236), parentId: 'titlegroup-data', type: 'custom', positionAbsolute: { x: 1579.6875, y: 1922 } },
-      { ...node('downstream', 1297, 119, 336, 119), parentId: 'titlegroup-external', type: 'custom', positionAbsolute: { x: 2250.4875, y: 119 } },
+      { ...node('titlegroup-external', 758.1125, 0, 1377, 290), type: 'titleGroup', positionAbsolute: { x: 758.1125, y: 0 } },
+      { ...node('titlegroup-logistics', 0, 450, 1882, 846), type: 'titleGroup', positionAbsolute: { x: 0, y: 450 } },
+      { ...node('titlegroup-data', 1254.3375, 1456, 404, 290), type: 'titleGroup', positionAbsolute: { x: 1254.3375, y: 1456 } },
+      { ...node('upstream', 32, 106.5, 210, 73), parentId: 'titlegroup-external', type: 'custom', positionAbsolute: { x: 790.1125, y: 106.5 } },
+      { ...node('l-oms', 935.25, 84, 259, 118), parentId: 'titlegroup-logistics', type: 'custom', positionAbsolute: { x: 935.25, y: 534 } },
+      { ...node('wms', 50, 362, 282, 118), parentId: 'titlegroup-logistics', type: 'custom', positionAbsolute: { x: 50, y: 812 } },
+      { ...node('wcs', 32, 640, 298, 118), parentId: 'titlegroup-logistics', type: 'custom', positionAbsolute: { x: 32, y: 1090 } },
+      { ...node('tms', 923.75, 362, 282, 118), parentId: 'titlegroup-logistics', type: 'custom', positionAbsolute: { x: 923.75, y: 812 } },
+      { ...node('customs', 1525.75, 373, 282, 96), parentId: 'titlegroup-logistics', type: 'custom', positionAbsolute: { x: 1525.75, y: 823 } },
+      { ...node('bms', 650, 640, 243, 118), parentId: 'titlegroup-logistics', type: 'custom', positionAbsolute: { x: 650, y: 1090 } },
+      { ...node('yms', 1213, 640, 250, 118), parentId: 'titlegroup-logistics', type: 'custom', positionAbsolute: { x: 1213, y: 1090 } },
+      { ...node('carrier-portal', 562, 84, 211, 118), parentId: 'titlegroup-external', type: 'custom', positionAbsolute: { x: 1320.1125, y: 84 } },
+      { ...node('visibility', 32, 84, 296, 118), parentId: 'titlegroup-data', type: 'custom', positionAbsolute: { x: 1286.3375, y: 1540 } },
+      { ...node('downstream', 1093, 106.5, 219, 73), parentId: 'titlegroup-external', type: 'custom', positionAbsolute: { x: 1851.1125, y: 106.5 } },
     ];
     const browserLockedRoutes: Record<string, {
       sourceHandle: string;
@@ -539,7 +548,182 @@ describe('baseReactFlowDisplayEdges logistics regressions', () => {
     expect(response.hardClean, JSON.stringify({ quality, paths }, null, 2)).toBe(true);
     expect(edgeNodeObstacleHits(result, absoluteNodes), JSON.stringify(paths, null, 2)).toEqual([]);
     expect(displayEdgesHaveNodeAnchoredTerminals(result, absoluteNodes)).toBe(true);
-  }, 30_000);
+
+    const precompiledBaseline = mergeBaseReactFlowDisplayEdgePatches(
+      browserProjected.edges,
+      logisticsPrecompiledRoute.patches as Edge[],
+    );
+    if (!precompiledBaseline) {
+      throw new Error('expected the Logistics precompiled baseline to merge');
+    }
+    const baselinePatches = createBaseReactFlowDisplayEdgePatches(
+      browserProjected.edges,
+      precompiledBaseline,
+    );
+    const baselineOutputRouteSignature =
+      computeBaseReactFlowDisplayOutputRouteSignature(precompiledBaseline);
+    const baselineIdentity = computeBaseReactFlowDisplayInputIdentityBundle({
+      nodes: browserProjected.nodes,
+      edges: browserProjected.edges,
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: false,
+    });
+    if (!baselinePatches || !baselineOutputRouteSignature) {
+      throw new Error('expected a valid Logistics incremental baseline');
+    }
+    const dragCases = [
+      { nodeId: 'tms', expectedMutableCount: 6, expectedAffectedCount: 7 },
+      { nodeId: 'wms', expectedMutableCount: 4 },
+      { nodeId: 'l-oms', expectedMutableCount: 5 },
+    ] as const;
+
+    for (const dragCase of dragCases) {
+      const movedNodes = browserProjected.nodes.map((item) => (
+        item.id === dragCase.nodeId
+          ? {
+            ...item,
+            position: {
+              x: item.position.x + 48.25,
+              y: item.position.y + 16,
+            },
+            positionAbsolute: {
+              x: item.positionAbsolute.x + 48.25,
+              y: item.positionAbsolute.y + 16,
+            },
+          }
+          : item
+      ));
+      const nextIdentity = computeBaseReactFlowDisplayInputIdentityBundle({
+        nodes: movedNodes,
+        edges: browserProjected.edges,
+        enableSmartEdges: true,
+        smartEdgePadding: 20,
+        isLargeGraph: false,
+      });
+      const changeSet = createBaseReactFlowRoutingChangeSet({
+        previousNodes: browserProjected.nodes,
+        previousEdges: browserProjected.edges,
+        nextNodes: movedNodes,
+        nextEdges: browserProjected.edges,
+        reasonHint: 'node-drag',
+      });
+      const affectedClosure = createBaseReactFlowRoutingAffectedClosure({
+        changeSet,
+        previousNodes: browserProjected.nodes,
+        nextNodes: movedNodes,
+        baselineEdges: precompiledBaseline,
+        nextEdges: browserProjected.edges,
+      });
+      const movedAbsoluteNodes = withDisplayAbsolutePositions(
+        movedNodes,
+        new Map(movedNodes.map(item => [item.id, item] as const)),
+      );
+      const incrementalResponse = computeBaseReactFlowDisplayEdgesWorkerResponse({
+        operation: 'incremental-route',
+        requestId: `logistics-${dragCase.nodeId}-incremental-route`,
+        edges: browserProjected.edges,
+        nodes: movedNodes,
+        enableSmartEdges: true,
+        smartEdgePadding: 20,
+        isLargeGraph: false,
+        displayEdgeEpoch: computeBaseReactFlowDisplayEdgeEpoch({
+          nodes: movedNodes,
+          edges: browserProjected.edges,
+        }),
+        qualityMode: 'full',
+        baselineInputSignature: baselineIdentity.cacheSignature,
+        baselineInputGeometryDigest: baselineIdentity.geometryDigest,
+        baselineNodes: browserProjected.nodes,
+        baselineSourceEdges: browserProjected.edges,
+        baselinePatches,
+        baselineOutputRouteSignature,
+        nextInputSignature: nextIdentity.cacheSignature,
+        nextInputGeometryDigest: nextIdentity.geometryDigest,
+        changeSet,
+        mutableEdgeIds: affectedClosure.mutableEdgeIds,
+        contextEdgeIds: affectedClosure.contextEdgeIds,
+      });
+      const hardReport = incrementalResponse.edges
+        ? getDisplayHardQualityGateReport(
+          incrementalResponse.edges,
+          movedAbsoluteNodes,
+          'polished',
+        )
+        : null;
+      const diagnostics = JSON.stringify({
+        nodeId: dragCase.nodeId,
+        routeResolution: incrementalResponse.routeResolution,
+        affectedEdgeCount: incrementalResponse.affectedEdgeCount,
+        fallbackLevel: incrementalResponse.fallbackLevel,
+        phaseTrace: incrementalResponse.phaseTrace,
+        report: hardReport,
+      }, null, 2);
+
+      expect(
+        affectedClosure.mutableEdgeIds,
+        diagnostics,
+      ).toHaveLength(dragCase.expectedMutableCount);
+      expect(incrementalResponse, diagnostics).toMatchObject({
+        hardClean: true,
+        routeResolution: 'incremental-route',
+        fallbackLevel: 'none',
+      });
+      if ('expectedAffectedCount' in dragCase) {
+        expect(incrementalResponse.affectedEdgeCount, diagnostics)
+          .toBe(dragCase.expectedAffectedCount);
+      } else {
+        expect(incrementalResponse.affectedEdgeCount, diagnostics)
+          .toBeGreaterThanOrEqual(dragCase.expectedMutableCount);
+        expect(incrementalResponse.affectedEdgeCount, diagnostics)
+          .toBeLessThanOrEqual(dragCase.expectedMutableCount + 8);
+      }
+      expect(hardReport, diagnostics).toMatchObject({
+        hardClean: true,
+        obstacleHits: 0,
+        terminalsAttached: true,
+        terminalsAnchored: true,
+        quality: {
+          nonOrthogonalSegments: 0,
+          strictCrossings: 0,
+          reverseOverlap: 0,
+          unrelatedOverlap: 0,
+          unexplainedRelatedOverlap: 0,
+          shortEndpointStubs: 0,
+          tinyInteriorDoglegs: 0,
+          hairpins: 0,
+        },
+      });
+      expect(incrementalResponse.phaseTrace?.map(trace => trace.phase), diagnostics)
+        .toEqual(['incremental-closure', 'local-route', 'hard-gate']);
+      expect(incrementalResponse.phaseTrace?.every(
+        trace => trace.resolution === 'accepted',
+      ), diagnostics).toBe(true);
+      const baselineById = new Map(
+        precompiledBaseline.map(edge => [edge.id, edge] as const),
+      );
+      const changedPathIds = (incrementalResponse.edges ?? [])
+        .filter(edge => {
+          const baselineEdge = baselineById.get(edge.id);
+          return JSON.stringify([
+            edge.sourceHandle,
+            edge.targetHandle,
+            (edge.data as { computedPath?: unknown } | undefined)?.computedPath,
+          ]) !== JSON.stringify([
+            baselineEdge?.sourceHandle,
+            baselineEdge?.targetHandle,
+            (baselineEdge?.data as { computedPath?: unknown } | undefined)?.computedPath,
+          ]);
+        })
+        .map(edge => edge.id)
+        .sort();
+      const expectedChangedPathIds = [
+        ...affectedClosure.mutableEdgeIds,
+        ...(dragCase.nodeId === 'tms' ? ['edge-loms-customs'] : []),
+      ].sort();
+      expect(changedPathIds, diagnostics).toEqual(expectedChangedPathIds);
+    }
+  }, 60_000);
 
   it('builds the WMS process final candidate within the cold quality budget', async () => {
     const canvas = await standardDataToCanvas(wmsProcessFlowStandardData as any);

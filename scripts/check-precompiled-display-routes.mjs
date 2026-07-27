@@ -20,7 +20,7 @@ const INPUT_IDENTITY_PATH = resolve(
 const LOADERS_PATH = resolve(GENERATED_DIR, 'baseReactFlowPrecompiledRouteLoaders.ts');
 const ARTIFACT_DIR = resolve(GENERATED_DIR, 'precompiledRoutes');
 const ARTIFACT_SCHEMA = 'vizly-precompiled-display-route-v1';
-const MANIFEST_SCHEMA = 'vizly-precompiled-display-route-manifest-v1';
+const MANIFEST_SCHEMA = 'vizly-precompiled-display-route-manifest-v2';
 const MAX_ARTIFACT_BYTES = 2_000_000;
 
 const sourceHash = value => `source-v1:${createHash('sha256').update(value).digest('hex')}`;
@@ -43,15 +43,22 @@ if (manifestSource !== renderPrecompiledRouteManifest(manifest)) {
   throw new Error('Precompiled route manifest is not canonical');
 }
 
-const expectedSources = new Set(PRECOMPILED_DISPLAY_ROUTE_TARGETS.map(target => target.sourcePath));
+const expectedTargets = new Map(PRECOMPILED_DISPLAY_ROUTE_TARGETS.map(
+  target => [target.sourcePath, target.presetId],
+));
 const signatures = new Set();
+const presetIds = new Set();
 const artifactFiles = new Set();
 let previousSignature = '';
 for (const entry of manifest.entries) {
+  const expectedPresetId = expectedTargets.get(entry?.sourcePath);
   if (
     !entry
     || typeof entry !== 'object'
-    || !expectedSources.delete(entry.sourcePath)
+    || typeof expectedPresetId !== 'string'
+    || entry.presetId !== expectedPresetId
+    || presetIds.has(entry.presetId)
+    || !expectedTargets.delete(entry.sourcePath)
     || typeof entry.artifactFile !== 'string'
     || !/^route-\d{1,10}\.json$/.test(entry.artifactFile)
     || artifactFiles.has(entry.artifactFile)
@@ -62,10 +69,15 @@ for (const entry of manifest.entries) {
     || !/^route-v2:\d{1,3}:\d{1,6}:[0-9a-f]{16}$/.test(entry.outputRouteSignature)
     || (previousSignature && previousSignature.localeCompare(entry.inputSignature) >= 0)
   ) throw new Error('Precompiled route manifest entry is malformed');
+  presetIds.add(entry.presetId);
   signatures.add(entry.inputSignature);
   artifactFiles.add(entry.artifactFile);
   previousSignature = entry.inputSignature;
   const source = await readFile(resolve(ROOT, entry.sourcePath), 'utf8');
+  const sourcePreset = JSON.parse(source);
+  if (sourcePreset?.id !== entry.presetId) {
+    throw new Error(`Precompiled route source preset id mismatch for ${entry.sourcePath}`);
+  }
   const expectedSourceHash = sourceHash(source);
   const artifactPath = resolve(ARTIFACT_DIR, entry.artifactFile);
   const artifactSource = await readFile(artifactPath, 'utf8');
@@ -101,7 +113,7 @@ for (const entry of manifest.entries) {
     throw new Error(`Precompiled route artifact ${entry.artifactFile} is not canonical`);
   }
 }
-if (expectedSources.size > 0) throw new Error('Precompiled route manifest is missing a target');
+if (expectedTargets.size > 0) throw new Error('Precompiled route manifest is missing a target');
 
 const existingArtifactFiles = (await readdir(ARTIFACT_DIR))
   .filter(file => /^route-\d{1,10}\.json$/.test(file))

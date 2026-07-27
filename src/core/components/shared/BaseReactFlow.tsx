@@ -185,7 +185,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
   );
   const handleNodeDragFallbackResolved = useCallback(() => {
     setIsNodeDragFallbackPending(false);
-    setNodeDragFallbackIds([]);
+    setNodeDragFallbackIds(current => current.length === 0 ? current : []);
   }, []);
 
   // 全局滚轮灵敏度（函数级注释）：从配置系统读取，用于主画布自定义缩放

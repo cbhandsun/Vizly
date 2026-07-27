@@ -1,0 +1,447 @@
+{
+  "schema": "vizly-precompiled-display-route-v1",
+  "routingVersion": "2026-07-20-measured-terminal-hard-gates-v119",
+  "sourceHash": "source-v1:070569b411557fd5c080c8580c2c6bdc2534134ebddfa3e40a2cf5c1f25c1c44",
+  "inputSignature": "260383796",
+  "inputGeometryDigest": "geometry-v1:69d1b94c14981a3c285bbdd4cb3f69f8",
+  "outputRouteSignature": "route-v2:14:62:70f57d9ad8ea3ab4",
+  "hardClean": true,
+  "patches": [
+    {
+      "id": "edge-loms-customs",
+      "source": "l-oms",
+      "target": "customs",
+      "type": "stablePath",
+      "sourceHandle": "bottom",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1176,
+            "y": 652
+          },
+          {
+            "x": 1176,
+            "y": 787
+          },
+          {
+            "x": 1224,
+            "y": 787
+          },
+          {
+            "x": 1224,
+            "y": 867
+          },
+          {
+            "x": 1525.75,
+            "y": 867
+          }
+        ],
+        "sharedTrunkSynthesized": true
+      }
+    },
+    {
+      "id": "edge-loms-tms",
+      "source": "l-oms",
+      "target": "tms",
+      "type": "stablePath",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1065,
+            "y": 652
+          },
+          {
+            "x": 1065,
+            "y": 812
+          }
+        ],
+        "sharedTrunkSynthesized": true
+      }
+    },
+    {
+      "id": "edge-loms-visibility",
+      "source": "l-oms",
+      "target": "visibility",
+      "type": "stablePath",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1065,
+            "y": 652
+          },
+          {
+            "x": 1065,
+            "y": 751
+          },
+          {
+            "x": 811,
+            "y": 751
+          },
+          {
+            "x": 811,
+            "y": 1044
+          },
+          {
+            "x": 902,
+            "y": 1044
+          },
+          {
+            "x": 902,
+            "y": 1386
+          },
+          {
+            "x": 1435,
+            "y": 1386
+          },
+          {
+            "x": 1435,
+            "y": 1540
+          }
+        ],
+        "sharedTrunkAware": true,
+        "sharedTrunkSynthesized": true
+      }
+    },
+    {
+      "id": "edge-loms-wms",
+      "source": "l-oms",
+      "target": "wms",
+      "type": "stablePath",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1065,
+            "y": 652
+          },
+          {
+            "x": 1065,
+            "y": 722
+          },
+          {
+            "x": 191,
+            "y": 722
+          },
+          {
+            "x": 191,
+            "y": 812
+          }
+        ],
+        "sharedTrunkSynthesized": true
+      }
+    },
+    {
+      "id": "edge-tms-bms",
+      "source": "tms",
+      "target": "bms",
+      "type": "stablePath",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1065,
+            "y": 930
+          },
+          {
+            "x": 1065,
+            "y": 1020
+          },
+          {
+            "x": 812,
+            "y": 1020
+          },
+          {
+            "x": 812,
+            "y": 1090
+          }
+        ],
+        "sharedTrunkAware": true,
+        "sharedTrunkSynthesized": true
+      }
+    },
+    {
+      "id": "edge-tms-carrier",
+      "source": "tms",
+      "target": "carrier-portal",
+      "type": "stablePath",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1177,
+            "y": 812
+          },
+          {
+            "x": 1177,
+            "y": 763
+          },
+          {
+            "x": 1426,
+            "y": 763
+          },
+          {
+            "x": 1426,
+            "y": 202
+          }
+        ],
+        "sharedTrunkAware": true,
+        "sharedTrunkSynthesized": true
+      }
+    },
+    {
+      "id": "edge-tms-downstream",
+      "source": "tms",
+      "target": "downstream",
+      "type": "stablePath",
+      "sourceHandle": "bottom",
+      "targetHandle": "bottom",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1065,
+            "y": 930
+          },
+          {
+            "x": 1065,
+            "y": 1019
+          },
+          {
+            "x": 1929,
+            "y": 1019
+          },
+          {
+            "x": 1929,
+            "y": 179.5
+          }
+        ],
+        "sharedTrunkAware": true,
+        "sharedTrunkSynthesized": true
+      }
+    },
+    {
+      "id": "edge-tms-visibility",
+      "source": "tms",
+      "target": "visibility",
+      "type": "stablePath",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1135,
+            "y": 930
+          },
+          {
+            "x": 1135,
+            "y": 1020
+          },
+          {
+            "x": 1487,
+            "y": 1020
+          },
+          {
+            "x": 1487,
+            "y": 1450
+          },
+          {
+            "x": 1435,
+            "y": 1450
+          },
+          {
+            "x": 1435,
+            "y": 1540
+          }
+        ],
+        "sharedTrunkAware": true,
+        "sharedTrunkSynthesized": true
+      }
+    },
+    {
+      "id": "edge-tms-yms",
+      "source": "tms",
+      "target": "yms",
+      "type": "stablePath",
+      "sourceHandle": "bottom",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1054,
+            "y": 930
+          },
+          {
+            "x": 1054,
+            "y": 1020
+          },
+          {
+            "x": 1107,
+            "y": 1020
+          },
+          {
+            "x": 1107,
+            "y": 1148
+          },
+          {
+            "x": 1213,
+            "y": 1148
+          }
+        ],
+        "sharedTrunkAware": true,
+        "sharedTrunkSynthesized": true
+      }
+    },
+    {
+      "id": "edge-upstream-loms",
+      "source": "upstream",
+      "target": "l-oms",
+      "type": "stablePath",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "data": {
+        "computedPath": [
+          {
+            "x": 895,
+            "y": 179.5
+          },
+          {
+            "x": 895,
+            "y": 236
+          },
+          {
+            "x": 1065,
+            "y": 236
+          },
+          {
+            "x": 1065,
+            "y": 534
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge-visibility-downstream",
+      "source": "visibility",
+      "target": "downstream",
+      "type": "stablePath",
+      "sourceHandle": "bottom",
+      "targetHandle": "bottom",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1434.3374999999999,
+            "y": 1658
+          },
+          {
+            "x": 1434.3374999999999,
+            "y": 1706
+          },
+          {
+            "x": 1960.6125,
+            "y": 1706
+          },
+          {
+            "x": 1960.6125,
+            "y": 179.5
+          }
+        ],
+        "sharedTrunkAware": true,
+        "sharedTrunkSynthesized": true
+      }
+    },
+    {
+      "id": "edge-wms-bms",
+      "source": "wms",
+      "target": "bms",
+      "type": "stablePath",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "data": {
+        "computedPath": [
+          {
+            "x": 191,
+            "y": 930
+          },
+          {
+            "x": 191,
+            "y": 1000
+          },
+          {
+            "x": 731,
+            "y": 1000
+          },
+          {
+            "x": 731,
+            "y": 1090
+          }
+        ],
+        "sharedTrunkAware": true
+      }
+    },
+    {
+      "id": "edge-wms-visibility",
+      "source": "wms",
+      "target": "visibility",
+      "type": "stablePath",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "data": {
+        "computedPath": [
+          {
+            "x": 186,
+            "y": 930
+          },
+          {
+            "x": 186,
+            "y": 1020
+          },
+          {
+            "x": 382,
+            "y": 1020
+          },
+          {
+            "x": 382,
+            "y": 1450
+          },
+          {
+            "x": 1435,
+            "y": 1450
+          },
+          {
+            "x": 1435,
+            "y": 1540
+          }
+        ],
+        "sharedTrunkSynthesized": true
+      }
+    },
+    {
+      "id": "edge-wms-wcs",
+      "source": "wms",
+      "target": "wcs",
+      "type": "stablePath",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "data": {
+        "computedPath": [
+          {
+            "x": 181,
+            "y": 930
+          },
+          {
+            "x": 181,
+            "y": 1090
+          }
+        ],
+        "sharedTrunkSynthesized": true
+      }
+    }
+  ]
+}
