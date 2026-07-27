@@ -203,7 +203,7 @@ body,
 
 /**
  * 性能降级策略
- * - 自动触发：当节点数超过300或正在拖拽时
+ * - 自动触发：当节点数超过300时
  * - 目标：减少重绘开销,保持60FPS流畅度
  * - 方法：关闭动画、降低模糊强度、移除阴影
  */
@@ -222,10 +222,12 @@ body,
 
 [data-performance="high"] .glass,
 [data-performance="high"] .glass-strong,
-[data-performance="high"] .glass-effect {
+[data-performance="high"] .glass-effect,
+[data-performance="high"] .diagram-node-glass {
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
   box-shadow: var(--shadow-sm) !important;
+  transition: none !important;
   /* 保留最小阴影 */
 }
 
@@ -240,10 +242,12 @@ body,
 [data-performance="high"] .premium-node::before,
 [data-performance="high"] [class*="pulse"],
 [data-performance="high"] [class*="glow"],
+[data-performance="high"] .diagram-node-selected,
 [data-performance="high"] .edge-cyber-flow path.react-flow__edge-path,
 [data-performance="high"] .cyber-minimap,
 [data-performance="high"] .react-flow__handle {
   animation: none !important;
+  transition: none !important;
   filter: none !important;
 }
 

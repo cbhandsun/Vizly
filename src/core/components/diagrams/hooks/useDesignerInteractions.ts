@@ -17,6 +17,7 @@ import type { DiagramTypePlugin, PluginContext } from '../../../types/plugin';
 import type { FlowStylePreset } from '../../shared/DiagramStyleManager';
 import type { LayerConfig } from './useLayerManagement';
 import type { CommentThread } from '../../../store/useDiagramStore';
+import type { HistorySnapshotOptions } from '../../../hooks/useDiagramHistory';
 
 export interface UseDesignerInteractionsProps {
     nodes: Node[];
@@ -25,7 +26,13 @@ export interface UseDesignerInteractionsProps {
     setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
     selectedNodes: Node[];
     setSelectedNodes: React.Dispatch<React.SetStateAction<Node[]>>;
-    takeSnapshot: (nodes: Node[], edges: Edge[]) => void;
+    takeSnapshot: (
+        nodes: Node[],
+        edges: Edge[],
+        label?: string,
+        options?: HistorySnapshotOptions,
+    ) => void;
+    notifyHistoryChanged: () => void;
     reactFlowInstance: ReactFlowInstance | null;
     isDragging: boolean;
     setIsDragging: (val: boolean) => void;
@@ -59,7 +66,7 @@ const ANNOTATION_COLORS = ['#facc15', '#f87171', '#60a5fa', '#34d399', '#c084fc'
 export function useDesignerInteractions({
     nodes, edges, setNodes, setEdges,
     selectedNodes, setSelectedNodes,
-    takeSnapshot, reactFlowInstance,
+    takeSnapshot, notifyHistoryChanged, reactFlowInstance,
     isDragging, setIsDragging,
     activePlugin, pluginCtx,
     onNodesChange, onEdgesChange,
@@ -183,7 +190,7 @@ export function useDesignerInteractions({
     const handleReconnectEnd = useCallback((_event: MouseEvent | React.MouseEvent | TouchEvent | React.TouchEvent, _edge: Edge) => {}, []);
 
     const { onDragOver, onDrop, onNodeDragStart, onNodeDrag, onNodeDragStop: originalOnNodeDragStop } = useDiagramDragDrop({
-        nodes, edges, setNodes, setEdges, takeSnapshot, reactFlowInstance, setIsDragging, onSmartNodeDrag, clearGuides,
+        nodes, edges, setNodes, setEdges, takeSnapshot, notifyHistoryChanged, reactFlowInstance, setIsDragging, onSmartNodeDrag, clearGuides,
         enableAltDuplicate: false, isConnecting, activeLayerId: normalizedActiveLayerId
     });
 
@@ -192,9 +199,6 @@ export function useDesignerInteractions({
 
     const wrappedOnNodeDragStart = useCallback((event: MouseEvent | TouchEvent, node: Node) => {
         setIsDraggingNode(true);
-        if (typeof document !== 'undefined') {
-            document.body.classList.add('performance-mode');
-        }
         onNodeDragStart(event, node);
     }, [onNodeDragStart]);
 
@@ -212,9 +216,6 @@ export function useDesignerInteractions({
         }, 300);
 
         setIsDraggingNode(false);
-        if (typeof document !== 'undefined') {
-            document.body.classList.remove('performance-mode');
-        }
     }, [originalOnNodeDragStop]);
 
     const addAnnotation = useCallback((x: number, y: number, text: string) => {

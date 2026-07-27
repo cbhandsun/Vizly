@@ -60,6 +60,10 @@ describe('layoutStorage', () => {
     });
 
     it('reads and writes right sidebar collapsed/visible flags defensively', () => {
+        expect(readDesignerRightSidebarCollapsed()).toBe(true);
+        localStorage.setItem(DESIGNER_RIGHT_SIDEBAR_COLLAPSED_STORAGE_KEY, 'invalid');
+        expect(readDesignerRightSidebarCollapsed()).toBe(true);
+        writeDesignerRightSidebarCollapsed(false);
         expect(readDesignerRightSidebarCollapsed()).toBe(false);
         writeDesignerRightSidebarCollapsed(true);
         expect(localStorage.getItem(DESIGNER_RIGHT_SIDEBAR_COLLAPSED_STORAGE_KEY)).toBe('true');

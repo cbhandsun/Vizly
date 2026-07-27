@@ -212,7 +212,11 @@ export const resolveBaseReactFlowDisplayedEdges = ({
     return mergeBaseReactFlowDisplayEdgePatches(immediate, deferred.displayPatches) ?? [];
   }
   if (cached) return cached;
-  return policyMode === 'skip' || policyMode === 'interactive' ? immediate : [];
+  // A full-quality route is an enhancement, not a prerequisite for rendering.
+  // Keeping endpoint-driven fallback edges visible prevents a blank graph while
+  // geometry is measured, after layout changes, and when the worker rejects.
+  void policyMode;
+  return immediate;
 };
 
 const detachBaseReactFlowDisplayWorkerIdleListeners = (worker: Worker): void => {

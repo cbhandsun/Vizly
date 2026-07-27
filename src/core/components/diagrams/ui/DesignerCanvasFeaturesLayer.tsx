@@ -29,6 +29,7 @@ export interface DesignerCanvasFeaturesLayerProps {
         | 'activePlugin'
         | 'quickAddMenuVisible'
         | 'isContextToolbarHidden'
+        | 'isDragging'
         | 'isConnecting'
         | 'updateNodesBatch'
         | 'updateEdgesBatch'
@@ -104,6 +105,7 @@ export const DesignerCanvasFeaturesLayer = React.memo(
                 activePlugin={hoverToolbar.activePlugin}
                 quickAddMenuVisible={hoverToolbar.quickAddMenuVisible}
                 isContextToolbarHidden={hoverToolbar.isContextToolbarHidden}
+                isDragging={hoverToolbar.isDragging}
                 isConnecting={hoverToolbar.isConnecting}
                 updateNodesBatch={hoverToolbar.updateNodesBatch}
                 updateEdgesBatch={hoverToolbar.updateEdgesBatch}
@@ -179,6 +181,7 @@ export const DesignerCanvasFeaturesLayer = React.memo(
       // check primitive boolean states
       if (prev.hoverToolbar.quickAddMenuVisible !== next.hoverToolbar.quickAddMenuVisible ||
           prev.hoverToolbar.isContextToolbarHidden !== next.hoverToolbar.isContextToolbarHidden ||
+          prev.hoverToolbar.isDragging !== next.hoverToolbar.isDragging ||
           prev.hoverToolbar.isConnecting !== next.hoverToolbar.isConnecting ||
           prev.hoverToolbar.hasCopiedStyle !== next.hoverToolbar.hasCopiedStyle) return false;
           

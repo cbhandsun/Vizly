@@ -5,6 +5,7 @@ import type { Node, Edge } from '@xyflow/react';
 import type { MessageInstance } from 'antd/es/message/interface';
 import type { NotificationInstance } from 'antd/es/notification/interface';
 import { parseClipboardJson } from '../../../utils/flowchartClipboard';
+import type { DiagramActionTarget } from './useDiagramActions';
 
 /**
  * 🚀 P2 性能优化：从 FlowchartDesigner 提取的 Toast 包装层
@@ -16,8 +17,8 @@ interface UseToastActionsProps {
     messageApi: MessageInstance;
     notificationApi: NotificationInstance;
     // Core actions (from useDiagramActions)
-    handleDelete: (targetId?: string) => void;
-    handleDuplicate: (targetId?: string) => void;
+    handleDelete: (target?: DiagramActionTarget) => void;
+    handleDuplicate: (target?: DiagramActionTarget) => void;
     // Clipboard actions
     handleCopy: () => void;
     handlePaste: () => void;
@@ -115,14 +116,21 @@ export function useToastActions({
     }, [handleCut, messageApi, selectedEdges.length, selectedNodes.length, t]);
 
     // --- Delete / Duplicate ---
-    const getDeleteCounts = useCallback((targetId?: string) => {
-        if (!targetId) {
+    const getDeleteCounts = useCallback((target?: DiagramActionTarget) => {
+        if (!target) {
             return { nodes: selectedNodes.length, edges: selectedEdges.length };
         }
-        const isNode = nodesRef.current!.some(n => n.id === targetId);
-        const isEdge = edgesRef.current!.some(e => e.id === targetId);
+        if (Array.isArray(target)) {
+            const targetIds = new Set(target);
+            return {
+                nodes: nodesRef.current.filter(node => targetIds.has(node.id)).length,
+                edges: edgesRef.current.filter(edge => targetIds.has(edge.id)).length,
+            };
+        }
+        const isNode = nodesRef.current.some(n => n.id === target);
+        const isEdge = edgesRef.current.some(e => e.id === target);
         if (isNode) {
-            if (selectedNodes.some(n => n.id === targetId)) {
+            if (selectedNodes.some(n => n.id === target)) {
                 return { nodes: selectedNodes.length, edges: selectedEdges.length };
             }
             return { nodes: 1, edges: 0 };
@@ -131,19 +139,23 @@ export function useToastActions({
         return { nodes: 0, edges: 0 };
     }, [selectedEdges, selectedNodes, nodesRef, edgesRef]);
 
-    const handleDeleteWithToast = useCallback((targetId?: string) => {
-        const counts = getDeleteCounts(targetId);
+    const handleDeleteWithToast = useCallback((target?: DiagramActionTarget) => {
+        const counts = getDeleteCounts(target);
         if (counts.nodes + counts.edges === 0) return;
-        handleDelete(targetId);
+        handleDelete(target);
     }, [getDeleteCounts, handleDelete]);
 
-    const handleDuplicateWithToast = useCallback((targetId?: string) => {
-        const count = targetId ? 1 : selectedNodes.length;
+    const handleDuplicateWithToast = useCallback((target?: DiagramActionTarget) => {
+        const count = Array.isArray(target)
+            ? new Set(target).size
+            : target
+                ? 1
+                : selectedNodes.length;
         if (count <= 0) {
             messageApi.info(t('designer.flowchart.toast.nothingToDuplicate'));
             return;
         }
-        handleDuplicate(targetId);
+        handleDuplicate(target);
     }, [handleDuplicate, messageApi, selectedNodes, t]);
 
     // --- Group / Ungroup ---

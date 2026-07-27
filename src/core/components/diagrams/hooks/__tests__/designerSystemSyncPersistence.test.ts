@@ -5,6 +5,8 @@ import {
   clearDesignerFreshSeedFlag,
   mergePresetExplicitEdgeHandles,
   recalculateAutosaveNodeSizes,
+  shouldUseGlobalDesignerPerformanceMode,
+  shouldUseScopedDesignerDragPerformanceMode,
 } from '../designerSystemSyncPersistence';
 
 describe('mergePresetExplicitEdgeHandles', () => {
@@ -107,5 +109,20 @@ describe('recalculateAutosaveNodeSizes', () => {
       calculateNodeHeight: () => -1,
     }));
     expect(invalid[0]).toBe(nodes[0]);
+  });
+});
+
+describe('shouldUseGlobalDesignerPerformanceMode', () => {
+  it('reserves document-wide style changes for high-density graphs', () => {
+    expect(shouldUseGlobalDesignerPerformanceMode(300)).toBe(false);
+    expect(shouldUseGlobalDesignerPerformanceMode(301)).toBe(true);
+    expect(shouldUseGlobalDesignerPerformanceMode(-1)).toBe(false);
+    expect(shouldUseGlobalDesignerPerformanceMode(Number.NaN)).toBe(false);
+  });
+
+  it('avoids a second canvas-wide class invalidation for high-density drags', () => {
+    expect(shouldUseScopedDesignerDragPerformanceMode(300, true)).toBe(true);
+    expect(shouldUseScopedDesignerDragPerformanceMode(301, true)).toBe(false);
+    expect(shouldUseScopedDesignerDragPerformanceMode(500, false)).toBe(false);
   });
 });

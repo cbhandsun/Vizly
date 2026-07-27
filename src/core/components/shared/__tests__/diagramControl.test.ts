@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  clampDiagramFullFitZoom,
-  MAX_DIAGRAM_FULL_FIT_ZOOM,
+    clampDiagramFullFitZoom,
+    coerceDiagramSidebarOffset,
+    DEFAULT_DIAGRAM_RIGHT_SIDEBAR_OFFSET,
+    MAX_DIAGRAM_FULL_FIT_ZOOM,
   MIN_DIAGRAM_FULL_FIT_ZOOM,
 } from '../diagramControlFit';
 
@@ -43,5 +45,14 @@ describe('diagramControl', () => {
     expect(clampDiagramFullFitZoom(Number.POSITIVE_INFINITY)).toBe(MIN_DIAGRAM_FULL_FIT_ZOOM);
     expect(clampDiagramFullFitZoom(-1)).toBe(MIN_DIAGRAM_FULL_FIT_ZOOM);
     expect(clampDiagramFullFitZoom(100)).toBe(MAX_DIAGRAM_FULL_FIT_ZOOM);
+  });
+
+  it('uses the actual bounded sidebar offset when fitting editor content', () => {
+    expect(coerceDiagramSidebarOffset('60px')).toBe(60);
+    expect(coerceDiagramSidebarOffset('316')).toBe(316);
+    expect(coerceDiagramSidebarOffset('')).toBe(DEFAULT_DIAGRAM_RIGHT_SIDEBAR_OFFSET);
+    expect(coerceDiagramSidebarOffset('not-a-size')).toBe(DEFAULT_DIAGRAM_RIGHT_SIDEBAR_OFFSET);
+    expect(coerceDiagramSidebarOffset(-1)).toBe(DEFAULT_DIAGRAM_RIGHT_SIDEBAR_OFFSET);
+    expect(coerceDiagramSidebarOffset(50_000)).toBe(800);
   });
 });

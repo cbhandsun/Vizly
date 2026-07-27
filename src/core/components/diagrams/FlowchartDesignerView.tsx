@@ -19,6 +19,7 @@ import { RemoteCursors } from './ui/RemoteCursors';
 import { UnifiedDesignerShell } from './UnifiedDesignerShell';
 import { generateSlides } from '../../hooks/usePresentationSlides';
 import { persistFlowchartOnboardingDismissed } from './flowchartOnboardingStorage';
+import { shouldOpenDesignerAiSidebar } from './designerRightSidebarState';
 import {
     resolveFlowchartPluginContribution,
     type FlowchartDesignerViewModel,
@@ -177,6 +178,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
         pluginCtx,
         pluginId,
         pluginManagerVisible,
+        presentationActive,
         preset,
         quickAddMenu,
         reactFlowInstance,
@@ -231,6 +233,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
     } = model;
 
     const _actualLeftOffset = isSidebarHidden ? 0 : (leftDrawerOpen ? 64 + leftDrawerWidth : 64);
+    const showEditingChrome = !presentationActive;
 
     return (
         <UnifiedDesignerShell
@@ -257,7 +260,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
             leftSidebar={<FlowchartDesignerLeftSidebar model={model} />}
             canvasArea={
                 <>
-                    {showRuler && (
+                    {showEditingChrome && showRuler && (
                         <>
                             <CanvasRuler orientation="horizontal" isDarkMode={theme?.mode === 'dark'} />
                             <CanvasRuler orientation="vertical" isDarkMode={theme?.mode === 'dark'} />
@@ -297,7 +300,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                     <div ref={reactFlowWrapper} style={{ position: 'relative', height: '100%' }}>
                         <ContextMenuLayer onAction={handleContextMenuAction} activePlugin={activePlugin} pluginCtx={pluginCtx} />
 
-                        <DesignerHeaderLayer
+                        {showEditingChrome && <DesignerHeaderLayer
                             diagramId={diagramIdForExport}
                             topActions={{
                                 onExportJSON: handleExport,
@@ -384,7 +387,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                 showAiCrown,
                                 onToggleAI: () => {
                                     if (onAiTabIntercept && !onAiTabIntercept()) return;
-                                    if (activeRightTab !== 'ai') {
+                                    if (shouldOpenDesignerAiSidebar(activeRightTab, aiChatVisible)) {
                                         setActiveRightTab('ai');
                                         setAiChatVisible(true);
                                     } else {
@@ -430,7 +433,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                 onAlign: handleAlign,
                                 onDistribute: handleDistribute,
                             }}
-                        />
+                        />}
 
                         <LayoutStabilityContext.Provider value={isLayoutStable}>
                             <div
@@ -468,7 +471,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                     onReconnectEnd={handleReconnectEnd}
                                     autoRoutingEnabled={autoRoutingEnabled}
                                     enableSmartEdges={true}
-                                    showMinimap={showMinimap}
+                                    showMinimap={showEditingChrome && showMinimap}
                                     showGrid={showGrid}
                                     gridVariant={gridVariant}
                                     backgroundGridColor={gridColor}
@@ -482,7 +485,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                     isDragging={isDragging}
                                 >
                                     <RemoteCursors />
-                                    <DesignerCanvasFeaturesLayer
+                                    {showEditingChrome && <DesignerCanvasFeaturesLayer
                                         quickConnect={{
                                             visible: !!quickAddMenu?.visible,
                                             x: quickAddMenu?.clientX || 0,
@@ -498,6 +501,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                             activePlugin,
                                             quickAddMenuVisible: !!quickAddMenu?.visible,
                                             isContextToolbarHidden,
+                                            isDragging,
                                             isConnecting,
                                             updateNodesBatch,
                                             updateEdgesBatch,
@@ -557,13 +561,13 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                             onReplaceAll: handleSearchReplaceAll,
                                             onBeforeReplace: handleBeforeReplace,
                                         }}
-                                    />
-                                    <FreehandDrawingLayer
+                                    />}
+                                    {showEditingChrome && <FreehandDrawingLayer
                                         isDrawingMode={isDrawingMode}
                                         zoom={viewport.zoom}
                                         pan={{ x: viewport.x, y: viewport.y }}
                                         currentColor={preset.name === 'sketch' ? '#555555' : '#000000'}
-                                    />
+                                    />}
                                     {resolveFlowchartPluginContribution(
                                         'canvas',
                                         pluginCtx && activePlugin?.contributeCanvasComponents

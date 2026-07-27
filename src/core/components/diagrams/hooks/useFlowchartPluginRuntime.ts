@@ -92,6 +92,7 @@ export function useFlowchartPluginRuntime({
                     viewport,
                     containerWidth: container?.offsetWidth ?? window.innerWidth,
                     containerHeight: container?.offsetHeight ?? window.innerHeight,
+                    existingNodes: getNodes(),
                 });
 
                 takeSnapshot(getNodes(), getEdges());

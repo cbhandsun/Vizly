@@ -205,7 +205,7 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
                                 <FaClock size={8} />
                                 {formatTime(entry.timestamp)}
                                 <span style={{ marginLeft: 4 }}>
-                                    {entry.patch.length} 变动
+                                    {entry.changeCount ?? entry.patch.length} 变动
                                 </span>
                             </div>
                         </div>

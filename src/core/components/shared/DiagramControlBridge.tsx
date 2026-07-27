@@ -1,7 +1,11 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import type { Node, XYPosition } from '@xyflow/react';
-import { clampDiagramFullFitZoom, MIN_DIAGRAM_FULL_FIT_ZOOM } from './diagramControlFit';
+import {
+  clampDiagramFullFitZoom,
+  coerceDiagramSidebarOffset,
+  MIN_DIAGRAM_FULL_FIT_ZOOM,
+} from './diagramControlFit';
 import { logDiagramControlBridgeFailure } from './diagramControlLogging';
 
 interface DiagramControlBridgeProps {
@@ -152,7 +156,9 @@ const DiagramControlBridge: React.FC<DiagramControlBridgeProps> = ({ diagramId }
 
           const SAFE_TOP = 64;
           const SAFE_LEFT = 56;
-          const SAFE_RIGHT = 380; // 右侧属性面板宽度
+          const SAFE_RIGHT = coerceDiagramSidebarOffset(
+            getComputedStyle(document.documentElement).getPropertyValue('--right-sidebar-offset'),
+          );
           const SAFE_BOTTOM = 64; // 底部控制栏高度
           const RULER_THICKNESS = 20;
           

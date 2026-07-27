@@ -10,6 +10,9 @@ interface DraggableSettingsPanelProps {
     title: string;
 }
 
+export const SETTINGS_PANEL_Z_INDEX = 900;
+export const SETTINGS_PANEL_POPUP_Z_INDEX = 950;
+
 export const DraggableSettingsPanel: React.FC<DraggableSettingsPanelProps> = ({ children, onClose, title }) => {
     // 初始位置设为居中偏上，避免与右侧属性面板（DesignerRightSidebar）冲突
     const initialPos = useMemo(() => ({
@@ -33,7 +36,7 @@ export const DraggableSettingsPanel: React.FC<DraggableSettingsPanelProps> = ({ 
                 maxHeight: 'calc(100vh - 100px)',
                 display: 'flex',
                 flexDirection: 'column',
-                zIndex: 2000,
+                zIndex: SETTINGS_PANEL_Z_INDEX,
             }}
             onPointerDown={(e) => e.stopPropagation()}
         >
@@ -46,6 +49,8 @@ export const DraggableSettingsPanel: React.FC<DraggableSettingsPanelProps> = ({ 
                     <span className="font-semibold text-[15px] tracking-wide text-gray-800 dark:text-gray-200">{title}</span>
                 </div>
                 <button
+                    type="button"
+                    aria-label={`关闭${title}`}
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={(e) => { e.stopPropagation(); onClose(); }}
                     className="flex items-center justify-center w-7 h-7 rounded-full bg-transparent hover:bg-black/5 dark:bg-transparent dark:hover:bg-white/10 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors border-none outline-none cursor-pointer"
@@ -61,7 +66,7 @@ export const DraggableSettingsPanel: React.FC<DraggableSettingsPanelProps> = ({ 
                 getPopupContainer={() => document.body}
                 theme={{
                     token: {
-                        zIndexPopupBase: 3000 // 确保下拉框高于面板(2000)
+                        zIndexPopupBase: SETTINGS_PANEL_POPUP_Z_INDEX
                     }
                 }}
             >

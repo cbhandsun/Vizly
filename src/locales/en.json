@@ -4,6 +4,7 @@
         "search": "Search",
         "save": "Save",
         "cancel": "Cancel",
+        "close": "Close",
         "ok": "OK",
         "remoteDataInvalid": "Remote diagram data is invalid: {{reason}}",
         "remoteDataRepaired": "Remote diagram data is incomplete; auto-repaired: {{reason}}",
@@ -414,7 +415,22 @@
             "restoreFullFlow": "Restore Full Flow",
             "snapOn": "Snap to Grid: On",
             "snapOff": "Snap to Grid: Off",
-            "historyWithCount": "History ({{count}})"
+            "historyWithCount": "History ({{count}})",
+            "canvasSettings": "Canvas Settings",
+            "minimap": "Minimap",
+            "minimapLoading": "Preparing minimap…",
+            "minimapEmpty": "No nodes on the canvas",
+            "ruler": "Ruler",
+            "grid": "Grid",
+            "shortcuts": "Keyboard Shortcuts",
+            "alignL": "Align Left",
+            "alignC": "Align Center",
+            "alignR": "Align Right",
+            "alignT": "Align Top",
+            "alignM": "Align Middle",
+            "alignB": "Align Bottom",
+            "distributeH": "Distribute Horizontally",
+            "distributeV": "Distribute Vertically"
         },
         "jsonEditor": {
             "title": "Edit Diagram Data (JSON)",
@@ -606,6 +622,7 @@
             "basic": "Basic Shapes",
             "components": "Components",
             "search": "Search...",
+            "searchComponents": "Search components...",
             "flowControl": "Flow Control",
             "dataIO": "Data & I/O",
             "containers": "Containers",
@@ -650,7 +667,11 @@
             "predefinedProcess": "Predefined Process",
             "multiDocument": "Multi-Document",
             "offPageConnector": "Off-page Connector",
-            "internalStorage": "Internal Storage"
+            "internalStorage": "Internal Storage",
+            "swimlane": "Swimlane",
+            "arrowTimeline": "Arrow Timeline",
+            "system": "System",
+            "thirdParty": "Third party"
         },
         "virtualization": {
             "enabled": "Virtualization enabled",

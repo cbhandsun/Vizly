@@ -8,14 +8,14 @@ import {
   GlobalOutlined,
   CloudDownloadOutlined,
   CheckCircleFilled,
-  StarFilled
+  StarFilled,
+  CloseOutlined
 } from '@ant-design/icons';
 import { PluginRegistry } from '../../../services/PluginRegistry';
 import { DiagramTypePlugin } from '../../../types';
 import './PluginMarketplace.css';
 
 const { Text, Title, Paragraph } = Typography;
-const { TabPane } = Tabs;
 
 interface PluginManagerModalProps {
   visible: boolean;
@@ -148,9 +148,28 @@ export const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ visible,
       footer={null}
       width={860}
       centered
+      closable={false}
       styles={{ body: { padding: 0 }, mask: { backdropFilter: 'blur(4px)' } }}
     >
       <div className="marketplace-container">
+        <Button
+          type="text"
+          aria-label={t('common.close')}
+          icon={<CloseOutlined aria-hidden="true" />}
+          onClick={onClose}
+          style={{
+            position: 'absolute',
+            top: 12,
+            right: 12,
+            zIndex: 3,
+            width: 32,
+            height: 32,
+            borderRadius: 8,
+            color: 'rgba(15, 23, 42, 0.68)',
+            background: 'rgba(255, 255, 255, 0.72)',
+            backdropFilter: 'blur(8px)',
+          }}
+        />
         {/* Banner Section */}
         <div style={{ height: 160, position: 'relative', overflow: 'hidden', padding: 24, display: 'flex', alignItems: 'center' }}>
             <img 
@@ -184,17 +203,18 @@ export const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ visible,
             {/* Search and Tabs */}
             <div className="marketplace-search-wrapper">
                 <Space size={20} style={{ width: '100%', justifyContent: 'space-between' }}>
-                    <Tabs 
-                        className="marketplace-tabs" 
-                        activeKey={activeTab} 
+                    <Tabs
+                        className="marketplace-tabs"
+                        activeKey={activeTab}
                         onChange={setActiveTab}
                         tabBarStyle={{ marginBottom: 0 }}
-                    >
-                        <TabPane tab={t('pluginMarketplace.tabAll')} key="all" />
-                        <TabPane tab={t('pluginMarketplace.tabCore')} key="core" />
-                        <TabPane tab={t('pluginMarketplace.tabProductivity')} key="productivity" />
-                        <TabPane tab={t('pluginMarketplace.tabInstalled')} key="installed" />
-                    </Tabs>
+                        items={[
+                          { key: 'all', label: t('pluginMarketplace.tabAll') },
+                          { key: 'core', label: t('pluginMarketplace.tabCore') },
+                          { key: 'productivity', label: t('pluginMarketplace.tabProductivity') },
+                          { key: 'installed', label: t('pluginMarketplace.tabInstalled') },
+                        ]}
+                    />
                     <Input
                         prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
                         placeholder={t('pluginMarketplace.searchPlaceholder')}

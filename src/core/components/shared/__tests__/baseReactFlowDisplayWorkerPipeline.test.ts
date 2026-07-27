@@ -629,7 +629,7 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
       deferred: null,
       cached: null,
       immediate: [sourceEdge],
-    })).toEqual([]);
+    })).toEqual([sourceEdge]);
     expect(resolveBaseReactFlowDisplayedEdges({
       signature: 'cache-quality-good',
       geometryDigest: 'digest-good',

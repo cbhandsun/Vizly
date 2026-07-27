@@ -44,6 +44,25 @@ export interface FloatingPositionResult {
     actualPlacement: 'top' | 'bottom';
 }
 
+export const resolveFloatingToolbarHorizontalPosition = ({
+    screenCenterX,
+    viewportWidth,
+}: {
+    screenCenterX: number;
+    viewportWidth: number;
+}): number | string => {
+    const toolbarEdgeAllowance = 176;
+    if (viewportWidth <= 768) {
+        const maximumCenter = viewportWidth - toolbarEdgeAllowance;
+        if (maximumCenter < toolbarEdgeAllowance) return viewportWidth / 2;
+        return Math.min(
+            maximumCenter,
+            Math.max(toolbarEdgeAllowance, screenCenterX),
+        );
+    }
+    return `clamp(calc(var(--left-sidebar-offset, 0px) + ${toolbarEdgeAllowance}px), ${screenCenterX}px, calc(100vw - var(--right-sidebar-offset, 340px) - ${toolbarEdgeAllowance}px))`;
+};
+
 // ─── 从 ReactFlow Store 计算选中节点的 bounds ─────────────────────────────────
 export function useSelectedNodeBounds(selectedNodeIds: string[]): WorldBounds | null {
     return useStore(s => {
@@ -70,8 +89,22 @@ export function useSelectedNodeBounds(selectedNodeIds: string[]): WorldBounds | 
 }
 
 // ─── 判断是否在拖拽中 ────────────────────────────────────────────────────────
+type DragStateNode = { dragging?: boolean };
+
+export const hasDraggingNode = (
+    nodes: readonly DragStateNode[],
+    nodeLookup?: Map<string, DragStateNode>,
+): boolean => {
+    if (nodeLookup) {
+        for (const node of nodeLookup.values()) {
+            if (node.dragging) return true;
+        }
+    }
+    return nodes.some(node => node.dragging);
+};
+
 export function useNodesDragging(): boolean {
-    return useStore(s => s.nodes.some(node => node.dragging));
+    return useStore(s => hasDraggingNode(s.nodes, s.nodeLookup));
 }
 
 // ─── 核心定位 Hook ───────────────────────────────────────────────────────────
@@ -109,28 +142,10 @@ export function useFloatingPosition({
         const placeBelow = actualPlacement === 'bottom';
 
         // 响应式水平限位：避免工具栏溢出屏幕或被左右侧面板遮挡
-        const isMobile = window.innerWidth <= 768;
-        let rightOffset = isMobile ? 20 : 340;
-        let leftOffset = isMobile ? 0 : 0;
-
-        if (!isMobile && typeof document !== 'undefined') {
-            const rootStyle = getComputedStyle(document.documentElement);
-            const rVal = parseFloat(rootStyle.getPropertyValue('--right-sidebar-offset'));
-            if (!isNaN(rVal)) rightOffset = rVal;
-            const lVal = parseFloat(rootStyle.getPropertyValue('--left-sidebar-offset'));
-            if (!isNaN(lVal)) leftOffset = lVal;
-        }
-
-        const toolbarHalfWidth = 160; // 预估工具栏宽度的一半，保证 translateX(-50%) 不越界
-        
-        const minLeft = leftOffset + toolbarHalfWidth + 16;
-        const maxRight = window.innerWidth - rightOffset - toolbarHalfWidth - 16;
-        
-        // Ensure constraints are valid even in extremely narrow screens
-        const safeMinLeft = Math.min(minLeft, maxRight);
-        const safeMaxRight = Math.max(minLeft, maxRight);
-        
-        const safeX = Math.min(safeMaxRight, Math.max(safeMinLeft, screenCenterX));
+        const safeX = resolveFloatingToolbarHorizontalPosition({
+            screenCenterX,
+            viewportWidth: window.innerWidth,
+        });
 
         const style: React.CSSProperties = {
             left: safeX,

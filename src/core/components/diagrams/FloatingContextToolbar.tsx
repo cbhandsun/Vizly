@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Node } from '@xyflow/react';
 import { Divider, Dropdown, ColorPicker, type MenuProps } from 'antd';
 import type { LayerConfig } from './hooks/useLayerManagement';
@@ -16,6 +17,7 @@ import { FaArrowUp, FaArrowDown, FaPercentage } from 'react-icons/fa';
 import { useAlignment } from './hooks/useAlignment';
 import { ShapePreview } from './ShapePreview';
 import type { FlowchartShape } from '../../types/flowchart-node';
+import { resolveFloatingContextToolbarOffset } from './floatingContextToolbarPosition';
 import {
     ToolbarContainer,
     ToolbarButton,
@@ -30,15 +32,15 @@ import {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const POPULAR_SHAPES: Array<{ shape: FlowchartShape; label: string }> = [
-    { shape: 'rectangle', label: 'Process' },
-    { shape: 'pill', label: 'Start/End' },
-    { shape: 'diamond', label: 'Decision' },
-    { shape: 'parallelogram', label: 'I/O' },
-    { shape: 'database', label: 'Database' },
-    { shape: 'document', label: 'Document' },
-    { shape: 'ellipse', label: 'Ellipse' },
-    { shape: 'hexagon', label: 'Hexagon' },
+const POPULAR_SHAPES: Array<{ shape: FlowchartShape; labelKey: string }> = [
+    { shape: 'rectangle', labelKey: 'propertyPanel.options.shape.rectangle' },
+    { shape: 'pill', labelKey: 'propertyPanel.options.shape.pill' },
+    { shape: 'diamond', labelKey: 'propertyPanel.options.shape.diamond' },
+    { shape: 'parallelogram', labelKey: 'propertyPanel.options.shape.parallelogram' },
+    { shape: 'database', labelKey: 'propertyPanel.options.shape.database' },
+    { shape: 'document', labelKey: 'propertyPanel.options.shape.document' },
+    { shape: 'ellipse', labelKey: 'propertyPanel.options.shape.ellipse' },
+    { shape: 'hexagon', labelKey: 'propertyPanel.options.shape.hexagon' },
 ];
 
 const DOMAIN_OPTIONS = [
@@ -94,28 +96,30 @@ const AlignPanel: React.FC<{
     onDistribute: (dir: 'horizontal' | 'vertical') => void;
     canAlign: boolean;
     canDistribute: boolean;
-}> = ({ onAlign, onDistribute, canAlign, canDistribute }) => (
-    <div style={{ padding: 4, display: 'flex', flexDirection: 'column', gap: 4 }}>
+}> = ({ onAlign, onDistribute, canAlign, canDistribute }) => {
+    const { t } = useTranslation();
+    return <div style={{ padding: 4, display: 'flex', flexDirection: 'column', gap: 4 }}>
         <div style={{ display: 'flex', gap: 2 }}>
-            <ToolbarButton icon={<MdAlignHorizontalLeft />} label="Align Left" onClick={() => onAlign('left')} disabled={!canAlign} />
-            <ToolbarButton icon={<MdAlignHorizontalCenter />} label="Align Center" onClick={() => onAlign('center')} disabled={!canAlign} />
-            <ToolbarButton icon={<MdAlignHorizontalRight />} label="Align Right" onClick={() => onAlign('right')} disabled={!canAlign} />
+            <ToolbarButton icon={<MdAlignHorizontalLeft />} label={t('designer.toolbar.alignL')} onClick={() => onAlign('left')} disabled={!canAlign} />
+            <ToolbarButton icon={<MdAlignHorizontalCenter />} label={t('designer.toolbar.alignC')} onClick={() => onAlign('center')} disabled={!canAlign} />
+            <ToolbarButton icon={<MdAlignHorizontalRight />} label={t('designer.toolbar.alignR')} onClick={() => onAlign('right')} disabled={!canAlign} />
         </div>
         <div style={{ display: 'flex', gap: 2 }}>
-            <ToolbarButton icon={<MdAlignVerticalTop />} label="Align Top" onClick={() => onAlign('top')} disabled={!canAlign} />
-            <ToolbarButton icon={<MdAlignVerticalCenter />} label="Align Middle" onClick={() => onAlign('middle')} disabled={!canAlign} />
-            <ToolbarButton icon={<MdAlignVerticalBottom />} label="Align Bottom" onClick={() => onAlign('bottom')} disabled={!canAlign} />
+            <ToolbarButton icon={<MdAlignVerticalTop />} label={t('designer.toolbar.alignT')} onClick={() => onAlign('top')} disabled={!canAlign} />
+            <ToolbarButton icon={<MdAlignVerticalCenter />} label={t('designer.toolbar.alignM')} onClick={() => onAlign('middle')} disabled={!canAlign} />
+            <ToolbarButton icon={<MdAlignVerticalBottom />} label={t('designer.toolbar.alignB')} onClick={() => onAlign('bottom')} disabled={!canAlign} />
         </div>
         <Divider style={{ margin: '4px 0' }} />
         <div style={{ display: 'flex', gap: 2 }}>
-            <ToolbarButton icon={<MdHorizontalDistribute />} label="Distribute Horizontally" onClick={() => onDistribute('horizontal')} disabled={!canDistribute} />
-            <ToolbarButton icon={<MdVerticalDistribute />} label="Distribute Vertically" onClick={() => onDistribute('vertical')} disabled={!canDistribute} />
+            <ToolbarButton icon={<MdHorizontalDistribute />} label={t('designer.toolbar.distributeH')} onClick={() => onDistribute('horizontal')} disabled={!canDistribute} />
+            <ToolbarButton icon={<MdVerticalDistribute />} label={t('designer.toolbar.distributeV')} onClick={() => onDistribute('vertical')} disabled={!canDistribute} />
         </div>
-    </div>
-);
+    </div>;
+};
 
-const ShapePanel: React.FC<{ onChangeShape: (shape: FlowchartShape) => void }> = ({ onChangeShape }) => (
-    <div style={{ padding: 8, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4, width: 180 }}>
+const ShapePanel: React.FC<{ onChangeShape: (shape: FlowchartShape) => void }> = ({ onChangeShape }) => {
+    const { t } = useTranslation();
+    return <div style={{ padding: 8, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4, width: 180 }}>
         {POPULAR_SHAPES.map(s => (
             <div
                 key={s.shape}
@@ -124,15 +128,15 @@ const ShapePanel: React.FC<{ onChangeShape: (shape: FlowchartShape) => void }> =
                     padding: '6px 4px', cursor: 'pointer', display: 'flex', flexDirection: 'column',
                     alignItems: 'center', gap: 4, borderRadius: 4, transition: 'background 0.2s',
                 }}
-                title={s.label}
+                title={t(s.labelKey)}
                 onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--toolbar-btn-hover-bg)'}
                 onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
             >
                 <div style={{ lineHeight: 0 }}><ShapePreview shape={s.shape} size={24} color="#64748b" /></div>
             </div>
         ))}
-    </div>
-);
+    </div>;
+};
 
 const DomainClassPanel: React.FC<{ onChangeDomainClass: (domainClass: string) => void }> = ({ onChangeDomainClass }) => (
     <div style={{ padding: 8, display: 'flex', flexDirection: 'column', gap: 4, width: 180 }}>
@@ -169,6 +173,7 @@ export const FloatingContextToolbar: React.FC<FloatingContextToolbarProps> = Rea
     const selectedIds = useMemo(() => selectedNodes.map(n => n.id), [selectedNodes]);
     const worldBounds = useSelectedNodeBounds(selectedIds);
     const nodesDragging = useNodesDragging();
+    const toolbarOffset = resolveFloatingContextToolbarOffset(selectedNodes);
 
     const { handleAlign, handleDistribute, canAlign, canDistribute } = useAlignment({
         selectedNodes, onUpdateNodes,
@@ -190,7 +195,7 @@ export const FloatingContextToolbar: React.FC<FloatingContextToolbarProps> = Rea
     const { style: positionStyle, visible } = useFloatingPosition({
         worldBounds,
         placement: 'auto',
-        offset: 20,
+        offset: toolbarOffset,
         hidden: nodesDragging || selectedNodes.length === 0,
     });
 

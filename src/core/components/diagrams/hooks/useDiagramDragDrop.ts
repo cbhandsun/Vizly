@@ -3,6 +3,7 @@ import { Node, Edge, ReactFlowInstance } from '@xyflow/react';
 import { projectScreenPositionToFlowPosition, readDomViewport } from '../../../utils/domViewport';
 import type { SnapDelta } from '../../../hooks/useSmartGuides';
 import type { ClipboardData } from '../../../utils/flowchartClipboard';
+import type { HistorySnapshotOptions } from '../../../hooks/useDiagramHistory';
 import { parseDragNodeTemplate, parseReverseImportDiagramState } from '../../../utils/dragDropPayload';
 import { getReverseImportImageFileError } from '../../../utils/fileImportGuards';
 import {
@@ -11,13 +12,25 @@ import {
     logDiagramDragDropReverseImportFailure,
 } from './diagramInteractionLogging';
 import { createSwimlaneDropNodes } from './diagramDropSwimlaneFactory';
+import {
+    findNodeParentCandidate,
+    findNodeParentPreviewCandidate,
+    getNodeAbsolutePosition,
+    mergeDraggedNodesIntoGraph,
+} from './diagramNodeParenting';
 
 interface UseDiagramDragDropProps {
     nodes: Node[];
     edges: Edge[];
     setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
     setEdges: React.Dispatch<React.SetStateAction<Edge[]>>; // ⭐ Phase 10: 恢复连线
-    takeSnapshot: (nodes: Node[], edges: Edge[]) => void;
+    takeSnapshot: (
+        nodes: Node[],
+        edges: Edge[],
+        label?: string,
+        options?: HistorySnapshotOptions,
+    ) => void;
+    notifyHistoryChanged: () => void;
     reactFlowInstance: ReactFlowInstance | null;
     setIsDragging: (dragging: boolean) => void;
     onSmartNodeDrag?: (event: MouseEvent | TouchEvent, node: Node, nodes: Node[]) => SnapDelta | null;
@@ -33,6 +46,7 @@ export const useDiagramDragDrop = ({
     setNodes,
     setEdges, // ⭐ Fix: add setEdges here
     takeSnapshot,
+    notifyHistoryChanged,
     reactFlowInstance,
     setIsDragging,
     onSmartNodeDrag,
@@ -280,7 +294,10 @@ export const useDiagramDragDrop = ({
         }
 
         // 🚀 P2: 使用 Ref 替代直接依赖 nodes/edges，避免回调在拖动期间重建
-        takeSnapshot(nodesRef.current, edgesRef.current);
+        takeSnapshot(nodesRef.current, edgesRef.current, undefined, {
+            notify: false,
+            dedupe: false,
+        });
         setIsDragging(true);
         dragTargetIdRef.current = null;
     }, [enableAltDuplicate, isConnecting, takeSnapshot, setIsDragging, setNodes]);
@@ -288,19 +305,19 @@ export const useDiagramDragDrop = ({
     // ⭐ 防振荡：记录上次 snap 签名，避免重复 snap
     const lastSnapSigRef = useRef('');
 
-    const onNodeDrag = useCallback((event: MouseEvent | TouchEvent, node: Node, allNodes: Node[]) => {
+    const onNodeDrag = useCallback((event: MouseEvent | TouchEvent, node: Node, draggedNodes: Node[]) => {
         // 🚀 P3: Smart Guides 吸附纳入 RAF 节流
         //   避免每个 mousemove 同步执行 O(n) 对齐计算
         if (onSmartNodeDrag) {
             if (smartGuideRafRef.current !== null) {
                 cancelAnimationFrame(smartGuideRafRef.current);
             }
-            // 捕获当前帧的 node 和 allNodes 引用
+            // 捕获当前帧的 node 和当前拖动节点引用
             const capturedNode = node;
-            const capturedAllNodes = allNodes;
+            const capturedDraggedNodes = draggedNodes;
             smartGuideRafRef.current = requestAnimationFrame(() => {
                 smartGuideRafRef.current = null;
-                const snapDelta = onSmartNodeDrag(event, capturedNode, capturedAllNodes);
+                const snapDelta = onSmartNodeDrag(event, capturedNode, capturedDraggedNodes);
                 if (snapDelta && (Math.abs(snapDelta.x) > 0.5 || Math.abs(snapDelta.y) > 0.5)) {
                     // 防振荡：生成签名，与上次相同则跳过
                     const sig = `${capturedNode.id}:${snapDelta.x.toFixed(1)}:${snapDelta.y.toFixed(1)}`;
@@ -334,64 +351,26 @@ export const useDiagramDragDrop = ({
         dragRafIdRef.current = requestAnimationFrame(() => {
             dragRafIdRef.current = null;
 
-            const enableParentPreview = allNodes.length <= 200;
+            const graphNodes = mergeDraggedNodesIntoGraph(
+                nodesRef.current,
+                node,
+                draggedNodes,
+            );
+            const enableParentPreview = graphNodes.length <= 200;
             if (!enableParentPreview) {
                 return;
             }
 
-            // [P-1] Pre-build nodeMap for O(1) parent chain resolution
-            // Avoids O(N) find() inside the while-loop for absolute position calculation.
-            const nodeMap = new Map<string, Node>(allNodes.map(n => [n.id, n]));
-            // Calculate Center
-            const nodeCenterX = node.position.x + (node.measured?.width || node.width || 0) / 2;
-            const nodeCenterY = node.position.y + (node.measured?.height || node.height || 0) / 2;
-
-            const parentCandidate = allNodes.find(n => {
-                if (n.id === node.id) return false;
-
-                // [DDD] Mind Map Magnetic Target Candidate
-                if (node.type === 'mindmap' && n.type === 'mindmap') {
-                    const absX = n.position.x;
-                    const absY = n.position.y;
-                    const w = n.measured?.width || n.width || 0;
-                    const h = n.measured?.height || n.height || 0;
-                    const hitPadding = 80; // 增大磁性吸附范围，让MindMap换绑更容易触发
-                    return nodeCenterX >= absX - hitPadding && nodeCenterX <= absX + w + hitPadding &&
-                           nodeCenterY >= absY - hitPadding && nodeCenterY <= absY + h + hitPadding;
-                }
-
-                if (n.type !== 'titleGroup' && n.type !== 'subGroup' && n.type !== 'swimlane') return false;
-                if (node.type === 'swimlane') return false;
-
-                // 🆕 Calculate Absolute Position for nested nodes (like swimlane lanes)
-                let absX = n.position.x;
-                let absY = n.position.y;
-                let currentParentId = n.parentId;
-                while (currentParentId) {
-                    const parentNode = nodeMap.get(currentParentId); // [P-1] O(1)
-                    if (parentNode) {
-                        absX += parentNode.position.x;
-                        absY += parentNode.position.y;
-                        currentParentId = parentNode.parentId;
-                    } else {
-                        break;
-                    }
-                }
-
-                const w = n.measured?.width || n.width || 0;
-                const h = n.measured?.height || n.height || 0;
-
-                // Hit detection using absolute coordinates
-                return nodeCenterX >= absX && nodeCenterX <= absX + w &&
-                    nodeCenterY >= absY && nodeCenterY <= absY + h;
-            });
+            const parentCandidate = findNodeParentPreviewCandidate(node, graphNodes);
 
             const newTargetId = parentCandidate?.id || null;
             let dropPosition: 'above' | 'below' | 'inside' | null = null;
             
             // [DDD] Mind Map Position Detection
             if (parentCandidate && node.type === 'mindmap' && parentCandidate.type === 'mindmap') {
-                const absY = parentCandidate.position.y;
+                const nodeAbsolute = getNodeAbsolutePosition(node, graphNodes);
+                const nodeCenterY = nodeAbsolute.y + (node.measured?.height || node.height || 0) / 2;
+                const absY = getNodeAbsolutePosition(parentCandidate, graphNodes).y;
                 const h = parentCandidate.measured?.height || parentCandidate.height || 0;
                 // If dragged near the top 30% -> insert above
                 if (nodeCenterY < absY + h * 0.3) {
@@ -439,7 +418,7 @@ export const useDiagramDragDrop = ({
         });
     }, [onSmartNodeDrag, setNodes]);
 
-    const onNodeDragStop = useCallback((_event: MouseEvent | TouchEvent, node: Node, allNodes: Node[]) => {
+    const onNodeDragStop = useCallback((_event: MouseEvent | TouchEvent, node: Node, draggedNodes: Node[]) => {
         // ⭐ P4: 清理pending的RAF
         if (dragRafIdRef.current !== null) {
             cancelAnimationFrame(dragRafIdRef.current);
@@ -458,54 +437,14 @@ export const useDiagramDragDrop = ({
         lastActiveSnapDeltaRef.current = null;
 
         setIsDragging(false);
+        notifyHistoryChanged();
         clearGuides();
-        let targetId = dragTargetIdRef.current;
-
-        if (!targetId) {
-            const nodeCenterX = node.position.x + (node.measured?.width || node.width || 0) / 2;
-            const nodeCenterY = node.position.y + (node.measured?.height || node.height || 0) / 2;
-
-            const parentCandidate = allNodes.find(n => {
-                if (n.id === node.id) return false;
-
-                // [DDD] Mind Map Magnetic Target Candidate
-                if (node.type === 'mindmap' && n.type === 'mindmap') {
-                    const absX = n.position.x;
-                    const absY = n.position.y;
-                    const w = n.measured?.width || n.width || 0;
-                    const h = n.measured?.height || n.height || 0;
-                    const hitPadding = 80; // 增大磁性吸附范围，让MindMap换绑更容易触发
-                    return nodeCenterX >= absX - hitPadding && nodeCenterX <= absX + w + hitPadding &&
-                           nodeCenterY >= absY - hitPadding && nodeCenterY <= absY + h + hitPadding;
-                }
-
-                if (n.type !== 'titleGroup' && n.type !== 'subGroup' && n.type !== 'swimlane') return false;
-                if (node.type === 'swimlane') return false;
-
-                // 🆕 Calculate Absolute Position for nested nodes (like swimlane lanes)
-                let absX = n.position.x;
-                let absY = n.position.y;
-                let currentParentId = n.parentId;
-                while (currentParentId) {
-                    const parentNode = allNodes.find(p => p.id === currentParentId);
-                    if (parentNode) {
-                        absX += parentNode.position.x;
-                        absY += parentNode.position.y;
-                        currentParentId = parentNode.parentId;
-                    } else {
-                        break;
-                    }
-                }
-
-                const w = n.measured?.width || n.width || 0;
-                const h = n.measured?.height || n.height || 0;
-
-                return nodeCenterX >= absX && nodeCenterX <= absX + w &&
-                    nodeCenterY >= absY && nodeCenterY <= absY + h;
-            });
-
-            targetId = parentCandidate?.id || null;
-        }
+        const graphNodes = mergeDraggedNodesIntoGraph(
+            nodesRef.current,
+            node,
+            draggedNodes,
+        );
+        const targetId = findNodeParentCandidate(node, graphNodes)?.id ?? null;
 
         // 清理 CSS 高亮（使用 DOM 操作，避免触发 React 重新渲染）
         if (dragTargetIdRef.current) {
@@ -514,7 +453,7 @@ export const useDiagramDragDrop = ({
         }
         dragTargetIdRef.current = null;
 
-        const parentCandidate = targetId ? allNodes.find(n => n.id === targetId) : null;
+        const parentCandidate = targetId ? graphNodes.find(n => n.id === targetId) : null;
 
         if (parentCandidate) {
             // [DDD] Mind Map Domain Event (Delegate reparenting to Orchestrator)
@@ -535,49 +474,12 @@ export const useDiagramDragDrop = ({
 
             setNodes((nds) => {
                 const CONTAINER_PADDING = 24;
-                // 🆕 Calculate Absolute Position of parentCandidate
-                let parentAbsX = parentCandidate.position.x;
-                let parentAbsY = parentCandidate.position.y;
-                let currentParentId = parentCandidate.parentId;
-                while (currentParentId) {
-                    const parentNode = nds.find(p => p.id === currentParentId);
-                    if (parentNode) {
-                        parentAbsX += parentNode.position.x;
-                        parentAbsY += parentNode.position.y;
-                        currentParentId = parentNode.parentId;
-                    } else {
-                        break;
-                    }
-                }
-
-                // Calculate the child's absolute position
-                let absX = node.position.x;
-                let absY = node.position.y;
-                if (node.parentId) {
-                    const oldParent = nds.find(p => p.id === node.parentId);
-                    if (oldParent) {
-                        // Compute oldParent absolute position
-                        let oldParentAbsX = oldParent.position.x;
-                        let oldParentAbsY = oldParent.position.y;
-                        let oldParentCurrentId = oldParent.parentId;
-                        while (oldParentCurrentId) {
-                            const pNode = nds.find(p => p.id === oldParentCurrentId);
-                            if (pNode) {
-                                oldParentAbsX += pNode.position.x;
-                                oldParentAbsY += pNode.position.y;
-                                oldParentCurrentId = pNode.parentId;
-                            } else {
-                                break;
-                            }
-                        }
-                        absX += oldParentAbsX;
-                        absY += oldParentAbsY;
-                    }
-                }
+                const parentAbsolute = getNodeAbsolutePosition(parentCandidate, nds);
+                const childAbsolute = getNodeAbsolutePosition(node, nds);
 
                 // Child's new relative position inside parent
-                const childRelX = absX - parentAbsX;
-                const childRelY = absY - parentAbsY;
+                const childRelX = childAbsolute.x - parentAbsolute.x;
+                const childRelY = childAbsolute.y - parentAbsolute.y;
                 const childW = node.measured?.width || node.width || 140;
                 const childH = node.measured?.height || node.height || 70;
 
@@ -627,33 +529,14 @@ export const useDiagramDragDrop = ({
                 setNodes((nds) => nds.map((n) => {
                     if (n.id === node.id) {
                         // Convert relative back to absolute
-                        const oldParent = allNodes.find(p => p.id === node.parentId);
-                        let absX = node.position.x;
-                        let absY = node.position.y;
-                        if (oldParent) {
-                            let oldParentAbsX = oldParent.position.x;
-                            let oldParentAbsY = oldParent.position.y;
-                            let oldParentCurrentId = oldParent.parentId;
-                            while (oldParentCurrentId) {
-                                const pNode = nds.find(p => p.id === oldParentCurrentId);
-                                if (pNode) {
-                                    oldParentAbsX += pNode.position.x;
-                                    oldParentAbsY += pNode.position.y;
-                                    oldParentCurrentId = pNode.parentId;
-                                } else {
-                                    break;
-                                }
-                            }
-                            absX += oldParentAbsX;
-                            absY += oldParentAbsY;
-                        }
+                        const absolute = getNodeAbsolutePosition(node, graphNodes);
 
                         const { parentId: _p, extent: _e, ...rest } = n; // Remove parentId/extent
                         return {
                             ...rest,
                             position: { 
-                                x: absX + (finalSnapDelta ? finalSnapDelta.x : 0), 
-                                y: absY + (finalSnapDelta ? finalSnapDelta.y : 0) 
+                                x: absolute.x + (finalSnapDelta ? finalSnapDelta.x : 0),
+                                y: absolute.y + (finalSnapDelta ? finalSnapDelta.y : 0),
                             }
                         };
                     }
@@ -675,7 +558,7 @@ export const useDiagramDragDrop = ({
                 }, 0);
             }
         }
-    }, [setIsDragging, setNodes, clearGuides]);
+    }, [setIsDragging, setNodes, clearGuides, notifyHistoryChanged]);
 
     return {
         onDragOver,

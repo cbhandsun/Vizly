@@ -1,18 +1,26 @@
 import { useCallback } from 'react';
 import { Node, Edge, ReactFlowInstance } from '@xyflow/react';
 import { PluginContext, DiagramTypePlugin } from '../../../types/plugin';
+import { useDiagramStore } from '../../../store/useDiagramStore';
 
 type AlignmentType = 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom';
 type DistributionType = 'horizontal' | 'vertical';
+export type DiagramActionTarget = string | readonly string[];
 
 const ALIGNMENT_TYPES = new Set<AlignmentType>(['left', 'center', 'right', 'top', 'middle', 'bottom']);
 const DISTRIBUTION_TYPES = new Set<DistributionType>(['horizontal', 'vertical']);
 const isAlignmentType = (value: string): value is AlignmentType => ALIGNMENT_TYPES.has(value as AlignmentType);
 const isDistributionType = (value: string): value is DistributionType => DISTRIBUTION_TYPES.has(value as DistributionType);
+const toTargetIds = (target: DiagramActionTarget): Set<string> => new Set(
+    (typeof target === 'string' ? [target] : target)
+        .filter((id): id is string => typeof id === 'string' && id.length > 0)
+);
 
 interface UseDiagramActionsProps {
     nodes: Node[];
     edges: Edge[];
+    nodesRef?: React.RefObject<Node[]>;
+    edgesRef?: React.RefObject<Edge[]>;
     setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
     setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
     selectedNodes: Node[];
@@ -26,6 +34,8 @@ interface UseDiagramActionsProps {
 export const useDiagramActions = ({
     nodes,
     edges,
+    nodesRef,
+    edgesRef,
     setNodes,
     setEdges,
     selectedNodes,
@@ -36,25 +46,31 @@ export const useDiagramActions = ({
     activePlugin
 }: UseDiagramActionsProps) => {
 
-    const handleDelete = useCallback(async (targetId?: string) => {
+    const handleDelete = useCallback(async (target?: DiagramActionTarget) => {
         // Determine what to delete
         let nodeIdsToDelete = new Set<string>();
         let edgeIdsToDelete = new Set<string>();
+        const currentNodes = nodesRef?.current ?? nodes;
+        const currentEdges = edgesRef?.current ?? edges;
 
-        if (targetId) {
+        if (target && typeof target !== 'string') {
+            const explicitIds = toTargetIds(target);
+            nodeIdsToDelete = new Set(currentNodes.filter(node => explicitIds.has(node.id)).map(node => node.id));
+            edgeIdsToDelete = new Set(currentEdges.filter(edge => explicitIds.has(edge.id)).map(edge => edge.id));
+        } else if (target) {
             // Context menu action on a specific element
-            const isNode = nodes.some(n => n.id === targetId);
-            const isEdge = edges.some(e => e.id === targetId);
+            const isNode = currentNodes.some(n => n.id === target);
+            const isEdge = currentEdges.some(e => e.id === target);
 
             if (isNode) {
                 // If the target is part of selection, delete all selected. Otherwise just target.
-                if (selectedNodes.some(n => n.id === targetId)) {
+                if (selectedNodes.some(n => n.id === target)) {
                     nodeIdsToDelete = new Set(selectedNodes.map(n => n.id));
                 } else {
-                    nodeIdsToDelete.add(targetId);
+                    nodeIdsToDelete.add(target);
                 }
             } else if (isEdge) {
-                edgeIdsToDelete.add(targetId);
+                edgeIdsToDelete.add(target);
             }
         } else {
             // General delete action (e.g. keyboard), delete selection
@@ -64,11 +80,11 @@ export const useDiagramActions = ({
 
         if (nodeIdsToDelete.size > 0 || edgeIdsToDelete.size > 0) {
             // [DDD] MindMap Cascading Deletion: if a mindmap node is deleted, delete its subtree
-            const mindMapNodes = nodes.filter(n => nodeIdsToDelete.has(n.id) && n.type === 'mindmap');
+            const mindMapNodes = currentNodes.filter(n => nodeIdsToDelete.has(n.id) && n.type === 'mindmap');
             if (mindMapNodes.length > 0) {
                 const visited = new Set<string>(nodeIdsToDelete);
                 const getDescendants = (parentId: string) => {
-                    const childrenIds = edges
+                    const childrenIds = currentEdges
                         .filter(e => e.source === parentId && e.type !== 'relationshipEdge')
                         .map(e => e.target);
                     for (const cid of childrenIds) {
@@ -85,13 +101,13 @@ export const useDiagramActions = ({
             // 拦截器：允许插件否决删除操作
             if (activePlugin && pluginCtx) {
                 if (nodeIdsToDelete.size > 0 && activePlugin.onBeforeNodesDelete) {
-                    const nodesToDelete = nodes.filter(n => nodeIdsToDelete.has(n.id));
+                    const nodesToDelete = currentNodes.filter(n => nodeIdsToDelete.has(n.id));
                     const allowDelete = await activePlugin.onBeforeNodesDelete(nodesToDelete, pluginCtx);
                     if (!allowDelete) nodeIdsToDelete.clear();
                 }
                 
                 if (edgeIdsToDelete.size > 0 && activePlugin.onBeforeEdgesDelete) {
-                    const edgesToDelete = edges.filter(e => edgeIdsToDelete.has(e.id));
+                    const edgesToDelete = currentEdges.filter(e => edgeIdsToDelete.has(e.id));
                     const allowDelete = await activePlugin.onBeforeEdgesDelete(edgesToDelete, pluginCtx);
                     if (!allowDelete) edgeIdsToDelete.clear();
                 }
@@ -99,7 +115,7 @@ export const useDiagramActions = ({
 
             if (nodeIdsToDelete.size === 0 && edgeIdsToDelete.size === 0) return;
 
-            takeSnapshot(nodes, edges);
+            takeSnapshot(currentNodes, currentEdges);
             setNodes(nds => nds.filter(n => !nodeIdsToDelete.has(n.id)));
             setEdges(eds => eds.filter(e =>
                 !edgeIdsToDelete.has(e.id) &&
@@ -107,16 +123,19 @@ export const useDiagramActions = ({
                 !nodeIdsToDelete.has(e.target)
             ));
         }
-    }, [nodes, edges, selectedNodes, selectedEdges, setNodes, setEdges, takeSnapshot, activePlugin, pluginCtx]);
+    }, [nodes, edges, nodesRef, edgesRef, selectedNodes, selectedEdges, setNodes, setEdges, takeSnapshot, activePlugin, pluginCtx]);
 
-    const handleDuplicate = useCallback((targetId?: string) => {
-        const nodesToDuplicate = targetId
-            ? nodes.filter(n => n.id === targetId)
+    const handleDuplicate = useCallback((target?: DiagramActionTarget) => {
+        const currentNodes = nodesRef?.current ?? nodes;
+        const currentEdges = edgesRef?.current ?? edges;
+        const explicitIds = target ? toTargetIds(target) : null;
+        const nodesToDuplicate = explicitIds
+            ? currentNodes.filter(n => explicitIds.has(n.id))
             : selectedNodes;
 
         if (nodesToDuplicate.length === 0) return;
 
-        takeSnapshot(nodes, edges);
+        takeSnapshot(currentNodes, currentEdges);
 
         const newNodes = nodesToDuplicate.map(node => ({
             ...node,
@@ -128,7 +147,7 @@ export const useDiagramActions = ({
 
         // Deselect originals and add new ones
         setNodes(nds => [...nds.map(n => ({ ...n, selected: false })), ...newNodes]);
-    }, [nodes, edges, selectedNodes, setNodes, takeSnapshot]);
+    }, [nodes, edges, nodesRef, edgesRef, selectedNodes, setNodes, takeSnapshot]);
 
     const handleBringToFront = useCallback((targetId?: string) => {
         if (!targetId) return;
@@ -150,11 +169,12 @@ export const useDiagramActions = ({
         });
     }, [nodes, edges, setNodes, takeSnapshot]);
 
-    const handleLock = useCallback((targetId?: string, locked: boolean = true) => {
-        if (!targetId) return;
-        takeSnapshot(nodes, edges);
-        setNodes(nds => nds.map(n => {
-            if (n.id === targetId) {
+    const handleLock = useCallback((target?: DiagramActionTarget, locked: boolean = true) => {
+        const targetIds = target ? toTargetIds(target) : new Set(selectedNodes.map(node => node.id));
+        if (targetIds.size === 0) return;
+        takeSnapshot(nodesRef?.current ?? nodes, edgesRef?.current ?? edges);
+        const updateLockedNodes = (items: Node[]) => items.map(n => {
+            if (targetIds.has(n.id)) {
                 return {
                     ...n,
                     draggable: !locked,
@@ -162,8 +182,10 @@ export const useDiagramActions = ({
                 };
             }
             return n;
-        }));
-    }, [nodes, edges, setNodes, takeSnapshot]);
+        });
+        setNodes(updateLockedNodes);
+        useDiagramStore.getState().setSelectedNodes(updateLockedNodes);
+    }, [nodes, edges, nodesRef, edgesRef, selectedNodes, setNodes, takeSnapshot]);
 
     const handleSelectAll = useCallback(() => {
         setNodes(nds => nds.map(n => ({ ...n, selected: true })));

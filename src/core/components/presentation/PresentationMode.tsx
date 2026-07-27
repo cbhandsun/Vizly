@@ -8,6 +8,7 @@
  * - 键盘/鼠标双导航
  */
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import { FaChevronLeft, FaChevronRight, FaTimes } from 'react-icons/fa';
 import { PresentationSlide } from '../../hooks/usePresentationSlides';
 import './PresentationMode.css';
 
@@ -145,7 +146,7 @@ const PresentationMode: React.FC<PresentationModeProps> = ({ slides, onFocusNode
   const progress = totalSlides > 1 ? (currentIndex / (totalSlides - 1)) * 100 : 100;
 
   return (
-    <div className="presentation-overlay">
+    <div className="presentation-overlay" role="dialog" aria-modal="true" aria-label="演示模式">
       <style>{highlightCSS}</style>
 
       {/* 顶部标题栏 */}
@@ -158,15 +159,27 @@ const PresentationMode: React.FC<PresentationModeProps> = ({ slides, onFocusNode
         <div className="presentation-counter">
           {currentIndex + 1}<span className="presentation-counter-sep">/</span>{totalSlides}
         </div>
-        <button className="presentation-exit" onClick={onExit} title="退出演示 (ESC)">
-          ✕
+        <button
+          type="button"
+          className="presentation-exit"
+          onClick={onExit}
+          title="退出演示 (ESC)"
+          aria-label="退出演示"
+        >
+          <FaTimes aria-hidden="true" />
         </button>
       </div>
 
       {/* 底部控制条 */}
       <div className="presentation-controls">
-        <button className="presentation-nav-btn" onClick={goPrev} disabled={currentIndex === 0}>
-          ◀
+        <button
+          type="button"
+          className="presentation-nav-btn"
+          onClick={goPrev}
+          disabled={currentIndex === 0}
+          aria-label="上一页"
+        >
+          <FaChevronLeft aria-hidden="true" />
         </button>
 
         <div className="presentation-progress-bar">
@@ -177,23 +190,27 @@ const PresentationMode: React.FC<PresentationModeProps> = ({ slides, onFocusNode
               className={`presentation-dot ${i === currentIndex ? 'active' : ''} ${i < currentIndex ? 'visited' : ''}`}
               onClick={() => setCurrentIndex(i)}
               title={slides[i].title}
+              aria-label={`转到第 ${i + 1} 页：${slides[i].title}`}
+              aria-current={i === currentIndex ? 'step' : undefined}
               style={{ left: `${totalSlides > 1 ? (i / (totalSlides - 1)) * 100 : 50}%` }}
             />
           ))}
         </div>
 
-        <button className="presentation-nav-btn" onClick={goNext} disabled={currentIndex === totalSlides - 1}>
-          ▶
+        <button
+          type="button"
+          className="presentation-nav-btn"
+          onClick={goNext}
+          disabled={currentIndex === totalSlides - 1}
+          aria-label="下一页"
+        >
+          <FaChevronRight aria-hidden="true" />
         </button>
       </div>
 
       {/* 备注区域 */}
       <div className="presentation-notes">
         {currentSlide.notes && <div>{currentSlide.notes}</div>}
-        <div style={{fontSize:'12px', color:'#ef4444', marginTop:'8px', fontFamily:'monospace', wordBreak:'break-all'}}>
-            [Debug] All IDs ({currentSlide.nodeIds.length}): {currentSlide.nodeIds.join(', ')}<br/>
-            [Debug] Container IDs ({currentSlide.containerIds?.length || 0}): {currentSlide.containerIds?.join(', ')}
-        </div>
       </div>
     </div>
   );

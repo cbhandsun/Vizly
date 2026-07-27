@@ -215,14 +215,14 @@ export const FlowchartShapesPanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) 
     };
 
     const ALL_ITEMS = [
-        { category: 'basic', label: 'Circle', icon: <ShapePreview shape="circle" />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'ellipse', icon: 'circle', theme: { main: '#2196F3', border: '#1e88e5', text: '#fff' } } },
-        { category: 'basic', label: 'Rect', icon: <ShapePreview shape="rectangle" />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'rectangle', icon: 'square', theme: { main: '#2196F3', border: '#1e88e5', text: '#fff' } } },
-        { category: 'basic', label: 'Diamond', icon: <ShapePreview shape="diamond" />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'diamond', icon: 'question', theme: { main: '#2196F3', border: '#1e88e5', text: '#fff' } } },
-        { category: 'basic', label: 'Triangle', icon: <ShapePreview shape="triangle" />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'triangle', icon: 'play', theme: { main: '#2196F3', border: '#1e88e5', text: '#fff' } } },
-        { category: 'basic', label: 'Hexagon', icon: <ShapePreview shape="hexagon" />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'hexagon', icon: 'hexagon', theme: { main: '#2196F3', border: '#1e88e5', text: '#fff' } } },
-        { category: 'basic', label: 'Star', icon: <ShapePreview shape="star" color="#F59E0B" />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'star', icon: 'star', theme: { main: '#FFC107', border: '#FFB300', text: '#fff' } } },
-        { category: 'basic', label: 'Pill', icon: <ShapePreview shape="pill" />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'pill', icon: 'play', theme: { main: '#2196F3', border: '#1e88e5', text: '#fff' } } },
-        { category: 'basic', label: 'Note', icon: <ShapePreview shape="note" color="#F59E0B" />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'note', icon: 'note', theme: { main: '#FFEB3B', border: '#FDD835', text: '#000' } } },
+        { category: 'basic', label: t('propertyPanel.options.shape.circle'), icon: <ShapePreview shape="circle" />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'ellipse', icon: 'circle', theme: { main: '#2196F3', border: '#1e88e5', text: '#fff' } } },
+        { category: 'basic', label: t('propertyPanel.options.shape.rectangle'), icon: <ShapePreview shape="rectangle" />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'rectangle', icon: 'square', theme: { main: '#2196F3', border: '#1e88e5', text: '#fff' } } },
+        { category: 'basic', label: t('propertyPanel.options.shape.diamond'), icon: <ShapePreview shape="diamond" />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'diamond', icon: 'question', theme: { main: '#2196F3', border: '#1e88e5', text: '#fff' } } },
+        { category: 'basic', label: t('propertyPanel.options.shape.triangle'), icon: <ShapePreview shape="triangle" />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'triangle', icon: 'play', theme: { main: '#2196F3', border: '#1e88e5', text: '#fff' } } },
+        { category: 'basic', label: t('propertyPanel.options.shape.hexagon'), icon: <ShapePreview shape="hexagon" />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'hexagon', icon: 'hexagon', theme: { main: '#2196F3', border: '#1e88e5', text: '#fff' } } },
+        { category: 'basic', label: t('propertyPanel.options.shape.star'), icon: <ShapePreview shape="star" color="#F59E0B" />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'star', icon: 'star', theme: { main: '#FFC107', border: '#FFB300', text: '#fff' } } },
+        { category: 'basic', label: t('propertyPanel.options.shape.pill'), icon: <ShapePreview shape="pill" />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'pill', icon: 'play', theme: { main: '#2196F3', border: '#1e88e5', text: '#fff' } } },
+        { category: 'basic', label: t('propertyPanel.options.shape.note'), icon: <ShapePreview shape="note" color="#F59E0B" />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'note', icon: 'note', theme: { main: '#FFEB3B', border: '#FDD835', text: '#000' } } },
         { category: 'flow-control', label: t('designer.toolbar.start'), icon: <ShapePreview shape="pill" color="#4CAF50" />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'pill', icon: 'play', theme: { main: '#4CAF50', border: '#43a047', text: '#fff' } } },
         { category: 'flow-control', label: t('designer.toolbar.process'), icon: <ShapePreview shape="rectangle" color="#2196F3" />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'rectangle', icon: 'square', theme: { main: '#2196F3', border: '#1e88e5', text: '#fff' } } },
         { category: 'flow-control', label: t('designer.toolbar.decision'), icon: <ShapePreview shape="diamond" color="#ff9800" />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'diamond', icon: 'question', theme: { main: '#ff9800', border: '#fb8c00', text: '#fff' } } },
@@ -236,7 +236,7 @@ export const FlowchartShapesPanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) 
         { category: 'data-io', label: t('designer.toolbar.image'), icon: <FaImage style={{ color: '#795548' }} />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'rectangle', icon: 'image', theme: { main: '#795548', border: '#6d4c41', text: '#fff' } } },
         { category: 'containers', label: t('designer.sidebar.domainGroup'), icon: <FaLayerGroup style={{ color: '#3F51B5' }} />, type: 'titleGroup', typeName: 'titleGroup', config: { themeColor: '#3F51B5', domainClass: 'core' } },
         { category: 'containers', label: t('designer.sidebar.subGroup'), icon: <FaBox style={{ color: '#673AB7' }} />, type: 'subGroup', typeName: 'subGroup', config: { themeColor: '#673AB7' } },
-        { category: 'containers', label: 'Swimlane', icon: <FaStream style={{ color: '#6366f1' }} />, type: 'swimlane', typeName: 'swimlane', config: { label: 'Swimlane', direction: 'horizontal', lanes: [{ id: 'lane-1', label: '用户', color: '#3b82f6' }] } },
+        { category: 'containers', label: t('designer.sidebar.swimlane'), icon: <FaStream style={{ color: '#6366f1' }} />, type: 'swimlane', typeName: 'swimlane', config: { label: t('designer.sidebar.swimlane'), direction: 'horizontal', lanes: [{ id: 'lane-1', label: t('designer.sidebar.user'), color: '#3b82f6' }] } },
         { category: 'tech-icons', label: t('designer.sidebar.server'), icon: <FaServer style={{ color: '#455A64' }} />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'rectangle', icon: 'server', theme: { main: '#455A64', border: '#37474F', text: '#fff' } } },
         { category: 'tech-icons', label: t('designer.sidebar.network'), icon: <FaNetworkWired style={{ color: '#0288D1' }} />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'rectangle', icon: 'network', theme: { main: '#0288D1', border: '#0277BD', text: '#fff' } } },
         { category: 'tech-icons', label: t('designer.sidebar.security'), icon: <FaLock style={{ color: '#E65100' }} />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'rectangle', icon: 'lock', theme: { main: '#E65100', border: '#BF360C', text: '#fff' } } },
@@ -250,7 +250,7 @@ export const FlowchartShapesPanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) 
         { category: 'special', label: t('designer.sidebar.connector'), icon: <ShapePreview shape="circle" color="#E91E63" />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'circle', icon: 'circle', theme: { main: '#E91E63', border: '#C2185B', text: '#fff' } } },
         { category: 'special', label: t('designer.sidebar.offPageConnector'), icon: <ShapePreview shape="off-page" color="#673AB7" />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'off-page', icon: 'arrow', theme: { main: '#673AB7', border: '#512DA8', text: '#fff' } } },
         { category: 'special', label: t('designer.sidebar.internalStorage'), icon: <ShapePreview shape="internal-storage" color="#455A64" />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'internal-storage', icon: 'database', theme: { main: '#455A64', border: '#37474F', text: '#fff' } } },
-        { category: 'special', label: 'Arrow Timeline', icon: <FaChevronRight style={{ color: '#00BCD4' }} />, type: 'arrowTimeline', typeName: 'arrowTimeline', config: {} },
+        { category: 'special', label: t('designer.sidebar.arrowTimeline'), icon: <FaChevronRight style={{ color: '#00BCD4' }} />, type: 'arrowTimeline', typeName: 'arrowTimeline', config: {} },
     ];
 
     const CATEGORIES_DEF = [
@@ -271,7 +271,7 @@ export const FlowchartShapesPanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) 
             <div style={{ padding: '8px 10px' }}>
                 <Input
                     prefix={<SearchOutlined style={{ color: '#8c8c8c' }} />}
-                    placeholder="搜索组件..."
+                    placeholder={t('designer.sidebar.searchComponents')}
                     size="small"
                     allowClear
                     value={search}
@@ -340,7 +340,7 @@ export const FlowchartShapesPanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) 
              }}>
                 <Input
                     prefix={<SearchOutlined style={{ color: '#8c8c8c' }} />}
-                    placeholder="搜索组件..."
+                    placeholder={t('designer.sidebar.searchComponents')}
                     size="small"
                     allowClear
                     value={search}

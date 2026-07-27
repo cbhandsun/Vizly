@@ -6,10 +6,11 @@
  * 解决方案：读取 edge.data.computedPath（我们的 A* 算法计算的路径点），直接渲染这些点，
  * 完全绕过 React Flow 的自动路径计算。
  */
-import React, { memo } from 'react';
-import { BaseEdge, EdgeLabelRenderer, useStore, type Edge, type EdgeProps } from '@xyflow/react';
+import React, { memo, useMemo } from 'react';
+import { BaseEdge, EdgeLabelRenderer, useStore, type EdgeProps } from '@xyflow/react';
 import { getSmartLabelPosition } from '../../algorithms/smartEdgeUtils';
 import { getEdgeLabelAutoOffset } from './edgeLabelAvoidance';
+import { collectStablePathPeerPaths } from './stablePathEdgePeerPaths';
 
 interface Point {
     x: number;
@@ -36,6 +37,23 @@ const isPoint = (value: unknown): value is Point => {
 const readPoint = (value: unknown): Point | undefined => (
     isPoint(value) ? value : undefined
 );
+
+const ENDPOINT_DRIFT_TOLERANCE = 2;
+
+const isPathAttachedToLiveEndpoints = (
+    points: Point[],
+    sourceX: number,
+    sourceY: number,
+    targetX: number,
+    targetY: number,
+): boolean => {
+    const start = points[0];
+    const end = points.at(-1);
+    if (!start || !end) return false;
+
+    return Math.hypot(start.x - sourceX, start.y - sourceY) <= ENDPOINT_DRIFT_TOLERANCE
+        && Math.hypot(end.x - targetX, end.y - targetY) <= ENDPOINT_DRIFT_TOLERANCE;
+};
 
 /**
  * 将路径点数组转换为 SVG path 的 d 属性
@@ -122,18 +140,13 @@ export const StablePathEdge = memo<EdgeProps>((props) => {
         labelStyle,
     } = props;
     const edgeData = data as StablePathEdgeData | undefined;
-    const peerPaths = useStore((state) => (
-        Array.isArray(state.edges)
-            ? state.edges
-                .filter((edge: Edge) => edge.id !== id)
-                .map((edge: Edge) => (edge.data as StablePathEdgeData | undefined)?.computedPath)
-                .filter((path: unknown): path is Point[] => (
-                    Array.isArray(path)
-                    && path.length >= 2
-                    && path.every(isPoint)
-                ))
-            : []
-    ));
+    // Subscribe to the stable edge-array reference. Returning a freshly mapped
+    // array from the store selector made every edge re-render on every node move.
+    const allEdges = useStore(state => state.edges);
+    const peerPaths = useMemo(
+        () => collectStablePathPeerPaths(allEdges, id, Boolean(label)),
+        [allEdges, id, label],
+    );
 
     // ReactFlow perf check: we are completely safe from global node movement here
     // 读取预计算的路径点
@@ -147,7 +160,17 @@ export const StablePathEdge = memo<EdgeProps>((props) => {
     let labelY: number;
     let renderPath: Point[] | undefined;
 
-    if (computedPath && computedPath.length >= 2) {
+    if (
+        computedPath
+        && computedPath.length >= 2
+        && isPathAttachedToLiveEndpoints(
+            computedPath,
+            sourceX,
+            sourceY,
+            targetX,
+            targetY,
+        )
+    ) {
         renderPath = snapNearOrthogonalPoints(computedPath);
         edgePath = pointsToPath(renderPath);
 
@@ -209,12 +232,10 @@ export const StablePathEdge = memo<EdgeProps>((props) => {
                         style={{
                             position: 'absolute',
                             transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
-                            fontSize: 10,
-                            fontWeight: 500,
                             pointerEvents: 'all',
                             ...labelStyle,
                         }}
-                        className="nodrag nopan"
+                        className="stable-path-edge-label nodrag nopan"
                     >
                         {label}
                     </div>

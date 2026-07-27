@@ -1,8 +1,8 @@
-import { useState, useCallback, useRef } from 'react';
-import { Node, Edge } from '@xyflow/react';
+import { useCallback, useRef, useState } from 'react';
+import type { Edge, Node } from '@xyflow/react';
 import jsonpatch from 'fast-json-patch';
 
-const { compare, applyPatch, deepClone } = jsonpatch;
+const { compare, deepClone } = jsonpatch;
 
 export type Operation = ReturnType<typeof compare>[number];
 
@@ -11,150 +11,152 @@ export interface HistoryState {
     edges: Edge[];
 }
 
-/** 增量快照条目 */
+/** Snapshot metadata shown by the history panel. */
 export interface HistoryEntry {
-    patch: Operation[]; // 从上一状态到当前状态的前向补丁
+    patch: Operation[];
+    changeCount?: number;
     timestamp: number;
     label: string;
 }
 
+export interface HistorySnapshotOptions {
+    /**
+     * Heavy interactions can record the snapshot first and refresh history UI
+     * after the gesture completes, keeping the first pointer-move responsive.
+     */
+    notify?: boolean;
+    /** Skip full-state comparison for gestures that already crossed a drag threshold. */
+    dedupe?: boolean;
+}
+
+interface StoredHistoryEntry {
+    state: HistoryState;
+    entry: HistoryEntry;
+}
+
 const MAX_HISTORY = 50;
+const EMPTY_HISTORY_STATE: HistoryState = { nodes: [], edges: [] };
+
+const cloneHistoryState = (nodes: Node[], edges: Edge[]): HistoryState => (
+    deepClone({ nodes, edges })
+);
 
 /**
- * 图表历史管理 Hook (Patch-Based History)
- * 占用更少内存：只保存一份初始的 Base 状态以及增量快照（Patches）
+ * Diagram history stores pre-operation snapshots.
+ *
+ * Callers already invoke `takeSnapshot` immediately before an edit. Treating
+ * that snapshot as undoable at once keeps the first drag/add/group operation
+ * reversible without requiring a second edit to "commit" the first one.
  */
 export const useDiagramHistory = (_initialNodes: Node[], _initialEdges: Edge[]) => {
     const [historyInfo, setHistoryInfo] = useState({ pastCount: 0, futureCount: 0 });
     const [pastEntries, setPastEntries] = useState<HistoryEntry[]>([]);
-
-    const baseStateRef = useRef<HistoryState | null>(null);
-    const pastRef = useRef<HistoryEntry[]>([]);
-    const futureRef = useRef<HistoryEntry[]>([]);
-    const lastStateRef = useRef<HistoryState | null>(null);
+    const pastRef = useRef<StoredHistoryEntry[]>([]);
+    const futureRef = useRef<StoredHistoryEntry[]>([]);
     const snapshotCounter = useRef(0);
 
-    const canUndo = historyInfo.pastCount > 0;
-    const canRedo = historyInfo.futureCount > 0;
-
     const updateInfo = useCallback(() => {
-        setHistoryInfo({ pastCount: pastRef.current.length, futureCount: futureRef.current.length });
-        setPastEntries([...pastRef.current]);
+        setHistoryInfo({
+            pastCount: pastRef.current.length,
+            futureCount: futureRef.current.length,
+        });
+        setPastEntries(pastRef.current.map(item => item.entry));
     }, []);
 
-    const takeSnapshot = useCallback((nodes: Node[], edges: Edge[], label?: string) => {
+    const takeSnapshot = useCallback((
+        nodes: Node[],
+        edges: Edge[],
+        label?: string,
+        options?: HistorySnapshotOptions,
+    ) => {
+        const state = cloneHistoryState(nodes, edges);
+        const previousState = pastRef.current.at(-1)?.state;
+        const shouldBuildPatch = options?.dedupe !== false || options?.notify !== false;
+        const patch = shouldBuildPatch
+            ? compare(previousState ?? EMPTY_HISTORY_STATE, state)
+            : [];
+        if (options?.dedupe !== false && previousState && patch.length === 0) return;
+
         snapshotCounter.current += 1;
-        const currentState = deepClone({ nodes, edges });
-
-        if (!baseStateRef.current || !lastStateRef.current) {
-            baseStateRef.current = currentState;
-            lastStateRef.current = currentState;
-            return;
-        }
-
-        const patch = compare(lastStateRef.current, currentState);
-
-        if (patch.length > 0) {
-            pastRef.current.push({
+        pastRef.current.push({
+            state,
+            entry: {
                 patch,
+                changeCount: shouldBuildPatch ? patch.length : 1,
                 timestamp: Date.now(),
                 label: label || `操作 #${snapshotCounter.current}`,
-            });
-
-            if (pastRef.current.length > MAX_HISTORY) {
-                const oldest = pastRef.current.shift()!;
-                baseStateRef.current = applyPatch(baseStateRef.current, oldest.patch, false, false).newDocument;
-            }
-        }
-
-        lastStateRef.current = currentState;
+            },
+        });
+        if (pastRef.current.length > MAX_HISTORY) pastRef.current.shift();
         futureRef.current = [];
-        updateInfo();
+        if (options?.notify !== false) updateInfo();
     }, [updateInfo]);
 
     const undo = useCallback((currentNodes: Node[], currentEdges: Edge[]) => {
-        if (!baseStateRef.current || !lastStateRef.current) return null;
+        const target = pastRef.current.pop();
+        if (!target) return null;
 
-        const currentState = deepClone({ nodes: currentNodes, edges: currentEdges });
-        const diffToCurrent = compare(lastStateRef.current, currentState);
-
-        if (diffToCurrent.length > 0) {
-            futureRef.current.push({
-                patch: diffToCurrent,
-                timestamp: Date.now(),
-                label: '恢复当前状态',
-            });
-            const stateToRestore = deepClone(lastStateRef.current);
-            updateInfo();
-            return stateToRestore;
-        }
-
-        if (pastRef.current.length === 0) return null;
-
-        const latestPast = pastRef.current.pop()!;
-        futureRef.current.push(latestPast);
-
-        let rebuild = deepClone(baseStateRef.current);
-        pastRef.current.forEach(entry => {
-            rebuild = applyPatch(rebuild, entry.patch, false, false).newDocument;
+        const currentState = cloneHistoryState(currentNodes, currentEdges);
+        futureRef.current.push({
+            state: currentState,
+            entry: {
+                ...target.entry,
+                patch: compare(target.state, currentState),
+            },
         });
-
-        lastStateRef.current = rebuild;
         updateInfo();
-        return deepClone(rebuild);
+        return deepClone(target.state);
     }, [updateInfo]);
 
-    const redo = useCallback((_currentNodes: Node[], _currentEdges: Edge[]) => {
-        if (futureRef.current.length === 0 || !lastStateRef.current) return null;
+    const redo = useCallback((currentNodes: Node[], currentEdges: Edge[]) => {
+        const target = futureRef.current.pop();
+        if (!target) return null;
 
-        const nextEntry = futureRef.current.pop()!;
-        const newState = applyPatch(lastStateRef.current, nextEntry.patch, false, false).newDocument;
-
-        pastRef.current.push(nextEntry);
-        lastStateRef.current = newState;
+        const currentState = cloneHistoryState(currentNodes, currentEdges);
+        pastRef.current.push({
+            state: currentState,
+            entry: {
+                ...target.entry,
+                patch: compare(currentState, target.state),
+            },
+        });
+        if (pastRef.current.length > MAX_HISTORY) pastRef.current.shift();
         updateInfo();
-        return deepClone(newState);
+        return deepClone(target.state);
     }, [updateInfo]);
 
     const jumpTo = useCallback((index: number, currentNodes: Node[], currentEdges: Edge[]) => {
-        if (!baseStateRef.current || index < 0 || index >= pastRef.current.length) return null;
+        if (index < 0 || index >= pastRef.current.length) return null;
 
-        const currentState = deepClone({ nodes: currentNodes, edges: currentEdges });
-        if (lastStateRef.current) {
-            const diffToCurrent = compare(lastStateRef.current, currentState);
-            if (diffToCurrent.length > 0) {
-                futureRef.current.push({
-                    patch: diffToCurrent,
+        const target = pastRef.current[index];
+        const laterEntries = pastRef.current.slice(index + 1).reverse();
+        const currentState = cloneHistoryState(currentNodes, currentEdges);
+        futureRef.current = [
+            {
+                state: currentState,
+                entry: {
+                    patch: compare(target.state, currentState),
                     timestamp: Date.now(),
                     label: '跳回前状态',
-                });
-            }
-        }
-
-        const discarded = pastRef.current.slice(index + 1);
-        const reversedDiscarded = [...discarded].reverse();
-        futureRef.current = [...futureRef.current, ...reversedDiscarded];
-        pastRef.current = pastRef.current.slice(0, index + 1);
-
-        let rebuild = deepClone(baseStateRef.current);
-        pastRef.current.forEach(entry => {
-            rebuild = applyPatch(rebuild, entry.patch, false, false).newDocument;
-        });
-
-        lastStateRef.current = rebuild;
+                },
+            },
+            ...laterEntries,
+        ];
+        pastRef.current = pastRef.current.slice(0, index);
         updateInfo();
-        return deepClone(rebuild);
+        return deepClone(target.state);
     }, [updateInfo]);
 
     return {
         takeSnapshot,
+        notifyHistoryChanged: updateInfo,
         undo,
         redo,
-        canUndo,
-        canRedo,
+        canUndo: historyInfo.pastCount > 0,
+        canRedo: historyInfo.futureCount > 0,
         pastEntries,
         jumpTo,
         historyDeep: historyInfo.pastCount,
-        getPreviousState: () => lastStateRef.current,
+        getPreviousState: () => pastRef.current.at(-1)?.state ?? null,
     };
 };

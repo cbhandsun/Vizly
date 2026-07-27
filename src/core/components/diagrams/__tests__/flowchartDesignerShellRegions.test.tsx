@@ -88,7 +88,7 @@ describe('FlowchartDesigner shell regions', () => {
             laserEnabled: true,
             mobilePropertyDrawerVisible: false,
             nodes: [{ id: 'node-1' }],
-            presentationActive: true,
+            presentationActive: false,
             presentationSlides: [],
             saveState: 'idle',
             selectedEdges: [],
@@ -100,9 +100,57 @@ describe('FlowchartDesigner shell regions', () => {
         }} />);
 
         expect(screen.getByTestId('designer-overlays').textContent).toBe('1:1');
-        expect(screen.getByTestId('laser').getAttribute('data-active')).toBe('true');
+        expect(screen.getByTestId('laser').getAttribute('data-active')).toBe('false');
         fireEvent.click(screen.getByTestId('mobile-ai'));
         expect(setAiChatVisible).toHaveBeenCalledWith(false);
         expect(setActiveRightTab).toHaveBeenCalledWith('property');
+    });
+
+    it('hides editing sidebars and the mobile dock during presentation', () => {
+        const model = {
+            activePlugin: {},
+            activeRightTab: 'property',
+            aiChatVisible: false,
+            isMobile: true,
+            isSidebarHidden: false,
+            layers: [],
+            nodes: [],
+            pluginCtx: {},
+            presentationActive: true,
+            selectedEdges: [],
+            selectedNodes: [],
+            templates: [],
+            groupedTemplates: [],
+        };
+
+        const { container } = render(
+            <>
+                <FlowchartDesignerLeftSidebar model={model} />
+                <FlowchartDesignerRightSidebarRegion model={model} />
+                <FlowchartDesignerOverlaysRegion model={{
+                    ...model,
+                    canRedo: false,
+                    canUndo: false,
+                    commandPaletteItems: [],
+                    commandPaletteVisible: false,
+                    diagramIdForExport: 'diagram-1',
+                    edges: [],
+                    isVersionHistoryOpen: false,
+                    jsonEditorVisible: false,
+                    laserEnabled: true,
+                    mobilePropertyDrawerVisible: false,
+                    presentationSlides: [],
+                    saveState: 'idle',
+                    shortcutHelpVisible: false,
+                    showShortcuts: false,
+                }} />
+            </>,
+        );
+
+        expect(screen.queryByTestId('left-sidebar')).toBeNull();
+        expect(screen.queryByTestId('right-sidebar')).toBeNull();
+        expect(screen.queryByTestId('mobile-ai')).toBeNull();
+        expect(screen.getByTestId('laser').getAttribute('data-active')).toBe('true');
+        expect(container).toBeTruthy();
     });
 });
