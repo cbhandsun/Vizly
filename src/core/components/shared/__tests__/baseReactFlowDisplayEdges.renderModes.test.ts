@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 
 import { createBaseReactFlowDisplayEdges } from '../baseReactFlowDisplayEdges';
 import { computeBaseReactFlowDisplayEdgeEpoch } from '../baseReactFlowDisplayEdgeCore';
+import { resolveDisplayQualityBudget } from '../baseReactFlowDisplayEvaluation';
+import { finalizeDisplayEdgesForRenderMode } from '../baseReactFlowDisplayRenderPipeline';
 import { displayEdgesHaveNodeAnchoredTerminals } from '../baseReactFlowTerminalAxisRepair';
 import { baseNodes } from './baseReactFlowDisplayEdges.testUtils';
 
@@ -37,6 +39,113 @@ describe('baseReactFlowDisplayEdges render modes', () => {
 
     expect(result[0].type).toBe('canvas-ref');
     expect((result[0].data as any).originalType).toBe('advanced-smart-step');
+  });
+
+  it('keeps a large-graph outer lane at least 96px from a parallel container boundary', () => {
+    const nodes: Node[] = [
+      {
+        id: 'source',
+        position: { x: 0, y: 20 },
+        data: {},
+        measured: { width: 80, height: 60 },
+      },
+      {
+        id: 'target',
+        position: { x: 0, y: 240 },
+        data: {},
+        measured: { width: 80, height: 60 },
+      },
+      {
+        id: 'peer-target',
+        position: { x: -240, y: 50 },
+        data: {},
+        measured: { width: 80, height: 60 },
+      },
+      {
+        id: 'domain',
+        type: 'titleGroup',
+        position: { x: 240, y: 0 },
+        data: {},
+        measured: { width: 400, height: 320 },
+      },
+    ];
+    const edges: Edge[] = [
+      {
+        id: 'edge-near-container',
+        source: 'source',
+        target: 'target',
+        type: 'advanced-smart-step',
+        data: {
+          computedPath: [
+            { x: 80, y: 50 },
+            { x: 160, y: 50 },
+            { x: 160, y: 270 },
+            { x: 80, y: 270 },
+          ],
+          layoutPathLocked: true,
+          sharedTrunkAware: true,
+          sharedTrunkSynthesized: true,
+        },
+      },
+      {
+        id: 'edge-opposite-sector',
+        source: 'source',
+        target: 'peer-target',
+        type: 'advanced-smart-step',
+        data: {
+          computedPath: [
+            { x: 0, y: 50 },
+            { x: -96, y: 50 },
+            { x: -96, y: 80 },
+            { x: -160, y: 80 },
+          ],
+          layoutPathLocked: true,
+        },
+      },
+    ];
+
+    const result = finalizeDisplayEdgesForRenderMode({
+      finalQualityEdges: edges,
+      rawEdges: edges,
+      repairNodes: nodes,
+      renderNodes: nodes,
+      enableSmartEdges: false,
+      smartEdgePadding: 20,
+      isLargeGraph: true,
+      layoutDirection: 'TB',
+      inputSignature: 'large-container-clearance',
+      qualityBudget: resolveDisplayQualityBudget(edges, nodes, true),
+    });
+    const boundedResult = finalizeDisplayEdgesForRenderMode({
+      finalQualityEdges: edges,
+      rawEdges: edges,
+      repairNodes: nodes,
+      renderNodes: nodes,
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: false,
+      layoutDirection: 'TB',
+      inputSignature: 'bounded-container-clearance',
+      qualityBudget: {
+        mode: 'bounded',
+        soft: { maxEdges: 2, maxCandidatesPerEdge: 16, maxQualityEvaluations: 18 },
+        finalSoft: { maxEdges: 2, maxCandidatesPerEdge: 16, maxQualityEvaluations: 18 },
+      },
+    });
+    const resultPaths = [result, boundedResult].map(candidate => {
+      const data = candidate[0].data;
+      return data && Array.isArray(data.computedPath)
+        ? data.computedPath as Array<{ x: number; y: number }>
+        : [];
+    });
+
+    expect(result[0].type).toBe('canvas-ref');
+    expect(boundedResult[0].type).toBe('stablePath');
+    for (const path of resultPaths) {
+      const parallelLaneX = path[1]?.x;
+      expect(parallelLaneX).toBeLessThanOrEqual(144);
+      expect(240 - parallelLaneX).toBeGreaterThanOrEqual(96);
+    }
   });
 
   it('reuses finalized display edges on the second render pass', () => {

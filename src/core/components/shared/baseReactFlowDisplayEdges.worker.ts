@@ -28,6 +28,7 @@ import {
   type DisplayRoutingPhaseTrace,
 } from './baseReactFlowDisplayRoutingTrace';
 import { createBaseReactFlowIncrementalDisplayEdges } from './baseReactFlowDisplayIncrementalRoute';
+import { repairDisplayContainerBoundaryClearanceRisks } from '../../strategies/shared/edgeDisplaySoftQualityRepair';
 
 interface DisplayEdgesWorkerScope {
   postMessage: (response: DisplayEdgesWorkerResponse) => void;
@@ -56,6 +57,36 @@ const doesDisplayCandidateMatchSourceGraph = (
   })
 );
 
+const finalizeContainerClearanceResponse = (
+  response: DisplayEdgesWorkerResponse,
+  nodes: DisplayEdgesWorkerRequest['nodes'],
+  options: {
+    eligibleEdgeIds?: ReadonlySet<string>;
+    isLargeGraph: boolean;
+  },
+): DisplayEdgesWorkerResponse => {
+  if (!response.edges) return response;
+  const repairNodes = withDisplayAbsolutePositions(
+    nodes,
+    new Map(nodes.map(node => [node.id, node] as const)),
+  );
+  const edges = repairDisplayContainerBoundaryClearanceRisks(
+    response.edges,
+    repairNodes,
+    {
+      eligibleEdgeIds: options.eligibleEdgeIds,
+      maxEdges: options.isLargeGraph ? 4 : 8,
+      maxQualityEvaluations: options.isLargeGraph ? 16 : 32,
+    },
+  );
+  if (edges === response.edges) return response;
+  return {
+    ...response,
+    edges,
+    hardClean: baseReactFlowDisplayHardQualityIsClean(edges, repairNodes),
+  };
+};
+
 export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
   request: DisplayEdgesWorkerRequest,
   onBoundedCandidate?: (report: BaseDisplayBoundedCandidateReport) => void,
@@ -79,13 +110,15 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
       request.nodes,
     );
     repairTimer.finish(repaired.report.hardClean ? 'accepted' : 'rejected', repaired.edges.length);
-    return {
+    return finalizeContainerClearanceResponse({
       requestId: request.requestId,
       edges: repaired.edges,
       hardClean: repaired.report.hardClean,
       routeResolution: 'repair',
       phaseTrace,
-    };
+    }, request.nodes, {
+      isLargeGraph: request.nodes.length > 36 || request.edges.length > 36,
+    });
   }
   let incrementalAffectedEdgeCount: number | undefined;
   if (request.operation === 'incremental-route') {
@@ -96,7 +129,7 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
     });
     incrementalAffectedEdgeCount = incremental.affectedEdgeCount;
     if (incremental.edges) {
-      return {
+      return finalizeContainerClearanceResponse({
         requestId: request.requestId,
         edges: incremental.edges,
         hardClean: true,
@@ -104,7 +137,10 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
         phaseTrace,
         affectedEdgeCount: incremental.affectedEdgeCount,
         fallbackLevel: 'none',
-      };
+      }, request.nodes, {
+        eligibleEdgeIds: new Set(request.mutableEdgeIds),
+        isLargeGraph: request.isLargeGraph,
+      });
     }
   }
   const incrementalFallbackMetadata = request.operation === 'incremental-route'
@@ -136,13 +172,13 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
     && baseReactFlowDisplayHardQualityIsClean(candidateEdges, request.nodes)
   ) {
     candidateTimer.finish('hit');
-    return {
+    return finalizeContainerClearanceResponse({
       requestId: request.requestId,
       edges: candidateEdges,
       hardClean: true,
       routeResolution: 'validated-candidate',
       phaseTrace,
-    };
+    }, request.nodes, { isLargeGraph: request.isLargeGraph });
   }
   candidateTimer.finish(candidateEdges ? 'rejected' : 'skip');
   const commonInput = {
@@ -161,14 +197,14 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
     });
     const edges = createBaseReactFlowInteractiveDisplayEdges(commonInput);
     interactiveTimer.finish('accepted', edges.length);
-    return {
+    return finalizeContainerClearanceResponse({
       requestId: request.requestId,
       edges,
       hardClean: baseReactFlowDisplayHardQualityIsClean(edges, request.nodes),
       routeResolution: 'full-route',
       phaseTrace,
       ...incrementalFallbackMetadata,
-    };
+    }, request.nodes, { isLargeGraph: request.isLargeGraph });
   }
 
   const repairNodes = withDisplayAbsolutePositions(
@@ -222,23 +258,23 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
       request.nodes,
     );
     repairTimer.finish(repaired.report.hardClean ? 'accepted' : 'rejected', repaired.edges.length);
-    return {
+    return finalizeContainerClearanceResponse({
       requestId: request.requestId,
       edges: repaired.edges,
       hardClean: repaired.report.hardClean,
       routeResolution: 'full-route-repaired',
       phaseTrace,
       ...incrementalFallbackMetadata,
-    };
+    }, request.nodes, { isLargeGraph: request.isLargeGraph });
   }
-  return {
+  return finalizeContainerClearanceResponse({
     requestId: request.requestId,
     edges: finalized.edges,
     hardClean: finalized.report.hardClean,
     routeResolution: 'full-route',
     phaseTrace,
     ...incrementalFallbackMetadata,
-  };
+  }, request.nodes, { isLargeGraph: request.isLargeGraph });
 };
 
 export const handleBaseReactFlowDisplayWorkerMessage = (

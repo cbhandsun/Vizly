@@ -2,7 +2,10 @@ import type { Edge, Node } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
 
 import { calculateEdgePathQualityScore } from '../edgeStrictCrossingGuard';
-import { repairDisplaySoftQualityRisks } from '../edgeDisplaySoftQualityRepair';
+import {
+  repairDisplayContainerBoundaryClearanceRisks,
+  repairDisplaySoftQualityRisks,
+} from '../edgeDisplaySoftQualityRepair';
 
 describe('repairDisplaySoftQualityRisks', () => {
   it('moves a severe logistics fan-out detour onto a shorter target-entry lane without hard-quality regression', () => {
@@ -74,6 +77,122 @@ describe('repairDisplaySoftQualityRisks', () => {
     expect(pathFor(repaired, 'edge-loms-visibility')).toEqual(pathFor(edges, 'edge-loms-visibility'));
   });
 
+  it('moves a long parallel lane to the visual clearance outside a container boundary', () => {
+    const nodes: Node[] = [
+      node('source', 0, 20, 80, 60),
+      node('target', 0, 240, 80, 60),
+      containerNode('domain', 'titleGroup', 240, 0, 400, 320),
+    ];
+    const edges = [
+      edge('edge-near-container', 'source', 'target', [
+        { x: 80, y: 50 },
+        { x: 160, y: 50 },
+        { x: 160, y: 270 },
+        { x: 80, y: 270 },
+      ]),
+    ];
+    const baselineQuality = calculateEdgePathQualityScore(edges);
+
+    const repaired = repairDisplaySoftQualityRisks(edges, nodes, 'TB', {
+      maxEdges: 1,
+      maxCandidatesPerEdge: 64,
+      maxQualityEvaluations: 64,
+    });
+    const repairedPath = pathFor(repaired, 'edge-near-container');
+    const repairedQuality = calculateEdgePathQualityScore(repaired);
+    const parallelLaneX = repairedPath[1]?.x;
+
+    expect(parallelLaneX).toBeLessThanOrEqual(144);
+    expect(240 - parallelLaneX).toBeGreaterThanOrEqual(96);
+    expect(repairedQuality.nonOrthogonalSegments).toBeLessThanOrEqual(baselineQuality.nonOrthogonalSegments);
+    expect(repairedQuality.strictCrossings).toBeLessThanOrEqual(baselineQuality.strictCrossings);
+    expect(repairedQuality.shortEndpointStubs).toBeLessThanOrEqual(baselineQuality.shortEndpointStubs);
+    expect(repairedQuality.tinyInteriorDoglegs).toBeLessThanOrEqual(baselineQuality.tinyInteriorDoglegs);
+    expect(repairedQuality.hairpins).toBeLessThanOrEqual(baselineQuality.hairpins);
+  });
+
+  it('keeps short boundary-adjacent segments and malformed containers out of the repair path', () => {
+    const nodes: Node[] = [
+      node('source', 0, 20, 80, 60),
+      node('target', 400, 100, 80, 60),
+      containerNode('short-domain', 'subGroup', 240, 0, 400, 320),
+      containerNode('invalid-domain', 'titleGroup', 200, 0, Number.POSITIVE_INFINITY, 320),
+    ];
+    const edges = [
+      edge('edge-short-near-container', 'source', 'target', [
+        { x: 80, y: 50 },
+        { x: 160, y: 50 },
+        { x: 160, y: 82 },
+        { x: 400, y: 82 },
+        { x: 400, y: 130 },
+      ]),
+    ];
+
+    const repaired = repairDisplaySoftQualityRisks(edges, nodes, 'TB', {
+      maxEdges: 1,
+      maxCandidatesPerEdge: 64,
+      maxQualityEvaluations: 64,
+    });
+
+    expect(pathFor(repaired, 'edge-short-near-container')).toEqual(
+      pathFor(edges, 'edge-short-near-container'),
+    );
+  });
+
+  it('limits the dedicated container repair to eligible incremental edges', () => {
+    const nodes: Node[] = [
+      node('source-a', 0, 20, 80, 60),
+      node('target-a', 0, 240, 80, 60),
+      node('source-b', 0, 380, 80, 60),
+      node('target-b', 0, 600, 80, 60),
+      containerNode('domain', 'titleGroup', 240, 0, 400, 720),
+    ];
+    const edges = [
+      edge('edge-a', 'source-a', 'target-a', [
+        { x: 80, y: 50 },
+        { x: 160, y: 50 },
+        { x: 160, y: 270 },
+        { x: 80, y: 270 },
+      ]),
+      edge('edge-b', 'source-b', 'target-b', [
+        { x: 80, y: 410 },
+        { x: 160, y: 410 },
+        { x: 160, y: 630 },
+        { x: 80, y: 630 },
+      ]),
+    ];
+
+    const repaired = repairDisplayContainerBoundaryClearanceRisks(edges, nodes, {
+      eligibleEdgeIds: new Set(['edge-a']),
+    });
+
+    expect(240 - pathFor(repaired, 'edge-a')[1].x).toBeGreaterThanOrEqual(96);
+    expect(pathFor(repaired, 'edge-b')).toEqual(pathFor(edges, 'edge-b'));
+  });
+
+  it('centers a parallel lane when opposing containers leave less than two clearances', () => {
+    const nodes: Node[] = [
+      node('source', 0, 20, 80, 60),
+      node('target', 0, 240, 80, 60),
+      containerNode('left-domain', 'titleGroup', -400, 0, 480, 320),
+      containerNode('right-domain', 'titleGroup', 240, 0, 400, 320),
+    ];
+    const edges = [
+      edge('edge-in-corridor', 'source', 'target', [
+        { x: 80, y: 50 },
+        { x: 200, y: 50 },
+        { x: 200, y: 270 },
+        { x: 80, y: 270 },
+      ]),
+    ];
+
+    const repaired = repairDisplayContainerBoundaryClearanceRisks(edges, nodes);
+    const centeredLane = pathFor(repaired, 'edge-in-corridor')[1].x;
+
+    expect(centeredLane).toBe(160);
+    expect(centeredLane - 80).toBe(240 - centeredLane);
+  });
+
   it('honors the caller candidate cap for obstacle routes while preserving an explicit repair budget', () => {
     const nodes: Node[] = [
       node('source', 0, 0, 80, 60),
@@ -135,6 +254,17 @@ describe('repairDisplaySoftQualityRisks', () => {
 
 function node(id: string, x: number, y: number, width: number, height: number): Node {
   return { id, position: { x, y }, data: {}, measured: { width, height } };
+}
+
+function containerNode(
+  id: string,
+  type: 'titleGroup' | 'subGroup',
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+): Node {
+  return { id, type, position: { x, y }, data: {}, measured: { width, height } };
 }
 
 function edge(id: string, source: string, target: string, computedPath: Array<{ x: number; y: number }>): Edge {

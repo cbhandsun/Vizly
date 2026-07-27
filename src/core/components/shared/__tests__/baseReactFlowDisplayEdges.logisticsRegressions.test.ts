@@ -2,6 +2,7 @@ import type { Edge, Node } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
 
 import logisticsStandardData from '../../../../data/standardized/LogisticsStandardData.json';
+import supplyChainReceivingFlow from '../../../../data/standardized/SupplyChainReceivingFlow.json';
 import tmsStandardData from '../../../../data/standardized/TmsStandardData.json';
 import wmsProcessFlowStandardData from '../../../../data/standardized/WmsProcessFlowStandardData.json';
 import logisticsPrecompiledRoute from '../generated/precompiledRoutes/route-260383796.json';
@@ -44,9 +45,33 @@ import {
   tinyInteriorSegments,
   withAbsoluteNodePositions,
 } from './baseReactFlowDisplayEdges.testUtils';
+import { coerceCustomPreset } from '../../../utils/customPresetStorage';
 
 type PositionedNode = Node & {
   positionAbsolute: { x: number; y: number };
+};
+
+const finitePointPath = (value: unknown): Array<{ x: number; y: number }> => (
+  Array.isArray(value)
+    ? value.filter((point): point is { x: number; y: number } => (
+      typeof point === 'object'
+      && point !== null
+      && Number.isFinite((point as { x?: unknown }).x)
+      && Number.isFinite((point as { y?: unknown }).y)
+    ))
+    : []
+);
+
+const absoluteNodeX = (nodeItem: Node): number => {
+  const position = (nodeItem as Node & {
+    positionAbsolute?: { x?: unknown };
+  }).positionAbsolute;
+  return typeof position?.x === 'number' ? position.x : nodeItem.position.x;
+};
+
+const measuredNodeWidth = (nodeItem: Node): number => {
+  const width = nodeItem.measured?.width ?? nodeItem.width ?? nodeItem.style?.width;
+  return typeof width === 'number' && Number.isFinite(width) ? width : 0;
 };
 
 describe('baseReactFlowDisplayEdges logistics regressions', () => {
@@ -846,5 +871,101 @@ describe('baseReactFlowDisplayEdges logistics regressions', () => {
     expect(edgeNodeObstacleHits(result, absoluteNodes), JSON.stringify(paths, null, 2)).toEqual([]);
     expect(displayEdgesHaveNodeAttachedTerminals(result, absoluteNodes)).toBe(true);
     expect(displayEdgesHaveNodeAnchoredTerminals(result, absoluteNodes)).toBe(true);
+  }, 60_000);
+
+  it('repairs a cached SupplyChain e11 lane into its narrow container corridor center', async () => {
+    const preset = coerceCustomPreset(supplyChainReceivingFlow, {
+      id: 'RouteClearanceProbe',
+      title: 'RouteClearanceProbe',
+    });
+    if (!preset) throw new Error('expected the SupplyChain preset to be valid');
+    const canvas = await standardDataToCanvas(preset);
+    const projected = projectBaseReactFlowDisplayWorkerInput(canvas);
+    const fullRouteResponse = computeBaseReactFlowDisplayEdgesWorkerResponse({
+      operation: 'route',
+      requestId: 'supply-chain-e11-full-route',
+      edges: projected.edges,
+      nodes: projected.nodes,
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: false,
+      displayEdgeEpoch: computeBaseReactFlowDisplayEdgeEpoch(projected),
+      qualityMode: 'full',
+    });
+    const fullRouteEdges = fullRouteResponse.edges ?? [];
+    const absoluteNodes = withAbsoluteNodePositions(projected.nodes);
+    const targetDomain = absoluteNodes.find(item => item.id === 'titlegroup-场地管理');
+    const sourceDomain = absoluteNodes.find(item => item.id === 'titlegroup-wms');
+    const targetBoundaryX = targetDomain ? absoluteNodeX(targetDomain) : Number.NaN;
+    const sourceBoundaryX = sourceDomain
+      ? absoluteNodeX(sourceDomain) + measuredNodeWidth(sourceDomain)
+      : Number.NaN;
+    const cachedCandidateEdges = fullRouteEdges.map(edge => {
+      if (edge.id !== 'e11') return edge;
+      const path = finitePointPath(
+        (edge.data as { computedPath?: unknown } | undefined)?.computedPath,
+      );
+      if (path.length !== 4) return edge;
+      const nearBoundaryLane = Math.round(targetBoundaryX - 30);
+      return {
+        ...edge,
+        data: {
+          ...edge.data,
+          computedPath: [
+            path[0],
+            { ...path[1], x: nearBoundaryLane },
+            { ...path[2], x: nearBoundaryLane },
+            path[3],
+          ],
+          displaySoftQualityRepaired: false,
+        },
+      };
+    });
+    const response = computeBaseReactFlowDisplayEdgesWorkerResponse({
+      operation: 'validate-or-route',
+      requestId: 'supply-chain-e11-cached-route',
+      edges: projected.edges,
+      nodes: projected.nodes,
+      candidateEdges: cachedCandidateEdges,
+      candidateSource: 'persistent',
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: false,
+      displayEdgeEpoch: computeBaseReactFlowDisplayEdgeEpoch(projected),
+      qualityMode: 'full',
+    });
+    const edge = response.edges?.find(item => item.id === 'e11');
+    const path = finitePointPath(
+      (edge?.data as { computedPath?: unknown } | undefined)?.computedPath,
+    );
+    const centeredLane = path.slice(0, -1)
+      .map((point, index) => ({ from: point, to: path[index + 1] }))
+      .filter(segment => (
+        segment.from.x === segment.to.x
+        && Math.abs(segment.to.y - segment.from.y) >= 48
+      ))
+      .map(segment => segment.from.x)
+      .filter(x => x < targetBoundaryX)
+      .sort((left, right) => right - left)[0];
+    const targetClearance = targetBoundaryX - centeredLane;
+    const sourceClearance = centeredLane - sourceBoundaryX;
+    const diagnostics = JSON.stringify({
+      routeResolution: response.routeResolution,
+      hardClean: response.hardClean,
+      path,
+      targetClearance,
+      sourceClearance,
+    }, null, 2);
+
+    expect(response.error, diagnostics).toBeUndefined();
+    expect(response.hardClean, diagnostics).toBe(true);
+    expect(response.routeResolution, diagnostics).toBe('validated-candidate');
+    expect(edge, diagnostics).toBeDefined();
+    expect(targetDomain, diagnostics).toBeDefined();
+    expect(sourceDomain, diagnostics).toBeDefined();
+    expect(centeredLane, diagnostics).toBeTypeOf('number');
+    expect(targetClearance, diagnostics).toBeGreaterThanOrEqual(79.5);
+    expect(sourceClearance, diagnostics).toBeGreaterThanOrEqual(79.5);
+    expect(Math.abs(targetClearance - sourceClearance), diagnostics).toBeLessThanOrEqual(1);
   }, 60_000);
 });

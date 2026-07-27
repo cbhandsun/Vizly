@@ -2,7 +2,10 @@ import type { Edge, Node } from '@xyflow/react';
 
 import { separateDetachedParallelOverlaps } from '../../strategies/shared/edgeDetachedOverlapRepair';
 import { repairDisplayMicroArtifacts } from '../../strategies/shared/edgeDisplayMicroCleanup';
-import { repairDisplaySoftQualityRisks } from '../../strategies/shared/edgeDisplaySoftQualityRepair';
+import {
+  repairDisplayContainerBoundaryClearanceRisks,
+  repairDisplaySoftQualityRisks,
+} from '../../strategies/shared/edgeDisplaySoftQualityRepair';
 import { repairEndpointLaneCrossings } from '../../strategies/shared/edgeEndpointLaneNudgeRepair';
 import { repairEndpointOrthogonalPaths } from '../../strategies/shared/edgeEndpointPathRepair';
 import {
@@ -359,8 +362,12 @@ export const finalizeDisplayEdgesForRenderMode = ({
   qualityBudget: DisplayQualityBudget;
 }): Edge[] => {
   if (isLargeGraph) {
+    const containerReadableEdges = repairDisplayContainerBoundaryClearanceRisks(
+      finalQualityEdges,
+      repairNodes,
+    );
     return markBaseDisplayFinalized(
-      finalQualityEdges.map(edge => toCanvasRefEdge(edge)),
+      containerReadableEdges.map(edge => toCanvasRefEdge(edge)),
       inputSignature,
     );
   }
@@ -391,8 +398,9 @@ export const finalizeDisplayEdgesForRenderMode = ({
     if (typeof smartEdgePadding !== 'number' || !Number.isFinite(smartEdgePadding)) {
       const finished = finishDisplayQuality(polishRenderedDisplayEdges(finalQualityEdges, repairNodes), renderNodes);
       const softFinished = finishDisplaySoftQuality(finished, repairNodes, layoutDirection, qualityBudget.finalSoft);
+      const strictFinished = repairFinalResidualStrictCrossings(softFinished, repairNodes);
       return markBaseDisplayFinalized(
-        repairFinalResidualStrictCrossings(softFinished, repairNodes),
+        repairDisplayContainerBoundaryClearanceRisks(strictFinished, repairNodes),
         inputSignature,
       );
     }
@@ -416,8 +424,12 @@ export const finalizeDisplayEdgesForRenderMode = ({
       layoutDirection,
       qualityBudget.finalSoft,
     );
+    const strictSmartDisplayEdges = repairFinalResidualStrictCrossings(
+      finalSmartDisplayEdges,
+      repairNodes,
+    );
     return markBaseDisplayFinalized(
-      repairFinalResidualStrictCrossings(finalSmartDisplayEdges, repairNodes),
+      repairDisplayContainerBoundaryClearanceRisks(strictSmartDisplayEdges, repairNodes),
       inputSignature,
     );
   }
@@ -440,8 +452,12 @@ export const finalizeDisplayEdgesForRenderMode = ({
     layoutDirection,
     qualityBudget.finalSoft,
   );
+  const strictBasicDisplayEdges = repairFinalResidualStrictCrossings(
+    finalBasicDisplayEdges,
+    repairNodes,
+  );
   return markBaseDisplayFinalized(
-    repairFinalResidualStrictCrossings(finalBasicDisplayEdges, repairNodes),
+    repairDisplayContainerBoundaryClearanceRisks(strictBasicDisplayEdges, repairNodes),
     inputSignature,
   );
 };
