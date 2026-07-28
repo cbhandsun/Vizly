@@ -33,7 +33,7 @@ interface UseDiagramDragDropProps {
     notifyHistoryChanged: () => void;
     reactFlowInstance: ReactFlowInstance | null;
     setIsDragging: (dragging: boolean) => void;
-    onSmartNodeDrag?: (event: MouseEvent | TouchEvent, node: Node, nodes: Node[]) => SnapDelta | null;
+    snapDeltaRef?: Readonly<{ current: SnapDelta | null }>;
     clearGuides: () => void;
     enableAltDuplicate?: boolean;
     isConnecting?: boolean; 
@@ -49,7 +49,7 @@ export const useDiagramDragDrop = ({
     notifyHistoryChanged,
     reactFlowInstance,
     setIsDragging,
-    onSmartNodeDrag,
+    snapDeltaRef,
     clearGuides,
     enableAltDuplicate = true,
     isConnecting = false, // 默认为 false
@@ -64,8 +64,6 @@ export const useDiagramDragDrop = ({
 
     const dragTargetIdRef = useRef<string | null>(null);
     const dragRafIdRef = useRef<number | null>(null); // ⭐ P4: onNodeDrag RAF 节流
-    const smartGuideRafRef = useRef<number | null>(null); // 🚀 P3: SmartGuides RAF 节流
-    const lastActiveSnapDeltaRef = useRef<SnapDelta | null>(null);
     const lastMindmapDropPosRef = useRef<'above' | 'below' | 'inside' | null>(null);
 
     const onDragOver = useCallback((event: React.DragEvent) => {
@@ -302,49 +300,7 @@ export const useDiagramDragDrop = ({
         dragTargetIdRef.current = null;
     }, [enableAltDuplicate, isConnecting, takeSnapshot, setIsDragging, setNodes]);
 
-    // ⭐ 防振荡：记录上次 snap 签名，避免重复 snap
-    const lastSnapSigRef = useRef('');
-
     const onNodeDrag = useCallback((event: MouseEvent | TouchEvent, node: Node, draggedNodes: Node[]) => {
-        // 🚀 P3: Smart Guides 吸附纳入 RAF 节流
-        //   避免每个 mousemove 同步执行 O(n) 对齐计算
-        if (onSmartNodeDrag) {
-            if (smartGuideRafRef.current !== null) {
-                cancelAnimationFrame(smartGuideRafRef.current);
-            }
-            // 捕获当前帧的 node 和当前拖动节点引用
-            const capturedNode = node;
-            const capturedDraggedNodes = draggedNodes;
-            smartGuideRafRef.current = requestAnimationFrame(() => {
-                smartGuideRafRef.current = null;
-                const snapDelta = onSmartNodeDrag(event, capturedNode, capturedDraggedNodes);
-                if (snapDelta && (Math.abs(snapDelta.x) > 0.5 || Math.abs(snapDelta.y) > 0.5)) {
-                    // 防振荡：生成签名，与上次相同则跳过
-                    const sig = `${capturedNode.id}:${snapDelta.x.toFixed(1)}:${snapDelta.y.toFixed(1)}`;
-                    if (sig !== lastSnapSigRef.current) {
-                        lastSnapSigRef.current = sig;
-                        // [FIX] Save the delta for drop persistence
-                        lastActiveSnapDeltaRef.current = snapDelta;
-
-                        setNodes(nds => nds.map(n => {
-                            if (n.id !== capturedNode.id) return n;
-                            return {
-                                ...n,
-                                position: {
-                                    x: n.position.x + snapDelta.x,
-                                    y: n.position.y + snapDelta.y
-                                }
-                            };
-                        }));
-                    }
-                } else {
-                    // 无吸附时清空签名，允许下次吸附
-                    lastSnapSigRef.current = '';
-                    lastActiveSnapDeltaRef.current = null;
-                }
-            });
-        }
-
         // ⭐ P4: 容器预览用 RAF 节流（非关键路径）
         if (dragRafIdRef.current !== null) return;
 
@@ -416,7 +372,7 @@ export const useDiagramDragDrop = ({
                 dragTargetIdRef.current = newTargetId;
             }
         });
-    }, [onSmartNodeDrag, setNodes]);
+    }, []);
 
     const onNodeDragStop = useCallback((_event: MouseEvent | TouchEvent, node: Node, draggedNodes: Node[]) => {
         // ⭐ P4: 清理pending的RAF
@@ -424,17 +380,10 @@ export const useDiagramDragDrop = ({
             cancelAnimationFrame(dragRafIdRef.current);
             dragRafIdRef.current = null;
         }
-        // 🚀 P3: 清理 SmartGuides RAF
-        if (smartGuideRafRef.current !== null) {
-            cancelAnimationFrame(smartGuideRafRef.current);
-            smartGuideRafRef.current = null;
-        }
-
         // [FIX] Capture the active snapDelta before clearing guides so we can cement the drop location
         // React Flow natively enforces snapToGrid when the drag drops, which discards our custom snapDelta
         // causing the node to jump back to strict grid coordinates upon release.
-        const finalSnapDelta = lastActiveSnapDeltaRef.current;
-        lastActiveSnapDeltaRef.current = null;
+        const finalSnapDelta = snapDeltaRef?.current ?? null;
 
         setIsDragging(false);
         notifyHistoryChanged();
@@ -558,7 +507,7 @@ export const useDiagramDragDrop = ({
                 }, 0);
             }
         }
-    }, [setIsDragging, setNodes, clearGuides, notifyHistoryChanged]);
+    }, [setIsDragging, setNodes, clearGuides, notifyHistoryChanged, snapDeltaRef]);
 
     return {
         onDragOver,

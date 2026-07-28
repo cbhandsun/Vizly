@@ -3,6 +3,10 @@ import { Node, Edge, BackgroundVariant, ReactFlowInstance, SelectionMode, NodeTy
 import BaseReactFlow from '../shared/BaseReactFlow';
 import { useConnectionMicrointeractions } from './hooks/useConnectionMicrointeractions';
 import { shouldUseScopedDesignerDragPerformanceMode } from './hooks/designerSystemSyncPersistence';
+import {
+    useFlowchartDragBuffer,
+    type SmartNodeDragHandler,
+} from './hooks/useFlowchartDragBuffer';
 
 export interface FlowchartCanvasShellProps {
     nodes: Node[];
@@ -21,6 +25,7 @@ export interface FlowchartCanvasShellProps {
     showGrid: boolean;
     gridVariant: BackgroundVariant;
     onNodeDrag: OnNodeDrag<Node>;
+    onSmartNodeDrag?: SmartNodeDragHandler;
     onNodeDragStart: OnNodeDrag<Node>;
     onNodeDragStop?: OnNodeDrag<Node>;
     onSelectionChange: (params: { nodes: Node[]; edges: Edge[] }) => void;
@@ -72,6 +77,7 @@ export const FlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> = React.m
     showGrid,
     gridVariant,
     onNodeDrag,
+    onSmartNodeDrag,
     onNodeDragStart,
     onNodeDragStop,
     onSelectionChange,
@@ -106,6 +112,20 @@ export const FlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> = React.m
     backgroundGridColor,
     children
 }) => {
+    const {
+        canvasNodes,
+        handleNodeDrag,
+        handleNodesChange,
+        handleNodeDragStart,
+        handleNodeDragStop,
+    } = useFlowchartDragBuffer({
+        nodes,
+        onNodesChange,
+        onNodeDrag,
+        onNodeDragStart,
+        onNodeDragStop,
+        onSmartNodeDrag,
+    });
     const connectionLineStyle = isConnecting ? {
         stroke: connectPreview ? 'rgba(16, 185, 129, 0.95)' : 'rgba(59, 130, 246, 0.95)',
         strokeWidth: connectPreview ? 3.5 : 2.5,
@@ -114,11 +134,11 @@ export const FlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> = React.m
     return (
         <BaseReactFlow
             onInit={onInit}
-            nodes={nodes}
+            nodes={canvasNodes}
             edges={displayEdges}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
-            onNodesChange={onNodesChange}
+            onNodesChange={handleNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             onConnectStart={onConnectStart}
@@ -134,9 +154,9 @@ export const FlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> = React.m
             backgroundVariant={gridVariant}
             backgroundGap={24}
             showBackgroundGrid={showGrid}
-            onNodeDrag={onNodeDrag}
-            onNodeDragStart={onNodeDragStart}
-            onNodeDragStop={onNodeDragStop}
+            onNodeDrag={handleNodeDrag}
+            onNodeDragStart={handleNodeDragStart}
+            onNodeDragStop={handleNodeDragStop}
             onSelectionChange={onSelectionChange}
             onViewportChange={onViewportChange}
             onNodeClick={onNodeClick}
@@ -156,7 +176,7 @@ export const FlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> = React.m
             connectionMode={connectionMode}
             connectionLineStyle={connectionLineStyle}
             connectionLineType={ConnectionLineType.SmoothStep}
-            flowClassName={shouldUseScopedDesignerDragPerformanceMode(nodes.length, isDragging)
+            flowClassName={shouldUseScopedDesignerDragPerformanceMode(canvasNodes.length, isDragging)
                 ? 'performance-mode'
                 : undefined}
             snapToGrid={snapEnabled}

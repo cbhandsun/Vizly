@@ -103,7 +103,7 @@ export function useDesignerInteractions({
 
     const [selectionMode] = useState<SelectionMode>(SelectionMode.Partial);
     const [isMarqueeActive, setIsMarqueeActive] = useState<boolean>(false);
-    const { guides, onSmartNodeDrag, clearGuides } = useSmartGuides();
+    const { guides, onSmartNodeDrag, clearGuides, snapDeltaRef } = useSmartGuides();
 
     const { handleAlign, handleDistribute, canAlign, canDistribute } = useAlignment({
         selectedNodes,
@@ -190,7 +190,7 @@ export function useDesignerInteractions({
     const handleReconnectEnd = useCallback((_event: MouseEvent | React.MouseEvent | TouchEvent | React.TouchEvent, _edge: Edge) => {}, []);
 
     const { onDragOver, onDrop, onNodeDragStart, onNodeDrag, onNodeDragStop: originalOnNodeDragStop } = useDiagramDragDrop({
-        nodes, edges, setNodes, setEdges, takeSnapshot, notifyHistoryChanged, reactFlowInstance, setIsDragging, onSmartNodeDrag, clearGuides,
+        nodes, edges, setNodes, setEdges, takeSnapshot, notifyHistoryChanged, reactFlowInstance, setIsDragging, snapDeltaRef, clearGuides,
         enableAltDuplicate: false, isConnecting, activeLayerId: normalizedActiveLayerId
     });
 
@@ -248,7 +248,7 @@ export function useDesignerInteractions({
         handleLabelOffsetChange, handleLabelStyleChange, handleWaypointsChange, handleEdgeLabelChange,
         handleGroup, handleUngroup,
         selectionMode, isMarqueeActive, setIsMarqueeActive,
-        guides, clearGuides,
+        guides, clearGuides, onSmartNodeDrag,
         handleAlign, handleDistribute, canAlign, canDistribute,
         hasCopiedStyle, copyStyle, pasteStyle,
         templates, groupedTemplates, saveAsTemplate, saveGroupAsTemplate, createFromTemplate, deleteTemplate, renameTemplate,

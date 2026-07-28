@@ -27,6 +27,7 @@ const CONTAINER_NODE_TYPES = new Set(['titleGroup', 'subGroup', 'swimlane', 'gro
 const MAX_NODE_DIMENSION = 1_000_000;
 const MAX_DESCRIPTION_LENGTH = 10_000;
 const GLOBAL_PERFORMANCE_MODE_NODE_THRESHOLD = 300;
+const SCOPED_PERFORMANCE_MODE_NODE_THRESHOLD = 120;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
@@ -184,11 +185,16 @@ export const shouldUseGlobalDesignerPerformanceMode = (nodeCount: number): boole
 );
 
 /**
+ * Small and medium canvases are cheaper to paint normally than to invalidate
+ * every visible node and edge by toggling the scoped performance class.
  * High-density canvases already keep document performance styles active.
- * Toggling the scoped class as well would invalidate every visible node and
- * edge at drag start/stop, which is more expensive than the styles it saves.
  */
 export const shouldUseScopedDesignerDragPerformanceMode = (
   nodeCount: number,
   isDragging: boolean,
-): boolean => isDragging && !shouldUseGlobalDesignerPerformanceMode(nodeCount);
+): boolean => (
+  isDragging
+  && Number.isFinite(nodeCount)
+  && nodeCount >= SCOPED_PERFORMANCE_MODE_NODE_THRESHOLD
+  && !shouldUseGlobalDesignerPerformanceMode(nodeCount)
+);

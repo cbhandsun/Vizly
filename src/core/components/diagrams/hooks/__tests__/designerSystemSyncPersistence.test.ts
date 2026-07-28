@@ -121,8 +121,11 @@ describe('shouldUseGlobalDesignerPerformanceMode', () => {
   });
 
   it('avoids a second canvas-wide class invalidation for high-density drags', () => {
+    expect(shouldUseScopedDesignerDragPerformanceMode(119, true)).toBe(false);
+    expect(shouldUseScopedDesignerDragPerformanceMode(120, true)).toBe(true);
     expect(shouldUseScopedDesignerDragPerformanceMode(300, true)).toBe(true);
     expect(shouldUseScopedDesignerDragPerformanceMode(301, true)).toBe(false);
     expect(shouldUseScopedDesignerDragPerformanceMode(500, false)).toBe(false);
+    expect(shouldUseScopedDesignerDragPerformanceMode(Number.NaN, true)).toBe(false);
   });
 });

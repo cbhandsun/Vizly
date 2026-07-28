@@ -164,6 +164,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
         onNodeDrag,
         onNodeDragStop,
         onNodesChangeWithLock,
+        onSmartNodeDrag,
         onOpenSettings,
         onOpenShareDialog,
         onPaneContextMenu,
@@ -465,6 +466,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                     onPaneContextMenu={onPaneContextMenu}
                                     onNodeDragStart={wrappedOnNodeDragStart}
                                     onNodeDrag={onNodeDrag}
+                                    onSmartNodeDrag={onSmartNodeDrag}
                                     onNodeDragStop={onNodeDragStop}
                                     onReconnect={handleReconnect}
                                     onReconnectStart={handleReconnectStart}
