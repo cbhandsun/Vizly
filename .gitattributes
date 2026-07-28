@@ -1,0 +1,3 @@
+src/core/components/shared/generated/baseReactFlowPrecompiledRouteManifest.json text eol=lf
+src/core/components/shared/generated/baseReactFlowPrecompiledRouteLoaders.ts text eol=lf
+src/core/components/shared/generated/precompiledRoutes/*.json text eol=lf

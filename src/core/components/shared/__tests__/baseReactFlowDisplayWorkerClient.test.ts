@@ -96,15 +96,18 @@ describe('baseReactFlowDisplayWorkerClient', () => {
     ['route', 'full-route', true],
     ['route', 'full-route-repaired', true],
     ['route', 'validated-candidate', false],
+    ['route', 'repaired-candidate', false],
     ['route', 'repair', false],
     ['incremental-route', 'incremental-route', true],
     ['incremental-route', 'full-route', true],
     ['incremental-route', 'full-route-repaired', true],
     ['incremental-route', 'validated-candidate', false],
+    ['incremental-route', 'repaired-candidate', false],
     ['repair', 'repair', true],
     ['repair', 'full-route', false],
     ['repair', 'full-route-repaired', false],
     ['validate-or-route', 'validated-candidate', true],
+    ['validate-or-route', 'repaired-candidate', true],
     ['validate-or-route', 'full-route', true],
     ['validate-or-route', 'full-route-repaired', true],
     ['validate-or-route', 'repair', false],
@@ -546,6 +549,15 @@ describe('baseReactFlowDisplayWorkerClient', () => {
       edgeCount: 44,
       isLargeGraph: false,
     })).toEqual({ mode: 'interactive', timeoutMs: 12_000 });
+  });
+
+  it('uses the full quality budget only for an authorized precompiled capture', () => {
+    expect(resolveBaseReactFlowDisplayQualityPolicy({
+      nodeCount: 45,
+      edgeCount: 44,
+      isLargeGraph: true,
+      forceFullQuality: true,
+    })).toEqual({ mode: 'full', timeoutMs: 60_000 });
   });
 
   it('keeps medium standard diagrams on the bounded interactive worker path', () => {

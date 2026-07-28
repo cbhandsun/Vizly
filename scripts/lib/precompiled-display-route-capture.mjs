@@ -16,6 +16,7 @@ export const isMatchingHardCleanDisplayWorkerResponse = (request, response) => (
   && response.hardClean === true
   && (
     response.routeResolution === 'validated-candidate'
+    || response.routeResolution === 'repaired-candidate'
     || response.routeResolution === 'full-route'
     || response.routeResolution === 'full-route-repaired'
   )

@@ -67,6 +67,10 @@ describe('smokeRouteBudgetUtils', () => {
     })).toBe(true);
     expect(isFinalWmsDisplayRoutingReady({
       ...finalState,
+      workerResolution: 'repaired-candidate',
+    })).toBe(true);
+    expect(isFinalWmsDisplayRoutingReady({
+      ...finalState,
       workerResolution: 'repair',
     })).toBe(true);
   });

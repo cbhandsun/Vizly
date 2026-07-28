@@ -84,6 +84,9 @@ const finalizeContainerClearanceResponse = (
     ...response,
     edges,
     hardClean: baseReactFlowDisplayHardQualityIsClean(edges, repairNodes),
+    routeResolution: response.routeResolution === 'validated-candidate'
+      ? 'repaired-candidate'
+      : response.routeResolution,
   };
 };
 

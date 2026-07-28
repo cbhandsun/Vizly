@@ -1,6 +1,10 @@
 import { setTimeout as delay } from 'node:timers/promises';
 
 import { withPrecompiledRouteBrowser } from './lib/precompiled-display-route-cdp.mjs';
+import {
+  readDisplayRoutingNodePanGesture,
+  readVisibleDisplayRoutingNodeRect,
+} from './lib/display-routing-browser-geometry.mjs';
 
 const BASE_URL = String(process.env.PRECOMPILED_ROUTE_BASE_URL || '')
   .trim()
@@ -89,21 +93,58 @@ const initialReadyExpression = `(() => {
 })()`;
 
 const dragNode = async (session, nodeId) => {
-  const rect = await waitForValue(session, `(() => {
-    const element = document.querySelector(
-      '.react-flow__node[data-id=${JSON.stringify(nodeId)}]',
-    );
-    if (!element) return null;
-    const bounds = element.getBoundingClientRect();
-    return bounds.width > 1 && bounds.height > 1
-      ? {
-        x: bounds.x,
-        y: bounds.y,
-        width: bounds.width,
-        height: bounds.height,
-      }
-      : null;
-  })()`);
+  const visibleRectExpression = `(() => {
+    const readVisibleNodeRect = ${readVisibleDisplayRoutingNodeRect.toString()};
+    return readVisibleNodeRect(${JSON.stringify(nodeId)});
+  })()`;
+  const panGestureExpression = `(() => {
+    const readNodePanGesture = ${readDisplayRoutingNodePanGesture.toString()};
+    return readNodePanGesture(${JSON.stringify(nodeId)});
+  })()`;
+  let rect = await session.evaluate(visibleRectExpression);
+  for (let attempt = 0; !rect && attempt < 8; attempt += 1) {
+    const gesture = await session.evaluate(panGestureExpression);
+    if (!gesture) {
+      await delay(100);
+      rect = await session.evaluate(visibleRectExpression);
+      continue;
+    }
+    await session.send('Input.dispatchMouseEvent', {
+      type: 'mouseMoved',
+      x: gesture.startX,
+      y: gesture.startY,
+      button: 'none',
+    });
+    await session.send('Input.dispatchMouseEvent', {
+      type: 'mousePressed',
+      x: gesture.startX,
+      y: gesture.startY,
+      button: 'left',
+      buttons: 1,
+      clickCount: 1,
+    });
+    for (let step = 1; step <= 4; step += 1) {
+      await session.send('Input.dispatchMouseEvent', {
+        type: 'mouseMoved',
+        x: gesture.startX + ((gesture.endX - gesture.startX) * step) / 4,
+        y: gesture.startY + ((gesture.endY - gesture.startY) * step) / 4,
+        button: 'left',
+        buttons: 1,
+      });
+      await delay(20);
+    }
+    await session.send('Input.dispatchMouseEvent', {
+      type: 'mouseReleased',
+      x: gesture.endX,
+      y: gesture.endY,
+      button: 'left',
+      buttons: 0,
+      clickCount: 1,
+    });
+    await delay(150);
+    rect = await session.evaluate(visibleRectExpression);
+  }
+  rect ??= await waitForValue(session, visibleRectExpression);
   const startX = rect.x + rect.width / 2;
   const startY = rect.y + rect.height / 2;
   const endX = startX + 24;

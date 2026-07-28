@@ -85,6 +85,7 @@ export type DisplayQualityMode = 'full' | 'interactive';
 export type DisplayEdgesWorkerCandidateSource = 'persistent' | 'precompiled';
 export type DisplayEdgesWorkerRouteResolution =
   | 'validated-candidate'
+  | 'repaired-candidate'
   | 'incremental-route'
   | 'full-route'
   | 'full-route-repaired'
@@ -630,6 +631,7 @@ export const parseDisplayEdgesWorkerResponse = (
     || typeof value.hardClean !== 'boolean'
     || (
       value.routeResolution !== 'validated-candidate'
+      && value.routeResolution !== 'repaired-candidate'
       && value.routeResolution !== 'incremental-route'
       && value.routeResolution !== 'full-route'
       && value.routeResolution !== 'full-route-repaired'

@@ -298,6 +298,15 @@ describe('baseReactFlowDisplayWorkerProtocol', () => {
       }],
     }, 'route-1')).not.toBeNull();
     expect(parseDisplayEdgesWorkerResponse({
+      requestId: 'candidate-1',
+      edges: validEdges,
+      hardClean: true,
+      routeResolution: 'repaired-candidate',
+      phaseTrace: [],
+    }, 'candidate-1')).toMatchObject({
+      routeResolution: 'repaired-candidate',
+    });
+    expect(parseDisplayEdgesWorkerResponse({
       requestId: 'incremental-1',
       edges: validEdges,
       hardClean: true,

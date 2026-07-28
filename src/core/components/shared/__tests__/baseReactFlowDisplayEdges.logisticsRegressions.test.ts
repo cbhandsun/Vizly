@@ -5,7 +5,6 @@ import logisticsStandardData from '../../../../data/standardized/LogisticsStanda
 import supplyChainReceivingFlow from '../../../../data/standardized/SupplyChainReceivingFlow.json';
 import tmsStandardData from '../../../../data/standardized/TmsStandardData.json';
 import wmsProcessFlowStandardData from '../../../../data/standardized/WmsProcessFlowStandardData.json';
-import logisticsPrecompiledRoute from '../generated/precompiledRoutes/route-260383796.json';
 import { standardDataToCanvas } from '../../diagrams/designerUtils';
 import { calculateEdgePathQualityScore } from '../../../strategies/shared/edgeStrictCrossingGuard';
 import {
@@ -46,6 +45,8 @@ import {
   withAbsoluteNodePositions,
 } from './baseReactFlowDisplayEdges.testUtils';
 import { coerceCustomPreset } from '../../../utils/customPresetStorage';
+import { parseBaseReactFlowPrecompiledRouteArtifact } from '../baseReactFlowPrecompiledRouteArtifact';
+import { GENERATED_BASE_REACT_FLOW_PRECOMPILED_ROUTE_LOADERS } from '../generated/baseReactFlowPrecompiledRouteLoaders';
 
 type PositionedNode = Node & {
   positionAbsolute: { x: number; y: number };
@@ -574,9 +575,27 @@ describe('baseReactFlowDisplayEdges logistics regressions', () => {
     expect(edgeNodeObstacleHits(result, absoluteNodes), JSON.stringify(paths, null, 2)).toEqual([]);
     expect(displayEdgesHaveNodeAnchoredTerminals(result, absoluteNodes)).toBe(true);
 
+    const logisticsLoaderEntry = Object.entries(
+      GENERATED_BASE_REACT_FLOW_PRECOMPILED_ROUTE_LOADERS,
+    ).find(([, descriptor]) => descriptor.presetId === 'logistics-architecture-v1');
+    if (!logisticsLoaderEntry) {
+      throw new Error('expected the Logistics precompiled loader');
+    }
+    const [precompiledInputSignature, precompiledDescriptor] = logisticsLoaderEntry;
+    const precompiledArtifact = parseBaseReactFlowPrecompiledRouteArtifact(
+      await precompiledDescriptor.load(),
+      {
+        inputSignature: precompiledInputSignature,
+        inputGeometryDigest: precompiledDescriptor.geometryDigest,
+        sourceHash: precompiledDescriptor.sourceHash,
+      },
+    );
+    if (!precompiledArtifact) {
+      throw new Error('expected the Logistics precompiled artifact to parse');
+    }
     const precompiledBaseline = mergeBaseReactFlowDisplayEdgePatches(
       browserProjected.edges,
-      logisticsPrecompiledRoute.patches as Edge[],
+      precompiledArtifact.edges,
     );
     if (!precompiledBaseline) {
       throw new Error('expected the Logistics precompiled baseline to merge');
@@ -959,7 +978,7 @@ describe('baseReactFlowDisplayEdges logistics regressions', () => {
 
     expect(response.error, diagnostics).toBeUndefined();
     expect(response.hardClean, diagnostics).toBe(true);
-    expect(response.routeResolution, diagnostics).toBe('validated-candidate');
+    expect(response.routeResolution, diagnostics).toBe('repaired-candidate');
     expect(edge, diagnostics).toBeDefined();
     expect(targetDomain, diagnostics).toBeDefined();
     expect(sourceDomain, diagnostics).toBeDefined();

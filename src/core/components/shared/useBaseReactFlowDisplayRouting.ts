@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { Edge, Node } from '@xyflow/react';
 import {
   BASE_DISPLAY_ROUTING_VERSION,
   computeBaseReactFlowDisplayOutputRouteSignature,
@@ -17,6 +16,7 @@ import {
   type DeferredDisplayEdges,
   type DisplayRoutingInput,
 } from './baseReactFlowDisplayWorkerClient';
+import { resolveBaseReactFlowPrecompiledCapturePresetId } from './baseReactFlowPrecompiledCaptureMode';
 import { updateDisplayRoutingDebugState } from './baseReactFlowDisplayRoutingDebug';
 import {
   createBaseReactFlowDisplayEdgePatches,
@@ -48,25 +48,15 @@ import {
 import { logBaseReactFlowEventBindingFailure } from './baseReactFlowLogging';
 import { isBaseReactFlowDisplayDiagnosticsEnabled } from './baseReactFlowDisplayDiagnostics';
 import { recordBaseReactFlowRejectedDisplayDiagnostics } from './baseReactFlowDisplayRejectedDiagnostics';
+import type {
+  UseBaseReactFlowDisplayRoutingOptions,
+  UseBaseReactFlowDisplayRoutingResult,
+} from './baseReactFlowDisplayRoutingTypes';
 
-export type UseBaseReactFlowDisplayRoutingOptions = {
-  edges: Edge[];
-  routingNodes: Node[];
-  routingGeometryReady: boolean;
-  isContainerReady: boolean;
-  enableSmartEdges: boolean;
-  smartEdgePadding: number;
-  isLargeGraph: boolean;
-  isNodeDragging: boolean;
-  isNodeDragFallbackPending: boolean;
-  nodeDragFallbackIds: readonly string[];
-  onNodeDragFallbackResolved: () => void;
-};
-
-export type UseBaseReactFlowDisplayRoutingResult = {
-  edges: Edge[];
-  routingOwner: 'edge' | 'canvas';
-};
+export type {
+  UseBaseReactFlowDisplayRoutingOptions,
+  UseBaseReactFlowDisplayRoutingResult,
+} from './baseReactFlowDisplayRoutingTypes';
 
 /**
  * Owns the asynchronous display-routing lifecycle while the canvas component
@@ -130,6 +120,11 @@ export const useBaseReactFlowDisplayRouting = ({
       nodeCount: routingNodes.length,
       edgeCount: edges.length,
       isLargeGraph,
+      forceFullQuality: typeof window !== 'undefined'
+        && resolveBaseReactFlowPrecompiledCapturePresetId({
+          search: window.location.search,
+          hash: window.location.hash,
+        }) !== null,
     })
   ), [routingNodes.length, edges.length, isLargeGraph]);
 

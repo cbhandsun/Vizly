@@ -90,16 +90,24 @@ export const resolveBaseReactFlowDisplayQualityPolicy = ({
   nodeCount,
   edgeCount,
   isLargeGraph,
+  forceFullQuality = false,
 }: {
   nodeCount: number;
   edgeCount: number;
   isLargeGraph: boolean;
+  forceFullQuality?: boolean;
 }): DisplayQualityPolicy => {
   if (
     nodeCount <= 0
     || edgeCount <= 0
   ) {
     return { mode: 'skip', timeoutMs: 0 };
+  }
+  if (forceFullQuality) {
+    return {
+      mode: 'full',
+      timeoutMs: DISPLAY_WORKER_TIMEOUT_MS,
+    };
   }
   if (
     isLargeGraph
@@ -268,6 +276,7 @@ export const doesBaseReactFlowDisplayWorkerResolutionMatchOperation = (
       || routeResolution === 'full-route-repaired';
   }
   return routeResolution === 'validated-candidate'
+    || routeResolution === 'repaired-candidate'
     || routeResolution === 'full-route'
     || routeResolution === 'full-route-repaired';
 };

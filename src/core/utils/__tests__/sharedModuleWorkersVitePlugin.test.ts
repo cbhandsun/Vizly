@@ -213,7 +213,7 @@ const worker = new Worker(new URL('./baseReactFlowDisplayEdges.worker.ts', impor
     )?.code).toContain('virtual:vizly-pathfinding-worker-constructor');
   });
 
-  it('keeps measured repair inside the display worker repair protocol', () => {
+  it('keeps measured repair inside the display worker implementation', () => {
     const hookPath = resolve(
       process.cwd(),
       'src/core/components/shared/useBaseReactFlowDisplayRouting.ts',
@@ -225,7 +225,7 @@ const worker = new Worker(new URL('./baseReactFlowDisplayEdges.worker.ts', impor
     const hookSource = readFileSync(hookPath, 'utf8');
     const workerSource = readFileSync(workerPath, 'utf8');
 
-    expect(hookSource).toContain(
+    expect(hookSource).not.toContain(
       'repairBaseReactFlowDisplayEdgesInWorker',
     );
     expect(hookSource).not.toContain('baseReactFlowDisplayMeasuredRepair');
