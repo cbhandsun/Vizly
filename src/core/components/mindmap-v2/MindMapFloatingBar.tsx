@@ -192,7 +192,10 @@ const MindMapFloatingBar: React.FC = () => {
             const tpcEl = getTpc();
             if (!tpcEl) return;
             mind.selectNode(tpcEl);
-            await mind.addChild(tpcEl, cleanMindMapChildNode({ label: topic }, mind.generateNewObj?.().id ?? `n_${Date.now()}`));
+            await mind.addChild(
+                tpcEl,
+                cleanMindMapChildNode({ label: topic }, mind.generateNewObj?.().id),
+            );
         } catch (error) {
             logMindMapFloatingActionFailure('applySuggestion', error);
         }

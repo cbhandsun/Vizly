@@ -64,18 +64,21 @@ const MindMapNode = ({ id, data, isConnectable, selected }: NodeProps<Node<MindM
     const progress = data?.progress as (0 | 25 | 50 | 75 | 100) | undefined;
     
     // Inline Edit State
-    const [isEditing, setIsEditing] = useState(false);
-    const [editValue, setEditValue] = useState(data?.label || '');
+    const [isEditing, setIsEditing] = useState(Boolean(data?.isNew));
+    const [editDraft, setEditDraft] = useState<string | null>(data?.isNew ? '' : null);
+    const editValue = editDraft ?? data?.label ?? '';
+    const [processedNewNodeId, setProcessedNewNodeId] = useState<string | null>(
+        data?.isNew ? id : null,
+    );
+    if (data?.isNew && processedNewNodeId !== id) {
+        setProcessedNewNodeId(id);
+        setEditDraft('');
+        setIsEditing(true);
+    } else if (!data?.isNew && processedNewNodeId === id) {
+        setProcessedNewNodeId(null);
+    }
     const inputRef = useRef<HTMLInputElement>(null);
     const { updateNodeData } = useReactFlow();
-
-    // Sync editValue when label changes externally (e.g. via undo/redo or outline panel)
-    useEffect(() => {
-        if (!isEditing) {
-            setEditValue(data?.label || '');
-        }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [data?.label]);
 
     useEffect(() => {
         if (isEditing && inputRef.current) {
@@ -91,8 +94,6 @@ const MindMapNode = ({ id, data, isConnectable, selected }: NodeProps<Node<MindM
 
     useEffect(() => {
         if (data?.isNew) {
-            setEditValue(''); // Start fresh for new nodes
-            setIsEditing(true);
             updateNodeData(id, { isNew: undefined });
         }
     }, [data?.isNew, id, updateNodeData]);
@@ -116,6 +117,7 @@ const MindMapNode = ({ id, data, isConnectable, selected }: NodeProps<Node<MindM
         if (isEditing) {
             setIsEditing(false);
             updateNodeData(id, { label: editValue });
+            setEditDraft(null);
         }
     };
 
@@ -133,7 +135,7 @@ const MindMapNode = ({ id, data, isConnectable, selected }: NodeProps<Node<MindM
         } else if (e.key === 'Escape') {
             e.stopPropagation();
             setIsEditing(false);
-            setEditValue(data?.label || '');
+            setEditDraft(null);
         }
     };
 
@@ -150,7 +152,11 @@ const MindMapNode = ({ id, data, isConnectable, selected }: NodeProps<Node<MindM
         <div 
             className={`mindmap-node depth-${depth} shape-${shape} ${selected ? 'selected' : ''} ${collapsed ? 'collapsed' : ''}`}
             style={themeStyle}
-            onDoubleClick={(e) => { e.stopPropagation(); setIsEditing(true); }}
+            onDoubleClick={(e) => {
+                e.stopPropagation();
+                setEditDraft(data?.label || '');
+                setIsEditing(true);
+            }}
         >
             <NodeToolbar isVisible={selected} position={Position.Top} offset={8}>
                 <MindMapActionBar />
@@ -187,7 +193,7 @@ const MindMapNode = ({ id, data, isConnectable, selected }: NodeProps<Node<MindM
                             ref={inputRef}
                             className="mindmap-inline-input"
                             value={editValue}
-                            onChange={(e) => setEditValue(e.target.value)}
+                            onChange={(e) => setEditDraft(e.target.value)}
                             onBlur={handleSave}
                             onKeyDown={handleKeyDown}
                             onClick={(e) => e.stopPropagation()}

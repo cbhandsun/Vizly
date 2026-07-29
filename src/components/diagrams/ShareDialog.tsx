@@ -99,12 +99,16 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
     }, [open, effectiveId]);
 
     useEffect(() => {
-        if (open) {
-            loadShares();
-            loadCollaborators();
+        if (!open) return;
+        let cancelled = false;
+        queueMicrotask(() => {
+            if (cancelled) return;
+            void loadShares();
+            void loadCollaborators();
             setJustCopiedUrl(null);
             setInviteStatus('idle');
-        }
+        });
+        return () => { cancelled = true; };
     }, [open, loadShares, loadCollaborators]);
 
     // ===== Link Tab Actions =====

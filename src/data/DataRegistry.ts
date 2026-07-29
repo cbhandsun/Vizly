@@ -17,6 +17,7 @@ import {
   logLocalDiagramLoadFailure,
   logRemoteTemplateFetchFailure,
 } from './dataRegistryLogging';
+import { getDiagramCollectionIssues } from './dataRegistryValidation';
 
 // 导入标准化数据
 import enterpriseArchitectureData from './standardized/ArchitectureStandardData.json';
@@ -252,11 +253,12 @@ export class DataRegistry {
 
     // 验证每个图表的数据完整性
     for (const diagram of allDiagrams.data) {
-      if (!diagram.nodes || diagram.nodes.length === 0) {
+      const issues = getDiagramCollectionIssues(diagram);
+      if (issues.missingNodes) {
         logDiagramMissingNodes(diagram.name);
       }
       
-      if (!diagram.edges || diagram.edges.length === 0) {
+      if (issues.missingEdges) {
         logDiagramMissingEdges(diagram.name);
       }
     }

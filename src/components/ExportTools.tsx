@@ -16,6 +16,11 @@ import { logCloudSaveEnsureFailure, logCloudSaveFailure } from '@/components/dia
 import { downloadFile } from '@/core/utils/downloadUtils';
 import { escapeMarkdownInlineText, escapeMarkdownTableCell, escapeMermaidLabel, toMermaidNodeId } from '@/core/utils/exportTextSecurity';
 import type { StandardDiagramData } from '@/core/models/DiagramModels';
+import {
+  parseDiagramExportEventDetail,
+  parseDiagramExportProgressEventDetail,
+  readDiagramExportEventDetail,
+} from './diagramExportEvent';
 
 const ShareDialog = React.lazy(() => import('@/components/diagrams/ShareDialog'));
 const CloudStorageManagerModal = React.lazy(() => import('@/components/storage/CloudStorageManagerModal').then(async (m) => {
@@ -96,31 +101,30 @@ const ExportTools: React.FC<ExportToolsProps> = ({
     };
 
     const handleStart = (e: Event) => {
-      const ce = e as CustomEvent<{ diagramId: string; type: 'png' | 'pdf' | 'svg' | 'gif' }>;
-      if (!ce.detail || !matchesEvent(ce.detail.diagramId)) return;
+      const detail = parseDiagramExportEventDetail(readDiagramExportEventDetail(e));
+      if (!detail || !matchesEvent(detail.diagramId)) return;
       setIsExporting(true);
-      setExportType(ce.detail.type);
+      setExportType(detail.type);
       setExportProgress(0);
     };
 
     const handleProgress = (e: Event) => {
-      const ce = e as CustomEvent<{ diagramId: string; type: 'gif'; progress: number; frameIndex?: number; frameCount?: number; stage?: string }>;
-      if (!ce.detail || !matchesEvent(ce.detail.diagramId)) return;
-      if (ce.detail.type !== 'gif') return;
-      setExportProgress(Math.min(1, Math.max(0, ce.detail.progress ?? 0)));
+      const detail = parseDiagramExportProgressEventDetail(readDiagramExportEventDetail(e));
+      if (!detail || !matchesEvent(detail.diagramId)) return;
+      setExportProgress(detail.progress);
     };
 
     const handleComplete = (e: Event) => {
-      const ce = e as CustomEvent<{ diagramId: string; type: 'png' | 'pdf' | 'svg' | 'gif' }>;
-      if (!ce.detail || !matchesEvent(ce.detail.diagramId)) return;
+      const detail = parseDiagramExportEventDetail(readDiagramExportEventDetail(e));
+      if (!detail || !matchesEvent(detail.diagramId)) return;
       setIsExporting(false);
       setExportType(null);
       setExportProgress(0);
     };
 
     const handleError = (e: Event) => {
-      const ce = e as CustomEvent<{ diagramId: string; type: 'png' | 'pdf' | 'svg' | 'gif'; error?: unknown }>;
-      if (!ce.detail || !matchesEvent(ce.detail.diagramId)) return;
+      const detail = parseDiagramExportEventDetail(readDiagramExportEventDetail(e));
+      if (!detail || !matchesEvent(detail.diagramId)) return;
       setIsExporting(false);
       setExportType(null);
       setExportProgress(0);
@@ -145,8 +149,13 @@ const ExportTools: React.FC<ExportToolsProps> = ({
       setExportType(type);
       await waitForNextPaint();
       await fn();
+      appMessage.success(t('export.success', { format: type.toUpperCase() }));
+    } catch {
+      appMessage.error(t('export.failed', { format: type.toUpperCase() }));
     } finally {
-      // 状态重置由事件监听处理，这里仅作为 fallback
+      setIsExporting(false);
+      setExportType(null);
+      setExportProgress(0);
     }
   };
 
@@ -326,7 +335,7 @@ ${mermaid}
     } finally {
       hide();
     }
-  }, [diagramId, diagramName, t, user?.id, hasFeature, showUpgradeModal, reactFlowInstance]);
+  }, [diagramId, diagramName, t, user, hasFeature, showUpgradeModal, reactFlowInstance]);
 
   // 确保图表已保存到云端（供 ShareDialog 使用），返回云端 UUID
   const handleEnsureSaved = useCallback(async (): Promise<string | false> => {
@@ -339,7 +348,7 @@ ${mermaid}
     }
   }, [diagramId, handleSaveToCloud]);
 
-  const items: MenuProps['items'] = [
+  const fileExportItems: MenuProps['items'] = [
     {
       key: 'png',
       label: t('export.png'),
@@ -370,14 +379,13 @@ ${mermaid}
     },
     {
       key: 'markdown',
-      label: 'Markdown 文档 (.md)',
+      label: t('export.markdown'),
       icon: <FaFileCode />,
       onClick: handleExportMarkdown,
       disabled: isExporting
     },
-    {
-      type: 'divider',
-    },
+  ];
+  const cloudItems: MenuProps['items'] = [
     {
       key: 'cloud',
       label: t('export.saveToCloud'),
@@ -399,6 +407,21 @@ ${mermaid}
       onClick: () => setShareDialogOpen(true),
       disabled: isExporting
     }
+  ];
+  const items: MenuProps['items'] = [
+    {
+      key: 'file-export-group',
+      type: 'group',
+      label: t('export.fileGroup'),
+      children: fileExportItems,
+    },
+    { type: 'divider' },
+    {
+      key: 'cloud-group',
+      type: 'group',
+      label: t('export.cloudGroup'),
+      children: cloudItems,
+    },
   ];
 
   return (

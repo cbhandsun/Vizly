@@ -3,7 +3,7 @@ import App from 'antd/es/app';
 import type { MenuProps } from 'antd/es/menu';
 import { coerceDiagramId, getQueryOrHashParamFromLocation, type LocationLike } from '@/core/utils/inputBoundary';
 import { Cloud, Database, ExternalLink, Pencil, Trash2, User } from 'lucide-react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router';
 import type { ManageStorageProvider } from '@/components/ui/ManageTopToolbar';
 import { useAuth } from '@/context/useAuth';
 import {
@@ -110,7 +110,11 @@ const WorkspaceDashboardPage: React.FC = () => {
     }, [activeView, cloudProvider, user]);
 
     useEffect(() => {
-        loadAllData();
+        let cancelled = false;
+        queueMicrotask(() => {
+            if (!cancelled) void loadAllData();
+        });
+        return () => { cancelled = true; };
     }, [loadAllData]);
 
     // --- Actions ---

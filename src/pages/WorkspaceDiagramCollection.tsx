@@ -1,6 +1,7 @@
 import React from 'react';
 import Dropdown from 'antd/es/dropdown';
 import type { MenuProps } from 'antd/es/menu';
+import { useTranslation } from 'react-i18next';
 import {
   ArrowUpAZ,
   Blocks,
@@ -22,6 +23,7 @@ import {
 
 import { coerceDiagramId } from '@/core/utils/inputBoundary';
 import { coerceRemoteTemplateMetadata } from '@/core/utils/remoteTemplateMetadata';
+import type { StandardDiagramData } from '@/core/models/DiagramModels';
 import {
   detectDiagramType,
   getNodeCount,
@@ -35,6 +37,7 @@ import { DiagramCardSkeleton } from './DiagramCardSkeleton';
 import { WorkspaceEmptyState } from './WorkspaceEmptyState';
 
 const RemoteDiagramCover = React.lazy(() => import('@/components/shared/RemoteDiagramCover'));
+const LocalDiagramCover = React.lazy(() => import('./LocalDiagramCover'));
 
 const TYPE_ICON_MAP: Record<string, React.ReactNode> = {
   flowchart: <Workflow size={18} strokeWidth={2} />,
@@ -66,16 +69,21 @@ interface WorkspaceDiagramCollectionProps {
   onCreateBlank: () => void;
 }
 
-const formatTimeAgo = (timestamp: number): string => {
-  if (!Number.isFinite(timestamp) || timestamp < 0) return 'Unknown';
+const formatTimeAgo = (
+  timestamp: number,
+  locale: string,
+  unknownLabel: string,
+): string => {
+  if (!Number.isFinite(timestamp) || timestamp < 0) return unknownLabel;
   const minutes = Math.max(0, Math.floor((Date.now() - timestamp) / 60_000));
-  if (minutes < 1) return 'Just now';
-  if (minutes < 60) return `${minutes} min ago`;
+  const relative = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
+  if (minutes < 1) return relative.format(0, 'minute');
+  if (minutes < 60) return relative.format(-minutes, 'minute');
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} hr ago`;
+  if (hours < 24) return relative.format(-hours, 'hour');
   const days = Math.floor(hours / 24);
-  if (days < 30) return `${days} days ago`;
-  return new Date(timestamp).toLocaleDateString();
+  if (days < 30) return relative.format(-days, 'day');
+  return new Date(timestamp).toLocaleDateString(locale);
 };
 
 export const WorkspaceDiagramCollection = ({
@@ -94,20 +102,23 @@ export const WorkspaceDiagramCollection = ({
   onDeleteDiagram,
   onCreateBlank,
 }: WorkspaceDiagramCollectionProps) => {
+  const { t, i18n } = useTranslation();
+  const locale = i18n.resolvedLanguage || i18n.language || 'en';
+  const unknownTime = t('workspace.unknownTime');
   const localCount = unifiedItems.filter(item => item.source === 'local').length;
   const cloudCount = unifiedItems.filter(item => item.source === 's3' || item.source === 'supabase').length;
   const sharedCount = unifiedItems.filter(item => item.role === 'viewer').length;
 
   const getCardMenu = (item: UnifiedDiagramItem): MenuProps['items'] => {
     if (isTemplateItem(item)) {
-      return [{ key: 'apply_template', label: '🚀 应用此模版', icon: <Copy size={16} strokeWidth={2} /> }];
+      return [{ key: 'apply_template', label: t('workspace.applyTemplate'), icon: <Copy size={16} strokeWidth={2} /> }];
     }
     const items: MenuProps['items'] = [
-      { key: 'open_new', label: 'Open in new tab', icon: <Share2 size={16} strokeWidth={2} /> },
+      { key: 'open_new', label: t('workspace.openInNewTab'), icon: <Share2 size={16} strokeWidth={2} /> },
     ];
     if (item.role === 'owner') {
       items.push({ type: 'divider' });
-      items.push({ key: 'delete', danger: true, label: 'Delete', icon: <Trash2 size={16} strokeWidth={2} /> });
+      items.push({ key: 'delete', danger: true, label: t('common.delete'), icon: <Trash2 size={16} strokeWidth={2} /> });
     }
     return items;
   };
@@ -128,27 +139,27 @@ export const WorkspaceDiagramCollection = ({
                     <div className="workspace-matrix-header">
                         <div className="workspace-filter-tabs">
                             <button type="button" className={`filter-tab ${activeView === 'recent' ? 'active' : ''}`} onClick={() => onActiveViewChange('recent')}>
-                                <Clock size={14} strokeWidth={2} /> Recent
+                                <Clock size={14} strokeWidth={2} /> {t('workspace.recent')}
                                 <span className="filter-tab-count">{unifiedItems.filter(i => i.source !== 'template' && i.source !== 'general_template').length}</span>
                             </button>
                             <button type="button" className={`filter-tab ${activeView === 'local' ? 'active' : ''}`} onClick={() => onActiveViewChange('local')}>
-                                <Laptop size={14} strokeWidth={2} /> Local
+                                <Laptop size={14} strokeWidth={2} /> {t('workspace.local')}
                                 <span className="filter-tab-count">{localCount}</span>
                             </button>
                             <button type="button" className={`filter-tab ${activeView === 'cloud' ? 'active' : ''}`} onClick={() => onActiveViewChange('cloud')}>
-                                <Cloud size={14} strokeWidth={2} /> Cloud
+                                <Cloud size={14} strokeWidth={2} /> {t('workspace.cloud')}
                                 <span className="filter-tab-count">{cloudCount}</span>
                             </button>
                             <button type="button" className={`filter-tab ${activeView === 'shared' ? 'active' : ''}`} onClick={() => onActiveViewChange('shared')}>
-                                <Share2 size={14} strokeWidth={2} /> Shared
+                                <Share2 size={14} strokeWidth={2} /> {t('workspace.shared')}
                                 <span className="filter-tab-count">{sharedCount}</span>
                             </button>
                             <button type="button" className={`filter-tab ${activeView === 'templates' ? 'active' : ''}`} onClick={() => onActiveViewChange('templates')}>
-                                <LayoutGrid size={14} strokeWidth={2} /> 行业模板库
+                                <LayoutGrid size={14} strokeWidth={2} /> {t('workspace.industryTemplates')}
                                 <span className="filter-tab-count">{unifiedItems.filter(i => i.source === 'template').length}</span>
                             </button>
                             <button type="button" className={`filter-tab ${activeView === 'general_templates' ? 'active' : ''}`} onClick={() => onActiveViewChange('general_templates')}>
-                                <Blocks size={14} strokeWidth={2} /> 通用模版
+                                <Blocks size={14} strokeWidth={2} /> {t('workspace.generalTemplates')}
                                 <span className="filter-tab-count">{unifiedItems.filter(i => i.source === 'general_template').length}</span>
                             </button>
                         </div>
@@ -157,30 +168,36 @@ export const WorkspaceDiagramCollection = ({
                             <Dropdown
                                 menu={{
                                     items: [
-                                        { key: 'updated', label: '📅 Last modified', onClick: () => onSortKeyChange('updated') },
-                                        { key: 'name', label: '🔤 Name', onClick: () => onSortKeyChange('name') },
-                                        { key: 'type', label: '📊 Type', onClick: () => onSortKeyChange('type') },
+                                        { key: 'updated', label: t('workspace.lastModified'), onClick: () => onSortKeyChange('updated') },
+                                        { key: 'name', label: t('workspace.name'), onClick: () => onSortKeyChange('name') },
+                                        { key: 'type', label: t('workspace.type'), onClick: () => onSortKeyChange('type') },
                                     ],
                                     selectedKeys: [sortKey]
                                 }}
                                 trigger={['click']}
                             >
-                                <button className="workspace-icon-btn" title="Sort by">
+                                <button type="button" className="workspace-icon-btn" title={t('workspace.sortBy')} aria-label={t('workspace.sortBy')}>
                                     <ArrowUpAZ size={16} strokeWidth={2} />
                                 </button>
                             </Dropdown>
                             <div className="view-toggle">
                                 <button
+                                    type="button"
                                     className={`view-toggle-btn ${viewMode === 'grid' ? 'active' : ''}`}
                                     onClick={() => onViewModeChange('grid')}
-                                    title="Grid view"
+                                    title={t('workspace.gridView')}
+                                    aria-label={t('workspace.gridView')}
+                                    aria-pressed={viewMode === 'grid'}
                                 >
                                     <LayoutGrid size={16} strokeWidth={2} />
                                 </button>
                                 <button
+                                    type="button"
                                     className={`view-toggle-btn ${viewMode === 'list' ? 'active' : ''}`}
                                     onClick={() => onViewModeChange('list')}
-                                    title="List view"
+                                    title={t('workspace.listView')}
+                                    aria-label={t('workspace.listView')}
+                                    aria-pressed={viewMode === 'list'}
                                 >
                                     <List size={16} strokeWidth={2} />
                                 </button>
@@ -203,13 +220,19 @@ export const WorkspaceDiagramCollection = ({
 
                                 if (viewMode === 'list') {
                                     return (
-                                        <div className="diagram-list-row" key={item.id} onClick={() => onOpenDiagram(item)} onContextMenu={(e) => onContextMenu(e, item)}>
+                                        <article className="diagram-list-row" key={item.id} onContextMenu={(e) => onContextMenu(e, item)}>
+                                            <button
+                                                type="button"
+                                                className="diagram-list-primary-action"
+                                                onClick={() => onOpenDiagram(item)}
+                                                aria-label={t('workspace.openDiagram', { title: item.title })}
+                                            />
                                             <div className={`list-row-icon type-${diagramType}`}>
                                                 {TYPE_ICON_MAP[diagramType] || TYPE_ICON_MAP.default}
                                             </div>
                                             <div className="list-row-title">{item.title}</div>
                                             <span className={`type-badge ${diagramType}`}>{diagramType}</span>
-                                            <span className="list-row-time">{formatTimeAgo(item.updatedAt)}</span>
+                                            <span className="list-row-time">{formatTimeAgo(item.updatedAt, locale, unknownTime)}</span>
                                             {nodeCount != null && (
                                                 <span className="node-count-chip"><Boxes size={14} strokeWidth={2} /> {nodeCount}</span>
                                             )}
@@ -219,21 +242,27 @@ export const WorkspaceDiagramCollection = ({
                                                     trigger={['click']}
                                                     placement="bottomRight"
                                                 >
-                                                    <button className="action-btn-glass" onClick={e => e.stopPropagation()}>
+                                                    <button type="button" className="action-btn-glass" onClick={e => e.stopPropagation()} aria-label={t('workspace.moreActions', { title: item.title })}>
                                                         <Ellipsis size={16} strokeWidth={2} />
                                                     </button>
                                                 </Dropdown>
                                             </div>
-                                        </div>
+                                        </article>
                                     );
                                 }
 
                                 return (
-                                    <div className="diagram-card" key={item.id}
-                                        onClick={() => !isTemplateItem(item) && onOpenDiagram(item)}
-                                        style={{ cursor: isTemplateItem(item) ? 'default' : 'pointer' }}
+                                    <article className="diagram-card" key={item.id}
                                         onContextMenu={(e) => onContextMenu(e, item)}
                                     >
+                                        <button
+                                            type="button"
+                                            className="diagram-card-primary-action"
+                                            onClick={() => onOpenDiagram(item)}
+                                            aria-label={isTemplateItem(item)
+                                                ? t('workspace.applyNamedTemplate', { title: item.title })
+                                                : t('workspace.openDiagram', { title: item.title })}
+                                        />
                                         {/* Source badge */}
                                         {item.source !== 'local' && (
                                             <div className={`source-badge ${item.source}`}>
@@ -252,7 +281,7 @@ export const WorkspaceDiagramCollection = ({
                                                 trigger={['click']}
                                                 placement="bottomRight"
                                             >
-                                                <button className="action-btn-glass" onClick={e => e.stopPropagation()}>
+                                                <button type="button" className="action-btn-glass" onClick={e => e.stopPropagation()} aria-label={t('workspace.moreActions', { title: item.title })}>
                                                     <Ellipsis size={16} strokeWidth={2} />
                                                 </button>
                                             </Dropdown>
@@ -261,11 +290,25 @@ export const WorkspaceDiagramCollection = ({
                                         <div className="diagram-card-cover">
                                             <div className="diagram-card-cover-inner">
                                                 {item.source === 'local' ? (
-                                                    <div className={`diagram-card-type-cover type-${diagramType}`}>
-                                                        <span className="type-cover-icon">
-                                                            {TYPE_ICON_MAP[diagramType] || TYPE_ICON_MAP.default}
-                                                        </span>
-                                                    </div>
+                                                    <React.Suspense fallback={(
+                                                        <div className={`diagram-card-type-cover type-${diagramType}`}>
+                                                            <span className="type-cover-icon">
+                                                                {TYPE_ICON_MAP[diagramType] || TYPE_ICON_MAP.default}
+                                                            </span>
+                                                        </div>
+                                                    )}>
+                                                        <LocalDiagramCover
+                                                            diagram={item.raw as StandardDiagramData}
+                                                            alt={item.title}
+                                                            fallback={(
+                                                                <div className={`diagram-card-type-cover type-${diagramType}`}>
+                                                                    <span className="type-cover-icon">
+                                                                        {TYPE_ICON_MAP[diagramType] || TYPE_ICON_MAP.default}
+                                                                    </span>
+                                                                </div>
+                                                            )}
+                                                        />
+                                                    </React.Suspense>
                                                 ) : (item.source === 'template' || item.source === 'general_template') ? (
                                                     (() => {
                                                         const metadata = coerceRemoteTemplateMetadata(asRecord(item.raw));
@@ -323,10 +366,10 @@ export const WorkspaceDiagramCollection = ({
                                                 })()}
                                                 {/* 模版封面 hover 遮罩：显示「应用」按钮 */}
                                                 {isTemplateItem(item) && (
-                                                    <div className="template-apply-overlay" onClick={() => onOpenDiagram(item)}>
-                                                        <button className="template-apply-btn">
-                                                            <Copy size={16} strokeWidth={2} /> 应用模版
-                                                        </button>
+                                                    <div className="template-apply-overlay" aria-hidden="true">
+                                                        <span className="template-apply-btn">
+                                                            <Copy size={16} strokeWidth={2} /> {t('workspace.applyTemplate')}
+                                                        </span>
                                                     </div>
                                                 )}
                                             </div>
@@ -338,17 +381,17 @@ export const WorkspaceDiagramCollection = ({
                                                     <span className={`type-badge ${diagramType}`}>
                                                         {diagramType}
                                                     </span>
-                                                    <span>{formatTimeAgo(item.updatedAt)}</span>
+                                                    <span>{formatTimeAgo(item.updatedAt, locale, unknownTime)}</span>
                                                 </div>
                                                 {nodeCount != null && (
                                                     <span className="node-count-chip">
                                                         <Boxes size={14} strokeWidth={2} /> {nodeCount}
                                                     </span>
                                                 )}
-                                                {item.role === 'viewer' && <span style={{ color: '#8b5cf6', fontWeight: 600, fontSize: 11 }}>Shared</span>}
+                                                {item.role === 'viewer' && <span style={{ color: '#8b5cf6', fontWeight: 600, fontSize: 11 }}>{t('workspace.shared')}</span>}
                                             </div>
                                         </div>
-                                    </div>
+                                    </article>
                                 );
                             })}
                         </div>

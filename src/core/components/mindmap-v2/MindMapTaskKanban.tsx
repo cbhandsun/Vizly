@@ -14,25 +14,13 @@ import {
 import { Clock } from 'lucide-react';
 import {
     applyTaskMeta,
-    getTaskMeta,
     type MindMapTaskMeta,
     type TaskPriority,
     type TaskStatus,
 } from './mindmapTaskModel';
 import { cleanMindMapNodePatch } from './mindmapNodePatchSecurity';
 import { logMindmapKanbanRefreshFailure } from './mindmapPanelLogging';
-
-interface KanbanTask {
-    id: string;
-    topic: string;
-    note?: string;
-    status: TaskStatus;
-    priority: TaskPriority;
-    dueDate?: string;
-    assignee?: string;
-    progress?: number;
-    ancestors: string[];
-}
+import { extractKanbanTasks, type KanbanTask } from './mindmapKanbanTasks';
 type TaskNode = NodeObj & { task?: MindMapTaskMeta };
 
 const reshapeTaskNode = (
@@ -55,50 +43,24 @@ export const MindMapTaskKanban: React.FC = () => {
     useEffect(() => subscribeMindElixir(m => setMind(m)), []);
     useEffect(() => subscribeKanban(o => setOpen(o)), []);
 
-    // 深度遍历，找出叶子节点及祖先路径
-    const extractTasksFromTree = useCallback((node: NodeObj, ancestors: string[] = []): KanbanTask[] => {
-        const currentAncestors = [...ancestors, node.topic];
-        const hasTaskMeta = Boolean((node as TaskNode).task);
-        const isLeaf = !node.children || node.children.length === 0;
-
-        if (isLeaf || hasTaskMeta) {
-            const task = getTaskMeta(node);
-
-            return [{
-                id: node.id,
-                topic: node.topic || '(无标题)',
-                note: node.note,
-                status: task.status,
-                priority: task.priority,
-                dueDate: task.dueDate,
-                assignee: task.assignee,
-                progress: task.progress,
-                ancestors: ancestors
-            }];
-        }
-
-        let result: KanbanTask[] = [];
-        for (const child of node.children || []) {
-            result = result.concat(extractTasksFromTree(child, currentAncestors));
-        }
-        return result;
-    }, []);
-
     const refreshTasks = useCallback(() => {
         if (!mind) return;
         try {
             const data = mind.getData();
-            const leafTasks = extractTasksFromTree(data.nodeData);
+            const leafTasks = extractKanbanTasks(data.nodeData);
             setTasks(leafTasks);
         } catch (err) {
             logMindmapKanbanRefreshFailure(err);
         }
-    }, [mind, extractTasksFromTree]);
+    }, [mind]);
 
     // 监听脑图变化，同步刷新看板
     useEffect(() => {
         if (!mind || !open) return;
-        refreshTasks();
+        let cancelled = false;
+        queueMicrotask(() => {
+            if (!cancelled) refreshTasks();
+        });
 
         const handleOp = () => {
             setTimeout(refreshTasks, 80);
@@ -106,6 +68,7 @@ export const MindMapTaskKanban: React.FC = () => {
 
         mind.bus.addListener('operation', handleOp);
         return () => {
+            cancelled = true;
             mind?.bus?.removeListener('operation', handleOp);
         };
     }, [mind, open, refreshTasks]);

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { TFunction } from 'i18next';
-import type { NavigateFunction } from 'react-router-dom';
+import type { NavigateFunction } from 'react-router';
 
 import { readRecentCommandIds } from '@/core/components/ui/commandPaletteStorage';
 import {

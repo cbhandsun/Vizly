@@ -97,7 +97,9 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
     const [taskAssignee, setTaskAssignee] = useState(initialTask.assignee ?? '');
     const [taskProgress, setTaskProgress] = useState(initialTask.progress ?? 0);
 
-    useEffect(() => {
+    const [syncedNodeId, setSyncedNodeId] = useState(node.id);
+    if (syncedNodeId !== node.id) {
+        setSyncedNodeId(node.id);
         setTopic(cleanMindMapTopic(node.topic, ''));
         setFontSize(parseFontSize(node));
         setTextColor(cleanMindMapColor(node.style?.color) ?? '');
@@ -116,8 +118,7 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
         setTaskDueDate(task.dueDate ?? '');
         setTaskAssignee(task.assignee ?? '');
         setTaskProgress(task.progress ?? 0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [node.id]);
+    }
 
     const reshape = useCallback((patch: MindMapNodePatch) => {
         if (!mind) return;

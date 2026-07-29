@@ -450,6 +450,26 @@ html[data-theme='dark'] .view-toggle-btn.active {
   animation: cardBlurIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) backwards;
 }
 
+.diagram-card-primary-action,
+.diagram-list-primary-action {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  z-index: 4;
+}
+
+.diagram-card-primary-action:focus-visible,
+.diagram-list-primary-action:focus-visible {
+  outline: 3px solid var(--vz-brand-from);
+  outline-offset: -3px;
+  border-radius: inherit;
+}
+
 /* Generate stagger delays for first 12 cards */
 .diagram-card:nth-child(1) { animation-delay: 0.02s; }
 .diagram-card:nth-child(2) { animation-delay: 0.05s; }
@@ -510,6 +530,25 @@ html[data-theme='dark'] .diagram-card:hover {
   width: 100%;
   height: 100%;
   transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.local-diagram-cover-image,
+.local-diagram-cover-empty {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.local-diagram-cover-image {
+  object-fit: contain;
+  padding: 8px;
+  background: color-mix(in srgb, var(--vz-surface-solid) 94%, var(--vz-brand-from));
+}
+
+.local-diagram-cover-empty {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -703,7 +742,7 @@ html[data-theme='dark'] .diagram-card-type-cover::after {
   gap: 6px;
   opacity: 0;
   transition: opacity 0.2s ease;
-  z-index: 2;
+  z-index: 5;
 }
 
 .diagram-card:hover .diagram-card-actions {
@@ -783,6 +822,7 @@ html[data-theme='dark'] .source-badge {
   transition: opacity 0.22s ease;
   z-index: 3;
   cursor: pointer;
+  pointer-events: none;
 }
 
 .diagram-card:hover .template-apply-overlay {
@@ -1060,6 +1100,11 @@ html[data-theme='dark'] .workspace-empty-tip kbd {
   cursor: pointer;
   transition: all 0.2s ease;
   animation: cardBlurIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  position: relative;
+}
+
+.diagram-list-row > :not(.diagram-list-primary-action):not(.diagram-card-actions) {
+  pointer-events: none;
 }
 
 .diagram-list-row:hover {

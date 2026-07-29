@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, lazy, useMemo, useCallback } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useDiagramControls } from '@/core/hooks/useDiagramControls';
 import { useUIState } from '@/core/hooks/useUIState';
@@ -233,37 +233,33 @@ const DiagramViewer: React.FC = () => {
         exportToGIF,
     } = useDiagramControls(selectedDiagramId, true, { getReactFlowSnapshot });
     const selectedDiagram = diagramDefinitions.find(d => d.id === selectedDiagramId);
-    const [sessionDocType, setSessionDocType] = useState<string | undefined>();
+    const [loadedDocType, setLoadedDocType] = useState<{
+        diagramId: string;
+        type?: string;
+    } | null>(null);
 
     useEffect(() => {
         let cancelled = false;
-        if (!selectedDiagramId || selectedDiagram) {
-            setSessionDocType(undefined);
-            return;
-        }
-        if (PLUGIN_EMPTY_CANVAS_IDS.has(selectedDiagramId)) {
-            setSessionDocType(selectedDiagramId);
-            return;
-        }
-        const standardPresetDocType = getStandardPresetDocTypeById(selectedDiagramId);
-        if (standardPresetDocType) {
-            setSessionDocType(standardPresetDocType);
-            return;
-        }
+        if (!selectedDiagramId || selectedDiagram) return;
+        if (PLUGIN_EMPTY_CANVAS_IDS.has(selectedDiagramId)) return;
+        if (getStandardPresetDocTypeById(selectedDiagramId)) return;
 
         void import('@/data/DataRegistry').then(async ({ dataRegistry }) => {
             await dataRegistry.initialize();
             if (cancelled) return;
             try {
                 const dataService = dataRegistry.getDataService();
-                setSessionDocType(dataService.getDiagram(selectedDiagramId)?.type);
+                setLoadedDocType({
+                    diagramId: selectedDiagramId,
+                    type: dataService.getDiagram(selectedDiagramId)?.type,
+                });
             } catch (error) {
                 logDiagramViewerDocTypeDetectionFailure(selectedDiagramId, error);
-                setSessionDocType(undefined);
+                setLoadedDocType({ diagramId: selectedDiagramId, type: undefined });
             }
         }).catch((error) => {
             logDiagramViewerDocTypeDetectionFailure(selectedDiagramId, error);
-            if (!cancelled) setSessionDocType(undefined);
+            if (!cancelled) setLoadedDocType({ diagramId: selectedDiagramId, type: undefined });
         });
 
         return () => { cancelled = true; };
@@ -275,9 +271,11 @@ const DiagramViewer: React.FC = () => {
         if (PLUGIN_EMPTY_CANVAS_IDS.has(selectedDiagramId)) return selectedDiagramId;
         const standardPresetDocType = getStandardPresetDocTypeById(selectedDiagramId);
         if (standardPresetDocType) return standardPresetDocType;
-        if (sessionDocType) return sessionDocType;
+        if (loadedDocType?.diagramId === selectedDiagramId && loadedDocType.type) {
+            return loadedDocType.type;
+        }
         return getDiagramDocTypeFromStorage(localStorage, selectedDiagramId);
-    }, [selectedDiagramId, selectedDiagram, sessionDocType]);
+    }, [loadedDocType, selectedDiagramId, selectedDiagram]);
 
     // Bridge: diagram.type → plugin registry ID
     // template type 值与 plugin.id 注册名之间存在历史差异，此映射表统一桥接
@@ -296,7 +294,7 @@ const DiagramViewer: React.FC = () => {
 
         // Fallback to FlowchartDesigner if not found
         return lazy(() => loadFlowchartDesigner(undefined, selectedDiagramId));
-    }, [selectedDiagram?.component, resolvedPluginId, selectedDiagramId]);
+    }, [selectedDiagram, resolvedPluginId, selectedDiagramId]);
 
     // 仅显示主流程（动线）开关状态（函数级注释）
     // - 将开关迁移到“更多”菜单中统一管理
@@ -443,6 +441,7 @@ const DiagramViewer: React.FC = () => {
         exportToPDF,
         exportToSVG,
         exportToGIF,
+        setCollabModalVisible,
     ]);
 
     /**

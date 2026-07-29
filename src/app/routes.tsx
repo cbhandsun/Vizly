@@ -1,6 +1,6 @@
 
 import React, { Suspense } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router';
 import { coerceSafeStringParam, getQueryOrHashParamFromLocation, type LocationLike, coerceDiagramId } from '@/core/utils/inputBoundary';
 import { loadDiagramViewerRoute } from './diagramViewerRouteLoader';
 

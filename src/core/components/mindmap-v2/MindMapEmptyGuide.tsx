@@ -72,9 +72,15 @@ const MindMapEmptyGuide: React.FC = () => {
 
     useEffect(() => {
         if (!mind) return;
-        checkEmpty();
+        let cancelled = false;
+        queueMicrotask(() => {
+            if (!cancelled) checkEmpty();
+        });
         mind.bus.addListener('operation', checkEmpty);
-        return () => { mind.bus.removeListener('operation', checkEmpty); };
+        return () => {
+            cancelled = true;
+            mind.bus.removeListener('operation', checkEmpty);
+        };
     }, [mind, checkEmpty]);
 
     // Also subscribe to mind instance changes

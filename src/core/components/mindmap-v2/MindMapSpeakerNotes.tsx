@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import type { NodeObj } from 'mind-elixir';
 import { getMindElixirInstance, getPresentationState, subscribePresentation } from './mindElixirStore';
 import { generateSpeakerNotes } from './mindmapAIService';
@@ -25,7 +25,60 @@ export const MindMapSpeakerNotes: React.FC = () => {
 
     // 缓存上一次请求的节点ID和语气，避免重复请求
     const lastRequestKeyRef = useRef<string>('');
+    const activeRequestKeyRef = useRef<string>('');
     const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const fetchNotes = useCallback(async (node: NodeObj, currentTone: string) => {
+        const nodeId = node.id;
+        const requestKey = `${nodeId}_${currentTone}`;
+        const noteText = node.note || undefined;
+        const childText = node.children && node.children.length > 0
+            ? node.children.map(c => c.topic).join('，')
+            : undefined;
+
+        activeRequestKeyRef.current = requestKey;
+        setLoading(true);
+        setError(null);
+
+        try {
+            const result = await generateSpeakerNotes(node.topic, noteText, childText, currentTone);
+            const presentation = getPresentationState();
+            if (
+                activeRequestKeyRef.current !== requestKey
+                || !presentation.isPresenting
+                || presentation.presentationNode?.id !== nodeId
+            ) {
+                return;
+            }
+
+            if ('error' in result) {
+                setError(result.error || '请求失败，请重试');
+                setNotes('');
+            } else {
+                setNotes(result.notes);
+                lastRequestKeyRef.current = requestKey;
+            }
+        } catch {
+            const presentation = getPresentationState();
+            if (
+                activeRequestKeyRef.current === requestKey
+                && presentation.isPresenting
+                && presentation.presentationNode?.id === nodeId
+            ) {
+                setError('请求失败，请重试');
+                setNotes('');
+            }
+        } finally {
+            const presentation = getPresentationState();
+            if (
+                activeRequestKeyRef.current === requestKey
+                && presentation.isPresenting
+                && presentation.presentationNode?.id === nodeId
+            ) {
+                setLoading(false);
+            }
+        }
+    }, []);
 
     // 订阅演示状态
     useEffect(() => {
@@ -33,6 +86,13 @@ export const MindMapSpeakerNotes: React.FC = () => {
             const state = getPresentationState();
             setIsPresenting(state.isPresenting);
             setCurrentNode(state.presentationNode);
+            if (!state.isPresenting || !state.presentationNode) {
+                activeRequestKeyRef.current = '';
+                lastRequestKeyRef.current = '';
+                setNotes('');
+                setError(null);
+                setLoading(false);
+            }
         };
         syncState();
         return subscribePresentation(syncState);
@@ -41,9 +101,6 @@ export const MindMapSpeakerNotes: React.FC = () => {
     // 监听节点或语气变化
     useEffect(() => {
         if (!isPresenting || !currentNode) {
-            setNotes('');
-            setError(null);
-            lastRequestKeyRef.current = '';
             return;
         }
 
@@ -60,12 +117,9 @@ export const MindMapSpeakerNotes: React.FC = () => {
             clearTimeout(debounceTimerRef.current);
         }
 
-        setLoading(true);
-        setError(null);
-
         // Debounce 400ms 请求 AI
         debounceTimerRef.current = setTimeout(() => {
-            fetchNotes(currentNode, tone);
+            void fetchNotes(currentNode, tone);
         }, 400);
 
         return () => {
@@ -73,40 +127,12 @@ export const MindMapSpeakerNotes: React.FC = () => {
                 clearTimeout(debounceTimerRef.current);
             }
         };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currentNode, tone, isPresenting]);
-
-    const fetchNotes = async (node: NodeObj, currentTone: string) => {
-        const nodeId = node.id;
-        const noteText = node.note || undefined;
-        const childText = node.children && node.children.length > 0
-            ? node.children.map(c => c.topic).join('，')
-            : undefined;
-
-        setLoading(true);
-        setError(null);
-
-        const result = await generateSpeakerNotes(node.topic, noteText, childText, currentTone);
-
-        // 如果用户在请求期间已经切换了节点，则丢弃该结果
-        if (currentNode?.id !== nodeId) {
-            return;
-        }
-
-        if ('error' in result) {
-            setError(result.error || '请求失败，请重试');
-            setNotes('');
-        } else {
-            setNotes(result.notes);
-            lastRequestKeyRef.current = `${nodeId}_${currentTone}`;
-        }
-        setLoading(false);
-    };
+    }, [currentNode, fetchNotes, tone, isPresenting]);
 
     const handleRetry = () => {
         if (!currentNode) return;
         lastRequestKeyRef.current = ''; // 清空缓存以强制重新生成
-        fetchNotes(currentNode, tone);
+        void fetchNotes(currentNode, tone);
     };
 
     const handleCopyNotes = async () => {

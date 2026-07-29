@@ -155,7 +155,11 @@ export function useVersionHistory(diagramId: string) {
 
     // Initial load
     useEffect(() => {
-        loadVersions();
+        let cancelled = false;
+        queueMicrotask(() => {
+            if (!cancelled) void loadVersions();
+        });
+        return () => { cancelled = true; };
     }, [loadVersions]);
 
     return {

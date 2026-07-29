@@ -1,8 +1,21 @@
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { WorkspaceDiagramCollection } from '../WorkspaceDiagramCollection';
 import type { UnifiedDiagramItem } from '../diagramManagementPage.helpers';
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, options?: { title?: string }) => {
+      if (key === 'workspace.unknownTime') return 'Unknown';
+      if (key === 'workspace.openDiagram') return `Open diagram ${options?.title ?? ''}`;
+      if (key === 'workspace.applyNamedTemplate') return `Use template ${options?.title ?? ''}`;
+      if (key === 'workspace.moreActions') return `More actions for ${options?.title ?? ''}`;
+      return key;
+    },
+    i18n: { language: 'en', resolvedLanguage: 'en' },
+  }),
+}));
 
 const renderCollection = (item: UnifiedDiagramItem): string => renderToStaticMarkup(
   <WorkspaceDiagramCollection

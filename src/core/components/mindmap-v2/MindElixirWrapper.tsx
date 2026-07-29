@@ -87,10 +87,13 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
     const [selectedNode, setSelectedNode] = useState<NodeObj | null>(null);
     const saveRef = useRef<() => void>(() => {});
 
-    // Keep save callback fresh without recreating the debounced fn
-    saveRef.current = useCallback(() => {
+    // Keep save callback fresh without recreating the debounced fn.
+    const saveCurrentMindMap = useCallback(() => {
         if (mindRef.current) saveMindElixirData(ctx, mindRef.current);
     }, [ctx]);
+    useEffect(() => {
+        saveRef.current = saveCurrentMindMap;
+    }, [saveCurrentMindMap]);
 
     const [ctxMenu, setCtxMenu] = useState<CtxPos>({ visible: false, x: 0, y: 0, nodeId: null });
     const [notePreview, setNotePreview] = useState<{ safeHtml: string; x: number; y: number } | null>(null);

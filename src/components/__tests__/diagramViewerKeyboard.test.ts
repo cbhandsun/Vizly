@@ -117,4 +117,33 @@ describe('diagramViewerKeyboard', () => {
 
     expect(onFullscreenExitFailure).toHaveBeenCalledTimes(1);
   });
+
+  it('does not duplicate shortcuts already handled by the active designer', () => {
+    const openCommandPalette = vi.fn();
+    const handler = createDiagramViewerGlobalKeydownHandler({
+      isPresentationMode: false,
+      isFullscreenActive: () => false,
+      exitFullscreen: vi.fn(),
+      onFullscreenExitFailure: vi.fn(),
+      toggleDebugPanel: vi.fn(),
+      openCommandPalette,
+      openSettings: vi.fn(),
+      triggerEditorCommand: vi.fn(),
+      triggerAi: vi.fn(),
+      triggerTheme: vi.fn(),
+      exitPresentation: vi.fn(),
+    });
+
+    handler({
+      key: 'k',
+      ctrlKey: true,
+      metaKey: false,
+      shiftKey: false,
+      altKey: false,
+      defaultPrevented: true,
+      preventDefault: vi.fn(),
+    } as unknown as KeyboardEvent);
+
+    expect(openCommandPalette).not.toHaveBeenCalled();
+  });
 });

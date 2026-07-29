@@ -9,7 +9,7 @@ import {
     TeamOutlined,
     CheckSquareOutlined
 } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { dataRegistry } from '../../data/DataRegistry';
 import { unifiedStorage } from '../../services/UnifiedStorageService';
 import { DiagramMetadata } from '../../services/storage/types';
@@ -102,11 +102,16 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
     // Initial Data Load
     useEffect(() => {
         if (!open) return;
-        if (activeTab === 'mine') {
-            void loadCloudDiagrams();
-        } else {
-            void loadSharedDiagrams();
-        }
+        let cancelled = false;
+        queueMicrotask(() => {
+            if (cancelled) return;
+            if (activeTab === 'mine') {
+                void loadCloudDiagrams();
+            } else {
+                void loadSharedDiagrams();
+            }
+        });
+        return () => { cancelled = true; };
     }, [activeTab, loadCloudDiagrams, loadSharedDiagrams, open]);
 
     const handleProviderChange = useCallback((value: 'supabase' | 's3') => {

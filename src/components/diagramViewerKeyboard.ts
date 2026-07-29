@@ -92,6 +92,10 @@ export const createDiagramViewerGlobalKeydownHandler = ({
   exitPresentation: () => void;
 }) => {
   return (event: KeyboardEvent) => {
+    if (event.defaultPrevented) {
+      return;
+    }
+
     const actions = resolveDiagramViewerKeyboardActions({
       event,
       isPresentationMode,

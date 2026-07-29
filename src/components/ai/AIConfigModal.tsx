@@ -32,11 +32,9 @@ import {
     resolveAIProviderEndpoint,
 } from '@/services/ai/aiProviderClient';
 import {
-    getAIConfig,
     loadCloudAIConfig,
     persistAIConfig,
     setRuntimeAIConfig,
-    type AIConfigState,
     type AIModel,
     type AIProviderConfig,
 } from './aiConfigStorage';
@@ -47,6 +45,7 @@ import {
     logAIConfigRequestFailure,
 } from './aiLogging';
 import { filterAIModels, filterAIProviders, groupAIModels } from './aiConfigModelCollections';
+import { useAIConfigModalConfig } from './useAIConfigModalConfig';
 
 const { Text, Title, Paragraph } = Typography;
 const loadStorageService = async () => (await import('@/services/SupabaseStorage')).storageService;
@@ -60,7 +59,7 @@ interface AIConfigModalProps {
 const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave }) => {
     const { t } = useTranslation();
     const { user } = useAuth();
-    const [config, setConfig] = useState<AIConfigState>(() => getAIConfig(user?.id));
+    const [config, setConfig] = useAIConfigModalConfig(open, user?.id);
     const [selectedProviderId, setSelectedProviderId] = useState<string>('global_settings');
     const [searchText, setSearchText] = useState('');
 
@@ -70,9 +69,6 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
 
     useEffect(() => {
         if (open) {
-            const loaded = getAIConfig(user?.id);
-            setConfig(loaded); // Load local first (fast)
-
             // Try to load from cloud if logged in
             if (user) {
                 loadCloudAIConfig(user.id).then((mergedConfig) => {
@@ -86,7 +82,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                 });
             }
         }
-    }, [open, user]);
+    }, [open, setConfig, user]);
 
     const handleSave = async () => {
         const invalidProvider = config.providers.find(p => p.enabled && p.baseUrl && !normalizeProviderBaseUrl(p.baseUrl));

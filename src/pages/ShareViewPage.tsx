@@ -4,7 +4,7 @@
  */
 
 import React, { Suspense, useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router';
 import { Spin, Result, theme, Typography } from 'antd';
 import { useTranslation } from 'react-i18next';
 import { coerceShareToken, getQueryOrHashParamFromLocation } from '@/core/utils/inputBoundary';
@@ -44,16 +44,18 @@ const ShareViewPage: React.FC = () => {
         getQueryOrHashParamFromLocation(typeof window === 'undefined' ? undefined : window.location, 'token') ||
         ''
     ) || '';
-    const [state, setState] = useState<LoadState>(() => {
-        if (!shareToken) return { status: 'error' };
-        return { status: 'loading' };
-    });
+    const [loadResult, setLoadResult] = useState<{
+        token: string;
+        state: LoadState;
+    } | null>(null);
+    const state: LoadState = !shareToken
+        ? { status: 'error' }
+        : loadResult?.token === shareToken
+            ? loadResult.state
+            : { status: 'loading' };
 
     useEffect(() => {
-        if (!shareToken) {
-            setState({ status: 'error' });
-            return;
-        }
+        if (!shareToken) return;
 
         let cancelled = false;
 
@@ -64,13 +66,13 @@ const ShareViewPage: React.FC = () => {
                 if (cancelled) return;
 
                 if (!result) {
-                    setState({ status: 'error' });
+                    setLoadResult({ token: shareToken, state: { status: 'error' } });
                     return;
                 }
 
                 const rawContent = result.diagram.content;
                 if (!rawContent) {
-                    setState({ status: 'error' });
+                    setLoadResult({ token: shareToken, state: { status: 'error' } });
                     return;
                 }
 
@@ -85,9 +87,11 @@ const ShareViewPage: React.FC = () => {
                 });
                 const title = content.name || content.metadata?.title || result.diagram.title || 'Shared Diagram';
 
-                setState({ status: 'success', title });
+                setLoadResult({ token: shareToken, state: { status: 'success', title } });
             } catch {
-                if (!cancelled) setState({ status: 'error' });
+                if (!cancelled) {
+                    setLoadResult({ token: shareToken, state: { status: 'error' } });
+                }
             }
         })();
 

@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { theme, Spin, Image } from 'antd';
+import { theme, Spin } from 'antd';
 import { PictureOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import { fetchRemoteDiagramPreview, type RemoteDiagramPreview } from '@/services/remoteDiagramPreview';
+
+type PreviewStatus = 'loading' | 'ready' | 'unavailable';
 
 export const RemoteDiagramCover: React.FC<{
   storageId: string;
@@ -10,18 +13,19 @@ export const RemoteDiagramCover: React.FC<{
   cacheBuster?: string | number;
 }> = ({ storageId, alt, height = 140, cacheBuster }) => {
   const { token } = theme.useToken();
+  const { t } = useTranslation();
   const [preview, setPreview] = useState<RemoteDiagramPreview | null>(null);
-  const [loaded, setLoaded] = useState(false);
+  const [status, setStatus] = useState<PreviewStatus>('loading');
 
   useEffect(() => {
     let cancelled = false;
     const load = () => {
-      setLoaded(false);
+      setStatus('loading');
       setPreview(null);
       fetchRemoteDiagramPreview(storageId).then((p) => {
         if (cancelled) return;
         setPreview(p);
-        setLoaded(true);
+        setStatus(p ? 'ready' : 'unavailable');
       });
     };
     load();
@@ -39,6 +43,8 @@ export const RemoteDiagramCover: React.FC<{
 
   return (
     <div
+      className="remote-diagram-cover"
+      data-preview-status={status}
       style={{
         height,
         width: '100%',
@@ -51,16 +57,25 @@ export const RemoteDiagramCover: React.FC<{
       }}
     >
       {preview ? (
-        <Image
+        <img
           src={preview.dataUrl}
           alt={alt}
-          preview={true}
-          wrapperStyle={{ width: '100%', height: '100%' }}
           style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          onError={() => {
+            setPreview(null);
+            setStatus('unavailable');
+          }}
         />
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, color: token.colorTextTertiary }}>
-          {!loaded ? <Spin size="small" /> : <PictureOutlined style={{ fontSize: 28 }} />}
+        <div
+          role="status"
+          aria-live="polite"
+          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, color: token.colorTextTertiary }}
+        >
+          {status === 'loading' ? <Spin size="small" /> : <PictureOutlined style={{ fontSize: 28 }} />}
+          <span style={{ fontSize: 11 }}>
+            {status === 'loading' ? t('workspace.previewLoading') : t('workspace.previewUnavailable')}
+          </span>
         </div>
       )}
     </div>

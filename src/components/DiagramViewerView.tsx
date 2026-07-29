@@ -264,6 +264,7 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
                                                 onDirectSave={handleDirectSave}
                                                 isDirectSaveDisabled={false}
                                                 onOpenSettings={() => setIsSettingsOpen(true)}
+                                                onOpenCommandPalette={() => setIsCommandOpen(true)}
                                                 loadLayoutPresetMap={loadLayoutPresetMap}
                                                 renderVersionHistoryPanel={renderVersionHistoryPanel}
                                                 renderAIChatPanel={() => (
