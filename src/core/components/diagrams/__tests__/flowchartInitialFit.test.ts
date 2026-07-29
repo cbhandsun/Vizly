@@ -3,7 +3,7 @@
 import type { Edge, Node, ReactFlowInstance } from '@xyflow/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import flowchartDesignerSource from '../FlowchartDesigner.tsx?raw';
+import flowchartDesignerControllerSource from '../useFlowchartDesignerController.ts?raw';
 import { scheduleFlowchartInitialFit } from '../flowchartInitialFit';
 import { dispatchDiagramControl } from '../../shared/diagramControl';
 
@@ -60,10 +60,10 @@ describe('flowchartInitialFit', () => {
   it('keeps the designer initializer bound to the fit dispatcher', () => {
     vi.useFakeTimers();
 
-    expect(flowchartDesignerSource).toMatch(
+    expect(flowchartDesignerControllerSource).toMatch(
       /import\s*{\s*dispatchDiagramControl\s*}\s*from\s*['"]\.\.\/shared\/diagramControl['"]/,
     );
-    expect(flowchartDesignerSource).toMatch(
+    expect(flowchartDesignerControllerSource).toMatch(
       /dispatchFit:\s*\(\)\s*=>\s*dispatchDiagramControl\(\s*['"]fit['"]\s*,\s*id\s*\)/,
     );
 

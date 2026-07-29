@@ -19,6 +19,10 @@ import {
   persistIconRailDrawerWidth,
   readIconRailDrawerWidth,
 } from '../iconRailSidebarStorage';
+import {
+  resolveIconRailRequestedPanel,
+  shouldAutoOpenShapesPanel,
+} from '../iconRailSidebarState';
 
 describe('IconRailSidebar storage helpers', () => {
   beforeEach(() => {
@@ -65,5 +69,48 @@ describe('IconRailSidebar storage helpers', () => {
     );
     expect(JSON.stringify(safeLogState.warn.mock.calls[0]?.[1])).toContain('[redacted]');
     expect(JSON.stringify(safeLogState.warn.mock.calls[0]?.[1])).not.toContain('sidebar-write-secret');
+  });
+
+  it('auto-opens built-in shapes for a first desktop blank canvas', () => {
+    expect(shouldAutoOpenShapesPanel({
+      activePanel: null,
+      alreadyAutoOpened: false,
+      isMobile: false,
+      nodeCount: 0,
+    })).toBe(true);
+  });
+
+  it('does not reopen shapes after dismissal, on mobile, or with content', () => {
+    expect(shouldAutoOpenShapesPanel({
+      activePanel: null,
+      alreadyAutoOpened: false,
+      enabled: false,
+      isMobile: false,
+      nodeCount: 0,
+    })).toBe(false);
+    expect(shouldAutoOpenShapesPanel({
+      activePanel: null,
+      alreadyAutoOpened: true,
+      isMobile: false,
+      nodeCount: 0,
+    })).toBe(false);
+    expect(shouldAutoOpenShapesPanel({
+      activePanel: null,
+      alreadyAutoOpened: false,
+      isMobile: true,
+      nodeCount: 0,
+    })).toBe(false);
+    expect(shouldAutoOpenShapesPanel({
+      activePanel: null,
+      alreadyAutoOpened: false,
+      isMobile: false,
+      nodeCount: 1,
+    })).toBe(false);
+  });
+
+  it('resolves explicit mobile open and close requests', () => {
+    expect(resolveIconRailRequestedPanel('shapes')).toBe('shapes');
+    expect(resolveIconRailRequestedPanel('layers')).toBe('layers');
+    expect(resolveIconRailRequestedPanel('close')).toBeNull();
   });
 });

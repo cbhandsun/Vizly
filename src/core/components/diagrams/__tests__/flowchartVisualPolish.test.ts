@@ -89,6 +89,14 @@ describe('flowchart visual polish stylesheet', () => {
         expect(highlightRule).not.toMatch(/\bz-index\s*:/);
     });
 
+    it('keeps the controlled property drawer available on mobile', () => {
+        const legacyStylesheet = readRelativeFile('../FlowchartDesigner.css');
+
+        expect(legacyStylesheet).not.toMatch(
+            /\.designer-right-sidebar\s*\{[^}]*display:\s*none\s*!important;/s,
+        );
+    });
+
     it('disables inner-node animations for high-density canvases', () => {
         const globalStylesheet = readRelativeFile('../../../../main.css');
 

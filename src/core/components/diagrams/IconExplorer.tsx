@@ -38,10 +38,7 @@ export const IconExplorer: React.FC<IconExplorerProps> = ({ ctx: _ctx }) => {
     }, [query]);
 
     useEffect(() => {
-        if (!debouncedQuery.trim()) {
-            setResults([]);
-            return;
-        }
+        if (!debouncedQuery.trim()) return;
 
         const controller = new AbortController();
         const fetchIcons = async () => {
@@ -61,9 +58,14 @@ export const IconExplorer: React.FC<IconExplorerProps> = ({ ctx: _ctx }) => {
             }
         };
 
-        void fetchIcons();
+        queueMicrotask(() => {
+            if (!controller.signal.aborted) void fetchIcons();
+        });
         return () => controller.abort();
     }, [debouncedQuery]);
+
+    const visibleResults = debouncedQuery.trim() ? results : [];
+    const visibleLoading = Boolean(debouncedQuery.trim()) && loading;
 
     const onDragStart = (event: React.DragEvent, iconName: string) => {
         if (!isSafeIconifyIconName(iconName)) {
@@ -153,13 +155,13 @@ export const IconExplorer: React.FC<IconExplorerProps> = ({ ctx: _ctx }) => {
                     </div>
                 )}
 
-                {loading ? (
+                {visibleLoading ? (
                     <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}>
                         <Spin size="small" tip="检索中..." />
                     </div>
-                ) : results.length > 0 ? (
+                ) : visibleResults.length > 0 ? (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
-                        {results.map(iconName => (
+                        {visibleResults.map(iconName => (
                             <Tooltip key={iconName} title={iconName} placement="right">
                                 <div
                                     draggable
@@ -190,7 +192,7 @@ export const IconExplorer: React.FC<IconExplorerProps> = ({ ctx: _ctx }) => {
                             </Tooltip>
                         ))}
                     </div>
-                ) : query && !loading ? (
+                ) : query && !visibleLoading ? (
                     <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="未找到匹配图标" />
                 ) : null}
             </div>

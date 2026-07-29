@@ -3,26 +3,23 @@ import { createPortal } from 'react-dom';
 import { Button, Dropdown, Tooltip, MenuProps, Grid } from 'antd';
 import { useTranslation } from 'react-i18next';
 import {
-    FaFileExport, FaFolderOpen, FaShareAlt, FaCloudUploadAlt, FaSave,
-    FaPlay, FaImage, FaFileCode, FaFilePdf, FaFilm, FaProjectDiagram,
+    FaShareAlt, FaCloudUploadAlt, FaSave, FaPlay, FaFileExport, FaCheckCircle,
     FaCode, FaHistory, FaExchangeAlt, FaCog, FaLock, FaUnlock,
     FaMagic, FaRegComment, FaEllipsisH, FaRobot
 } from 'react-icons/fa';
 import { CollaborationAvatars } from './ui/CollaborationAvatars';
-import { AdvancedExportModal } from './ui/AdvancedExportModal';
-import { PluginManagerModal } from './ui/PluginManagerModal';
 import { ApiOutlined } from '@ant-design/icons';
 import type { ReactFlowRenderSnapshot } from '../../rendering/reactFlowScene';
 
+const AdvancedExportModal = React.lazy(() => import('./ui/AdvancedExportModal').then(module => ({
+    default: module.AdvancedExportModal,
+})));
+const PluginManagerModal = React.lazy(() => import('./ui/PluginManagerModal').then(module => ({
+    default: module.PluginManagerModal,
+})));
+
 interface TopActionButtonsProps {
     diagramId?: string;
-    onExportJSON: () => void;
-    onExportPNG?: () => Promise<void>;
-    onExportSVG?: () => Promise<void>;
-    onExportPDF?: () => Promise<void>;
-    onExportGIF?: () => Promise<void>;
-    onExportMermaid?: () => void;
-    onImportClick: () => void;
     onEditJson?: () => void;
     onStartPresentation?: () => void;
     onShowDiff?: () => void;
@@ -57,8 +54,7 @@ interface TopActionButtonsProps {
 }
 
 export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
-    diagramId, onExportJSON, onExportPNG, onExportSVG, onExportPDF, onExportGIF, onExportMermaid,
-    onImportClick, onEditJson,
+    diagramId, onEditJson,
     onStartPresentation, onShowDiff,
     onSaveToCloud, onDirectSave, isDirectSaveDisabled, extraActionItems, onShare, onShowHistory,
     rightOffset = 0,
@@ -84,39 +80,40 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
 }) => {
     const { t } = useTranslation();
     const screens = Grid.useBreakpoint();
-    const isMobile = !screens.lg;
     const isSmallMobile = !screens.md;
 
     // [Fix] Modals must render regardless of portal vs fallback path.
     // Extract them here so both branches can render the portal content + these modals.
     const modals = (
         <>
-            <AdvancedExportModal 
-                visible={exportModalVisible} 
-                onClose={() => setExportModalVisible(false)} 
-                diagramId={diagramId}
-                getReactFlowSnapshot={getReactFlowSnapshot}
-            />
-            <PluginManagerModal 
-                visible={pluginManagerVisible} 
-                onClose={() => setPluginManagerVisible(false)} 
-            />
+            {exportModalVisible && (
+                <React.Suspense fallback={null}>
+                    <AdvancedExportModal
+                        visible
+                        onClose={() => setExportModalVisible(false)}
+                        diagramId={diagramId}
+                        getReactFlowSnapshot={getReactFlowSnapshot}
+                    />
+                </React.Suspense>
+            )}
+            {pluginManagerVisible && (
+                <React.Suspense fallback={null}>
+                    <PluginManagerModal
+                        visible
+                        onClose={() => setPluginManagerVisible(false)}
+                    />
+                </React.Suspense>
+            )}
         </>
     );
 
-    // [M-4] Memoize menu items to avoid recreating on every render (Antd Dropdown does vdom diff on items ref).
-    const exportMenu: MenuProps['items'] = useMemo(() => [
-        { key: 'png', label: '导出为 PNG', icon: <FaImage />, onClick: onExportPNG, disabled: !onExportPNG },
-        { key: 'svg', label: '导出为 SVG', icon: <FaFileCode />, onClick: onExportSVG, disabled: !onExportSVG },
-        { key: 'pdf', label: '导出为 PDF', icon: <FaFilePdf />, onClick: onExportPDF, disabled: !onExportPDF },
-        { key: 'gif', label: '导出为 GIF', icon: <FaFilm />, onClick: onExportGIF, disabled: !onExportGIF },
-        { type: 'divider' as const },
-        { key: 'json', label: '导出为 JSON', icon: <FaFileExport />, onClick: onExportJSON },
-        { key: 'mermaid', label: '导出为 Mermaid', icon: <FaProjectDiagram />, onClick: onExportMermaid, disabled: !onExportMermaid },
-        ...((extraExportItems && extraExportItems.length > 0) ? [{ type: 'divider' as const }, ...extraExportItems] : [])
-    ], [onExportPNG, onExportSVG, onExportPDF, onExportGIF, onExportJSON, onExportMermaid, extraExportItems]);
-
-    const moreMenu: MenuProps['items'] = useMemo(() => [
+    const documentMenu: MenuProps['items'] = useMemo(() => [
+        ...(onStartPresentation ? [{
+            key: 'presentation',
+            label: t('designer.toolbar.presentationMode'),
+            icon: <FaPlay />,
+            onClick: onStartPresentation,
+        }] : []),
         ...(onEditJson ? [{
             key: 'edit-json',
             label: t('designer.toolbar.edit'),
@@ -125,18 +122,105 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
         }] : []),
         ...(onShowDiff ? [{
             key: 'diff',
-            label: '版本对比',
+            label: t('designer.toolbar.diffView'),
             icon: <FaExchangeAlt />,
             onClick: onShowDiff,
         }] : []),
         ...(onShowHistory ? [{
             key: 'history',
-            label: '历史记录',
+            label: t('designer.toolbar.historyPanel'),
             icon: <FaHistory />,
             onClick: onShowHistory,
         }] : []),
+        ...(onSmartOptimize ? [{
+            key: 'smart-optimize',
+            label: t('designer.toolbar.smartOptimize'),
+            icon: <FaMagic />,
+            onClick: onSmartOptimize,
+        }] : []),
+        ...(onOpenSettings ? [{
+            key: 'settings',
+            label: t('designer.toolbar.settings', '设置'),
+            icon: <FaCog />,
+            onClick: onOpenSettings,
+        }] : []),
+        ...(onToggleAI ? [{
+            key: 'ai',
+            label: t('aiChat.title', 'AI 助手'),
+            icon: <FaRobot />,
+            onClick: onToggleAI,
+        }] : []),
+        ...((extraExportItems && extraExportItems.length > 0) ? [{
+            key: 'plugin-export',
+            label: t('designer.toolbar.pluginExport'),
+            icon: <FaFileExport />,
+            children: extraExportItems,
+        }] : []),
+        ...(isYjsSynced ? [{
+            key: 'collaboration-connected',
+            label: t('designer.toolbar.yjsSynced'),
+            icon: <FaCheckCircle />,
+            disabled: true,
+        }] : []),
+        {
+            key: 'plugins',
+            label: t('designer.toolbar.pluginManager'),
+            icon: <ApiOutlined />,
+            onClick: () => setPluginManagerVisible(true),
+        },
+        {
+            key: 'comments',
+            label: isCommentMode
+                ? t('designer.toolbar.commentModeExit')
+                : t('designer.toolbar.commentMode'),
+            icon: <FaRegComment />,
+            onClick: () => setIsCommentMode(!isCommentMode),
+        },
+        ...(onReadonlyChange ? [{
+            key: 'readonly',
+            label: isReadonly
+                ? t('designer.toolbar.unlockCanvas', '解锁画布')
+                : t('designer.toolbar.lockCanvas', '锁定画布'),
+            icon: isReadonly ? <FaUnlock /> : <FaLock />,
+            onClick: () => onReadonlyChange(!isReadonly),
+        }] : []),
         ...((extraMoreItems && extraMoreItems.length > 0) ? [{ type: 'divider' as const }, ...extraMoreItems] : [])
-    ], [onEditJson, onShowDiff, onShowHistory, extraMoreItems, t]);
+    ], [
+        extraMoreItems,
+        extraExportItems,
+        isCommentMode,
+        isReadonly,
+        isYjsSynced,
+        onEditJson,
+        onOpenSettings,
+        onReadonlyChange,
+        onShowDiff,
+        onShowHistory,
+        onSmartOptimize,
+        onStartPresentation,
+        onToggleAI,
+        setIsCommentMode,
+        setPluginManagerVisible,
+        t,
+    ]);
+
+    const saveMenu: MenuProps['items'] = useMemo(() => [
+        ...(onDirectSave ? [{
+            key: 'direct-save',
+            label: isDirectSaveDisabled
+                ? t('designer.toolbar.directSaveDisabled')
+                : t('designer.toolbar.directSave', '覆盖保存'),
+            icon: <FaSave />,
+            disabled: isDirectSaveDisabled,
+            onClick: onDirectSave,
+        }] : []),
+        ...(onSaveToCloud ? [{
+            key: 'cloud-save',
+            label: t('designer.toolbar.saveToCloud', '保存到云端'),
+            icon: <FaCloudUploadAlt />,
+            onClick: onSaveToCloud,
+        }] : []),
+    ], [isDirectSaveDisabled, onDirectSave, onSaveToCloud, t]);
 
     const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
     const [contextPortalTarget, setContextPortalTarget] = useState<HTMLElement | null>(null);
@@ -155,110 +239,24 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
         return () => window.clearTimeout(timer);
     }, []);
 
-    // Generate more menu items dynamically for mobile
-    const mobileMoreItems: MenuProps['items'] = useMemo(() => {
-        if (!isMobile) return [];
-        const items = [];
-        
-        if (onStartPresentation) {
-            items.push({ key: 'presentation', label: t('designer.toolbar.presentationMode'), icon: <FaPlay />, onClick: onStartPresentation });
-        }
-        if (onShowDiff) {
-            items.push({ key: 'diff-view', label: t('designer.toolbar.diffView'), icon: <FaExchangeAlt />, onClick: onShowDiff });
-        }
-        if (onSmartOptimize) {
-            items.push({ key: 'smart-optimize', label: t('designer.toolbar.smartOptimize'), icon: <FaMagic className="text-purple-500" />, onClick: onSmartOptimize });
-        }
-        
-        if (items.length > 0) items.push({ type: 'divider' as const });
-        return items;
-    }, [isMobile, onStartPresentation, onShowDiff, onSmartOptimize, t]);
-
-    const combinedMoreMenu: MenuProps['items'] = useMemo(() => [
-        ...mobileMoreItems,
-        ...moreMenu
-    ], [mobileMoreItems, moreMenu]);
-
     // 统一按钮样式 (与 ModernFlowchartToolbar 保持一致)
     const tbtn = "w-8 h-8 p-0 flex items-center justify-center border-none rounded-[6px] text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] transition-colors";
     const tbtnActive = "w-8 h-8 p-0 flex items-center justify-center border-none rounded-[6px] bg-[#e8f0fe] dark:bg-[rgba(138,180,248,0.15)] text-[#1a73e8] dark:text-[#8ab4f8] transition-colors hover:bg-[#d2e3fc] dark:hover:bg-[rgba(138,180,248,0.22)]";
-    const divider = <div className="w-[1px] h-4 bg-slate-200/80 dark:bg-white/10 mx-0.5 flex-shrink-0" />;
 
     const content = (
         <div className="flex items-center gap-0.5">
-            {onStartPresentation && !isMobile && (
-                <Tooltip title={t('designer.toolbar.presentationMode')}>
-                    <Button type="text" aria-label={t('designer.toolbar.presentationMode')} icon={<FaPlay className="text-[13px]" />} onClick={onStartPresentation} className={tbtn} />
-                </Tooltip>
-            )}
-
-            {onShowDiff && !isMobile && (
-                <Tooltip title={t('designer.toolbar.diffView')}>
-                    <Button type="text" aria-label={t('designer.toolbar.diffView')} icon={<FaExchangeAlt className="text-[13px]" />} onClick={onShowDiff} className={tbtn} />
-                </Tooltip>
-            )}
-
-            {onShowHistory && (
-                <Tooltip title={t('designer.toolbar.historyPanel')}>
-                    <Button type="text" aria-label={t('designer.toolbar.historyPanel')} icon={<FaHistory className="text-[13px]" />} onClick={onShowHistory} className={tbtn} />
-                </Tooltip>
-            )}
-
-            {divider}
-
-            {onSaveToCloud && (
-                <Tooltip title={t('designer.toolbar.saveToCloud', '保存到云端')}>
-                    <Button type="text" aria-label={t('designer.toolbar.saveToCloud', '保存到云端')} icon={<FaCloudUploadAlt className="text-[13px]" />} onClick={onSaveToCloud} className={tbtn} />
-                </Tooltip>
-            )}
-
-            {onDirectSave && (
-                <Tooltip title={isDirectSaveDisabled ? t('designer.toolbar.saveDisabled') : t('designer.toolbar.directSave', '覆盖保存')}>
-                    <Button type="text" aria-label={isDirectSaveDisabled ? t('designer.toolbar.saveDisabled') : t('designer.toolbar.directSave', '覆盖保存')} icon={<FaSave className="text-[13px]" />} onClick={onDirectSave} disabled={isDirectSaveDisabled} className={isDirectSaveDisabled ? "w-8 h-8 p-0 flex items-center justify-center border-none rounded-[6px] text-slate-300 dark:text-slate-600 cursor-not-allowed" : tbtn} />
-                </Tooltip>
-            )}
-
-            {onSmartOptimize && !isMobile && (
-                <Tooltip title={t('designer.toolbar.smartOptimize')}>
-                    <Button type="text" aria-label={t('designer.toolbar.smartOptimize')} icon={<FaMagic className="text-[13px]" />} onClick={onSmartOptimize} className={tbtn} />
-                </Tooltip>
-            )}
-
-            {onOpenSettings && (
-                <Tooltip title={t('designer.toolbar.settings', '设置')}>
-                    <Button type="text" aria-label={t('designer.toolbar.settings', '设置')} icon={<FaCog className="text-[13px]" />} onClick={onOpenSettings} className={tbtn} />
-                </Tooltip>
-            )}
-
-            {divider}
-
-            {onToggleAI && (
-                <Tooltip title={t('aiChat.title', 'AI 助手')}>
-                    <Button type="text" aria-label={t('aiChat.title', 'AI 助手')} icon={<FaRobot className="text-[13px]" />} onClick={onToggleAI} className={aiChatActive ? tbtnActive : tbtn} />
-                </Tooltip>
-            )}
-
-            {!isSmallMobile && (
-                <Tooltip title={t('designer.toolbar.pluginManager')}>
-                    <Button type="text" aria-label={t('designer.toolbar.pluginManager')} icon={<ApiOutlined style={{ fontSize: 13 }} />} onClick={() => setPluginManagerVisible(true)} className={tbtn} />
-                </Tooltip>
-            )}
-
-            {setIsCommentMode && (
-                <Tooltip title={isCommentMode ? t('designer.toolbar.commentModeExit') : t('designer.toolbar.commentMode')}>
-                    <Button type="text" aria-label={isCommentMode ? t('designer.toolbar.commentModeExit') : t('designer.toolbar.commentMode')} icon={<FaRegComment className="text-[13px]" />} onClick={() => setIsCommentMode(!isCommentMode)} className={isCommentMode ? tbtnActive : tbtn} />
-                </Tooltip>
-            )}
-
-            {isMobile && combinedMoreMenu.length > 0 && (
-                <Dropdown menu={{ items: combinedMoreMenu }} placement="bottomRight" trigger={['click']}>
-                    <Button type="text" icon={<FaEllipsisH className="text-[13px]" />} className={tbtn} />
+            {saveMenu.length > 0 && (
+                <Dropdown menu={{ items: saveMenu }} placement="bottomRight" trigger={['click']}>
+                    <Tooltip title={t('designer.toolbar.saveOptions')}>
+                        <Button
+                            type="text"
+                            aria-label={t('designer.toolbar.saveOptions')}
+                            icon={<FaSave className="text-[13px]" />}
+                            className={tbtn}
+                        />
+                    </Tooltip>
                 </Dropdown>
             )}
-
-            {divider}
-
-            <CollaborationAvatars />
 
             {onShare && (
                 <Button
@@ -270,6 +268,21 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
                 >
                     <span className="hidden xl:inline">{t('designer.toolbar.share')}</span>
                 </Button>
+            )}
+
+            <CollaborationAvatars />
+
+            {documentMenu.length > 0 && (
+                <Dropdown menu={{ items: documentMenu }} placement="bottomRight" trigger={['click']}>
+                    <Tooltip title={t('designer.toolbar.documentActions')}>
+                        <Button
+                            type="text"
+                            aria-label={t('designer.toolbar.documentActions')}
+                            icon={<FaEllipsisH className="text-[13px]" />}
+                            className={aiChatActive || isCommentMode ? tbtnActive : tbtn}
+                        />
+                    </Tooltip>
+                </Dropdown>
             )}
 
             {extraActionItems}
@@ -303,120 +316,23 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
 
     // Fallback if portal missing
     return (
-        <div 
-            className="glass-effect"
+        <div
+            className="glass-effect flex items-center gap-1"
             style={{
-            position: 'absolute',
-            top: 16,
-            right: 24 + rightOffset,
-            zIndex: 1010,
-            display: 'flex',
-            gap: 4,
-            alignItems: 'center',
-            padding: '4px 10px',
-            borderRadius: 9999,
-            background: 'var(--designer-panel-bg, rgba(255, 255, 255, 0.7))',
-            backdropFilter: 'var(--designer-blur, blur(12px) saturate(180%))',
-            boxShadow: 'var(--designer-shadow, 0 8px 32px rgba(31, 38, 135, 0.15))',
-            border: '1px solid var(--designer-border, rgba(255, 255, 255, 0.2))',
-            transition: 'top 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.1), right 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.1)',
-        }}>
-            {onStartPresentation && (
-                <Tooltip title="演示模式">
-                    <Button 
-                        type="text" 
-                        icon={<FaPlay />} 
-                        onClick={onStartPresentation} 
-                    />
-                </Tooltip>
-            )}
-
-            <Tooltip title={t('designer.toolbar.import')}>
-                <Button 
-                    type="text" 
-                    icon={<FaFolderOpen />} 
-                    onClick={onImportClick} 
-                />
-            </Tooltip>
-
-            <Dropdown 
-                menu={{ items: exportMenu }} 
-                placement="bottomRight"
-                getPopupContainer={(trigger) => trigger.parentElement!}
-            >
-                <Button type="text" icon={<FaFileExport />} onClick={() => setExportModalVisible(true)}>
-                    {t('common.export', '导出')}
-                </Button>
-            </Dropdown>
-
-            {onDirectSave && (
-                <Tooltip title={isDirectSaveDisabled ? "当前状态无法直接保存" : "覆盖保存 (直接存储)"}>
-                    <Button 
-                        type="text" 
-                        icon={<FaSave style={{ color: isDirectSaveDisabled ? '#ccc' : '#13c2c2' }} />} 
-                        onClick={onDirectSave} 
-                        disabled={isDirectSaveDisabled}
-                    />
-                </Tooltip>
-            )}
-
-            {extraActionItems}
-
-            {!extraActionItems && !onDirectSave && onSaveToCloud && (
-                <Tooltip title="保存到云端">
-                    <Button 
-                        type="text" 
-                        icon={<FaCloudUploadAlt style={{ color: '#52c41a' }} />} 
-                        onClick={onSaveToCloud} 
-                    />
-                </Tooltip>
-            )}
-
-            {onShare && (
-                <Button 
-                    type="primary" 
-                    icon={<FaShareAlt />} 
-                    onClick={onShare}
-                    style={{ borderRadius: 99 }}
-                >
-                    分享
-                </Button>
-            )}
-
-            {onReadonlyChange && (
-                <Tooltip title={isReadonly ? "解锁画布" : "锁定防误触"}>
-                    <Button 
-                        type={isReadonly ? 'primary' : 'text'} 
-                        danger={isReadonly}
-                        icon={isReadonly ? <FaLock /> : <FaUnlock />} 
-                        onClick={() => onReadonlyChange(!isReadonly)}
-                        style={isReadonly ? { borderRadius: 99, padding: '4px 12px' } : {}}
-                    >
-                        {isReadonly ? '只读锁定' : ''}
-                    </Button>
-                </Tooltip>
-            )}
-
-            {moreMenu.length > 0 && (
-            <Dropdown 
-                menu={{ items: moreMenu }} 
-                placement="bottomRight"
-                getPopupContainer={(trigger) => trigger.parentElement!}
-            >
-                <Button type="text" icon={<FaEllipsisH />} />
-            </Dropdown>
-            )}
-            
-            {isYjsSynced && (
-                <Tooltip title="云端协同已连接">
-                    <div style={{ marginLeft: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: '50%', background: 'rgba(82, 196, 26, 0.1)' }}>
-                        <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#52c41a', boxShadow: '0 0 6px #52c41a' }} />
-                    </div>
-                </Tooltip>
-            )}
-
-            {children}
-
+                position: 'absolute',
+                top: 16,
+                right: 24 + rightOffset,
+                zIndex: 1010,
+                padding: '4px 10px',
+                borderRadius: 9999,
+                background: 'var(--designer-panel-bg, rgba(255, 255, 255, 0.7))',
+                backdropFilter: 'var(--designer-blur, blur(12px) saturate(180%))',
+                boxShadow: 'var(--designer-shadow, 0 8px 32px rgba(31, 38, 135, 0.15))',
+                border: '1px solid var(--designer-border, rgba(255, 255, 255, 0.2))',
+                transition: 'top 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.1), right 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.1)',
+            }}
+        >
+            {content}
             {modals}
         </div>
     );

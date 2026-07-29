@@ -6,12 +6,14 @@ import { useFlowchartNodeStyleResolution } from './hooks/useFlowchartNodeStyleRe
 import { EditableLabel } from '../diagrams/EditableLabel';
 import type { FlowchartNodeData } from './hooks/useFlowchartNodeStyleResolution';
 import { FaChevronUp, FaChevronRight, FaChevronDown, FaChevronLeft } from 'react-icons/fa';
+import { useTranslation } from 'react-i18next';
 import { sanitizeInlineHtml } from '../../utils/sanitizeHtml';
 import './FlowchartNode.css';
 
 export type FlowchartNodeProps = NodeProps<Node<FlowchartNodeData>>;
 
 const FlowchartNode = ({ data, selected, id }: FlowchartNodeProps) => {
+    const { t } = useTranslation();
     const _isConnecting = useStore((s) => s.connection.inProgress);
     const nodeData = useStore(s => s.nodeLookup.get(id));
 
@@ -48,7 +50,11 @@ const FlowchartNode = ({ data, selected, id }: FlowchartNodeProps) => {
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
             role="treeitem"
-            aria-label={`${shape} 节点: ${data.label || id}${selected ? ' (已选中)' : ''}${data.locked ? ' (已锁定)' : ''}`}
+            aria-label={t('designer.flowchart.nodeAriaLabel', {
+                label: data.label || id,
+                selectedState: selected ? t('designer.flowchart.nodeSelectedState') : '',
+                lockedState: data.locked ? t('designer.flowchart.nodeLockedState') : '',
+            })}
             aria-selected={selected}
             tabIndex={0}
         >
@@ -142,7 +148,7 @@ const FlowchartNode = ({ data, selected, id }: FlowchartNodeProps) => {
                                 handleUpdateData({ isEditing: true });
                             }}
                             style={{ cursor: 'text', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', width: '100%', textAlign: data.textAlign || 'center' }}
-                            title="Double click to edit"
+                            title={t('designer.flowchart.doubleClickToEdit')}
                         >
                             {safeTitleLineHtml && (
                                 <div className="flowchart-node-title">
@@ -181,7 +187,7 @@ const FlowchartNode = ({ data, selected, id }: FlowchartNodeProps) => {
                                 <div
                                     className="flowchart-quick-clone-btn"
                                     data-dir={dir}
-                                    title="单击: 快速添加 | 拖拽: 连线"
+                                    title={t('designer.flowchart.quickAddOrConnect')}
                                     onPointerDown={(ev) => {
                                         const startX = ev.clientX;
                                         const startY = ev.clientY;

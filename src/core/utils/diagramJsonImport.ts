@@ -24,8 +24,8 @@ export const parseDiagramJson = (content: string): unknown => {
     }
     try {
         return JSON.parse(content);
-    } catch (_error) {
-        throw new Error('Diagram JSON is invalid.');
+    } catch (error) {
+        throw new Error('Diagram JSON is invalid.', { cause: error });
     }
 };
 

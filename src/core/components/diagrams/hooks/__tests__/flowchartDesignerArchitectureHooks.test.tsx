@@ -51,7 +51,6 @@ describe('flowchart designer architecture hooks', () => {
     it('wires canvas commands to state setters without duplicating canvas state', () => {
         const setGridVariant = vi.fn();
         const setShowGrid = vi.fn();
-        const setJsonEditorVisible = vi.fn();
         const updateNodesBatch = vi.fn();
         const selectedNodes = [{ id: 'node-1' }, { id: 'node-2' }] as Node[];
         const { result } = renderHook(() => useFlowchartCanvasCommands({
@@ -66,21 +65,19 @@ describe('flowchart designer architecture hooks', () => {
             gridVariant: BackgroundVariant.Lines,
             setGridVariant,
             setShowGrid,
-            setJsonEditorVisible,
             reactFlowInstance: null,
             viewport: { x: 0, y: 0, zoom: 1 },
             createFromTemplate: vi.fn(() => ({ nodes: [], edges: [] })),
+            templates: [],
             selectedNodes,
             updateNodesBatch,
         }));
 
         act(() => result.current.handleGridRotate());
-        act(() => result.current.handleExport());
         act(() => result.current.handleOpacity(0.5));
 
         expect(setGridVariant).toHaveBeenCalledWith(BackgroundVariant.Dots);
         expect(setShowGrid).toHaveBeenCalledWith(true);
-        expect(setJsonEditorVisible).toHaveBeenCalledWith(true);
         expect(updateNodesBatch).toHaveBeenCalledWith(
             ['node-1', 'node-2'],
             { style: { opacity: 0.5 } },

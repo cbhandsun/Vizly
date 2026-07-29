@@ -17,6 +17,28 @@
         "delete": "Delete",
         "proFeature": "Pro Feature"
     },
+    "workspace": {
+        "recent": "Recent",
+        "local": "Local",
+        "cloud": "Cloud",
+        "shared": "Shared",
+        "industryTemplates": "Industry templates",
+        "generalTemplates": "General templates",
+        "lastModified": "Last modified",
+        "name": "Name",
+        "type": "Type",
+        "sortBy": "Sort diagrams",
+        "gridView": "Grid view",
+        "listView": "List view",
+        "openInNewTab": "Open in new tab",
+        "applyTemplate": "Use template",
+        "applyNamedTemplate": "Use template {{title}}",
+        "openDiagram": "Open diagram {{title}}",
+        "moreActions": "More actions for {{title}}",
+        "unknownTime": "Unknown time",
+        "previewLoading": "Loading preview",
+        "previewUnavailable": "Preview unavailable"
+    },
     "templates": {
         "title": "Template Library",
         "use": "Use",
@@ -104,6 +126,15 @@
     },
     "designer": {
         "title": "Diagram View",
+        "mobileDock": {
+            "add": "Add component",
+            "properties": "Properties",
+            "propertiesSelected": "Properties ({{count}} selected)",
+            "layers": "Layers",
+            "ai": "AI assistant",
+            "aiShort": "AI",
+            "settings": "Settings"
+        },
         "debug": {
             "panel": {
                 "title": "Routing Debugger",
@@ -336,12 +367,16 @@
             "renderFailed": "Render failed",
             "renderFailedSubtitle": "An error occurred while rendering the diagram. Refresh or switch to another diagram."
         },
+        "canvas": {
+            "initializing": "Initializing canvas…"
+        },
         "toolbar": {
             "undo": "Undo (Ctrl+Z)",
             "redo": "Redo (Ctrl+Y)",
             "zoomIn": "Zoom In",
             "zoomOut": "Zoom Out",
             "fitView": "Fit View",
+            "autoLayout": "Auto Layout",
             "layout": "Layout",
             "save": "Save",
             "style": "Chart Style",
@@ -390,8 +425,11 @@
             "hideMinimap": "Hide Minimap",
             "showMinimap": "Show Minimap",
             "saveToCloud": "Save to Cloud",
-            "directSave": "Overwrite Save",
+            "directSave": "Save to current location",
             "directSaveDisabled": "Cannot save directly in current state",
+            "saveOptions": "Save options",
+            "documentActions": "Document actions",
+            "pluginExport": "Plugin exports",
             "yjsSynced": "Cloud collaboration connected",
             "fileGroup": "File Operations",
             "viewGroup": "View Controls",
@@ -432,6 +470,25 @@
             "distributeH": "Distribute Horizontally",
             "distributeV": "Distribute Vertically"
         },
+        "saveStatus": {
+            "local": {
+                "saving": "Saving locally",
+                "saved": "Saved locally",
+                "failed": "Local save failed"
+            },
+            "cloud": {
+                "saving": "Saving to cloud",
+                "saved": "Saved to cloud",
+                "failed": "Cloud save failed"
+            },
+            "lastSaved": "Last saved {{timeAgo}}",
+            "secondsAgo_one": "{{count}} second ago",
+            "secondsAgo_other": "{{count}} seconds ago",
+            "minutesAgo_one": "{{count}} minute ago",
+            "minutesAgo_other": "{{count}} minutes ago",
+            "hoursAgo_one": "{{count}} hour ago",
+            "hoursAgo_other": "{{count}} hours ago"
+        },
         "jsonEditor": {
             "title": "Edit Diagram Data (JSON)",
             "formatStandard": "Standard Data (Editable)",
@@ -454,7 +511,12 @@
         },
         "flowchart": {
             "newNode": "New Node",
-            "nodeAdded": "Added {{type}}",
+            "nodeAdded": "Added {{label}}",
+            "nodeAriaLabel": "Node: {{label}}{{selectedState}}{{lockedState}}",
+            "nodeSelectedState": " (selected)",
+            "nodeLockedState": " (locked)",
+            "doubleClickToEdit": "Double-click to edit",
+            "quickAddOrConnect": "Click to add; drag to connect",
             "edgeNodeInserted": "Inserted new node at edge midpoint",
             "clearCanvas": {
                 "title": "Clear Canvas",
@@ -822,10 +884,15 @@
         "exitFullScreen": "Exit Fullscreen",
         "options": "Export Options",
         "export": "Export",
+        "fileGroup": "File export",
+        "cloudGroup": "Cloud and sharing",
         "png": "PNG Format",
         "pdf": "PDF Format",
         "svg": "SVG Format",
         "gif": "GIF Animation",
+        "markdown": "Markdown document (.md)",
+        "success": "{{format}} export completed",
+        "failed": "{{format}} export failed",
         "saveToCloud": "Save to Cloud",
         "savingToCloud": "Saving to cloud...",
         "cloudSaveSuccess": "Saved to cloud",

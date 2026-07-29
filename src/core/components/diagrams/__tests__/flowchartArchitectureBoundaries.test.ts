@@ -9,6 +9,7 @@ import {
     createStableFlowchartRendererMapResolver,
     normalizeFlowchartPluginNodeData,
     normalizeFlowchartPluginNodeType,
+    resolveFlowchartPluginNodeNotificationLabel,
     resolveFlowchartPluginNodePosition,
 } from '../flowchartPluginRuntimeModel';
 import { coerceFlowchartThemeGridState } from '../hooks/useFlowchartShellState';
@@ -27,6 +28,19 @@ describe('flowchart architecture boundaries', () => {
             containerWidth: 0,
             containerHeight: 0,
         })).toEqual({ x: 10, y: 20 });
+    });
+
+    it('uses a bounded, readable label for plugin-node notifications', () => {
+        expect(resolveFlowchartPluginNodeNotificationLabel(
+            { label: '  Sales \n process  ' },
+            'flowchart',
+        )).toBe('Sales process');
+        expect(resolveFlowchartPluginNodeNotificationLabel({ label: '' }, 'rectangle')).toBe('rectangle');
+        expect(resolveFlowchartPluginNodeNotificationLabel({ label: 42 }, 'custom')).toBe('custom');
+        expect(resolveFlowchartPluginNodeNotificationLabel(
+            { label: 'x'.repeat(200) },
+            'custom',
+        )).toHaveLength(80);
     });
 
     it('coerces invalid viewport numbers into a finite centered position', () => {

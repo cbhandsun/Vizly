@@ -3,6 +3,10 @@ import { describe, expect, it } from 'vitest';
 import { FlowchartPlugin } from '../FlowchartPlugin';
 
 describe('FlowchartPlugin migration', () => {
+    it('leaves host-owned alignment, layout, and fit controls out of the plugin toolbar', () => {
+        expect(Object.hasOwn(FlowchartPlugin.prototype, 'contributeToolbar')).toBe(false);
+    });
+
     it('adds the legacy default shape without mutating the input', async () => {
         const source = { nodes: [{ id: 'a', metadata: {} }] };
         const result = await new FlowchartPlugin().migrate(source, '1.0');

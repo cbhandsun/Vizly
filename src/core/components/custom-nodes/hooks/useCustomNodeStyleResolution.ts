@@ -201,13 +201,14 @@ export const useCustomNodeStyleResolution = ({
         }
     }, []);
 
+    const nodeFontFamily = d?.fontFamily;
     const effectiveFontFamily = useMemo(() => {
         try {
-            return (d?.fontFamily as string) || (diagramConfigManager.getConfig()?.node?.font?.family as string) || DEFAULT_FONT_STACK;
+            return (nodeFontFamily as string) || (diagramConfigManager.getConfig()?.node?.font?.family as string) || DEFAULT_FONT_STACK;
         } catch {
-            return (d?.fontFamily as string) || DEFAULT_FONT_STACK;
+            return (nodeFontFamily as string) || DEFAULT_FONT_STACK;
         }
-    }, [d?.fontFamily]);
+    }, [nodeFontFamily]);
 
     const finalFontSize = typeof d.fontSize === 'number'
         ? d.fontSize

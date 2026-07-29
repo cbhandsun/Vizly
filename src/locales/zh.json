@@ -17,6 +17,28 @@
         "delete": "删除",
         "proFeature": "Pro 功能"
     },
+    "workspace": {
+        "recent": "最近",
+        "local": "本地",
+        "cloud": "云端",
+        "shared": "共享",
+        "industryTemplates": "行业模板库",
+        "generalTemplates": "通用模板",
+        "lastModified": "最近修改",
+        "name": "名称",
+        "type": "类型",
+        "sortBy": "图表排序",
+        "gridView": "网格视图",
+        "listView": "列表视图",
+        "openInNewTab": "在新标签页打开",
+        "applyTemplate": "使用模板",
+        "applyNamedTemplate": "使用模板 {{title}}",
+        "openDiagram": "打开图表 {{title}}",
+        "moreActions": "{{title}} 的更多操作",
+        "unknownTime": "未知时间",
+        "previewLoading": "正在加载预览",
+        "previewUnavailable": "预览暂不可用"
+    },
     "templates": {
         "title": "模板库",
         "use": "使用",
@@ -104,6 +126,15 @@
     },
     "designer": {
         "title": "图表视图",
+        "mobileDock": {
+            "add": "添加组件",
+            "properties": "属性",
+            "propertiesSelected": "属性（已选择 {{count}} 项）",
+            "layers": "图层",
+            "ai": "AI 助手",
+            "aiShort": "AI",
+            "settings": "设置"
+        },
         "debug": {
             "panel": {
                 "title": "路由调试器",
@@ -342,12 +373,16 @@
             "renderFailed": "渲染失败",
             "renderFailedSubtitle": "图表渲染出现异常，请刷新页面或切换到其他图表。"
         },
+        "canvas": {
+            "initializing": "正在初始化画布…"
+        },
         "toolbar": {
             "undo": "撤销 (Ctrl+Z)",
             "redo": "重做 (Ctrl+Y)",
             "zoomIn": "放大",
             "zoomOut": "缩小",
             "fitView": "适应",
+            "autoLayout": "自动布局",
             "layout": "布局",
             "save": "保存",
             "style": "图表风格",
@@ -395,8 +430,11 @@
             "hideMinimap": "隐藏小地图",
             "showMinimap": "显示小地图",
             "saveToCloud": "保存到云端",
-            "directSave": "覆盖保存 (直接存储)",
+            "directSave": "保存到当前位置",
             "directSaveDisabled": "当前状态无法直接保存",
+            "saveOptions": "保存选项",
+            "documentActions": "文档操作",
+            "pluginExport": "插件导出",
             "yjsSynced": "云端协同已连接",
             "fileGroup": "文件操作",
             "viewGroup": "视图控制",
@@ -418,7 +456,8 @@
             "unhighlightMainFlow": "取消高亮主链路",
             "showOnlyMainFlow": "过滤精简直视主干",
             "restoreFullFlow": "恢复完整链路体验",
-            "snapOff": "网格吸附：关",
+            "snapOn": "网格吸附：开启",
+            "snapOff": "网格吸附：关闭",
             "historyWithCount": "历史记录 ({{count}})",
             "canvasSettings": "画布设置",
             "minimap": "小地图",
@@ -435,6 +474,22 @@
             "alignB": "底对齐",
             "distributeH": "水平均分",
             "distributeV": "垂直均分"
+        },
+        "saveStatus": {
+            "local": {
+                "saving": "正在保存到本地",
+                "saved": "已保存到本地",
+                "failed": "本地保存失败"
+            },
+            "cloud": {
+                "saving": "正在保存到云端",
+                "saved": "已保存到云端",
+                "failed": "云端保存失败"
+            },
+            "lastSaved": "上次保存：{{timeAgo}}",
+            "secondsAgo": "{{count}} 秒前",
+            "minutesAgo": "{{count}} 分钟前",
+            "hoursAgo": "{{count}} 小时前"
         },
         "virtualization": {
             "enabled": "虚拟化已启用",
@@ -568,13 +623,18 @@
                 "nodeDagre": "◈ Dagre分层 (默认)"
             },
             "newNode": "新节点",
-            "nodeAdded": "已添加 {{type}}",
+            "nodeAdded": "已添加 {{label}}",
+            "nodeAriaLabel": "节点：{{label}}{{selectedState}}{{lockedState}}",
+            "nodeSelectedState": "（已选中）",
+            "nodeLockedState": "（已锁定）",
+            "doubleClickToEdit": "双击编辑",
+            "quickAddOrConnect": "单击快速添加，拖拽创建连线",
             "edgeNodeInserted": "已在连线中点插入新节点",
             "clearCanvas": {
-                "title": "清空画布 (Clear Canvas)",
-                "content": "确定要清空画布吗？此操作不可撤销。(Are you sure you want to clear the canvas?)",
-                "ok": "确定 (OK)",
-                "cancel": "取消 (Cancel)"
+                "title": "清空画布",
+                "content": "确定要清空画布吗？此操作不可撤销。",
+                "ok": "确定",
+                "cancel": "取消"
             },
             "import": {
                 "standardSuccess": "成功导入标准化配置（{{count}} 节点）",
@@ -901,10 +961,15 @@
         "exitFullScreen": "退出全屏",
         "options": "导出选项",
         "export": "导出",
+        "fileGroup": "文件导出",
+        "cloudGroup": "云端与分享",
         "png": "PNG 格式",
         "pdf": "PDF 格式",
         "svg": "SVG 格式",
         "gif": "GIF 动图",
+        "markdown": "Markdown 文档 (.md)",
+        "success": "{{format}} 导出完成",
+        "failed": "{{format}} 导出失败",
         "saveToCloud": "保存到云端",
         "savingToCloud": "正在保存到云端...",
         "cloudSaveSuccess": "云端保存成功",

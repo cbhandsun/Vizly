@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Node, Edge, BackgroundVariant, ReactFlowInstance, SelectionMode, NodeTypes, EdgeTypes, NodeChange, EdgeChange, Connection, OnConnectStart, OnConnectEnd, ConnectionMode, ConnectionLineType, type IsValidConnection, type OnNodeDrag, type OnReconnect } from '@xyflow/react';
 import BaseReactFlow from '../shared/BaseReactFlow';
 import { useConnectionMicrointeractions } from './hooks/useConnectionMicrointeractions';
@@ -7,6 +7,7 @@ import {
     useFlowchartDragBuffer,
     type SmartNodeDragHandler,
 } from './hooks/useFlowchartDragBuffer';
+import { addFlowchartAccessibilityLabels } from './flowchartCanvasAccessibility';
 
 export interface FlowchartCanvasShellProps {
     nodes: Node[];
@@ -126,6 +127,10 @@ export const FlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> = React.m
         onNodeDragStop,
         onSmartNodeDrag,
     });
+    const accessibleElements = useMemo(
+        () => addFlowchartAccessibilityLabels(canvasNodes, displayEdges),
+        [canvasNodes, displayEdges],
+    );
     const connectionLineStyle = isConnecting ? {
         stroke: connectPreview ? 'rgba(16, 185, 129, 0.95)' : 'rgba(59, 130, 246, 0.95)',
         strokeWidth: connectPreview ? 3.5 : 2.5,
@@ -134,8 +139,8 @@ export const FlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> = React.m
     return (
         <BaseReactFlow
             onInit={onInit}
-            nodes={canvasNodes}
-            edges={displayEdges}
+            nodes={accessibleElements.nodes}
+            edges={accessibleElements.edges}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
             onNodesChange={handleNodesChange}
@@ -185,6 +190,8 @@ export const FlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> = React.m
             disableZoomCompensation={disableZoomCompensation}
             nodesDraggable={nodesDraggable}
             nodesConnectable={nodesConnectable}
+            nodesFocusable
+            edgesFocusable
             edgesReconnectable={edgesReconnectable}
             onReconnect={onReconnect}
             onReconnectStart={onReconnectStart}

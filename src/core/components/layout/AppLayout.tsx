@@ -1,7 +1,7 @@
 import React from 'react';
 import { Layout, Menu, Typography, theme } from 'antd';
 import { FaGithub, FaBook, FaCog, FaChartBar } from 'react-icons/fa';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router';
 
 const { Header, Content, Footer } = Layout;
 const { Text } = Typography;

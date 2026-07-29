@@ -98,9 +98,16 @@ export const QuickConnectMenu: React.FC<QuickConnectMenuProps> = ({ x, y, visibl
     const ref = useRef<HTMLDivElement>(null);
     const [search, setSearch] = useState('');
     const [selectedIndex, setSelectedIndex] = useState(0);
+    const [previousVisible, setPreviousVisible] = useState(visible);
+    if (previousVisible !== visible) {
+        setPreviousVisible(visible);
+        if (!visible) {
+            setSearch('');
+            setSelectedIndex(0);
+        }
+    }
 
     const reactFlow = useReactFlow();
-    const inputRef = useRef<HTMLInputElement>(null);
 
     // Click outside or press ESC to close
     useEffect(() => {
@@ -119,11 +126,6 @@ export const QuickConnectMenu: React.FC<QuickConnectMenuProps> = ({ x, y, visibl
         if (visible) {
             document.addEventListener('mousedown', handleClickOutside);
             document.addEventListener('keydown', handleGlobalKeyDown, { capture: true });
-            // Auto-focus search on open
-            setTimeout(() => inputRef.current?.focus(), 50);
-        } else {
-            setSearch(''); // Reset search when closing
-            setSelectedIndex(0);
         }
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
@@ -155,30 +157,19 @@ export const QuickConnectMenu: React.FC<QuickConnectMenuProps> = ({ x, y, visibl
             requestAnimationFrame(() => {
                 const input = ref.current?.querySelector('input');
                 if (input) input.focus();
-            });
-
-            // 智能记忆：尝试选中同源形状
-            if (sourceNodeId && !search) {
-                const sourceNode = reactFlow.getNode(sourceNodeId);
-                const sourceShape = sourceNode?.data?.shape as FlowchartShape; // Cast to FlowchartShape
-                if (sourceShape) {
-                    const index = flatFilteredShapes.findIndex(item => item.shape === sourceShape); // Compare with item.shape
-                    if (index !== -1) {
-                        setSelectedIndex(index);
+                if (sourceNodeId && !search) {
+                    const sourceNode = reactFlow.getNode(sourceNodeId);
+                    const sourceShape = sourceNode?.data?.shape as FlowchartShape;
+                    if (sourceShape) {
+                        const index = flatFilteredShapes.findIndex(item => item.shape === sourceShape);
+                        if (index !== -1) {
+                            setSelectedIndex(index);
+                        }
                     }
                 }
-            }
-        } else {
-            // Reset when hiding (already handled by the other useEffect, but good to be explicit)
-            setSearch('');
-            setSelectedIndex(0);
+            });
         }
     }, [visible, reactFlow, sourceNodeId, search, flatFilteredShapes]);
-
-    // Reset selection when search changes (handled partially by above when visible turns off)
-    useEffect(() => {
-        if (visible) setSelectedIndex(0);
-    }, [search, visible]);
 
     // Trigger preview when selection changes
     useEffect(() => {
@@ -295,11 +286,14 @@ export const QuickConnectMenu: React.FC<QuickConnectMenuProps> = ({ x, y, visibl
                 {/* Search Input */}
                 <div style={{ padding: '8px 10px 4px', borderBottom: `1px solid rgba(0,0,0,0.06)` }}>
                     <input
-                        ref={inputRef}
+                        autoFocus
                         type="text"
                         placeholder="Search shapes (e.g. Database)..."
                         value={search}
-                        onChange={e => setSearch(e.target.value)}
+                        onChange={e => {
+                            setSearch(e.target.value);
+                            setSelectedIndex(0);
+                        }}
                         onKeyDown={handleKeyDown}
                         style={{
                             width: '100%',

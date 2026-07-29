@@ -6,7 +6,8 @@ import { CommandPalette as UiCommandPalette } from '../../ui/CommandPalette';
 import { SaveStatusIndicator } from '../SaveStatusIndicator';
 import { DiffResult } from '../../../utils/diagramDiff';
 import type { CommandItem } from '../../../types/plugin';
-import type { AutoSaveState } from '../../../hooks/useAutoSave';
+import type { AutoSaveState } from '../hooks/useAutoSave';
+import type { FlowchartSaveTarget } from '../hooks/useTrackedFlowchartSaves';
 import type { PresentationSlide } from '../../../hooks/usePresentationSlides';
 
 const JsonEditorModal = React.lazy(() => import('../JsonEditorModal').then(module => ({
@@ -57,6 +58,7 @@ export interface DesignerOverlaysLayerProps {
     // Status & Performance
     status: {
         saveState: AutoSaveState;
+        saveTarget: FlowchartSaveTarget;
         showPerformanceDashboard: boolean;
         nodeCount: number;
         edgeCount: number;
@@ -150,7 +152,7 @@ export const DesignerOverlaysLayer: React.FC<DesignerOverlaysLayerProps> = ({
                 pointerEvents: 'none',
                 transition: 'right 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
             }}>
-                <SaveStatusIndicator saveState={status.saveState} />
+                <SaveStatusIndicator saveState={status.saveState} target={status.saveTarget} />
             </div>
 
             {/* ⭐ 性能仪表盘 */}

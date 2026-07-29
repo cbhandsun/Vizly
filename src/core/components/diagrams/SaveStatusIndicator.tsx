@@ -1,13 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { Tag, Tooltip } from 'antd';
 import { SyncOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
-import type { AutoSaveState } from '../../hooks/useAutoSave';
+import { useTranslation } from 'react-i18next';
+import type { AutoSaveState } from './hooks/useAutoSave';
 
 interface SaveStatusIndicatorProps {
     saveState: AutoSaveState;
+    target?: 'local' | 'cloud';
 }
 
-export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = React.memo(({ saveState }) => {
+export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = React.memo(({
+    saveState,
+    target = 'local',
+}) => {
+    const { t } = useTranslation();
     const { saving, lastSaved, error } = saveState;
     const [now, setNow] = useState<number | null>(null);
 
@@ -26,10 +32,11 @@ export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = React.mem
 
     // 保存中
     if (saving) {
+        const label = t(`designer.saveStatus.${target}.saving`);
         return (
-            <Tooltip title="保存中...">
+            <Tooltip title={label}>
                 <Tag icon={<SyncOutlined spin />} color="processing">
-                    保存中
+                    {label}
                 </Tag>
             </Tooltip>
         );
@@ -37,10 +44,11 @@ export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = React.mem
 
     // 保存失败
     if (error) {
+        const label = t(`designer.saveStatus.${target}.failed`);
         return (
-            <Tooltip title={`保存失败: ${error}`}>
+            <Tooltip title={label}>
                 <Tag icon={<CloseCircleOutlined />} color="error">
-                    保存失败
+                    {label}
                 </Tag>
             </Tooltip>
         );
@@ -51,15 +59,16 @@ export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = React.mem
         const diffMs = now === null ? 0 : Math.max(0, now - lastSaved);
         const diffSec = Math.floor(diffMs / 1000);
         const timeAgo = diffSec < 60
-            ? `${diffSec}秒前`
+            ? t('designer.saveStatus.secondsAgo', { count: diffSec })
             : diffSec < 3600
-                ? `${Math.floor(diffSec / 60)}分钟前`
-                : `${Math.floor(diffSec / 3600)}小时前`;
+                ? t('designer.saveStatus.minutesAgo', { count: Math.floor(diffSec / 60) })
+                : t('designer.saveStatus.hoursAgo', { count: Math.floor(diffSec / 3600) });
+        const label = t(`designer.saveStatus.${target}.saved`);
 
         return (
-            <Tooltip title={`上次保存: ${timeAgo}`}>
+            <Tooltip title={t('designer.saveStatus.lastSaved', { timeAgo })}>
                 <Tag icon={<CheckCircleOutlined />} color="success">
-                    已保存
+                    {label}
                 </Tag>
             </Tooltip>
         );

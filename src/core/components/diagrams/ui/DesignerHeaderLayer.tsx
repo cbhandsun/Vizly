@@ -16,13 +16,6 @@ export interface DesignerHeaderLayerProps {
     diagramId?: string;
     
     topActions: {
-        onExportJSON: () => void;
-        onExportPNG: TopActionProps['onExportPNG'];
-        onExportSVG: TopActionProps['onExportSVG'];
-        onExportPDF: TopActionProps['onExportPDF'];
-        onExportGIF: TopActionProps['onExportGIF'];
-        onExportMermaid: () => void;
-        onImportClick: () => void;
         onEditJson: () => void;
         onStartPresentation: () => void;
         onShowDiff: () => void;
@@ -124,13 +117,6 @@ export const DesignerHeaderLayer = React.memo(
             <>
                 <TopActionButtons
                     diagramId={_diagramId}
-                    onExportJSON={topActions.onExportJSON}
-                    onExportPNG={topActions.onExportPNG}
-                    onExportSVG={topActions.onExportSVG}
-                    onExportPDF={topActions.onExportPDF}
-                    onExportGIF={topActions.onExportGIF}
-                    onExportMermaid={topActions.onExportMermaid}
-                    onImportClick={topActions.onImportClick}
                     onEditJson={topActions.onEditJson}
                     onStartPresentation={topActions.onStartPresentation}
                     onShowDiff={topActions.onShowDiff}
@@ -245,7 +231,6 @@ export const DesignerHeaderLayer = React.memo(
                     onImportClick={toolbar.onImportClick}
                     isCommentMode={topActions.isCommentMode}
                     setIsCommentMode={topActions.setIsCommentMode}
-                    onShowHistory={topActions.onShowHistory}
                     historyCount={toolbar.historyCount}
                     onAlign={toolbar.onAlign}
                     onDistribute={toolbar.onDistribute}

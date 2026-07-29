@@ -11,6 +11,7 @@ import {
     writeDesignerRightSidebarWidth,
 } from '../../utils/layoutStorage';
 import {
+    shouldActivateDesignerPropertyTab,
     shouldExpandDesignerRightSidebar,
     shouldFreezeDesignerRightSidebarDuringDrag,
 } from './designerRightSidebarState';
@@ -37,6 +38,9 @@ export interface DesignerRightSidebarProps {
     activePlugin?: DiagramTypePlugin;
     pluginCtx?: PluginContext;
     isMobile?: boolean; // GAP-11
+    collapseForLeftDrawer?: boolean;
+    mobileOpen?: boolean;
+    onMobileOpenChange?: (open: boolean) => void;
 }
 
 const RAIL_WIDTH = 44; // Matched with exact IconRailSidebar width
@@ -64,12 +68,16 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
     activePlugin,
     pluginCtx,
     isMobile = false,
+    collapseForLeftDrawer = false,
+    mobileOpen,
+    onMobileOpenChange,
 }) => {
     const visible = true; // Always true so theme switcher is accessible
     const { t } = useTranslation();
     const { token } = theme.useToken();
     const hasSelection = selectedNodes.length > 0 || selectedEdges.length > 0;
     const previousAiChatVisibleRef = React.useRef(aiChatVisible);
+    const previousHasSelectionRef = React.useRef(false);
 
     // 折叠状态持久化
     const [collapsedState, setCollapsedState] = useState(() => {
@@ -78,8 +86,15 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
             value: readDesignerRightSidebarCollapsed(),
         };
     });
-    const isCollapsed = collapsedState.diagramId === diagramId ? collapsedState.value : true;
+    const isControlledMobile = isMobile && mobileOpen !== undefined;
+    const persistedCollapsed = collapsedState.diagramId === diagramId ? collapsedState.value : true;
+    const isCollapsed = isControlledMobile ? !mobileOpen : persistedCollapsed;
     const setIsCollapsed = useCallback((update: React.SetStateAction<boolean>) => {
+        if (isControlledMobile) {
+            const nextCollapsed = typeof update === 'function' ? update(!mobileOpen) : update;
+            onMobileOpenChange?.(!nextCollapsed);
+            return;
+        }
         setCollapsedState(previous => {
             const current = previous.diagramId === diagramId ? previous.value : true;
             return {
@@ -87,11 +102,20 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
                 value: typeof update === 'function' ? update(current) : update,
             };
         });
-    }, [diagramId]);
+    }, [diagramId, isControlledMobile, mobileOpen, onMobileOpenChange]);
 
     useEffect(() => {
-        writeDesignerRightSidebarCollapsed(isCollapsed);
-    }, [isCollapsed]);
+        if (!isMobile) {
+            writeDesignerRightSidebarCollapsed(isCollapsed);
+        }
+    }, [isCollapsed, isMobile]);
+
+    useEffect(() => {
+        if (!isMobile && collapseForLeftDrawer && !hasSelection) {
+            const timer = window.setTimeout(() => setIsCollapsed(true), 0);
+            return () => window.clearTimeout(timer);
+        }
+    }, [collapseForLeftDrawer, hasSelection, isMobile, setIsCollapsed]);
 
     // 面板宽度持久化与拖拽逻辑
     const [panelWidth, setPanelWidth] = useState<number>(() => {
@@ -151,6 +175,7 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
         if (shouldExpandDesignerRightSidebar({
             isCollapsed,
             hasSelection,
+            isMobile,
             activeTab,
             aiChatVisible,
             previousAiChatVisible,
@@ -160,7 +185,20 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
             }, 0);
             return () => window.clearTimeout(timer);
         }
-    }, [activeTab, aiChatVisible, hasSelection, isCollapsed, setIsCollapsed]);
+    }, [activeTab, aiChatVisible, hasSelection, isCollapsed, isMobile, setIsCollapsed]);
+
+    useEffect(() => {
+        const previousHasSelection = previousHasSelectionRef.current;
+        previousHasSelectionRef.current = hasSelection;
+        if (shouldActivateDesignerPropertyTab({
+            activeTab,
+            hasSelection,
+            isMobile,
+            previousHasSelection,
+        })) {
+            onTabChange('property');
+        }
+    }, [activeTab, hasSelection, isMobile, onTabChange]);
 
     const toggle = useCallback(() => {
         if (!isCollapsed && activeTab === 'ai' && aiChatVisible) {
@@ -206,7 +244,9 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
                 maxHeight: isMobile ? '85vh' : 'calc(100% - 96px)',
                 height: isCollapsed ? (isMobile ? 0 : 'max-content') : (isMobile ? '85vh' : 'calc(100% - 96px)'),
                 width: isMobile ? '100%' : (isCollapsed ? RAIL_WIDTH : panelWidth),
-                backgroundColor: 'var(--designer-panel-bg, rgba(255, 255, 255, 0.72))',
+                backgroundColor: isMobile
+                    ? token.colorBgContainer
+                    : 'var(--designer-panel-bg, rgba(255, 255, 255, 0.72))',
                 backdropFilter: 'var(--designer-blur, blur(24px) saturate(180%))',
                 WebkitBackdropFilter: 'var(--designer-blur, blur(24px) saturate(180%))',
                 display: 'flex',

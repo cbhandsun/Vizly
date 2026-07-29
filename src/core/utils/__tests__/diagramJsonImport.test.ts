@@ -21,7 +21,17 @@ describe('diagramJsonImport', () => {
     it('parses bounded JSON and rejects oversized content', () => {
         expect(parseDiagramJson('{"nodes":[],"edges":[]}')).toEqual({ nodes: [], edges: [] });
         expect(() => parseDiagramJson('x'.repeat(DIAGRAM_JSON_IMPORT_MAX_CHARS + 1))).toThrow('too large');
-        expect(() => parseDiagramJson('{broken')).toThrow('invalid');
+        let invalidJsonError: unknown;
+        try {
+            parseDiagramJson('{broken');
+        } catch (error) {
+            invalidJsonError = error;
+        }
+        expect(invalidJsonError).toBeInstanceOf(Error);
+        expect(invalidJsonError).toMatchObject({
+            message: 'Diagram JSON is invalid.',
+            cause: expect.any(SyntaxError),
+        });
     });
 
     it('detects likely standard diagram data', () => {

@@ -1,6 +1,6 @@
 import type { Node } from '@xyflow/react';
 
-import type { PluginContext } from '../../types/plugin';
+import type { DiagramTypePlugin } from '../../types/plugin';
 import { MobileBottomDock } from '../layout/MobileBottomDock';
 import { DesignerOverlaysLayer } from './ui/DesignerOverlaysLayer';
 import { DesignerRightSidebar } from './DesignerRightSidebar';
@@ -11,11 +11,115 @@ import {
     type FlowchartDesignerViewModel,
 } from './flowchartDesignerViewModel';
 
-interface FlowchartDesignerRegionProps {
-    model: FlowchartDesignerViewModel;
-}
+export type FlowchartDesignerLeftSidebarModel = Omit<Pick<FlowchartDesignerViewModel,
+    | 'activeLayerId'
+    | 'activePlugin'
+    | 'createLayer'
+    | 'deleteLayer'
+    | 'deleteTemplate'
+    | 'groupedTemplates'
+    | 'handleFocusNode'
+    | 'handleUseTemplate'
+    | 'isMobile'
+    | 'isInitialDiagramLoading'
+    | 'isSidebarHidden'
+    | 'layers'
+    | 'mobileRequestedPanel'
+    | 'nodes'
+    | 'pluginCtx'
+    | 'presentationActive'
+    | 'renameLayer'
+    | 'renameTemplate'
+    | 'reorderLayers'
+    | 'selectedNodes'
+    | 'setActiveLayerId'
+    | 'setLayerColor'
+    | 'setLeftDrawerOpen'
+    | 'setLeftDrawerWidth'
+    | 'setMobileRequestedPanel'
+    | 'templates'
+    | 'toggleLock'
+    | 'toggleVisibility'
+>, 'activePlugin'> & {
+    activePlugin?: Pick<DiagramTypePlugin, 'hideDefaultSidebar' | 'contributeSidebarPanels'>;
+};
 
-export function FlowchartDesignerLeftSidebar({ model }: FlowchartDesignerRegionProps) {
+export type FlowchartDesignerRightSidebarModel = Pick<FlowchartDesignerViewModel,
+    | 'activePlugin'
+    | 'activeRightTab'
+    | 'aiChatVisible'
+    | 'handleBeforeUpdate'
+    | 'id'
+    | 'isDraggingNode'
+    | 'isMobile'
+    | 'leftDrawerOpen'
+    | 'mobilePropertyDrawerVisible'
+    | 'onAiTabIntercept'
+    | 'pluginCtx'
+    | 'presentationActive'
+    | 'renderAIChatPanel'
+    | 'selectedEdges'
+    | 'selectedNodes'
+    | 'setActiveRightTab'
+    | 'setAiChatVisible'
+    | 'setMobilePropertyDrawerVisible'
+    | 'setRightSidebarWidth'
+    | 'showAiCrown'
+    | 'updateEdgesBatch'
+    | 'updateNodesBatch'
+>;
+
+export type FlowchartDesignerOverlaysModel = Pick<FlowchartDesignerViewModel,
+    | 'activeRightTab'
+    | 'canRedo'
+    | 'canUndo'
+    | 'commandPaletteItems'
+    | 'commandPaletteVisible'
+    | 'diagramIdForExport'
+    | 'diffResult'
+    | 'edges'
+    | 'handleOpenSettings'
+    | 'handlePresentationFocus'
+    | 'id'
+    | 'isMobile'
+    | 'isVersionHistoryOpen'
+    | 'jsonEditorInitialContent'
+    | 'jsonEditorVisible'
+    | 'laserEnabled'
+    | 'mobilePropertyDrawerVisible'
+    | 'nodes'
+    | 'onOpenSettings'
+    | 'onVersionHistoryClose'
+    | 'presentationActive'
+    | 'presentationSlides'
+    | 'reactFlowInstance'
+    | 'redo'
+    | 'renderAIConfigModal'
+    | 'renderShareDialog'
+    | 'renderVersionHistoryPanel'
+    | 'saveState'
+    | 'saveTarget'
+    | 'selectedEdges'
+    | 'selectedNodes'
+    | 'setActiveRightTab'
+    | 'setAiChatVisible'
+    | 'setCommandPaletteVisible'
+    | 'setDiffResult'
+    | 'setEdges'
+    | 'setJsonEditorVisible'
+    | 'setMobileRequestedPanel'
+    | 'setMobilePropertyDrawerVisible'
+    | 'setNodes'
+    | 'setPresentationActive'
+    | 'setShortcutHelpVisible'
+    | 'setShowShortcutsModal'
+    | 'shortcutHelpVisible'
+    | 'showPerformanceDashboard'
+    | 'showShortcuts'
+    | 'undo'
+>;
+
+export function FlowchartDesignerLeftSidebar({ model }: { model: FlowchartDesignerLeftSidebarModel }) {
     const {
         activeLayerId,
         activePlugin,
@@ -25,29 +129,34 @@ export function FlowchartDesignerLeftSidebar({ model }: FlowchartDesignerRegionP
         groupedTemplates,
         handleFocusNode,
         handleUseTemplate,
+        isInitialDiagramLoading,
         isMobile,
         isSidebarHidden,
         layers,
+        mobileRequestedPanel,
         nodes,
         pluginCtx,
         presentationActive,
         renameLayer,
         renameTemplate,
         reorderLayers,
+        selectedNodes,
         setActiveLayerId,
         setLayerColor,
         setLeftDrawerOpen,
         setLeftDrawerWidth,
+        setMobileRequestedPanel,
         templates,
         toggleLock,
         toggleVisibility,
     } = model;
 
     if (presentationActive || isSidebarHidden || activePlugin?.hideDefaultSidebar) return null;
+    const contributeSidebarPanels = activePlugin?.contributeSidebarPanels;
     const rawPluginPanels = resolveFlowchartPluginContribution(
         'sidebar',
-        activePlugin?.contributeSidebarPanels && pluginCtx
-            ? () => activePlugin.contributeSidebarPanels(pluginCtx)
+        contributeSidebarPanels && pluginCtx
+            ? () => contributeSidebarPanels(pluginCtx)
             : null,
         [],
     );
@@ -55,6 +164,7 @@ export function FlowchartDesignerLeftSidebar({ model }: FlowchartDesignerRegionP
 
     return (
         <IconRailSidebar
+            key={(selectedNodes?.length ?? 0) > 0 ? 'selection-active' : 'selection-empty'}
             nodes={nodes}
             onFocusNode={(node: Node) => handleFocusNode(node.id)}
             layers={layers}
@@ -76,11 +186,14 @@ export function FlowchartDesignerLeftSidebar({ model }: FlowchartDesignerRegionP
             onDrawerWidthChange={setLeftDrawerWidth}
             pluginPanels={pluginPanels}
             isMobile={isMobile}
+            autoOpenShapes={!isInitialDiagramLoading && nodes.length === 0}
+            requestedPanel={isMobile ? mobileRequestedPanel : null}
+            onRequestedPanelHandled={() => setMobileRequestedPanel(null)}
         />
     );
 }
 
-export function FlowchartDesignerRightSidebarRegion({ model }: FlowchartDesignerRegionProps) {
+export function FlowchartDesignerRightSidebarRegion({ model }: { model: FlowchartDesignerRightSidebarModel }) {
     const {
         activePlugin,
         activeRightTab,
@@ -89,14 +202,17 @@ export function FlowchartDesignerRightSidebarRegion({ model }: FlowchartDesigner
         handleBeforeUpdate,
         isDraggingNode,
         isMobile,
+        mobilePropertyDrawerVisible,
         onAiTabIntercept,
         pluginCtx,
         presentationActive,
+        leftDrawerOpen,
         renderAIChatPanel,
         selectedEdges,
         selectedNodes,
         setActiveRightTab,
         setAiChatVisible,
+        setMobilePropertyDrawerVisible,
         setRightSidebarWidth,
         showAiCrown,
         updateEdgesBatch,
@@ -123,13 +239,16 @@ export function FlowchartDesignerRightSidebarRegion({ model }: FlowchartDesigner
             showAiCrown={showAiCrown}
             onAiTabIntercept={onAiTabIntercept}
             activePlugin={activePlugin}
-            pluginCtx={pluginCtx as PluginContext}
+            pluginCtx={pluginCtx ?? undefined}
             isMobile={isMobile}
+            collapseForLeftDrawer={leftDrawerOpen}
+            mobileOpen={isMobile ? mobilePropertyDrawerVisible : undefined}
+            onMobileOpenChange={isMobile ? setMobilePropertyDrawerVisible : undefined}
         />
     );
 }
 
-export function FlowchartDesignerOverlaysRegion({ model }: FlowchartDesignerRegionProps) {
+export function FlowchartDesignerOverlaysRegion({ model }: { model: FlowchartDesignerOverlaysModel }) {
     const {
         activeRightTab,
         canRedo,
@@ -157,6 +276,7 @@ export function FlowchartDesignerOverlaysRegion({ model }: FlowchartDesignerRegi
         renderShareDialog,
         renderVersionHistoryPanel,
         saveState,
+        saveTarget,
         selectedEdges,
         selectedNodes,
         setActiveRightTab,
@@ -165,8 +285,7 @@ export function FlowchartDesignerOverlaysRegion({ model }: FlowchartDesignerRegi
         setDiffResult,
         setEdges,
         setJsonEditorVisible,
-        setLeftDrawerOpen,
-        setMobileAddDrawerVisible,
+        setMobileRequestedPanel,
         setMobilePropertyDrawerVisible,
         setNodes,
         setPresentationActive,
@@ -207,6 +326,7 @@ export function FlowchartDesignerOverlaysRegion({ model }: FlowchartDesignerRegi
                 }}
                 status={{
                     saveState,
+                    saveTarget,
                     showPerformanceDashboard: !!showPerformanceDashboard,
                     nodeCount: nodes.length,
                     edgeCount: edges.length,
@@ -229,25 +349,30 @@ export function FlowchartDesignerOverlaysRegion({ model }: FlowchartDesignerRegi
             <LaserPointer active={presentationActive && laserEnabled} />
             {isMobile && !presentationActive && (
                 <MobileBottomDock
-                    activeTab={mobilePropertyDrawerVisible ? 'property' : (activeRightTab === 'ai' ? 'ai' : null)}
+                    activeTab={mobilePropertyDrawerVisible ? activeRightTab : null}
                     selectedCount={selectedNodes.length + selectedEdges.length}
-                    onAddClick={() => {
-                        setLeftDrawerOpen(true);
-                        setMobileAddDrawerVisible(true);
-                    }}
+                    onAddClick={() => setMobileRequestedPanel('shapes')}
                     onPropertyClick={() => {
-                        setMobilePropertyDrawerVisible(!mobilePropertyDrawerVisible);
-                        if (!mobilePropertyDrawerVisible) setActiveRightTab('property');
-                    }}
-                    onLayerClick={() => setLeftDrawerOpen(true)}
-                    onAiClick={() => {
-                        if (activeRightTab === 'ai') {
-                            setAiChatVisible(false);
-                            setActiveRightTab('property');
-                        } else {
-                            setActiveRightTab('ai');
-                            setAiChatVisible(true);
+                        const shouldClose = mobilePropertyDrawerVisible && activeRightTab === 'property';
+                        if (shouldClose) {
+                            setMobilePropertyDrawerVisible(false);
+                            return;
                         }
+                        setAiChatVisible(false);
+                        setActiveRightTab('property');
+                        setMobilePropertyDrawerVisible(true);
+                    }}
+                    onLayerClick={() => setMobileRequestedPanel('layers')}
+                    onAiClick={() => {
+                        const shouldClose = mobilePropertyDrawerVisible && activeRightTab === 'ai';
+                        if (shouldClose) {
+                            setAiChatVisible(false);
+                            setMobilePropertyDrawerVisible(false);
+                            return;
+                        }
+                        setActiveRightTab('ai');
+                        setAiChatVisible(true);
+                        setMobilePropertyDrawerVisible(true);
                     }}
                     onUndo={undo}
                     onRedo={redo}

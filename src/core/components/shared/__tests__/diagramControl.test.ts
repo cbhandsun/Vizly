@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
-    clampDiagramFullFitZoom,
+  clampDiagramFullFitZoom,
+    computeDiagramFitViewport,
     coerceDiagramSidebarOffset,
     DEFAULT_DIAGRAM_RIGHT_SIDEBAR_OFFSET,
     MAX_DIAGRAM_FULL_FIT_ZOOM,
@@ -35,8 +36,8 @@ describe('diagramControl', () => {
     );
   });
 
-  it('allows full-fit views below the old 45 percent clipping floor', () => {
-    expect(clampDiagramFullFitZoom(0.3)).toBeCloseTo(0.294);
+  it('keeps full-fit views readable without returning to the old 45 percent floor', () => {
+    expect(clampDiagramFullFitZoom(0.3)).toBe(MIN_DIAGRAM_FULL_FIT_ZOOM);
     expect(clampDiagramFullFitZoom(0.3)).toBeLessThan(0.45);
   });
 
@@ -54,5 +55,28 @@ describe('diagramControl', () => {
     expect(coerceDiagramSidebarOffset('not-a-size')).toBe(DEFAULT_DIAGRAM_RIGHT_SIDEBAR_OFFSET);
     expect(coerceDiagramSidebarOffset(-1)).toBe(DEFAULT_DIAGRAM_RIGHT_SIDEBAR_OFFSET);
     expect(coerceDiagramSidebarOffset(50_000)).toBe(800);
+  });
+
+  it('computes a centered viewport inside the real panel-safe canvas area', () => {
+    expect(computeDiagramFitViewport({
+      bounds: { minX: 100, minY: 50, width: 800, height: 400 },
+      viewportWidth: 1_280,
+      viewportHeight: 720,
+      safeArea: { top: 84, right: 320, bottom: 64, left: 68 },
+      padding: 8,
+    })).toEqual(expect.objectContaining({
+      x: expect.any(Number),
+      y: expect.any(Number),
+      zoom: expect.any(Number),
+    }));
+  });
+
+  it('rejects invalid viewport geometry', () => {
+    expect(computeDiagramFitViewport({
+      bounds: { minX: 0, minY: 0, width: 0, height: 10 },
+      viewportWidth: 1_280,
+      viewportHeight: 720,
+      safeArea: { top: 0, right: 0, bottom: 0, left: 0 },
+    })).toBeNull();
   });
 });

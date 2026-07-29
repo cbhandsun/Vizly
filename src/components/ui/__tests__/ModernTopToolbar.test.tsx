@@ -1,0 +1,71 @@
+// @vitest-environment jsdom
+
+import React from 'react';
+import { render } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+
+const breakpointState = vi.hoisted(() => ({ md: false }));
+
+vi.mock('antd', () => ({
+  Grid: {
+    useBreakpoint: () => breakpointState,
+  },
+  Popover: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  Select: () => <select aria-label="edge-mode" />,
+  Tooltip: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, fallback?: string) => fallback ?? key,
+  }),
+}));
+
+vi.mock('../../ExportTools', () => ({
+  default: () => <div data-testid="export-tools" />,
+}));
+
+vi.mock('../EnhancedThemeSelector', () => ({
+  EnhancedThemeSelector: () => <div data-testid="theme-selector" />,
+}));
+
+vi.mock('../../shared/LanguageSwitcher', () => ({
+  LanguageSwitcher: () => <div data-testid="language-switcher" />,
+}));
+
+vi.mock('../../auth/AuthStatus', () => ({
+  AuthStatusCompact: () => <div data-testid="auth-status" />,
+}));
+
+import { ModernTopToolbar } from '../ModernTopToolbar';
+
+const renderToolbar = () => render(
+  <ModernTopToolbar
+    diagramId="diagram-1"
+    edgeMode="native"
+    onEdgeModeChange={() => undefined}
+    centerChildren={<button type="button">center</button>}
+  />,
+);
+
+describe('ModernTopToolbar responsive layout', () => {
+  it('moves the main canvas tools to a second row on mobile', () => {
+    breakpointState.md = false;
+    const { container } = renderToolbar();
+    const centerPortal = container.querySelector('#vizly-plugin-center-island-portal');
+    const centerSection = centerPortal?.parentElement?.parentElement?.parentElement;
+
+    expect(centerSection?.className).toContain('absolute');
+    expect(centerSection?.className).toContain('top-[48px]');
+  });
+
+  it('keeps the main canvas tools inline on desktop', () => {
+    breakpointState.md = true;
+    const { container } = renderToolbar();
+    const centerPortal = container.querySelector('#vizly-plugin-center-island-portal');
+    const centerSection = centerPortal?.parentElement?.parentElement?.parentElement;
+
+    expect(centerSection?.className).not.toContain('absolute');
+    expect(centerSection?.className).toContain('flex-1');
+  });
+});

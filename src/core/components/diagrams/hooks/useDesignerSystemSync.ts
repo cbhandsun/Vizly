@@ -7,13 +7,13 @@ import { EdgeRoutingCoordinator } from '../../../services/EdgeRoutingCoordinator
 import { cancelLayoutTransition, suspendLayoutTransitions } from '../../../utils/animateLayoutTransition';
 import { readReactFlowCanvasSize } from '../../../utils/domViewport';
 import { loadStandardPresetCanvas } from './standardPresetCanvasCache';
+import { useDesignerPresetInitialization } from './useDesignerPresetInitialization';
 import {
     logDesignerSystemSyncAutoSaveFailure,
     logDesignerSystemSyncAutosaveRecalculationFailure,
     logDesignerSystemSyncDataRegistryImportFailure,
     logDesignerSystemSyncDataRegistryWriteFailure,
     logDesignerSystemSyncImportDataFailure,
-    logDesignerSystemSyncPresetLoadFailure,
     logDesignerSystemSyncStaleAutosaveDetected,
     logDesignerSystemSyncStandardDataToCanvasFailure,
 } from './designerSystemSyncLogging';
@@ -287,7 +287,7 @@ export function useDesignerSystemSync({
                         if (n.id === id) {
                             const newData = { ...n.data, ...data };
                             if (label && !data.description) {
-                                newData.description = `<b>${label}</b>`;
+                                newData.description = label;
                             }
                             
                             // Re-calculate width if label changed
@@ -442,7 +442,7 @@ export function useDesignerSystemSync({
 
     const [autosaveEnabled, setAutosaveEnabled] = useState(false);
 
-    const { loadSaved, clearSaved, saveNow } = useAutoSave(nodes, edges, {
+    const { loadSaved, clearSaved, saveNow, saveState } = useAutoSave(nodes, edges, {
         interval: 60000,
         storageKey: `flowchart-autosave-v2-${id || 'default'}`,
         enabled: autosaveEnabled,
@@ -477,48 +477,25 @@ export function useDesignerSystemSync({
         };
     }, [nodes, edges, saveNow, autosaveEnabled]);
 
-    const hasRestoredAutoSave = useRef(false);
     const needsInitialFitView = useRef(false);
-    const processedDiagramId = useRef(id);
-    const [presetLookup, setPresetLookup] = useState<{ id?: string; ready: boolean; preset: StandardDiagramData | null }>({
-        id,
-        ready: false,
-        preset: null,
-    });
-
-    useEffect(() => {
-        let cancelled = false;
-        if (!getApplicationDiagramRuntime().isStandardPresetId(id)) {
-            setPresetLookup({ id, ready: true, preset: null });
-            return () => { cancelled = true; };
-        }
-
-        setPresetLookup({ id, ready: false, preset: null });
-
-        void getApplicationDiagramRuntime().loadStandardPreset(id).then((preset) => {
-            if (!cancelled) setPresetLookup({ id, ready: true, preset });
-        }).catch((error) => {
-            logDesignerSystemSyncPresetLoadFailure(error);
-            if (!cancelled) setPresetLookup({ id, ready: true, preset: null });
-        });
-
-        return () => { cancelled = true; };
-    }, [id]);
-
-    // If ID changed dynamically WITHOUT unmount, reset local initialization flags
-    if (processedDiagramId.current !== id) {
-        processedDiagramId.current = id;
-        hasRestoredAutoSave.current = false;
-        needsInitialFitView.current = true;
+    const {
+        activePresetLookup,
+        hasStandardPresetId,
+        isCurrentDiagramInitialized,
+        markCurrentDiagramInitialized,
+    } = useDesignerPresetInitialization(id);
+    const shouldEnableAutosave = activePresetLookup.ready
+        && !(activePresetLookup.preset && !String(id || '').startsWith('custom:'));
+    if (autosaveEnabled !== shouldEnableAutosave) {
+        setAutosaveEnabled(shouldEnableAutosave);
     }
 
     useEffect(() => {
-        if (!presetLookup.ready || presetLookup.id !== id) return;
-        if (hasRestoredAutoSave.current) return;
+        if (!activePresetLookup.ready || activePresetLookup.id !== id) return;
+        if (isCurrentDiagramInitialized) return;
 
-        const preset = presetLookup.preset;
+        const preset = activePresetLookup.preset;
         const isStandardPreset = !!preset && !String(id || '').startsWith('custom:');
-        setAutosaveEnabled(!isStandardPreset);
 
         // Seed switching now uses localStorage + reload exclusively.
         // useDiagramSeedStore is no longer used for handoff.
@@ -569,12 +546,12 @@ export function useDesignerSystemSync({
         }
 
         if (shouldLoadAutosave && saved) {
-            hasRestoredAutoSave.current = true;
             void recalculateAutosaveNodeSizes(saved.nodes).then((recalculatedNodes) => {
                 cancelLayoutTransition(setNodes);
                 setNodes(recalculatedNodes);
                 setEdges(saved.edges);
                 needsInitialFitView.current = true;
+                markCurrentDiagramInitialized();
 
                 // [COLD-START FIX] 冻结路由器，阻止在节点尺寸未稳定前触发大量 A* 计算。
                 // 根据 CDP 调试，34节点图加载时出现 A* openSet exhausted (iterations=23892)，
@@ -592,6 +569,7 @@ export function useDesignerSystemSync({
                     messageApi?.info('已恢复上次编辑内容');
                 }
             }).catch((error) => {
+                markCurrentDiagramInitialized();
                 logDesignerSystemSyncAutosaveRecalculationFailure(error);
             });
         } else {
@@ -604,9 +582,9 @@ export function useDesignerSystemSync({
                     setNodes(newNodes);
                     setEdges(newEdges);
                     needsInitialFitView.current = true;
-                    hasRestoredAutoSave.current = true;
+                    markCurrentDiagramInitialized();
                 }).catch(e => {
-                    hasRestoredAutoSave.current = true;
+                    markCurrentDiagramInitialized();
                     logDesignerSystemSyncStandardDataToCanvasFailure('preset', e);
                 });
             } else if (PLUGIN_EMPTY_CANVAS_IDS.has(String(id || ''))) {
@@ -616,7 +594,7 @@ export function useDesignerSystemSync({
                     setEdges(emptyState.edges);
                     needsInitialFitView.current = true;
                 }
-                hasRestoredAutoSave.current = true;
+                queueMicrotask(markCurrentDiagramInitialized);
             } else {
                 // Try DataRegistry for imported/general templates before falling back to empty state
                 getApplicationDiagramRuntime().loadDiagram(id || '', { initialize: true }).then(async (existing) => {
@@ -627,9 +605,9 @@ export function useDesignerSystemSync({
                                 setNodes(newNodes);
                                 setEdges(newEdges);
                                 needsInitialFitView.current = true;
-                                hasRestoredAutoSave.current = true;
+                                markCurrentDiagramInitialized();
                             }).catch(e => {
-                                hasRestoredAutoSave.current = true;
+                                markCurrentDiagramInitialized();
                                 logDesignerSystemSyncStandardDataToCanvasFailure('registry', e);
                             });
                         });
@@ -642,15 +620,26 @@ export function useDesignerSystemSync({
                             // ALWAYS trigger initial viewport adjustment, even for empty canvases
                             needsInitialFitView.current = true;
                         }
-                        hasRestoredAutoSave.current = true;
+                        markCurrentDiagramInitialized();
                     }
                 }).catch(e => {
-                    hasRestoredAutoSave.current = true;
+                    markCurrentDiagramInitialized();
                     logDesignerSystemSyncDataRegistryImportFailure(e);
                 });
             }
         }
-    }, [loadSaved, clearSaved, setNodes, setEdges, pluginId, id, presetLookup, messageApi]);
+    }, [
+        activePresetLookup,
+        clearSaved,
+        id,
+        isCurrentDiagramInitialized,
+        loadSaved,
+        markCurrentDiagramInitialized,
+        messageApi,
+        pluginId,
+        setEdges,
+        setNodes,
+    ]);
 
     // Deferred view adjustment: waits for reactFlowInstance to become available
     useEffect(() => {
@@ -689,7 +678,9 @@ export function useDesignerSystemSync({
 
     return {
         performanceMode,
-        isInitialDiagramLoading: getApplicationDiagramRuntime().isStandardPresetId(id) && (!presetLookup.ready || !hasRestoredAutoSave.current)
+        saveState,
+        isInitialDiagramLoading: hasStandardPresetId
+            && (!activePresetLookup.ready || !isCurrentDiagramInitialized)
     };
 }
 

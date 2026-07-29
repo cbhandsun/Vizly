@@ -1,4 +1,5 @@
 const MAX_PLUGIN_NODE_TYPE_LENGTH = 80;
+const MAX_PLUGIN_NODE_NOTIFICATION_LABEL_LENGTH = 80;
 const SAFE_PLUGIN_NODE_TYPE = /^[A-Za-z0-9_.:-]+$/u;
 
 const toFiniteNumber = (value: unknown, fallback: number): number => (
@@ -31,6 +32,16 @@ export const normalizeFlowchartPluginNodeData = (value: unknown): Record<string,
         ? { ...(value as Record<string, unknown>) }
         : {}
 );
+
+export const resolveFlowchartPluginNodeNotificationLabel = (
+    data: Readonly<Record<string, unknown>>,
+    fallbackType: string,
+): string => {
+    const candidate = typeof data.label === 'string'
+        ? data.label.replace(/\s+/gu, ' ').trim()
+        : '';
+    return (candidate || fallbackType).slice(0, MAX_PLUGIN_NODE_NOTIFICATION_LABEL_LENGTH);
+};
 
 interface ResolveFlowchartPluginNodePositionOptions {
     requestedPosition?: { x?: unknown; y?: unknown };

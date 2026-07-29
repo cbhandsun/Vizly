@@ -4,6 +4,7 @@ import { BackgroundVariant } from '@xyflow/react';
 import type { DiffResult } from '../../../utils/diagramDiff';
 import type { PresentationSlide } from '../../../hooks/usePresentationSlides';
 import { readFlowchartOnboardingDismissed } from '../flowchartOnboardingStorage';
+import type { MobileIconRailPanelRequest } from '../iconRailSidebarState';
 
 export interface FlowchartThemeGridState {
     showGrid: boolean;
@@ -32,7 +33,7 @@ export const coerceFlowchartThemeGridState = (value: unknown): FlowchartThemeGri
     }
 };
 
-export function useFlowchartShellState(themeGrid: unknown) {
+export function useFlowchartShellState(themeGrid: unknown, initialShowMinimap = true) {
     const [leftDrawerOpen, setLeftDrawerOpen] = useState(false);
     const [leftDrawerWidth, setLeftDrawerWidth] = useState(300);
     const [rightSidebarWidth, setRightSidebarWidth] = useState(300);
@@ -43,7 +44,7 @@ export function useFlowchartShellState(themeGrid: unknown) {
     const [laserEnabled, setLaserEnabled] = useState(false);
     const [diffResult, setDiffResult] = useState<DiffResult | null>(null);
     const [canvasSearchVisible, setCanvasSearchVisible] = useState(false);
-    const [, setMobileAddDrawerVisible] = useState(false);
+    const [mobileRequestedPanel, setMobileRequestedPanel] = useState<MobileIconRailPanelRequest | null>(null);
     const [mobilePropertyDrawerVisible, setMobilePropertyDrawerVisible] = useState(false);
     const [exportModalVisible, setExportModalVisible] = useState(false);
     const [pluginManagerVisible, setPluginManagerVisible] = useState(false);
@@ -56,7 +57,7 @@ export function useFlowchartShellState(themeGrid: unknown) {
     const [, setHighlightedNodeId] = useState<string | null>(null);
     const [onboardingDismissed, setOnboardingDismissed] = useState(readFlowchartOnboardingDismissed);
     const [showGrid, setShowGrid] = useState(true);
-    const [showMinimap, setShowMinimap] = useState(true);
+    const [showMinimap, setShowMinimap] = useState(initialShowMinimap);
     const [snapEnabled, setSnapEnabled] = useState(true);
     const [showRuler, setShowRuler] = useState(false);
     const [gridVariant, setGridVariant] = useState<BackgroundVariant>(BackgroundVariant.Lines);
@@ -90,12 +91,12 @@ export function useFlowchartShellState(themeGrid: unknown) {
         leftDrawerOpen, setLeftDrawerOpen, leftDrawerWidth, setLeftDrawerWidth, rightSidebarWidth, setRightSidebarWidth,
         isDrawingMode, setIsDrawingMode, historyPanelVisible, setHistoryPanelVisible, jsonEditorVisible, setJsonEditorVisible,
         presentationActive, setPresentationActive, laserEnabled, diffResult, setDiffResult, canvasSearchVisible, setCanvasSearchVisible,
-        setMobileAddDrawerVisible, mobilePropertyDrawerVisible, setMobilePropertyDrawerVisible,
+        mobileRequestedPanel, setMobileRequestedPanel, mobilePropertyDrawerVisible, setMobilePropertyDrawerVisible,
         exportModalVisible, setExportModalVisible, pluginManagerVisible, setPluginManagerVisible,
         aiChatVisible, setAiChatVisible, activeRightTab, setActiveRightTab,
         commandPaletteVisible, setCommandPaletteVisible, shortcutHelpVisible, setShortcutHelpVisible,
         showShortcuts, setShowShortcutsModal, jsonEditorInitialContent: undefined as string | undefined,
-        saveState: 'idle', showPerformanceDashboard: false,
+        showPerformanceDashboard: false,
         presentationSlides, setPresentationSlides, setHighlightedNodeId,
         onboardingDismissed, setOnboardingDismissed,
         showGrid, setShowGrid, showMinimap, setShowMinimap, snapEnabled, setSnapEnabled,

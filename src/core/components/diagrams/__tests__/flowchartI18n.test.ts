@@ -14,6 +14,7 @@ describe('flowchart interaction copy', () => {
         const sidebarSource = readRelativeFile('../ModernFlowchartSidebar.tsx');
         const pluginSource = readRelativeFile('../../../plugins/FlowchartPlugin.tsx');
         const pluginModalSource = readRelativeFile('../ui/PluginManagerModal.tsx');
+        const nodeSource = readRelativeFile('../../custom-nodes/FlowchartNode.tsx');
 
         expect(toolbarSource).not.toContain('label="Align Left"');
         expect(toolbarSource).toContain("t('designer.toolbar.alignL')");
@@ -28,6 +29,8 @@ describe('flowchart interaction copy', () => {
         expect(pluginModalSource).toContain('closable={false}');
         expect(pluginModalSource).toContain("aria-label={t('common.close')}");
         expect(pluginModalSource).not.toContain('<TabPane');
+        expect(nodeSource).toContain("t('designer.flowchart.nodeAriaLabel'");
+        expect(nodeSource).not.toContain('`${shape} 节点:');
     });
 
     it('keeps Chinese and English translation keys aligned', () => {
@@ -43,6 +46,10 @@ describe('flowchart interaction copy', () => {
         for (const key of ['alignL', 'alignC', 'alignR', 'alignT', 'alignM', 'alignB', 'distributeH', 'distributeV']) {
             expect(read(zh, ['designer', 'toolbar', key])).toBeTypeOf('string');
             expect(read(en, ['designer', 'toolbar', key])).toBeTypeOf('string');
+        }
+        for (const key of ['nodeAriaLabel', 'nodeSelectedState', 'nodeLockedState', 'doubleClickToEdit', 'quickAddOrConnect']) {
+            expect(read(zh, ['designer', 'flowchart', key])).toBeTypeOf('string');
+            expect(read(en, ['designer', 'flowchart', key])).toBeTypeOf('string');
         }
     });
 });

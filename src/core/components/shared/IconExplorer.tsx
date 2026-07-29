@@ -67,7 +67,11 @@ export const IconExplorer: React.FC<IconExplorerProps> = ({
   useEffect(() => {
     const controller = new AbortController();
     if (visible) {
-      void searchIcons(searchTerm, selectedCategory, page, controller.signal);
+      queueMicrotask(() => {
+        if (!controller.signal.aborted) {
+          void searchIcons(searchTerm, selectedCategory, page, controller.signal);
+        }
+      });
     }
     return () => controller.abort();
   }, [visible, searchTerm, selectedCategory, page]);

@@ -1,19 +1,5 @@
 import React from 'react';
-import {
-    AlignCenterOutlined,
-    AlignLeftOutlined,
-    AlignRightOutlined,
-    ApartmentOutlined,
-    ColumnHeightOutlined,
-    ColumnWidthOutlined,
-    FullscreenOutlined,
-    VerticalAlignBottomOutlined,
-    VerticalAlignMiddleOutlined,
-    VerticalAlignTopOutlined,
-} from '@ant-design/icons';
-import { Button, Divider, Tooltip } from 'antd';
 import { FaCloud, FaShapes } from 'react-icons/fa';
-import { useTranslation } from 'react-i18next';
 
 import { FlowchartShapesPanel } from '../components/diagrams/FlowchartShapesPanel';
 import { IconExplorer } from '../components/diagrams/IconExplorer';
@@ -61,10 +47,6 @@ export class FlowchartPlugin extends BaseDiagramPlugin implements DiagramTypePlu
         return migratedData;
     }
 
-    contributeToolbar(ctx: PluginContext) {
-        return <FlowchartToolbar ctx={ctx} />;
-    }
-
     contributeSidebarPanels(ctx: PluginContext): SidebarPanel[] {
         return [
             {
@@ -97,58 +79,3 @@ export class FlowchartPlugin extends BaseDiagramPlugin implements DiagramTypePlu
         };
     }
 }
-
-const FlowchartToolbar: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
-    const { t } = useTranslation();
-    if (!ctx) return null;
-
-    const handleAlign = (direction: string) => {
-        window.dispatchEvent(new CustomEvent('diagram:align', { detail: { direction } }));
-    };
-    const handleDistribute = (axis: 'horizontal' | 'vertical') => {
-        window.dispatchEvent(new CustomEvent('diagram:distribute', { detail: { axis } }));
-    };
-    const handleFitView = () => {
-        ctx.reactFlowInstance?.fitView({ duration: 600, padding: 0.25, minZoom: 0.55 });
-    };
-    const handleAutoLayout = () => {
-        window.dispatchEvent(new CustomEvent('diagram:requestLayout', {
-            detail: { strategy: 'DomainDagreLayout' },
-        }));
-    };
-    const iconBtnStyle: React.CSSProperties = { fontSize: 13 };
-    const actionButton = (
-        label: string,
-        icon: React.ReactNode,
-        onClick: () => void,
-    ) => (
-        <Tooltip title={label}>
-            <Button
-                size="small"
-                type="text"
-                aria-label={label}
-                icon={icon}
-                onClick={onClick}
-            />
-        </Tooltip>
-    );
-
-    return (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 2, padding: '0 8px', borderLeft: '1px solid #e8e8e8', marginLeft: 8 }}>
-            {actionButton(t('designer.toolbar.alignL'), <AlignLeftOutlined style={iconBtnStyle} />, () => handleAlign('left'))}
-            {actionButton(t('designer.toolbar.alignC'), <AlignCenterOutlined style={iconBtnStyle} />, () => handleAlign('center-h'))}
-            {actionButton(t('designer.toolbar.alignR'), <AlignRightOutlined style={iconBtnStyle} />, () => handleAlign('right'))}
-            {actionButton(t('designer.toolbar.alignT'), <VerticalAlignTopOutlined style={iconBtnStyle} />, () => handleAlign('top'))}
-            {actionButton(t('designer.toolbar.alignM'), <VerticalAlignMiddleOutlined style={iconBtnStyle} />, () => handleAlign('center-v'))}
-            {actionButton(t('designer.toolbar.alignB'), <VerticalAlignBottomOutlined style={iconBtnStyle} />, () => handleAlign('bottom'))}
-
-            <Divider orientation="vertical" style={{ height: 16, margin: '0 4px' }} />
-            {actionButton(t('designer.toolbar.distributeH'), <ColumnWidthOutlined style={iconBtnStyle} />, () => handleDistribute('horizontal'))}
-            {actionButton(t('designer.toolbar.distributeV'), <ColumnHeightOutlined style={iconBtnStyle} />, () => handleDistribute('vertical'))}
-
-            <Divider orientation="vertical" style={{ height: 16, margin: '0 4px' }} />
-            {actionButton(t('designer.toolbar.autoLayout'), <ApartmentOutlined style={iconBtnStyle} />, handleAutoLayout)}
-            {actionButton(t('designer.toolbar.fitView'), <FullscreenOutlined style={iconBtnStyle} />, handleFitView)}
-        </div>
-    );
-};

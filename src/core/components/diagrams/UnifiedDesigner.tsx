@@ -47,18 +47,13 @@ export const UnifiedDesigner: React.FC<UnifiedDesignerProps> = ({
   const [nodes, setNodes] = useState<Node[]>(() => resolveCanvasState().nodes);
   const [edges, setEdges] = useState<Edge[]>(() => resolveCanvasState().edges);
 
-  React.useEffect(() => {
+  const [canvasSource, setCanvasSource] = useState({ plugin, initialData });
+  if (canvasSource.plugin !== plugin || canvasSource.initialData !== initialData) {
     const nextState = resolveCanvasState();
+    setCanvasSource({ plugin, initialData });
     setNodes(nextState.nodes);
     setEdges(nextState.edges);
-  }, [resolveCanvasState]);
-
-  const nodesRef = React.useRef(nodes);
-  const edgesRef = React.useRef(edges);
-  React.useEffect(() => {
-      nodesRef.current = nodes;
-      edgesRef.current = edges;
-  }, [nodes, edges]);
+  }
 
   // 插件状态沙箱
   const [pluginStates, setPluginStates] = useState<Record<string, unknown>>({});
@@ -83,10 +78,10 @@ export const UnifiedDesigner: React.FC<UnifiedDesignerProps> = ({
 
   // 组装透传给各插件面板的统一上下文
   const pluginCtx = useMemo<PluginContext>(() => ({
-    getNodes: () => nodesRef.current,
-    getEdges: () => edgesRef.current,
-    get nodes() { return nodesRef.current; },
-    get edges() { return edgesRef.current; },
+    getNodes: () => nodes,
+    getEdges: () => edges,
+    get nodes() { return nodes; },
+    get edges() { return edges; },
     updateNodesBatch: () => { unsupportedAction('updateNodesBatch'); },
     updateEdgesBatch: () => { unsupportedAction('updateEdgesBatch'); },
     takeSnapshot: () => { unsupportedAction('takeSnapshot'); },
@@ -99,7 +94,7 @@ export const UnifiedDesigner: React.FC<UnifiedDesignerProps> = ({
     getPluginState,
     setPluginState,
     // TODO: 之后在内部真正实例化 ReactFlow 时放入 reactFlowInstance
-  }), [setNodes, setEdges, getPluginState, setPluginState, unsupportedAction]);
+  }), [nodes, edges, setNodes, setEdges, getPluginState, setPluginState, unsupportedAction]);
 
   const sidebarPanels = useMemo<SidebarPanel[]>(
     () => (plugin?.contributeSidebarPanels ? plugin.contributeSidebarPanels(pluginCtx) : []),

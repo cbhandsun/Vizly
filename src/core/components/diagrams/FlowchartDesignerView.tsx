@@ -14,6 +14,7 @@ import { DesignerHeaderLayer } from './ui/DesignerHeaderLayer';
 import { FlowchartCanvasShell } from './FlowchartCanvasShell';
 import { FlowchartEmptyState } from './FlowchartEmptyState';
 import { FlowchartOnboardingHint } from './FlowchartOnboardingHint';
+import { shouldShowFlowchartOnboarding } from './flowchartResponsiveChrome';
 import { FreehandDrawingLayer } from './FreehandDrawingLayer';
 import { RemoteCursors } from './ui/RemoteCursors';
 import { UnifiedDesignerShell } from './UnifiedDesignerShell';
@@ -73,10 +74,6 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
         enhancedOnConnect,
         enhancedOnConnectEnd,
         exportModalVisible,
-        exportToGIF,
-        exportToPDF,
-        exportToPNG,
-        exportToSVG,
         extraExportItems,
         fileInputRef,
         getPreviousState,
@@ -95,8 +92,6 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
         handleDistribute,
         handleDuplicateWithToast,
         handleEdgeDoubleClick,
-        handleExport,
-        handleExportMermaid,
         handleFitView,
         handleGridRotate,
         handleImport,
@@ -134,6 +129,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
         isInitialDiagramLoading,
         isLayoutStable,
         isMarqueeActive,
+        isMobile,
         isReadonly,
         isSidebarHidden,
         isSpacePressed,
@@ -238,7 +234,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
 
     return (
         <UnifiedDesignerShell
-            id={id}
+            id={id || diagramIdForExport}
             isDragging={isDragging}
             onDragOver={onDragOver}
             onDrop={onDrop}
@@ -270,7 +266,18 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                     )}
 
                     <FlowchartOnboardingHint
-                        visible={pluginId !== 'mindmap' && !isInitialDiagramLoading && !onboardingDismissed && nodes.length <= 1 && edges.length === 0 && !jsonEditorVisible && selectedNodes.length === 0 && selectedEdges.length === 0}
+                        visible={shouldShowFlowchartOnboarding({
+                            isMobile,
+                            pluginId,
+                            isInitialDiagramLoading,
+                            onboardingDismissed,
+                            leftDrawerOpen,
+                            nodeCount: nodes.length,
+                            edgeCount: edges.length,
+                            jsonEditorVisible,
+                            selectedNodeCount: selectedNodes.length,
+                            selectedEdgeCount: selectedEdges.length,
+                        })}
                         mod={/Mac/i.test(navigator.platform) ? '⌘' : 'Ctrl'}
                         onOpenCommandPalette={() => setCommandPaletteVisible(true)}
                         onDismiss={() => {
@@ -299,18 +306,11 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                         </div>
                     )}
                     <div ref={reactFlowWrapper} style={{ position: 'relative', height: '100%' }}>
-                        <ContextMenuLayer onAction={handleContextMenuAction} activePlugin={activePlugin} pluginCtx={pluginCtx} />
+                        <ContextMenuLayer onAction={handleContextMenuAction} activePlugin={activePlugin} pluginCtx={pluginCtx ?? undefined} />
 
                         {showEditingChrome && <DesignerHeaderLayer
                             diagramId={diagramIdForExport}
                             topActions={{
-                                onExportJSON: handleExport,
-                                onExportPNG: exportToPNG,
-                                onExportSVG: exportToSVG,
-                                onExportPDF: exportToPDF,
-                                onExportGIF: exportToGIF,
-                                onExportMermaid: handleExportMermaid,
-                                onImportClick: () => fileInputRef.current?.click(),
                                 onEditJson: handleOpenJsonEditor,
                                 onStartPresentation: () => {
                                     const slides = generateSlides(nodesRef.current, 'vertical');
@@ -357,7 +357,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                 pluginToolbar: resolveFlowchartPluginContribution(
                                     'toolbar',
                                     pluginCtx && activePlugin?.contributeToolbar
-                                        ? () => activePlugin.contributeToolbar(pluginCtx)
+                                        ? () => activePlugin.contributeToolbar?.(pluginCtx)
                                         : null,
                                     null,
                                 ),
@@ -427,7 +427,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                 },
                                 onAddStickyNote: handleAddStickyNote,
                                 onAddMindMap: handleAddMindMap,
-                                onExport: handleExport,
+                                onExport: () => setExportModalVisible(true),
                                 onImportClick: () => fileInputRef.current?.click(),
                                 renderThemeSelector,
                                 historyCount: pastEntries?.length ?? 0,
@@ -499,7 +499,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                         }}
                                         hoverToolbar={{
                                             nodeTypes: dynamicNodeTypes,
-                                            pluginCtx,
+                                            pluginCtx: pluginCtx ?? undefined,
                                             activePlugin,
                                             quickAddMenuVisible: !!quickAddMenu?.visible,
                                             isContextToolbarHidden,
@@ -573,7 +573,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                     {resolveFlowchartPluginContribution(
                                         'canvas',
                                         pluginCtx && activePlugin?.contributeCanvasComponents
-                                            ? () => activePlugin.contributeCanvasComponents(pluginCtx)
+                                            ? () => activePlugin.contributeCanvasComponents?.(pluginCtx)
                                             : null,
                                         null,
                                     )}

@@ -1622,10 +1622,6 @@ circle.custom-edge-updater {
         display: none !important;
     }
 
-    .designer-right-sidebar {
-        display: none !important;
-    }
-
     /* Canvas full screen on mobile */
     .diagram-canvas-area {
         height: 100vh;

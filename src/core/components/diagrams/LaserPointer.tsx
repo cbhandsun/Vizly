@@ -20,7 +20,7 @@ let _trailId = 0;
  * 渲染一个红色光点（带两圈扩散波纹）并在鼠标移动时留下短暂轨迹。
  * 完全基于 CSS + React state，无 Canvas 依赖，性能友好。
  */
-export const LaserPointer: React.FC<LaserPointerProps> = ({ active }) => {
+const ActiveLaserPointer: React.FC = () => {
     const [pos, setPos] = useState({ x: -999, y: -999 });
     const [trails, setTrails] = useState<Trail[]>([]);
     const trailTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -40,18 +40,12 @@ export const LaserPointer: React.FC<LaserPointerProps> = ({ active }) => {
     }, []);
 
     useEffect(() => {
-        if (!active) {
-            setTrails([]);
-            return;
-        }
         document.addEventListener('mousemove', handleMouseMove);
         return () => {
             document.removeEventListener('mousemove', handleMouseMove);
             if (trailTimer.current) clearTimeout(trailTimer.current);
         };
-    }, [active, handleMouseMove]);
-
-    if (!active) return null;
+    }, [handleMouseMove]);
 
     return (
         <div
@@ -146,3 +140,7 @@ export const LaserPointer: React.FC<LaserPointerProps> = ({ active }) => {
         </div>
     );
 };
+
+export const LaserPointer: React.FC<LaserPointerProps> = ({ active }) => (
+    active ? <ActiveLaserPointer /> : null
+);

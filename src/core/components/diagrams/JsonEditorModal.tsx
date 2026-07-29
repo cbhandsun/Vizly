@@ -44,14 +44,14 @@ export const JsonEditorModal: React.FC<JsonEditorModalProps> = ({
     const [jsonContent, setJsonContent] = useState(initialContent || '');
     const [pureJsonContent, setPureJsonContent] = useState('');
     const [jsonFormatMode, setJsonFormatMode] = useState<'standard' | 'pure' | 'react-flow'>('standard');
-
-    // 当外部 initialContent 变更时同步
-    React.useEffect(() => {
+    const [loadedInitialContent, setLoadedInitialContent] = useState(initialContent);
+    if (loadedInitialContent !== initialContent) {
+        setLoadedInitialContent(initialContent);
         if (initialContent !== undefined) {
             setJsonContent(initialContent);
             setJsonFormatMode('standard');
         }
-    }, [initialContent]);
+    }
 
     // 当首次打开且无初始内容时，自动转换当前画布数据并与已存在的 Diagram 数据壳合并（防止布局配置等丢失）
     React.useEffect(() => {

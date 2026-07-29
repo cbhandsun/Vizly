@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { Position } from '@xyflow/react';
 import {
     generateOrthogonalPath,
@@ -40,7 +40,8 @@ export function useEditableEdgeInteractions({
     edgeCallbacks,
     initialLabel
 }: UseEditableEdgeInteractionsProps) {
-    const [localWaypoints, setLocalWaypoints] = useState<Waypoint[]>(waypoints);
+    const [draftWaypoints, setDraftWaypoints] = useState<Waypoint[] | null>(null);
+    const localWaypoints = draftWaypoints ?? waypoints;
 
     const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
     const [hoveredSegment, setHoveredSegment] = useState<number | null>(null);
@@ -60,12 +61,6 @@ export function useEditableEdgeInteractions({
     const [editingLabelValue, setEditingLabelValue] = useState(initialLabel || '');
 
     const rafIdRef = useRef<number | null>(null);
-
-    useEffect(() => {
-        if (draggingIndex === null && draggingSegment === null) {
-            setLocalWaypoints(waypoints);
-        }
-    }, [waypoints, draggingIndex, draggingSegment]);
 
     const screenToFlowPosition = useCallback((clientX: number, clientY: number) => {
         const uiScale = getUiScale();
@@ -93,7 +88,7 @@ export function useEditableEdgeInteractions({
         return pathResult.segments || [];
     }, [pathResult.segments]);
 
-    const labelPos = useMemo(() => {
+    const labelPos = (() => {
         if (segments.length === 0) {
             return { x: (sourceX + targetX) / 2, y: (sourceY + targetY) / 2 };
         }
@@ -117,7 +112,7 @@ export function useEditableEdgeInteractions({
         }
         const last = segments[segments.length - 1];
         return { x: (last.start.x + last.end.x) / 2, y: (last.start.y + last.end.y) / 2 };
-    }, [segments, sourceX, sourceY, targetX, targetY]);
+    })();
 
     const handleBendPointPointerDown = useCallback((index: number, _bp: BendPoint, e: React.PointerEvent<Element>) => {
         e.preventDefault();
@@ -144,7 +139,7 @@ export function useEditableEdgeInteractions({
                 } else {
                     newWaypoints.push(flowPos);
                 }
-                setLocalWaypoints(newWaypoints);
+                setDraftWaypoints(newWaypoints);
             } finally {
                 rafIdRef.current = null;
             }
@@ -159,6 +154,7 @@ export function useEditableEdgeInteractions({
             }
         }
         setDraggingIndex(null);
+        setDraftWaypoints(null);
         if (rafIdRef.current !== null) {
             cancelAnimationFrame(rafIdRef.current);
             rafIdRef.current = null;
@@ -181,7 +177,7 @@ export function useEditableEdgeInteractions({
         const middlePoints = allPoints.slice(1, -1).map(p => ({ x: p.x, y: p.y }));
         snapshotPointsRef.current = middlePoints;
 
-        setLocalWaypoints(middlePoints);
+        setDraftWaypoints(middlePoints);
 
         setDraggingSegment({
             segIndex: index,
@@ -225,7 +221,7 @@ export function useEditableEdgeInteractions({
                 }
             }
 
-            setLocalWaypoints(updatedWaypoints);
+            setDraftWaypoints(updatedWaypoints);
             segmentRafIdRef.current = null;
         });
     }, [draggingSegment, viewport.zoom]);
@@ -238,6 +234,7 @@ export function useEditableEdgeInteractions({
             }
         }
         setDraggingSegment(null);
+        setDraftWaypoints(null);
         snapshotPointsRef.current = [];
 
         if (segmentRafIdRef.current !== null) {

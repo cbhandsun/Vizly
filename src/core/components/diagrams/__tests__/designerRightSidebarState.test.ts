@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+    shouldActivateDesignerPropertyTab,
     shouldExpandDesignerRightSidebar,
     shouldFreezeDesignerRightSidebarDuringDrag,
     shouldOpenDesignerAiSidebar,
@@ -11,6 +12,7 @@ describe('shouldExpandDesignerRightSidebar', () => {
         expect(shouldExpandDesignerRightSidebar({
             isCollapsed: true,
             hasSelection: true,
+            isMobile: false,
             activeTab: 'property',
             aiChatVisible: false,
             previousAiChatVisible: false,
@@ -18,6 +20,7 @@ describe('shouldExpandDesignerRightSidebar', () => {
         expect(shouldExpandDesignerRightSidebar({
             isCollapsed: true,
             hasSelection: false,
+            isMobile: false,
             activeTab: 'ai',
             aiChatVisible: true,
             previousAiChatVisible: false,
@@ -28,6 +31,7 @@ describe('shouldExpandDesignerRightSidebar', () => {
         expect(shouldExpandDesignerRightSidebar({
             isCollapsed: true,
             hasSelection: false,
+            isMobile: false,
             activeTab: 'ai',
             aiChatVisible: false,
             previousAiChatVisible: false,
@@ -35,6 +39,7 @@ describe('shouldExpandDesignerRightSidebar', () => {
         expect(shouldExpandDesignerRightSidebar({
             isCollapsed: true,
             hasSelection: false,
+            isMobile: false,
             activeTab: 'property',
             aiChatVisible: true,
             previousAiChatVisible: false,
@@ -42,6 +47,7 @@ describe('shouldExpandDesignerRightSidebar', () => {
         expect(shouldExpandDesignerRightSidebar({
             isCollapsed: false,
             hasSelection: false,
+            isMobile: false,
             activeTab: 'ai',
             aiChatVisible: true,
             previousAiChatVisible: false,
@@ -49,9 +55,53 @@ describe('shouldExpandDesignerRightSidebar', () => {
         expect(shouldExpandDesignerRightSidebar({
             isCollapsed: true,
             hasSelection: false,
+            isMobile: false,
             activeTab: 'ai',
             aiChatVisible: true,
             previousAiChatVisible: true,
+        })).toBe(false);
+    });
+
+    it('does not cover the mobile canvas merely because an item becomes selected', () => {
+        expect(shouldExpandDesignerRightSidebar({
+            isCollapsed: true,
+            hasSelection: true,
+            isMobile: true,
+            activeTab: 'property',
+            aiChatVisible: false,
+            previousAiChatVisible: false,
+        })).toBe(false);
+    });
+});
+
+describe('shouldActivateDesignerPropertyTab', () => {
+    it('returns to properties when a new desktop selection starts from the AI tab', () => {
+        expect(shouldActivateDesignerPropertyTab({
+            activeTab: 'ai',
+            hasSelection: true,
+            isMobile: false,
+            previousHasSelection: false,
+        })).toBe(true);
+    });
+
+    it('keeps the current tab for mobile, a continuing selection, or no selection', () => {
+        expect(shouldActivateDesignerPropertyTab({
+            activeTab: 'ai',
+            hasSelection: true,
+            isMobile: true,
+            previousHasSelection: false,
+        })).toBe(false);
+        expect(shouldActivateDesignerPropertyTab({
+            activeTab: 'ai',
+            hasSelection: true,
+            isMobile: false,
+            previousHasSelection: true,
+        })).toBe(false);
+        expect(shouldActivateDesignerPropertyTab({
+            activeTab: 'ai',
+            hasSelection: false,
+            isMobile: false,
+            previousHasSelection: false,
         })).toBe(false);
     });
 });

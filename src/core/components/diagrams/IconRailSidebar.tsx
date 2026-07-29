@@ -14,6 +14,11 @@ import {
     persistIconRailDrawerWidth,
     readIconRailDrawerWidth,
 } from './iconRailSidebarStorage';
+import {
+    resolveIconRailRequestedPanel,
+    shouldAutoOpenShapesPanel,
+    type MobileIconRailPanelRequest,
+} from './iconRailSidebarState';
 import type { NodeTemplate } from './hooks/useNodeTemplates';
 import type { LayerConfig } from './hooks/useLayerManagement';
 import type { DataNode } from 'antd/es/tree';
@@ -65,6 +70,9 @@ interface IconRailSidebarProps {
     // 插件化面板注入
     pluginPanels?: { id: string; title: string; icon: React.ReactNode; content: React.ReactNode }[];
     isMobile?: boolean; // GAP-11
+    autoOpenShapes?: boolean;
+    requestedPanel?: MobileIconRailPanelRequest | null;
+    onRequestedPanelHandled?: () => void;
 }
 
 type _NodeConfig = Record<string, unknown>;
@@ -97,10 +105,21 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
     onDrawerWidthChange,
     pluginPanels = [],
     isMobile = false,
+    autoOpenShapes = true,
+    requestedPanel = null,
+    onRequestedPanelHandled,
 }) => {
     const { t } = useTranslation();
     const { token } = theme.useToken();
-    const [activePanel, setActivePanel] = useState<string | null>(null);
+    const initialPanel = shouldAutoOpenShapesPanel({
+            activePanel: null,
+            alreadyAutoOpened: false,
+            enabled: autoOpenShapes,
+            isMobile,
+            nodeCount: nodes.length,
+        }) ? 'shapes' : null;
+    const [activePanel, setActivePanel] = useState<string | null>(initialPanel);
+    const autoOpenedEmptyPanelRef = useRef(initialPanel === 'shapes');
     const [searchTerm, setSearchTerm] = useState('');
     const panelZoom = usePanelZoom({ storageKey: 'designer.sidebar.zoom', defaultScale: 1, minScale: 0.75, maxScale: 1.35 });
 
@@ -209,6 +228,39 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
     const closeDrawer = useCallback(() => {
         setActivePanel(null);
     }, []);
+
+    useEffect(() => {
+        if (!requestedPanel) return;
+        const timer = window.setTimeout(() => {
+            setActivePanel(resolveIconRailRequestedPanel(requestedPanel));
+            onRequestedPanelHandled?.();
+        }, 0);
+        return () => window.clearTimeout(timer);
+    }, [onRequestedPanelHandled, requestedPanel]);
+
+    useEffect(() => {
+        if (!shouldAutoOpenShapesPanel({
+            activePanel,
+            alreadyAutoOpened: autoOpenedEmptyPanelRef.current,
+            enabled: autoOpenShapes,
+            isMobile,
+            nodeCount: nodes.length,
+        })) return;
+
+        const timer = window.setTimeout(() => {
+            autoOpenedEmptyPanelRef.current = true;
+            setActivePanel('shapes');
+        }, 0);
+        return () => window.clearTimeout(timer);
+    }, [activePanel, autoOpenShapes, isMobile, nodes.length]);
+
+    useEffect(() => {
+        const offset = isMobile ? 0 : (activePanel ? 68 + drawerWidth : 68);
+        document.documentElement.style.setProperty('--left-sidebar-offset', `${offset}px`);
+        return () => {
+            document.documentElement.style.setProperty('--left-sidebar-offset', '0px');
+        };
+    }, [activePanel, drawerWidth, isMobile]);
 
     // Effect to notify parent when activePanel changes (avoids rendering during render warning)
     useEffect(() => {
@@ -373,6 +425,7 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
                 {railButtons.map((btn) => (
                     <Tooltip key={btn.key} title={btn.label} placement="right">
                         <button
+                            type="button"
                             className={`icon-rail-btn ${activePanel === btn.key ? 'active' : ''}`}
                             aria-label={btn.label}
                             aria-pressed={activePanel === btn.key}
@@ -389,6 +442,7 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
                 <div className="icon-rail-spacer" />
                 <Tooltip title={t('designer.sidebar.search')} placement="right">
                     <button
+                        type="button"
                         className={`icon-rail-btn ${activePanel === 'shapes' && searchTerm ? 'active' : ''}`}
                         aria-label={t('designer.sidebar.search')}
                         onClick={() => {

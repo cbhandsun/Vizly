@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Modal from 'antd/es/modal';
 import Input from 'antd/es/input';
-import List from 'antd/es/list';
 import Typography from 'antd/es/typography';
 import Tag from 'antd/es/tag';
 import { theme } from 'antd';
@@ -31,7 +30,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, i
   const { token } = theme.useToken();
   const inputRef = useRef<InputRef>(null);
   const listViewportRef = useRef<HTMLDivElement | null>(null);
-  const itemRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+  const itemRefs = useRef<Map<number, HTMLButtonElement>>(new Map());
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
   const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/i.test(navigator.platform || '');
@@ -252,11 +251,19 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, i
               setActiveIndex(0);
             }}
             aria-label={t('designer.commandPalette.searchAria')}
+            aria-controls="command-palette-results"
+            aria-activedescendant={flat[activeIndex] ? `command-palette-option-${flat[activeIndex].id}` : undefined}
             placeholder={t('designer.commandPalette.placeholder', { mod: modKeyLabel })}
             size="large"
             autoComplete="off"
           />
-          <div ref={listViewportRef} style={{ maxHeight: 420, overflow: 'auto' }}>
+          <div
+            ref={listViewportRef}
+            id="command-palette-results"
+            role="listbox"
+            aria-label={t('designer.commandPalette.searchAria')}
+            style={{ maxHeight: 420, overflow: 'auto' }}
+          >
             {flat.length === 0 && (
               <div style={{ padding: 16 }}>
                 <Typography.Text type="secondary">{t('designer.commandPalette.noResults')}</Typography.Text>
@@ -279,20 +286,23 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, i
                 >
                   {t('designer.commandPalette.groupHeader', { group: groupLabel(g.group), count: g.items.length })}
                 </Typography.Text>
-                <List
-                  size="small"
-                  dataSource={g.items}
-                  renderItem={(it) => {
+                <div>
+                  {g.items.map((it) => {
                     const idx = indexById.get(it.id) ?? -1;
                     const active = idx === activeIndex;
                     return (
-                      <List.Item
+                      <button
+                        type="button"
+                        id={`command-palette-option-${it.id}`}
+                        key={it.id}
+                        role="option"
+                        aria-selected={active}
                         ref={(el) => {
                           if (!el || idx < 0) {
                             if (idx >= 0) itemRefs.current.delete(idx);
                             return;
                           }
-                          itemRefs.current.set(idx, el as HTMLDivElement);
+                          itemRefs.current.set(idx, el);
                         }}
                         onMouseEnter={() => setActiveIndex(idx)}
                         onClick={(e) => {
@@ -300,45 +310,53 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, i
                         }}
                         style={{
                           borderRadius: 10,
+                          border: 0,
+                          width: '100%',
+                          display: 'block',
+                          textAlign: 'left',
+                          color: token.colorText,
                           padding: '10px 12px',
                           cursor: 'pointer',
                           background: active ? token.colorFillSecondary : 'transparent',
                           outline: active ? `1px solid ${token.colorPrimaryBorder}` : '1px solid transparent'
                         }}
                       >
-                        <List.Item.Meta
-                          title={
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  {highlight(it.title)}
-                                </span>
-                                {(it.meta || []).slice(0, 3).map((m) => (
-                                  <Tag key={m} color="default">
-                                    {m}
-                                  </Tag>
-                                ))}
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: '0 0 auto' }}>
-                                {it.shortcut && (
-                                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                                    {it.shortcut}
-                                  </Typography.Text>
-                                )}
-                                {it.onAltSelect && (
-                                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                                    {t('designer.commandPalette.openInNewTabHint', { mod: modKeyLabel })}
-                                  </Typography.Text>
-                                )}
-                              </div>
-                            </div>
-                          }
-                          description={it.description}
-                        />
-                      </List.Item>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {highlight(it.title)}
+                            </span>
+                            {(it.meta || []).slice(0, 3).map((m) => (
+                              <Tag key={m} color="default">
+                                {m}
+                              </Tag>
+                            ))}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: '0 0 auto' }}>
+                            {it.shortcut && (
+                              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                                {it.shortcut}
+                              </Typography.Text>
+                            )}
+                            {it.onAltSelect && (
+                              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                                {t('designer.commandPalette.openInNewTabHint', { mod: modKeyLabel })}
+                              </Typography.Text>
+                            )}
+                          </div>
+                        </div>
+                        {it.description && (
+                          <Typography.Text
+                            type="secondary"
+                            style={{ display: 'block', marginTop: 2, fontSize: 12 }}
+                          >
+                            {it.description}
+                          </Typography.Text>
+                        )}
+                      </button>
                     );
-                  }}
-                />
+                  })}
+                </div>
               </div>
             ))}
           </div>

@@ -15,6 +15,7 @@ import type {
   OnNodeDrag,
   ReactFlowInstance,
   SelectionMode,
+  AriaLabelConfig,
 } from '@xyflow/react';
 import type { BackgroundVariant } from '@xyflow/react';
 
@@ -55,6 +56,9 @@ export interface BaseReactFlowProps {
   preventScrolling?: boolean;
   nodesDraggable?: boolean;
   nodesConnectable?: boolean;
+  nodesFocusable?: boolean;
+  edgesFocusable?: boolean;
+  ariaLabelConfig?: Partial<AriaLabelConfig>;
   elementsSelectable?: boolean;
   enableSmartEdges?: boolean;
   smartEdgePadding?: number;

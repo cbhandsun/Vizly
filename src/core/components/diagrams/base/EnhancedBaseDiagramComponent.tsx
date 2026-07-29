@@ -253,9 +253,16 @@ export const EnhancedBaseDiagramComponent: React.FC<EnhancedBaseDiagramProps> = 
   // 受控状态：用于拖拽/选择交互
   const [rfNodes, setRfNodes] = useState<Node[]>(nodes);
   const [rfEdges, setRfEdges] = useState<Edge[]>(edges);
-
-  useEffect(() => { setRfNodes(nodes); }, [nodes]);
-  useEffect(() => { setRfEdges(edges); }, [edges]);
+  const [nodeSource, setNodeSource] = useState(nodes);
+  const [edgeSource, setEdgeSource] = useState(edges);
+  if (nodeSource !== nodes) {
+    setNodeSource(nodes);
+    setRfNodes(nodes);
+  }
+  if (edgeSource !== edges) {
+    setEdgeSource(edges);
+    setRfEdges(edges);
+  }
 
   const handleNodesChange = useCallback((changes: import('@xyflow/react').NodeChange[]) => {
     setRfNodes((nds) => applyNodeChanges(changes, nds));

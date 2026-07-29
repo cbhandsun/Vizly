@@ -79,7 +79,11 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
   ), [edgeMode, onEdgeModeChange, t]);
 
   return (
-    <div className="fixed top-3 left-3 right-3 z-[1000] flex items-center justify-between pointer-events-none h-[40px] gap-3">
+    <div
+      className={`fixed top-3 left-3 right-3 z-[1000] flex justify-between pointer-events-none ${
+        isMobile ? 'items-start h-auto gap-2' : 'items-center h-[40px] gap-3'
+      }`}
+    >
       
       {/* ── LEFT SECTION: Brand + Project + Search (unified pill) ── */}
       <div className="flex-[0_1_auto] flex items-center min-w-0">
@@ -145,8 +149,14 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
       </div>
 
       {/* ── CENTER SECTION: Tools ── */}
-      <div className="flex-1 flex items-center justify-center min-w-0">
-        <div className="flex items-center gap-2 max-w-full">
+      <div className={
+        isMobile
+          ? 'absolute top-[48px] left-0 right-0 flex items-center justify-center min-w-0'
+          : 'flex-1 flex items-center justify-center min-w-0'
+      }>
+        <div className={`flex items-center gap-2 max-w-full ${
+          isMobile ? 'w-full justify-center overflow-x-auto px-1' : ''
+        }`}>
           {/* Core Tools Pill */}
           {!hideCenterIsland && (
             <div className={`${islandBaseClass} px-2 shrink-0`}>

@@ -11,6 +11,7 @@ import {
     createFlowchartPluginNodeId,
     normalizeFlowchartPluginNodeData,
     normalizeFlowchartPluginNodeType,
+    resolveFlowchartPluginNodeNotificationLabel,
     resolveFlowchartPluginNodePosition,
 } from '../flowchartPluginRuntimeModel';
 import {
@@ -34,7 +35,7 @@ interface UseFlowchartPluginRuntimeOptions {
     isMobile: boolean;
     t: TFunction;
     onMobileNodeAdded: () => void;
-    notifyNodeAdded: (type: string) => void;
+    notifyNodeAdded: (label: string) => void;
 }
 
 export interface FlowchartPluginRuntime {
@@ -108,7 +109,7 @@ export function useFlowchartPluginRuntime({
                     },
                 };
                 setNodes(currentNodes => [...currentNodes, newNode]);
-                notifyNodeAdded(type);
+                notifyNodeAdded(resolveFlowchartPluginNodeNotificationLabel(newNode.data, type));
                 if (isMobile) onMobileNodeAdded();
                 return id;
             },

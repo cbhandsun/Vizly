@@ -132,6 +132,8 @@ export interface DiagramComponentProps {
   onReadonlyChange?: (isReadonly: boolean) => void;
   /** 触发打开高级偏好设置回调 */
   onOpenSettings?: () => void;
+  /** (IoC) 由宿主统一打开命令面板，避免嵌套编辑器重复渲染面板 */
+  onOpenCommandPalette?: () => void;
   /** (IoC) 是否打开版本历史面板 */
   isVersionHistoryOpen?: boolean;
   /** (IoC) 关闭版本历史面板回调 */

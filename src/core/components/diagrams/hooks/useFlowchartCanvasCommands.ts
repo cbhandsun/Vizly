@@ -18,6 +18,8 @@ import {
 } from '../flowchartClearCanvas';
 import { runFlowchartSmartOptimize } from '../flowchartSmartOptimize';
 import type { NodeDataUpdate } from '../../../types/diagram-updates';
+import type { NodeTemplate } from './useNodeTemplates';
+import { findFlowchartTemplateById } from '../flowchartTemplateSelection';
 
 type TemplateApplyOptions = Parameters<typeof applyFlowchartTemplate>[0];
 
@@ -37,10 +39,10 @@ interface UseFlowchartCanvasCommandsOptions {
     gridVariant: BackgroundVariant;
     setGridVariant: React.Dispatch<React.SetStateAction<BackgroundVariant>>;
     setShowGrid: React.Dispatch<React.SetStateAction<boolean>>;
-    setJsonEditorVisible: React.Dispatch<React.SetStateAction<boolean>>;
     reactFlowInstance: ReactFlowInstance | null;
     viewport: TemplateApplyOptions['viewport'];
     createFromTemplate: TemplateApplyOptions['createFromTemplate'];
+    templates: NodeTemplate[];
     selectedNodes: Node[];
     updateNodesBatch: (ids: string[], updates: NodeDataUpdate) => void;
 }
@@ -57,10 +59,10 @@ export function useFlowchartCanvasCommands({
     gridVariant,
     setGridVariant,
     setShowGrid,
-    setJsonEditorVisible,
     reactFlowInstance,
     viewport,
     createFromTemplate,
+    templates,
     selectedNodes,
     updateNodesBatch,
 }: UseFlowchartCanvasCommandsOptions) {
@@ -118,7 +120,6 @@ export function useFlowchartCanvasCommands({
         setShowGrid(true);
     }, [gridVariant, setGridVariant, setShowGrid]);
 
-    const handleExport = useCallback(() => setJsonEditorVisible(true), [setJsonEditorVisible]);
     const handleClearCanvasCommand = useCallback(() => {
         appModal.confirm(buildFlowchartClearCanvasConfirm({
             title: t('designer.flowchart.clearCanvas.title'),
@@ -151,8 +152,10 @@ export function useFlowchartCanvasCommands({
         }
     }, [getEdges, getNodes, t]);
 
-    const handleUseTemplate = useCallback((template: TemplateApplyOptions['template']) => {
+    const handleUseTemplate = useCallback((templateId: string) => {
         if (!reactFlowInstance) return;
+        const template = findFlowchartTemplateById(templates, templateId);
+        if (!template) return;
         takeSnapshot(getNodes(), getEdges());
         applyFlowchartTemplate({
             template,
@@ -162,7 +165,7 @@ export function useFlowchartCanvasCommands({
             appendEdges: nextEdges => setEdges(edges => [...edges, ...nextEdges]),
         });
         appMessage.success(t('designer.flowchart.templateApplied'));
-    }, [createFromTemplate, getEdges, getNodes, reactFlowInstance, setEdges, setNodes, t, takeSnapshot, viewport]);
+    }, [createFromTemplate, getEdges, getNodes, reactFlowInstance, setEdges, setNodes, t, takeSnapshot, templates, viewport]);
 
     const handleOpacity = useCallback((opacity: number) => {
         updateNodesBatch(selectedNodes.map(node => node.id), { style: { opacity } });
@@ -173,7 +176,6 @@ export function useFlowchartCanvasCommands({
         handleSmartOptimize,
         handleEdgeDoubleClick,
         handleGridRotate,
-        handleExport,
         handleClearCanvasCommand,
         handleExportMermaid,
         handleCopyAsMermaid,

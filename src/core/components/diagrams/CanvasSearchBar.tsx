@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { theme } from 'antd';
 import { FaSearch, FaChevronUp, FaChevronDown, FaTimes, FaExchangeAlt } from 'react-icons/fa';
 import { Node, useReactFlow } from '@xyflow/react';
@@ -24,8 +24,7 @@ type ThemeToken = ReturnType<typeof theme.useToken>['token'];
  * 支持关键词匹配节点标签/描述/ID/域名，上/下导航结果，聚焦视口 + 脉冲高亮
  * Phase 2：新增查找替换功能
  */
-export const CanvasSearchBar: React.FC<CanvasSearchBarProps> = ({
-    visible,
+const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = ({
     onClose,
     nodes,
     onHighlightNode,
@@ -35,58 +34,14 @@ export const CanvasSearchBar: React.FC<CanvasSearchBarProps> = ({
 }) => {
     const { token } = theme.useToken();
     const reactFlow = useReactFlow();
-    const inputRef = useRef<HTMLInputElement>(null);
 
     const [query, setQuery] = useState('');
-    const [matchIds, setMatchIds] = useState<string[]>([]);
+    const [excludedMatchIds, setExcludedMatchIds] = useState<string[]>([]);
     const [currentIndex, setCurrentIndex] = useState(0);
 
     // Phase 2：替换功能
     const [replaceText, setReplaceText] = useState('');
     const [showReplace, setShowReplace] = useState(false);
-
-    // 搜索逻辑 — 搜索 label / description / id / domain
-    useEffect(() => {
-        if (!query.trim()) {
-            setMatchIds([]);
-            setCurrentIndex(0);
-            onHighlightNode?.(null);
-            return;
-        }
-        const q = query.toLowerCase();
-        const ids = nodes
-            .filter(n => {
-                const d = n.data as Record<string, unknown>;
-                const label = String(d?.label || '').toLowerCase();
-                const desc = String(d?.description || '').toLowerCase();
-                const domain = String(d?.domain || '').toLowerCase();
-                return label.includes(q) || desc.includes(q) || domain.includes(q) || n.id.toLowerCase().includes(q);
-            })
-            .map(n => n.id);
-        setMatchIds(ids);
-        setCurrentIndex(0);
-        if (ids.length > 0) {
-            onHighlightNode?.(ids[0]);
-            focusNode(ids[0]);
-        } else {
-            onHighlightNode?.(null);
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [query, nodes]);
-
-    // 自动聚焦输入框
-    useEffect(() => {
-        if (visible) {
-            setTimeout(() => inputRef.current?.focus(), 50);
-        } else {
-            setQuery('');
-            setReplaceText('');
-            setMatchIds([]);
-            setShowReplace(false);
-            onHighlightNode?.(null);
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [visible]);
 
     const focusNode = useCallback((nodeId: string) => {
         const node = nodes.find(n => n.id === nodeId);
@@ -101,48 +56,79 @@ export const CanvasSearchBar: React.FC<CanvasSearchBarProps> = ({
         onHighlightNode?.(nodeId);
     }, [nodes, reactFlow, onHighlightNode]);
 
+    // 搜索结果由输入和节点直接派生，避免维护第二套易失步状态。
+    const matchIds = useMemo(() => {
+        const q = query.trim().toLowerCase();
+        if (!q) return [];
+        const excluded = new Set(excludedMatchIds);
+        return nodes
+            .filter(n => {
+                const d = n.data as Record<string, unknown>;
+                const label = String(d?.label || '').toLowerCase();
+                const desc = String(d?.description || '').toLowerCase();
+                const domain = String(d?.domain || '').toLowerCase();
+                return !excluded.has(n.id)
+                    && (label.includes(q)
+                        || desc.includes(q)
+                        || domain.includes(q)
+                        || n.id.toLowerCase().includes(q));
+            })
+            .map(n => n.id);
+    }, [excludedMatchIds, nodes, query]);
+    const boundedCurrentIndex = matchIds.length > 0
+        ? Math.min(currentIndex, matchIds.length - 1)
+        : 0;
+    const currentMatchId = matchIds[boundedCurrentIndex] ?? null;
+
+    useEffect(() => {
+        if (currentMatchId) {
+            focusNode(currentMatchId);
+        } else {
+            onHighlightNode?.(null);
+        }
+    }, [currentMatchId, focusNode, onHighlightNode]);
+    useEffect(() => {
+        return () => onHighlightNode?.(null);
+    }, [onHighlightNode]);
+
+    const handleQueryChange = useCallback((value: string) => {
+        setQuery(value);
+        setExcludedMatchIds([]);
+        setCurrentIndex(0);
+    }, []);
+
     const goNext = useCallback(() => {
         if (matchIds.length === 0) return;
-        const next = (currentIndex + 1) % matchIds.length;
+        const next = (boundedCurrentIndex + 1) % matchIds.length;
         setCurrentIndex(next);
-        focusNode(matchIds[next]);
-    }, [matchIds, currentIndex, focusNode]);
+    }, [boundedCurrentIndex, matchIds.length]);
 
     const goPrev = useCallback(() => {
         if (matchIds.length === 0) return;
-        const prev = (currentIndex - 1 + matchIds.length) % matchIds.length;
+        const prev = (boundedCurrentIndex - 1 + matchIds.length) % matchIds.length;
         setCurrentIndex(prev);
-        focusNode(matchIds[prev]);
-    }, [matchIds, currentIndex, focusNode]);
+    }, [boundedCurrentIndex, matchIds.length]);
 
     // ── 替换当前匹配 ──
     const handleReplaceCurrent = useCallback(() => {
         if (matchIds.length === 0 || !onReplaceNode) return;
-        const targetId = matchIds[currentIndex];
+        const targetId = matchIds[boundedCurrentIndex];
         onBeforeReplace?.();
         onReplaceNode(targetId, replaceText);
-        // 替换后从列表移除
+        setExcludedMatchIds(ids => [...ids, targetId]);
         const newIds = matchIds.filter(id => id !== targetId);
-        setMatchIds(newIds);
-        const nextIndex = Math.min(currentIndex, newIds.length - 1);
+        const nextIndex = Math.min(boundedCurrentIndex, newIds.length - 1);
         setCurrentIndex(Math.max(0, nextIndex));
-        if (newIds.length > 0) {
-            onHighlightNode?.(newIds[Math.max(0, nextIndex)]);
-            focusNode(newIds[Math.max(0, nextIndex)]);
-        } else {
-            onHighlightNode?.(null);
-        }
-    }, [matchIds, currentIndex, replaceText, onReplaceNode, onBeforeReplace, onHighlightNode, focusNode]);
+    }, [boundedCurrentIndex, matchIds, onBeforeReplace, onReplaceNode, replaceText]);
 
     // ── 全部替换 ──
     const handleReplaceAll = useCallback(() => {
         if (matchIds.length === 0 || !onReplaceAll) return;
         onBeforeReplace?.();
         onReplaceAll(matchIds, replaceText);
-        setMatchIds([]);
+        setExcludedMatchIds(ids => Array.from(new Set([...ids, ...matchIds])));
         setCurrentIndex(0);
-        onHighlightNode?.(null);
-    }, [matchIds, replaceText, onReplaceAll, onBeforeReplace, onHighlightNode]);
+    }, [matchIds, replaceText, onReplaceAll, onBeforeReplace]);
 
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
         if (e.key === 'Escape') {
@@ -154,10 +140,8 @@ export const CanvasSearchBar: React.FC<CanvasSearchBarProps> = ({
     }, [onClose, goNext, goPrev]);
 
     // --- 动态注入搜索高亮样式 ---
-    const currentMatchId = matchIds.length > 0 ? matchIds[currentIndex] : null;
-
     const highlightStyle = useMemo(() => {
-        if (!visible || !query.trim() || matchIds.length === 0) return '';
+        if (!query.trim() || matchIds.length === 0) return '';
 
         // 当前匹配项：脉冲蓝色高亮
         const currentSelector = currentMatchId
@@ -198,9 +182,7 @@ export const CanvasSearchBar: React.FC<CanvasSearchBarProps> = ({
         }`;
 
         return `${keyframes}\n${currentSelector}\n${otherStyles}\n${dimStyles}`;
-    }, [visible, query, matchIds, currentMatchId, nodes]);
-
-    if (!visible) return null;
+    }, [query, matchIds, currentMatchId, nodes]);
 
     const hasReplaceFns = !!(onReplaceNode && onReplaceAll);
 
@@ -226,9 +208,9 @@ export const CanvasSearchBar: React.FC<CanvasSearchBarProps> = ({
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px' }}>
                     <FaSearch size={12} style={{ color: token.colorTextTertiary, flexShrink: 0 }} />
                     <input
-                        ref={inputRef}
+                        autoFocus
                         value={query}
-                        onChange={e => setQuery(e.target.value)}
+                        onChange={e => handleQueryChange(e.target.value)}
                         onKeyDown={handleKeyDown}
                         placeholder="搜索节点..."
                         style={{
@@ -244,7 +226,7 @@ export const CanvasSearchBar: React.FC<CanvasSearchBarProps> = ({
                             whiteSpace: 'nowrap',
                             fontVariantNumeric: 'tabular-nums',
                         }}>
-                            {matchIds.length > 0 ? `${currentIndex + 1}/${matchIds.length}` : '无结果'}
+                            {matchIds.length > 0 ? `${boundedCurrentIndex + 1}/${matchIds.length}` : '无结果'}
                         </span>
                     )}
                     {/* 上下导航 */}
@@ -313,6 +295,10 @@ export const CanvasSearchBar: React.FC<CanvasSearchBarProps> = ({
         </>
     );
 };
+
+export const CanvasSearchBar: React.FC<CanvasSearchBarProps> = ({ visible, ...props }) => (
+    visible ? <ActiveCanvasSearchBar {...props} /> : null
+);
 
 // ── 样式辅助 ──
 const navBtnStyle = (active: boolean, token: ThemeToken): React.CSSProperties => ({

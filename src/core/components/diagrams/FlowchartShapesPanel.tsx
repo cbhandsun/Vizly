@@ -174,11 +174,14 @@ export const FlowchartShapesPanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) 
     const renderDraggableItem = (label: string, icon: React.ReactNode, type: string, typeName: string, config: NodeConfig) => {
         return (
             <Tooltip key={label} title={label} placement="right">
-                <div
+                <button
+                    type="button"
                     draggable
                     onDragStart={(event) => onDragStart(event, type, typeName, label, config)}
                     onClick={() => ctx.addNode(typeName, { label, ...config })}
+                    aria-label={label}
                     style={{
+                        width: '100%',
                         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                         padding: '12px 8px', cursor: 'grab', 
                         border: '1px solid rgba(255, 255, 255, 0.4)',
@@ -209,7 +212,7 @@ export const FlowchartShapesPanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) 
                     <Text style={{ fontSize: 10, textAlign: 'center', lineHeight: 1.2, color: '#454d5d', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block', fontWeight: 500 }}>
                         {label}
                     </Text>
-                </div>
+                </button>
             </Tooltip>
         );
     };
@@ -305,9 +308,14 @@ export const FlowchartShapesPanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) 
         
         return (
             <div style={{ marginBottom: 16 }}>
-                <div 
+                <button
+                    type="button"
                     onClick={() => setExpanded(!expanded)}
+                    aria-expanded={expanded}
                     style={{ 
+                        width: '100%',
+                        border: 0,
+                        background: 'transparent',
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between', 
                         padding: '6px 4px', cursor: 'pointer', userSelect: 'none',
                         color: '@text-color-secondary', fontWeight: 600, fontSize: 12, marginBottom: 8 
@@ -318,7 +326,7 @@ export const FlowchartShapesPanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) 
                         fontSize: 10, color: '#bfbfbf', transition: 'transform 0.2s', 
                         transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)' 
                     }}>▶</span>
-                </div>
+                </button>
                 <div style={{ 
                     display: expanded ? 'grid' : 'none', 
                     gridTemplateColumns: 'repeat(2, 1fr)',

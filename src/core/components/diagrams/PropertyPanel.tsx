@@ -16,6 +16,7 @@ import { useNodePropertyItems } from './NodePropertyEditor';
 import { useEdgePropertyItems } from './EdgePropertyEditor';
 import { ThemeSwitcherPanel } from '../ui/ThemeSwitcherPanel';
 import { IconExplorer } from '../shared/IconExplorer';
+import { normalizeNodeDescriptionForEditing } from './nodeDescriptionText';
 import './PropertyPanel.css';
 
 const { Text } = Typography;
@@ -96,10 +97,25 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
     const commonDomain = getCommonValue(selectedNodes, (n) => getNodeData(n)?.domain);
     const commonEdgeLabel = getCommonValue(selectedEdges, (e) => e.data?.label || e.label);
 
-    useEffect(() => { setLocalLabel(commonNodeLabel ?? ''); }, [commonNodeLabel]);
-    useEffect(() => { setLocalDesc(commonNodeDesc ?? ''); }, [commonNodeDesc]);
-    useEffect(() => { setLocalDomain(commonDomain ?? ''); }, [commonDomain]);
-    useEffect(() => { setLocalEdgeLabel(typeof commonEdgeLabel === 'string' ? commonEdgeLabel : ''); }, [commonEdgeLabel]);
+    const externalFieldValues = {
+        label: commonNodeLabel ?? '',
+        description: normalizeNodeDescriptionForEditing(commonNodeDesc),
+        domain: commonDomain ?? '',
+        edgeLabel: typeof commonEdgeLabel === 'string' ? commonEdgeLabel : '',
+    };
+    const [syncedExternalFieldValues, setSyncedExternalFieldValues] = useState(externalFieldValues);
+    if (
+        syncedExternalFieldValues.label !== externalFieldValues.label
+        || syncedExternalFieldValues.description !== externalFieldValues.description
+        || syncedExternalFieldValues.domain !== externalFieldValues.domain
+        || syncedExternalFieldValues.edgeLabel !== externalFieldValues.edgeLabel
+    ) {
+        setSyncedExternalFieldValues(externalFieldValues);
+        setLocalLabel(externalFieldValues.label);
+        setLocalDesc(externalFieldValues.description);
+        setLocalDomain(externalFieldValues.domain);
+        setLocalEdgeLabel(externalFieldValues.edgeLabel);
+    }
 
     // --- Update 回调 ---
     const updateNodes = useCallback((partialData: NodeDataUpdate) => {
@@ -180,7 +196,12 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
     }, [edgeCount, hasSelection, isAllGroups, isAllArchitecture, nodeCount]);
 
     const [activeKeys, setActiveKeys] = useState<string[]>(() => initialActiveKeys);
-    useEffect(() => { setActiveKeys(initialActiveKeys); }, [initialActiveKeys]);
+    const activeKeyPreset = initialActiveKeys.join('\u0000');
+    const [syncedActiveKeyPreset, setSyncedActiveKeyPreset] = useState(activeKeyPreset);
+    if (syncedActiveKeyPreset !== activeKeyPreset) {
+        setSyncedActiveKeyPreset(activeKeyPreset);
+        setActiveKeys(initialActiveKeys);
+    }
 
     const title = hasSelection
         ? `${t('propertyPanel.title')} (${nodeCount + edgeCount})`

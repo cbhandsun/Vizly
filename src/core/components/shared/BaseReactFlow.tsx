@@ -73,6 +73,7 @@ import type { BaseReactFlowProps } from './baseReactFlowTypes';
 import { useBaseReactFlowFitController } from './useBaseReactFlowFitController';
 import { SmartEdgeRoutingOwnerContext } from '../custom-edges/smartEdgeRoutingOwnership';
 import { resolveBaseReactFlowRoutingComputation } from './baseReactFlowDragRoutingFreeze';
+import { BaseReactFlowInitializationOverlay } from './BaseReactFlowInitializationOverlay';
 
 // 模块级常量：避免在组件参数默认值中创建新引用
 const DEFAULT_VIEWPORT = { x: 0, y: 0, zoom: 1 };
@@ -121,6 +122,9 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
   preventScrolling = undefined, // To be auto-detected if not provided
   nodesDraggable = true,
   nodesConnectable = true,
+  nodesFocusable = true,
+  edgesFocusable = true,
+  ariaLabelConfig,
   elementsSelectable = true,
   enableSmartEdges = false,
   smartEdgePadding = 20,
@@ -584,6 +588,9 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
           preventScrolling={effectivePreventScrolling}
           nodesDraggable={nodesDraggable}
           nodesConnectable={nodesConnectable}
+          nodesFocusable={nodesFocusable}
+          edgesFocusable={edgesFocusable}
+          ariaLabelConfig={ariaLabelConfig}
           elementsSelectable={elementsSelectable}
           connectionLineType={connectionLineType}
           connectionLineStyle={connectionLineStyle}
@@ -651,24 +658,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
         </ReactFlow>
         </SmartEdgeRoutingOwnerContext.Provider>
       </div>
-      {!isContainerReady && (
-        <div style={{
-          position: 'absolute',
-          inset: 0,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          width: '100%',
-          height: '100%',
-          color: '#6b7280',
-          fontSize: 14,
-          background: 'rgba(250, 250, 252, 0.75)',
-          backdropFilter: 'saturate(1.1) blur(0.5px)',
-          pointerEvents: 'none'
-        }}>
-          正在初始化画布...
-        </div>
-      )}
+      {!isContainerReady && <BaseReactFlowInitializationOverlay />}
     </div>
   );
 };

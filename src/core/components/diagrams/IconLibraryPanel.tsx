@@ -38,10 +38,7 @@ export const IconLibraryPanel: React.FC = () => {
     const CACHE = useRef<Record<string, IconResult[]>>({});
 
     useEffect(() => {
-        if (!debouncedSearch.trim()) {
-            setIcons([]);
-            return;
-        }
+        if (!debouncedSearch.trim()) return;
 
         const controller = new AbortController();
         const fetchIcons = async () => {
@@ -79,9 +76,15 @@ export const IconLibraryPanel: React.FC = () => {
             }
         };
 
-        void fetchIcons();
+        queueMicrotask(() => {
+            if (!controller.signal.aborted) void fetchIcons();
+        });
         return () => controller.abort();
     }, [debouncedSearch]);
+
+    const visibleIcons = debouncedSearch.trim() ? icons : [];
+    const visibleLoading = Boolean(debouncedSearch.trim()) && loading;
+    const visibleError = debouncedSearch.trim() ? error : null;
 
     const onDragStart = (event: React.DragEvent, iconId: string) => {
         if (!isSafeIconifyIconName(iconId)) {
@@ -118,11 +121,11 @@ export const IconLibraryPanel: React.FC = () => {
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-                {loading && icons.length === 0 ? (
+                {visibleLoading && visibleIcons.length === 0 ? (
                     <div style={{ padding: 24, textAlign: 'center' }}><Spin /></div>
-                ) : error ? (
-                    <div style={{ padding: 24, textAlign: 'center', color: token.colorError }}>{error}</div>
-                ) : icons.length === 0 ? (
+                ) : visibleError ? (
+                    <div style={{ padding: 24, textAlign: 'center', color: token.colorError }}>{visibleError}</div>
+                ) : visibleIcons.length === 0 ? (
                     <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('designer.sidebar.noIconsFound', 'No icons found')} />
                 ) : (
                     <div style={{ 
@@ -131,7 +134,7 @@ export const IconLibraryPanel: React.FC = () => {
                         gap: 8,
                         padding: 4
                     }}>
-                        {icons.map((icon) => (
+                        {visibleIcons.map((icon) => (
                             <Tooltip key={icon.id} title={icon.name} placement="right">
                                 <div
                                     draggable
