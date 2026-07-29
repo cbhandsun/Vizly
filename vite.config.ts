@@ -21,7 +21,7 @@ const shardCoverageReportsDirectory = process.env.VIZLY_COVERAGE_REPORTS_DIR
 const isShardCoverage = process.env.TEST_CI_COVERAGE === '1'
 
 const vendorChunkRules: Array<[string, string[]]> = [
-  ['vendor-react', ['react', 'react-dom', 'react-router', 'react-router-dom', 'react-error-boundary']],
+  ['vendor-react', ['react', 'react-dom', 'react-router', 'react-error-boundary']],
   ['vendor-reactflow', ['@xyflow']],
   ['vendor-elk', ['elkjs']],
   ['vendor-three', ['three', '@react-three', 'troika-', 'webgl-sdf-generator', 'suspend-react', 'its-fine']],
@@ -114,7 +114,6 @@ const matchesReactVendorPackage = (id: string) => {
     normalizedId.includes('/node_modules/react/') ||
     normalizedId.includes('/node_modules/react-dom') ||
     normalizedId.includes('/node_modules/react-router') ||
-    normalizedId.includes('/node_modules/react-router-dom') ||
     normalizedId.includes('/node_modules/react-error-boundary')
   );
 }
