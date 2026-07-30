@@ -543,8 +543,8 @@
 /* 🆕 Quick Clone & Connect Buttons（⊕ 作为 Handle 子元素） */
 .flowchart-quick-clone-btn {
     position: absolute;
-    width: 20px;
-    height: 20px;
+    width: 32px;
+    height: 32px;
     background: #fff;
     border: 1.5px solid var(--node-border, #3b82f6);
     color: var(--node-border, #3b82f6);
@@ -577,6 +577,13 @@
 .flowchart-quick-clone-btn:hover {
     background: var(--node-border, #3b82f6);
     color: #fff;
+}
+
+.flowchart-quick-clone-btn:focus-visible {
+    opacity: 1;
+    outline: 3px solid rgba(59, 130, 246, 0.35);
+    outline-offset: 2px;
+    pointer-events: auto;
 }
 
 /* 拖拽/连线进行中隐藏 ⊕ */

@@ -187,7 +187,7 @@ export function FlowchartDesignerLeftSidebar({ model }: { model: FlowchartDesign
             pluginPanels={pluginPanels}
             isMobile={isMobile}
             autoOpenShapes={!isInitialDiagramLoading && nodes.length === 0}
-            requestedPanel={isMobile ? mobileRequestedPanel : null}
+            requestedPanel={mobileRequestedPanel}
             onRequestedPanelHandled={() => setMobileRequestedPanel(null)}
         />
     );
@@ -351,18 +351,27 @@ export function FlowchartDesignerOverlaysRegion({ model }: { model: FlowchartDes
                 <MobileBottomDock
                     activeTab={mobilePropertyDrawerVisible ? activeRightTab : null}
                     selectedCount={selectedNodes.length + selectedEdges.length}
-                    onAddClick={() => setMobileRequestedPanel('shapes')}
+                    onAddClick={() => {
+                        setAiChatVisible(false);
+                        setMobilePropertyDrawerVisible(false);
+                        setMobileRequestedPanel('shapes');
+                    }}
                     onPropertyClick={() => {
                         const shouldClose = mobilePropertyDrawerVisible && activeRightTab === 'property';
                         if (shouldClose) {
                             setMobilePropertyDrawerVisible(false);
                             return;
                         }
+                        setMobileRequestedPanel('close');
                         setAiChatVisible(false);
                         setActiveRightTab('property');
                         setMobilePropertyDrawerVisible(true);
                     }}
-                    onLayerClick={() => setMobileRequestedPanel('layers')}
+                    onLayerClick={() => {
+                        setAiChatVisible(false);
+                        setMobilePropertyDrawerVisible(false);
+                        setMobileRequestedPanel('layers');
+                    }}
                     onAiClick={() => {
                         const shouldClose = mobilePropertyDrawerVisible && activeRightTab === 'ai';
                         if (shouldClose) {
@@ -370,6 +379,7 @@ export function FlowchartDesignerOverlaysRegion({ model }: { model: FlowchartDes
                             setMobilePropertyDrawerVisible(false);
                             return;
                         }
+                        setMobileRequestedPanel('close');
                         setActiveRightTab('ai');
                         setAiChatVisible(true);
                         setMobilePropertyDrawerVisible(true);

@@ -112,6 +112,10 @@
     animation: drawerSlideIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.1);
 }
 
+.side-drawer.mobile-drawer {
+    box-sizing: border-box;
+}
+
 @keyframes drawerSlideIn {
     from {
         opacity: 0;
@@ -238,5 +242,35 @@
     :root:not([data-theme='light']) .side-drawer {
         background: rgba(30, 30, 46, 0.92);
         box-shadow: 8px 0 32px rgba(0, 0, 0, 0.25), 1px 0 0 rgba(255, 255, 255, 0.04);
+    }
+}
+
+@media (max-width: 768px) {
+    .icon-rail {
+        top: 88px;
+        left: 8px;
+        width: 52px;
+        padding: 6px 0;
+    }
+
+    .icon-rail-btn {
+        width: 44px;
+        height: 44px;
+        border-radius: 10px;
+        font-size: 16px;
+    }
+
+    .side-drawer-header {
+        min-height: 52px;
+        padding: 8px 12px;
+    }
+
+    .side-drawer-header .ant-btn {
+        min-width: 40px;
+        min-height: 40px;
+    }
+
+    .side-drawer-body {
+        padding: 12px;
     }
 }

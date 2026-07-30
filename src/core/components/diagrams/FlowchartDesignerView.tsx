@@ -197,6 +197,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
         setIsCommentMode,
         setIsDrawingMode,
         setIsMarqueeActive,
+        setMobileRequestedPanel,
         setNodes,
         setOnboardingDismissed,
         setPluginManagerVisible,
@@ -287,6 +288,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                     />
                     <FlowchartEmptyState
                         visible={pluginId !== 'mindmap' && !isInitialDiagramLoading && nodes.length === 0 && !jsonEditorVisible && !isDragging && !isConnecting && !quickAddMenu?.visible}
+                        onOpenShapePicker={() => setMobileRequestedPanel('shapes')}
                     />
                     {isInitialDiagramLoading && (
                         <div

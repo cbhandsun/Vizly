@@ -96,7 +96,7 @@ export const MobileBottomDock: React.FC<MobileBottomDockProps> = ({
 
                     {/* History / More */}
                     <div className="mobile-dock-group">
-                        <div className="flex flex-col gap-1 items-center">
+                        <div className="mobile-dock-history">
                             <button 
                                 type="button"
                                 className="mobile-dock-btn mini" 

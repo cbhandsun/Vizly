@@ -226,12 +226,17 @@ describe('workspace diagram actions', () => {
       getStorage: () => null,
     });
 
-    await expect(actions.createDiagram('blank')).resolves.toBe('created-id');
+    await expect(actions.createDiagram('blank', '  未命名流程图  ')).resolves.toBe('created-id');
     expect(registerDiagram).toHaveBeenCalledWith(expect.objectContaining({
       id: 'created-id',
       type: 'flowchart',
+      name: '未命名流程图',
+      metadata: expect.objectContaining({ title: '未命名流程图' }),
     }));
     expect(seed).toMatchObject({ id: 'seed-id', type: '' });
+
+    await actions.createDiagram('blank', 'x'.repeat(400));
+    expect(registerDiagram.mock.calls.at(-1)?.[0].name).toHaveLength(240);
 
     const invalid = createWorkspaceDiagramActions({
       createTemplateSeed: dependency<'createTemplateSeed'>(vi.fn(() => seed)),

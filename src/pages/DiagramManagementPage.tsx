@@ -2,14 +2,14 @@ import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import App from 'antd/es/app';
 import type { MenuProps } from 'antd/es/menu';
 import { coerceDiagramId, getQueryOrHashParamFromLocation, type LocationLike } from '@/core/utils/inputBoundary';
-import { Cloud, Database, ExternalLink, Pencil, Trash2, User } from 'lucide-react';
+import { ExternalLink, Pencil, Trash2 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router';
+import { useTranslation } from 'react-i18next';
 import type { ManageStorageProvider } from '@/components/ui/ManageTopToolbar';
 import { useAuth } from '@/context/useAuth';
 import {
     coerceFilterView,
     filterAndSortItems,
-    loadUnifiedStorage,
     loadWorkspaceItems,
     readStoredCloudProvider,
     type FilterViewType,
@@ -19,6 +19,7 @@ import {
     type ViewMode,
 } from './diagramManagementPage.helpers';
 import './WorkspaceDashboard.css';
+import './WorkspaceDashboard.mobile.css';
 import { appMessage } from '@/core/utils/antdStaticBridge';
 import { safeLog } from '@/core/utils/consoleCleanup';
 import { redactSensitiveLogValue } from '@/core/utils/logSecurity';
@@ -26,6 +27,7 @@ import { WorkspaceCompactHeader } from './WorkspaceCompactHeader';
 import { WorkspaceDiagramCollection } from './WorkspaceDiagramCollection';
 import { WorkspaceGlobalHeader } from './WorkspaceGlobalHeader';
 import { createWorkspaceDiagramActions } from './diagramManagementActions';
+import { createWorkspaceSettingsMenu } from './workspaceSettingsMenu';
 
 const AuthModal = React.lazy(() => import('@/components/auth/AuthModal').then(module => ({
     default: module.AuthModal,
@@ -35,6 +37,7 @@ const workspaceDiagramActions = createWorkspaceDiagramActions();
 
 const WorkspaceDashboardPage: React.FC = () => {
     const navigate = useNavigate();
+    const { t } = useTranslation();
     const [searchParams] = useSearchParams();
     const browserLocation = typeof window === 'undefined' ? null : window.location as LocationLike;
     const { user } = useAuth();
@@ -49,7 +52,7 @@ const WorkspaceDashboardPage: React.FC = () => {
     const [sortKey, setSortKey] = useState<SortKey>('updated');
     
     const [unifiedItems, setUnifiedItems] = useState<UnifiedDiagramItem[]>([]);
-    const [cloudProvider, setCloudProvider] = useState<ManageStorageProvider>(() => {
+    const [cloudProvider] = useState<ManageStorageProvider>(() => {
         const p = searchParams.get('provider');
         if (p === 's3' || p === 'supabase') return p;
         return readStoredCloudProvider();
@@ -179,7 +182,10 @@ const WorkspaceDashboardPage: React.FC = () => {
     // Advanced Creation Router mapping to correct domains
     const handleCreateTemplate = async (templateKey: TemplateKey) => {
         try {
-            const diagramId = await workspaceDiagramActions.createDiagram(templateKey);
+            const requestedName = templateKey === 'flowchart'
+                ? t('workspace.untitledFlowchart')
+                : undefined;
+            const diagramId = await workspaceDiagramActions.createDiagram(templateKey, requestedName);
             if (diagramId) navigateToDiagram(diagramId);
         } catch (error: unknown) {
             safeLog.error('Failed to create workspace diagram', redactSensitiveLogValue(error));
@@ -194,37 +200,18 @@ const WorkspaceDashboardPage: React.FC = () => {
     );
 
     // --- Settings Menu ---
-    const settingsMenu: MenuProps['items'] = [
-        {
-            key: 's3',
-            label: 'Use S3 Cloud Storage',
-            icon: <Cloud size={16} strokeWidth={2} />,
-            onClick: async () => {
-                const unifiedStorage = await loadUnifiedStorage();
-                unifiedStorage.setProvider('s3');
-                setCloudProvider('s3');
-                appMessage.info('Switched purely to S3 Backend');
-            }
-        },
-        {
-            key: 'supabase',
-            label: 'Use Supabase (Social)',
-            icon: <Database size={16} strokeWidth={2} />,
-            onClick: async () => {
-                const unifiedStorage = await loadUnifiedStorage();
-                unifiedStorage.setProvider('supabase');
-                setCloudProvider('supabase');
-                appMessage.info('Switched purely to Supabase');
-            }
-        },
-        { type: 'divider' },
-        {
-            key: 'login',
-            label: user ? `Logged in as ${user.email}` : 'Login via Supabase',
-            icon: <User size={16} strokeWidth={2} />,
-            onClick: () => !user && setIsAuthModalOpen(true)
-        }
-    ];
+    const settingsMenu: MenuProps['items'] = useMemo(
+        () => createWorkspaceSettingsMenu({
+            accountLabel: user?.email
+                ? t('workspace.signedInAs', { email: user.email })
+                : t('workspace.signIn'),
+            isAuthenticated: Boolean(user),
+            onOpenSignIn: () => setIsAuthModalOpen(true),
+            onOpenStorageSettings: () => navigate('/storage-config'),
+            storageSettingsLabel: t('workspace.storageSettings'),
+        }),
+        [navigate, t, user],
+    );
 
     return (
         <div className="workspace-dashboard">

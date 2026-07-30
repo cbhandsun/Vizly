@@ -187,7 +187,18 @@ const FlowchartNode = ({ data, selected, id }: FlowchartNodeProps) => {
                                 <div
                                     className="flowchart-quick-clone-btn"
                                     data-dir={dir}
+                                    role="button"
+                                    tabIndex={0}
+                                    aria-label={t('designer.flowchart.quickAddDirection', {
+                                        direction: t(`designer.flowchart.direction.${dir}`),
+                                    })}
                                     title={t('designer.flowchart.quickAddOrConnect')}
+                                    onKeyDown={(ev) => {
+                                        if (ev.key !== 'Enter' && ev.key !== ' ') return;
+                                        ev.preventDefault();
+                                        ev.stopPropagation();
+                                        handleQuickClone(dir, ev);
+                                    }}
                                     onPointerDown={(ev) => {
                                         const startX = ev.clientX;
                                         const startY = ev.clientY;

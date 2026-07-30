@@ -37,7 +37,38 @@
         "moreActions": "More actions for {{title}}",
         "unknownTime": "Unknown time",
         "previewLoading": "Loading preview",
-        "previewUnavailable": "Preview unavailable"
+        "previewUnavailable": "Preview unavailable",
+        "title": "Workspace",
+        "documentCount_one": "{{count}} document",
+        "documentCount_other": "{{count}} documents",
+        "newDiagram": "New diagram",
+        "newFlowchart": "New flowchart",
+        "untitledFlowchart": "Untitled flowchart",
+        "untitledDiagram": "Untitled diagram",
+        "chooseDiagramType": "Choose another diagram type",
+        "goHome": "Go to workspace",
+        "search": "Search workspace",
+        "searchPlaceholder": "Find your diagrams...",
+        "toggleTheme": "Toggle theme",
+        "settings": "Settings",
+        "storageSettings": "Storage and sync",
+        "signIn": "Sign in",
+        "signedInAs": "Signed in as {{email}}",
+        "diagramTypes": {
+            "flowchart": "Flowchart",
+            "mindmap": "Mind map",
+            "timeline": "Timeline",
+            "architecture": "Architecture"
+        },
+        "diagramTypeDescriptions": {
+            "mindmap": "Explore ideas and relationships",
+            "timeline": "Plan milestones and schedules",
+            "architecture": "Map systems and dependencies"
+        },
+        "empty": {
+            "title": "No diagrams yet",
+            "description": "Create a diagram or use the command menu to get started."
+        }
     },
     "templates": {
         "title": "Template Library",
@@ -510,6 +541,15 @@
             "directRoutingEnabled": "Direct routing enabled"
         },
         "flowchart": {
+            "emptyState": {
+                "title": "Build your first flow",
+                "desktopDescription": "Start with a shape, then use its directional controls to add and connect the next step.",
+                "mobileDescription": "Add a start, process, or decision shape to begin.",
+                "primaryAction": "Choose your first shape",
+                "contextMenuHint": "Right-click for actions",
+                "panHint": "Hold Space to pan",
+                "duplicateHint": "Alt-drag to duplicate"
+            },
             "newNode": "New Node",
             "nodeAdded": "Added {{label}}",
             "nodeAriaLabel": "Node: {{label}}{{selectedState}}{{lockedState}}",
@@ -517,6 +557,36 @@
             "nodeLockedState": " (locked)",
             "doubleClickToEdit": "Double-click to edit",
             "quickAddOrConnect": "Click to add; drag to connect",
+            "quickAddDirection": "Quick add and connect {{direction}}",
+            "direction": {
+                "top": "above",
+                "right": "to the right",
+                "bottom": "below",
+                "left": "to the left"
+            },
+            "quickCloneLabels": {
+                "process": "Process",
+                "startEnd": "Start / End",
+                "decision": "Decision",
+                "io": "Input / Output",
+                "database": "Database",
+                "subProcess": "Sub-process",
+                "document": "Document",
+                "multiDocument": "Multiple documents",
+                "note": "Note",
+                "ellipse": "Ellipse",
+                "circle": "Circle",
+                "triangle": "Triangle",
+                "hexagon": "Hexagon",
+                "trapezoid": "Trapezoid",
+                "star": "Star",
+                "cloud": "Cloud",
+                "manualInput": "Manual input",
+                "delay": "Delay",
+                "display": "Display",
+                "offPage": "Off-page connector",
+                "storage": "Internal storage"
+            },
             "edgeNodeInserted": "Inserted new node at edge midpoint",
             "clearCanvas": {
                 "title": "Clear Canvas",
@@ -1607,6 +1677,13 @@
     },
     "diagramViewer": {
         "canvasNotFound": "Cannot connect to canvas, please retry",
+        "switchDiagram": "Switch diagram",
+        "rename": {
+            "action": "Rename diagram",
+            "label": "Diagram name",
+            "inputLabel": "New diagram name",
+            "failed": "Could not rename this diagram. Try again."
+        },
         "saveAs": {
             "title": "Save As to {{target}}...",
             "namePlaceholder": "Enter diagram name:",

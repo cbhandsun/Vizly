@@ -1,0 +1,40 @@
+.designer-save-status-anchor {
+    position: absolute;
+    right: 20px;
+    bottom: 20px;
+    z-index: 1001;
+    pointer-events: auto;
+    transition:
+        right 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+        top 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.designer-save-status {
+    display: inline-flex;
+    align-items: center;
+}
+
+.designer-save-status .ant-tag {
+    min-height: 28px;
+    margin-inline-end: 0;
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    box-shadow: 0 2px 8px rgb(15 23 42 / 10%);
+    font-weight: 500;
+}
+
+@media (max-width: 767px) {
+    .designer-save-status-anchor {
+        top: 104px;
+        right: 12px;
+        bottom: auto;
+    }
+
+    .designer-save-status .ant-tag {
+        min-height: 30px;
+        padding-inline: 10px;
+        background: color-mix(in srgb, var(--designer-panel-bg, #fff) 92%, transparent);
+        backdrop-filter: blur(10px);
+    }
+}

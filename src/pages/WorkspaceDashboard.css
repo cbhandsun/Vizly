@@ -266,8 +266,9 @@ html[data-theme='dark'] .workspace-icon-btn:hover {
 .create-btn-primary {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  height: 32px;
+  height: 40px;
   padding: 0 14px;
   border: none;
   border-radius: 6px;
@@ -282,6 +283,79 @@ html[data-theme='dark'] .workspace-icon-btn:hover {
   position: relative;
   box-shadow: 0 1px 3px rgba(99, 102, 241, 0.3);
   flex-shrink: 0;
+}
+
+.create-split-button {
+  display: inline-flex;
+  align-items: stretch;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(99, 102, 241, 0.3);
+}
+
+.create-split-button .create-btn-primary {
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.create-split-button .create-btn-main {
+  border-radius: 8px 0 0 8px;
+}
+
+.create-split-button .create-btn-menu {
+  width: 40px;
+  padding: 0;
+  border-left: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 0 8px 8px 0;
+}
+
+.workspace-create-dropdown .ant-dropdown-menu {
+  min-width: min(280px, calc(100vw - 32px));
+  padding: 8px;
+  border-radius: 12px;
+}
+
+.workspace-create-dropdown .ant-dropdown-menu-item {
+  min-height: 58px;
+  padding: 9px 12px;
+  border-radius: 8px;
+}
+
+.workspace-create-dropdown .ant-dropdown-menu-item-icon {
+  color: #6366f1;
+}
+
+.workspace-create-menu-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.workspace-create-menu-copy strong {
+  color: inherit;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.workspace-create-menu-copy small {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.35;
+  white-space: normal;
+}
+
+[data-theme='dark'] .workspace-create-menu-copy small {
+  color: #94a3b8;
+}
+
+.create-btn-primary:focus-visible,
+.workspace-icon-btn:focus-visible,
+.workspace-settings-trigger:focus-visible,
+.workspace-header-brand:focus-visible,
+.filter-tab:focus-visible,
+.view-toggle-btn:focus-visible {
+  outline: 2px solid var(--vz-brand-from);
+  outline-offset: 2px;
 }
 
 html[data-theme='dark'] .create-btn-primary {
@@ -1158,56 +1232,6 @@ html[data-theme='dark'] .diagram-list-row:hover {
 .diagram-list-row:nth-child(6) { animation-delay: 0.11s; }
 .diagram-list-row:nth-child(7) { animation-delay: 0.13s; }
 .diagram-list-row:nth-child(8) { animation-delay: 0.15s; }
-
-/* ==========================================================================
-   Responsive Adjustments
-   ========================================================================== */
-
-@media (max-width: 768px) {
-  .workspace-global-header {
-    padding: 0 16px;
-  }
-
-  .workspace-header-brand {
-    width: auto;
-  }
-
-  .workspace-header-title {
-    display: none;
-  }
-
-  .workspace-header-search-container {
-    max-width: none;
-    flex: 1;
-    margin: 0 12px;
-  }
-
-  .workspace-hero-section {
-    padding: 32px 20px;
-  }
-
-  .workspace-greeting {
-    font-size: 22px;
-  }
-
-  .workspace-main-inner {
-    padding: 0 20px 20px;
-  }
-
-  .diagram-grid {
-    grid-template-columns: 1fr;
-    gap: 16px;
-  }
-
-  .filter-pill {
-    padding: 6px 12px;
-    font-size: 12px;
-  }
-
-  .workspace-view-controls {
-    display: none;
-  }
-}
 
 /* ==========================================================================
    Context Menu (Phase 1.3)

@@ -19,6 +19,7 @@ import {
     shouldAutoOpenShapesPanel,
     type MobileIconRailPanelRequest,
 } from './iconRailSidebarState';
+import { createIconRailDrawerStyle } from './iconRailSidebarLayout';
 import type { NodeTemplate } from './hooks/useNodeTemplates';
 import type { LayerConfig } from './hooks/useLayerManagement';
 import type { DataNode } from 'antd/es/tree';
@@ -462,13 +463,7 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
                     <div className="side-drawer-backdrop" onClick={closeDrawer} />
                     <div 
                         className={`side-drawer ${isMobile ? 'mobile-drawer' : ''}`} 
-                        style={{ 
-                            width: isMobile ? '100%' : drawerWidth,
-                            height: isMobile ? '80vh' : '100%',
-                            bottom: isMobile ? 0 : 'auto',
-                            top: isMobile ? 'auto' : 0,
-                            borderRadius: isMobile ? '24px 24px 0 0' : 0
-                        }}
+                        style={createIconRailDrawerStyle(isMobile, drawerWidth)}
                     >
                         <div className="side-drawer-header">
                             <div className="side-drawer-header-title">
@@ -517,18 +512,20 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
                             {renderDrawerContent()}
                         </div>
                         {/* Resize Handle */}
-                        <div
-                            onMouseDown={startDrawerResize}
-                            style={{
-                                position: 'absolute',
-                                right: -3,
-                                top: 0,
-                                bottom: 0,
-                                width: 6,
-                                cursor: 'col-resize',
-                                zIndex: 120,
-                            }}
-                        />
+                        {!isMobile && (
+                            <div
+                                onMouseDown={startDrawerResize}
+                                style={{
+                                    position: 'absolute',
+                                    right: -3,
+                                    top: 0,
+                                    bottom: 0,
+                                    width: 6,
+                                    cursor: 'col-resize',
+                                    zIndex: 120,
+                                }}
+                            />
+                        )}
                     </div>
                 </>
             )}

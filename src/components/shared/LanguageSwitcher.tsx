@@ -8,9 +8,10 @@ import {
 } from '@/components/configurationLogging';
 import { LayeredConfigManager, ConfigLayer } from '@/core/config/LayeredConfigManager';
 import type { LayeredConfigChangeEvent } from '@/core/config/LayeredConfigTypes';
+import { parseSupportedLanguage } from '@/core/utils/languagePreference';
 
 export const LanguageSwitcher: React.FC<{ variant?: 'select' | 'icon', className?: string }> = ({ variant = 'select', className }) => {
-    const { i18n } = useTranslation();
+    const { i18n, t } = useTranslation();
     const currentLanguage = i18n.resolvedLanguage || i18n.language;
 
     // Listen to LayeredConfigManager for cloud sync updates
@@ -19,14 +20,15 @@ export const LanguageSwitcher: React.FC<{ variant?: 'select' | 'icon', className
             const configManager = LayeredConfigManager.getInstance();
             
             // Check initial synced value
-            const savedLng = configManager.get('i18n.language');
-            if (savedLng && typeof savedLng === 'string' && savedLng !== i18n.language) {
-                i18n.changeLanguage(savedLng);
+            const savedLanguage = parseSupportedLanguage(configManager.get('i18n.language'));
+            if (savedLanguage && savedLanguage !== i18n.language) {
+                void i18n.changeLanguage(savedLanguage);
             }
 
             const handleConfigChange = (e: LayeredConfigChangeEvent<unknown>) => {
-                if (e.key === 'i18n.language' && typeof e.effectiveValue === 'string' && e.effectiveValue !== i18n.language) {
-                    i18n.changeLanguage(e.effectiveValue);
+                const nextLanguage = parseSupportedLanguage(e.effectiveValue);
+                if (e.key === 'i18n.language' && nextLanguage && nextLanguage !== i18n.language) {
+                    void i18n.changeLanguage(nextLanguage);
                 }
             };
 
@@ -39,10 +41,13 @@ export const LanguageSwitcher: React.FC<{ variant?: 'select' | 'icon', className
         }
     }, [i18n]);
 
-    const handleChange = (value: string) => {
-        i18n.changeLanguage(value);
+    const handleChange = (value: unknown) => {
+        const language = parseSupportedLanguage(value);
+        if (!language) return;
+
+        void i18n.changeLanguage(language);
         try {
-            LayeredConfigManager.getInstance().set('i18n.language', value, ConfigLayer.USER);
+            LayeredConfigManager.getInstance().set('i18n.language', language, ConfigLayer.USER);
         } catch (e) {
             logLanguageSwitcherConfigSyncFailure(e);
         }
@@ -64,7 +69,12 @@ export const LanguageSwitcher: React.FC<{ variant?: 'select' | 'icon', className
                 trigger={['click']}
                 getPopupContainer={(triggerNode) => (document.fullscreenElement as HTMLElement) || triggerNode.parentNode || document.body}
             >
-                <button className={className || "inline-flex items-center justify-center w-8 h-8 rounded-[10px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:text-indigo-500 hover:border-indigo-500/30 hover:bg-indigo-50/50 dark:hover:bg-indigo-500/10 transition-all cursor-pointer shadow-sm"}>
+                <button
+                    type="button"
+                    className={className || "inline-flex items-center justify-center w-8 h-8 rounded-[10px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:text-indigo-500 hover:border-indigo-500/30 hover:bg-indigo-50/50 dark:hover:bg-indigo-500/10 transition-all cursor-pointer shadow-sm"}
+                    aria-label={t('common.language')}
+                    title={t('common.language')}
+                >
                     <GlobalOutlined />
                 </button>
             </Dropdown>

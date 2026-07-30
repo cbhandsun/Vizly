@@ -1,11 +1,19 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useReactFlow, Node } from '@xyflow/react';
+import { useTranslation } from 'react-i18next';
 import type { FlowchartNodeData } from '../FlowchartNode';
 import { MarkerType } from '@xyflow/react';
 import { useNodeUpdate } from '../../diagrams/useNodeUpdate';
+import {
+    calculateCanvasVisibleRight,
+    calculateQuickCloneViewportAdjustment,
+    resolveFlowchartQuickCloneLabelKey,
+    type FlowchartQuickCloneDirection,
+} from '../flowchartQuickClone';
 
 export function useFlowchartNodeInteractions(id: string, data: FlowchartNodeData, selected: boolean) {
     const { setNodes, setEdges, getViewport, setViewport } = useReactFlow();
+    const { t } = useTranslation();
     const onUpdateNodeData = useNodeUpdate();
 
     const [isHovered, setIsHovered] = useState(false);
@@ -102,29 +110,52 @@ export function useFlowchartNodeInteractions(id: string, data: FlowchartNodeData
         });
     }, [handleUpdateData]);
 
-    const ensureNodeVisible = useCallback((nx: number, ny: number) => {
+    const ensureNodeVisible = useCallback((nx: number, ny: number, nodeWidth: number, nodeHeight: number) => {
         const vp = getViewport();
-        const container = document.querySelector('.react-flow') as HTMLElement;
+        const container = document.querySelector<HTMLElement>('.react-flow');
         if (!container) return;
-        const { width: cw, height: ch } = container.getBoundingClientRect();
-        const screenX = nx * vp.zoom + vp.x;
-        const screenY = ny * vp.zoom + vp.y;
-        const margin = 80;
-        if (screenX < margin || screenX > cw - margin || screenY < margin || screenY > ch - margin) {
-            setViewport({
-                x: cw / 2 - nx * vp.zoom,
-                y: ch / 2 - ny * vp.zoom,
-                zoom: vp.zoom
-            }, { duration: 300 });
+        const containerRect = container.getBoundingClientRect();
+        const sidebar = document.querySelector<HTMLElement>('.designer-right-sidebar');
+        const sidebarRect = sidebar?.getBoundingClientRect();
+        const visibleRight = calculateCanvasVisibleRight({
+            containerLeft: containerRect.left,
+            containerRight: containerRect.right,
+            containerWidth: containerRect.width,
+            sidebarLeft: sidebarRect?.left,
+            sidebarRight: sidebarRect?.right,
+            sidebarWidth: sidebarRect?.width,
+            sidebarHeight: sidebarRect?.height,
+            sidebarVisible: Boolean(
+                sidebar
+                && sidebarRect
+                && getComputedStyle(sidebar).visibility !== 'hidden'
+            ),
+        });
+        const adjustment = calculateQuickCloneViewportAdjustment({
+            containerWidth: containerRect.width,
+            containerHeight: containerRect.height,
+            visibleLeft: 0,
+            visibleRight,
+            nodeX: nx,
+            nodeY: ny,
+            nodeWidth,
+            nodeHeight,
+            viewportX: vp.x,
+            viewportY: vp.y,
+            zoom: vp.zoom,
+        });
+        if (adjustment) {
+            setViewport(adjustment, { duration: 300 });
         }
     }, [getViewport, setViewport]);
 
-    const handleQuickClone = useCallback((direction: 'top' | 'right' | 'bottom' | 'left', e: React.MouseEvent | PointerEvent) => {
+    const handleQuickClone = useCallback((direction: FlowchartQuickCloneDirection, e: React.SyntheticEvent | PointerEvent) => {
         if (e && 'stopPropagation' in e) {
              e.stopPropagation();
         }
         const newNodeId = `flowchart-node-${Date.now()}`;
         const finalPos = { x: 0, y: 0 };
+        const finalSize = { width: 120, height: 60 };
         
         setNodes((nds) => {
             const sourceNode = nds.find(n => n.id === id);
@@ -144,6 +175,8 @@ export function useFlowchartNodeInteractions(id: string, data: FlowchartNodeData
 
             const nodeW = (sourceNode.measured?.width ?? sourceNode.width ?? 120) as number;
             const nodeH = (sourceNode.measured?.height ?? sourceNode.height ?? 60) as number;
+            finalSize.width = nodeW;
+            finalSize.height = nodeH;
             const OVERLAP_PAD = 20;
             const MAX_SHIFTS = 5;
 
@@ -169,15 +202,6 @@ export function useFlowchartNodeInteractions(id: string, data: FlowchartNodeData
             finalPos.x = nx; finalPos.y = ny;
             const srcData = sourceNode.data as FlowchartNodeData;
             const shape = srcData.shape || 'rectangle';
-            const SHAPE_LABELS: Record<string, string> = {
-                'rectangle': 'Process', 'pill': 'Start/End', 'diamond': 'Decision',
-                'parallelogram': 'I/O', 'database': 'Database', 'predefined-process': 'Sub-Process',
-                'document': 'Document', 'multi-document': 'Multi-Doc', 'note': 'Note',
-                'ellipse': 'Ellipse', 'circle': 'Circle', 'triangle': 'Triangle',
-                'hexagon': 'Hexagon', 'trapezoid': 'Trapezoid', 'star': 'Star',
-                'cloud': 'Cloud', 'manual-input': 'Manual Input', 'delay': 'Delay',
-                'display': 'Display', 'off-page': 'Off-Page', 'internal-storage': 'Storage',
-            };
 
             const newNode: Node = {
                 id: newNodeId,
@@ -185,7 +209,7 @@ export function useFlowchartNodeInteractions(id: string, data: FlowchartNodeData
                 position: { x: nx, y: ny },
                 style: sourceNode.style,
                 data: {
-                    label: SHAPE_LABELS[shape] || 'Process',
+                    label: t(resolveFlowchartQuickCloneLabelKey(shape)),
                     shape,
                     ...(srcData.theme && { theme: srcData.theme }),
                     ...(srcData.domainClass && { domainClass: srcData.domainClass }),
@@ -225,8 +249,11 @@ export function useFlowchartNodeInteractions(id: string, data: FlowchartNodeData
             return [...eds.map(e => ({ ...e, selected: false })), newEdge];
         });
 
-        setTimeout(() => ensureNodeVisible(finalPos.x, finalPos.y), 50);
-    }, [id, setNodes, setEdges, ensureNodeVisible]);
+        setTimeout(
+            () => ensureNodeVisible(finalPos.x, finalPos.y, finalSize.width, finalSize.height),
+            80,
+        );
+    }, [id, setNodes, setEdges, ensureNodeVisible, t]);
 
     return {
         isHovered,

@@ -9,6 +9,7 @@ import { AuthStatusCompact } from '../auth/AuthStatus';
 import { FaChevronDown, FaEllipsisV } from 'react-icons/fa';
 import type { TopToolbarProps } from './TopToolbar';
 import { getToolbarPopupContainer, isToolbarEdgeMode } from './topToolbarGuards';
+import { DiagramTitleEditor } from './DiagramTitleEditor';
 
 export type { TopToolbarProps };
 
@@ -21,6 +22,7 @@ export type { TopToolbarProps };
 export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
   diagramId,
   diagramName,
+  onRenameDiagram,
   edgeMode,
   onEdgeModeChange,
   isFullscreen,
@@ -127,6 +129,9 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
                   </div>
                 </Tooltip>
               </Popover>
+              {onRenameDiagram && (
+                <DiagramTitleEditor title={title} onRename={onRenameDiagram} />
+              )}
             </div>
           )}
 
@@ -187,6 +192,7 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
                 diagramName={diagramName ?? 'diagram'}
                 onToggleFullscreen={onToggleFullscreen}
                 isFullscreen={isFullscreen}
+                showControls={!isMobile}
                 variant="compact"
               />
             )}

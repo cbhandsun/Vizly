@@ -23,6 +23,10 @@ import {
   resolveIconRailRequestedPanel,
   shouldAutoOpenShapesPanel,
 } from '../iconRailSidebarState';
+import {
+  createIconRailDrawerStyle,
+  MOBILE_DRAWER_DOCK_CLEARANCE,
+} from '../iconRailSidebarLayout';
 
 describe('IconRailSidebar storage helpers', () => {
   beforeEach(() => {
@@ -112,5 +116,26 @@ describe('IconRailSidebar storage helpers', () => {
     expect(resolveIconRailRequestedPanel('shapes')).toBe('shapes');
     expect(resolveIconRailRequestedPanel('layers')).toBe('layers');
     expect(resolveIconRailRequestedPanel('close')).toBeNull();
+  });
+
+  it('keeps the mobile drawer inside the viewport and above the bottom dock', () => {
+    expect(createIconRailDrawerStyle(true, 320)).toMatchObject({
+      width: 'auto',
+      minWidth: 0,
+      maxWidth: 'none',
+      left: 12,
+      right: 12,
+      bottom: MOBILE_DRAWER_DOCK_CLEARANCE,
+      maxHeight: 'calc(100% - 176px)',
+    });
+  });
+
+  it('preserves the desktop drawer geometry', () => {
+    expect(createIconRailDrawerStyle(false, 320)).toMatchObject({
+      width: 320,
+      height: '100%',
+      top: 0,
+      bottom: 'auto',
+    });
   });
 });

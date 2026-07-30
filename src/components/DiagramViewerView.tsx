@@ -41,7 +41,8 @@ type MermaidImportModalProps = React.ComponentProps<typeof MermaidImportModal>;
 interface DiagramViewerViewProps {
     t: TFunction;
     selectedDiagramId: string;
-    selectedDiagram?: { name: string; titleKey?: string };
+    diagramTitle: string;
+    onRenameDiagram?: (title: string) => Promise<void>;
     edgeMode: 'advanced-smart' | 'native';
     setEdgeMode: (mode: 'advanced-smart' | 'native') => void | Promise<void>;
     layoutStrategy: string;
@@ -102,7 +103,8 @@ interface DiagramViewerViewProps {
 export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
     t,
     selectedDiagramId,
-    selectedDiagram,
+    diagramTitle,
+    onRenameDiagram,
     edgeMode,
     setEdgeMode,
     layoutStrategy,
@@ -165,8 +167,9 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
                 isPresentationMode={isPresentationMode}
                 toolbarProps={{
                     diagramId: selectedDiagramId,
-                    diagramName: selectedDiagram?.titleKey ? t(selectedDiagram.titleKey) : (selectedDiagram?.name || 'Diagram'),
-                    title: selectedDiagram?.titleKey ? t(selectedDiagram.titleKey) : (selectedDiagram?.name || 'Diagram'),
+                    diagramName: diagramTitle,
+                    title: diagramTitle,
+                    onRenameDiagram,
                     edgeMode: edgeMode || 'advanced-smart',
                     onEdgeModeChange: (mode: 'advanced-smart' | 'native') => setEdgeMode(mode),
                     isFullscreen: isFullscreen,

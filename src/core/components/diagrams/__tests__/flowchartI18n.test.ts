@@ -1,6 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import {
+    calculateCanvasVisibleRight,
+    calculateQuickCloneViewportAdjustment,
+    resolveFlowchartQuickCloneLabelKey,
+} from '../../custom-nodes/flowchartQuickClone';
 
 const readRelativeFile = (relativePath: string) => readFileSync(
     fileURLToPath(new URL(relativePath, import.meta.url)),
@@ -30,6 +35,9 @@ describe('flowchart interaction copy', () => {
         expect(pluginModalSource).toContain("aria-label={t('common.close')}");
         expect(pluginModalSource).not.toContain('<TabPane');
         expect(nodeSource).toContain("t('designer.flowchart.nodeAriaLabel'");
+        expect(nodeSource).toContain('role="button"');
+        expect(nodeSource).toContain('tabIndex={0}');
+        expect(nodeSource).toContain("t('designer.flowchart.quickAddDirection'");
         expect(nodeSource).not.toContain('`${shape} 节点:');
     });
 
@@ -47,9 +55,117 @@ describe('flowchart interaction copy', () => {
             expect(read(zh, ['designer', 'toolbar', key])).toBeTypeOf('string');
             expect(read(en, ['designer', 'toolbar', key])).toBeTypeOf('string');
         }
-        for (const key of ['nodeAriaLabel', 'nodeSelectedState', 'nodeLockedState', 'doubleClickToEdit', 'quickAddOrConnect']) {
+        for (const key of ['nodeAriaLabel', 'nodeSelectedState', 'nodeLockedState', 'doubleClickToEdit', 'quickAddOrConnect', 'quickAddDirection']) {
             expect(read(zh, ['designer', 'flowchart', key])).toBeTypeOf('string');
             expect(read(en, ['designer', 'flowchart', key])).toBeTypeOf('string');
         }
+        for (const key of ['title', 'desktopDescription', 'mobileDescription', 'primaryAction']) {
+            expect(read(zh, ['designer', 'flowchart', 'emptyState', key])).toBeTypeOf('string');
+            expect(read(en, ['designer', 'flowchart', 'emptyState', key])).toBeTypeOf('string');
+        }
+        for (const key of ['process', 'startEnd', 'decision']) {
+            expect(read(zh, ['designer', 'flowchart', 'quickCloneLabels', key])).toBeTypeOf('string');
+            expect(read(en, ['designer', 'flowchart', 'quickCloneLabels', key])).toBeTypeOf('string');
+        }
+    });
+
+    it('resolves safe localized defaults for quick-cloned shapes', () => {
+        expect(resolveFlowchartQuickCloneLabelKey('pill')).toBe(
+            'designer.flowchart.quickCloneLabels.startEnd',
+        );
+        expect(resolveFlowchartQuickCloneLabelKey('')).toBe(
+            'designer.flowchart.quickCloneLabels.process',
+        );
+        expect(resolveFlowchartQuickCloneLabelKey({ shape: 'pill' })).toBe(
+            'designer.flowchart.quickCloneLabels.process',
+        );
+    });
+
+    it('keeps a quick-cloned node inside the canvas area left of an open sidebar', () => {
+        expect(calculateCanvasVisibleRight({
+            containerLeft: 0,
+            containerRight: 1280,
+            containerWidth: 1280,
+            sidebarLeft: 960,
+            sidebarRight: 1280,
+            sidebarWidth: 320,
+            sidebarHeight: 720,
+            sidebarVisible: true,
+        })).toBe(960);
+        expect(calculateCanvasVisibleRight({
+            containerLeft: 0,
+            containerRight: 390,
+            containerWidth: 390,
+            sidebarLeft: 0,
+            sidebarRight: 390,
+            sidebarWidth: 390,
+            sidebarHeight: 0,
+            sidebarVisible: true,
+        })).toBe(390);
+        expect(calculateCanvasVisibleRight({
+            containerLeft: 0,
+            containerRight: Number.NaN,
+            containerWidth: 390,
+            sidebarVisible: false,
+        })).toBe(0);
+        expect(calculateQuickCloneViewportAdjustment({
+            containerWidth: 1280,
+            containerHeight: 720,
+            visibleLeft: 0,
+            visibleRight: 960,
+            nodeX: 1050,
+            nodeY: 300,
+            nodeWidth: 120,
+            nodeHeight: 60,
+            viewportX: 0,
+            viewportY: 0,
+            zoom: 1,
+        })).toEqual({
+            x: -630,
+            y: 0,
+            zoom: 1,
+        });
+        expect(calculateQuickCloneViewportAdjustment({
+            containerWidth: 1280,
+            containerHeight: 720,
+            visibleLeft: 0,
+            visibleRight: 960,
+            nodeX: 400,
+            nodeY: 300,
+            nodeWidth: 120,
+            nodeHeight: 60,
+            viewportX: 0,
+            viewportY: 0,
+            zoom: 1,
+        })).toBeNull();
+    });
+
+    it('rejects invalid quick-clone viewport measurements', () => {
+        expect(calculateQuickCloneViewportAdjustment({
+            containerWidth: Number.NaN,
+            containerHeight: 720,
+            visibleLeft: 0,
+            visibleRight: 960,
+            nodeX: 400,
+            nodeY: 300,
+            nodeWidth: 120,
+            nodeHeight: 60,
+            viewportX: 0,
+            viewportY: 0,
+            zoom: 1,
+        })).toBeNull();
+        expect(calculateQuickCloneViewportAdjustment({
+            containerWidth: 1280,
+            containerHeight: 720,
+            visibleLeft: 0,
+            visibleRight: 960,
+            nodeX: 400,
+            nodeY: 300,
+            nodeWidth: 120,
+            nodeHeight: 60,
+            viewportX: 0,
+            viewportY: 0,
+            zoom: 0,
+        })).toBeNull();
     });
 });

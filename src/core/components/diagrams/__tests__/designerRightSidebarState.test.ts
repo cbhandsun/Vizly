@@ -1,11 +1,50 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+    createDesignerRightSidebarLayout,
+    MOBILE_DESIGNER_PANEL_DOCK_CLEARANCE,
     shouldActivateDesignerPropertyTab,
     shouldExpandDesignerRightSidebar,
     shouldFreezeDesignerRightSidebarDuringDrag,
     shouldOpenDesignerAiSidebar,
 } from '../designerRightSidebarState';
+
+describe('createDesignerRightSidebarLayout', () => {
+    it('keeps an expanded mobile panel above the bottom dock and safe area', () => {
+        expect(createDesignerRightSidebarLayout({
+            isCollapsed: false,
+            isMobile: true,
+            panelWidth: 360,
+        })).toMatchObject({
+            position: 'fixed',
+            right: 0,
+            left: 0,
+            bottom: MOBILE_DESIGNER_PANEL_DOCK_CLEARANCE,
+            maxHeight: 'calc(100% - 176px)',
+            height: 'min(85vh, calc(100% - 176px))',
+            width: '100%',
+        });
+    });
+
+    it('preserves desktop sizing and collapses the mobile panel to zero height', () => {
+        expect(createDesignerRightSidebarLayout({
+            isCollapsed: true,
+            isMobile: true,
+            panelWidth: 360,
+        }).height).toBe(0);
+        expect(createDesignerRightSidebarLayout({
+            isCollapsed: false,
+            isMobile: false,
+            panelWidth: 360,
+        })).toMatchObject({
+            position: 'absolute',
+            right: 16,
+            bottom: 'auto',
+            height: 'calc(100% - 96px)',
+            width: 360,
+        });
+    });
+});
 
 describe('shouldExpandDesignerRightSidebar', () => {
     it('expands a collapsed sidebar for a selection or an active AI request', () => {

@@ -11,6 +11,7 @@ import {
     writeDesignerRightSidebarWidth,
 } from '../../utils/layoutStorage';
 import {
+    createDesignerRightSidebarLayout,
     shouldActivateDesignerPropertyTab,
     shouldExpandDesignerRightSidebar,
     shouldFreezeDesignerRightSidebarDuringDrag,
@@ -228,6 +229,12 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
         railButtons.push({ key: 'ai', icon: <FaRobot />, label: showAiCrown ? `${t('aiChat.title')} 👑` : t('aiChat.title') });
     }
 
+    const sidebarLayout = createDesignerRightSidebarLayout({
+        isCollapsed,
+        isMobile,
+        panelWidth,
+    });
+
     return (
         <div
             className="designer-right-sidebar"
@@ -235,15 +242,8 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
             style={{
-                position: isMobile ? 'fixed' : 'absolute',
+                ...sidebarLayout,
                 pointerEvents: 'auto',
-                right: isMobile ? 0 : 16,
-                left: isMobile ? 0 : 'auto',
-                top: isMobile ? 'auto' : 72,
-                bottom: isMobile ? 0 : 'auto',
-                maxHeight: isMobile ? '85vh' : 'calc(100% - 96px)',
-                height: isCollapsed ? (isMobile ? 0 : 'max-content') : (isMobile ? '85vh' : 'calc(100% - 96px)'),
-                width: isMobile ? '100%' : (isCollapsed ? RAIL_WIDTH : panelWidth),
                 backgroundColor: isMobile
                     ? token.colorBgContainer
                     : 'var(--designer-panel-bg, rgba(255, 255, 255, 0.72))',

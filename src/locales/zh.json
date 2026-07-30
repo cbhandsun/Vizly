@@ -37,7 +37,37 @@
         "moreActions": "{{title}} 的更多操作",
         "unknownTime": "未知时间",
         "previewLoading": "正在加载预览",
-        "previewUnavailable": "预览暂不可用"
+        "previewUnavailable": "预览暂不可用",
+        "title": "工作区",
+        "documentCount": "{{count}} 个文档",
+        "newDiagram": "新建图表",
+        "newFlowchart": "新建流程图",
+        "untitledFlowchart": "未命名流程图",
+        "untitledDiagram": "未命名图表",
+        "chooseDiagramType": "选择其他图表类型",
+        "goHome": "返回工作区",
+        "search": "搜索工作区",
+        "searchPlaceholder": "搜索你的图表...",
+        "toggleTheme": "切换主题",
+        "settings": "设置",
+        "storageSettings": "存储与同步",
+        "signIn": "登录",
+        "signedInAs": "已登录：{{email}}",
+        "diagramTypes": {
+            "flowchart": "流程图",
+            "mindmap": "思维导图",
+            "timeline": "时间线",
+            "architecture": "架构图"
+        },
+        "diagramTypeDescriptions": {
+            "mindmap": "梳理想法与关联关系",
+            "timeline": "规划里程碑与进度",
+            "architecture": "呈现系统与依赖关系"
+        },
+        "empty": {
+            "title": "还没有图表",
+            "description": "新建一个图表，或打开命令菜单开始使用。"
+        }
     },
     "templates": {
         "title": "模板库",
@@ -522,6 +552,15 @@
             "directRoutingEnabled": "直接连线模式"
         },
         "flowchart": {
+            "emptyState": {
+                "title": "创建你的第一个流程",
+                "desktopDescription": "先选择一个图形，再使用节点方向按钮添加并连接下一步。",
+                "mobileDescription": "添加开始、流程或判断图形即可开始。",
+                "primaryAction": "选择第一个图形",
+                "contextMenuHint": "右键打开操作",
+                "panHint": "按住 Space 拖动画布",
+                "duplicateHint": "按住 Alt 拖动复制"
+            },
             "importFailed": "导入失败：JSON 无效或数据格式不支持",
             "invalidJson": "JSON 无效：{{reason}}",
             "commandPaletteHint": "按下 {{mod}}+K 或 / 打开命令面板",
@@ -629,6 +668,36 @@
             "nodeLockedState": "（已锁定）",
             "doubleClickToEdit": "双击编辑",
             "quickAddOrConnect": "单击快速添加，拖拽创建连线",
+            "quickAddDirection": "向{{direction}}快速添加并连接",
+            "direction": {
+                "top": "上方",
+                "right": "右侧",
+                "bottom": "下方",
+                "left": "左侧"
+            },
+            "quickCloneLabels": {
+                "process": "流程",
+                "startEnd": "开始 / 结束",
+                "decision": "判断",
+                "io": "输入 / 输出",
+                "database": "数据库",
+                "subProcess": "子流程",
+                "document": "文档",
+                "multiDocument": "多文档",
+                "note": "备注",
+                "ellipse": "椭圆",
+                "circle": "圆形",
+                "triangle": "三角形",
+                "hexagon": "六边形",
+                "trapezoid": "梯形",
+                "star": "星形",
+                "cloud": "云",
+                "manualInput": "手动输入",
+                "delay": "延迟",
+                "display": "显示",
+                "offPage": "跨页连接",
+                "storage": "内部存储"
+            },
             "edgeNodeInserted": "已在连线中点插入新节点",
             "clearCanvas": {
                 "title": "清空画布",
@@ -750,6 +819,13 @@
     },
     "diagramViewer": {
         "canvasNotFound": "无法连接到画布，请重试",
+        "switchDiagram": "切换图表",
+        "rename": {
+            "action": "重命名流程图",
+            "label": "流程图名称",
+            "inputLabel": "新的流程图名称",
+            "failed": "重命名失败，请重试。"
+        },
         "saveAs": {
             "title": "另存为至 {{target}}...",
             "namePlaceholder": "请输入图表名称：",

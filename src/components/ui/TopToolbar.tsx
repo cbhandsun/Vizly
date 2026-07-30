@@ -21,6 +21,7 @@ export interface TopToolbarProps {
    * 图的显示名称（用于导出文件命名与界面显示）
    */
   diagramName?: string;
+  onRenameDiagram?: (title: string) => Promise<void>;
   /**
    * 当前连线模式（smart/advanced-smart/native），用于下拉选择器显示与联动
    */

@@ -3,6 +3,7 @@ import { Tag, Tooltip } from 'antd';
 import { SyncOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import type { AutoSaveState } from './hooks/useAutoSave';
+import './SaveStatusIndicator.css';
 
 interface SaveStatusIndicatorProps {
     saveState: AutoSaveState;
@@ -34,11 +35,13 @@ export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = React.mem
     if (saving) {
         const label = t(`designer.saveStatus.${target}.saving`);
         return (
-            <Tooltip title={label}>
-                <Tag icon={<SyncOutlined spin />} color="processing">
-                    {label}
-                </Tag>
-            </Tooltip>
+            <span className="designer-save-status" role="status" aria-live="polite">
+                <Tooltip title={label}>
+                    <Tag icon={<SyncOutlined spin />} color="processing">
+                        {label}
+                    </Tag>
+                </Tooltip>
+            </span>
         );
     }
 
@@ -46,11 +49,13 @@ export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = React.mem
     if (error) {
         const label = t(`designer.saveStatus.${target}.failed`);
         return (
-            <Tooltip title={label}>
-                <Tag icon={<CloseCircleOutlined />} color="error">
-                    {label}
-                </Tag>
-            </Tooltip>
+            <span className="designer-save-status" role="status" aria-live="assertive">
+                <Tooltip title={label}>
+                    <Tag icon={<CloseCircleOutlined />} color="error">
+                        {label}
+                    </Tag>
+                </Tooltip>
+            </span>
         );
     }
 
@@ -66,11 +71,13 @@ export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = React.mem
         const label = t(`designer.saveStatus.${target}.saved`);
 
         return (
-            <Tooltip title={t('designer.saveStatus.lastSaved', { timeAgo })}>
-                <Tag icon={<CheckCircleOutlined />} color="success">
-                    {label}
-                </Tag>
-            </Tooltip>
+            <span className="designer-save-status" role="status" aria-live="polite">
+                <Tooltip title={t('designer.saveStatus.lastSaved', { timeAgo })}>
+                    <Tag icon={<CheckCircleOutlined />} color="success">
+                        {label}
+                    </Tag>
+                </Tooltip>
+            </span>
         );
     }
 

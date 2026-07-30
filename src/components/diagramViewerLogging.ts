@@ -46,6 +46,13 @@ export const logDiagramViewerDocTypeDetectionFailure = (diagramId: string, error
   );
 };
 
+export const logDiagramViewerRenameFailure = (diagramId: string, error: unknown): void => {
+  safeLog.warn(
+    `[DiagramViewer] Failed to rename diagram "${diagramId}":`,
+    redactSensitiveLogValue(error)
+  );
+};
+
 export const logDiagramViewerSwitchConfirmationFailure = (error: unknown): void => {
   safeLog.warn('[DiagramViewer] Switch confirmation failed, continuing without prompt:', redactSensitiveLogValue(error));
 };

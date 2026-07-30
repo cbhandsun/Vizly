@@ -3,7 +3,7 @@
     bottom: 0;
     left: 0;
     right: 0;
-    z-index: 1000;
+    z-index: 1100;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -15,7 +15,7 @@
     pointer-events: auto;
     width: calc(100% - 32px);
     max-width: 500px;
-    height: 64px;
+    height: 72px;
     background: rgba(255, 255, 255, 0.72);
     backdrop-filter: blur(24px) saturate(190%);
     -webkit-backdrop-filter: blur(24px) saturate(190%);
@@ -76,11 +76,11 @@
 .mobile-dock-btn.primary {
     background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
     color: white;
-    width: 52px;
-    height: 52px;
-    flex: 0 0 52px;
-    border-radius: 26px;
-    margin: 6px;
+    width: 56px;
+    height: 56px;
+    flex: 0 0 56px;
+    border-radius: 28px;
+    margin: 8px 6px;
     font-size: 22px;
     box-shadow: 0 6px 16px rgba(79, 70, 229, 0.4);
     transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.2s ease;
@@ -105,10 +105,23 @@
     display: flex;
     align-items: center;
     flex: 1.2;
+    height: 100%;
+}
+
+.mobile-dock-history {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    width: 34px;
+    height: 100%;
 }
 
 .mobile-dock-btn.mini {
-    flex: 0.8;
+    flex: 0 0 auto;
+    width: 32px;
+    height: 28px;
     font-size: 14px;
 }
 

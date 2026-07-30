@@ -1,8 +1,10 @@
 import type { MenuProps } from 'antd/es/menu';
 import Avatar from 'antd/es/avatar';
 import Dropdown from 'antd/es/dropdown';
-import { Globe, Palette, Search, Settings, User } from 'lucide-react';
+import { Palette, Search, Settings, User } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
+import { LanguageSwitcher } from '@/components/shared/LanguageSwitcher';
 import { toSafeImageUrl } from '@/core/utils/sanitizeHtml';
 interface WorkspaceGlobalHeaderProps {
   searchTerm: string;
@@ -20,9 +22,17 @@ export const WorkspaceGlobalHeader = ({
   settingsMenu,
   isAuthenticated,
   avatarUrl,
-}: WorkspaceGlobalHeaderProps) => (
+}: WorkspaceGlobalHeaderProps) => {
+  const { t } = useTranslation();
+
+  return (
   <header className="workspace-global-header">
-    <button type="button" className="workspace-header-brand" onClick={onNavigateHome}>
+    <button
+      type="button"
+      className="workspace-header-brand"
+      onClick={onNavigateHome}
+      aria-label={t('workspace.goHome')}
+    >
       <div className="workspace-header-logo">
         <div style={{
           width: 28,
@@ -45,7 +55,8 @@ export const WorkspaceGlobalHeader = ({
       <div className="workspace-search">
         <Search size={16} strokeWidth={2} style={{ color: 'var(--vz-brand-from)', opacity: 0.7 }} />
         <input
-          placeholder="Find your ideas..."
+          aria-label={t('workspace.search')}
+          placeholder={t('workspace.searchPlaceholder')}
           value={searchTerm}
           onChange={event => onSearchTermChange(event.target.value)}
         />
@@ -60,27 +71,19 @@ export const WorkspaceGlobalHeader = ({
           const isDark = html.getAttribute('data-theme') === 'dark';
           html.setAttribute('data-theme', isDark ? 'light' : 'dark');
         }}
-        aria-label="Toggle theme"
-        title="Toggle theme"
+        aria-label={t('workspace.toggleTheme')}
+        title={t('workspace.toggleTheme')}
       >
         <Palette size={16} strokeWidth={2} />
       </button>
-      <Dropdown
-        menu={{
-          items: [
-            { key: 'en', label: '🇬🇧 English', onClick: () => undefined },
-            { key: 'zh', label: '🇨🇳 中文', onClick: () => undefined },
-          ],
-        }}
-        trigger={['click']}
-        placement="bottomRight"
-      >
-        <button className="workspace-icon-btn" aria-label="Language" title="Language">
-          <Globe size={16} strokeWidth={2} />
-        </button>
-      </Dropdown>
+      <LanguageSwitcher variant="icon" className="workspace-icon-btn" />
       <Dropdown menu={{ items: settingsMenu }} trigger={['click']} placement="bottomRight">
-        <button className="workspace-settings-trigger" aria-label="Settings">
+        <button
+          type="button"
+          className="workspace-settings-trigger"
+          aria-label={t('workspace.settings')}
+          title={t('workspace.settings')}
+        >
           {isAuthenticated
             ? <Avatar size={24} src={avatarUrl ? toSafeImageUrl(avatarUrl) ?? undefined : undefined} icon={<User size={14} strokeWidth={2} />} />
             : <Settings size={16} strokeWidth={2} />}
@@ -88,4 +91,5 @@ export const WorkspaceGlobalHeader = ({
       </Dropdown>
     </div>
   </header>
-);
+  );
+};

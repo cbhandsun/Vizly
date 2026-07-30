@@ -144,14 +144,7 @@ export const DesignerOverlaysLayer: React.FC<DesignerOverlaysLayerProps> = ({
             )}
 
             {/* 保存状态指示器 */}
-            <div style={{
-                position: 'absolute',
-                bottom: 20,
-                right: 20, // Overlay 模式不需要偏移
-                zIndex: 10,
-                pointerEvents: 'none',
-                transition: 'right 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-            }}>
+            <div className="designer-save-status-anchor">
                 <SaveStatusIndicator saveState={status.saveState} target={status.saveTarget} />
             </div>
 

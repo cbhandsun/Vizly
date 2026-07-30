@@ -316,20 +316,24 @@ describe('FlowchartDesigner shell regions', () => {
     it('opens the requested mobile property and AI drawers with a single source of truth', () => {
         const setActiveRightTab = vi.fn();
         const setAiChatVisible = vi.fn();
+        const setMobileRequestedPanel = vi.fn();
         const setMobilePropertyDrawerVisible = vi.fn();
         render(<FlowchartDesignerOverlaysRegion model={createOverlaysModel({
             isMobile: true,
             setActiveRightTab,
             setAiChatVisible,
+            setMobileRequestedPanel,
             setMobilePropertyDrawerVisible,
         })} />);
 
         fireEvent.click(screen.getByTestId('mobile-property'));
+        expect(setMobileRequestedPanel).toHaveBeenCalledWith('close');
         expect(setAiChatVisible).toHaveBeenCalledWith(false);
         expect(setActiveRightTab).toHaveBeenCalledWith('property');
         expect(setMobilePropertyDrawerVisible).toHaveBeenCalledWith(true);
 
         fireEvent.click(screen.getByTestId('mobile-ai'));
+        expect(setMobileRequestedPanel).toHaveBeenLastCalledWith('close');
         expect(setActiveRightTab).toHaveBeenCalledWith('ai');
         expect(setAiChatVisible).toHaveBeenCalledWith(true);
         expect(setMobilePropertyDrawerVisible).toHaveBeenLastCalledWith(true);
@@ -337,9 +341,13 @@ describe('FlowchartDesigner shell regions', () => {
 
     it('routes the mobile add and layers actions to the matching sidebar panel', () => {
         const setMobileRequestedPanel = vi.fn();
+        const setAiChatVisible = vi.fn();
+        const setMobilePropertyDrawerVisible = vi.fn();
         render(<FlowchartDesignerOverlaysRegion model={createOverlaysModel({
             isMobile: true,
+            setAiChatVisible,
             setMobileRequestedPanel,
+            setMobilePropertyDrawerVisible,
         })} />);
 
         fireEvent.click(screen.getByTestId('mobile-add'));
@@ -347,6 +355,10 @@ describe('FlowchartDesigner shell regions', () => {
 
         expect(setMobileRequestedPanel).toHaveBeenNthCalledWith(1, 'shapes');
         expect(setMobileRequestedPanel).toHaveBeenNthCalledWith(2, 'layers');
+        expect(setAiChatVisible).toHaveBeenCalledTimes(2);
+        expect(setMobilePropertyDrawerVisible).toHaveBeenCalledTimes(2);
+        expect(setMobilePropertyDrawerVisible).toHaveBeenNthCalledWith(1, false);
+        expect(setMobilePropertyDrawerVisible).toHaveBeenNthCalledWith(2, false);
     });
 
     it('hides editing sidebars and the mobile dock during presentation', () => {

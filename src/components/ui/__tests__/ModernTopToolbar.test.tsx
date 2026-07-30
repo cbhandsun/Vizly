@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import React from 'react';
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 const breakpointState = vi.hoisted(() => ({ md: false }));
@@ -22,7 +22,13 @@ vi.mock('react-i18next', () => ({
 }));
 
 vi.mock('../../ExportTools', () => ({
-  default: () => <div data-testid="export-tools" />,
+  default: ({ showControls }: { showControls?: boolean }) => (
+    <div data-testid="export-tools" data-show-controls={String(showControls)} />
+  ),
+}));
+
+vi.mock('../DiagramTitleEditor', () => ({
+  DiagramTitleEditor: () => <button type="button">rename-title</button>,
 }));
 
 vi.mock('../EnhancedThemeSelector', () => ({
@@ -42,6 +48,8 @@ import { ModernTopToolbar } from '../ModernTopToolbar';
 const renderToolbar = () => render(
   <ModernTopToolbar
     diagramId="diagram-1"
+    title="Untitled flowchart"
+    onRenameDiagram={async () => undefined}
     edgeMode="native"
     onEdgeModeChange={() => undefined}
     centerChildren={<button type="button">center</button>}
@@ -57,6 +65,8 @@ describe('ModernTopToolbar responsive layout', () => {
 
     expect(centerSection?.className).toContain('absolute');
     expect(centerSection?.className).toContain('top-[48px]');
+    expect(screen.getByTestId('export-tools').getAttribute('data-show-controls')).toBe('false');
+    expect(screen.getByRole('button', { name: 'rename-title' })).toBeTruthy();
   });
 
   it('keeps the main canvas tools inline on desktop', () => {
@@ -67,5 +77,6 @@ describe('ModernTopToolbar responsive layout', () => {
 
     expect(centerSection?.className).not.toContain('absolute');
     expect(centerSection?.className).toContain('flex-1');
+    expect(screen.getByTestId('export-tools').getAttribute('data-show-controls')).toBe('true');
   });
 });

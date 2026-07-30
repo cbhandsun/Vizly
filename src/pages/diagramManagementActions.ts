@@ -197,7 +197,7 @@ export const createWorkspaceDiagramActions = (
       return 'deleted';
     },
 
-    async createDiagram(templateKey: TemplateKey): Promise<string | null> {
+    async createDiagram(templateKey: TemplateKey, requestedName?: unknown): Promise<string | null> {
       const templateData = dependencies.createTemplateSeed(templateKey);
       if (!templateData) return null;
 
@@ -207,6 +207,11 @@ export const createWorkspaceDiagramActions = (
       const cloned = structuredClone(templateData);
       cloned.id = createValidId(dependencies);
       cloned.type ||= templateKey === 'blank' ? 'flowchart' : templateKey;
+      cloned.name = boundedTitle(requestedName, cloned.name || 'Untitled');
+      cloned.metadata = {
+        ...cloned.metadata,
+        title: cloned.name,
+      };
       localService.registerDiagram(cloned);
       persistDiagramIndex(dependencies, cloned);
       return cloned.id;

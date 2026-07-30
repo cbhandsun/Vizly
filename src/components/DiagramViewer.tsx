@@ -18,6 +18,7 @@ import {
     logDiagramViewerDocTypeDetectionFailure,
     logDiagramViewerEdgeModeInitializationFailure,
     logDiagramViewerMermaidImportFailure,
+    logDiagramViewerRenameFailure,
     logDiagramViewerRemoteLoadFailure,
     logDiagramViewerStandardDataLayoutFallbackFailure,
     logDiagramViewerSwitchConfirmationFailure,
@@ -73,6 +74,8 @@ import {
 import { useDiagramViewerCommands } from './useDiagramViewerCommands';
 import { useDiagramViewerSaveActions } from './useDiagramViewerSaveActions';
 import { DiagramViewerView } from './DiagramViewerView';
+import { getPersistedDiagramTitle } from './diagramViewerTitle';
+import { persistDiagramTitle } from './diagramViewerRename';
 import { ensureDiagramViewerExportAllowed } from './diagramViewerExportPolicy';
 import type { DiagramExportFormat } from '@/core/types/diagram-components';
 import type { DiagramComponentProps } from '@/core/types/diagram-components';
@@ -236,6 +239,7 @@ const DiagramViewer: React.FC = () => {
     const [loadedDocType, setLoadedDocType] = useState<{
         diagramId: string;
         type?: string;
+        name?: string;
     } | null>(null);
 
     useEffect(() => {
@@ -249,9 +253,11 @@ const DiagramViewer: React.FC = () => {
             if (cancelled) return;
             try {
                 const dataService = dataRegistry.getDataService();
+                const loadedDiagram = dataService.getDiagram(selectedDiagramId);
                 setLoadedDocType({
                     diagramId: selectedDiagramId,
-                    type: dataService.getDiagram(selectedDiagramId)?.type,
+                    type: loadedDiagram?.type,
+                    name: getPersistedDiagramTitle(loadedDiagram),
                 });
             } catch (error) {
                 logDiagramViewerDocTypeDetectionFailure(selectedDiagramId, error);
@@ -280,6 +286,40 @@ const DiagramViewer: React.FC = () => {
     // Bridge: diagram.type → plugin registry ID
     // template type 值与 plugin.id 注册名之间存在历史差异，此映射表统一桥接
     const resolvedPluginId = resolvePluginId(docType);
+    const diagramTitle = selectedDiagram?.titleKey
+        ? t(selectedDiagram.titleKey)
+        : selectedDiagram?.name
+            || (loadedDocType?.diagramId === selectedDiagramId ? loadedDocType.name : undefined)
+            || t('workspace.untitledDiagram');
+    const canRenameDiagram = !selectedDiagram
+        && loadedDocType?.diagramId === selectedDiagramId
+        && Boolean(loadedDocType.name);
+    const handleRenameDiagram = useCallback(async (requestedTitle: string) => {
+        if (!canRenameDiagram) {
+            throw new Error('Diagram title is invalid or diagram is not renameable.');
+        }
+
+        try {
+            const nextTitle = await persistDiagramTitle({
+                diagramId: selectedDiagramId,
+                requestedTitle,
+                currentTitle: diagramTitle,
+                fallbackType: resolvedPluginId,
+                storage: localStorage,
+            });
+            setLoadedDocType((current) => current?.diagramId === selectedDiagramId
+                ? { ...current, name: nextTitle }
+                : current);
+        } catch (error) {
+            logDiagramViewerRenameFailure(selectedDiagramId, error);
+            throw new Error('Diagram rename failed.', { cause: error });
+        }
+    }, [
+        canRenameDiagram,
+        diagramTitle,
+        resolvedPluginId,
+        selectedDiagramId,
+    ]);
 
     const SelectedDiagramComponent = useMemo(() => {
         if (selectedDiagram?.component) return selectedDiagram.component;
@@ -581,7 +621,8 @@ const DiagramViewer: React.FC = () => {
         <DiagramViewerView
             t={t}
             selectedDiagramId={selectedDiagramId}
-            selectedDiagram={selectedDiagram}
+            diagramTitle={diagramTitle}
+            onRenameDiagram={canRenameDiagram ? handleRenameDiagram : undefined}
             edgeMode={edgeMode || 'advanced-smart'}
             setEdgeMode={setEdgeMode}
             layoutStrategy={String(layoutStrategy || '')}
