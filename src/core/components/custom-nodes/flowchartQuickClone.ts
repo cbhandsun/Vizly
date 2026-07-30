@@ -62,6 +62,17 @@ interface CanvasVisibleRightInput {
     sidebarVisible: boolean;
 }
 
+interface CanvasVisibleLeftInput {
+    containerLeft: number;
+    containerRight: number;
+    containerWidth: number;
+    drawerLeft?: number;
+    drawerRight?: number;
+    drawerWidth?: number;
+    drawerHeight?: number;
+    drawerVisible: boolean;
+}
+
 const clamp = (value: number, min: number, max: number): number => (
     Math.min(Math.max(value, min), max)
 );
@@ -99,6 +110,41 @@ export const calculateCanvasVisibleRight = (input: CanvasVisibleRightInput): num
             input.containerWidth,
         )
         : input.containerWidth;
+};
+
+export const calculateCanvasVisibleLeft = (input: CanvasVisibleLeftInput): number => {
+    if (
+        !Number.isFinite(input.containerLeft)
+        || !Number.isFinite(input.containerRight)
+        || !Number.isFinite(input.containerWidth)
+        || input.containerWidth <= 0
+        || input.containerRight <= input.containerLeft
+    ) {
+        return 0;
+    }
+
+    const drawerValues = [
+        input.drawerLeft,
+        input.drawerRight,
+        input.drawerWidth,
+        input.drawerHeight,
+    ];
+    const drawerOccludesCanvas = (
+        input.drawerVisible
+        && drawerValues.every(value => typeof value === 'number' && Number.isFinite(value))
+        && (input.drawerWidth ?? 0) > 0
+        && (input.drawerHeight ?? 0) > 0
+        && (input.drawerLeft ?? input.containerRight) < input.containerRight
+        && (input.drawerRight ?? input.containerLeft) > input.containerLeft
+    );
+
+    return drawerOccludesCanvas
+        ? clamp(
+            (input.drawerRight ?? input.containerLeft) - input.containerLeft,
+            0,
+            input.containerWidth,
+        )
+        : 0;
 };
 
 export const calculateQuickCloneViewportAdjustment = (

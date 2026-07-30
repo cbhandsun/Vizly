@@ -5,6 +5,7 @@ import type { FlowchartNodeData } from '../FlowchartNode';
 import { MarkerType } from '@xyflow/react';
 import { useNodeUpdate } from '../../diagrams/useNodeUpdate';
 import {
+    calculateCanvasVisibleLeft,
     calculateCanvasVisibleRight,
     calculateQuickCloneViewportAdjustment,
     resolveFlowchartQuickCloneLabelKey,
@@ -115,8 +116,24 @@ export function useFlowchartNodeInteractions(id: string, data: FlowchartNodeData
         const container = document.querySelector<HTMLElement>('.react-flow');
         if (!container) return;
         const containerRect = container.getBoundingClientRect();
+        const drawer = document.querySelector<HTMLElement>('.side-drawer');
+        const drawerRect = drawer?.getBoundingClientRect();
         const sidebar = document.querySelector<HTMLElement>('.designer-right-sidebar');
         const sidebarRect = sidebar?.getBoundingClientRect();
+        const visibleLeft = calculateCanvasVisibleLeft({
+            containerLeft: containerRect.left,
+            containerRight: containerRect.right,
+            containerWidth: containerRect.width,
+            drawerLeft: drawerRect?.left,
+            drawerRight: drawerRect?.right,
+            drawerWidth: drawerRect?.width,
+            drawerHeight: drawerRect?.height,
+            drawerVisible: Boolean(
+                drawer
+                && drawerRect
+                && getComputedStyle(drawer).visibility !== 'hidden'
+            ),
+        });
         const visibleRight = calculateCanvasVisibleRight({
             containerLeft: containerRect.left,
             containerRight: containerRect.right,
@@ -134,7 +151,7 @@ export function useFlowchartNodeInteractions(id: string, data: FlowchartNodeData
         const adjustment = calculateQuickCloneViewportAdjustment({
             containerWidth: containerRect.width,
             containerHeight: containerRect.height,
-            visibleLeft: 0,
+            visibleLeft,
             visibleRight,
             nodeX: nx,
             nodeY: ny,

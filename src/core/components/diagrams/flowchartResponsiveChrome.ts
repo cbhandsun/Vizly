@@ -36,3 +36,14 @@ export const shouldShowFlowchartOnboarding = ({
 );
 
 export const shouldShowFlowchartMinimapByDefault = (isMobile: boolean): boolean => !isMobile;
+
+export const shouldFitFlowchartAfterMobileTransition = (
+    wasMobile: boolean,
+    isMobile: boolean,
+    nodeCount: number,
+): boolean => (
+    !wasMobile
+    && isMobile
+    && Number.isFinite(nodeCount)
+    && nodeCount > 0
+);

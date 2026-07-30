@@ -611,4 +611,27 @@
     transition: filter 0.08s, transform 0.1s cubic-bezier(0.4, 0, 0.6, 1) !important;
 }
 
+@media (pointer: coarse), (max-width: 768px) {
+    .flowchart-quick-clone-btn {
+        width: 44px;
+        height: 44px;
+    }
+
+    .flowchart-quick-clone-btn[data-dir="top"] {
+        transform: translate(-50%, -8px) scale(1);
+    }
+
+    .flowchart-quick-clone-btn[data-dir="bottom"] {
+        transform: translate(-50%, 8px) scale(1);
+    }
+
+    .flowchart-quick-clone-btn[data-dir="left"] {
+        transform: translate(-8px, -50%) scale(1);
+    }
+
+    .flowchart-quick-clone-btn[data-dir="right"] {
+        transform: translate(8px, -50%) scale(1);
+    }
+}
+
 /* 显示时：opacity 恢复（位置由 data-dir 规则管理） */

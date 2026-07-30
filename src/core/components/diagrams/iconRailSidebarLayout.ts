@@ -9,10 +9,10 @@ export const createIconRailDrawerStyle = (
   if (!isMobile) {
     return {
       width: drawerWidth,
-      height: '100%',
-      top: 0,
+      height: 'calc(100% - 96px)',
+      top: 80,
       bottom: 'auto',
-      borderRadius: 0,
+      borderRadius: 'var(--designer-radius, 10px)',
     };
   }
 

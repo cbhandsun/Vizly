@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { useState } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -18,12 +19,20 @@ import {
 } from '../flowchartResponsiveChrome';
 import type { PluginContext } from '../../../types/plugin';
 
+let iconRailMountSequence = 0;
 vi.mock('../IconRailSidebar', () => ({
-    IconRailSidebar: (props: { pluginPanels: unknown[]; requestedPanel?: string | null }) => (
-        <div data-testid="left-sidebar" data-requested-panel={props.requestedPanel ?? ''}>
-            {props.pluginPanels.length}
-        </div>
-    ),
+    IconRailSidebar: (props: { pluginPanels: unknown[]; requestedPanel?: string | null }) => {
+        const [mountId] = useState(() => ++iconRailMountSequence);
+        return (
+            <div
+                data-testid="left-sidebar"
+                data-mount-id={mountId}
+                data-requested-panel={props.requestedPanel ?? ''}
+            >
+                {props.pluginPanels.length}
+            </div>
+        );
+    },
 }));
 
 vi.mock('../DesignerRightSidebar', () => ({
@@ -108,7 +117,6 @@ const createLeftModel = (
     renameLayer: () => undefined,
     renameTemplate: () => undefined,
     reorderLayers: () => undefined,
-    selectedNodes: [],
     setActiveLayerId: () => undefined,
     setLayerColor: () => undefined,
     setLeftDrawerOpen: () => undefined,
@@ -272,6 +280,24 @@ describe('FlowchartDesigner shell regions', () => {
         expect(screen.getByTestId('left-sidebar').textContent).toBe('1');
         rerender(<FlowchartDesignerLeftSidebar model={{ ...model, isSidebarHidden: true }} />);
         expect(screen.queryByTestId('left-sidebar')).toBeNull();
+    });
+
+    it('preserves the open shape-library instance when node selection changes', () => {
+        const model = createLeftModel();
+        const { rerender } = render(<FlowchartDesignerLeftSidebar model={model} />);
+        const initialMountId = screen.getByTestId('left-sidebar').getAttribute('data-mount-id');
+
+        rerender(<FlowchartDesignerLeftSidebar model={{
+            ...model,
+            nodes: [{
+                id: 'node-1',
+                position: { x: 0, y: 0 },
+                data: {},
+                selected: true,
+            }],
+        }} />);
+
+        expect(screen.getByTestId('left-sidebar').getAttribute('data-mount-id')).toBe(initialMountId);
     });
 
     it('forwards AI visibility and controlled mobile visibility to the right sidebar adapter', () => {

@@ -51,6 +51,7 @@ import { coerceCollaborationPresenceUsers } from './collaborationPresence';
 import { shouldShowFlowchartMinimapByDefault } from './flowchartResponsiveChrome';
 import { useFlowchartChromeCoordination } from './hooks/useFlowchartChromeCoordination';
 import { useFlowchartHostActions } from './hooks/useFlowchartHostActions';
+import { useMobileFlowchartViewportGuard, useScheduledFlowchartFit } from './hooks/useMobileFlowchartViewportGuard';
 
 export const useFlowchartDesignerController = ({
     id,
@@ -229,6 +230,11 @@ export const useFlowchartDesignerController = ({
     const [notificationApi, notificationContextHolder] = notification.useNotification();
     const getCurrentNodes = useCallback(() => nodesRef.current, [nodesRef]);
     const getCurrentEdges = useCallback(() => edgesRef.current, [edgesRef]);
+    useMobileFlowchartViewportGuard({
+        isMobile,
+        getNodes: getCurrentNodes,
+        fitView: handleFitView,
+    });
     const {
         activePlugin,
         pluginCtx,
@@ -451,9 +457,7 @@ export const useFlowchartDesignerController = ({
     const notifyReverseImportSuccess = useCallback((filename: string) => {
         messageApi.success(t('designer.flowchart.import.reverseSuccess', { filename }));
     }, [messageApi, t]);
-    const scheduleReverseImportFit = useCallback(() => {
-        window.setTimeout(handleFitView, 300);
-    }, [handleFitView]);
+    const scheduleReverseImportFit = useScheduledFlowchartFit(handleFitView, 300);
     const selectExternalRightTab = useCallback((tab: string) => {
         setActiveRightTab(tab === 'ai' ? 'ai' : 'property');
     }, [setActiveRightTab]);

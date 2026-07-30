@@ -86,6 +86,18 @@ export function useNodePropertyItems(params: UseNodePropertyItemsParams): Collap
     } = params;
 
     const nodeCount = selectedNodes.length;
+    const fieldIdPrefix = React.useId().replace(/:/g, '');
+    const fieldIds = {
+        label: `${fieldIdPrefix}-label`,
+        description: `${fieldIdPrefix}-description`,
+        width: `${fieldIdPrefix}-width`,
+        height: `${fieldIdPrefix}-height`,
+        domain: `${fieldIdPrefix}-domain`,
+        domainClass: `${fieldIdPrefix}-domain-class`,
+        sequence: `${fieldIdPrefix}-sequence`,
+        shape: `${fieldIdPrefix}-shape`,
+        icon: `${fieldIdPrefix}-icon`,
+    };
 
     const getCommonValue = <T, V>(items: T[], getter: (item: T) => V): V | undefined => {
         if (items.length === 0) return undefined;
@@ -141,20 +153,24 @@ export function useNodePropertyItems(params: UseNodePropertyItemsParams): Collap
         label: <Space><InfoCircleOutlined />{t('propertyPanel.information')}</Space>,
         children: (
             <Form layout="vertical" size="small">
-                <Form.Item label={t('propertyPanel.label')}>
-                    <Input value={localLabel}
+                <Form.Item label={t('propertyPanel.label')} htmlFor={fieldIds.label}>
+                    <Input id={fieldIds.label} aria-label={t('propertyPanel.label')} value={localLabel}
                         onChange={e => { setLocalLabel(e.target.value); debouncedUpdateLabel(e.target.value); }}
                         onBlur={() => { debouncedUpdateLabel.cancel?.(); updateNodes({ label: localLabel }); }}
                         onFocus={armSnapshot}
-                        placeholder={nodeCount > 1 && commonNodeLabel === undefined ? mixedLabel : selectLabel}
+                        placeholder={nodeCount > 1 && commonNodeLabel === undefined
+                            ? mixedLabel
+                            : t('propertyPanel.placeholders.label')}
                         allowClear disabled={disabled} />
                 </Form.Item>
-                <Form.Item label={t('propertyPanel.description')}>
-                    <TextArea value={localDesc}
+                <Form.Item label={t('propertyPanel.description')} htmlFor={fieldIds.description}>
+                    <TextArea id={fieldIds.description} aria-label={t('propertyPanel.description')} value={localDesc}
                         onChange={e => { setLocalDesc(e.target.value); debouncedUpdateDesc(e.target.value); }}
                         onBlur={() => { debouncedUpdateDesc.cancel?.(); updateNodes({ description: localDesc }); }}
                         onFocus={armSnapshot} rows={2}
-                        placeholder={nodeCount > 1 && commonNodeDesc === undefined ? mixedLabel : selectLabel}
+                        placeholder={nodeCount > 1 && commonNodeDesc === undefined
+                            ? mixedLabel
+                            : t('propertyPanel.placeholders.description')}
                         disabled={disabled} />
                 </Form.Item>
             </Form>
@@ -168,15 +184,15 @@ export function useNodePropertyItems(params: UseNodePropertyItemsParams): Collap
         children: (
             <Row gutter={8}>
                 <Col span={12}>
-                    <Form.Item label={t('propertyPanel.width')} style={{ marginBottom: 0 }}>
-                        <InputNumber style={{ width: '100%' }} value={commonWidth}
+                    <Form.Item label={t('propertyPanel.width')} htmlFor={fieldIds.width} style={{ marginBottom: 0 }}>
+                        <InputNumber id={fieldIds.width} aria-label={t('propertyPanel.width')} style={{ width: '100%' }} value={commonWidth}
                             onChange={val => updateNodes({ style: { width: typeof val === 'number' ? val : undefined } })}
                             onFocus={armSnapshot} placeholder={commonWidth === undefined ? mixedLabel : undefined} disabled={disabled} />
                     </Form.Item>
                 </Col>
                 <Col span={12}>
-                    <Form.Item label={t('propertyPanel.height')} style={{ marginBottom: 0 }}>
-                        <InputNumber style={{ width: '100%' }} value={commonHeight}
+                    <Form.Item label={t('propertyPanel.height')} htmlFor={fieldIds.height} style={{ marginBottom: 0 }}>
+                        <InputNumber id={fieldIds.height} aria-label={t('propertyPanel.height')} style={{ width: '100%' }} value={commonHeight}
                             onChange={val => updateNodes({ style: { height: typeof val === 'number' ? val : undefined } })}
                             onFocus={armSnapshot} placeholder={commonHeight === undefined ? mixedLabel : undefined} disabled={disabled} />
                     </Form.Item>
@@ -192,16 +208,18 @@ export function useNodePropertyItems(params: UseNodePropertyItemsParams): Collap
             label: <Space><AppstoreOutlined />{t('propertyPanel.semantics')}</Space>,
             children: (
                 <Form layout="vertical" size="small">
-                    <Form.Item label={t('propertyPanel.domainName')}>
-                        <Input value={localDomain}
+                    <Form.Item label={t('propertyPanel.domainName')} htmlFor={fieldIds.domain}>
+                        <Input id={fieldIds.domain} aria-label={t('propertyPanel.domainName')} value={localDomain}
                             onChange={e => { setLocalDomain(e.target.value); debouncedUpdateDomain(e.target.value); }}
                             onBlur={() => { debouncedUpdateDomain.cancel?.(); updateNodes({ domain: localDomain }); }}
                             onFocus={armSnapshot}
-                            placeholder={commonDomain === undefined ? mixedLabel : selectLabel}
+                            placeholder={commonDomain === undefined
+                                ? mixedLabel
+                                : t('propertyPanel.placeholders.domain')}
                             allowClear disabled={disabled} />
                     </Form.Item>
-                    <Form.Item label={t('propertyPanel.domainClass')}>
-                        <Select value={commonDomainClass} onChange={val => updateNodes({ domainClass: val })}
+                    <Form.Item label={t('propertyPanel.domainClass')} htmlFor={fieldIds.domainClass}>
+                        <Select id={fieldIds.domainClass} aria-label={t('propertyPanel.domainClass')} value={commonDomainClass} onChange={val => updateNodes({ domainClass: val })}
                             onOpenChange={(open) => { if (open) armSnapshot(); }}
                             placeholder={commonDomainClass === undefined ? mixedLabel : selectLabel}
                             allowClear disabled={disabled}
@@ -213,8 +231,8 @@ export function useNodePropertyItems(params: UseNodePropertyItemsParams): Collap
                                 { label: t('propertyPanel.options.domainClass.support'), value: 'support' }
                             ]} />
                     </Form.Item>
-                    <Form.Item label={t('propertyPanel.sequence')}>
-                        <InputNumber style={{ width: '100%' }} value={commonSequence}
+                    <Form.Item label={t('propertyPanel.sequence')} htmlFor={fieldIds.sequence}>
+                        <InputNumber id={fieldIds.sequence} aria-label={t('propertyPanel.sequence')} style={{ width: '100%' }} value={commonSequence}
                             onChange={val => updateNodes({ sequence: typeof val === 'number' ? val : undefined })}
                             onFocus={armSnapshot}
                             placeholder={commonSequence === undefined ? mixedLabel : undefined}
@@ -229,8 +247,8 @@ export function useNodePropertyItems(params: UseNodePropertyItemsParams): Collap
             label: <Space><RadiusSettingOutlined />{t('propertyPanel.appearance')}</Space>,
             children: (
                 <Form layout="vertical" size="small">
-                    <Form.Item label={t('propertyPanel.shape')}>
-                        <Select value={commonShape} onChange={val => updateNodes({ shape: val })}
+                    <Form.Item label={t('propertyPanel.shape')} htmlFor={fieldIds.shape}>
+                        <Select id={fieldIds.shape} aria-label={t('propertyPanel.shape')} value={commonShape} onChange={val => updateNodes({ shape: val })}
                             onOpenChange={(open) => { if (open) armSnapshot(); }}
                             placeholder={commonShape === undefined ? mixedLabel : selectLabel}
                             allowClear disabled={disabled}
@@ -254,9 +272,11 @@ export function useNodePropertyItems(params: UseNodePropertyItemsParams): Collap
                                 { label: t('propertyPanel.options.shape.note'), value: 'note' },
                             ]} />
                     </Form.Item>
-                    <Form.Item label={t('propertyPanel.icon')}>
+                    <Form.Item label={t('propertyPanel.icon')} htmlFor={fieldIds.icon}>
                         <Space.Compact style={{ width: '100%' }}>
                             <Select 
+                                id={fieldIds.icon}
+                                aria-label={t('propertyPanel.icon')}
                                 value={commonNodeIcon}
                                 onChange={val => updateNodes({ icon: typeof val === 'string' ? val : undefined })}
                                 onOpenChange={(open) => { if (open) armSnapshot(); }}

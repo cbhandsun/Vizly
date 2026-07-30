@@ -31,7 +31,6 @@ export type FlowchartDesignerLeftSidebarModel = Omit<Pick<FlowchartDesignerViewM
     | 'renameLayer'
     | 'renameTemplate'
     | 'reorderLayers'
-    | 'selectedNodes'
     | 'setActiveLayerId'
     | 'setLayerColor'
     | 'setLeftDrawerOpen'
@@ -140,7 +139,6 @@ export function FlowchartDesignerLeftSidebar({ model }: { model: FlowchartDesign
         renameLayer,
         renameTemplate,
         reorderLayers,
-        selectedNodes,
         setActiveLayerId,
         setLayerColor,
         setLeftDrawerOpen,
@@ -164,7 +162,6 @@ export function FlowchartDesignerLeftSidebar({ model }: { model: FlowchartDesign
 
     return (
         <IconRailSidebar
-            key={(selectedNodes?.length ?? 0) > 0 ? 'selection-active' : 'selection-empty'}
             nodes={nodes}
             onFocusNode={(node: Node) => handleFocusNode(node.id)}
             layers={layers}

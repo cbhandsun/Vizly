@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
+    calculateCanvasVisibleLeft,
     calculateCanvasVisibleRight,
     calculateQuickCloneViewportAdjustment,
     resolveFlowchartQuickCloneLabelKey,
@@ -82,6 +83,22 @@ describe('flowchart interaction copy', () => {
     });
 
     it('keeps a quick-cloned node inside the canvas area left of an open sidebar', () => {
+        expect(calculateCanvasVisibleLeft({
+            containerLeft: 0,
+            containerRight: 1280,
+            containerWidth: 1280,
+            drawerLeft: 68,
+            drawerRight: 348,
+            drawerWidth: 280,
+            drawerHeight: 624,
+            drawerVisible: true,
+        })).toBe(348);
+        expect(calculateCanvasVisibleLeft({
+            containerLeft: 0,
+            containerRight: 1280,
+            containerWidth: 1280,
+            drawerVisible: false,
+        })).toBe(0);
         expect(calculateCanvasVisibleRight({
             containerLeft: 0,
             containerRight: 1280,

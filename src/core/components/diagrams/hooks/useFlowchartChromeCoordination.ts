@@ -30,9 +30,12 @@ export const useFlowchartChromeCoordination = ({
 
     useEffect(() => {
         if (!isMobile) return;
-        const timer = window.setTimeout(() => setShowMinimap(false), 0);
+        const timer = window.setTimeout(() => {
+            setShowMinimap(false);
+            setMobileRequestedPanel('close');
+        }, 0);
         return () => window.clearTimeout(timer);
-    }, [isMobile, setShowMinimap]);
+    }, [isMobile, setMobileRequestedPanel, setShowMinimap]);
 
     const handleMobilePluginNodeAdded = useCallback(() => {
         setLeftDrawerOpen(false);

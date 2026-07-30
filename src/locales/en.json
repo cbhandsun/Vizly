@@ -755,6 +755,7 @@
             "components": "Components",
             "search": "Search...",
             "searchComponents": "Search components...",
+            "addAndConnectHint": "Click to add a shape. Select one flow node first and the next click will add and connect it. Drag for free placement.",
             "flowControl": "Flow Control",
             "dataIO": "Data & I/O",
             "containers": "Containers",
@@ -1084,6 +1085,11 @@
         "borderWidth": "Border Width",
         "select": "Select...",
         "mixed": "(Mixed)",
+        "placeholders": {
+            "label": "Enter node name",
+            "description": "Add a node description",
+            "domain": "Enter business domain"
+        },
         "icon": "Icon",
         "colors": "Colors",
         "mainColor": "Main Color",

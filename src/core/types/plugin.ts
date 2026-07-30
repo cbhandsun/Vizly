@@ -63,10 +63,14 @@ export interface PluginContext {
   reactFlowInstance?: ReactFlowInstance | null;
   diagramId?: string;
 
-  /** 
+  /**
    * [NEW] 在画布中心或指定位置添加节点 (GAP-11 Mobile Tap-to-Add)
    */
   addNode: (type: string, data?: unknown, position?: XYPosition) => string;
+  /**
+   * 从单个已选流程节点继续添加并自动连线；无可用起点时回退为普通添加。
+   */
+  addConnectedNode?: (type: string, data?: unknown) => string;
   
   // ====== 插件状态沙箱 (Plugin State Sandbox) ======
   /** 获取当前激活插件的独立持久化状态 */

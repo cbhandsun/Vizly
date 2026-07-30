@@ -178,7 +178,10 @@ export const FlowchartShapesPanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) 
                     type="button"
                     draggable
                     onDragStart={(event) => onDragStart(event, type, typeName, label, config)}
-                    onClick={() => ctx.addNode(typeName, { label, ...config })}
+                    onClick={() => (
+                        ctx.addConnectedNode?.(typeName, { label, ...config })
+                        ?? ctx.addNode(typeName, { label, ...config })
+                    )}
                     aria-label={label}
                     style={{
                         width: '100%',
@@ -275,6 +278,7 @@ export const FlowchartShapesPanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) 
                 <Input
                     prefix={<SearchOutlined style={{ color: '#8c8c8c' }} />}
                     placeholder={t('designer.sidebar.searchComponents')}
+                    aria-label={t('designer.sidebar.searchComponents')}
                     size="small"
                     allowClear
                     value={search}
@@ -346,9 +350,25 @@ export const FlowchartShapesPanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) 
                 backdropFilter: 'blur(8px)',
                 paddingBottom: 12 
              }}>
+                <div
+                    role="note"
+                    style={{
+                        marginBottom: 10,
+                        padding: '8px 10px',
+                        border: '1px solid rgba(22, 119, 255, 0.16)',
+                        borderRadius: 10,
+                        background: 'rgba(22, 119, 255, 0.06)',
+                        color: '#44546f',
+                        fontSize: 11,
+                        lineHeight: 1.45,
+                    }}
+                >
+                    {t('designer.sidebar.addAndConnectHint')}
+                </div>
                 <Input
                     prefix={<SearchOutlined style={{ color: '#8c8c8c' }} />}
                     placeholder={t('designer.sidebar.searchComponents')}
+                    aria-label={t('designer.sidebar.searchComponents')}
                     size="small"
                     allowClear
                     value={search}

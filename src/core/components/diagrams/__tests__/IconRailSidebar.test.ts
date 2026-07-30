@@ -133,9 +133,10 @@ describe('IconRailSidebar storage helpers', () => {
   it('preserves the desktop drawer geometry', () => {
     expect(createIconRailDrawerStyle(false, 320)).toMatchObject({
       width: 320,
-      height: '100%',
-      top: 0,
+      height: 'calc(100% - 96px)',
+      top: 80,
       bottom: 'auto',
+      borderRadius: 'var(--designer-radius, 10px)',
     });
   });
 });
