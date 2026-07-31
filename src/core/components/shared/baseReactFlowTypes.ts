@@ -16,6 +16,7 @@ import type {
   ReactFlowInstance,
   SelectionMode,
   AriaLabelConfig,
+  KeyCode,
 } from '@xyflow/react';
 import type { BackgroundVariant } from '@xyflow/react';
 
@@ -58,6 +59,7 @@ export interface BaseReactFlowProps {
   nodesConnectable?: boolean;
   nodesFocusable?: boolean;
   edgesFocusable?: boolean;
+  multiSelectionKeyCode?: KeyCode | null;
   ariaLabelConfig?: Partial<AriaLabelConfig>;
   elementsSelectable?: boolean;
   enableSmartEdges?: boolean;

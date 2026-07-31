@@ -124,6 +124,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
   nodesConnectable = true,
   nodesFocusable = true,
   edgesFocusable = true,
+  multiSelectionKeyCode,
   ariaLabelConfig,
   elementsSelectable = true,
   enableSmartEdges = false,
@@ -590,6 +591,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
           nodesConnectable={nodesConnectable}
           nodesFocusable={nodesFocusable}
           edgesFocusable={edgesFocusable}
+          multiSelectionKeyCode={multiSelectionKeyCode}
           ariaLabelConfig={ariaLabelConfig}
           elementsSelectable={elementsSelectable}
           connectionLineType={connectionLineType}

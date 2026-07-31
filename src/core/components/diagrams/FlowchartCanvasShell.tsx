@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { Node, Edge, BackgroundVariant, ReactFlowInstance, SelectionMode, NodeTypes, EdgeTypes, NodeChange, EdgeChange, Connection, OnConnectStart, OnConnectEnd, ConnectionMode, ConnectionLineType, type IsValidConnection, type OnNodeDrag, type OnReconnect } from '@xyflow/react';
 import BaseReactFlow from '../shared/BaseReactFlow';
 import { useConnectionMicrointeractions } from './hooks/useConnectionMicrointeractions';
@@ -8,6 +8,7 @@ import {
     type SmartNodeDragHandler,
 } from './hooks/useFlowchartDragBuffer';
 import { addFlowchartAccessibilityLabels } from './flowchartCanvasAccessibility';
+import { buildShiftMultiSelectionChanges } from './flowchartMultiSelection';
 
 export interface FlowchartCanvasShellProps {
     nodes: Node[];
@@ -136,6 +137,15 @@ export const FlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> = React.m
         strokeWidth: connectPreview ? 3.5 : 2.5,
         strokeDasharray: connectPreview ? '0' : '4 4'
     } : undefined;
+    const handleCanvasNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
+        if (event.shiftKey) {
+            const selectionChanges = buildShiftMultiSelectionChanges(canvasNodes, node.id);
+            if (selectionChanges.length > 0) {
+                handleNodesChange(selectionChanges);
+            }
+        }
+        onNodeClick?.(event, node);
+    }, [canvasNodes, handleNodesChange, onNodeClick]);
     return (
         <BaseReactFlow
             onInit={onInit}
@@ -164,7 +174,7 @@ export const FlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> = React.m
             onNodeDragStop={handleNodeDragStop}
             onSelectionChange={onSelectionChange}
             onViewportChange={onViewportChange}
-            onNodeClick={onNodeClick}
+            onNodeClick={handleCanvasNodeClick}
             onEdgeClick={onEdgeClick}
             onEdgeDoubleClick={onEdgeDoubleClick}
             onPaneClick={onPaneClick}
@@ -192,6 +202,7 @@ export const FlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> = React.m
             nodesConnectable={nodesConnectable}
             nodesFocusable
             edgesFocusable
+            multiSelectionKeyCode="Shift"
             edgesReconnectable={edgesReconnectable}
             onReconnect={onReconnect}
             onReconnectStart={onReconnectStart}

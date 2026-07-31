@@ -1,5 +1,5 @@
 import { EdgeProps, BaseEdge, getBezierPath, getSmoothStepPath, getStraightPath, EdgeLabelRenderer } from '@xyflow/react';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 interface CustomEdgeData extends Record<string, unknown> {
   label?: string;
@@ -46,24 +46,31 @@ const CustomEdge: React.FC<CustomEdgeProps> = ({
   markerEnd,
   markerStart,
   data,
+  selected,
   // React Flow's EdgeProps includes `animated` and other flags that should not be forwarded to DOM
   animated,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(String(data?.label ?? ''));
+  const cancelCommitRef = useRef(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setEditText(String(data?.label ?? '')), 0);
     return () => clearTimeout(timer);
   }, [data?.label]);
 
-  const handleLabelDoubleClick = (e: React.MouseEvent) => {
+  const handleLabelEdit = (e: React.MouseEvent) => {
     e.stopPropagation();
     setIsEditing(true);
   };
 
   const handleLabelBlur = () => {
     setIsEditing(false);
+    if (cancelCommitRef.current) {
+      cancelCommitRef.current = false;
+      setEditText(String(data?.label ?? ''));
+      return;
+    }
     if (editText !== String(data?.label ?? '')) {
       if (typeof data?.onLabelChange === 'function') {
         data.onLabelChange(id, editText);
@@ -149,7 +156,7 @@ const CustomEdge: React.FC<CustomEdgeProps> = ({
         // Avoid forwarding unknown props to DOM; use className to indicate animation if needed
         className={animated ? 'edge-animated' : undefined}
       />
-      {data?.label && (
+      {(data?.label || isEditing || selected) && (
         <EdgeLabelRenderer>
           <div
             style={{
@@ -168,15 +175,21 @@ const CustomEdge: React.FC<CustomEdgeProps> = ({
             {isEditing ? (
               <textarea
                 value={editText}
+                maxLength={256}
                 onChange={(e) => setEditText(e.target.value)}
                 onBlur={handleLabelBlur}
                 autoFocus
-                aria-label="Edit Edge Label"
-                title="Edit Edge Label"
+                aria-label="编辑连线标签"
+                title="编辑连线标签"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
-                    handleLabelBlur();
+                    e.currentTarget.blur();
+                  } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    cancelCommitRef.current = true;
+                    setEditText(String(data?.label ?? ''));
+                    e.currentTarget.blur();
                   }
                 }}
                 style={{
@@ -197,13 +210,44 @@ const CustomEdge: React.FC<CustomEdgeProps> = ({
                 }}
                 onClick={(e) => e.stopPropagation()}
               />
-            ) : (
-              <div
-                onDoubleClick={handleLabelDoubleClick}
-                style={{ cursor: 'text', color: '#666' }}
+            ) : data?.label ? (
+              <button
+                type="button"
+                aria-label={`编辑连线标签：${data.label}`}
+                onClick={handleLabelEdit}
+                style={{
+                  cursor: 'text',
+                  color: '#666',
+                  border: 0,
+                  minHeight: 44,
+                  padding: '4px 6px',
+                  background: 'transparent',
+                  font: 'inherit',
+                }}
               >
                 {data.label}
-              </div>
+              </button>
+            ) : (
+              <button
+                type="button"
+                aria-label="添加连线标签"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setIsEditing(true);
+                }}
+                style={{
+                  minHeight: 44,
+                  border: '1px dashed rgba(59, 130, 246, 0.55)',
+                  borderRadius: 6,
+                  padding: '4px 8px',
+                  background: 'rgba(255,255,255,0.92)',
+                  color: '#2563eb',
+                  cursor: 'text',
+                  font: 'inherit',
+                }}
+              >
+                + 标签
+              </button>
             )}
           </div>
         </EdgeLabelRenderer>

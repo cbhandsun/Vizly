@@ -71,6 +71,9 @@ describe('FlowchartCanvasShell', () => {
       fitMode: 'none',
       fitPadding: 0.1,
       pinFit: false,
+      nodesFocusable: true,
+      edgesFocusable: true,
+      multiSelectionKeyCode: 'Shift',
     });
     expect(props).not.toHaveProperty('fitView');
   });
@@ -224,6 +227,60 @@ describe('FlowchartCanvasShell', () => {
       ) => void)(changes);
     });
     expect(onNodesChange).toHaveBeenCalledWith(changes);
+  });
+
+  it('preserves existing selections when a node is Shift-clicked', () => {
+    const onNodesChange = vi.fn();
+    const noop = vi.fn();
+    const nodes = [
+      { id: 'A', position: { x: 0, y: 0 }, data: {}, selected: true },
+      { id: 'B', position: { x: 50, y: 0 }, data: {}, selected: false },
+    ] satisfies Node[];
+    render(
+      <FlowchartCanvasShell
+        nodes={nodes}
+        displayEdges={[]}
+        nodeTypes={{}}
+        onInit={noop}
+        onNodesChange={onNodesChange}
+        onEdgesChange={noop}
+        onConnect={noop}
+        onConnectStart={noop}
+        onConnectEnd={noop}
+        autoRoutingEnabled
+        enableSmartEdges
+        showMinimap={false}
+        showGrid
+        gridVariant={'dots' as never}
+        onNodeDrag={noop}
+        onNodeDragStart={noop}
+        onSelectionChange={noop}
+        onPaneClick={noop}
+        onPaneDoubleClick={noop}
+        selectionMode={'partial' as never}
+        onNodeContextMenu={noop}
+        onEdgeContextMenu={noop}
+        onPaneContextMenu={noop}
+        isSpacePressed={false}
+        isConnecting={false}
+        connectPreview={null}
+        connectionMode={'loose' as never}
+        isDragging={false}
+      />,
+    );
+
+    const props = baseReactFlowProps.mock.calls.at(-1)?.[0];
+    act(() => {
+      (props.onNodeClick as (event: React.MouseEvent, node: Node) => void)(
+        { shiftKey: true } as React.MouseEvent,
+        nodes[1],
+      );
+    });
+
+    expect(onNodesChange).toHaveBeenCalledWith([
+      { id: 'A', type: 'select', selected: true },
+      { id: 'B', type: 'select', selected: true },
+    ]);
   });
 
   it('applies smart-guide snapping inside the canvas without an upstream position write', () => {

@@ -12,6 +12,10 @@ import { useDiagramActions } from './useDiagramActions';
 import { useSpacePan } from './useSpacePan';
 import type { DiagramTypePlugin, PluginContext } from '../../../types/plugin';
 import type { LayerConfig } from './useLayerManagement';
+import {
+    focusFlowchartNodeById,
+    shouldHandleFlowchartCanvasTab,
+} from '../flowchartTabNavigation';
 
 export interface UseDesignerEventHandlersProps {
     nodes: Node[];
@@ -229,10 +233,11 @@ export function useDesignerEventHandlers({
     // Tab / Shift+Tab：在节点间循环导航
     useEffect(() => {
         const handleTabNav = (e: KeyboardEvent) => {
-            if (e.key !== 'Tab') return;
-            const target = e.target as HTMLElement;
-            // 焦点在输入框时不拦截
-            if (['INPUT', 'TEXTAREA'].includes(target.tagName) || target.isContentEditable) return;
+            if (!shouldHandleFlowchartCanvasTab({
+                key: e.key,
+                target: e.target,
+                activeElement: document.activeElement,
+            })) return;
             // 有模态框打开时不拦截
             if (document.querySelector('.ant-modal-wrap:not([style*="display: none"])')) return;
 
@@ -258,6 +263,9 @@ export function useDesignerEventHandlers({
 
             // 更新选中状态
             setNodes((nds: Node[]) => nds.map(n => ({ ...n, selected: n.id === nextNode.id })));
+            window.requestAnimationFrame(() => {
+                focusFlowchartNodeById(document, nextNode.id);
+            });
 
             // 自动居中到目标节点
             if (reactFlowInstance) {

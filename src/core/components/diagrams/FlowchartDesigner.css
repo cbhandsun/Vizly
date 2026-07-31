@@ -1848,3 +1848,34 @@ html[data-theme='dark'] body.performance-mode .modern-sidebar-container {
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255,255,255,0.04) inset;
 }
 
+/* Canvas search stays below the two-row mobile toolbar and preserves touch targets. */
+.canvas-search-bar {
+    position: absolute;
+    top: 56px;
+    right: 12px;
+    width: min(360px, calc(100vw - 24px));
+    min-width: 280px;
+    max-width: calc(100vw - 24px);
+}
+
+@media (max-width: 767px) {
+    .canvas-search-bar {
+        top: 96px;
+        right: 8px;
+        left: 8px;
+        width: auto;
+        min-width: 0;
+        max-width: none;
+        max-height: calc(100dvh - 112px);
+    }
+
+    .canvas-search-icon-button {
+        min-width: 44px !important;
+        height: 44px !important;
+    }
+
+    .canvas-search-action-button {
+        min-height: 44px !important;
+    }
+}
+

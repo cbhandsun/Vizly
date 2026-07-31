@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Button, Space, Input, Tooltip, Popconfirm, Popover } from 'antd';
 import {
     EyeOutlined,
@@ -11,6 +11,9 @@ import {
     BgColorsOutlined
 } from '@ant-design/icons';
 import type { LayerConfig } from './hooks/useLayerManagement';
+import { normalizeLayerNameInput } from './layerNameInput';
+import { resolveLayerTouchTargetSize } from './layerInteractionMetrics';
+import { getUiScale } from '../shared/viewportStore';
 
 /** 预定义图层颜色 */
 const LAYER_COLORS = [
@@ -36,14 +39,19 @@ interface LayerManagementPanelProps {
 const ColorPicker: React.FC<{
     current?: string;
     onSelect: (color: string | undefined) => void;
-}> = ({ current, onSelect }) => (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, width: 156 }}>
+    touchTargetSize: number;
+}> = ({ current, onSelect, touchTargetSize }) => (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, width: touchTargetSize * 4 + 18 }} aria-label="图层颜色" role="group">
         {LAYER_COLORS.map(c => (
-            <div
+            <button
+                type="button"
                 key={c}
+                aria-label={`选择图层颜色 ${c}`}
+                aria-pressed={c === current}
                 onClick={() => onSelect(c)}
                 style={{
-                    width: 24, height: 24,
+                    width: touchTargetSize, height: touchTargetSize,
+                    padding: 0,
                     borderRadius: 6,
                     background: c,
                     cursor: 'pointer',
@@ -57,10 +65,13 @@ const ColorPicker: React.FC<{
         ))}
         {/* 清除颜色 */}
         {current && (
-            <div
+            <button
+                type="button"
+                aria-label="清除图层颜色"
                 onClick={() => onSelect(undefined)}
                 style={{
-                    width: 24, height: 24,
+                    width: touchTargetSize, height: touchTargetSize,
+                    padding: 0,
                     borderRadius: 6,
                     background: '#f1f5f9',
                     cursor: 'pointer',
@@ -68,10 +79,9 @@ const ColorPicker: React.FC<{
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: 12, color: '#64748b',
                 }}
-                title="清除颜色"
             >
                 ×
-            </div>
+            </button>
         )}
     </div>
 );
@@ -89,10 +99,20 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
 }) => {
     const [editingLayerId, setEditingLayerId] = useState<string | null>(null);
     const [editName, setEditName] = useState('');
+    const touchTargetSize = useMemo(
+        () => resolveLayerTouchTargetSize(getUiScale()),
+        [],
+    );
+    const actionButtonStyle = useMemo<React.CSSProperties>(() => ({
+        minWidth: touchTargetSize,
+        width: touchTargetSize,
+        height: touchTargetSize,
+        padding: 0,
+    }), [touchTargetSize]);
 
     const handleCreate = () => {
-        const name = prompt('图层名称:');
-        if (name) onCreate(name.trim());
+        const name = normalizeLayerNameInput(prompt('图层名称:'));
+        if (name) onCreate(name);
     };
 
     const startEdit = (layer: LayerConfig) => {
@@ -101,8 +121,9 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
     };
 
     const finishEdit = (layerId: string) => {
-        if (editName.trim()) {
-            onRename(layerId, editName.trim());
+        const name = normalizeLayerNameInput(editName);
+        if (name) {
+            onRename(layerId, name);
         }
         setEditingLayerId(null);
     };
@@ -111,7 +132,7 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
         <div style={{ padding: 16, background: '#fafafa', height: '100%', display: 'flex', flexDirection: 'column' }}>
             <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>图层</h3>
-                <Button type="primary" icon={<PlusOutlined />} size="small" onClick={handleCreate}>
+                <Button type="primary" icon={<PlusOutlined />} style={{ minHeight: touchTargetSize }} onClick={handleCreate}>
                     新建
                 </Button>
             </div>
@@ -122,6 +143,8 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
                         <div
                             key={layer.id}
                             role="listitem"
+                            tabIndex={0}
+                            aria-current={layer.id === activeLayerId ? 'true' : undefined}
                             style={{
                                 background: layer.id === activeLayerId ? '#e6f7ff' : '#fff',
                                 padding: '10px 12px',
@@ -132,6 +155,13 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
                                 borderLeft: layer.color ? `4px solid ${layer.color}` : undefined,
                             }}
                             onClick={() => onSetActive(layer.id)}
+                            onKeyDown={(event) => {
+                                if (event.target !== event.currentTarget) return;
+                                if (event.key === 'Enter' || event.key === ' ') {
+                                    event.preventDefault();
+                                    onSetActive(layer.id);
+                                }
+                            }}
                         >
                             {/* 垂直布局：名称在上，操作按钮在下 */}
                             <div style={{ width: '100%' }}>
@@ -173,7 +203,7 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
                                     <Tooltip title={layer.visible ? '隐藏' : '显示'}>
                                         <Button
                                             type="text"
-                                            size="small"
+                                            style={actionButtonStyle}
                                             aria-label={`${layer.visible ? '隐藏' : '显示'}图层：${layer.name}`}
                                             icon={layer.visible ? <EyeOutlined /> : <EyeInvisibleOutlined />}
                                             onClick={(e) => {
@@ -186,7 +216,7 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
                                     <Tooltip title={layer.locked ? '解锁' : '锁定'}>
                                         <Button
                                             type="text"
-                                            size="small"
+                                            style={actionButtonStyle}
                                             aria-label={`${layer.locked ? '解锁' : '锁定'}图层：${layer.name}`}
                                             icon={layer.locked ? <LockOutlined /> : <UnlockOutlined />}
                                             onClick={(e) => {
@@ -203,6 +233,7 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
                                                 <ColorPicker
                                                     current={layer.color}
                                                     onSelect={(c) => onSetColor(layer.id, c)}
+                                                    touchTargetSize={touchTargetSize}
                                                 />
                                             }
                                             trigger="click"
@@ -211,7 +242,7 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
                                             <Tooltip title="颜色标记">
                                                 <Button
                                                     type="text"
-                                                    size="small"
+                                                    style={actionButtonStyle}
                                                     aria-label={`设置图层颜色：${layer.name}`}
                                                     icon={<BgColorsOutlined style={{ color: layer.color || undefined }} />}
                                                     onClick={(e) => e.stopPropagation()}
@@ -225,7 +256,7 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
                                             <Tooltip title="重命名">
                                                 <Button
                                                     type="text"
-                                                    size="small"
+                                                    style={actionButtonStyle}
                                                     aria-label={`重命名图层：${layer.name}`}
                                                     icon={<EditOutlined />}
                                                     onClick={(e) => {
@@ -246,7 +277,7 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
                                             >
                                                 <Button
                                                     type="text"
-                                                    size="small"
+                                                    style={actionButtonStyle}
                                                     danger
                                                     aria-label={`删除图层：${layer.name}`}
                                                     icon={<DeleteOutlined />}

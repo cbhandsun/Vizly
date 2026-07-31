@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Button, Dropdown, Tooltip, MenuProps, Grid } from 'antd';
 import { useTranslation } from 'react-i18next';
@@ -10,6 +10,12 @@ import {
 import { CollaborationAvatars } from './ui/CollaborationAvatars';
 import { ApiOutlined } from '@ant-design/icons';
 import type { ReactFlowRenderSnapshot } from '../../rendering/reactFlowScene';
+import {
+    DOCUMENT_MENU_OVERLAY_CLASS,
+    focusFirstEnabledDocumentMenuItem,
+    shouldCloseDocumentMenuFromKey,
+    shouldOpenDocumentMenuFromKey,
+} from './documentMenuKeyboard';
 
 const AdvancedExportModal = React.lazy(() => import('./ui/AdvancedExportModal').then(module => ({
     default: module.AdvancedExportModal,
@@ -81,6 +87,33 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
     const { t } = useTranslation();
     const screens = Grid.useBreakpoint();
     const isSmallMobile = !screens.md;
+    const [documentMenuOpen, setDocumentMenuOpen] = useState(false);
+    const documentMenuButtonRef = useRef<HTMLButtonElement>(null);
+
+    const focusDocumentMenuTrigger = useCallback(() => {
+        documentMenuButtonRef.current?.focus();
+    }, []);
+
+    const focusDocumentMenuFirstItem = useCallback(() => {
+        window.setTimeout(() => {
+            focusFirstEnabledDocumentMenuItem(document);
+        }, 0);
+    }, []);
+
+    const handleDocumentMenuButtonKeyDown = useCallback((event: React.KeyboardEvent<HTMLButtonElement>) => {
+        if (!shouldOpenDocumentMenuFromKey(event.key)) return;
+        event.preventDefault();
+        setDocumentMenuOpen(true);
+        focusDocumentMenuFirstItem();
+    }, [focusDocumentMenuFirstItem]);
+
+    const handleDocumentMenuKeyDown = useCallback((event: React.KeyboardEvent<HTMLUListElement>) => {
+        if (!shouldCloseDocumentMenuFromKey(event.key)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        setDocumentMenuOpen(false);
+        window.setTimeout(focusDocumentMenuTrigger, 0);
+    }, [focusDocumentMenuTrigger]);
 
     // [Fix] Modals must render regardless of portal vs fallback path.
     // Extract them here so both branches can render the portal content + these modals.
@@ -289,11 +322,22 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
             <CollaborationAvatars />
 
             {documentMenu.length > 0 && (
-                <Dropdown menu={{ items: documentMenu }} placement="bottomRight" trigger={['click']}>
+                <Dropdown
+                    menu={{ items: documentMenu, onKeyDown: handleDocumentMenuKeyDown }}
+                    placement="bottomRight"
+                    trigger={['click']}
+                    open={documentMenuOpen}
+                    onOpenChange={setDocumentMenuOpen}
+                    classNames={{ root: DOCUMENT_MENU_OVERLAY_CLASS }}
+                >
                     <Tooltip title={t('designer.toolbar.documentActions')}>
                         <Button
+                            ref={documentMenuButtonRef}
                             type="text"
                             aria-label={t('designer.toolbar.documentActions')}
+                            aria-haspopup="menu"
+                            aria-expanded={documentMenuOpen}
+                            onKeyDown={handleDocumentMenuButtonKeyDown}
                             icon={<FaEllipsisH className="text-[13px]" />}
                             className={aiChatActive || isCommentMode ? tbtnActive : tbtn}
                         />

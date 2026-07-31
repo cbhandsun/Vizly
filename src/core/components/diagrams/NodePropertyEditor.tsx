@@ -26,7 +26,8 @@ import {
     AppstoreOutlined,
     AlignLeftOutlined,
     AlignCenterOutlined,
-    AlignRightOutlined
+    AlignRightOutlined,
+    CloseCircleOutlined,
 } from '@ant-design/icons';
 import { FaSearch } from 'react-icons/fa';
 import { Clock } from 'lucide-react';
@@ -35,10 +36,10 @@ import type { CollapseProps } from 'antd';
 
 import { ArrowTimelineEventsEditor } from './ArrowTimelineEventsEditor';
 import { ArchitectureNodeEditor } from './ArchitectureNodeEditor';
+import { LocalizedInputNumber } from './LocalizedInputNumber';
 
 const { Text } = Typography;
 const { TextArea } = Input;
-
 
 export interface UseNodePropertyItemsParams {
     selectedNodes: Node[];
@@ -161,7 +162,14 @@ export function useNodePropertyItems(params: UseNodePropertyItemsParams): Collap
                         placeholder={nodeCount > 1 && commonNodeLabel === undefined
                             ? mixedLabel
                             : t('propertyPanel.placeholders.label')}
-                        allowClear disabled={disabled} />
+                        allowClear={{
+                            clearIcon: (
+                                <CloseCircleOutlined
+                                    aria-label={t('propertyPanel.clearLabel')}
+                                />
+                            ),
+                        }}
+                        disabled={disabled} />
                 </Form.Item>
                 <Form.Item label={t('propertyPanel.description')} htmlFor={fieldIds.description}>
                     <TextArea id={fieldIds.description} aria-label={t('propertyPanel.description')} value={localDesc}
@@ -185,14 +193,18 @@ export function useNodePropertyItems(params: UseNodePropertyItemsParams): Collap
             <Row gutter={8}>
                 <Col span={12}>
                     <Form.Item label={t('propertyPanel.width')} htmlFor={fieldIds.width} style={{ marginBottom: 0 }}>
-                        <InputNumber id={fieldIds.width} aria-label={t('propertyPanel.width')} style={{ width: '100%' }} value={commonWidth}
+                        <LocalizedInputNumber id={fieldIds.width} aria-label={t('propertyPanel.width')} style={{ width: '100%' }} value={commonWidth}
+                            increaseLabel={t('propertyPanel.increaseValue', { field: t('propertyPanel.width') })}
+                            decreaseLabel={t('propertyPanel.decreaseValue', { field: t('propertyPanel.width') })}
                             onChange={val => updateNodes({ style: { width: typeof val === 'number' ? val : undefined } })}
                             onFocus={armSnapshot} placeholder={commonWidth === undefined ? mixedLabel : undefined} disabled={disabled} />
                     </Form.Item>
                 </Col>
                 <Col span={12}>
                     <Form.Item label={t('propertyPanel.height')} htmlFor={fieldIds.height} style={{ marginBottom: 0 }}>
-                        <InputNumber id={fieldIds.height} aria-label={t('propertyPanel.height')} style={{ width: '100%' }} value={commonHeight}
+                        <LocalizedInputNumber id={fieldIds.height} aria-label={t('propertyPanel.height')} style={{ width: '100%' }} value={commonHeight}
+                            increaseLabel={t('propertyPanel.increaseValue', { field: t('propertyPanel.height') })}
+                            decreaseLabel={t('propertyPanel.decreaseValue', { field: t('propertyPanel.height') })}
                             onChange={val => updateNodes({ style: { height: typeof val === 'number' ? val : undefined } })}
                             onFocus={armSnapshot} placeholder={commonHeight === undefined ? mixedLabel : undefined} disabled={disabled} />
                     </Form.Item>

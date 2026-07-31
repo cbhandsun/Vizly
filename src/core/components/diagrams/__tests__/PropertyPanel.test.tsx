@@ -57,6 +57,7 @@ describe('PropertyPanel field synchronization', () => {
         expect(Array.from(inputs).some(input => input.value === 'Decision')).toBe(true);
         expect(container.querySelector<HTMLTextAreaElement>('textarea')?.value)
             .toBe('Decision description');
+        expect(container.querySelector('[aria-label="propertyPanel.clearLabel"]')).not.toBeNull();
     });
 
     it('refreshes local fields when history restores the selected node data', async () => {

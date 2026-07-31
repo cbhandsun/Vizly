@@ -20,7 +20,7 @@ interface CanvasSearchBarProps {
 type ThemeToken = ReturnType<typeof theme.useToken>['token'];
 
 /**
- * 画布内搜索栏 — Ctrl+F / Ctrl+K 触发
+ * 画布内搜索栏 — Ctrl+F / Ctrl+H 触发
  * 支持关键词匹配节点标签/描述/ID/域名，上/下导航结果，聚焦视口 + 脉冲高亮
  * Phase 2：新增查找替换功能
  */
@@ -191,10 +191,7 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
             {/* 动态搜索高亮样式 */}
             {highlightStyle && <style>{highlightStyle}</style>}
 
-            <div style={{
-                position: 'absolute',
-                top: 56,
-                right: 12,
+            <div className="canvas-search-bar" role="search" aria-label="画布节点查找与替换" style={{
                 zIndex: 1600,
                 background: token.colorBgContainer,
                 border: `1px solid ${token.colorBorderSecondary}`,
@@ -202,7 +199,6 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
                 boxShadow: '0 4px 20px rgba(0,0,0,0.12)',
                 animation: 'quickMenuFadeIn 0.15s ease-out',
                 overflow: 'hidden',
-                minWidth: 280,
             }}>
                 {/* ── 搜索行 ── */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px' }}>
@@ -216,7 +212,7 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
                         placeholder="搜索节点..."
                         style={{
                             border: 'none', outline: 'none', background: 'transparent',
-                            fontSize: 13, flex: 1, color: token.colorText, fontFamily: 'inherit',
+                            fontSize: 13, flex: 1, minWidth: 0, color: token.colorText, fontFamily: 'inherit',
                         }}
                     />
                     {/* 结果计数 */}
@@ -231,15 +227,16 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
                         </span>
                     )}
                     {/* 上下导航 */}
-                    <button aria-label="上一个搜索结果" onClick={goPrev} disabled={matchIds.length === 0} style={navBtnStyle(matchIds.length > 0, token)}>
+                    <button className="canvas-search-icon-button" aria-label="上一个搜索结果" onClick={goPrev} disabled={matchIds.length === 0} style={navBtnStyle(matchIds.length > 0, token)}>
                         <FaChevronUp size={11} />
                     </button>
-                    <button aria-label="下一个搜索结果" onClick={goNext} disabled={matchIds.length === 0} style={navBtnStyle(matchIds.length > 0, token)}>
+                    <button className="canvas-search-icon-button" aria-label="下一个搜索结果" onClick={goNext} disabled={matchIds.length === 0} style={navBtnStyle(matchIds.length > 0, token)}>
                         <FaChevronDown size={11} />
                     </button>
                     {/* 切换替换模式 */}
                     {hasReplaceFns && (
                         <button
+                            className="canvas-search-icon-button"
                             aria-label={showReplace ? '关闭替换' : '打开查找替换'}
                             onClick={() => setShowReplace(v => !v)}
                             title="查找替换 (Ctrl+H)"
@@ -252,7 +249,7 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
                         </button>
                     )}
                     {/* 关闭 */}
-                    <button onClick={onClose} style={navBtnStyle(true, token)}>
+                    <button className="canvas-search-icon-button" aria-label="关闭画布搜索" onClick={onClose} style={navBtnStyle(true, token)}>
                         <FaTimes size={11} />
                     </button>
                 </div>
@@ -269,13 +266,16 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
                             value={replaceText}
                             onChange={e => setReplaceText(e.target.value)}
                             onKeyDown={e => { if (e.key === 'Enter') handleReplaceCurrent(); }}
+                            aria-label="替换为"
                             placeholder="替换为..."
                             style={{
                                 border: 'none', outline: 'none', background: 'transparent',
-                                fontSize: 13, flex: 1, color: token.colorText, fontFamily: 'inherit',
+                                fontSize: 13, flex: 1, minWidth: 0, color: token.colorText, fontFamily: 'inherit',
                             }}
                         />
                         <button
+                            className="canvas-search-action-button"
+                            aria-label="替换当前匹配"
                             onClick={handleReplaceCurrent}
                             disabled={matchIds.length === 0}
                             title="替换当前"
@@ -284,6 +284,8 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
                             替换
                         </button>
                         <button
+                            className="canvas-search-action-button"
+                            aria-label={`全部替换，共 ${matchIds.length} 处`}
                             onClick={handleReplaceAll}
                             disabled={matchIds.length === 0}
                             title={`全部替换 (${matchIds.length} 处)`}
@@ -307,7 +309,7 @@ const navBtnStyle = (active: boolean, token: ThemeToken): React.CSSProperties =>
     border: 'none', background: 'transparent',
     cursor: active ? 'pointer' : 'default',
     color: active ? token.colorText : token.colorTextDisabled,
-    padding: 2, display: 'flex', alignItems: 'center',
+    padding: 2, minWidth: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
     borderRadius: 3,
     transition: 'background 0.15s',
 });
@@ -320,6 +322,7 @@ const actionBtnStyle = (active: boolean, token: ThemeToken): React.CSSProperties
     borderRadius: 4,
     fontSize: 11,
     padding: '1px 8px',
+    minHeight: 32,
     fontFamily: 'inherit',
     transition: 'all 0.15s',
     whiteSpace: 'nowrap' as const,

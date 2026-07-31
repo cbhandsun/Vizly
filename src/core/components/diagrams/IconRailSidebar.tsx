@@ -441,11 +441,11 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
 
                 {/* Zoom controls at bottom */}
                 <div className="icon-rail-spacer" />
-                <Tooltip title={t('designer.sidebar.search')} placement="right">
+                <Tooltip title={t('designer.sidebar.searchComponents')} placement="right">
                     <button
                         type="button"
                         className={`icon-rail-btn ${activePanel === 'shapes' && searchTerm ? 'active' : ''}`}
-                        aria-label={t('designer.sidebar.search')}
+                        aria-label={t('designer.sidebar.searchComponents')}
                         onClick={() => {
                             if (activePanel !== 'shapes') togglePanel('shapes');
                             // Focus the search input after panel opens
