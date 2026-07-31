@@ -480,7 +480,6 @@ export function useDesignerSystemSync({
     const needsInitialFitView = useRef(false);
     const {
         activePresetLookup,
-        hasStandardPresetId,
         isCurrentDiagramInitialized,
         markCurrentDiagramInitialized,
     } = useDesignerPresetInitialization(id);
@@ -491,8 +490,11 @@ export function useDesignerSystemSync({
     }
 
     useEffect(() => {
-        if (!activePresetLookup.ready || activePresetLookup.id !== id) return;
         if (isCurrentDiagramInitialized) return;
+        cancelLayoutTransition(setNodes);
+        setNodes([]);
+        setEdges([]);
+        if (!activePresetLookup.ready || activePresetLookup.id !== id) return;
 
         const preset = activePresetLookup.preset;
         const isStandardPreset = !!preset && !String(id || '').startsWith('custom:');
@@ -679,8 +681,7 @@ export function useDesignerSystemSync({
     return {
         performanceMode,
         saveState,
-        isInitialDiagramLoading: hasStandardPresetId
-            && (!activePresetLookup.ready || !isCurrentDiagramInitialized)
+        isInitialDiagramLoading: !activePresetLookup.ready || !isCurrentDiagramInitialized,
     };
 }
 

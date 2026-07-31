@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useReactFlow, Node } from '@xyflow/react';
+import { useReactFlow } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import type { FlowchartNodeData } from '../FlowchartNode';
-import { MarkerType } from '@xyflow/react';
-import { useNodeUpdate } from '../../diagrams/useNodeUpdate';
+import {
+    useBeforeDiagramStructuralChange,
+    useNodeUpdate,
+} from '../../diagrams/useNodeUpdate';
 import {
     calculateCanvasVisibleLeft,
     calculateCanvasVisibleRight,
@@ -11,11 +13,24 @@ import {
     resolveFlowchartQuickCloneLabelKey,
     type FlowchartQuickCloneDirection,
 } from '../flowchartQuickClone';
+import {
+    cloneFlowchartNode,
+    quickCloneFlowchartNode,
+    shouldSnapshotFlowchartNodeDataUpdate,
+} from '../flowchartNodeMutations';
 
 export function useFlowchartNodeInteractions(id: string, data: FlowchartNodeData, selected: boolean) {
-    const { setNodes, setEdges, getViewport, setViewport } = useReactFlow();
+    const {
+        getEdges,
+        getNodes,
+        getViewport,
+        setEdges,
+        setNodes,
+        setViewport,
+    } = useReactFlow();
     const { t } = useTranslation();
     const onUpdateNodeData = useNodeUpdate();
+    const beforeStructuralChange = useBeforeDiagramStructuralChange();
 
     const [isHovered, setIsHovered] = useState(false);
     const [bounceAnimate, setBounceAnimate] = useState(false);
@@ -26,7 +41,11 @@ export function useFlowchartNodeInteractions(id: string, data: FlowchartNodeData
     // Node Update Helper
     const handleUpdateData = useCallback((newData: Partial<FlowchartNodeData>) => {
         if (onUpdateNodeData) {
-            onUpdateNodeData([id], { data: { ...data, ...newData } });
+            onUpdateNodeData(
+                [id],
+                { data: { ...data, ...newData } },
+                { snapshot: shouldSnapshotFlowchartNodeDataUpdate(newData) },
+            );
         } else {
             setNodes((nds) => nds.map((n) => {
                 if (n.id === id) {
@@ -85,23 +104,12 @@ export function useFlowchartNodeInteractions(id: string, data: FlowchartNodeData
 
 
     const handleDelete = useCallback(() => {
-        setNodes((nds) => nds.filter((n) => n.id !== id));
-        setEdges((eds) => eds.filter((e) => e.source !== id && e.target !== id));
-    }, [id, setNodes, setEdges]);
-
-    const handleClone = useCallback(() => {
-        setNodes((nds) => {
-            const source = nds.find(n => n.id === id);
-            if (!source) return nds;
-            const newNode = {
-                ...source,
-                id: `${source.id}_copy_${Date.now()}`,
-                position: { x: source.position.x + 30, y: source.position.y + 30 },
-                selected: true
-            };
-            return [...nds.map(n => ({ ...n, selected: false })), newNode];
-        });
-    }, [id, setNodes]);
+        const currentNodes = getNodes();
+        if (!currentNodes.some(node => node.id === id)) return;
+        beforeStructuralChange?.();
+        setNodes(currentNodes.filter(node => node.id !== id));
+        setEdges(getEdges().filter(edge => edge.source !== id && edge.target !== id));
+    }, [beforeStructuralChange, getEdges, getNodes, id, setEdges, setNodes]);
 
     const handleDomainClassChange = useCallback((dc: string, domainName: string) => {
         handleUpdateData({
@@ -166,111 +174,72 @@ export function useFlowchartNodeInteractions(id: string, data: FlowchartNodeData
         }
     }, [getViewport, setViewport]);
 
+    const handleClone = useCallback(() => {
+        const mutation = cloneFlowchartNode({
+            nodes: getNodes(),
+            edges: getEdges(),
+            sourceId: id,
+            timestamp: Date.now(),
+        });
+        if (!mutation) return;
+        beforeStructuralChange?.();
+        setNodes(mutation.nodes);
+        setEdges(mutation.edges);
+        ensureNodeVisible(
+            mutation.newNode.position.x,
+            mutation.newNode.position.y,
+            120,
+            60,
+        );
+    }, [
+        beforeStructuralChange,
+        ensureNodeVisible,
+        getEdges,
+        getNodes,
+        id,
+        setEdges,
+        setNodes,
+    ]);
+
     const handleQuickClone = useCallback((direction: FlowchartQuickCloneDirection, e: React.SyntheticEvent | PointerEvent) => {
         if (e && 'stopPropagation' in e) {
              e.stopPropagation();
         }
-        const newNodeId = `flowchart-node-${Date.now()}`;
-        const finalPos = { x: 0, y: 0 };
-        const finalSize = { width: 120, height: 60 };
-        
-        setNodes((nds) => {
-            const sourceNode = nds.find(n => n.id === id);
-            if (!sourceNode) return nds;
-            
-            const offsetDistX = 180;
-            const offsetDistY = 140;
-            let nx = sourceNode.position.x;
-            let ny = sourceNode.position.y;
-            
-            switch (direction) {
-                case 'top': ny -= offsetDistY; break;
-                case 'bottom': ny += offsetDistY; break;
-                case 'left': nx -= offsetDistX; break;
-                case 'right': nx += offsetDistX; break;
-            }
-
-            const nodeW = (sourceNode.measured?.width ?? sourceNode.width ?? 120) as number;
-            const nodeH = (sourceNode.measured?.height ?? sourceNode.height ?? 60) as number;
-            finalSize.width = nodeW;
-            finalSize.height = nodeH;
-            const OVERLAP_PAD = 20;
-            const MAX_SHIFTS = 5;
-
-            for (let shift = 0; shift < MAX_SHIFTS; shift++) {
-                const hasOverlap = nds.some(n => {
-                    if (n.id === id) return false;
-                    const nw = (n.measured?.width ?? n.width ?? 120) as number;
-                    const nh = (n.measured?.height ?? n.height ?? 60) as number;
-                    return !(nx + nodeW + OVERLAP_PAD < n.position.x ||
-                             nx > n.position.x + nw + OVERLAP_PAD ||
-                             ny + nodeH + OVERLAP_PAD < n.position.y ||
-                             ny > n.position.y + nh + OVERLAP_PAD);
-                });
-                if (!hasOverlap) break;
-                switch (direction) {
-                    case 'top': ny -= offsetDistY; break;
-                    case 'bottom': ny += offsetDistY; break;
-                    case 'left': nx -= offsetDistX; break;
-                    case 'right': nx += offsetDistX; break;
-                }
-            }
-
-            finalPos.x = nx; finalPos.y = ny;
-            const srcData = sourceNode.data as FlowchartNodeData;
-            const shape = srcData.shape || 'rectangle';
-
-            const newNode: Node = {
-                id: newNodeId,
-                type: sourceNode.type,
-                position: { x: nx, y: ny },
-                style: sourceNode.style,
-                data: {
-                    label: t(resolveFlowchartQuickCloneLabelKey(shape)),
-                    shape,
-                    ...(srcData.theme && { theme: srcData.theme }),
-                    ...(srcData.domainClass && { domainClass: srcData.domainClass }),
-                    ...(srcData.domain && { domain: srcData.domain }),
-                    ...(srcData.style && { style: srcData.style }),
-                    ...(srcData.textAlign && { textAlign: srcData.textAlign }),
-                    isEditing: true,
-                    layer: srcData.layer || 'layer-0',
-                },
-                selected: true,
-            };
-
-            return [...nds.map(n => ({ ...n, selected: false })), newNode];
+        const sourceNode = getNodes().find(node => node.id === id);
+        if (!sourceNode) return;
+        const sourceData = sourceNode.data as FlowchartNodeData;
+        const mutation = quickCloneFlowchartNode({
+            nodes: getNodes(),
+            edges: getEdges(),
+            sourceId: id,
+            direction,
+            label: t(resolveFlowchartQuickCloneLabelKey(sourceData.shape || 'rectangle')),
+            timestamp: Date.now(),
         });
-
-        setEdges((eds) => {
-            let handleSource = 'right';
-            let handleTarget = 'left';
-
-            switch (direction) {
-                case 'top': handleSource = 'top'; handleTarget = 'bottom'; break;
-                case 'bottom': handleSource = 'bottom'; handleTarget = 'top'; break;
-                case 'left': handleSource = 'left'; handleTarget = 'right'; break;
-                case 'right': handleSource = 'right'; handleTarget = 'left'; break;
-            }
-
-            const newEdge = {
-                id: `e-${id}-${newNodeId}`,
-                source: id,
-                target: newNodeId,
-                sourceHandle: handleSource,
-                targetHandle: handleTarget,
-                type: 'advanced-smart-step',
-                markerEnd: { type: MarkerType.ArrowClosed },
-                selected: true
-            };
-            return [...eds.map(e => ({ ...e, selected: false })), newEdge];
-        });
+        if (!mutation) return;
+        beforeStructuralChange?.();
+        setNodes(mutation.nodes);
+        setEdges(mutation.edges);
 
         setTimeout(
-            () => ensureNodeVisible(finalPos.x, finalPos.y, finalSize.width, finalSize.height),
+            () => ensureNodeVisible(
+                mutation.newNode.position.x,
+                mutation.newNode.position.y,
+                mutation.nodeSize.width,
+                mutation.nodeSize.height,
+            ),
             80,
         );
-    }, [id, setNodes, setEdges, ensureNodeVisible, t]);
+    }, [
+        beforeStructuralChange,
+        ensureNodeVisible,
+        getEdges,
+        getNodes,
+        id,
+        setEdges,
+        setNodes,
+        t,
+    ]);
 
     return {
         isHovered,

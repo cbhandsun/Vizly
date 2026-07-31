@@ -3,9 +3,13 @@ import { NodeUpdateContext, type UpdateNodesBatchFn } from './NodeUpdateContextV
 
 export const NodeUpdateProvider: React.FC<{
     updateNodesBatch: UpdateNodesBatchFn;
+    beforeStructuralChange?: () => void;
     businessData?: Record<string, unknown>;
     children: React.ReactNode;
-}> = ({ updateNodesBatch, businessData, children }) => {
-    const value = useMemo(() => ({ updateNodesBatch, businessData }), [updateNodesBatch, businessData]);
+}> = ({ updateNodesBatch, beforeStructuralChange, businessData, children }) => {
+    const value = useMemo(
+        () => ({ updateNodesBatch, beforeStructuralChange, businessData }),
+        [beforeStructuralChange, businessData, updateNodesBatch],
+    );
     return <NodeUpdateContext.Provider value={value}>{children}</NodeUpdateContext.Provider>;
 };

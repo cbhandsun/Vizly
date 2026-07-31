@@ -3,6 +3,7 @@ import { Tabs, Tooltip, Button, theme } from 'antd';
 import { Node, Edge } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import { FaCog, FaRobot, FaChevronRight, FaChevronLeft } from 'react-icons/fa';
+import type { DiagramPanelRenderControls } from '../../types/diagram-components';
 import { DiagramTypePlugin, PluginContext } from '../../types/plugin';
 import {
     readDesignerRightSidebarCollapsed,
@@ -31,7 +32,7 @@ export interface DesignerRightSidebarProps {
     updateEdgesBatch: (ids: string[], data: Record<string, unknown>) => void;
     onBeforeUpdate: () => void;
     isDraggingNode: boolean;
-    renderAIChatPanel?: () => React.ReactNode;
+    renderAIChatPanel?: (controls: DiagramPanelRenderControls) => React.ReactNode;
     /** 通知父组件当前面板实际宽度 (0=不可见, 42=收起, 320=展开) */
     onWidthChange?: (width: number) => void;
     showAiCrown?: boolean;
@@ -176,6 +177,7 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
         if (shouldExpandDesignerRightSidebar({
             isCollapsed,
             hasSelection,
+            previousHasSelection: previousHasSelectionRef.current,
             isMobile,
             activeTab,
             aiChatVisible,
@@ -207,6 +209,11 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
         }
         setIsCollapsed(previous => !previous);
     }, [activeTab, aiChatVisible, isCollapsed, setAiChatVisible, setIsCollapsed]);
+
+    const closeAiPanel = useCallback(() => {
+        setAiChatVisible(false);
+        setIsCollapsed(true);
+    }, [setAiChatVisible, setIsCollapsed]);
 
     // 通知父组件当前面板实际宽度（用 ref 避免依赖变化）
     const onWidthChangeRef = React.useRef(onWidthChange);
@@ -441,7 +448,9 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
                                 label: <span style={{ display: 'flex', alignItems: 'center' }}>{t('aiChat.title')} {showAiCrown && <span style={{ marginLeft: 4, fontSize: '13px' }} title="Pro 功能">👑</span>}</span>,
                                 children: (
                                     <div style={{ height: '100%', padding: '0 8px' }}>
-                                        {activeTab === 'ai' ? renderAIChatPanel() : null}
+                                        {activeTab === 'ai'
+                                            ? renderAIChatPanel({ onClose: closeAiPanel })
+                                            : null}
                                     </div>
                                 )
                             }] : [])

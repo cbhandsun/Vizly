@@ -270,7 +270,7 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
                                                 onOpenCommandPalette={() => setIsCommandOpen(true)}
                                                 loadLayoutPresetMap={loadLayoutPresetMap}
                                                 renderVersionHistoryPanel={renderVersionHistoryPanel}
-                                                renderAIChatPanel={() => (
+                                                renderAIChatPanel={({ onClose }) => (
                                                     <Suspense fallback={<div className="p-4 text-center text-gray-500">Loading AI...</div>}>
                                                         <AIChatView
                                                             onOpenConfig={() => setAiConfigVisible(true)}
@@ -281,10 +281,7 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
                                                             diagramNodesRef={aiNodesRef}
                                                             diagramEdgesRef={aiEdgesRef}
                                                             canvasOps={aiCanvasOps}
-                                                            onClose={() => {
-                                                                const aiBtn = document.querySelector<HTMLElement>('.toolbar-button-ai');
-                                                                if (aiBtn) aiBtn.click();
-                                                            }}
+                                                            onClose={onClose}
                                                         />
                                                     </Suspense>
                                                 )}

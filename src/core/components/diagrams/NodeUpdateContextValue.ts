@@ -5,6 +5,7 @@ export type UpdateNodesBatchFn = (ids: string[], data: NodeDataUpdate, options?:
 
 export interface NodeUpdateContextValue {
     updateNodesBatch: UpdateNodesBatchFn;
+    beforeStructuralChange?: () => void;
     businessData?: Record<string, unknown>;
 }
 

@@ -45,7 +45,10 @@ import {
   createBaseReactFlowNodeDragFallbackEdges,
   shouldUseBaseReactFlowNodeDragFallback,
 } from './baseReactFlowDisplayFallback';
-import { logBaseReactFlowEventBindingFailure } from './baseReactFlowLogging';
+import {
+  logBaseReactFlowEventBindingFailure,
+  logBaseReactFlowQualityFallback,
+} from './baseReactFlowLogging';
 import { isBaseReactFlowDisplayDiagnosticsEnabled } from './baseReactFlowDisplayDiagnostics';
 import { recordBaseReactFlowRejectedDisplayDiagnostics } from './baseReactFlowDisplayRejectedDiagnostics';
 import type {
@@ -540,10 +543,7 @@ export const useBaseReactFlowDisplayRouting = ({
             nodeCount,
             edgeCount,
           });
-          logBaseReactFlowEventBindingFailure(
-            'displayEdgesFinalQuality',
-            new Error('display-edge-worker-final-signature-mismatch'),
-          );
+          logBaseReactFlowQualityFallback('worker-final-signature-mismatch');
           return;
         }
         const cacheReplaySignature = mergedTransactions.cachePatches

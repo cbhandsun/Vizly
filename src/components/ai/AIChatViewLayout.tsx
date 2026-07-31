@@ -8,7 +8,6 @@ import Select from 'antd/es/select';
 import Space from 'antd/es/space';
 import Tooltip from 'antd/es/tooltip';
 import Typography from 'antd/es/typography';
-import List from 'antd/es/list';
 import Popconfirm from 'antd/es/popconfirm';
 import {
     AudioOutlined,
@@ -162,10 +161,11 @@ export const AIChatViewLayout: React.FC<AIChatViewLayoutProps> = ({
                     <Button size="small" icon={<PlusOutlined />} onClick={() => { handleNewChat(); setIsSidebarOpen(false); }} type="text" />
                 </div>
                 <div className="ai-chat-sidebar-list">
-                    <List
-                        dataSource={conversations}
-                        renderItem={conv => (
+                    <div role="list" aria-label={t('aiChat.historyTitle')}>
+                        {conversations.map(conv => (
                             <div
+                                key={conv.id}
+                                role="listitem"
                                 onClick={() => { handleSwitchChat(conv.id); setIsSidebarOpen(false); }}
                                 className={`ai-chat-history-item ${activeId === conv.id ? 'active' : ''}`}
                             >
@@ -200,8 +200,8 @@ export const AIChatViewLayout: React.FC<AIChatViewLayoutProps> = ({
                                     </div>
                                 )}
                             </div>
-                        )}
-                    />
+                        ))}
+                    </div>
                 </div>
             </div>
 
@@ -215,13 +215,14 @@ export const AIChatViewLayout: React.FC<AIChatViewLayoutProps> = ({
                         size="small"
                         onClick={() => setIsSidebarOpen(true)}
                         title={t('aiChat.viewHistory')}
+                        aria-label={t('aiChat.viewHistory')}
                     />
                     <Select
                         size="small"
                         variant="borderless"
                         value={aiConfig.activeModelKey}
                         onChange={handleModelChange}
-                        dropdownMatchSelectWidth={false}
+                        popupMatchSelectWidth={false}
                         options={groupModelOptions(availableModels)}
                         labelRender={() => (
                             <span style={{ color: '#1677ff' }}>{activeModelName}</span>
@@ -242,8 +243,22 @@ export const AIChatViewLayout: React.FC<AIChatViewLayoutProps> = ({
                             <CloudServerOutlined style={{ color: '#bfbfbf', fontSize: 14 }} />
                         </Tooltip>
                     )}
-                    <Button icon={<SettingOutlined />} type="text" size="small" onClick={onOpenConfig} title={t('aiChat.settings')} />
-                    <Button icon={<CloseOutlined />} type="text" size="small" onClick={onClose} title={t('aiChat.close')} />
+                    <Button
+                        icon={<SettingOutlined />}
+                        type="text"
+                        size="small"
+                        onClick={onOpenConfig}
+                        title={t('aiChat.settings')}
+                        aria-label={t('aiChat.settings')}
+                    />
+                    <Button
+                        icon={<CloseOutlined />}
+                        type="text"
+                        size="small"
+                        onClick={onClose}
+                        title={t('aiChat.close')}
+                        aria-label={t('aiChat.close')}
+                    />
                 </Space>
             </div>
 

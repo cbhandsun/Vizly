@@ -1,11 +1,11 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type React from 'react';
 import type { Edge, Node } from '@xyflow/react';
 
 interface DiagramScopedSelection {
     diagramId?: string;
-    nodes: Node[];
-    edges: Edge[];
+    nodeIds: string[];
+    edgeIds: string[];
 }
 
 const resolveStateUpdate = <T,>(
@@ -15,37 +15,79 @@ const resolveStateUpdate = <T,>(
     ? (update as (previous: T) => T)(current)
     : update;
 
-export const useDiagramScopedSelection = (diagramId?: string) => {
+export const useDiagramScopedSelection = (
+    diagramId: string | undefined,
+    nodes: Node[],
+    edges: Edge[],
+) => {
     const [selection, setSelection] = useState<DiagramScopedSelection>({
         diagramId,
-        nodes: [],
-        edges: [],
+        nodeIds: [],
+        edgeIds: [],
     });
     const isCurrentDiagram = selection.diagramId === diagramId;
-    const selectedNodes = isCurrentDiagram ? selection.nodes : [];
-    const selectedEdges = isCurrentDiagram ? selection.edges : [];
+    const nodeById = useMemo(
+        () => new Map(nodes.map(node => [node.id, node])),
+        [nodes],
+    );
+    const edgeById = useMemo(
+        () => new Map(edges.map(edge => [edge.id, edge])),
+        [edges],
+    );
+    const selectedNodes = useMemo(
+        () => isCurrentDiagram
+            ? selection.nodeIds.flatMap(id => {
+                const node = nodeById.get(id);
+                return node ? [node] : [];
+            })
+            : [],
+        [isCurrentDiagram, nodeById, selection.nodeIds],
+    );
+    const selectedEdges = useMemo(
+        () => isCurrentDiagram
+            ? selection.edgeIds.flatMap(id => {
+                const edge = edgeById.get(id);
+                return edge ? [edge] : [];
+            })
+            : [],
+        [edgeById, isCurrentDiagram, selection.edgeIds],
+    );
 
     const setSelectedNodes = useCallback<React.Dispatch<React.SetStateAction<Node[]>>>((update) => {
         setSelection(previous => {
             const sameDiagram = previous.diagramId === diagramId;
+            const currentNodes = sameDiagram
+                ? previous.nodeIds.flatMap(id => {
+                    const node = nodeById.get(id);
+                    return node ? [node] : [];
+                })
+                : [];
+            const nextNodes = resolveStateUpdate(update, currentNodes);
             return {
                 diagramId,
-                nodes: resolveStateUpdate(update, sameDiagram ? previous.nodes : []),
-                edges: sameDiagram ? previous.edges : [],
+                nodeIds: nextNodes.map(node => node.id),
+                edgeIds: sameDiagram ? previous.edgeIds : [],
             };
         });
-    }, [diagramId]);
+    }, [diagramId, nodeById]);
 
     const setSelectedEdges = useCallback<React.Dispatch<React.SetStateAction<Edge[]>>>((update) => {
         setSelection(previous => {
             const sameDiagram = previous.diagramId === diagramId;
+            const currentEdges = sameDiagram
+                ? previous.edgeIds.flatMap(id => {
+                    const edge = edgeById.get(id);
+                    return edge ? [edge] : [];
+                })
+                : [];
+            const nextEdges = resolveStateUpdate(update, currentEdges);
             return {
                 diagramId,
-                nodes: sameDiagram ? previous.nodes : [],
-                edges: resolveStateUpdate(update, sameDiagram ? previous.edges : []),
+                nodeIds: sameDiagram ? previous.nodeIds : [],
+                edgeIds: nextEdges.map(edge => edge.id),
             };
         });
-    }, [diagramId]);
+    }, [diagramId, edgeById]);
 
     return {
         selectedNodes,

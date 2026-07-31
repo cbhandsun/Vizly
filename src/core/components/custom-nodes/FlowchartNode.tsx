@@ -16,6 +16,7 @@ const FlowchartNode = ({ data, selected, id }: FlowchartNodeProps) => {
     const { t } = useTranslation();
     const _isConnecting = useStore((s) => s.connection.inProgress);
     const nodeData = useStore(s => s.nodeLookup.get(id));
+    const viewportZoom = useStore(s => s.transform[2]);
 
     const nodeWidth = nodeData?.measured?.width || nodeData?.width || 150;
     const nodeHeight = nodeData?.measured?.height || nodeData?.height || 80;
@@ -42,6 +43,10 @@ const FlowchartNode = ({ data, selected, id }: FlowchartNodeProps) => {
     } = useFlowchartNodeStyleResolution({ data, selected });
 
     const isNonRectShape = shape !== 'rectangle';
+    const quickActionSize = Math.min(
+        88,
+        Math.max(44, 44 / Math.max(viewportZoom, 0.5)),
+    );
 
     return (
         <div
@@ -187,6 +192,9 @@ const FlowchartNode = ({ data, selected, id }: FlowchartNodeProps) => {
                                 <div
                                     className="flowchart-quick-clone-btn"
                                     data-dir={dir}
+                                    style={{
+                                        '--flowchart-quick-action-size': `${quickActionSize}px`,
+                                    } as React.CSSProperties}
                                     role="button"
                                     tabIndex={0}
                                     aria-label={t('designer.flowchart.quickAddDirection', {

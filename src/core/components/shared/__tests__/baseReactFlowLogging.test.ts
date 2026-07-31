@@ -24,6 +24,7 @@ describe('baseReactFlowLogging', () => {
       logBaseReactFlowEventBindingFailure,
       logBaseReactFlowFitWidthTopFailure,
       logBaseReactFlowOverlayFlagReadFailure,
+      logBaseReactFlowQualityFallback,
     } = await import('../baseReactFlowLogging');
 
     logBaseReactFlowFitWidthTopFailure(new Error('Authorization: Bearer fit-secret'));
@@ -31,6 +32,7 @@ describe('baseReactFlowLogging', () => {
     logBaseReactFlowConfigReadFailure('canvas.zoom.fitRatio', new Error('token=fit-ratio-secret'));
     logBaseReactFlowConfigReadFailure('canvas.zoom.maxFitZoom', new Error('credential=max-fit-secret'));
     logBaseReactFlowEventBindingFailure('unbindWheelHandler', new Error('api_key=unbind-secret'));
+    logBaseReactFlowQualityFallback('worker-final-signature-mismatch');
     logBaseReactFlowOverlayFlagReadFailure('alignGuide', new Error('token=overlay-secret'));
 
     const errorPayload = JSON.stringify(safeLogState.error.mock.calls);
@@ -41,6 +43,10 @@ describe('baseReactFlowLogging', () => {
     expect(warnMessages).toContain('[BaseReactFlow] Failed to read config "canvas.zoom.fitRatio":');
     expect(warnMessages).toContain('[BaseReactFlow] Failed to read config "canvas.zoom.maxFitZoom":');
     expect(warnMessages).toContain('[BaseReactFlow] unbindWheelHandler failed:');
+    expect(safeLogState.debug).toHaveBeenCalledWith(
+      '[BaseReactFlow] Display routing kept the stable fallback:',
+      'worker-final-signature-mismatch',
+    );
     expect(warnMessages).toContain('[BaseReactFlow] Failed to read overlay flag "alignGuide":');
     expect(errorPayload).toContain('[redacted]');
     expect(warnPayload).toContain('[redacted]');

@@ -447,8 +447,12 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                             >
                                 <GestureOverlay zoom={currentZoom} visible={showOverlay} />
                                 <FlowchartCanvasShell
-                                    nodes={performanceMode ? nodes : layerSyncedNodes}
-                                    displayEdges={visibleEdges}
+                                    nodes={isInitialDiagramLoading
+                                        ? []
+                                        : performanceMode
+                                            ? nodes
+                                            : layerSyncedNodes}
+                                    displayEdges={isInitialDiagramLoading ? [] : visibleEdges}
                                     nodeTypes={dynamicNodeTypes}
                                     edgeTypes={dynamicEdgeTypes}
                                     onInit={handleReactFlowInit}

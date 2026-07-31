@@ -612,10 +612,10 @@
 }
 
 @media (pointer: coarse), (max-width: 768px) {
-    .flowchart-quick-clone-btn {
-        width: 44px;
-        height: 44px;
-    }
+     .flowchart-quick-clone-btn {
+          width: var(--flowchart-quick-action-size, 44px);
+          height: var(--flowchart-quick-action-size, 44px);
+      }
 
     .flowchart-quick-clone-btn[data-dir="top"] {
         transform: translate(-50%, -8px) scale(1);

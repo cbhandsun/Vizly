@@ -79,13 +79,6 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
         onBeforeUpdate();
     }, [onBeforeUpdate]);
 
-    // --- 本地状态 ---
-    const [localLabel, setLocalLabel] = useState('');
-    const [localDesc, setLocalDesc] = useState('');
-    const [localDomain, setLocalDomain] = useState('');
-    const [localEdgeLabel, setLocalEdgeLabel] = useState('');
-    const [iconExplorerVisible, setIconExplorerVisible] = useState(false);
-
     const getNodeData = (node: Node) => node.data as FlowchartNodeData;
     const getCommonValue = <T, V>(items: T[], getter: (item: T) => V): V | undefined => {
         if (items.length === 0) return undefined;
@@ -103,6 +96,13 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
         domain: commonDomain ?? '',
         edgeLabel: typeof commonEdgeLabel === 'string' ? commonEdgeLabel : '',
     };
+
+    // --- 本地状态 ---
+    const [localLabel, setLocalLabel] = useState(externalFieldValues.label);
+    const [localDesc, setLocalDesc] = useState(externalFieldValues.description);
+    const [localDomain, setLocalDomain] = useState(externalFieldValues.domain);
+    const [localEdgeLabel, setLocalEdgeLabel] = useState(externalFieldValues.edgeLabel);
+    const [iconExplorerVisible, setIconExplorerVisible] = useState(false);
     const [syncedExternalFieldValues, setSyncedExternalFieldValues] = useState(externalFieldValues);
     if (
         syncedExternalFieldValues.label !== externalFieldValues.label

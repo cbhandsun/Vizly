@@ -157,11 +157,11 @@ const WorkspaceDashboardPage: React.FC = () => {
     const handleDeleteDiagram = async (e: { stopPropagation: () => void }, item: UnifiedDiagramItem) => {
         e.stopPropagation();
         modal.confirm({
-            title: 'Delete Document',
-            content: 'Are you sure you want to completely erase this document? This cannot be undone.',
-            okText: 'Delete',
+            title: t('workspace.deleteConfirmTitle'),
+            content: t('workspace.deleteConfirmDescription'),
+            okText: t('common.delete'),
             okType: 'danger',
-            cancelText: 'Cancel',
+            cancelText: t('common.cancel'),
             onOk: async () => {
                 try {
                     const result = await workspaceDiagramActions.deleteDiagram(item);
@@ -169,11 +169,11 @@ const WorkspaceDashboardPage: React.FC = () => {
                         appMessage.error('Unable to delete diagram: missing diagram id.');
                         return;
                     }
-                    appMessage.success('Deleted successfully');
+                    appMessage.success(t('workspace.deleteSuccess'));
                     loadAllData();
                 } catch (error: unknown) {
                     safeLog.error('Failed to delete workspace diagram', redactSensitiveLogValue(error));
-                    appMessage.error("Failed to delete diagram.");
+                    appMessage.error(t('workspace.deleteFailed'));
                 }
             }
         });

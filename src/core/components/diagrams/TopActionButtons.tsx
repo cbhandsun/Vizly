@@ -107,8 +107,9 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
         </>
     );
 
-    const documentMenu: MenuProps['items'] = useMemo(() => [
-        ...(onStartPresentation ? [{
+    const documentMenu: MenuProps['items'] = useMemo(() => {
+        const viewItems: NonNullable<MenuProps['items']> = [
+            ...(onStartPresentation ? [{
             key: 'presentation',
             label: t('designer.toolbar.presentationMode'),
             icon: <FaPlay />,
@@ -138,6 +139,8 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
             icon: <FaMagic />,
             onClick: onSmartOptimize,
         }] : []),
+        ];
+        const toolItems: NonNullable<MenuProps['items']> = [
         ...(onOpenSettings ? [{
             key: 'settings',
             label: t('designer.toolbar.settings', '设置'),
@@ -168,6 +171,8 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
             icon: <ApiOutlined />,
             onClick: () => setPluginManagerVisible(true),
         },
+        ];
+        const collaborationItems: NonNullable<MenuProps['items']> = [
         {
             key: 'comments',
             label: isCommentMode
@@ -184,8 +189,19 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
             icon: isReadonly ? <FaUnlock /> : <FaLock />,
             onClick: () => onReadonlyChange(!isReadonly),
         }] : []),
-        ...((extraMoreItems && extraMoreItems.length > 0) ? [{ type: 'divider' as const }, ...extraMoreItems] : [])
-    ], [
+        ];
+        const sections = [
+            viewItems,
+            toolItems,
+            collaborationItems,
+            extraMoreItems || [],
+        ].filter(section => section.length > 0);
+        return sections.flatMap((section, index) => (
+            index === 0
+                ? section
+                : [{ type: 'divider' as const, key: `document-section-${index}` }, ...section]
+        ));
+    }, [
         extraMoreItems,
         extraExportItems,
         isCommentMode,

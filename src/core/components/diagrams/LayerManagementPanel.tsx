@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { List, Button, Space, Input, Tooltip, Popconfirm, Popover } from 'antd';
+import { Button, Space, Input, Tooltip, Popconfirm, Popover } from 'antd';
 import {
     EyeOutlined,
     EyeInvisibleOutlined,
@@ -117,11 +117,11 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
             </div>
 
             <div style={{ flex: 1, overflow: 'auto' }}>
-                <List
-                    dataSource={[...layers].reverse()} // 顶部=最高zIndex
-                    renderItem={(layer) => (
-                        <List.Item
+                <div role="list" aria-label="图层列表">
+                    {[...layers].reverse().map(layer => (
+                        <div
                             key={layer.id}
+                            role="listitem"
                             style={{
                                 background: layer.id === activeLayerId ? '#e6f7ff' : '#fff',
                                 padding: '10px 12px',
@@ -174,6 +174,7 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
                                         <Button
                                             type="text"
                                             size="small"
+                                            aria-label={`${layer.visible ? '隐藏' : '显示'}图层：${layer.name}`}
                                             icon={layer.visible ? <EyeOutlined /> : <EyeInvisibleOutlined />}
                                             onClick={(e) => {
                                                 e.stopPropagation();
@@ -186,6 +187,7 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
                                         <Button
                                             type="text"
                                             size="small"
+                                            aria-label={`${layer.locked ? '解锁' : '锁定'}图层：${layer.name}`}
                                             icon={layer.locked ? <LockOutlined /> : <UnlockOutlined />}
                                             onClick={(e) => {
                                                 e.stopPropagation();
@@ -210,6 +212,7 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
                                                 <Button
                                                     type="text"
                                                     size="small"
+                                                    aria-label={`设置图层颜色：${layer.name}`}
                                                     icon={<BgColorsOutlined style={{ color: layer.color || undefined }} />}
                                                     onClick={(e) => e.stopPropagation()}
                                                 />
@@ -223,6 +226,7 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
                                                 <Button
                                                     type="text"
                                                     size="small"
+                                                    aria-label={`重命名图层：${layer.name}`}
                                                     icon={<EditOutlined />}
                                                     onClick={(e) => {
                                                         e.stopPropagation();
@@ -244,6 +248,7 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
                                                     type="text"
                                                     size="small"
                                                     danger
+                                                    aria-label={`删除图层：${layer.name}`}
                                                     icon={<DeleteOutlined />}
                                                     onClick={(e) => e.stopPropagation()}
                                                 />
@@ -252,9 +257,9 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
                                     )}
                                 </Space>
                             </div>
-                        </List.Item>
-                    )}
-                />
+                        </div>
+                    ))}
+                </div>
             </div>
         </div>
     );

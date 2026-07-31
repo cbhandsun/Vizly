@@ -18,16 +18,16 @@ interface ShortcutGroup {
     items: ShortcutItem[];
 }
 
-const SHORTCUT_GROUPS: ShortcutGroup[] = [
+const createShortcutGroups = (isMac: boolean): ShortcutGroup[] => [
     {
         title: '通用操作',
         items: [
-            { keys: ['Ctrl', 'Z'], label: '撤销' },
-            { keys: ['Ctrl', 'Shift', 'Z'], label: '重做' },
-            { keys: ['Ctrl', 'A'], label: '全选' },
-            { keys: ['Ctrl', 'C'], label: '复制' },
-            { keys: ['Ctrl', 'V'], label: '粘贴' },
-            { keys: ['Ctrl', 'X'], label: '剪切' },
+            { keys: [isMac ? '⌘' : 'Ctrl', 'Z'], label: '撤销' },
+            { keys: isMac ? ['⌘', 'Shift', 'Z'] : ['Ctrl', 'Y'], label: '重做' },
+            { keys: [isMac ? '⌘' : 'Ctrl', 'A'], label: '全选' },
+            { keys: [isMac ? '⌘' : 'Ctrl', 'C'], label: '复制' },
+            { keys: [isMac ? '⌘' : 'Ctrl', 'V'], label: '粘贴' },
+            { keys: [isMac ? '⌘' : 'Ctrl', 'X'], label: '剪切' },
             { keys: ['Esc'], label: '取消 / 退出编辑' },
         ]
     },
@@ -36,9 +36,9 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
         items: [
             { keys: ['Delete'], label: '删除选中' },
             { keys: ['Backspace'], label: '删除选中' },
-            { keys: ['Ctrl', 'D'], label: '创建副本' },
-            { keys: ['Ctrl', 'G'], label: '成组' },
-            { keys: ['Ctrl', 'Shift', 'G'], label: '取消成组' },
+            { keys: [isMac ? '⌘' : 'Ctrl', 'D'], label: '创建副本' },
+            { keys: [isMac ? '⌘' : 'Ctrl', 'G'], label: '成组' },
+            { keys: [isMac ? '⌘' : 'Ctrl', 'Shift', 'G'], label: '取消成组' },
             { keys: ['↑ ↓ ← →'], label: '移动节点 (1px)' },
             { keys: ['Shift', '↑ ↓ ← →'], label: '移动节点 (10px)' },
         ]
@@ -46,10 +46,10 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
     {
         title: '视图操作',
         items: [
-            { keys: ['Ctrl', '+'], label: '放大' },
-            { keys: ['Ctrl', '-'], label: '缩小' },
-            { keys: ['Ctrl', '0'], label: '适应屏幕' },
-            { keys: ['Ctrl', '1'], label: '实际大小' },
+            { keys: [isMac ? '⌘' : 'Ctrl', '+'], label: '放大' },
+            { keys: [isMac ? '⌘' : 'Ctrl', '-'], label: '缩小' },
+            { keys: [isMac ? '⌘' : 'Ctrl', '0'], label: '适应屏幕' },
+            { keys: [isMac ? '⌘' : 'Ctrl', '1'], label: '实际大小' },
             { keys: ['滚轮'], label: '缩放画布' },
         ]
     },
@@ -87,6 +87,9 @@ const KeyBadge: React.FC<{ children: string; token: ThemeToken }> = ({ children,
 
 export const KeyboardShortcutPanel: React.FC<KeyboardShortcutPanelProps> = ({ visible, onClose }) => {
     const { token } = theme.useToken();
+    const shortcutGroups = createShortcutGroups(
+        typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform),
+    );
 
     return (
         <Modal
@@ -100,8 +103,8 @@ export const KeyboardShortcutPanel: React.FC<KeyboardShortcutPanelProps> = ({ vi
                 body: { maxHeight: '60vh', overflowY: 'auto', padding: '12px 0' },
             }}
         >
-            {SHORTCUT_GROUPS.map((group, gi) => (
-                <div key={gi} style={{ marginBottom: gi < SHORTCUT_GROUPS.length - 1 ? 16 : 0 }}>
+            {shortcutGroups.map((group, gi) => (
+                <div key={gi} style={{ marginBottom: gi < shortcutGroups.length - 1 ? 16 : 0 }}>
                     <div style={{
                         fontSize: 12,
                         fontWeight: 700,

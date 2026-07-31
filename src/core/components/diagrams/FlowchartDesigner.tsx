@@ -19,7 +19,11 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = (props) => {
 
     return (
         <EdgeUpdateProvider callbacks={edgeCallbacks}>
-            <NodeUpdateProvider updateNodesBatch={updateNodesBatch} businessData={businessData}>
+            <NodeUpdateProvider
+                updateNodesBatch={updateNodesBatch}
+                beforeStructuralChange={viewModel.handleBeforeUpdate}
+                businessData={businessData}
+            >
                 <FlowchartDesignerView model={viewModel} />
             </NodeUpdateProvider>
         </EdgeUpdateProvider>

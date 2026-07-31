@@ -111,6 +111,18 @@ describe('shouldExpandDesignerRightSidebar', () => {
             previousAiChatVisible: false,
         })).toBe(false);
     });
+
+    it('respects a manual collapse while the current selection continues', () => {
+        expect(shouldExpandDesignerRightSidebar({
+            isCollapsed: true,
+            hasSelection: true,
+            previousHasSelection: true,
+            isMobile: false,
+            activeTab: 'property',
+            aiChatVisible: false,
+            previousAiChatVisible: false,
+        })).toBe(false);
+    });
 });
 
 describe('shouldActivateDesignerPropertyTab', () => {

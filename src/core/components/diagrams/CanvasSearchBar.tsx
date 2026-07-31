@@ -212,6 +212,7 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
                         value={query}
                         onChange={e => handleQueryChange(e.target.value)}
                         onKeyDown={handleKeyDown}
+                        aria-label="搜索画布节点"
                         placeholder="搜索节点..."
                         style={{
                             border: 'none', outline: 'none', background: 'transparent',
@@ -230,15 +231,16 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
                         </span>
                     )}
                     {/* 上下导航 */}
-                    <button onClick={goPrev} disabled={matchIds.length === 0} style={navBtnStyle(matchIds.length > 0, token)}>
+                    <button aria-label="上一个搜索结果" onClick={goPrev} disabled={matchIds.length === 0} style={navBtnStyle(matchIds.length > 0, token)}>
                         <FaChevronUp size={11} />
                     </button>
-                    <button onClick={goNext} disabled={matchIds.length === 0} style={navBtnStyle(matchIds.length > 0, token)}>
+                    <button aria-label="下一个搜索结果" onClick={goNext} disabled={matchIds.length === 0} style={navBtnStyle(matchIds.length > 0, token)}>
                         <FaChevronDown size={11} />
                     </button>
                     {/* 切换替换模式 */}
                     {hasReplaceFns && (
                         <button
+                            aria-label={showReplace ? '关闭替换' : '打开查找替换'}
                             onClick={() => setShowReplace(v => !v)}
                             title="查找替换 (Ctrl+H)"
                             style={{

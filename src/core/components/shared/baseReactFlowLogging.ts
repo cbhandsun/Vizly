@@ -13,6 +13,10 @@ export const logBaseReactFlowEventBindingFailure = (action: string, error: unkno
   safeLog.warn(`[BaseReactFlow] ${action} failed:`, redactSensitiveLogValue(error));
 };
 
+export const logBaseReactFlowQualityFallback = (reason: string): void => {
+  safeLog.debug('[BaseReactFlow] Display routing kept the stable fallback:', reason);
+};
+
 export const logBaseReactFlowOverlayFlagReadFailure = (key: string, error: unknown): void => {
   safeLog.warn(`[BaseReactFlow] Failed to read overlay flag "${key}":`, redactSensitiveLogValue(error));
 };

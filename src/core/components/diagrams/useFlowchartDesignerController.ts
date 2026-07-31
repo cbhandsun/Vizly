@@ -153,7 +153,7 @@ export const useFlowchartDesignerController = ({
         selectedEdges,
         setSelectedNodes,
         setSelectedEdges,
-    } = useDiagramScopedSelection(id);
+    } = useDiagramScopedSelection(id, nodes, edges);
     const [isContextToolbarHidden] = useState(false);
     const handleBeforeUpdate = useCallback(() => {
         takeSnapshot(nodesRef.current, edgesRef.current);

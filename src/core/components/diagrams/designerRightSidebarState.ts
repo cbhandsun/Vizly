@@ -1,6 +1,7 @@
 export const shouldExpandDesignerRightSidebar = ({
     isCollapsed,
     hasSelection,
+    previousHasSelection = false,
     isMobile,
     activeTab,
     aiChatVisible,
@@ -8,6 +9,7 @@ export const shouldExpandDesignerRightSidebar = ({
 }: {
     isCollapsed: boolean;
     hasSelection: boolean;
+    previousHasSelection?: boolean;
     isMobile: boolean;
     activeTab: 'property' | 'ai';
     aiChatVisible: boolean;
@@ -15,7 +17,7 @@ export const shouldExpandDesignerRightSidebar = ({
 }): boolean => (
     isCollapsed
     && (
-        (hasSelection && !isMobile)
+        (hasSelection && !previousHasSelection && !isMobile)
         || (activeTab === 'ai' && aiChatVisible && !previousAiChatVisible)
     )
 );

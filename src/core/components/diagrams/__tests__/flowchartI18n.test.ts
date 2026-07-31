@@ -68,6 +68,10 @@ describe('flowchart interaction copy', () => {
             expect(read(zh, ['designer', 'flowchart', 'quickCloneLabels', key])).toBeTypeOf('string');
             expect(read(en, ['designer', 'flowchart', 'quickCloneLabels', key])).toBeTypeOf('string');
         }
+        for (const key of ['deleteConfirmTitle', 'deleteConfirmDescription', 'deleteSuccess', 'deleteFailed']) {
+            expect(read(zh, ['workspace', key])).toBeTypeOf('string');
+            expect(read(en, ['workspace', key])).toBeTypeOf('string');
+        }
     });
 
     it('resolves safe localized defaults for quick-cloned shapes', () => {
