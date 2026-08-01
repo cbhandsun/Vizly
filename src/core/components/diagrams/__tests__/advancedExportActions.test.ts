@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ReactFlowRenderSnapshot } from '../../../rendering/reactFlowScene';
 
 const exportRenderSceneToPngDataUrl = vi.fn(async () => 'data:image/png;base64,aGVsbG8=');
 const exportRenderSceneToSvgDataUrl = vi.fn(() => 'data:image/svg+xml;charset=utf-8,%3Csvg%3E%3C%2Fsvg%3E');
@@ -44,7 +45,7 @@ describe('runAdvancedExport', () => {
       pixelRatio: 2,
       includeBackground: true,
       embedMetadata: false,
-      getReactFlowSnapshot: () => snapshot as any,
+      getReactFlowSnapshot: () => snapshot as unknown as ReactFlowRenderSnapshot,
     });
 
     expect(result).toBe('scene');
@@ -56,6 +57,52 @@ describe('runAdvancedExport', () => {
     expect(downloadImage).not.toHaveBeenCalled();
   });
 
+  it('uses the visible diagram title for scene metadata and the download filename', async () => {
+    const { runAdvancedExport } = await import('../advancedExportActions');
+    await runAdvancedExport({
+      diagramId: 'diagram-1',
+      diagramTitle: '  客户入驻流程  ',
+      nodes: [],
+      format: 'png',
+      pixelRatio: 2,
+      includeBackground: true,
+      embedMetadata: false,
+      getReactFlowSnapshot: () => snapshot as unknown as ReactFlowRenderSnapshot,
+    });
+
+    expect(exportRenderSceneToPngDataUrl).toHaveBeenCalledWith(
+      expect.any(Object),
+      { title: '客户入驻流程', pixelRatio: 2 },
+    );
+    expect(triggerDownload).toHaveBeenCalledWith(
+      'data:image/png;base64,aGVsbG8=',
+      '客户入驻流程.png',
+    );
+  });
+
+  it('falls back to the diagram id when the visible title is empty', async () => {
+    const { runAdvancedExport } = await import('../advancedExportActions');
+    await runAdvancedExport({
+      diagramId: ' diagram-2 ',
+      diagramTitle: '   ',
+      nodes: [],
+      format: 'svg',
+      pixelRatio: 1,
+      includeBackground: true,
+      embedMetadata: true,
+      getReactFlowSnapshot: () => snapshot as unknown as ReactFlowRenderSnapshot,
+    });
+
+    expect(exportRenderSceneToSvgDataUrl).toHaveBeenCalledWith(
+      expect.any(Object),
+      { title: 'diagram-2' },
+    );
+    expect(triggerDownload).toHaveBeenCalledWith(
+      'data:image/svg+xml;charset=utf-8,%3Csvg%3E%3C%2Fsvg%3E',
+      'diagram-2.svg',
+    );
+  });
+
   it('uses scene-based SVG export when a snapshot is available', async () => {
     const { runAdvancedExport } = await import('../advancedExportActions');
     const result = await runAdvancedExport({
@@ -65,7 +112,7 @@ describe('runAdvancedExport', () => {
       pixelRatio: 1,
       includeBackground: true,
       embedMetadata: true,
-      getReactFlowSnapshot: () => snapshot as any,
+      getReactFlowSnapshot: () => snapshot as unknown as ReactFlowRenderSnapshot,
     });
 
     expect(result).toBe('scene');
@@ -85,7 +132,7 @@ describe('runAdvancedExport', () => {
       pixelRatio: 3,
       includeBackground: false,
       embedMetadata: true,
-      getReactFlowSnapshot: () => snapshot as any,
+      getReactFlowSnapshot: () => snapshot as unknown as ReactFlowRenderSnapshot,
     });
     const pngFallbackResult = await runAdvancedExport({
       diagramId: 'diagram-4',

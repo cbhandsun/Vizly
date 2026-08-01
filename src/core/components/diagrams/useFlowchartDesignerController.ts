@@ -56,6 +56,7 @@ import { useMobileFlowchartViewportGuard, useScheduledFlowchartFit } from './hoo
 
 export const useFlowchartDesignerController = ({
     id,
+    title,
     businessData,
     extraExportItems,
     onExportPermissionCheck,
@@ -687,7 +688,7 @@ export const useFlowchartDesignerController = ({
         setPluginManagerVisible, setPresentationActive, setPresentationSlides, setQuickConnectPreview, setRightSidebarWidth, setShortcutHelpVisible,
         setShowMinimap, setShowRuler, setShowShortcuts, setShowShortcutsModal, setSnapEnabled, shortcutHelpVisible, showAiCrown, showGrid, showMinimap,
         showOnlyMainFlow, showOverlay, showPerformanceDashboard, showRuler, showShortcuts, snapEnabled, t, takeSnapshot, templates, theme, toggleLock,
-        toggleResolved, toggleVisibility, topActionArea, undo, updateAnnotation, updateEdgesBatch, updateNodesBatch, viewport, visibleEdges,
+        title, toggleResolved, toggleVisibility, topActionArea, undo, updateAnnotation, updateEdgesBatch, updateNodesBatch, viewport, visibleEdges,
         wrappedOnNodeDragStart, yAwareness,
     };
 

@@ -321,6 +321,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
 
                         {showEditingChrome && <DesignerHeaderLayer
                             diagramId={diagramIdForExport}
+                            diagramTitle={model.title}
                             topActions={{
                                 onEditJson: handleOpenJsonEditor,
                                 onStartPresentation: () => {

@@ -27,6 +27,7 @@ interface AdvancedExportModalProps {
   visible: boolean;
   onClose: () => void;
   diagramId?: string;
+  diagramTitle?: string;
   getReactFlowSnapshot?: () => ReactFlowRenderSnapshot | null | undefined;
 }
 
@@ -168,7 +169,7 @@ export const SvgExportPreview: React.FC<{
  * 高级导出模态框 (Phase 10)
  * 提供清晰度选择、背景控制、元数据注入及一键拷贝功能
  */
-export const AdvancedExportModal: React.FC<AdvancedExportModalProps> = ({ visible, onClose, diagramId, getReactFlowSnapshot }) => {
+export const AdvancedExportModal: React.FC<AdvancedExportModalProps> = ({ visible, onClose, diagramId, diagramTitle, getReactFlowSnapshot }) => {
   const { t } = useTranslation();
   const [format, setFormat] = useState<ExportOptions['format']>('png');
   const [pixelRatio, setPixelRatio] = useState<number>(2);
@@ -182,6 +183,7 @@ export const AdvancedExportModal: React.FC<AdvancedExportModalProps> = ({ visibl
       const currentNodes = useDiagramStore.getState().nodes;
       await runAdvancedExport({
         diagramId,
+        diagramTitle,
         nodes: currentNodes,
         format,
         pixelRatio,

@@ -26,6 +26,7 @@ const PluginManagerModal = React.lazy(() => import('./ui/PluginManagerModal').th
 
 interface TopActionButtonsProps {
     diagramId?: string;
+    diagramTitle?: string;
     onEditJson?: () => void;
     onStartPresentation?: () => void;
     onShowDiff?: () => void;
@@ -61,7 +62,7 @@ interface TopActionButtonsProps {
 }
 
 export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
-    diagramId, onEditJson,
+    diagramId, diagramTitle, onEditJson,
     onStartPresentation, onShowDiff,
     onSaveToCloud, onDirectSave, isDirectSaveDisabled, extraActionItems, onShare, onShowHistory, onOpenVersionHistory,
     rightOffset = 0,
@@ -126,6 +127,7 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
                         visible
                         onClose={() => setExportModalVisible(false)}
                         diagramId={diagramId}
+                        diagramTitle={diagramTitle}
                         getReactFlowSnapshot={getReactFlowSnapshot}
                     />
                 </React.Suspense>

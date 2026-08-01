@@ -12,6 +12,7 @@ import { downloadImage, type ExportOptions } from '../../utils/imageExporter';
 
 export interface RunAdvancedExportOptions {
   diagramId?: string;
+  diagramTitle?: string;
   nodes: Parameters<typeof downloadImage>[0];
   format: ExportOptions['format'];
   pixelRatio: number;
@@ -26,6 +27,7 @@ const canUseSceneExport = (format: ExportOptions['format']): format is 'png' | '
 
 export const runAdvancedExport = async ({
   diagramId,
+  diagramTitle,
   nodes,
   format,
   pixelRatio,
@@ -36,7 +38,7 @@ export const runAdvancedExport = async ({
   const snapshot = canUseSceneExport(format) ? getReactFlowSnapshot?.() : null;
   if (snapshot) {
     const scene = buildRenderSceneFromReactFlowSnapshot(snapshot, { padding: 40 });
-    const title = diagramId || 'advanced-export';
+    const title = diagramTitle?.trim() || diagramId?.trim() || 'advanced-export';
     const dataUrl = format === 'png'
       ? await exportRenderSceneToPngDataUrl(scene, { title, pixelRatio })
       : exportRenderSceneToSvgDataUrl(scene, { title });

@@ -14,6 +14,7 @@ type ToolbarProps = React.ComponentProps<typeof ModernFlowchartToolbar>;
 
 export interface DesignerHeaderLayerProps {
     diagramId?: string;
+    diagramTitle?: string;
     
     topActions: {
         onEditJson: () => void;
@@ -109,6 +110,7 @@ export interface DesignerHeaderLayerProps {
 export const DesignerHeaderLayer = React.memo(
     ({
         diagramId: _diagramId = 'flowchart-designer',
+        diagramTitle,
         topActions,
         toolbar
     }: DesignerHeaderLayerProps) => {
@@ -118,6 +120,7 @@ export const DesignerHeaderLayer = React.memo(
             <>
                 <TopActionButtons
                     diagramId={_diagramId}
+                    diagramTitle={diagramTitle}
                     onEditJson={topActions.onEditJson}
                     onStartPresentation={topActions.onStartPresentation}
                     onShowDiff={topActions.onShowDiff}
@@ -245,6 +248,7 @@ export const DesignerHeaderLayer = React.memo(
         // 只有当核心可变数据（节点数/连线数/缩放比例/锁定状态/UI模式）发生真正变化时才重绘
         return (
             prevProps.toolbar.nodeCount === nextProps.toolbar.nodeCount &&
+            prevProps.diagramTitle === nextProps.diagramTitle &&
             prevProps.toolbar.edgeCount === nextProps.toolbar.edgeCount &&
             prevProps.toolbar.selectedNodesCount === nextProps.toolbar.selectedNodesCount &&
             prevProps.toolbar.selectedEdgesCount === nextProps.toolbar.selectedEdgesCount &&

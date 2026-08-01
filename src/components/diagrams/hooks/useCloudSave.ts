@@ -5,9 +5,16 @@ import type { StandardDiagramData } from '@/core/models/DiagramModels';
 import { appMessage } from '@/core/utils/antdStaticBridge';
 import { getFlowDataBridge } from '@/core/utils/flowDataBridge';
 import { coerceToStandardDiagramData } from '@/core/utils/coerceDiagram';
-import { logCloudSaveEnsureFailure, logCloudSaveFailure } from './diagramStorageLogging';
+import { logCloudSaveFailure } from './diagramStorageLogging';
 
 const loadUnifiedStorage = async () => (await import('@/services/UnifiedStorageService')).unifiedStorage;
+
+class CloudSaveBoundaryError extends Error {
+    constructor(readonly userMessage: string) {
+        super(userMessage);
+        this.name = 'CloudSaveBoundaryError';
+    }
+}
 
 /**
  * 轻量云保存 Hook — 读取 __flowDataBridge 数据并上传到活动云提供商
@@ -16,21 +23,20 @@ export function useCloudSave(diagramId: string, diagramName?: string) {
     const [shareDialogOpen, setShareDialogOpen] = useState(false);
 
     const saveToCloud = useCallback(async () => {
-        const unifiedStorage = await loadUnifiedStorage();
-
-        if (!unifiedStorage.isConfigured()) {
-            appMessage.error('云存储未配置，请先在设置中配置');
-            return;
-        }
-
-        const hide = appMessage.loading('正在保存到云端...', 0);
+        let hideLoading: (() => void) | undefined;
         try {
+            const unifiedStorage = await loadUnifiedStorage();
+            if (!unifiedStorage.isConfigured()) {
+                throw new CloudSaveBoundaryError('云存储未配置，请先在设置中配置');
+            }
+
             // 从桥接数据中读取（FlowchartDesigner 的 useEffect 会持续更新此数据）
             const bridge = getFlowDataBridge(diagramId);
             if (!bridge || !bridge.nodes || bridge.nodes.length === 0) {
-                appMessage.error('未找到图表数据');
-                return;
+                throw new CloudSaveBoundaryError('未找到图表数据');
             }
+
+            hideLoading = appMessage.loading('正在保存到云端...', 0);
 
             const bridgeCloud = bridge.metadata?.cloud;
             const cloudProvider = bridgeCloud?.provider;
@@ -68,8 +74,8 @@ export function useCloudSave(diagramId: string, diagramName?: string) {
             const finalTitle = diagramName || diagram.metadata?.title || diagram.name;
 
             await provider.saveDiagram({
-                id: finalId!,
-                title: finalTitle!,
+                id: finalId,
+                title: finalTitle,
                 content: { ...snap.diagram, id: finalId, name: finalTitle },
                 updated_at: new Date().toISOString(),
                 user_id: 'anonymous',
@@ -87,10 +93,15 @@ export function useCloudSave(diagramId: string, diagramName?: string) {
 
             appMessage.success('已保存到云端');
         } catch (error) {
-            logCloudSaveFailure('useCloudSave', error);
-            appMessage.error('保存到云端失败');
+            if (error instanceof CloudSaveBoundaryError) {
+                appMessage.error(error.userMessage);
+            } else {
+                logCloudSaveFailure('useCloudSave', error);
+                appMessage.error('保存到云端失败');
+            }
+            throw error;
         } finally {
-            hide();
+            hideLoading?.();
         }
     }, [diagramId, diagramName]);
 
@@ -108,8 +119,7 @@ export function useCloudSave(diagramId: string, diagramName?: string) {
             await saveToCloud();
             const bridge = getFlowDataBridge(diagramId);
             return bridge?.metadata?.cloud?.id || false;
-        } catch (error) {
-            logCloudSaveEnsureFailure(diagramId, error);
+        } catch {
             return false;
         }
     }, [saveToCloud, diagramId]);

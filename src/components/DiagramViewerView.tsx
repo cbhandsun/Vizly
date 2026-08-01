@@ -253,6 +253,7 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
                                             <SelectedDiagramComponent
                                                 key={`${selectedDiagramId}-${refreshNonce}`}
                                                 id={selectedDiagramId}
+                                                title={diagramTitle}
                                                 edgeMode={edgeMode}
                                                 layoutStrategy={layoutStrategy}
                                                 nodeLayoutStrategy={nodeLayoutStrategy}
