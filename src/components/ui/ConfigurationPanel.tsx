@@ -18,6 +18,10 @@ import { useModalFocusTrap } from '@/hooks/useModalFocusTrap';
 import { safeLog } from '@/core/utils/consoleCleanup';
 import { createConfigurationItemsByCategory } from './configurationPanelCatalog';
 import {
+  stageConfigurationPreset,
+  type ConfigurationPresetId,
+} from './configurationPanelPresets';
+import {
   coerceConfigValue,
   type ConfigItem,
   type ConfigTab,
@@ -48,12 +52,17 @@ export const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({
   const [changedKeys, setChangedKeys] = useState<Set<string>>(new Set());
   const [isAdvancedMode, setIsAdvancedMode] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<ConfigTab>('basic');
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const titleId = useId();
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const saveInFlightRef = useRef(false);
+  const isSaving = saveStatus === 'saving';
   const handleCancel = useCallback(() => {
+    if (saveInFlightRef.current) return;
     setEditingValues({});
     setHasChanges(false);
     setChangedKeys(new Set());
+    setSaveStatus('idle');
     onClose();
   }, [onClose]);
   const { containerRef: dialogRef, handleKeyDown: handleDialogKeyDown } = useModalFocusTrap<HTMLDivElement>({
@@ -100,6 +109,7 @@ useEffect(() => {
     setEditingValues(currentValues);
     setHasChanges(false);
     setChangedKeys(new Set());
+    setSaveStatus('idle');
   };
 
   loadCurrentValues();
@@ -167,14 +177,19 @@ const handleValueChange = useCallback((key: string, value: unknown) => {
 
   setHasChanges(true);
   setChangedKeys(prev => new Set(prev).add(key));
+  setSaveStatus('idle');
 }, [configItems]);
 
 // 保存所有更改
 const handleSaveChanges = useCallback(async () => {
-  if (!state.isReady || !state.integration) return;
+  if (!state.isReady || !state.integration || saveInFlightRef.current || changedKeys.size === 0) return;
 
+  saveInFlightRef.current = true;
+  setSaveStatus('saving');
   try {
-    for (const item of configItems) {
+    for (const key of changedKeys) {
+      const item = configItems.find(candidate => candidate.key === key);
+      if (!item) continue;
       const value = editingValues[item.key] ?? item.value;
       await actions.setConfig(item.key, coerceConfigValue(item, value));
     }
@@ -187,8 +202,12 @@ const handleSaveChanges = useCallback(async () => {
     }
     setHasChanges(false);
     setChangedKeys(new Set());
+    setSaveStatus('success');
   } catch (error) {
     logConfigurationPanelSaveFailure(error);
+    setSaveStatus('error');
+  } finally {
+    saveInFlightRef.current = false;
   }
 }, [actions, changedKeys, configItems, editingValues, requestLayoutApply, state.integration, state.isReady]);
 
@@ -201,7 +220,20 @@ const handleResetChanges = useCallback(() => {
   setEditingValues(resetValues);
   setHasChanges(true);
   setChangedKeys(new Set(configItems.map(item => item.key)));
+  setSaveStatus('idle');
 }, [configItems]);
+
+const handleStagePreset = useCallback((presetId: ConfigurationPresetId) => {
+  const staged = stageConfigurationPreset(editingValues, presetId);
+  setEditingValues(staged.values);
+  setHasChanges(true);
+  setChangedKeys(previous => {
+    const next = new Set(previous);
+    staged.changedKeys.forEach(key => next.add(key));
+    return next;
+  });
+  setSaveStatus('idle');
+}, [editingValues]);
 
 // 渲染配置项编辑器
 const renderConfigEditor = (item: ConfigItem, hasDescription: boolean) => {
@@ -234,6 +266,7 @@ const renderConfigEditor = (item: ConfigItem, hasDescription: boolean) => {
           max={item.max}
           step={item.step}
           onChange={(e) => handleValueChange(item.key, e.target.value)}
+          disabled={isSaving}
           aria-labelledby={labelId}
           aria-describedby={hasDescription ? descriptionId : undefined}
           className="w-full sm:w-24 min-h-[44px] px-3 py-1.5 text-[13px] font-medium text-center transition-all bg-black/[0.04] dark:bg-white/10 border border-black/5 dark:border-white/5 rounded-[6px] text-gray-800 dark:text-gray-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.15] hover:border-black/10 dark:hover:border-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:bg-white dark:focus:bg-black/50 focus:border-indigo-500"
@@ -252,6 +285,7 @@ const renderConfigEditor = (item: ConfigItem, hasDescription: boolean) => {
             aria-describedby={hasDescription ? descriptionId : undefined}
             checked={Boolean(currentValue)}
             onChange={(e) => handleValueChange(item.key, e.target.checked)}
+            disabled={isSaving}
             className="sr-only peer"
           />
           <div className="w-[36px] h-[20px] bg-black/10 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-500/50 rounded-full peer dark:bg-white/10 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-200/50 after:border after:rounded-full after:h-[16px] after:w-[16px] after:transition-all after:shadow-sm dark:border-gray-600 peer-checked:bg-indigo-500 group-hover:bg-black/15 dark:group-hover:bg-white/15 peer-checked:group-hover:bg-indigo-600 transition-colors"></div>
@@ -269,7 +303,7 @@ const renderConfigEditor = (item: ConfigItem, hasDescription: boolean) => {
             aria-describedby={hasDescription ? descriptionId : undefined}
             className="w-full sm:w-48 min-h-[44px] px-3 py-1.5 text-[13px] font-medium transition-all bg-black/[0.04] dark:bg-white/10 border border-black/5 dark:border-white/5 rounded-[6px] text-gray-800 dark:text-gray-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.15] hover:border-black/10 dark:hover:border-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:bg-white dark:focus:bg-black/50 focus:border-indigo-500 cursor-pointer disabled:opacity-50 appearance-none"
             style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'%236b7280\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M19 9l-7 7-7-7\'%3E%3C/path%3E%3C/svg%3E")', backgroundPosition: 'right 0.5rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1em' }}
-            disabled={nodeLayoutDisabled}
+            disabled={nodeLayoutDisabled || isSaving}
             title={t(`config.${item.key}.label`)}
           >
             {item.options?.map(option => (
@@ -294,6 +328,7 @@ const renderConfigEditor = (item: ConfigItem, hasDescription: boolean) => {
           type="text"
           value={stringValue}
           onChange={(e) => handleValueChange(item.key, e.target.value)}
+          disabled={isSaving}
           aria-labelledby={labelId}
           aria-describedby={hasDescription ? descriptionId : undefined}
           className="w-full sm:w-64 min-h-[44px] px-3 py-1.5 text-[13px] font-medium transition-all bg-black/[0.04] dark:bg-white/10 border border-black/5 dark:border-white/5 rounded-[6px] text-gray-800 dark:text-gray-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.15] hover:border-black/10 dark:hover:border-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:bg-white dark:focus:bg-black/50 focus:border-indigo-500"
@@ -399,10 +434,6 @@ const renderTabContent = () => {
   );
 };
 
-if (!isOpen) {
-  return null;
-}
-
 // 如果模态框未打开，不渲染任何内容
 if (!isOpen) {
   return null;
@@ -440,6 +471,24 @@ const visibleTabs: Array<{ id: ConfigTab; label: string }> = isAdvancedMode ? [
 ] : [
   { id: 'basic', label: t('config.tabs.basic') },
 ];
+const handleTabKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
+  const horizontalDelta = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+  const verticalDelta = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0;
+  let nextIndex: number;
+  if (event.key === 'Home') nextIndex = 0;
+  else if (event.key === 'End') nextIndex = visibleTabs.length - 1;
+  else if (horizontalDelta || verticalDelta) {
+    nextIndex = (index + horizontalDelta + verticalDelta + visibleTabs.length) % visibleTabs.length;
+  } else {
+    return;
+  }
+  event.preventDefault();
+  const nextTab = visibleTabs[nextIndex];
+  setActiveTab(nextTab.id);
+  dialogRef.current
+    ?.querySelector<HTMLButtonElement>(`[data-configuration-tab="${nextTab.id}"]`)
+    ?.focus();
+};
 
 // 修复（函数级注释）：确保配置面板在全屏下可见，portal 挂载到全屏元素
 return createPortal(
@@ -461,7 +510,7 @@ return createPortal(
          onClick={(e) => e.stopPropagation()}>
       
       {/* 左侧导航栏 Sidebar */}
-      <div className="w-full sm:w-[240px] max-h-[190px] sm:max-h-none flex-none flex flex-col border-b sm:border-b-0 sm:border-r border-black/10 dark:border-white/10" style={{ backgroundColor: 'rgba(0, 0, 0, 0.03)' }}>
+      <div data-testid="configuration-panel-sidebar" className="w-full sm:w-[240px] flex-none flex flex-col border-b sm:border-b-0 sm:border-r border-black/10 dark:border-white/10" style={{ backgroundColor: 'rgba(0, 0, 0, 0.03)' }}>
         <div className="border-b border-transparent" style={{ padding: 'var(--glass-padding-md)' }}>
           <h2 id={titleId} className="text-[15px] font-semibold tracking-tight text-gray-900 dark:text-gray-100 flex items-center gap-2">
             <div className="p-1.5 bg-indigo-500/10 rounded-md">
@@ -471,14 +520,19 @@ return createPortal(
           </h2>
         </div>
         
-        <div role="tablist" aria-label={t('config.title')} className="flex sm:flex-col flex-none sm:flex-1 overflow-x-auto sm:overflow-x-hidden sm:overflow-y-auto gap-1 scrollbar-none" style={{ padding: 'var(--glass-padding-sm)' }}>
-          {visibleTabs.map(tab => (
+        <div role="tablist" aria-label={t('config.title')} aria-orientation="horizontal" className="flex sm:flex-col flex-none sm:flex-1 overflow-x-auto sm:overflow-x-hidden sm:overflow-y-auto gap-1 scrollbar-thin scrollbar-thumb-black/10 dark:scrollbar-thumb-white/10" style={{ padding: 'var(--glass-padding-sm)' }}>
+          {visibleTabs.map((tab, index) => (
             <button
               key={tab.id}
               type="button"
               role="tab"
+              id={`configuration-tab-${tab.id}`}
+              data-configuration-tab={tab.id}
+              aria-controls="configuration-tabpanel"
               aria-selected={activeTab === tab.id}
+              tabIndex={activeTab === tab.id ? 0 : -1}
               onClick={() => setActiveTab(tab.id)}
+              onKeyDown={(event) => handleTabKeyDown(event, index)}
               className={`w-auto sm:w-full min-h-[44px] flex-none flex items-center px-3.5 py-2.5 text-[13px] whitespace-nowrap rounded-[6px] transition-colors ${activeTab === tab.id ? activeTabClass : inactiveTabClass}`}
             >
               {tab.label}
@@ -488,27 +542,28 @@ return createPortal(
 
         {/* 高级模式切换 */}
         <div className="border-t border-black/5 dark:border-white/5 bg-gray-50/50 dark:bg-black/20" style={{ padding: 'var(--glass-padding-md)' }}>
-          <label className="flex items-center justify-between cursor-pointer group">
+          <div className="flex min-h-[44px] items-center justify-between group">
             <span className="text-[13px] font-medium text-gray-700 dark:text-gray-300 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
               {t('config.groups.expertMode', 'Expert Mode')}
             </span>
-            <div className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-600/50 focus:ring-offset-1 ${isAdvancedMode ? 'bg-[#111111] dark:bg-white' : 'bg-gray-300 dark:bg-gray-600'}`}>
-              <span className="sr-only">Use advanced mode</span>
-              <input
-                type="checkbox"
+            <button
+                type="button"
                 role="switch"
                 aria-label={t('config.groups.expertMode', 'Expert Mode')}
-                className="sr-only"
-                checked={isAdvancedMode}
-                onChange={(e) => {
-                  const advanced = e.target.checked;
+                aria-checked={isAdvancedMode}
+                className={`relative inline-flex min-h-[44px] min-w-[44px] shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-600/50 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed`}
+                disabled={isSaving}
+                onClick={() => {
+                  const advanced = !isAdvancedMode;
                   setIsAdvancedMode(advanced);
                   setActiveTab(advanced ? 'nodes' : 'basic');
                 }}
-              />
-              <span className={`pointer-events-none absolute left-[2px] top-[2px] inline-block h-4 w-4 transform rounded-full shadow ring-0 transition duration-200 ease-in-out ${isAdvancedMode ? 'translate-x-4 bg-white dark:bg-black' : 'translate-x-0 bg-white dark:bg-gray-200'}`} />
-            </div>
-          </label>
+              >
+              <span className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${isAdvancedMode ? 'bg-[#111111] dark:bg-white' : 'bg-gray-300 dark:bg-gray-600'}`}>
+                <span className={`pointer-events-none absolute left-[2px] top-[2px] inline-block h-4 w-4 transform rounded-full shadow ring-0 transition duration-200 ease-in-out ${isAdvancedMode ? 'translate-x-4 bg-white dark:bg-black' : 'translate-x-0 bg-white dark:bg-gray-200'}`} />
+              </span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -519,67 +574,31 @@ return createPortal(
             <h1 className="text-lg font-semibold text-gray-900 dark:text-white tracking-tight leading-none">
               {t(`config.tabs.${activeTab}`)}
             </h1>
-            <button ref={closeButtonRef} type="button" onClick={handleCancel} aria-label={t('config.actions.close')} className="-mr-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md text-gray-400 hover:text-gray-800 hover:bg-black/5 dark:hover:text-gray-100 dark:hover:bg-white/10 transition-colors" title={t('config.actions.close')}>
+            <button ref={closeButtonRef} type="button" onClick={handleCancel} disabled={isSaving} aria-label={t('config.actions.close')} className="-mr-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md text-gray-400 hover:text-gray-800 hover:bg-black/5 dark:hover:text-gray-100 dark:hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" title={t('config.actions.close')}>
               <FaTimes className="w-4 h-4" />
             </button>
           </div>
 
           {/* 滚动内容区 */}
           <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-black/10 dark:scrollbar-thumb-white/10" style={{ padding: '0 var(--glass-padding-lg) var(--glass-padding-lg)' }}>
-            <div className="w-full max-w-2xl mx-auto pb-8">
+            <div id="configuration-tabpanel" role="tabpanel" aria-labelledby={`configuration-tab-${activeTab}`} tabIndex={0} className="w-full max-w-2xl mx-auto pb-8">
               {renderTabContent()}
             {activeTab === 'layout' && (
               <div className="mt-8 flex flex-col sm:flex-row gap-3">
                 <button
-                className={`flex items-center justify-center gap-2 px-4 py-2 text-[13px] font-medium transition-colors rounded-lg flex-1 sm:flex-none ${actionBtnSecondary}`}
-                onClick={async () => {
-                  const preset: ConfigValues = {
-                    'diagram.layout.ELK_NODE_SPACING': 36,
-                    'diagram.layout.ELK_LAYER_SPACING': 64,
-                    'diagram.layout.ELK_EDGE_ROUTING': 'ORTHOGONAL',
-                    'diagram.layout.ELK_NODE_PLACEMENT': 'BRANDES_KOEPF',
-                    'diagram.layout.ELK_LAYERING': 'LONGEST_PATH',
-                    'diagram.layout.ELK_FIXED_ALIGNMENT': 'BALANCED',
-                    'diagram.layout.ELK_CONSIDER_MODEL_ORDER': true,
-                    'diagram.layout.ELK_MERGE_EDGES': false,
-                    'diagram.layout.ELK_CYCLE_BREAKING': 'GREEDY',
-                    'diagram.layout.ELK_PORT_BORDER_OFFSET': 4,
-                    'diagram.layout.ELK_LABEL_SPACING': 6,
-                  };
-                  const next = { ...editingValues };
-                  for (const [k, v] of Object.entries(preset)) {
-                    next[k] = v; await actions.setConfig(k, v);
-                  }
-                  setEditingValues(next);
-                  setHasChanges(false);
-                }}
+                type="button"
+                className={`min-h-[44px] flex items-center justify-center gap-2 px-4 py-2 text-[13px] font-medium transition-colors rounded-lg flex-1 sm:flex-none disabled:opacity-50 disabled:cursor-not-allowed ${actionBtnSecondary}`}
+                onClick={() => handleStagePreset('elk-compact')}
+                disabled={isSaving}
                 title={t('config.actions.applyCompact')}
               >
                 {t('config.actions.applyCompact')}
               </button>
               <button
-                className={`flex items-center justify-center gap-2 px-4 py-2 text-[13px] font-medium transition-colors rounded-lg flex-1 sm:flex-none ${actionBtnSecondary}`}
-                onClick={async () => {
-                  const preset: ConfigValues = {
-                    'diagram.layout.ELK_NODE_SPACING': 56,
-                    'diagram.layout.ELK_LAYER_SPACING': 96,
-                    'diagram.layout.ELK_EDGE_ROUTING': 'POLYLINE',
-                    'diagram.layout.ELK_NODE_PLACEMENT': 'NETWORK_SIMPLEX',
-                    'diagram.layout.ELK_LAYERING': 'NETWORK_SIMPLEX',
-                    'diagram.layout.ELK_FIXED_ALIGNMENT': 'NONE',
-                    'diagram.layout.ELK_CONSIDER_MODEL_ORDER': false,
-                    'diagram.layout.ELK_MERGE_EDGES': true,
-                    'diagram.layout.ELK_CYCLE_BREAKING': 'DEPTH_FIRST',
-                    'diagram.layout.ELK_PORT_BORDER_OFFSET': 4,
-                    'diagram.layout.ELK_LABEL_SPACING': 8,
-                  };
-                  const next = { ...editingValues };
-                  for (const [k, v] of Object.entries(preset)) {
-                    next[k] = v; await actions.setConfig(k, v);
-                  }
-                  setEditingValues(next);
-                  setHasChanges(false);
-                }}
+                type="button"
+                className={`min-h-[44px] flex items-center justify-center gap-2 px-4 py-2 text-[13px] font-medium transition-colors rounded-lg flex-1 sm:flex-none disabled:opacity-50 disabled:cursor-not-allowed ${actionBtnSecondary}`}
+                onClick={() => handleStagePreset('elk-consistent')}
+                disabled={isSaving}
                 title={t('config.actions.applyConsistent')}
               >
                 {t('config.actions.applyConsistent')}
@@ -591,11 +610,11 @@ return createPortal(
 
         {/* 底部操作栏 */}
         <div className="flex-none border-t border-black/10 dark:border-white/10 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between" style={{ padding: 'var(--glass-padding-md) var(--glass-padding-lg)', backgroundColor: 'rgba(0, 0, 0, 0.03)' }}>
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex w-full sm:w-auto flex-wrap items-center gap-3">
             <button
               onClick={handleResetChanges}
-              className={`min-h-[44px] flex items-center justify-center gap-2 px-5 py-2 text-[13px] font-medium transition-colors rounded-[6px] disabled:opacity-50 disabled:cursor-not-allowed ${actionBtnSecondary}`}
-              disabled={!state.isReady || !state.integration}
+              className={`min-h-[44px] w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2 text-[13px] font-medium transition-colors rounded-[6px] disabled:opacity-50 disabled:cursor-not-allowed ${actionBtnSecondary}`}
+              disabled={!state.isReady || !state.integration || isSaving}
             >
               <FaUndo />
               {t('config.actions.reset')}
@@ -606,21 +625,34 @@ return createPortal(
                 {t('config.unsavedChanges')}
               </div>
             )}
+            {saveStatus !== 'idle' && (
+              <div
+                role={saveStatus === 'error' ? 'alert' : 'status'}
+                aria-live={saveStatus === 'error' ? 'assertive' : 'polite'}
+                className={`text-[13px] font-medium ${saveStatus === 'error' ? 'text-red-600 dark:text-red-400' : 'text-emerald-700 dark:text-emerald-400'}`}
+              >
+                {saveStatus === 'saving' && t('config.saving')}
+                {saveStatus === 'success' && t('config.saveSuccess')}
+                {saveStatus === 'error' && t('config.saveError')}
+              </div>
+            )}
           </div>
-          <div className="flex items-center gap-3 sm:justify-end">
+          <div className="grid w-full grid-cols-2 items-center gap-3 sm:flex sm:w-auto sm:justify-end">
             <button
               onClick={handleCancel}
-              className={`min-h-[44px] px-6 py-2 text-[13px] font-medium transition-colors rounded-[6px] ${actionBtnSecondary}`}
+              disabled={isSaving}
+              className={`min-h-[44px] w-full sm:w-auto px-6 py-2 text-[13px] font-medium transition-colors rounded-[6px] disabled:opacity-50 disabled:cursor-not-allowed ${actionBtnSecondary}`}
             >
               {t('config.actions.cancel', 'Cancel')}
             </button>
             <button
               onClick={handleSaveChanges}
-              disabled={!hasChanges || !state.isReady || !state.integration}
-              className={`min-h-[44px] flex items-center justify-center gap-2 px-6 py-2 text-[13px] font-medium transition-all rounded-[6px] disabled:opacity-50 disabled:cursor-not-allowed ${actionBtnPrimary}`}
+              disabled={!hasChanges || !state.isReady || !state.integration || isSaving}
+              aria-busy={isSaving}
+              className={`min-h-[44px] w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2 text-[13px] font-medium transition-all rounded-[6px] disabled:opacity-50 disabled:cursor-not-allowed ${actionBtnPrimary}`}
             >
               <FaCheck />
-              {t('config.actions.save')}
+              {isSaving ? t('config.actions.saving') : t('config.actions.save')}
             </button>
           </div>
         </div>

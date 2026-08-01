@@ -1326,8 +1326,12 @@
         "loading": "正在加载配置系统...",
         "error": "错误: {{message}}",
         "unsavedChanges": "有未保存的更改",
+        "saving": "正在保存配置...",
+        "saveSuccess": "配置已保存",
+        "saveError": "配置保存失败，请重试",
         "actions": {
             "save": "保存更改",
+            "saving": "保存中...",
             "reset": "重置",
             "cancel": "取消",
             "close": "关闭",

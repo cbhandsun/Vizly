@@ -1240,8 +1240,12 @@
         "loading": "Loading configuration system...",
         "error": "Error: {{message}}",
         "unsavedChanges": "Unsaved changes",
+        "saving": "Saving configuration...",
+        "saveSuccess": "Configuration saved",
+        "saveError": "Could not save configuration. Please try again.",
         "actions": {
             "save": "Save Changes",
+            "saving": "Saving...",
             "reset": "Reset",
             "cancel": "Cancel",
             "close": "Close",
