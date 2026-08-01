@@ -8,17 +8,13 @@ import {
     FaMagnet, FaPen, FaStickyNote, FaMousePointer,
     FaFolderOpen, FaFileExport, FaMap,
 } from 'react-icons/fa';
-import { 
-    MdAlignHorizontalLeft, MdAlignHorizontalCenter, MdAlignHorizontalRight,
-    MdAlignVerticalTop, MdAlignVerticalCenter, MdAlignVerticalBottom,
-    MdHorizontalDistribute, MdVerticalDistribute
-} from 'react-icons/md';
 import { BackgroundVariant } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import { Tooltip, Button, Dropdown, MenuProps, Popover, Grid } from 'antd';
 import { appModal } from '../../utils/antdStaticBridge';
 import { clearFlowchartCache } from '../../utils/clearFlowchartCache';
 import { coerceDiagramId, getQueryOrHashParamFromLocation } from '../../utils/inputBoundary';
+import { FlowchartAlignmentTools } from './FlowchartAlignmentTools';
 
 interface FlowchartToolbarProps {
     canUndo: boolean;
@@ -639,56 +635,20 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
         </div>
     );
 
-    const AlignmentTools = (
-        <div className="flex items-center gap-1.5 h-full">
-            <div className="flex items-center gap-1 px-1">
-                <Tooltip title={t('toolbar.alignL', '左对齐')}>
-                    <Button type="text" size="small" icon={<MdAlignHorizontalLeft className="text-[16px]" />} onClick={() => onAlign?.('left')} className="w-8 h-8 p-0 flex items-center justify-center text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] rounded-[6px] transition-colors" />
-                </Tooltip>
-                <Tooltip title={t('toolbar.alignC', '水平居中')}>
-                    <Button type="text" size="small" icon={<MdAlignHorizontalCenter className="text-[16px]" />} onClick={() => onAlign?.('center')} className="w-8 h-8 p-0 flex items-center justify-center text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] rounded-[6px] transition-colors" />
-                </Tooltip>
-                <Tooltip title={t('toolbar.alignR', '右对齐')}>
-                    <Button type="text" size="small" icon={<MdAlignHorizontalRight className="text-[16px]" />} onClick={() => onAlign?.('right')} className="w-8 h-8 p-0 flex items-center justify-center text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] rounded-[6px] transition-colors" />
-                </Tooltip>
-            </div>
-            
-            <div className="w-[1px] h-4 bg-slate-200 dark:bg-white/10 mx-1" />
-            
-            <div className="flex items-center gap-1 px-1">
-                <Tooltip title={t('toolbar.alignT', '顶对齐')}>
-                    <Button type="text" size="small" icon={<MdAlignVerticalTop className="text-[16px]" />} onClick={() => onAlign?.('top')} className="w-8 h-8 p-0 flex items-center justify-center text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] rounded-[6px] transition-colors" />
-                </Tooltip>
-                <Tooltip title={t('toolbar.alignM', '垂直居中')}>
-                    <Button type="text" size="small" icon={<MdAlignVerticalCenter className="text-[16px]" />} onClick={() => onAlign?.('middle')} className="w-8 h-8 p-0 flex items-center justify-center text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] rounded-[6px] transition-colors" />
-                </Tooltip>
-                <Tooltip title={t('toolbar.alignB', '底对齐')}>
-                    <Button type="text" size="small" icon={<MdAlignVerticalBottom className="text-[16px]" />} onClick={() => onAlign?.('bottom')} className="w-8 h-8 p-0 flex items-center justify-center text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] rounded-[6px] transition-colors" />
-                </Tooltip>
-            </div>
-            
-            {(selectedNodesCount || 0) > 2 && (
-                <>
-                    <div className="w-[1px] h-4 bg-slate-200 dark:bg-white/10 mx-1" />
-                    <div className="flex items-center gap-1 px-1">
-                        <Tooltip title={t('toolbar.distributeH', '水平均分')}>
-                            <Button type="text" size="small" icon={<MdHorizontalDistribute className="text-[16px]" />} onClick={() => onDistribute?.('horizontal')} className="w-8 h-8 p-0 flex items-center justify-center text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] rounded-[6px] transition-colors" />
-                        </Tooltip>
-                        <Tooltip title={t('toolbar.distributeV', '垂直均分')}>
-                            <Button type="text" size="small" icon={<MdVerticalDistribute className="text-[16px]" />} onClick={() => onDistribute?.('vertical')} className="w-8 h-8 p-0 flex items-center justify-center text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] rounded-[6px] transition-colors" />
-                        </Tooltip>
-                    </div>
-                </>
-            )}
-        </div>
-    );
-
     if (!portalTarget) return null;
 
     return (
         <>
             {createPortal(MainWorkflowTools, portalTarget)}
-            {contextPortalTarget && (selectedNodesCount || 0) > 1 && createPortal(AlignmentTools, contextPortalTarget)}
+            {contextPortalTarget && (selectedNodesCount || 0) > 1 && createPortal(
+                <FlowchartAlignmentTools
+                    isMobile={isMobile}
+                    selectedNodesCount={selectedNodesCount || 0}
+                    onAlign={onAlign}
+                    onDistribute={onDistribute}
+                />,
+                contextPortalTarget,
+            )}
             {bottomPortalTarget && createPortal(CreationTools, bottomPortalTarget)}
         </>
     );

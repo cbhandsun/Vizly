@@ -3,7 +3,12 @@ export const bindIconRailEscapeClose = (
     closeDrawer: () => void
 ): (() => void) => {
     const onKeyDown = (event: KeyboardEvent) => {
-        if (event.key === 'Escape') closeDrawer();
+        if (event.key !== 'Escape') return;
+
+        const eventTarget = event.target;
+        const preservesDrawer = eventTarget instanceof Element
+            && eventTarget.closest('[data-preserve-drawer-on-escape="true"]');
+        if (!preservesDrawer) closeDrawer();
     };
 
     target.addEventListener('keydown', onKeyDown, true);

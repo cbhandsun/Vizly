@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from 'react';
-import { Button, Space, Input, Tooltip, Popconfirm, Popover } from 'antd';
+import React, { useMemo, useRef, useState } from 'react';
+import { Button, Space, Input, Tooltip, Popover, Modal } from 'antd';
+import type { InputRef } from 'antd';
 import {
     EyeOutlined,
     EyeInvisibleOutlined,
@@ -21,6 +22,8 @@ const LAYER_COLORS = [
     '#3b82f6', '#8b5cf6', '#ec4899', '#06b6d4',
     '#6366f1', '#14b8a6', '#f59e0b', '#10b981',
 ];
+
+const CREATE_ERROR_ID = 'layer-create-name-error';
 
 interface LayerManagementPanelProps {
     layers: LayerConfig[];
@@ -102,6 +105,9 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
     const [createError, setCreateError] = useState<string | null>(null);
     const [editingLayerId, setEditingLayerId] = useState<string | null>(null);
     const [editName, setEditName] = useState('');
+    const [pendingDeleteLayer, setPendingDeleteLayer] = useState<LayerConfig | null>(null);
+    const createInputRef = useRef<InputRef>(null);
+    const skipNextEditBlurRef = useRef(false);
     const touchTargetSize = useMemo(
         () => resolveLayerTouchTargetSize(getUiScale()),
         [],
@@ -123,6 +129,7 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
         const name = normalizeLayerNameInput(createName);
         if (!name) {
             setCreateError('请输入图层名称');
+            createInputRef.current?.focus();
             return;
         }
         onCreate(name);
@@ -130,6 +137,7 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
     };
 
     const startEdit = (layer: LayerConfig) => {
+        skipNextEditBlurRef.current = false;
         setEditingLayerId(layer.id);
         setEditName(layer.name);
     };
@@ -140,6 +148,13 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
             onRename(layerId, name);
         }
         setEditingLayerId(null);
+        setEditName('');
+    };
+
+    const cancelEdit = () => {
+        skipNextEditBlurRef.current = true;
+        setEditingLayerId(null);
+        setEditName('');
     };
 
     return (
@@ -150,11 +165,13 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
                         <Space.Compact>
                             <Input
+                                ref={createInputRef}
                                 value={createName}
                                 autoFocus
                                 maxLength={80}
                                 aria-label="新图层名称"
                                 aria-invalid={Boolean(createError)}
+                                aria-describedby={createError ? CREATE_ERROR_ID : undefined}
                                 placeholder="输入图层名称"
                                 status={createError ? 'error' : undefined}
                                 style={{ width: 180, minHeight: touchTargetSize }}
@@ -184,7 +201,7 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
                             </Button>
                         </Space.Compact>
                         {createError ? (
-                            <div role="alert" style={{ color: '#cf1322', fontSize: 12 }}>
+                            <div id={CREATE_ERROR_ID} role="alert" style={{ color: '#cf1322', fontSize: 12 }}>
                                 {createError}
                             </div>
                         ) : null}
@@ -245,9 +262,24 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
                                         <Input
                                             value={editName}
                                             onChange={(e) => setEditName(e.target.value)}
-                                            onBlur={() => finishEdit(layer.id)}
+                                            onBlur={() => {
+                                                if (skipNextEditBlurRef.current) {
+                                                    skipNextEditBlurRef.current = false;
+                                                    return;
+                                                }
+                                                finishEdit(layer.id);
+                                            }}
                                             onPressEnter={() => finishEdit(layer.id)}
+                                            onKeyDown={(event) => {
+                                                if (event.key !== 'Escape') return;
+                                                event.preventDefault();
+                                                event.stopPropagation();
+                                                cancelEdit();
+                                            }}
                                             autoFocus
+                                            maxLength={80}
+                                            aria-label={`重命名图层：${layer.name}`}
+                                            data-preserve-drawer-on-escape="true"
                                             size="small"
                                             style={{ width: '100%' }}
                                             onClick={(e) => e.stopPropagation()}
@@ -331,24 +363,17 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
                                                 />
                                             </Tooltip>
 
-                                            <Popconfirm
-                                                title="确定删除此图层？"
-                                                onConfirm={(e) => {
-                                                    e?.stopPropagation();
-                                                    onDelete(layer.id);
+                                            <Button
+                                                type="text"
+                                                style={actionButtonStyle}
+                                                danger
+                                                aria-label={`删除图层：${layer.name}`}
+                                                icon={<DeleteOutlined />}
+                                                onClick={(event) => {
+                                                    event.stopPropagation();
+                                                    setPendingDeleteLayer(layer);
                                                 }}
-                                                okText="删除"
-                                                cancelText="取消"
-                                            >
-                                                <Button
-                                                    type="text"
-                                                    style={actionButtonStyle}
-                                                    danger
-                                                    aria-label={`删除图层：${layer.name}`}
-                                                    icon={<DeleteOutlined />}
-                                                    onClick={(e) => e.stopPropagation()}
-                                                />
-                                            </Popconfirm>
+                                            />
                                         </>
                                     )}
                                 </Space>
@@ -357,6 +382,28 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
                     ))}
                 </div>
             </div>
+
+            <Modal
+                open={Boolean(pendingDeleteLayer)}
+                title={pendingDeleteLayer ? `删除图层“${pendingDeleteLayer.name}”？` : '删除图层？'}
+                okText="删除"
+                cancelText="取消"
+                okButtonProps={{ danger: true, 'aria-label': '确认删除图层' }}
+                cancelButtonProps={{ 'aria-label': '取消删除图层' }}
+                wrapClassName="commercial-viewport-modal"
+                width={420}
+                zIndex={1100}
+                centered
+                focusable={{ focusTriggerAfterClose: true }}
+                onCancel={() => setPendingDeleteLayer(null)}
+                onOk={() => {
+                    if (!pendingDeleteLayer) return;
+                    onDelete(pendingDeleteLayer.id);
+                    setPendingDeleteLayer(null);
+                }}
+            >
+                <p style={{ margin: 0 }}>此操作无法撤销。</p>
+            </Modal>
         </div>
     );
 };

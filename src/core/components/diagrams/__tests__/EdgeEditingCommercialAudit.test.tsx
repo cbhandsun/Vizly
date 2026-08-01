@@ -77,7 +77,7 @@ describe('edge editing commercial audit regressions', () => {
             'utf8',
         );
 
-        expect(css).toMatch(/@media \(max-width: 768px\), \(pointer: coarse\)[\s\S]*?\.contextual-edge-toolbar[\s\S]*?--ftb-btn-size: var\(--commercial-touch-target, 44px\)/);
+        expect(css).toMatch(/@media \(max-width: 768px\), \(pointer: coarse\)[\s\S]*?\.floating-toolbar-container,[\s\S]*?\.contextual-edge-toolbar[\s\S]*?--ftb-btn-size: var\(--commercial-touch-target, 44px\)/);
         expect(css).toMatch(/\.contextual-edge-toolbar-label-input[\s\S]*?min-height: var\(--commercial-touch-target, 44px\)/);
     });
 });

@@ -36,4 +36,20 @@ describe('bindIconRailEscapeClose', () => {
         expect(closeDrawer).not.toHaveBeenCalled();
         unbind();
     });
+
+    it('preserves the drawer when a marked control owns Escape locally', () => {
+        const closeDrawer = vi.fn();
+        const input = document.createElement('input');
+        input.dataset.preserveDrawerOnEscape = 'true';
+        document.body.append(input);
+        const unbind = bindIconRailEscapeClose(window, closeDrawer);
+
+        input.dispatchEvent(new KeyboardEvent('keydown', {
+            key: 'Escape',
+            bubbles: true,
+        }));
+
+        expect(closeDrawer).not.toHaveBeenCalled();
+        unbind();
+    });
 });

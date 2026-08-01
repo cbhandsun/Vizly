@@ -109,4 +109,45 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
         expect(onToggleDrawingMode).not.toHaveBeenCalled();
         expect(onAddStickyNote).not.toHaveBeenCalled();
     });
+
+    it('names multi-selection actions and preserves a physical mobile touch target', async () => {
+        const onAlign = vi.fn();
+        const onDistribute = vi.fn();
+
+        render(
+            <ModernFlowchartToolbar
+                canUndo={false}
+                canRedo={false}
+                onUndo={vi.fn()}
+                onRedo={vi.fn()}
+                onZoomIn={vi.fn()}
+                onZoomOut={vi.fn()}
+                onFitView={vi.fn()}
+                autoRouting={false}
+                toggleAutoRouting={vi.fn()}
+                showGrid
+                toggleGrid={vi.fn()}
+                onShowShortcuts={vi.fn()}
+                showRuler={false}
+                toggleRuler={vi.fn()}
+                selectedNodesCount={3}
+                onAlign={onAlign}
+                onDistribute={onDistribute}
+            />,
+        );
+
+        const actionNames = ['左对齐', '水平居中', '右对齐', '顶对齐', '垂直居中', '底对齐', '水平均分', '垂直均分'];
+        const buttons = await Promise.all(actionNames.map(name => screen.findByRole('button', { name })));
+
+        for (const button of buttons) {
+            expect(button.style.minWidth).toBe('var(--commercial-touch-target, 44px)');
+            expect(button.style.width).toBe(button.style.minWidth);
+            expect(button.style.height).toBe(button.style.minWidth);
+        }
+
+        fireEvent.click(screen.getByRole('button', { name: '左对齐' }));
+        fireEvent.click(screen.getByRole('button', { name: '水平均分' }));
+        expect(onAlign).toHaveBeenCalledWith('left');
+        expect(onDistribute).toHaveBeenCalledWith('horizontal');
+    });
 });

@@ -13,6 +13,14 @@ const layer = {
     zIndex: 0,
 };
 
+const reviewLayer = {
+    id: 'layer-review',
+    name: '评审图层',
+    visible: true,
+    locked: false,
+    zIndex: 1,
+};
+
 describe('LayerManagementPanel', () => {
     afterEach(() => {
         vi.restoreAllMocks();
@@ -105,10 +113,69 @@ describe('LayerManagementPanel', () => {
         });
         fireEvent.click(screen.getByRole('button', { name: '创建图层' }));
 
-        expect(screen.getByRole('alert').textContent).toContain('请输入图层名称');
+        const input = screen.getByRole('textbox', { name: '新图层名称' });
+        const alert = screen.getByRole('alert');
+        expect(alert.textContent).toContain('请输入图层名称');
+        expect(input.getAttribute('aria-describedby')).toBe(alert.id);
+        expect(document.activeElement).toBe(input);
         expect(onCreate).not.toHaveBeenCalled();
 
         fireEvent.click(screen.getByRole('button', { name: '取消新建图层' }));
         expect(screen.queryByRole('textbox', { name: '新图层名称' })).toBeNull();
+    });
+
+    it('names the rename input and cancels only the edit when Escape is pressed', () => {
+        const onRename = vi.fn();
+
+        render(
+            <LayerManagementPanel
+                layers={[layer, reviewLayer]}
+                activeLayerId="layer-review"
+                onSetActive={vi.fn()}
+                onToggleVisibility={vi.fn()}
+                onToggleLock={vi.fn()}
+                onRename={onRename}
+                onCreate={vi.fn()}
+                onDelete={vi.fn()}
+                onReorder={vi.fn()}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: '重命名图层：评审图层' }));
+        const input = screen.getByRole('textbox', { name: '重命名图层：评审图层' });
+        expect(input.getAttribute('maxlength')).toBe('80');
+
+        fireEvent.keyDown(input, { key: 'Escape' });
+
+        expect(onRename).not.toHaveBeenCalled();
+        expect(screen.queryByRole('textbox', { name: '重命名图层：评审图层' })).toBeNull();
+        expect(screen.getByText('评审图层')).toBeTruthy();
+    });
+
+    it('uses a named dialog before deleting a non-default layer', async () => {
+        const onDelete = vi.fn();
+
+        render(
+            <LayerManagementPanel
+                layers={[layer, reviewLayer]}
+                activeLayerId="layer-review"
+                onSetActive={vi.fn()}
+                onToggleVisibility={vi.fn()}
+                onToggleLock={vi.fn()}
+                onRename={vi.fn()}
+                onCreate={vi.fn()}
+                onDelete={onDelete}
+                onReorder={vi.fn()}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: '删除图层：评审图层' }));
+
+        const dialog = await screen.findByRole('dialog', { name: '删除图层“评审图层”？' });
+        expect(dialog.closest('.ant-modal-wrap')?.getAttribute('style')).toContain('z-index: 1100');
+        expect(onDelete).not.toHaveBeenCalled();
+
+        fireEvent.click(screen.getByRole('button', { name: '确认删除图层' }));
+        expect(onDelete).toHaveBeenCalledWith('layer-review');
     });
 });

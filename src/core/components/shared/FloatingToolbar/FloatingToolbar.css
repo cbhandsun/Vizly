@@ -262,6 +262,7 @@
 }
 
 @media (max-width: 768px), (pointer: coarse) {
+    .floating-toolbar-container,
     .contextual-edge-toolbar {
         --ftb-btn-size: var(--commercial-touch-target, 44px);
         --ftb-icon-size: 16px;
