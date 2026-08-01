@@ -323,6 +323,50 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                 }] : []),
             ]
         },
+        ...((onActivatePointer || toggleSelectionMode || onToggleDrawingMode || onAddStickyNote || onAddMindMap) ? [
+            { type: 'divider' as const },
+            {
+                key: 'creation-group',
+                label: t('toolbar.creationTools', '操作工具'),
+                type: 'group' as const,
+                children: [
+                    ...(onActivatePointer ? [{
+                        key: 'pointer',
+                        label: t('toolbar.pointer', '普通选择器 (V)'),
+                        icon: <FaMousePointer />,
+                        onClick: onActivatePointer,
+                    }] : []),
+                    ...(toggleSelectionMode ? [{
+                        key: 'marquee',
+                        label: isMarqueeActive
+                            ? t('toolbar.marqueeExit', '退出框选 (Esc)')
+                            : t('toolbar.marqueeEnter', '框选模式 (M)'),
+                        icon: <FaObjectGroup />,
+                        onClick: toggleSelectionMode,
+                    }] : []),
+                    ...(onToggleDrawingMode ? [{
+                        key: 'drawing',
+                        label: isDrawingMode
+                            ? t('toolbar.drawingModeExit', '退出自由画笔 (Esc)')
+                            : t('toolbar.drawingMode', '自由画笔 (P)'),
+                        icon: <FaPen />,
+                        onClick: onToggleDrawingMode,
+                    }] : []),
+                    ...(onAddStickyNote ? [{
+                        key: 'sticky-note',
+                        label: t('toolbar.stickyNote', '便签 (S)'),
+                        icon: <FaStickyNote />,
+                        onClick: onAddStickyNote,
+                    }] : []),
+                    ...(onAddMindMap ? [{
+                        key: 'mind-map',
+                        label: t('toolbar.mindMap', '思维导图 (M)'),
+                        icon: <FaSitemap />,
+                        onClick: onAddMindMap,
+                    }] : []),
+                ],
+            },
+        ] : []),
         { type: 'divider' as const },
         {
             key: 'shortcuts',
@@ -367,7 +411,11 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                 });
             },
         },
-    ], [t, gridInfo, toggleGrid, showRuler, toggleRuler, toggleMinimap, showMinimap, onShowShortcuts, onImportClick, onExport]);
+    ], [
+        t, gridInfo, toggleGrid, showRuler, toggleRuler, toggleMinimap, showMinimap,
+        onShowShortcuts, onImportClick, onExport, onActivatePointer, toggleSelectionMode,
+        onToggleDrawingMode, onAddStickyNote, onAddMindMap, isMarqueeActive, isDrawingMode,
+    ]);
 
     const CanvasSettingsContent = (
         <div className="p-1 min-w-[180px]">

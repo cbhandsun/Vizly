@@ -1,11 +1,12 @@
 import { useCallback } from 'react';
 import { Node, Edge } from '@xyflow/react';
-import { createGroupingPlan } from './groupingOperations';
+import { createGroupingPlan, deselectEdgesForGrouping } from './groupingOperations';
 
 interface UseGroupingProps {
     nodes: Node[];
     edges: Edge[];
     setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
+    setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
     selectedNodes: Node[];
     setSelectedNodes: React.Dispatch<React.SetStateAction<Node[]>>;
     takeSnapshot: (nodes: Node[], edges: Edge[]) => void;
@@ -17,6 +18,7 @@ export const useGrouping = ({
     nodes,
     edges,
     setNodes,
+    setEdges,
     selectedNodes,
     setSelectedNodes,
     takeSnapshot,
@@ -36,8 +38,9 @@ export const useGrouping = ({
 
         takeSnapshot(nodes, edges);
         setNodes(plan.nodes);
+        setEdges(deselectEdgesForGrouping);
         setSelectedNodes([plan.groupNode]);
-    }, [defaultGroupDescription, defaultGroupLabel, selectedNodes, nodes, edges, takeSnapshot, setNodes, setSelectedNodes]);
+    }, [defaultGroupDescription, defaultGroupLabel, selectedNodes, nodes, edges, takeSnapshot, setNodes, setEdges, setSelectedNodes]);
 
     const handleUngroup = useCallback(() => {
         const groupsToUngroup = selectedNodes.filter(n => n.type === 'titleGroup' || n.type === 'subGroup');
@@ -84,8 +87,9 @@ export const useGrouping = ({
             return nextNodes.filter(n => !groupIds.has(n.id));
         });
 
+        setEdges(deselectEdgesForGrouping);
         setSelectedNodes([]);
-    }, [selectedNodes, nodes, edges, takeSnapshot, setNodes, setSelectedNodes]);
+    }, [selectedNodes, nodes, edges, takeSnapshot, setNodes, setEdges, setSelectedNodes]);
 
     return {
         handleGroup,

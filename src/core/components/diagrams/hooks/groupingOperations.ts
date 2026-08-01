@@ -1,4 +1,4 @@
-import type { Node } from '@xyflow/react';
+import type { Edge, Node } from '@xyflow/react';
 
 export interface CreateGroupingPlanOptions {
     nodes: Node[];
@@ -18,6 +18,17 @@ const CONTAINER_NODE_TYPES = new Set(['titleGroup', 'subGroup', 'swimlane']);
 
 const readNodeWidth = (node: Node): number => node.measured?.width ?? node.width ?? 100;
 const readNodeHeight = (node: Node): number => node.measured?.height ?? node.height ?? 100;
+
+/**
+ * Grouping replaces the current node selection with a container selection.
+ * React Flow keeps edge selection independently, so clear it explicitly to
+ * avoid a stale selected-edge count after grouping or ungrouping.
+ */
+export const deselectEdgesForGrouping = (edges: Edge[]): Edge[] => (
+    edges.some(edge => edge.selected)
+        ? edges.map(edge => edge.selected ? { ...edge, selected: false } : edge)
+        : edges
+);
 
 const insertGroupBeforeChildren = (
     nodes: Node[],

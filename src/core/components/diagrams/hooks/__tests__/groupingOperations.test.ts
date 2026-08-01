@@ -1,7 +1,7 @@
-import type { Node } from '@xyflow/react';
+import type { Edge, Node } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
 
-import { createGroupingPlan } from '../groupingOperations';
+import { createGroupingPlan, deselectEdgesForGrouping } from '../groupingOperations';
 
 const node = (
     id: string,
@@ -95,5 +95,26 @@ describe('createGroupingPlan', () => {
             selectedNodes: [first, invalid],
             groupId: 'group',
         })).toBeNull();
+    });
+});
+
+describe('deselectEdgesForGrouping', () => {
+    it('clears selected edges while preserving unselected edge data', () => {
+        const edges: Edge[] = [
+            { id: 'selected', source: 'a', target: 'b', selected: true },
+            { id: 'idle', source: 'b', target: 'c', label: 'keep' },
+        ];
+
+        expect(deselectEdgesForGrouping(edges)).toEqual([
+            { id: 'selected', source: 'a', target: 'b', selected: false },
+            { id: 'idle', source: 'b', target: 'c', label: 'keep' },
+        ]);
+    });
+
+    it('preserves the array reference when no edge is selected', () => {
+        const edges: Edge[] = [{ id: 'idle', source: 'a', target: 'b' }];
+
+        expect(deselectEdgesForGrouping(edges)).toBe(edges);
+        expect(deselectEdgesForGrouping([])).toEqual([]);
     });
 });

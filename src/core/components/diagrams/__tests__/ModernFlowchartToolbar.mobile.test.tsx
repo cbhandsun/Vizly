@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('react-i18next', () => ({
@@ -65,5 +65,48 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
 
         const moreButton = await screen.findByRole('button', { name: /更多操作|moreActions/i });
         expect(moreButton.hasAttribute('disabled')).toBe(false);
+    });
+
+    it('exposes selection and creation tools through the mobile more menu', async () => {
+        const onActivatePointer = vi.fn();
+        const toggleSelectionMode = vi.fn();
+        const onToggleDrawingMode = vi.fn();
+        const onAddStickyNote = vi.fn();
+
+        render(
+            <ModernFlowchartToolbar
+                canUndo={false}
+                canRedo={false}
+                onUndo={vi.fn()}
+                onRedo={vi.fn()}
+                onZoomIn={vi.fn()}
+                onZoomOut={vi.fn()}
+                onFitView={vi.fn()}
+                autoRouting={false}
+                toggleAutoRouting={vi.fn()}
+                showGrid
+                toggleGrid={vi.fn()}
+                onShowShortcuts={vi.fn()}
+                showRuler={false}
+                toggleRuler={vi.fn()}
+                onActivatePointer={onActivatePointer}
+                toggleSelectionMode={toggleSelectionMode}
+                onToggleDrawingMode={onToggleDrawingMode}
+                onAddStickyNote={onAddStickyNote}
+            />,
+        );
+
+        fireEvent.click(await screen.findByRole('button', { name: /更多操作|moreActions/i }));
+
+        expect(await screen.findByRole('menuitem', { name: /普通选择器/ })).toBeTruthy();
+        fireEvent.click(screen.getByRole('menuitem', { name: /框选模式/ }));
+        expect(toggleSelectionMode).toHaveBeenCalledTimes(1);
+
+        fireEvent.click(await screen.findByRole('button', { name: /更多操作|moreActions/i }));
+        expect(await screen.findByRole('menuitem', { name: /自由画笔/ })).toBeTruthy();
+        expect(screen.getByRole('menuitem', { name: /便签/ })).toBeTruthy();
+        expect(onActivatePointer).not.toHaveBeenCalled();
+        expect(onToggleDrawingMode).not.toHaveBeenCalled();
+        expect(onAddStickyNote).not.toHaveBeenCalled();
     });
 });

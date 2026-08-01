@@ -97,7 +97,7 @@ export function useDesignerInteractions({
     const enhancedEdges = visibleEdges;
 
     const { handleGroup, handleUngroup } = useGrouping({
-        nodes, edges, setNodes, selectedNodes, setSelectedNodes, takeSnapshot,
+        nodes, edges, setNodes, setEdges, selectedNodes, setSelectedNodes, takeSnapshot,
         defaultGroupLabel: '组件', defaultGroupDescription: '组件'
     });
 
