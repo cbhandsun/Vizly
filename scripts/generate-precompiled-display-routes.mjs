@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { mkdir, readFile, readdir, rename, unlink, writeFile } from 'node:fs/promises';
 import { basename, dirname, resolve, sep } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -11,6 +10,7 @@ import {
   renderPrecompiledRouteManifest,
 } from './lib/precompiled-display-route-render.mjs';
 import { PRECOMPILED_DISPLAY_ROUTE_TARGETS } from './lib/precompiled-display-route-targets.mjs';
+import { hashPrecompiledDisplayRouteSource } from './lib/precompiled-display-route-source-hash.mjs';
 
 const ROOT = resolve(process.cwd());
 const BASE_URL = String(process.env.PRECOMPILED_ROUTE_BASE_URL || '').trim().replace(/\/$/, '');
@@ -44,8 +44,6 @@ const readRoutingVersion = async () => {
   if (!match) throw new Error('EDGE_ROUTING_CACHE_VERSION could not be read');
   return match[1];
 };
-
-const sourceHash = value => `source-v1:${createHash('sha256').update(value).digest('hex')}`;
 
 const writeAtomic = async (path, contents) => {
   await mkdir(dirname(path), { recursive: true });
@@ -148,7 +146,7 @@ const captureTarget = async (session, target, source, routingVersion) => {
     artifact: {
       schema: SCHEMA,
       routingVersion,
-      sourceHash: sourceHash(source),
+      sourceHash: hashPrecompiledDisplayRouteSource(source),
       inputSignature: routing.signature,
       inputGeometryDigest,
       outputRouteSignature,
@@ -226,7 +224,7 @@ const assertFileContents = async (path, expected, label) => {
 const main = async () => {
   await assertProductionPreview();
   const routingVersion = await readRoutingVersion();
-  const identitySourceHash = sourceHash(await readFile(INPUT_IDENTITY_PATH, 'utf8'));
+  const identitySourceHash = hashPrecompiledDisplayRouteSource(await readFile(INPUT_IDENTITY_PATH, 'utf8'));
   const sources = await Promise.all(PRECOMPILED_DISPLAY_ROUTE_TARGETS.map(async target => ({
     target,
     source: await readFile(resolve(ROOT, target.sourcePath), 'utf8'),

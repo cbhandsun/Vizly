@@ -45,6 +45,7 @@ import {
     logAIConfigRequestFailure,
 } from './aiLogging';
 import { filterAIModels, filterAIProviders, groupAIModels } from './aiConfigModelCollections';
+import { createCustomAIProvider } from './aiConfigProviderMutations';
 import { useAIConfigModalConfig } from './useAIConfigModalConfig';
 import {
     COMMERCIAL_VIEWPORT_MODAL_CLASS,
@@ -159,15 +160,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
 
     const addCustomProvider = () => {
         const newId = `custom_${Date.now()}`;
-        const newProvider: AIProviderConfig = {
-            id: newId,
-            name: t('aiConfig.newProviderName'),
-            enabled: true,
-            baseUrl: '',
-            apiKey: '',
-            icon: 'deployment-unit',
-            models: []
-        };
+        const newProvider = createCustomAIProvider(newId, t('aiConfig.newProviderName'));
         setConfig(prev => ({ ...prev, providers: [...prev.providers, newProvider] }));
         setSelectedProviderId(newId);
     };

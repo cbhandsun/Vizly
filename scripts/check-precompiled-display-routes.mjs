@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
@@ -8,6 +7,7 @@ import {
   renderPrecompiledRouteManifest,
 } from './lib/precompiled-display-route-render.mjs';
 import { PRECOMPILED_DISPLAY_ROUTE_TARGETS } from './lib/precompiled-display-route-targets.mjs';
+import { hashPrecompiledDisplayRouteSource } from './lib/precompiled-display-route-source-hash.mjs';
 
 const ROOT = resolve(process.cwd());
 const GENERATED_DIR = resolve(ROOT, 'src/core/components/shared/generated');
@@ -23,12 +23,10 @@ const ARTIFACT_SCHEMA = 'vizly-precompiled-display-route-v1';
 const MANIFEST_SCHEMA = 'vizly-precompiled-display-route-manifest-v2';
 const MAX_ARTIFACT_BYTES = 2_000_000;
 
-const sourceHash = value => `source-v1:${createHash('sha256').update(value).digest('hex')}`;
-
 const routingSource = await readFile(ROUTING_VERSION_PATH, 'utf8');
 const routingVersion = routingSource.match(/EDGE_ROUTING_CACHE_VERSION\s*=\s*['"]([^'"]+)['"]/)?.[1];
 if (!routingVersion) throw new Error('EDGE_ROUTING_CACHE_VERSION could not be read');
-const identitySourceHash = sourceHash(await readFile(INPUT_IDENTITY_PATH, 'utf8'));
+const identitySourceHash = hashPrecompiledDisplayRouteSource(await readFile(INPUT_IDENTITY_PATH, 'utf8'));
 
 const manifestSource = await readFile(MANIFEST_PATH, 'utf8');
 const manifest = JSON.parse(manifestSource);
@@ -78,7 +76,7 @@ for (const entry of manifest.entries) {
   if (sourcePreset?.id !== entry.presetId) {
     throw new Error(`Precompiled route source preset id mismatch for ${entry.sourcePath}`);
   }
-  const expectedSourceHash = sourceHash(source);
+  const expectedSourceHash = hashPrecompiledDisplayRouteSource(source);
   const artifactPath = resolve(ARTIFACT_DIR, entry.artifactFile);
   const artifactSource = await readFile(artifactPath, 'utf8');
   if (Buffer.byteLength(artifactSource, 'utf8') > MAX_ARTIFACT_BYTES) {

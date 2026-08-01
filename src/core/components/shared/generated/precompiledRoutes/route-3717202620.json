@@ -1,7 +1,7 @@
 {
   "schema": "vizly-precompiled-display-route-v1",
   "routingVersion": "2026-07-28-container-clearance-candidate-v120",
-  "sourceHash": "source-v1:070569b411557fd5c080c8580c2c6bdc2534134ebddfa3e40a2cf5c1f25c1c44",
+  "sourceHash": "source-v1:da286fbefa1a0d0a3ba3bf5a6589d2edba849af0f477ddb910ecad4d91649986",
   "inputSignature": "3717202620",
   "inputGeometryDigest": "geometry-v1:d0f096ef3f34238742f9b0a38802daf3",
   "outputRouteSignature": "route-v2:14:62:fe980c960aa3f118",

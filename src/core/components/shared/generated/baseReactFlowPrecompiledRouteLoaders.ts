@@ -7,14 +7,14 @@ export type GeneratedBaseReactFlowPrecompiledRouteDescriptor = {
 
 const generatedPrecompiledRouteDescriptor0: GeneratedBaseReactFlowPrecompiledRouteDescriptor = {
   presetId: "wms-process-flow-v1",
-  sourceHash: "source-v1:25907dec641afd53490cc910f19fbdadcd0c93b30d443e340272528f92f9ff42",
+  sourceHash: "source-v1:2a580f110590a416ff1aeb9fb5a3cd21536428e26368841fd160f87243cc25d3",
   geometryDigest: "geometry-v1:0ce701440ea318b0afde8342e3d3d4ac",
   load: () => import('./precompiledRoutes/route-1220377107.json').then(module => module.default),
 };
 
 const generatedPrecompiledRouteDescriptor1: GeneratedBaseReactFlowPrecompiledRouteDescriptor = {
   presetId: "logistics-architecture-v1",
-  sourceHash: "source-v1:070569b411557fd5c080c8580c2c6bdc2534134ebddfa3e40a2cf5c1f25c1c44",
+  sourceHash: "source-v1:da286fbefa1a0d0a3ba3bf5a6589d2edba849af0f477ddb910ecad4d91649986",
   geometryDigest: "geometry-v1:d0f096ef3f34238742f9b0a38802daf3",
   load: () => import('./precompiledRoutes/route-3717202620.json').then(module => module.default),
 };
