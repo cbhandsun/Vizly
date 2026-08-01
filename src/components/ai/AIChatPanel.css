@@ -417,6 +417,7 @@
 }
 
 .ai-chat-textarea {
+    min-height: var(--commercial-touch-target, 44px) !important;
     border-radius: 12px !important;
     resize: none !important;
     background: rgba(255, 255, 255, 0.9) !important;

@@ -82,6 +82,6 @@ export const createDesignerRightSidebarLayout = ({
         bottom: 'auto',
         maxHeight: 'calc(100% - 96px)',
         height: isCollapsed ? 'max-content' : 'calc(100% - 96px)',
-        width: isCollapsed ? 42 : panelWidth,
+        width: isCollapsed ? 'var(--commercial-touch-target, 44px)' : panelWidth,
     };
 };

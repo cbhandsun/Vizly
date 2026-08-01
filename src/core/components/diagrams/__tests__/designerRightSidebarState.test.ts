@@ -43,6 +43,11 @@ describe('createDesignerRightSidebarLayout', () => {
             height: 'calc(100% - 96px)',
             width: 360,
         });
+        expect(createDesignerRightSidebarLayout({
+            isCollapsed: true,
+            isMobile: false,
+            panelWidth: 360,
+        }).width).toBe('var(--commercial-touch-target, 44px)');
     });
 });
 

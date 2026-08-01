@@ -1107,6 +1107,17 @@ circle.custom-edge-updater {
     height: 100%;
 }
 
+.designer-right-sidebar .ant-tabs-nav,
+.designer-right-sidebar .ant-tabs-tab,
+.designer-right-sidebar .ant-tabs-tab-btn {
+    min-height: var(--commercial-touch-target, 44px);
+}
+
+.designer-right-sidebar .ant-tabs-tab-btn {
+    display: flex;
+    align-items: center;
+}
+
 .designer-right-sidebar .ant-tabs-content-holder {
     flex: 1;
     min-height: 0;

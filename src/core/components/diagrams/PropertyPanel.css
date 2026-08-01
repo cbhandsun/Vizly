@@ -162,6 +162,8 @@
 /* Customizing Ant Design Collapse to look transparent/minimal */
 .property-collapse .ant-collapse-header {
     padding: 12px 16px !important;
+    min-height: var(--commercial-touch-target, 44px);
+    align-items: center !important;
     font-weight: 600;
     color: rgba(0, 0, 0, 0.65) !important;
     font-size: 13px !important;
@@ -183,6 +185,36 @@
 .property-collapse .ant-form-item-label label {
     font-size: 12px;
     color: rgba(0, 0, 0, 0.45);
+}
+
+.property-collapse .ant-input,
+.property-collapse .ant-input-affix-wrapper,
+.property-collapse .ant-input-number,
+.property-collapse .ant-input-number-input,
+.property-collapse .ant-select-selector,
+.property-collapse .ant-radio-button-wrapper,
+.property-collapse .ant-btn {
+    min-height: var(--commercial-touch-target, 44px) !important;
+}
+
+.property-collapse textarea.ant-input {
+    min-height: var(--commercial-touch-target, 44px) !important;
+}
+
+.property-panel-container .ant-typography-copy,
+.property-panel-container .ant-input-clear-icon {
+    min-width: var(--commercial-touch-target, 44px);
+    min-height: var(--commercial-touch-target, 44px);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+@media (max-width: 767px), (pointer: coarse) {
+    .property-collapse .ant-input-number-handler-wrap,
+    .property-collapse .ant-input-number-actions {
+        display: none;
+    }
 }
 
 /* Scrollbar styling for webkit */

@@ -19,6 +19,7 @@ import {
 } from './designerRightSidebarState';
 
 const PropertyPanel = React.lazy(() => import('./PropertyPanel'));
+const COMMERCIAL_TOUCH_TARGET = 'var(--commercial-touch-target, 44px)';
 
 export interface DesignerRightSidebarProps {
     activeTab: 'property' | 'ai';
@@ -291,7 +292,7 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
 
             {/* Icon Rail (始终显示) */}
             <div style={{
-                width: RAIL_WIDTH,
+                width: COMMERCIAL_TOUCH_TARGET,
                 flexShrink: 0,
                 display: 'flex',
                 flexDirection: 'column',
@@ -330,8 +331,9 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
                             }}
                             icon={btn.icon}
                             style={{
-                                width: 32,
-                                height: 32,
+                                width: COMMERCIAL_TOUCH_TARGET,
+                                minWidth: COMMERCIAL_TOUCH_TARGET,
+                                height: COMMERCIAL_TOUCH_TARGET,
                                 borderRadius: 6,
                                 border: 'none',
                                 background: (!isCollapsed && activeTab === btn.key)
@@ -374,8 +376,9 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
                         onClick={(e) => { e.stopPropagation(); toggle(); }}
                         icon={isCollapsed ? <FaChevronLeft /> : <FaChevronRight />}
                         style={{
-                            width: 32,
-                            height: 32,
+                            width: COMMERCIAL_TOUCH_TARGET,
+                            minWidth: COMMERCIAL_TOUCH_TARGET,
+                            height: COMMERCIAL_TOUCH_TARGET,
                             borderRadius: 6,
                             border: 'none',
                             background: 'transparent',
@@ -461,7 +464,7 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
                             padding: '0 16px',
                             background: 'transparent',
                             borderBottom: `1px solid ${token.colorBorderSecondary}`,
-                            height: 48, // matching the global header scale
+                            minHeight: COMMERCIAL_TOUCH_TARGET,
                         }}
                     />
                 </div>
