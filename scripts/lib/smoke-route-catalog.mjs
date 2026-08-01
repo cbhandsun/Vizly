@@ -1,5 +1,22 @@
 import { isFinalWmsDisplayRoutingReady } from '../smokeRouteBudgetUtils.mjs';
 
+export const isManagementTemplatesReady = ({ hasRoot, activeTab, body }) => {
+  if (!hasRoot || typeof activeTab !== 'string' || typeof body !== 'string') return false;
+  const hasExpectedTab = (
+    activeTab.includes('行业模板库')
+    || activeTab.includes('Industry templates')
+  );
+  return hasExpectedTab
+    && !body.includes('加载应用')
+    && !body.includes('加载图表管理')
+    && !body.includes('页面出现错误')
+    && (
+      body.includes('行业模板库')
+      || body.includes('Industry templates')
+      || body.includes('No diagrams')
+    );
+};
+
 export const createSmokeRouteCatalog = (BASE_URL) => {
   const routes = [
     {
@@ -41,23 +58,19 @@ export const createSmokeRouteCatalog = (BASE_URL) => {
       expression: `(() => {
         const body = document.body?.textContent || '';
         const activeTab = document.querySelector('.filter-tab.active')?.textContent || '';
+        const hasRoot = Boolean(document.getElementById('root'));
         return {
           href: location.href,
           title: document.title,
           readyState: document.readyState,
-          hasRoot: Boolean(document.getElementById('root')),
+          hasRoot,
           activeTab,
           appFallback: body.includes('加载应用'),
           pageFallback: body.includes('加载图表管理') || body.includes('加载图表'),
           errorBoundary: body.includes('页面出现错误'),
           bodyText: body.slice(0, 240),
           rootText: (document.getElementById('root')?.textContent || '').slice(0, 240),
-          ready: Boolean(document.getElementById('root')) &&
-            activeTab.includes('行业模板库') &&
-            !body.includes('加载应用') &&
-            !body.includes('加载图表管理') &&
-            !body.includes('页面出现错误') &&
-            (body.includes('行业模板库') || body.includes('No diagrams')),
+          ready: (${isManagementTemplatesReady.toString()})({ hasRoot, activeTab, body }),
         };
       })()`,
     },

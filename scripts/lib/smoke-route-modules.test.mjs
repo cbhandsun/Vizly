@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { createSmokeRouteCatalog } from './smoke-route-catalog.mjs';
+import {
+  createSmokeRouteCatalog,
+  isManagementTemplatesReady,
+} from './smoke-route-catalog.mjs';
 import { CdpSession } from './smoke-route-cdp-session.mjs';
 import {
   aggregateRouteSamples,
@@ -33,6 +36,42 @@ describe('smoke route modules', () => {
     expect(session.isMobile).toBe(true);
     expect(session.logs).toEqual([]);
     expect(session.networkIssues).toEqual([]);
+  });
+
+  it('accepts localized management-template empty states as ready', () => {
+    expect(isManagementTemplatesReady({
+      hasRoot: true,
+      activeTab: 'Industry templates0',
+      body: 'Industry templates0 General templates0 No diagrams yet',
+    })).toBe(true);
+    expect(isManagementTemplatesReady({
+      hasRoot: true,
+      activeTab: '行业模板库0',
+      body: '行业模板库0 通用模板库0 暂无图表',
+    })).toBe(true);
+  });
+
+  it('rejects loading, error, missing-root, and malformed template states', () => {
+    expect(isManagementTemplatesReady({
+      hasRoot: false,
+      activeTab: 'Industry templates0',
+      body: 'No diagrams yet',
+    })).toBe(false);
+    expect(isManagementTemplatesReady({
+      hasRoot: true,
+      activeTab: 'Industry templates0',
+      body: '加载应用 No diagrams yet',
+    })).toBe(false);
+    expect(isManagementTemplatesReady({
+      hasRoot: true,
+      activeTab: 'Industry templates0',
+      body: '页面出现错误 No diagrams yet',
+    })).toBe(false);
+    expect(isManagementTemplatesReady({
+      hasRoot: true,
+      activeTab: null,
+      body: 'No diagrams yet',
+    })).toBe(false);
   });
 
   it('filters allowlisted warnings but never suppresses errors', () => {
