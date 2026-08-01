@@ -12,6 +12,7 @@ vi.mock('react-i18next', () => ({
                 'designer.pages.tabList': '页面',
                 'designer.pages.new': '新建页面',
                 'designer.pages.rename': '重命名页面 {{name}}',
+                'designer.pages.renameAction': '重命名页面 {{name}}',
                 'designer.pages.delete': '删除页面 {{name}}',
                 'designer.pages.deleteConfirm': '删除「{{name}}」？',
                 'designer.pages.deleteAction': '删除',
@@ -74,6 +75,22 @@ describe('PageTabs', () => {
         );
 
         fireEvent.doubleClick(screen.getByRole('tab', { name: '页面 1' }));
+        expect(screen.getByRole('textbox', { name: '重命名页面 页面 1' })).toBeTruthy();
+    });
+
+    it('offers an explicit rename action for the active page', () => {
+        render(
+            <PageTabs
+                pages={[{ id: 'page-1', name: '页面 1', nodes: [], edges: [] }]}
+                activePageId="page-1"
+                onSwitchPage={vi.fn()}
+                onAddPage={vi.fn()}
+                onDeletePage={vi.fn()}
+                onRenamePage={vi.fn()}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: '重命名页面 页面 1' }));
         expect(screen.getByRole('textbox', { name: '重命名页面 页面 1' })).toBeTruthy();
     });
 

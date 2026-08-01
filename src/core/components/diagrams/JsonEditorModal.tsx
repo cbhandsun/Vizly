@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { Button, Modal, Segmented } from 'antd';
+import { Alert, Button, Modal, Segmented } from 'antd';
 import { UploadOutlined } from '@ant-design/icons';
 import { Node, Edge, ReactFlowInstance } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
@@ -43,12 +43,16 @@ export const JsonEditorModal: React.FC<JsonEditorModalProps> = ({
     const { t } = useTranslation();
     const [jsonContent, setJsonContent] = useState(initialContent || '');
     const [pureJsonContent, setPureJsonContent] = useState('');
+    const [validationError, setValidationError] = useState<string | null>(null);
     const [jsonFormatMode, setJsonFormatMode] = useState<'standard' | 'pure' | 'react-flow'>('standard');
     const [editorMode, setEditorMode] = useState<LazyMonacoEditorMode>('loading');
     const [editorVisible, setEditorVisible] = useState(visible);
     if (editorVisible !== visible) {
         setEditorVisible(visible);
-        if (visible) setEditorMode('loading');
+        if (visible) {
+            setEditorMode('loading');
+            setValidationError(null);
+        }
     }
     const [loadedInitialContent, setLoadedInitialContent] = useState(initialContent);
     if (loadedInitialContent !== initialContent) {
@@ -58,6 +62,15 @@ export const JsonEditorModal: React.FC<JsonEditorModalProps> = ({
             setJsonFormatMode('standard');
         }
     }
+
+    const showValidationError = useCallback((error: unknown) => {
+        const reason = error instanceof Error && error.message
+            ? error.message
+            : t('designer.flowchart.invalidJsonUnknownReason', '无法解析 JSON');
+        const message = t('designer.flowchart.invalidJson', { reason });
+        setValidationError(message);
+        appMessage.error(message);
+    }, [t]);
 
     // 当首次打开且无初始内容时，自动转换当前画布数据并与已存在的 Diagram 数据壳合并（防止布局配置等丢失）
     React.useEffect(() => {
@@ -92,6 +105,7 @@ export const JsonEditorModal: React.FC<JsonEditorModalProps> = ({
 
     const applyJsonContentToCanvas = async (contentToApply: string) => {
         try {
+            setValidationError(null);
             const parsedData = parseDiagramJson(contentToApply);
             const data = coerceStandardDiagramImport(parsedData, {
                 id: diagramId || `json-import-${Date.now()}`,
@@ -124,7 +138,7 @@ export const JsonEditorModal: React.FC<JsonEditorModalProps> = ({
             }
             return false;
         } catch (e) {
-            appMessage.error(t('designer.flowchart.invalidJson', { reason: (e as Error).message }));
+            showValidationError(e);
             return false;
         }
     };
@@ -146,9 +160,9 @@ export const JsonEditorModal: React.FC<JsonEditorModalProps> = ({
             setActiveContent(JSON.stringify(obj, null, 2));
             appMessage.success(t('designer.flowchart.jsonFormatted') || 'JSON 格式化成功');
         } catch (e: unknown) {
-            appMessage.error(t('designer.flowchart.invalidJson', { reason: (e as Error).message }));
+            showValidationError(e);
         }
-    }, [getActiveContent, setActiveContent, t]);
+    }, [getActiveContent, setActiveContent, showValidationError, t]);
 
     // Download JSON
     const handleDownload = useCallback(() => {
@@ -159,9 +173,9 @@ export const JsonEditorModal: React.FC<JsonEditorModalProps> = ({
                            jsonFormatMode === 'pure' ? 'Diagram_Pure' : 'Diagram_ReactFlow';
             downloadFile(content, `${prefix}_${new Date().getTime()}.json`, 'application/json');
         } catch (e: unknown) {
-            appMessage.error(t('designer.flowchart.invalidJson', { reason: (e as Error).message }));
+            showValidationError(e);
         }
-    }, [getActiveContent, jsonFormatMode, t]);
+    }, [getActiveContent, jsonFormatMode, showValidationError]);
 
     // Preview/Apply without closing
     const handlePreviewApply = async () => {
@@ -250,7 +264,10 @@ export const JsonEditorModal: React.FC<JsonEditorModalProps> = ({
                         { label: t('designer.jsonEditor.formatReactFlow') || 'React Flow (Read-Only)', value: 'react-flow' }
                     ]}
                     value={jsonFormatMode}
-                    onChange={(val) => setJsonFormatMode(val as 'standard' | 'pure' | 'react-flow')}
+                    onChange={(val) => {
+                        setValidationError(null);
+                        setJsonFormatMode(val as 'standard' | 'pure' | 'react-flow');
+                    }}
                 />
             </div>
             {jsonFormatMode === 'react-flow' && (
@@ -258,11 +275,22 @@ export const JsonEditorModal: React.FC<JsonEditorModalProps> = ({
                     {t('designer.jsonEditor.reactFlowWarning') || '当前处于 React Flow 内部渲染节点/边结构大纲预览（只读）。该模式仅供 Debug，不支持反向应用。如需修改架构，请切换到标准数据模式。'}
                 </div>
             )}
+            {validationError && (
+                <Alert
+                    id="json-editor-validation-error"
+                    className="json-editor-modal__validation"
+                    type="error"
+                    showIcon
+                    title={validationError}
+                    role="alert"
+                />
+            )}
             <div style={{ flex: 1, border: '1px solid #eee', borderRadius: 4, overflow: 'hidden' }}>
                 <LazyMonacoEditor
                         onModeChange={setEditorMode}
                         value={editorDisplayContent}
                         onChange={(val: string | undefined) => {
+                            setValidationError(null);
                             if (jsonFormatMode === 'standard') {
                                 setJsonContent(val || '');
                             } else if (jsonFormatMode === 'pure') {
@@ -270,6 +298,8 @@ export const JsonEditorModal: React.FC<JsonEditorModalProps> = ({
                             }
                         }}
                         language="json"
+                        ariaInvalid={Boolean(validationError)}
+                        ariaDescribedBy={validationError ? 'json-editor-validation-error' : undefined}
                         options={{
                             minimap: { enabled: false },
                             formatOnPaste: true,

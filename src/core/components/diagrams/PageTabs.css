@@ -30,6 +30,7 @@
 }
 
 .page-tabs__tab,
+.page-tabs__rename-action,
 .page-tabs__delete,
 .page-tabs__add {
     min-height: var(--commercial-touch-target, 44px);
@@ -62,6 +63,7 @@
 }
 
 .page-tabs__delete,
+.page-tabs__rename-action,
 .page-tabs__add {
     display: grid;
     width: var(--commercial-touch-target, 44px);
@@ -76,6 +78,11 @@
 .page-tabs__delete:hover {
     color: var(--page-tab-error-color);
     background: color-mix(in srgb, var(--page-tab-error-color) 8%, transparent);
+}
+
+.page-tabs__rename-action:hover {
+    color: var(--page-tab-active-color);
+    background: var(--page-tab-hover-bg);
 }
 
 .page-tabs__rename {

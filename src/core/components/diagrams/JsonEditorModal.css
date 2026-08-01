@@ -23,6 +23,10 @@
     height: var(--commercial-touch-target, 44px);
 }
 
+.json-editor-modal__validation {
+    margin-bottom: 12px;
+}
+
 .json-editor-modal .ant-segmented-item {
     min-height: var(--commercial-touch-target, 44px);
 }

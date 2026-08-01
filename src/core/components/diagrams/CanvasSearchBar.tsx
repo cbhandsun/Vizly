@@ -322,6 +322,7 @@ const actionBtnStyle = (active: boolean, token: ThemeToken): React.CSSProperties
     borderRadius: 4,
     fontSize: 11,
     padding: '1px 8px',
+    minWidth: 44,
     minHeight: 32,
     fontFamily: 'inherit',
     transition: 'all 0.15s',

@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState } from 'react';
-import { CloseOutlined, PlusOutlined } from '@ant-design/icons';
+import { CloseOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
 import { Input, Popconfirm, theme, Tooltip } from 'antd';
 import type { InputRef } from 'antd';
 import { useTranslation } from 'react-i18next';
@@ -91,6 +91,19 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                             >
                                 {page.name}
                             </button>
+                        )}
+
+                        {isActive && !isEditing && (
+                            <Tooltip title={t('designer.pages.renameAction', { name: page.name, defaultValue: '重命名页面 {{name}}' })}>
+                                <button
+                                    type="button"
+                                    aria-label={t('designer.pages.renameAction', { name: page.name, defaultValue: '重命名页面 {{name}}' })}
+                                    className="page-tabs__rename-action"
+                                    onClick={() => handleStartRename(page)}
+                                >
+                                    <EditOutlined aria-hidden style={{ fontSize: 12 }} />
+                                </button>
+                            </Tooltip>
                         )}
 
                         {pages.length > 1 && !isEditing && (

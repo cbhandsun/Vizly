@@ -32,4 +32,19 @@ describe('LazyMonacoEditor', () => {
         expect(onChange).toHaveBeenCalledWith('{"name":"after"}');
         expect(onModeChange).toHaveBeenLastCalledWith('basic');
     });
+
+    it('exposes validation semantics supplied by the host dialog', () => {
+        render(
+            <LazyMonacoEditor
+                value="invalid"
+                ariaLabel="Mermaid 基础编辑器"
+                ariaInvalid
+                ariaDescribedBy="mermaid-import-error"
+            />,
+        );
+
+        const editor = screen.getByRole('textbox', { name: 'Mermaid 基础编辑器' });
+        expect(editor.getAttribute('aria-invalid')).toBe('true');
+        expect(editor.getAttribute('aria-describedby')).toBe('mermaid-import-error');
+    });
 });

@@ -1,0 +1,26 @@
+.mermaid-import-modal .ant-modal {
+  box-sizing: border-box;
+  max-width: calc(100vw - 32px);
+}
+
+.mermaid-import-modal .ant-modal-close,
+.mermaid-import-modal .ant-modal-footer .ant-btn {
+  min-width: var(--commercial-touch-target, 44px);
+  min-height: var(--commercial-touch-target, 44px);
+}
+
+@media (max-width: 640px) {
+  .mermaid-import-modal .ant-modal {
+    margin: 16px auto;
+    padding-bottom: 0;
+  }
+
+  .mermaid-import-modal .ant-modal-content {
+    max-height: calc(100dvh - 32px);
+    overflow: auto;
+  }
+
+  .mermaid-import-modal .ant-modal-body {
+    padding-inline: 16px;
+  }
+}

@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { Modal, Button, Space, Alert } from 'antd';
-import Editor from '@monaco-editor/react';
 import type { Edge, Node } from '@xyflow/react';
 import { MermaidParser } from '@/services/import/MermaidParser';
 import { appMessage } from '@/core/utils/antdStaticBridge';
+import LazyMonacoEditor from '@/core/components/lazy/LazyMonacoEditor';
+import './MermaidImportModal.css';
 
 
 interface MermaidImportModalProps {
@@ -49,6 +50,7 @@ export const MermaidImportModal: React.FC<MermaidImportModalProps> = ({ visible,
     <Modal
       title="从 Mermaid 导入"
       open={visible}
+      rootClassName="mermaid-import-modal"
       onCancel={onClose}
       getContainer={() => document.getElementById('app-root-layout') || document.body}
       width={800}
@@ -61,27 +63,28 @@ export const MermaidImportModal: React.FC<MermaidImportModalProps> = ({ visible,
         </Button>,
       ]}
     >
-      <Space direction="vertical" style={{ width: '100%' }} size="middle">
+      <Space orientation="vertical" style={{ width: '100%' }} size="middle">
         <Alert 
-          message="目前仅支持 Flowchart (graph/flowchart) 基础语法。导入后可手动微调布局。" 
+          title="目前仅支持 Flowchart (graph/flowchart) 基础语法。导入后可手动微调布局。"
           type="info" 
           showIcon 
         />
         
-        {error && <Alert message={error} type="error" showIcon />}
+        {error && <Alert id="mermaid-import-error" title={error} type="error" showIcon role="alert" />}
 
         <div style={{ height: '400px', border: '1px solid #d9d9d9', borderRadius: '4px', overflow: 'hidden' }}>
-          <Editor
-            height="100%"
-            defaultLanguage="markdown"
-            theme="vs-dark"
+          <LazyMonacoEditor
+            ariaLabel="Mermaid 基础编辑器"
+            ariaInvalid={Boolean(error)}
+            ariaDescribedBy={error ? 'mermaid-import-error' : undefined}
             value={code}
-            onChange={(val) => setCode(val || '')}
+            onChange={(val) => {
+              setError(null);
+              setCode(val || '');
+            }}
+            language="markdown"
             options={{
               minimap: { enabled: false },
-              fontSize: 14,
-              scrollBeyondLastLine: false,
-              automaticLayout: true,
             }}
           />
         </div>

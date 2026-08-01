@@ -561,6 +561,7 @@
             "tabList": "页面",
             "new": "新建页面",
             "rename": "重命名页面 {{name}}",
+            "renameAction": "重命名页面 {{name}}",
             "delete": "删除页面 {{name}}",
             "deleteConfirm": "删除「{{name}}」？",
             "deleteAction": "删除"
@@ -577,6 +578,7 @@
             },
             "importFailed": "导入失败：JSON 无效或数据格式不支持",
             "invalidJson": "JSON 无效：{{reason}}",
+            "invalidJsonUnknownReason": "无法解析 JSON",
             "commandPaletteHint": "按下 {{mod}}+K 或 / 打开命令面板",
             "commandDisabled": "当前不可用",
             "undo": {

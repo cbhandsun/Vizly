@@ -81,6 +81,7 @@ export type FlowchartDesignerOverlaysModel = Pick<FlowchartDesignerViewModel,
     | 'handlePresentationFocus'
     | 'id'
     | 'isMobile'
+    | 'isReadonly'
     | 'isVersionHistoryOpen'
     | 'jsonEditorInitialContent'
     | 'jsonEditorVisible'
@@ -257,6 +258,7 @@ export function FlowchartDesignerOverlaysRegion({ model }: { model: FlowchartDes
         edges,
         id,
         isMobile,
+        isReadonly,
         isVersionHistoryOpen,
         jsonEditorInitialContent,
         jsonEditorVisible,
@@ -347,7 +349,8 @@ export function FlowchartDesignerOverlaysRegion({ model }: { model: FlowchartDes
             {isMobile && !presentationActive && (
                 <MobileBottomDock
                     activeTab={mobilePropertyDrawerVisible ? activeRightTab : null}
-                    selectedCount={selectedNodes.length + selectedEdges.length}
+                    selectedCount={isReadonly ? 0 : selectedNodes.length + selectedEdges.length}
+                    editingDisabled={isReadonly}
                     onAddClick={() => {
                         setAiChatVisible(false);
                         setMobilePropertyDrawerVisible(false);

@@ -550,6 +550,7 @@
             "tabList": "Pages",
             "new": "New page",
             "rename": "Rename page {{name}}",
+            "renameAction": "Rename page {{name}}",
             "delete": "Delete page {{name}}",
             "deleteConfirm": "Delete “{{name}}”?",
             "deleteAction": "Delete"
@@ -632,6 +633,7 @@
             "relationshipEdgeLabel": "Related",
             "importFailed": "Import failed: invalid format",
             "invalidJson": "Invalid JSON: {{reason}}",
+            "invalidJsonUnknownReason": "Unable to parse JSON",
             "commandPaletteHint": "Press {{mod}}+K to open command palette",
             "commandDisabled": "Not available",
             "undo": {

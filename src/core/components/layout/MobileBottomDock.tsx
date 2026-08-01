@@ -17,6 +17,7 @@ interface MobileBottomDockProps {
     onRedo?: () => void;
     canUndo?: boolean;
     canRedo?: boolean;
+    editingDisabled?: boolean;
     selectedCount: number;
     activeTab: 'property' | 'ai' | null;
 }
@@ -35,6 +36,7 @@ export const MobileBottomDock: React.FC<MobileBottomDockProps> = ({
     onRedo,
     canUndo,
     canRedo,
+    editingDisabled = false,
     selectedCount,
     activeTab
 }) => {
@@ -52,6 +54,7 @@ export const MobileBottomDock: React.FC<MobileBottomDockProps> = ({
                         type="button"
                         className="mobile-dock-btn primary"
                         onClick={onAddClick}
+                        disabled={editingDisabled}
                         aria-label={t('designer.mobileDock.add', '添加组件')}
                     >
                         <FaPlus />
@@ -62,6 +65,7 @@ export const MobileBottomDock: React.FC<MobileBottomDockProps> = ({
                         type="button"
                         className={`mobile-dock-btn ${activeTab === 'property' ? 'active' : ''}`}
                         onClick={onPropertyClick}
+                        disabled={editingDisabled}
                         aria-label={propertyLabel}
                         aria-pressed={activeTab === 'property'}
                     >
@@ -87,6 +91,7 @@ export const MobileBottomDock: React.FC<MobileBottomDockProps> = ({
                         type="button"
                         className={`mobile-dock-btn ai-btn ${activeTab === 'ai' ? 'active' : ''}`}
                         onClick={onAiClick}
+                        disabled={editingDisabled}
                         aria-label={t('designer.mobileDock.ai', 'AI 助手')}
                         aria-pressed={activeTab === 'ai'}
                     >

@@ -17,6 +17,9 @@ export interface LazyMonacoEditorProps {
     options?: EditorProps['options'];
     language?: string;
     onModeChange?: (mode: LazyMonacoEditorMode) => void;
+    ariaLabel?: string;
+    ariaInvalid?: boolean;
+    ariaDescribedBy?: string;
 }
 
 export const LazyMonacoEditor: React.FC<LazyMonacoEditorProps> = ({
@@ -24,6 +27,9 @@ export const LazyMonacoEditor: React.FC<LazyMonacoEditorProps> = ({
     onChange,
     options,
     onModeChange,
+    ariaLabel,
+    ariaInvalid,
+    ariaDescribedBy,
 }) => {
     const { t } = useTranslation();
 
@@ -33,7 +39,9 @@ export const LazyMonacoEditor: React.FC<LazyMonacoEditorProps> = ({
 
     return (
         <textarea
-            aria-label={t('designer.jsonEditor.basicEditorLabel', { defaultValue: 'JSON 基础编辑器' })}
+            aria-label={ariaLabel ?? t('designer.jsonEditor.basicEditorLabel', { defaultValue: 'JSON 基础编辑器' })}
+            aria-invalid={ariaInvalid || undefined}
+            aria-describedby={ariaDescribedBy}
             value={value ?? ''}
             onChange={event => onChange?.(event.target.value)}
             readOnly={options?.readOnly === true}

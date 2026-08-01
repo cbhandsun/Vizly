@@ -171,6 +171,7 @@ const createOverlaysModel = (
     handlePresentationFocus: () => undefined,
     id: 'diagram-1',
     isMobile: false,
+    isReadonly: false,
     isVersionHistoryOpen: false,
     jsonEditorInitialContent: undefined,
     jsonEditorVisible: false,

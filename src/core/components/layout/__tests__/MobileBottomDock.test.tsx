@@ -39,4 +39,36 @@ describe('MobileBottomDock', () => {
         expect((screen.getByRole('button', { name: '重做' }) as HTMLButtonElement).disabled).toBe(true);
         expect(screen.getByRole('button', { name: '设置' })).toBeTruthy();
     });
+
+    it('disables editing actions when the canvas is read-only', () => {
+        const onAddClick = vi.fn();
+        const onPropertyClick = vi.fn();
+        const onAiClick = vi.fn();
+        render(
+            <MobileBottomDock
+                onAddClick={onAddClick}
+                onPropertyClick={onPropertyClick}
+                onLayerClick={vi.fn()}
+                onAiClick={onAiClick}
+                selectedCount={0}
+                activeTab={null}
+                editingDisabled
+            />,
+        );
+
+        const addButton = screen.getByRole('button', { name: '添加组件' });
+        const propertyButton = screen.getByRole('button', { name: '属性' });
+        const aiButton = screen.getByRole('button', { name: 'AI 助手' });
+        expect((addButton as HTMLButtonElement).disabled).toBe(true);
+        expect((propertyButton as HTMLButtonElement).disabled).toBe(true);
+        expect((aiButton as HTMLButtonElement).disabled).toBe(true);
+
+        fireEvent.click(addButton);
+        fireEvent.click(propertyButton);
+        fireEvent.click(aiButton);
+        expect(onAddClick).not.toHaveBeenCalled();
+        expect(onPropertyClick).not.toHaveBeenCalled();
+        expect(onAiClick).not.toHaveBeenCalled();
+        expect((screen.getByRole('button', { name: '图层' }) as HTMLButtonElement).disabled).toBe(false);
+    });
 });
