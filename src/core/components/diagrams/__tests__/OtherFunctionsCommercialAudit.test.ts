@@ -27,10 +27,13 @@ describe('other-function commercial interaction safeguards', () => {
         expect(source).toContain('getContainer={getViewportOverlayContainer}');
         expect(source).toContain('zIndex={COMMERCIAL_VIEWPORT_MODAL_Z_INDEX}');
         expect(source).toContain('className="marketplace-toolbar"');
-        expect(source).toContain("aria-label={t('pluginMarketplace.discoverMore')}");
+        expect(source).toContain("aria-label={`${t('pluginMarketplace.discoverMore')} · ${t('pluginMarketplace.comingSoon')}`}");
         expect(source).toContain("aria-label={t('pluginMarketplace.searchPlaceholder')}");
         expect(source).toContain('className="plugin-card-switch-target"');
-        expect(source).toContain("aria-label={`${isActive ? '停用' : '启用'}插件：${plugin.name}`}");
+        expect(source).toContain("isActive ? 'pluginMarketplace.disablePlugin' : 'pluginMarketplace.enablePlugin'");
+        expect(source).toContain("appMessage.error(t('pluginMarketplace.statusChangeFailed'))");
+        expect(source).toContain('alt=""');
+        expect(source).toContain('aria-hidden="true"');
         expect(css).toMatch(/\.plugin-manager-modal \.ant-modal[\s\S]*?width: calc\(100vw - 16px\) !important/);
         expect(css).toMatch(/\.plugin-card-switch-target[\s\S]*?min-height: var\(--commercial-touch-target, 44px\)/);
         expect(css).toMatch(/\.marketplace-toolbar\.ant-space[\s\S]*?flex-direction: column/);

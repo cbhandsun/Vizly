@@ -51,13 +51,23 @@ export class PluginRegistry {
     }
   }
 
-  public setPluginActive(id: string, active: boolean): void {
-    if (this.isSafePluginId(id) && this.plugins.has(id)) {
-      this.activeStatus.set(id, active);
-      this.saveStatus();
-      // 触发全局事件，告知应用插件状态变更
-      window.dispatchEvent(new CustomEvent('vizly:plugin-status-change', { detail: { id, active } }));
+  public setPluginActive(id: string, active: boolean): boolean {
+    if (!this.isSafePluginId(id) || !this.plugins.has(id)) return false;
+
+    const previous = this.activeStatus.get(id);
+    this.activeStatus.set(id, active);
+    if (!this.saveStatus()) {
+      if (previous === undefined) {
+        this.activeStatus.delete(id);
+      } else {
+        this.activeStatus.set(id, previous);
+      }
+      return false;
     }
+
+    // 仅在状态持久化成功后通知运行时，避免 UI 与刷新后的状态分叉。
+    window.dispatchEvent(new CustomEvent('vizly:plugin-status-change', { detail: { id, active } }));
+    return true;
   }
 
   public isPluginActive(id: string): boolean {
@@ -65,14 +75,16 @@ export class PluginRegistry {
     return this.activeStatus.get(id) ?? true;
   }
 
-  private saveStatus(): void {
+  private saveStatus(): boolean {
     const statusObj = Object.fromEntries(
       Array.from(this.activeStatus).filter(([id, active]) => this.isSafePluginId(id) && typeof active === 'boolean')
     );
     try {
       localStorage.setItem(this.STORAGE_KEY, JSON.stringify(statusObj));
+      return true;
     } catch (error) {
       logUiStorageWriteFailure('PluginRegistry.saveStatus', this.STORAGE_KEY, error);
+      return false;
     }
   }
 

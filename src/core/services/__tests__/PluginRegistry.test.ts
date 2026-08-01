@@ -175,9 +175,11 @@ describe('PluginRegistry', () => {
     window.removeEventListener('vizly:plugin-status-change', listener);
   });
 
-  it('logs and keeps in-memory plugin status when persistence write fails', () => {
+  it('rolls back plugin status and suppresses change events when persistence fails', () => {
     const registry = PluginRegistry.getInstance();
     registry.register(plugin('safe-plugin'));
+    const listener = vi.fn();
+    window.addEventListener('vizly:plugin-status-change', listener);
 
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation((key: string) => {
       if (key === 'vizly_plugin_status') {
@@ -185,14 +187,16 @@ describe('PluginRegistry', () => {
       }
     });
 
-    expect(() => registry.setPluginActive('safe-plugin', false)).not.toThrow();
-    expect(registry.isPluginActive('safe-plugin')).toBe(false);
+    expect(registry.setPluginActive('safe-plugin', false)).toBe(false);
+    expect(registry.isPluginActive('safe-plugin')).toBe(true);
+    expect(listener).not.toHaveBeenCalled();
     expect(safeLogState.warn).toHaveBeenCalledWith(
       '[PluginRegistry.saveStatus] Failed to write "vizly_plugin_status":',
       expect.anything()
     );
     expect(JSON.stringify(safeLogState.warn.mock.calls[0]?.[1])).toContain('[redacted]');
     expect(JSON.stringify(safeLogState.warn.mock.calls[0]?.[1])).not.toContain('plugin-status-write-secret');
+    window.removeEventListener('vizly:plugin-status-change', listener);
   });
 
   it('unregisters plugins and promotes the next plugin as default', () => {

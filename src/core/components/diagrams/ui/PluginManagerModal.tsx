@@ -13,6 +13,7 @@ import {
 } from '@ant-design/icons';
 import { PluginRegistry } from '../../../services/PluginRegistry';
 import { DiagramTypePlugin } from '../../../types';
+import { appMessage } from '../../../utils/antdStaticBridge';
 import {
   COMMERCIAL_VIEWPORT_MODAL_CLASS,
   COMMERCIAL_VIEWPORT_MODAL_Z_INDEX,
@@ -65,7 +66,10 @@ export const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ visible,
   }, [visible, registry]);
 
   const togglePlugin = (id: string, active: boolean) => {
-    registry.setPluginActive(id, active);
+    if (!registry.setPluginActive(id, active)) {
+      appMessage.error(t('pluginMarketplace.statusChangeFailed'));
+      return;
+    }
     setActiveMap(prev => ({ ...prev, [id]: active }));
   };
 
@@ -140,7 +144,10 @@ export const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ visible,
             role="switch"
             tabIndex={0}
             aria-checked={Boolean(isActive)}
-            aria-label={`${isActive ? '停用' : '启用'}插件：${plugin.name}`}
+            aria-label={t(
+              isActive ? 'pluginMarketplace.disablePlugin' : 'pluginMarketplace.enablePlugin',
+              { name: plugin.name },
+            )}
             onClick={() => togglePlugin(plugin.id, !isActive)}
             onKeyDown={(event) => {
               if (event.key !== 'Enter' && event.key !== ' ') return;
@@ -193,7 +200,8 @@ export const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ visible,
         <div className="marketplace-hero" style={{ height: 160, position: 'relative', overflow: 'hidden', padding: 24, display: 'flex', alignItems: 'center' }}>
             <img 
                 src="/assets/marketplace_banner.png" 
-                alt="Marketplace Banner"
+                alt=""
+                aria-hidden="true"
                 style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: -1 }}
             />
             <div style={{ 
@@ -212,13 +220,12 @@ export const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ visible,
             <Button 
                 type="primary" 
                 className="marketplace-discover-button"
-                aria-label={t('pluginMarketplace.discoverMore')}
+                aria-label={`${t('pluginMarketplace.discoverMore')} · ${t('pluginMarketplace.comingSoon')}`}
                 icon={<GlobalOutlined />} 
                 disabled
-                title="在线扩展市场即将开放"
                 style={{ position: 'absolute', bottom: 24, right: 24, borderRadius: 20 }}
             >
-                {t('pluginMarketplace.discoverMore')}
+                {t('pluginMarketplace.discoverMore')} · {t('pluginMarketplace.comingSoon')}
             </Button>
         </div>
 
@@ -291,8 +298,8 @@ export const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ visible,
                         <div style={{ fontSize: 12, color: '#8c8c8c' }}>{t('pluginMarketplace.deliveryDesc')}</div>
                     </div>
                 </Space>
-                <Button type="link" disabled title="开发者 URL 配置即将开放">
-                    {t('pluginMarketplace.configDevUrl')}
+                <Button type="link" disabled>
+                    {t('pluginMarketplace.configDevUrl')} · {t('pluginMarketplace.comingSoon')}
                 </Button>
             </div>
         </div>

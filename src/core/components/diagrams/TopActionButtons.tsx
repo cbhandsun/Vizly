@@ -61,6 +61,14 @@ interface TopActionButtonsProps {
     getReactFlowSnapshot?: () => ReactFlowRenderSnapshot | null | undefined;
 }
 
+const MODE_STATUS_BUTTON_STYLE: React.CSSProperties = {
+    minHeight: 32,
+    borderRadius: 9999,
+    paddingInline: 12,
+    fontSize: 12,
+    fontWeight: 600,
+};
+
 export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
     diagramId, diagramTitle, onEditJson,
     onStartPresentation, onShowDiff,
@@ -116,6 +124,15 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
         setDocumentMenuOpen(false);
         window.setTimeout(focusDocumentMenuTrigger, 0);
     }, [focusDocumentMenuTrigger]);
+
+    const handleReadonlyToggle = useCallback(() => {
+        if (!onReadonlyChange) return;
+        const nextReadonly = !isReadonly;
+        if (nextReadonly && isCommentMode) {
+            setIsCommentMode(false);
+        }
+        onReadonlyChange(nextReadonly);
+    }, [isCommentMode, isReadonly, onReadonlyChange, setIsCommentMode]);
 
     // [Fix] Modals must render regardless of portal vs fallback path.
     // Extract them here so both branches can render the portal content + these modals.
@@ -233,7 +250,7 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
                 ? t('designer.toolbar.unlockCanvas', '解锁画布')
                 : t('designer.toolbar.lockCanvas', '锁定画布'),
             icon: isReadonly ? <FaUnlock /> : <FaLock />,
-            onClick: () => onReadonlyChange(!isReadonly),
+            onClick: handleReadonlyToggle,
         }] : []),
         ];
         const sections = [
@@ -250,6 +267,7 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
     }, [
         extraMoreItems,
         extraExportItems,
+        handleReadonlyToggle,
         isCommentMode,
         isReadonly,
         isYjsSynced,
@@ -332,6 +350,36 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
                 >
                     <span className="hidden xl:inline">{t('designer.toolbar.share')}</span>
                 </Button>
+            )}
+
+            {isCommentMode && !isReadonly && (
+                <Tooltip title={t('designer.toolbar.commentModeHint')}>
+                    <Button
+                        type="primary"
+                        ghost
+                        aria-pressed="true"
+                        aria-label={t('designer.toolbar.commentModeExit')}
+                        icon={<FaRegComment aria-hidden="true" />}
+                        onClick={() => setIsCommentMode(false)}
+                        style={MODE_STATUS_BUTTON_STYLE}
+                    >
+                        {t('designer.toolbar.commentModeStatus')}
+                    </Button>
+                </Tooltip>
+            )}
+
+            {isReadonly && onReadonlyChange && (
+                <Tooltip title={t('designer.toolbar.readonlyStatus')}>
+                    <Button
+                        type="default"
+                        aria-label={t('designer.toolbar.unlockCanvas')}
+                        icon={<FaUnlock aria-hidden="true" />}
+                        onClick={handleReadonlyToggle}
+                        style={MODE_STATUS_BUTTON_STYLE}
+                    >
+                        {t('designer.toolbar.readonlyStatusAction')}
+                    </Button>
+                </Tooltip>
             )}
 
             <CollaborationAvatars />

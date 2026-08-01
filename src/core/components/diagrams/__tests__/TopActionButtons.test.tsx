@@ -11,6 +11,13 @@ vi.mock('react-i18next', () => ({
             'designer.toolbar.presentationMode': '演示模式',
             'designer.toolbar.pluginManager': '插件管理',
             'designer.toolbar.commentMode': '评论模式',
+            'designer.toolbar.commentModeExit': '退出评论模式',
+            'designer.toolbar.commentModeStatus': '评论模式 · 退出',
+            'designer.toolbar.commentModeHint': '点击画布添加批注',
+            'designer.toolbar.readonlyStatus': '画布已锁定 · 仅可查看',
+            'designer.toolbar.readonlyStatusAction': '已锁定 · 解锁',
+            'designer.toolbar.lockCanvas': '锁定画布',
+            'designer.toolbar.unlockCanvas': '解锁画布',
             'designer.toolbar.operationHistory': '操作历史',
             'designer.toolbar.versionHistory': '版本快照',
         }[key] ?? key),
@@ -81,5 +88,51 @@ describe('TopActionButtons document menu', () => {
         expect(await screen.findByRole('menuitem', { name: /操作历史/ })).toBeTruthy();
         fireEvent.click(screen.getByRole('menuitem', { name: /版本快照/ }));
         expect(onOpenVersionHistory).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps comment and read-only modes visible with direct recovery actions', async () => {
+        const setIsCommentMode = vi.fn();
+        const commentView = render(
+            <TopActionButtons
+                disablePortal
+                isCommentMode
+                setIsCommentMode={setIsCommentMode}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: '退出评论模式' }));
+        expect(setIsCommentMode).toHaveBeenCalledWith(false);
+        commentView.unmount();
+
+        const onReadonlyChange = vi.fn();
+        render(
+            <TopActionButtons
+                disablePortal
+                isReadonly
+                onReadonlyChange={onReadonlyChange}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: '解锁画布' }));
+        expect(onReadonlyChange).toHaveBeenCalledWith(false);
+    });
+
+    it('exits comment mode before locking the canvas', async () => {
+        const setIsCommentMode = vi.fn();
+        const onReadonlyChange = vi.fn();
+        render(
+            <TopActionButtons
+                disablePortal
+                isCommentMode
+                setIsCommentMode={setIsCommentMode}
+                onReadonlyChange={onReadonlyChange}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: '文档操作' }));
+        fireEvent.click(await screen.findByRole('menuitem', { name: /锁定画布/ }));
+
+        expect(setIsCommentMode).toHaveBeenCalledWith(false);
+        expect(onReadonlyChange).toHaveBeenCalledWith(true);
     });
 });
