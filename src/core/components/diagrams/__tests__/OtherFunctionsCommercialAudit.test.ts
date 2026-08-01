@@ -19,6 +19,21 @@ describe('other-function commercial interaction safeguards', () => {
         expect(css).toMatch(/@media \(max-width: 640px\)[\s\S]*?\.json-editor-modal \.ant-modal-footer > div > div[\s\S]*?width: 100%/);
     });
 
+    it('keeps advanced export controls named, touch-safe, and explicitly reflowed on mobile', () => {
+        const source = readSource('../ui/AdvancedExportModal.tsx');
+        const css = readSource('../ui/AdvancedExportModal.css');
+
+        expect(source).toContain('rootClassName="advanced-export-modal"');
+        expect(source).toContain("'aria-label': t('common.close')");
+        expect(source).toContain('aria-label={t(\'advancedExport.formatLabel\')}');
+        expect(source).toContain('aria-label={t(\'advancedExport.dpiLabel\')}');
+        expect(css).toMatch(/\.advanced-export-modal \.ant-modal-close,[\s\S]*?min-height: var\(--commercial-touch-target, 44px\)/);
+        expect(css).toContain('.advanced-export-modal .advanced-export-dpi-select,');
+        expect(css).toMatch(/\.advanced-export-format-group\.ant-radio-group[\s\S]*?grid-template-columns: repeat\(5, minmax\(0, 1fr\)\)/);
+        expect(css).toMatch(/@media \(max-width: 480px\)[\s\S]*?grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/);
+        expect(css).toMatch(/\.advanced-export-modal \.ant-modal-footer \.ant-btn:first-child[\s\S]*?grid-column: 1 \/ -1/);
+    });
+
     it('reflows plugin discovery and management controls on narrow viewports', () => {
         const source = readSource('../ui/PluginManagerModal.tsx');
         const css = readSource('../ui/PluginMarketplace.css');
@@ -107,7 +122,9 @@ describe('other-function commercial interaction safeguards', () => {
         const source = readSource('../../../../components/diagrams/ui/VersionHistoryPanel.tsx');
 
         expect(source).toContain('aria-label="版本备注（选填）"');
-        expect(source).toContain('aria-describedby="version-history-message-hint"');
+        expect(source).toContain('aria-describedby={previewVersion');
         expect(source).toContain('留空时将使用“手动保存的版本快照”');
+        expect(source).toContain('if (isSaving || previewVersion) return;');
+        expect(source).toContain('退出预览后才能创建新快照');
     });
 });

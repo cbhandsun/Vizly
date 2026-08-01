@@ -1,0 +1,94 @@
+.advanced-export-modal .ant-modal {
+  box-sizing: border-box;
+  max-width: calc(100vw - 16px);
+}
+
+.advanced-export-modal .ant-modal-close,
+.advanced-export-modal .ant-modal-footer .ant-btn,
+.advanced-export-modal .advanced-export-format-group .ant-radio-button-wrapper,
+.advanced-export-modal .advanced-export-dpi-select,
+.advanced-export-modal .advanced-export-dpi-select .ant-select-selector {
+  min-height: var(--commercial-touch-target, 44px);
+}
+
+.advanced-export-modal .ant-modal-close,
+.advanced-export-modal .ant-modal-footer .ant-btn {
+  min-width: var(--commercial-touch-target, 44px);
+}
+
+.advanced-export-format-group.ant-radio-group {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.advanced-export-format-group .ant-radio-button-wrapper {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  padding-inline: 6px;
+}
+
+.advanced-export-dpi-select,
+.advanced-export-dpi-select .ant-select-selector {
+  align-items: center;
+}
+
+.advanced-export-options {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.advanced-export-options .ant-checkbox-wrapper {
+  display: flex;
+  min-height: var(--commercial-touch-target, 44px);
+  align-items: center;
+}
+
+@media (max-width: 480px) {
+  .advanced-export-modal .ant-modal {
+    margin: 8px auto;
+    padding-bottom: 0;
+  }
+
+  .advanced-export-modal .ant-modal-content {
+    max-height: calc(100dvh - 16px);
+    overflow: auto;
+  }
+
+  .advanced-export-modal .ant-modal-body,
+  .advanced-export-modal .ant-modal-footer {
+    padding-inline: 16px;
+  }
+
+  .advanced-export-format-group.ant-radio-group {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .advanced-export-format-group .ant-radio-button-wrapper {
+    border: 1px solid var(--ant-color-border, #d9d9d9);
+    border-radius: 6px;
+  }
+
+  .advanced-export-format-group .ant-radio-button-wrapper::before {
+    display: none;
+  }
+
+  .advanced-export-modal .ant-modal-footer {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .advanced-export-modal .ant-modal-footer .ant-btn {
+    width: 100%;
+    margin-inline-start: 0;
+  }
+
+  .advanced-export-modal .ant-modal-footer .ant-btn:first-child {
+    grid-column: 1 / -1;
+  }
+}

@@ -40,7 +40,7 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
     const [restoringVersionId, setRestoringVersionId] = useState<string | null>(null);
 
     const handleSave = async () => {
-        if (isSaving) return;
+        if (isSaving || previewVersion) return;
         setIsSaving(true);
         try {
             const saved = await saveVersion(normalizeVersionMessage(commitMessage));
@@ -81,7 +81,7 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
 
     return (
         <Drawer
-            title="版本历史 (Version History)"
+            title="版本历史"
             placement="right"
             onClose={() => {
                 const previewBase = exitPreview();
@@ -108,11 +108,14 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
                 <div className="version-history-create-row">
                     <Input 
                         aria-label="版本备注（选填）"
-                        aria-describedby="version-history-message-hint"
+                        aria-describedby={previewVersion
+                            ? 'version-history-message-hint version-history-preview-notice'
+                            : 'version-history-message-hint'}
                         placeholder="版本备注（选填，例如：添加了订单模块）"
                         value={commitMessage}
                         onChange={e => setCommitMessage(e.target.value)}
                         onPressEnter={handleSave}
+                        disabled={Boolean(previewVersion)}
                         maxLength={VERSION_MESSAGE_MAX_LENGTH}
                     />
                     <Button 
@@ -121,6 +124,7 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
                         icon={<PlusOutlined />} 
                         onClick={handleSave}
                         loading={isSaving}
+                        disabled={Boolean(previewVersion)}
                     >
                         保存
                     </Button>
@@ -136,17 +140,24 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
 
             {/* Preview Banner */}
             {previewVersion && (
-                <div style={{
-                    padding: '12px 20px',
-                    background: '#e6f4ff',
-                    borderBottom: '1px solid #91caff',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
-                }}>
-                    <Space>
-                        <EyeOutlined style={{ color: '#1677ff' }} />
-                        <Text strong style={{ color: '#1677ff', fontSize: 13 }}>正在预览: {previewVersion.message}</Text>
+                <div
+                    id="version-history-preview-notice"
+                    role="status"
+                    style={{
+                        padding: '12px 20px',
+                        background: '#e6f4ff',
+                        borderBottom: '1px solid #91caff',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center'
+                    }}
+                >
+                    <Space orientation="vertical" size={0}>
+                        <Space>
+                            <EyeOutlined style={{ color: '#1677ff' }} />
+                            <Text strong style={{ color: '#1677ff', fontSize: 13 }}>正在预览：{previewVersion.message}</Text>
+                        </Space>
+                        <Text style={{ color: '#1677ff', fontSize: 12 }}>退出预览后才能创建新快照</Text>
                     </Space>
                     <Button
                         size="small"
@@ -232,7 +243,7 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
                                     </Space>
                                 }
                                 description={
-                                    <Space direction="vertical" size={0}>
+                                    <Space orientation="vertical" size={0}>
                                         <Text type="secondary" style={{ fontSize: 12 }}>
                                             {new Date(item.createdAt).toLocaleString()}
                                         </Text>

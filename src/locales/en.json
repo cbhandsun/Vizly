@@ -1990,13 +1990,17 @@
         "includeBackground": "Include background (use PNG for transparent)",
         "embedMetadata": "Embed metadata (enables drag-to-restore in Vizly)",
         "svgHint": "Tip: SVG scales infinitely without quality loss — ideal for PowerPoint or professional design tools.",
-        "copyClipboard": "Copy to Clipboard",
+        "copyClipboard": "Copy PNG to Clipboard",
         "cancel": "Cancel",
         "confirm": "Confirm Export",
         "successMsg": "Successfully exported {{format}}",
         "errorMsg": "Export failed, please try again",
         "copySuccess": "Copied to clipboard — paste directly into Lark/DingTalk",
-        "copyFailed": "Copy failed"
+        "copyFailed": "Copy failed",
+        "sceneBasedHint": "PNG/SVG exports are rendered from the current canvas data for a reliable result.",
+        "legacyExportHint": "The selected format uses the standard export engine.",
+        "svgPreviewAlt": "SVG export preview",
+        "svgPreviewUnavailable": "SVG preview is temporarily unavailable"
     },
     "collaboration": {
         "onlineIndicator": "Online",

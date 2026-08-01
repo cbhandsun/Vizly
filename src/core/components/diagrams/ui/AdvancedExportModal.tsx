@@ -21,6 +21,7 @@ import {
 } from '../../../rendering/reactFlowScene';
 import { buildSvgPreviewModel, type SvgPreviewModel } from '../../../export/svgPreviewModel';
 import { isSafeExportDataUrl } from '../../shared/exportUtils';
+import './AdvancedExportModal.css';
 
 
 interface AdvancedExportModalProps {
@@ -40,11 +41,11 @@ export const AdvancedExportModeNotice: React.FC<{
   const message = usesScenePath
     ? t(
       'advancedExport.sceneBasedHint',
-      'PNG/SVG export uses the scene model safe approximation when canvas data is available.',
+      'PNG/SVG exports are rendered from the current canvas data for a reliable result.',
     )
     : t(
       'advancedExport.legacyExportHint',
-      'This format uses the existing export path.',
+      'The selected format uses the standard export engine.',
     );
 
   return (
@@ -213,14 +214,27 @@ export const AdvancedExportModal: React.FC<AdvancedExportModalProps> = ({ visibl
 
   return (
     <Modal
+      rootClassName="advanced-export-modal"
       title={<span><DownloadOutlined /> {t('advancedExport.title')}</span>}
       open={visible}
       onCancel={onClose}
+      closable={{
+        'aria-label': t('common.close'),
+        disabled: exporting,
+      }}
+      keyboard={!exporting}
+      mask={{ closable: !exporting }}
       footer={[
-        <Button key="copy" icon={<CopyOutlined />} onClick={handleCopyClipboard}>
+        <Button
+          key="copy"
+          icon={<CopyOutlined />}
+          aria-label={t('advancedExport.copyClipboard')}
+          disabled={exporting}
+          onClick={handleCopyClipboard}
+        >
           {t('advancedExport.copyClipboard')}
         </Button>,
-        <Button key="cancel" onClick={onClose}>
+        <Button key="cancel" disabled={exporting} onClick={onClose}>
           {t('advancedExport.cancel')}
         </Button>,
         <Button key="submit" type="primary" icon={<DownloadOutlined />} loading={exporting} onClick={handleExport}>
@@ -231,23 +245,26 @@ export const AdvancedExportModal: React.FC<AdvancedExportModalProps> = ({ visibl
     >
       <div style={{ padding: 'var(--glass-padding-md, 24px) 0' }}>
         <p style={{ fontWeight: 500, marginBottom: 8 }}>{t('advancedExport.formatLabel')}</p>
-        <Radio.Group 
+        <Radio.Group
+          className="advanced-export-format-group"
+          aria-label={t('advancedExport.formatLabel')}
           value={format} 
           onChange={(e) => setFormat(e.target.value)}
           buttonStyle="solid"
-          style={{ width: '100%' }}
         >
-          <Radio.Button value="png" style={{ width: '20%', textAlign: 'center' }}><FileImageOutlined /> PNG</Radio.Button>
-          <Radio.Button value="jpg" style={{ width: '20%', textAlign: 'center' }}>JPG</Radio.Button>
-          <Radio.Button value="svg" style={{ width: '20%', textAlign: 'center' }}>SVG</Radio.Button>
-          <Radio.Button value="pdf" style={{ width: '20%', textAlign: 'center' }}><FilePdfOutlined /> PDF</Radio.Button>
-          <Radio.Button value="json" style={{ width: '20%', textAlign: 'center' }}><CodeOutlined /> JSON</Radio.Button>
+          <Radio.Button value="png"><FileImageOutlined /> PNG</Radio.Button>
+          <Radio.Button value="jpg">JPG</Radio.Button>
+          <Radio.Button value="svg">SVG</Radio.Button>
+          <Radio.Button value="pdf"><FilePdfOutlined /> PDF</Radio.Button>
+          <Radio.Button value="json"><CodeOutlined /> JSON</Radio.Button>
         </Radio.Group>
 
         <Divider style={{ margin: '16px 0' }} />
 
         <p style={{ fontWeight: 500, marginBottom: 8 }}>{t('advancedExport.dpiLabel')}</p>
-        <Select 
+        <Select
+          className="advanced-export-dpi-select"
+          aria-label={t('advancedExport.dpiLabel')}
           value={pixelRatio} 
           disabled={format === 'json' || format === 'svg'}
           onChange={setPixelRatio}
@@ -261,15 +278,17 @@ export const AdvancedExportModal: React.FC<AdvancedExportModalProps> = ({ visibl
 
         <Divider style={{ margin: '16px 0' }} />
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <Checkbox 
+        <div className="advanced-export-options">
+          <Checkbox
+            aria-label={t('advancedExport.includeBackground')}
             checked={includeBackground} 
             onChange={(e) => setIncludeBackground(e.target.checked)}
             disabled={format === 'pdf' || format === 'jpg'}
           >
             {t('advancedExport.includeBackground')}
           </Checkbox>
-          <Checkbox 
+          <Checkbox
+            aria-label={t('advancedExport.embedMetadata')}
             checked={embedMetadata} 
             onChange={(e) => setEmbedMetadata(e.target.checked)}
           >

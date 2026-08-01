@@ -5,6 +5,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  AdvancedExportModal,
   AdvancedExportModeNotice,
   SvgExportPreview,
 } from '../ui/AdvancedExportModal';
@@ -12,9 +13,23 @@ import { isSceneBasedAdvancedExportFormat } from '../advancedExportMode';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (_key: string, fallback?: string | Record<string, unknown>) => (
-      typeof fallback === 'string' ? fallback : _key
-    ),
+    t: (key: string, fallback?: string | Record<string, unknown>) => {
+      const translations: Record<string, string> = {
+        'advancedExport.title': '高级图表导出',
+        'advancedExport.formatLabel': '选择导出格式',
+        'advancedExport.dpiLabel': '图片清晰度 (DPI)',
+        'advancedExport.dpi1x': '1x - 标准清晰度',
+        'advancedExport.dpi2x': '2x - 高清（推荐）',
+        'advancedExport.dpi4x': '4x - 印刷级超清',
+        'advancedExport.includeBackground': '包含底色背景',
+        'advancedExport.embedMetadata': '注入元数据',
+        'advancedExport.copyClipboard': '复制 PNG 到剪贴板',
+        'advancedExport.cancel': '取消',
+        'advancedExport.confirm': '确认导出',
+        'common.close': '关闭',
+      };
+      return translations[key] ?? (typeof fallback === 'string' ? fallback : key);
+    },
   }),
 }));
 
@@ -136,11 +151,11 @@ describe('AdvancedExportModeNotice', () => {
     expect(isSceneBasedAdvancedExportFormat('json')).toBe(false);
   });
 
-  it('explains the scene model safe approximation for PNG and SVG when snapshots are available', () => {
+  it('explains reliable canvas rendering for PNG and SVG when snapshots are available', () => {
     render(<AdvancedExportModeNotice format="svg" hasSnapshotProvider />);
 
     expect(screen.getByTestId('advanced-export-mode-notice').textContent).toContain(
-      'scene model safe approximation',
+      'rendered from the current canvas data',
     );
   });
 
@@ -148,7 +163,7 @@ describe('AdvancedExportModeNotice', () => {
     render(<AdvancedExportModeNotice format="pdf" hasSnapshotProvider />);
 
     expect(screen.getByTestId('advanced-export-mode-notice').textContent).toContain(
-      'existing export path',
+      'standard export engine',
     );
   });
 
@@ -156,7 +171,27 @@ describe('AdvancedExportModeNotice', () => {
     render(<AdvancedExportModeNotice format="png" hasSnapshotProvider={false} />);
 
     expect(screen.getByTestId('advanced-export-mode-notice').textContent).toContain(
-      'existing export path',
+      'standard export engine',
     );
+  });
+});
+
+describe('AdvancedExportModal commercial controls', () => {
+  it('names the format, resolution, options, close, and PNG clipboard actions', () => {
+    render(
+      <AdvancedExportModal
+        visible
+        onClose={vi.fn()}
+        diagramId="diagram-1"
+        diagramTitle="Audit diagram"
+      />,
+    );
+
+    expect(screen.getByRole('radiogroup', { name: '选择导出格式' })).toBeTruthy();
+    expect(screen.getByRole('combobox', { name: '图片清晰度 (DPI)' })).toBeTruthy();
+    expect(screen.getByRole('checkbox', { name: '包含底色背景' })).toBeTruthy();
+    expect(screen.getByRole('checkbox', { name: '注入元数据' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: '复制 PNG 到剪贴板' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: '关闭' })).toBeTruthy();
   });
 });
