@@ -1,6 +1,8 @@
-import React from 'react';
-import { Modal, Space, theme } from 'antd';
+import React, { useMemo, useState } from 'react';
+import { Input, Modal, Space, theme } from 'antd';
+import { SearchOutlined } from '@ant-design/icons';
 import { FaKeyboard } from 'react-icons/fa';
+import { AccessibleInputClearIcon } from './AccessibleInputClearIcon';
 import './KeyboardShortcutPanel.css';
 
 interface KeyboardShortcutPanelProps {
@@ -59,6 +61,8 @@ const createShortcutGroups = (isMac: boolean): ShortcutGroup[] => [
         title: '高级功能',
         items: [
             { keys: ['Ctrl', 'K'], label: '命令面板' },
+            { keys: [isMac ? '⌘' : 'Ctrl', 'F'], label: '搜索画布节点' },
+            { keys: [isMac ? '⌘' : 'Ctrl', 'H'], label: '查找并替换节点文本' },
             { keys: ['Alt', '拖拽'], label: '拖拽复制节点' },
             { keys: ['Shift', '点击'], label: '多选节点' },
             { keys: ['?'], label: '显示快捷键面板' },
@@ -89,9 +93,24 @@ const KeyBadge: React.FC<{ children: string; token: ThemeToken }> = ({ children,
 
 export const KeyboardShortcutPanel: React.FC<KeyboardShortcutPanelProps> = ({ visible, onClose }) => {
     const { token } = theme.useToken();
-    const shortcutGroups = createShortcutGroups(
+    const [searchText, setSearchText] = useState('');
+    const shortcutGroups = useMemo(() => createShortcutGroups(
         typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform),
-    );
+    ), []);
+    const filteredGroups = useMemo(() => {
+        const normalizedSearch = searchText.trim().toLocaleLowerCase();
+        if (!normalizedSearch) return shortcutGroups;
+
+        return shortcutGroups
+            .map((group) => ({
+                ...group,
+                items: group.items.filter((item) => (
+                    item.label.toLocaleLowerCase().includes(normalizedSearch)
+                    || item.keys.join('+').toLocaleLowerCase().includes(normalizedSearch)
+                )),
+            }))
+            .filter((group) => group.items.length > 0);
+    }, [searchText, shortcutGroups]);
 
     return (
         <Modal
@@ -101,13 +120,26 @@ export const KeyboardShortcutPanel: React.FC<KeyboardShortcutPanelProps> = ({ vi
             footer={null}
             width={520}
             centered
+            afterClose={() => setSearchText('')}
             rootClassName="keyboard-shortcut-panel"
             styles={{
                 body: { maxHeight: '60vh', overflowY: 'auto', padding: '12px 0' },
             }}
         >
-            {shortcutGroups.map((group, gi) => (
-                <div key={gi} style={{ marginBottom: gi < shortcutGroups.length - 1 ? 16 : 0 }}>
+            <Input
+                aria-label="搜索快捷键或动作"
+                placeholder="搜索快捷键或动作..."
+                prefix={<SearchOutlined aria-hidden="true" />}
+                allowClear={{
+                    clearIcon: <AccessibleInputClearIcon label="清除快捷键搜索" />,
+                }}
+                value={searchText}
+                onChange={(event) => setSearchText(event.target.value)}
+                style={{ margin: '0 24px 12px', width: 'calc(100% - 48px)' }}
+            />
+
+            {filteredGroups.map((group, gi) => (
+                <div key={group.title} style={{ marginBottom: gi < filteredGroups.length - 1 ? 16 : 0 }}>
                     <div style={{
                         fontSize: 12,
                         fontWeight: 700,
@@ -118,8 +150,8 @@ export const KeyboardShortcutPanel: React.FC<KeyboardShortcutPanelProps> = ({ vi
                     }}>
                         {group.title}
                     </div>
-                    {group.items.map((item, ii) => (
-                        <div key={ii} style={{
+                    {group.items.map((item) => (
+                        <div key={`${item.label}-${item.keys.join('-')}`} style={{
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
@@ -145,6 +177,12 @@ export const KeyboardShortcutPanel: React.FC<KeyboardShortcutPanelProps> = ({ vi
                     ))}
                 </div>
             ))}
+
+            {filteredGroups.length === 0 && (
+                <div role="status" style={{ padding: '28px 24px', textAlign: 'center', color: token.colorTextSecondary }}>
+                    未找到匹配的快捷键
+                </div>
+            )}
 
             <div style={{
                 textAlign: 'center',

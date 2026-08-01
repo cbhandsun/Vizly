@@ -475,7 +475,14 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
                                 {activePanel === 'shapes' && (
                                     <>
                                         <Tooltip title={t('designer.sidebar.zoomOutHint')}>
-                                            <Button type="text" size="small" icon={<FaSearchMinus />} onClick={panelZoom.zoomOut} />
+                                            <Button
+                                                type="text"
+                                                size="small"
+                                                aria-label={t('designer.sidebar.zoomOutHint')}
+                                                icon={<FaSearchMinus aria-hidden="true" />}
+                                                onClick={panelZoom.zoomOut}
+                                                style={{ minWidth: 'var(--commercial-touch-target, 44px)', height: 'var(--commercial-touch-target, 44px)' }}
+                                            />
                                         </Tooltip>
                                         <Popover
                                             trigger="click"
@@ -492,12 +499,24 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
                                                 </div>
                                             }
                                         >
-                                            <Button type="text" size="small">
+                                            <Button
+                                                type="text"
+                                                size="small"
+                                                aria-label={`${t('designer.sidebar.zoomLevel')} ${panelZoom.percent}%`}
+                                                style={{ minWidth: 'var(--commercial-touch-target, 44px)', height: 'var(--commercial-touch-target, 44px)' }}
+                                            >
                                                 {panelZoom.percent}%
                                             </Button>
                                         </Popover>
                                         <Tooltip title={t('designer.sidebar.zoomInHint')}>
-                                            <Button type="text" size="small" icon={<FaSearchPlus />} onClick={panelZoom.zoomIn} />
+                                            <Button
+                                                type="text"
+                                                size="small"
+                                                aria-label={t('designer.sidebar.zoomInHint')}
+                                                icon={<FaSearchPlus aria-hidden="true" />}
+                                                onClick={panelZoom.zoomIn}
+                                                style={{ minWidth: 'var(--commercial-touch-target, 44px)', height: 'var(--commercial-touch-target, 44px)' }}
+                                            />
                                         </Tooltip>
                                     </>
                                 )}

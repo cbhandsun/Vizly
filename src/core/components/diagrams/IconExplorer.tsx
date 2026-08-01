@@ -6,6 +6,7 @@ import { PluginContext } from '../../types/plugin';
 import { appMessage } from '@/core/utils/antdStaticBridge';
 import { isSafeIconifyIconName, searchIconifyIcons } from '@/core/utils/iconifySecurity';
 import { logDiagramIconExplorerFetchFailure } from '../shared/iconSearchLogging';
+import { AccessibleInputClearIcon } from './AccessibleInputClearIcon';
 
 
 const { Text } = Typography;
@@ -23,7 +24,14 @@ const POPULAR_COLLECTIONS = [
     { prefix: 'carbon', title: 'IBM Carbon', icon: 'carbon:carbon' },
 ];
 
-export const IconExplorer: React.FC<IconExplorerProps> = ({ ctx: _ctx }) => {
+const createIconNodeData = (iconName: string) => ({
+    label: iconName.split(':').pop() || 'Icon',
+    icon: iconName,
+    width: 64,
+    height: 64,
+});
+
+export const IconExplorer: React.FC<IconExplorerProps> = ({ ctx }) => {
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<string[]>([]);
     const [loading, setLoading] = useState(false);
@@ -74,18 +82,14 @@ export const IconExplorer: React.FC<IconExplorerProps> = ({ ctx: _ctx }) => {
         }
         const target = event.currentTarget as HTMLElement;
         const rect = target.getBoundingClientRect();
+        const iconData = createIconNodeData(iconName);
         
         // Structure the payload for useDiagramDragDrop
         event.dataTransfer.setData('application/reactflow', JSON.stringify({
             type: 'iconNode',
             typeName: 'iconNode',
-            label: iconName.split(':').pop() || 'Icon',
-            config: {
-                icon: iconName,
-                // Default styles
-                width: 64,
-                height: 64,
-            },
+            label: iconData.label,
+            config: iconData,
             offsetX: rect.width / 2,
             offsetY: rect.height / 2,
             clientWidth: rect.width,
@@ -105,7 +109,8 @@ export const IconExplorer: React.FC<IconExplorerProps> = ({ ctx: _ctx }) => {
                 <Input
                     prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
                     placeholder="搜索 100,000+ 图标..."
-                    allowClear
+                    aria-label="搜索云端图标"
+                    allowClear={{ clearIcon: <AccessibleInputClearIcon label="清除图标搜索" /> }}
                     size="small"
                     value={query}
                     onChange={e => setQuery(e.target.value)}
@@ -122,9 +127,11 @@ export const IconExplorer: React.FC<IconExplorerProps> = ({ ctx: _ctx }) => {
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
                             {POPULAR_COLLECTIONS.map(item => (
-                                <div
+                                <button
+                                    type="button"
                                     key={item.prefix}
                                     onClick={() => handlePresetClick(item.prefix)}
+                                    aria-label={`搜索图标库 ${item.title}`}
                                     style={{
                                         padding: '10px 8px',
                                         background: 'rgba(255,255,255,0.5)',
@@ -149,7 +156,7 @@ export const IconExplorer: React.FC<IconExplorerProps> = ({ ctx: _ctx }) => {
                                 >
                                     <Icon icon={item.icon} style={{ fontSize: 24 }} />
                                     <Text style={{ fontSize: 10, fontWeight: 500 }}>{item.title}</Text>
-                                </div>
+                                </button>
                             ))}
                         </div>
                     </div>
@@ -163,9 +170,12 @@ export const IconExplorer: React.FC<IconExplorerProps> = ({ ctx: _ctx }) => {
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
                         {visibleResults.map(iconName => (
                             <Tooltip key={iconName} title={iconName} placement="right">
-                                <div
+                                <button
+                                    type="button"
                                     draggable
                                     onDragStart={(e) => onDragStart(e, iconName)}
+                                    onClick={() => ctx.addNode('iconNode', createIconNodeData(iconName))}
+                                    aria-label={`添加图标 ${iconName}`}
                                     style={{
                                         aspectRatio: '1',
                                         display: 'flex',
@@ -188,7 +198,7 @@ export const IconExplorer: React.FC<IconExplorerProps> = ({ ctx: _ctx }) => {
                                     }}
                                 >
                                     <Icon icon={iconName} style={{ fontSize: 28, width: '100%', height: '100%' }} />
-                                </div>
+                                </button>
                             </Tooltip>
                         ))}
                     </div>
@@ -201,7 +211,7 @@ export const IconExplorer: React.FC<IconExplorerProps> = ({ ctx: _ctx }) => {
             <div style={{ padding: '8px 12px', background: 'rgba(0,0,0,0.02)', borderTop: '1px solid rgba(0,0,0,0.05)' }}>
                 <Text type="secondary" style={{ fontSize: 10 }}>
                     <CloudDownloadOutlined style={{ marginRight: 4 }} />
-                    直接拖拽图标到画布即可插入
+                    点击添加，或拖拽到画布指定位置
                 </Text>
             </div>
         </div>

@@ -760,6 +760,9 @@
             "title": "流程图快捷键",
             "subtitle": "这些快捷键在流程图画布中可用；系统会自动使用 {{mod}}。",
             "paletteDescription": "查看流程图快捷键清单",
+            "searchPlaceholder": "搜索快捷键或动作...",
+            "clearSearch": "清除快捷键搜索",
+            "noResults": "未找到匹配的快捷键",
             "table": {
                 "action": "动作",
                 "shortcut": "快捷键",
@@ -767,6 +770,8 @@
             },
             "action": {
                 "palette": "打开命令面板",
+                "canvasSearch": "搜索画布节点",
+                "findReplace": "查找并替换节点文本",
                 "undo": "撤销",
                 "redo": "重做",
                 "copy": "复制选中",
@@ -818,6 +823,7 @@
             "reset": "重置",
             "zoomInHint": "放大（Ctrl+滚轮也可）",
             "zoomOutHint": "缩小（Ctrl+滚轮也可）",
+            "zoomLevel": "组件库缩放",
             "layers": "图层",
             "techIcons": "技术图标",
             "server": "服务器",

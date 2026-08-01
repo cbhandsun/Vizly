@@ -1,7 +1,15 @@
 import React, { useState } from 'react';
 import { Button, Input, Tooltip, Popconfirm, Empty, theme } from 'antd';
-import { DeleteOutlined, PlusOutlined, StarFilled } from '@ant-design/icons';
+import {
+    CheckOutlined,
+    CloseOutlined,
+    DeleteOutlined,
+    EditOutlined,
+    PlusOutlined,
+    StarFilled,
+} from '@ant-design/icons';
 import type { NodeTemplate } from './hooks/useNodeTemplates';
+import { AccessibleInputClearIcon } from './AccessibleInputClearIcon';
 
 interface NodeTemplatePanelProps {
     templates: NodeTemplate[];
@@ -43,10 +51,11 @@ export const NodeTemplatePanel: React.FC<NodeTemplatePanelProps> = ({
             <Input
                 size="small"
                 placeholder="搜索模板..."
+                aria-label="搜索模板"
                 prefix={<StarFilled style={{ color: token.colorTextQuaternary, fontSize: 11 }} />}
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                allowClear
+                allowClear={{ clearIcon: <AccessibleInputClearIcon label="清除模板搜索" /> }}
                 style={{ marginBottom: 8 }}
             />
 
@@ -59,6 +68,12 @@ export const NodeTemplatePanel: React.FC<NodeTemplatePanelProps> = ({
                             或选中节点后 Ctrl+Alt+S
                         </span>
                     }
+                    style={{ margin: '20px 0' }}
+                />
+            ) : Object.keys(filteredGroups).length === 0 ? (
+                <Empty
+                    image={Empty.PRESENTED_IMAGE_SIMPLE}
+                    description="未找到匹配模板"
                     style={{ margin: '20px 0' }}
                 />
             ) : (
@@ -79,16 +94,18 @@ export const NodeTemplatePanel: React.FC<NodeTemplatePanelProps> = ({
                         </div>
 
                         {/* 模板列表 */}
-                        {items.map(tpl => (
-                            <TemplateItem
-                                key={tpl.id}
-                                template={tpl}
-                                onUse={() => onUseTemplate(tpl.id)}
-                                onDelete={() => onDeleteTemplate(tpl.id)}
-                                onRename={(name) => onRenameTemplate(tpl.id, name)}
-                                token={token}
-                            />
-                        ))}
+                        <div role="list" aria-label={`${category}模板`}>
+                            {items.map(tpl => (
+                                <TemplateItem
+                                    key={tpl.id}
+                                    template={tpl}
+                                    onUse={() => onUseTemplate(tpl.id)}
+                                    onDelete={() => onDeleteTemplate(tpl.id)}
+                                    onRename={(name) => onRenameTemplate(tpl.id, name)}
+                                    token={token}
+                                />
+                            ))}
+                        </div>
                     </div>
                 ))
             )}
@@ -103,21 +120,41 @@ const TemplateItem: React.FC<{
     onDelete: () => void;
     onRename: (name: string) => void;
     token: ReturnType<typeof theme.useToken>['token'];
-}> = ({ template, onUse, onDelete, token }) => {
+}> = ({ template, onUse, onDelete, onRename, token }) => {
     const shape = (template.data.shape as string) || 'rectangle';
     const mainColor = (template.data.theme as Record<string, string>)?.main || '#2196F3';
     const isGroup = template.isGroup && template.nodes && template.nodes.length > 1;
+    const [isRenaming, setIsRenaming] = useState(false);
+    const [draftName, setDraftName] = useState(template.name);
+    const normalizedDraftName = draftName.trim();
+
+    const startRenaming = () => {
+        setDraftName(template.name);
+        setIsRenaming(true);
+    };
+
+    const cancelRenaming = () => {
+        setDraftName(template.name);
+        setIsRenaming(false);
+    };
+
+    const commitRename = () => {
+        if (!normalizedDraftName) return;
+        if (normalizedDraftName !== template.name) onRename(normalizedDraftName);
+        setDraftName(normalizedDraftName);
+        setIsRenaming(false);
+    };
 
     return (
         <div
-            onClick={onUse}
+            role="listitem"
+            aria-label={`模板 ${template.name}`}
             style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: 8,
                 padding: '6px 8px',
                 borderRadius: token.borderRadius,
-                cursor: 'pointer',
                 transition: 'background 0.15s',
                 marginBottom: 2,
             }}
@@ -144,46 +181,110 @@ const TemplateItem: React.FC<{
             </div>
 
             {/* 名称 */}
-            <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{
-                    fontSize: 12,
-                    fontWeight: 500,
-                    color: token.colorText,
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                }}>
-                    {template.name}
+            {isRenaming ? (
+                <div style={{ display: 'flex', flex: 1, minWidth: 0, alignItems: 'center', gap: 4 }}>
+                    <Input
+                        autoFocus
+                        size="small"
+                        maxLength={80}
+                        aria-label={`重命名模板 ${template.name}`}
+                        aria-invalid={!normalizedDraftName}
+                        value={draftName}
+                        onChange={(event) => setDraftName(event.target.value)}
+                        onPressEnter={commitRename}
+                        onKeyDown={(event) => {
+                            if (event.key === 'Escape') cancelRenaming();
+                        }}
+                    />
+                    <Button
+                        type="text"
+                        size="small"
+                        aria-label={`保存模板名称 ${template.name}`}
+                        disabled={!normalizedDraftName}
+                        icon={<CheckOutlined aria-hidden="true" />}
+                        onClick={commitRename}
+                        style={{ width: 44, height: 44, minWidth: 44 }}
+                    />
+                    <Button
+                        type="text"
+                        size="small"
+                        aria-label={`取消重命名模板 ${template.name}`}
+                        icon={<CloseOutlined aria-hidden="true" />}
+                        onClick={cancelRenaming}
+                        style={{ width: 44, height: 44, minWidth: 44 }}
+                    />
                 </div>
-                <div style={{ fontSize: 10, color: token.colorTextQuaternary }}>
-                    {isGroup ? `${template.nodes!.length} 节点 · ${template.edges?.length || 0} 连线` : shape}
-                </div>
-            </div>
+            ) : (
+                <button
+                    type="button"
+                    aria-label={`使用模板 ${template.name}`}
+                    onClick={onUse}
+                    style={{
+                        flex: 1,
+                        minWidth: 0,
+                        padding: 0,
+                        border: 0,
+                        background: 'transparent',
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                        minHeight: 44,
+                    }}
+                >
+                    <div style={{
+                        fontSize: 12,
+                        fontWeight: 500,
+                        color: token.colorText,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                    }}>
+                        {template.name}
+                    </div>
+                    <div style={{ fontSize: 10, color: token.colorTextQuaternary }}>
+                        {isGroup ? `${template.nodes!.length} 节点 · ${template.edges?.length || 0} 连线` : shape}
+                    </div>
+                </button>
+            )}
 
             {/* 操作 */}
-            <Tooltip title="添加到画布">
-                <Button
-                    type="text"
-                    size="small"
-                    icon={<PlusOutlined style={{ fontSize: 11 }} />}
-                    onClick={e => { e.stopPropagation(); onUse(); }}
-                    style={{ width: 22, height: 22, minWidth: 22 }}
-                />
-            </Tooltip>
-            <Popconfirm
-                title="删除此模板？"
-                onConfirm={e => { e?.stopPropagation(); onDelete(); }}
-                okText="删除"
-                cancelText="取消"
-            >
-                <Button
-                    type="text"
-                    size="small"
-                    icon={<DeleteOutlined style={{ fontSize: 11 }} />}
-                    onClick={e => e.stopPropagation()}
-                    style={{ width: 22, height: 22, minWidth: 22, color: token.colorTextQuaternary }}
-                />
-            </Popconfirm>
+            {!isRenaming && (
+                <>
+                    <Tooltip title="添加到画布">
+                        <Button
+                            type="text"
+                            size="small"
+                            aria-label={`添加模板 ${template.name} 到画布`}
+                            icon={<PlusOutlined aria-hidden="true" style={{ fontSize: 11 }} />}
+                            onClick={onUse}
+                            style={{ width: 44, height: 44, minWidth: 44 }}
+                        />
+                    </Tooltip>
+                    <Tooltip title="重命名模板">
+                        <Button
+                            type="text"
+                            size="small"
+                            aria-label={`重命名模板 ${template.name}`}
+                            icon={<EditOutlined aria-hidden="true" style={{ fontSize: 11 }} />}
+                            onClick={startRenaming}
+                            style={{ width: 44, height: 44, minWidth: 44 }}
+                        />
+                    </Tooltip>
+                    <Popconfirm
+                        title="删除此模板？"
+                        onConfirm={onDelete}
+                        okText="删除"
+                        cancelText="取消"
+                    >
+                        <Button
+                            type="text"
+                            size="small"
+                            aria-label={`删除模板 ${template.name}`}
+                            icon={<DeleteOutlined aria-hidden="true" style={{ fontSize: 11 }} />}
+                            style={{ width: 44, height: 44, minWidth: 44, color: token.colorTextQuaternary }}
+                        />
+                    </Popconfirm>
+                </>
+            )}
         </div>
     );
 };

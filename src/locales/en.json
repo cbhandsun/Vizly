@@ -749,6 +749,9 @@
             "title": "Flowchart Shortcuts",
             "subtitle": "These shortcuts work in the flowchart canvas; it uses {{mod}} automatically on your system.",
             "paletteDescription": "Show flowchart shortcut list",
+            "searchPlaceholder": "Search shortcuts or actions...",
+            "clearSearch": "Clear shortcut search",
+            "noResults": "No matching shortcuts",
             "table": {
                 "action": "Action",
                 "shortcut": "Shortcut",
@@ -756,6 +759,8 @@
             },
             "action": {
                 "palette": "Open command palette",
+                "canvasSearch": "Search canvas nodes",
+                "findReplace": "Find and replace node text",
                 "undo": "Undo",
                 "redo": "Redo",
                 "copy": "Copy selection",
@@ -807,6 +812,7 @@
             "reset": "Reset",
             "zoomInHint": "Zoom In (Ctrl+Wheel)",
             "zoomOutHint": "Zoom Out (Ctrl+Wheel)",
+            "zoomLevel": "Component library zoom",
             "layers": "Layers",
             "techIcons": "Tech Icons",
             "server": "Server",
