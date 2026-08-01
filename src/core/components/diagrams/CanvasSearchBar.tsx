@@ -181,7 +181,14 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
             50% { outline-color: rgba(59, 130, 246, 1); box-shadow: 0 0 16px 4px rgba(59, 130, 246, 0.25); }
         }`;
 
-        return `${keyframes}\n${currentSelector}\n${otherStyles}\n${dimStyles}`;
+        const reducedMotionStyles = `@media (prefers-reduced-motion: reduce) {
+            .react-flow__node {
+                animation: none !important;
+                transition: none !important;
+            }
+        }`;
+
+        return `${keyframes}\n${currentSelector}\n${otherStyles}\n${dimStyles}\n${reducedMotionStyles}`;
     }, [query, matchIds, currentMatchId, nodes]);
 
     const hasReplaceFns = !!(onReplaceNode && onReplaceAll);
@@ -217,7 +224,7 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
                     />
                     {/* 结果计数 */}
                     {query && (
-                        <span style={{
+                        <span role="status" aria-live="polite" aria-atomic="true" style={{
                             fontSize: 11,
                             color: matchIds.length > 0 ? token.colorTextSecondary : '#ef4444',
                             whiteSpace: 'nowrap',

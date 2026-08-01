@@ -6,7 +6,7 @@ import {
     FaSitemap, FaObjectGroup, FaRegObjectGroup, FaRuler,
     FaEllipsisH, FaTrashAlt,
     FaMagnet, FaPen, FaStickyNote, FaMousePointer,
-    FaFolderOpen, FaFileExport, FaMap,
+    FaFolderOpen, FaFileExport, FaMap, FaSearch,
 } from 'react-icons/fa';
 import { BackgroundVariant } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
@@ -31,6 +31,7 @@ interface FlowchartToolbarProps {
     gridVariant?: BackgroundVariant;
     toggleGrid: () => void;
     onShowShortcuts: () => void;
+    onShowCanvasSearch?: () => void;
     /** 域感知策略布局回调（统一入口） */
     onStrategyLayout?: (strategyName: string, nodeLayout?: string, direction?: 'TB' | 'LR') => void;
     /** 当前选中的域布局策略 */
@@ -97,6 +98,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
     autoRouting, toggleAutoRouting,
     showGrid, gridVariant, toggleGrid,
     onShowShortcuts,
+    onShowCanvasSearch,
     onStrategyLayout,
     lastDomainStrategy,
     lastDomainDirection,
@@ -364,6 +366,12 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
             },
         ] : []),
         { type: 'divider' as const },
+        ...(onShowCanvasSearch ? [{
+            key: 'canvas-search',
+            label: t('designer.toolbar.searchCanvas', '搜索画布节点 (Ctrl+F)'),
+            icon: <FaSearch />,
+            onClick: onShowCanvasSearch,
+        }, { type: 'divider' as const }] : []),
         {
             key: 'shortcuts',
             label: t('designer.toolbar.shortcuts'),
@@ -409,7 +417,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
         },
     ], [
         t, gridInfo, toggleGrid, showRuler, toggleRuler, toggleMinimap, showMinimap,
-        onShowShortcuts, onImportClick, onExport, onActivatePointer, toggleSelectionMode,
+        onShowShortcuts, onShowCanvasSearch, onImportClick, onExport, onActivatePointer, toggleSelectionMode,
         onToggleDrawingMode, onAddStickyNote, onAddMindMap, isMarqueeActive, isDrawingMode,
     ]);
 

@@ -7,6 +7,7 @@ import { theme } from 'antd';
 import type { InputRef } from 'antd';
 import Button from 'antd/es/button';
 import { useTranslation } from 'react-i18next';
+import { FaTimes } from 'react-icons/fa';
 
 import type { CommandGroup, CommandItem } from '../../types/plugin';
 import {
@@ -243,20 +244,39 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, i
         }}
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <Input
-            ref={inputRef}
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setActiveIndex(0);
-            }}
-            aria-label={t('designer.commandPalette.searchAria')}
-            aria-controls="command-palette-results"
-            aria-activedescendant={flat[activeIndex] ? `command-palette-option-${flat[activeIndex].id}` : undefined}
-            placeholder={t('designer.commandPalette.placeholder', { mod: modKeyLabel })}
-            size="large"
-            autoComplete="off"
-          />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Input
+              ref={inputRef}
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setActiveIndex(0);
+              }}
+              role="combobox"
+              aria-expanded={open}
+              aria-autocomplete="list"
+              aria-haspopup="listbox"
+              aria-label={t('designer.commandPalette.searchAria')}
+              aria-controls="command-palette-results"
+              aria-activedescendant={flat[activeIndex] ? `command-palette-option-${flat[activeIndex].id}` : undefined}
+              placeholder={t('designer.commandPalette.placeholder', { mod: modKeyLabel })}
+              size="large"
+              autoComplete="off"
+              style={{ minHeight: 'var(--commercial-touch-target, 44px)' }}
+            />
+            <Button
+              type="text"
+              aria-label={t('common.close')}
+              icon={<FaTimes aria-hidden="true" />}
+              onClick={onClose}
+              style={{
+                width: 'var(--commercial-touch-target, 44px)',
+                minWidth: 'var(--commercial-touch-target, 44px)',
+                height: 'var(--commercial-touch-target, 44px)',
+                flex: '0 0 var(--commercial-touch-target, 44px)',
+              }}
+            />
+          </div>
           <div
             ref={listViewportRef}
             id="command-palette-results"
@@ -316,6 +336,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, i
                           textAlign: 'left',
                           color: token.colorText,
                           padding: '10px 12px',
+                          minHeight: 'var(--commercial-touch-target, 44px)',
                           cursor: 'pointer',
                           background: active ? token.colorFillSecondary : 'transparent',
                           outline: active ? `1px solid ${token.colorPrimaryBorder}` : '1px solid transparent'
@@ -360,13 +381,20 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, i
               </div>
             ))}
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>
               {t('designer.commandPalette.footerHint', { mod: modKeyLabel })}
             </Typography.Text>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               {shortcutsItem && (
-                <Button type="text" size="small" onClick={() => runItem(shortcutsItem, false)}>
+                <Button
+                  type="text"
+                  onClick={() => runItem(shortcutsItem, false)}
+                  style={{
+                    minWidth: 'var(--commercial-touch-target, 44px)',
+                    minHeight: 'var(--commercial-touch-target, 44px)',
+                  }}
+                >
                   {t('designer.commandPalette.shortcutsHelp')}
                 </Button>
               )}

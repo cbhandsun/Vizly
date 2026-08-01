@@ -478,6 +478,7 @@
             "yjsSynced": "云端协同已连接",
             "fileGroup": "文件操作",
             "viewGroup": "视图控制",
+            "searchCanvas": "搜索画布节点 (Ctrl+F)",
             "clearCache": "清除本地缓存",
             "clearCacheTitle": "清除缓存",
             "clearCacheContent": "将清除所有本地缓存数据（包括设置和自动保存），页面将自动刷新。确定继续？",

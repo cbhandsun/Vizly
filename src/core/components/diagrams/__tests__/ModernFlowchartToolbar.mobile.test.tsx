@@ -110,6 +110,35 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
         expect(onAddStickyNote).not.toHaveBeenCalled();
     });
 
+    it('exposes canvas search through the mobile more menu', async () => {
+        const onShowCanvasSearch = vi.fn();
+
+        render(
+            <ModernFlowchartToolbar
+                canUndo={false}
+                canRedo={false}
+                onUndo={vi.fn()}
+                onRedo={vi.fn()}
+                onZoomIn={vi.fn()}
+                onZoomOut={vi.fn()}
+                onFitView={vi.fn()}
+                autoRouting={false}
+                toggleAutoRouting={vi.fn()}
+                showGrid
+                toggleGrid={vi.fn()}
+                onShowShortcuts={vi.fn()}
+                onShowCanvasSearch={onShowCanvasSearch}
+                showRuler={false}
+                toggleRuler={vi.fn()}
+            />,
+        );
+
+        fireEvent.click(await screen.findByRole('button', { name: /更多操作|moreActions/i }));
+        fireEvent.click(await screen.findByRole('menuitem', { name: /搜索画布节点/ }));
+
+        expect(onShowCanvasSearch).toHaveBeenCalledTimes(1);
+    });
+
     it('names multi-selection actions and preserves a physical mobile touch target', async () => {
         const onAlign = vi.fn();
         const onDistribute = vi.fn();

@@ -66,6 +66,7 @@ export interface DesignerHeaderLayerProps {
         gridVariant: ToolbarProps['gridVariant'];
         toggleGrid: () => void;
         onShowShortcuts: () => void;
+        onShowCanvasSearch: () => void;
         onStrategyLayout: ToolbarProps['onStrategyLayout'];
         lastDomainStrategy?: string;
         lastDomainDirection?: string;
@@ -198,6 +199,7 @@ export const DesignerHeaderLayer = React.memo(
                     gridVariant={toolbar.gridVariant}
                     toggleGrid={toolbar.toggleGrid}
                     onShowShortcuts={toolbar.onShowShortcuts}
+                    onShowCanvasSearch={toolbar.onShowCanvasSearch}
                     onStrategyLayout={toolbar.onStrategyLayout}
                     lastDomainStrategy={toolbar.lastDomainStrategy}
                     lastDomainDirection={toolbar.lastDomainDirection as 'TB' | 'LR' | undefined}

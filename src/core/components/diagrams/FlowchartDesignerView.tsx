@@ -390,6 +390,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                 gridVariant,
                                 toggleGrid: handleGridRotate,
                                 onShowShortcuts: () => setShowShortcuts(),
+                                onShowCanvasSearch: () => setCanvasSearchVisible(true),
                                 onStrategyLayout: handleStrategyLayout,
                                 lastDomainStrategy,
                                 lastDomainDirection,

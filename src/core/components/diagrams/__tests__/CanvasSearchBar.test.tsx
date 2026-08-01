@@ -40,11 +40,19 @@ describe('CanvasSearchBar', () => {
         expect(screen.getByRole('textbox', { name: '搜索画布节点' })).toBeTruthy();
         expect(screen.getByRole('button', { name: '关闭画布搜索' })).toBeTruthy();
 
+        fireEvent.change(screen.getByRole('textbox', { name: '搜索画布节点' }), {
+            target: { value: 'Circle' },
+        });
+        expect(screen.getByRole('status').textContent).toBe('1/1');
+        expect(Array.from(document.querySelectorAll('style')).some(style =>
+            style.textContent?.includes('@media (prefers-reduced-motion: reduce)'),
+        )).toBe(true);
+
         fireEvent.click(screen.getByRole('button', { name: '打开查找替换' }));
 
         expect(screen.getByRole('textbox', { name: '替换为' })).toBeTruthy();
         expect(screen.getByRole('button', { name: '替换当前匹配' })).toBeTruthy();
-        expect(screen.getByRole('button', { name: '全部替换，共 0 处' })).toBeTruthy();
+        expect(screen.getByRole('button', { name: '全部替换，共 1 处' })).toBeTruthy();
     });
 
     it('keeps the mobile search below the second toolbar row with touch-sized actions', () => {

@@ -474,6 +474,7 @@
             "yjsSynced": "Cloud collaboration connected",
             "fileGroup": "File Operations",
             "viewGroup": "View Controls",
+            "searchCanvas": "Search canvas nodes (Ctrl+F)",
             "clearCache": "Clear Local Cache",
             "clearCacheTitle": "Clear Cache",
             "clearCacheContent": "This will clear all local cache data. The page will reload. Continue?",
