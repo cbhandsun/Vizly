@@ -92,6 +92,12 @@ interface FlowchartToolbarProps {
     onDistribute?: (type: 'horizontal' | 'vertical') => void;
 }
 
+const COMMERCIAL_MOBILE_TOUCH_STYLE: React.CSSProperties = {
+    minWidth: 'var(--commercial-touch-target, 44px)',
+    width: 'var(--commercial-touch-target, 44px)',
+    height: 'var(--commercial-touch-target, 44px)',
+};
+
 export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
     canUndo, canRedo, onUndo, onRedo,
     onZoomIn, onZoomOut, onFitView,
@@ -139,6 +145,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
     const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
     const [contextPortalTarget, setContextPortalTarget] = useState<HTMLElement | null>(null);
     const [bottomPortalTarget, setBottomPortalTarget] = useState<HTMLElement | null>(null);
+    const [layoutMenuOpen, setLayoutMenuOpen] = useState(false);
 
     useEffect(() => {
         const timer = window.setTimeout(() => {
@@ -520,6 +527,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
     const tbtnActive = "w-8 h-8 p-0 border-none bg-[#e8f0fe] dark:bg-[rgba(138,180,248,0.15)] text-[#1a73e8] dark:text-[#8ab4f8] rounded-[6px] transition-colors hover:bg-[#d2e3fc] dark:hover:bg-[rgba(138,180,248,0.22)]";
     const tbtnDisabled = "w-8 h-8 p-0 border-none text-slate-300 dark:text-slate-600 rounded-[6px] cursor-not-allowed";
     const dividerCls = "w-[1px] h-4 bg-slate-200/80 dark:bg-white/10 mx-0.5 flex-shrink-0";
+    const mobileToolbarButtonStyle = isMobile ? COMMERCIAL_MOBILE_TOUCH_STYLE : undefined;
 
     const MainWorkflowTools = (
         <div className="flex items-center gap-0.5">
@@ -545,13 +553,13 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
             {!hideZoomControls && (
                 <>
                     <Tooltip title={t('designer.toolbar.zoomIn')}>
-                        <Button type="text" aria-label={t('designer.toolbar.zoomIn')} icon={<FaSearchPlus size={13} />} onClick={onZoomIn} className={tbtn} />
+                        <Button type="text" aria-label={t('designer.toolbar.zoomIn')} icon={<FaSearchPlus size={13} />} onClick={onZoomIn} className={tbtn} style={mobileToolbarButtonStyle} />
                     </Tooltip>
                     <Tooltip title={t('designer.toolbar.zoomOut')}>
-                        <Button type="text" aria-label={t('designer.toolbar.zoomOut')} icon={<FaSearchMinus size={13} />} onClick={onZoomOut} className={tbtn} />
+                        <Button type="text" aria-label={t('designer.toolbar.zoomOut')} icon={<FaSearchMinus size={13} />} onClick={onZoomOut} className={tbtn} style={mobileToolbarButtonStyle} />
                     </Tooltip>
                     <Tooltip title={t('designer.toolbar.fitView')}>
-                        <Button type="text" aria-label={t('designer.toolbar.fitView')} icon={<FaCompressArrowsAlt size={13} />} onClick={onFitView} className={tbtn} />
+                        <Button type="text" aria-label={t('designer.toolbar.fitView')} icon={<FaCompressArrowsAlt size={13} />} onClick={onFitView} className={tbtn} style={mobileToolbarButtonStyle} />
                     </Tooltip>
                     {zoomPercent !== undefined && screens.lg && (
                         <span className="text-[11px] font-mono font-semibold text-slate-500 dark:text-slate-400 min-w-[32px] text-center tabular-nums">{zoomPercent}%</span>
@@ -563,18 +571,34 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
             {/* ── Layout + Routing ── */}
             {!hideLayoutControls && (
                 <>
-                    <Dropdown menu={{ items: layoutMenu, selectedKeys: selectedLayoutKeys, selectable: true }} placement="bottom">
+                    <Dropdown
+                        menu={{ items: layoutMenu, selectedKeys: selectedLayoutKeys, selectable: true }}
+                        placement="bottom"
+                        trigger={['click']}
+                        open={layoutMenuOpen}
+                        onOpenChange={setLayoutMenuOpen}
+                    >
                         <Tooltip title={t('designer.flowchart.layout.tooltip')}>
-                            <Button type="text" aria-label={t('designer.flowchart.layout.tooltip')} icon={<FaSitemap size={13} />} className={tbtn} />
+                            <Button
+                                type="text"
+                                aria-label={t('designer.flowchart.layout.tooltip')}
+                                aria-haspopup="menu"
+                                aria-expanded={layoutMenuOpen}
+                                icon={<FaSitemap size={13} />}
+                                className={tbtn}
+                                style={mobileToolbarButtonStyle}
+                            />
                         </Tooltip>
                     </Dropdown>
                     <Tooltip title={autoRouting ? t('designer.toolbar.autoRouting') + ' ' + onLabel : t('designer.toolbar.autoRouting') + ' ' + offLabel}>
                         <Button
                             type="text"
                             aria-label={autoRouting ? t('designer.toolbar.autoRouting') + ' ' + onLabel : t('designer.toolbar.autoRouting') + ' ' + offLabel}
+                            aria-pressed={autoRouting}
                             icon={<FaMagic size={13} />}
                             onClick={toggleAutoRouting}
                             className={autoRouting ? tbtnActive : tbtn}
+                            style={mobileToolbarButtonStyle}
                         />
                     </Tooltip>
                     <div className={dividerCls} />
@@ -630,6 +654,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                             aria-label={t('designer.toolbar.moreActions')}
                             icon={<FaEllipsisH className="text-[13px]" />}
                             className={tbtn}
+                            style={mobileToolbarButtonStyle}
                         />
                     </Tooltip>
                 </Dropdown>
