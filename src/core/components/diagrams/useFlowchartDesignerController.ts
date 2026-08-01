@@ -36,13 +36,13 @@ import {
     addFlowchartMindMapNode,
     addFlowchartStickyNote,
 } from './flowchartDesignerCanvasActions';
-import { createFlowchartImportHandler } from './flowchartImportHandler';
+import { createFlowchartImportHandler, type FlowchartImportEvent } from './flowchartImportHandler';
 import {
     replaceFlowchartNodeLabel,
     replaceFlowchartNodeLabels,
 } from './flowchartSearchReplace';
 import { scheduleFlowchartInitialFit } from './flowchartInitialFit';
-import { getApplicationDiagramRuntime } from '../../ports/applicationDiagramRuntime';
+import { registerImportedFlowchartDiagram } from './flowchartImportRegistration';
 import { useFlowchartPluginRuntime } from './hooks/useFlowchartPluginRuntime';
 import { useFlowchartExternalEvents } from './hooks/useFlowchartExternalEvents';
 import { useFlowchartShellState } from './hooks/useFlowchartShellState';
@@ -498,7 +498,7 @@ export const useFlowchartDesignerController = ({
         },
     });
 
-    const handleImport = useMemo(() => createFlowchartImportHandler({
+    const handleImport = useCallback((event: FlowchartImportEvent) => createFlowchartImportHandler({
         t,
         messageApi,
         activePlugin,
@@ -506,17 +506,10 @@ export const useFlowchartDesignerController = ({
         diagramId: id,
         setNodes,
         setEdges,
+        onBeforeCanvasReplace: handleBeforeUpdate,
         fitView: handleFitView,
-        registerStandardReload: async ({ normalized, currentId: reloadId, title }) => {
-            await getApplicationDiagramRuntime().registerDiagram(normalized, {
-                id: reloadId,
-                title,
-            }, true, {
-                id: reloadId,
-                metadata: normalized.metadata,
-            });
-        },
-    }), [t, messageApi, activePlugin, businessData?.id, id, setNodes, setEdges, handleFitView]);
+        registerStandardReload: registerImportedFlowchartDiagram,
+    })(event), [t, messageApi, activePlugin, businessData?.id, id, setNodes, setEdges, handleBeforeUpdate, handleFitView]);
 
     const onSelectionChange = useCanonicalSelectionChange({
         nodesRef,

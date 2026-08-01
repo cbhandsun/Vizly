@@ -43,6 +43,7 @@ describe('flowchartImportHandler', () => {
             messageApi,
             setNodes: vi.fn(),
             setEdges: vi.fn(),
+            onBeforeCanvasReplace: vi.fn(),
             fitView: vi.fn(),
             registerStandardReload: vi.fn(async () => undefined),
         });
@@ -65,6 +66,7 @@ describe('flowchartImportHandler', () => {
         const scheduleDelay = vi.fn((callback: () => void) => callback());
         const fitView = vi.fn();
         const registerStandardReload = vi.fn(async () => undefined);
+        const onBeforeCanvasReplace = vi.fn();
         importPipelineState.runFlowchartImportPipeline.mockImplementation(async (options) => {
             options.onReactFlowSuccess({ nodes: [{ id: 'n1' }], edges: [{ id: 'e1' }] });
             options.onMermaidSuccess();
@@ -81,6 +83,7 @@ describe('flowchartImportHandler', () => {
             diagramId: 'diagram-1',
             setNodes: vi.fn(),
             setEdges: vi.fn(),
+            onBeforeCanvasReplace,
             fitView,
             scheduleDelay,
             registerStandardReload,
@@ -96,6 +99,7 @@ describe('flowchartImportHandler', () => {
             businessDataId: 'biz-1',
             diagramId: 'diagram-1',
             registerStandardReload,
+            onBeforeCanvasReplace,
         }));
         expect(messageApi.info).toHaveBeenCalledWith('designer.flowchart.import.rfSuccess:{"nodes":1,"edges":1}');
         expect(messageApi.info).toHaveBeenCalledWith('designer.flowchart.import.mermaidSuccess');
@@ -117,6 +121,7 @@ describe('flowchartImportHandler', () => {
             messageApi,
             setNodes: vi.fn(),
             setEdges: vi.fn(),
+            onBeforeCanvasReplace: vi.fn(),
             fitView: vi.fn(),
             registerStandardReload: vi.fn(async () => undefined),
         });

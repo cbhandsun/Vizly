@@ -12,6 +12,18 @@ export interface ClipboardCoerceOptions {
     maxCoordinateAbs?: number;
 }
 
+export const buildFlowchartClipboardData = (
+    selectedNodes: Node[],
+    allEdges: Edge[],
+): ClipboardData => {
+    const selectedNodeIds = new Set(selectedNodes.map(node => node.id));
+    const edges = allEdges.filter(edge => (
+        selectedNodeIds.has(edge.source) && selectedNodeIds.has(edge.target)
+    ));
+
+    return { nodes: selectedNodes, edges };
+};
+
 const DEFAULT_MAX_NODES = 1000;
 const DEFAULT_MAX_EDGES = 2000;
 const DEFAULT_MAX_ID_LENGTH = 256;

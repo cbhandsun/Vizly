@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+    buildFlowchartClipboardData,
     coerceClipboardData,
     FLOWCHART_CLIPBOARD_TEXT_MAX_BYTES,
     isFlowchartClipboardTextWithinBounds,
@@ -7,6 +8,27 @@ import {
 } from '../flowchartClipboard';
 
 describe('flowchartClipboard', () => {
+    it('copies a selected subgraph with all connecting edges', () => {
+        const selectedNodes = [
+            { id: 'a', position: { x: 0, y: 0 }, data: {} },
+            { id: 'b', position: { x: 10, y: 10 }, data: {} },
+        ];
+        const result = buildFlowchartClipboardData(selectedNodes, [
+            { id: 'inside', source: 'a', target: 'b' },
+            { id: 'outbound', source: 'b', target: 'c' },
+            { id: 'inbound', source: 'c', target: 'a' },
+        ]);
+
+        expect(result.nodes).toBe(selectedNodes);
+        expect(result.edges.map(edge => edge.id)).toEqual(['inside']);
+    });
+
+    it('returns an empty subgraph for an empty node selection', () => {
+        expect(buildFlowchartClipboardData([], [
+            { id: 'edge', source: 'a', target: 'b' },
+        ])).toEqual({ nodes: [], edges: [] });
+    });
+
     it('accepts valid clipboard data and normalizes missing node data', () => {
         const result = coerceClipboardData({
             nodes: [{ id: 'a', position: { x: 1, y: 2 } }],

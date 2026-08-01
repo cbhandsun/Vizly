@@ -3,6 +3,7 @@ import { Node, Edge } from '@xyflow/react';
 import { fromMermaid } from '../../../utils/mermaidConverter';
 import {
     coerceClipboardData,
+    buildFlowchartClipboardData,
     isFlowchartClipboardTextWithinBounds,
     parseClipboardJson,
     type ClipboardData,
@@ -45,14 +46,9 @@ export const useClipboard = ({
 }: UseClipboardProps) => {
 
     const handleCopy = useCallback(() => {
-        if (selectedNodes.length === 0 && selectedEdges.length === 0) return;
+        if (selectedNodes.length === 0) return;
 
-        const selectedNodeIds = new Set(selectedNodes.map(n => n.id));
-        const relevantEdges = selectedEdges.filter(e =>
-            selectedNodeIds.has(e.source) && selectedNodeIds.has(e.target)
-        );
-
-        const clipboardData: ClipboardData = { nodes: selectedNodes, edges: relevantEdges };
+        const clipboardData: ClipboardData = buildFlowchartClipboardData(selectedNodes, edges);
 
         try {
             localStorage.setItem(clipboardKey, JSON.stringify(clipboardData));
@@ -67,7 +63,7 @@ export const useClipboard = ({
         } catch (error) {
             logClipboardWriteFailure(error);
         }
-    }, [selectedNodes, selectedEdges, clipboardKey]);
+    }, [selectedNodes, edges, clipboardKey]);
 
     /**
      * 尝试解析文本为 ClipboardData

@@ -31,6 +31,7 @@ export const runFlowchartImportPipeline = async ({
     openedAt,
     setNodes,
     setEdges,
+    onBeforeCanvasReplace,
     onStandardPluginSuccess,
     registerStandardReload,
     onStandardReloadQueued,
@@ -50,6 +51,7 @@ export const runFlowchartImportPipeline = async ({
     openedAt: string;
     setNodes: (nodes: Node[]) => void;
     setEdges: (edges: Edge[]) => void;
+    onBeforeCanvasReplace: () => void;
     onStandardPluginSuccess: (count: number) => void;
     registerStandardReload: (payload: {
         normalized: StandardDiagramData;
@@ -78,6 +80,7 @@ export const runFlowchartImportPipeline = async ({
                 openedAt,
                 invalidFormatMessage,
             });
+            if (importPlan.kind !== 'standard-reload') onBeforeCanvasReplace();
             await applyFlowchartJsonImportPlan({
                 importPlan,
                 setNodes,
@@ -95,6 +98,7 @@ export const runFlowchartImportPipeline = async ({
 
     try {
         const importPlan = buildFlowchartMermaidImportPlan(content);
+        onBeforeCanvasReplace();
         applyFlowchartMermaidImportPlan({
             importPlan,
             setNodes,

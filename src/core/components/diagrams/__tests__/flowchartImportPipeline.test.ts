@@ -11,6 +11,7 @@ describe('flowchartImportPipeline', () => {
     const onStandardReloadQueued = vi.fn();
     const onReactFlowSuccess = vi.fn();
     const onJsonImportFailure = vi.fn();
+    const onBeforeCanvasReplace = vi.fn();
 
     await runFlowchartImportPipeline({
       content: JSON.stringify({
@@ -30,6 +31,7 @@ describe('flowchartImportPipeline', () => {
       openedAt: '2026-06-25T00:00:00.000Z',
       setNodes,
       setEdges,
+      onBeforeCanvasReplace,
       onStandardPluginSuccess,
       registerStandardReload,
       onStandardReloadQueued,
@@ -54,10 +56,13 @@ describe('flowchartImportPipeline', () => {
       edges: [],
     });
     expect(onJsonImportFailure).not.toHaveBeenCalled();
+    expect(onBeforeCanvasReplace).toHaveBeenCalledTimes(1);
+    expect(onBeforeCanvasReplace.mock.invocationCallOrder[0]).toBeLessThan(setNodes.mock.invocationCallOrder[0]);
   });
 
   it('reports json import failures through the provided callback', async () => {
     const onJsonImportFailure = vi.fn();
+    const onBeforeCanvasReplace = vi.fn();
 
     await runFlowchartImportPipeline({
       content: '{invalid-json',
@@ -67,6 +72,7 @@ describe('flowchartImportPipeline', () => {
       openedAt: '2026-06-25T00:00:00.000Z',
       setNodes: vi.fn(),
       setEdges: vi.fn(),
+      onBeforeCanvasReplace,
       onStandardPluginSuccess: vi.fn(),
       registerStandardReload: vi.fn(async () => undefined),
       onStandardReloadQueued: vi.fn(),
@@ -78,6 +84,7 @@ describe('flowchartImportPipeline', () => {
     });
 
     expect(onJsonImportFailure).toHaveBeenCalled();
+    expect(onBeforeCanvasReplace).not.toHaveBeenCalled();
   });
 
   it('uses the invalid-format message when a plugin throws a non-error value', async () => {
@@ -96,6 +103,7 @@ describe('flowchartImportPipeline', () => {
       openedAt: '2026-06-25T00:00:00.000Z',
       setNodes: vi.fn(),
       setEdges: vi.fn(),
+      onBeforeCanvasReplace: vi.fn(),
       onStandardPluginSuccess: vi.fn(),
       registerStandardReload: vi.fn(async () => undefined),
       onStandardReloadQueued: vi.fn(),
@@ -115,6 +123,7 @@ describe('flowchartImportPipeline', () => {
     const onMermaidSuccess = vi.fn();
     const onMermaidLayoutHint = vi.fn();
     const onMermaidImportFailure = vi.fn();
+    const onBeforeCanvasReplace = vi.fn();
 
     await runFlowchartImportPipeline({
       content: 'flowchart TD\nA-->B',
@@ -124,6 +133,7 @@ describe('flowchartImportPipeline', () => {
       openedAt: '2026-06-25T00:00:00.000Z',
       setNodes,
       setEdges,
+      onBeforeCanvasReplace,
       onStandardPluginSuccess: vi.fn(),
       registerStandardReload: vi.fn(async () => undefined),
       onStandardReloadQueued: vi.fn(),
@@ -139,5 +149,7 @@ describe('flowchartImportPipeline', () => {
     expect(onMermaidSuccess).toHaveBeenCalled();
     expect(onMermaidLayoutHint).toHaveBeenCalled();
     expect(onMermaidImportFailure).not.toHaveBeenCalled();
+    expect(onBeforeCanvasReplace).toHaveBeenCalledTimes(1);
+    expect(onBeforeCanvasReplace.mock.invocationCallOrder[0]).toBeLessThan(setNodes.mock.invocationCallOrder[0]);
   });
 });

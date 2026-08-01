@@ -570,6 +570,19 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                 </>
             )}
 
+            {isMobile && (
+                <Dropdown menu={{ items: moreMenuItems }} placement="bottomRight" trigger={['click']}>
+                    <Tooltip title={t('designer.toolbar.moreActions')}>
+                        <Button
+                            type="text"
+                            aria-label={t('designer.toolbar.moreActions')}
+                            icon={<FaEllipsisH className="text-[13px]" />}
+                            className={tbtn}
+                        />
+                    </Tooltip>
+                </Dropdown>
+            )}
+
             {children && (
                 <div className="flex items-center ml-1 pl-2 border-l border-slate-200/60 dark:border-white/10">
                     {children}

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Menu, MenuProps } from 'antd';
 import {
   DeleteOutlined,
@@ -30,6 +30,10 @@ import {
 import { FaRulerCombined } from 'react-icons/fa';
 import { Node, Edge } from '@xyflow/react';
 import { logDiagramContextMenuFailure } from './diagramContextMenuLogging';
+import {
+  focusFirstEnabledDiagramContextMenuItem,
+  shouldCloseDiagramContextMenuFromKey,
+} from './diagramContextMenuKeyboard';
 
 export interface ContextMenuProps {
   top: number;
@@ -60,6 +64,19 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
   nodes,
   extraItems,
 }) => {
+  const menuRootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const previouslyFocused = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    focusFirstEnabledDiagramContextMenuItem(menuRootRef.current);
+
+    return () => {
+      if (previouslyFocused?.isConnected) previouslyFocused.focus();
+    };
+  }, []);
+
   const handleMenuClick = (info: { key: string }) => {
     onAction(info.key, targetId);
     onClose();
@@ -288,6 +305,7 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
 
   return (
     <div
+      ref={menuRootRef}
       style={{
         position: 'absolute',
         top,
@@ -296,6 +314,12 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
       }}
       className="diagram-context-menu"
       onContextMenu={(e) => e.preventDefault()}
+      onKeyDownCapture={(event) => {
+        if (!shouldCloseDiagramContextMenuFromKey(event.key)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        onClose();
+      }}
     >
       <Menu
         mode="vertical"

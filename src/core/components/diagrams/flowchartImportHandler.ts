@@ -9,7 +9,7 @@ import {
 } from './flowchartImportFile';
 import type { FlowchartImportPlugin } from './flowchartImportPlan';
 
-type FlowchartImportEvent = {
+export type FlowchartImportEvent = {
     target: {
         files?: FileList | File[] | null;
         value: string;
@@ -30,6 +30,7 @@ export interface CreateFlowchartImportHandlerOptions {
     diagramId?: string;
     setNodes: (nodes: Node[]) => void;
     setEdges: (edges: Edge[]) => void;
+    onBeforeCanvasReplace: () => void;
     fitView: () => void;
     scheduleDelay?: (callback: () => void, delayMs: number) => void;
     registerStandardReload: (payload: {
@@ -51,6 +52,7 @@ export const createFlowchartImportHandler = ({
     diagramId,
     setNodes,
     setEdges,
+    onBeforeCanvasReplace,
     fitView,
     scheduleDelay = DEFAULT_DELAY_SCHEDULER,
     registerStandardReload,
@@ -79,6 +81,7 @@ export const createFlowchartImportHandler = ({
             openedAt: new Date().toISOString(),
             setNodes,
             setEdges,
+            onBeforeCanvasReplace,
             onStandardPluginSuccess: (count) => {
                 messageApi.success(t('designer.flowchart.import.standardSuccess', { count }));
                 scheduleDelay(() => fitView(), 500);
