@@ -151,12 +151,14 @@ describe('runAdvancedExport', () => {
       pixelRatio: 3,
       includeBackground: false,
       embedMetadata: true,
+      fileNameBase: 'diagram-3',
     });
     expect(downloadImage).toHaveBeenCalledWith([{ id: 'fallback-node' }], {
       format: 'png',
       pixelRatio: 1,
       includeBackground: true,
       embedMetadata: false,
+      fileNameBase: 'diagram-4',
     });
   });
 });

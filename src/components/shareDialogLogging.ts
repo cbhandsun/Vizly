@@ -9,8 +9,12 @@ export const logShareDialogLoadFailure = (
 };
 
 export const logShareDialogMutationFailure = (
-  action: 'revokeShare' | 'removeCollaborator',
+  action: 'createShareLink' | 'addCollaborator' | 'revokeShare' | 'removeCollaborator',
   error: unknown
 ): void => {
   safeLog.warn(`[ShareDialog] ${action} failed:`, redactSensitiveLogValue(error));
+};
+
+export const logShareDialogClipboardFailure = (error: unknown): void => {
+  safeLog.warn('[ShareDialog] Clipboard write failed:', redactSensitiveLogValue(error));
 };

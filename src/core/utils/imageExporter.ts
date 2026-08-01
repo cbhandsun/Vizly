@@ -15,6 +15,7 @@ export interface ExportOptions {
     includeBackground?: boolean;
     selectionOnly?: boolean;
     embedMetadata?: boolean;
+    fileNameBase?: string;
 }
 
 const MAX_EXPORT_DIMENSION = 12_000;
@@ -113,10 +114,7 @@ export const downloadImage = async (
     // We need to target the viewport element.
     const viewportElem = document.querySelector('.react-flow__viewport') as HTMLElement;
 
-    if (!viewportElem) {
-        safeLog.error('React Flow Viewport not found');
-        return;
-    }
+    if (!viewportElem) throw new Error('React Flow viewport not found');
 
     const exportWidth = bounds.width + 100;
     const exportHeight = bounds.height + 100;
@@ -134,7 +132,10 @@ export const downloadImage = async (
         },
     };
 
-    const filename = `vizly-diagram-${new Date().getTime()}`;
+    const filename = sanitizeDownloadFileName(
+        options.fileNameBase?.trim() || `vizly-diagram-${new Date().getTime()}`,
+        'vizly-diagram',
+    );
 
     // 辅助函数：注入元数据 (PNG/SVG)
     const injectMetadata = async (dataUrl: string, rawData: unknown) => {
@@ -193,40 +194,36 @@ export const downloadImage = async (
     switch (format) {
         case 'png': {
             const { toPng } = await import('html-to-image');
-            toPng(viewportElem, exportOptions).then(async (dataUrl: string) => {
-                const finalUrl = await injectMetadata(dataUrl, { nodes });
-                downloadHref(finalUrl, `${filename}.png`);
-            });
+            const dataUrl = await toPng(viewportElem, exportOptions);
+            const finalUrl = await injectMetadata(dataUrl, { nodes });
+            downloadHref(finalUrl, `${filename}.png`);
             break;
         }
         case 'jpg': {
             const { toJpeg } = await import('html-to-image');
-            toJpeg(viewportElem, exportOptions).then(async (dataUrl: string) => {
-                const finalUrl = await injectMetadata(dataUrl, { nodes });
-                downloadHref(finalUrl, `${filename}.jpg`);
-            });
+            const dataUrl = await toJpeg(viewportElem, exportOptions);
+            const finalUrl = await injectMetadata(dataUrl, { nodes });
+            downloadHref(finalUrl, `${filename}.jpg`);
             break;
         }
         case 'svg': {
             const { toSvg } = await import('html-to-image');
-            toSvg(viewportElem, exportOptions).then(async (dataUrl: string) => {
-                const finalUrl = await injectMetadata(dataUrl, { nodes });
-                downloadHref(finalUrl, `${filename}.svg`);
-            });
+            const dataUrl = await toSvg(viewportElem, exportOptions);
+            const finalUrl = await injectMetadata(dataUrl, { nodes });
+            downloadHref(finalUrl, `${filename}.svg`);
             break;
         }
         case 'pdf': {
             const { toPng } = await import('html-to-image');
             const { jsPDF } = await import('jspdf');
-            toPng(viewportElem, exportOptions).then((dataUrl: string) => {
-                const pdf = new jsPDF({
-                    orientation: bounds.width > bounds.height ? 'l' : 'p',
-                    unit: 'px',
-                    format: [bounds.width + 100, bounds.height + 100]
-                });
-                pdf.addImage(dataUrl, 'PNG', 0, 0, bounds.width + 100, bounds.height + 100);
-                pdf.save(`${filename}.pdf`);
+            const dataUrl = await toPng(viewportElem, exportOptions);
+            const pdf = new jsPDF({
+                orientation: bounds.width > bounds.height ? 'l' : 'p',
+                unit: 'px',
+                format: [bounds.width + 100, bounds.height + 100]
             });
+            pdf.addImage(dataUrl, 'PNG', 0, 0, bounds.width + 100, bounds.height + 100);
+            pdf.save(`${filename}.pdf`);
             break;
         }
         case 'json': {

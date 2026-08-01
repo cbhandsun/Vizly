@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Modal, Button, Select, Space, Typography, Tooltip, List, Tag, Popconfirm, Spin, theme, Tabs, Input, Avatar, Empty, Alert } from 'antd';
 import { FaCopy, FaLink, FaTrash, FaUserPlus } from 'react-icons/fa';
 import { LinkOutlined, TeamOutlined, UserOutlined, CheckCircleFilled, SafetyOutlined, LockOutlined } from '@ant-design/icons';
@@ -10,6 +10,7 @@ import {
     logShareDialogLoadFailure,
     logShareDialogMutationFailure,
 } from '@/components/shareDialogLogging';
+import { tryCopyShareUrl } from '@/components/shareClipboard';
 import {
     COMMERCIAL_VIEWPORT_MODAL_CLASS,
     COMMERCIAL_VIEWPORT_MODAL_Z_INDEX,
@@ -66,7 +67,9 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
     const [shares, setShares] = useState<ShareRecord[]>([]);
     const [loadingLink, setLoadingLink] = useState(false);
     const [creatingLink, setCreatingLink] = useState(false);
-    const [justCopiedUrl, setJustCopiedUrl] = useState<string | null>(null);
+    const [shareLinkResult, setShareLinkResult] = useState<{ url: string; copied: boolean } | null>(null);
+    const sharesLoadRequestRef = useRef(0);
+    const pendingCreatedSharesRef = useRef<ShareRecord[]>([]);
 
     // Collaboration State
     const [collaborators, setCollaborators] = useState<CollaboratorRecord[]>([]);
@@ -83,10 +86,20 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
     // Load Data
     const loadShares = useCallback(async () => {
         if (!open || !effectiveId || !isValidUuid(effectiveId)) return;
+        const requestId = ++sharesLoadRequestRef.current;
         setLoadingLink(true);
         try {
             const list = await shareService.listSharesForDiagram(effectiveId);
-            setShares(list);
+            if (requestId === sharesLoadRequestRef.current) {
+                const listedIds = new Set(list.map(share => share.id));
+                const pendingForDiagram = pendingCreatedSharesRef.current.filter(
+                    share => share.diagram_id === effectiveId && !listedIds.has(share.id),
+                );
+                pendingCreatedSharesRef.current = pendingCreatedSharesRef.current.filter(
+                    share => share.diagram_id !== effectiveId || !listedIds.has(share.id),
+                );
+                setShares([...pendingForDiagram, ...list]);
+            }
         } catch (error) {
             logShareDialogLoadFailure('shares', error);
         } finally { setLoadingLink(false); }
@@ -110,7 +123,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
             if (cancelled) return;
             void loadShares();
             void loadCollaborators();
-            setJustCopiedUrl(null);
+            setShareLinkResult(null);
             setInviteStatus('idle');
         });
         return () => { cancelled = true; };
@@ -122,16 +135,25 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
         setCreatingLink(true);
         try {
             const savedId = await onEnsureSaved();
-            if (!savedId) { appMessage.error(t('export.cloudSaveFailed')); return; }
+            if (!savedId) return;
             setCloudDiagramId(savedId);
             const record = await shareService.createShareLink({ diagramId: savedId, userId: user.id, expiresAt: getExpiresAt(expiration) });
             const url = shareService.buildShareUrl(record.share_token);
-            await navigator.clipboard.writeText(url);
-            setJustCopiedUrl(url);
-            setTimeout(() => setJustCopiedUrl(null), 5000);
+            // A cloud-ID transition can start a list request while creation is in flight.
+            // Invalidate that older response before preserving the newly created record.
+            sharesLoadRequestRef.current += 1;
+            pendingCreatedSharesRef.current = [record, ...pendingCreatedSharesRef.current];
             setShares(prev => [record, ...prev]);
-        } catch (err) {
-            appMessage.error(String(err));
+            const copied = await tryCopyShareUrl(url);
+            setShareLinkResult({ url, copied });
+            if (copied) {
+                appMessage.success(t('share.copied'));
+            } else {
+                appMessage.warning(t('share.copyUnavailable', '链接已生成，请手动复制'));
+            }
+        } catch (error) {
+            logShareDialogMutationFailure('createShareLink', error);
+            appMessage.error(t('share.generateFailed', '无法生成分享链接，请稍后重试'));
         } finally {
             setCreatingLink(false);
         }
@@ -139,14 +161,19 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
 
     const handleCopy = useCallback(async (shareToken: string) => {
         const url = shareService.buildShareUrl(shareToken);
-        await navigator.clipboard.writeText(url);
-        appMessage.success(t('share.copied'));
+        const copied = await tryCopyShareUrl(url);
+        if (copied) {
+            appMessage.success(t('share.copied'));
+        } else {
+            appMessage.error(t('share.copyFailed', '复制失败，请手动选择链接'));
+        }
     }, [t]);
 
     const handleRevokeShare = useCallback(async (shareId: string) => {
         try {
             await shareService.revokeShare(shareId);
             appMessage.success(t('share.revoked'));
+            pendingCreatedSharesRef.current = pendingCreatedSharesRef.current.filter(share => share.id !== shareId);
             setShares(prev => prev.filter(s => s.id !== shareId));
         } catch (error) {
             logShareDialogMutationFailure('revokeShare', error);
@@ -162,7 +189,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
         setInviteStatus('idle');
         try {
             const savedId = await onEnsureSaved();
-            if (!savedId) { appMessage.error(t('export.cloudSaveFailed')); return; }
+            if (!savedId) return;
             setCloudDiagramId(savedId);
             const res = await shareService.addCollaborator(savedId, inviteEmail.trim(), inviteRole);
             if (res.success) {
@@ -172,16 +199,16 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
                 setTimeout(() => setInviteStatus('idle'), 1500);
                 await loadCollaborators();
             } else {
+                logShareDialogMutationFailure('addCollaborator', new Error('Collaborator invite was rejected'));
                 setInviteStatus('error');
                 setTimeout(() => setInviteStatus('idle'), 2000);
-                appMessage.error(t('share.inviteFailed', { error: res.error || 'Unknown' }));
+                appMessage.error(t('share.inviteFailedSafe', '邀请失败，请稍后重试'));
             }
-        } catch (err) {
+        } catch (error) {
+            logShareDialogMutationFailure('addCollaborator', error);
             setInviteStatus('error');
             setTimeout(() => setInviteStatus('idle'), 2000);
-            appMessage.error(t('share.inviteFailed', {
-                error: err instanceof Error ? err.message : String(err),
-            }));
+            appMessage.error(t('share.inviteFailedSafe', '邀请失败，请稍后重试'));
         } finally {
             setInviting(false);
         }
@@ -212,6 +239,14 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
             label: <span><TeamOutlined style={{ marginRight: 6 }} />{t('share.tabs.invite')}</span>,
             children: (
                 <div style={{ paddingTop: 8 }}>
+                    {!user && (
+                        <Alert
+                            type="warning"
+                            showIcon
+                            title={t('share.loginRequired')}
+                            style={{ marginBottom: 16 }}
+                        />
+                    )}
                     <Space.Compact style={{ width: '100%', marginBottom: 24 }}>
                         <Input
                             placeholder={t('share.inviteInput')}
@@ -235,7 +270,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
                     ) : collaborators.length === 0 ? (
                         <Empty
                             image={Empty.PRESENTED_IMAGE_SIMPLE}
-                            imageStyle={{ height: 48 }}
+                            styles={{ image: { height: 48 } }}
                             description={
                                 <Text type="secondary" style={{ fontSize: 13 }}>
                                     输入邮箱邀请协作者查看此图表
@@ -309,20 +344,20 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
                     {!user && <Text type="warning" style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>{t('share.loginRequired')}</Text>}
 
                     {/* 链接复制成功高亮提示 */}
-                    {justCopiedUrl && (
+                    {shareLinkResult && (
                         <Alert
-                            type="success"
+                            type={shareLinkResult.copied ? 'success' : 'warning'}
                             showIcon
-                            icon={<CheckCircleFilled />}
-                            message="链接已复制到剪贴板"
+                            icon={shareLinkResult.copied ? <CheckCircleFilled /> : undefined}
+                            title={shareLinkResult.copied ? '链接已复制到剪贴板' : '链接已生成，请手动复制'}
                             description={
-                                <Text copyable={{ text: justCopiedUrl }} style={{ fontSize: 12, wordBreak: 'break-all' }}>
-                                    {justCopiedUrl}
+                                <Text copyable={{ text: shareLinkResult.url }} style={{ fontSize: 12, wordBreak: 'break-all' }}>
+                                    {shareLinkResult.url}
                                 </Text>
                             }
                             style={{ marginBottom: 16 }}
                             closable
-                            onClose={() => setJustCopiedUrl(null)}
+                            onClose={() => setShareLinkResult(null)}
                         />
                     )}
 
@@ -332,7 +367,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
                     ) : shares.length === 0 ? (
                         <Empty
                             image={Empty.PRESENTED_IMAGE_SIMPLE}
-                            imageStyle={{ height: 48 }}
+                            styles={{ image: { height: 48 } }}
                             description={
                                 <Text type="secondary" style={{ fontSize: 13 }}>
                                     生成公开链接，任何拥有链接的人都可查看

@@ -35,10 +35,10 @@ export const runAdvancedExport = async ({
   embedMetadata,
   getReactFlowSnapshot,
 }: RunAdvancedExportOptions): Promise<'scene' | 'fallback'> => {
+  const title = diagramTitle?.trim() || diagramId?.trim() || 'advanced-export';
   const snapshot = canUseSceneExport(format) ? getReactFlowSnapshot?.() : null;
   if (snapshot) {
     const scene = buildRenderSceneFromReactFlowSnapshot(snapshot, { padding: 40 });
-    const title = diagramTitle?.trim() || diagramId?.trim() || 'advanced-export';
     const dataUrl = format === 'png'
       ? await exportRenderSceneToPngDataUrl(scene, { title, pixelRatio })
       : exportRenderSceneToSvgDataUrl(scene, { title });
@@ -51,6 +51,7 @@ export const runAdvancedExport = async ({
     pixelRatio,
     includeBackground,
     embedMetadata,
+    fileNameBase: title,
   });
   return 'fallback';
 };

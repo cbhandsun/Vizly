@@ -1,0 +1,208 @@
+// @vitest-environment jsdom
+
+import React from 'react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.stubGlobal('ResizeObserver', class ResizeObserverStub {
+  observe() { /* no-op */ }
+  unobserve() { /* no-op */ }
+  disconnect() { /* no-op */ }
+});
+vi.stubGlobal('matchMedia', (query: string) => ({
+  matches: false,
+  media: query,
+  onchange: null,
+  addListener: vi.fn(),
+  removeListener: vi.fn(),
+  addEventListener: vi.fn(),
+  removeEventListener: vi.fn(),
+  dispatchEvent: vi.fn(),
+}));
+
+const authMocks = vi.hoisted(() => ({
+  user: null as { id: string } | null,
+}));
+
+const serviceMocks = vi.hoisted(() => ({
+  addCollaborator: vi.fn(),
+  buildShareUrl: vi.fn(),
+  createShareLink: vi.fn(),
+  listCollaborators: vi.fn(),
+  listSharesForDiagram: vi.fn(),
+  removeCollaborator: vi.fn(),
+  revokeShare: vi.fn(),
+}));
+
+const messageMocks = vi.hoisted(() => ({
+  error: vi.fn(),
+  success: vi.fn(),
+  warning: vi.fn(),
+}));
+
+const clipboardMocks = vi.hoisted(() => ({
+  copy: vi.fn(),
+}));
+
+const loggingMocks = vi.hoisted(() => ({
+  loadFailure: vi.fn(),
+  mutationFailure: vi.fn(),
+}));
+
+vi.mock('@/context/useAuth', () => ({
+  useAuth: () => ({ user: authMocks.user }),
+}));
+
+vi.mock('@/services/ShareService', () => ({
+  shareService: serviceMocks,
+}));
+
+vi.mock('@/core/utils/antdStaticBridge', () => ({
+  appMessage: messageMocks,
+}));
+
+vi.mock('@/components/shareClipboard', () => ({
+  tryCopyShareUrl: clipboardMocks.copy,
+}));
+
+vi.mock('@/components/shareDialogLogging', () => ({
+  logShareDialogLoadFailure: loggingMocks.loadFailure,
+  logShareDialogMutationFailure: loggingMocks.mutationFailure,
+}));
+
+const translations: Record<string, string> = {
+  'share.title': '分享图表',
+  'share.tabs.invite': '定向邀请',
+  'share.tabs.link': '公开链接',
+  'share.inviteInput': '输入用户的注册邮箱...',
+  'share.roleViewer': '只读 (Viewer)',
+  'share.roleEditor': '编辑 (Editor)',
+  'share.inviteBtn': '邀请',
+  'share.collaborators': '协作者',
+  'share.loginRequired': '请先登录后才能使用分享功能',
+  'share.never': '永不过期',
+  'share.1day': '1 天',
+  'share.7days': '7 天',
+  'share.30days': '30 天',
+  'share.generateLink': '生成分享链接',
+  'share.copied': '已复制',
+};
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, fallback?: string | Record<string, unknown>) => (
+      typeof fallback === 'string' ? fallback : translations[key] || key
+    ),
+  }),
+}));
+
+import ShareDialog from '../diagrams/ShareDialog';
+
+const DIAGRAM_ID = '11111111-1111-4111-8111-111111111111';
+const USER_ID = '22222222-2222-4222-8222-222222222222';
+const SHARE_URL = 'https://vizly.example/#/shared?token=abcdefghijklmnop';
+const shareRecord = {
+  id: '33333333-3333-4333-8333-333333333333',
+  diagram_id: DIAGRAM_ID,
+  share_token: 'abcdefghijklmnop',
+  created_by: USER_ID,
+  expires_at: null,
+  is_active: true,
+  created_at: '2026-08-01T00:00:00.000Z',
+};
+
+describe('ShareDialog commercial failure handling', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    authMocks.user = null;
+    serviceMocks.listSharesForDiagram.mockResolvedValue([]);
+    serviceMocks.listCollaborators.mockResolvedValue([]);
+    serviceMocks.createShareLink.mockResolvedValue(shareRecord);
+    serviceMocks.buildShareUrl.mockReturnValue(SHARE_URL);
+    clipboardMocks.copy.mockResolvedValue(true);
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('explains the login prerequisite on the default invite tab', async () => {
+    render(
+      <ShareDialog open onClose={vi.fn()} diagramId={DIAGRAM_ID} onEnsureSaved={vi.fn()} />,
+    );
+
+    expect(await screen.findByText('请先登录后才能使用分享功能')).toBeTruthy();
+    expect((screen.getByRole('button', { name: '邀请' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('keeps a created link visible when clipboard permission is denied', async () => {
+    authMocks.user = { id: USER_ID };
+    clipboardMocks.copy.mockResolvedValue(false);
+    const ensureSaved = vi.fn(async () => DIAGRAM_ID);
+    render(
+      <ShareDialog open onClose={vi.fn()} diagramId={DIAGRAM_ID} onEnsureSaved={ensureSaved} />,
+    );
+
+    fireEvent.click(await screen.findByText('公开链接'));
+    fireEvent.click(await screen.findByRole('button', { name: '生成分享链接' }));
+
+    expect(await screen.findByText('链接已生成，请手动复制')).toBeTruthy();
+    expect(screen.getAllByText(SHARE_URL).length).toBeGreaterThan(0);
+    expect(serviceMocks.createShareLink).toHaveBeenCalledWith(expect.objectContaining({ diagramId: DIAGRAM_ID }));
+    expect(messageMocks.warning).toHaveBeenCalledWith('链接已生成，请手动复制');
+    expect(messageMocks.error).not.toHaveBeenCalled();
+  });
+
+  it('does not let a cloud-id reload overwrite a newly created link', async () => {
+    authMocks.user = { id: USER_ID };
+    let resolveReload: ((records: typeof shareRecord[]) => void) | undefined;
+    serviceMocks.listSharesForDiagram.mockImplementation(() => new Promise((resolve) => {
+      resolveReload = resolve;
+    }));
+    render(
+      <ShareDialog
+        open
+        onClose={vi.fn()}
+        diagramId="local-unsaved-diagram"
+        onEnsureSaved={vi.fn(async () => DIAGRAM_ID)}
+      />,
+    );
+
+    fireEvent.click(await screen.findByText('公开链接'));
+    fireEvent.click(await screen.findByRole('button', { name: '生成分享链接' }));
+
+    await waitFor(() => {
+      expect(serviceMocks.listSharesForDiagram).toHaveBeenCalledWith(DIAGRAM_ID);
+      expect(clipboardMocks.copy).toHaveBeenCalledWith(SHARE_URL);
+    });
+    resolveReload?.([]);
+
+    await waitFor(() => {
+      expect(document.querySelectorAll('.ant-list-item')).toHaveLength(1);
+      expect(screen.queryByText('生成公开链接，任何拥有链接的人都可查看')).toBeNull();
+    });
+  });
+
+  it('shows a stable error and never renders a raw provider failure', async () => {
+    authMocks.user = { id: USER_ID };
+    const providerFailure = new Error('Authorization: Bearer share-provider-secret');
+    serviceMocks.createShareLink.mockRejectedValue(providerFailure);
+    render(
+      <ShareDialog
+        open
+        onClose={vi.fn()}
+        diagramId={DIAGRAM_ID}
+        onEnsureSaved={vi.fn(async () => DIAGRAM_ID)}
+      />,
+    );
+
+    fireEvent.click(await screen.findByText('公开链接'));
+    fireEvent.click(await screen.findByRole('button', { name: '生成分享链接' }));
+
+    await waitFor(() => {
+      expect(messageMocks.error).toHaveBeenCalledWith('无法生成分享链接，请稍后重试');
+    });
+    expect(loggingMocks.mutationFailure).toHaveBeenCalledWith('createShareLink', providerFailure);
+    expect(document.body.textContent).not.toContain('share-provider-secret');
+  });
+});
