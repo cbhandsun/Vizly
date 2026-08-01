@@ -246,6 +246,7 @@ const renderConfigEditor = (item: ConfigItem) => {
         <label className="relative inline-flex items-center cursor-pointer group">
           <input
             type="checkbox"
+            aria-label={t(`config.${item.key}.label`)}
             checked={Boolean(currentValue)}
             onChange={(e) => handleValueChange(item.key, e.target.checked)}
             className="sr-only peer"
@@ -474,6 +475,7 @@ return createPortal(
               <span className="sr-only">Use advanced mode</span>
               <input
                 type="checkbox"
+                aria-label={t('config.groups.expertMode', 'Expert Mode')}
                 className="sr-only"
                 checked={isAdvancedMode}
                 onChange={(e) => {

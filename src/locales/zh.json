@@ -1305,6 +1305,7 @@
         "actions": {
             "save": "保存更改",
             "reset": "重置",
+            "cancel": "取消",
             "close": "关闭",
             "applyCompact": "应用ELK紧凑预设",
             "applyConsistent": "应用ELK一致性预设"
@@ -1861,7 +1862,12 @@
         "markUnresolved": "取消解决",
         "delete": "删除",
         "emptySearch": "未找到匹配的评论",
-        "emptyAll": "暂无评论反馈"
+        "emptyAll": "暂无评论反馈",
+        "emptyFiltered": "当前筛选条件下没有评论",
+        "clearFilters": "清除筛选",
+        "addFirstHint": "进入评论模式后，点击画布上的位置即可添加反馈。",
+        "addFirst": "添加第一条评论",
+        "modeActive": "评论模式已开启"
     },
     "advancedExport": {
         "title": "高级图表导出",

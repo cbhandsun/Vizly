@@ -82,6 +82,11 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
     const [isPanelOpen, setIsPanelOpen] = useState(false);
     const isLayoutSwitchSupported = !selectedDiagram || !!selectedDiagram.supportsLayoutSwitch;
     const isMainFlowToggleSupported = !selectedDiagram || !!selectedDiagram.supportsMainFlowToggle;
+    const nodeLayoutLabel = (() => {
+        const normalizedLayout = normalizeLayoutName(layoutStrategy);
+        const isDomainElk = normalizedLayout === 'domainelk' || normalizedLayout === 'domainelklayout';
+        return isDomainElk ? t('designer.settings.elkAlgorithm') : t('designer.settings.nodeLayout');
+    })();
 
     // 节点布局策略自动修正逻辑
     useEffect(() => {
@@ -167,6 +172,7 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                     >
                         <div className="min-w-[120px]">
                             <EnhancedThemeSelector
+                                ariaLabel={t('designer.settings.theme', '颜色主题')}
                                 borderless={true}
                                 showPresets={true}
                                 showCustomThemes={true}
@@ -184,7 +190,12 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                         description={t('designer.settings.styleDesc', '调整节点与连线的艺术形式')}
                     >
                         <div className="min-w-[120px]">
-                            <EnhancedStyleSwitcher borderless={true} size="sm" className="w-full text-right font-semibold" />
+                            <EnhancedStyleSwitcher
+                                ariaLabel={t('designer.settings.style', '线条风格')}
+                                borderless={true}
+                                size="sm"
+                                className="w-full text-right font-semibold"
+                            />
                         </div>
                     </SettingRow>
                 </motion.div>
@@ -202,6 +213,7 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                         description={t('designer.settings.edgeModeDesc', '决定连线的避障与寻路逻辑')}
                     >
                         <Select
+                            aria-label={t('designer.settings.edgeMode')}
                             variant="borderless"
                             className="text-right font-bold text-indigo-600 dark:text-indigo-400 min-w-[140px]"
                             value={normalizeDiagramEdgeMode(edgeMode)}
@@ -224,6 +236,7 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                         disabled={!isLayoutSwitchSupported}
                     >
                         <Select
+                            aria-label={t('designer.settings.layoutStrategy')}
                             variant="borderless"
                             className="text-right font-bold text-gray-700 dark:text-gray-300 min-w-[140px]"
                             value={layoutStrategy}
@@ -276,11 +289,7 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
 
                     <SettingRow 
                         icon={Cpu} 
-                        label={(() => {
-                            const norm = String(layoutStrategy || '').trim().toLowerCase().replace(/\s+/g, '').replace(/[+_-]/g, '');
-                            const isDomainElk = norm === 'domainelk' || norm === 'domainelklayout';
-                            return isDomainElk ? t('designer.settings.elkAlgorithm') : t('designer.settings.nodeLayout');
-                        })()}
+                        label={nodeLayoutLabel}
                         description={t('designer.settings.nodeLayoutDesc', '子域内节点的排布微调')}
                     >
                         {(() => {
@@ -289,6 +298,7 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                             if (isDomainElk) {
                                 return (
                                     <Select
+                                        aria-label={nodeLayoutLabel}
                                         variant="borderless"
                                         className="text-right font-bold text-gray-700 dark:text-gray-300 min-w-[140px]"
                                         value={normalizeElkAlgorithm(elkAlgorithm)}
@@ -322,6 +332,7 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                                 ];
                                 return (
                                     <Select
+                                        aria-label={nodeLayoutLabel}
                                         variant="borderless"
                                         className="text-right font-bold text-gray-700 dark:text-gray-300 min-w-[140px]"
                                         value={currentPreset}
@@ -349,6 +360,7 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                             }
                             return (
                                 <Select
+                                    aria-label={nodeLayoutLabel}
                                     variant="borderless"
                                     className="text-right font-bold text-gray-700 dark:text-gray-300 min-w-[140px]"
                                     value={nodeLayoutStrategy}
@@ -424,6 +436,7 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                         disabled={!isMainFlowToggleSupported}
                     >
                         <Switch
+                            aria-label={t('designer.settings.showMainFlow')}
                             checked={showOnlyMainFlow}
                             onChange={(checked) => onShowOnlyMainFlowChange(checked)}
                             disabled={!isMainFlowToggleSupported}

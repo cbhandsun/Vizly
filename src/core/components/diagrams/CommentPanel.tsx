@@ -15,6 +15,8 @@ export const CommentPanel: React.FC = () => {
     const removeComment = useDiagramStore(state => state.removeComment);
     const updateComment = useDiagramStore(state => state.updateComment);
     const setActiveCommentId = useDiagramStore(state => state.setActiveCommentId);
+    const isCommentMode = useDiagramStore(state => state.isCommentMode);
+    const setIsCommentMode = useDiagramStore(state => state.setIsCommentMode);
     const { setCenter } = useReactFlow();
     
     const [searchTerm, setSearchTerm] = useState('');
@@ -59,6 +61,12 @@ export const CommentPanel: React.FC = () => {
 
     const handleDelete = (id: string) => {
         removeComment(id);
+    };
+
+    const hasComments = comments.length > 0;
+    const resetCommentFilters = () => {
+        setSearchTerm('');
+        setFilter('all');
     };
 
     return (
@@ -236,10 +244,28 @@ export const CommentPanel: React.FC = () => {
                     />
                 ) : (
                     <div style={{ padding: '64px 32px' }}>
-                        <Empty 
-                            image={Empty.PRESENTED_IMAGE_SIMPLE} 
-                            description={searchTerm ? t('comment.emptySearch') : t('comment.emptyAll')} 
-                        />
+                        <Empty
+                            image={Empty.PRESENTED_IMAGE_SIMPLE}
+                            description={hasComments ? t('comment.emptyFiltered') : t('comment.emptyAll')}
+                        >
+                            {hasComments ? (
+                                <Button onClick={resetCommentFilters}>
+                                    {t('comment.clearFilters')}
+                                </Button>
+                            ) : (
+                                <Flex vertical align="center" gap={12}>
+                                    <Text type="secondary">{t('comment.addFirstHint')}</Text>
+                                    <Button
+                                        type="primary"
+                                        icon={<FaRegCommentDots />}
+                                        onClick={() => setIsCommentMode(true)}
+                                        aria-pressed={isCommentMode}
+                                    >
+                                        {isCommentMode ? t('comment.modeActive') : t('comment.addFirst')}
+                                    </Button>
+                                </Flex>
+                            )}
+                        </Empty>
                     </div>
                 )}
             </div>

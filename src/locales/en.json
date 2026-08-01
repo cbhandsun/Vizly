@@ -1219,6 +1219,7 @@
         "actions": {
             "save": "Save Changes",
             "reset": "Reset",
+            "cancel": "Cancel",
             "close": "Close",
             "applyCompact": "Apply ELK Compact Preset",
             "applyConsistent": "Apply ELK Consistent Preset"
@@ -1949,7 +1950,12 @@
         "markUnresolved": "Mark as unresolved",
         "delete": "Delete",
         "emptySearch": "No matching comments found",
-        "emptyAll": "No comments yet"
+        "emptyAll": "No comments yet",
+        "emptyFiltered": "No comments match the current filters",
+        "clearFilters": "Clear filters",
+        "addFirstHint": "Enter comment mode, then click anywhere on the canvas to add feedback.",
+        "addFirst": "Add the first comment",
+        "modeActive": "Comment mode is active"
     },
     "advancedExport": {
         "title": "Advanced Diagram Export",

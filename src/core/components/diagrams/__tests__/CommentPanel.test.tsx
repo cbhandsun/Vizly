@@ -18,6 +18,8 @@ const storeState = vi.hoisted(() => ({
     removeComment: vi.fn(),
     updateComment: vi.fn(),
     setActiveCommentId: vi.fn(),
+    isCommentMode: false,
+    setIsCommentMode: vi.fn(),
 }));
 
 vi.mock('../../../store/useDiagramStore', () => ({
@@ -38,6 +40,8 @@ describe('CommentPanel', () => {
         storeState.removeComment.mockReset();
         storeState.updateComment.mockReset();
         storeState.setActiveCommentId.mockReset();
+        storeState.isCommentMode = false;
+        storeState.setIsCommentMode.mockReset();
         Object.defineProperty(window, 'matchMedia', {
             configurable: true,
             value: vi.fn().mockImplementation(() => ({
@@ -70,6 +74,35 @@ describe('CommentPanel', () => {
         expect(resolved.getAttribute('aria-pressed')).toBe('true');
         expect(unresolved.getAttribute('aria-pressed')).toBe('false');
         expect(screen.getByRole('textbox', { name: 'comment.searchPlaceholder' })).toBeTruthy();
+    });
+
+    it('offers a direct path to create the first comment', () => {
+        render(<CommentPanel />);
+
+        const addFirst = screen.getByRole('button', { name: 'comment.addFirst' });
+        expect(addFirst.getAttribute('aria-pressed')).toBe('false');
+
+        fireEvent.click(addFirst);
+        expect(storeState.setIsCommentMode).toHaveBeenCalledWith(true);
+    });
+
+    it('lets users recover from filters that have no results', () => {
+        storeState.comments = [{
+            id: 'comment-1',
+            content: '已解决反馈',
+            authorName: '测试用户',
+            authorColor: '#3b82f6',
+            createdAt: Date.now(),
+            isResolved: true,
+            replies: [],
+            x: 10,
+            y: 20,
+        }];
+        render(<CommentPanel />);
+
+        fireEvent.click(screen.getByRole('button', { name: 'comment.clearFilters' }));
+        expect(screen.getByText('已解决反馈')).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'comment.filterAll' }).getAttribute('aria-pressed')).toBe('true');
     });
 
     it('requires confirmation before deleting a comment', async () => {

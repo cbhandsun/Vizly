@@ -24,6 +24,7 @@ export interface EnhancedStyleSwitcherProps {
     className?: string;
     style?: React.CSSProperties;
     borderless?: boolean;
+    ariaLabel?: string;
 }
 
 /**
@@ -158,6 +159,7 @@ export const EnhancedStyleSwitcher: React.FC<EnhancedStyleSwitcherProps> = ({
     className = '',
     style,
     borderless = false,
+    ariaLabel,
 }) => {
     const { t } = useTranslation();
     const currentPreset = useDiagramStylePreset_v2();
@@ -197,6 +199,7 @@ export const EnhancedStyleSwitcher: React.FC<EnhancedStyleSwitcherProps> = ({
         <>
             {/* 触发按钮 */}
             <button
+                aria-label={ariaLabel}
                 className={`flex items-center justify-between gap-2.5 ${buttonSizeClass} font-semibold transition-all rounded-xl ${
                     borderless 
                     ? 'bg-transparent border-none' 

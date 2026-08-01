@@ -42,6 +42,7 @@ export interface EnhancedThemeSelectorProps {
   borderless?: boolean;
   variant?: 'default' | 'icon';
   onThemeChange?: (theme: Theme) => void;
+  ariaLabel?: string;
 }
 
 interface CustomThemeForm {
@@ -71,6 +72,7 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
   borderless = false,
   variant = 'default',
   onThemeChange,
+  ariaLabel,
 }) => {
   const { t } = useTranslation();
   const { token } = theme.useToken();
@@ -574,6 +576,7 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
     <>
       {variant === 'icon' ? (
         <button
+            aria-label={ariaLabel}
             className={className || "inline-flex items-center justify-center w-7 h-7 rounded-[6px] border-none text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] transition-colors cursor-pointer"}
             onClick={() => setIsOpen(!isOpen)}
             style={style}
@@ -583,6 +586,7 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
         </button>
       ) : (
         <button
+            aria-label={ariaLabel}
             className={`flex items-center justify-between gap-1.5 h-8 px-2.5 text-[13px] transition-colors rounded-[6px] ${borderless ? 'bg-transparent border-none' : 'bg-white dark:bg-[#1C1C1E] border border-[#d9d9d9] dark:border-white/15 hover:border-blue-400 dark:hover:border-blue-500 shadow-sm'} text-gray-700 dark:text-gray-200 pointer-events-auto overflow-hidden w-full ${className}`}
             onClick={() => setIsOpen(!isOpen)}
             style={style}
