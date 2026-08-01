@@ -18,6 +18,7 @@ import { IconLibraryPanel } from './IconLibraryPanel';
 import type { NodeTemplate } from './hooks/useNodeTemplates';
 import type { LayerConfig } from './hooks/useLayerManagement';
 import { useSidebarNavigatorTree, type NavigatorTreeNode } from './hooks/useSidebarNavigatorTree';
+import { AccessibleInputClearIcon } from './AccessibleInputClearIcon';
 const { Sider } = Layout;
 const { Text } = Typography;
 
@@ -347,7 +348,7 @@ export const ModernFlowchartSidebar: React.FC<FlowchartSidebarProps> = ({
                                 aria-label={t('designer.sidebar.search')}
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                allowClear
+                                allowClear={{ clearIcon: <AccessibleInputClearIcon label={t('designer.sidebar.clearSearch')} /> }}
                                 size="middle"
                                 style={{ minHeight: 'var(--commercial-touch-target, 44px)' }}
                             />

@@ -9,6 +9,7 @@ import {
     writeActiveLayerId,
     writeLayers,
 } from '../../../utils/layerStorage';
+import { normalizeLayerNameInput } from '../layerNameInput';
 
 export interface LayerConfig {
     id: string;            // 图层 ID
@@ -51,7 +52,7 @@ export const useLayerManagement = () => {
     }, [activeLayerId, layers]);
 
     const createLayer = useCallback((name: string) => {
-        const normalizedName = name.trim().slice(0, 80);
+        const normalizedName = normalizeLayerNameInput(name);
         if (!normalizedName) {
             appMessage.warning('图层名称不能为空');
             return;
@@ -95,7 +96,7 @@ export const useLayerManagement = () => {
     }, []);
 
     const renameLayer = useCallback((layerId: string, newName: string) => {
-        const normalizedName = newName.trim().slice(0, 80);
+        const normalizedName = normalizeLayerNameInput(newName);
         if (!normalizedName) return;
         setLayers(prev => coerceLayers(prev.map(l =>
             l.id === layerId ? { ...l, name: normalizedName } : l

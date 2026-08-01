@@ -795,6 +795,7 @@
             "components": "组件",
             "search": "搜索...",
             "searchComponents": "搜索组件...",
+            "clearSearch": "清除搜索",
             "addAndConnectHint": "点击添加形状；先选中一个流程节点，再点击形状会自动添加并连线。拖拽可自由放置。",
             "flowControl": "流程控制",
             "dataIO": "数据与 I/O",

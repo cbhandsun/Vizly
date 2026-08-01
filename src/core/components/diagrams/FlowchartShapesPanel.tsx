@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { PluginContext } from '../../types/plugin';
 import { ShapePreview } from './ShapePreview';
 import { logFlowchartShapesDragPreviewFailure } from './flowchartShapesLogging';
+import { AccessibleInputClearIcon } from './AccessibleInputClearIcon';
 
 const { Text } = Typography;
 type NodeConfig = Record<string, unknown>;
@@ -280,7 +281,7 @@ export const FlowchartShapesPanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) 
                     placeholder={t('designer.sidebar.searchComponents')}
                     aria-label={t('designer.sidebar.searchComponents')}
                     size="small"
-                    allowClear
+                    allowClear={{ clearIcon: <AccessibleInputClearIcon label={t('designer.sidebar.clearSearch')} /> }}
                     value={search}
                     onChange={e => setSearch(e.target.value)}
                     style={{ 
@@ -370,7 +371,7 @@ export const FlowchartShapesPanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) 
                     placeholder={t('designer.sidebar.searchComponents')}
                     aria-label={t('designer.sidebar.searchComponents')}
                     size="small"
-                    allowClear
+                    allowClear={{ clearIcon: <AccessibleInputClearIcon label={t('designer.sidebar.clearSearch')} /> }}
                     value={search}
                     onChange={e => setSearch(e.target.value)}
                     style={{ 

@@ -97,6 +97,9 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
     onDelete,
     onSetColor,
 }) => {
+    const [isCreating, setIsCreating] = useState(false);
+    const [createName, setCreateName] = useState('');
+    const [createError, setCreateError] = useState<string | null>(null);
     const [editingLayerId, setEditingLayerId] = useState<string | null>(null);
     const [editName, setEditName] = useState('');
     const touchTargetSize = useMemo(
@@ -110,9 +113,20 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
         padding: 0,
     }), [touchTargetSize]);
 
+    const cancelCreate = () => {
+        setIsCreating(false);
+        setCreateName('');
+        setCreateError(null);
+    };
+
     const handleCreate = () => {
-        const name = normalizeLayerNameInput(prompt('图层名称:'));
-        if (name) onCreate(name);
+        const name = normalizeLayerNameInput(createName);
+        if (!name) {
+            setCreateError('请输入图层名称');
+            return;
+        }
+        onCreate(name);
+        cancelCreate();
     };
 
     const startEdit = (layer: LayerConfig) => {
@@ -132,9 +146,60 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
         <div style={{ padding: 16, background: '#fafafa', height: '100%', display: 'flex', flexDirection: 'column' }}>
             <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>图层</h3>
-                <Button type="primary" icon={<PlusOutlined />} style={{ minHeight: touchTargetSize }} onClick={handleCreate}>
-                    新建
-                </Button>
+                {isCreating ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+                        <Space.Compact>
+                            <Input
+                                value={createName}
+                                autoFocus
+                                maxLength={80}
+                                aria-label="新图层名称"
+                                aria-invalid={Boolean(createError)}
+                                placeholder="输入图层名称"
+                                status={createError ? 'error' : undefined}
+                                style={{ width: 180, minHeight: touchTargetSize }}
+                                onChange={(event) => {
+                                    setCreateName(event.target.value);
+                                    if (createError) setCreateError(null);
+                                }}
+                                onPressEnter={handleCreate}
+                                onKeyDown={(event) => {
+                                    if (event.key === 'Escape') cancelCreate();
+                                }}
+                            />
+                            <Button
+                                type="primary"
+                                aria-label="创建图层"
+                                style={{ minHeight: touchTargetSize }}
+                                onClick={handleCreate}
+                            >
+                                创建
+                            </Button>
+                            <Button
+                                aria-label="取消新建图层"
+                                style={{ minHeight: touchTargetSize }}
+                                onClick={cancelCreate}
+                            >
+                                取消
+                            </Button>
+                        </Space.Compact>
+                        {createError ? (
+                            <div role="alert" style={{ color: '#cf1322', fontSize: 12 }}>
+                                {createError}
+                            </div>
+                        ) : null}
+                    </div>
+                ) : (
+                    <Button
+                        type="primary"
+                        icon={<PlusOutlined />}
+                        aria-label="新建图层"
+                        style={{ minHeight: touchTargetSize }}
+                        onClick={() => setIsCreating(true)}
+                    >
+                        新建
+                    </Button>
+                )}
             </div>
 
             <div style={{ flex: 1, overflow: 'auto' }}>

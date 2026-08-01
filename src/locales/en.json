@@ -784,6 +784,7 @@
             "components": "Components",
             "search": "Search...",
             "searchComponents": "Search components...",
+            "clearSearch": "Clear search",
             "addAndConnectHint": "Click to add a shape. Select one flow node first and the next click will add and connect it. Drag for free placement.",
             "flowControl": "Flow Control",
             "dataIO": "Data & I/O",

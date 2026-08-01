@@ -30,6 +30,7 @@ import {
     resolveNavigatorSearchText,
 } from './navigatorNodePresentation';
 import './IconRailSidebar.css';
+import { AccessibleInputClearIcon } from './AccessibleInputClearIcon';
 
 const { Text } = Typography;
 
@@ -304,9 +305,10 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
                             <Input
                                 prefix={<FaSearch style={{ color: token.colorTextDescription }} />}
                                 placeholder={t('designer.sidebar.search')}
+                                aria-label={t('designer.sidebar.search')}
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                allowClear
+                                allowClear={{ clearIcon: <AccessibleInputClearIcon label={t('designer.sidebar.clearSearch')} /> }}
                                 size="small"
                             />
                         </div>
