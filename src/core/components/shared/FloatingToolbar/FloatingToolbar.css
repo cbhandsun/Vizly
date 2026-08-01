@@ -244,6 +244,39 @@
     outline-offset: 1px;
 }
 
+.contextual-edge-toolbar-label-editor {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.contextual-edge-toolbar-label-input {
+    width: 100px;
+    padding: 2px 6px;
+    border: 1px solid var(--ftb-divider-color, rgba(0, 0, 0, 0.09));
+    border-radius: 4px;
+    outline: none;
+    background: transparent;
+    color: inherit;
+    font-size: 12px;
+}
+
+@media (max-width: 768px), (pointer: coarse) {
+    .contextual-edge-toolbar {
+        --ftb-btn-size: var(--commercial-touch-target, 44px);
+        --ftb-icon-size: 16px;
+        --ftb-gap: 2px;
+        --ftb-padding: 4px;
+    }
+
+    .contextual-edge-toolbar-label-input {
+        width: 160px;
+        min-height: var(--commercial-touch-target, 44px);
+        padding: 8px 10px;
+        font-size: 14px;
+    }
+}
+
 /* ─── Reduced motion ─── */
 @media (prefers-reduced-motion: reduce) {
     .floating-toolbar-container,

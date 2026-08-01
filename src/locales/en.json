@@ -1078,6 +1078,29 @@
             }
         }
     },
+    "edgeToolbar": {
+        "switchToCurve": "Switch to curve",
+        "switchToOrthogonal": "Switch to orthogonal",
+        "dashStyle": "Line style: {{style}} (click to switch)",
+        "lineWidth": "Line width: {{width}}px",
+        "stopAnimation": "Stop animation",
+        "startAnimation": "Start animation",
+        "switchArrowStyle": "Switch arrow style",
+        "switchColor": "Switch color",
+        "labelInput": "Edge label",
+        "labelPlaceholder": "Label text...",
+        "confirm": "Confirm",
+        "cancel": "Cancel",
+        "currentLabel": "Label: {{label}}",
+        "addLabel": "Add label",
+        "dash": {
+            "solid": "Solid",
+            "dashed": "Dashed",
+            "dotted": "Dotted",
+            "longDash": "Long dash",
+            "dashDot": "Dash dot"
+        }
+    },
     "propertyPanel": {
         "mixedSelection": "Mixed Selection ({{count}})",
         "title": "Property Settings",

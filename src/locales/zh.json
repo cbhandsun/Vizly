@@ -1164,6 +1164,29 @@
             }
         }
     },
+    "edgeToolbar": {
+        "switchToCurve": "切换至曲线",
+        "switchToOrthogonal": "切换至正交",
+        "dashStyle": "线型：{{style}}（点击切换）",
+        "lineWidth": "线宽：{{width}}px",
+        "stopAnimation": "停止流动",
+        "startAnimation": "开启流动动画",
+        "switchArrowStyle": "切换箭头样式",
+        "switchColor": "切换颜色",
+        "labelInput": "连线标签",
+        "labelPlaceholder": "标签文本...",
+        "confirm": "确认",
+        "cancel": "取消",
+        "currentLabel": "标签：{{label}}",
+        "addLabel": "添加标签",
+        "dash": {
+            "solid": "实线",
+            "dashed": "虚线",
+            "dotted": "点线",
+            "longDash": "长虚线",
+            "dashDot": "点划线"
+        }
+    },
     "propertyPanel": {
         "mixedSelection": "混合选择 ({{count}})",
         "title": "属性设置",

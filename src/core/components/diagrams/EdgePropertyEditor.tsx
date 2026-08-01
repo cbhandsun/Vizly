@@ -66,6 +66,7 @@ export function useEdgePropertyItems(params: UseEdgePropertyItemsParams): Collap
     const commonEdgeType = getCommonValue(selectedEdges, (e) => e.type);
     const commonEdgeRadius = getCommonValue(selectedEdges, (e) => e.data?.borderRadius as number | undefined);
     const commonEdgeColor = getCommonValue(selectedEdges, (e) => e.style?.stroke);
+    const commonEdgeColorText = typeof commonEdgeColor === 'string' ? commonEdgeColor : selectLabel;
     const commonEdgeWidth = getCommonValue(selectedEdges, (e) => e.style?.strokeWidth);
     const getDashStyle = (style: React.CSSProperties | undefined): string => {
         const d = style?.strokeDasharray;
@@ -88,6 +89,7 @@ export function useEdgePropertyItems(params: UseEdgePropertyItemsParams): Collap
             <Form layout="vertical" size="small">
                 <Form.Item label={t('propertyPanel.label')}>
                     <Input value={localEdgeLabel}
+                        aria-label={t('propertyPanel.label')}
                         onChange={e => { setLocalEdgeLabel(e.target.value); debouncedUpdateEdgeLabel(e.target.value); }}
                         onBlur={() => { debouncedUpdateEdgeLabel.cancel?.(); updateEdges({ label: localEdgeLabel, data: { label: localEdgeLabel } }); }}
                         onFocus={armSnapshot}
@@ -105,7 +107,8 @@ export function useEdgePropertyItems(params: UseEdgePropertyItemsParams): Collap
         children: (
             <Form layout="vertical" size="small">
                 <Form.Item label={t('propertyPanel.lineType')}>
-                    <Select value={commonEdgeType} onChange={val => updateEdges({ type: val })}
+                    <Select aria-label={t('propertyPanel.lineType')}
+                        value={commonEdgeType} onChange={val => updateEdges({ type: val })}
                         onOpenChange={(open) => { if (open) armSnapshot(); }}
                         placeholder={commonEdgeType === undefined ? mixedLabel : selectLabel}
                         allowClear disabled={disabled}
@@ -124,6 +127,7 @@ export function useEdgePropertyItems(params: UseEdgePropertyItemsParams): Collap
                 {commonEdgeType === 'smart-orthogonal' && (
                     <Form.Item label={t('propertyPanel.cornerRadius', 'Corner Radius')}>
                         <InputNumber style={{ width: '100%' }} value={commonEdgeRadius}
+                            aria-label={t('propertyPanel.cornerRadius', 'Corner Radius')}
                             onChange={(val) => { armSnapshot(); updateEdges({ data: { borderRadius: typeof val === 'number' ? val : undefined } }); }}
                             placeholder={commonEdgeRadius === undefined ? mixedLabel : undefined}
                             min={0} max={100} disabled={disabled} />
@@ -132,6 +136,7 @@ export function useEdgePropertyItems(params: UseEdgePropertyItemsParams): Collap
 
                 <Form.Item label={t('propertyPanel.style', '线型')}>
                     <Select
+                        aria-label={t('propertyPanel.style', '线型')}
                         value={commonEdgeLineStyle}
                         onChange={val => {
                             armSnapshot();
@@ -160,19 +165,36 @@ export function useEdgePropertyItems(params: UseEdgePropertyItemsParams): Collap
                 <Form.Item label={t('propertyPanel.color')}>
                     <div className="color-row">
                         <Text style={{ fontSize: 12 }}>{t('propertyPanel.strokeColor')}</Text>
-                        <ColorPicker value={commonEdgeColor ?? undefined} onChange={c => onColorChange(c, 'stroke')} showText disabled={disabled} />
+                        <ColorPicker value={commonEdgeColor ?? undefined}
+                            onChange={c => onColorChange(c, 'stroke')} disabled={disabled}>
+                            <button
+                                type="button"
+                                className="edge-color-picker-trigger"
+                                aria-label={t('propertyPanel.strokeColor')}
+                                disabled={disabled}
+                            >
+                                <span
+                                    className="edge-color-picker-swatch"
+                                    style={{ backgroundColor: typeof commonEdgeColor === 'string' ? commonEdgeColor : 'transparent' }}
+                                    aria-hidden="true"
+                                />
+                                <span>{commonEdgeColorText}</span>
+                            </button>
+                        </ColorPicker>
                     </div>
                 </Form.Item>
 
                 <Form.Item label={t('propertyPanel.lineWidth')}>
                     <InputNumber style={{ width: '100%' }} value={commonEdgeWidth}
+                        aria-label={t('propertyPanel.lineWidth')}
                         onChange={(val) => { armSnapshot(); updateEdges({ style: { strokeWidth: typeof val === 'number' ? val : undefined } }); }}
                         placeholder={commonEdgeWidth === undefined ? mixedLabel : undefined}
                         min={1} max={16} disabled={disabled} />
                 </Form.Item>
 
                 <Form.Item label={t('propertyPanel.arrowHead')}>
-                    <Select value={commonEdgeArrow}
+                    <Select aria-label={t('propertyPanel.arrowHead')}
+                        value={commonEdgeArrow}
                         onChange={val => {
                             armSnapshot();
                             const commonColor = commonEdgeColor ?? '#555';

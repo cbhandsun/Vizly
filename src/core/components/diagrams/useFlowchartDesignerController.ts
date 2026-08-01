@@ -37,10 +37,6 @@ import {
     addFlowchartStickyNote,
 } from './flowchartDesignerCanvasActions';
 import { createFlowchartImportHandler, type FlowchartImportEvent } from './flowchartImportHandler';
-import {
-    replaceFlowchartNodeLabel,
-    replaceFlowchartNodeLabels,
-} from './flowchartSearchReplace';
 import { scheduleFlowchartInitialFit } from './flowchartInitialFit';
 import { registerImportedFlowchartDiagram } from './flowchartImportRegistration';
 import { useFlowchartPluginRuntime } from './hooks/useFlowchartPluginRuntime';
@@ -53,6 +49,7 @@ import { shouldShowFlowchartMinimapByDefault } from './flowchartResponsiveChrome
 import { useFlowchartChromeCoordination } from './hooks/useFlowchartChromeCoordination';
 import { useFlowchartHostActions } from './hooks/useFlowchartHostActions';
 import { useMobileFlowchartViewportGuard, useScheduledFlowchartFit } from './hooks/useMobileFlowchartViewportGuard';
+import { useFlowchartSearchReplaceActions } from './hooks/useFlowchartSearchReplaceActions';
 
 export const useFlowchartDesignerController = ({
     id,
@@ -587,18 +584,16 @@ export const useFlowchartDesignerController = ({
 
     // commandPaletteVisible 现在直接使用 hook 内部 state，无需双向同步
 
-    // Phase 2：查找替换回调 — 通过 ref 读取最新数据，支持撤销
-    const handleSearchReplaceNode = useCallback((nodeId: string, newLabel: string) => {
-        setNodes((nds) => replaceFlowchartNodeLabel(nds, nodeId, newLabel));
-    }, [setNodes]);
-
-    const handleSearchReplaceAll = useCallback((matchIds: string[], newLabel: string) => {
-        setNodes((nds) => replaceFlowchartNodeLabels(nds, matchIds, newLabel));
-    }, [setNodes]);
-
-    const handleBeforeReplace = useCallback(() => {
-        takeSnapshot(nodesRef.current, edgesRef.current);
-    }, [takeSnapshot, nodesRef, edgesRef]);
+    const {
+        handleSearchReplaceNode,
+        handleSearchReplaceAll,
+        handleBeforeReplace,
+    } = useFlowchartSearchReplaceActions({
+        setNodes,
+        getNodes: getCurrentNodes,
+        getEdges: getCurrentEdges,
+        takeSnapshot,
+    });
 
     // 🚀 P2 性能优化：稳定的 onInit 回调，避?CanvasShell memo 失效
     const handleReactFlowInit = useCallback((instance: ReactFlowInstance) => {

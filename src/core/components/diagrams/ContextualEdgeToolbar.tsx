@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Edge } from '@xyflow/react';
+import { useTranslation } from 'react-i18next';
 import type { EdgeDataUpdate } from '../../types/diagram-updates';
 import {
     LineOutlined,
@@ -26,13 +27,14 @@ interface ContextualEdgeToolbarProps {
 
 // 箭头样式循环列表
 const ARROW_STYLES = [
-    { label: '单箭头', markerEnd: 'arrowclosed', markerStart: undefined },
-    { label: '双箭头', markerEnd: 'arrowclosed', markerStart: 'arrowclosed' },
-    { label: '无箭头', markerEnd: undefined, markerStart: undefined },
-    { label: '圆点终端', markerEnd: 'dot', markerStart: undefined },
+    { markerEnd: 'arrowclosed', markerStart: undefined },
+    { markerEnd: 'arrowclosed', markerStart: 'arrowclosed' },
+    { markerEnd: undefined, markerStart: undefined },
+    { markerEnd: 'dot', markerStart: undefined },
 ] as const;
 
 export const ContextualEdgeToolbar: React.FC<ContextualEdgeToolbarProps> = ({ edge, onUpdateEdge }) => {
+    const { t } = useTranslation();
     // 根据边的数据解析当前状态
     const isAnimated = !!edge.animated;
     const getDashStyle = (s?: React.CSSProperties) => {
@@ -142,17 +144,20 @@ export const ContextualEdgeToolbar: React.FC<ContextualEdgeToolbarProps> = ({ ed
         setIsEditingLabel(false);
     };
 
-    const DASH_LABELS: Record<string, string> = {
-        'solid': '实线', 'dashed': '虚线', 'dotted': '点线',
-        'long-dash': '长虚线', 'dash-dot': '点划线',
+    const DASH_LABEL_KEYS: Record<string, string> = {
+        'solid': 'edgeToolbar.dash.solid',
+        'dashed': 'edgeToolbar.dash.dashed',
+        'dotted': 'edgeToolbar.dash.dotted',
+        'long-dash': 'edgeToolbar.dash.longDash',
+        'dash-dot': 'edgeToolbar.dash.dashDot',
     };
 
     return (
-        <ToolbarContainer>
+        <ToolbarContainer className="contextual-edge-toolbar">
             {/* 路由模式 */}
             <ToolbarButton
                 icon={<PartitionOutlined />}
-                label={isOrthogonal ? "切换至曲线" : "切换至正交"}
+                label={t(isOrthogonal ? 'edgeToolbar.switchToCurve' : 'edgeToolbar.switchToOrthogonal')}
                 onClick={toggleRouting}
                 active={isOrthogonal}
 
@@ -163,7 +168,9 @@ export const ContextualEdgeToolbar: React.FC<ContextualEdgeToolbarProps> = ({ ed
             {/* 线型循环 */}
             <ToolbarButton
                 icon={isDashed ? <DashOutlined /> : <LineOutlined />}
-                label={`线型：${DASH_LABELS[currentDash] || '实线'}（点击切换）`}
+                label={t('edgeToolbar.dashStyle', {
+                    style: t(DASH_LABEL_KEYS[currentDash] ?? 'edgeToolbar.dash.solid'),
+                })}
                 onClick={toggleDashed}
                 active={isDashed}
 
@@ -181,14 +188,14 @@ export const ContextualEdgeToolbar: React.FC<ContextualEdgeToolbarProps> = ({ ed
                         }}>{currentWidth}</span>
                     </span>
                 }
-                label={`线宽: ${currentWidth}px`}
+                label={t('edgeToolbar.lineWidth', { width: currentWidth })}
                 onClick={cycleWidth}
             />
 
             {/* 流动动画 */}
             <ToolbarButton
                 icon={<PlayCircleOutlined />}
-                label={isAnimated ? "停止流动" : "开启流动动画"}
+                label={t(isAnimated ? 'edgeToolbar.stopAnimation' : 'edgeToolbar.startAnimation')}
                 onClick={toggleAnimation}
                 active={isAnimated}
 
@@ -199,14 +206,14 @@ export const ContextualEdgeToolbar: React.FC<ContextualEdgeToolbarProps> = ({ ed
             {/* 箭头样式 */}
             <ToolbarButton
                 icon={<SwapOutlined />}
-                label="切换箭头样式"
+                label={t('edgeToolbar.switchArrowStyle')}
                 onClick={cycleArrow}
             />
 
             {/* 颜色 */}
             <ToolbarButton
                 icon={<FormatPainterOutlined />}
-                label="切换颜色"
+                label={t('edgeToolbar.switchColor')}
                 onClick={toggleColor}
 
             />
@@ -215,7 +222,7 @@ export const ContextualEdgeToolbar: React.FC<ContextualEdgeToolbarProps> = ({ ed
 
             {/* 标签编辑 */}
             {isEditingLabel ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <div className="contextual-edge-toolbar-label-editor">
                     <input 
                         ref={labelInputRef}
                         value={labelText}
@@ -224,25 +231,19 @@ export const ContextualEdgeToolbar: React.FC<ContextualEdgeToolbarProps> = ({ ed
                             if (e.key === 'Enter') confirmLabel();
                             if (e.key === 'Escape') cancelLabel();
                         }}
-                        placeholder="标签文本..."
-                        style={{
-                            border: '1px solid var(--ftb-divider-color, rgba(0,0,0,0.09))',
-                            borderRadius: 4,
-                            padding: '2px 6px',
-                            fontSize: 12,
-                            width: 100,
-                            outline: 'none',
-                            background: 'transparent',
-                            color: 'inherit',
-                        }}
+                        aria-label={t('edgeToolbar.labelInput')}
+                        placeholder={t('edgeToolbar.labelPlaceholder')}
+                        className="contextual-edge-toolbar-label-input"
                     />
-                    <ToolbarButton icon={<CheckOutlined />} label="确认" onClick={confirmLabel} />
-                    <ToolbarButton icon={<CloseOutlined />} label="取消" onClick={cancelLabel} danger />
+                    <ToolbarButton icon={<CheckOutlined />} label={t('edgeToolbar.confirm')} onClick={confirmLabel} />
+                    <ToolbarButton icon={<CloseOutlined />} label={t('edgeToolbar.cancel')} onClick={cancelLabel} danger />
                 </div>
             ) : (
                 <ToolbarButton
                     icon={<EditOutlined />}
-                    label={edge.label ? `标签: ${edge.label}` : '添加标签'}
+                    label={edge.label
+                        ? t('edgeToolbar.currentLabel', { label: String(edge.label) })
+                        : t('edgeToolbar.addLabel')}
                     onClick={() => setIsEditingLabel(true)}
                     active={!!edge.label}
 
