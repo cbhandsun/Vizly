@@ -107,8 +107,9 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
                 <Title level={5} style={{ marginTop: 0, fontSize: 14 }}>创建新快照</Title>
                 <div className="version-history-create-row">
                     <Input 
-                        aria-label="版本备注"
-                        placeholder="版本备注 (例如：添加了订单模块)" 
+                        aria-label="版本备注（选填）"
+                        aria-describedby="version-history-message-hint"
+                        placeholder="版本备注（选填，例如：添加了订单模块）"
                         value={commitMessage}
                         onChange={e => setCommitMessage(e.target.value)}
                         onPressEnter={handleSave}
@@ -124,6 +125,13 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
                         保存
                     </Button>
                 </div>
+                <Text
+                    id="version-history-message-hint"
+                    type="secondary"
+                    className="version-history-message-hint"
+                >
+                    留空时将使用“手动保存的版本快照”
+                </Text>
             </div>
 
             {/* Preview Banner */}

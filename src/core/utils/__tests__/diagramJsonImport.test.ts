@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
     coerceReactFlowImport,
     coerceStandardDiagramImport,
+    DiagramJsonImportError,
     DIAGRAM_JSON_IMPORT_MAX_CHARS,
     getDiagramImportKind,
     isLikelyStandardDiagramData,
@@ -20,7 +21,14 @@ describe('diagramJsonImport', () => {
 
     it('parses bounded JSON and rejects oversized content', () => {
         expect(parseDiagramJson('{"nodes":[],"edges":[]}')).toEqual({ nodes: [], edges: [] });
-        expect(() => parseDiagramJson('x'.repeat(DIAGRAM_JSON_IMPORT_MAX_CHARS + 1))).toThrow('too large');
+        let oversizedJsonError: unknown;
+        try {
+            parseDiagramJson('x'.repeat(DIAGRAM_JSON_IMPORT_MAX_CHARS + 1));
+        } catch (error) {
+            oversizedJsonError = error;
+        }
+        expect(oversizedJsonError).toBeInstanceOf(DiagramJsonImportError);
+        expect(oversizedJsonError).toMatchObject({ code: 'too-large' });
         let invalidJsonError: unknown;
         try {
             parseDiagramJson('{broken');
@@ -29,6 +37,8 @@ describe('diagramJsonImport', () => {
         }
         expect(invalidJsonError).toBeInstanceOf(Error);
         expect(invalidJsonError).toMatchObject({
+            name: 'DiagramJsonImportError',
+            code: 'invalid-json',
             message: 'Diagram JSON is invalid.',
             cause: expect.any(SyntaxError),
         });

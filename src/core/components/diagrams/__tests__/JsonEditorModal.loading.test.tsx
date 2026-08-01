@@ -11,7 +11,7 @@ vi.mock('react-i18next', () => ({
             'designer.jsonEditor.title': '编辑图表数据',
             'designer.jsonEditor.format': '格式化 JSON',
             'designer.jsonEditor.download': '下载文件',
-            'designer.jsonEditor.applyOnly': '仅预览并应用',
+            'designer.jsonEditor.applyOnly': '应用但不关闭',
             'designer.jsonEditor.saveAndClose': '应用修改并关闭',
             'designer.jsonEditor.formatStandard': '标准数据',
             'designer.jsonEditor.formatPure': '纯净数据',
@@ -54,7 +54,7 @@ describe('JsonEditorModal loading controls', () => {
             />,
         );
 
-        for (const name of ['格式化 JSON', '下载文件', '仅预览并应用', '应用修改并关闭']) {
+        for (const name of ['格式化 JSON', '下载文件', '应用但不关闭', '应用修改并关闭']) {
             const button = screen.getByRole('button', { name: new RegExp(name.split('').join('\\s*')) });
             expect((button as HTMLButtonElement).disabled).toBe(true);
         }

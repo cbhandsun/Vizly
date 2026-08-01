@@ -3,6 +3,17 @@ import { coerceClipboardData, type ClipboardData } from './flowchartClipboard';
 
 export const DIAGRAM_JSON_IMPORT_MAX_CHARS = 5 * 1024 * 1024;
 export type DiagramImportKind = 'json' | 'mermaid';
+export type DiagramJsonImportErrorCode = 'invalid-json' | 'too-large';
+
+export class DiagramJsonImportError extends Error {
+    readonly code: DiagramJsonImportErrorCode;
+
+    constructor(code: DiagramJsonImportErrorCode, message: string, options?: ErrorOptions) {
+        super(message, options);
+        this.name = 'DiagramJsonImportError';
+        this.code = code;
+    }
+}
 
 const getFileExtension = (fileName: unknown): string => {
     if (typeof fileName !== 'string') return '';
@@ -20,12 +31,12 @@ export const getDiagramImportKind = (fileName: unknown): DiagramImportKind | nul
 
 export const parseDiagramJson = (content: string): unknown => {
     if (content.length > DIAGRAM_JSON_IMPORT_MAX_CHARS) {
-        throw new Error('Diagram JSON is too large.');
+        throw new DiagramJsonImportError('too-large', 'Diagram JSON is too large.');
     }
     try {
         return JSON.parse(content);
     } catch (error) {
-        throw new Error('Diagram JSON is invalid.', { cause: error });
+        throw new DiagramJsonImportError('invalid-json', 'Diagram JSON is invalid.', { cause: error });
     }
 };
 

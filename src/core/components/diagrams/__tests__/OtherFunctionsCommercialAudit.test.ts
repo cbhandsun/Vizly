@@ -99,4 +99,12 @@ describe('other-function commercial interaction safeguards', () => {
         expect(source).toContain("height: 'var(--commercial-touch-target, 44px)'");
         expect(source).toContain("minWidth: 'var(--commercial-touch-target, 44px)'");
     });
+
+    it('explains that version snapshot notes are optional and supplies the default outcome', () => {
+        const source = readSource('../../../../components/diagrams/ui/VersionHistoryPanel.tsx');
+
+        expect(source).toContain('aria-label="版本备注（选填）"');
+        expect(source).toContain('aria-describedby="version-history-message-hint"');
+        expect(source).toContain('留空时将使用“手动保存的版本快照”');
+    });
 });

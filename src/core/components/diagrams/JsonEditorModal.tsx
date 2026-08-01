@@ -7,6 +7,7 @@ import { appMessage } from '@/core/utils/antdStaticBridge';
 import { coerceStandardDiagramImport, parseDiagramJson } from '@/core/utils/diagramJsonImport';
 import { downloadFile } from '@/core/utils/downloadUtils';
 import { logJsonEditorExistingDiagramMergeFailure } from './diagramImportLogging';
+import { getJsonValidationReasonKey } from './jsonEditorValidation';
 import { getApplicationDiagramRuntime } from '../../ports/applicationDiagramRuntime';
 import LazyMonacoEditor from '../lazy/LazyMonacoEditor';
 import type { LazyMonacoEditorMode } from '../lazy/LazyMonacoEditor';
@@ -24,6 +25,8 @@ export interface JsonEditorModalProps {
     initialContent?: string;
     diagramId?: string;
 }
+
+type JsonApplyMode = 'canvas-only' | 'persist';
 
 /**
  * JSON 编辑器模态框
@@ -64,9 +67,8 @@ export const JsonEditorModal: React.FC<JsonEditorModalProps> = ({
     }
 
     const showValidationError = useCallback((error: unknown) => {
-        const reason = error instanceof Error && error.message
-            ? error.message
-            : t('designer.flowchart.invalidJsonUnknownReason', '无法解析 JSON');
+        const reasonKey = getJsonValidationReasonKey(error);
+        const reason = t(reasonKey);
         const message = t('designer.flowchart.invalidJson', { reason });
         setValidationError(message);
         appMessage.error(message);
@@ -103,7 +105,7 @@ export const JsonEditorModal: React.FC<JsonEditorModalProps> = ({
         }
     }, [visible, diagramId, nodes, edges, initialContent]); // 仅在 visible 变化时触发
 
-    const applyJsonContentToCanvas = async (contentToApply: string) => {
+    const applyJsonContentToCanvas = async (contentToApply: string, applyMode: JsonApplyMode) => {
         try {
             setValidationError(null);
             const parsedData = parseDiagramJson(contentToApply);
@@ -112,8 +114,8 @@ export const JsonEditorModal: React.FC<JsonEditorModalProps> = ({
                 title: 'Flowchart Export',
             });
 
-            // 如果有 DiagramID 并且是在标准模式，把修改后的布局和元数据存回去并触发页面刷新（向后兼容布局修改生效）
-            if (diagramId && jsonFormatMode === 'standard') {
+            // 只有明确的“应用并关闭”操作可以进入持久化与重载路径。
+            if (applyMode === 'persist' && diagramId && jsonFormatMode === 'standard') {
                 await getApplicationDiagramRuntime().registerDiagram({ ...data, id: diagramId }, {
                     id: diagramId,
                     title: data.name || data.metadata?.title || 'Flowchart Export',
@@ -177,14 +179,14 @@ export const JsonEditorModal: React.FC<JsonEditorModalProps> = ({
         }
     }, [getActiveContent, jsonFormatMode, showValidationError]);
 
-    // Preview/Apply without closing
-    const handlePreviewApply = async () => {
-        await applyJsonContentToCanvas(getActiveContent());
+    // Apply to the current canvas without closing or entering the persistence/reload path.
+    const handleApplyWithoutClosing = async () => {
+        await applyJsonContentToCanvas(getActiveContent(), 'canvas-only');
     };
 
     // Save and close
     const handleSave = async () => {
-        const success = await applyJsonContentToCanvas(getActiveContent());
+        const success = await applyJsonContentToCanvas(getActiveContent(), 'persist');
         if (success) {
             onClose();
         }
@@ -238,10 +240,10 @@ export const JsonEditorModal: React.FC<JsonEditorModalProps> = ({
                         </Button>
                         <Button
                             type="dashed"
-                            onClick={handlePreviewApply}
+                            onClick={handleApplyWithoutClosing}
                             disabled={editorIsLoading || jsonFormatMode === 'react-flow'}
                         >
-                            {t('designer.jsonEditor.applyOnly') || '仅预览并应用'}
+                            {t('designer.jsonEditor.applyOnly') || '应用但不关闭'}
                         </Button>
                         <Button
                             type="primary"

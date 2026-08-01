@@ -20,6 +20,12 @@
     min-height: var(--commercial-touch-target, 44px);
 }
 
+.version-history-message-hint {
+    display: block;
+    margin-top: 8px;
+    font-size: 12px;
+}
+
 .version-history-list-item .ant-list-item-action {
     display: flex;
     gap: 4px;

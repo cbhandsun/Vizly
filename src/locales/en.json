@@ -532,7 +532,7 @@
             "formatReactFlow": "React Flow (Read-Only)",
             "format": "Format JSON",
             "download": "Download File",
-            "applyOnly": "Preview and Apply",
+            "applyOnly": "Apply Without Closing",
             "saveAndClose": "Apply and Close",
             "basicEditorLabel": "Basic JSON editor",
             "reactFlowWarning": "You are currently viewing internal React Flow graph models (Read-Only mode). This is for debugging purposes only. To edit diagram structure, please switch to Standard Data mode."
@@ -630,7 +630,7 @@
             "templateApplied": "Template applied",
             "smartLayout": "Recommended layout: {{reason}} (confidence {{confidence}}%)",
             "optimize": "Optimized: resolved {{overlaps}} overlaps, aligned {{nodes}} nodes.",
-            "noHistory": "No history to compare",
+            "noHistory": "Make a change first, then compare it with the previous state",
             "settingsNotAvailable": "Advanced settings panel not mounted in standalone mode. Open from main view or press Ctrl+Shift+,",
             "mindMapCenter": "Central Topic",
             "summaryLabel": "Summary",
@@ -639,6 +639,8 @@
             "importFailed": "Import failed: invalid format",
             "invalidJson": "Invalid JSON: {{reason}}",
             "invalidJsonUnknownReason": "Unable to parse JSON",
+            "invalidJsonSyntax": "Syntax error; check brackets, quotation marks, and commas",
+            "invalidJsonTooLarge": "Content exceeds the allowed size limit",
             "commandPaletteHint": "Press {{mod}}+K to open command palette",
             "commandDisabled": "Not available",
             "undo": {
