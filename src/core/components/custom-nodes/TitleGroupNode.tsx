@@ -7,6 +7,11 @@ import { ensureReadableText } from '../../utils/colorUtils';
 import { useDiagramStylePreset_v2 } from '../../hooks/useDiagramStylePreset_v2';
 import { useContainerNode } from './useContainerNode';
 import { sanitizeInlineHtml, sanitizeSvgMarkup } from '../../utils/sanitizeHtml';
+import { useTranslation } from 'react-i18next';
+import {
+  createContainerNodeAccessibilityProps,
+  toContainerAccessibleText,
+} from './containerNodeAccessibility';
 import './TitleGroupNode.css';
 
 type TitleGroupStyle = CSSProperties & {
@@ -34,6 +39,7 @@ interface TitleGroupNodeData extends Record<string, unknown> {
 type TitleGroupCssProperties = CSSProperties & Record<`--${string}`, string>;
 
 const TitleGroupNode = React.memo(({ id, data, selected }: NodeProps<Node<TitleGroupNodeData>>) => {
+  const { t } = useTranslation();
   const [theme] = useTheme({ autoInitialize: true });
   const preset = useDiagramStylePreset_v2();
 
@@ -74,6 +80,21 @@ const TitleGroupNode = React.memo(({ id, data, selected }: NodeProps<Node<TitleG
     ? rawTitle
     : (chineseTitleMapping[domainKey] || String(domainKey || ''));
   const safeDisplayTitle = sanitizeInlineHtml(displayTitle);
+  const accessibleTitle = toContainerAccessibleText(safeDisplayTitle, id);
+  const isCollapsed = data.collapsed === true;
+  const containerAccessibility = createContainerNodeAccessibilityProps({
+    accessibleName: t('designer.flowchart.containerAriaLabel', {
+      label: accessibleTitle,
+      selectedState: selected ? t('designer.flowchart.nodeSelectedState') : '',
+      expandState: t(isCollapsed
+        ? 'designer.flowchart.containerCollapsedState'
+        : 'designer.flowchart.containerExpandedState'),
+      childCount,
+    }),
+    selected,
+    collapsed: isCollapsed,
+    childCount,
+  });
 
   const domainTheme = theme ? getDomainTheme(theme, { domainClass: data?.domainClass, domain: domainKey }) : null;
   const themeColor = data.themeColor || domainTheme?.main || '#4A90E2';
@@ -134,6 +155,7 @@ const TitleGroupNode = React.memo(({ id, data, selected }: NodeProps<Node<TitleG
 
   return (
     <div
+      {...containerAccessibility}
       className={`title-group-node ${data?.hidden ? 'hidden' : ''} ${preset?.name === 'glass' ? 'glass' : ''} ${preset?.name === 'blueprint' ? 'blueprint' : ''} ${data.isDropTarget ? 'drop-target' : ''}`}
       style={nodeStyle}
     >
@@ -193,12 +215,19 @@ const TitleGroupNode = React.memo(({ id, data, selected }: NodeProps<Node<TitleG
           <div className="title-group-collapse-controls">
             <span className="title-group-child-count">{childCount}</span>
             <button
+              type="button"
               className="title-group-collapse-btn"
               onClick={(e) => {
                 e.stopPropagation();
                 toggleCollapse();
               }}
-              title={data.collapsed ? "展开子节点" : "折叠子节点"}
+              aria-label={t(isCollapsed
+                ? 'designer.flowchart.expandContainerChildren'
+                : 'designer.flowchart.collapseContainerChildren')}
+              aria-expanded={!isCollapsed}
+              title={t(isCollapsed
+                ? 'designer.flowchart.expandContainerChildren'
+                : 'designer.flowchart.collapseContainerChildren')}
             >
               {data.collapsed ? '⊕' : '⊖'}
             </button>

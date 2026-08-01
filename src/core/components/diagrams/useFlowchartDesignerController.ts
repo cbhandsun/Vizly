@@ -148,7 +148,8 @@ export const useFlowchartDesignerController = ({
 
     const {
         takeSnapshot, notifyHistoryChanged, undo, redo, canUndo, canRedo,
-        pastEntries, getPreviousState, jumpTo,
+        pastEntries, getPreviousState, jumpTo, switchScope: switchHistoryScope,
+        removeScope: removeHistoryScope,
     } = diagramHistory;
     const {
         selectedNodes,
@@ -399,7 +400,11 @@ export const useFlowchartDesignerController = ({
         () => nodesRef.current,
         () => edgesRef.current,
         setNodes,
-        setEdges
+        setEdges,
+        {
+            switchScope: switchHistoryScope,
+            removeScope: removeHistoryScope,
+        },
     );
 
     const { autoRoutingEnabled, setAutoRoutingEnabled, isLayoutStable, handleStrategyLayout, lastDomainStrategy, lastDomainDirection, lastNodeLayout } = useAutoRouting({
@@ -536,7 +541,9 @@ export const useFlowchartDesignerController = ({
 
     // 4. System Sync Domain Controller
     const { performanceMode, isInitialDiagramLoading, saveState } = useDesignerSystemSync({
-        id, diagramIdForExport, nodes, edges, setNodes, setEdges, reactFlowInstance, isDragging, pluginId, messageApi
+        id, diagramIdForExport, nodes, edges, setNodes, setEdges, reactFlowInstance, isDragging, pluginId, messageApi,
+        getAutoSaveMetadata: multiPage.getPersistedMetadata,
+        restoreAutoSaveMetadata: multiPage.restorePersistedMetadata,
     });
 
     const { commandPaletteItems } = useDesignerCommands({

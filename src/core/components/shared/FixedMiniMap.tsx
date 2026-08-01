@@ -21,6 +21,10 @@ import {
   shouldFreezeFixedMiniMapDuringNodeDrag,
   type FixedMiniMapMessage,
 } from './fixedMiniMapState';
+import {
+  resolveFixedMiniMapBottom,
+  type ReservedBottomArea,
+} from './fixedMiniMapPlacement';
 
 interface FixedMiniMapProps {
   nodes: MinimapNode[];
@@ -39,6 +43,14 @@ type MinimapNodeData = {
 };
 
 type MinimapNode = Node<MinimapNodeData>;
+
+const readReservedBottomArea = (): ReservedBottomArea | null => {
+  if (typeof document === 'undefined') return null;
+  const pageTabs = document.querySelector<HTMLElement>('.page-tabs');
+  if (!pageTabs) return null;
+  const rect = pageTabs.getBoundingClientRect();
+  return { left: rect.left, right: rect.right, top: rect.top };
+};
 
 const getNodeWidth = (node: MinimapNode): number => (
   extractValidNumber(node.measured?.width ?? node.width ?? node.style?.width, 200)
@@ -129,6 +141,25 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
   // 缓存画布容器的 Bound 用于计算 Portal 绝对位置
   const [containerRect, setContainerRect] = useState<DOMRect | null>(null);
   const [canvasPixelSize, setCanvasPixelSize] = useState({ width: 800, height: 600 });
+  const [reservedBottomArea, setReservedBottomArea] = useState<ReservedBottomArea | null>(readReservedBottomArea);
+
+  useEffect(() => {
+    const pageTabs = document.querySelector<HTMLElement>('.page-tabs');
+    if (!pageTabs) return;
+
+    const updateReservedArea = () => {
+      const rect = pageTabs.getBoundingClientRect();
+      setReservedBottomArea({ left: rect.left, right: rect.right, top: rect.top });
+    };
+
+    const resizeObserver = new ResizeObserver(updateReservedArea);
+    resizeObserver.observe(pageTabs);
+    window.addEventListener('resize', updateReservedArea);
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', updateReservedArea);
+    };
+  }, []);
 
   // 订阅视口变化以驱动 minimap 缩略图矩形的实时更新
   const [viewportForRender, setViewportForRender] = useState<Viewport>(reactFlowInstance.getViewport());
@@ -280,9 +311,16 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
   const absoluteBottom = containerRect 
     ? (window.innerHeight - containerRect.bottom) + overlay.offset.bottom 
     : 76;
+  const resolvedBottom = resolveFixedMiniMapBottom({
+    baseBottom: absoluteBottom,
+    absoluteLeft,
+    width: overlay.isMinimized ? 44 : currentSizeConfig.width,
+    viewportHeight: window.innerHeight,
+    reservedArea: reservedBottomArea,
+  });
 
   const containerStyle: React.CSSProperties = {
-    bottom: `${absoluteBottom}px`,
+    bottom: `${resolvedBottom}px`,
     left: `${absoluteLeft}px`,
     width: overlay.isMinimized ? '44px' : `${currentSizeConfig.width}px`,
     height: overlay.isMinimized ? '44px' : `${currentSizeConfig.height}px`,

@@ -42,6 +42,8 @@ export const useFlowchartState = (edgeMode: 'advanced-smart' | 'native' = 'advan
         pastEntries,
         jumpTo,
         getPreviousState,
+        switchScope,
+        removeScope,
     } = useDiagramHistory(nodes, edges);
 
     // Presets
@@ -206,7 +208,9 @@ export const useFlowchartState = (edgeMode: 'advanced-smart' | 'native' = 'advan
                 const target = jumpTo(index, nodesRef.current, edgesRef.current);
                 if (target) { setNodes(target.nodes); setEdges(target.edges); }
             },
-            getPreviousState
+            getPreviousState,
+            switchScope,
+            removeScope,
         }
     };
 };

@@ -9,11 +9,13 @@ const AutoSaveProbe: React.FC<{
     nodes: any[];
     edges?: any[];
     onReady?: (api: ReturnType<typeof useAutoSave>) => void;
-}> = ({ nodes, edges = [], onReady }) => {
+    getMetadata?: () => unknown;
+}> = ({ nodes, edges = [], onReady, getMetadata }) => {
     const api = useAutoSave(nodes, edges, {
         enabled: false,
         storageKey: 'flowchart-autosave-v2-test',
         diagramId: 'test',
+        getMetadata,
     });
 
     useEffect(() => {
@@ -78,6 +80,28 @@ describe('useAutoSave', () => {
             diagramId: 'test',
             nodes: [expect.objectContaining({ id: 'ok' })],
             version: '1.0',
+        });
+    });
+
+    it('persists metadata-only changes instead of treating them as duplicate saves', async () => {
+        let api: ReturnType<typeof useAutoSave> | undefined;
+        let activePageId = 'page-1';
+        const getMetadata = () => ({ multiPage: { version: 1, activePageId, pages: [] } });
+        render(
+            <AutoSaveProbe
+                nodes={[]}
+                getMetadata={getMetadata}
+                onReady={(nextApi) => { api = nextApi; }}
+            />
+        );
+
+        await waitFor(() => expect(api).toBeDefined());
+        await act(async () => { api?.saveNow(); });
+        activePageId = 'page-2';
+        await act(async () => { api?.saveNow(); });
+
+        expect(JSON.parse(localStorage.getItem('flowchart-autosave-v2-test') || '{}')).toMatchObject({
+            metadata: { multiPage: { activePageId: 'page-2' } },
         });
     });
 });

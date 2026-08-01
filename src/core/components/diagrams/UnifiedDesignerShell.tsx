@@ -17,6 +17,7 @@ export interface UnifiedDesignerShellProps {
     canvasBg?: string;
     themeMode?: 'light' | 'dark';
     diagramIdForExport?: string;
+    style?: React.CSSProperties;
 
     canvasArea: React.ReactNode;
     overlays?: React.ReactNode;
@@ -36,6 +37,7 @@ export const UnifiedDesignerShell: React.FC<UnifiedDesignerShellProps> = ({
     canvasBg,
     themeMode = 'light',
     diagramIdForExport,
+    style,
     canvasArea,
     overlays,
 }) => {
@@ -43,6 +45,7 @@ export const UnifiedDesignerShell: React.FC<UnifiedDesignerShellProps> = ({
         <div
             id={`diagram-${id}`}
             className={isDragging ? 'diagram-root diagram-dragging' : 'diagram-root'}
+            style={style}
             onDragOver={onDragOver}
             onDrop={onDrop}
         >

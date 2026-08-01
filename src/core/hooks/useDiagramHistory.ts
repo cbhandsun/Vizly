@@ -34,8 +34,21 @@ interface StoredHistoryEntry {
     entry: HistoryEntry;
 }
 
+interface HistoryScope {
+    past: StoredHistoryEntry[];
+    future: StoredHistoryEntry[];
+    snapshotCounter: number;
+}
+
 const MAX_HISTORY = 50;
 const EMPTY_HISTORY_STATE: HistoryState = { nodes: [], edges: [] };
+const DEFAULT_HISTORY_SCOPE = 'default';
+
+const createHistoryScope = (): HistoryScope => ({
+    past: [],
+    future: [],
+    snapshotCounter: 0,
+});
 
 const cloneHistoryState = (nodes: Node[], edges: Edge[]): HistoryState => (
     deepClone({ nodes, edges })
@@ -51,17 +64,47 @@ const cloneHistoryState = (nodes: Node[], edges: Edge[]): HistoryState => (
 export const useDiagramHistory = (_initialNodes: Node[], _initialEdges: Edge[]) => {
     const [historyInfo, setHistoryInfo] = useState({ pastCount: 0, futureCount: 0 });
     const [pastEntries, setPastEntries] = useState<HistoryEntry[]>([]);
-    const pastRef = useRef<StoredHistoryEntry[]>([]);
-    const futureRef = useRef<StoredHistoryEntry[]>([]);
-    const snapshotCounter = useRef(0);
+    const scopesRef = useRef<Map<string, HistoryScope>>(new Map([
+        [DEFAULT_HISTORY_SCOPE, createHistoryScope()],
+    ]));
+    const activeScopeKeyRef = useRef(DEFAULT_HISTORY_SCOPE);
+
+    const getActiveScope = useCallback((): HistoryScope => {
+        const activeKey = activeScopeKeyRef.current;
+        const existingScope = scopesRef.current.get(activeKey);
+        if (existingScope) return existingScope;
+
+        const scope = createHistoryScope();
+        scopesRef.current.set(activeKey, scope);
+        return scope;
+    }, []);
 
     const updateInfo = useCallback(() => {
+        const scope = getActiveScope();
         setHistoryInfo({
-            pastCount: pastRef.current.length,
-            futureCount: futureRef.current.length,
+            pastCount: scope.past.length,
+            futureCount: scope.future.length,
         });
-        setPastEntries(pastRef.current.map(item => item.entry));
-    }, []);
+        setPastEntries(scope.past.map(item => item.entry));
+    }, [getActiveScope]);
+
+    const switchScope = useCallback((scopeKey: string) => {
+        if (!scopeKey || scopeKey === activeScopeKeyRef.current) return;
+        activeScopeKeyRef.current = scopeKey;
+        if (!scopesRef.current.has(scopeKey)) {
+            scopesRef.current.set(scopeKey, createHistoryScope());
+        }
+        updateInfo();
+    }, [updateInfo]);
+
+    const removeScope = useCallback((scopeKey: string) => {
+        if (!scopeKey) return;
+        scopesRef.current.delete(scopeKey);
+        if (activeScopeKeyRef.current === scopeKey) {
+            activeScopeKeyRef.current = DEFAULT_HISTORY_SCOPE;
+        }
+        updateInfo();
+    }, [updateInfo]);
 
     const takeSnapshot = useCallback((
         nodes: Node[],
@@ -69,35 +112,37 @@ export const useDiagramHistory = (_initialNodes: Node[], _initialEdges: Edge[]) 
         label?: string,
         options?: HistorySnapshotOptions,
     ) => {
+        const scope = getActiveScope();
         const state = cloneHistoryState(nodes, edges);
-        const previousState = pastRef.current.at(-1)?.state;
+        const previousState = scope.past.at(-1)?.state;
         const shouldBuildPatch = options?.dedupe !== false || options?.notify !== false;
         const patch = shouldBuildPatch
             ? compare(previousState ?? EMPTY_HISTORY_STATE, state)
             : [];
         if (options?.dedupe !== false && previousState && patch.length === 0) return;
 
-        snapshotCounter.current += 1;
-        pastRef.current.push({
+        scope.snapshotCounter += 1;
+        scope.past.push({
             state,
             entry: {
                 patch,
                 changeCount: shouldBuildPatch ? patch.length : 1,
                 timestamp: Date.now(),
-                label: label || `操作 #${snapshotCounter.current}`,
+                label: label || `操作 #${scope.snapshotCounter}`,
             },
         });
-        if (pastRef.current.length > MAX_HISTORY) pastRef.current.shift();
-        futureRef.current = [];
+        if (scope.past.length > MAX_HISTORY) scope.past.shift();
+        scope.future = [];
         if (options?.notify !== false) updateInfo();
-    }, [updateInfo]);
+    }, [getActiveScope, updateInfo]);
 
     const undo = useCallback((currentNodes: Node[], currentEdges: Edge[]) => {
-        const target = pastRef.current.pop();
+        const scope = getActiveScope();
+        const target = scope.past.pop();
         if (!target) return null;
 
         const currentState = cloneHistoryState(currentNodes, currentEdges);
-        futureRef.current.push({
+        scope.future.push({
             state: currentState,
             entry: {
                 ...target.entry,
@@ -106,32 +151,34 @@ export const useDiagramHistory = (_initialNodes: Node[], _initialEdges: Edge[]) 
         });
         updateInfo();
         return deepClone(target.state);
-    }, [updateInfo]);
+    }, [getActiveScope, updateInfo]);
 
     const redo = useCallback((currentNodes: Node[], currentEdges: Edge[]) => {
-        const target = futureRef.current.pop();
+        const scope = getActiveScope();
+        const target = scope.future.pop();
         if (!target) return null;
 
         const currentState = cloneHistoryState(currentNodes, currentEdges);
-        pastRef.current.push({
+        scope.past.push({
             state: currentState,
             entry: {
                 ...target.entry,
                 patch: compare(currentState, target.state),
             },
         });
-        if (pastRef.current.length > MAX_HISTORY) pastRef.current.shift();
+        if (scope.past.length > MAX_HISTORY) scope.past.shift();
         updateInfo();
         return deepClone(target.state);
-    }, [updateInfo]);
+    }, [getActiveScope, updateInfo]);
 
     const jumpTo = useCallback((index: number, currentNodes: Node[], currentEdges: Edge[]) => {
-        if (index < 0 || index >= pastRef.current.length) return null;
+        const scope = getActiveScope();
+        if (index < 0 || index >= scope.past.length) return null;
 
-        const target = pastRef.current[index];
-        const laterEntries = pastRef.current.slice(index + 1).reverse();
+        const target = scope.past[index];
+        const laterEntries = scope.past.slice(index + 1).reverse();
         const currentState = cloneHistoryState(currentNodes, currentEdges);
-        futureRef.current = [
+        scope.future = [
             {
                 state: currentState,
                 entry: {
@@ -142,10 +189,10 @@ export const useDiagramHistory = (_initialNodes: Node[], _initialEdges: Edge[]) 
             },
             ...laterEntries,
         ];
-        pastRef.current = pastRef.current.slice(0, index);
+        scope.past = scope.past.slice(0, index);
         updateInfo();
         return deepClone(target.state);
-    }, [updateInfo]);
+    }, [getActiveScope, updateInfo]);
 
     return {
         takeSnapshot,
@@ -157,6 +204,8 @@ export const useDiagramHistory = (_initialNodes: Node[], _initialEdges: Edge[]) 
         pastEntries,
         jumpTo,
         historyDeep: historyInfo.pastCount,
-        getPreviousState: () => pastRef.current.at(-1)?.state ?? null,
+        getPreviousState: () => getActiveScope().past.at(-1)?.state ?? null,
+        switchScope,
+        removeScope,
     };
 };

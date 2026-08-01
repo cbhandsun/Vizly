@@ -5,7 +5,9 @@ export const AUTOSAVE_PREFIX = 'flowchart-autosave-v2-';
 export const AUTOSAVE_GC_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export const MAX_AUTOSAVE_JSON_CHARS = 2 * 1024 * 1024;
 const MAX_DIAGRAM_ID_LENGTH = 180;
-const MAX_AUX_DEPTH = 6;
+// Multi-page snapshots add four structural levels before reaching node data.
+// Keep a hard bound while allowing the same nested node payloads as the primary canvas.
+const MAX_AUX_DEPTH = 12;
 const MAX_AUX_OBJECT_KEYS = 200;
 const MAX_AUX_ARRAY_ITEMS = 1000;
 const MAX_AUX_STRING_CHARS = 20_000;

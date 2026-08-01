@@ -54,11 +54,14 @@ export interface UseDesignerSystemSyncProps {
     isDragging: boolean;
     pluginId: string;
     messageApi?: MessageInstance;
+    getAutoSaveMetadata?: () => unknown;
+    restoreAutoSaveMetadata?: (metadata: unknown) => { nodes: Node[]; edges: Edge[] } | null;
 }
 
 export function useDesignerSystemSync({
     id, diagramIdForExport, nodes, edges, setNodes, setEdges,
-    reactFlowInstance, isDragging, pluginId, messageApi
+    reactFlowInstance, isDragging, pluginId, messageApi,
+    getAutoSaveMetadata, restoreAutoSaveMetadata,
 }: UseDesignerSystemSyncProps) {
     // 使用 ref 持有最新的 nodes/edges，避免 __flowDataBridge Effect 因每次编辑重建整个 API 对象
     const nodesRef = useRef(nodes);
@@ -448,7 +451,8 @@ export function useDesignerSystemSync({
         enabled: autosaveEnabled,
         diagramId: id,
         onSaveSuccess: undefined,
-        onSaveError: (error) => logDesignerSystemSyncAutoSaveFailure(error)
+        onSaveError: (error) => logDesignerSystemSyncAutoSaveFailure(error),
+        getMetadata: getAutoSaveMetadata,
     });
 
     // 节点/边变化后 3 秒防抖保存；跳过 mount 与 autosave 恢复的前两次触发。
@@ -548,10 +552,13 @@ export function useDesignerSystemSync({
         }
 
         if (shouldLoadAutosave && saved) {
-            void recalculateAutosaveNodeSizes(saved.nodes).then((recalculatedNodes) => {
+            const restoredActivePage = restoreAutoSaveMetadata?.(saved.metadata);
+            const restoredNodes = restoredActivePage?.nodes ?? saved.nodes;
+            const restoredEdges = restoredActivePage?.edges ?? saved.edges;
+            void recalculateAutosaveNodeSizes(restoredNodes).then((recalculatedNodes) => {
                 cancelLayoutTransition(setNodes);
                 setNodes(recalculatedNodes);
-                setEdges(saved.edges);
+                setEdges(restoredEdges);
                 needsInitialFitView.current = true;
                 markCurrentDiagramInitialized();
 
@@ -639,6 +646,7 @@ export function useDesignerSystemSync({
         markCurrentDiagramInitialized,
         messageApi,
         pluginId,
+        restoreAutoSaveMetadata,
         setEdges,
         setNodes,
     ]);

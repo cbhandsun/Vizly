@@ -67,6 +67,7 @@ export interface DesignerCanvasFeaturesLayerProps {
         onAddPage: PageTabsProps['onAddPage'];
         onDeletePage: PageTabsProps['onDeletePage'];
         onRenamePage: PageTabsProps['onRenamePage'];
+        disabled?: PageTabsProps['disabled'];
     };
 
     history: Pick<
@@ -145,6 +146,7 @@ export const DesignerCanvasFeaturesLayer = React.memo(
                 onAddPage={pages.onAddPage}
                 onDeletePage={pages.onDeletePage}
                 onRenamePage={pages.onRenamePage}
+                disabled={pages.disabled}
             />
             
             <HistoryPanel

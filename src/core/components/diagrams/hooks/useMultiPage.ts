@@ -1,5 +1,9 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { Node, Edge } from '@xyflow/react';
+import {
+    createMultiPageMetadata,
+    parseMultiPageMetadata,
+} from '../multiPagePersistence';
 
 export interface DiagramPage {
     id: string;
@@ -17,6 +21,11 @@ const createPage = (id: string, name: string): DiagramPage => ({
     edges: [],
 });
 
+export interface MultiPageHistoryScopes {
+    switchScope: (pageId: string) => void;
+    removeScope: (pageId: string) => void;
+}
+
 /**
  * 多页画布管理 Hook
  * - 页面切换时保存当前页、加载目标页
@@ -28,38 +37,55 @@ export const useMultiPage = (
     getCurrentEdges: () => Edge[],
     setNodes: (nodes: Node[]) => void,
     setEdges: (edges: Edge[]) => void,
+    historyScopes?: MultiPageHistoryScopes,
 ) => {
     const [pages, setPages] = useState<DiagramPage[]>([
         createPage(DEFAULT_PAGE_ID, '页面 1'),
     ]);
     const [activePageId, setActivePageId] = useState(DEFAULT_PAGE_ID);
     const pagesRef = useRef(pages);
+    const activePageIdRef = useRef(activePageId);
+    const switchHistoryScope = historyScopes?.switchScope;
+    const removeHistoryScope = historyScopes?.removeScope;
 
     useEffect(() => {
         pagesRef.current = pages;
     }, [pages]);
 
+    useEffect(() => {
+        activePageIdRef.current = activePageId;
+    }, [activePageId]);
+
+    useEffect(() => {
+        switchHistoryScope?.(activePageId);
+    }, [activePageId, switchHistoryScope]);
+
     // 切换页面
     const switchPage = useCallback((targetPageId: string) => {
         if (targetPageId === activePageId) return;
+
+        const targetPage = pagesRef.current.find(p => p.id === targetPageId);
+        if (!targetPage) return;
 
         // 保存当前页面状态
         const currentNodes = getCurrentNodes();
         const currentEdges = getCurrentEdges();
 
-        setPages(prev => prev.map(p =>
+        setPages(prev => {
+            const nextPages = prev.map(p =>
             p.id === activePageId
                 ? { ...p, nodes: currentNodes, edges: currentEdges }
                 : p
-        ));
+            );
+            pagesRef.current = nextPages;
+            return nextPages;
+        });
 
-        // 加载目标页面
-        const targetPage = pagesRef.current.find(p => p.id === targetPageId);
-        if (targetPage) {
-            setNodes(targetPage.nodes);
-            setEdges(targetPage.edges);
-        }
+        // 加载目标页面；历史作用域由 activePageId effect 统一切换，避免同一事件重复同步。
+        setNodes(targetPage.nodes);
+        setEdges(targetPage.edges);
 
+        activePageIdRef.current = targetPageId;
         setActivePageId(targetPageId);
     }, [activePageId, getCurrentNodes, getCurrentEdges, setNodes, setEdges]);
 
@@ -73,18 +99,23 @@ export const useMultiPage = (
         const newName = `页面 ${pagesRef.current.length + 1}`;
         const newPage = createPage(newId, newName);
 
-        setPages(prev => [
-            ...prev.map(p =>
+        setPages(prev => {
+            const nextPages = [
+                ...prev.map(p =>
                 p.id === activePageId
                     ? { ...p, nodes: currentNodes, edges: currentEdges }
                     : p
-            ),
-            newPage,
-        ]);
+                ),
+                newPage,
+            ];
+            pagesRef.current = nextPages;
+            return nextPages;
+        });
 
-        // 切换到新页面（空画布）
+        // 切换到新页面（空画布）；历史作用域由 activePageId effect 统一隔离。
         setNodes([]);
         setEdges([]);
+        activePageIdRef.current = newId;
         setActivePageId(newId);
 
         return newId;
@@ -95,6 +126,7 @@ export const useMultiPage = (
         if (pagesRef.current.length <= 1) return; // 至少保留一页
 
         const remainingPages = pagesRef.current.filter(p => p.id !== pageId);
+        pagesRef.current = remainingPages;
         setPages(remainingPages);
 
         // 如果删除的是当前页，切换到第一页
@@ -102,15 +134,40 @@ export const useMultiPage = (
             const first = remainingPages[0];
             setNodes(first.nodes);
             setEdges(first.edges);
+            activePageIdRef.current = first.id;
             setActivePageId(first.id);
         }
-    }, [activePageId, setNodes, setEdges]);
+        removeHistoryScope?.(pageId);
+    }, [activePageId, removeHistoryScope, setNodes, setEdges]);
 
     // 重命名页面
     const renamePage = useCallback((pageId: string, newName: string) => {
-        setPages(prev => prev.map(p =>
-            p.id === pageId ? { ...p, name: newName } : p
-        ));
+        const normalizedName = newName.trim().slice(0, 80);
+        if (!normalizedName) return;
+        setPages(prev => {
+            const nextPages = prev.map(p =>
+                p.id === pageId ? { ...p, name: normalizedName } : p
+            );
+            pagesRef.current = nextPages;
+            return nextPages;
+        });
+    }, []);
+
+    const getPersistedMetadata = useCallback(() => createMultiPageMetadata(
+        pagesRef.current,
+        activePageIdRef.current,
+        getCurrentNodes(),
+        getCurrentEdges(),
+    ), [getCurrentEdges, getCurrentNodes]);
+
+    const restorePersistedMetadata = useCallback((metadata: unknown) => {
+        const restored = parseMultiPageMetadata(metadata);
+        if (!restored) return null;
+        pagesRef.current = restored.pages;
+        activePageIdRef.current = restored.activePageId;
+        setPages(restored.pages);
+        setActivePageId(restored.activePageId);
+        return restored.pages.find(page => page.id === restored.activePageId) ?? null;
     }, []);
 
     return {
@@ -120,5 +177,7 @@ export const useMultiPage = (
         addPage,
         deletePage,
         renamePage,
+        getPersistedMetadata,
+        restorePersistedMetadata,
     };
 };

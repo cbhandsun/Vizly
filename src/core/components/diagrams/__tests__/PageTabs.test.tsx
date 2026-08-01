@@ -57,6 +57,20 @@ describe('PageTabs', () => {
         fireEvent.keyDown(secondTab, { key: 'Enter' });
         expect(onSwitchPage).toHaveBeenCalledWith('page-2');
 
+        secondTab.focus();
+        fireEvent.keyDown(secondTab, { key: 'ArrowLeft' });
+        const firstTab = screen.getByRole('tab', { name: '页面 1' });
+        expect(onSwitchPage).toHaveBeenLastCalledWith('page-1');
+        expect(document.activeElement).toBe(firstTab);
+
+        fireEvent.keyDown(firstTab, { key: 'End' });
+        expect(onSwitchPage).toHaveBeenLastCalledWith('page-2');
+        expect(document.activeElement).toBe(secondTab);
+
+        fireEvent.keyDown(secondTab, { key: 'ArrowRight' });
+        expect(onSwitchPage).toHaveBeenLastCalledWith('page-1');
+        expect(document.activeElement).toBe(firstTab);
+
         fireEvent.click(screen.getByRole('button', { name: '新建页面' }));
         expect(onAddPage).toHaveBeenCalledTimes(1);
         expect(screen.getByRole('button', { name: '删除页面 页面 2' })).toBeTruthy();
@@ -120,5 +134,30 @@ describe('PageTabs', () => {
         await waitFor(() => expect(deleteButton.getAttribute('aria-describedby')).toBeNull());
         expect(onSwitchPage).not.toHaveBeenCalled();
         expect(onDeletePage).not.toHaveBeenCalled();
+    });
+
+    it('blocks page mutations while the initial diagram is loading', () => {
+        const onSwitchPage = vi.fn();
+        const onAddPage = vi.fn();
+        render(
+            <PageTabs
+                pages={[{ id: 'page-1', name: '页面 1', nodes: [], edges: [] }]}
+                activePageId="page-1"
+                onSwitchPage={onSwitchPage}
+                onAddPage={onAddPage}
+                onDeletePage={vi.fn()}
+                onRenamePage={vi.fn()}
+                disabled
+            />,
+        );
+
+        const tab = screen.getByRole('tab', { name: '页面 1' });
+        const add = screen.getByRole('button', { name: '新建页面' });
+        expect(tab.hasAttribute('disabled')).toBe(true);
+        expect(add.hasAttribute('disabled')).toBe(true);
+        fireEvent.click(add);
+        fireEvent.keyDown(tab, { key: 'Enter' });
+        expect(onAddPage).not.toHaveBeenCalled();
+        expect(onSwitchPage).not.toHaveBeenCalled();
     });
 });

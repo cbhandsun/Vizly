@@ -85,7 +85,7 @@
     top: 0;
     left: 0;
     right: 0;
-    bottom: 0;
+    bottom: var(--designer-bottom-chrome-clearance, 64px);
     z-index: 105;
     /* 透明背景，仅用于点击关闭 */
 }
@@ -246,6 +246,10 @@
 }
 
 @media (max-width: 768px) {
+    .side-drawer-backdrop {
+        bottom: 0;
+    }
+
     .icon-rail {
         top: 88px;
         left: 8px;

@@ -8,6 +8,11 @@ import type { Theme, ThemeColor } from '../../themes/types/ThemeTypes';
 import { useDiagramStylePreset_v2 } from '../../hooks/useDiagramStylePreset_v2';
 import { useContainerNode } from './useContainerNode';
 import { sanitizeInlineHtml } from '../../utils/sanitizeHtml';
+import { useTranslation } from 'react-i18next';
+import {
+  createContainerNodeAccessibilityProps,
+  toContainerAccessibleText,
+} from './containerNodeAccessibility';
 import './SubGroupNode.css';
 
 // 形状渲染回撤：不再使用 ShapeRenderer，仅保留矩形容器
@@ -44,6 +49,7 @@ type SubGroupNodeData = GroupNodeData & {
 };
 
 const SubGroupNode = ({ id, data, zIndex, selected, isConnectable }: NodeProps<Node<SubGroupNodeData>>) => {
+  const { t } = useTranslation();
   // 订阅配置与主题变化 - 使用全新的引擎内置 useTheme 钩子
   const [currentTheme] = useTheme();
 
@@ -108,14 +114,30 @@ const SubGroupNode = ({ id, data, zIndex, selected, isConnectable }: NodeProps<N
     ? 'none'
     : `${borderWidthValue}px ${borderStyleValue} ${preset?.name === 'mono' ? '#111111' : borderColor}`;
 
+  const safeTitleHtml = typeof description === 'string' && description.trim().length > 0
+    ? sanitizeInlineHtml(description)
+    : '';
+  const accessibleTitle = toContainerAccessibleText(safeTitleHtml, id);
+  const isCollapsed = data.collapsed === true;
+  const containerAccessibility = createContainerNodeAccessibilityProps({
+    accessibleName: t('designer.flowchart.containerAriaLabel', {
+      label: accessibleTitle,
+      selectedState: selected ? t('designer.flowchart.nodeSelectedState') : '',
+      expandState: t(isCollapsed
+        ? 'designer.flowchart.containerCollapsedState'
+        : 'designer.flowchart.containerExpandedState'),
+      childCount,
+    }),
+    selected,
+    collapsed: isCollapsed,
+    childCount,
+  });
+
   /**
    * 获取子组标题文本（函数级注释）
    * 仅使用 data.description；若包含简单 HTML 标签（如 <b>/<br/>），使用 innerHTML 渲染。
    */
   const getTitleContent = () => {
-    const safeTitleHtml = typeof description === 'string' && description.trim().length > 0
-      ? sanitizeInlineHtml(description)
-      : '';
     const hasHtml = /<[^>]+>/.test(safeTitleHtml);
     return hasHtml
       ? <span dangerouslySetInnerHTML={{ __html: safeTitleHtml }} />
@@ -124,6 +146,7 @@ const SubGroupNode = ({ id, data, zIndex, selected, isConnectable }: NodeProps<N
 
   return (
     <div
+      {...containerAccessibility}
       className={`sub-group-node ${selected ? 'selected' : ''} ${data.hidden ? 'hidden' : ''} ${preset?.name === 'glass' ? 'glass' : ''} ${preset?.name === 'blueprint' ? 'blueprint' : ''} ${data.isDropTarget ? 'drop-target' : ''}`}
       style={{
         zIndex,
@@ -210,12 +233,19 @@ const SubGroupNode = ({ id, data, zIndex, selected, isConnectable }: NodeProps<N
           <div className="sub-group-collapse-controls">
             <span className="sub-group-child-count">{childCount}</span>
             <button
+              type="button"
               className="sub-group-collapse-btn"
               onClick={(e) => {
                 e.stopPropagation();
                 toggleCollapse();
               }}
-              title={data.collapsed ? "展开子节点" : "折叠子节点"}
+              aria-label={t(isCollapsed
+                ? 'designer.flowchart.expandContainerChildren'
+                : 'designer.flowchart.collapseContainerChildren')}
+              aria-expanded={!isCollapsed}
+              title={t(isCollapsed
+                ? 'designer.flowchart.expandContainerChildren'
+                : 'designer.flowchart.collapseContainerChildren')}
             >
               {data.collapsed ? '⊕' : '⊖'}
             </button>

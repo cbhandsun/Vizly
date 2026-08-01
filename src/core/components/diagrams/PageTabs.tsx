@@ -5,6 +5,7 @@ import type { InputRef } from 'antd';
 import { useTranslation } from 'react-i18next';
 
 import type { DiagramPage } from './hooks/useMultiPage';
+import { resolvePageTabTargetIndex } from './pageTabKeyboard';
 import './PageTabs.css';
 
 interface PageTabsProps {
@@ -14,11 +15,12 @@ interface PageTabsProps {
     onAddPage: () => void;
     onDeletePage: (id: string) => void;
     onRenamePage: (id: string, name: string) => void;
+    disabled?: boolean;
 }
 
 /** 底部页面 Tab 栏 — 类似 Excel 的 sheet tabs。 */
 export const PageTabs: React.FC<PageTabsProps> = React.memo(({
-    pages, activePageId, onSwitchPage, onAddPage, onDeletePage, onRenamePage,
+    pages, activePageId, onSwitchPage, onAddPage, onDeletePage, onRenamePage, disabled = false,
 }) => {
     const { token } = theme.useToken();
     const { t } = useTranslation();
@@ -26,6 +28,7 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
     const [editName, setEditName] = useState('');
     const [confirmingPageId, setConfirmingPageId] = useState<string | null>(null);
     const inputRef = useRef<InputRef>(null);
+    const tabButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
 
     const handleStartRename = useCallback((page: DiagramPage) => {
         setConfirmingPageId(null);
@@ -41,9 +44,32 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
         setEditingId(null);
     }, [editingId, editName, onRenamePage]);
 
+    const handleTabKeyDown = useCallback((
+        event: React.KeyboardEvent<HTMLButtonElement>,
+        pageId: string,
+    ) => {
+        if (disabled) return;
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            onSwitchPage(pageId);
+            return;
+        }
+
+        const currentIndex = pages.findIndex(page => page.id === pageId);
+        const targetIndex = resolvePageTabTargetIndex(event.key, currentIndex, pages.length);
+        if (targetIndex === null) return;
+
+        event.preventDefault();
+        const targetPage = pages[targetIndex];
+        if (!targetPage) return;
+        onSwitchPage(targetPage.id);
+        tabButtonRefs.current.get(targetPage.id)?.focus();
+    }, [disabled, onSwitchPage, pages]);
+
     return (
         <div
             role="tablist"
+            aria-orientation="horizontal"
             aria-label={t('designer.pages.tabList', { defaultValue: '页面' })}
             className="page-tabs"
             style={{
@@ -75,19 +101,20 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                             />
                         ) : (
                             <button
+                                ref={element => {
+                                    if (element) tabButtonRefs.current.set(page.id, element);
+                                    else tabButtonRefs.current.delete(page.id);
+                                }}
                                 type="button"
                                 role="tab"
                                 tabIndex={isActive ? 0 : -1}
                                 aria-selected={isActive}
                                 aria-label={page.name}
                                 className={`page-tabs__tab${isActive ? ' page-tabs__tab--active' : ''}`}
+                                disabled={disabled}
                                 onClick={() => onSwitchPage(page.id)}
                                 onDoubleClick={() => handleStartRename(page)}
-                                onKeyDown={event => {
-                                    if (event.key !== 'Enter' && event.key !== ' ') return;
-                                    event.preventDefault();
-                                    onSwitchPage(page.id);
-                                }}
+                                onKeyDown={event => handleTabKeyDown(event, page.id)}
                             >
                                 {page.name}
                             </button>
@@ -99,6 +126,7 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                                     type="button"
                                     aria-label={t('designer.pages.renameAction', { name: page.name, defaultValue: '重命名页面 {{name}}' })}
                                     className="page-tabs__rename-action"
+                                    disabled={disabled}
                                     onClick={() => handleStartRename(page)}
                                 >
                                     <EditOutlined aria-hidden style={{ fontSize: 12 }} />
@@ -124,6 +152,7 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                                     type="button"
                                     aria-label={t('designer.pages.delete', { name: page.name, defaultValue: '删除页面 {{name}}' })}
                                     className="page-tabs__delete"
+                                    disabled={disabled}
                                 >
                                     <CloseOutlined aria-hidden style={{ fontSize: 12 }} />
                                 </button>
@@ -139,6 +168,7 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                     aria-label={t('designer.pages.new', { defaultValue: '新建页面' })}
                     onClick={onAddPage}
                     className="page-tabs__add"
+                    disabled={disabled}
                 >
                     <PlusOutlined aria-hidden style={{ fontSize: 14 }} />
                 </button>

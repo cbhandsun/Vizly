@@ -16,6 +16,7 @@ import { FlowchartCanvasShell } from './FlowchartCanvasShell';
 import { FlowchartEmptyState } from './FlowchartEmptyState';
 import { FlowchartOnboardingHint } from './FlowchartOnboardingHint';
 import { shouldShowFlowchartOnboarding } from './flowchartResponsiveChrome';
+import { resolveFlowchartLeftClearance } from './flowchartChromeLayout';
 import { FreehandDrawingLayer } from './FreehandDrawingLayer';
 import { RemoteCursors } from './ui/RemoteCursors';
 import { UnifiedDesignerShell } from './UnifiedDesignerShell';
@@ -232,7 +233,11 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
         yAwareness,
     } = model;
 
-    const _actualLeftOffset = isSidebarHidden ? 0 : (leftDrawerOpen ? 64 + leftDrawerWidth : 64);
+    const actualLeftOffset = resolveFlowchartLeftClearance({
+        isSidebarHidden,
+        leftDrawerOpen,
+        leftDrawerWidth,
+    });
     const editingEnabled = !isReadonly && !presentationActive;
     const showEditingChrome = !presentationActive;
 
@@ -247,6 +252,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
             canvasBg={canvasBg}
             themeMode={theme?.mode || 'light'}
             diagramIdForExport={diagramIdForExport}
+            style={{ '--designer-left-clearance': `${actualLeftOffset}px` } as React.CSSProperties}
             hiddenInputs={
                 <input
                     type="file"
@@ -580,6 +586,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                             onAddPage: multiPage.addPage,
                                             onDeletePage: multiPage.deletePage,
                                             onRenamePage: multiPage.renamePage,
+                                            disabled: isInitialDiagramLoading,
                                         }}
                                         history={{
                                             visible: historyPanelVisible,

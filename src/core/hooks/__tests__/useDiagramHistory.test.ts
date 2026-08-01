@@ -118,4 +118,62 @@ describe('useDiagramHistory', () => {
         });
         expect(redone).toEqual({ nodes: third, edges: [] });
     });
+
+    it('isolates undo and redo entries between page scopes', () => {
+        const pageOneInitial = [node('page-1-node', 0)];
+        const pageOneCurrent = [node('page-1-node', 100)];
+        const pageTwoInitial = [node('page-2-node', 20)];
+        const pageTwoCurrent = [node('page-2-node', 200)];
+        const { result } = renderHook(() => useDiagramHistory([], []));
+
+        act(() => {
+            result.current.switchScope('page-1');
+            result.current.takeSnapshot(pageOneInitial, [], '移动第 1 页节点');
+        });
+        expect(result.current.canUndo).toBe(true);
+
+        act(() => result.current.switchScope('page-2'));
+        expect(result.current.canUndo).toBe(false);
+        expect(result.current.getPreviousState()).toBeNull();
+
+        act(() => result.current.takeSnapshot(pageTwoInitial, [], '移动第 2 页节点'));
+        let restored: ReturnType<typeof result.current.undo> = null;
+        act(() => {
+            restored = result.current.undo(pageTwoCurrent, []);
+        });
+        expect(restored).toEqual({ nodes: pageTwoInitial, edges: [] });
+        expect(result.current.canRedo).toBe(true);
+
+        act(() => result.current.switchScope('page-1'));
+        expect(result.current.canUndo).toBe(true);
+        expect(result.current.canRedo).toBe(false);
+        expect(result.current.getPreviousState()).toEqual({ nodes: pageOneInitial, edges: [] });
+
+        act(() => {
+            restored = result.current.undo(pageOneCurrent, []);
+        });
+        expect(restored).toEqual({ nodes: pageOneInitial, edges: [] });
+    });
+
+    it('discards a removed page scope without affecting another page', () => {
+        const pageOneInitial = [node('page-1-node', 0)];
+        const pageTwoInitial = [node('page-2-node', 0)];
+        const { result } = renderHook(() => useDiagramHistory([], []));
+
+        act(() => {
+            result.current.switchScope('page-1');
+            result.current.takeSnapshot(pageOneInitial, []);
+            result.current.switchScope('page-2');
+            result.current.takeSnapshot(pageTwoInitial, []);
+            result.current.removeScope('page-2');
+            result.current.switchScope('page-2');
+        });
+
+        expect(result.current.canUndo).toBe(false);
+        expect(result.current.getPreviousState()).toBeNull();
+
+        act(() => result.current.switchScope('page-1'));
+        expect(result.current.canUndo).toBe(true);
+        expect(result.current.getPreviousState()).toEqual({ nodes: pageOneInitial, edges: [] });
+    });
 });

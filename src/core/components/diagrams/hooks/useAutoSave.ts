@@ -30,6 +30,7 @@ export interface AutoSaveOptions {
     diagramId?: string; // ensures storage key matches diagram ID
     onSaveSuccess?: () => void;
     onSaveError?: (error: Error) => void;
+    getMetadata?: () => unknown;
 }
 
 /** GC: remove autosave entries not accessed in 7 days */
@@ -68,7 +69,8 @@ export const useAutoSave = (
         enabled = true,
         diagramId,
         onSaveSuccess,
-        onSaveError
+        onSaveError,
+        getMetadata,
     } = options;
 
     const [saveState, setSaveState] = useState<AutoSaveState>({
@@ -104,7 +106,8 @@ export const useAutoSave = (
             // Only write if content (nodes + edges) actually changed since last save
             const currentNodes = nodesRef.current;
             const currentEdges = edgesRef.current;
-            const contentKey = JSON.stringify({ nodes: currentNodes, edges: currentEdges });
+            const metadata = getMetadata?.();
+            const contentKey = JSON.stringify({ nodes: currentNodes, edges: currentEdges, metadata });
             if (contentKey === lastSavedContentRef.current) {
                 return;
             }
@@ -117,6 +120,7 @@ export const useAutoSave = (
                 nodes: currentNodes,
                 edges: currentEdges,
                 timestamp: now,
+                metadata,
             });
 
             if (!data) {
@@ -156,7 +160,7 @@ export const useAutoSave = (
                 appMessage.error(`Auto-save failed: ${errorMsg}`);
             }
         }
-    }, [storageKey, diagramId, onSaveSuccess, onSaveError]);
+    }, [storageKey, diagramId, onSaveSuccess, onSaveError, getMetadata]);
 
     useEffect(() => {
         saveRef.current = save;
@@ -189,7 +193,8 @@ export const useAutoSave = (
             const currentNodes = nodesRef.current;
             const currentEdges = edgesRef.current;
             if (!currentNodes || !enabled) return;
-            const contentKey = JSON.stringify({ nodes: currentNodes, edges: currentEdges });
+            const metadata = getMetadata?.();
+            const contentKey = JSON.stringify({ nodes: currentNodes, edges: currentEdges, metadata });
             if (contentKey === lastSavedContentRef.current) return; // 无变化无需写入
             try {
                 const data = createAutoSavePayload({
@@ -197,6 +202,7 @@ export const useAutoSave = (
                     nodes: currentNodes,
                     edges: currentEdges,
                     timestamp: Date.now(),
+                    metadata,
                 });
                 if (!data) return;
                 localStorage.setItem(storageKey, JSON.stringify(data));
@@ -207,7 +213,7 @@ export const useAutoSave = (
         };
         window.addEventListener('beforeunload', handleBeforeUnload);
         return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-    }, [enabled, storageKey, diagramId]);
+    }, [enabled, storageKey, diagramId, getMetadata]);
 
     // Manual save trigger
     const saveNow = useCallback(() => {
@@ -215,7 +221,7 @@ export const useAutoSave = (
     }, [save]);
 
     // Load saved data, also refreshes lastAccessedAt to prevent GC expiry
-    const loadSaved = useCallback((): Pick<AutoSavePayload, 'diagramId' | 'nodes' | 'edges' | 'isFreshSeed' | 'timestamp'> | null => {
+    const loadSaved = useCallback((): Pick<AutoSavePayload, 'diagramId' | 'nodes' | 'edges' | 'isFreshSeed' | 'timestamp' | 'metadata'> | null => {
         try {
             const saved = localStorage.getItem(storageKey);
             if (!saved) return null;
@@ -238,7 +244,8 @@ export const useAutoSave = (
                 nodes: data.nodes || [],
                 edges: data.edges || [],
                 isFreshSeed: !!data.isFreshSeed,
-                timestamp: data.timestamp   // required for isFreshSeed TTL check
+                timestamp: data.timestamp,   // required for isFreshSeed TTL check
+                metadata: data.metadata,
             };
         } catch (error) {
             logAutoSaveLoadFailure(error);
