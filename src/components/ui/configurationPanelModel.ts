@@ -15,13 +15,6 @@ export interface ConfigItem {
   group?: string;
 }
 
-export const INSTANT_CONFIG_KEYS = new Set<string>([
-  'diagram.layout.strategy',
-  'diagram.layout.ELK_ALGORITHM',
-  'diagram.layout.ELK_DIRECTION',
-  'diagram.layout.direction',
-]);
-
 const clampNumber = (value: number, min?: number, max?: number): number => {
   let next = value;
   if (typeof min === 'number' && Number.isFinite(min)) next = Math.max(min, next);

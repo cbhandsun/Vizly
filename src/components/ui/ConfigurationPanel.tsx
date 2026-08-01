@@ -3,7 +3,7 @@
  * 提供简洁易用的配置管理界面，支持实时编辑和预览
  */
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -14,10 +14,10 @@ import { LayeredConfigManager } from '@/core/config/LayeredConfigManager';
 import { LayoutStrategyManager } from '@/core/strategies/LayoutStrategyManager';
 import { FaTimes, FaUndo, FaCheck, FaExclamationTriangle, FaCog } from 'react-icons/fa';
 import { useConfigIntegration } from '@/core/hooks/useConfigIntegration';
+import { useModalFocusTrap } from '@/hooks/useModalFocusTrap';
 import { safeLog } from '@/core/utils/consoleCleanup';
 import { createConfigurationItemsByCategory } from './configurationPanelCatalog';
 import {
-  INSTANT_CONFIG_KEYS,
   coerceConfigValue,
   type ConfigItem,
   type ConfigTab,
@@ -48,6 +48,19 @@ export const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({
   const [changedKeys, setChangedKeys] = useState<Set<string>>(new Set());
   const [isAdvancedMode, setIsAdvancedMode] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<ConfigTab>('basic');
+  const titleId = useId();
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const handleCancel = useCallback(() => {
+    setEditingValues({});
+    setHasChanges(false);
+    setChangedKeys(new Set());
+    onClose();
+  }, [onClose]);
+  const { containerRef: dialogRef, handleKeyDown: handleDialogKeyDown } = useModalFocusTrap<HTMLDivElement>({
+    active: isOpen,
+    initialFocusRef: closeButtonRef,
+    onClose: handleCancel,
+  });
 
   const configItemsByCategory = useMemo(() => {
     const layoutManager = LayoutStrategyManager.getShared();
@@ -69,7 +82,7 @@ const configItems: ConfigItem[] = useMemo(() => [
 
 // 加载当前配置值
 useEffect(() => {
-  if (!state.isReady || !state.integration) return;
+  if (!isOpen || !state.isReady || !state.integration) return;
 
   const loadCurrentValues = async () => {
     const currentValues: ConfigValues = {};
@@ -85,10 +98,12 @@ useEffect(() => {
     }
 
     setEditingValues(currentValues);
+    setHasChanges(false);
+    setChangedKeys(new Set());
   };
 
   loadCurrentValues();
-}, [actions, configItems, state.isReady, state.integration]);
+}, [actions, configItems, isOpen, state.isReady, state.integration]);
 
 // 处理配置值变更
 // 处理配置值变更
@@ -122,7 +137,7 @@ const requestLayoutApply = useCallback((values: ConfigValues) => {
   }));
 }, [getEngineNodeLayout]);
 
-const handleValueChange = useCallback(async (key: string, value: unknown) => {
+const handleValueChange = useCallback((key: string, value: unknown) => {
   const item = configItems.find(candidate => candidate.key === key);
   if (!item) {
     safeLog.warn('[Config] Ignoring unknown config key:', key);
@@ -135,20 +150,13 @@ const handleValueChange = useCallback(async (key: string, value: unknown) => {
   // 联动逻辑：当选择域水平/垂直布局时，默认将子域内部节点按纵向流程排列
   if (key === 'diagram.layout.strategy' && (nextValue === 'DomainHorizontalLayout' || nextValue === 'DomainVerticalLayout')) {
     safeLog.info('[Config] Auto-switching nodeStrategy to VerticalLayout');
-    const nextValues: ConfigValues = {
-      ...editingValues,
-      [key]: nextValue,
-      'diagram.layout.nodeStrategy': 'VerticalLayout',
-    };
     setEditingValues(prev => ({
       ...prev,
       [key]: nextValue,
       'diagram.layout.nodeStrategy': 'VerticalLayout'
     }));
-    // Auto-save for immediate feedback
-    await actions.setConfig(key, nextValue);
-    await actions.setConfig('diagram.layout.nodeStrategy', 'VerticalLayout');
-    requestLayoutApply(nextValues);
+    setHasChanges(true);
+    setChangedKeys(prev => new Set(prev).add(key).add('diagram.layout.nodeStrategy'));
     return;
   }
 
@@ -157,23 +165,9 @@ const handleValueChange = useCallback(async (key: string, value: unknown) => {
     [key]: nextValue
   }));
 
-  if (INSTANT_CONFIG_KEYS.has(key)) {
-    await actions.setConfig(key, nextValue);
-    if (key.startsWith('diagram.layout.')) {
-      requestLayoutApply({
-        ...editingValues,
-        [key]: nextValue
-      });
-    }
-  } else {
-    setHasChanges(true);
-    setChangedKeys(prev => {
-      const next = new Set(prev);
-      next.add(key);
-      return next;
-    });
-  }
-}, [actions, configItems, editingValues, requestLayoutApply]);
+  setHasChanges(true);
+  setChangedKeys(prev => new Set(prev).add(key));
+}, [configItems]);
 
 // 保存所有更改
 const handleSaveChanges = useCallback(async () => {
@@ -205,12 +199,12 @@ const handleResetChanges = useCallback(() => {
     resetValues[item.key] = item.value;
   });
   setEditingValues(resetValues);
-  setHasChanges(false);
-  setChangedKeys(new Set());
+  setHasChanges(true);
+  setChangedKeys(new Set(configItems.map(item => item.key)));
 }, [configItems]);
 
 // 渲染配置项编辑器
-const renderConfigEditor = (item: ConfigItem) => {
+const renderConfigEditor = (item: ConfigItem, hasDescription: boolean) => {
   const currentValue = editingValues[item.key] ?? item.value;
   const numericValue = typeof currentValue === 'number' ? currentValue : Number(item.value);
   const stringValue = String(currentValue ?? '');
@@ -218,6 +212,9 @@ const renderConfigEditor = (item: ConfigItem) => {
   const currentLayoutStrategy = String(editingValues['diagram.layout.strategy'] || layeredStrategy || '');
   const nodeLayoutDisabled = item.key === 'diagram.layout.nodeStrategy' &&
     !LayoutStrategyManager.getShared().isNodeLayoutExternallySelectable(currentLayoutStrategy);
+  const fieldId = `configuration-field-${item.key.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
+  const labelId = `${fieldId}-label`;
+  const descriptionId = `${fieldId}-description`;
   const getOptionLabel = (option: string) => {
     if (item.key === 'diagram.edge.pathType' && option === 'auto') {
       return t('config.options.autoPathType', 'Auto Path');
@@ -230,23 +227,29 @@ const renderConfigEditor = (item: ConfigItem) => {
     case 'number':
       return (
         <input
+          id={fieldId}
           type="number"
           value={Number.isFinite(numericValue) ? numericValue : ''}
           min={item.min}
           max={item.max}
           step={item.step}
           onChange={(e) => handleValueChange(item.key, e.target.value)}
-          className="w-24 px-3 py-1.5 text-[13px] font-medium text-center transition-all bg-black/[0.04] dark:bg-white/10 border border-black/5 dark:border-white/5 rounded-[6px] text-gray-800 dark:text-gray-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.15] hover:border-black/10 dark:hover:border-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:bg-white dark:focus:bg-black/50 focus:border-indigo-500"
+          aria-labelledby={labelId}
+          aria-describedby={hasDescription ? descriptionId : undefined}
+          className="w-full sm:w-24 min-h-[44px] px-3 py-1.5 text-[13px] font-medium text-center transition-all bg-black/[0.04] dark:bg-white/10 border border-black/5 dark:border-white/5 rounded-[6px] text-gray-800 dark:text-gray-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.15] hover:border-black/10 dark:hover:border-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:bg-white dark:focus:bg-black/50 focus:border-indigo-500"
           title={t(`config.${item.key}.label`)}
         />
       );
 
     case 'boolean':
       return (
-        <label className="relative inline-flex items-center cursor-pointer group">
+        <label htmlFor={fieldId} className="relative inline-flex min-w-[44px] min-h-[44px] items-center justify-end cursor-pointer group">
           <input
+            id={fieldId}
             type="checkbox"
-            aria-label={t(`config.${item.key}.label`)}
+            role="switch"
+            aria-labelledby={labelId}
+            aria-describedby={hasDescription ? descriptionId : undefined}
             checked={Boolean(currentValue)}
             onChange={(e) => handleValueChange(item.key, e.target.checked)}
             className="sr-only peer"
@@ -259,9 +262,12 @@ const renderConfigEditor = (item: ConfigItem) => {
       return (
         <div className="flex flex-col items-end gap-1">
           <select
+            id={fieldId}
             value={stringValue}
             onChange={(e) => handleValueChange(item.key, e.target.value)}
-            className="w-48 px-3 py-1.5 text-[13px] font-medium transition-all bg-black/[0.04] dark:bg-white/10 border border-black/5 dark:border-white/5 rounded-[6px] text-gray-800 dark:text-gray-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.15] hover:border-black/10 dark:hover:border-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:bg-white dark:focus:bg-black/50 focus:border-indigo-500 cursor-pointer disabled:opacity-50 appearance-none"
+            aria-labelledby={labelId}
+            aria-describedby={hasDescription ? descriptionId : undefined}
+            className="w-full sm:w-48 min-h-[44px] px-3 py-1.5 text-[13px] font-medium transition-all bg-black/[0.04] dark:bg-white/10 border border-black/5 dark:border-white/5 rounded-[6px] text-gray-800 dark:text-gray-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.15] hover:border-black/10 dark:hover:border-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:bg-white dark:focus:bg-black/50 focus:border-indigo-500 cursor-pointer disabled:opacity-50 appearance-none"
             style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'%236b7280\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M19 9l-7 7-7-7\'%3E%3C/path%3E%3C/svg%3E")', backgroundPosition: 'right 0.5rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1em' }}
             disabled={nodeLayoutDisabled}
             title={t(`config.${item.key}.label`)}
@@ -284,10 +290,13 @@ const renderConfigEditor = (item: ConfigItem) => {
     default:
       return (
         <input
+          id={fieldId}
           type="text"
           value={stringValue}
           onChange={(e) => handleValueChange(item.key, e.target.value)}
-          className="w-64 px-3 py-1.5 text-[13px] font-medium transition-all bg-black/[0.04] dark:bg-white/10 border border-black/5 dark:border-white/5 rounded-[6px] text-gray-800 dark:text-gray-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.15] hover:border-black/10 dark:hover:border-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:bg-white dark:focus:bg-black/50 focus:border-indigo-500"
+          aria-labelledby={labelId}
+          aria-describedby={hasDescription ? descriptionId : undefined}
+          className="w-full sm:w-64 min-h-[44px] px-3 py-1.5 text-[13px] font-medium transition-all bg-black/[0.04] dark:bg-white/10 border border-black/5 dark:border-white/5 rounded-[6px] text-gray-800 dark:text-gray-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.15] hover:border-black/10 dark:hover:border-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:bg-white dark:focus:bg-black/50 focus:border-indigo-500"
           title={t(`config.${item.key}.label`)}
         />
       );
@@ -310,16 +319,18 @@ const renderConfigItem = (item: ConfigItem) => {
   const displayDesc = rawDesc.startsWith('config.') ? item.description : rawDesc;
   // Extract primary sentence to avoid wall of text, keep rest in tooltip
   const primaryDesc = displayDesc ? displayDesc.split(' - ')[0] : '';
+  const fieldId = `configuration-field-${item.key.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
 
   return (
-  <div key={item.key} className="flex items-center justify-between transition-colors hover:bg-black/[0.02] dark:hover:bg-white/[0.02]" style={{ padding: 'var(--glass-padding-sm) var(--glass-padding-md)' }}>
+  <div key={item.key} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors hover:bg-black/[0.02] dark:hover:bg-white/[0.02]" style={{ padding: 'var(--glass-padding-sm) var(--glass-padding-md)' }}>
     <div className="flex flex-col pr-4 flex-1 min-w-0">
-      <div className="text-[13px] font-medium text-gray-800 dark:text-gray-200 leading-tight">
+      <div id={`${fieldId}-label`} className="text-[13px] font-medium text-gray-800 dark:text-gray-200 leading-tight">
         {displayLabel}
       </div>
       {primaryDesc && (
         <div
-          className="mt-0.5 text-[11.5px] text-gray-500 dark:text-gray-400 truncate max-w-[280px] cursor-help"
+          id={`${fieldId}-description`}
+          className="mt-0.5 text-[11.5px] text-gray-500 dark:text-gray-400 line-clamp-2 sm:truncate max-w-[280px] cursor-help"
           title={displayDesc}
         >
           {primaryDesc}
@@ -327,8 +338,8 @@ const renderConfigItem = (item: ConfigItem) => {
       )}
     </div>
 
-    <div className="flex items-center flex-none">
-      {renderConfigEditor(item)}
+    <div className="flex items-center w-full sm:w-auto flex-none">
+      {renderConfigEditor(item, Boolean(primaryDesc))}
     </div>
   </div>
   );
@@ -432,10 +443,17 @@ const visibleTabs: Array<{ id: ConfigTab; label: string }> = isAdvancedMode ? [
 
 // 修复（函数级注释）：确保配置面板在全屏下可见，portal 挂载到全屏元素
 return createPortal(
-  <div className={`fixed inset-0 z-[5000] flex items-center justify-center bg-black/30 dark:bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`} style={{ padding: 'var(--glass-padding-lg)' }} onClick={onClose}>
+  <div className={`fixed inset-0 z-[5000] flex items-center justify-center bg-black/30 dark:bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`} style={{ padding: 'var(--glass-padding-lg)' }} onClick={handleCancel}>
     {/* Vercel/Linear 风格设置面板 (Sidebar Master-Detail) */}
     <div
-         className={`relative flex w-full max-w-[900px] h-full max-h-[640px] border-none shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1),inset_0_0_0_1px_rgba(255,255,255,0.45)] dark:shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1),inset_0_0_0_1px_rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] transition-all duration-300 transform ${isOpen ? 'scale-100 translate-y-0 opacity-100' : 'scale-95 translate-y-8 opacity-0'} overflow-hidden ${className}`}
+         ref={dialogRef}
+         role="dialog"
+         aria-modal="true"
+         aria-labelledby={titleId}
+         tabIndex={-1}
+         onKeyDown={handleDialogKeyDown}
+         data-testid="configuration-panel-shell"
+         className={`relative flex flex-col sm:flex-row w-full max-w-[900px] h-[calc(100dvh-32px)] sm:h-full max-h-[640px] border-none shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1),inset_0_0_0_1px_rgba(255,255,255,0.45)] dark:shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1),inset_0_0_0_1px_rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] transition-all duration-300 transform ${isOpen ? 'scale-100 translate-y-0 opacity-100' : 'scale-95 translate-y-8 opacity-0'} overflow-hidden ${className}`}
          style={{
            borderRadius: 'calc(var(--glass-radius) * 1.6)',
            ...style,
@@ -443,9 +461,9 @@ return createPortal(
          onClick={(e) => e.stopPropagation()}>
       
       {/* 左侧导航栏 Sidebar */}
-      <div className="w-[240px] flex-none flex flex-col border-r border-black/10 dark:border-white/10" style={{ backgroundColor: 'rgba(0, 0, 0, 0.03)' }}>
+      <div className="w-full sm:w-[240px] max-h-[190px] sm:max-h-none flex-none flex flex-col border-b sm:border-b-0 sm:border-r border-black/10 dark:border-white/10" style={{ backgroundColor: 'rgba(0, 0, 0, 0.03)' }}>
         <div className="border-b border-transparent" style={{ padding: 'var(--glass-padding-md)' }}>
-          <h2 className="text-[15px] font-semibold tracking-tight text-gray-900 dark:text-gray-100 flex items-center gap-2">
+          <h2 id={titleId} className="text-[15px] font-semibold tracking-tight text-gray-900 dark:text-gray-100 flex items-center gap-2">
             <div className="p-1.5 bg-indigo-500/10 rounded-md">
               <FaCog className="text-indigo-600 dark:text-indigo-400 w-3.5 h-3.5" />
             </div>
@@ -453,12 +471,15 @@ return createPortal(
           </h2>
         </div>
         
-        <div className="flex-1 overflow-y-auto space-y-1 scrollbar-none" style={{ padding: 'var(--glass-padding-sm)' }}>
+        <div role="tablist" aria-label={t('config.title')} className="flex sm:flex-col flex-none sm:flex-1 overflow-x-auto sm:overflow-x-hidden sm:overflow-y-auto gap-1 scrollbar-none" style={{ padding: 'var(--glass-padding-sm)' }}>
           {visibleTabs.map(tab => (
             <button
               key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`w-full flex items-center px-3.5 py-2.5 text-[13px] rounded-[6px] transition-colors ${activeTab === tab.id ? activeTabClass : inactiveTabClass}`}
+              className={`w-auto sm:w-full min-h-[44px] flex-none flex items-center px-3.5 py-2.5 text-[13px] whitespace-nowrap rounded-[6px] transition-colors ${activeTab === tab.id ? activeTabClass : inactiveTabClass}`}
             >
               {tab.label}
             </button>
@@ -475,6 +496,7 @@ return createPortal(
               <span className="sr-only">Use advanced mode</span>
               <input
                 type="checkbox"
+                role="switch"
                 aria-label={t('config.groups.expertMode', 'Expert Mode')}
                 className="sr-only"
                 checked={isAdvancedMode}
@@ -497,7 +519,7 @@ return createPortal(
             <h1 className="text-lg font-semibold text-gray-900 dark:text-white tracking-tight leading-none">
               {t(`config.tabs.${activeTab}`)}
             </h1>
-            <button onClick={onClose} className="-mr-2 p-1.5 rounded-md text-gray-400 hover:text-gray-800 hover:bg-black/5 dark:hover:text-gray-100 dark:hover:bg-white/10 transition-colors" title={t('config.actions.close')}>
+            <button ref={closeButtonRef} type="button" onClick={handleCancel} aria-label={t('config.actions.close')} className="-mr-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md text-gray-400 hover:text-gray-800 hover:bg-black/5 dark:hover:text-gray-100 dark:hover:bg-white/10 transition-colors" title={t('config.actions.close')}>
               <FaTimes className="w-4 h-4" />
             </button>
           </div>
@@ -568,12 +590,12 @@ return createPortal(
       </div>
 
         {/* 底部操作栏 */}
-        <div className="flex-none border-t border-black/10 dark:border-white/10 flex items-center justify-between" style={{ padding: 'var(--glass-padding-md) var(--glass-padding-lg)', backgroundColor: 'rgba(0, 0, 0, 0.03)' }}>
-          <div className="flex items-center gap-3">
+        <div className="flex-none border-t border-black/10 dark:border-white/10 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between" style={{ padding: 'var(--glass-padding-md) var(--glass-padding-lg)', backgroundColor: 'rgba(0, 0, 0, 0.03)' }}>
+          <div className="flex flex-wrap items-center gap-3">
             <button
               onClick={handleResetChanges}
-              className={`flex items-center justify-center gap-2 px-5 py-2 text-[13px] font-medium transition-colors rounded-[6px] disabled:opacity-50 disabled:cursor-not-allowed ${actionBtnSecondary}`}
-              disabled={!hasChanges}
+              className={`min-h-[44px] flex items-center justify-center gap-2 px-5 py-2 text-[13px] font-medium transition-colors rounded-[6px] disabled:opacity-50 disabled:cursor-not-allowed ${actionBtnSecondary}`}
+              disabled={!state.isReady || !state.integration}
             >
               <FaUndo />
               {t('config.actions.reset')}
@@ -585,17 +607,17 @@ return createPortal(
               </div>
             )}
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 sm:justify-end">
             <button
-              onClick={onClose}
-              className={`px-6 py-2 text-[13px] font-medium transition-colors rounded-[6px] ${actionBtnSecondary}`}
+              onClick={handleCancel}
+              className={`min-h-[44px] px-6 py-2 text-[13px] font-medium transition-colors rounded-[6px] ${actionBtnSecondary}`}
             >
               {t('config.actions.cancel', 'Cancel')}
             </button>
             <button
               onClick={handleSaveChanges}
               disabled={!hasChanges || !state.isReady || !state.integration}
-              className={`flex items-center justify-center gap-2 px-6 py-2 text-[13px] font-medium transition-all rounded-[6px] disabled:opacity-50 disabled:cursor-not-allowed ${actionBtnPrimary}`}
+              className={`min-h-[44px] flex items-center justify-center gap-2 px-6 py-2 text-[13px] font-medium transition-all rounded-[6px] disabled:opacity-50 disabled:cursor-not-allowed ${actionBtnPrimary}`}
             >
               <FaCheck />
               {t('config.actions.save')}

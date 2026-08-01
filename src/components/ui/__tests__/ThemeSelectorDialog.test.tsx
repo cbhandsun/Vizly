@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ThemeSelectorDialog } from '../ThemeSelectorDialog';
@@ -48,21 +48,25 @@ describe('ThemeSelectorDialog', () => {
     expect(onTabChange).toHaveBeenCalledWith('presets');
   });
 
-  it('traps focus, closes on Escape, and restores the trigger focus', () => {
+  it('traps focus, closes on Escape, and restores the trigger focus', async () => {
     const trigger = document.createElement('button');
     trigger.textContent = '打开主题';
     document.body.appendChild(trigger);
     trigger.focus();
+    const outerEscapeHandler = vi.fn();
+    document.addEventListener('keydown', outerEscapeHandler);
     const onClose = vi.fn();
     const { unmount } = renderDialog({ onClose });
 
     const close = screen.getByRole('button', { name: '关闭主题设置' });
-    expect(document.activeElement).toBe(close);
+    await waitFor(() => expect(document.activeElement).toBe(close));
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(onClose).toHaveBeenCalledOnce();
+    expect(outerEscapeHandler).not.toHaveBeenCalled();
 
     unmount();
     expect(document.activeElement).toBe(trigger);
+    document.removeEventListener('keydown', outerEscapeHandler);
     trigger.remove();
   });
 });

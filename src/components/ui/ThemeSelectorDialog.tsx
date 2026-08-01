@@ -1,6 +1,7 @@
-import React, { useEffect, useId, useMemo, useRef } from 'react';
+import React, { useId, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { FaCog, FaPalette } from 'react-icons/fa';
+import { useModalFocusTrap } from '@/hooks/useModalFocusTrap';
 
 export type ThemeSelectorTab = 'themes' | 'presets' | 'custom' | 'settings';
 
@@ -36,7 +37,6 @@ export const ThemeSelectorDialog: React.FC<ThemeSelectorDialogProps> = ({
   themesLabel,
   title,
 }) => {
-  const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const tabRefs = useRef<Partial<Record<ThemeSelectorTab, HTMLButtonElement>>>({});
   const titleId = useId();
@@ -48,45 +48,11 @@ export const ThemeSelectorDialog: React.FC<ThemeSelectorDialogProps> = ({
     ...(showCustomThemes ? [{ id: 'custom' as const, label: customLabel }] : []),
     { id: 'settings' as const, label: settingsLabel, iconOnly: true },
   ], [customLabel, presetsLabel, settingsLabel, showCustomThemes, showPresets, themesLabel]);
-
-  useEffect(() => {
-    const previouslyFocused = document.activeElement instanceof HTMLElement
-      ? document.activeElement
-      : null;
-    closeButtonRef.current?.focus();
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      event.preventDefault();
-      onClose();
-    };
-    document.addEventListener('keydown', handleEscape);
-    return () => {
-      document.removeEventListener('keydown', handleEscape);
-      previouslyFocused?.focus();
-    };
-  }, [onClose]);
-
-  const handleDialogKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== 'Tab' || !dialogRef.current) return;
-    const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(
-      'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
-    )).filter(element => !element.hasAttribute('hidden'));
-    if (focusable.length === 0) {
-      event.preventDefault();
-      dialogRef.current.focus();
-      return;
-    }
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault();
-      last.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault();
-      first.focus();
-    }
-  };
+  const { containerRef: dialogRef, handleKeyDown: handleDialogKeyDown } = useModalFocusTrap<HTMLDivElement>({
+    active: true,
+    initialFocusRef: closeButtonRef,
+    onClose,
+  });
 
   const handleTabKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
     let nextIndex: number | null = null;
