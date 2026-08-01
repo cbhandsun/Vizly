@@ -62,6 +62,7 @@ describe('flowchart designer architecture hooks', () => {
             takeSnapshot: vi.fn(),
             handleStrategyLayout: vi.fn(),
             isReadonly: false,
+            showGrid: true,
             gridVariant: BackgroundVariant.Lines,
             setGridVariant,
             setShowGrid,
@@ -77,11 +78,49 @@ describe('flowchart designer architecture hooks', () => {
         act(() => result.current.handleOpacity(0.5));
 
         expect(setGridVariant).toHaveBeenCalledWith(BackgroundVariant.Dots);
-        expect(setShowGrid).toHaveBeenCalledWith(true);
+        expect(setShowGrid).not.toHaveBeenCalled();
         expect(updateNodesBatch).toHaveBeenCalledWith(
             ['node-1', 'node-2'],
             { style: { opacity: 0.5 } },
         );
+    });
+
+    it('cycles the grid through cross, hidden, and a stable visible default', () => {
+        const baseOptions = {
+            t: ((key: string) => key) as never,
+            getNodes: () => [],
+            getEdges: () => [],
+            setNodes: vi.fn(),
+            setEdges: vi.fn(),
+            takeSnapshot: vi.fn(),
+            handleStrategyLayout: vi.fn(),
+            isReadonly: false,
+            setGridVariant: vi.fn(),
+            setShowGrid: vi.fn(),
+            reactFlowInstance: null,
+            viewport: { x: 0, y: 0, zoom: 1 },
+            createFromTemplate: vi.fn(() => ({ nodes: [], edges: [] })),
+            templates: [],
+            selectedNodes: [],
+            updateNodesBatch: vi.fn(),
+        };
+        const { result, rerender } = renderHook(
+            ({ showGrid, gridVariant }) => useFlowchartCanvasCommands({
+                ...baseOptions,
+                showGrid,
+                gridVariant,
+            }),
+            { initialProps: { showGrid: true, gridVariant: BackgroundVariant.Cross } },
+        );
+
+        act(() => result.current.handleGridRotate());
+        expect(baseOptions.setShowGrid).toHaveBeenLastCalledWith(false);
+        expect(baseOptions.setGridVariant).not.toHaveBeenCalled();
+
+        rerender({ showGrid: false, gridVariant: BackgroundVariant.Cross });
+        act(() => result.current.handleGridRotate());
+        expect(baseOptions.setGridVariant).toHaveBeenLastCalledWith(BackgroundVariant.Lines);
+        expect(baseOptions.setShowGrid).toHaveBeenLastCalledWith(true);
     });
 
     it('binds external snapshot events to current canvas getters', () => {

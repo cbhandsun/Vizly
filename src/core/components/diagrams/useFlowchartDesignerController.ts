@@ -455,7 +455,7 @@ export const useFlowchartDesignerController = ({
         handleUseTemplate, handleOpacity,
     } = useFlowchartCanvasCommands({
         t, getNodes: getCurrentNodes, getEdges: getCurrentEdges, setNodes, setEdges, takeSnapshot,
-        handleStrategyLayout, isReadonly, gridVariant, setGridVariant, setShowGrid,
+        handleStrategyLayout, isReadonly, showGrid, gridVariant, setGridVariant, setShowGrid,
         reactFlowInstance, viewport, createFromTemplate, templates, selectedNodes, updateNodesBatch,
     });
 

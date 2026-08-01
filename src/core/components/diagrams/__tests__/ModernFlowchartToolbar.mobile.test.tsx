@@ -139,6 +139,38 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
         expect(onShowCanvasSearch).toHaveBeenCalledTimes(1);
     });
 
+    it('keeps the mobile menu below its trigger and exposes snap-to-grid', async () => {
+        const onToggleSnap = vi.fn();
+
+        render(
+            <ModernFlowchartToolbar
+                canUndo={false}
+                canRedo={false}
+                onUndo={vi.fn()}
+                onRedo={vi.fn()}
+                onZoomIn={vi.fn()}
+                onZoomOut={vi.fn()}
+                onFitView={vi.fn()}
+                autoRouting={false}
+                toggleAutoRouting={vi.fn()}
+                showGrid
+                toggleGrid={vi.fn()}
+                onShowShortcuts={vi.fn()}
+                showRuler={false}
+                toggleRuler={vi.fn()}
+                snapToGrid
+                onToggleSnap={onToggleSnap}
+            />,
+        );
+
+        fireEvent.click(await screen.findByRole('button', { name: /更多操作|moreActions/i }));
+
+        const popup = (await screen.findByRole('menu')).closest('.ant-dropdown');
+        expect(popup?.className).toContain('ant-dropdown-placement-bottomRight');
+        fireEvent.click(await screen.findByRole('menuitem', { name: /网格吸附：开启|snapOn/i }));
+        expect(onToggleSnap).toHaveBeenCalledTimes(1);
+    });
+
     it('opens the automatic-layout menu by click and runs the selected strategy', async () => {
         const onStrategyLayout = vi.fn();
 

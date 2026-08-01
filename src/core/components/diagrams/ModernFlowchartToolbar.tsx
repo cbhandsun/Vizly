@@ -15,6 +15,7 @@ import { appModal } from '../../utils/antdStaticBridge';
 import { clearFlowchartCache } from '../../utils/clearFlowchartCache';
 import { coerceDiagramId, getQueryOrHashParamFromLocation } from '../../utils/inputBoundary';
 import { FlowchartAlignmentTools } from './FlowchartAlignmentTools';
+import { FlowchartCanvasSettingsContent } from './FlowchartCanvasSettingsContent';
 
 interface FlowchartToolbarProps {
     canUndo: boolean;
@@ -314,6 +315,12 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                     icon: gridInfo.icon,
                     onClick: toggleGrid,
                 },
+                ...(isMobile && onToggleSnap ? [{
+                    key: 'snap',
+                    label: snapToGrid ? t('designer.toolbar.snapOn') : t('designer.toolbar.snapOff'),
+                    icon: <FaMagnet />,
+                    onClick: onToggleSnap,
+                }] : []),
                 {
                     key: 'ruler',
                     label: showRuler ? t('designer.toolbar.hideRuler') : t('designer.toolbar.showRuler'),
@@ -423,61 +430,23 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
             },
         },
     ], [
-        t, gridInfo, toggleGrid, showRuler, toggleRuler, toggleMinimap, showMinimap,
+        t, gridInfo, toggleGrid, showRuler, toggleRuler, toggleMinimap, showMinimap, isMobile,
+        onToggleSnap, snapToGrid,
         onShowShortcuts, onShowCanvasSearch, onImportClick, onExport, onActivatePointer, toggleSelectionMode,
         onToggleDrawingMode, onAddStickyNote, onAddMindMap, isMarqueeActive, isDrawingMode,
     ]);
 
     const CanvasSettingsContent = (
-        <div className="p-1 min-w-[180px]">
-            <div className="px-2 py-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                {t('designer.toolbar.canvasSettings', '画布设置')}
-            </div>
-            <div className="flex flex-col gap-0.5">
-                <Button 
-                    type="text" 
-                    block 
-                    className="flex items-center justify-between h-9 px-2 hover:bg-slate-100 dark:hover:bg-white/5"
-                    onClick={toggleMinimap}
-                >
-                    <span className="flex items-center gap-2 text-[13px] text-slate-600 dark:text-slate-300">
-                        <FaMap className="text-[14px]" /> {t('designer.toolbar.minimap', '小地图')}
-                    </span>
-                    <div className={`w-2 h-2 rounded-full ${showMinimap ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-slate-300 dark:bg-slate-700'}`} />
-                </Button>
-                <Button 
-                    type="text" 
-                    block 
-                    className="flex items-center justify-between h-9 px-2 hover:bg-slate-100 dark:hover:bg-white/5"
-                    onClick={toggleRuler}
-                >
-                    <span className="flex items-center gap-2 text-[13px] text-slate-600 dark:text-slate-300">
-                        <FaRuler className="text-[14px]" /> {t('designer.toolbar.ruler', '标尺')}
-                    </span>
-                    <div className={`w-2 h-2 rounded-full ${showRuler ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-slate-300 dark:bg-slate-700'}`} />
-                </Button>
-                <Button 
-                    type="text" 
-                    block 
-                    className="flex items-center justify-between h-9 px-2 hover:bg-slate-100 dark:hover:bg-white/5"
-                    onClick={toggleGrid}
-                >
-                    <span className="flex items-center gap-2 text-[13px] text-slate-600 dark:text-slate-300">
-                        <FaTh className="text-[14px]" /> {t('designer.toolbar.grid', '网格')}
-                    </span>
-                    <div className={`w-2 h-2 rounded-full ${showGrid ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-slate-300 dark:bg-slate-700'}`} />
-                </Button>
-                <div className="h-[1px] bg-slate-100 dark:bg-white/5 my-1" />
-                <Button 
-                    type="text" 
-                    block 
-                    className="flex items-center gap-2 h-9 px-2 text-[13px] text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5"
-                    onClick={onShowShortcuts}
-                >
-                    <FaKeyboard className="text-[14px]" /> {t('designer.toolbar.shortcuts', '快捷键')}
-                </Button>
-            </div>
-        </div>
+        <FlowchartCanvasSettingsContent
+            gridInfo={gridInfo}
+            onShowShortcuts={onShowShortcuts}
+            showGrid={showGrid}
+            showMinimap={showMinimap}
+            showRuler={showRuler}
+            toggleGrid={toggleGrid}
+            toggleMinimap={toggleMinimap}
+            toggleRuler={toggleRuler}
+        />
     );
 
     const CreationTools = (
@@ -647,7 +616,12 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
             )}
 
             {isMobile && (
-                <Dropdown menu={{ items: moreMenuItems }} placement="bottomRight" trigger={['click']}>
+                <Dropdown
+                    menu={{ items: moreMenuItems }}
+                    placement="bottomRight"
+                    trigger={['click']}
+                    autoAdjustOverflow={false}
+                >
                     <Tooltip title={t('designer.toolbar.moreActions')}>
                         <Button
                             type="text"

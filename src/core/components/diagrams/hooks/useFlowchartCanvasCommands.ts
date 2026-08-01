@@ -36,6 +36,7 @@ interface UseFlowchartCanvasCommandsOptions {
         direction?: 'TB' | 'LR',
     ) => void | Promise<void>;
     isReadonly: boolean;
+    showGrid: boolean;
     gridVariant: BackgroundVariant;
     setGridVariant: React.Dispatch<React.SetStateAction<BackgroundVariant>>;
     setShowGrid: React.Dispatch<React.SetStateAction<boolean>>;
@@ -56,6 +57,7 @@ export function useFlowchartCanvasCommands({
     takeSnapshot,
     handleStrategyLayout,
     isReadonly,
+    showGrid,
     gridVariant,
     setGridVariant,
     setShowGrid,
@@ -115,10 +117,18 @@ export function useFlowchartCanvasCommands({
 
     const handleGridRotate = useCallback(() => {
         const variants = [BackgroundVariant.Lines, BackgroundVariant.Dots, BackgroundVariant.Cross];
+        if (!showGrid) {
+            setGridVariant(BackgroundVariant.Lines);
+            setShowGrid(true);
+            return;
+        }
         const currentIndex = variants.indexOf(gridVariant);
-        setGridVariant(variants[(currentIndex + 1) % variants.length]);
-        setShowGrid(true);
-    }, [gridVariant, setGridVariant, setShowGrid]);
+        if (currentIndex < 0 || currentIndex === variants.length - 1) {
+            setShowGrid(false);
+            return;
+        }
+        setGridVariant(variants[currentIndex + 1]);
+    }, [gridVariant, setGridVariant, setShowGrid, showGrid]);
 
     const handleClearCanvasCommand = useCallback(() => {
         appModal.confirm(buildFlowchartClearCanvasConfirm({
