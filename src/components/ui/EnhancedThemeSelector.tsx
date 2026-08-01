@@ -4,15 +4,13 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { THEME_JSON_IMPORT_MAX_BYTES, getFileSizeLimitError } from '../../core/utils/fileImportGuards';
 import { theme } from 'antd';
-import { FaPalette, FaCog, FaDownload, FaUpload, FaPlus, FaTrash, FaCheck, FaTimes } from 'react-icons/fa';
+import { FaPalette, FaDownload, FaUpload, FaPlus, FaTrash, FaCheck, FaTimes } from 'react-icons/fa';
 
 import { useConfigIntegration } from '@/core/hooks/useConfigIntegration';
 import { useTheme } from '@/core/themes/useCoreTheme';
-import { useDraggablePanel } from '../../hooks/useDraggablePanel';
 import type { Theme, ThemeMode } from '@/core/themes/types/ThemeTypes';
 import type { ThemePreset } from '@/core/themes/ThemePresetManager';
 
@@ -31,6 +29,7 @@ import {
 } from '@/core/themes/themeLogging';
 import { renderSafeThemePreviewGradient } from '@/core/themes/themePreviewSecurity';
 import { downloadFile } from '@/core/utils/downloadUtils';
+import { ThemeSelectorDialog, type ThemeSelectorTab } from './ThemeSelectorDialog';
 
 export interface EnhancedThemeSelectorProps {
   className?: string;
@@ -80,7 +79,7 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
   const [currentTheme, setTheme] = useTheme();
 
   const [isOpen, setIsOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'themes' | 'presets' | 'custom' | 'settings'>('themes');
+  const [activeTab, setActiveTab] = useState<ThemeSelectorTab>('themes');
   const [presets, setPresets] = useState<ThemePreset[]>([]);
   const [customThemes, setCustomThemes] = useState<Theme[]>([]);
   const [isCreatingCustom, setIsCreatingCustom] = useState(false);
@@ -92,9 +91,8 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
     baseTheme: 'light',
   });
   const [themeCache, setThemeCache] = useState<Record<string, Theme>>({});
-
-  // 拖拽逻辑 Hook
-  const { panelRef, isDragging, handlePointerDown } = useDraggablePanel();
+  const closeThemeDialog = useCallback(() => setIsOpen(false), []);
+  const triggerLabel = ariaLabel || t('theme.selector.title');
 
   // 加载预设和自定义主题
   useEffect(() => {
@@ -332,6 +330,7 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
             className={`group relative flex flex-col gap-3 p-4 transition-all duration-300 rounded-[var(--glass-radius)] cursor-pointer ${isActive ? 'bg-white dark:bg-[#1A1A1C]/60 border-indigo-500 dark:border-indigo-400 shadow-[0_2px_12px_rgba(99,102,241,0.15)] ring-1 ring-indigo-500/20' : 'bg-white dark:bg-white/5 border border-black/[0.06] dark:border-white/[0.08] hover:border-black/[0.1] dark:hover:border-white/[0.15] hover:shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)]'}`}
             onClick={() => handleThemeChange(themeId)}
             role="button"
+            aria-pressed={isActive}
             tabIndex={0}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleThemeChange(themeId); } }}
           >
@@ -569,15 +568,14 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
     );
   }
 
-  const activeTabClass = "bg-white dark:bg-white/10 text-gray-900 dark:text-white shadow-[0_1px_2px_rgba(0,0,0,0.05)] rounded-[6px] font-semibold transform transition-all duration-300 ring-1 ring-black/[0.04] dark:ring-white/[0.05]";
-  const inactiveTabClass = "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] rounded-[6px] font-medium transition-all duration-300 opacity-80 hover:opacity-100";
-
   return (
     <>
       {variant === 'icon' ? (
         <button
-            aria-label={ariaLabel}
-            className={className || "inline-flex items-center justify-center w-7 h-7 rounded-[6px] border-none text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] transition-colors cursor-pointer"}
+            aria-label={triggerLabel}
+            aria-expanded={isOpen}
+            aria-haspopup="dialog"
+            className={className || "inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded-[6px] border-none text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] transition-colors cursor-pointer"}
             onClick={() => setIsOpen(!isOpen)}
             style={style}
             title={t('theme.selector.title')}
@@ -586,8 +584,10 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
         </button>
       ) : (
         <button
-            aria-label={ariaLabel}
-            className={`flex items-center justify-between gap-1.5 h-8 px-2.5 text-[13px] transition-colors rounded-[6px] ${borderless ? 'bg-transparent border-none' : 'bg-white dark:bg-[#1C1C1E] border border-[#d9d9d9] dark:border-white/15 hover:border-blue-400 dark:hover:border-blue-500 shadow-sm'} text-gray-700 dark:text-gray-200 pointer-events-auto overflow-hidden w-full ${className}`}
+            aria-label={triggerLabel}
+            aria-expanded={isOpen}
+            aria-haspopup="dialog"
+            className={`flex items-center justify-between gap-1.5 ${borderless ? 'min-h-[44px]' : 'h-8'} px-2.5 text-[13px] transition-colors rounded-[6px] ${borderless ? 'bg-transparent border-none' : 'bg-white dark:bg-[#1C1C1E] border border-[#d9d9d9] dark:border-white/15 hover:border-blue-400 dark:hover:border-blue-500 shadow-sm'} text-gray-700 dark:text-gray-200 pointer-events-auto overflow-hidden w-full ${className}`}
             onClick={() => setIsOpen(!isOpen)}
             style={style}
         >
@@ -606,83 +606,25 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
         </button>
       )}
 
-      {isOpen && createPortal(
-        <div className={`fixed inset-0 z-[3000] flex items-center justify-center p-4 sm:p-6 bg-black/40 backdrop-blur-sm transition-opacity duration-300 ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`} onClick={() => setIsOpen(false)}>
-          <div
-            className="relative flex flex-col w-full max-w-3xl max-h-[85vh] rounded-[var(--glass-radius)] bg-slate-50/90 dark:bg-[#111113]/95 backdrop-blur-2xl backdrop-saturate-[180%] border border-white/40 dark:border-white/10 shadow-[0_16px_40px_-8px_rgba(0,0,0,0.15)] overflow-hidden transition-all duration-300 pointer-events-auto"
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              cursor: isDragging ? 'grabbing' : 'default',
-              transform: isOpen ? 'scale(1) translateY(0)' : 'scale(0.95) translateY(20px)',
-              opacity: isOpen ? 1 : 0
-            }}
-            ref={panelRef}
-          >
-            {/* Header */}
-            <div className="flex-none px-8 py-5 bg-white/40 dark:bg-black/20 border-b border-black/5 dark:border-white/5 flex items-center justify-between shrink-0"
-              onPointerDown={handlePointerDown}
-              style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
-            >
-              <div className="flex items-center gap-3 text-[16px] font-semibold text-gray-800 dark:text-gray-100 tracking-tight">
-                <FaPalette className="text-indigo-500" />
-                <h2>{t('theme.selector.title')}</h2>
-              </div>
-              <button
-                onClick={() => setIsOpen(false)}
-                onPointerDown={(e) => e.stopPropagation()}
-                className="flex items-center justify-center w-7 h-7 rounded-[6px] bg-transparent hover:bg-black/5 dark:bg-transparent dark:hover:bg-white/10 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors border-none outline-none cursor-pointer"
-                title={t('config.actions.close')}
-              >
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 1L13 13M1 13L13 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
-              </button>
-            </div>
-
-            {/* Tabs */}
-            <div className="flex-none px-8 py-5">
-              <div className="flex items-center gap-1 p-1 bg-black/[0.04] dark:bg-white/[0.06] rounded-[8px] w-fit border border-black/[0.02] dark:border-white/[0.02]">
-                <button
-                  className={`flex-none px-4 py-2 text-[14px] rounded-[10px] whitespace-nowrap cursor-pointer ${activeTab === 'themes' ? activeTabClass : inactiveTabClass}`}
-                  onClick={() => setActiveTab('themes')}
-                >
-                  {t('theme.selector.themes')}
-                </button>
-                {showPresets && (
-                  <button
-                    className={`flex-none px-4 py-2 text-[14px] rounded-[10px] whitespace-nowrap cursor-pointer ${activeTab === 'presets' ? activeTabClass : inactiveTabClass}`}
-                    onClick={() => setActiveTab('presets')}
-                  >
-                    {t('theme.selector.presets')}
-                  </button>
-                )}
-                {showCustomThemes && (
-                  <button
-                    className={`flex-none px-4 py-2 text-[14px] rounded-[10px] whitespace-nowrap cursor-pointer ${activeTab === 'custom' ? activeTabClass : inactiveTabClass}`}
-                    onClick={() => setActiveTab('custom')}
-                  >
-                    {t('theme.selector.custom')}
-                  </button>
-                )}
-                <div className="w-2" />
-                <button
-                  className={`flex-none px-3 py-2 rounded-[10px] cursor-pointer flex items-center justify-center ${activeTab === 'settings' ? activeTabClass : inactiveTabClass}`}
-                  onClick={() => setActiveTab('settings')}
-                  title={t('theme.selector.settings') || 'Settings'}
-                >
-                  <FaCog />
-                </button>
-              </div>
-            </div>
-
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto px-8 pb-8 custom-scrollbar">
-              {activeTab === 'themes' && renderThemeList()}
-              {activeTab === 'presets' && showPresets && renderPresetList()}
-              {activeTab === 'custom' && showCustomThemes && renderCustomThemes()}
-              {activeTab === 'settings' && renderSettings()}
-            </div>
-          </div>
-        </div>,
-        (document.fullscreenElement as HTMLElement | null) || document.body
+      {isOpen && (
+        <ThemeSelectorDialog
+          activeTab={activeTab}
+          closeLabel={t('config.actions.close')}
+          customLabel={t('theme.selector.custom')}
+          onClose={closeThemeDialog}
+          onTabChange={setActiveTab}
+          presetsLabel={t('theme.selector.presets')}
+          settingsLabel={t('theme.selector.settings') || 'Settings'}
+          showCustomThemes={showCustomThemes}
+          showPresets={showPresets}
+          themesLabel={t('theme.selector.themes')}
+          title={t('theme.selector.title')}
+        >
+          {activeTab === 'themes' && renderThemeList()}
+          {activeTab === 'presets' && showPresets && renderPresetList()}
+          {activeTab === 'custom' && showCustomThemes && renderCustomThemes()}
+          {activeTab === 'settings' && renderSettings()}
+        </ThemeSelectorDialog>
       )}
     </>
   );
