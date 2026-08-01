@@ -5,10 +5,6 @@ export const logArchitectureNodeMissingData = (): void => {
   safeLog.warn('[ArchitectureNode] Rendered without data. Falling back to invalid-node placeholder.');
 };
 
-export const logLazyMonacoCdnRaceFailure = (): void => {
-  safeLog.warn('[LazyMonacoEditor] CDN race failed, falling back to jsdelivr.');
-};
-
 export const logUnifiedDesignerUnsupportedAction = (
   method: 'updateNodesBatch' | 'updateEdgesBatch' | 'takeSnapshot' | 'addNode',
   pluginId?: string

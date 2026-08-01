@@ -19,7 +19,12 @@ import {
     shouldSnapshotFlowchartNodeDataUpdate,
 } from '../flowchartNodeMutations';
 
-export function useFlowchartNodeInteractions(id: string, data: FlowchartNodeData, selected: boolean) {
+export function useFlowchartNodeInteractions(
+    id: string,
+    data: FlowchartNodeData,
+    selected: boolean,
+    editingAllowed = true,
+) {
     const {
         getEdges,
         getNodes,
@@ -40,6 +45,7 @@ export function useFlowchartNodeInteractions(id: string, data: FlowchartNodeData
 
     // Node Update Helper
     const handleUpdateData = useCallback((newData: Partial<FlowchartNodeData>) => {
+        if (!editingAllowed) return;
         if (onUpdateNodeData) {
             onUpdateNodeData(
                 [id],
@@ -54,7 +60,7 @@ export function useFlowchartNodeInteractions(id: string, data: FlowchartNodeData
                 return n;
             }));
         }
-    }, [id, data, onUpdateNodeData, setNodes]);
+    }, [data, editingAllowed, id, onUpdateNodeData, setNodes]);
 
     // Bounce Animation on Select
     useEffect(() => {
@@ -73,6 +79,7 @@ export function useFlowchartNodeInteractions(id: string, data: FlowchartNodeData
 
     // Auto-expand Text Bounds
     useEffect(() => {
+        if (!editingAllowed) return;
         if (!contentRef.current) return;
         const requiredHeight = contentRef.current.scrollHeight;
         
@@ -100,16 +107,17 @@ export function useFlowchartNodeInteractions(id: string, data: FlowchartNodeData
             }
             return nds;
         });
-    }, [id, setNodes, data.label, data.description, data.isEditing, data.shape]);
+    }, [data.description, data.isEditing, data.label, data.shape, editingAllowed, id, setNodes]);
 
 
     const handleDelete = useCallback(() => {
+        if (!editingAllowed) return;
         const currentNodes = getNodes();
         if (!currentNodes.some(node => node.id === id)) return;
         beforeStructuralChange?.();
         setNodes(currentNodes.filter(node => node.id !== id));
         setEdges(getEdges().filter(edge => edge.source !== id && edge.target !== id));
-    }, [beforeStructuralChange, getEdges, getNodes, id, setEdges, setNodes]);
+    }, [beforeStructuralChange, editingAllowed, getEdges, getNodes, id, setEdges, setNodes]);
 
     const handleDomainClassChange = useCallback((dc: string, domainName: string) => {
         handleUpdateData({
@@ -175,6 +183,7 @@ export function useFlowchartNodeInteractions(id: string, data: FlowchartNodeData
     }, [getViewport, setViewport]);
 
     const handleClone = useCallback(() => {
+        if (!editingAllowed) return;
         const mutation = cloneFlowchartNode({
             nodes: getNodes(),
             edges: getEdges(),
@@ -193,6 +202,7 @@ export function useFlowchartNodeInteractions(id: string, data: FlowchartNodeData
         );
     }, [
         beforeStructuralChange,
+        editingAllowed,
         ensureNodeVisible,
         getEdges,
         getNodes,
@@ -205,6 +215,7 @@ export function useFlowchartNodeInteractions(id: string, data: FlowchartNodeData
         if (e && 'stopPropagation' in e) {
              e.stopPropagation();
         }
+        if (!editingAllowed) return;
         const sourceNode = getNodes().find(node => node.id === id);
         if (!sourceNode) return;
         const sourceData = sourceNode.data as FlowchartNodeData;
@@ -232,6 +243,7 @@ export function useFlowchartNodeInteractions(id: string, data: FlowchartNodeData
         );
     }, [
         beforeStructuralChange,
+        editingAllowed,
         ensureNodeVisible,
         getEdges,
         getNodes,

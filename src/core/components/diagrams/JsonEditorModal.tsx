@@ -8,9 +8,9 @@ import { coerceStandardDiagramImport, parseDiagramJson } from '@/core/utils/diag
 import { downloadFile } from '@/core/utils/downloadUtils';
 import { logJsonEditorExistingDiagramMergeFailure } from './diagramImportLogging';
 import { getApplicationDiagramRuntime } from '../../ports/applicationDiagramRuntime';
-
-
-const LazyMonacoEditor = React.lazy(() => import('../lazy/LazyMonacoEditor'));
+import LazyMonacoEditor from '../lazy/LazyMonacoEditor';
+import type { LazyMonacoEditorMode } from '../lazy/LazyMonacoEditor';
+import './JsonEditorModal.css';
 
 export interface JsonEditorModalProps {
     visible: boolean;
@@ -19,7 +19,7 @@ export interface JsonEditorModalProps {
     edges: Edge[];
     setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
     setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
-    reactFlowInstance: ReactFlowInstance<Node, Edge>;
+    reactFlowInstance: Pick<ReactFlowInstance<Node, Edge>, 'fitView'>;
     /** 外部注入的初始 JSON 内容（可选，例如 AI 生成后直接注入） */
     initialContent?: string;
     diagramId?: string;
@@ -44,6 +44,12 @@ export const JsonEditorModal: React.FC<JsonEditorModalProps> = ({
     const [jsonContent, setJsonContent] = useState(initialContent || '');
     const [pureJsonContent, setPureJsonContent] = useState('');
     const [jsonFormatMode, setJsonFormatMode] = useState<'standard' | 'pure' | 'react-flow'>('standard');
+    const [editorMode, setEditorMode] = useState<LazyMonacoEditorMode>('loading');
+    const [editorVisible, setEditorVisible] = useState(visible);
+    if (editorVisible !== visible) {
+        setEditorVisible(visible);
+        if (visible) setEditorMode('loading');
+    }
     const [loadedInitialContent, setLoadedInitialContent] = useState(initialContent);
     if (loadedInitialContent !== initialContent) {
         setLoadedInitialContent(initialContent);
@@ -180,28 +186,32 @@ export const JsonEditorModal: React.FC<JsonEditorModalProps> = ({
         }
         return JSON.stringify({ nodes, edges }, null, 2);
     }, [jsonFormatMode, jsonContent, pureJsonContent, nodes, edges]);
+    const editorIsLoading = editorMode === 'loading';
 
     if (!visible) return null;
 
     return (
         <Modal
             open={visible}
+            rootClassName="json-editor-modal"
             title={t('designer.jsonEditor.title') || 'Diagram Data Viewer'}
             onCancel={onClose}
             getContainer={() => document.getElementById('app-root-layout') || document.body}
             width={850}
+            zIndex={2100}
             footer={
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     {/* 左侧功能区 */}
                     <div style={{ display: 'flex', gap: 8 }}>
                         <Button
                             onClick={handleFormat}
-                            disabled={jsonFormatMode === 'react-flow'}
+                            disabled={editorIsLoading || jsonFormatMode === 'react-flow'}
                         >
                             {t('designer.jsonEditor.format') || '格式化 JSON'}
                         </Button>
                         <Button
                             onClick={handleDownload}
+                            disabled={editorIsLoading}
                             icon={<UploadOutlined style={{ transform: 'rotate(180deg)' }} />}
                         >
                             {t('designer.jsonEditor.download') || '下载文件'}
@@ -215,14 +225,14 @@ export const JsonEditorModal: React.FC<JsonEditorModalProps> = ({
                         <Button
                             type="dashed"
                             onClick={handlePreviewApply}
-                            disabled={jsonFormatMode === 'react-flow'}
+                            disabled={editorIsLoading || jsonFormatMode === 'react-flow'}
                         >
                             {t('designer.jsonEditor.applyOnly') || '仅预览并应用'}
                         </Button>
                         <Button
                             type="primary"
                             onClick={handleSave}
-                            disabled={jsonFormatMode === 'react-flow'}
+                            disabled={editorIsLoading || jsonFormatMode === 'react-flow'}
                         >
                             {t('designer.jsonEditor.saveAndClose') || '应用修改并关闭'}
                         </Button>
@@ -248,9 +258,9 @@ export const JsonEditorModal: React.FC<JsonEditorModalProps> = ({
                     {t('designer.jsonEditor.reactFlowWarning') || '当前处于 React Flow 内部渲染节点/边结构大纲预览（只读）。该模式仅供 Debug，不支持反向应用。如需修改架构，请切换到标准数据模式。'}
                 </div>
             )}
-            <React.Suspense fallback={<div>{t('common.loading')}</div>}>
-                <div style={{ flex: 1, border: '1px solid #eee', borderRadius: 4, overflow: 'hidden' }}>
-                    <LazyMonacoEditor
+            <div style={{ flex: 1, border: '1px solid #eee', borderRadius: 4, overflow: 'hidden' }}>
+                <LazyMonacoEditor
+                        onModeChange={setEditorMode}
                         value={editorDisplayContent}
                         onChange={(val: string | undefined) => {
                             if (jsonFormatMode === 'standard') {
@@ -265,9 +275,8 @@ export const JsonEditorModal: React.FC<JsonEditorModalProps> = ({
                             formatOnPaste: true,
                             readOnly: jsonFormatMode === 'react-flow'
                         }}
-                    />
-                </div>
-            </React.Suspense>
+                />
+            </div>
         </Modal>
     );
 };

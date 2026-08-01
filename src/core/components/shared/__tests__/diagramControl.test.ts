@@ -7,6 +7,7 @@ import {
     DEFAULT_DIAGRAM_RIGHT_SIDEBAR_OFFSET,
     MAX_DIAGRAM_FULL_FIT_ZOOM,
   MIN_DIAGRAM_FULL_FIT_ZOOM,
+  resolveDiagramFitLayout,
 } from '../diagramControlFit';
 
 const logDiagramControlDispatchFailure = vi.fn();
@@ -69,6 +70,41 @@ describe('diagramControl', () => {
       y: expect.any(Number),
       zoom: expect.any(Number),
     }));
+  });
+
+  it('reserves mobile chrome and quick-action space when fitting content', () => {
+    const layout = resolveDiagramFitLayout({
+      viewportWidth: 390,
+      leftSidebarOffset: '76px',
+      rightSidebarOffset: '316px',
+    });
+    expect(layout).toEqual({
+      safeArea: { top: 104, right: 20, bottom: 148, left: 20 },
+      padding: 32,
+    });
+
+    const bounds = { minX: 0, minY: 0, width: 600, height: 500 };
+    const viewport = computeDiagramFitViewport({
+      bounds,
+      viewportWidth: 390,
+      viewportHeight: 844,
+      ...layout,
+    });
+    expect(viewport).not.toBeNull();
+    if (!viewport) return;
+
+    expect(viewport.x + bounds.minX * viewport.zoom).toBeGreaterThanOrEqual(
+      layout.safeArea.left + layout.padding,
+    );
+    expect(viewport.y + bounds.minY * viewport.zoom).toBeGreaterThanOrEqual(
+      layout.safeArea.top + layout.padding,
+    );
+    expect(viewport.x + (bounds.minX + bounds.width) * viewport.zoom).toBeLessThanOrEqual(
+      390 - layout.safeArea.right - layout.padding,
+    );
+    expect(viewport.y + (bounds.minY + bounds.height) * viewport.zoom).toBeLessThanOrEqual(
+      844 - layout.safeArea.bottom - layout.padding,
+    );
   });
 
   it('rejects invalid viewport geometry', () => {

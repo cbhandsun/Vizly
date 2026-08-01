@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { theme } from 'antd';
 import { FaHistory, FaUndoAlt, FaRedoAlt, FaClock } from 'react-icons/fa';
@@ -43,16 +43,30 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
         [pastEntries]
     );
 
+    useEffect(() => {
+        if (!visible) return;
+        const handleEscape = (event: KeyboardEvent) => {
+            if (event.key !== 'Escape') return;
+            event.preventDefault();
+            onClose();
+        };
+        document.addEventListener('keydown', handleEscape);
+        return () => document.removeEventListener('keydown', handleEscape);
+    }, [onClose, visible]);
+
     if (!visible) return null;
 
     return createPortal(
         <div
+            role="region"
+            aria-label="历史记录"
             style={{
                 position: 'fixed',
-                left: 320,
+                right: 16,
                 top: 60,
-                width: 260,
-                maxHeight: 400,
+                width: 'calc(100vw - 32px)',
+                maxWidth: 320,
+                maxHeight: 'calc(100dvh - 76px)',
                 zIndex: 3000,
                 background: token.colorBgContainer,
                 border: `1px solid ${token.colorBorderSecondary}`,
@@ -81,49 +95,64 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
                 </div>
                 <div style={{ display: 'flex', gap: 4 }}>
                     <button
+                        type="button"
                         onClick={onUndo}
                         disabled={!canUndo}
                         title="撤销"
+                        aria-label="撤销"
                         style={{
                             border: 'none',
                             background: canUndo ? token.colorFillTertiary : 'transparent',
                             borderRadius: token.borderRadius,
-                            padding: '4px 6px',
+                            width: 'var(--commercial-touch-target, 44px)',
+                            height: 'var(--commercial-touch-target, 44px)',
+                            padding: 0,
                             cursor: canUndo ? 'pointer' : 'not-allowed',
                             color: canUndo ? token.colorText : token.colorTextDisabled,
-                            display: 'flex', alignItems: 'center',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
                         }}
                     >
                         <FaUndoAlt size={11} />
                     </button>
                     <button
+                        type="button"
                         onClick={onRedo}
                         disabled={!canRedo}
                         title="重做"
+                        aria-label="重做"
                         style={{
                             border: 'none',
                             background: canRedo ? token.colorFillTertiary : 'transparent',
                             borderRadius: token.borderRadius,
-                            padding: '4px 6px',
+                            width: 'var(--commercial-touch-target, 44px)',
+                            height: 'var(--commercial-touch-target, 44px)',
+                            padding: 0,
                             cursor: canRedo ? 'pointer' : 'not-allowed',
                             color: canRedo ? token.colorText : token.colorTextDisabled,
-                            display: 'flex', alignItems: 'center',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
                         }}
                     >
                         <FaRedoAlt size={11} />
                     </button>
                     <button
+                        type="button"
                         onClick={onClose}
                         title="关闭"
+                        aria-label="关闭历史记录"
                         style={{
                             border: 'none',
                             background: 'transparent',
                             borderRadius: token.borderRadius,
-                            padding: '4px 6px',
+                            width: 'var(--commercial-touch-target, 44px)',
+                            height: 'var(--commercial-touch-target, 44px)',
+                            padding: 0,
                             cursor: 'pointer',
                             color: token.colorTextSecondary,
                             fontSize: 14,
                             lineHeight: 1,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
                         }}
                     >
                         ×
@@ -147,6 +176,7 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
                 {/* 当前状态标记 */}
                 <div style={{
                     padding: '6px 12px',
+                    minHeight: 'var(--commercial-touch-target, 44px)',
                     display: 'flex',
                     alignItems: 'center',
                     gap: 8,
@@ -162,11 +192,18 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
                 </div>
 
                 {reversedEntries.map((entry) => (
-                    <div
+                    <button
+                        type="button"
                         key={`${entry.index}-${entry.timestamp}`}
                         onClick={() => onJumpTo(entry.index)}
+                        aria-label={`恢复到 ${entry.label}，${formatTime(entry.timestamp)}`}
                         style={{
                             padding: '6px 12px',
+                            minHeight: 'var(--commercial-touch-target, 44px)',
+                            width: '100%',
+                            border: 'none',
+                            background: 'transparent',
+                            textAlign: 'left',
                             display: 'flex',
                             alignItems: 'center',
                             gap: 8,
@@ -179,23 +216,25 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
                         onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
                     >
                         {/* Timeline dot */}
-                        <div style={{
+                        <span style={{
+                            display: 'block',
                             width: 6, height: 6, borderRadius: '50%',
                             background: token.colorTextQuaternary,
                             flexShrink: 0,
                         }} />
 
                         {/* Content */}
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{
+                        <span style={{ flex: 1, minWidth: 0 }}>
+                            <span style={{
+                                display: 'block',
                                 color: token.colorText,
                                 overflow: 'hidden',
                                 textOverflow: 'ellipsis',
                                 whiteSpace: 'nowrap',
                             }}>
                                 {entry.label}
-                            </div>
-                            <div style={{
+                            </span>
+                            <span style={{
                                 color: token.colorTextTertiary,
                                 fontSize: 10,
                                 display: 'flex',
@@ -207,9 +246,9 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
                                 <span style={{ marginLeft: 4 }}>
                                     {entry.changeCount ?? entry.patch.length} 变动
                                 </span>
-                            </div>
-                        </div>
-                    </div>
+                            </span>
+                        </span>
+                    </button>
                 ))}
             </div>
         </div>,

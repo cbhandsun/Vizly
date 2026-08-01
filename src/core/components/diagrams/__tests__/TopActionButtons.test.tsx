@@ -11,6 +11,8 @@ vi.mock('react-i18next', () => ({
             'designer.toolbar.presentationMode': '演示模式',
             'designer.toolbar.pluginManager': '插件管理',
             'designer.toolbar.commentMode': '评论模式',
+            'designer.toolbar.operationHistory': '操作历史',
+            'designer.toolbar.versionHistory': '版本快照',
         }[key] ?? key),
     }),
 }));
@@ -63,5 +65,21 @@ describe('TopActionButtons document menu', () => {
             expect(trigger.getAttribute('aria-expanded')).toBe('false');
             expect(document.activeElement).toBe(trigger);
         });
+    });
+
+    it('separates operation history from version snapshots and invokes the snapshot entry', async () => {
+        const onOpenVersionHistory = vi.fn();
+        render(
+            <TopActionButtons
+                disablePortal
+                onShowHistory={vi.fn()}
+                onOpenVersionHistory={onOpenVersionHistory}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: '文档操作' }));
+        expect(await screen.findByRole('menuitem', { name: /操作历史/ })).toBeTruthy();
+        fireEvent.click(screen.getByRole('menuitem', { name: /版本快照/ }));
+        expect(onOpenVersionHistory).toHaveBeenCalledTimes(1);
     });
 });

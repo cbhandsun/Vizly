@@ -1,0 +1,69 @@
+.auth-modal .ant-modal {
+    max-width: calc(100vw - 32px);
+    padding-bottom: 0;
+}
+
+.auth-modal .ant-modal-content {
+    max-height: calc(100dvh - 32px);
+    overflow: hidden;
+}
+
+.auth-modal .ant-modal-body {
+    max-height: calc(100dvh - 80px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.auth-modal .ant-modal-close {
+    width: var(--commercial-touch-target, 44px);
+    height: var(--commercial-touch-target, 44px);
+    inset-block-start: 8px;
+    inset-inline-end: 8px;
+}
+
+.auth-modal .ant-tabs-tab-btn,
+.auth-modal .ant-btn,
+.auth-modal .ant-input-affix-wrapper-lg {
+    min-height: var(--commercial-touch-target, 44px);
+}
+
+.auth-modal .ant-tabs-tab {
+    padding-block: 0;
+}
+
+.auth-modal__switch-row {
+    text-align: center;
+}
+
+.auth-modal__switch-action.ant-btn {
+    margin-inline-start: 4px;
+    padding-inline: 8px;
+}
+
+.auth-modal__success {
+    padding: 20px;
+    text-align: center;
+}
+
+.auth-modal__success-icon {
+    display: inline-grid;
+    width: 56px;
+    height: 56px;
+    margin-bottom: 16px;
+    place-items: center;
+    border-radius: 50%;
+    color: var(--color-primary-600, #4f46e5);
+    background: var(--color-primary-50, #eef2ff);
+    font-size: 28px;
+}
+
+@media (max-width: 480px) {
+    .auth-modal .ant-modal {
+        margin: 16px auto;
+        top: 0;
+    }
+
+    .auth-modal .ant-modal-content {
+        padding: 20px 16px;
+    }
+}

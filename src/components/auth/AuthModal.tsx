@@ -5,6 +5,7 @@ import { UserOutlined, MailOutlined, LockOutlined, KeyOutlined } from '@ant-desi
 import { useAuth } from '@/context/useAuth';
 import { useTranslation } from 'react-i18next';
 import { appMessage } from '@/core/utils/antdStaticBridge';
+import './AuthModal.css';
 
 
 const { Text } = Typography;
@@ -16,6 +17,8 @@ interface AuthModalProps {
 
 type TabKey = 'password' | 'magiclink' | 'register';
 
+export const AUTH_MODAL_Z_INDEX = 1500;
+
 export const AuthModal: React.FC<AuthModalProps> = ({ open, onCancel }) => {
     const { t } = useTranslation();
     const { signInWithEmail, signInWithPassword, signUp } = useAuth();
@@ -25,11 +28,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onCancel }) => {
 
     const handleClose = () => {
         onCancel();
-        // Reset state after closing
-        setTimeout(() => {
-            setMagicLinkSent(false);
-            setActiveTab('password');
-        }, 300);
+    };
+
+    const resetTransientState = () => {
+        setMagicLinkSent(false);
+        setActiveTab('password');
     };
 
     // ===== Password Login =====
@@ -86,6 +89,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onCancel }) => {
     const passwordForm = (
         <Form name="auth_password" onFinish={onPasswordLogin} layout="vertical" autoComplete="off">
             <Form.Item
+                label={t('auth.modal.emailPlaceholder')}
                 name="email"
                 rules={[
                     { required: true, message: t('auth.modal.emailRequired') },
@@ -99,6 +103,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onCancel }) => {
                 />
             </Form.Item>
             <Form.Item
+                label={t('auth.modal.password.placeholder')}
                 name="password"
                 rules={[{ required: true, message: t('auth.modal.password.required') }]}
             >
@@ -120,12 +125,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onCancel }) => {
                     {t('auth.modal.loginButton')}
                 </Button>
             </Form.Item>
-            <div style={{ textAlign: 'center' }}>
+            <div className="auth-modal__switch-row">
                 <Text type="secondary" style={{ fontSize: 12 }}>
                     {t('auth.modal.noAccount')}
-                    <a onClick={() => setActiveTab('register')} style={{ marginLeft: 4 }}>
+                    <Button
+                        type="link"
+                        size="small"
+                        className="auth-modal__switch-action"
+                        onClick={() => setActiveTab('register')}
+                    >
                         {t('auth.modal.registerNow')}
-                    </a>
+                    </Button>
                 </Text>
             </div>
         </Form>
@@ -133,8 +143,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onCancel }) => {
 
     // Magic Link Form
     const magicLinkForm = magicLinkSent ? (
-        <div style={{ textAlign: 'center', padding: '20px' }}>
-            <div style={{ fontSize: 40, marginBottom: 16 }}>📧</div>
+        <div className="auth-modal__success">
+            <div className="auth-modal__success-icon" aria-hidden="true"><MailOutlined /></div>
             <h3>{t('auth.modal.checkEmailTitle')}</h3>
             <p style={{ color: '#666', marginBottom: 16 }}>{t('auth.modal.checkEmailDesc')}</p>
             <Button type="primary" onClick={handleClose}>
@@ -150,6 +160,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onCancel }) => {
             </div>
 
             <Form.Item
+                label={t('auth.modal.emailPlaceholder')}
                 name="email"
                 rules={[
                     { required: true, message: t('auth.modal.emailRequired') },
@@ -182,6 +193,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onCancel }) => {
     const registerForm = (
         <Form name="auth_register" onFinish={onRegister} layout="vertical" autoComplete="off">
             <Form.Item
+                label={t('auth.modal.emailPlaceholder')}
                 name="email"
                 rules={[
                     { required: true, message: t('auth.modal.emailRequired') },
@@ -195,6 +207,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onCancel }) => {
                 />
             </Form.Item>
             <Form.Item
+                label={t('auth.modal.register.passwordPlaceholder')}
                 name="password"
                 rules={[
                     { required: true, message: t('auth.modal.password.required') },
@@ -208,6 +221,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onCancel }) => {
                 />
             </Form.Item>
             <Form.Item
+                label={t('auth.modal.register.confirmPlaceholder')}
                 name="confirmPassword"
                 rules={[{ required: true, message: t('auth.modal.register.confirmRequired') }]}
             >
@@ -228,12 +242,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onCancel }) => {
                     {t('auth.modal.register.button')}
                 </Button>
             </Form.Item>
-            <div style={{ textAlign: 'center' }}>
+            <div className="auth-modal__switch-row">
                 <Text type="secondary" style={{ fontSize: 12 }}>
                     {t('auth.modal.hasAccount')}
-                    <a onClick={() => setActiveTab('password')} style={{ marginLeft: 4 }}>
+                    <Button
+                        type="link"
+                        size="small"
+                        className="auth-modal__switch-action"
+                        onClick={() => setActiveTab('password')}
+                    >
                         {t('auth.modal.backToLogin')}
-                    </a>
+                    </Button>
                 </Text>
             </div>
         </Form>
@@ -250,10 +269,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onCancel }) => {
             title={null}
             open={open}
             onCancel={handleClose}
-            getContainer={() => document.getElementById('app-root-layout') || document.body}
+            afterClose={resetTransientState}
             footer={null}
             destroyOnHidden
             width={420}
+            zIndex={AUTH_MODAL_Z_INDEX}
+            rootClassName="auth-modal"
         >
             <Tabs
                 activeKey={activeTab}

@@ -4,6 +4,11 @@ import { PlusOutlined, UndoOutlined, EyeOutlined } from '@ant-design/icons';
 import { Clock } from 'lucide-react';
 import { useVersionHistory } from '../hooks/useVersionHistory';
 import { useReactFlow } from '@xyflow/react';
+import {
+    normalizeVersionMessage,
+    VERSION_MESSAGE_MAX_LENGTH,
+} from './versionHistoryInput';
+import './VersionHistoryPanel.css';
 
 const { Text, Title } = Typography;
 
@@ -31,18 +36,46 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
 
     const [commitMessage, setCommitMessage] = useState('');
     const [isSaving, setIsSaving] = useState(false);
+    const [previewingVersionId, setPreviewingVersionId] = useState<string | null>(null);
+    const [restoringVersionId, setRestoringVersionId] = useState<string | null>(null);
 
     const handleSave = async () => {
+        if (isSaving) return;
         setIsSaving(true);
-        await saveVersion(commitMessage.trim() || '手动保存的版本快照');
-        setCommitMessage('');
-        setIsSaving(false);
+        try {
+            const saved = await saveVersion(normalizeVersionMessage(commitMessage));
+            if (saved) setCommitMessage('');
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const handleRestore = async (versionId: string) => {
-        const success = await restoreVersion(versionId, setNodes, setEdges);
-        if (success) {
-            onClose();
+        if (restoringVersionId) return;
+        setRestoringVersionId(versionId);
+        try {
+            const success = await restoreVersion(versionId, setNodes, setEdges);
+            if (success) onClose();
+        } finally {
+            setRestoringVersionId(null);
+        }
+    };
+
+    const handlePreview = async (versionId: string) => {
+        if (previewingVersionId) return;
+        if (previewVersion?.id === versionId) {
+            const previewBase = exitPreview();
+            if (previewBase) {
+                setNodes(previewBase.nodes);
+                setEdges(previewBase.edges);
+            }
+            return;
+        }
+        setPreviewingVersionId(versionId);
+        try {
+            await enterPreview(versionId, setNodes, setEdges, getNodes(), getEdges());
+        } finally {
+            setPreviewingVersionId(null);
         }
     };
 
@@ -59,7 +92,9 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
                 onClose();
             }}
             open={isOpen}
-            getContainer={() => document.getElementById('app-root-layout') || document.body}
+            rootClassName="version-history-drawer"
+            getContainer={() => document.body}
+            zIndex={2200}
             size="default"
             styles={{
                 header: { padding: '16px 20px', borderBottom: '1px solid #f0f0f0' },
@@ -70,14 +105,17 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
             {/* Create Snapshot Area */}
             <div style={{ padding: '20px', background: '#fafafa', borderBottom: '1px solid #f0f0f0' }}>
                 <Title level={5} style={{ marginTop: 0, fontSize: 14 }}>创建新快照</Title>
-                <div style={{ display: 'flex', gap: '8px' }}>
+                <div className="version-history-create-row">
                     <Input 
+                        aria-label="版本备注"
                         placeholder="版本备注 (例如：添加了订单模块)" 
                         value={commitMessage}
                         onChange={e => setCommitMessage(e.target.value)}
                         onPressEnter={handleSave}
+                        maxLength={VERSION_MESSAGE_MAX_LENGTH}
                     />
                     <Button 
+                        className="version-history-save"
                         type="primary" 
                         icon={<PlusOutlined />} 
                         onClick={handleSave}
@@ -120,6 +158,7 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
                 loading={loading}
                 itemLayout="horizontal"
                 dataSource={versions}
+                locale={{ emptyText: '暂无版本快照' }}
                 style={{ flex: 1, overflowY: 'auto' }}
                 renderItem={(item, index) => {
                     const isLatest = index === 0;
@@ -128,34 +167,42 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
                     return (
                         <List.Item
                             actions={[
+                                <Button
+                                    key="preview"
+                                    className="version-history-action"
+                                    type={isPreviewing ? 'primary' : 'default'}
+                                    aria-label={isPreviewing ? `退出预览：${item.message}` : `预览版本：${item.message}`}
+                                    icon={<EyeOutlined />}
+                                    loading={previewingVersionId === item.id}
+                                    onClick={() => void handlePreview(item.id)}
+                                >
+                                    {isPreviewing ? '退出预览' : '预览'}
+                                </Button>,
                                 <Popconfirm
                                     key="restore"
-                                    title="穿越确认"
-                                    description="恢复后，当前未保存的更改将丢失。确定穿越回这个版本吗？"
-                                    onConfirm={() => handleRestore(item.id)}
+                                    title="恢复版本"
+                                    description="恢复后，当前未保存的更改将丢失。确定恢复此版本吗？"
+                                    onConfirm={() => void handleRestore(item.id)}
+                                    okText="恢复"
+                                    cancelText="取消"
                                 >
                                     <Tooltip title="恢复此版本">
-                                        <Button type="text" size="small" icon={<UndoOutlined />} />
+                                        <Button
+                                            className="version-history-action"
+                                            aria-label={`恢复版本：${item.message}`}
+                                            type="text"
+                                            icon={<UndoOutlined />}
+                                            loading={restoringVersionId === item.id}
+                                        />
                                     </Tooltip>
                                 </Popconfirm>
                             ]}
+                            className="version-history-list-item"
                             style={{
                                 padding: '16px 20px',
-                                cursor: 'pointer',
                                 background: isPreviewing ? '#f0f5ff' : 'transparent',
                                 borderLeft: isPreviewing ? '3px solid #1677ff' : '3px solid transparent',
                                 transition: 'all 0.2s'
-                            }}
-                            onClick={() => {
-                                if (isPreviewing) {
-                                    const previewBase = exitPreview();
-                                    if (previewBase) {
-                                        setNodes(previewBase.nodes);
-                                        setEdges(previewBase.edges);
-                                    }
-                                } else {
-                                    enterPreview(item.id, setNodes, setEdges, getNodes(), getEdges());
-                                }
                             }}
                         >
                             <List.Item.Meta

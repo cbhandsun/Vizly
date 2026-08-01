@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { act, render } from '@testing-library/react';
-import { applyNodeChanges, type Node, type NodeChange } from '@xyflow/react';
+import { applyNodeChanges, type Edge, type Node, type NodeChange } from '@xyflow/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const baseReactFlowProps = vi.fn();
@@ -76,6 +76,61 @@ describe('FlowchartCanvasShell', () => {
       multiSelectionKeyCode: 'Shift',
     });
     expect(props).not.toHaveProperty('fitView');
+  });
+
+  it('removes every canvas mutation entry point when editing is disabled', () => {
+    const noop = vi.fn();
+    render(
+      <FlowchartCanvasShell
+        nodes={[{ id: 'A', position: { x: 0, y: 0 }, data: {}, selected: true }]}
+        displayEdges={[{ id: 'E', source: 'A', target: 'A', selected: true }]}
+        nodeTypes={{}}
+        onInit={noop}
+        onNodesChange={noop}
+        onEdgesChange={noop}
+        onConnect={noop}
+        onConnectStart={noop}
+        onConnectEnd={noop}
+        autoRoutingEnabled
+        enableSmartEdges
+        showMinimap={false}
+        showGrid
+        gridVariant={'dots' as never}
+        onNodeDrag={noop}
+        onNodeDragStart={noop}
+        onSelectionChange={noop}
+        onPaneClick={noop}
+        onPaneDoubleClick={noop}
+        selectionMode={'partial' as never}
+        onNodeContextMenu={noop}
+        onEdgeContextMenu={noop}
+        onPaneContextMenu={noop}
+        isSpacePressed={false}
+        isConnecting={false}
+        connectPreview={null}
+        connectionMode={'loose' as never}
+        isDragging={false}
+        editingEnabled={false}
+      />,
+    );
+
+    const props = baseReactFlowProps.mock.calls.at(-1)?.[0];
+    expect(props).toMatchObject({
+      nodesDraggable: false,
+      nodesConnectable: false,
+      elementsSelectable: false,
+      nodesFocusable: false,
+      edgesFocusable: false,
+      edgesReconnectable: false,
+      selectionOnDrag: false,
+      panOnDrag: true,
+    });
+    expect(props.onNodesChange).toBeUndefined();
+    expect(props.onEdgesChange).toBeUndefined();
+    expect(props.onConnect).toBeUndefined();
+    expect(props.onPaneDoubleClick).toBeUndefined();
+    expect((props.nodes as Node[])[0].selected).toBe(false);
+    expect((props.edges as Edge[])[0].selected).toBe(false);
   });
 
   it('keeps drag positions local and commits final multi-node positions once', () => {

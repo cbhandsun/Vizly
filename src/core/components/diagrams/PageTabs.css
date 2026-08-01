@@ -1,0 +1,97 @@
+.page-tabs {
+    position: absolute;
+    bottom: 0;
+    left: 20px;
+    z-index: 1010;
+    display: flex;
+    max-width: min(60vw, 600px);
+    align-items: center;
+    gap: 2px;
+    padding: 4px 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    background: var(--designer-panel-bg, rgba(255, 255, 255, 0.8));
+    border: 1px solid;
+    border-bottom: 0;
+    border-radius: 8px 8px 0 0;
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
+    backdrop-filter: var(--designer-blur, blur(20px) saturate(180%));
+    -webkit-backdrop-filter: var(--designer-blur, blur(20px) saturate(180%));
+}
+
+.page-tabs::-webkit-scrollbar { display: none; }
+
+.page-tabs__item {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    overflow: hidden;
+    border-radius: 6px;
+}
+
+.page-tabs__tab,
+.page-tabs__delete,
+.page-tabs__add {
+    min-height: var(--commercial-touch-target, 44px);
+    border: 0;
+    cursor: pointer;
+    transition: color 0.15s, background-color 0.15s;
+}
+
+.page-tabs__tab {
+    min-width: 60px;
+    padding: 4px 10px;
+    color: var(--page-tab-text-color);
+    font-weight: 400;
+    font-size: 12px;
+    white-space: nowrap;
+    background: transparent;
+    user-select: none;
+}
+
+.page-tabs__tab:hover,
+.page-tabs__add:hover {
+    color: var(--page-tab-active-color);
+    background: var(--page-tab-hover-bg);
+}
+
+.page-tabs__tab--active {
+    color: var(--page-tab-active-color);
+    font-weight: 600;
+    background: var(--page-tab-active-bg);
+}
+
+.page-tabs__delete,
+.page-tabs__add {
+    display: grid;
+    width: var(--commercial-touch-target, 44px);
+    min-width: var(--commercial-touch-target, 44px);
+    height: var(--commercial-touch-target, 44px);
+    padding: 0;
+    place-items: center;
+    color: var(--page-tab-muted-color);
+    background: transparent;
+}
+
+.page-tabs__delete:hover {
+    color: var(--page-tab-error-color);
+    background: color-mix(in srgb, var(--page-tab-error-color) 8%, transparent);
+}
+
+.page-tabs__rename {
+    width: 96px;
+    height: 32px;
+    margin: 6px;
+    font-size: 12px;
+}
+
+@media (max-width: 768px) {
+    .page-tabs {
+        right: 8px;
+        bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+        left: 8px;
+        max-width: none;
+        border-bottom: 1px solid;
+        border-radius: 8px;
+    }
+}

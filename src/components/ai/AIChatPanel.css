@@ -159,6 +159,13 @@
     z-index: 10;
 }
 
+.ai-chat-inline-action.ant-btn {
+    width: var(--commercial-touch-target, 44px);
+    min-width: var(--commercial-touch-target, 44px);
+    height: var(--commercial-touch-target, 44px);
+    padding: 0;
+}
+
 /* --- Messages Area --- */
 .ai-chat-messages {
     flex: 1;
@@ -427,8 +434,11 @@
 
 .ai-chat-send-btn {
     border-radius: 12px;
-    height: 40px;
-    width: 40px;
+    min-width: var(--commercial-touch-target, 44px) !important;
+    width: var(--commercial-touch-target, 44px) !important;
+    min-height: var(--commercial-touch-target, 44px) !important;
+    height: var(--commercial-touch-target, 44px) !important;
+    flex: 0 0 auto;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -766,6 +776,11 @@
 
 /* --- Voice Button (Beta) --- */
 .voice-btn {
+    min-width: var(--commercial-touch-target, 44px) !important;
+    width: var(--commercial-touch-target, 44px) !important;
+    min-height: var(--commercial-touch-target, 44px) !important;
+    height: var(--commercial-touch-target, 44px) !important;
+    flex: 0 0 auto;
     border: none !important;
     background: transparent !important;
     color: #94a3b8;

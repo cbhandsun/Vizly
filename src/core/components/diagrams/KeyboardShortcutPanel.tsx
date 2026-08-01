@@ -1,5 +1,7 @@
 import React from 'react';
-import { Modal, theme } from 'antd';
+import { Modal, Space, theme } from 'antd';
+import { FaKeyboard } from 'react-icons/fa';
+import './KeyboardShortcutPanel.css';
 
 interface KeyboardShortcutPanelProps {
     visible: boolean;
@@ -93,12 +95,13 @@ export const KeyboardShortcutPanel: React.FC<KeyboardShortcutPanelProps> = ({ vi
 
     return (
         <Modal
-            title="⌨️ 键盘快捷键"
+            title={<Space><FaKeyboard aria-hidden="true" />键盘快捷键</Space>}
             open={visible}
             onCancel={onClose}
             footer={null}
             width={520}
             centered
+            rootClassName="keyboard-shortcut-panel"
             styles={{
                 body: { maxHeight: '60vh', overflowY: 'auto', padding: '12px 0' },
             }}

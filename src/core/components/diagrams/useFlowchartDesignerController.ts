@@ -1,12 +1,13 @@
 import React, { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import { message, notification } from 'antd';
-import { Node, Edge, ReactFlowInstance, addEdge, type Connection } from '@xyflow/react';
+import { ReactFlowInstance, addEdge, type Connection, type Edge } from '@xyflow/react';
 
 import { useDesignerCanvasState } from './hooks/useDesignerCanvasState';
 import { useDesignerInteractions } from './hooks/useDesignerInteractions';
 import { useDesignerEventHandlers } from './hooks/useDesignerEventHandlers';
 import { useDesignerSystemSync } from './hooks/useDesignerSystemSync';
 import { useDiagramScopedSelection } from './hooks/useDiagramScopedSelection';
+import { useCanonicalSelectionChange } from './hooks/useCanonicalSelectionChange';
 import { computeFlowchartCollapsedStateHash } from './flowchartCollapsedState';
 import { DiagramComponentProps } from '../../types/diagram-components';
 import { useTranslation } from 'react-i18next';
@@ -14,7 +15,7 @@ import { useComponentPerformance, useInteractionPerformance } from '../../hooks/
 import { useResponsive } from '../../../hooks/useResponsive';
 import { useDiagramCollaboration } from '../../hooks/useDiagramCollaboration';
 import { useTopologyLinter } from '../../hooks/useTopologyLinter';
-import { useDiagramStore, useDiagramStore as useDiagramStoreStatic } from '../../store/useDiagramStore';
+import { useDiagramStore } from '../../store/useDiagramStore';
 
 import { useMobileInteractions } from '../../hooks/useMobileInteractions';
 import { useCollapsibleGroups } from './hooks/useCollapsibleGroups';
@@ -73,6 +74,7 @@ export const useFlowchartDesignerController = ({
     onAiTabIntercept,
     topActionArea,
     isVersionHistoryOpen = false,
+    onOpenVersionHistory,
     onVersionHistoryClose,
     renderVersionHistoryPanel,
     loadLayoutPresetMap,
@@ -369,7 +371,7 @@ export const useFlowchartDesignerController = ({
         selectedNodes, selectedEdges,
         takeSnapshot, undo, redo,
         reactFlowInstance, reactFlowWrapper,
-        isDragging, pluginCtx, activePlugin,
+        isDragging, editingEnabled: !isReadonly && !presentationActive, pluginCtx, activePlugin,
         messageApi, notificationApi,
         layers, setActiveLayerId, toggleVisibility,
         canAlign, canDistribute, handleAlign, handleDistribute,
@@ -516,13 +518,12 @@ export const useFlowchartDesignerController = ({
         },
     }), [t, messageApi, activePlugin, businessData?.id, id, setNodes, setEdges, handleFitView]);
 
-    const onSelectionChange = useCallback(({ nodes: selNodes, edges: selEdges }: { nodes: Node[]; edges: Edge[] }) => {
-        setSelectedNodes(selNodes);
-        setSelectedEdges(selEdges);
-        // 同步状态给 zustand store（静态 import，避免异步滞后导致 HoverToolbarsOverlay 读到旧选区）
-        useDiagramStoreStatic.getState().setSelectedNodes(selNodes);
-        useDiagramStoreStatic.getState().setSelectedEdges(selEdges);
-    }, [setSelectedNodes, setSelectedEdges]);
+    const onSelectionChange = useCanonicalSelectionChange({
+        nodesRef,
+        edgesRef,
+        setSelectedNodes,
+        setSelectedEdges,
+    });
 
     const onPaneDoubleClick = useCallback((event: React.MouseEvent | MouseEvent) => {
         if (!reactFlowInstance) return;
@@ -676,7 +677,7 @@ export const useFlowchartDesignerController = ({
         lastDomainDirection, lastDomainStrategy, lastNodeLayout, layerSyncedNodes, layers, leftDrawerOpen, leftDrawerWidth, messageContextHolder,
         mobilePropertyDrawerVisible, multiPage, nodes, nodesRef, notificationContextHolder, onAiTabIntercept, onCloudSave, onConnectStart, onDirectSave,
         onDragOver, onDrop, onEdgeContextMenu, onEdgesChangeWithLock, onNodeContextMenu, onNodeDrag, onNodeDragStop, onNodesChangeWithLock, onSmartNodeDrag,
-        onOpenSettings, onOpenShareDialog, onPaneContextMenu, onPaneDoubleClick, onPaneMouseLeave, onPaneMouseMove,
+        onOpenSettings, onOpenShareDialog, onOpenVersionHistory, onPaneContextMenu, onPaneDoubleClick, onPaneMouseLeave, onPaneMouseMove,
         onSelectionChange, onVersionHistoryClose, onboardingDismissed, pastEntries, pasteStyle, performanceMode, pluginCtx, pluginId, pluginManagerVisible,
         presentationActive, presentationSlides, preset, quickAddMenu, reactFlowInstance, reactFlowWrapper, redo, renameLayer, renameTemplate, renderAIChatPanel,
         renderAIConfigModal, renderShareDialog, renderThemeSelector, renderVersionHistoryPanel, reorderLayers, rightSidebarWidth, saveState: displayedSaveState, saveTarget: displayedSaveTarget, selectedEdges, selectedNodes, setActiveLayerId,

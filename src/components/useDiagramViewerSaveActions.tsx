@@ -35,6 +35,11 @@ const getStorageProvider = async (providerName: 's3' | 'supabase') => {
     return unifiedStorage.getProvider(providerName);
 };
 
+const getSaveTargetLabel = (target: SaveTarget, t: TFunction): string => {
+    if (target === 'local') return t('common.local');
+    return target === 's3' ? 'S3' : 'Supabase';
+};
+
 export function useDiagramViewerSaveActions({
     selectedDiagramId,
     t,
@@ -47,16 +52,23 @@ export function useDiagramViewerSaveActions({
             return;
         }
 
-        const defaultName = bridge.metadata?.title || bridge.name || selectedDiagramId;
+        const defaultName = bridge.metadata?.title || bridge.name || t('diagramViewer.saveAs.defaultName');
+        const targetLabel = getSaveTargetLabel(target, t);
         let newName = String(defaultName);
         appModal.confirm({
-            title: t('diagramViewer.saveAs.title', { target: target.toUpperCase() }),
+            title: t('diagramViewer.saveAs.title', { target: targetLabel }),
             content: (
                 <div style={{ marginTop: 16 }}>
                     <p style={{ marginBottom: 8, color: '#666' }}>{t('diagramViewer.saveAs.namePlaceholder')}</p>
-                    <Input defaultValue={newName} onChange={event => { newName = event.target.value; }} />
+                    <Input
+                        aria-label={t('diagramViewer.saveAs.nameLabel')}
+                        defaultValue={newName}
+                        onChange={event => { newName = event.target.value; }}
+                    />
                 </div>
             ),
+            okText: t('common.confirm'),
+            cancelText: t('common.cancel'),
             onOk: async () => {
                 const normalizedName = normalizeDiagramSaveAsName(newName);
                 if (!normalizedName) {
@@ -64,7 +76,7 @@ export function useDiagramViewerSaveActions({
                     return;
                 }
 
-                const hideLoading = appMessage.loading(t('diagramViewer.saveAs.saving', { target }), 0);
+                const hideLoading = appMessage.loading(t('diagramViewer.saveAs.saving', { target: targetLabel }), 0);
                 try {
                     const dataToSave = {
                         ...bridge,
@@ -106,8 +118,12 @@ export function useDiagramViewerSaveActions({
     const handleDirectSave = useCallback(async () => {
         const bridge = getFlowDataBridge(selectedDiagramId);
         const cloudMeta = bridge?.metadata?.cloud;
-        if (!bridge || !cloudMeta?.provider || !cloudMeta.title) {
-            await handleSaveTo('supabase');
+        if (!bridge) {
+            appMessage.error(t('diagramViewer.canvasNotFound'));
+            return;
+        }
+        if (!cloudMeta?.provider || !cloudMeta.title) {
+            appMessage.info(t('diagramViewer.directSave.locationRequired'));
             return;
         }
 
@@ -127,7 +143,7 @@ export function useDiagramViewerSaveActions({
         } finally {
             hideLoading();
         }
-    }, [handleSaveTo, selectedDiagramId, t]);
+    }, [selectedDiagramId, t]);
 
     return { handleSaveTo, handleDirectSave };
 }

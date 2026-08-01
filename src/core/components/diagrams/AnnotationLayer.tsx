@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { theme, Input, Button, Tooltip, Popconfirm } from 'antd';
 import { CheckOutlined, DeleteOutlined, CloseOutlined } from '@ant-design/icons';
 import type { CommentThread as Annotation } from '../../store/useDiagramStore';
 import { useDiagramStore } from '../../store/useDiagramStore';
+import { resolveAnnotationEditorPosition } from './annotationEditorPosition';
 
 const { TextArea } = Input;
 
@@ -28,7 +30,16 @@ export const AnnotationLayer: React.FC<AnnotationLayerProps> = ({
     const globalActiveId = useDiagramStore(state => state.activeCommentId);
     const [activeId, setActiveId] = useState<string | null>(null);
     const [editText, setEditText] = useState('');
-    const [pendingPos, setPendingPos] = useState<{ x: number; y: number } | null>(null);
+    const [pendingPos, setPendingPos] = useState<{
+        canvasX: number;
+        canvasY: number;
+        clientX: number;
+        clientY: number;
+    } | null>(null);
+    const [viewportSize, setViewportSize] = useState(() => ({
+        width: typeof window === 'undefined' ? 320 : window.innerWidth,
+        height: typeof window === 'undefined' ? 568 : window.innerHeight,
+    }));
 
     // 批注模式下点击画布空白处创建新批注
     const handleCanvasClick = useCallback((e: React.MouseEvent) => {
@@ -44,7 +55,7 @@ export const AnnotationLayer: React.FC<AnnotationLayerProps> = ({
         // nativeEvent.offsetX/Y 不可靠，用 client 坐标手动计算
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
-        setPendingPos({ x, y });
+        setPendingPos({ canvasX: x, canvasY: y, clientX: e.clientX, clientY: e.clientY });
         setEditText('');
     }, [annotationMode]);
 
@@ -54,7 +65,7 @@ export const AnnotationLayer: React.FC<AnnotationLayerProps> = ({
             setPendingPos(null);
             return;
         }
-        onAdd(pendingPos.x, pendingPos.y, editText.trim());
+        onAdd(pendingPos.canvasX, pendingPos.canvasY, editText.trim());
         setPendingPos(null);
         setEditText('');
     }, [pendingPos, editText, onAdd]);
@@ -89,6 +100,13 @@ export const AnnotationLayer: React.FC<AnnotationLayerProps> = ({
         return () => window.clearTimeout(timer);
     }, [activePageId]);
 
+    useEffect(() => {
+        if (!pendingPos) return;
+        const handleResize = () => setViewportSize({ width: window.innerWidth, height: window.innerHeight });
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, [pendingPos]);
+
     // 没有批注、不在批注模式且无待处理状态时，完全不渲染
     if (!annotationMode && annotations.length === 0 && !pendingPos && !activeId) {
         return null;
@@ -119,15 +137,19 @@ export const AnnotationLayer: React.FC<AnnotationLayerProps> = ({
     ));
 
     // 新建批注输入框
-    const pendingEditor = pendingPos && (
+    const editorPosition = pendingPos && resolveAnnotationEditorPosition(
+        { x: pendingPos.clientX, y: pendingPos.clientY },
+        viewportSize,
+    );
+    const pendingEditor = pendingPos && editorPosition && createPortal(
         <div
+            data-testid="pending-annotation-editor"
             style={{
-                position: 'absolute',
-                left: pendingPos.x,
-                top: pendingPos.y,
-                transform: 'translate(-8px, -8px)',
+                position: 'fixed',
+                left: editorPosition.x,
+                top: editorPosition.y,
                 pointerEvents: 'auto',
-                zIndex: 10,
+                zIndex: 2200,
             }}
             onClick={e => e.stopPropagation()}
         >
@@ -139,7 +161,8 @@ export const AnnotationLayer: React.FC<AnnotationLayerProps> = ({
                 token={token}
                 autoFocus
             />
-        </div>
+        </div>,
+        document.body,
     );
 
     // 批注模式：渲染全画布覆盖层（捕获点击以创建新批注）
@@ -208,37 +231,38 @@ const AnnotationPin: React.FC<{
                         aria-label={`查看批注：${text || '空批注'}`}
                         onClick={onOpen}
                         style={{
+                            width: 44,
+                            height: 44,
+                            border: 0,
+                            background: 'transparent',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: 0,
+                        }}
+                    >
+                        <span style={{
                             width: 24,
                             height: 24,
                             borderRadius: '50% 50% 50% 0',
                             background: resolved ? `${color}60` : color,
                             border: `2px solid ${isHighlighted ? '#f59e0b' : (resolved ? '#9ca3af' : 'white')}`,
                             boxShadow: isHighlighted ? '0 0 15px #f59e0b' : '0 2px 8px rgba(0,0,0,0.2)',
-                            cursor: 'pointer',
                             transform: 'rotate(-45deg)',
                             animation: isHighlighted ? 'pulse-highlight 1.5s infinite alternate' : 'none',
-                            transition: 'transform 0.2s, box-shadow 0.2s',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            padding: 0,
-                        }}
-                        onMouseEnter={e => {
-                            e.currentTarget.style.transform = 'rotate(-45deg) scale(1.2)';
-                            e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.3)';
-                        }}
-                        onMouseLeave={e => {
-                            e.currentTarget.style.transform = 'rotate(-45deg)';
-                            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)';
-                        }}
-                    >
-                        {resolved ? (
-                            <CheckOutlined style={{ transform: 'rotate(45deg)', fontSize: 10, color: '#fff' }} />
-                        ) : (
-                            <div style={{ transform: 'rotate(45deg)', fontSize: 9, color: '#fff', fontWeight: 800 }}>
-                                {(annotation.authorName || '?').charAt(0).toUpperCase()}
-                            </div>
-                        )}
+                        }}>
+                            {resolved ? (
+                                <CheckOutlined style={{ transform: 'rotate(45deg)', fontSize: 10, color: '#fff' }} />
+                            ) : (
+                                <span style={{ transform: 'rotate(45deg)', fontSize: 9, color: '#fff', fontWeight: 800 }}>
+                                    {(annotation.authorName || '?').charAt(0).toUpperCase()}
+                                </span>
+                            )}
+                        </span>
                     </button>
                 </Tooltip>
             )}
@@ -250,7 +274,7 @@ const AnnotationPin: React.FC<{
                     borderRadius: 8,
                     boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
                     border: `2px solid ${color}`,
-                    width: 240,
+                    width: 'min(300px, calc(100vw - 24px))',
                     overflow: 'hidden',
                 }}>
                     {/* 顶部色条 + 操作按钮 */}
@@ -262,7 +286,7 @@ const AnnotationPin: React.FC<{
                         justifyContent: 'space-between',
                     }}>
                         {/* 颜色选择 */}
-                        <div style={{ display: 'flex', gap: 3 }}>
+                        <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
                             {colors.map(c => (
                                 <button
                                     type="button"
@@ -271,8 +295,8 @@ const AnnotationPin: React.FC<{
                                     aria-pressed={c === color}
                                     onClick={() => onChangeColor(c)}
                                     style={{
-                                        width: 14,
-                                        height: 14,
+                                        width: 44,
+                                        height: 44,
                                         borderRadius: '50%',
                                         background: c,
                                         border: c === color ? '2px solid white' : '1px solid rgba(255,255,255,0.5)',
@@ -284,11 +308,10 @@ const AnnotationPin: React.FC<{
                         </div>
                         <Button
                             type="text"
-                            size="small"
                             aria-label="关闭批注编辑器"
                             icon={<CloseOutlined style={{ fontSize: 10, color: '#fff' }} />}
                             onClick={onClose}
-                            style={{ width: 20, height: 20, minWidth: 20 }}
+                            style={{ width: 44, height: 44, minWidth: 44 }}
                         />
                     </div>
 
@@ -311,25 +334,23 @@ const AnnotationPin: React.FC<{
                             <div style={{ display: 'flex', gap: 4 }}>
                                 <Tooltip title={resolved ? '标记未解决' : '标记已解决'}>
                                     <Button
-                                        size="small"
                                         aria-label={resolved ? '标记批注为未解决' : '标记批注为已解决'}
                                         type={resolved ? 'primary' : 'default'}
                                         icon={<CheckOutlined style={{ fontSize: 11 }} />}
                                         onClick={onToggleResolved}
-                                        style={{ width: 24, height: 24, minWidth: 24 }}
+                                        style={{ width: 44, height: 44, minWidth: 44 }}
                                     />
                                 </Tooltip>
                                 <Popconfirm title="删除此批注？" onConfirm={onDelete} okText="删除" cancelText="取消">
                                     <Button
-                                        size="small"
                                         aria-label="删除批注"
                                         danger
                                         icon={<DeleteOutlined style={{ fontSize: 11 }} />}
-                                        style={{ width: 24, height: 24, minWidth: 24 }}
+                                        style={{ width: 44, height: 44, minWidth: 44 }}
                                     />
                                 </Popconfirm>
                             </div>
-                            <Button size="small" type="primary" onClick={onSave}>
+                            <Button type="primary" onClick={onSave} style={{ minWidth: 64, minHeight: 44 }}>
                                 保存
                             </Button>
                         </div>
@@ -358,7 +379,7 @@ const AnnotationEditor: React.FC<{
         borderRadius: 8,
         boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
         border: `2px solid #facc15`,
-        width: 220,
+        width: 'min(280px, calc(100vw - 24px))',
         padding: 8,
         animation: 'toolbarFadeIn 0.15s ease-out',
     }}>
@@ -380,8 +401,8 @@ const AnnotationEditor: React.FC<{
             }}
         />
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 4 }}>
-            <Button size="small" onClick={onCancel}>取消</Button>
-            <Button size="small" type="primary" onClick={onSubmit} disabled={!text.trim()}>添加</Button>
+            <Button onClick={onCancel} style={{ minWidth: 64, minHeight: 44 }}>取消</Button>
+            <Button type="primary" onClick={onSubmit} disabled={!text.trim()} style={{ minWidth: 64, minHeight: 44 }}>添加</Button>
         </div>
     </div>
 );

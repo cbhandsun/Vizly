@@ -11,7 +11,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    width: 44px;
+    width: var(--commercial-touch-target, 44px);
     height: max-content;
     padding: 8px 0;
     gap: 4px;
@@ -28,8 +28,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
+    width: var(--commercial-touch-target, 44px);
+    height: var(--commercial-touch-target, 44px);
     border-radius: 6px;
     border: none;
     background: transparent;
@@ -93,7 +93,7 @@
 .side-drawer {
     position: absolute;
     top: 80px;
-    left: 68px; /* offset from the icon rail (16 + 44 + 8) */
+    left: calc(24px + var(--commercial-touch-target, 44px));
     max-height: calc(100% - 96px); /* padding from bottom */
     /* width is set dynamically via inline style (240-400px) */
     min-width: 240px;
@@ -249,13 +249,13 @@
     .icon-rail {
         top: 88px;
         left: 8px;
-        width: 52px;
+        width: var(--commercial-touch-target, 44px);
         padding: 6px 0;
     }
 
     .icon-rail-btn {
-        width: 44px;
-        height: 44px;
+        width: var(--commercial-touch-target, 44px);
+        height: var(--commercial-touch-target, 44px);
         border-radius: 10px;
         font-size: 16px;
     }
@@ -266,8 +266,12 @@
     }
 
     .side-drawer-header .ant-btn {
-        min-width: 40px;
-        min-height: 40px;
+        min-width: var(--commercial-touch-target, 44px);
+        min-height: var(--commercial-touch-target, 44px);
+    }
+
+    .side-drawer {
+        left: calc(16px + var(--commercial-touch-target, 44px));
     }
 
     .side-drawer-body {

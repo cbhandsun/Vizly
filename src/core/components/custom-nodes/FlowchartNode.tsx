@@ -8,6 +8,7 @@ import type { FlowchartNodeData } from './hooks/useFlowchartNodeStyleResolution'
 import { FaChevronUp, FaChevronRight, FaChevronDown, FaChevronLeft } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 import { sanitizeInlineHtml } from '../../utils/sanitizeHtml';
+import { useDiagramEditingAllowed } from '../diagrams/DiagramEditingContext';
 import './FlowchartNode.css';
 
 export type FlowchartNodeProps = NodeProps<Node<FlowchartNodeData>>;
@@ -17,6 +18,7 @@ const FlowchartNode = ({ data, selected, id }: FlowchartNodeProps) => {
     const _isConnecting = useStore((s) => s.connection.inProgress);
     const nodeData = useStore(s => s.nodeLookup.get(id));
     const viewportZoom = useStore(s => s.transform[2]);
+    const editingAllowed = useDiagramEditingAllowed();
 
     const nodeWidth = nodeData?.measured?.width || nodeData?.width || 150;
     const nodeHeight = nodeData?.measured?.height || nodeData?.height || 80;
@@ -29,7 +31,7 @@ const FlowchartNode = ({ data, selected, id }: FlowchartNodeProps) => {
         editStartRef,
         handleUpdateData,
         handleQuickClone
-    } = useFlowchartNodeInteractions(id as string, data, selected);
+    } = useFlowchartNodeInteractions(id as string, data, selected, editingAllowed);
 
     const {
         preset,
@@ -70,7 +72,7 @@ const FlowchartNode = ({ data, selected, id }: FlowchartNodeProps) => {
                 maxWidth={600}
                 maxHeight={400}
                 color="#3b82f6"
-                isVisible={selected}
+                isVisible={editingAllowed && selected}
                 handleClassName="flowchart-resize-handle"
                 lineClassName="flowchart-resize-line"
             />
@@ -106,7 +108,7 @@ const FlowchartNode = ({ data, selected, id }: FlowchartNodeProps) => {
                     const raw = data.description || data.label || '';
                     const safeContentHtml = sanitizeInlineHtml(raw);
 
-                    if (data.isEditing) {
+                    if (editingAllowed && data.isEditing) {
                         return (
                             <EditableLabel
                                 value={safeContentHtml}
@@ -149,6 +151,7 @@ const FlowchartNode = ({ data, selected, id }: FlowchartNodeProps) => {
                     return (
                         <div
                             onDoubleClick={(e) => {
+                                if (!editingAllowed) return;
                                 e.stopPropagation();
                                 handleUpdateData({ isEditing: true });
                             }}
@@ -177,7 +180,7 @@ const FlowchartNode = ({ data, selected, id }: FlowchartNodeProps) => {
                 const IconMap = { top: FaChevronUp, right: FaChevronRight, bottom: FaChevronDown, left: FaChevronLeft };
                 const shortIdMap = { top: 't', right: 'r', bottom: 'b', left: 'l' } as const;
                 const Icon = IconMap[dir];
-                const showQuickBtn = (isHovered || selected) && !data.locked;
+                const showQuickBtn = editingAllowed && (isHovered || selected) && !data.locked;
                 return (
                     <React.Fragment key={dir}>
                         <Handle
@@ -185,8 +188,8 @@ const FlowchartNode = ({ data, selected, id }: FlowchartNodeProps) => {
                             position={posMap[dir]}
                             id={dir}
                             className={`flowchart-handle flowchart-handle-bidirectional${showQuickBtn ? ' has-quick-btn' : ''}`}
-                            isConnectableStart={true}
-                            isConnectableEnd={true}
+                            isConnectableStart={editingAllowed}
+                            isConnectableEnd={editingAllowed}
                         >
                             {showQuickBtn && (
                                 <div
@@ -231,8 +234,8 @@ const FlowchartNode = ({ data, selected, id }: FlowchartNodeProps) => {
                             position={posMap[dir]}
                             id={shortIdMap[dir]}
                             className="flowchart-handle flowchart-handle-bidirectional flowchart-handle-alias"
-                            isConnectableStart={true}
-                            isConnectableEnd={true}
+                            isConnectableStart={editingAllowed}
+                            isConnectableEnd={editingAllowed}
                         />
                         <Handle
                             type="target"
@@ -240,7 +243,7 @@ const FlowchartNode = ({ data, selected, id }: FlowchartNodeProps) => {
                             id={dir}
                             className="flowchart-handle flowchart-handle-bidirectional flowchart-handle-target-shadow"
                             isConnectableStart={false}
-                            isConnectableEnd={true}
+                            isConnectableEnd={editingAllowed}
                             style={{ opacity: 0, pointerEvents: 'none' }}
                         />
                         <Handle
@@ -249,7 +252,7 @@ const FlowchartNode = ({ data, selected, id }: FlowchartNodeProps) => {
                             id={shortIdMap[dir]}
                             className="flowchart-handle flowchart-handle-bidirectional flowchart-handle-alias flowchart-handle-target-shadow"
                             isConnectableStart={false}
-                            isConnectableEnd={true}
+                            isConnectableEnd={editingAllowed}
                             style={{ opacity: 0, pointerEvents: 'none' }}
                         />
                     </React.Fragment>

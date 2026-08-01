@@ -29,6 +29,42 @@ export interface DiagramFitViewport {
   zoom: number;
 }
 
+export interface DiagramFitLayout {
+  safeArea: DiagramFitSafeArea;
+  padding: number;
+}
+
+export interface DiagramFitLayoutInput {
+  viewportWidth: number;
+  leftSidebarOffset: unknown;
+  rightSidebarOffset: unknown;
+}
+
+const MOBILE_DIAGRAM_BREAKPOINT = 768;
+
+export const resolveDiagramFitLayout = ({
+  viewportWidth,
+  leftSidebarOffset,
+  rightSidebarOffset,
+}: DiagramFitLayoutInput): DiagramFitLayout => {
+  if (Number.isFinite(viewportWidth) && viewportWidth <= MOBILE_DIAGRAM_BREAKPOINT) {
+    return {
+      safeArea: { top: 104, right: 20, bottom: 148, left: 20 },
+      padding: 32,
+    };
+  }
+
+  return {
+    safeArea: {
+      top: 84,
+      right: coerceDiagramSidebarOffset(rightSidebarOffset),
+      bottom: 64,
+      left: coerceDiagramSidebarOffset(leftSidebarOffset, 76),
+    },
+    padding: 8,
+  };
+};
+
 export const coerceDiagramSidebarOffset = (
   value: unknown,
   fallback = DEFAULT_DIAGRAM_RIGHT_SIDEBAR_OFFSET,

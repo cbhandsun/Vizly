@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { readFileSync } from 'node:fs';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -29,5 +30,16 @@ describe('PresentationMode', () => {
         expect(screen.getByText('详情')).toBeTruthy();
         fireEvent.keyDown(window, { key: 'Escape' });
         expect(onExit).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps exit, navigation, and slide targets touch sized', () => {
+        const css = readFileSync(
+            'src/core/components/presentation/PresentationMode.css',
+            'utf8',
+        );
+
+        expect(css).toMatch(/\.presentation-exit[\s\S]*?width: var\(--commercial-touch-target, 44px\);[\s\S]*?height: var\(--commercial-touch-target, 44px\);/);
+        expect(css).toMatch(/\.presentation-nav-btn[\s\S]*?width: var\(--commercial-touch-target, 44px\);[\s\S]*?height: var\(--commercial-touch-target, 44px\);/);
+        expect(css).toMatch(/\.presentation-dot[\s\S]*?width: var\(--commercial-touch-target, 44px\);[\s\S]*?height: var\(--commercial-touch-target, 44px\);/);
     });
 });

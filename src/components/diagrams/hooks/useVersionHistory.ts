@@ -36,15 +36,15 @@ export function useVersionHistory(diagramId: string) {
         }
     }, [diagramId]);
 
-    const saveVersion = useCallback(async (commitMessage: string) => {
-        if (!diagramId) return;
+    const saveVersion = useCallback(async (commitMessage: string): Promise<boolean> => {
+        if (!diagramId) return false;
 
         try {
             const unifiedStorage = await loadUnifiedStorage();
             const bridge = getStandardFlowDataBridge(diagramId);
             if (!bridge) {
                 appMessage.error('无法提取当前图表数据');
-                return;
+                return false;
             }
 
             const snap = await tryAttachDiagramSnapshot(bridge, diagramId);
@@ -55,10 +55,12 @@ export function useVersionHistory(diagramId: string) {
             // Add new version to list without refetching all
             setVersions(prev => [newVersion, ...prev]);
             appMessage.success("已保存快照");
+            return true;
             
         } catch (error) {
             logVersionHistorySaveFailure(error);
             appMessage.error("保存版本失败");
+            return false;
         }
     }, [diagramId]);
 

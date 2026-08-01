@@ -1,0 +1,25 @@
+.commercial-shortcuts-modal .ant-modal {
+  max-width: calc(100vw - 16px);
+}
+
+.commercial-shortcuts-modal .ant-modal-close {
+  width: var(--commercial-touch-target, 44px);
+  height: var(--commercial-touch-target, 44px);
+  inset-block-start: 8px;
+  inset-inline-end: 8px;
+}
+
+.commercial-shortcuts-modal .ant-modal-content {
+  max-height: calc(100dvh - 32px);
+  overflow: hidden;
+}
+
+.commercial-shortcuts-modal .ant-modal-body {
+  max-height: calc(100dvh - 112px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.commercial-shortcuts-modal .ant-table-wrapper {
+  overflow-x: auto;
+}

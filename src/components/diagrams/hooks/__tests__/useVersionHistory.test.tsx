@@ -129,4 +129,42 @@ describe('useVersionHistory', () => {
         expect(setEdges).toHaveBeenLastCalledWith(previewEdges);
         expect(result.current.exitPreview()).toBeNull();
     });
+
+    it('returns success and appends a saved snapshot', async () => {
+        storageMocks.saveVersion.mockResolvedValue(makeVersion());
+        const bridge = { id: 'diagram-1', nodes: originalNodes, edges: originalEdges };
+        (window as unknown as { __flowDataBridge: Record<string, typeof bridge> }).__flowDataBridge = { 'diagram-1': bridge };
+        const { result } = renderHook(() => useVersionHistory('diagram-1'));
+        await waitFor(() => expect(storageMocks.listVersions).toHaveBeenCalled());
+
+        let saved = false;
+        await act(async () => {
+            saved = await result.current.saveVersion('发布候选版本');
+        });
+
+        expect(saved).toBe(true);
+        expect(storageMocks.saveVersion).toHaveBeenCalledWith(
+            'diagram-1',
+            expect.objectContaining({ id: 'diagram-1', nodes: expect.any(Array), edges: [] }),
+            '发布候选版本',
+        );
+        expect(result.current.versions[0]?.id).toBe('version-1');
+    });
+
+    it('returns failure when persistence rejects', async () => {
+        storageMocks.saveVersion.mockRejectedValue(new Error('storage unavailable'));
+        const bridge = { id: 'diagram-1', nodes: originalNodes, edges: originalEdges };
+        (window as unknown as { __flowDataBridge: Record<string, typeof bridge> }).__flowDataBridge = { 'diagram-1': bridge };
+        const { result } = renderHook(() => useVersionHistory('diagram-1'));
+        await waitFor(() => expect(storageMocks.listVersions).toHaveBeenCalled());
+
+        let saved = true;
+        await act(async () => {
+            saved = await result.current.saveVersion('失败版本');
+        });
+
+        expect(saved).toBe(false);
+        expect(messageMocks.error).toHaveBeenCalledWith('保存版本失败');
+        expect(result.current.versions).toEqual([]);
+    });
 });

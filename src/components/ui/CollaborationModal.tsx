@@ -3,6 +3,11 @@ import { Modal, Input, Button, List, Typography, Badge, Avatar } from 'antd';
 import { CopyOutlined, TeamOutlined } from '@ant-design/icons';
 import { buildCollaborationShareUrl } from './collaborationUrl';
 import type { ActiveCollaborator } from '../diagrams/collaboration/YjsProviderHooks';
+import {
+    COMMERCIAL_VIEWPORT_MODAL_CLASS,
+    COMMERCIAL_VIEWPORT_MODAL_Z_INDEX,
+    getViewportOverlayContainer,
+} from '@/core/components/ui/viewportOverlayPortal';
 
 export interface CollaborationModalProps {
     open: boolean;
@@ -41,7 +46,9 @@ export const CollaborationModal: React.FC<CollaborationModalProps> = ({
             }
             open={open}
             onCancel={onClose}
-            getContainer={() => document.getElementById('app-root-layout') || document.body}
+            getContainer={getViewportOverlayContainer}
+            rootClassName={COMMERCIAL_VIEWPORT_MODAL_CLASS}
+            zIndex={COMMERCIAL_VIEWPORT_MODAL_Z_INDEX}
             footer={null}
             destroyOnHidden
             width={480}

@@ -3,6 +3,7 @@ import Modal from 'antd/es/modal';
 import Typography from 'antd/es/typography';
 import Table from 'antd/es/table';
 import { useTranslation } from 'react-i18next';
+import '../ui/ShortcutsHelpModal.css';
 
 type ShortcutRow = {
   key: string;
@@ -15,7 +16,7 @@ export const FlowchartShortcutsHelpModal: React.FC<{
   open: boolean;
   onClose: () => void;
   getContainer?: () => HTMLElement;
-}> = ({ open, onClose, getContainer }) => {
+}> = ({ open, onClose }) => {
   const { t } = useTranslation();
   const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/i.test(navigator.platform || '');
   const mod = isMac ? '⌘' : 'Ctrl';
@@ -48,7 +49,8 @@ export const FlowchartShortcutsHelpModal: React.FC<{
       title={t('designer.flowchartShortcuts.title')}
       width={760}
       centered
-      getContainer={getContainer}
+      getContainer={() => document.body}
+      rootClassName="commercial-shortcuts-modal"
     >
       <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
         {t('designer.flowchartShortcuts.subtitle', { mod })}

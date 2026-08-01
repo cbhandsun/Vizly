@@ -46,6 +46,12 @@ import {
 } from './aiLogging';
 import { filterAIModels, filterAIProviders, groupAIModels } from './aiConfigModelCollections';
 import { useAIConfigModalConfig } from './useAIConfigModalConfig';
+import {
+    COMMERCIAL_VIEWPORT_MODAL_CLASS,
+    COMMERCIAL_VIEWPORT_MODAL_Z_INDEX,
+    getViewportOverlayContainer,
+} from '@/core/components/ui/viewportOverlayPortal';
+import './AIConfigModal.css';
 
 const { Text, Title, Paragraph } = Typography;
 const loadStorageService = async () => (await import('@/services/SupabaseStorage')).storageService;
@@ -382,18 +388,19 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
             open={open}
             onOk={handleSave}
             onCancel={onCancel}
-            getContainer={() => document.getElementById('app-root-layout') || document.body}
+            getContainer={getViewportOverlayContainer}
             okText={t('aiConfig.saveAll')}
             cancelText={t('aiConfig.cancel')}
             width={760}
-            zIndex={1050}
+            zIndex={COMMERCIAL_VIEWPORT_MODAL_Z_INDEX}
             className="ai-hyper-glass-modal"
+            rootClassName={`${COMMERCIAL_VIEWPORT_MODAL_CLASS} ai-config-viewport-modal`}
             styles={{ body: { padding: 0, height: 480 } }}
         >
-            <div style={{ display: 'flex', height: '100%' }}>
+            <div className="ai-config-layout" style={{ display: 'flex', height: '100%' }}>
                 {/* --- Left Sidebar: Providers --- */}
-                <div style={{ width: 240, borderRight: '1px solid var(--designer-border, rgba(0,0,0,0.06))', display: 'flex', flexDirection: 'column', backgroundColor: 'transparent' }}>
-                    <div style={{ padding: 'var(--glass-padding-sm, 16px)' }}>
+                <div className="ai-config-provider-sidebar" style={{ width: 240, borderRight: '1px solid var(--designer-border, rgba(0,0,0,0.06))', display: 'flex', flexDirection: 'column', backgroundColor: 'transparent' }}>
+                    <div className="ai-config-provider-tools" style={{ padding: 'var(--glass-padding-sm, 16px)' }}>
                         <Input.Search
                             placeholder={t('aiConfig.searchPlaceholder')}
                             allowClear
@@ -422,9 +429,9 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                         </div>
                     </div>
 
-                    <div style={{ flex: 1, overflowY: 'auto', padding: '0 var(--glass-padding-sm, 16px)' }}>
+                    <div className="ai-config-provider-list" style={{ flex: 1, overflowY: 'auto', padding: '0 var(--glass-padding-sm, 16px)' }}>
                         <Text type="secondary" style={{ fontSize: 12, marginBottom: 8, display: 'block', paddingLeft: 4 }}>{t('aiConfig.providerList')}</Text>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <div className="ai-config-provider-items" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                             {filteredProviders.map(item => (
                                 <div
                                     key={item.id}
@@ -457,7 +464,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                             ))}
                         </div>
                     </div>
-                    <div style={{ padding: 'var(--glass-padding-sm, 16px)', borderTop: '1px solid rgba(0,0,0,0.06)' }}>
+                    <div className="ai-config-provider-footer" style={{ padding: 'var(--glass-padding-sm, 16px)', borderTop: '1px solid rgba(0,0,0,0.06)' }}>
                         <Button type="dashed" block icon={<PlusOutlined />} onClick={addCustomProvider} style={{ height: 40, borderRadius: 10 }}>
                             {t('aiConfig.addCustomProvider')}
                         </Button>
@@ -465,7 +472,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                 </div>
 
                 {/* --- Right Content: Settings --- */}
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: 'transparent', overflow: 'hidden' }}>
+                <div className="ai-config-content" style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: 'transparent', overflow: 'hidden' }}>
 
                     {/* Header */}
                     <div style={{ padding: '24px var(--glass-padding-md, 24px)', borderBottom: '1px solid rgba(0,0,0,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -636,7 +643,9 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                 open={discoveryModalVisible}
                 onOk={handleAddDiscoveredModels}
                 onCancel={() => setDiscoveryModalVisible(false)}
-                getContainer={() => document.getElementById('app-root-layout') || document.body}
+                getContainer={getViewportOverlayContainer}
+                rootClassName={`${COMMERCIAL_VIEWPORT_MODAL_CLASS} ai-config-discovery-modal`}
+                zIndex={COMMERCIAL_VIEWPORT_MODAL_Z_INDEX + 10}
                 okText={t('aiConfig.confirmAdd')}
                 width={700}
                 styles={{ body: { padding: '16px 0', height: 500, overflowY: 'auto' } }}

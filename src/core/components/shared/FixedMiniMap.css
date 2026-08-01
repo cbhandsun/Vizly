@@ -27,8 +27,8 @@
 }
 
 .fixed-minimap-container.minimized {
-    width: 44px;
-    height: 44px;
+    width: var(--commercial-touch-target, 44px);
+    height: var(--commercial-touch-target, 44px);
     border-radius: 50%;
     display: flex;
     align-items: center;

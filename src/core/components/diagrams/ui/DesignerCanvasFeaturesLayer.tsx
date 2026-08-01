@@ -25,6 +25,8 @@ export interface DesignerCanvasFeaturesLayerProps {
     hoverToolbar: Pick<
         HoverToolbarProps,
         | 'nodeTypes'
+        | 'selectedNodes'
+        | 'selectedEdges'
         | 'pluginCtx'
         | 'activePlugin'
         | 'quickAddMenuVisible'
@@ -100,6 +102,8 @@ export const DesignerCanvasFeaturesLayer = React.memo(
             />
             
             <HoverToolbarsOverlay
+                selectedNodes={hoverToolbar.selectedNodes}
+                selectedEdges={hoverToolbar.selectedEdges}
                 nodeTypes={hoverToolbar.nodeTypes}
                 pluginCtx={hoverToolbar.pluginCtx}
                 activePlugin={hoverToolbar.activePlugin}
@@ -183,7 +187,9 @@ export const DesignerCanvasFeaturesLayer = React.memo(
           prev.hoverToolbar.isContextToolbarHidden !== next.hoverToolbar.isContextToolbarHidden ||
           prev.hoverToolbar.isDragging !== next.hoverToolbar.isDragging ||
           prev.hoverToolbar.isConnecting !== next.hoverToolbar.isConnecting ||
-          prev.hoverToolbar.hasCopiedStyle !== next.hoverToolbar.hasCopiedStyle) return false;
+          prev.hoverToolbar.hasCopiedStyle !== next.hoverToolbar.hasCopiedStyle ||
+          prev.hoverToolbar.selectedNodes !== next.hoverToolbar.selectedNodes ||
+          prev.hoverToolbar.selectedEdges !== next.hoverToolbar.selectedEdges) return false;
           
       if (prev.annotations.items !== next.annotations.items || 
           prev.annotations.mode !== next.annotations.mode || 

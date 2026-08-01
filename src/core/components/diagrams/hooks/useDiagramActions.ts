@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { Node, Edge, ReactFlowInstance } from '@xyflow/react';
+import { useTranslation } from 'react-i18next';
 import { PluginContext, DiagramTypePlugin } from '../../../types/plugin';
 import { useDiagramStore } from '../../../store/useDiagramStore';
 
@@ -16,11 +17,32 @@ const toTargetIds = (target: DiagramActionTarget): Set<string> => new Set(
         .filter((id): id is string => typeof id === 'string' && id.length > 0)
 );
 
+export const applyNodeLockState = (
+    nodes: Node[],
+    targetIds: ReadonlySet<string>,
+    locked: boolean,
+): { nodes: Node[]; changed: boolean } => {
+    let changed = false;
+    const nextNodes = nodes.map(node => {
+        if (!targetIds.has(node.id)) return node;
+        if (node.draggable === !locked && node.data?.locked === locked) return node;
+
+        changed = true;
+        return {
+            ...node,
+            draggable: !locked,
+            data: { ...node.data, locked },
+        };
+    });
+
+    return { nodes: changed ? nextNodes : nodes, changed };
+};
+
 interface UseDiagramActionsProps {
     nodes: Node[];
     edges: Edge[];
-    nodesRef?: React.RefObject<Node[]>;
-    edgesRef?: React.RefObject<Edge[]>;
+    nodesRef?: React.MutableRefObject<Node[]>;
+    edgesRef?: React.MutableRefObject<Edge[]>;
     setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
     setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
     selectedNodes: Node[];
@@ -45,6 +67,7 @@ export const useDiagramActions = ({
     pluginCtx,
     activePlugin
 }: UseDiagramActionsProps) => {
+    const { t } = useTranslation();
 
     const handleDelete = useCallback(async (target?: DiagramActionTarget) => {
         // Determine what to delete
@@ -142,12 +165,18 @@ export const useDiagramActions = ({
             id: `${node.type}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
             position: { x: node.position.x + 50, y: node.position.y + 50 },
             selected: true,
-            data: { ...node.data, label: `${node.data.label || 'Node'} (Copy)` }
+            data: {
+                ...node.data,
+                label: t('designer.flowchart.duplicateLabel', {
+                    label: String(node.data.label || t('designer.flowchart.newNode', { defaultValue: 'Node' })),
+                    defaultValue: '{{label}} (Copy)',
+                }),
+            },
         }));
 
         // Deselect originals and add new ones
         setNodes(nds => [...nds.map(n => ({ ...n, selected: false })), ...newNodes]);
-    }, [nodes, edges, nodesRef, edgesRef, selectedNodes, setNodes, takeSnapshot]);
+    }, [nodes, edges, nodesRef, edgesRef, selectedNodes, setNodes, takeSnapshot, t]);
 
     const handleBringToFront = useCallback((targetId?: string) => {
         if (!targetId) return;
@@ -172,19 +201,19 @@ export const useDiagramActions = ({
     const handleLock = useCallback((target?: DiagramActionTarget, locked: boolean = true) => {
         const targetIds = target ? toTargetIds(target) : new Set(selectedNodes.map(node => node.id));
         if (targetIds.size === 0) return;
-        takeSnapshot(nodesRef?.current ?? nodes, edgesRef?.current ?? edges);
-        const updateLockedNodes = (items: Node[]) => items.map(n => {
-            if (targetIds.has(n.id)) {
-                return {
-                    ...n,
-                    draggable: !locked,
-                    data: { ...n.data, locked }
-                };
-            }
-            return n;
-        });
-        setNodes(updateLockedNodes);
-        useDiagramStore.getState().setSelectedNodes(updateLockedNodes);
+        const currentNodes = nodesRef?.current ?? nodes;
+        const currentEdges = edgesRef?.current ?? edges;
+        const result = applyNodeLockState(currentNodes, targetIds, locked);
+        if (!result.changed) return;
+
+        takeSnapshot(currentNodes, currentEdges);
+        if (nodesRef) nodesRef.current = result.nodes;
+        setNodes(result.nodes);
+
+        const nodeById = new Map(result.nodes.map(node => [node.id, node]));
+        const updateSelection = (items: Node[]) => items.map(node => nodeById.get(node.id) ?? node);
+        const diagramStore = useDiagramStore.getState();
+        diagramStore.setSelectedNodes(updateSelection(diagramStore.selectedNodes));
     }, [nodes, edges, nodesRef, edgesRef, selectedNodes, setNodes, takeSnapshot]);
 
     const handleSelectAll = useCallback(() => {

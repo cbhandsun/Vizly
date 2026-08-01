@@ -1,10 +1,15 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { clampDraggablePanelPosition } from './draggablePanelPosition';
 
 interface UseDraggablePanelOptions {
     initialPosition?: { x: number; y: number };
+    viewportInset?: number;
 }
 
-export const useDraggablePanel = ({ initialPosition = { x: 0, y: 0 } }: UseDraggablePanelOptions = {}) => {
+export const useDraggablePanel = ({
+    initialPosition = { x: 0, y: 0 },
+    viewportInset = 16,
+}: UseDraggablePanelOptions = {}) => {
     const [isDragging, setIsDragging] = useState(false);
     const [panelPosition, setPanelPosition] = useState(initialPosition);
 
@@ -12,6 +17,18 @@ export const useDraggablePanel = ({ initialPosition = { x: 0, y: 0 } }: UseDragg
     const dragOffsetRef = useRef({ x: 0, y: 0 });
     const rafPendingRef = useRef(false);
     const nextPosRef = useRef<{ x: number; y: number } | null>(null);
+
+    const clampToViewport = useCallback((position: { x: number; y: number }) => {
+        const panel = panelRef.current;
+        return clampDraggablePanelPosition({
+            ...position,
+            panelWidth: panel?.offsetWidth ?? 0,
+            panelHeight: panel?.offsetHeight ?? 0,
+            viewportWidth: window.innerWidth,
+            viewportHeight: window.innerHeight,
+            inset: viewportInset,
+        });
+    }, [viewportInset]);
 
     const handlePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
         if (e.button !== 0) return;
@@ -36,7 +53,7 @@ export const useDraggablePanel = ({ initialPosition = { x: 0, y: 0 } }: UseDragg
         if (!isDragging || !panelRef.current) return;
 
         const { x, y } = dragOffsetRef.current;
-        nextPosRef.current = { x: e.clientX - x, y: e.clientY - y };
+        nextPosRef.current = clampToViewport({ x: e.clientX - x, y: e.clientY - y });
 
         if (!rafPendingRef.current) {
             rafPendingRef.current = true;
@@ -48,7 +65,7 @@ export const useDraggablePanel = ({ initialPosition = { x: 0, y: 0 } }: UseDragg
                 }
             });
         }
-    }, [isDragging]);
+    }, [clampToViewport, isDragging]);
 
     const handlePointerUp = useCallback(() => {
         setIsDragging(false);
@@ -72,12 +89,21 @@ export const useDraggablePanel = ({ initialPosition = { x: 0, y: 0 } }: UseDragg
             const transform = style.transform;
             if (transform && transform !== 'none') {
                 const matrix = new DOMMatrixReadOnly(transform);
-                setPanelPosition({ x: matrix.m41, y: matrix.m42 });
+                setPanelPosition(clampToViewport({ x: matrix.m41, y: matrix.m42 }));
             } else {
-                setPanelPosition({ x: 0, y: 0 });
+                setPanelPosition(clampToViewport({ x: 0, y: 0 }));
             }
         }
-    }, []);
+    }, [clampToViewport]);
+
+    useEffect(() => {
+        const keepPanelVisible = () => {
+            setPanelPosition(current => clampToViewport(current));
+        };
+        keepPanelVisible();
+        window.addEventListener('resize', keepPanelVisible);
+        return () => window.removeEventListener('resize', keepPanelVisible);
+    }, [clampToViewport]);
 
     useEffect(() => {
         if (isDragging) {

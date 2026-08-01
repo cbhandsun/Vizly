@@ -54,6 +54,7 @@ export interface FlowchartCanvasShellProps {
     panOnDrag?: boolean;
     nodesDraggable?: boolean;
     nodesConnectable?: boolean;
+    editingEnabled?: boolean;
     snapEnabled?: boolean;
     edgesReconnectable?: boolean;
     onReconnect?: OnReconnect;
@@ -107,6 +108,7 @@ export const FlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> = React.m
     panOnDrag,
     nodesDraggable,
     nodesConnectable,
+    editingEnabled = true,
     edgesReconnectable,
     onReconnect,
     onReconnectStart,
@@ -128,9 +130,21 @@ export const FlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> = React.m
         onNodeDragStop,
         onSmartNodeDrag,
     });
+    const renderedNodes = useMemo(
+        () => editingEnabled
+            ? canvasNodes
+            : canvasNodes.map(node => node.selected ? { ...node, selected: false } : node),
+        [canvasNodes, editingEnabled],
+    );
+    const renderedEdges = useMemo(
+        () => editingEnabled
+            ? displayEdges
+            : displayEdges.map(edge => edge.selected ? { ...edge, selected: false } : edge),
+        [displayEdges, editingEnabled],
+    );
     const accessibleElements = useMemo(
-        () => addFlowchartAccessibilityLabels(canvasNodes, displayEdges),
-        [canvasNodes, displayEdges],
+        () => addFlowchartAccessibilityLabels(renderedNodes, renderedEdges),
+        [renderedEdges, renderedNodes],
     );
     const connectionLineStyle = isConnecting ? {
         stroke: connectPreview ? 'rgba(16, 185, 129, 0.95)' : 'rgba(59, 130, 246, 0.95)',
@@ -138,6 +152,7 @@ export const FlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> = React.m
         strokeDasharray: connectPreview ? '0' : '4 4'
     } : undefined;
     const handleCanvasNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
+        if (!editingEnabled) return;
         if (event.shiftKey) {
             const selectionChanges = buildShiftMultiSelectionChanges(canvasNodes, node.id);
             if (selectionChanges.length > 0) {
@@ -145,7 +160,7 @@ export const FlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> = React.m
             }
         }
         onNodeClick?.(event, node);
-    }, [canvasNodes, handleNodesChange, onNodeClick]);
+    }, [canvasNodes, editingEnabled, handleNodesChange, onNodeClick]);
     return (
         <BaseReactFlow
             onInit={onInit}
@@ -153,11 +168,11 @@ export const FlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> = React.m
             edges={accessibleElements.edges}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
-            onNodesChange={handleNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            onConnectStart={onConnectStart}
-            onConnectEnd={onConnectEnd}
+            onNodesChange={editingEnabled ? handleNodesChange : undefined}
+            onEdgesChange={editingEnabled ? onEdgesChange : undefined}
+            onConnect={editingEnabled ? onConnect : undefined}
+            onConnectStart={editingEnabled ? onConnectStart : undefined}
+            onConnectEnd={editingEnabled ? onConnectEnd : undefined}
             fitMode="none"
             fitPadding={0.1}
             pinFit={false}
@@ -169,16 +184,16 @@ export const FlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> = React.m
             backgroundVariant={gridVariant}
             backgroundGap={24}
             showBackgroundGrid={showGrid}
-            onNodeDrag={handleNodeDrag}
-            onNodeDragStart={handleNodeDragStart}
-            onNodeDragStop={handleNodeDragStop}
-            onSelectionChange={onSelectionChange}
+            onNodeDrag={editingEnabled ? handleNodeDrag : undefined}
+            onNodeDragStart={editingEnabled ? handleNodeDragStart : undefined}
+            onNodeDragStop={editingEnabled ? handleNodeDragStop : undefined}
+            onSelectionChange={editingEnabled ? onSelectionChange : undefined}
             onViewportChange={onViewportChange}
             onNodeClick={handleCanvasNodeClick}
             onEdgeClick={onEdgeClick}
-            onEdgeDoubleClick={onEdgeDoubleClick}
+            onEdgeDoubleClick={editingEnabled ? onEdgeDoubleClick : undefined}
             onPaneClick={onPaneClick}
-            onPaneDoubleClick={onPaneDoubleClick}
+            onPaneDoubleClick={editingEnabled ? onPaneDoubleClick : undefined}
             onPaneMouseMove={onPaneMouseMove}
             onPaneMouseLeave={onPaneMouseLeave}
             selectionMode={selectionMode}
@@ -186,8 +201,8 @@ export const FlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> = React.m
             onNodeContextMenu={onNodeContextMenu}
             onEdgeContextMenu={onEdgeContextMenu}
             onPaneContextMenu={onPaneContextMenu}
-            panOnDrag={panOnDrag !== undefined ? panOnDrag : isSpacePressed}
-            selectionOnDrag={selectionOnDrag}
+            panOnDrag={editingEnabled ? (panOnDrag !== undefined ? panOnDrag : isSpacePressed) : true}
+            selectionOnDrag={editingEnabled ? selectionOnDrag : false}
             connectionMode={connectionMode}
             connectionLineStyle={connectionLineStyle}
             connectionLineType={ConnectionLineType.SmoothStep}
@@ -198,15 +213,16 @@ export const FlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> = React.m
             snapGrid={[12, 12]}
             isValidConnection={isValidConnection}
             disableZoomCompensation={disableZoomCompensation}
-            nodesDraggable={nodesDraggable}
-            nodesConnectable={nodesConnectable}
-            nodesFocusable
-            edgesFocusable
+            nodesDraggable={editingEnabled ? nodesDraggable : false}
+            nodesConnectable={editingEnabled ? nodesConnectable : false}
+            elementsSelectable={editingEnabled}
+            nodesFocusable={editingEnabled}
+            edgesFocusable={editingEnabled}
             multiSelectionKeyCode="Shift"
-            edgesReconnectable={edgesReconnectable}
-            onReconnect={onReconnect}
-            onReconnectStart={onReconnectStart}
-            onReconnectEnd={onReconnectEnd}
+            edgesReconnectable={editingEnabled ? edgesReconnectable : false}
+            onReconnect={editingEnabled ? onReconnect : undefined}
+            onReconnectStart={editingEnabled ? onReconnectStart : undefined}
+            onReconnectEnd={editingEnabled ? onReconnectEnd : undefined}
         >
             {children}
         </BaseReactFlow>

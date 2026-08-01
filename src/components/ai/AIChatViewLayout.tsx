@@ -210,6 +210,7 @@ export const AIChatViewLayout: React.FC<AIChatViewLayoutProps> = ({
             <div className="ai-chat-inline-header">
                 <Space size={4}>
                     <Button
+                        className="ai-chat-inline-action"
                         icon={<MenuFoldOutlined />}
                         type="text"
                         size="small"
@@ -244,6 +245,7 @@ export const AIChatViewLayout: React.FC<AIChatViewLayoutProps> = ({
                         </Tooltip>
                     )}
                     <Button
+                        className="ai-chat-inline-action"
                         icon={<SettingOutlined />}
                         type="text"
                         size="small"
@@ -252,6 +254,7 @@ export const AIChatViewLayout: React.FC<AIChatViewLayoutProps> = ({
                         aria-label={t('aiChat.settings')}
                     />
                     <Button
+                        className="ai-chat-inline-action"
                         icon={<CloseOutlined />}
                         type="text"
                         size="small"
@@ -307,6 +310,7 @@ export const AIChatViewLayout: React.FC<AIChatViewLayoutProps> = ({
                             }
                         }}
                         placeholder={t('aiChat.inputPlaceholder')}
+                        aria-label={t('aiChat.inputLabel')}
                         autoSize={{ minRows: 1, maxRows: 6 }}
                         disabled={loading}
                         className="ai-chat-textarea"
@@ -319,7 +323,9 @@ export const AIChatViewLayout: React.FC<AIChatViewLayoutProps> = ({
                                 icon={<AudioOutlined />}
                                 shape="circle"
                                 onClick={handleVoiceToggle}
-                                title="Voice (Beta)"
+                                aria-label={t('aiChat.voiceInput')}
+                                aria-pressed={isListening}
+                                title={t('aiChat.voiceInput')}
                             />
                             <Button
                                 type={loading ? 'default' : 'primary'}
@@ -328,7 +334,8 @@ export const AIChatViewLayout: React.FC<AIChatViewLayoutProps> = ({
                                 icon={loading ? <StopOutlined /> : <SendOutlined />}
                                 onClick={loading ? handleStopGeneration : handleSendMessage}
                                 disabled={!loading && !inputValue.trim()}
-                                title={loading ? '停止生成' : '发送'}
+                                aria-label={loading ? t('aiChat.stopGeneration') : t('aiChat.sendMessage')}
+                                title={loading ? t('aiChat.stopGeneration') : t('aiChat.sendMessage')}
                                 className="ai-chat-send-btn"
                             />
                         </Space>

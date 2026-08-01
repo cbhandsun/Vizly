@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Modal, Button, Select, Space, Typography, Tooltip, List, Tag, Popconfirm, Spin, theme, Tabs, Input, Avatar, Empty, Alert } from 'antd';
 import { FaCopy, FaLink, FaTrash, FaUserPlus } from 'react-icons/fa';
-import { LinkOutlined, TeamOutlined, UserOutlined, CheckCircleFilled, SafetyOutlined } from '@ant-design/icons';
+import { LinkOutlined, TeamOutlined, UserOutlined, CheckCircleFilled, SafetyOutlined, LockOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { shareService, ShareRecord, CollaboratorRecord } from '@/services/ShareService';
 import { useAuth } from '@/context/useAuth';
@@ -10,6 +10,11 @@ import {
     logShareDialogLoadFailure,
     logShareDialogMutationFailure,
 } from '@/components/shareDialogLogging';
+import {
+    COMMERCIAL_VIEWPORT_MODAL_CLASS,
+    COMMERCIAL_VIEWPORT_MODAL_Z_INDEX,
+    getViewportOverlayContainer,
+} from '@/core/components/ui/viewportOverlayPortal';
 
 
 const { Text } = Typography;
@@ -396,7 +401,9 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
         <Modal
             open={open}
             onCancel={onClose}
-            getContainer={() => document.getElementById('app-root-layout') || document.body}
+            getContainer={getViewportOverlayContainer}
+            rootClassName={COMMERCIAL_VIEWPORT_MODAL_CLASS}
+            zIndex={COMMERCIAL_VIEWPORT_MODAL_Z_INDEX}
             title={
                 <Space>
                     <SafetyOutlined style={{ color: token.colorPrimary }} />
@@ -405,7 +412,8 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
             }
             footer={
                 <Text type="secondary" style={{ fontSize: 11, display: 'block', textAlign: 'center' }}>
-                    🔒 分享的图表可随时撤销访问权限
+                    <LockOutlined aria-hidden="true" style={{ marginRight: 6 }} />
+                    分享的图表可随时撤销访问权限
                 </Text>
             }
             width={600}

@@ -1,0 +1,81 @@
+.json-editor-modal .ant-modal {
+    box-sizing: border-box;
+    max-width: calc(100vw - 32px);
+}
+
+.json-editor-modal .ant-modal-footer > div,
+.json-editor-modal .ant-modal-footer > div > div {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.json-editor-modal .ant-modal-footer > div {
+    width: 100%;
+}
+
+.json-editor-modal .ant-modal-footer .ant-btn {
+    min-height: var(--commercial-touch-target, 44px);
+}
+
+.json-editor-modal .ant-modal-close {
+    width: var(--commercial-touch-target, 44px);
+    height: var(--commercial-touch-target, 44px);
+}
+
+.json-editor-modal .ant-segmented-item {
+    min-height: var(--commercial-touch-target, 44px);
+}
+
+.json-editor-modal .ant-segmented-item-label {
+    display: flex;
+    min-height: inherit;
+    align-items: center;
+    justify-content: center;
+    line-height: 1.25;
+    white-space: normal;
+}
+
+@media (max-width: 640px) {
+    .json-editor-modal .ant-modal {
+        margin: 16px auto;
+        padding-bottom: 0;
+    }
+
+    .json-editor-modal .ant-modal-content {
+        max-height: calc(100dvh - 32px);
+        overflow: auto;
+    }
+
+    .json-editor-modal .ant-modal-body {
+        height: min(52dvh, 520px) !important;
+        margin-top: 8px !important;
+        padding-inline: 16px;
+    }
+
+    .json-editor-modal .ant-modal-footer {
+        padding-inline: 16px;
+    }
+
+    .json-editor-modal .ant-modal-footer > div {
+        align-items: stretch !important;
+    }
+
+    .json-editor-modal .ant-modal-footer > div > div {
+        width: 100%;
+    }
+
+    .json-editor-modal .ant-modal-footer > div > div:last-child {
+        justify-content: flex-end;
+    }
+
+    .json-editor-modal .ant-segmented-group {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .json-editor-modal .ant-segmented-item-label {
+        padding-inline: 6px;
+        font-size: 12px;
+    }
+}

@@ -28,13 +28,11 @@ describe('componentFallbackLogging', () => {
     const {
       logArchitectureNodeMissingData,
       logUnifiedDesignerInitialDataFallback,
-      logLazyMonacoCdnRaceFailure,
       logUnifiedDesignerBatchUpdateUnavailable,
       logUnifiedDesignerUnsupportedAction,
     } = await import('../componentFallbackLogging');
 
     logArchitectureNodeMissingData();
-    logLazyMonacoCdnRaceFailure();
     logUnifiedDesignerBatchUpdateUnavailable('updateNodesBatch');
     logUnifiedDesignerBatchUpdateUnavailable('updateEdgesBatch');
     logUnifiedDesignerUnsupportedAction('takeSnapshot', 'flowchart');
@@ -43,7 +41,6 @@ describe('componentFallbackLogging', () => {
 
     const warnMessages = safeLogState.warn.mock.calls.map(call => String(call[0]));
     expect(warnMessages).toContain('[ArchitectureNode] Rendered without data. Falling back to invalid-node placeholder.');
-    expect(warnMessages).toContain('[LazyMonacoEditor] CDN race failed, falling back to jsdelivr.');
     expect(warnMessages).toContain('[UnifiedDesigner] updateNodesBatch is not implemented in the placeholder context.');
     expect(warnMessages).toContain('[UnifiedDesigner] updateEdgesBatch is not implemented in the placeholder context.');
     expect(warnMessages).toContain('[UnifiedDesigner] takeSnapshot is not implemented in the placeholder context for plugin "flowchart".');

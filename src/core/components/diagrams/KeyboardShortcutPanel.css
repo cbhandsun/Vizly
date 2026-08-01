@@ -1,0 +1,19 @@
+.keyboard-shortcut-panel .ant-modal {
+    max-width: calc(100vw - 16px);
+}
+
+.keyboard-shortcut-panel .ant-modal-close {
+    width: var(--commercial-touch-target, 44px);
+    height: var(--commercial-touch-target, 44px);
+    inset-block-start: 8px;
+    inset-inline-end: 8px;
+}
+
+.keyboard-shortcut-panel .ant-modal-content {
+    max-height: calc(100dvh - 32px);
+    overflow: hidden;
+}
+
+.keyboard-shortcut-panel .ant-modal-body {
+    overscroll-behavior: contain;
+}

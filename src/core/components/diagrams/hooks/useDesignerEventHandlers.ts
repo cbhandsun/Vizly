@@ -30,6 +30,7 @@ export interface UseDesignerEventHandlersProps {
     reactFlowInstance: ReactFlowInstance | null;
     reactFlowWrapper: React.RefObject<HTMLDivElement | null>;
     isDragging: boolean;
+    editingEnabled: boolean;
     pluginCtx: PluginContext | null;
     activePlugin?: DiagramTypePlugin;
     messageApi: MessageInstance;
@@ -64,7 +65,7 @@ export function useDesignerEventHandlers({
     selectedNodes, selectedEdges,
     takeSnapshot, undo, redo,
     reactFlowInstance, reactFlowWrapper,
-    isDragging, pluginCtx, activePlugin,
+    isDragging, editingEnabled, pluginCtx, activePlugin,
     messageApi, notificationApi,
     layers, setActiveLayerId, toggleVisibility,
     canAlign, canDistribute, handleAlign, handleDistribute,
@@ -136,6 +137,7 @@ export function useDesignerEventHandlers({
     }, [layoutContainer, toggleGroupCollapse, onContextMenuActionWithToast, undo, redo, reactFlowInstance, handleSelectAll]);
 
     const handleNudge = useCallback((direction: 'up' | 'down' | 'left' | 'right', distance: number) => {
+        if (!editingEnabled) return;
         if (selectedNodes.length === 0) return;
         takeSnapshot(nodesRef.current, edgesRef.current);
         const delta = {
@@ -149,7 +151,7 @@ export function useDesignerEventHandlers({
             }
             return n;
         }));
-    }, [setNodes, takeSnapshot, selectedNodes, nodesRef, edgesRef]);
+    }, [editingEnabled, edgesRef, nodesRef, selectedNodes, setNodes, takeSnapshot]);
 
     useLayerKeyboardShortcuts({
         messageApi, layers, canAlign, canDistribute,
@@ -157,8 +159,8 @@ export function useDesignerEventHandlers({
             onHelp: () => setShortcutHelpVisible(true),
             onLayerSwitch: (layerIndex: number) => setActiveLayerId(layers[layerIndex].id),
             onLayerToggleVisibility: (layerIndex: number) => toggleVisibility(layers[layerIndex].id),
-            onAlign: handleAlign,
-            onDistribute: handleDistribute,
+            onAlign: (type) => { if (editingEnabled) handleAlign(type); },
+            onDistribute: (direction) => { if (editingEnabled) handleDistribute(direction); },
         },
     });
 
@@ -168,21 +170,22 @@ export function useDesignerEventHandlers({
     }, [isDragging]);
 
     useKeyboardShortcuts({
-        onDelete: () => handleDeleteWithToast(),
-        onDuplicate: () => { if (!isDraggingRef.current) handleDuplicateWithToast(); },
-        onUndo: undo,
-        onRedo: redo,
+        onDelete: () => { if (editingEnabled) handleDeleteWithToast(); },
+        onDuplicate: () => { if (editingEnabled && !isDraggingRef.current) handleDuplicateWithToast(); },
+        onUndo: () => { if (editingEnabled) undo(); },
+        onRedo: () => { if (editingEnabled) redo(); },
         onSelectAll: handleSelectAll,
         onCopy: () => { if (!isDraggingRef.current) handleCopyWithToast(); },
-        onPaste: handlePasteWithToast,
-        onCut: () => { if (!isDraggingRef.current) handleCutWithToast(); },
-        onGroup: handleGroupWithToast,
-        onUngroup: handleUngroupWithToast,
+        onPaste: () => { if (editingEnabled) handlePasteWithToast(); },
+        onCut: () => { if (editingEnabled && !isDraggingRef.current) handleCutWithToast(); },
+        onGroup: () => { if (editingEnabled) handleGroupWithToast(); },
+        onUngroup: () => { if (editingEnabled) handleUngroupWithToast(); },
         onNudge: handleNudge,
         onZoomIn: () => reactFlowInstance?.zoomIn(),
         onZoomOut: () => reactFlowInstance?.zoomOut(),
         onFitView: handleFitView,
         onEnterEdit: () => {
+            if (!editingEnabled) return;
             if (selectedNodes.length === 1) {
                 const nodeId = selectedNodes[0].id;
                 setNodes((nds: Node[]) => nds.map(n => n.id === nodeId ? { ...n, data: { ...n.data, isEditing: true } } : n));
@@ -285,6 +288,7 @@ export function useDesignerEventHandlers({
 
     useEffect(() => {
         const handleStyleKeys = (e: KeyboardEvent) => {
+            if (!editingEnabled) return;
             const isCtrlOrCmd = e.ctrlKey || e.metaKey;
             if (!isCtrlOrCmd || !e.altKey) return;
             const target = e.target as HTMLElement;
@@ -305,12 +309,13 @@ export function useDesignerEventHandlers({
         };
         window.addEventListener('keydown', handleStyleKeys);
         return () => window.removeEventListener('keydown', handleStyleKeys);
-    }, [selectedNodes, copyStyle, pasteStyle, hasCopiedStyle, saveAsTemplate]);
+    }, [copyStyle, editingEnabled, hasCopiedStyle, pasteStyle, saveAsTemplate, selectedNodes]);
 
     // Alt+[ / Alt+] : 折叠/展开选中的容器节点
     useEffect(() => {
         const CONTAINER_TYPES = new Set(['titleGroup', 'subGroup', 'swimlane', 'group']);
         const handleCollapseKey = (e: KeyboardEvent) => {
+            if (!editingEnabled) return;
             if (!e.altKey || e.ctrlKey || e.metaKey) return;
             if (e.key !== '[' && e.key !== ']') return;
             const target = e.target as HTMLElement;
@@ -324,7 +329,7 @@ export function useDesignerEventHandlers({
         };
         window.addEventListener('keydown', handleCollapseKey);
         return () => window.removeEventListener('keydown', handleCollapseKey);
-    }, [selectedNodes, toggleGroupCollapse]);
+    }, [editingEnabled, selectedNodes, toggleGroupCollapse]);
 
     const { isSpacePressed } = useSpacePan();
 

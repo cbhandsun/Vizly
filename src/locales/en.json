@@ -462,6 +462,7 @@
             "saveToCloud": "Save to Cloud",
             "directSave": "Save to current location",
             "directSaveDisabled": "Cannot save directly in current state",
+            "readonlyStatus": "Canvas locked · View only",
             "saveOptions": "Save options",
             "documentActions": "Document actions",
             "pluginExport": "Plugin exports",
@@ -533,6 +534,7 @@
             "download": "Download File",
             "applyOnly": "Preview and Apply",
             "saveAndClose": "Apply and Close",
+            "basicEditorLabel": "Basic JSON editor",
             "reactFlowWarning": "You are currently viewing internal React Flow graph models (Read-Only mode). This is for debugging purposes only. To edit diagram structure, please switch to Standard Data mode."
         },
         "statusBar": {
@@ -543,6 +545,14 @@
             "selectedSummary": "Selected: {{nodes}} nodes, {{edges}} edges",
             "smartRoutingEnabled": "Smart routing enabled",
             "directRoutingEnabled": "Direct routing enabled"
+        },
+        "pages": {
+            "tabList": "Pages",
+            "new": "New page",
+            "rename": "Rename page {{name}}",
+            "delete": "Delete page {{name}}",
+            "deleteConfirm": "Delete “{{name}}”?",
+            "deleteAction": "Delete"
         },
         "flowchart": {
             "emptyState": {
@@ -555,6 +565,7 @@
                 "duplicateHint": "Alt-drag to duplicate"
             },
             "newNode": "New Node",
+            "duplicateLabel": "{{label}} (Copy)",
             "nodeAdded": "Added {{label}}",
             "nodeAriaLabel": "Node: {{label}}{{selectedState}}{{lockedState}}",
             "nodeSelectedState": " (selected)",
@@ -855,6 +866,10 @@
         "apply": "Apply",
         "inputHint": "⌨️ Enter to send | Shift+Enter new line | Esc close",
         "inputPlaceholder": "Describe the architecture diagram... Type / for commands",
+        "inputLabel": "Message the AI assistant",
+        "voiceInput": "Voice input (Beta)",
+        "stopGeneration": "Stop generating",
+        "sendMessage": "Send message",
         "saveDialogTitle": "Save Diagram",
         "confirmSave": "Confirm Save",
         "cancel": "Cancel",
@@ -1700,6 +1715,8 @@
         "saveAs": {
             "title": "Save As to {{target}}...",
             "namePlaceholder": "Enter diagram name:",
+            "nameLabel": "Diagram name",
+            "defaultName": "Untitled diagram",
             "nameRequired": "Name cannot be empty",
             "saving": "Saving to {{target}}...",
             "localSuccess": "Saved to local template library",
@@ -1707,6 +1724,7 @@
             "error": "Save failed: {{message}}"
         },
         "directSave": {
+            "locationRequired": "This diagram has no save location yet. Choose Local, S3, or Supabase from Save As.",
             "saving": "Overwriting to {{provider}}...",
             "success": "Overwrite saved",
             "error": "Save error: {{message}}"

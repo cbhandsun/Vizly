@@ -126,4 +126,26 @@ describe('useFlowchartNodeInteractions structural history', () => {
         expect(flowState.nodes).toEqual([]);
         expect(flowState.edges).toEqual([]);
     });
+
+    it('blocks quick-add, duplication, deletion, and data edits when editing is disabled', () => {
+        const { result } = renderHook(() => useFlowchartNodeInteractions(
+            sourceNode.id,
+            sourceData,
+            true,
+            false,
+        ));
+
+        act(() => {
+            result.current.handleQuickClone('right', { stopPropagation: vi.fn() } as unknown as PointerEvent);
+            result.current.handleClone();
+            result.current.handleDelete();
+            result.current.handleUpdateData({ label: 'Blocked update' });
+        });
+
+        expect(flowState.beforeStructuralChange).not.toHaveBeenCalled();
+        expect(flowState.setNodes).not.toHaveBeenCalled();
+        expect(flowState.setEdges).not.toHaveBeenCalled();
+        expect(flowState.nodes).toEqual([sourceNode]);
+        expect(flowState.edges).toHaveLength(1);
+    });
 });

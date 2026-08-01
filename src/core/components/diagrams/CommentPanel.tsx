@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Input, List, Button, Tag, Typography, Empty, Flex, theme, Space, Tooltip } from 'antd';
+import { Input, List, Button, Tag, Typography, Empty, Flex, theme, Space, Tooltip, Popconfirm } from 'antd';
 import { FaSearch, FaCheck, FaTrash, FaChevronRight, FaRegCommentDots } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 import { useDiagramStore, type CommentThread } from '../../store/useDiagramStore';
@@ -57,8 +57,7 @@ export const CommentPanel: React.FC = () => {
         updateComment(id, { isResolved: !currentStatus });
     };
 
-    const handleDelete = (e: React.MouseEvent, id: string) => {
-        e.stopPropagation();
+    const handleDelete = (id: string) => {
         removeComment(id);
     };
 
@@ -72,14 +71,23 @@ export const CommentPanel: React.FC = () => {
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     allowClear
-                    size="small"
+                    size="middle"
+                    style={{
+                        minWidth: 'var(--commercial-touch-target, 44px)',
+                        minHeight: 'var(--commercial-touch-target, 44px)',
+                    }}
                 />
                 <Flex gap={8} style={{ marginTop: 12 }}>
                     <Button 
                         size="small" 
                         type={filter === 'unresolved' ? 'primary' : 'default'} 
                         onClick={() => setFilter('unresolved')}
+                        aria-pressed={filter === 'unresolved'}
                         className="rounded-full"
+                        style={{
+                            minWidth: 'var(--commercial-touch-target, 44px)',
+                            minHeight: 'var(--commercial-touch-target, 44px)',
+                        }}
                     >
                         {t('comment.filterUnresolved')}
                     </Button>
@@ -87,7 +95,12 @@ export const CommentPanel: React.FC = () => {
                         size="small" 
                         type={filter === 'resolved' ? 'primary' : 'default'} 
                         onClick={() => setFilter('resolved')}
+                        aria-pressed={filter === 'resolved'}
                         className="rounded-full"
+                        style={{
+                            minWidth: 'var(--commercial-touch-target, 44px)',
+                            minHeight: 'var(--commercial-touch-target, 44px)',
+                        }}
                     >
                         {t('comment.filterResolved')}
                     </Button>
@@ -95,7 +108,12 @@ export const CommentPanel: React.FC = () => {
                         size="small" 
                         type={filter === 'all' ? 'primary' : 'default'} 
                         onClick={() => setFilter('all')}
+                        aria-pressed={filter === 'all'}
                         className="rounded-full"
+                        style={{
+                            minWidth: 'var(--commercial-touch-target, 44px)',
+                            minHeight: 'var(--commercial-touch-target, 44px)',
+                        }}
                     >
                         {t('comment.filterAll')}
                     </Button>
@@ -110,6 +128,14 @@ export const CommentPanel: React.FC = () => {
                             <List.Item
                                 className="comment-list-item"
                                 onClick={() => handleFocus(item)}
+                                onKeyDown={(event) => {
+                                    if (event.key === 'Enter' || event.key === ' ') {
+                                        event.preventDefault();
+                                        handleFocus(item);
+                                    }
+                                }}
+                                tabIndex={0}
+                                aria-label={`${t('comment.focus')}: ${item.content}`}
                                 style={{ 
                                     padding: '12px 16px', 
                                     cursor: 'pointer',
@@ -172,18 +198,34 @@ export const CommentPanel: React.FC = () => {
                                                         icon={<FaCheck />} 
                                                         onClick={(e) => toggleResolve(e, item.id, item.isResolved)}
                                                         className={item.isResolved ? 'text-green-500' : 'text-slate-400'}
+                                                        style={{
+                                                            minWidth: 'var(--commercial-touch-target, 44px)',
+                                                            minHeight: 'var(--commercial-touch-target, 44px)',
+                                                        }}
                                                     />
                                                 </Tooltip>
-                                                <Tooltip title={t('comment.delete')}>
-                                                    <Button 
-                                                        size="small" 
-                                                        type="text" 
-                                                        aria-label={t('comment.delete')}
-                                                        danger 
-                                                        icon={<FaTrash />} 
-                                                        onClick={(e) => handleDelete(e, item.id)}
-                                                    />
-                                                </Tooltip>
+                                                <Popconfirm
+                                                    title={t('comment.deleteConfirmTitle', '删除这条评论？')}
+                                                    description={t('comment.deleteConfirmDescription', '删除后无法恢复。')}
+                                                    okText={t('common.delete', '删除')}
+                                                    cancelText={t('common.cancel', '取消')}
+                                                    onConfirm={() => handleDelete(item.id)}
+                                                >
+                                                    <Tooltip title={t('comment.delete')}>
+                                                        <Button
+                                                            size="small"
+                                                            type="text"
+                                                            aria-label={t('comment.delete')}
+                                                            danger
+                                                            icon={<FaTrash />}
+                                                            onClick={(event) => event.stopPropagation()}
+                                                            style={{
+                                                                minWidth: 'var(--commercial-touch-target, 44px)',
+                                                                minHeight: 'var(--commercial-touch-target, 44px)',
+                                                            }}
+                                                        />
+                                                    </Tooltip>
+                                                </Popconfirm>
                                                 <FaChevronRight style={{ fontSize: 10, color: token.colorTextQuaternary, marginLeft: 4 }} />
                                             </Space>
                                         </Flex>

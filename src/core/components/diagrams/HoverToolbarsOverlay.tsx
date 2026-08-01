@@ -9,6 +9,8 @@ import type { DiagramActionTarget } from './hooks/useDiagramActions';
 import { shouldShowNodeHoverToolbar } from './hoverToolbarVisibility';
 
 interface HoverToolbarsOverlayProps {
+    selectedNodes: Node[];
+    selectedEdges: Edge[];
     quickAddMenuVisible: boolean;
     isContextToolbarHidden: boolean;
     isDragging: boolean;
@@ -61,6 +63,8 @@ const readNodeToolbarMetadata = (nodeTypes: NodeTypes, node: Node | undefined): 
 };
 
 export const HoverToolbarsOverlay: React.FC<HoverToolbarsOverlayProps> = ({
+    selectedNodes,
+    selectedEdges,
     quickAddMenuVisible,
     isContextToolbarHidden,
     isDragging,
@@ -82,8 +86,6 @@ export const HoverToolbarsOverlay: React.FC<HoverToolbarsOverlayProps> = ({
     activePlugin
 }) => {
     const contextMenu = useDiagramStore((state) => state.contextMenu);
-    const selectedNodes = useDiagramStore((state) => state.selectedNodes);
-    const selectedEdges = useDiagramStore((state) => state.selectedEdges);
     // 🚀 P3 性能优化: 移除全局 useViewport，防止缩放/平移导致所有工具栏和父组件 (HoverToolbarsOverlay) 60FPS 重渲染
     
     // Hide global toolbar if a mindmap node is selected because they have their own integrated tool island

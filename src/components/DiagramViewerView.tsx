@@ -1,4 +1,4 @@
-import React, { lazy, Suspense } from 'react';
+import React, { lazy, Suspense, useState } from 'react';
 import type { TFunction } from 'i18next';
 import Spin from 'antd/es/spin';
 import { ConfigProvider } from 'antd';
@@ -88,6 +88,7 @@ interface DiagramViewerViewProps {
     aiCanvasOps: AIChatViewProps['canvasOps'];
     handleAiTabIntercept: () => boolean;
     shareDialogOpen: boolean;
+    openShareDialog: NonNullable<DiagramComponentProps['onOpenShareDialog']>;
     closeShareDialog: ShareDialogProps['onClose'];
     ensureSaved: ShareDialogProps['onEnsureSaved'];
     cloudManagerVisible: boolean;
@@ -150,6 +151,7 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
     aiCanvasOps,
     handleAiTabIntercept,
     shareDialogOpen,
+    openShareDialog,
     closeShareDialog,
     ensureSaved,
     cloudManagerVisible,
@@ -161,6 +163,8 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
     showDebugPanel,
     setShowDebugPanel,
 }) => {
+    const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(false);
+
     return (
         <DiagramThemeProvider>
             <DiagramLayout
@@ -266,8 +270,12 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
                                                 onCloudSave={saveToCloud}
                                                 onDirectSave={handleDirectSave}
                                                 isDirectSaveDisabled={false}
+                                                onOpenShareDialog={openShareDialog}
                                                 onOpenSettings={() => setIsSettingsOpen(true)}
                                                 onOpenCommandPalette={() => setIsCommandOpen(true)}
+                                                isVersionHistoryOpen={isVersionHistoryOpen}
+                                                onOpenVersionHistory={() => setIsVersionHistoryOpen(true)}
+                                                onVersionHistoryClose={() => setIsVersionHistoryOpen(false)}
                                                 loadLayoutPresetMap={loadLayoutPresetMap}
                                                 renderVersionHistoryPanel={renderVersionHistoryPanel}
                                                 renderAIChatPanel={({ onClose }) => (

@@ -111,7 +111,7 @@
   }
 
   .flowchart-empty-action.ant-btn {
-    min-height: 44px;
+    min-height: var(--commercial-touch-target, 44px);
     margin-top: 18px;
   }
 }

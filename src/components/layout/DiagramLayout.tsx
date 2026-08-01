@@ -24,6 +24,7 @@ import {
 } from './diagramLayoutGuards';
 import { logDiagramLayoutFailure } from './diagramLayoutLogging';
 import { getWindowSearchString } from '@/core/utils/inputBoundary';
+import { resolvePhysicalTouchTargetSize } from '@/core/utils/interactionMetrics';
 
 const { Header, Sider, Content } = Layout;
 
@@ -208,8 +209,9 @@ export const DiagramLayout: React.FC<DiagramLayoutProps> = ({
           overflow: 'hidden',
           minHeight: 0,
           zoom: uiScale,
+          '--commercial-touch-target': `${resolvePhysicalTouchTargetSize(uiScale)}px`,
           transition: 'zoom 0.2s ease-out, height 0.2s ease-out, width 0.2s ease-out'
-        }}
+        } as React.CSSProperties}
       >
         {!isPresentationMode && (
           <Header

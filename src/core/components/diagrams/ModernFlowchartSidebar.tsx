@@ -344,10 +344,12 @@ export const ModernFlowchartSidebar: React.FC<FlowchartSidebarProps> = ({
                             <Input
                                 prefix={<FaSearch style={{ color: token.colorTextDescription }} />}
                                 placeholder={t('designer.sidebar.search')}
+                                aria-label={t('designer.sidebar.search')}
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 allowClear
-                                size="small"
+                                size="middle"
+                                style={{ minHeight: 'var(--commercial-touch-target, 44px)' }}
                             />
                         </div>
 
@@ -389,6 +391,8 @@ export const ModernFlowchartSidebar: React.FC<FlowchartSidebarProps> = ({
                                         <div style={{ padding: '0 8px', overflowY: 'auto', flex: 1 }}>
                                             {navigatorTreeData.length > 0 ? (
                                                 <Tree<NavigatorTreeNode>
+                                                    aria-label={t('designer.sidebar.navigator')}
+                                                    className="navigator-tree-commercial"
                                                     treeData={navigatorTreeData}
                                                     blockNode
                                                     expandedKeys={expandedKeys}
@@ -411,6 +415,7 @@ export const ModernFlowchartSidebar: React.FC<FlowchartSidebarProps> = ({
                                                                     alignItems: 'center',
                                                                     gap: 8,
                                                                     padding: '4px 0',
+                                                                    minHeight: 'var(--commercial-touch-target, 44px)',
                                                                     opacity: !searchTerm || treeNode.isMatched ? 1 : 0.4
                                                                 }}
                                                             >

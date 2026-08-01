@@ -132,6 +132,18 @@
     min-width: 0;
   }
 
+  .diagram-card-actions {
+    top: 8px;
+    right: 8px;
+    opacity: 1;
+  }
+
+  .action-btn-glass {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+  }
+
   .workspace-view-controls {
     display: none;
   }

@@ -35,6 +35,7 @@ interface TopActionButtonsProps {
     extraActionItems?: React.ReactNode;
     onShare?: () => void;
     onShowHistory?: () => void;
+    onOpenVersionHistory?: () => void;
     /** 右侧面板宽度偏移量，工具栏位置 = right: 20 + rightOffset */
     rightOffset?: number;
     children?: React.ReactNode;
@@ -62,7 +63,7 @@ interface TopActionButtonsProps {
 export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
     diagramId, onEditJson,
     onStartPresentation, onShowDiff,
-    onSaveToCloud, onDirectSave, isDirectSaveDisabled, extraActionItems, onShare, onShowHistory,
+    onSaveToCloud, onDirectSave, isDirectSaveDisabled, extraActionItems, onShare, onShowHistory, onOpenVersionHistory,
     rightOffset = 0,
     children,
     extraExportItems,
@@ -152,6 +153,7 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
             key: 'edit-json',
             label: t('designer.toolbar.edit'),
             icon: <FaCode />,
+            disabled: isReadonly,
             onClick: onEditJson,
         }] : []),
         ...(onShowDiff ? [{
@@ -161,15 +163,22 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
             onClick: onShowDiff,
         }] : []),
         ...(onShowHistory ? [{
-            key: 'history',
-            label: t('designer.toolbar.historyPanel'),
+            key: 'operation-history',
+            label: t('designer.toolbar.operationHistory', '操作历史'),
             icon: <FaHistory />,
             onClick: onShowHistory,
+        }] : []),
+        ...(onOpenVersionHistory ? [{
+            key: 'version-history',
+            label: t('designer.toolbar.versionHistory', '版本快照'),
+            icon: <FaHistory />,
+            onClick: onOpenVersionHistory,
         }] : []),
         ...(onSmartOptimize ? [{
             key: 'smart-optimize',
             label: t('designer.toolbar.smartOptimize'),
             icon: <FaMagic />,
+            disabled: isReadonly,
             onClick: onSmartOptimize,
         }] : []),
         ];
@@ -184,6 +193,7 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
             key: 'ai',
             label: t('aiChat.title', 'AI 助手'),
             icon: <FaRobot />,
+            disabled: isReadonly,
             onClick: onToggleAI,
         }] : []),
         ...((extraExportItems && extraExportItems.length > 0) ? [{
@@ -212,6 +222,7 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
                 ? t('designer.toolbar.commentModeExit')
                 : t('designer.toolbar.commentMode'),
             icon: <FaRegComment />,
+            disabled: isReadonly,
             onClick: () => setIsCommentMode(!isCommentMode),
         },
         ...(onReadonlyChange ? [{
@@ -245,6 +256,7 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
         onReadonlyChange,
         onShowDiff,
         onShowHistory,
+        onOpenVersionHistory,
         onSmartOptimize,
         onStartPresentation,
         onToggleAI,
@@ -310,10 +322,11 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
             {onShare && (
                 <Button
                     type="primary"
+                    aria-label={t('designer.toolbar.share')}
                     icon={<FaShareAlt className="text-[11px]" />}
                     onClick={onShare}
                     className="flex items-center gap-1 transition-transform active:scale-95 ml-0.5"
-                    style={{ height: 28, borderRadius: 9999, border: 'none', padding: isSmallMobile ? '0 8px' : '0 12px', fontSize: 12, background: 'var(--designer-primary, #1a73e8)', boxShadow: '0 1px 4px rgba(26,115,232,0.3)' }}
+                    style={{ height: 'var(--commercial-touch-target, 44px)', minWidth: 'var(--commercial-touch-target, 44px)', borderRadius: 9999, border: 'none', padding: isSmallMobile ? '0 12px' : '0 16px', fontSize: 12, background: 'var(--designer-primary, #1a73e8)', boxShadow: '0 1px 4px rgba(26,115,232,0.3)' }}
                 >
                     <span className="hidden xl:inline">{t('designer.toolbar.share')}</span>
                 </Button>

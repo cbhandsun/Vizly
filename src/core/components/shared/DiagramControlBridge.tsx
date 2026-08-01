@@ -4,6 +4,7 @@ import {
   coerceDiagramSidebarOffset,
   computeDiagramFitViewport,
   MIN_DIAGRAM_FULL_FIT_ZOOM,
+  resolveDiagramFitLayout,
 } from './diagramControlFit';
 import { computeDiagramNodeBounds } from './diagramNodeBounds';
 import { logDiagramControlBridgeFailure } from './diagramControlLogging';
@@ -102,22 +103,17 @@ const DiagramControlBridge: React.FC<DiagramControlBridgeProps> = ({ diagramId }
           ) as HTMLElement;
           const applyViewport = (duration?: number) => {
             const rootStyle = getComputedStyle(document.documentElement);
+            const fitLayout = resolveDiagramFitLayout({
+              viewportWidth: viewportEl.clientWidth,
+              leftSidebarOffset: rootStyle.getPropertyValue('--left-sidebar-offset'),
+              rightSidebarOffset: rootStyle.getPropertyValue('--right-sidebar-offset'),
+            });
             const viewport = computeDiagramFitViewport({
               bounds,
               viewportWidth: viewportEl.clientWidth,
               viewportHeight: viewportEl.clientHeight,
-              safeArea: {
-                top: 84,
-                right: coerceDiagramSidebarOffset(
-                  rootStyle.getPropertyValue('--right-sidebar-offset'),
-                ),
-                bottom: 64,
-                left: coerceDiagramSidebarOffset(
-                  rootStyle.getPropertyValue('--left-sidebar-offset'),
-                  76,
-                ),
-              },
-              padding: 8,
+              safeArea: fitLayout.safeArea,
+              padding: fitLayout.padding,
             });
             if (!viewport) {
               rf.fitView({ padding: 24, includeHiddenNodes: false, duration, minZoom: MIN_DIAGRAM_FULL_FIT_ZOOM, maxZoom: 1 });

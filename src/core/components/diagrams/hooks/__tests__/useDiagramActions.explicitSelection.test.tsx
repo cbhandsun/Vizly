@@ -7,6 +7,16 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { useDiagramActions } from '../useDiagramActions';
 
+vi.mock('react-i18next', () => ({
+    useTranslation: () => ({
+        t: (key: string, options?: Record<string, unknown>) => {
+            if (key === 'designer.flowchart.newNode') return 'Node';
+            if (key === 'designer.flowchart.duplicateLabel') return `${String(options?.label ?? 'Node')} (Copy)`;
+            return key;
+        },
+    }),
+}));
+
 const node = (id: string, selected = false): Node => ({
     id,
     type: 'custom',
@@ -84,6 +94,7 @@ describe('useDiagramActions explicit selection targets', () => {
 
     it('locks all explicit toolbar targets in one history step', () => {
         const initialNodes = [node('node-1', true), node('node-2', true), node('node-3')];
+        const nodesRef = { current: initialNodes };
         let currentNodes = initialNodes;
         const setNodes = vi.fn((update: SetStateAction<Node[]>) => {
             currentNodes = typeof update === 'function' ? update(currentNodes) : update;
@@ -93,7 +104,7 @@ describe('useDiagramActions explicit selection targets', () => {
         const { result } = renderHook(() => useDiagramActions({
             nodes: [],
             edges: [],
-            nodesRef: { current: initialNodes },
+            nodesRef,
             edgesRef: { current: [] },
             setNodes,
             setEdges: vi.fn(),
@@ -115,5 +126,19 @@ describe('useDiagramActions explicit selection targets', () => {
             { id: 'node-2', draggable: false, locked: true },
             { id: 'node-3', draggable: undefined, locked: undefined },
         ]);
+
+        act(() => result.current.handleLock(['node-1', 'node-2'], false));
+
+        expect(takeSnapshot).toHaveBeenCalledTimes(2);
+        expect(currentNodes.slice(0, 2).map(item => ({
+            draggable: item.draggable,
+            locked: item.data.locked,
+        }))).toEqual([
+            { draggable: true, locked: false },
+            { draggable: true, locked: false },
+        ]);
+
+        act(() => result.current.handleLock(['node-1', 'node-2'], false));
+        expect(takeSnapshot).toHaveBeenCalledTimes(2);
     });
 });

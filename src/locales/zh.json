@@ -466,6 +466,7 @@
             "saveToCloud": "保存到云端",
             "directSave": "保存到当前位置",
             "directSaveDisabled": "当前状态无法直接保存",
+            "readonlyStatus": "画布已锁定 · 仅可查看",
             "saveOptions": "保存选项",
             "documentActions": "文档操作",
             "pluginExport": "插件导出",
@@ -544,6 +545,7 @@
             "download": "下载文件",
             "applyOnly": "仅预览并应用",
             "saveAndClose": "应用修改并关闭",
+            "basicEditorLabel": "JSON 基础编辑器",
             "reactFlowWarning": "当前处于 React Flow 内部渲染节点/边结构大纲预览（只读）。该模式仅供 Debug，不支持反向应用。如需修改架构，请切换到标准数据模式。"
         },
         "statusBar": {
@@ -554,6 +556,14 @@
             "selectedSummary": "已选：{{nodes}} 节点，{{edges}} 连线",
             "smartRoutingEnabled": "智能布线已启用",
             "directRoutingEnabled": "直接连线模式"
+        },
+        "pages": {
+            "tabList": "页面",
+            "new": "新建页面",
+            "rename": "重命名页面 {{name}}",
+            "delete": "删除页面 {{name}}",
+            "deleteConfirm": "删除「{{name}}」？",
+            "deleteAction": "删除"
         },
         "flowchart": {
             "emptyState": {
@@ -666,6 +676,7 @@
                 "nodeDagre": "◈ Dagre分层 (默认)"
             },
             "newNode": "新节点",
+            "duplicateLabel": "{{label}}（副本）",
             "nodeAdded": "已添加 {{label}}",
             "nodeAriaLabel": "节点：{{label}}{{selectedState}}{{lockedState}}",
             "nodeSelectedState": "（已选中）",
@@ -834,6 +845,8 @@
         "saveAs": {
             "title": "另存为至 {{target}}...",
             "namePlaceholder": "请输入图表名称：",
+            "nameLabel": "图表名称",
+            "defaultName": "未命名流程图",
             "nameRequired": "名称不能为空",
             "saving": "正在保存至 {{target}}...",
             "localSuccess": "已存入本地模板库",
@@ -841,6 +854,7 @@
             "error": "保存失败：{{message}}"
         },
         "directSave": {
+            "locationRequired": "当前图表还没有保存位置，请从“另存为”中选择本地、S3 或 Supabase。",
             "saving": "覆盖保存至 {{provider}}...",
             "success": "覆盖保存成功",
             "error": "覆盖出错: {{message}}"
@@ -938,6 +952,10 @@
         "apply": "应用",
         "inputHint": "⌨️ Enter 发送 | Shift+Enter 换行 | Esc 关闭",
         "inputPlaceholder": "描述你想生成的架构图... 输入 / 查看命令",
+        "inputLabel": "向 AI 助手发送消息",
+        "voiceInput": "语音输入（测试版）",
+        "stopGeneration": "停止生成",
+        "sendMessage": "发送消息",
         "saveDialogTitle": "保存图表",
         "confirmSave": "确认保存",
         "cancel": "取消",

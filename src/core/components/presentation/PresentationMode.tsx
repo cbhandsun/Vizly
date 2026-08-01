@@ -186,6 +186,7 @@ const PresentationMode: React.FC<PresentationModeProps> = ({ slides, onFocusNode
           <div className="presentation-progress-fill" style={{ width: `${progress}%` }} />
           {slides.map((_, i) => (
             <button
+              type="button"
               key={i}
               className={`presentation-dot ${i === currentIndex ? 'active' : ''} ${i < currentIndex ? 'visited' : ''}`}
               onClick={() => setCurrentIndex(i)}

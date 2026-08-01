@@ -10,6 +10,7 @@ import { GestureOverlay } from '../shared/GestureOverlay';
 import { CanvasRuler, RulerCorner } from './CanvasRuler';
 import { ContextMenuLayer } from './ContextMenuLayer';
 import { DesignerCanvasFeaturesLayer } from './ui/DesignerCanvasFeaturesLayer';
+import { DiagramEditingProvider } from './DiagramEditingContext';
 import { DesignerHeaderLayer } from './ui/DesignerHeaderLayer';
 import { FlowchartCanvasShell } from './FlowchartCanvasShell';
 import { FlowchartEmptyState } from './FlowchartEmptyState';
@@ -163,6 +164,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
         onSmartNodeDrag,
         onOpenSettings,
         onOpenShareDialog,
+        onOpenVersionHistory,
         onPaneContextMenu,
         onPaneDoubleClick,
         onPaneMouseLeave,
@@ -231,6 +233,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
     } = model;
 
     const _actualLeftOffset = isSidebarHidden ? 0 : (leftDrawerOpen ? 64 + leftDrawerWidth : 64);
+    const editingEnabled = !isReadonly && !presentationActive;
     const showEditingChrome = !presentationActive;
 
     return (
@@ -255,7 +258,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                     title={t('designer.toolbar.import')}
                 />
             }
-            leftSidebar={<FlowchartDesignerLeftSidebar model={model} />}
+            leftSidebar={editingEnabled ? <FlowchartDesignerLeftSidebar model={model} /> : null}
             canvasArea={
                 <>
                     {showEditingChrome && showRuler && (
@@ -266,7 +269,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                         </>
                     )}
 
-                    <FlowchartOnboardingHint
+                    {editingEnabled && <FlowchartOnboardingHint
                         visible={shouldShowFlowchartOnboarding({
                             isMobile,
                             pluginId,
@@ -285,11 +288,11 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                             setOnboardingDismissed(true);
                             persistFlowchartOnboardingDismissed();
                         }}
-                    />
-                    <FlowchartEmptyState
+                    />}
+                    {editingEnabled && <FlowchartEmptyState
                         visible={pluginId !== 'mindmap' && !isInitialDiagramLoading && nodes.length === 0 && !jsonEditorVisible && !isDragging && !isConnecting && !quickAddMenu?.visible}
                         onOpenShapePicker={() => setMobileRequestedPanel('shapes')}
-                    />
+                    />}
                     {isInitialDiagramLoading && (
                         <div
                             style={{
@@ -308,7 +311,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                         </div>
                     )}
                     <div ref={reactFlowWrapper} style={{ position: 'relative', height: '100%' }}>
-                        <ContextMenuLayer onAction={handleContextMenuAction} activePlugin={activePlugin} pluginCtx={pluginCtx ?? undefined} />
+                        {editingEnabled && <ContextMenuLayer onAction={handleContextMenuAction} activePlugin={activePlugin} pluginCtx={pluginCtx ?? undefined} />}
 
                         {showEditingChrome && <DesignerHeaderLayer
                             diagramId={diagramIdForExport}
@@ -332,6 +335,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                     }
                                 },
                                 onShowHistory: () => setHistoryPanelVisible((prev: boolean) => !prev),
+                                onOpenVersionHistory,
                                 onSaveToCloud: onCloudSave ? handleWrappedCloudSave : undefined,
                                 onDirectSave: onDirectSave ? handleWrappedDirectSave : undefined,
                                 isDirectSaveDisabled,
@@ -438,6 +442,30 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                             }}
                         />}
 
+                        {isReadonly && !presentationActive && (
+                            <div
+                                role="status"
+                                aria-live="polite"
+                                style={{
+                                    position: 'absolute',
+                                    top: 72,
+                                    left: '50%',
+                                    transform: 'translateX(-50%)',
+                                    zIndex: 120,
+                                    padding: '8px 14px',
+                                    borderRadius: 999,
+                                    background: 'rgba(15, 23, 42, 0.9)',
+                                    color: '#fff',
+                                    fontSize: 13,
+                                    fontWeight: 600,
+                                    pointerEvents: 'none',
+                                }}
+                            >
+                                {t('designer.toolbar.readonlyStatus', '画布已锁定 · 仅可查看')}
+                            </div>
+                        )}
+
+                        <DiagramEditingProvider value={editingEnabled}>
                         <LayoutStabilityContext.Provider value={isLayoutStable}>
                             <div
                                 className="canvas-touch-wrapper"
@@ -491,9 +519,10 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                     isValidConnection={isValidConnection}
                                     snapEnabled={snapEnabled}
                                     isDragging={isDragging}
+                                    editingEnabled={editingEnabled}
                                 >
                                     <RemoteCursors />
-                                    {showEditingChrome && <DesignerCanvasFeaturesLayer
+                                    {editingEnabled && <DesignerCanvasFeaturesLayer
                                         quickConnect={{
                                             visible: !!quickAddMenu?.visible,
                                             x: quickAddMenu?.clientX || 0,
@@ -504,6 +533,8 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                             onPreview: setQuickConnectPreview,
                                         }}
                                         hoverToolbar={{
+                                            selectedNodes,
+                                            selectedEdges,
                                             nodeTypes: dynamicNodeTypes,
                                             pluginCtx: pluginCtx ?? undefined,
                                             activePlugin,
@@ -570,13 +601,13 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                             onBeforeReplace: handleBeforeReplace,
                                         }}
                                     />}
-                                    {showEditingChrome && <FreehandDrawingLayer
+                                    {editingEnabled && <FreehandDrawingLayer
                                         isDrawingMode={isDrawingMode}
                                         zoom={viewport.zoom}
                                         pan={{ x: viewport.x, y: viewport.y }}
                                         currentColor={preset.name === 'sketch' ? '#555555' : '#000000'}
                                     />}
-                                    {resolveFlowchartPluginContribution(
+                                    {editingEnabled && resolveFlowchartPluginContribution(
                                         'canvas',
                                         pluginCtx && activePlugin?.contributeCanvasComponents
                                             ? () => activePlugin.contributeCanvasComponents?.(pluginCtx)
@@ -589,10 +620,11 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                 </FlowchartCanvasShell>
                             </div>
                         </LayoutStabilityContext.Provider>
+                        </DiagramEditingProvider>
                     </div>
                 </>
             }
-            rightSidebar={<FlowchartDesignerRightSidebarRegion model={model} />}
+            rightSidebar={editingEnabled ? <FlowchartDesignerRightSidebarRegion model={model} /> : null}
             overlays={<FlowchartDesignerOverlaysRegion model={model} />}
         />
     );

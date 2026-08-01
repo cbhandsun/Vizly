@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 
 type CanvasOpsOptions = {
@@ -22,6 +22,7 @@ const exportToPNGMock = vi.fn();
 const exportToPDFMock = vi.fn();
 const exportToSVGMock = vi.fn();
 const exportToGIFMock = vi.fn();
+const openShareDialogMock = vi.fn();
 const useDiagramControlsMock = vi.fn((
     _diagramId: string,
     _ready: boolean,
@@ -96,6 +97,7 @@ vi.mock('../diagrams/hooks/useCloudSave', () => ({
     useCloudSave: () => ({
         saveToCloud: vi.fn(),
         shareDialogOpen: false,
+        openShareDialog: openShareDialogMock,
         closeShareDialog: vi.fn(),
         ensureSaved: vi.fn(),
     }),
@@ -248,7 +250,9 @@ vi.mock('@/data/diagram-definitions', () => ({
     diagramDefinitions: [{
         id: 'test-diagram',
         name: 'test',
-        component: () => <div data-testid="diagram" />,
+        component: (props: { onOpenShareDialog?: () => void }) => (
+            <button data-testid="diagram" onClick={props.onOpenShareDialog}>diagram</button>
+        ),
     }],
 }));
 
@@ -319,5 +323,18 @@ describe('DiagramViewer regression', () => {
                 { id: 'edge-1', source: 'node-1', target: 'node-2' },
             ],
         });
+    });
+
+    it('wires the cloud share action into the selected designer', () => {
+        openShareDialogMock.mockClear();
+
+        render(
+            <MemoryRouter initialEntries={['/diagram?diagram=test-diagram']}>
+                <DiagramViewer />
+            </MemoryRouter>
+        );
+
+        fireEvent.click(screen.getByTestId('diagram'));
+        expect(openShareDialogMock).toHaveBeenCalledTimes(1);
     });
 });

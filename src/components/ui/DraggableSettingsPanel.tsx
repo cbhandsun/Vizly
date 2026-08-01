@@ -1,4 +1,4 @@
-import React, { ReactNode, useMemo } from 'react';
+import React, { ReactNode, useEffect, useId, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { ConfigProvider } from 'antd';
 import { MdDragIndicator } from 'react-icons/md';
@@ -10,33 +10,94 @@ interface DraggableSettingsPanelProps {
     title: string;
 }
 
-export const SETTINGS_PANEL_Z_INDEX = 900;
-export const SETTINGS_PANEL_POPUP_Z_INDEX = 950;
+export const SETTINGS_PANEL_Z_INDEX = 1100;
+export const SETTINGS_PANEL_POPUP_Z_INDEX = 1150;
 
 export const DraggableSettingsPanel: React.FC<DraggableSettingsPanelProps> = ({ children, onClose, title }) => {
-    // 初始位置设为居中偏上，避免与右侧属性面板（DesignerRightSidebar）冲突
     const initialPos = useMemo(() => ({
-        x: Math.max(20, (window.innerWidth - 440) / 2),
-        y: 80
+        x: Math.max(16, (window.innerWidth - Math.min(480, window.innerWidth - 32)) / 2),
+        y: Math.max(16, Math.min(80, window.innerHeight - 160)),
     }), []);
+    const titleId = useId();
+    const onCloseRef = useRef(onClose);
+    useEffect(() => {
+        onCloseRef.current = onClose;
+    }, [onClose]);
 
     const { panelRef, handlePointerDown } = useDraggablePanel({
-        initialPosition: initialPos
+        initialPosition: initialPos,
+        viewportInset: 16,
     });
+
+    useEffect(() => {
+        const previouslyFocused = document.activeElement instanceof HTMLElement
+            ? document.activeElement
+            : null;
+        const panel = panelRef.current;
+        panel?.querySelector<HTMLElement>('[data-settings-close]')?.focus();
+        const handleEscape = (event: KeyboardEvent) => {
+            if (event.key !== 'Escape') return;
+            event.preventDefault();
+            onCloseRef.current();
+        };
+        document.addEventListener('keydown', handleEscape);
+        return () => {
+            document.removeEventListener('keydown', handleEscape);
+            previouslyFocused?.focus();
+        };
+    }, [panelRef]);
+
+    const handleDialogKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+        if (event.key !== 'Tab' || !panelRef.current) return;
+        const focusable = Array.from(panelRef.current.querySelectorAll<HTMLElement>(
+            'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+        )).filter(element => !element.hasAttribute('hidden'));
+        if (focusable.length === 0) {
+            event.preventDefault();
+            panelRef.current.focus();
+            return;
+        }
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+        }
+    };
 
     return createPortal(
         <div
+            style={{
+                position: 'fixed',
+                inset: 0,
+                zIndex: SETTINGS_PANEL_Z_INDEX,
+                background: 'rgba(15, 23, 42, 0.12)',
+            }}
+            onPointerDown={(event) => {
+                if (event.target === event.currentTarget) onClose();
+            }}
+        >
+        <div
             ref={panelRef}
-            className="bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.45)] dark:border-[rgba(255,255,255,0.12)] shadow-[0_24px_48px_-12px_rgba(0,0,0,0.15)] rounded-[20px] overflow-hidden"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+            tabIndex={-1}
+            onKeyDown={handleDialogKeyDown}
+            className="bg-[rgba(255,255,255,0.92)] dark:bg-[rgba(28,28,41,0.92)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.45)] dark:border-[rgba(255,255,255,0.12)] shadow-[0_24px_48px_-12px_rgba(0,0,0,0.22)] rounded-[20px] overflow-hidden"
             style={{
                 position: 'fixed',
                 top: 0,
                 left: 0,
-                width: '480px',
-                maxHeight: 'calc(100vh - 100px)',
+                width: 'calc(100vw - 32px)',
+                maxWidth: 480,
+                maxHeight: 'calc(100dvh - 32px)',
                 display: 'flex',
                 flexDirection: 'column',
-                zIndex: SETTINGS_PANEL_Z_INDEX,
+                zIndex: 1,
             }}
             onPointerDown={(e) => e.stopPropagation()}
         >
@@ -46,14 +107,20 @@ export const DraggableSettingsPanel: React.FC<DraggableSettingsPanelProps> = ({ 
             >
                 <div className="flex items-center gap-3">
                     <MdDragIndicator className="text-gray-400 dark:text-gray-500 text-[20px]" />
-                    <span className="font-semibold text-[15px] tracking-wide text-gray-800 dark:text-gray-200">{title}</span>
+                    <span id={titleId} className="font-semibold text-[15px] tracking-wide text-gray-800 dark:text-gray-200">{title}</span>
                 </div>
                 <button
                     type="button"
+                    data-settings-close
                     aria-label={`关闭${title}`}
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={(e) => { e.stopPropagation(); onClose(); }}
-                    className="flex items-center justify-center w-7 h-7 rounded-full bg-transparent hover:bg-black/5 dark:bg-transparent dark:hover:bg-white/10 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors border-none outline-none cursor-pointer"
+                    className="flex items-center justify-center rounded-full bg-transparent hover:bg-black/5 dark:bg-transparent dark:hover:bg-white/10 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors border-none outline-none cursor-pointer"
+                    style={{
+                        width: 'var(--commercial-touch-target, 44px)',
+                        height: 'var(--commercial-touch-target, 44px)',
+                        flexShrink: 0,
+                    }}
                 >
                     <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M1 1L13 13M1 13L13 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
@@ -78,6 +145,7 @@ export const DraggableSettingsPanel: React.FC<DraggableSettingsPanelProps> = ({ 
                     {children}
                 </div>
             </ConfigProvider>
+        </div>
         </div>,
         document.body
     );

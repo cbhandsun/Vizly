@@ -54,6 +54,6 @@ describe('CanvasSearchBar', () => {
         );
 
         expect(css).toMatch(/@media \(max-width: 767px\)[\s\S]*?\.canvas-search-bar[\s\S]*?top: 96px/);
-        expect(css).toMatch(/\.canvas-search-icon-button[\s\S]*?min-width: 44px !important[\s\S]*?height: 44px !important/);
+        expect(css).toMatch(/\.canvas-search-icon-button[\s\S]*?min-width: var\(--commercial-touch-target, 44px\) !important[\s\S]*?height: var\(--commercial-touch-target, 44px\) !important/);
     });
 });

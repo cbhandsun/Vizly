@@ -140,6 +140,8 @@ export interface DiagramComponentProps {
   onOpenCommandPalette?: () => void;
   /** (IoC) 是否打开版本历史面板 */
   isVersionHistoryOpen?: boolean;
+  /** (IoC) 打开版本历史面板回调 */
+  onOpenVersionHistory?: () => void;
   /** (IoC) 关闭版本历史面板回调 */
   onVersionHistoryClose?: () => void;
   /** (IoC) 应用层提供版本历史实现，核心画布不直接依赖存储/UI 适配器 */

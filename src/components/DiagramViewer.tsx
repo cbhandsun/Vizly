@@ -148,7 +148,7 @@ const DiagramViewer: React.FC = () => {
         enabled: isCollabEnabled
     });
 
-    const { saveToCloud, shareDialogOpen, closeShareDialog, ensureSaved } = useCloudSave(selectedDiagramId);
+    const { saveToCloud, shareDialogOpen, openShareDialog, closeShareDialog, ensureSaved } = useCloudSave(selectedDiagramId);
     
     // --- Phase 6: Mermaid Import Logic ---
     const handleImportMermaidNodes = useCallback(async (nodes: unknown[], edges: unknown[]) => {
@@ -668,6 +668,7 @@ const DiagramViewer: React.FC = () => {
             aiCanvasOps={aiCanvasOps}
             handleAiTabIntercept={handleAiTabIntercept}
             shareDialogOpen={shareDialogOpen}
+            openShareDialog={openShareDialog}
             closeShareDialog={closeShareDialog}
             ensureSaved={ensureSaved}
             cloudManagerVisible={cloudManagerVisible}

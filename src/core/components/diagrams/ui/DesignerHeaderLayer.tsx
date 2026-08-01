@@ -20,6 +20,7 @@ export interface DesignerHeaderLayerProps {
         onStartPresentation: () => void;
         onShowDiff: () => void;
         onShowHistory: () => void;
+        onOpenVersionHistory?: () => void;
         onSaveToCloud?: () => Promise<void>;
         onDirectSave?: () => Promise<void>;
         isDirectSaveDisabled?: boolean;
@@ -121,6 +122,7 @@ export const DesignerHeaderLayer = React.memo(
                     onStartPresentation={topActions.onStartPresentation}
                     onShowDiff={topActions.onShowDiff}
                     onShowHistory={topActions.onShowHistory}
+                    onOpenVersionHistory={topActions.onOpenVersionHistory}
                     onSaveToCloud={topActions.onSaveToCloud}
                     onDirectSave={topActions.onDirectSave}
                     isDirectSaveDisabled={topActions.isDirectSaveDisabled}
@@ -162,10 +164,10 @@ export const DesignerHeaderLayer = React.memo(
                         }
                     ]}
                 >
-                    {topActions.pluginToolbar}
+                    {!topActions.isReadonly && topActions.pluginToolbar}
                 </TopActionButtons>
 
-                {topActions.topActionArea && (
+                {!topActions.isReadonly && topActions.topActionArea && (
                     <div style={{ position: 'absolute', top: 16, left: 24, zIndex: 110 }} className="designer-top-left-actions">
                         {topActions.topActionArea}
                     </div>
@@ -178,7 +180,7 @@ export const DesignerHeaderLayer = React.memo(
                     </div>
                 )}
                 
-                <ModernFlowchartToolbar
+                {!topActions.isReadonly && <ModernFlowchartToolbar
                     canUndo={toolbar.canUndo}
                     canRedo={toolbar.canRedo}
                     onUndo={toolbar.onUndo}
@@ -234,7 +236,7 @@ export const DesignerHeaderLayer = React.memo(
                     historyCount={toolbar.historyCount}
                     onAlign={toolbar.onAlign}
                     onDistribute={toolbar.onDistribute}
-                />
+                />}
             </>
         );
     },

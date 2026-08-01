@@ -13,6 +13,11 @@ import {
 } from '@ant-design/icons';
 import { PluginRegistry } from '../../../services/PluginRegistry';
 import { DiagramTypePlugin } from '../../../types';
+import {
+  COMMERCIAL_VIEWPORT_MODAL_CLASS,
+  COMMERCIAL_VIEWPORT_MODAL_Z_INDEX,
+  getViewportOverlayContainer,
+} from '../../ui/viewportOverlayPortal';
 import './PluginMarketplace.css';
 
 const { Text, Title, Paragraph } = Typography;
@@ -130,11 +135,21 @@ export const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ visible,
               <Text type="secondary" style={{ fontSize: 12 }}>{t('pluginMarketplace.statusInactive')}</Text>
             )}
           </Space>
-          <Switch 
-            size="small"
-            checked={isActive} 
-            onChange={(checked) => togglePlugin(plugin.id, checked)}
-          />
+          <div
+            className="plugin-card-switch-target"
+            role="switch"
+            tabIndex={0}
+            aria-checked={Boolean(isActive)}
+            aria-label={`${isActive ? '停用' : '启用'}插件：${plugin.name}`}
+            onClick={() => togglePlugin(plugin.id, !isActive)}
+            onKeyDown={(event) => {
+              if (event.key !== 'Enter' && event.key !== ' ') return;
+              event.preventDefault();
+              togglePlugin(plugin.id, !isActive);
+            }}
+          >
+            <Switch size="small" checked={isActive} tabIndex={-1} aria-hidden="true" />
+          </div>
         </div>
       </div>
     );
@@ -144,7 +159,10 @@ export const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ visible,
     <Modal
       title={null}
       open={visible}
+      rootClassName={`${COMMERCIAL_VIEWPORT_MODAL_CLASS} plugin-manager-modal`}
       onCancel={onClose}
+      getContainer={getViewportOverlayContainer}
+      zIndex={COMMERCIAL_VIEWPORT_MODAL_Z_INDEX}
       footer={null}
       width={860}
       centered
@@ -154,6 +172,7 @@ export const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ visible,
       <div className="marketplace-container">
         <Button
           type="text"
+          className="plugin-manager-close"
           aria-label={t('common.close')}
           icon={<CloseOutlined aria-hidden="true" />}
           onClick={onClose}
@@ -171,7 +190,7 @@ export const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ visible,
           }}
         />
         {/* Banner Section */}
-        <div style={{ height: 160, position: 'relative', overflow: 'hidden', padding: 24, display: 'flex', alignItems: 'center' }}>
+        <div className="marketplace-hero" style={{ height: 160, position: 'relative', overflow: 'hidden', padding: 24, display: 'flex', alignItems: 'center' }}>
             <img 
                 src="/assets/marketplace_banner.png" 
                 alt="Marketplace Banner"
@@ -192,17 +211,21 @@ export const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ visible,
 
             <Button 
                 type="primary" 
+                className="marketplace-discover-button"
+                aria-label={t('pluginMarketplace.discoverMore')}
                 icon={<GlobalOutlined />} 
+                disabled
+                title="在线扩展市场即将开放"
                 style={{ position: 'absolute', bottom: 24, right: 24, borderRadius: 20 }}
             >
                 {t('pluginMarketplace.discoverMore')}
             </Button>
         </div>
 
-        <div style={{ padding: '0 24px 32px' }}>
+        <div className="marketplace-content" style={{ padding: '0 24px 32px' }}>
             {/* Search and Tabs */}
             <div className="marketplace-search-wrapper">
-                <Space size={20} style={{ width: '100%', justifyContent: 'space-between' }}>
+                <Space className="marketplace-toolbar" size={20} style={{ width: '100%', justifyContent: 'space-between' }}>
                     <Tabs
                         className="marketplace-tabs"
                         activeKey={activeTab}
@@ -216,6 +239,7 @@ export const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ visible,
                         ]}
                     />
                     <Input
+                        aria-label={t('pluginMarketplace.searchPlaceholder')}
                         prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
                         placeholder={t('pluginMarketplace.searchPlaceholder')}
                         style={{ width: 240, borderRadius: 20 }}
@@ -248,7 +272,7 @@ export const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ visible,
             )}
 
             {/* Delivery Section Simulation */}
-            <div style={{ 
+            <div className="marketplace-delivery" style={{
                 marginTop: 32, 
                 padding: '20px 24px', 
                 background: 'rgba(24, 144, 255, 0.04)', 
@@ -267,7 +291,9 @@ export const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ visible,
                         <div style={{ fontSize: 12, color: '#8c8c8c' }}>{t('pluginMarketplace.deliveryDesc')}</div>
                     </div>
                 </Space>
-                <Button type="link">{t('pluginMarketplace.configDevUrl')}</Button>
+                <Button type="link" disabled title="开发者 URL 配置即将开放">
+                    {t('pluginMarketplace.configDevUrl')}
+                </Button>
             </div>
         </div>
       </div>

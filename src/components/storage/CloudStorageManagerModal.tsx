@@ -27,6 +27,11 @@ import {
     logCloudStorageManagerOpenFailure,
     logCloudStorageManagerSharedLoadFailure,
 } from '@/components/diagrams/hooks/diagramStorageLogging';
+import {
+    COMMERCIAL_VIEWPORT_MODAL_CLASS,
+    COMMERCIAL_VIEWPORT_MODAL_Z_INDEX,
+    getViewportOverlayContainer,
+} from '@/core/components/ui/viewportOverlayPortal';
 
 
 const { Text } = Typography;
@@ -488,7 +493,9 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
             title={modalTitle}
             open={open}
             onCancel={onCancel}
-            getContainer={() => document.getElementById('app-root-layout') || document.body}
+            getContainer={getViewportOverlayContainer}
+            rootClassName={COMMERCIAL_VIEWPORT_MODAL_CLASS}
+            zIndex={COMMERCIAL_VIEWPORT_MODAL_Z_INDEX}
             footer={null}
             width={800}
             styles={{ body: { padding: '0 var(--glass-padding-lg, 32px) var(--glass-padding-lg, 32px)' } }}

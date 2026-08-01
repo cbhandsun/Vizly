@@ -204,7 +204,7 @@ export const FloatingContextToolbar: React.FC<FloatingContextToolbarProps> = Rea
 
     // ─── Derived state ───────────────────────────────────────────────────────
     const isHide = (feature: ToolbarFeature) => excludeToolbarFeatures?.includes(feature);
-    const allLocked = selectedNodes.every(n => n.draggable === false);
+    const allLocked = selectedNodes.every(node => node.data?.locked === true || node.draggable === false);
 
     const currentOpacity = selectedNodes.reduce((acc, n) => {
         const op = n.style?.opacity !== undefined ? Number(n.style.opacity) : 1;
