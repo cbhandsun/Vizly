@@ -103,6 +103,7 @@
             "emailPlaceholder": "Email Address",
             "emailRequired": "Please enter your email",
             "emailInvalid": "Please enter a valid email",
+            "emailTooLong": "Email address is too long",
             "sendMagicLink": "Send Magic Link",
             "magicLinkSent": "Magic link sent to your email",
             "checkEmailTitle": "Check your email",
@@ -116,6 +117,7 @@
                 "placeholder": "Password",
                 "required": "Please enter a password"
             },
+            "passwordTooLong": "Password cannot exceed 128 characters",
             "register": {
                 "passwordPlaceholder": "Password (min 6 characters)",
                 "passwordMin": "Password must be at least 6 characters",
@@ -133,7 +135,13 @@
             "hasAccount": "Already have an account?",
             "backToLogin": "Back to login",
             "setPasswordSuccess": "Password set successfully! You can now use it to sign in.",
-            "magicLinkHint": "💡 If you previously used Magic Link, you can continue using it. You can set a password later in your profile."
+            "magicLinkHint": "💡 If you previously used Magic Link, you can continue using it. You can set a password later in your profile.",
+            "errors": {
+                "accountExists": "An account already exists for this email. Try signing in instead.",
+                "passwordRejected": "This password does not meet the account security requirements.",
+                "rateLimited": "Too many attempts. Please wait a moment and try again.",
+                "unavailable": "Authentication is temporarily unavailable. Please try again."
+            }
         }
     },
     "storage": {

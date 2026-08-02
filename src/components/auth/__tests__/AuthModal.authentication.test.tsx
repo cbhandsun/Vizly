@@ -115,7 +115,10 @@ vi.mock('antd', async () => {
 
     return {
         Button: MockButton,
-        Form: Object.assign(MockForm, { Item: MockFormItem }),
+        Form: Object.assign(MockForm, {
+            Item: MockFormItem,
+            useForm: () => [{ resetFields: vi.fn() }],
+        }),
         Input: MockInput,
         Modal: MockModal,
         Tabs: MockTabs,

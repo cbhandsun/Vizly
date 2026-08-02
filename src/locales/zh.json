@@ -102,6 +102,7 @@
             "emailPlaceholder": "邮箱地址",
             "emailRequired": "请输入邮箱",
             "emailInvalid": "请输入有效的邮箱地址",
+            "emailTooLong": "邮箱地址过长",
             "sendMagicLink": "发送 Magic Link",
             "magicLinkSent": "登录链接已发送，请检查邮箱",
             "checkEmailTitle": "请查收邮箱",
@@ -115,6 +116,7 @@
                 "placeholder": "密码",
                 "required": "请输入密码"
             },
+            "passwordTooLong": "密码不能超过 128 位",
             "register": {
                 "passwordPlaceholder": "密码（至少6位）",
                 "passwordMin": "密码至少 6 位",
@@ -132,7 +134,13 @@
             "hasAccount": "已有账号？",
             "backToLogin": "返回登录",
             "setPasswordSuccess": "密码设置成功！下次可直接用密码登录。",
-            "magicLinkHint": "💡 如果您之前通过 Magic Link 登录过，可以继续使用此方式。登录后可在个人菜单中设置密码。"
+            "magicLinkHint": "💡 如果您之前通过 Magic Link 登录过，可以继续使用此方式。登录后可在个人菜单中设置密码。",
+            "errors": {
+                "accountExists": "该邮箱已注册，请直接登录。",
+                "passwordRejected": "该密码不符合账号安全要求，请更换后重试。",
+                "rateLimited": "尝试次数过多，请稍后再试。",
+                "unavailable": "认证服务暂时不可用，请重试。"
+            }
         }
     },
     "storage": {

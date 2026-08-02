@@ -1,10 +1,15 @@
 
-import React, { useState } from 'react';
-import { Modal, Form, Input, Button, Tabs, Typography } from 'antd';
+import React, { useLayoutEffect, useState } from 'react';
+import { Alert, Modal, Form, Input, Button, Tabs, Typography } from 'antd';
 import { UserOutlined, MailOutlined, LockOutlined, KeyOutlined } from '@ant-design/icons';
 import { useAuth } from '@/context/useAuth';
 import { useTranslation } from 'react-i18next';
 import { appMessage } from '@/core/utils/antdStaticBridge';
+import {
+    AUTH_EMAIL_MAX_LENGTH,
+    AUTH_PASSWORD_MAX_LENGTH,
+    useAuthOperation,
+} from './useAuthOperation';
 import './AuthModal.css';
 
 
@@ -29,85 +34,110 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 }) => {
     const { t } = useTranslation();
     const { signInWithEmail, signInWithPassword, signUp } = useAuth();
-    const [loading, setLoading] = useState(false);
     const [activeTab, setActiveTab] = useState<TabKey>('password');
     const [magicLinkSent, setMagicLinkSent] = useState(false);
+    const [passwordFormInstance] = Form.useForm();
+    const [magicLinkFormInstance] = Form.useForm();
+    const [registerFormInstance] = Form.useForm();
+    const operation = useAuthOperation(open);
+    const { invalidate: invalidateOperation } = operation;
+
+    useLayoutEffect(() => {
+        if (!open) invalidateOperation();
+    }, [invalidateOperation, open]);
 
     const handleClose = () => {
+        if (operation.busy) return;
         onCancel();
     };
 
     const resetTransientState = () => {
+        passwordFormInstance.resetFields();
+        magicLinkFormInstance.resetFields();
+        registerFormInstance.resetFields();
+        operation.invalidate();
         setMagicLinkSent(false);
         setActiveTab('password');
     };
 
     // ===== Password Login =====
     const onPasswordLogin = async (values: { email: string; password: string }) => {
-        setLoading(true);
-        const { error } = await signInWithPassword(values.email, values.password);
-        setLoading(false);
-
-        if (error) {
-            if (error.message === 'Invalid login credentials') {
-                appMessage.error(t('auth.modal.invalidCredentials'));
-            } else {
-                appMessage.error(error.message);
-            }
-        } else {
-            appMessage.success(t('auth.modal.loginSuccess'));
-            onAuthenticated?.();
-            handleClose();
-        }
+        await operation.run(
+            () => signInWithPassword(values.email, values.password),
+            {
+                onError: (messageKey) => appMessage.error(t(messageKey)),
+                onSuccess: () => {
+                    appMessage.success(t('auth.modal.loginSuccess'));
+                    onAuthenticated?.();
+                    onCancel();
+                },
+            },
+        );
     };
 
     // ===== Magic Link Login =====
     const onMagicLinkLogin = async (values: { email: string }) => {
-        setLoading(true);
-        const { error } = await signInWithEmail(values.email);
-        setLoading(false);
-
-        if (error) {
-            appMessage.error(error.message);
-        } else {
-            setMagicLinkSent(true);
-            appMessage.success(t('auth.modal.magicLinkSent'));
-        }
+        await operation.run(
+            () => signInWithEmail(values.email),
+            {
+                onError: (messageKey) => appMessage.error(t(messageKey)),
+                onSuccess: () => {
+                    setMagicLinkSent(true);
+                    appMessage.success(t('auth.modal.magicLinkSent'));
+                },
+            },
+        );
     };
 
     // ===== Register =====
     const onRegister = async (values: { email: string; password: string; confirmPassword: string }) => {
-        if (values.password !== values.confirmPassword) {
-            appMessage.error(t('auth.modal.register.passwordMismatch'));
-            return;
-        }
-        setLoading(true);
-        const { error } = await signUp(values.email, values.password);
-        setLoading(false);
-
-        if (error) {
-            appMessage.error(error.message);
-        } else {
-            appMessage.success(t('auth.modal.register.success'));
-            handleClose();
-        }
+        await operation.run(
+            () => signUp(values.email, values.password),
+            {
+                onError: (messageKey) => appMessage.error(t(messageKey)),
+                onSuccess: () => {
+                    appMessage.success(t('auth.modal.register.success'));
+                    onCancel();
+                },
+            },
+        );
     };
+
+    const operationError = operation.errorMessageKey ? (
+        <div className="auth-modal__operation-error" tabIndex={-1}>
+            <Alert
+                type="error"
+                showIcon
+                title={t(operation.errorMessageKey)}
+            />
+        </div>
+    ) : null;
 
     // Password Form
     const passwordForm = (
-        <Form name="auth_password" onFinish={onPasswordLogin} layout="vertical" autoComplete="off">
+        <Form
+            form={passwordFormInstance}
+            name="auth_password"
+            onFinish={onPasswordLogin}
+            layout="vertical"
+            autoComplete="on"
+        >
+            {operationError}
             <Form.Item
                 label={t('auth.modal.emailPlaceholder')}
                 name="email"
                 rules={[
                     { required: true, message: t('auth.modal.emailRequired') },
-                    { type: 'email', message: t('auth.modal.emailInvalid') }
+                    { type: 'email', message: t('auth.modal.emailInvalid') },
+                    { max: AUTH_EMAIL_MAX_LENGTH, message: t('auth.modal.emailTooLong') },
                 ]}
             >
                 <Input
-                    prefix={<MailOutlined style={{ color: '#bfbfbf' }} />}
+                    prefix={<MailOutlined className="auth-modal__field-icon" />}
                     placeholder={t('auth.modal.emailPlaceholder')}
                     size="large"
+                    autoComplete="email"
+                    maxLength={AUTH_EMAIL_MAX_LENGTH}
                 />
             </Form.Item>
             <Form.Item
@@ -116,9 +146,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 rules={[{ required: true, message: t('auth.modal.password.required') }]}
             >
                 <Input.Password
-                    prefix={<LockOutlined style={{ color: '#bfbfbf' }} />}
+                    prefix={<LockOutlined className="auth-modal__field-icon" />}
                     placeholder={t('auth.modal.password.placeholder')}
                     size="large"
+                    autoComplete="current-password"
+                    maxLength={AUTH_PASSWORD_MAX_LENGTH}
                 />
             </Form.Item>
             <Form.Item style={{ marginBottom: 12 }}>
@@ -127,7 +159,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     htmlType="submit"
                     block
                     size="large"
-                    loading={loading}
+                    loading={operation.busy}
+                    disabled={operation.busy}
                     icon={<UserOutlined />}
                 >
                     {t('auth.modal.loginButton')}
@@ -140,7 +173,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         type="link"
                         size="small"
                         className="auth-modal__switch-action"
-                        onClick={() => setActiveTab('register')}
+                        disabled={operation.busy}
+                        onClick={() => {
+                            operation.clearError();
+                            setActiveTab('register');
+                        }}
                     >
                         {t('auth.modal.registerNow')}
                     </Button>
@@ -154,15 +191,22 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         <div className="auth-modal__success">
             <div className="auth-modal__success-icon" aria-hidden="true"><MailOutlined /></div>
             <h3>{t('auth.modal.checkEmailTitle')}</h3>
-            <p style={{ color: '#666', marginBottom: 16 }}>{t('auth.modal.checkEmailDesc')}</p>
-            <Button type="primary" onClick={handleClose}>
+            <p className="auth-modal__success-description">{t('auth.modal.checkEmailDesc')}</p>
+            <Button type="primary" onClick={handleClose} disabled={operation.busy}>
                 {t('common.ok')}
             </Button>
         </div>
     ) : (
-        <Form name="auth_magiclink" onFinish={onMagicLinkLogin} layout="vertical" autoComplete="off">
-            <div style={{ marginBottom: 16, padding: '12px 16px', background: '#f6f8fa', borderRadius: 8 }}>
-                <Text type="secondary" style={{ fontSize: 12 }}>
+        <Form
+            form={magicLinkFormInstance}
+            name="auth_magiclink"
+            onFinish={onMagicLinkLogin}
+            layout="vertical"
+            autoComplete="on"
+        >
+            {operationError}
+            <div className="auth-modal__hint">
+                <Text type="secondary" className="auth-modal__hint-text">
                     {t('auth.modal.magicLinkHint')}
                 </Text>
             </div>
@@ -172,13 +216,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 name="email"
                 rules={[
                     { required: true, message: t('auth.modal.emailRequired') },
-                    { type: 'email', message: t('auth.modal.emailInvalid') }
+                    { type: 'email', message: t('auth.modal.emailInvalid') },
+                    { max: AUTH_EMAIL_MAX_LENGTH, message: t('auth.modal.emailTooLong') },
                 ]}
             >
                 <Input
-                    prefix={<MailOutlined style={{ color: '#bfbfbf' }} />}
+                    prefix={<MailOutlined className="auth-modal__field-icon" />}
                     placeholder={t('auth.modal.emailPlaceholder')}
                     size="large"
+                    autoComplete="email"
+                    maxLength={AUTH_EMAIL_MAX_LENGTH}
                 />
             </Form.Item>
 
@@ -188,7 +235,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     htmlType="submit"
                     block
                     size="large"
-                    loading={loading}
+                    loading={operation.busy}
+                    disabled={operation.busy}
                     icon={<KeyOutlined />}
                 >
                     {t('auth.modal.sendMagicLink')}
@@ -199,19 +247,29 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     // Register Form
     const registerForm = (
-        <Form name="auth_register" onFinish={onRegister} layout="vertical" autoComplete="off">
+        <Form
+            form={registerFormInstance}
+            name="auth_register"
+            onFinish={onRegister}
+            layout="vertical"
+            autoComplete="on"
+        >
+            {operationError}
             <Form.Item
                 label={t('auth.modal.emailPlaceholder')}
                 name="email"
                 rules={[
                     { required: true, message: t('auth.modal.emailRequired') },
-                    { type: 'email', message: t('auth.modal.emailInvalid') }
+                    { type: 'email', message: t('auth.modal.emailInvalid') },
+                    { max: AUTH_EMAIL_MAX_LENGTH, message: t('auth.modal.emailTooLong') },
                 ]}
             >
                 <Input
-                    prefix={<MailOutlined style={{ color: '#bfbfbf' }} />}
+                    prefix={<MailOutlined className="auth-modal__field-icon" />}
                     placeholder={t('auth.modal.emailPlaceholder')}
                     size="large"
+                    autoComplete="email"
+                    maxLength={AUTH_EMAIL_MAX_LENGTH}
                 />
             </Form.Item>
             <Form.Item
@@ -219,24 +277,38 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 name="password"
                 rules={[
                     { required: true, message: t('auth.modal.password.required') },
-                    { min: 6, message: t('auth.modal.register.passwordMin') }
+                    { min: 6, message: t('auth.modal.register.passwordMin') },
+                    { max: AUTH_PASSWORD_MAX_LENGTH, message: t('auth.modal.passwordTooLong') },
                 ]}
             >
                 <Input.Password
-                    prefix={<LockOutlined style={{ color: '#bfbfbf' }} />}
+                    prefix={<LockOutlined className="auth-modal__field-icon" />}
                     placeholder={t('auth.modal.register.passwordPlaceholder')}
                     size="large"
+                    autoComplete="new-password"
+                    maxLength={AUTH_PASSWORD_MAX_LENGTH}
                 />
             </Form.Item>
             <Form.Item
                 label={t('auth.modal.register.confirmPlaceholder')}
                 name="confirmPassword"
-                rules={[{ required: true, message: t('auth.modal.register.confirmRequired') }]}
+                dependencies={['password']}
+                rules={[
+                    { required: true, message: t('auth.modal.register.confirmRequired') },
+                    ({ getFieldValue }) => ({
+                        validator(_, value: string | undefined) {
+                            if (!value || getFieldValue('password') === value) return Promise.resolve();
+                            return Promise.reject(new Error(t('auth.modal.register.passwordMismatch')));
+                        },
+                    }),
+                ]}
             >
                 <Input.Password
-                    prefix={<LockOutlined style={{ color: '#bfbfbf' }} />}
+                    prefix={<LockOutlined className="auth-modal__field-icon" />}
                     placeholder={t('auth.modal.register.confirmPlaceholder')}
                     size="large"
+                    autoComplete="new-password"
+                    maxLength={AUTH_PASSWORD_MAX_LENGTH}
                 />
             </Form.Item>
             <Form.Item style={{ marginBottom: 12 }}>
@@ -245,7 +317,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     htmlType="submit"
                     block
                     size="large"
-                    loading={loading}
+                    loading={operation.busy}
+                    disabled={operation.busy}
                 >
                     {t('auth.modal.register.button')}
                 </Button>
@@ -257,7 +330,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         type="link"
                         size="small"
                         className="auth-modal__switch-action"
-                        onClick={() => setActiveTab('password')}
+                        disabled={operation.busy}
+                        onClick={() => {
+                            operation.clearError();
+                            setActiveTab('password');
+                        }}
                     >
                         {t('auth.modal.backToLogin')}
                     </Button>
@@ -277,6 +354,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             title={null}
             open={open}
             onCancel={handleClose}
+            closable={!operation.busy}
+            keyboard={!operation.busy}
+            mask={{ closable: !operation.busy }}
             afterClose={resetTransientState}
             footer={null}
             destroyOnHidden
@@ -286,8 +366,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         >
             <Tabs
                 activeKey={activeTab}
-                onChange={(k) => setActiveTab(k as TabKey)}
-                items={tabItems}
+                onChange={(k) => {
+                    if (operation.busy) return;
+                    operation.clearError();
+                    setActiveTab(k as TabKey);
+                }}
+                items={tabItems.map((item) => ({ ...item, disabled: operation.busy }))}
                 centered
                 style={{ marginTop: -8 }}
             />
