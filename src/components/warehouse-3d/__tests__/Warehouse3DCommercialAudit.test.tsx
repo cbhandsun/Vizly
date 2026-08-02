@@ -32,6 +32,7 @@ import ControlsOverlay from '../ControlsOverlay';
 import { Warehouse3DErrorBoundary } from '../Warehouse3DErrorBoundary';
 import { Warehouse3DProvider } from '../WarehouseContext';
 import WarehouseModel from '../WarehouseModel';
+import Warehouse3DShell from '../Warehouse3DShell';
 import Zones from '../Zones';
 import Warehouse3DPage from '../../../pages/Warehouse3DPage';
 
@@ -64,6 +65,15 @@ describe('Warehouse 3D commercial safeguards', () => {
 
         fireEvent.click(await screen.findByRole('button', { name: 'model ready' }));
         expect(screen.queryByRole('status')).toBeNull();
+    });
+
+    it('provides a branded route fallback before the page module is available', () => {
+        const { container } = render(<Warehouse3DShell loading />);
+
+        expect(container.firstElementChild?.getAttribute('data-smoke-ready')).toBe('warehouse-3d');
+        expect(screen.getByText('Large Retail Logistics Center')).toBeTruthy();
+        expect(screen.getByText('Interactive 3D Simulation View')).toBeTruthy();
+        expect(screen.getByRole('status').textContent).toContain('正在加载 3D 场景');
     });
 
     it('marks the core scene ready before progressively mounting heavy details', () => {

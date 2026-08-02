@@ -3,6 +3,7 @@ import React, { Suspense } from 'react';
 import { useLocation } from 'react-router';
 import { coerceSafeStringParam, getQueryOrHashParamFromLocation, type LocationLike, coerceDiagramId } from '@/core/utils/inputBoundary';
 import { loadDiagramViewerRoute } from './diagramViewerRouteLoader';
+import Warehouse3DShell from '@/components/warehouse-3d/Warehouse3DShell';
 
 type LazyPageModule = { default: React.ComponentType };
 
@@ -31,8 +32,8 @@ const DiagramManagementPage = withAntdRoute(() => import('@/pages/DiagramManagem
 const ShareViewPage = withAntdRoute(() => import('@/pages/ShareViewPage'));
 const UnifiedDesignerTestPage = withAntdRoute(() => import('@/pages/UnifiedDesignerTestPage'));
 
-const renderRoute = (fallback: string, RouteComponent: React.ComponentType) => (
-  <Suspense fallback={<div style={{ padding: 16 }}>{fallback}</div>}>
+const renderRoute = (fallback: React.ReactNode, RouteComponent: React.ComponentType) => (
+  <Suspense fallback={typeof fallback === 'string' ? <div style={{ padding: 16 }}>{fallback}</div> : fallback}>
     <RouteComponent />
   </Suspense>
 );
@@ -80,7 +81,7 @@ const AppRoutes = () => {
   }
 
   if (path.startsWith('/warehouse-3d') || testMode === '3d') {
-    return renderRoute('Loading 3D Warehouse...', Warehouse3DPage);
+    return renderRoute(<Warehouse3DShell loading />, Warehouse3DPage);
   }
 
   if (path.startsWith('/storage-config')) {
