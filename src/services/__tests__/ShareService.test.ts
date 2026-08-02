@@ -28,6 +28,7 @@ describe('ShareService', () => {
             insert: vi.fn(() => query),
             update: vi.fn(() => query),
             order: vi.fn(() => query),
+            abortSignal: vi.fn(() => query),
             single: vi.fn(() => Promise.resolve(result)),
             maybeSingle: vi.fn(() => Promise.resolve(result)),
         };
@@ -106,6 +107,59 @@ describe('ShareService', () => {
                 error: null,
             })),
         });
+        const { shareService } = await import('../ShareService');
+
+        await expect(shareService.getSharedDiagram('safe-token-123456')).resolves.toBeNull();
+    });
+
+    it('surfaces operational share lookup failures without exposing provider details', async () => {
+        mockSupabase.rpc.mockReturnValue({
+            maybeSingle: vi.fn(() => Promise.resolve({
+                data: null,
+                error: {
+                    code: '57014',
+                    message: 'Authorization: Bearer private-share-secret',
+                },
+            })),
+        });
+        const { shareService } = await import('../ShareService');
+
+        const request = shareService.getSharedDiagram('safe-token-123456');
+
+        await expect(request).rejects.toThrow('temporarily unavailable');
+        await expect(request).rejects.not.toThrow('private-share-secret');
+        expect(mockSupabase.from).not.toHaveBeenCalled();
+    });
+
+    it('passes the caller abort signal to the remote share lookup', async () => {
+        const maybeSingle = vi.fn(() => Promise.resolve({
+            data: null,
+            error: { code: '57014', message: 'request cancelled' },
+        }));
+        const abortSignal = vi.fn(() => ({ maybeSingle }));
+        mockSupabase.rpc.mockReturnValue({ abortSignal, maybeSingle });
+        const controller = new AbortController();
+        const { shareService } = await import('../ShareService');
+
+        await expect(
+            shareService.getSharedDiagram('safe-token-123456', controller.signal)
+        ).rejects.toThrow('temporarily unavailable');
+
+        expect(abortSignal).toHaveBeenCalledWith(controller.signal);
+    });
+
+    it('keeps missing legacy share rows distinct from service failures', async () => {
+        mockSupabase.rpc.mockReturnValue({
+            maybeSingle: vi.fn(() => Promise.resolve({
+                data: null,
+                error: { code: 'PGRST202', message: 'RPC not installed' },
+            })),
+        });
+        const shareQuery = createQueryMock({
+            data: null,
+            error: { code: 'PGRST116', message: 'No rows found' },
+        });
+        mockSupabase.from.mockReturnValue(shareQuery);
         const { shareService } = await import('../ShareService');
 
         await expect(shareService.getSharedDiagram('safe-token-123456')).resolves.toBeNull();

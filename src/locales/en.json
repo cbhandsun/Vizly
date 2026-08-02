@@ -1076,7 +1076,13 @@
         "loginRequired": "Please sign in to use sharing",
         "savingFirst": "Saving diagram to cloud...",
         "loadingShared": "Loading shared diagram...",
+        "loadingCanvas": "Preparing the read-only canvas...",
         "notFound": "Share link is invalid or has expired",
+        "viewerUnavailable": "The shared diagram is temporarily unavailable",
+        "viewerUnavailableHint": "Check your connection and try again. The share link has not been changed.",
+        "backToWorkspace": "Back to workspace",
+        "viewerLabel": "Shared diagram read-only canvas",
+        "fallbackTitle": "Shared diagram",
         "poweredBy": "Created with DiagramView",
         "tabs": {
             "link": "Public Link",

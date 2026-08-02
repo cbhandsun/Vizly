@@ -1,0 +1,116 @@
+.share-view-page,
+.share-view-state-page {
+    min-height: 100vh;
+    min-height: 100dvh;
+    background: var(--ant-color-bg-layout);
+}
+
+.share-view-page {
+    height: 100vh;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.share-view-state-page,
+.share-view-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.share-view-state-page {
+    padding: 24px;
+}
+
+.share-view-state-page .ant-result {
+    max-width: 680px;
+}
+
+.share-view-state-page .ant-result-extra .ant-btn,
+.share-view-state-page .ant-result-extra a.ant-btn {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.share-view-loading {
+    flex: 1;
+    min-height: 0;
+    flex-direction: column;
+    gap: 16px;
+    padding: 24px;
+}
+
+.share-view-loading--canvas {
+    height: 100%;
+}
+
+.share-view-header {
+    min-height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 0 20px;
+    border-bottom: 1px solid var(--ant-color-border-secondary);
+    background: var(--ant-color-bg-container);
+    flex-shrink: 0;
+}
+
+.share-view-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 16px;
+}
+
+.share-view-brand {
+    flex: none;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.share-view-canvas {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+@media (max-width: 480px) {
+    .share-view-state-page {
+        padding: 16px;
+    }
+
+    .share-view-state-page .ant-result {
+        padding-inline: 0;
+    }
+
+    .share-view-state-page .ant-result-extra {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .share-view-state-page .ant-result-extra .ant-btn,
+    .share-view-state-page .ant-result-extra a.ant-btn {
+        width: 100%;
+        margin-inline: 0;
+    }
+
+    .share-view-header {
+        min-height: 56px;
+        gap: 12px;
+        padding-inline: 16px;
+    }
+
+    .share-view-brand {
+        max-width: 34%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+}

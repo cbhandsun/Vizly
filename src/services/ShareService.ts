@@ -81,6 +81,22 @@ function isValidUuid(id: string): boolean {
     return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
 }
 
+const getRemoteErrorCode = (error: unknown): string => {
+    if (!isRecord(error) || typeof error.code !== 'string') return '';
+    return error.code.trim();
+};
+
+const isMissingRpcError = (error: unknown): boolean => {
+    const code = getRemoteErrorCode(error);
+    return code === 'PGRST202' || code === '42883';
+};
+
+const isMissingRowError = (error: unknown): boolean => getRemoteErrorCode(error) === 'PGRST116';
+
+const throwShareLookupFailure = (): never => {
+    throw new Error('Shared diagram lookup is temporarily unavailable.');
+};
+
 function coerceSharedDiagram(diagram: unknown): SharedDiagramRecord | null {
     if (!isRecord(diagram) || !diagram.content) return null;
 
@@ -275,16 +291,22 @@ class ShareService {
     /**
      * 通过 share_token 获取分享的图表数据
      */
-    async getSharedDiagram(token: string): Promise<{
+    async getSharedDiagram(token: string, signal?: AbortSignal): Promise<{
         share: ShareRecord;
         diagram: SharedDiagramRecord;
     } | null> {
         const normalizedToken = token.trim();
         if (!isValidShareToken(normalizedToken)) return null;
 
-        const { data: rpcRow, error: rpcError } = await supabase!
-            .rpc('get_shared_diagram_by_token', { p_share_token: normalizedToken })
-            .maybeSingle();
+        if (signal?.aborted) {
+            throw new DOMException('Shared diagram lookup aborted.', 'AbortError');
+        }
+
+        const rpcQuery = supabase!
+            .rpc('get_shared_diagram_by_token', { p_share_token: normalizedToken });
+        const { data: rpcRow, error: rpcError } = signal
+            ? await rpcQuery.abortSignal(signal).maybeSingle()
+            : await rpcQuery.maybeSingle();
 
         if (!rpcError && isRecord(rpcRow) && rpcRow.share && rpcRow.diagram) {
             const share = coerceShareRecord(rpcRow.share, normalizedToken);
@@ -301,29 +323,38 @@ class ShareService {
 
         // Older databases may not have the hardened RPC yet. Keep the legacy
         // path as a compatibility fallback; RLS will still decide access.
-        const missingRpc = rpcError?.code === 'PGRST202' || rpcError?.code === '42883';
-        if (rpcError && !missingRpc) return null;
+        if (rpcError && !isMissingRpcError(rpcError)) throwShareLookupFailure();
 
-        const { data: share, error: shareError } = await supabase!
+        let shareQuery = supabase!
             .from('shared_diagrams')
             .select('*')
             .eq('share_token', normalizedToken)
-            .eq('is_active', true)
-            .single();
+            .eq('is_active', true);
+        if (signal) shareQuery = shareQuery.abortSignal(signal);
+        const { data: share, error: shareError } = await shareQuery.single();
 
-        if (shareError || !share) return null;
+        if (shareError) {
+            if (isMissingRowError(shareError)) return null;
+            throwShareLookupFailure();
+        }
+        if (!share) return null;
 
         const safeShare = coerceShareRecord(share, normalizedToken);
         if (!safeShare) return null;
 
         // 2. 加载图表内容
-        const { data: diagram, error: diagramError } = await supabase!
+        let diagramQuery = supabase!
             .from('diagrams')
             .select('*')
-            .eq('id', safeShare.diagram_id)
-            .single();
+            .eq('id', safeShare.diagram_id);
+        if (signal) diagramQuery = diagramQuery.abortSignal(signal);
+        const { data: diagram, error: diagramError } = await diagramQuery.single();
 
-        if (diagramError || !diagram) return null;
+        if (diagramError) {
+            if (isMissingRowError(diagramError)) return null;
+            throwShareLookupFailure();
+        }
+        if (!diagram) return null;
 
         const safeDiagram = coerceSharedDiagram(diagram);
         if (!safeDiagram) return null;

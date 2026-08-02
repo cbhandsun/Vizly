@@ -1,26 +1,37 @@
 import '@testing-library/jest-dom/vitest';
 import React from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import ShareViewPage from '../ShareViewPage';
 
 const getSharedDiagramMock = vi.fn();
 const registerDiagramMock = vi.fn();
-const registerRemoteDiagramMock = vi.fn((content: any, fallback: { id: string; title: string }) => {
-    if (!content || typeof content !== 'object' || !Array.isArray(content.nodes)) {
+const SHARE_RECORD_ID = '44444444-4444-4444-8444-444444444444';
+const LOCAL_SHARED_DIAGRAM_ID = `shared-record-${SHARE_RECORD_ID}`;
+const registerRemoteDiagramMock = vi.fn((content: unknown, fallback: { id: string; title: string }) => {
+    if (!content || typeof content !== 'object' || Array.isArray(content)) {
         throw new Error('Remote diagram is invalid');
     }
+    const record = content as Record<string, unknown>;
+    if (!Array.isArray(record.nodes)) throw new Error('Remote diagram is invalid');
+    const metadata = record.metadata && typeof record.metadata === 'object' && !Array.isArray(record.metadata)
+        ? record.metadata as Record<string, unknown>
+        : undefined;
     return {
-        ...content,
+        ...record,
         id: fallback.id,
-        name: content?.name || content?.metadata?.title || fallback.title,
-        nodes: content.nodes,
-        edges: Array.isArray(content?.edges) ? content.edges : [],
-        type: content?.type || 'custom',
-        version: content?.version || '1.0.0',
-        layout: content?.layout || {},
-        theme: content?.theme || {},
+        name: typeof record.name === 'string'
+            ? record.name
+            : typeof metadata?.title === 'string'
+                ? metadata.title
+                : fallback.title,
+        nodes: record.nodes,
+        edges: Array.isArray(record.edges) ? record.edges : [],
+        type: typeof record.type === 'string' ? record.type : 'custom',
+        version: typeof record.version === 'string' ? record.version : '1.0.0',
+        layout: record.layout && typeof record.layout === 'object' ? record.layout : {},
+        theme: record.theme && typeof record.theme === 'object' ? record.theme : {},
     };
 });
 
@@ -32,23 +43,44 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('antd', () => ({
     Spin: () => <div data-testid="spin" />,
-    Result: ({ title, subTitle }: { title: string; subTitle?: string }) => (
+    Button: ({
+        children,
+        href,
+        onClick,
+    }: {
+        children?: React.ReactNode;
+        href?: string;
+        onClick?: () => void;
+    }) => href ? (
+        <a href={href}>{children}</a>
+    ) : (
+        <button type="button" onClick={onClick}>{children}</button>
+    ),
+    Result: ({
+        title,
+        subTitle,
+        extra,
+    }: {
+        title: React.ReactNode;
+        subTitle?: React.ReactNode;
+        extra?: React.ReactNode;
+    }) => (
         <div>
             <h1>{title}</h1>
             {subTitle && <p>{subTitle}</p>}
+            {extra}
         </div>
     ),
     Typography: {
-        Text: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
-    },
-    theme: {
-        useToken: () => ({
-            token: {
-                colorBgLayout: '#f5f5f5',
-                colorBgContainer: '#ffffff',
-                colorBorderSecondary: '#eeeeee',
-            },
-        }),
+        Text: ({
+            children,
+            className,
+            title,
+        }: {
+            children: React.ReactNode;
+            className?: string;
+            title?: string;
+        }) => <span className={className} title={title}>{children}</span>,
     },
 }));
 
@@ -85,6 +117,7 @@ const renderSharePage = (initialEntry: string) => render(
 
 describe('ShareViewPage', () => {
     beforeEach(() => {
+        window.history.replaceState({}, '', '/');
         getSharedDiagramMock.mockReset();
         registerDiagramMock.mockReset();
         registerRemoteDiagramMock.mockClear();
@@ -95,6 +128,7 @@ describe('ShareViewPage', () => {
 
         expect(screen.getByRole('heading', { name: '404' })).toBeInTheDocument();
         expect(screen.getByText('share.notFound')).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: 'share.backToWorkspace' })).toHaveAttribute('href', '#/manage');
 
         await waitFor(() => {
             expect(getSharedDiagramMock).not.toHaveBeenCalled();
@@ -122,7 +156,7 @@ describe('ShareViewPage', () => {
             edges: [],
         };
         getSharedDiagramMock.mockResolvedValueOnce({
-            share: { id: 'share-id' },
+            share: { id: SHARE_RECORD_ID },
             diagram: {
                 title: 'Fallback title',
                 content,
@@ -134,17 +168,19 @@ describe('ShareViewPage', () => {
         expect(screen.getByTestId('spin')).toBeInTheDocument();
 
         await screen.findByText('Shared Flow');
-        expect(getSharedDiagramMock).toHaveBeenCalledWith(token);
+        expect(getSharedDiagramMock).toHaveBeenCalledWith(token, expect.any(AbortSignal));
         expect(registerRemoteDiagramMock).toHaveBeenCalledWith({
             ...content,
-            id: `shared-${token}`,
+            id: LOCAL_SHARED_DIAGRAM_ID,
         }, {
-            id: `shared-${token}`,
+            id: LOCAL_SHARED_DIAGRAM_ID,
             title: 'Fallback title',
         });
         expect(registerDiagramMock).not.toHaveBeenCalled();
-        expect(await screen.findByTestId('flowchart-designer')).toHaveAttribute('data-id', `shared-${token}`);
+        expect(await screen.findByTestId('flowchart-designer')).toHaveAttribute('data-id', LOCAL_SHARED_DIAGRAM_ID);
         expect(screen.getAllByTestId('flowchart-designer')).toHaveLength(1);
+        expect(screen.getByRole('banner')).toBeInTheDocument();
+        expect(screen.getByRole('main', { name: 'share.viewerLabel' })).toBeInTheDocument();
     });
 
     it('loads direct-path share links that put token in the browser search string', async () => {
@@ -157,7 +193,7 @@ describe('ShareViewPage', () => {
         };
         window.history.replaceState({}, '', `/shared?token=${token}`);
         getSharedDiagramMock.mockResolvedValueOnce({
-            share: { id: 'share-id' },
+            share: { id: SHARE_RECORD_ID },
             diagram: {
                 title: 'Direct fallback title',
                 content,
@@ -167,15 +203,15 @@ describe('ShareViewPage', () => {
         renderSharePage('/shared');
 
         await screen.findByText('Direct Shared Flow');
-        expect(getSharedDiagramMock).toHaveBeenCalledWith(token);
+        expect(getSharedDiagramMock).toHaveBeenCalledWith(token, expect.any(AbortSignal));
         expect(registerRemoteDiagramMock).toHaveBeenCalledWith({
             ...content,
-            id: `shared-${token}`,
+            id: LOCAL_SHARED_DIAGRAM_ID,
         }, {
-            id: `shared-${token}`,
+            id: LOCAL_SHARED_DIAGRAM_ID,
             title: 'Direct fallback title',
         });
-        expect(await screen.findByTestId('flowchart-designer')).toHaveAttribute('data-id', `shared-${token}`);
+        expect(await screen.findByTestId('flowchart-designer')).toHaveAttribute('data-id', LOCAL_SHARED_DIAGRAM_ID);
     });
 
     it('routes unsafe shared content through the remote registration guard', async () => {
@@ -200,7 +236,7 @@ describe('ShareViewPage', () => {
             theme: { name: 'light', displayName: 'Light', domains: {} },
         };
         getSharedDiagramMock.mockResolvedValueOnce({
-            share: { id: 'share-id' },
+            share: { id: SHARE_RECORD_ID },
             diagram: {
                 title: 'Unsafe shared diagram',
                 content: unsafeContent,
@@ -212,18 +248,18 @@ describe('ShareViewPage', () => {
         await screen.findByText('Unsafe Flow');
         expect(registerRemoteDiagramMock).toHaveBeenCalledWith({
             ...unsafeContent,
-            id: `shared-${token}`,
+            id: LOCAL_SHARED_DIAGRAM_ID,
         }, {
-            id: `shared-${token}`,
+            id: LOCAL_SHARED_DIAGRAM_ID,
             title: 'Unsafe shared diagram',
         });
         expect(registerDiagramMock).not.toHaveBeenCalled();
     });
 
-    it('shows an error when mocked shared content has an invalid shape', async () => {
+    it('shows a recoverable service state when shared content cannot be registered', async () => {
         const token = 'abcdefghijklmnop';
         getSharedDiagramMock.mockResolvedValueOnce({
-            share: { id: 'share-id' },
+            share: { id: SHARE_RECORD_ID },
             diagram: {
                 title: 'Bad shared diagram',
                 content: {
@@ -237,14 +273,15 @@ describe('ShareViewPage', () => {
 
         renderSharePage(`/shared?token=${token}`);
 
-        expect(await screen.findByRole('heading', { name: '404' })).toBeInTheDocument();
+        expect(await screen.findByRole('heading', { name: 'share.viewerUnavailable' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'common.retry' })).toBeInTheDocument();
         expect(registerDiagramMock).not.toHaveBeenCalled();
     });
 
-    it('shows an error when the shared record has no diagram content', async () => {
+    it('shows a recoverable service state when the shared record has no diagram content', async () => {
         const token = 'abcdefghijklmnop';
         getSharedDiagramMock.mockResolvedValueOnce({
-            share: { id: 'share-id' },
+            share: { id: SHARE_RECORD_ID },
             diagram: {
                 title: 'Empty shared diagram',
                 content: null,
@@ -253,8 +290,59 @@ describe('ShareViewPage', () => {
 
         renderSharePage(`/shared?token=${token}`);
 
-        expect(await screen.findByRole('heading', { name: '404' })).toBeInTheDocument();
-        expect(getSharedDiagramMock).toHaveBeenCalledWith(token);
+        expect(await screen.findByRole('heading', { name: 'share.viewerUnavailable' })).toBeInTheDocument();
+        expect(getSharedDiagramMock).toHaveBeenCalledWith(token, expect.any(AbortSignal));
         expect(registerDiagramMock).not.toHaveBeenCalled();
+    });
+
+    it('keeps service failures distinct from expired links and retries in place', async () => {
+        const token = 'retrysharetoken1';
+        getSharedDiagramMock
+            .mockRejectedValueOnce(new Error('Authorization: Bearer private-share-secret'))
+            .mockResolvedValueOnce({
+                share: { id: SHARE_RECORD_ID },
+                diagram: {
+                    title: 'Recovered title',
+                    content: {
+                        id: 'remote-id',
+                        name: 'Recovered shared flow',
+                        nodes: [],
+                        edges: [],
+                    },
+                },
+            });
+
+        renderSharePage(`/shared?token=${token}`);
+
+        expect(await screen.findByRole('heading', { name: 'share.viewerUnavailable' })).toBeInTheDocument();
+        expect(screen.queryByText(/private-share-secret/i)).not.toBeInTheDocument();
+        expect(screen.queryByRole('heading', { name: '404' })).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: 'common.retry' }));
+
+        expect(await screen.findByText('Recovered shared flow')).toBeInTheDocument();
+        expect(getSharedDiagramMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('bounds and normalizes the public title before rendering it in the header', async () => {
+        const token = 'boundedsharetoken';
+        getSharedDiagramMock.mockResolvedValueOnce({
+            share: { id: SHARE_RECORD_ID },
+            diagram: {
+                title: 'Fallback title',
+                content: {
+                    id: 'remote-id',
+                    name: `  ${'x'.repeat(500)}\nsecret  `,
+                    nodes: [],
+                    edges: [],
+                },
+            },
+        });
+
+        renderSharePage(`/shared?token=${token}`);
+
+        const title = await screen.findByTitle('x'.repeat(240));
+        expect(title).toHaveTextContent('x'.repeat(240));
+        expect(title.textContent).not.toContain('secret');
     });
 });

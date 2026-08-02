@@ -1187,7 +1187,13 @@
         "loginRequired": "请先登录后才能使用分享功能",
         "savingFirst": "正在保存图表到云端...",
         "loadingShared": "正在加载分享的图表...",
+        "loadingCanvas": "正在准备只读画布...",
         "notFound": "分享链接无效或已过期",
+        "viewerUnavailable": "暂时无法加载分享图表",
+        "viewerUnavailableHint": "请检查网络后重试，当前分享链接不会受到影响。",
+        "backToWorkspace": "返回工作台",
+        "viewerLabel": "分享图表只读画布",
+        "fallbackTitle": "分享图表",
         "poweredBy": "由 DiagramView 创建",
         "tabs": {
             "link": "公开链接",

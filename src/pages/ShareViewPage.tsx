@@ -5,9 +5,15 @@
 
 import React, { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { Spin, Result, theme, Typography } from 'antd';
+import { Button, Result, Spin, Typography } from 'antd';
 import { useTranslation } from 'react-i18next';
 import { coerceShareToken, getQueryOrHashParamFromLocation } from '@/core/utils/inputBoundary';
+import {
+    coerceShareViewTitle,
+    createSharedDiagramLocalId,
+    runShareViewRequest,
+} from './shareViewBoundary';
+import './ShareViewPage.css';
 
 const { Text } = Typography;
 
@@ -30,139 +36,175 @@ const SharedDiagramCanvas = React.lazy(async () => {
     };
 });
 
+type PreparedSharedDiagram = {
+    diagramId: string;
+    title: string;
+};
+
 type LoadState =
     | { status: 'loading' }
-    | { status: 'error' }
-    | { status: 'success'; title: string };
+    | { status: 'not-found' }
+    | { status: 'unavailable' }
+    | { status: 'success'; diagramId: string; title: string };
+
+const LoadingState = ({ label, compact = false }: { label: string; compact?: boolean }) => (
+    <div
+        className={compact ? 'share-view-loading share-view-loading--canvas' : 'share-view-loading'}
+        role="status"
+        aria-live="polite"
+        aria-busy="true"
+    >
+        <Spin size="large" />
+        <Text type="secondary">{label}</Text>
+    </div>
+);
 
 const ShareViewPage: React.FC = () => {
     const { t } = useTranslation();
-    const { token: antToken } = theme.useToken();
+    const fallbackTitle = t('share.fallbackTitle');
     const [searchParams] = useSearchParams();
     const shareToken = coerceShareToken(
-        searchParams.get('token') ||
-        getQueryOrHashParamFromLocation(typeof window === 'undefined' ? undefined : window.location, 'token') ||
-        ''
+        searchParams.get('token')
+        || getQueryOrHashParamFromLocation(
+            typeof window === 'undefined' ? undefined : window.location,
+            'token'
+        )
+        || ''
     ) || '';
+    const [requestRevision, setRequestRevision] = useState(0);
     const [loadResult, setLoadResult] = useState<{
+        revision: number;
         token: string;
         state: LoadState;
     } | null>(null);
     const state: LoadState = !shareToken
-        ? { status: 'error' }
-        : loadResult?.token === shareToken
+        ? { status: 'not-found' }
+        : loadResult?.token === shareToken && loadResult.revision === requestRevision
             ? loadResult.state
             : { status: 'loading' };
 
     useEffect(() => {
         if (!shareToken) return;
 
-        let cancelled = false;
+        const controller = new AbortController();
+        const revision = requestRevision;
 
-        (async () => {
-            try {
-                const { shareService } = await import('@/services/ShareService');
-                const result = await shareService.getSharedDiagram(shareToken);
-                if (cancelled) return;
+        void (async () => {
+            const request = await runShareViewRequest<PreparedSharedDiagram | null>(async (signal) => {
+                const [{ shareService }, { dataService }] = await Promise.all([
+                    import('@/services/ShareService'),
+                    import('@/services/DataService'),
+                ]);
+                const result = await shareService.getSharedDiagram(shareToken, signal);
+                if (!result) return null;
 
-                if (!result) {
-                    setLoadResult({ token: shareToken, state: { status: 'error' } });
-                    return;
+                const diagramId = createSharedDiagramLocalId(result.share.id);
+                if (!diagramId || !result.diagram.content) {
+                    throw new Error('Shared diagram record is invalid.');
                 }
 
-                const rawContent = result.diagram.content;
-                if (!rawContent) {
-                    setLoadResult({ token: shareToken, state: { status: 'error' } });
-                    return;
-                }
-
-                // 注册到 DataService 以便 GenericStandardDiagram 可以加载
-                const diagramId = `shared-${shareToken}`;
-                const { dataService } = await import('@/services/DataService');
-                if (cancelled) return;
-                const contentForRegistration = { ...rawContent, id: diagramId };
+                const contentForRegistration = { ...result.diagram.content, id: diagramId };
                 const content = dataService.registerRemoteDiagram(contentForRegistration, {
                     id: diagramId,
-                    title: result.diagram.title || 'Shared Diagram',
+                    title: coerceShareViewTitle(result.diagram.title, fallbackTitle),
                 });
-                const title = content.name || content.metadata?.title || result.diagram.title || 'Shared Diagram';
+                const title = coerceShareViewTitle(
+                    content.name || content.metadata?.title,
+                    result.diagram.title || fallbackTitle
+                );
 
-                setLoadResult({ token: shareToken, state: { status: 'success', title } });
-            } catch {
-                if (!cancelled) {
-                    setLoadResult({ token: shareToken, state: { status: 'error' } });
-                }
+                return { diagramId, title };
+            }, { signal: controller.signal });
+
+            if (request.status === 'cancelled') return;
+            if (request.status === 'timeout' || request.status === 'unavailable') {
+                setLoadResult({
+                    revision,
+                    token: shareToken,
+                    state: { status: 'unavailable' },
+                });
+                return;
             }
+            if (!request.value) {
+                setLoadResult({
+                    revision,
+                    token: shareToken,
+                    state: { status: 'not-found' },
+                });
+                return;
+            }
+
+            setLoadResult({
+                revision,
+                token: shareToken,
+                state: { status: 'success', ...request.value },
+            });
         })();
 
-        return () => { cancelled = true; };
-    }, [shareToken]);
+        return () => controller.abort();
+    }, [fallbackTitle, requestRevision, shareToken]);
 
     if (state.status === 'loading') {
         return (
-            <div style={{
-                height: '100vh',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 16,
-                background: antToken.colorBgLayout,
-            }}>
-                <Spin size="large" />
-                <Text type="secondary">{t('share.loadingShared')}</Text>
-            </div>
+            <main className="share-view-state-page">
+                <LoadingState label={t('share.loadingShared')} />
+            </main>
         );
     }
 
-    if (state.status === 'error') {
+    if (state.status === 'not-found') {
         return (
-            <div style={{
-                height: '100vh',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: antToken.colorBgLayout,
-            }}>
+            <main className="share-view-state-page">
                 <Result
                     status="404"
                     title="404"
                     subTitle={t('share.notFound')}
+                    extra={<Button href="#/manage">{t('share.backToWorkspace')}</Button>}
                 />
-            </div>
+            </main>
         );
     }
 
-    const diagramId = `shared-${shareToken}`;
+    if (state.status === 'unavailable') {
+        return (
+            <main className="share-view-state-page">
+                <Result
+                    status="error"
+                    title={t('share.viewerUnavailable')}
+                    subTitle={t('share.viewerUnavailableHint')}
+                    extra={[
+                        <Button
+                            key="retry"
+                            type="primary"
+                            onClick={() => setRequestRevision((current) => current + 1)}
+                        >
+                            {t('common.retry')}
+                        </Button>,
+                        <Button key="workspace" href="#/manage">
+                            {t('share.backToWorkspace')}
+                        </Button>,
+                    ]}
+                />
+            </main>
+        );
+    }
 
     return (
-        <div style={{
-            height: '100vh',
-            display: 'flex',
-            flexDirection: 'column',
-            background: antToken.colorBgLayout,
-        }}>
-            {/* 顶部标题栏 */}
-            <div style={{
-                height: 48,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '0 20px',
-                borderBottom: `1px solid ${antToken.colorBorderSecondary}`,
-                background: antToken.colorBgContainer,
-                flexShrink: 0,
-            }}>
-                <Text strong style={{ fontSize: 16 }}>{state.title}</Text>
-                <Text type="secondary" style={{ fontSize: 12 }}>{t('share.poweredBy')}</Text>
-            </div>
+        <div className="share-view-page">
+            <header className="share-view-header">
+                <Text className="share-view-title" strong title={state.title}>
+                    {state.title}
+                </Text>
+                <Text className="share-view-brand" type="secondary">
+                    {t('share.poweredBy')}
+                </Text>
+            </header>
 
-            {/* 图表区域 */}
-            <div style={{ flex: 1, overflow: 'hidden' }}>
-                <Suspense fallback={null}>
-                    <SharedDiagramCanvas diagramId={diagramId} />
+            <main className="share-view-canvas" aria-label={t('share.viewerLabel')}>
+                <Suspense fallback={<LoadingState compact label={t('share.loadingCanvas')} />}>
+                    <SharedDiagramCanvas diagramId={state.diagramId} />
                 </Suspense>
-            </div>
+            </main>
         </div>
     );
 };
