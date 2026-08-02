@@ -1,4 +1,8 @@
 import type { AIConfigState, AIModel, AIProviderConfig } from './aiConfigStorage';
+import {
+    getAIProviderConnectionReadiness,
+    type AIProviderConnectionIssue,
+} from './aiProviderConnectionReadiness';
 
 export interface AIChatResolvedModelSelection {
     provider: AIProviderConfig | null;
@@ -10,6 +14,14 @@ export interface AIChatResolvedModelSelection {
 export type AIChatRequestValidationResult =
     | { ok: true; provider: AIProviderConfig; model: AIModel }
     | { ok: false; reason: 'missing-model' | 'missing-api-key' | 'invalid-endpoint' };
+
+export type AIChatConfigurationState =
+    | { ready: true; providerName: string }
+    | {
+        ready: false;
+        reason: 'missing-model' | AIProviderConnectionIssue;
+        providerName?: string;
+    };
 
 const findFirstEnabledModelSelection = (
     providers: AIProviderConfig[]
@@ -35,7 +47,7 @@ export const resolveAIChatActiveModelSelection = (
     const provider = config.providers.find((item) => item.id === providerId) ?? null;
     const model = provider?.models.find((item) => item.id === modelId) ?? null;
 
-    if (provider && model) {
+    if (provider?.enabled && model?.enabled) {
         return {
             provider,
             model,
@@ -65,6 +77,29 @@ export const resolveAIChatActiveModelSelection = (
     };
 };
 
+export const getAIChatConfigurationState = (
+    config: AIConfigState,
+): AIChatConfigurationState => {
+    const selection = resolveAIChatActiveModelSelection(config);
+    if (!selection.provider || !selection.model) {
+        return { ready: false, reason: 'missing-model' };
+    }
+
+    const readiness = getAIProviderConnectionReadiness(selection.provider);
+    if (!readiness.ready) {
+        return {
+            ready: false,
+            reason: readiness.issue,
+            providerName: selection.provider.name,
+        };
+    }
+
+    return {
+        ready: true,
+        providerName: selection.provider.name,
+    };
+};
+
 export const validateAIChatRequestSelection = (
     selection: Pick<AIChatResolvedModelSelection, 'provider' | 'model'>,
     resolveEndpoint: (provider: AIProviderConfig) => void
@@ -76,7 +111,8 @@ export const validateAIChatRequestSelection = (
         };
     }
 
-    if (!selection.provider.apiKey) {
+    const readiness = getAIProviderConnectionReadiness(selection.provider);
+    if (!readiness.ready && readiness.issue === 'missing-api-key') {
         return {
             ok: false,
             reason: 'missing-api-key',

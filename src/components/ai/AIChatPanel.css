@@ -159,6 +159,39 @@
     z-index: 10;
 }
 
+.ai-chat-configuration-status {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(250, 173, 20, 0.28);
+    background: rgba(255, 251, 230, 0.88);
+}
+
+.ai-chat-configuration-copy {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.ai-chat-configuration-status .ant-btn {
+    min-height: var(--commercial-touch-target, 44px);
+    flex: 0 0 auto;
+}
+
+@media (max-width: 480px) {
+    .ai-chat-configuration-status {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .ai-chat-configuration-status .ant-btn {
+        align-self: flex-start;
+    }
+}
+
 .ai-chat-inline-action.ant-btn {
     width: var(--commercial-touch-target, 44px);
     min-width: var(--commercial-touch-target, 44px);

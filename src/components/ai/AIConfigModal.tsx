@@ -10,15 +10,16 @@ import Space from 'antd/es/space';
 import Tag from 'antd/es/tag';
 import Divider from 'antd/es/divider';
 import Collapse from 'antd/es/collapse';
-import Checkbox from 'antd/es/checkbox';
+import Alert from 'antd/es/alert';
 import {
     PlusOutlined,
     DeleteOutlined,
     RocketOutlined,
-    SettingOutlined,
     CheckCircleFilled,
-    AppstoreOutlined,
-    SyncOutlined
+    SyncOutlined,
+    CloseOutlined,
+    EyeInvisibleOutlined,
+    EyeOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '@/context/useAuth';
 import { CryptoService } from '@/core/utils/CryptoService';
@@ -46,6 +47,9 @@ import {
 } from './aiLogging';
 import { filterAIModels, filterAIProviders, groupAIModels } from './aiConfigModelCollections';
 import { createCustomAIProvider } from './aiConfigProviderMutations';
+import { getAIProviderConnectionReadiness } from './aiProviderConnectionReadiness';
+import { AIConfigProviderSidebar } from './AIConfigProviderSidebar';
+import { AIConfigModelDiscoveryModal } from './AIConfigModelDiscoveryModal';
 import { useAIConfigModalConfig } from './useAIConfigModalConfig';
 import {
     COMMERCIAL_VIEWPORT_MODAL_CLASS,
@@ -69,6 +73,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
     const [config, setConfig] = useAIConfigModalConfig(open, user?.id);
     const [selectedProviderId, setSelectedProviderId] = useState<string>('global_settings');
     const [searchText, setSearchText] = useState('');
+    const [isApiKeyVisible, setIsApiKeyVisible] = useState(false);
 
     // For adding new models
     const [newModelFormVisible, setNewModelFormVisible] = useState(false);
@@ -130,8 +135,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
     };
 
     // --- Provider Actions ---
-    const toggleProvider = (id: string, checked: boolean, event: React.SyntheticEvent<HTMLButtonElement>) => {
-        event.stopPropagation();
+    const toggleProvider = (id: string, checked: boolean) => {
         setConfig(prev => ({
             ...prev,
             providers: prev.providers.map(p => {
@@ -238,6 +242,9 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
     };
 
     const selectedProvider = config.providers.find(p => p.id === selectedProviderId);
+    const selectedProviderReadiness = selectedProvider
+        ? getAIProviderConnectionReadiness(selectedProvider)
+        : null;
 
     // Derived state for rendering
     const filteredProviders = filterAIProviders(config.providers, searchText);
@@ -251,8 +258,9 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
     const [isTesting, setIsTesting] = useState(false);
 
     const handleTestConnection = async (provider: AIProviderConfig) => {
-        if (!provider.baseUrl) {
-            appMessage.warning(t('aiConfig.testFillRequired'));
+        const readiness = getAIProviderConnectionReadiness(provider);
+        if (!readiness.ready) {
+            appMessage.warning(t(`aiConfig.connection.${readiness.issue}`));
             return;
         }
         try {
@@ -322,8 +330,9 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
     }, [discoveredModels, discoverySearchText]);
 
     const handleFetchModels = async (provider: AIProviderConfig) => {
-        if (!provider.baseUrl) {
-            appMessage.warning(t('aiConfig.testFillRequired'));
+        const readiness = getAIProviderConnectionReadiness(provider);
+        if (!readiness.ready) {
+            appMessage.warning(t(`aiConfig.connection.${readiness.issue}`));
             return;
         }
         try {
@@ -377,10 +386,22 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
 
     return (
         <Modal
-            title={t('aiConfig.title')}
+            title={(
+                <div className="ai-config-modal-title">
+                    <span>{t('aiConfig.title')}</span>
+                    <Button
+                        type="text"
+                        className="ai-config-modal-close"
+                        icon={<CloseOutlined />}
+                        aria-label={t('aiConfig.close')}
+                        onClick={onCancel}
+                    />
+                </div>
+            )}
             open={open}
             onOk={handleSave}
             onCancel={onCancel}
+            closable={false}
             getContainer={getViewportOverlayContainer}
             okText={t('aiConfig.saveAll')}
             cancelText={t('aiConfig.cancel')}
@@ -391,78 +412,15 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
             styles={{ body: { padding: 0, height: 480 } }}
         >
             <div className="ai-config-layout" style={{ display: 'flex', height: '100%' }}>
-                {/* --- Left Sidebar: Providers --- */}
-                <div className="ai-config-provider-sidebar" style={{ width: 240, borderRight: '1px solid var(--designer-border, rgba(0,0,0,0.06))', display: 'flex', flexDirection: 'column', backgroundColor: 'transparent' }}>
-                    <div className="ai-config-provider-tools" style={{ padding: 'var(--glass-padding-sm, 16px)' }}>
-                        <Input.Search
-                            placeholder={t('aiConfig.searchPlaceholder')}
-                            allowClear
-                            value={searchText}
-                            onChange={e => setSearchText(e.target.value)}
-                            style={{ marginBottom: 12 }}
-                        />
-                        <div
-                            onClick={() => setSelectedProviderId('global_settings')}
-                            className={`glass-pulse-glow-container ${selectedProviderId === 'global_settings' ? 'glass-pulse-glow' : ''}`}
-                            style={{
-                                padding: '12px 16px',
-                                cursor: 'pointer',
-                                borderRadius: 10,
-                                backgroundColor: selectedProviderId === 'global_settings' ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
-                                color: selectedProviderId === 'global_settings' ? 'var(--color-primary-500, #6366f1)' : 'inherit',
-                                fontWeight: 600,
-                                display: 'flex', alignItems: 'center', gap: 12,
-                                transition: 'all 0.3s',
-                                border: selectedProviderId === 'global_settings' ? '1px solid rgba(99, 102, 241, 0.3)' : '1px solid transparent',
-                                zIndex: 1
-                            }}
-                        >
-                            <SettingOutlined style={{ position: 'relative', zIndex: 2, fontSize: 16 }} /> 
-                            <span style={{ position: 'relative', zIndex: 2 }}>{t('aiConfig.globalSettings')}</span>
-                        </div>
-                    </div>
-
-                    <div className="ai-config-provider-list" style={{ flex: 1, overflowY: 'auto', padding: '0 var(--glass-padding-sm, 16px)' }}>
-                        <Text type="secondary" style={{ fontSize: 12, marginBottom: 8, display: 'block', paddingLeft: 4 }}>{t('aiConfig.providerList')}</Text>
-                        <div className="ai-config-provider-items" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                            {filteredProviders.map(item => (
-                                <div
-                                    key={item.id}
-                                    onClick={() => setSelectedProviderId(item.id)}
-                                    className={selectedProviderId === item.id ? 'glass-pulse-glow' : ''}
-                                    style={{
-                                        padding: '12px 16px',
-                                        cursor: 'pointer',
-                                        borderRadius: 10,
-                                        backgroundColor: selectedProviderId === item.id ? 'rgba(255,255,255,0.45)' : 'transparent',
-                                        border: selectedProviderId === item.id ? '1px solid rgba(255,255,255,0.6)' : '1px solid transparent',
-                                        boxShadow: selectedProviderId === item.id ? '0 4px 12px rgba(0,0,0,0.05)' : 'none',
-                                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                                        transition: 'all 0.2s',
-                                        zIndex: 1
-                                    }}
-                                >
-                                    <Space style={{ position: 'relative', zIndex: 2 }} size={12}>
-                                        <AppstoreOutlined style={{ color: item.enabled ? 'var(--color-primary-500, #6366f1)' : '#ccc', fontSize: 16 }} />
-                                        <Text strong={selectedProviderId === item.id} style={{ color: item.enabled ? 'inherit' : 'rgba(0,0,0,0.45)' }}>
-                                            {item.name}
-                                        </Text>
-                                    </Space>
-                                    <Switch
-                                        size="small"
-                                        checked={item.enabled}
-                                        onClick={(checked, event) => toggleProvider(item.id, checked, event)}
-                                    />
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                    <div className="ai-config-provider-footer" style={{ padding: 'var(--glass-padding-sm, 16px)', borderTop: '1px solid rgba(0,0,0,0.06)' }}>
-                        <Button type="dashed" block icon={<PlusOutlined />} onClick={addCustomProvider} style={{ height: 40, borderRadius: 10 }}>
-                            {t('aiConfig.addCustomProvider')}
-                        </Button>
-                    </div>
-                </div>
+                <AIConfigProviderSidebar
+                    providers={filteredProviders}
+                    selectedProviderId={selectedProviderId}
+                    searchText={searchText}
+                    onSearchTextChange={setSearchText}
+                    onSelectProvider={setSelectedProviderId}
+                    onToggleProvider={toggleProvider}
+                    onAddCustomProvider={addCustomProvider}
+                />
 
                 {/* --- Right Content: Settings --- */}
                 <div className="ai-config-content" style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: 'transparent', overflow: 'hidden' }}>
@@ -470,7 +428,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                     {/* Header */}
                     <div style={{ padding: '24px var(--glass-padding-md, 24px)', borderBottom: '1px solid rgba(0,0,0,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <Title level={4} style={{ margin: 0, fontWeight: 700, letterSpacing: '-0.02em' }}>
-                            {selectedProviderId === 'global_settings' ? 'Global Settings' : selectedProvider?.name}
+                            {selectedProviderId === 'global_settings' ? t('aiConfig.globalSettings') : selectedProvider?.name}
                         </Title>
                         {selectedProvider && selectedProvider.id.startsWith('custom_') && (
                             <Button danger type="text" icon={<DeleteOutlined />} onClick={() => deleteProvider(selectedProvider.id)}>{t('aiConfig.deleteProvider')}</Button>
@@ -483,6 +441,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                                 <Form.Item label={t('aiConfig.systemPromptLabel')}>
                                     <Paragraph type="secondary">{t('aiConfig.systemPromptDesc')}</Paragraph>
                                         <Input.TextArea
+                                        aria-label={t('aiConfig.systemPromptLabel')}
                                         rows={12}
                                         value={config.systemPrompt}
                                         onChange={e => setConfig({ ...config, systemPrompt: e.target.value })}
@@ -493,47 +452,89 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                         ) : selectedProvider ? (
                             <Form layout="vertical">
                                 {/* Platform Config */}
-                                <div style={{ marginBottom: 24, padding: 16, border: '1px solid rgba(0,0,0,0.06)', borderRadius: 12, background: 'rgba(255,255,255,0.3)' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div className="ai-config-connection-card" style={{ marginBottom: 24, padding: 16, border: '1px solid rgba(0,0,0,0.06)', borderRadius: 12, background: 'rgba(255,255,255,0.3)' }}>
+                                    <div className="ai-config-connection-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                         <Text strong>{t('aiConfig.apiConfig')}</Text>
                                         <Button
-                                            size="small"
+                                            className="ai-config-primary-action"
                                             icon={<RocketOutlined />}
                                             loading={isTesting}
+                                            disabled={!selectedProviderReadiness?.ready || isFetchingModels}
                                             onClick={() => handleTestConnection(selectedProvider)}
                                         >
                                             {t('aiConfig.testConnection')}
                                         </Button>
                                     </div>
                                     <Divider style={{ margin: '12px 0' }} />
-                                    <Form.Item label="API Base URL" required tooltip="例如: https://api.openai.com/v1">
+                                    <Form.Item label={t('aiConfig.baseUrlLabel')} required tooltip={t('aiConfig.baseUrlHint')}>
                                         <Input
+                                            aria-label={t('aiConfig.baseUrlLabel')}
                                             value={selectedProvider.baseUrl}
                                             onChange={e => updateProvider(selectedProvider.id, { baseUrl: e.target.value })}
                                             placeholder="https://..."
                                         />
                                     </Form.Item>
-                                    <Form.Item label="API Key" required>
-                                        <Input.Password
-                                            value={selectedProvider.apiKey}
-                                            onChange={e => updateProvider(selectedProvider.id, { apiKey: e.target.value })}
-                                            placeholder="sk-..."
-                                        />
+                                    <Form.Item
+                                        label={t('aiConfig.apiKeyLabel')}
+                                        required={selectedProviderReadiness?.authMode === 'bearer-required'}
+                                    >
+                                        <Space.Compact block>
+                                            <Input
+                                                aria-label={t('aiConfig.apiKeyLabel')}
+                                                type={isApiKeyVisible ? 'text' : 'password'}
+                                                autoComplete="off"
+                                                value={selectedProvider.apiKey}
+                                                onChange={e => updateProvider(selectedProvider.id, { apiKey: e.target.value })}
+                                                placeholder="sk-..."
+                                            />
+                                            <Button
+                                                className="ai-config-api-key-toggle"
+                                                icon={isApiKeyVisible ? <EyeInvisibleOutlined /> : <EyeOutlined />}
+                                                aria-label={t(isApiKeyVisible ? 'aiConfig.hideApiKey' : 'aiConfig.showApiKey')}
+                                                aria-pressed={isApiKeyVisible}
+                                                onClick={() => setIsApiKeyVisible(visible => !visible)}
+                                            />
+                                        </Space.Compact>
                                     </Form.Item>
+                                    {selectedProviderReadiness && (
+                                        <Alert
+                                            className="ai-config-readiness-alert"
+                                            type={selectedProviderReadiness.ready ? 'success' : 'warning'}
+                                            showIcon
+                                            message={t(selectedProviderReadiness.ready
+                                                ? 'aiConfig.connection.ready'
+                                                : `aiConfig.connection.${selectedProviderReadiness.issue}`)}
+                                            description={t(selectedProviderReadiness.authMode === 'optional-local'
+                                                ? 'aiConfig.connection.localNotice'
+                                                : 'aiConfig.connection.remoteNotice')}
+                                        />
+                                    )}
                                     {selectedProvider.id.startsWith('custom_') && (
                                         <Form.Item label={t('aiConfig.platformName')}>
-                                            <Input value={selectedProvider.name} onChange={e => updateProvider(selectedProvider.id, { name: e.target.value })} />
+                                            <Input
+                                                aria-label={t('aiConfig.platformName')}
+                                                value={selectedProvider.name}
+                                                onChange={e => updateProvider(selectedProvider.id, { name: e.target.value })}
+                                            />
                                         </Form.Item>
                                     )}
                                 </div>
 
                                 {/* Models List */}
                                 <div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                                    <div className="ai-config-model-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                                         <Text strong>{t('aiConfig.modelList', { count: selectedProvider.models.length })}</Text>
                                         <Space>
-                                            <Button size="small" icon={<SyncOutlined />} loading={isFetchingModels} onClick={() => handleFetchModels(selectedProvider)}>{t('aiConfig.fetchModels')}</Button>
-                                            <Button size="small" type="primary" icon={<PlusOutlined />} onClick={() => setNewModelFormVisible(true)}>{t('aiConfig.addModel')}</Button>
+                                            <Button
+                                                className="ai-config-primary-action"
+                                                icon={<SyncOutlined />}
+                                                loading={isFetchingModels}
+                                                disabled={!selectedProviderReadiness?.ready || isTesting}
+                                                onClick={() => handleFetchModels(selectedProvider)}
+                                            >
+                                                {t('aiConfig.fetchModels')}
+                                            </Button>
+                                            <Button className="ai-config-primary-action" type="primary" icon={<PlusOutlined />} onClick={() => setNewModelFormVisible(true)}>{t('aiConfig.addModel')}</Button>
                                         </Space>
                                     </div>
 
@@ -541,18 +542,21 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                                         <div style={{ marginBottom: 16, padding: 12, border: '1px dashed #1890ff', borderRadius: 6, background: '#e6f7ff' }}>
                                             <div style={{ width: '100%', marginBottom: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
                                                 <Input
+                                                    aria-label={t('aiConfig.modelIdLabel')}
                                                     placeholder={t('aiConfig.modelIdPlaceholder')}
                                                     value={newModelData.id}
                                                     onChange={e => setNewModelData({ ...newModelData, id: e.target.value })}
                                                     prefix={<span style={{ color: '#999', marginRight: 4 }}>ID:</span>}
                                                 />
                                                 <Input
+                                                    aria-label={t('aiConfig.displayNameLabel')}
                                                     placeholder={t('aiConfig.displayNamePlaceholder')}
                                                     value={newModelData.name}
                                                     onChange={e => setNewModelData({ ...newModelData, name: e.target.value })}
                                                     prefix={<span style={{ color: '#999', marginRight: 4 }}>Name:</span>}
                                                 />
                                                 <Input
+                                                    aria-label={t('aiConfig.groupLabel')}
                                                     placeholder={t('aiConfig.groupPlaceholder')}
                                                     value={newModelData.group}
                                                     onChange={e => setNewModelData({ ...newModelData, group: e.target.value })}
@@ -581,8 +585,8 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                                                         {groupedModels[groupName].map(model => {
                                                             const isGlobalActive = config.activeModelKey === `${selectedProvider.id}:${model.id}`;
                                                             return (
-                                                                <div key={model.id} className={isGlobalActive ? "glass-pulse-glow" : ""} style={{ padding: '12px var(--glass-padding-sm, 16px)', borderBottom: '1px solid var(--designer-border, rgba(0,0,0,0.06))', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: 8, backgroundColor: isGlobalActive ? 'rgba(99, 102, 241, 0.04)' : 'transparent', marginBottom: 4 }}>
-                                                                    <div style={{ display: 'flex', alignItems: 'center', zIndex: 1 }}>
+                                                                <div key={model.id} className={`ai-config-model-row ${isGlobalActive ? "glass-pulse-glow" : ""}`} style={{ padding: '12px var(--glass-padding-sm, 16px)', borderBottom: '1px solid var(--designer-border, rgba(0,0,0,0.06))', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: 8, backgroundColor: isGlobalActive ? 'rgba(99, 102, 241, 0.04)' : 'transparent', marginBottom: 4 }}>
+                                                                    <div className="ai-config-model-info" style={{ display: 'flex', alignItems: 'center', zIndex: 1 }}>
                                                                         <Space>
                                                                             <Text delete={!model.enabled} strong={isGlobalActive}>{model.name}</Text>
                                                                             <Text type="secondary" style={{ fontSize: 12 }}>({model.id})</Text>
@@ -593,7 +597,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                                                                             )}
                                                                         </Space>
                                                                     </div>
-                                                                    <Space style={{ zIndex: 1 }}>
+                                                                    <Space className="ai-config-model-actions" style={{ zIndex: 1 }}>
                                                                         <Button
                                                                             size="small"
                                                                             type={isGlobalActive ? "primary" : "default"}
@@ -605,10 +609,18 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                                                                         <Switch
                                                                             size="small"
                                                                             checked={model.enabled}
+                                                                            aria-label={t('aiConfig.modelToggleLabel', { name: model.name || model.id })}
                                                                             onChange={c => toggleModel(selectedProvider.id, model.id, c)}
                                                                         />
                                                                         {(model.isCustom || selectedProvider.id.startsWith('custom_')) && (
-                                                                            <Button size="small" type="text" danger icon={<DeleteOutlined />} onClick={() => deleteModel(selectedProvider.id, model.id)} />
+                                                                            <Button
+                                                                                size="small"
+                                                                                type="text"
+                                                                                danger
+                                                                                icon={<DeleteOutlined />}
+                                                                                aria-label={t('aiConfig.deleteModelLabel', { name: model.name || model.id })}
+                                                                                onClick={() => deleteModel(selectedProvider.id, model.id)}
+                                                                            />
                                                                         )}
                                                                     </Space>
                                                                 </div>
@@ -630,65 +642,17 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                 </div>
             </div>
 
-            {/* Model Discovery Modal */}
-            <Modal
-                title={t('aiConfig.discoveryTitle', '选择要添加的模型')}
+            <AIConfigModelDiscoveryModal
                 open={discoveryModalVisible}
-                onOk={handleAddDiscoveredModels}
+                groupedModels={groupedDiscoveredModels}
+                searchText={discoverySearchText}
+                selectedIds={discoverySelectedIds}
+                onSearchTextChange={setDiscoverySearchText}
+                onToggleModel={toggleDiscoverySelection}
+                onToggleGroup={toggleDiscoveryGroupSelection}
+                onConfirm={handleAddDiscoveredModels}
                 onCancel={() => setDiscoveryModalVisible(false)}
-                getContainer={getViewportOverlayContainer}
-                rootClassName={`${COMMERCIAL_VIEWPORT_MODAL_CLASS} ai-config-discovery-modal`}
-                zIndex={COMMERCIAL_VIEWPORT_MODAL_Z_INDEX + 10}
-                okText={t('aiConfig.confirmAdd')}
-                width={700}
-                styles={{ body: { padding: '16px 0', height: 500, overflowY: 'auto' } }}
-            >
-                <div style={{ padding: '0 24px', marginBottom: 16 }}>
-                    <Input.Search
-                        placeholder={t('aiConfig.discoverySearchPlaceholder', '搜索模型 ID 或名称')}
-                        allowClear
-                        value={discoverySearchText}
-                        onChange={e => setDiscoverySearchText(e.target.value)}
-                    />
-                </div>
-                
-                <div style={{ padding: '0 24px' }}>
-                    {Object.keys(groupedDiscoveredModels).map(groupName => {
-                        const groupModels = groupedDiscoveredModels[groupName];
-                        const allSelected = groupModels.length > 0 && groupModels.every(m => discoverySelectedIds.includes(m.id));
-                        const indeterminate = groupModels.some(m => discoverySelectedIds.includes(m.id)) && !allSelected;
-                        
-                        return (
-                            <div key={groupName} style={{ marginBottom: 16, border: '1px solid #f0f0f0', borderRadius: 8, overflow: 'hidden' }}>
-                                <div style={{ padding: '8px 12px', background: '#fafafa', borderBottom: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                    <Space>
-                                        <Checkbox
-                                            indeterminate={indeterminate}
-                                            checked={allSelected}
-                                            onChange={e => toggleDiscoveryGroupSelection(groupModels, e.target.checked)}
-                                        />
-                                        <Text strong>{groupName} <Tag color="blue" style={{ marginLeft: 8, border: 'none', background: '#e6f7ff' }}>{groupModels.length}</Tag></Text>
-                                    </Space>
-                                </div>
-                                <div style={{ padding: '0 12px' }}>
-                                    {groupModels.map(model => (
-                                        <div key={model.id} style={{ padding: '10px 0', borderBottom: '1px solid #f0f0f0', display: 'flex', alignItems: 'center' }}>
-                                            <Checkbox
-                                                checked={discoverySelectedIds.includes(model.id)}
-                                                onChange={e => toggleDiscoverySelection(model.id, e.target.checked)}
-                                            />
-                                            <Space style={{ marginLeft: 12 }}>
-                                                <Text>{model.name}</Text>
-                                                <Text type="secondary" style={{ fontSize: 12 }}>({model.id})</Text>
-                                            </Space>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-            </Modal>
+            />
         </Modal>
     );
 };

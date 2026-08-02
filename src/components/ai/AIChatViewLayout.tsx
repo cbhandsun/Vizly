@@ -24,6 +24,7 @@ import {
 
 import type { Conversation, Message } from '@/services/ai/AIConversationService';
 import type { AIChatSaveTarget } from './aiChatSave';
+import type { AIChatConfigurationState } from './aiChatRequestConfig';
 import { MemoizedMessageItem } from './AIChatMessageItem';
 
 export interface AIChatSlashCommand {
@@ -78,6 +79,7 @@ interface AIChatViewLayoutProps {
     aiConfig: { activeModelKey: string };
     availableModels: AIChatModelOption[];
     activeModelName: string;
+    configurationState: AIChatConfigurationState;
     handleModelChange: (value: string) => void;
     onOpenConfig: () => void;
     onClose: () => void;
@@ -124,6 +126,7 @@ export const AIChatViewLayout: React.FC<AIChatViewLayoutProps> = ({
     aiConfig,
     availableModels,
     activeModelName,
+    configurationState,
     handleModelChange,
     onOpenConfig,
     onClose,
@@ -158,7 +161,13 @@ export const AIChatViewLayout: React.FC<AIChatViewLayoutProps> = ({
             <div className={`ai-chat-sidebar ${isSidebarOpen ? 'open' : 'closed'}`}>
                 <div className="ai-chat-sidebar-header">
                     <Typography.Text strong>{t('aiChat.historyTitle')}</Typography.Text>
-                    <Button size="small" icon={<PlusOutlined />} onClick={() => { handleNewChat(); setIsSidebarOpen(false); }} type="text" />
+                    <Button
+                        size="small"
+                        icon={<PlusOutlined />}
+                        aria-label={t('aiChat.newConversation')}
+                        onClick={() => { handleNewChat(); setIsSidebarOpen(false); }}
+                        type="text"
+                    />
                 </div>
                 <div className="ai-chat-sidebar-list">
                     <div role="list" aria-label={t('aiChat.historyTitle')}>
@@ -219,6 +228,7 @@ export const AIChatViewLayout: React.FC<AIChatViewLayoutProps> = ({
                         aria-label={t('aiChat.viewHistory')}
                     />
                     <Select
+                        aria-label={t('aiChat.modelSelectLabel')}
                         size="small"
                         variant="borderless"
                         value={aiConfig.activeModelKey}
@@ -264,6 +274,22 @@ export const AIChatViewLayout: React.FC<AIChatViewLayoutProps> = ({
                     />
                 </Space>
             </div>
+
+            {!configurationState.ready && (
+                <div className="ai-chat-configuration-status" role="status">
+                    <div className="ai-chat-configuration-copy">
+                        <Typography.Text strong>{t('aiChat.configStatusTitle')}</Typography.Text>
+                        <Typography.Text type="secondary">
+                            {t(`aiChat.configReason.${configurationState.reason}`, {
+                                provider: configurationState.providerName ?? '',
+                            })}
+                        </Typography.Text>
+                    </div>
+                    <Button type="link" onClick={onOpenConfig}>
+                        {t('aiChat.configureNow')}
+                    </Button>
+                </div>
+            )}
 
             {/* Content */}
             <div className="ai-chat-messages">

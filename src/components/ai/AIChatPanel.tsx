@@ -20,6 +20,7 @@ import { useAIChatConversations } from './useAIChatConversations';
 import { createAIChatMessageId } from './aiChatConversationModel';
 import { AIChatViewLayout, type AIChatSlashCommand } from './AIChatViewLayout';
 import { useAIChatRequestLifecycle } from './useAIChatRequestLifecycle';
+import { getAIChatConfigurationState } from './aiChatRequestConfig';
 
 // --- Message Item Component (with Memo) ---
 /**
@@ -162,6 +163,11 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
         }
         return mId || aiConfig.activeModelKey;
     }, [aiConfig]);
+
+    const configurationState = useMemo(
+        () => getAIChatConfigurationState(aiConfig),
+        [aiConfig],
+    );
 
     const handleModelChange = (val: string) => {
         const newConfig = { ...aiConfig, activeModelKey: val };
@@ -576,6 +582,7 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
             aiConfig={aiConfig}
             availableModels={availableModels}
             activeModelName={activeModelName}
+            configurationState={configurationState}
             handleModelChange={handleModelChange}
             onOpenConfig={onOpenConfig}
             onClose={onClose}
