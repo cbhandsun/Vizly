@@ -51,10 +51,14 @@ export const resolveRouteBudget = (routeName, { env = process.env, isMobile = fa
   };
 };
 
-export const shouldRetryEvaluateAfterTimeout = (error, { isMobile = false } = {}) => {
-  if (!isMobile || !(error instanceof Error)) return false;
-  return /CDP command timed out: Runtime\.evaluate/.test(error.message);
-};
+export const isRuntimeEvaluateTimeout = (error) => (
+  error instanceof Error
+  && error.message === 'CDP command timed out: Runtime.evaluate'
+);
+
+export const shouldRetryEvaluateAfterTimeout = (error, { isMobile = false } = {}) => (
+  isMobile && isRuntimeEvaluateTimeout(error)
+);
 
 /**
  * The WMS page is not ready merely because React Flow mounted. Its user-visible

@@ -22,6 +22,8 @@ export const resolveRouteBudget: (
   options?: RouteBudgetOptions,
 ) => RouteBudget;
 
+export const isRuntimeEvaluateTimeout: (error: unknown) => boolean;
+
 export const shouldRetryEvaluateAfterTimeout: (
   error: unknown,
   options?: Pick<RouteBudgetOptions, 'isMobile'>,

@@ -4,6 +4,7 @@ import {
   isManagementTemplatesReady,
 } from './smoke-route-catalog.mjs';
 import { CdpSession } from './smoke-route-cdp-session.mjs';
+import { waitForRouteReadiness } from './smoke-route-readiness.mjs';
 import {
   aggregateRouteSamples,
   collectBudgetViolations,
@@ -36,6 +37,97 @@ describe('smoke route modules', () => {
     expect(session.isMobile).toBe(true);
     expect(session.logs).toEqual([]);
     expect(session.networkIssues).toEqual([]);
+  });
+
+  it('keeps polling within the route deadline after a Runtime.evaluate timeout', async () => {
+    let currentTime = 0;
+    const expressions = [];
+    const session = {
+      logs: [],
+      networkIssues: [],
+      pendingLogEnrichments: [],
+      evaluate: async (expression) => {
+        expressions.push(expression);
+        if (expressions.length === 1) {
+          throw new Error('CDP command timed out: Runtime.evaluate');
+        }
+        if (expression === 'performance.now()') return 875;
+        return { ready: true, href: 'http://example.test/ready' };
+      },
+    };
+
+    const state = await waitForRouteReadiness(session, {
+      name: 'large-diagram',
+      expression: 'readinessProbe()',
+      timeoutMs: 2_000,
+    }, {
+      now: () => currentTime,
+      wait: async (durationMs) => { currentTime += durationMs; },
+    });
+
+    expect(state).toEqual({
+      ready: true,
+      href: 'http://example.test/ready',
+      readyAt: 875,
+    });
+    expect(expressions).toEqual([
+      'readinessProbe()',
+      'readinessProbe()',
+      'performance.now()',
+    ]);
+  });
+
+  it('does not swallow unrelated CDP or evaluation errors', async () => {
+    const session = {
+      logs: [],
+      networkIssues: [],
+      pendingLogEnrichments: [],
+      evaluate: async () => {
+        throw new Error('CDP command timed out: Page.navigate');
+      },
+    };
+
+    await expect(waitForRouteReadiness(session, {
+      name: 'broken-route',
+      expression: 'readinessProbe()',
+      timeoutMs: 2_000,
+    })).rejects.toThrow('CDP command timed out: Page.navigate');
+  });
+
+  it('fails with timeout diagnostics when Runtime.evaluate stays unavailable', async () => {
+    let currentTime = 0;
+    let readinessAttempts = 0;
+    const session = {
+      logs: [{ level: 'warn', message: 'rendering' }],
+      networkIssues: [],
+      pendingLogEnrichments: [],
+      evaluate: async (expression) => {
+        if (expression === 'readinessProbe()') {
+          readinessAttempts += 1;
+          throw new Error('CDP command timed out: Runtime.evaluate');
+        }
+        return null;
+      },
+    };
+
+    const result = waitForRouteReadiness(session, {
+      name: 'stuck-route',
+      expression: 'readinessProbe()',
+      timeoutMs: 1_000,
+    }, {
+      now: () => currentTime,
+      wait: async (durationMs) => { currentTime += durationMs; },
+    });
+
+    await expect(result).rejects.toMatchObject({
+      message: 'Route smoke failed for stuck-route',
+      details: {
+        evaluateTimeoutCount: 2,
+        lastEvaluateTimeout: 'CDP command timed out: Runtime.evaluate',
+        logs: [{ level: 'warn', message: 'rendering' }],
+      },
+    });
+    expect(readinessAttempts).toBe(2);
   });
 
   it('accepts localized management-template empty states as ready', () => {

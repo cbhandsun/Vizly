@@ -4,6 +4,7 @@ import {
   defaultDesktopRouteBudgets,
   collectRouteStabilityViolations,
   isFinalWmsDisplayRoutingReady,
+  isRuntimeEvaluateTimeout,
   resolveRouteBudget,
   shouldRetryEvaluateAfterTimeout,
 } from '../../../../scripts/smokeRouteBudgetUtils.mjs';
@@ -44,6 +45,9 @@ describe('smokeRouteBudgetUtils', () => {
   });
 
   it('retries only mobile Runtime.evaluate timeouts', () => {
+    expect(isRuntimeEvaluateTimeout(new Error('CDP command timed out: Runtime.evaluate'))).toBe(true);
+    expect(isRuntimeEvaluateTimeout(new Error('CDP command timed out: Runtime.evaluate later'))).toBe(false);
+    expect(isRuntimeEvaluateTimeout('CDP command timed out: Runtime.evaluate')).toBe(false);
     expect(shouldRetryEvaluateAfterTimeout(new Error('CDP command timed out: Runtime.evaluate'), { isMobile: true })).toBe(true);
     expect(shouldRetryEvaluateAfterTimeout(new Error('CDP command timed out: Runtime.evaluate'), { isMobile: false })).toBe(false);
     expect(shouldRetryEvaluateAfterTimeout(new Error('CDP command timed out: Page.navigate'), { isMobile: true })).toBe(false);

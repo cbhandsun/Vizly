@@ -9,6 +9,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import WebSocket from 'ws';
 import { createSmokeRouteCatalog } from './lib/smoke-route-catalog.mjs';
 import { CdpSession } from './lib/smoke-route-cdp-session.mjs';
+import { waitForRouteReadiness } from './lib/smoke-route-readiness.mjs';
 import {
   aggregateRouteSamples,
   attachInitiators,
@@ -362,57 +363,6 @@ const createTarget = async (url = 'about:blank') => {
   return target;
 };
 
-const waitForRouteState = async (session, route) => {
-  const deadline = Date.now() + route.timeoutMs;
-  let state;
-  let errorLoggerSnapshot;
-  let rawErrorCapture;
-
-  while (Date.now() < deadline) {
-    state = await session.evaluate(route.expression);
-    if (state?.ready) {
-      state.readyAt = await session.evaluate('performance.now()');
-      return state;
-    }
-    if (state?.errorBoundary) break;
-    await delay(500);
-  }
-
-  if (!errorLoggerSnapshot) {
-    try {
-      errorLoggerSnapshot = await session.evaluate(`
-        typeof window.__errorLogger?.getLogs === 'function'
-          ? window.__errorLogger.getLogs().slice(-20)
-          : null
-      `);
-    } catch {
-      errorLoggerSnapshot = null;
-    }
-  }
-  if (!rawErrorCapture) {
-    try {
-      rawErrorCapture = await session.evaluate('window.__smokeErrorCapture?.slice(-20) || null');
-    } catch {
-      rawErrorCapture = null;
-    }
-  }
-  if (session.pendingLogEnrichments.length > 0) {
-    try {
-      await Promise.allSettled(session.pendingLogEnrichments);
-    } catch {
-      // ignore best-effort enrichment failures
-    }
-  }
-
-  fail(`Route smoke failed for ${route.name}`, {
-    state,
-    logs: session.logs.slice(-20),
-    networkIssues: session.networkIssues.slice(-20),
-    errorLogger: errorLoggerSnapshot,
-    rawErrorCapture,
-  });
-};
-
 const assertViewportState = async (session, routeName) => {
   if (!VIEWPORT) return null;
 
@@ -613,7 +563,7 @@ const runRouteSample = async (route, sampleIndex = 0) => {
     log(`Navigating route: ${route.name}${sampleSuffix}`);
     await session.navigate(route.url);
     log(`Waiting for route readiness: ${route.name}${sampleSuffix}`);
-    const state = await waitForRouteState(session, route);
+    const state = await waitForRouteReadiness(session, route);
     const viewportState = await assertViewportState(session, route.name);
     const stabilityReport = await collectRouteStabilityReport(session, route.stabilityBudget);
     const assetReport = attachInitiators(session, await getRouteAssetReport(session, state.readyAt));
