@@ -89,7 +89,9 @@ describe('DiagramTitleEditor', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => expect(onRename).toHaveBeenCalledWith('Order approval'));
-    expect(screen.queryByRole('textbox', { name: 'New diagram name' })).toBeNull();
+    await waitFor(() => {
+      expect(screen.queryByRole('textbox', { name: 'New diagram name' })).toBeNull();
+    });
   });
 
   it('keeps the editor open and exposes a status when persistence fails', async () => {
