@@ -10,6 +10,7 @@ import {
 } from '../../../../vite-plugins/sharedModuleWorkers';
 import {
   matchesAppSafeLoggingModule,
+  matchesFlowchartRuntimeModule,
   matchesThemePresetModule,
 } from '../../../../vite-plugins/buildChunkGroups';
 import {
@@ -154,6 +155,21 @@ describe('sharedModuleWorkers Vite plugin', () => {
     )).toBe(true);
     expect(matchesThemePresetModule(
       'C:/repo/src/core/themes/EnhancedThemeManager.ts',
+    )).toBe(false);
+  });
+
+  it('co-loads only the curated synchronous flowchart runtime modules', () => {
+    expect(matchesFlowchartRuntimeModule(
+      'C:\\repo\\src\\core\\components\\diagrams\\ShapePreview.tsx',
+    )).toBe(true);
+    expect(matchesFlowchartRuntimeModule(
+      'C:/repo/src/core/utils/flowchartClipboard.ts',
+    )).toBe(true);
+    expect(matchesFlowchartRuntimeModule(
+      'C:/repo/src/core/components/custom-nodes/FlowchartNode.tsx',
+    )).toBe(false);
+    expect(matchesFlowchartRuntimeModule(
+      'C:/repo/src/core/utils/__tests__/flowchartClipboard.test.ts',
     )).toBe(false);
   });
 

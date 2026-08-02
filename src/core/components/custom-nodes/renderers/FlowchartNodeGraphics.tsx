@@ -1,9 +1,9 @@
-import React, { useRef, useEffect, useMemo } from 'react';
-import rough from 'roughjs';
+import React, { useRef, useEffect, useMemo, useState } from 'react';
 import { hexToRgba } from '../../shared/layoutUtils';
 import type { FlowchartShape } from '../FlowchartNode';
 import type { FlowchartNodeData } from '../hooks/useFlowchartNodeStyleResolution';
 import type { FlowStylePreset } from '../../shared/DiagramStyleManager';
+import { loadRoughRenderer } from './roughRendererLoader';
 
 export interface FlowchartNodeGraphicsProps {
     id: string;
@@ -36,8 +36,24 @@ export const FlowchartNodeGraphics: React.FC<FlowchartNodeGraphicsProps> = ({
 }) => {
     const accent = preset.node.accentBar;
     const sketchRef = useRef<SVGGElement>(null);
+    const [roughRenderer, setRoughRenderer] = useState<Awaited<ReturnType<typeof loadRoughRenderer>> | null>(null);
 
     const isSketch = preset.name === 'sketch';
+
+    useEffect(() => {
+        if (!isSketch || roughRenderer) return;
+        let active = true;
+        void loadRoughRenderer()
+            .then(renderer => {
+                if (active) setRoughRenderer(renderer);
+            })
+            .catch(() => {
+                // The standard SVG remains visible when the optional chunk fails.
+            });
+        return () => {
+            active = false;
+        };
+    }, [isSketch, roughRenderer]);
 
     // roughjs 绘制参数（memo 化避免不必要的重绘）
     const roughOpts = useMemo(() => ({
@@ -58,12 +74,12 @@ export const FlowchartNodeGraphics: React.FC<FlowchartNodeGraphicsProps> = ({
 
     // ── Sketch 模式：使用 roughjs 直接生成 SVG 元素 ──
     useEffect(() => {
-        if (!isSketch || !sketchRef.current) return;
+        if (!isSketch || !roughRenderer || !sketchRef.current) return;
         const g = sketchRef.current;
         // 需要一个临时的父 SVG 来初始化 rough.svg()
         const parentSvg = g.ownerSVGElement;
         if (!parentSvg) return;
-        const rc = rough.svg(parentSvg);
+        const rc = roughRenderer.svg(parentSvg);
 
         // 清空之前的内容
         while (g.firstChild) g.removeChild(g.firstChild);
@@ -148,7 +164,7 @@ export const FlowchartNodeGraphics: React.FC<FlowchartNodeGraphicsProps> = ({
                 g.appendChild(rc.rectangle(0, 0, 100, 100, roughOpts));
                 break;
         }
-    }, [isSketch, shape, roughOpts, thinLineOpts]);
+    }, [isSketch, roughRenderer, shape, roughOpts, thinLineOpts]);
 
     // ── 风格预设：accentBar（强调条）──
     const renderAccentBar = () => {
@@ -310,7 +326,7 @@ export const FlowchartNodeGraphics: React.FC<FlowchartNodeGraphicsProps> = ({
                 viewBox="0 0 100 100"
                 preserveAspectRatio="none"
             >
-                {isSketch ? <g ref={sketchRef} /> : renderStandardShape()}
+                {isSketch && roughRenderer ? <g ref={sketchRef} /> : renderStandardShape()}
             </svg>
         </>
     );

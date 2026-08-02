@@ -9,6 +9,7 @@ import { jspdfRasterOnlyPlugin } from './vite-plugins/jspdfRasterOnly'
 import { sharedModuleWorkersPlugin } from './vite-plugins/sharedModuleWorkers'
 import {
   matchesAppSafeLoggingModule,
+  matchesFlowchartRuntimeModule,
   matchesThemePresetModule,
 } from './vite-plugins/buildChunkGroups'
 import { createDisplayRoutingChunkClassifier } from './vite-plugins/displayRoutingChunkClassifier'
@@ -390,6 +391,12 @@ export default defineConfig({
               name: 'display-routing-shared',
               test: displayRoutingChunks.matchesSharedModule,
               priority: 80,
+              minSize: 0,
+            },
+            {
+              name: 'flowchart-runtime-shared',
+              test: matchesFlowchartRuntimeModule,
+              priority: 75,
               minSize: 0,
             },
             {

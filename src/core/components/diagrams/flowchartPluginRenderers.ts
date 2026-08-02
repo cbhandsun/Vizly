@@ -2,23 +2,25 @@ import type { EdgeTypes, NodeTypes } from '@xyflow/react';
 
 import type { DiagramTypePlugin } from '../../types/plugin';
 import CustomNode from '../custom-nodes/CustomNode';
-import TitleGroupNode from '../custom-nodes/TitleGroupNode';
-import SubGroupNode from '../custom-nodes/SubGroupNode';
 import FlowchartNode from '../custom-nodes/FlowchartNode';
-import IconNode from '../custom-nodes/IconNode';
-import SwimLaneNode from '../custom-nodes/SwimLaneNode';
-import StickyNoteNode from '../custom-nodes/StickyNoteNode';
-import MindMapNode from '../custom-nodes/MindMapNode';
-import MindMapBoundaryNode from '../custom-nodes/MindMapBoundaryNode';
-import CommentNode from '../custom-nodes/CommentNode';
 import ArrowTimelineNode from './nodes/ArrowTimelineNode';
-import ERDatabaseNode from '../custom-nodes/ERDatabaseNode';
 import MindMapEdge from '../edges/MindMapEdge';
 import { RelationshipEdge } from '../custom-edges/RelationshipEdge';
 import { createStableFlowchartRendererMapResolver } from './flowchartPluginRuntimeModel';
+import { createLazyNodeRenderer } from './lazyNodeRenderer';
 
 type EdgeRendererTypes = EdgeTypes;
 type FlowchartRendererPlugin = Pick<DiagramTypePlugin, 'getNodeTypes' | 'getEdgeTypes'>;
+
+const TitleGroupNode = createLazyNodeRenderer(() => import('../custom-nodes/TitleGroupNode'));
+const SubGroupNode = createLazyNodeRenderer(() => import('../custom-nodes/SubGroupNode'));
+const IconNode = createLazyNodeRenderer(() => import('../custom-nodes/IconNode'));
+const SwimLaneNode = createLazyNodeRenderer(() => import('../custom-nodes/SwimLaneNode'));
+const StickyNoteNode = createLazyNodeRenderer(() => import('../custom-nodes/StickyNoteNode'));
+const MindMapNode = createLazyNodeRenderer(() => import('../custom-nodes/MindMapNode'));
+const MindMapBoundaryNode = createLazyNodeRenderer(() => import('../custom-nodes/MindMapBoundaryNode'));
+const CommentNode = createLazyNodeRenderer(() => import('../custom-nodes/CommentNode'));
+const ERDatabaseNode = createLazyNodeRenderer(() => import('../custom-nodes/ERDatabaseNode'));
 
 const DEFAULT_NODE_TYPES: NodeTypes = {
     custom: CustomNode,

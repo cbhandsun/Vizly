@@ -40,6 +40,7 @@ export const TEST_CI_SHARD_GROUPS = Object.freeze({
     'test:ci:core-components-b-dom',
     'test:ci:core-components-c',
     'test:ci:core-components-extra',
+    'test:ci:core-components-extra-interactions',
     'test:ci:data-main',
     'test:ci:mindmap',
   ]),
