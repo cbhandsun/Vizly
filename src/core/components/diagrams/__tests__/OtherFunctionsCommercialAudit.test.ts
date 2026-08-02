@@ -124,6 +124,27 @@ describe('other-function commercial interaction safeguards', () => {
         expect(source).toContain("minWidth: 'var(--commercial-touch-target, 44px)'");
     });
 
+    it('reflows sharing and collaboration recovery controls on narrow viewports', () => {
+        const shareSource = readSource('../../../../components/diagrams/ShareDialog.tsx');
+        const shareCss = readSource('../../../../components/diagrams/ShareDialog.css');
+        const collaborationSource = readSource('../../../../components/ui/CollaborationModal.tsx');
+        const collaborationCss = readSource('../../../../components/ui/CollaborationModal.css');
+
+        expect(shareSource).toContain('share-dialog-viewport-modal');
+        expect(shareSource).toContain('share-dialog-invite-controls');
+        expect(shareSource).toContain('share-dialog-recovery-alert');
+        expect(shareSource).toContain('aria-describedby="share-dialog-email-help"');
+        expect(shareCss).toMatch(/\.share-dialog-invite-controls[\s\S]*?grid-template-columns: minmax\(0, 1fr\) 124px auto/);
+        expect(shareCss).toMatch(/@media \(max-width: 640px\)[\s\S]*?\.share-dialog-invite-email[\s\S]*?grid-column: 1 \/ -1/);
+        expect(shareCss).toMatch(/\.share-dialog-list \.ant-list-item-action \.ant-btn[\s\S]*?min-height: var\(--commercial-touch-target, 44px\)/);
+
+        expect(collaborationSource).toContain('collaboration-viewport-modal');
+        expect(collaborationSource).toContain('tryCopyShareUrl');
+        expect(collaborationSource).toContain('copyFailed &&');
+        expect(collaborationCss).toMatch(/\.collaboration-copy-row \.ant-input,[\s\S]*?min-height: var\(--commercial-touch-target, 44px\)/);
+        expect(collaborationCss).toMatch(/@media \(max-width: 480px\)[\s\S]*?\.collaboration-copy-row[\s\S]*?grid-template-columns: minmax\(0, 1fr\)/);
+    });
+
     it('explains that version snapshot notes are optional and supplies the default outcome', () => {
         const source = readSource('../../../../components/diagrams/ui/VersionHistoryPanel.tsx');
 

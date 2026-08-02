@@ -1,13 +1,16 @@
-import React, { useState } from 'react';
-import { Modal, Input, Button, List, Typography, Badge, Avatar } from 'antd';
+import React, { useCallback, useState } from 'react';
+import { Alert, Modal, Input, Button, List, Typography, Badge, Avatar } from 'antd';
 import { CopyOutlined, TeamOutlined } from '@ant-design/icons';
 import { buildCollaborationShareUrl } from './collaborationUrl';
 import type { ActiveCollaborator } from '../diagrams/collaboration/YjsProviderHooks';
+import { useTranslation } from 'react-i18next';
+import { tryCopyShareUrl } from '@/components/shareClipboard';
 import {
     COMMERCIAL_VIEWPORT_MODAL_CLASS,
     COMMERCIAL_VIEWPORT_MODAL_Z_INDEX,
     getViewportOverlayContainer,
 } from '@/core/components/ui/viewportOverlayPortal';
+import './CollaborationModal.css';
 
 export interface CollaborationModalProps {
     open: boolean;
@@ -22,32 +25,44 @@ export const CollaborationModal: React.FC<CollaborationModalProps> = ({
     activeUsers,
     roomName,
 }) => {
-    const [copied, setCopied] = useState(false);
+    const { t } = useTranslation();
+    const [copyState, setCopyState] = useState<{
+        roomName: string;
+        status: 'idle' | 'copying' | 'copied' | 'failed';
+    }>({ roomName, status: 'idle' });
 
     // Build the shareable URL
     const shareUrl = typeof window !== 'undefined'
         ? buildCollaborationShareUrl(window.location, roomName)
         : '';
 
-    const handleCopy = () => {
+    const currentCopyStatus = copyState.roomName === roomName ? copyState.status : 'idle';
+    const copied = currentCopyStatus === 'copied';
+    const copying = currentCopyStatus === 'copying';
+    const copyFailed = currentCopyStatus === 'failed';
+
+    const handleCopy = useCallback(async () => {
         if (!shareUrl) return;
-        navigator.clipboard.writeText(shareUrl);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-    };
+        setCopyState({ roomName, status: 'copying' });
+        const didCopy = await tryCopyShareUrl(shareUrl);
+        setCopyState({ roomName, status: didCopy ? 'copied' : 'failed' });
+    }, [roomName, shareUrl]);
 
     return (
         <Modal
             title={
                 <div className="flex items-center gap-2">
                     <TeamOutlined className="text-blue-500" />
-                    <span>实时协作 (Beta)</span>
+                    <span>{t('collaboration.modalTitle')}</span>
                 </div>
             }
             open={open}
             onCancel={onClose}
+            afterOpenChange={(nextOpen) => {
+                if (!nextOpen) setCopyState({ roomName, status: 'idle' });
+            }}
             getContainer={getViewportOverlayContainer}
-            rootClassName={COMMERCIAL_VIEWPORT_MODAL_CLASS}
+            rootClassName={`${COMMERCIAL_VIEWPORT_MODAL_CLASS} collaboration-viewport-modal`}
             zIndex={COMMERCIAL_VIEWPORT_MODAL_Z_INDEX}
             footer={null}
             destroyOnHidden
@@ -57,30 +72,50 @@ export const CollaborationModal: React.FC<CollaborationModalProps> = ({
             <div className="flex flex-col gap-4 py-4">
                 <div className="bg-blue-50/50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-100 dark:border-blue-800">
                     <Typography.Text className="block mb-2 font-medium text-gray-700 dark:text-gray-300">
-                        邀请链接
+                        {t('collaboration.inviteLink')}
                     </Typography.Text>
-                    <div className="flex gap-2">
+                    <div className="collaboration-copy-row">
                         <Input 
                             value={shareUrl} 
                             readOnly 
+                            aria-label={t('collaboration.inviteLink')}
                             className="bg-white/80 dark:bg-slate-800/80" 
                         />
                         <Button 
                             type="primary" 
                             icon={<CopyOutlined />} 
                             onClick={handleCopy}
+                            loading={copying}
+                            aria-label={copied
+                                ? t('collaboration.copied')
+                                : copyFailed
+                                    ? t('collaboration.retryCopy')
+                                    : t('collaboration.copy')}
                         >
-                            {copied ? '已复制' : '复制'}
+                            {copied
+                                ? t('collaboration.copied')
+                                : copyFailed
+                                    ? t('collaboration.retryCopy')
+                                    : t('collaboration.copy')}
                         </Button>
                     </div>
                     <Typography.Text type="secondary" className="text-xs mt-2 block">
-                        将此链接发送给团队成员，即可在同一画板实时白板协作（鼠标指针实时同步）。
+                        {t('collaboration.inviteDescription')}
                     </Typography.Text>
+                    {copyFailed && (
+                        <Alert
+                            className="collaboration-copy-alert"
+                            type="warning"
+                            showIcon
+                            title={t('collaboration.copyFailed')}
+                            description={t('collaboration.copyFallback')}
+                        />
+                    )}
                 </div>
 
                 <div className="mt-2">
                     <Typography.Text className="block mb-3 font-medium text-gray-700 dark:text-gray-300">
-                        当前在线 ({activeUsers.length})
+                        {t('collaboration.currentOnline', { count: activeUsers.length })}
                     </Typography.Text>
                     <List
                         className="bg-white dark:bg-slate-800 rounded-lg border border-gray-100 dark:border-gray-700 max-h-[200px] overflow-y-auto"
@@ -95,16 +130,16 @@ export const CollaborationModal: React.FC<CollaborationModalProps> = ({
                                     >
                                         {item.user?.name?.charAt(0)?.toUpperCase()}
                                     </Avatar>
-                                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                        {item.user?.name || 'Unknown User'}
+                                    <span className="collaboration-user-name text-sm font-medium text-gray-700 dark:text-gray-300">
+                                        {item.user?.name || t('collaboration.unknownUser')}
                                     </span>
                                     {item.isLocal && (
-                                        <Badge count="你" style={{ backgroundColor: '#52c41a' }} />
+                                        <Badge count={t('collaboration.localUser')} style={{ backgroundColor: '#52c41a' }} />
                                     )}
                                 </div>
                             </List.Item>
                         )}
-                        locale={{ emptyText: '当前房间内没有在线成员' }}
+                        locale={{ emptyText: t('collaboration.noOnlineUsers') }}
                     />
                 </div>
             </div>

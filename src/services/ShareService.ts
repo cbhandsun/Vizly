@@ -7,6 +7,7 @@ import { supabase } from './supabase';
 import { coerceRemoteDiagramContent } from './remoteDiagramContent';
 import { safeLog } from '@/core/utils/consoleCleanup';
 import { redactSensitiveLogValue } from '@/core/utils/logSecurity';
+import { parseCollaboratorEmail } from './shareInvitationBoundary';
 
 const isRecord = (value: unknown): value is Record<string, unknown> => (
     typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -78,12 +79,6 @@ function isValidShareToken(token: string): boolean {
 
 function isValidUuid(id: string): boolean {
     return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
-}
-
-function normalizeInviteEmail(email: string): string | null {
-    const normalized = email.trim().toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) return null;
-    return normalized;
 }
 
 function coerceSharedDiagram(diagram: unknown): SharedDiagramRecord | null {
@@ -159,14 +154,14 @@ function coerceCollaboratorRecord(value: unknown): CollaboratorRecord | null {
     if (role !== 'viewer' && role !== 'editor' && role !== 'owner') return null;
     if (!createdAt || Number.isNaN(new Date(createdAt).getTime())) return null;
 
-    const email = typeof row.email === 'string' ? normalizeInviteEmail(row.email) : null;
+    const parsedEmail = parseCollaboratorEmail(row.email);
     return {
         diagram_id: diagramId,
         user_id: userId,
         role,
         added_by: addedBy,
         created_at: createdAt,
-        ...(email ? { email } : {}),
+        ...(parsedEmail.ok ? { email: parsedEmail.email } : {}),
     };
 }
 
@@ -422,8 +417,8 @@ class ShareService {
         if (!isValidUuid(diagramId)) {
             throw new Error('Collaborators require a saved cloud diagram id.');
         }
-        const targetEmail = normalizeInviteEmail(email);
-        if (!targetEmail) {
+        const targetEmail = parseCollaboratorEmail(email);
+        if (!targetEmail.ok) {
             throw new Error('Invalid collaborator email.');
         }
         if (role !== 'viewer' && role !== 'editor') {
@@ -432,7 +427,7 @@ class ShareService {
 
         const { data, error } = await supabase!.rpc('add_diagram_collaborator', {
             p_diagram_id: diagramId,
-            p_target_email: targetEmail,
+            p_target_email: targetEmail.email,
             p_role: role
         });
 

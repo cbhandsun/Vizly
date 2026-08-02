@@ -78,6 +78,12 @@ const translations: Record<string, string> = {
   'share.roleViewer': '只读 (Viewer)',
   'share.roleEditor': '编辑 (Editor)',
   'share.inviteBtn': '邀请',
+  'share.inviteHint': '目前支持邀请已注册用户以只读方式查看。',
+  'share.emailRequired': '请输入协作者邮箱。',
+  'share.emailInvalid': '请输入有效的邮箱地址。',
+  'share.emailTooLong': '邮箱地址过长，请检查后重试。',
+  'share.roleLabel': '协作者权限',
+  'share.roleEditorComingSoon': '编辑（即将支持）',
   'share.collaborators': '协作者',
   'share.loginRequired': '请先登录后才能使用分享功能',
   'share.never': '永不过期',
@@ -86,6 +92,14 @@ const translations: Record<string, string> = {
   'share.30days': '30 天',
   'share.generateLink': '生成分享链接',
   'share.copied': '已复制',
+  'share.collaboratorsLoadFailed': '无法加载协作者',
+  'share.linksLoadFailed': '无法加载分享链接',
+  'share.loadRetryHint': '连接恢复后可直接重试，不会影响当前图表。',
+  'share.generateFailed': '无法生成分享链接',
+  'share.generateRetryHint': '请确认图表已保存到云端并稍后重试。',
+  'share.inviteFailedSafe': '邀请未发送',
+  'share.inviteRetryHint': '请确认对方已注册，或稍后重试。',
+  'common.retry': '重试',
 };
 
 vi.mock('react-i18next', () => ({
@@ -133,6 +147,36 @@ describe('ShareDialog commercial failure handling', () => {
 
     expect(await screen.findByText('请先登录后才能使用分享功能')).toBeTruthy();
     expect((screen.getByRole('button', { name: '邀请' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('blocks an invalid email locally and explains how to recover', async () => {
+    authMocks.user = { id: USER_ID };
+    render(
+      <ShareDialog open onClose={vi.fn()} diagramId={DIAGRAM_ID} onEnsureSaved={vi.fn()} />,
+    );
+
+    const email = await screen.findByPlaceholderText('输入用户的注册邮箱...');
+    fireEvent.change(email, { target: { value: 'not-an-email' } });
+    fireEvent.blur(email);
+
+    expect(await screen.findByText('请输入有效的邮箱地址。')).toBeTruthy();
+    expect((screen.getByRole('button', { name: '邀请' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(serviceMocks.addCollaborator).not.toHaveBeenCalled();
+  });
+
+  it('shows a retry action instead of treating collaborator load failure as an empty list', async () => {
+    authMocks.user = { id: USER_ID };
+    serviceMocks.listCollaborators.mockRejectedValueOnce(new Error('network unavailable'));
+    render(
+      <ShareDialog open onClose={vi.fn()} diagramId={DIAGRAM_ID} onEnsureSaved={vi.fn()} />,
+    );
+
+    expect(await screen.findByText('无法加载协作者')).toBeTruthy();
+    serviceMocks.listCollaborators.mockResolvedValueOnce([]);
+    fireEvent.click(screen.getByRole('button', { name: '重试' }));
+
+    await waitFor(() => expect(serviceMocks.listCollaborators).toHaveBeenCalledTimes(2));
+    expect(loggingMocks.loadFailure).toHaveBeenCalledWith('collaborators', expect.any(Error));
   });
 
   it('keeps a created link visible when clipboard permission is denied', async () => {

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, Button, Select, Space, Typography, Tooltip, List, Tag, Popconfirm, Spin, theme, Tabs, Input, Avatar, Empty, Alert } from 'antd';
 import { FaCopy, FaLink, FaTrash, FaUserPlus } from 'react-icons/fa';
 import { LinkOutlined, TeamOutlined, UserOutlined, CheckCircleFilled, SafetyOutlined, LockOutlined } from '@ant-design/icons';
@@ -11,11 +11,13 @@ import {
     logShareDialogMutationFailure,
 } from '@/components/shareDialogLogging';
 import { tryCopyShareUrl } from '@/components/shareClipboard';
+import { parseCollaboratorEmail } from '@/services/shareInvitationBoundary';
 import {
     COMMERCIAL_VIEWPORT_MODAL_CLASS,
     COMMERCIAL_VIEWPORT_MODAL_Z_INDEX,
     getViewportOverlayContainer,
 } from '@/core/components/ui/viewportOverlayPortal';
+import './ShareDialog.css';
 
 
 const { Text } = Typography;
@@ -68,6 +70,8 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
     const [loadingLink, setLoadingLink] = useState(false);
     const [creatingLink, setCreatingLink] = useState(false);
     const [shareLinkResult, setShareLinkResult] = useState<{ url: string; copied: boolean } | null>(null);
+    const [sharesLoadFailed, setSharesLoadFailed] = useState(false);
+    const [linkMutationFailed, setLinkMutationFailed] = useState(false);
     const sharesLoadRequestRef = useRef(0);
     const pendingCreatedSharesRef = useRef<ShareRecord[]>([]);
 
@@ -75,9 +79,16 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
     const [collaborators, setCollaborators] = useState<CollaboratorRecord[]>([]);
     const [loadingCollabs, setLoadingCollabs] = useState(false);
     const [inviteEmail, setInviteEmail] = useState('');
+    const [inviteEmailTouched, setInviteEmailTouched] = useState(false);
     const [inviteRole, setInviteRole] = useState<InviteRole>('viewer');
     const [inviting, setInviting] = useState(false);
     const [inviteStatus, setInviteStatus] = useState<'idle' | 'success' | 'error'>('idle');
+    const [collaboratorsLoadFailed, setCollaboratorsLoadFailed] = useState(false);
+
+    const parsedInviteEmail = useMemo(
+        () => parseCollaboratorEmail(inviteEmail),
+        [inviteEmail],
+    );
 
     // 云端 UUID（保存后获得，用于替代本地 diagramId）
     const [cloudDiagramId, setCloudDiagramId] = useState<string | null>(null);
@@ -88,6 +99,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
         if (!open || !effectiveId || !isValidUuid(effectiveId)) return;
         const requestId = ++sharesLoadRequestRef.current;
         setLoadingLink(true);
+        setSharesLoadFailed(false);
         try {
             const list = await shareService.listSharesForDiagram(effectiveId);
             if (requestId === sharesLoadRequestRef.current) {
@@ -102,17 +114,20 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
             }
         } catch (error) {
             logShareDialogLoadFailure('shares', error);
+            if (requestId === sharesLoadRequestRef.current) setSharesLoadFailed(true);
         } finally { setLoadingLink(false); }
     }, [open, effectiveId]);
 
     const loadCollaborators = useCallback(async () => {
         if (!open || !effectiveId || !isValidUuid(effectiveId)) return;
         setLoadingCollabs(true);
+        setCollaboratorsLoadFailed(false);
         try {
             const list = await shareService.listCollaborators(effectiveId);
             setCollaborators(list);
         } catch (error) {
             logShareDialogLoadFailure('collaborators', error);
+            setCollaboratorsLoadFailed(true);
         } finally { setLoadingCollabs(false); }
     }, [open, effectiveId]);
 
@@ -124,7 +139,9 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
             void loadShares();
             void loadCollaborators();
             setShareLinkResult(null);
+            setLinkMutationFailed(false);
             setInviteStatus('idle');
+            setInviteEmailTouched(false);
         });
         return () => { cancelled = true; };
     }, [open, loadShares, loadCollaborators]);
@@ -133,9 +150,13 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
     const handleCreateLink = useCallback(async () => {
         if (!user) { appMessage.warning(t('share.loginRequired')); return; }
         setCreatingLink(true);
+        setLinkMutationFailed(false);
         try {
             const savedId = await onEnsureSaved();
-            if (!savedId) return;
+            if (!savedId) {
+                setLinkMutationFailed(true);
+                return;
+            }
             setCloudDiagramId(savedId);
             const record = await shareService.createShareLink({ diagramId: savedId, userId: user.id, expiresAt: getExpiresAt(expiration) });
             const url = shareService.buildShareUrl(record.share_token);
@@ -153,6 +174,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
             }
         } catch (error) {
             logShareDialogMutationFailure('createShareLink', error);
+            setLinkMutationFailed(true);
             appMessage.error(t('share.generateFailed', '无法生成分享链接，请稍后重试'));
         } finally {
             setCreatingLink(false);
@@ -184,30 +206,35 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
     // ===== Invite Tab Actions =====
     const handleInvite = useCallback(async () => {
         if (!user) { appMessage.warning(t('share.loginRequired')); return; }
-        if (!inviteEmail.trim()) return;
+        const targetEmail = parseCollaboratorEmail(inviteEmail);
+        if (!targetEmail.ok) {
+            setInviteEmailTouched(true);
+            return;
+        }
         setInviting(true);
         setInviteStatus('idle');
         try {
             const savedId = await onEnsureSaved();
-            if (!savedId) return;
+            if (!savedId) {
+                setInviteStatus('error');
+                return;
+            }
             setCloudDiagramId(savedId);
-            const res = await shareService.addCollaborator(savedId, inviteEmail.trim(), inviteRole);
+            const res = await shareService.addCollaborator(savedId, targetEmail.email, inviteRole);
             if (res.success) {
                 appMessage.success(t('share.inviteSuccess'));
                 setInviteEmail('');
+                setInviteEmailTouched(false);
                 setInviteStatus('success');
-                setTimeout(() => setInviteStatus('idle'), 1500);
                 await loadCollaborators();
             } else {
                 logShareDialogMutationFailure('addCollaborator', new Error('Collaborator invite was rejected'));
                 setInviteStatus('error');
-                setTimeout(() => setInviteStatus('idle'), 2000);
                 appMessage.error(t('share.inviteFailedSafe', '邀请失败，请稍后重试'));
             }
         } catch (error) {
             logShareDialogMutationFailure('addCollaborator', error);
             setInviteStatus('error');
-            setTimeout(() => setInviteStatus('idle'), 2000);
             appMessage.error(t('share.inviteFailedSafe', '邀请失败，请稍后重试'));
         } finally {
             setInviting(false);
@@ -232,6 +259,16 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
             ? { borderColor: token.colorError, boxShadow: `0 0 0 2px ${token.colorErrorBg}`, transition: 'all 0.3s' }
             : {};
 
+    const inviteEmailError = inviteEmailTouched && !parsedInviteEmail.ok
+        ? t(
+            parsedInviteEmail.reason === 'required'
+                ? 'share.emailRequired'
+                : parsedInviteEmail.reason === 'too-long'
+                    ? 'share.emailTooLong'
+                    : 'share.emailInvalid',
+        )
+        : null;
+
     // ===== UI Renders =====
     const items = [
         {
@@ -247,26 +284,64 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
                             style={{ marginBottom: 16 }}
                         />
                     )}
-                    <Space.Compact style={{ width: '100%', marginBottom: 24 }}>
+                    <div className="share-dialog-invite-controls">
                         <Input
+                            className="share-dialog-invite-email"
                             placeholder={t('share.inviteInput')}
                             value={inviteEmail}
-                            onChange={(e) => setInviteEmail(e.target.value)}
-                            onPressEnter={handleInvite}
+                            onChange={(e) => {
+                                setInviteEmail(e.target.value);
+                                setInviteStatus('idle');
+                            }}
+                            onBlur={() => setInviteEmailTouched(true)}
+                            onPressEnter={() => {
+                                if (parsedInviteEmail.ok) void handleInvite();
+                                else setInviteEmailTouched(true);
+                            }}
+                            status={inviteEmailError ? 'error' : undefined}
+                            aria-invalid={Boolean(inviteEmailError)}
+                            aria-describedby="share-dialog-email-help"
                             style={inputBorderStyle}
                         />
-                        <Select<InviteRole> value={inviteRole} onChange={setInviteRole} style={{ width: 120 }}>
+                        <Select<InviteRole> value={inviteRole} onChange={setInviteRole} aria-label={t('share.roleLabel')}>
                             <Select.Option value="viewer">{t('share.roleViewer')}</Select.Option>
-                            <Select.Option value="editor" disabled>{t('share.roleEditor')}</Select.Option>
+                            <Select.Option value="editor" disabled>{t('share.roleEditorComingSoon')}</Select.Option>
                         </Select>
-                        <Button type="primary" icon={<FaUserPlus />} loading={inviting} onClick={handleInvite} disabled={!user || !inviteEmail.trim()}>
+                        <Button type="primary" icon={<FaUserPlus />} loading={inviting} onClick={handleInvite} disabled={!user || !parsedInviteEmail.ok}>
                             {t('share.inviteBtn')}
                         </Button>
-                    </Space.Compact>
+                    </div>
+                    <Text
+                        id="share-dialog-email-help"
+                        className="share-dialog-field-help"
+                        type={inviteEmailError ? 'danger' : 'secondary'}
+                        role={inviteEmailError ? 'alert' : undefined}
+                    >
+                        {inviteEmailError || t('share.inviteHint')}
+                    </Text>
+
+                    {inviteStatus === 'error' && (
+                        <Alert
+                            className="share-dialog-recovery-alert"
+                            type="error"
+                            showIcon
+                            title={t('share.inviteFailedSafe')}
+                            description={t('share.inviteRetryHint')}
+                        />
+                    )}
 
                     <Text type="secondary" strong style={{ display: 'block', marginBottom: 12 }}>{t('share.collaborators')}</Text>
                     {loadingCollabs ? (
                         <div style={{ textAlign: 'center', padding: 24 }}><Spin /></div>
+                    ) : collaboratorsLoadFailed ? (
+                        <Alert
+                            className="share-dialog-recovery-alert"
+                            type="error"
+                            showIcon
+                            title={t('share.collaboratorsLoadFailed')}
+                            description={t('share.loadRetryHint')}
+                            action={<Button aria-label={t('common.retry')} onClick={() => void loadCollaborators()}>{t('common.retry')}</Button>}
+                        />
                     ) : collaborators.length === 0 ? (
                         <Empty
                             image={Empty.PRESENTED_IMAGE_SIMPLE}
@@ -279,6 +354,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
                         />
                     ) : (
                         <List
+                            className="share-dialog-list"
                             size="small"
                             dataSource={collaborators}
                             renderItem={item => {
@@ -325,7 +401,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
             label: <span><LinkOutlined style={{ marginRight: 6 }} />{t('share.tabs.link')}</span>,
             children: (
                 <div style={{ paddingTop: 8 }}>
-                    <Space style={{ width: '100%', marginBottom: 16 }}>
+                    <div className="share-dialog-link-controls">
                         <Select
                             value={expiration}
                             onChange={setExpiration}
@@ -335,12 +411,12 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
                                 { value: '7days', label: t('share.7days') },
                                 { value: '30days', label: t('share.30days') },
                             ]}
-                            style={{ width: 140 }}
+                            aria-label={t('share.expiration')}
                         />
                         <Button type="primary" icon={<FaLink />} loading={creatingLink} onClick={handleCreateLink} disabled={!user}>
                             {t('share.generateLink')}
                         </Button>
-                    </Space>
+                    </div>
                     {!user && <Text type="warning" style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>{t('share.loginRequired')}</Text>}
 
                     {/* 链接复制成功高亮提示 */}
@@ -361,9 +437,28 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
                         />
                     )}
 
+                    {linkMutationFailed && (
+                        <Alert
+                            className="share-dialog-recovery-alert"
+                            type="error"
+                            showIcon
+                            title={t('share.generateFailed')}
+                            description={t('share.generateRetryHint')}
+                        />
+                    )}
+
                     <Text type="secondary" strong style={{ display: 'block', marginBottom: 12 }}>分享链接历史</Text>
                     {loadingLink ? (
                         <div style={{ textAlign: 'center', padding: 24 }}><Spin /></div>
+                    ) : sharesLoadFailed ? (
+                        <Alert
+                            className="share-dialog-recovery-alert"
+                            type="error"
+                            showIcon
+                            title={t('share.linksLoadFailed')}
+                            description={t('share.loadRetryHint')}
+                            action={<Button aria-label={t('common.retry')} onClick={() => void loadShares()}>{t('common.retry')}</Button>}
+                        />
                     ) : shares.length === 0 ? (
                         <Empty
                             image={Empty.PRESENTED_IMAGE_SIMPLE}
@@ -376,6 +471,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
                         />
                     ) : (
                         <List
+                            className="share-dialog-list"
                             size="small"
                             dataSource={shares}
                             renderItem={item => {
@@ -385,10 +481,10 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
                                     <List.Item
                                         actions={[
                                             <Tooltip title={t('share.copyLink')} key="copy">
-                                                <Button type="text" size="small" icon={<FaCopy />} onClick={() => handleCopy(item.share_token)} />
+                                                <Button aria-label={t('share.copyLink')} type="text" size="small" icon={<FaCopy />} onClick={() => handleCopy(item.share_token)} />
                                             </Tooltip>,
                                             <Popconfirm key="revoke" title={t('share.revokeConfirm')} onConfirm={() => handleRevokeShare(item.id)} okText={t('share.revokeShare')}>
-                                                <Tooltip title={t('share.revokeShare')}><Button type="text" size="small" danger icon={<FaTrash />} /></Tooltip>
+                                                <Tooltip title={t('share.revokeShare')}><Button aria-label={t('share.revokeShare')} type="text" size="small" danger icon={<FaTrash />} /></Tooltip>
                                             </Popconfirm>,
                                         ]}
                                     >
@@ -437,7 +533,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
             open={open}
             onCancel={onClose}
             getContainer={getViewportOverlayContainer}
-            rootClassName={COMMERCIAL_VIEWPORT_MODAL_CLASS}
+            rootClassName={`${COMMERCIAL_VIEWPORT_MODAL_CLASS} share-dialog-viewport-modal`}
             zIndex={COMMERCIAL_VIEWPORT_MODAL_Z_INDEX}
             title={
                 <Space>
@@ -446,7 +542,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
                 </Space>
             }
             footer={
-                <Text type="secondary" style={{ fontSize: 11, display: 'block', textAlign: 'center' }}>
+                <Text type="secondary" className="share-dialog-footer-note">
                     <LockOutlined aria-hidden="true" style={{ marginRight: 6 }} />
                     分享的图表可随时撤销访问权限
                 </Text>

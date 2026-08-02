@@ -1,0 +1,98 @@
+.share-dialog-viewport-modal .ant-modal-body {
+    max-height: min(68vh, 640px);
+    overflow-y: auto;
+}
+
+.share-dialog-invite-controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 124px auto;
+    gap: 8px;
+    align-items: start;
+    margin-bottom: 8px;
+}
+
+.share-dialog-invite-controls .ant-input,
+.share-dialog-invite-controls .ant-select-selector,
+.share-dialog-invite-controls .ant-btn,
+.share-dialog-link-controls .ant-select-selector,
+.share-dialog-link-controls .ant-btn {
+    min-height: var(--commercial-touch-target, 44px);
+}
+
+.share-dialog-invite-controls .ant-select,
+.share-dialog-link-controls .ant-select {
+    width: 100%;
+}
+
+.share-dialog-field-help {
+    display: block;
+    min-height: 20px;
+    margin-bottom: 12px;
+    font-size: 12px;
+}
+
+.share-dialog-link-controls {
+    display: grid;
+    grid-template-columns: minmax(140px, 180px) minmax(0, max-content);
+    gap: 8px;
+    align-items: start;
+    margin-bottom: 16px;
+}
+
+.share-dialog-recovery-alert {
+    margin-bottom: 16px;
+}
+
+.share-dialog-recovery-alert .ant-alert-action .ant-btn {
+    min-height: var(--commercial-touch-target, 44px);
+}
+
+.share-dialog-list .ant-list-item-action .ant-btn {
+    min-width: var(--commercial-touch-target, 44px);
+    min-height: var(--commercial-touch-target, 44px);
+}
+
+.share-dialog-footer-note {
+    display: block;
+    text-align: center;
+    font-size: 11px;
+}
+
+@media (max-width: 640px) {
+    .share-dialog-viewport-modal .ant-modal {
+        top: 8px;
+        margin-bottom: 8px;
+    }
+
+    .share-dialog-viewport-modal .ant-modal-body {
+        max-height: calc(100dvh - 172px);
+        padding-right: 16px !important;
+        padding-left: 16px !important;
+    }
+
+    .share-dialog-invite-controls {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+
+    .share-dialog-invite-email {
+        grid-column: 1 / -1;
+    }
+
+    .share-dialog-invite-controls .ant-btn,
+    .share-dialog-link-controls .ant-btn {
+        width: 100%;
+    }
+
+    .share-dialog-link-controls {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .share-dialog-list .ant-list-item {
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .share-dialog-list .ant-list-item-meta-title {
+        overflow-wrap: anywhere;
+    }
+}
