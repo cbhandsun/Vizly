@@ -21,6 +21,7 @@ import {
   parseDiagramExportProgressEventDetail,
   readDiagramExportEventDetail,
 } from './diagramExportEvent';
+import { resolveExportPopupContainer } from './exportPopupContainer';
 
 const ShareDialog = React.lazy(() => import('@/components/diagrams/ShareDialog'));
 const CloudStorageManagerModal = React.lazy(() => import('@/components/storage/CloudStorageManagerModal').then(async (m) => {
@@ -501,7 +502,7 @@ ${mermaid}
           menu={{ items }}
           trigger={['click']}
           placement="bottomRight"
-          getPopupContainer={(trigger) => (document.fullscreenElement as HTMLElement) || trigger.parentElement || document.body}
+          getPopupContainer={() => resolveExportPopupContainer(document)}
         >
           {variant === 'compact' ? (
             <Button

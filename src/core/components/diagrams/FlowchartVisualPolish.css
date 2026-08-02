@@ -460,3 +460,15 @@
         transform: none;
     }
 }
+.flowchart-mobile-more-menu {
+  position: fixed !important;
+  inset: 96px 12px auto auto !important;
+  max-height: calc(100vh - 112px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.flowchart-mobile-more-menu .ant-dropdown-menu {
+  max-height: inherit;
+  overflow-y: auto;
+}

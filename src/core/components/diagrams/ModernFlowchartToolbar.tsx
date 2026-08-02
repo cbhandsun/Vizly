@@ -620,7 +620,8 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                     menu={{ items: moreMenuItems }}
                     placement="bottomRight"
                     trigger={['click']}
-                    autoAdjustOverflow={false}
+                    autoAdjustOverflow
+                    overlayClassName="flowchart-mobile-more-menu"
                 >
                     <Tooltip title={t('designer.toolbar.moreActions')}>
                         <Button

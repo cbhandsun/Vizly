@@ -59,10 +59,16 @@ describe('other-function commercial interaction safeguards', () => {
     it('keeps menus, confirmations, and mobile card actions touch-safe', () => {
         const globalCss = readSource('../../../../index.css');
         const mobileCss = readSource('../../../../pages/WorkspaceDashboard.mobile.css');
+        const toolbarSource = readSource('../ModernFlowchartToolbar.tsx');
+        const flowchartCss = readSource('../FlowchartVisualPolish.css');
 
         expect(globalCss).toMatch(/\.ant-dropdown-menu-item,[\s\S]*?min-height: var\(--commercial-touch-target, 44px\) !important/);
         expect(globalCss).toMatch(/\.ant-popconfirm-buttons \.ant-btn[\s\S]*?min-height: var\(--commercial-touch-target, 44px\)/);
         expect(mobileCss).toMatch(/\.action-btn-glass[\s\S]*?width: 44px;[\s\S]*?height: 44px;/);
+        expect(toolbarSource).toContain('autoAdjustOverflow');
+        expect(toolbarSource).not.toContain('autoAdjustOverflow={false}');
+        expect(toolbarSource).toContain('overlayClassName="flowchart-mobile-more-menu"');
+        expect(flowchartCss).toMatch(/\.flowchart-mobile-more-menu[\s\S]*?max-height: calc\(100vh - 112px\)[\s\S]*?overflow-y: auto/);
     });
 
     it('keeps the shortcut reference modal close action touch-safe', () => {
@@ -97,7 +103,7 @@ describe('other-function commercial interaction safeguards', () => {
         }
         expect(aiSource).toContain('rootClassName={`${COMMERCIAL_VIEWPORT_MODAL_CLASS} ai-config-viewport-modal`}');
         expect(aiCss).toMatch(/@media \(max-width: 640px\)[\s\S]*?\.ai-config-layout[\s\S]*?flex-direction: column/);
-        expect(aiCss).toMatch(/\.ai-config-provider-sidebar[\s\S]*?max-height: 250px/);
+        expect(aiCss).toMatch(/\.ai-config-provider-sidebar[\s\S]*?max-height: 232px/);
         expect(aiCss).toMatch(/\.ai-config-provider-items[\s\S]*?flex-direction: row !important/);
         expect(globalCss).toMatch(/\.commercial-viewport-modal \.ant-modal-close,[\s\S]*?min-height: 44px/);
     });

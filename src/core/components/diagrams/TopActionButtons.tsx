@@ -10,6 +10,7 @@ import {
 import { CollaborationAvatars } from './ui/CollaborationAvatars';
 import { ApiOutlined } from '@ant-design/icons';
 import type { ReactFlowRenderSnapshot } from '../../rendering/reactFlowScene';
+import type { DiagramExportFormat } from '../../types/diagram-components';
 import {
     DOCUMENT_MENU_OVERLAY_CLASS,
     focusFirstEnabledDocumentMenuItem,
@@ -59,6 +60,7 @@ interface TopActionButtonsProps {
     onToggleAI?: () => void;
     aiChatActive?: boolean;
     getReactFlowSnapshot?: () => ReactFlowRenderSnapshot | null | undefined;
+    onExportPermissionCheck?: (format: DiagramExportFormat) => boolean;
 }
 
 const MODE_STATUS_BUTTON_STYLE: React.CSSProperties = {
@@ -93,6 +95,7 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
     onToggleAI,
     aiChatActive = false,
     getReactFlowSnapshot,
+    onExportPermissionCheck,
 }) => {
     const { t } = useTranslation();
     const screens = Grid.useBreakpoint();
@@ -146,6 +149,7 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
                         diagramId={diagramId}
                         diagramTitle={diagramTitle}
                         getReactFlowSnapshot={getReactFlowSnapshot}
+                        onExportPermissionCheck={onExportPermissionCheck}
                     />
                 </React.Suspense>
             )}

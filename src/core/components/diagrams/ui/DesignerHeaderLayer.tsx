@@ -8,6 +8,7 @@ import { TopActionButtons } from '../TopActionButtons';
 import { ModernFlowchartToolbar } from '../ModernFlowchartToolbar';
 import type { ReactFlowRenderSnapshot } from '../../../rendering/reactFlowScene';
 import type { CollaborationPresenceUser } from '../collaborationPresence';
+import type { DiagramExportFormat } from '../../../types/diagram-components';
 
 type TopActionProps = React.ComponentProps<typeof TopActionButtons>;
 type ToolbarProps = React.ComponentProps<typeof ModernFlowchartToolbar>;
@@ -49,6 +50,7 @@ export interface DesignerHeaderLayerProps {
         isCommentMode: boolean; // ⭐ Phase 11
         setIsCommentMode: (v: boolean) => void;
         getReactFlowSnapshot?: () => ReactFlowRenderSnapshot | null | undefined;
+        onExportPermissionCheck?: (format: DiagramExportFormat) => boolean;
     };
 
     toolbar: {
@@ -146,6 +148,7 @@ export const DesignerHeaderLayer = React.memo(
                     isCommentMode={topActions.isCommentMode}
                     setIsCommentMode={topActions.setIsCommentMode}
                     getReactFlowSnapshot={topActions.getReactFlowSnapshot}
+                    onExportPermissionCheck={topActions.onExportPermissionCheck}
                     onToggleAI={toolbar.onToggleAI}
                     aiChatActive={toolbar.aiChatActive}
                     disablePortal={false}
@@ -269,6 +272,7 @@ export const DesignerHeaderLayer = React.memo(
             prevProps.topActions.showOnlyMainFlow === nextProps.topActions.showOnlyMainFlow &&
             prevProps.topActions.isDirectSaveDisabled === nextProps.topActions.isDirectSaveDisabled &&
             prevProps.topActions.isCommentMode === nextProps.topActions.isCommentMode &&
+            prevProps.topActions.onExportPermissionCheck === nextProps.topActions.onExportPermissionCheck &&
             prevProps.toolbar.historyCount === nextProps.toolbar.historyCount &&
             // ⭐ Phase 10: 弹窗状态 — 必须纳入比较，否则 setExportModalVisible(true) 后组件不重渲染
             prevProps.topActions.exportModalVisible === nextProps.topActions.exportModalVisible &&

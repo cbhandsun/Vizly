@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next';
 import { copyImageToClipboard, ExportOptions } from '../../../utils/imageExporter';
 import { useDiagramStore } from '../../../store/useDiagramStore';
 import { appMessage } from '@/core/utils/antdStaticBridge';
+import type { DiagramExportFormat } from '@/core/types/diagram-components';
 import { runAdvancedExport } from '../advancedExportActions';
 import { isSceneBasedAdvancedExportFormat } from '../advancedExportMode';
 import {
@@ -30,6 +31,7 @@ interface AdvancedExportModalProps {
   diagramId?: string;
   diagramTitle?: string;
   getReactFlowSnapshot?: () => ReactFlowRenderSnapshot | null | undefined;
+  onExportPermissionCheck?: (format: DiagramExportFormat) => boolean;
 }
 
 export const AdvancedExportModeNotice: React.FC<{
@@ -170,7 +172,14 @@ export const SvgExportPreview: React.FC<{
  * 高级导出模态框 (Phase 10)
  * 提供清晰度选择、背景控制、元数据注入及一键拷贝功能
  */
-export const AdvancedExportModal: React.FC<AdvancedExportModalProps> = ({ visible, onClose, diagramId, diagramTitle, getReactFlowSnapshot }) => {
+export const AdvancedExportModal: React.FC<AdvancedExportModalProps> = ({
+  visible,
+  onClose,
+  diagramId,
+  diagramTitle,
+  getReactFlowSnapshot,
+  onExportPermissionCheck,
+}) => {
   const { t } = useTranslation();
   const [format, setFormat] = useState<ExportOptions['format']>('png');
   const [pixelRatio, setPixelRatio] = useState<number>(2);
@@ -179,6 +188,14 @@ export const AdvancedExportModal: React.FC<AdvancedExportModalProps> = ({ visibl
   const [exporting, setExporting] = useState(false);
 
   const handleExport = async () => {
+    if (
+      (format === 'pdf' || format === 'svg')
+      && onExportPermissionCheck?.(format) === false
+    ) {
+      onClose();
+      return;
+    }
+
     setExporting(true);
     try {
       const currentNodes = useDiagramStore.getState().nodes;

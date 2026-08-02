@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -50,6 +50,12 @@ vi.mock('@/core/utils/antdStaticBridge', () => ({
     error: vi.fn(),
   },
 }));
+
+vi.mock('../advancedExportActions', () => ({
+  runAdvancedExport: vi.fn(),
+}));
+
+import { runAdvancedExport } from '../advancedExportActions';
 
 const installReactFlowInstance = () => {
   (window as any).reactFlowInstance = {
@@ -193,5 +199,29 @@ describe('AdvancedExportModal commercial controls', () => {
     expect(screen.getByRole('checkbox', { name: '注入元数据' })).toBeTruthy();
     expect(screen.getByRole('button', { name: '复制 PNG 到剪贴板' })).toBeTruthy();
     expect(screen.getByRole('button', { name: '关闭' })).toBeTruthy();
+  });
+
+  it('blocks gated PDF exports before the advanced export action runs', async () => {
+    const onClose = vi.fn();
+    const onExportPermissionCheck = vi.fn(() => false);
+
+    render(
+      <AdvancedExportModal
+        visible
+        onClose={onClose}
+        diagramId="diagram-1"
+        diagramTitle="Audit diagram"
+        onExportPermissionCheck={onExportPermissionCheck}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('radio', { name: 'file-pdf PDF' }));
+    fireEvent.click(screen.getByRole('button', { name: 'download 确认导出' }));
+
+    await waitFor(() => {
+      expect(onExportPermissionCheck).toHaveBeenCalledWith('pdf');
+    });
+    expect(runAdvancedExport).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
