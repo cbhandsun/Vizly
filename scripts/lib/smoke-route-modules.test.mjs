@@ -24,6 +24,15 @@ describe('smoke route modules', () => {
       .toMatchObject({ durationMs: 15000, maxActiveWorkers: 0 });
   });
 
+  it('measures the warehouse shell without blocking on the progressively loaded canvas', () => {
+    const warehouseRoute = createSmokeRouteCatalog('http://127.0.0.1:5373')
+      .find((route) => route.name === 'warehouse-3d');
+
+    expect(warehouseRoute?.expression).toContain('data-smoke-ready="warehouse-3d"');
+    expect(warehouseRoute?.expression).toContain('Interactive 3D Simulation View');
+    expect(warehouseRoute?.expression).not.toContain("querySelector('canvas')");
+  });
+
   it('keeps CDP runtime options explicit at the browser boundary', () => {
     const viewport = { width: 390, height: 844, scale: 2 };
     const session = new CdpSession('ws://browser', 'target-1', {

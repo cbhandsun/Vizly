@@ -344,19 +344,19 @@ export const createSmokeRouteCatalog = (BASE_URL) => {
           title: document.title,
           readyState: document.readyState,
           hasRoot: Boolean(document.getElementById('root')),
-          hasCanvas: Boolean(document.querySelector('canvas')),
           hasReadyMarker: Boolean(readyMarker),
+          hasLoadingStatus: Boolean(document.querySelector('[role="status"]')),
           appFallback: body.includes('加载应用'),
           pageFallback: body.includes('Loading 3D Warehouse') || body.includes('Loading 3D Environment'),
           errorBoundary: body.includes('页面出现错误'),
           bodyText: body.slice(0, 240),
           rootText: (document.getElementById('root')?.textContent || '').slice(0, 240),
           ready: Boolean(readyMarker) &&
-            Boolean(document.querySelector('canvas')) &&
             !body.includes('Loading 3D Warehouse') &&
             !body.includes('Loading 3D Environment') &&
             !body.includes('页面出现错误') &&
-            body.includes('Large Retail Logistics Center'),
+            body.includes('Large Retail Logistics Center') &&
+            body.includes('Interactive 3D Simulation View'),
         };
       })()`,
     },

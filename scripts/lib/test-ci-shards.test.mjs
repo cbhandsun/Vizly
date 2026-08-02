@@ -19,7 +19,7 @@ describe('test:ci shard catalog', () => {
   it('keeps every shard in exactly one non-empty CI group', () => {
     const grouped = Object.values(TEST_CI_SHARD_GROUPS).flat();
     expect(TEST_CI_GROUP_NAMES).toEqual(['foundation', 'ui', 'flow', 'core', 'routing']);
-    expect(grouped).toHaveLength(41);
+    expect(grouped).toHaveLength(43);
     expect(new Set(grouped).size).toBe(grouped.length);
     expect(TEST_CI_SHARDS).toEqual(grouped);
     expect(Object.values(TEST_CI_SHARD_GROUPS).every((shards) => shards.length > 0)).toBe(true);
@@ -66,6 +66,27 @@ describe('test:ci shard catalog', () => {
     ]) {
       expect(fullShard).toContain(`--exclude src/core/components/diagrams/__tests__/${fileName}`);
       expect(interactionShard).toContain(`src/core/components/diagrams/__tests__/${fileName}`);
+    }
+  });
+
+  it('isolates resource-sensitive auth and property panels without widening timeouts', () => {
+    const primitiveShard = packageJson.scripts['test:ci:ui-components-primitives'];
+    const authShard = packageJson.scripts['test:ci:ui-components-auth'];
+    const fullShard = packageJson.scripts['test:ci:core-components-extra'];
+    const propertyShard = packageJson.scripts['test:ci:core-components-extra-properties'];
+
+    expect(primitiveShard).not.toContain('src/components/auth/__tests__');
+    expect(authShard).toContain('--maxWorkers=1');
+    expect(authShard).toContain('src/components/auth/__tests__');
+    expect(authShard).not.toContain('testTimeout');
+    expect(propertyShard).toContain('--maxWorkers=1');
+    expect(propertyShard).not.toContain('testTimeout');
+    for (const fileName of [
+      'PropertyPanel.test.tsx',
+      'EdgeEditingCommercialAudit.test.tsx',
+    ]) {
+      expect(fullShard).toContain(`--exclude src/core/components/diagrams/__tests__/${fileName}`);
+      expect(propertyShard).toContain(`src/core/components/diagrams/__tests__/${fileName}`);
     }
   });
 });

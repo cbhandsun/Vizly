@@ -6,14 +6,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('@react-three/drei', () => ({ Html: ({ children }: { children: ReactNode }) => children }));
 vi.mock('../Scene', () => ({
     default: ({
-        onCanvasMounted,
         onModelReady,
     }: {
-        onCanvasMounted?: () => void;
         onModelReady?: () => void;
     }) => (
         <>
-            <button type="button" onClick={onCanvasMounted}>canvas mounted</button>
             <button type="button" onClick={onModelReady}>model ready</button>
         </>
     ),
@@ -58,18 +55,14 @@ describe('Warehouse 3D commercial safeguards', () => {
         expect(screen.getByText('自动化立体仓库 (AS/RS)')).toBeTruthy();
     });
 
-    it('separates canvas smoke readiness from the user-visible model loading state', () => {
+    it('makes the route shell measurable while the heavy scene loads progressively', async () => {
         const { container } = render(<Warehouse3DPage />);
         const page = container.firstElementChild;
 
-        expect(page?.getAttribute('data-smoke-ready')).toBeNull();
-        expect(screen.getByRole('status').textContent).toContain('正在加载 3D 场景');
-
-        fireEvent.click(screen.getByRole('button', { name: 'canvas mounted' }));
         expect(page?.getAttribute('data-smoke-ready')).toBe('warehouse-3d');
         expect(screen.getByRole('status').textContent).toContain('正在加载 3D 场景');
 
-        fireEvent.click(screen.getByRole('button', { name: 'model ready' }));
+        fireEvent.click(await screen.findByRole('button', { name: 'model ready' }));
         expect(screen.queryByRole('status')).toBeNull();
     });
 

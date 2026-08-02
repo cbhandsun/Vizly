@@ -11,11 +11,10 @@ import { useRef, useEffect } from 'react';
 const WarehouseModel = lazy(() => import('./WarehouseModel'));
 
 export interface SceneProps {
-    onCanvasMounted?: () => void;
     onModelReady?: () => void;
 }
 
-const Scene: React.FC<SceneProps> = ({ onCanvasMounted, onModelReady }) => {
+const Scene: React.FC<SceneProps> = ({ onModelReady }) => {
     const { autoRotate, resetViewTrigger } = useWarehouse3D();
     const controlsRef = useRef<React.ElementRef<typeof OrbitControls>>(null);
 
@@ -24,10 +23,6 @@ const Scene: React.FC<SceneProps> = ({ onCanvasMounted, onModelReady }) => {
             controlsRef.current.reset();
         }
     }, [resetViewTrigger]);
-
-    useEffect(() => {
-        onCanvasMounted?.();
-    }, [onCanvasMounted]);
 
     return (
         <Canvas
