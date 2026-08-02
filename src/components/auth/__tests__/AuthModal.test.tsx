@@ -5,6 +5,10 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { AUTH_MODAL_Z_INDEX, AuthModal } from '../AuthModal';
 
+const signInWithEmailMock = vi.fn();
+const signInWithPasswordMock = vi.fn();
+const signUpMock = vi.fn();
+
 vi.stubGlobal('ResizeObserver', class {
     observe() {}
     unobserve() {}
@@ -24,9 +28,9 @@ vi.stubGlobal('matchMedia', (query: string) => ({
 
 vi.mock('@/context/useAuth', () => ({
     useAuth: () => ({
-        signInWithEmail: vi.fn(),
-        signInWithPassword: vi.fn(),
-        signUp: vi.fn(),
+        signInWithEmail: signInWithEmailMock,
+        signInWithPassword: signInWithPasswordMock,
+        signUp: signUpMock,
     }),
 }));
 
@@ -37,6 +41,31 @@ vi.mock('react-i18next', () => ({
 }));
 
 describe('AuthModal', () => {
+    it('separates authenticated completion from ordinary cancellation', async () => {
+        signInWithPasswordMock.mockResolvedValueOnce({ error: null });
+        const onAuthenticated = vi.fn();
+        const onCancel = vi.fn();
+        render(
+            <AuthModal
+                open
+                onCancel={onCancel}
+                onAuthenticated={onAuthenticated}
+                zIndex={AUTH_MODAL_Z_INDEX + 100}
+            />
+        );
+
+        fireEvent.change(screen.getByLabelText('auth.modal.emailPlaceholder'), {
+            target: { value: 'member@example.com' },
+        });
+        fireEvent.change(screen.getByLabelText('auth.modal.password.placeholder'), {
+            target: { value: 'safe-password' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: /auth\.modal\.loginButton/ }));
+
+        await waitFor(() => expect(onAuthenticated).toHaveBeenCalledOnce());
+        expect(onCancel).toHaveBeenCalledOnce();
+    });
+
     it('portals outside the zoomed app layout and stays above application chrome', () => {
         const layout = document.createElement('div');
         layout.id = 'app-root-layout';

@@ -13,13 +13,20 @@ const { Text } = Typography;
 interface AuthModalProps {
     open: boolean;
     onCancel: () => void;
+    onAuthenticated?: () => void;
+    zIndex?: number;
 }
 
 type TabKey = 'password' | 'magiclink' | 'register';
 
 export const AUTH_MODAL_Z_INDEX = 1500;
 
-export const AuthModal: React.FC<AuthModalProps> = ({ open, onCancel }) => {
+export const AuthModal: React.FC<AuthModalProps> = ({
+    open,
+    onCancel,
+    onAuthenticated,
+    zIndex = AUTH_MODAL_Z_INDEX,
+}) => {
     const { t } = useTranslation();
     const { signInWithEmail, signInWithPassword, signUp } = useAuth();
     const [loading, setLoading] = useState(false);
@@ -49,6 +56,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onCancel }) => {
             }
         } else {
             appMessage.success(t('auth.modal.loginSuccess'));
+            onAuthenticated?.();
             handleClose();
         }
     };
@@ -273,7 +281,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onCancel }) => {
             footer={null}
             destroyOnHidden
             width={420}
-            zIndex={AUTH_MODAL_Z_INDEX}
+            zIndex={zIndex}
             rootClassName="auth-modal"
         >
             <Tabs

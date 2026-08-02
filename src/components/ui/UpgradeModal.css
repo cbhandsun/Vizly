@@ -1,0 +1,111 @@
+.upgrade-viewport-modal .ant-modal {
+  max-width: calc(100vw - 32px);
+  padding-bottom: 0;
+}
+
+.upgrade-viewport-modal .ant-modal-content {
+  max-height: calc(100dvh - 32px);
+  overflow: hidden;
+}
+
+.upgrade-viewport-modal .ant-modal-body {
+  max-height: calc(100dvh - 112px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 20px 28px 24px;
+}
+
+.upgrade-viewport-modal .ant-modal-close,
+.upgrade-viewport-modal .ant-btn {
+  min-width: var(--commercial-touch-target, 44px);
+  min-height: var(--commercial-touch-target, 44px);
+}
+
+.upgrade-modal__hero {
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.upgrade-modal__crown {
+  margin-bottom: 12px;
+  color: #d97706;
+  font-size: 56px;
+}
+
+.upgrade-modal__feature-context {
+  display: block;
+  margin-top: 8px;
+}
+
+.upgrade-modal__subtitle {
+  margin-bottom: 0;
+  font-size: 16px;
+  text-align: center;
+}
+
+.upgrade-modal__features {
+  margin-top: 20px;
+  padding: 16px;
+  border-radius: 8px;
+  background: var(--color-bg-layout, #fafafa);
+}
+
+.upgrade-modal__feature-icon {
+  margin-inline-end: 8px;
+  color: var(--color-success-600, #16a34a);
+}
+
+.upgrade-modal__recovery {
+  margin-top: 16px;
+}
+
+.upgrade-modal__actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.upgrade-modal__subscribe.ant-btn-primary {
+  border-color: #d97706;
+  background: #d97706;
+}
+
+.upgrade-modal__subscribe.ant-btn-primary:hover {
+  border-color: #b45309;
+  background: #b45309;
+}
+
+@media (max-width: 640px) {
+  .upgrade-viewport-modal .ant-modal {
+    top: 16px;
+    margin: 0 auto;
+  }
+
+  .upgrade-viewport-modal .ant-modal-body {
+    padding: 16px 20px 20px;
+  }
+
+  .upgrade-modal__crown {
+    font-size: 48px;
+  }
+}
+
+@media (max-width: 480px) {
+  .upgrade-viewport-modal .ant-modal {
+    width: calc(100vw - 16px) !important;
+    max-width: calc(100vw - 16px);
+  }
+
+  .upgrade-viewport-modal .ant-modal-body {
+    padding-inline: 16px;
+  }
+
+  .upgrade-modal__actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .upgrade-modal__actions .ant-btn {
+    width: 100%;
+  }
+}
