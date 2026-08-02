@@ -314,7 +314,7 @@ export class S3StorageProvider implements IStorageProvider {
 
     // === Operations (Legacy / specific) ===
 
-    async testConnection(config?: StorageConfig): Promise<boolean> {
+    async testConnection(config?: StorageConfig, signal?: AbortSignal): Promise<boolean> {
         const existingSecret = this.readPersistedSessionSecret();
         const configToTest = config
             ? coerceS3StorageConfig(config, config.secretAccessKey || existingSecret)
@@ -334,7 +334,7 @@ export class S3StorageProvider implements IStorageProvider {
                 Bucket: configToTest.bucket,
                 MaxKeys: 1
             });
-            await client.send(command);
+            await client.send(command, signal ? { abortSignal: signal } : undefined);
             return true;
         } catch (error) {
             safeLog.error('S3 Connection Test Failed', redactSensitiveLogValue(error));

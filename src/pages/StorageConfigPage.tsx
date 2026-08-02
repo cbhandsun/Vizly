@@ -1,36 +1,58 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
-import { Form, Input, Button, Card, Switch, Typography, Space } from 'antd';
-import { SaveOutlined, ApiOutlined, CloudServerOutlined } from '@ant-design/icons';
-import { s3Storage as storageService, StorageConfig } from '../services/StorageService';
+import { Alert, Button, Card, Form, Input, Space, Switch, Typography } from 'antd';
+import { ApiOutlined, CloudServerOutlined, SaveOutlined } from '@ant-design/icons';
+
 import { appMessage, appModal } from '@/core/utils/antdStaticBridge';
-import { redactSensitiveValue } from '@/services/storageSecurity';
 import { safeLog } from '@/core/utils/consoleCleanup';
+import { s3Storage as storageService, type StorageConfig } from '@/services/StorageService';
+import { redactSensitiveValue, S3_STORAGE_INPUT_LIMITS } from '@/services/storageSecurity';
+import {
+    isAbortFailure,
+    isFormValidationFailure,
+    S3_CONNECTION_TIMEOUT_MS,
+} from './storageConfigPageModel';
+import './StorageConfigPage.css';
 
+const { Title, Paragraph } = Typography;
 
-const { Title, Text, Paragraph } = Typography;
+type ConnectionState = 'not-configured' | 'saved' | 'dirty' | 'testing' | 'verified' | 'failed';
 
 const StorageConfigPage: React.FC = () => {
     const { t } = useTranslation();
-    const [form] = Form.useForm();
+    const [form] = Form.useForm<StorageConfig>();
     const [loading, setLoading] = useState(false);
     const [testing, setTesting] = useState(false);
+    const [connectionState, setConnectionState] = useState<ConnectionState>(
+        storageService.getConfig() ? 'saved' : 'not-configured',
+    );
+    const testControllerRef = useRef<AbortController | null>(null);
+    const mountedRef = useRef(true);
     const navigate = useNavigate();
 
     useEffect(() => {
+        mountedRef.current = true;
         const config = storageService.getConfig();
         if (config) {
             form.setFieldsValue({ ...config, secretAccessKey: '' });
         }
+
+        return () => {
+            mountedRef.current = false;
+            testControllerRef.current?.abort();
+            testControllerRef.current = null;
+        };
     }, [form]);
 
     const onFinish = (values: StorageConfig) => {
         setLoading(true);
         try {
             storageService.saveConfig(values);
+            setConnectionState('saved');
             appMessage.success(t('storageConfig.saveSuccess'));
         } catch {
+            setConnectionState('failed');
             appMessage.error(t('storageConfig.saveFail'));
         } finally {
             setLoading(false);
@@ -38,13 +60,49 @@ const StorageConfigPage: React.FC = () => {
     };
 
     const handleTestConnection = async () => {
-        setTesting(true);
-        try {
-            const values = await form.validateFields();
+        if (loading || testing) return;
 
-            await storageService.testConnection(values);
+        let values: StorageConfig;
+        try {
+            values = await form.validateFields();
+        } catch (error: unknown) {
+            if (isFormValidationFailure(error)) {
+                setConnectionState('dirty');
+                return;
+            }
+            safeLog.error('S3 configuration validation failed', redactSensitiveValue(error));
+            setConnectionState('failed');
+            appMessage.error(t('storageConfig.validationFail'));
+            return;
+        }
+
+        if (!mountedRef.current) return;
+
+        testControllerRef.current?.abort();
+        const controller = new AbortController();
+        testControllerRef.current = controller;
+        const timeoutId = window.setTimeout(() => controller.abort(), S3_CONNECTION_TIMEOUT_MS);
+        setTesting(true);
+        setConnectionState('testing');
+
+        try {
+            await storageService.testConnection(values, controller.signal);
+            if (!mountedRef.current) return;
+            if (controller.signal.aborted) {
+                setConnectionState('failed');
+                appMessage.error(t('storageConfig.testTimeout'));
+                return;
+            }
+            setConnectionState('verified');
             appMessage.success(t('storageConfig.testSuccess'));
         } catch (error: unknown) {
+            if (!mountedRef.current) return;
+            if (isAbortFailure(error)) {
+                setConnectionState('failed');
+                appMessage.error(t('storageConfig.testTimeout'));
+                return;
+            }
+
             const safeError = error instanceof Error ? error : new Error(String(error));
             const redactedError = redactSensitiveValue({
                 name: safeError.name,
@@ -52,30 +110,23 @@ const StorageConfigPage: React.FC = () => {
                 metadata: error && typeof error === 'object' && '$metadata' in error
                     ? error.$metadata
                     : undefined,
-                stack: safeError.stack
             });
             safeLog.error('S3 connection test failed', redactedError);
-            const errorDetails = JSON.stringify(redactedError, null, 2);
+            setConnectionState('failed');
 
+            const isNetworkFailure = safeError.message === 'Failed to fetch' || safeError.name === 'TypeError';
             appModal.error({
                 title: t('storageConfig.testFail.title'),
                 width: 600,
                 content: (
-                    <div>
-                        {(safeError.message === 'Failed to fetch' || safeError.name === 'TypeError') && (
-                            <div style={{ background: '#fff2f0', border: '1px solid #ffccc7', padding: '8px 12px', borderRadius: 4, marginBottom: 16 }}>
-                                <Paragraph type="danger" style={{ margin: 0, fontWeight: 'bold' }}>
-                                    {t('storageConfig.testFail.corsTitle')}
-                                </Paragraph>
-                                <Paragraph style={{ margin: 0, fontSize: 12 }}>
-                                    {t('storageConfig.testFail.corsDesc')}
-                                    <br />
-                                    <ul style={{ paddingLeft: 20, marginTop: 4 }}>
-                                        <li>Origin (来源): <code>*</code> {t('storageConfig.testFail.corsOrigin').replace('Origin (来源): * 或本站地址', '或本站地址')}</li>
-                                        <li>Methods (方法): <code>GET, PUT, POST, HEAD</code></li>
-                                    </ul>
-                                </Paragraph>
-                            </div>
+                    <div className="storage-config-error-content">
+                        {isNetworkFailure && (
+                            <Alert
+                                type="error"
+                                showIcon
+                                title={t('storageConfig.testFail.corsTitle')}
+                                description={t('storageConfig.testFail.corsDesc')}
+                            />
                         )}
                         <p>{t('storageConfig.testFail.genericTitle')}</p>
                         <ul>
@@ -84,97 +135,76 @@ const StorageConfigPage: React.FC = () => {
                             <li>{t('storageConfig.testFail.check3')}</li>
                             <li>{t('storageConfig.testFail.check4')}</li>
                         </ul>
-                        <div style={{ marginTop: 10 }}>
-                            <Text type="secondary">{t('storageConfig.testFail.errorDetail')}</Text>
-                            <pre style={{
-                                background: '#f5f5f5',
-                                padding: 10,
-                                borderRadius: 4,
-                                maxHeight: 200,
-                                overflow: 'auto',
-                                fontSize: 12
-                            }}>
-                                {errorDetails}
-                            </pre>
-                        </div>
                     </div>
-                )
+                ),
             });
         } finally {
-            setTesting(false);
+            window.clearTimeout(timeoutId);
+            if (testControllerRef.current === controller) testControllerRef.current = null;
+            if (mountedRef.current) setTesting(false);
         }
     };
 
+    const statusCopy: Record<ConnectionState, { type: 'info' | 'success' | 'warning' | 'error'; message: string }> = {
+        'not-configured': { type: 'info', message: t('storageConfig.status.notConfigured') },
+        saved: { type: 'info', message: t('storageConfig.status.saved') },
+        dirty: { type: 'warning', message: t('storageConfig.status.dirty') },
+        testing: { type: 'info', message: t('storageConfig.status.testing') },
+        verified: { type: 'success', message: t('storageConfig.status.verified') },
+        failed: { type: 'error', message: t('storageConfig.status.failed') },
+    };
+
     return (
-        <div style={{
-            height: '100vh',
-            overflowY: 'auto',
-            overflowX: 'hidden',
-            background: 'var(--vz-dashboard-bg, #fcfcfc)'
-        }}>
-            {/* Consistent Header */}
-            <header className="workspace-global-header" style={{ marginBottom: 0 }}>
-                <div className="workspace-header-brand" onClick={() => navigate('/manage')}>
-                    <div className="workspace-header-logo">
-                        <div style={{
-                            width: 28,
-                            height: 28,
-                            background: 'var(--vz-brand-gradient)',
-                            borderRadius: '8px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: '#fff',
-                            fontSize: '16px',
-                            fontWeight: '800',
-                            boxShadow: '0 4px 12px rgba(99, 102, 241, 0.3)'
-                        }}>V</div>
-                    </div>
-                    <div className="workspace-header-title">Vizly</div>
-                </div>
-                <div style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 600, color: 'var(--vz-text-secondary)' }}>
-                    Settings &amp; Storage
-                </div>
-                <div style={{ width: 220, display: 'flex', justifyContent: 'flex-end' }}>
-                     <Button type="text" onClick={() => navigate('/manage')}>Return to Workspace</Button>
-                </div>
+        <div className="storage-config-page">
+            <header className="storage-config-header">
+                <button
+                    type="button"
+                    className="storage-config-brand"
+                    onClick={() => navigate('/manage')}
+                    aria-label={t('storageConfig.returnToWorkspace')}
+                >
+                    <span className="storage-config-logo" aria-hidden="true">V</span>
+                    <span className="storage-config-brand-name">Vizly</span>
+                </button>
+                <span className="storage-config-header-title">{t('storageConfig.headerTitle')}</span>
+                <Button className="storage-config-return" type="text" onClick={() => navigate('/manage')}>
+                    {t('storageConfig.returnToWorkspace')}
+                </Button>
             </header>
 
-            <div style={{ padding: '48px 24px 72px', maxWidth: '800px', margin: '0 auto' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', width: '100%' }}>
-                <div>
+            <main className="storage-config-main">
+                <div className="storage-config-intro">
                     <Title level={2}><CloudServerOutlined /> {t('storageConfig.pageTitle')}</Title>
-                    <Paragraph type="secondary">
-                        {t('storageConfig.pageDescription')}
-                    </Paragraph>
+                    <Paragraph type="secondary">{t('storageConfig.pageDescription')}</Paragraph>
+                    <Alert
+                        className="storage-config-status"
+                        type={statusCopy[connectionState].type}
+                        showIcon
+                        message={statusCopy[connectionState].message}
+                        aria-live="polite"
+                    />
                 </div>
 
                 <Card
-                    title={<span style={{ fontWeight: 700, letterSpacing: '-0.2px' }}>Connection Settings</span>}
+                    className="storage-config-card"
+                    title={t('storageConfig.connectionSettings')}
                     variant="borderless"
-                    style={{
-                        borderRadius: 12,
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 16px 32px -8px rgba(0,0,0,0.05)',
-                        background: 'rgba(255, 255, 255, 0.8)',
-                        backdropFilter: 'blur(20px)'
-                    }}
                 >
-                    <Form
+                    <Form<StorageConfig>
+                        className="storage-config-form"
                         form={form}
                         layout="vertical"
                         onFinish={onFinish}
-                        initialValues={{
-                            s3ForcePathStyle: true,
-                            region: 'us-east-1'
-                        }}
+                        onValuesChange={() => setConnectionState('dirty')}
+                        initialValues={{ s3ForcePathStyle: true, region: 'us-east-1' }}
                     >
                         <Form.Item
                             name="endpoint"
                             label={t('storageConfig.form.endpointLabel')}
-                            tooltip="例如: https://s3.amazonaws.com 或 https://play.min.io"
+                            tooltip={t('storageConfig.form.endpointTooltip')}
                             rules={[{ required: true, message: t('storageConfig.form.endpointRequired') }]}
                         >
-                            <Input placeholder="https://..." />
+                            <Input placeholder="https://..." maxLength={S3_STORAGE_INPUT_LIMITS.endpoint} autoComplete="off" />
                         </Form.Item>
 
                         <Form.Item
@@ -182,7 +212,7 @@ const StorageConfigPage: React.FC = () => {
                             label={t('storageConfig.form.bucketLabel')}
                             rules={[{ required: true, message: t('storageConfig.form.bucketRequired') }]}
                         >
-                            <Input placeholder="my-diagrams-bucket" />
+                            <Input placeholder="my-diagrams-bucket" maxLength={S3_STORAGE_INPUT_LIMITS.bucket} autoComplete="off" />
                         </Form.Item>
 
                         <Form.Item
@@ -190,30 +220,37 @@ const StorageConfigPage: React.FC = () => {
                             label={t('storageConfig.form.regionLabel')}
                             rules={[{ required: true, message: t('storageConfig.form.regionRequired') }]}
                         >
-                            <Input placeholder="us-east-1" />
+                            <Input placeholder="us-east-1" maxLength={S3_STORAGE_INPUT_LIMITS.region} autoComplete="off" />
                         </Form.Item>
 
                         <Form.Item
                             name="accessKeyId"
-                            label="Access Key ID"
+                            label={t('storageConfig.form.accessKeyLabel')}
                             rules={[{ required: true, message: t('storageConfig.form.accessKeyRequired') }]}
                         >
-                            <Input.Password placeholder="Access Key" />
+                            <Input.Password
+                                placeholder={t('storageConfig.form.accessKeyPlaceholder')}
+                                maxLength={S3_STORAGE_INPUT_LIMITS.accessKeyId}
+                                autoComplete="off"
+                            />
                         </Form.Item>
 
                         <Form.Item
                             name="secretAccessKey"
-                            label="Secret Access Key"
+                            label={t('storageConfig.form.secretKeyLabel')}
+                            extra={t('storageConfig.form.secretKeyHint')}
                             rules={[{
                                 validator: (_, value) => {
-                                    if (value || storageService.getConfig()?.secretAccessKey) {
-                                        return Promise.resolve();
-                                    }
+                                    if (value || storageService.getConfig()?.secretAccessKey) return Promise.resolve();
                                     return Promise.reject(new Error(t('storageConfig.form.secretKeyRequired')));
-                                }
+                                },
                             }]}
                         >
-                            <Input.Password placeholder="Secret Key" />
+                            <Input.Password
+                                placeholder={t('storageConfig.form.secretKeyPlaceholder')}
+                                maxLength={S3_STORAGE_INPUT_LIMITS.secretAccessKey}
+                                autoComplete="new-password"
+                            />
                         </Form.Item>
 
                         <Form.Item
@@ -222,15 +259,26 @@ const StorageConfigPage: React.FC = () => {
                             valuePropName="checked"
                             tooltip={t('storageConfig.form.forcePathStyleTooltip')}
                         >
-                            <Switch />
+                            <Switch aria-label={t('storageConfig.form.forcePathStyleLabel')} />
                         </Form.Item>
 
-                        <Form.Item>
-                            <Space>
-                                <Button type="primary" htmlType="submit" icon={<SaveOutlined />} loading={loading}>
+                        <Form.Item className="storage-config-actions-item">
+                            <Space className="storage-config-actions" wrap>
+                                <Button
+                                    type="primary"
+                                    htmlType="submit"
+                                    icon={<SaveOutlined />}
+                                    loading={loading}
+                                    disabled={testing}
+                                >
                                     {t('storageConfig.form.saveBtn')}
                                 </Button>
-                                <Button icon={<ApiOutlined />} onClick={handleTestConnection} loading={testing}>
+                                <Button
+                                    icon={<ApiOutlined />}
+                                    onClick={() => void handleTestConnection()}
+                                    loading={testing}
+                                    disabled={loading}
+                                >
                                     {t('storageConfig.form.testBtn')}
                                 </Button>
                             </Space>
@@ -238,15 +286,14 @@ const StorageConfigPage: React.FC = () => {
                     </Form>
                 </Card>
 
-                <Card title={t('storageConfig.notes.title')} size="small">
+                <Card className="storage-config-notes" title={t('storageConfig.notes.title')} size="small">
                     <ul>
                         <li>{t('storageConfig.notes.cors')}</li>
                         <li>{t('storageConfig.notes.security')}</li>
                     </ul>
                 </Card>
-            </div>
+            </main>
         </div>
-    </div>
     );
 };
 

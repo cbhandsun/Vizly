@@ -291,6 +291,16 @@ describe('S3StorageProvider', () => {
         expect(s3Storage.getConfig()).toBeNull();
     });
 
+    it('forwards the abort signal to the S3 connection request', async () => {
+        sendMock.mockResolvedValueOnce({});
+        const controller = new AbortController();
+        const { s3Storage } = await loadStorageService();
+
+        await s3Storage.testConnection(config, controller.signal);
+
+        expect(sendMock).toHaveBeenCalledWith(expect.anything(), { abortSignal: controller.signal });
+    });
+
     it('redacts storage bootstrap errors before logging them', async () => {
         const getItemSpy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation((key: string) => {
             if (key === 'diagram_storage_config') {

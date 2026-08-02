@@ -1,11 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Modal, Card, Button, Input, Space, Typography, Empty, Row, Col, Spin, Select, Popconfirm, Tabs, Tag, Checkbox } from 'antd';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Modal, Card, Button, Space, Typography, Empty, Row, Col, Spin, Popconfirm, Tabs, Tag, Checkbox } from 'antd';
 import {
     CloudOutlined,
     EyeOutlined,
     DeleteOutlined,
     DatabaseOutlined,
-    ReloadOutlined,
     TeamOutlined,
     CheckSquareOutlined
 } from '@ant-design/icons';
@@ -32,10 +31,23 @@ import {
     COMMERCIAL_VIEWPORT_MODAL_Z_INDEX,
     getViewportOverlayContainer,
 } from '@/core/components/ui/viewportOverlayPortal';
+import type { StorageProviderType } from '@/services/UnifiedStorageService';
+import { CloudStorageManagerSearch, CloudStorageManagerTitle } from './CloudStorageManagerControls';
+import { CloudStorageRecoveryAlert } from './CloudStorageRecoveryAlert';
+import {
+    createCloudStorageManagerScope,
+    invalidateCloudStorageManagerScope,
+    isOwnedCloudStorageItem,
+    isCloudStorageManagerScopeCurrent,
+    matchesCloudStorageSearch,
+    resolveCloudStorageItemProvider,
+    transitionCloudStorageManagerScope,
+    type CloudStorageManagerTab,
+} from './cloudStorageManagerScope';
+import './CloudStorageManagerModal.css';
 
 
 const { Text } = Typography;
-const { Search } = Input;
 const { Meta } = Card;
 const AuthModal = React.lazy(() => import('@/components/auth/AuthModal').then(module => ({
     default: module.AuthModal,
@@ -58,51 +70,95 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
     const [sharedDiagrams, setSharedDiagrams] = useState<SharedWithMeRecord[]>([]);
     const [loading, setLoading] = useState(false);
     const [sharedLoading, setSharedLoading] = useState(false);
+    const [cloudLoadFailed, setCloudLoadFailed] = useState(false);
+    const [sharedLoadFailed, setSharedLoadFailed] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [currentProvider, setCurrentProvider] = useState(unifiedStorage.currentProviderId);
-    const [activeTab, setActiveTab] = useState<string>('mine');
+    const [activeTab, setActiveTab] = useState<CloudStorageManagerTab>('mine');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [batchMode, setBatchMode] = useState(false);
     const [batchDeleting, setBatchDeleting] = useState(false);
+    const [openingId, setOpeningId] = useState<string | null>(null);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
+    const cloudListRequestRef = useRef(0);
+    const sharedListRequestRef = useRef(0);
+    const scopeRef = useRef(createCloudStorageManagerScope(unifiedStorage.currentProviderId));
+
+    const storageActionBusy = batchDeleting || openingId !== null || deletingId !== null;
+
+    const resetBatchSelection = useCallback(() => {
+        setBatchMode(false);
+        setSelectedIds(new Set());
+    }, []);
 
     const loadSharedDiagrams = useCallback(async () => {
+        const requestScope = scopeRef.current;
+        const requestId = ++sharedListRequestRef.current;
         if (!user) {
             setSharedDiagrams([]);
+            setSharedLoadFailed(false);
+            setSharedLoading(false);
             return;
         }
         setSharedLoading(true);
+        setSharedLoadFailed(false);
         try {
             const items = await shareService.listSharedWithMe();
-            setSharedDiagrams(items);
+            if (
+                requestId === sharedListRequestRef.current
+                && isCloudStorageManagerScopeCurrent(requestScope, scopeRef.current)
+            ) {
+                setSharedDiagrams(items);
+            }
         } catch (error) {
             logCloudStorageManagerSharedLoadFailure(error);
-            setSharedDiagrams([]);
+            if (
+                requestId === sharedListRequestRef.current
+                && isCloudStorageManagerScopeCurrent(requestScope, scopeRef.current)
+            ) {
+                setSharedLoadFailed(true);
+            }
         } finally {
-            setSharedLoading(false);
+            if (requestId === sharedListRequestRef.current) setSharedLoading(false);
         }
     }, [user]);
 
     const loadCloudDiagrams = useCallback(async () => {
-        if (!unifiedStorage.isConfigured()) {
+        const requestScope = scopeRef.current;
+        const requestId = ++cloudListRequestRef.current;
+        const provider = unifiedStorage.getProvider(requestScope.providerId);
+        if (!provider.isConfigured()) {
             setCloudDiagrams([]);
+            setCloudLoadFailed(false);
             return;
         }
-        if (currentProvider === 'supabase' && !user) {
+        if (requestScope.providerId === 'supabase' && !user) {
             setCloudDiagrams([]);
+            setCloudLoadFailed(false);
             return;
         }
         setLoading(true);
+        setCloudLoadFailed(false);
         try {
-            const items = await unifiedStorage.listDiagrams();
-            setCloudDiagrams(items);
+            const items = await provider.listDiagrams();
+            if (
+                requestId === cloudListRequestRef.current
+                && isCloudStorageManagerScopeCurrent(requestScope, scopeRef.current)
+            ) {
+                setCloudDiagrams(items);
+            }
         } catch (error) {
             logCloudStorageManagerListFailure(error);
-            appMessage.error(t('storage.manager.loadFailed'));
-            setCloudDiagrams([]);
+            if (
+                requestId === cloudListRequestRef.current
+                && isCloudStorageManagerScopeCurrent(requestScope, scopeRef.current)
+            ) {
+                setCloudLoadFailed(true);
+            }
         } finally {
-            setLoading(false);
+            if (requestId === cloudListRequestRef.current) setLoading(false);
         }
-    }, [currentProvider, t, user]);
+    }, [user]);
 
     // Initial Data Load
     useEffect(() => {
@@ -117,22 +173,73 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
             }
         });
         return () => { cancelled = true; };
-    }, [activeTab, loadCloudDiagrams, loadSharedDiagrams, open]);
+    }, [activeTab, currentProvider, loadCloudDiagrams, loadSharedDiagrams, open]);
 
-    const handleProviderChange = useCallback((value: 'supabase' | 's3') => {
+    useEffect(() => {
+        if (open) return;
+        let cancelled = false;
+        queueMicrotask(() => {
+            if (cancelled) return;
+            scopeRef.current = invalidateCloudStorageManagerScope(scopeRef.current);
+            cloudListRequestRef.current += 1;
+            sharedListRequestRef.current += 1;
+            setLoading(false);
+            setSharedLoading(false);
+            setCloudLoadFailed(false);
+            setSharedLoadFailed(false);
+            resetBatchSelection();
+        });
+        return () => { cancelled = true; };
+    }, [open, resetBatchSelection]);
+
+    const handleProviderChange = useCallback((value: StorageProviderType) => {
+        if (storageActionBusy || value === scopeRef.current.providerId) return;
+        scopeRef.current = transitionCloudStorageManagerScope(scopeRef.current, {
+            providerId: value,
+            tab: scopeRef.current.tab,
+        });
+        cloudListRequestRef.current += 1;
+        sharedListRequestRef.current += 1;
+        setLoading(false);
+        setSharedLoading(false);
+        setCloudDiagrams([]);
+        setCloudLoadFailed(false);
+        resetBatchSelection();
         unifiedStorage.setProvider(value);
         setCurrentProvider(value);
         appMessage.info(t('storage.manager.providerSwitched', { provider: value === 's3' ? 'S3' : 'Supabase' }));
-    }, [t]);
+    }, [resetBatchSelection, storageActionBusy, t]);
 
-    const handleOpenCloud = async (item: DiagramMetadata) => {
-        if (currentProvider === 'supabase' && !user) {
+    const handleTabChange = useCallback((value: string) => {
+        if (storageActionBusy || (value !== 'mine' && value !== 'shared')) return;
+        const nextTab = value as CloudStorageManagerTab;
+        if (nextTab === scopeRef.current.tab) return;
+        scopeRef.current = transitionCloudStorageManagerScope(scopeRef.current, {
+            providerId: scopeRef.current.providerId,
+            tab: nextTab,
+        });
+        cloudListRequestRef.current += 1;
+        sharedListRequestRef.current += 1;
+        setLoading(false);
+        setSharedLoading(false);
+        resetBatchSelection();
+        setActiveTab(nextTab);
+    }, [resetBatchSelection, storageActionBusy]);
+
+    const handleOpenCloud = async (
+        item: DiagramMetadata,
+        requestedProvider = resolveCloudStorageItemProvider(activeTab, currentProvider),
+    ) => {
+        if (storageActionBusy) return;
+        if (requestedProvider === 'supabase' && !user) {
             setIsAuthModalOpen(true);
             return;
         }
+        const provider = unifiedStorage.getProvider(requestedProvider);
+        setOpeningId(item.id);
         const hide = appMessage.loading(t('storage.manager.downloading'), 0);
         try {
-            const savedDiagram = await unifiedStorage.loadDiagram(item.id);
+            const savedDiagram = await provider.loadDiagram(item.id);
             if (savedDiagram && savedDiagram.content) {
                 const localService = dataRegistry.getDataService();
                 const report = coerceToStandardDiagramDataWithReport(savedDiagram.content, { id: savedDiagram.id, title: savedDiagram.title });
@@ -156,7 +263,7 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
                         title: savedDiagram.title || report.diagram.metadata?.title,
                         updatedAt: savedDiagram.updated_at,
                         cloud: {
-                            provider: currentProvider,
+                            provider: requestedProvider,
                             id: savedDiagram.id,
                             title: savedDiagram.title,
                             openedAt: new Date().toISOString()
@@ -188,20 +295,26 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
             }
         } catch (error) {
             logCloudStorageManagerOpenFailure(error);
-            appMessage.error(error instanceof Error ? error.message : t('common.error'));
+            appMessage.error(t('storage.manager.openFailed'));
         } finally {
             hide();
+            setOpeningId(null);
         }
     };
 
     const handleDeleteCloud = async (id: string) => {
+        if (storageActionBusy) return;
+        const provider = unifiedStorage.getProvider(currentProvider);
+        setDeletingId(id);
         try {
-            await unifiedStorage.deleteDiagram(id);
+            await provider.deleteDiagram(id);
             appMessage.success(t('storage.manager.deleted'));
             void loadCloudDiagrams();
         } catch (error) {
             logCloudStorageManagerDeleteFailure(error);
             appMessage.error(t('storage.manager.deleteFailed'));
+        } finally {
+            setDeletingId(null);
         }
     };
 
@@ -218,7 +331,7 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
     };
 
     const handleSelectAll = () => {
-        const ownedItems = filteredCloud.filter(d => !d.userId || d.userId === user?.id);
+        const ownedItems = filteredCloud.filter(d => isOwnedCloudStorageItem(d, user?.id));
         if (selectedIds.size === ownedItems.length) {
             setSelectedIds(new Set());
         } else {
@@ -227,7 +340,8 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
     };
 
     const handleBatchDelete = async () => {
-        if (selectedIds.size === 0) return;
+        if (selectedIds.size === 0 || storageActionBusy) return;
+        const provider = unifiedStorage.getProvider(currentProvider);
         setBatchDeleting(true);
         const ids = Array.from(selectedIds);
         let success = 0;
@@ -238,7 +352,7 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
         for (const chunk of chunks) {
             await Promise.allSettled(chunk.map(async id => {
                 try {
-                    await unifiedStorage.deleteDiagram(id);
+                    await provider.deleteDiagram(id);
                     success++;
                 } catch (error) {
                     logCloudStorageManagerBatchDeleteFailure(id, error);
@@ -249,13 +363,13 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
         setBatchDeleting(false);
         setSelectedIds(new Set());
         if (success === 0 && failed > 0) {
-            appMessage.error(`删除失败：${failed} 个未删除`);
+            appMessage.error(t('storage.manager.batchDeleteAllFailed', { failed }));
         } else if (failed > 0) {
-            appMessage.warning(`已删除 ${success} 个，${failed} 个失败`);
+            appMessage.warning(t('storage.manager.batchDeletePartial', { success, failed }));
         } else {
-            appMessage.success(`已删除 ${success} 个`);
+            appMessage.success(t('storage.manager.batchDeleteSuccess', { success }));
         }
-        loadCloudDiagrams();
+        void loadCloudDiagrams();
     };
 
     const exitBatchMode = () => {
@@ -263,13 +377,13 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
         setSelectedIds(new Set());
     };
 
-    const filteredCloud = cloudDiagrams.filter(d =>
-        (d.title || d.id).toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const handleSearchTermChange = (value: string) => {
+        setSearchTerm(value);
+        setSelectedIds(new Set());
+    };
 
-    const filteredShared = sharedDiagrams.filter(d =>
-        (d.title || d.id).toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredCloud = cloudDiagrams.filter(item => matchesCloudStorageSearch(item, searchTerm));
+    const filteredShared = sharedDiagrams.filter(item => matchesCloudStorageSearch(item, searchTerm));
 
     const renderMyDiagrams = () => {
         if (currentProvider === 'supabase' && !user) {
@@ -284,7 +398,7 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
                 </Empty>
             );
         }
-        if (!unifiedStorage.isConfigured()) {
+        if (!unifiedStorage.getProvider(currentProvider).isConfigured()) {
             return (
                 <Empty
                     description={t('storage.manager.providerNotConfigured', { provider: currentProvider === 's3' ? 'S3' : 'Supabase' })}
@@ -299,32 +413,43 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
         }
 
         return (
-            <div style={{ maxHeight: '55vh', overflowY: 'auto', padding: '8px 4px' }}>
+            <div className="cloud-storage-manager-list">
+                {cloudLoadFailed && (
+                    <CloudStorageRecoveryAlert
+                        title={t('storage.manager.loadFailed')}
+                        description={t('storage.manager.loadRetryHint')}
+                        retryLabel={t('common.retry')}
+                        loading={loading}
+                        onRetry={() => void loadCloudDiagrams()}
+                    />
+                )}
                 {/* 批量操作栏 */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, minHeight: 32 }}>
+                <div className="cloud-storage-manager-batch-bar">
                     <Button
-                        size="small"
                         type={batchMode ? 'primary' : 'default'}
                         icon={<CheckSquareOutlined />}
                         onClick={() => batchMode ? exitBatchMode() : setBatchMode(true)}
+                        disabled={storageActionBusy}
                     >
-                        {batchMode ? '退出多选' : '多选管理'}
+                        {batchMode ? t('storage.manager.exitBatchMode') : t('storage.manager.batchMode')}
                     </Button>
                     {batchMode && (
-                        <Space size={4}>
-                            <Button size="small" onClick={handleSelectAll}>
-                                {selectedIds.size > 0 && selectedIds.size === filteredCloud.filter(d => !d.userId || d.userId === user?.id).length ? '取消全选' : '全选'}
+                        <Space className="cloud-storage-manager-batch-actions" size={8} wrap>
+                            <Button onClick={handleSelectAll} disabled={storageActionBusy}>
+                                {selectedIds.size > 0 && selectedIds.size === filteredCloud.filter(d => isOwnedCloudStorageItem(d, user?.id)).length
+                                    ? t('storage.manager.clearSelection')
+                                    : t('storage.manager.selectAll')}
                             </Button>
                             <Popconfirm
-                                title={`确认删除 ${selectedIds.size} 个图表？`}
-                                description="此操作不可撤销"
-                                okText="删除"
-                                cancelText="取消"
+                                title={t('storage.manager.batchDeleteTitle', { count: selectedIds.size })}
+                                description={t('storage.manager.confirmDeleteDesc')}
+                                okText={t('storage.manager.delete')}
+                                cancelText={t('common.cancel')}
                                 okButtonProps={{ danger: true }}
                                 onConfirm={handleBatchDelete}
                             >
-                                <Button size="small" danger disabled={selectedIds.size === 0} loading={batchDeleting}>
-                                    删除选中 ({selectedIds.size})
+                                <Button danger disabled={selectedIds.size === 0 || storageActionBusy} loading={batchDeleting}>
+                                    {t('storage.manager.deleteSelected', { count: selectedIds.size })}
                                 </Button>
                             </Popconfirm>
                         </Space>
@@ -333,7 +458,7 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
                 <Spin spinning={loading}>
                     <Row gutter={[16, 16]}>
                         {filteredCloud.map((item) => {
-                            const isOwner = !item.userId || item.userId === user?.id;
+                            const isOwner = isOwnedCloudStorageItem(item, user?.id);
                             return (
                             <Col xs={24} sm={12} key={item.id}>
                                 <div style={{ position: 'relative' }}>
@@ -341,13 +466,23 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
                                         <Checkbox
                                             checked={selectedIds.has(item.id)}
                                             onChange={() => toggleSelect(item.id)}
-                                            style={{ position: 'absolute', top: 8, left: 8, zIndex: 10 }}
+                                            className="cloud-storage-manager-checkbox"
+                                            aria-label={t('storage.manager.selectDiagram', { title: item.title || item.id })}
                                         />
                                     )}
                                     <Card
                                         hoverable
                                         size="small"
                                         onClick={batchMode && isOwner ? () => toggleSelect(item.id) : undefined}
+                                        role={batchMode && isOwner ? 'button' : undefined}
+                                        tabIndex={batchMode && isOwner ? 0 : undefined}
+                                        aria-pressed={batchMode && isOwner ? selectedIds.has(item.id) : undefined}
+                                        onKeyDown={batchMode && isOwner ? event => {
+                                            if (event.key === 'Enter' || event.key === ' ') {
+                                                event.preventDefault();
+                                                toggleSelect(item.id);
+                                            }
+                                        } : undefined}
                                         style={{
                                             borderRadius: 12,
                                             overflow: 'hidden',
@@ -359,7 +494,15 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
                                         }}
                                         cover={<RemoteDiagramCover storageId={item.id} alt={item.title} height={110} cacheBuster={item.updatedAt?.getTime?.() ?? ''} />}
                                         actions={batchMode ? undefined : [
-                                            <Button type="text" size="small" icon={<EyeOutlined />} onClick={() => handleOpenCloud(item)}>{t('storage.manager.open')}</Button>,
+                                            <Button
+                                                type="text"
+                                                icon={<EyeOutlined />}
+                                                loading={openingId === item.id}
+                                                disabled={storageActionBusy && openingId !== item.id}
+                                                onClick={() => void handleOpenCloud(item, currentProvider)}
+                                            >
+                                                {t('storage.manager.open')}
+                                            </Button>,
                                             isOwner ? (
                                                 <Popconfirm
                                                     title={t('storage.manager.confirmDeleteTitle')}
@@ -369,10 +512,18 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
                                                     okButtonProps={{ danger: true }}
                                                     onConfirm={() => handleDeleteCloud(item.id)}
                                                 >
-                                                    <Button type="text" size="small" danger icon={<DeleteOutlined />}>{t('storage.manager.delete')}</Button>
+                                                    <Button
+                                                        type="text"
+                                                        danger
+                                                        icon={<DeleteOutlined />}
+                                                        loading={deletingId === item.id}
+                                                        disabled={storageActionBusy && deletingId !== item.id}
+                                                    >
+                                                        {t('storage.manager.delete')}
+                                                    </Button>
                                                 </Popconfirm>
                                             ) : (
-                                                <Button type="text" size="small" disabled icon={<DeleteOutlined />}>无权限</Button>
+                                                <Button type="text" disabled icon={<DeleteOutlined />}>{t('storage.manager.noPermission')}</Button>
                                             )
                                         ]}
                                     >
@@ -381,7 +532,7 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
                                             title={
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                                                     <span style={{ fontSize: 14 }}>{item.title}</span>
-                                                    {!isOwner && <Tag color="blue" style={{ fontSize: 10, lineHeight: '16px', padding: '0 4px' }}>协作</Tag>}
+                                                    {!isOwner && <Tag color="blue" style={{ fontSize: 10, lineHeight: '16px', padding: '0 4px' }}>{t('storage.manager.collaborative')}</Tag>}
                                                 </div>
                                             }
                                             description={
@@ -398,7 +549,7 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
                                 </div>
                             </Col>
                         );})}
-                        {filteredCloud.length === 0 && !loading && (
+                        {filteredCloud.length === 0 && !loading && !cloudLoadFailed && (
                             <Col span={24}>
                                 <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('storage.manager.noCloudDiagrams')} />
                             </Col>
@@ -413,7 +564,7 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
         if (!user) {
             return (
                 <Empty
-                    description="登录后查看共享给你的图表"
+                    description={t('storage.manager.sharedLoginRequired')}
                     image={Empty.PRESENTED_IMAGE_SIMPLE}
                 >
                     <Button type="primary" onClick={() => setIsAuthModalOpen(true)} icon={<DatabaseOutlined />}>
@@ -424,7 +575,16 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
         }
 
         return (
-            <div style={{ maxHeight: '55vh', overflowY: 'auto', padding: '8px 4px' }}>
+            <div className="cloud-storage-manager-list">
+                {sharedLoadFailed && (
+                    <CloudStorageRecoveryAlert
+                        title={t('storage.manager.sharedLoadFailed')}
+                        description={t('storage.manager.loadRetryHint')}
+                        retryLabel={t('common.retry')}
+                        loading={sharedLoading}
+                        onRetry={() => void loadSharedDiagrams()}
+                    />
+                )}
                 <Spin spinning={sharedLoading}>
                     <Row gutter={[16, 16]}>
                         {filteredShared.map((item) => (
@@ -433,7 +593,15 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
                                     hoverable
                                     size="small"
                                     actions={[
-                                        <Button type="text" size="small" icon={<EyeOutlined />} onClick={() => handleOpenCloud(item)}>{t('storage.manager.open')}</Button>,
+                                        <Button
+                                            type="text"
+                                            icon={<EyeOutlined />}
+                                            loading={openingId === item.id}
+                                            disabled={storageActionBusy && openingId !== item.id}
+                                            onClick={() => void handleOpenCloud(item, 'supabase')}
+                                        >
+                                            {t('storage.manager.open')}
+                                        </Button>,
                                     ]}
                                 >
                                     <Meta
@@ -442,7 +610,7 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                                 <span style={{ fontSize: 14 }}>{item.title}</span>
                                                 <Tag color={item.role === 'editor' ? 'blue' : 'default'} style={{ fontSize: 11 }}>
-                                                    {item.role === 'editor' ? '可编辑' : '只读'}
+                                                    {item.role === 'editor' ? t('storage.manager.editable') : t('storage.manager.readOnly')}
                                                 </Tag>
                                             </div>
                                         }
@@ -455,9 +623,9 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
                                 </Card>
                             </Col>
                         ))}
-                        {filteredShared.length === 0 && !sharedLoading && (
+                        {filteredShared.length === 0 && !sharedLoading && !sharedLoadFailed && (
                             <Col span={24}>
-                                <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无共享图表" />
+                                <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('storage.manager.noSharedDiagrams')} />
                             </Col>
                         )}
                     </Row>
@@ -466,61 +634,56 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
         );
     };
 
-    const modalTitle = useMemo(() => {
-        return (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingRight: 32 }}>
-                <span>{t('storage.manager.title')}</span>
-                <Space>
-                    <Select
-                        value={currentProvider}
-                        onChange={handleProviderChange}
-                        size="small"
-                        style={{ width: 120 }}
-                        options={[
-                            { value: 'supabase', label: <span><DatabaseOutlined /> Supabase</span> },
-                            { value: 's3', label: <span><CloudOutlined /> S3</span> },
-                        ]}
-                    />
-                    <Button size="small" icon={<ReloadOutlined />} onClick={loadCloudDiagrams} aria-label={t('storage.manager.refresh')} />
-                </Space>
-            </div>
-        );
-    }, [currentProvider, handleProviderChange, loadCloudDiagrams, t]);
+    const handleModalCancel = useCallback(() => {
+        if (storageActionBusy) {
+            appMessage.info(t('storage.manager.operationInProgress'));
+            return;
+        }
+        scopeRef.current = invalidateCloudStorageManagerScope(scopeRef.current);
+        cloudListRequestRef.current += 1;
+        sharedListRequestRef.current += 1;
+        resetBatchSelection();
+        onCancel();
+    }, [onCancel, resetBatchSelection, storageActionBusy, t]);
 
     return (
         <>
         <Modal
-            title={modalTitle}
+            title={(
+                <CloudStorageManagerTitle
+                    activeTab={activeTab}
+                    currentProvider={currentProvider}
+                    loading={loading}
+                    operationBusy={storageActionBusy}
+                    onProviderChange={handleProviderChange}
+                    onRefresh={() => void loadCloudDiagrams()}
+                />
+            )}
             open={open}
-            onCancel={onCancel}
+            onCancel={handleModalCancel}
             getContainer={getViewportOverlayContainer}
-            rootClassName={COMMERCIAL_VIEWPORT_MODAL_CLASS}
+            rootClassName={`${COMMERCIAL_VIEWPORT_MODAL_CLASS} cloud-storage-manager-modal`}
             zIndex={COMMERCIAL_VIEWPORT_MODAL_Z_INDEX}
             footer={null}
             width={800}
-            styles={{ body: { padding: '0 var(--glass-padding-lg, 32px) var(--glass-padding-lg, 32px)' } }}
+            maskClosable={!storageActionBusy}
+            keyboard={!storageActionBusy}
         >
-            <div style={{ marginBottom: 12, marginTop: 16 }}>
-                <Search
-                    placeholder={t('storage.manager.searchPlaceholder')}
-                    allowClear
-                    onSearch={setSearchTerm}
-                    onChange={e => setSearchTerm(e.target.value)}
-                    style={{ width: '100%' }}
-                />
-            </div>
+            <CloudStorageManagerSearch value={searchTerm} onChange={handleSearchTermChange} />
             <Tabs
                 activeKey={activeTab}
-                onChange={setActiveTab}
+                onChange={handleTabChange}
                 items={[
                     {
                         key: 'mine',
-                        label: <span><CloudOutlined /> 我的图表</span>,
+                        label: <span><CloudOutlined /> {t('storage.manager.mineTab')}</span>,
+                        disabled: storageActionBusy && activeTab !== 'mine',
                         children: renderMyDiagrams(),
                     },
                     {
                         key: 'shared',
-                        label: <span><TeamOutlined /> 共享给我</span>,
+                        label: <span><TeamOutlined /> {t('storage.manager.sharedTab')}</span>,
+                        disabled: storageActionBusy && activeTab !== 'shared',
                         children: renderSharedWithMe(),
                     },
                 ]}

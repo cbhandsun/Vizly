@@ -1,10 +1,18 @@
 const LOCAL_HTTP_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
 const REDACTED = '[redacted]';
-const MAX_ENDPOINT_LENGTH = 2_048;
-const MAX_ACCESS_KEY_LENGTH = 512;
-const MAX_SECRET_LENGTH = 8_000;
-const MAX_BUCKET_LENGTH = 255;
-const MAX_REGION_LENGTH = 128;
+export const S3_STORAGE_INPUT_LIMITS = {
+    endpoint: 2_048,
+    accessKeyId: 512,
+    secretAccessKey: 8_000,
+    bucket: 255,
+    region: 128,
+} as const;
+
+const MAX_ENDPOINT_LENGTH = S3_STORAGE_INPUT_LIMITS.endpoint;
+const MAX_ACCESS_KEY_LENGTH = S3_STORAGE_INPUT_LIMITS.accessKeyId;
+const MAX_SECRET_LENGTH = S3_STORAGE_INPUT_LIMITS.secretAccessKey;
+const MAX_BUCKET_LENGTH = S3_STORAGE_INPUT_LIMITS.bucket;
+const MAX_REGION_LENGTH = S3_STORAGE_INPUT_LIMITS.region;
 
 export interface PersistedS3StorageConfig {
     endpoint: string;

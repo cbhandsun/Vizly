@@ -140,12 +140,17 @@
         "manager": {
             "title": "Cloud diagrams",
             "refresh": "Refresh",
+            "providerLabel": "Storage provider",
             "searchPlaceholder": "Search cloud diagrams...",
+            "searchLabel": "Search cloud diagrams",
             "providerSwitched": "Switched provider: {{provider}}",
             "loadFailed": "Failed to load cloud list. Check config or login.",
+            "sharedLoadFailed": "Failed to load shared diagrams",
+            "loadRetryHint": "Check your network or sign-in status and retry. The current list is preserved to avoid showing a false empty state.",
             "downloading": "Loading cloud diagram...",
             "downloadedAndOpened": "Downloaded and opened",
             "noContent": "No content",
+            "openFailed": "Could not open the cloud diagram. Please retry.",
             "deleted": "Deleted",
             "deleteFailed": "Delete failed",
             "open": "Open",
@@ -155,9 +160,28 @@
             "unknownTime": "Unknown time",
             "sizeKb": "{{kb}} KB",
             "noCloudDiagrams": "No cloud diagrams",
+            "noSharedDiagrams": "No shared diagrams",
             "providerNotConfigured": "{{provider}} not configured",
             "goConfig": "Configure",
-            "needLoginForSupabase": "Sign in to use Supabase"
+            "needLoginForSupabase": "Sign in to use Supabase",
+            "sharedLoginRequired": "Sign in to view diagrams shared with you",
+            "mineTab": "My diagrams",
+            "sharedTab": "Shared with me",
+            "batchMode": "Batch manage",
+            "exitBatchMode": "Exit batch mode",
+            "selectAll": "Select all",
+            "clearSelection": "Clear selection",
+            "selectDiagram": "Select diagram: {{title}}",
+            "deleteSelected": "Delete selected ({{count}})",
+            "batchDeleteTitle": "Delete the {{count}} selected diagrams?",
+            "batchDeleteSuccess": "Deleted {{success}} diagrams",
+            "batchDeletePartial": "Deleted {{success}}; {{failed}} failed",
+            "batchDeleteAllFailed": "All {{failed}} diagrams failed to delete",
+            "operationInProgress": "A cloud operation is in progress. Please wait.",
+            "noPermission": "No delete permission",
+            "collaborative": "Collaborative diagram",
+            "editable": "Editable",
+            "readOnly": "Read only"
         }
     },
     "designer": {
@@ -1927,7 +1951,20 @@
         "requiredField": "This field is required",
         "pageTitle": "Storage Configuration",
         "pageDescription": "Configure your cloud storage provider.",
+        "headerTitle": "Storage settings",
+        "returnToWorkspace": "Return to workspace",
+        "connectionSettings": "Connection settings",
         "saveFail": "Save failed",
+        "validationFail": "The current configuration could not be validated. Review the inputs and retry.",
+        "testTimeout": "The connection test timed out. Check the network and endpoint, then retry.",
+        "status": {
+            "notConfigured": "No storage configuration has been saved",
+            "saved": "Configuration saved; test the connection before use",
+            "dirty": "Configuration has unsaved or unverified changes",
+            "testing": "Testing the connection...",
+            "verified": "Connection verified",
+            "failed": "Connection or save failed; review the configuration"
+        },
         "testFail": {
             "title": "Connection Failed",
             "corsTitle": "CORS Required",
@@ -1943,6 +1980,7 @@
         },
         "form": {
             "endpointLabel": "Endpoint URL",
+            "endpointTooltip": "Enter the full HTTP or HTTPS service URL",
             "endpointRequired": "Endpoint is required",
             "bucketLabel": "Bucket Name",
             "bucketRequired": "Bucket is required",
@@ -1950,7 +1988,12 @@
             "regionRequired": "Region is required",
             "forcePathStyleLabel": "Force Path Style",
             "forcePathStyleTooltip": "Enable for MinIO or non-AWS S3",
+            "accessKeyLabel": "Access Key ID",
+            "accessKeyPlaceholder": "Enter the Access Key ID",
             "accessKeyRequired": "Access Key is required",
+            "secretKeyLabel": "Secret Access Key",
+            "secretKeyPlaceholder": "Leave blank to keep the key from this session",
+            "secretKeyHint": "The Secret Key is kept only for this browser session and must be entered again after the session ends.",
             "secretKeyRequired": "Secret Key is required",
             "saveBtn": "Save",
             "testBtn": "Test Connection"
@@ -1958,7 +2001,7 @@
         "notes": {
             "title": "Notes",
             "cors": "Ensure S3 CORS allows this origin.",
-            "security": "Credentials are stored locally only."
+            "security": "Configuration stays in this browser. The Secret Key is session-only and is not written to persistent local storage."
         }
     },
     "upgrade": {

@@ -1,0 +1,173 @@
+.storage-config-page {
+    --vz-brand-from: #6366f1;
+    --vz-brand-to: #a855f7;
+    --vz-brand-gradient: linear-gradient(135deg, var(--vz-brand-from), var(--vz-brand-to));
+    --vz-text-primary: #0f172a;
+    --vz-text-secondary: #475569;
+    --vz-border: rgba(15, 23, 42, 0.08);
+    min-height: 100dvh;
+    overflow-x: hidden;
+    background: var(--vz-dashboard-bg, #fcfcfc);
+    color: var(--vz-text-primary);
+}
+
+.storage-config-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    display: grid;
+    grid-template-columns: minmax(0, 220px) minmax(0, 1fr) minmax(0, 220px);
+    align-items: center;
+    min-height: 56px;
+    padding: 0 24px;
+    border-bottom: 1px solid var(--vz-border);
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(16px);
+}
+
+.storage-config-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    width: max-content;
+    min-height: var(--commercial-touch-target, 44px);
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+}
+
+.storage-config-logo {
+    display: inline-flex;
+    width: 28px;
+    height: 28px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    background: var(--vz-brand-gradient);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    color: #fff;
+    font-size: 16px;
+    font-weight: 800;
+}
+
+.storage-config-brand-name {
+    background: var(--vz-brand-gradient);
+    background-clip: text;
+    color: transparent;
+    font-size: 17px;
+    font-weight: 800;
+}
+
+.storage-config-header-title {
+    overflow: hidden;
+    color: var(--vz-text-secondary);
+    font-size: 13px;
+    font-weight: 650;
+    text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.storage-config-return {
+    justify-self: end;
+    min-height: var(--commercial-touch-target, 44px);
+}
+
+.storage-config-brand:focus-visible {
+    border-radius: 8px;
+    outline: 2px solid var(--vz-brand-from);
+    outline-offset: 2px;
+}
+
+.storage-config-main {
+    display: flex;
+    width: min(800px, calc(100% - 48px));
+    margin: 0 auto;
+    padding: 48px 0 72px;
+    flex-direction: column;
+    gap: 32px;
+}
+
+.storage-config-intro .ant-typography:last-child,
+.storage-config-notes ul {
+    margin-bottom: 0;
+}
+
+.storage-config-status {
+    margin-top: 20px;
+}
+
+.storage-config-card {
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.86);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 16px 32px -8px rgba(0, 0, 0, 0.05);
+    backdrop-filter: blur(20px);
+}
+
+.storage-config-card .ant-card-head-title {
+    font-weight: 700;
+    letter-spacing: -0.2px;
+}
+
+.storage-config-form .ant-input,
+.storage-config-form .ant-input-affix-wrapper,
+.storage-config-form .ant-btn,
+.storage-config-return {
+    min-height: var(--commercial-touch-target, 44px);
+}
+
+.storage-config-form .ant-switch {
+    min-width: var(--commercial-touch-target, 44px);
+    min-height: 24px;
+}
+
+.storage-config-actions-item {
+    margin-bottom: 0;
+}
+
+.storage-config-error-content .ant-alert {
+    margin-bottom: 16px;
+}
+
+@media (max-width: 640px) {
+    .storage-config-header {
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 8px 12px;
+        padding: 8px 16px;
+    }
+
+    .storage-config-header-title {
+        text-align: right;
+    }
+
+    .storage-config-return {
+        grid-column: 1 / -1;
+        width: 100%;
+    }
+
+    .storage-config-main {
+        width: min(100% - 32px, 800px);
+        padding: 28px 0 48px;
+        gap: 20px;
+    }
+
+    .storage-config-card .ant-card-body {
+        padding: 20px 16px;
+    }
+
+    .storage-config-actions,
+    .storage-config-actions .ant-space-item,
+    .storage-config-actions .ant-btn {
+        width: 100%;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .storage-config-page *,
+    .storage-config-page *::before,
+    .storage-config-page *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+    }
+}
