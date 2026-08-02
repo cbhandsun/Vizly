@@ -1,0 +1,86 @@
+.mind-elixir-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    max-width: 100%;
+    margin-left: 8px;
+    padding: 0 8px;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    border-left: 1px solid rgba(0, 0, 0, 0.08);
+    scrollbar-width: thin;
+}
+
+.mind-elixir-toolbar-button {
+    min-width: var(--commercial-touch-target, 44px) !important;
+    width: var(--commercial-touch-target, 44px);
+    height: var(--commercial-touch-target, 44px);
+    padding: 0 !important;
+    flex: 0 0 var(--commercial-touch-target, 44px);
+}
+
+.mind-elixir-toolbar-direction {
+    width: 124px;
+    min-width: 124px;
+}
+
+.mind-elixir-toolbar-direction .ant-select-selector {
+    min-height: var(--commercial-touch-target, 44px) !important;
+    align-items: center;
+}
+
+.mind-elixir-toolbar-zoom {
+    display: flex;
+    align-items: center;
+    gap: 1px;
+    min-height: var(--commercial-touch-target, 44px);
+    overflow: hidden;
+    flex: 0 0 auto;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.mind-elixir-toolbar-zoom .mind-elixir-toolbar-button {
+    border-radius: 0;
+}
+
+.mind-elixir-toolbar-zoom-reset {
+    min-width: var(--commercial-touch-target, 44px);
+    height: var(--commercial-touch-target, 44px);
+    padding: 0 4px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    transition: color 0.15s, background-color 0.15s;
+}
+
+.mind-elixir-toolbar-zoom-reset:hover,
+.mind-elixir-toolbar-zoom-reset:focus-visible {
+    background: rgba(99, 102, 241, 0.1);
+    outline: 2px solid rgba(99, 102, 241, 0.55);
+    outline-offset: -2px;
+}
+
+.mind-elixir-toolbar-zoom-reset.is-modified {
+    color: #6366f1;
+}
+
+.mind-elixir-toolbar-stats {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-height: var(--commercial-touch-target, 44px);
+    padding: 2px 8px;
+    flex: 0 0 auto;
+    border: 1px solid rgba(99, 102, 241, 0.15);
+    border-radius: 12px;
+    background: rgba(99, 102, 241, 0.08);
+    cursor: default;
+    user-select: none;
+}
