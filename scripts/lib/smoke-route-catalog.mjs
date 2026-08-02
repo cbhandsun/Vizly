@@ -223,6 +223,7 @@ export const createSmokeRouteCatalog = (BASE_URL) => {
       timeoutMs: 30000,
       expression: `(() => {
         const body = document.body?.textContent || '';
+        const readyMarker = document.querySelector('[data-smoke-ready="storage-config"]');
         return {
           href: location.href,
           title: document.title,
@@ -231,13 +232,13 @@ export const createSmokeRouteCatalog = (BASE_URL) => {
           appFallback: body.includes('加载应用'),
           pageFallback: body.includes('加载存储配置'),
           errorBoundary: body.includes('页面出现错误'),
+          hasReadyMarker: Boolean(readyMarker),
           bodyText: body.slice(0, 240),
           rootText: (document.getElementById('root')?.textContent || '').slice(0, 240),
           ready: Boolean(document.getElementById('root')) &&
+            Boolean(readyMarker) &&
             !body.includes('加载存储配置') &&
-            !body.includes('页面出现错误') &&
-            body.includes('Settings & Storage') &&
-            body.includes('Connection Settings'),
+            !body.includes('页面出现错误'),
         };
       })()`,
     },

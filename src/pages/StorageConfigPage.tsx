@@ -172,7 +172,7 @@ const StorageConfigPage: React.FC = () => {
                 </Button>
             </header>
 
-            <main className="storage-config-main">
+            <main className="storage-config-main" data-smoke-ready="storage-config">
                 <div className="storage-config-intro">
                     <Title level={2}><CloudServerOutlined /> {t('storageConfig.pageTitle')}</Title>
                     <Paragraph type="secondary">{t('storageConfig.pageDescription')}</Paragraph>

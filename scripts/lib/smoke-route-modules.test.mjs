@@ -33,6 +33,15 @@ describe('smoke route modules', () => {
     expect(warehouseRoute?.expression).not.toContain("querySelector('canvas')");
   });
 
+  it('detects storage configuration readiness without coupling to localized copy', () => {
+    const storageRoute = createSmokeRouteCatalog('http://127.0.0.1:5373')
+      .find((route) => route.name === 'storage-config');
+
+    expect(storageRoute?.expression).toContain('data-smoke-ready="storage-config"');
+    expect(storageRoute?.expression).not.toContain('Settings & Storage');
+    expect(storageRoute?.expression).not.toContain('Connection Settings');
+  });
+
   it('keeps CDP runtime options explicit at the browser boundary', () => {
     const viewport = { width: 390, height: 844, scale: 2 };
     const session = new CdpSession('ws://browser', 'target-1', {
