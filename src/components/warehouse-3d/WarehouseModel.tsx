@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Floor from './Floor';
 import Racks from './Racks';
 import Zones from './Zones';
@@ -13,22 +13,50 @@ import Workers from './Workers';
 import DigitalTwinUI from './DigitalTwinUI';
 import StructuralElements from './StructuralElements';
 
-const WarehouseModel: React.FC = () => {
+interface WarehouseModelProps {
+    onReady?: () => void;
+}
+
+const FIRST_DETAIL_DELAY_MS = 2500;
+const SECOND_DETAIL_DELAY_MS = 5000;
+
+const WarehouseModel: React.FC<WarehouseModelProps> = ({ onReady }) => {
+    const [detailStage, setDetailStage] = useState(0);
+
+    useEffect(() => {
+        onReady?.();
+        const firstStageTimer = window.setTimeout(() => setDetailStage(1), FIRST_DETAIL_DELAY_MS);
+        const secondStageTimer = window.setTimeout(() => setDetailStage(2), SECOND_DETAIL_DELAY_MS);
+
+        return () => {
+            window.clearTimeout(firstStageTimer);
+            window.clearTimeout(secondStageTimer);
+        };
+    }, [onReady]);
+
     return (
         <group>
             <Floor />
-            <Docks />
-            <Racks />
-            <AsrsSystem />
-            <Conveyors />
-            <LogisticsFlow />
             <Zones />
-            <SupportAreas />
-            <Vehicles />
-            <Trucks />
-            <Workers />
             <DigitalTwinUI />
-            <StructuralElements />
+            {detailStage >= 1 && (
+                <>
+                    <Docks />
+                    <Racks />
+                    <AsrsSystem />
+                    <StructuralElements />
+                </>
+            )}
+            {detailStage >= 2 && (
+                <>
+                    <Conveyors />
+                    <LogisticsFlow />
+                    <SupportAreas />
+                    <Vehicles />
+                    <Trucks />
+                    <Workers />
+                </>
+            )}
         </group>
     );
 };

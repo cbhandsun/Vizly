@@ -53,7 +53,7 @@ export const Lazy3DViewer: React.FC<Lazy3DViewerProps> = ({
         <Suspense fallback={loading || defaultLoading}>
             <Warehouse3DProvider>
                 <div style={{ width: '100%', height: '100%', position: 'relative' }}>
-                    <WarehouseScene onReady={onReady} />
+                    <WarehouseScene onModelReady={onReady} />
                 </div>
             </Warehouse3DProvider>
         </Suspense>

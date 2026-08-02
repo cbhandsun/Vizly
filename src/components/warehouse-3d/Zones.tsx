@@ -1,22 +1,34 @@
 import React from 'react';
-import { Text } from '@react-three/drei';
+import { Html } from '@react-three/drei';
 import { WAREHOUSE } from './constants';
 import { useWarehouse3D } from './useWarehouse3D';
 
 const FloatingLabel: React.FC<{ position: [number, number, number], text: string, color?: string }> = ({ position, text, color = WAREHOUSE.COLORS.ZONE_LABELS }) => {
     return (
-        <Text
+        <Html
+            center
+            transform
+            distanceFactor={25}
             position={[position[0], position[1] + 2, position[2]]} // Lift slightly higher
-            fontSize={5}
-            color={color}
-            anchorX="center"
-            anchorY="middle"
-            outlineWidth={0.2}
-            outlineColor="white"
-            renderOrder={10} // Ensure it renders on top of transparent objects
+            zIndexRange={[20, 0]}
         >
-            {text}
-        </Text>
+            <div
+                aria-hidden="true"
+                style={{
+                    color,
+                    fontSize: '20px',
+                    fontWeight: 700,
+                    lineHeight: 1.2,
+                    pointerEvents: 'none',
+                    textAlign: 'center',
+                    textShadow: '-1px -1px 0 white, 1px -1px 0 white, -1px 1px 0 white, 1px 1px 0 white',
+                    userSelect: 'none',
+                    whiteSpace: 'pre-line',
+                }}
+            >
+                {text}
+            </div>
+        </Html>
     );
 };
 
@@ -37,10 +49,10 @@ const Zones: React.FC = () => {
             <FloatingLabel position={[(WAREHOUSE.HIGH_BAY_X[0] + WAREHOUSE.HIGH_BAY_X[1]) / 2, 22, 0]} text="高位托盘货架存储区" />
 
             {/* 4: 自动化立体仓库 (AS/RS) */}
-            <FloatingLabel position={[0, 28, 0]} text="自动化立体仓库\n(AS/RS)" color="#c0392b" />
+            <FloatingLabel position={[0, 28, 0]} text={'自动化立体仓库\n(AS/RS)'} color="#c0392b" />
 
             {/* 5: 多层阁楼拣选区 */}
-            <FloatingLabel position={[65, 12, -20]} text="多层阁楼拣选区\n(电子标签/RF)" />
+            <FloatingLabel position={[65, 12, -20]} text={'多层阁楼拣选区\n(电子标签/RF)'} />
 
             {/* 6: 高速自动分拣输送系统 */}
             <FloatingLabel position={[110, 8, 0]} text="高速自动分拣输送系统" color="#16a085" />

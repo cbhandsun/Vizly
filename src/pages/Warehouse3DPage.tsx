@@ -1,29 +1,50 @@
 
-import React, { Suspense, useState } from 'react';
+import React, { Suspense, useCallback, useState } from 'react';
 import Scene from '@/components/warehouse-3d/Scene';
 import { Warehouse3DProvider } from '@/components/warehouse-3d/WarehouseContext';
 import ControlsOverlay from '@/components/warehouse-3d/ControlsOverlay';
+import { Warehouse3DErrorBoundary } from '@/components/warehouse-3d/Warehouse3DErrorBoundary';
 
 const Warehouse3DPage: React.FC = () => {
+    const [canvasMounted, setCanvasMounted] = useState(false);
     const [sceneReady, setSceneReady] = useState(false);
+    const [sceneKey, setSceneKey] = useState(0);
+    const retryScene = useCallback(() => {
+        setCanvasMounted(false);
+        setSceneReady(false);
+        setSceneKey(current => current + 1);
+    }, []);
+    const markCanvasMounted = useCallback(() => setCanvasMounted(true), []);
+    const markSceneReady = useCallback(() => setSceneReady(true), []);
 
     return (
         <Warehouse3DProvider>
             <div
                 className="relative w-full h-screen bg-slate-900 overflow-hidden font-sans"
-                data-smoke-ready={sceneReady ? 'warehouse-3d' : undefined}
+                data-smoke-ready={canvasMounted ? 'warehouse-3d' : undefined}
             >
                 {/* Background mesh/glow effects */}
                 <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-900/20 via-slate-900/80 to-slate-900"></div>
                 
-                <Suspense fallback={
-                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/90 text-white z-50 backdrop-blur-sm">
-                        <div className="w-12 h-12 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin mb-4"></div>
-                        <div className="text-lg font-medium tracking-wide">Loading 3D Environment...</div>
-                    </div>
-                }>
-                    <Scene onReady={() => setSceneReady(true)} />
-                </Suspense>
+                <Warehouse3DErrorBoundary onRetry={retryScene}>
+                    <Suspense fallback={null}>
+                        <Scene
+                            key={sceneKey}
+                            onCanvasMounted={markCanvasMounted}
+                            onModelReady={markSceneReady}
+                        />
+                    </Suspense>
+                    {!sceneReady && (
+                        <div
+                            aria-live="polite"
+                            className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-slate-900/90 text-white backdrop-blur-sm"
+                            role="status"
+                        >
+                            <div aria-hidden="true" className="mb-4 h-12 w-12 animate-spin rounded-full border-4 border-indigo-500/30 border-t-indigo-500" />
+                            <div className="text-lg font-medium tracking-wide">正在加载 3D 场景…</div>
+                        </div>
+                    )}
+                </Warehouse3DErrorBoundary>
                 
                 {/* Modern Floating Header Panel */}
                 <div className="absolute top-4 left-4 z-10 pointer-events-none">

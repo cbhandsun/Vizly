@@ -2,7 +2,7 @@ import React, { lazy, Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
 import {
     OrbitControls, PerspectiveCamera, ContactShadows, Sky,
-    AdaptiveDpr, AdaptiveEvents, Bvh
+    AdaptiveDpr
 } from '@react-three/drei';
 
 import { useWarehouse3D } from './useWarehouse3D';
@@ -11,10 +11,11 @@ import { useRef, useEffect } from 'react';
 const WarehouseModel = lazy(() => import('./WarehouseModel'));
 
 export interface SceneProps {
-    onReady?: () => void;
+    onCanvasMounted?: () => void;
+    onModelReady?: () => void;
 }
 
-const Scene: React.FC<SceneProps> = ({ onReady }) => {
+const Scene: React.FC<SceneProps> = ({ onCanvasMounted, onModelReady }) => {
     const { autoRotate, resetViewTrigger } = useWarehouse3D();
     const controlsRef = useRef<React.ElementRef<typeof OrbitControls>>(null);
 
@@ -24,11 +25,14 @@ const Scene: React.FC<SceneProps> = ({ onReady }) => {
         }
     }, [resetViewTrigger]);
 
+    useEffect(() => {
+        onCanvasMounted?.();
+    }, [onCanvasMounted]);
+
     return (
         <Canvas
             shadows
             dpr={1}
-            onCreated={onReady}
             gl={{
                 antialias: true,
                 powerPreference: 'high-performance',
@@ -70,16 +74,12 @@ const Scene: React.FC<SceneProps> = ({ onReady }) => {
             <fog attach="fog" args={['#d0d0d0', 100, 800]} />
 
             {/* The Actual Content */}
-            {/* Optimized Raycasting */}
             <Suspense fallback={null}>
-                <Bvh firstHitOnly>
-                    <WarehouseModel />
-                </Bvh>
+                <WarehouseModel onReady={onModelReady} />
             </Suspense>
 
             {/* Performance Adaptivity */}
             <AdaptiveDpr pixelated />
-            <AdaptiveEvents />
 
             {/* Background color */}
             <color attach="background" args={['#d0d0d0']} />
