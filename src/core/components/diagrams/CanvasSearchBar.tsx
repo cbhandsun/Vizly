@@ -3,7 +3,7 @@ import { theme } from 'antd';
 import { FaSearch, FaChevronUp, FaChevronDown, FaTimes, FaExchangeAlt } from 'react-icons/fa';
 import { Node, useReactFlow } from '@xyflow/react';
 
-interface CanvasSearchBarProps {
+export interface CanvasSearchBarProps {
     visible: boolean;
     onClose: () => void;
     nodes: Node[];

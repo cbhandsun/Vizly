@@ -29,7 +29,6 @@ vi.mock('../ui/CollaborationAvatars', () => ({
 }));
 
 import { TopActionButtons } from '../TopActionButtons';
-import { requestPresentationFocusReturn } from '../../presentation/presentationFocusReturn';
 
 describe('TopActionButtons document menu', () => {
     beforeEach(() => {
@@ -75,8 +74,7 @@ describe('TopActionButtons document menu', () => {
         });
     });
 
-    it('restores focus after the presentation header is remounted', async () => {
-        requestPresentationFocusReturn();
+    it('exposes a stable presentation focus-return target', () => {
         render(
             <TopActionButtons
                 disablePortal
@@ -85,7 +83,7 @@ describe('TopActionButtons document menu', () => {
         );
 
         const trigger = screen.getByRole('button', { name: '文档操作' });
-        await waitFor(() => expect(document.activeElement).toBe(trigger));
+        expect(trigger.hasAttribute('data-presentation-focus-return')).toBe(true);
     });
 
     it('separates operation history from version snapshots and invokes the snapshot entry', async () => {

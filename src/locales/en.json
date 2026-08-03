@@ -485,6 +485,7 @@
             "share": "Share",
             "presentationMode": "Presentation Mode",
             "presentationEmpty": "Add at least one node before starting a presentation",
+            "presentationLoadFailed": "Presentation mode failed to load. Try again.",
             "diffView": "Diff View",
             "historyPanel": "History",
             "smartOptimize": "Smart Optimize (resolve overlaps & align)",

@@ -5,16 +5,23 @@ import { HoverToolbarsOverlay } from '../HoverToolbarsOverlay';
 import { SmartGuideRenderer } from '../SmartGuideRenderer';
 import { AnnotationLayer } from '../AnnotationLayer';
 import { PageTabs } from '../PageTabs';
-import { HistoryPanel } from '../HistoryPanel';
-import { CanvasSearchBar } from '../CanvasSearchBar';
+import type { HistoryPanelProps } from '../HistoryPanel';
+import type { CanvasSearchBarProps } from '../CanvasSearchBar';
+
+const HistoryPanel = React.lazy(() => import('../HistoryPanel').then(module => ({
+    default: module.HistoryPanel,
+})));
+const CanvasSearchBar = React.lazy(() => import('../CanvasSearchBar').then(module => ({
+    default: module.CanvasSearchBar,
+})));
 
 type QuickConnectProps = React.ComponentProps<typeof QuickConnectMenu>;
 type HoverToolbarProps = React.ComponentProps<typeof HoverToolbarsOverlay>;
 type SmartGuideProps = React.ComponentProps<typeof SmartGuideRenderer>;
 type AnnotationProps = React.ComponentProps<typeof AnnotationLayer>;
 type PageTabsProps = React.ComponentProps<typeof PageTabs>;
-type HistoryProps = React.ComponentProps<typeof HistoryPanel>;
-type SearchProps = React.ComponentProps<typeof CanvasSearchBar>;
+type HistoryProps = HistoryPanelProps;
+type SearchProps = CanvasSearchBarProps;
 
 export interface DesignerCanvasFeaturesLayerProps {
     quickConnect: Pick<
@@ -149,26 +156,34 @@ export const DesignerCanvasFeaturesLayer = React.memo(
                 disabled={pages.disabled}
             />
             
-            <HistoryPanel
-                visible={history.visible}
-                onClose={history.onClose}
-                pastEntries={history.pastEntries}
-                canUndo={history.canUndo}
-                canRedo={history.canRedo}
-                onUndo={history.onUndo}
-                onRedo={history.onRedo}
-                onJumpTo={history.onJumpTo}
-            />
+            {history.visible && (
+                <React.Suspense fallback={null}>
+                    <HistoryPanel
+                        visible
+                        onClose={history.onClose}
+                        pastEntries={history.pastEntries}
+                        canUndo={history.canUndo}
+                        canRedo={history.canRedo}
+                        onUndo={history.onUndo}
+                        onRedo={history.onRedo}
+                        onJumpTo={history.onJumpTo}
+                    />
+                </React.Suspense>
+            )}
             
-            <CanvasSearchBar
-                visible={search.visible}
-                onClose={search.onClose}
-                nodes={search.nodes}
-                onHighlightNode={search.onHighlightNode}
-                onReplaceNode={search.onReplaceNode}
-                onReplaceAll={search.onReplaceAll}
-                onBeforeReplace={search.onBeforeReplace}
-            />
+            {search.visible && (
+                <React.Suspense fallback={null}>
+                    <CanvasSearchBar
+                        visible
+                        onClose={search.onClose}
+                        nodes={search.nodes}
+                        onHighlightNode={search.onHighlightNode}
+                        onReplaceNode={search.onReplaceNode}
+                        onReplaceAll={search.onReplaceAll}
+                        onBeforeReplace={search.onBeforeReplace}
+                    />
+                </React.Suspense>
+            )}
         </>
     );
   },

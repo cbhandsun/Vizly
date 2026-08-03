@@ -14,7 +14,6 @@ import {
   buildPresentationEdgeSelector,
   buildPresentationNodeSelector,
 } from './presentationSelectorSafety';
-import { requestPresentationFocusReturn } from './presentationFocusReturn';
 import './PresentationMode.css';
 
 interface PresentationModeProps {
@@ -62,8 +61,12 @@ const PresentationMode: React.FC<PresentationModeProps> = ({ slides, onFocusNode
   }, [currentIndex]);
 
   const handleExit = useCallback(() => {
-    requestPresentationFocusReturn();
     onExit();
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        document.querySelector<HTMLButtonElement>('[data-presentation-focus-return]')?.focus();
+      });
+    });
   }, [onExit]);
 
   // 键盘导航

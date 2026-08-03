@@ -4,7 +4,7 @@ import { theme } from 'antd';
 import { FaHistory, FaUndoAlt, FaRedoAlt, FaClock } from 'react-icons/fa';
 import type { HistoryEntry } from '../../hooks/useDiagramHistory';
 
-interface HistoryPanelProps {
+export interface HistoryPanelProps {
     visible: boolean;
     onClose: () => void;
     pastEntries: HistoryEntry[];

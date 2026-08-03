@@ -9,7 +9,6 @@ import {
     buildPresentationEdgeSelector,
     buildPresentationNodeSelector,
 } from '../../presentation/presentationSelectorSafety';
-import { consumePresentationFocusReturnRequest } from '../../presentation/presentationFocusReturn';
 import { generateSlides } from '../../../hooks/usePresentationSlides';
 
 describe('PresentationMode', () => {
@@ -36,7 +35,24 @@ describe('PresentationMode', () => {
         expect(screen.getByText('详情')).toBeTruthy();
         fireEvent.keyDown(window, { key: 'Escape' });
         expect(onExit).toHaveBeenCalledTimes(1);
-        expect(consumePresentationFocusReturnRequest()).toBe(true);
+    });
+
+    it('returns focus to the persistent document trigger after exit', () => {
+        const requestAnimationFrameSpy = vi.spyOn(window, 'requestAnimationFrame')
+            .mockImplementation(callback => {
+                callback(0);
+                return 1;
+            });
+        const focusTarget = document.createElement('button');
+        focusTarget.dataset.presentationFocusReturn = '';
+        document.body.append(focusTarget);
+
+        render(<PresentationMode slides={slides} onFocusNodes={vi.fn()} onExit={vi.fn()} />);
+        fireEvent.click(screen.getByRole('button', { name: '退出演示' }));
+
+        expect(document.activeElement).toBe(focusTarget);
+        focusTarget.remove();
+        requestAnimationFrameSpy.mockRestore();
     });
 
     it('moves focus into the dialog, traps it, and restores the trigger on unmount', () => {
@@ -60,16 +76,6 @@ describe('PresentationMode', () => {
         unmount();
         expect(document.activeElement).toBe(trigger);
         trigger.remove();
-    });
-
-    it('requests focus handoff before exiting through the transient menu flow', () => {
-        const onExit = vi.fn();
-        render(<PresentationMode slides={slides} onFocusNodes={vi.fn()} onExit={onExit} />);
-
-        fireEvent.click(screen.getByRole('button', { name: '退出演示' }));
-
-        expect(onExit).toHaveBeenCalledTimes(1);
-        expect(consumePresentationFocusReturnRequest()).toBe(true);
     });
 
     it('announces slide changes and exposes page progress semantics', () => {

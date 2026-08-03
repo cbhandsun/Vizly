@@ -489,6 +489,7 @@
             "share": "分享",
             "presentationMode": "演示模式",
             "presentationEmpty": "请先添加至少一个节点再开始演示",
+            "presentationLoadFailed": "演示模式加载失败，请重试",
             "diffView": "差异对比",
             "historyPanel": "历史记录",
             "smartOptimize": "智能全图优化 (解决重叠与对齐)",

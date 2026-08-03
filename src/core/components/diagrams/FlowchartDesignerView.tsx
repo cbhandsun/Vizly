@@ -20,7 +20,6 @@ import { resolveFlowchartLeftClearance } from './flowchartChromeLayout';
 import { FreehandDrawingLayer } from './FreehandDrawingLayer';
 import { RemoteCursors } from './ui/RemoteCursors';
 import { UnifiedDesignerShell } from './UnifiedDesignerShell';
-import { generateSlides } from '../../hooks/usePresentationSlides';
 import { persistFlowchartOnboardingDismissed } from './flowchartOnboardingStorage';
 import { shouldOpenDesignerAiSidebar } from './designerRightSidebarState';
 import {
@@ -325,17 +324,25 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                             diagramTitle={model.title}
                             topActions={{
                                 onEditJson: handleOpenJsonEditor,
-                                onStartPresentation: () => {
-                                    const slides = generateSlides(nodesRef.current, 'vertical');
-                                    if (slides.length === 0) {
+                                onStartPresentation: async () => {
+                                    const currentNodes = nodesRef.current;
+                                    if (currentNodes.length === 0) {
                                         appMessage.info(t(
                                             'designer.toolbar.presentationEmpty',
                                             '请先添加至少一个节点再开始演示',
                                         ));
                                         return;
                                     }
-                                    setPresentationSlides(slides);
-                                    setPresentationActive(true);
+                                    try {
+                                        const { generateSlides } = await import('../../hooks/usePresentationSlides');
+                                        setPresentationSlides(generateSlides(currentNodes, 'vertical'));
+                                        setPresentationActive(true);
+                                    } catch {
+                                        appMessage.error(t(
+                                            'designer.toolbar.presentationLoadFailed',
+                                            '演示模式加载失败，请重试',
+                                        ));
+                                    }
                                 },
                                 onShowDiff: () => {
                                     const prevState = getPreviousState();
