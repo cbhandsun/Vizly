@@ -14,6 +14,7 @@ import {
     logClipboardSystemWriteFailure,
     logClipboardWriteFailure,
 } from './clipboardLogging';
+import { hasMutationLockedNode } from '../nodeLockPolicy';
 
 interface UseClipboardProps {
     nodesRef: React.RefObject<Node[]>;
@@ -161,6 +162,7 @@ export const useClipboard = ({
     const handleCut = useCallback(() => {
         // 连线没有可独立粘贴的载荷；与右键菜单一致，禁止仅剪切连线后不可恢复地删除。
         if (selectedNodes.length === 0) return;
+        if (hasMutationLockedNode(selectedNodes)) return;
 
         handleCopy();
         takeSnapshot(nodesRef.current, edgesRef.current);

@@ -18,6 +18,7 @@ import { useAlignment } from './hooks/useAlignment';
 import { ShapePreview } from './ShapePreview';
 import type { FlowchartShape } from '../../types/flowchart-node';
 import { resolveFloatingContextToolbarOffset } from './floatingContextToolbarPosition';
+import { hasMutationLockedNode } from './nodeLockPolicy';
 import {
     ToolbarContainer,
     ToolbarButton,
@@ -205,6 +206,8 @@ export const FloatingContextToolbar: React.FC<FloatingContextToolbarProps> = Rea
     // ─── Derived state ───────────────────────────────────────────────────────
     const isHide = (feature: ToolbarFeature) => excludeToolbarFeatures?.includes(feature);
     const allLocked = selectedNodes.every(node => node.data?.locked === true || node.draggable === false);
+    const hasLockedSelection = hasMutationLockedNode(selectedNodes);
+    const lockedActionLabel = (label: string) => hasLockedSelection ? `${label}（请先解锁）` : label;
 
     const currentOpacity = selectedNodes.reduce((acc, n) => {
         const op = n.style?.opacity !== undefined ? Number(n.style.opacity) : 1;
@@ -237,6 +240,7 @@ export const FloatingContextToolbar: React.FC<FloatingContextToolbarProps> = Rea
                     {/* ── 外观区 ── */}
                     {!isHide('color') && (
                         <ColorPicker
+                            disabled={hasLockedSelection}
                             value={currentColor}
                             onChange={(color: AggregationColor | string) => {
                                 const hex = typeof color === 'string' ? color : color.toHexString();
@@ -262,11 +266,11 @@ export const FloatingContextToolbar: React.FC<FloatingContextToolbarProps> = Rea
                     )}
 
                     {!isHide('shape') && (
-                        <ToolbarPopover icon={<FaShapes />} label="形状" content={<ShapePanel onChangeShape={onChangeShape || (() => {})} />} />
+                        <ToolbarPopover icon={<FaShapes />} label={lockedActionLabel('形状')} disabled={hasLockedSelection} content={<ShapePanel onChangeShape={onChangeShape || (() => {})} />} />
                     )}
 
                     {!isHide('align') && (
-                        <ToolbarPopover icon={<FaArrowsAlt />} label="对齐" disabled={!canAlign}
+                        <ToolbarPopover icon={<FaArrowsAlt />} label={lockedActionLabel('对齐')} disabled={!canAlign || hasLockedSelection}
                             content={<AlignPanel onAlign={handleAlign} onDistribute={handleDistribute} canAlign={canAlign} canDistribute={canDistribute} />}
                         />
                     )}
@@ -280,8 +284,8 @@ export const FloatingContextToolbar: React.FC<FloatingContextToolbarProps> = Rea
                         onClick={() => onLock(!allLocked)}
                         active={allLocked}
                     />
-                    <ToolbarButton icon={<FaCopy />} label="复制 (Ctrl+D)" onClick={onDuplicate} />
-                    <ToolbarButton icon={<FaTrash />} label="删除 (Del)" onClick={onDelete} danger />
+                    <ToolbarButton icon={<FaCopy />} label={lockedActionLabel('复制 (Ctrl+D)')} onClick={onDuplicate} disabled={hasLockedSelection} />
+                    <ToolbarButton icon={<FaTrash />} label={lockedActionLabel('删除 (Del)')} onClick={onDelete} disabled={hasLockedSelection} danger />
 
                     {/* ── 更多 ── */}
                     <ToolbarDivider />
@@ -294,10 +298,11 @@ export const FloatingContextToolbar: React.FC<FloatingContextToolbarProps> = Rea
                                 const idx = steps.findIndex(s => Math.abs(s - currentOpacity) < 0.05);
                                 onOpacity(steps[(idx + 1) % steps.length]);
                             },
+                            disabled: hasLockedSelection,
                         }] : []),
                         ...(!isHide('layer') ? [
-                            { key: 'bringFront', icon: <FaArrowUp />, label: '置顶', onClick: onBringToFront },
-                            { key: 'sendBack', icon: <FaArrowDown />, label: '置底', onClick: onSendToBack },
+                            { key: 'bringFront', icon: <FaArrowUp />, label: '置顶', onClick: onBringToFront, disabled: hasLockedSelection },
+                            { key: 'sendBack', icon: <FaArrowDown />, label: '置底', onClick: onSendToBack, disabled: hasLockedSelection },
                         ] : []),
                         ...(!isHide('border') ? [{
                             key: 'border', icon: <MdLineWeight />,
@@ -307,12 +312,14 @@ export const FloatingContextToolbar: React.FC<FloatingContextToolbarProps> = Rea
                                 const idx = widths.indexOf(currentStrokeWidth);
                                 onUpdateStyle({ strokeWidth: widths[(idx + 1) % widths.length] });
                             },
+                            disabled: hasLockedSelection,
                         }] : []),
                         ...(onSaveAsComponent ? [{ key: 'save', icon: <FaStar />, label: '保存为组件', onClick: onSaveAsComponent }] : []),
                         ...(onCopyStyle && onPasteStyle ? [{
                             key: 'format', icon: <FaPaintBrush />,
                             label: hasCopiedStyle ? '粘贴样式' : '复制样式',
                             onClick: hasCopiedStyle ? onPasteStyle : onCopyStyle,
+                            disabled: hasCopiedStyle && hasLockedSelection,
                         }] : []),
                     ]} />
 
@@ -321,14 +328,15 @@ export const FloatingContextToolbar: React.FC<FloatingContextToolbarProps> = Rea
                         <ToolbarPopover
                             icon={<div style={{ width: 12, height: 12, borderRadius: 3, background: 'linear-gradient(135deg, #3b82f6, #ef4444)' }} />}
                             label="业务域"
+                            disabled={hasLockedSelection}
                             content={<DomainClassPanel onChangeDomainClass={onChangeDomainClass} />}
                         />
                     )}
 
                     {/* 图层 dropdown */}
                     {!isHide('layer') && layers && layers.length > 0 && onMoveToLayer && (
-                        <Dropdown menu={{ items: layerMenuItems }} trigger={['click']}>
-                            <span><ToolbarButton icon={<FaLayerGroup />} label="移动到图层" /></span>
+                        <Dropdown disabled={hasLockedSelection} menu={{ items: layerMenuItems }} trigger={['click']}>
+                            <span><ToolbarButton icon={<FaLayerGroup />} label={lockedActionLabel('移动到图层')} disabled={hasLockedSelection} /></span>
                         </Dropdown>
                     )}
 

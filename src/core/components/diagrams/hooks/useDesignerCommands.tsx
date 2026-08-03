@@ -5,6 +5,7 @@ import { FaEdit, FaTrash, FaCopy, FaSave, FaFolderOpen, FaSearchPlus, FaSearchMi
 import { useCommandRegistry } from './useCommandRegistry';
 import { type CommandItem } from '../../../types/plugin';
 import { PluginContext, DiagramTypePlugin } from '../../../types/plugin';
+import { hasMutationLockedNode } from '../nodeLockPolicy';
 
 interface UseDesignerCommandsProps {
     // View
@@ -109,6 +110,7 @@ export function useDesignerCommands(props: UseDesignerCommandsProps) {
     const { t } = useTranslation();
     const isMac = /Mac|iPhone|iPad|iPod/i.test(navigator.userAgent);
     const mod = isMac ? '⌘' : 'Ctrl';
+    const hasLockedSelection = hasMutationLockedNode(selectedNodes ?? []);
 
     const [commandPaletteVisible, setCommandPaletteVisible] = useState(false);
     const { registerCommands, commands } = useCommandRegistry();
@@ -139,12 +141,12 @@ export function useDesignerCommands(props: UseDesignerCommandsProps) {
             { id: 'edit.redo', label: t('designer.flowchart.commands.redo'), category: 'General', shortcut: isMac ? `${mod} + Shift + Z` : `${mod} + Y`, enabled: canRedo, action: redo },
             { id: 'edit.copy', label: t('designer.flowchart.commands.copy'), category: 'General', shortcut: `${mod} + C`, icon: <FaCopy />, action: handleCopyWithToast },
             { id: 'edit.paste', label: t('designer.flowchart.commands.paste'), category: 'General', shortcut: `${mod} + V`, action: handlePasteWithToast },
-            { id: 'edit.cut', label: t('designer.flowchart.commands.cut'), category: 'General', shortcut: `${mod} + X`, action: handleCutWithToast },
-            { id: 'edit.delete', label: t('designer.flowchart.commands.deleteSelected'), category: 'General', shortcut: t('designer.flowchart.commands.deleteShortcut'), icon: <FaTrash />, action: () => handleDeleteWithToast() },
-            { id: 'edit.duplicate', label: t('designer.flowchart.commands.duplicate'), category: 'General', shortcut: `${mod} + D`, action: () => handleDuplicateWithToast() },
+            { id: 'edit.cut', label: t('designer.flowchart.commands.cut'), category: 'General', shortcut: `${mod} + X`, enabled: !hasLockedSelection, action: handleCutWithToast },
+            { id: 'edit.delete', label: t('designer.flowchart.commands.deleteSelected'), category: 'General', shortcut: t('designer.flowchart.commands.deleteShortcut'), icon: <FaTrash />, enabled: !hasLockedSelection, action: () => handleDeleteWithToast() },
+            { id: 'edit.duplicate', label: t('designer.flowchart.commands.duplicate'), category: 'General', shortcut: `${mod} + D`, enabled: !hasLockedSelection, action: () => handleDuplicateWithToast() },
             { id: 'edit.selectAll', label: t('designer.flowchart.commands.selectAll'), category: 'General', shortcut: `${mod} + A`, action: handleSelectAll },
-            { id: 'edit.group', label: t('designer.flowchart.commands.group'), category: 'Nodes', shortcut: `${mod} + G`, action: handleGroupWithToast },
-            { id: 'edit.ungroup', label: t('designer.flowchart.commands.ungroup'), category: 'Nodes', shortcut: `${mod} + Shift + G`, action: handleUngroupWithToast },
+            { id: 'edit.group', label: t('designer.flowchart.commands.group'), category: 'Nodes', shortcut: `${mod} + G`, enabled: !hasLockedSelection, action: handleGroupWithToast },
+            { id: 'edit.ungroup', label: t('designer.flowchart.commands.ungroup'), category: 'Nodes', shortcut: `${mod} + Shift + G`, enabled: !hasLockedSelection, action: handleUngroupWithToast },
 
             // --- File ---
             { id: 'file.export', label: '高级导出 (High-DPI Export)...', category: 'File', keywords: ['export', 'png', 'svg', 'pdf', 'high-dpi', '导出', '打印'], icon: <FaSave />, action: handleExport },
@@ -160,16 +162,16 @@ export function useDesignerCommands(props: UseDesignerCommandsProps) {
             { id: 'layout.smart', label: '智能布局推荐 (Smart Layout)', category: 'Action', icon: <FaProjectDiagram />, action: handleSmartLayout },
 
             // --- 统一尺寸 (Match Size) ---
-            { id: 'node.matchWidth', label: '统一宽度 (Match Width)', category: 'Nodes', keywords: ['match', 'width', 'size', '统一', '宽度'], icon: <FaProjectDiagram />, enabled: (selectedNodes?.length ?? 0) >= 2, action: () => handleMatchSize?.('width') },
-            { id: 'node.matchHeight', label: '统一高度 (Match Height)', category: 'Nodes', keywords: ['match', 'height', 'size', '统一', '高度'], icon: <FaProjectDiagram />, enabled: (selectedNodes?.length ?? 0) >= 2, action: () => handleMatchSize?.('height') },
-            { id: 'node.matchSize', label: '统一大小 (Match Size)', category: 'Nodes', keywords: ['match', 'size', 'both', '统一', '大小'], icon: <FaProjectDiagram />, enabled: (selectedNodes?.length ?? 0) >= 2, action: () => handleMatchSize?.('both') },
+            { id: 'node.matchWidth', label: '统一宽度 (Match Width)', category: 'Nodes', keywords: ['match', 'width', 'size', '统一', '宽度'], icon: <FaProjectDiagram />, enabled: !hasLockedSelection && (selectedNodes?.length ?? 0) >= 2, action: () => handleMatchSize?.('width') },
+            { id: 'node.matchHeight', label: '统一高度 (Match Height)', category: 'Nodes', keywords: ['match', 'height', 'size', '统一', '高度'], icon: <FaProjectDiagram />, enabled: !hasLockedSelection && (selectedNodes?.length ?? 0) >= 2, action: () => handleMatchSize?.('height') },
+            { id: 'node.matchSize', label: '统一大小 (Match Size)', category: 'Nodes', keywords: ['match', 'size', 'both', '统一', '大小'], icon: <FaProjectDiagram />, enabled: !hasLockedSelection && (selectedNodes?.length ?? 0) >= 2, action: () => handleMatchSize?.('both') },
 
             // --- 连线操作 ---
             { id: 'edge.reverse', label: '反转连线方向 (Reverse Edge)', category: 'Edges', keywords: ['reverse', 'edge', 'direction', '反转', '连线'], icon: <FaCopy />, enabled: (selectedEdges?.length ?? 0) === 1, action: () => handleReverseEdge?.(selectedEdges?.[0]?.id) },
 
             // --- 格式刷 (Style Painter) ---
             { id: 'style.copy', label: '复制样式 (Copy Style) - Ctrl+Alt+C', category: 'Nodes', keywords: ['copy', 'style', 'format', 'painter', '格式刷', '样式'], icon: <FaCopy />, enabled: (selectedNodes?.length ?? 0) === 1, action: () => selectedNodes?.[0] && copyStyle?.(selectedNodes[0]) },
-            { id: 'style.paste', label: '粘贴样式 (Paste Style) - Ctrl+Alt+V', category: 'Nodes', keywords: ['paste', 'style', 'format', 'painter', '格式刷', '样式'], icon: <FaCopy />, enabled: !!hasCopiedStyle && (selectedNodes?.length ?? 0) > 0, action: () => pasteStyle?.(selectedNodes?.map(n => n.id) ?? []) },
+            { id: 'style.paste', label: '粘贴样式 (Paste Style) - Ctrl+Alt+V', category: 'Nodes', keywords: ['paste', 'style', 'format', 'painter', '格式刷', '样式'], icon: <FaCopy />, enabled: !hasLockedSelection && !!hasCopiedStyle && (selectedNodes?.length ?? 0) > 0, action: () => pasteStyle?.(selectedNodes?.map(n => n.id) ?? []) },
             { id: 'style.saveTemplate', label: '保存为模板 (Save as Template) - Ctrl+Alt+S', category: 'Nodes', keywords: ['save', 'template', 'style', '模板', '保存'], icon: <FaSave />, enabled: (selectedNodes?.length ?? 0) === 1, action: () => { const n = selectedNodes?.[0]; if (n) saveAsTemplate?.(n, typeof n.data?.label === 'string' ? n.data.label : '未命名'); } },
 
             // --- 折叠/展开 组容器 ---
@@ -180,7 +182,7 @@ export function useDesignerCommands(props: UseDesignerCommandsProps) {
                 keywords: ['collapse', 'expand', 'group', '折叠', '展开', '容器'], 
                 icon: <FaProjectDiagram />,
                 shortcut: 'Alt + [',
-                enabled: (selectedNodes?.length ?? 0) > 0 && selectedNodes?.some(
+                enabled: !hasLockedSelection && (selectedNodes?.length ?? 0) > 0 && selectedNodes?.some(
                     n => ['titleGroup', 'subGroup', 'swimlane', 'group'].includes(n.type || '')
                 ),
                 action: () => {
@@ -219,6 +221,7 @@ export function useDesignerCommands(props: UseDesignerCommandsProps) {
         handleStrategyLayout,
         handleUngroupWithToast,
         hasCopiedStyle,
+        hasLockedSelection,
         isCommentMode,
         isMac,
         mod,

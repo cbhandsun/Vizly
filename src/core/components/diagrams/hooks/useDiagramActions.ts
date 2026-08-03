@@ -3,6 +3,7 @@ import { Node, Edge, ReactFlowInstance } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import { PluginContext, DiagramTypePlugin } from '../../../types/plugin';
 import { useDiagramStore } from '../../../store/useDiagramStore';
+import { hasMutationLockedNode, isNodeMutationLocked, resolveTargetNodes } from '../nodeLockPolicy';
 
 type AlignmentType = 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom';
 type DistributionType = 'horizontal' | 'vertical';
@@ -121,6 +122,9 @@ export const useDiagramActions = ({
                 mindMapNodes.forEach(rn => getDescendants(rn.id));
             }
 
+            // Cascading operations are all-or-nothing: a protected descendant also blocks deletion.
+            if (hasMutationLockedNode(resolveTargetNodes(currentNodes, nodeIdsToDelete))) return;
+
             // 拦截器：允许插件否决删除操作
             if (activePlugin && pluginCtx) {
                 if (nodeIdsToDelete.size > 0 && activePlugin.onBeforeNodesDelete) {
@@ -157,6 +161,7 @@ export const useDiagramActions = ({
             : selectedNodes;
 
         if (nodesToDuplicate.length === 0) return;
+        if (hasMutationLockedNode(nodesToDuplicate)) return;
 
         takeSnapshot(currentNodes, currentEdges);
 
@@ -180,23 +185,29 @@ export const useDiagramActions = ({
 
     const handleBringToFront = useCallback((targetId?: string) => {
         if (!targetId) return;
-        takeSnapshot(nodes, edges);
+        const currentNodes = nodesRef?.current ?? nodes;
+        const currentEdges = edgesRef?.current ?? edges;
+        if (currentNodes.some(node => node.id === targetId && isNodeMutationLocked(node))) return;
+        takeSnapshot(currentNodes, currentEdges);
         setNodes(nds => {
             const node = nds.find(n => n.id === targetId);
             if (!node) return nds;
             return [...nds.filter(n => n.id !== targetId), node];
         });
-    }, [nodes, edges, setNodes, takeSnapshot]);
+    }, [nodes, edges, nodesRef, edgesRef, setNodes, takeSnapshot]);
 
     const handleSendToBack = useCallback((targetId?: string) => {
         if (!targetId) return;
-        takeSnapshot(nodes, edges);
+        const currentNodes = nodesRef?.current ?? nodes;
+        const currentEdges = edgesRef?.current ?? edges;
+        if (currentNodes.some(node => node.id === targetId && isNodeMutationLocked(node))) return;
+        takeSnapshot(currentNodes, currentEdges);
         setNodes(nds => {
             const node = nds.find(n => n.id === targetId);
             if (!node) return nds;
             return [node, ...nds.filter(n => n.id !== targetId)];
         });
-    }, [nodes, edges, setNodes, takeSnapshot]);
+    }, [nodes, edges, nodesRef, edgesRef, setNodes, takeSnapshot]);
 
     const handleLock = useCallback((target?: DiagramActionTarget, locked: boolean = true) => {
         const targetIds = target ? toTargetIds(target) : new Set(selectedNodes.map(node => node.id));
@@ -298,6 +309,7 @@ export const useDiagramActions = ({
     // 对齐选中节点
     const handleAlign = useCallback((type: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom') => {
         if (selectedNodes.length < 2) return;
+        if (hasMutationLockedNode(selectedNodes)) return;
         takeSnapshot(nodes, edges);
 
         let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
@@ -333,6 +345,7 @@ export const useDiagramActions = ({
     // 均匀分布选中节点
     const handleDistribute = useCallback((type: 'horizontal' | 'vertical') => {
         if (selectedNodes.length < 3) return;
+        if (hasMutationLockedNode(selectedNodes)) return;
         takeSnapshot(nodes, edges);
 
         const sorted = [...selectedNodes].sort((a, b) =>
@@ -379,6 +392,7 @@ export const useDiagramActions = ({
     // 统一选中节点尺寸（参照第一个选中节点）
     const handleMatchSize = useCallback((mode: 'width' | 'height' | 'both') => {
         if (selectedNodes.length < 2) return;
+        if (hasMutationLockedNode(selectedNodes)) return;
         const ref = selectedNodes[0];
         const refW = ref.measured?.width || ref.width || 150;
         const refH = ref.measured?.height || ref.height || 40;

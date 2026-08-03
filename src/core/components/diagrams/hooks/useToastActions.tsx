@@ -5,6 +5,7 @@ import type { Node, Edge } from '@xyflow/react';
 import type { MessageInstance } from 'antd/es/message/interface';
 import type { NotificationInstance } from 'antd/es/notification/interface';
 import type { DiagramActionTarget } from './useDiagramActions';
+import { hasMutationLockedNode } from '../nodeLockPolicy';
 
 /**
  * 🚀 P2 性能优化：从 FlowchartDesigner 提取的 Toast 包装层
@@ -101,8 +102,12 @@ export function useToastActions({
             messageApi.info(t('designer.flowchart.toast.nothingToCut'));
             return;
         }
+        if (hasMutationLockedNode(selectedNodes)) {
+            messageApi.warning(t('designer.flowchart.toast.lockedSelection', '节点已锁定，请先解锁后再操作'));
+            return;
+        }
         handleCut();
-    }, [handleCut, messageApi, selectedNodes.length, t]);
+    }, [handleCut, messageApi, selectedNodes, t]);
 
     // --- Delete / Duplicate ---
     const getDeleteCounts = useCallback((target?: DiagramActionTarget) => {
@@ -131,8 +136,21 @@ export function useToastActions({
     const handleDeleteWithToast = useCallback((target?: DiagramActionTarget) => {
         const counts = getDeleteCounts(target);
         if (counts.nodes + counts.edges === 0) return;
+        const targetIds = target
+            ? new Set(typeof target === 'string' ? [target] : target)
+            : null;
+        const targetNodes = targetIds
+            ? nodesRef.current.filter(node => targetIds.has(node.id))
+            : selectedNodes;
+        const deletionNodes = typeof target === 'string' && selectedNodes.some(node => node.id === target)
+            ? selectedNodes
+            : targetNodes;
+        if (hasMutationLockedNode(deletionNodes)) {
+            messageApi.warning(t('designer.flowchart.toast.lockedSelection', '节点已锁定，请先解锁后再操作'));
+            return;
+        }
         handleDelete(target);
-    }, [getDeleteCounts, handleDelete]);
+    }, [getDeleteCounts, handleDelete, messageApi, nodesRef, selectedNodes, t]);
 
     const handleDuplicateWithToast = useCallback((target?: DiagramActionTarget) => {
         const count = Array.isArray(target)
@@ -144,8 +162,18 @@ export function useToastActions({
             messageApi.info(t('designer.flowchart.toast.nothingToDuplicate'));
             return;
         }
+        const targetIds = target
+            ? new Set(typeof target === 'string' ? [target] : target)
+            : null;
+        const targetNodes = targetIds
+            ? nodesRef.current.filter(node => targetIds.has(node.id))
+            : selectedNodes;
+        if (hasMutationLockedNode(targetNodes)) {
+            messageApi.warning(t('designer.flowchart.toast.lockedSelection', '节点已锁定，请先解锁后再操作'));
+            return;
+        }
         handleDuplicate(target);
-    }, [handleDuplicate, messageApi, selectedNodes, t]);
+    }, [handleDuplicate, messageApi, nodesRef, selectedNodes, t]);
 
     // --- Group / Ungroup ---
     const handleGroupWithToast = useCallback(() => {

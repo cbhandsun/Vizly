@@ -18,6 +18,7 @@ import {
     shouldExpandDesignerRightSidebar,
     shouldFreezeDesignerRightSidebarDuringDrag,
 } from './designerRightSidebarState';
+import { hasMutationLockedNode } from './nodeLockPolicy';
 
 const PropertyPanel = React.lazy(() => import('./PropertyPanel'));
 const COMMERCIAL_TOUCH_TARGET = 'var(--commercial-touch-target, 44px)';
@@ -80,6 +81,7 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
     const { t } = useTranslation();
     const { token } = theme.useToken();
     const hasSelection = selectedNodes.length > 0 || selectedEdges.length > 0;
+    const hasLockedSelection = hasMutationLockedNode(selectedNodes);
     const previousAiChatVisibleRef = React.useRef(aiChatVisible);
     const previousHasSelectionRef = React.useRef(false);
 
@@ -440,7 +442,8 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
                                                 onUpdateNodes={(ids, data) => updateNodesBatch(ids, data, { snapshot: false })}
                                                 onUpdateEdges={updateEdgesBatch}
                                                 onBeforeUpdate={onBeforeUpdate}
-                                                disabled={isDraggingNode}
+                                                disabled={isDraggingNode || hasLockedSelection}
+                                                disabledReason={hasLockedSelection ? '节点已锁定，请先解锁后再编辑' : undefined}
                                                 docked={true}
                                             />
                                         </React.Suspense>

@@ -28,6 +28,7 @@ interface PropertyPanelProps {
     onUpdateEdges: (ids: string[], data: EdgeDataUpdate) => void;
     onBeforeUpdate?: () => void;
     disabled?: boolean;
+    disabledReason?: string;
     docked?: boolean;
 }
 
@@ -57,7 +58,7 @@ function useDebouncedCallback<TArgs extends unknown[]>(
 
 const PropertyPanel: React.FC<PropertyPanelProps> = ({
     selectedNodes, selectedEdges, onUpdateNodes, onUpdateEdges,
-    onBeforeUpdate, disabled = false, docked = false
+    onBeforeUpdate, disabled = false, disabledReason, docked = false
 }) => {
     const { t } = useTranslation();
     const [collapsed, setCollapsed] = useState(false);
@@ -240,12 +241,18 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
                     <RightOutlined />
                 </div>
             )}
-            <div className="property-panel-wrapper">
+            <div className="property-panel-wrapper" aria-disabled={disabled}>
                 {!docked && (
                     <div className="property-panel-header">
                         <SettingOutlined />
                         <Text strong>{title}</Text>
-                        {disabled && <Text type="secondary" style={{ fontSize: 11, marginLeft: 'auto' }}>拖动中...</Text>}
+                        {disabled && <Text type="secondary" style={{ fontSize: 11, marginLeft: 'auto' }}>{disabledReason || '拖动中...'}</Text>}
+                    </div>
+                )}
+
+                {docked && disabledReason && (
+                    <div role="status" style={{ padding: '10px 16px 0' }}>
+                        <Text type="secondary" style={{ fontSize: 12 }}>{disabledReason}</Text>
                     </div>
                 )}
 

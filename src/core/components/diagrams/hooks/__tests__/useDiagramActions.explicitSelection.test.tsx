@@ -26,6 +26,65 @@ const node = (id: string, selected = false): Node => ({
 });
 
 describe('useDiagramActions explicit selection targets', () => {
+    it.each(['delete', 'duplicate'] as const)('blocks %s when an explicit target is locked', async actionName => {
+        const lockedNode = { ...node('node-1', true), draggable: false, data: { label: 'node-1', locked: true } };
+        const setNodes = vi.fn();
+        const setEdges = vi.fn();
+        const takeSnapshot = vi.fn();
+
+        const { result } = renderHook(() => useDiagramActions({
+            nodes: [],
+            edges: [],
+            nodesRef: { current: [lockedNode] },
+            edgesRef: { current: [] },
+            setNodes,
+            setEdges,
+            selectedNodes: [lockedNode],
+            selectedEdges: [],
+            takeSnapshot,
+            reactFlowInstance: null,
+        }));
+
+        if (actionName === 'delete') {
+            await act(async () => result.current.handleDelete(['node-1']));
+        } else {
+            act(() => result.current.handleDuplicate(['node-1']));
+        }
+
+        expect(takeSnapshot).not.toHaveBeenCalled();
+        expect(setNodes).not.toHaveBeenCalled();
+        expect(setEdges).not.toHaveBeenCalled();
+    });
+
+    it('blocks cascading deletion when a protected descendant would be removed', async () => {
+        const root = { ...node('root', true), type: 'mindmap' };
+        const lockedChild = { ...node('child'), draggable: false, data: { label: 'child', locked: true } };
+        const initialNodes = [root, lockedChild];
+        const initialEdges: Edge[] = [{ id: 'parent-child', source: 'root', target: 'child' }];
+        const setNodes = vi.fn();
+        const setEdges = vi.fn();
+        const takeSnapshot = vi.fn();
+
+        const { result } = renderHook(() => useDiagramActions({
+            nodes: [],
+            edges: [],
+            nodesRef: { current: initialNodes },
+            edgesRef: { current: initialEdges },
+            setNodes,
+            setEdges,
+            selectedNodes: [root],
+            selectedEdges: [],
+            takeSnapshot,
+            reactFlowInstance: null,
+        }));
+
+        await act(async () => result.current.handleDelete(['root']));
+
+        expect(takeSnapshot).not.toHaveBeenCalled();
+        expect(setNodes).not.toHaveBeenCalled();
+        expect(setEdges).not.toHaveBeenCalled();
+    });
+
     it('duplicates toolbar targets even when the legacy selection snapshot is empty', () => {
         const initialNodes = [node('node-1', true), node('node-2')];
         let currentNodes = initialNodes;

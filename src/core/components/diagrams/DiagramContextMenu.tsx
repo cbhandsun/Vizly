@@ -51,6 +51,7 @@ export interface ContextMenuProps {
 }
 
 import './DiagramContextMenu.css';
+import { hasMutationLockedNode, isNodeMutationLocked } from './nodeLockPolicy';
 
 export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
   top,
@@ -65,6 +66,14 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
   extraItems,
 }) => {
   const menuRootRef = useRef<HTMLDivElement>(null);
+  const allNodes = nodes || selectedNodes;
+  const targetNode = targetId ? allNodes.find(node => node.id === targetId) : undefined;
+  const nodeActionTargets = type === 'edge' || type === 'pane'
+    ? []
+    : targetNode
+      ? (selectedNodes.some(node => node.id === targetNode.id) ? selectedNodes : [targetNode])
+      : selectedNodes;
+  const hasLockedActionTarget = hasMutationLockedNode(nodeActionTargets);
 
   useEffect(() => {
     const previouslyFocused = document.activeElement instanceof HTMLElement
@@ -100,13 +109,13 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
           key: 'cut',
           icon: <ScissorOutlined />,
           label: '剪切 (Cut)',
-          disabled: type === 'edge'
+          disabled: type === 'edge' || hasLockedActionTarget
         },
         {
           key: 'copy',
           icon: <CopyOutlined />,
           label: '复制 (Copy)',
-          disabled: type === 'edge'
+          disabled: type === 'edge' || hasLockedActionTarget
         },
         {
           key: 'paste',
@@ -124,7 +133,8 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
           key: 'delete',
           icon: <DeleteOutlined />,
           label: '删除 (Delete)',
-          danger: true
+          danger: true,
+          disabled: hasLockedActionTarget,
         }
       );
 
@@ -132,9 +142,7 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
 
       // Lock/Unlock - dynamic based on target node state
       if (type === 'node' || type === 'multi-node') {
-        const allNodes = nodes || selectedNodes;
-        const targetNode = allNodes.find(n => n.id === targetId);
-        const isLocked = targetNode?.data?.locked === true;
+        const isLocked = targetNode ? isNodeMutationLocked(targetNode) : false;
         items.push({
           key: isLocked ? 'unlock' : 'lock',
           icon: isLocked ? <UnlockOutlined /> : <LockOutlined />,
@@ -149,11 +157,13 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
             key: 'autoLayoutContainer',
             icon: <AppstoreOutlined />,
             label: '自动布局子节点 (Auto Layout)',
+            disabled: isLocked,
           });
           items.push({
             key: 'toggleCollapse',
             icon: isCollapsed ? <ExpandOutlined /> : <GroupOutlined />,
             label: isCollapsed ? '展开组 (Expand Group)' : '折叠组 (Collapse Group)',
+            disabled: isLocked,
           });
         }
       }
@@ -200,12 +210,14 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
         {
           key: 'bringToFront',
           icon: <VerticalAlignTopOutlined />,
-          label: '置于顶层 (Bring to Front)'
+          label: '置于顶层 (Bring to Front)',
+          disabled: hasLockedActionTarget,
         },
         {
           key: 'sendToBack',
           icon: <VerticalAlignBottomOutlined />,
-          label: '置于底层 (Send to Back)'
+          label: '置于底层 (Send to Back)',
+          disabled: hasLockedActionTarget,
         }
       );
     }
@@ -218,6 +230,7 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
         key: 'align-submenu',
         icon: <MdAlignHorizontalCenter />,
         label: '对齐 (Align)',
+        disabled: hasLockedActionTarget,
         children: [
           { key: 'align:left', icon: <MdAlignHorizontalLeft />, label: '左对齐' },
           { key: 'align:center', icon: <MdAlignHorizontalCenter />, label: '水平居中' },
@@ -239,6 +252,7 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
         key: 'match-submenu',
         icon: <FaRulerCombined />,
         label: '统一尺寸 (Match Size)',
+        disabled: hasLockedActionTarget,
         children: [
           { key: 'matchWidth', icon: <ColumnWidthOutlined />, label: '统一宽度' },
           { key: 'matchHeight', icon: <ColumnHeightOutlined />, label: '统一高度' },
@@ -250,7 +264,8 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
       items.push({
         key: 'group',
         icon: <GroupOutlined />,
-        label: '成组 (Group)'
+        label: '成组 (Group)',
+        disabled: hasLockedActionTarget,
       });
     }
 

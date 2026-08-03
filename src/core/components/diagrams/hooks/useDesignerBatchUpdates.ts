@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { Node, Edge, MarkerType, EdgeMarkerType } from '@xyflow/react';
 import { NodeDataUpdate, EdgeDataUpdate } from '../../../types/diagram-updates';
+import { hasMutationLockedNode, resolveTargetNodes } from '../nodeLockPolicy';
 
 interface UseDesignerBatchUpdatesOptions {
     nodes: Node[];
@@ -104,8 +105,13 @@ export function useDesignerBatchUpdates({
     }, [setNodes, setSelectedNodes]);
 
     const updateNodesBatch = useCallback((ids: string[], partialData: NodeDataUpdate, options?: { snapshot?: boolean }) => {
+        const currentNodes = nodesRefForUpdate.current;
+        const targetIds = new Set(ids);
+        const targetNodes = resolveTargetNodes(currentNodes, targetIds);
+        if (targetNodes.length === 0 || hasMutationLockedNode(targetNodes)) return;
+
         if (options?.snapshot !== false) {
-            takeSnapshot(nodesRefForUpdate.current, edgesRefForUpdate.current); // ✅ 使用 ref
+            takeSnapshot(currentNodes, edgesRefForUpdate.current); // ✅ 使用 ref
         }
         updateNodesBatchCore(ids, partialData);
     }, [takeSnapshot, updateNodesBatchCore]); // ✅ 移除 nodes 和 edges 依赖

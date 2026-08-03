@@ -141,4 +141,37 @@ describe('useClipboard', () => {
     expect(writeText).not.toHaveBeenCalled();
     expect(localStorage.getItem('flowchart-clipboard')).toBeNull();
   });
+
+  it('does not cut a locked node or write it to either clipboard channel', () => {
+    const lockedNodes: Node[] = [{
+      ...selectedNodes[0],
+      draggable: false,
+      data: { ...selectedNodes[0].data, locked: true },
+    }];
+    const setNodes = vi.fn();
+    const setEdges = vi.fn();
+    const takeSnapshot = vi.fn();
+    const writeText = vi.fn();
+    Object.assign(navigator, { clipboard: { writeText, readText: vi.fn() } });
+
+    const { result } = renderHook(() =>
+      useClipboard({
+        nodesRef: { current: lockedNodes },
+        edgesRef: { current: [] },
+        selectedNodes: lockedNodes,
+        selectedEdges: [],
+        setNodes,
+        setEdges,
+        takeSnapshot,
+      })
+    );
+
+    act(() => result.current.handleCut());
+
+    expect(takeSnapshot).not.toHaveBeenCalled();
+    expect(setNodes).not.toHaveBeenCalled();
+    expect(setEdges).not.toHaveBeenCalled();
+    expect(writeText).not.toHaveBeenCalled();
+    expect(localStorage.getItem('flowchart-clipboard')).toBeNull();
+  });
 });

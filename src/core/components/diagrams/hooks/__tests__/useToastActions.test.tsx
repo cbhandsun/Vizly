@@ -13,13 +13,15 @@ vi.mock('react-i18next', () => ({
 
 const createProps = (handlePaste: () => Promise<boolean>) => {
   const info = vi.fn();
+  const warning = vi.fn();
   const nodesRef = { current: [] as Node[] };
   const edgesRef = { current: [] as Edge[] };
 
   return {
     info,
+    warning,
     props: {
-      messageApi: { info } as unknown as MessageInstance,
+      messageApi: { info, warning } as unknown as MessageInstance,
       notificationApi: {} as NotificationInstance,
       handleDelete: vi.fn(),
       handleDuplicate: vi.fn(),
@@ -39,6 +41,31 @@ const createProps = (handlePaste: () => Promise<boolean>) => {
 };
 
 describe('useToastActions clipboard feedback', () => {
+  it('explains why locked destructive actions are blocked', () => {
+    const { props, warning } = createProps(vi.fn().mockResolvedValue(false));
+    const lockedNode: Node = {
+      id: 'locked',
+      position: { x: 0, y: 0 },
+      data: { locked: true },
+      draggable: false,
+    };
+    props.selectedNodes = [lockedNode];
+    props.nodesRef.current = [lockedNode];
+
+    const { result } = renderHook(() => useToastActions(props));
+
+    act(() => {
+      result.current.handleCutWithToast();
+      result.current.handleDeleteWithToast();
+      result.current.handleDuplicateWithToast();
+    });
+
+    expect(warning).toHaveBeenCalledTimes(3);
+    expect(props.handleCut).not.toHaveBeenCalled();
+    expect(props.handleDelete).not.toHaveBeenCalled();
+    expect(props.handleDuplicate).not.toHaveBeenCalled();
+  });
+
   it('delegates paste to the clipboard boundary even when local storage is empty', async () => {
     const handlePaste = vi.fn().mockResolvedValue(true);
     const { info, props } = createProps(handlePaste);

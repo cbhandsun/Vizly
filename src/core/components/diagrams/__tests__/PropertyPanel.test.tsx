@@ -42,6 +42,24 @@ const createNode = (label: string): Node => ({
 });
 
 describe('PropertyPanel field synchronization', () => {
+    it('communicates and enforces a locked read-only state', () => {
+        const { container, getByRole } = render(
+            <PropertyPanel
+                selectedNodes={[createNode('Locked')]}
+                selectedEdges={[]}
+                onUpdateNodes={vi.fn()}
+                onUpdateEdges={vi.fn()}
+                disabled
+                disabledReason="节点已锁定，请先解锁后再编辑"
+                docked
+            />,
+        );
+
+        expect(getByRole('status').textContent).toContain('节点已锁定');
+        expect(container.querySelector('.property-panel-wrapper')?.getAttribute('aria-disabled')).toBe('true');
+        expect(container.querySelector<HTMLElement>('.property-panel-content')?.style.pointerEvents).toBe('none');
+    });
+
     it('hydrates fields from the initial selected node', () => {
         const { container } = render(
             <PropertyPanel
