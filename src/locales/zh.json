@@ -605,6 +605,7 @@
         "pages": {
             "tabList": "页面",
             "new": "新建页面",
+            "limitReached": "最多可创建 {{count}} 个页面",
             "rename": "重命名页面 {{name}}",
             "renameAction": "重命名页面 {{name}}",
             "delete": "删除页面 {{name}}",

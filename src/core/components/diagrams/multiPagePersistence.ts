@@ -5,9 +5,9 @@ import { coerceClipboardData } from '../../utils/flowchartClipboard';
 import type { DiagramPage } from './hooks/useMultiPage';
 
 const MULTI_PAGE_VERSION = 1;
-const MAX_PAGES = 50;
+export const MAX_DIAGRAM_PAGES = 50;
 const MAX_PAGE_ID_LENGTH = 120;
-const MAX_PAGE_NAME_LENGTH = 80;
+export const MAX_DIAGRAM_PAGE_NAME_LENGTH = 80;
 
 export interface PersistedMultiPageState {
     version: typeof MULTI_PAGE_VERSION;
@@ -28,7 +28,7 @@ const coerceBoundedText = (value: unknown, maxLength: number): string | null => 
 const coercePage = (value: unknown): DiagramPage | null => {
     if (!isRecord(value)) return null;
     const id = coerceBoundedText(value.id, MAX_PAGE_ID_LENGTH);
-    const name = coerceBoundedText(value.name, MAX_PAGE_NAME_LENGTH);
+    const name = coerceBoundedText(value.name, MAX_DIAGRAM_PAGE_NAME_LENGTH);
     if (!id || !name || !Array.isArray(value.nodes) || !Array.isArray(value.edges)) return null;
 
     if (value.nodes.length === 0) {
@@ -43,7 +43,7 @@ export const parseMultiPageMetadata = (metadata: unknown): PersistedMultiPageSta
     if (!isRecord(metadata) || !isRecord(metadata.multiPage)) return null;
     const candidate = metadata.multiPage;
     if (candidate.version !== MULTI_PAGE_VERSION || !Array.isArray(candidate.pages)) return null;
-    if (candidate.pages.length === 0 || candidate.pages.length > MAX_PAGES) return null;
+    if (candidate.pages.length === 0 || candidate.pages.length > MAX_DIAGRAM_PAGES) return null;
 
     const pages: DiagramPage[] = [];
     const pageIds = new Set<string>();

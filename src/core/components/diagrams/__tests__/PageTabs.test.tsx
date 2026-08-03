@@ -11,6 +11,7 @@ vi.mock('react-i18next', () => ({
             const translations: Record<string, string> = {
                 'designer.pages.tabList': '页面',
                 'designer.pages.new': '新建页面',
+                'designer.pages.limitReached': '最多可创建 {{count}} 个页面',
                 'designer.pages.rename': '重命名页面 {{name}}',
                 'designer.pages.renameAction': '重命名页面 {{name}}',
                 'designer.pages.delete': '删除页面 {{name}}',
@@ -19,7 +20,9 @@ vi.mock('react-i18next', () => ({
                 'common.cancel': '取消',
             };
             const template = translations[key] ?? key;
-            return template.replace('{{name}}', String(options?.name ?? ''));
+            return template
+                .replace('{{name}}', String(options?.name ?? ''))
+                .replace('{{count}}', String(options?.count ?? ''));
         },
     }),
 }));
@@ -106,6 +109,54 @@ describe('PageTabs', () => {
 
         fireEvent.click(screen.getByRole('button', { name: '重命名页面 页面 1' }));
         expect(screen.getByRole('textbox', { name: '重命名页面 页面 1' })).toBeTruthy();
+    });
+
+    it('cancels inline rename with Escape and restores tab focus', async () => {
+        const onRenamePage = vi.fn();
+        render(
+            <PageTabs
+                pages={[{ id: 'page-1', name: '页面 1', nodes: [], edges: [] }]}
+                activePageId="page-1"
+                onSwitchPage={vi.fn()}
+                onAddPage={vi.fn()}
+                onDeletePage={vi.fn()}
+                onRenamePage={onRenamePage}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: '重命名页面 页面 1' }));
+        const input = screen.getByRole('textbox', { name: '重命名页面 页面 1' });
+        fireEvent.change(input, { target: { value: '不会保存' } });
+        fireEvent.keyDown(input, { key: 'Escape' });
+
+        const tab = screen.getByRole('tab', { name: '页面 1' });
+        await waitFor(() => expect(document.activeElement).toBe(tab));
+        expect(onRenamePage).not.toHaveBeenCalled();
+    });
+
+    it('disables page creation at the 50-page limit', () => {
+        const onAddPage = vi.fn();
+        const pages = Array.from({ length: 50 }, (_, index) => ({
+            id: `page-${index + 1}`,
+            name: `页面 ${index + 1}`,
+            nodes: [],
+            edges: [],
+        }));
+        render(
+            <PageTabs
+                pages={pages}
+                activePageId="page-1"
+                onSwitchPage={vi.fn()}
+                onAddPage={onAddPage}
+                onDeletePage={vi.fn()}
+                onRenamePage={vi.fn()}
+            />,
+        );
+
+        const add = screen.getByRole('button', { name: '新建页面' });
+        expect(add.hasAttribute('disabled')).toBe(true);
+        fireEvent.click(add);
+        expect(onAddPage).not.toHaveBeenCalled();
     });
 
     it('keeps the inactive page unchanged when deletion is cancelled', async () => {

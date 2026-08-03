@@ -594,6 +594,7 @@
         "pages": {
             "tabList": "Pages",
             "new": "New page",
+            "limitReached": "You can create up to {{count}} pages",
             "rename": "Rename page {{name}}",
             "renameAction": "Rename page {{name}}",
             "delete": "Delete page {{name}}",

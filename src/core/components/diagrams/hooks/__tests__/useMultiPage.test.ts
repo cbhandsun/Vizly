@@ -29,10 +29,11 @@ describe('useMultiPage', () => {
 
     expect(switchScope).toHaveBeenCalledWith('page-1');
 
-    let newPageId = '';
+    let newPageId: string | null = null;
     act(() => {
       newPageId = result.current.addPage();
     });
+    if (!newPageId) throw new Error('Expected a page to be created');
 
     expect(switchScope).toHaveBeenCalledWith(newPageId);
     expect(setNodes).toHaveBeenLastCalledWith([]);
@@ -60,16 +61,18 @@ describe('useMultiPage', () => {
       { switchScope, removeScope },
     ));
 
-    let newPageId = '';
+    let newPageId: string | null = null;
     act(() => {
       newPageId = result.current.addPage();
     });
+    if (!newPageId) throw new Error('Expected a page to be created');
+    const createdPageId = newPageId;
     switchScope.mockClear();
     setNodes.mockClear();
 
-    act(() => result.current.deletePage(newPageId));
+    act(() => result.current.deletePage(createdPageId));
 
-    expect(removeScope).toHaveBeenCalledWith(newPageId);
+    expect(removeScope).toHaveBeenCalledWith(createdPageId);
     expect(switchScope).toHaveBeenCalledWith('page-1');
     expect(result.current.activePageId).toBe('page-1');
     expect(setNodes).toHaveBeenCalledWith([]);
@@ -127,5 +130,55 @@ describe('useMultiPage', () => {
 
     expect(result.current.activePageId).toBe('page-1');
     expect(result.current.pages[0]?.name).toHaveLength(80);
+  });
+
+  it('keeps generated page names unique after deletion', () => {
+    const { result } = renderHook(() => useMultiPage(
+      () => [],
+      () => [],
+      vi.fn(),
+      vi.fn(),
+    ));
+
+    act(() => {
+      result.current.addPage();
+      result.current.deletePage('page-1');
+      result.current.addPage();
+    });
+
+    expect(result.current.pages.map(page => page.name)).toEqual(['页面 2', '页面 1']);
+    expect(new Set(result.current.pages.map(page => page.id)).size).toBe(2);
+  });
+
+  it('refuses to create pages beyond the persisted 50-page boundary', () => {
+    const getCurrentNodes = vi.fn(() => []);
+    const { result } = renderHook(() => useMultiPage(
+      getCurrentNodes,
+      () => [],
+      vi.fn(),
+      vi.fn(),
+    ));
+    const pages = Array.from({ length: 50 }, (_, index) => ({
+      id: `page-${index + 1}`,
+      name: `页面 ${index + 1}`,
+      nodes: [],
+      edges: [],
+    }));
+
+    act(() => {
+      result.current.restorePersistedMetadata({
+        multiPage: { version: 1, activePageId: 'page-50', pages },
+      });
+    });
+    getCurrentNodes.mockClear();
+
+    let createdPageId: string | null = 'unexpected';
+    act(() => {
+      createdPageId = result.current.addPage();
+    });
+
+    expect(createdPageId).toBeNull();
+    expect(result.current.pages).toHaveLength(50);
+    expect(getCurrentNodes).not.toHaveBeenCalled();
   });
 });

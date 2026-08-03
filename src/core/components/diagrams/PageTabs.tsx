@@ -5,6 +5,7 @@ import type { InputRef } from 'antd';
 import { useTranslation } from 'react-i18next';
 
 import type { DiagramPage } from './hooks/useMultiPage';
+import { MAX_DIAGRAM_PAGES } from './multiPagePersistence';
 import { resolvePageTabTargetIndex } from './pageTabKeyboard';
 import './PageTabs.css';
 
@@ -29,6 +30,7 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
     const [confirmingPageId, setConfirmingPageId] = useState<string | null>(null);
     const inputRef = useRef<InputRef>(null);
     const tabButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+    const pageLimitReached = pages.length >= MAX_DIAGRAM_PAGES;
 
     const handleStartRename = useCallback((page: DiagramPage) => {
         setConfirmingPageId(null);
@@ -43,6 +45,15 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
         }
         setEditingId(null);
     }, [editingId, editName, onRenamePage]);
+
+    const handleRenameKeyDown = useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
+        if (event.key !== 'Escape' || !editingId) return;
+        event.preventDefault();
+        const cancelledPageId = editingId;
+        setEditingId(null);
+        setEditName('');
+        requestAnimationFrame(() => tabButtonRefs.current.get(cancelledPageId)?.focus());
+    }, [editingId]);
 
     const handleTabKeyDown = useCallback((
         event: React.KeyboardEvent<HTMLButtonElement>,
@@ -97,6 +108,7 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                                 onChange={event => setEditName(event.target.value)}
                                 onBlur={handleFinishRename}
                                 onPressEnter={handleFinishRename}
+                                onKeyDown={handleRenameKeyDown}
                                 className="page-tabs__rename"
                             />
                         ) : (
@@ -162,13 +174,16 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                 );
             })}
 
-            <Tooltip title={t('designer.pages.new', { defaultValue: '新建页面' })}>
+            <Tooltip title={pageLimitReached
+                ? t('designer.pages.limitReached', { count: MAX_DIAGRAM_PAGES, defaultValue: '最多可创建 {{count}} 个页面' })
+                : t('designer.pages.new', { defaultValue: '新建页面' })}
+            >
                 <button
                     type="button"
                     aria-label={t('designer.pages.new', { defaultValue: '新建页面' })}
                     onClick={onAddPage}
                     className="page-tabs__add"
-                    disabled={disabled}
+                    disabled={disabled || pageLimitReached}
                 >
                     <PlusOutlined aria-hidden style={{ fontSize: 14 }} />
                 </button>

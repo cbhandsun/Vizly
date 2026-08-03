@@ -2,8 +2,11 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { Node, Edge } from '@xyflow/react';
 import {
     createMultiPageMetadata,
+    MAX_DIAGRAM_PAGE_NAME_LENGTH,
+    MAX_DIAGRAM_PAGES,
     parseMultiPageMetadata,
 } from '../multiPagePersistence';
+import { createNextPageName } from '../multiPageNaming';
 
 export interface DiagramPage {
     id: string;
@@ -91,12 +94,14 @@ export const useMultiPage = (
 
     // 添加页面
     const addPage = useCallback(() => {
+        if (pagesRef.current.length >= MAX_DIAGRAM_PAGES) return null;
+
         // 先保存当前页面
         const currentNodes = getCurrentNodes();
         const currentEdges = getCurrentEdges();
 
-        const newId = `page-${Date.now()}`;
-        const newName = `页面 ${pagesRef.current.length + 1}`;
+        const newId = `page-${crypto.randomUUID()}`;
+        const newName = createNextPageName(pagesRef.current);
         const newPage = createPage(newId, newName);
 
         setPages(prev => {
@@ -142,7 +147,7 @@ export const useMultiPage = (
 
     // 重命名页面
     const renamePage = useCallback((pageId: string, newName: string) => {
-        const normalizedName = newName.trim().slice(0, 80);
+        const normalizedName = newName.trim().slice(0, MAX_DIAGRAM_PAGE_NAME_LENGTH);
         if (!normalizedName) return;
         setPages(prev => {
             const nextPages = prev.map(p =>
