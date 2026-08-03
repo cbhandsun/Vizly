@@ -9,6 +9,14 @@ const runtimeMocks = vi.hoisted(() => ({
     registerDiagram: vi.fn(),
 }));
 
+const modalMocks = vi.hoisted(() => ({
+    confirm: vi.fn(),
+}));
+
+const conversionMocks = vi.hoisted(() => ({
+    nodes: [{ id: 'applied-node', position: { x: 0, y: 0 }, data: {} }],
+}));
+
 vi.mock('react-i18next', () => ({
     useTranslation: () => ({
         t: (key: string, options?: Record<string, unknown> | string) => {
@@ -21,6 +29,10 @@ vi.mock('react-i18next', () => ({
                 'designer.jsonEditor.download': '下载文件',
                 'designer.jsonEditor.applyOnly': '应用但不关闭',
                 'designer.jsonEditor.saveAndClose': '应用修改并关闭',
+                'designer.jsonEditor.discardTitle': '放弃未应用的修改？',
+                'designer.jsonEditor.discardContent': '关闭后，本次 JSON 草稿中的未应用修改将丢失。',
+                'designer.jsonEditor.discardConfirm': '放弃修改',
+                'designer.jsonEditor.keepEditing': '继续编辑',
                 'designer.jsonEditor.formatStandard': '标准数据',
                 'designer.jsonEditor.formatPure': '纯净数据',
                 'designer.jsonEditor.formatReactFlow': 'React Flow',
@@ -42,13 +54,16 @@ vi.mock('@/core/utils/antdStaticBridge', () => ({
         info: vi.fn(),
         success: vi.fn(),
     },
+    appModal: {
+        confirm: modalMocks.confirm,
+    },
 }));
 
 vi.mock('../designerUtils', () => ({
     canvasToPureStandardData: () => ({ nodes: [], edges: [] }),
     canvasToStandardData: () => ({ nodes: [], edges: [], groups: [] }),
     standardDataToCanvas: async () => ({
-        nodes: [{ id: 'applied-node', position: { x: 0, y: 0 }, data: {} }],
+        nodes: conversionMocks.nodes,
         edges: [],
     }),
 }));
@@ -100,6 +115,7 @@ describe('JsonEditorModal validation feedback', () => {
     });
 
     it('applies standard JSON without persisting, reloading, or closing the dialog', async () => {
+        conversionMocks.nodes = [{ id: 'applied-node', position: { x: 0, y: 0 }, data: {} }];
         runtimeMocks.registerDiagram.mockClear();
         const onClose = vi.fn();
         const setNodes = vi.fn();
@@ -127,5 +143,66 @@ describe('JsonEditorModal validation feedback', () => {
         expect(runtimeMocks.registerDiagram).not.toHaveBeenCalled();
         expect(onClose).not.toHaveBeenCalled();
         expect(screen.getByRole('dialog')).not.toBeNull();
+    });
+
+    it('applies a valid empty diagram and snapshots before replacing the canvas', async () => {
+        conversionMocks.nodes = [];
+        const onBeforeCanvasReplace = vi.fn();
+        const setNodes = vi.fn();
+        const setEdges = vi.fn();
+
+        render(
+            <JsonEditorModal
+                visible
+                onClose={vi.fn()}
+                nodes={[{ id: 'existing-node', position: { x: 0, y: 0 }, data: {} }]}
+                edges={[]}
+                setNodes={setNodes}
+                setEdges={setEdges}
+                reactFlowInstance={{ fitView: vi.fn() }}
+                initialContent={'{"type":"flowchart","version":"1.0.0","nodes":[],"edges":[]}' }
+                onBeforeCanvasReplace={onBeforeCanvasReplace}
+            />,
+        );
+
+        await screen.findByRole('textbox', { name: 'JSON 基础编辑器' });
+        fireEvent.click(screen.getByRole('button', { name: /应用但不关闭/ }));
+
+        await waitFor(() => expect(setNodes).toHaveBeenCalledWith([]));
+        expect(setEdges).toHaveBeenCalledWith([]);
+        expect(onBeforeCanvasReplace).toHaveBeenCalledTimes(1);
+        expect(onBeforeCanvasReplace.mock.invocationCallOrder[0]).toBeLessThan(setNodes.mock.invocationCallOrder[0]);
+    });
+
+    it('asks before discarding an edited JSON draft', async () => {
+        modalMocks.confirm.mockClear();
+        const onClose = vi.fn();
+        render(
+            <JsonEditorModal
+                visible
+                onClose={onClose}
+                nodes={[]}
+                edges={[]}
+                setNodes={vi.fn()}
+                setEdges={vi.fn()}
+                reactFlowInstance={{ fitView: vi.fn() }}
+                initialContent="{}"
+            />,
+        );
+
+        const editor = await screen.findByRole('textbox', { name: 'JSON 基础编辑器' });
+        fireEvent.change(editor, { target: { value: '{"nodes":[]}' } });
+        fireEvent.click(screen.getByRole('button', { name: /取\s*消/ }));
+
+        expect(onClose).not.toHaveBeenCalled();
+        expect(modalMocks.confirm).toHaveBeenCalledWith(expect.objectContaining({
+            zIndex: 2200,
+            title: '放弃未应用的修改？',
+            okButtonProps: { danger: true },
+        }));
+
+        const confirmConfig = modalMocks.confirm.mock.calls[0]?.[0] as { onOk?: () => void };
+        confirmConfig.onOk?.();
+        expect(onClose).toHaveBeenCalledTimes(1);
     });
 });

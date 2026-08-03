@@ -78,6 +78,7 @@ export type FlowchartDesignerOverlaysModel = Pick<FlowchartDesignerViewModel,
     | 'diffResult'
     | 'edges'
     | 'handleOpenSettings'
+    | 'handleBeforeUpdate'
     | 'handlePresentationFocus'
     | 'id'
     | 'isMobile'
@@ -295,6 +296,7 @@ export function FlowchartDesignerOverlaysRegion({ model }: { model: FlowchartDes
         showShortcuts,
         undo,
         handleOpenSettings,
+        handleBeforeUpdate,
         handlePresentationFocus,
     } = model;
 
@@ -311,6 +313,7 @@ export function FlowchartDesignerOverlaysRegion({ model }: { model: FlowchartDes
                     setEdges,
                     reactFlowInstance,
                     initialContent: jsonEditorInitialContent,
+                    onBeforeCanvasReplace: handleBeforeUpdate,
                 }}
                 commandPalette={{
                     visible: commandPaletteVisible,

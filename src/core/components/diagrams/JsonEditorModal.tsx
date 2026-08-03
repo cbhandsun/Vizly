@@ -3,7 +3,7 @@ import { Alert, Button, Modal, Segmented } from 'antd';
 import { UploadOutlined } from '@ant-design/icons';
 import { Node, Edge, ReactFlowInstance } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
-import { appMessage } from '@/core/utils/antdStaticBridge';
+import { appMessage, appModal } from '@/core/utils/antdStaticBridge';
 import { coerceStandardDiagramImport, parseDiagramJson } from '@/core/utils/diagramJsonImport';
 import { downloadFile } from '@/core/utils/downloadUtils';
 import { logJsonEditorExistingDiagramMergeFailure } from './diagramImportLogging';
@@ -24,6 +24,7 @@ export interface JsonEditorModalProps {
     /** 外部注入的初始 JSON 内容（可选，例如 AI 生成后直接注入） */
     initialContent?: string;
     diagramId?: string;
+    onBeforeCanvasReplace?: () => void;
 }
 
 type JsonApplyMode = 'canvas-only' | 'persist';
@@ -42,6 +43,7 @@ export const JsonEditorModal: React.FC<JsonEditorModalProps> = ({
     reactFlowInstance,
     initialContent,
     diagramId,
+    onBeforeCanvasReplace,
 }) => {
     const { t } = useTranslation();
     const [jsonContent, setJsonContent] = useState(initialContent || '');
@@ -50,11 +52,13 @@ export const JsonEditorModal: React.FC<JsonEditorModalProps> = ({
     const [jsonFormatMode, setJsonFormatMode] = useState<'standard' | 'pure' | 'react-flow'>('standard');
     const [editorMode, setEditorMode] = useState<LazyMonacoEditorMode>('loading');
     const [editorVisible, setEditorVisible] = useState(visible);
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
     if (editorVisible !== visible) {
         setEditorVisible(visible);
         if (visible) {
             setEditorMode('loading');
             setValidationError(null);
+            setHasUnsavedChanges(false);
         }
     }
     const [loadedInitialContent, setLoadedInitialContent] = useState(initialContent);
@@ -131,14 +135,14 @@ export const JsonEditorModal: React.FC<JsonEditorModalProps> = ({
             const { standardDataToCanvas } = await import('./designerUtils');
             const { nodes: newNodes, edges: newEdges } = await standardDataToCanvas(data);
 
+            onBeforeCanvasReplace?.();
+            setNodes(newNodes);
+            setEdges(newEdges);
             if (newNodes.length > 0) {
-                setNodes(newNodes);
-                setEdges(newEdges);
                 setTimeout(() => reactFlowInstance.fitView({ duration: 800, padding: 0.35, minZoom: 0.55 }), 50);
-                appMessage.success(t('designer.flowchart.jsonApplied') || '应用成功');
-                return true;
             }
-            return false;
+            appMessage.success(t('designer.flowchart.jsonApplied') || '应用成功');
+            return true;
         } catch (e) {
             showValidationError(e);
             return false;
@@ -160,6 +164,7 @@ export const JsonEditorModal: React.FC<JsonEditorModalProps> = ({
             const content = getActiveContent();
             const obj = parseDiagramJson(content || '{}');
             setActiveContent(JSON.stringify(obj, null, 2));
+            setHasUnsavedChanges(true);
             appMessage.success(t('designer.flowchart.jsonFormatted') || 'JSON 格式化成功');
         } catch (e: unknown) {
             showValidationError(e);
@@ -181,16 +186,37 @@ export const JsonEditorModal: React.FC<JsonEditorModalProps> = ({
 
     // Apply to the current canvas without closing or entering the persistence/reload path.
     const handleApplyWithoutClosing = async () => {
-        await applyJsonContentToCanvas(getActiveContent(), 'canvas-only');
+        const success = await applyJsonContentToCanvas(getActiveContent(), 'canvas-only');
+        if (success) setHasUnsavedChanges(false);
     };
 
     // Save and close
     const handleSave = async () => {
         const success = await applyJsonContentToCanvas(getActiveContent(), 'persist');
         if (success) {
+            setHasUnsavedChanges(false);
             onClose();
         }
     };
+
+    const requestClose = useCallback(() => {
+        if (!hasUnsavedChanges) {
+            onClose();
+            return;
+        }
+        appModal.confirm({
+            zIndex: 2200,
+            title: t('designer.jsonEditor.discardTitle'),
+            content: t('designer.jsonEditor.discardContent'),
+            okText: t('designer.jsonEditor.discardConfirm'),
+            cancelText: t('designer.jsonEditor.keepEditing'),
+            okButtonProps: { danger: true },
+            onOk: () => {
+                setHasUnsavedChanges(false);
+                onClose();
+            },
+        });
+    }, [hasUnsavedChanges, onClose, t]);
 
     // Derived content based on format mode
     const editorDisplayContent = useMemo(() => {
@@ -211,7 +237,7 @@ export const JsonEditorModal: React.FC<JsonEditorModalProps> = ({
             open={visible}
             rootClassName="json-editor-modal"
             title={t('designer.jsonEditor.title') || 'Diagram Data Viewer'}
-            onCancel={onClose}
+            onCancel={requestClose}
             getContainer={() => document.getElementById('app-root-layout') || document.body}
             width={850}
             zIndex={2100}
@@ -235,7 +261,7 @@ export const JsonEditorModal: React.FC<JsonEditorModalProps> = ({
                     </div>
                     {/* 右侧保存区 */}
                     <div style={{ display: 'flex', gap: 8 }}>
-                        <Button onClick={onClose}>
+                        <Button onClick={requestClose}>
                             {t('common.cancel')}
                         </Button>
                         <Button
@@ -293,6 +319,7 @@ export const JsonEditorModal: React.FC<JsonEditorModalProps> = ({
                         value={editorDisplayContent}
                         onChange={(val: string | undefined) => {
                             setValidationError(null);
+                            setHasUnsavedChanges(true);
                             if (jsonFormatMode === 'standard') {
                                 setJsonContent(val || '');
                             } else if (jsonFormatMode === 'pure') {

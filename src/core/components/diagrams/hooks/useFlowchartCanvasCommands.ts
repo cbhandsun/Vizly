@@ -15,6 +15,7 @@ import { buildFlowchartEdgeInsertionPlan } from '../flowchartEdgeInsertion';
 import {
     buildFlowchartClearCanvasConfirm,
     clearFlowchartCanvas,
+    shouldConfirmFlowchartClearCanvas,
 } from '../flowchartClearCanvas';
 import { runFlowchartSmartOptimize } from '../flowchartSmartOptimize';
 import type { NodeDataUpdate } from '../../../types/diagram-updates';
@@ -131,14 +132,29 @@ export function useFlowchartCanvasCommands({
     }, [gridVariant, setGridVariant, setShowGrid, showGrid]);
 
     const handleClearCanvasCommand = useCallback(() => {
+        const currentNodes = getNodes();
+        const currentEdges = getEdges();
+        if (!shouldConfirmFlowchartClearCanvas(currentNodes, currentEdges)) {
+            appMessage.info(t('designer.flowchart.clearCanvas.empty'));
+            return;
+        }
         appModal.confirm(buildFlowchartClearCanvasConfirm({
             title: t('designer.flowchart.clearCanvas.title'),
-            content: t('designer.flowchart.clearCanvas.content'),
+            content: t('designer.flowchart.clearCanvas.content', {
+                nodes: currentNodes.length,
+                edges: currentEdges.length,
+            }),
             okText: t('designer.flowchart.clearCanvas.ok'),
             cancelText: t('designer.flowchart.clearCanvas.cancel'),
-            onConfirm: () => clearFlowchartCanvas({ setNodes, setEdges, takeSnapshot }),
+            onConfirm: () => clearFlowchartCanvas({
+                nodes: currentNodes,
+                edges: currentEdges,
+                setNodes,
+                setEdges,
+                takeSnapshot,
+            }),
         }));
-    }, [setEdges, setNodes, t, takeSnapshot]);
+    }, [getEdges, getNodes, setEdges, setNodes, t, takeSnapshot]);
 
     const handleExportMermaid = useCallback(async () => {
         try {

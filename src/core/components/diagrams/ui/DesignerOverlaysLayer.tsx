@@ -38,6 +38,7 @@ export interface DesignerOverlaysLayerProps {
         setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
         reactFlowInstance: ReactFlowInstance | null;
         initialContent?: string;
+        onBeforeCanvasReplace?: () => void;
     };
 
     // Command Palette
@@ -108,6 +109,7 @@ export const DesignerOverlaysLayer: React.FC<DesignerOverlaysLayerProps> = ({
                         reactFlowInstance={jsonEditor.reactFlowInstance}
                         initialContent={jsonEditor.initialContent}
                         diagramId={diagramId}
+                        onBeforeCanvasReplace={jsonEditor.onBeforeCanvasReplace}
                     />
                 </React.Suspense>
             )}

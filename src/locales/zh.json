@@ -586,6 +586,10 @@
             "download": "下载文件",
             "applyOnly": "应用但不关闭",
             "saveAndClose": "应用修改并关闭",
+            "discardTitle": "放弃未应用的修改？",
+            "discardContent": "关闭后，本次 JSON 草稿中的未应用修改将丢失。",
+            "discardConfirm": "放弃修改",
+            "keepEditing": "继续编辑",
             "basicEditorLabel": "JSON 基础编辑器",
             "reactFlowWarning": "当前处于 React Flow 内部渲染节点/边结构大纲预览（只读）。该模式仅供 Debug，不支持反向应用。如需修改架构，请切换到标准数据模式。"
         },
@@ -766,9 +770,10 @@
             "edgeNodeInserted": "已在连线中点插入新节点",
             "clearCanvas": {
                 "title": "清空画布",
-                "content": "确定要清空画布吗？此操作不可撤销。",
-                "ok": "确定",
-                "cancel": "取消"
+                "content": "将清空 {{nodes}} 个节点和 {{edges}} 条连线。清空后可使用撤销恢复。",
+                "ok": "清空",
+                "cancel": "取消",
+                "empty": "画布已经为空，无需清空"
             },
             "import": {
                 "standardSuccess": "成功导入标准化配置（{{count}} 节点）",

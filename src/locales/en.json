@@ -575,6 +575,10 @@
             "download": "Download File",
             "applyOnly": "Apply Without Closing",
             "saveAndClose": "Apply and Close",
+            "discardTitle": "Discard unapplied changes?",
+            "discardContent": "Closing will discard the unapplied changes in this JSON draft.",
+            "discardConfirm": "Discard Changes",
+            "keepEditing": "Keep Editing",
             "basicEditorLabel": "Basic JSON editor",
             "reactFlowWarning": "You are currently viewing internal React Flow graph models (Read-Only mode). This is for debugging purposes only. To edit diagram structure, please switch to Standard Data mode."
         },
@@ -652,9 +656,10 @@
             "edgeNodeInserted": "Inserted new node at edge midpoint",
             "clearCanvas": {
                 "title": "Clear Canvas",
-                "content": "Are you sure you want to clear the canvas? This cannot be undone.",
-                "ok": "OK",
-                "cancel": "Cancel"
+                "content": "Clear {{nodes}} nodes and {{edges}} edges? You can restore them with Undo.",
+                "ok": "Clear",
+                "cancel": "Cancel",
+                "empty": "The canvas is already empty"
             },
             "import": {
                 "standardSuccess": "Imported successfully ({{count}} nodes)",

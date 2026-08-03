@@ -167,6 +167,7 @@ const createOverlaysModel = (
     diagramIdForExport: 'diagram-1',
     diffResult: null,
     edges: [],
+    handleBeforeUpdate: () => undefined,
     handleOpenSettings: () => undefined,
     handlePresentationFocus: () => undefined,
     id: 'diagram-1',
