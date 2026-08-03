@@ -53,7 +53,8 @@ describe('AIChatViewLayout accessibility contract', () => {
         expect(source).toContain('className="ai-chat-panel-shell"');
         expect(layoutSource).toContain("maxWidth: isMobile ? MOBILE_DESIGNER_PANEL_WIDTH : '100vw'");
         expect(layoutSource).toContain("boxSizing: 'border-box'");
-        expect(css).toMatch(/\.ai-chat-panel-shell,[\s\S]*?\.ai-chat-container[\s\S]*?max-width: 100%;[\s\S]*?min-width: 0/);
+        expect(css).toMatch(/\.ai-chat-panel-shell\s*\{[\s\S]*?max-width: 100%;[\s\S]*?min-width: 0/);
+        expect(css).toMatch(/\.ai-chat-container\s*\{[\s\S]*?max-width: 100%;[\s\S]*?min-width: 0/);
         expect(css).toMatch(/@media \(max-width: 480px\)[\s\S]*?\.ai-chat-model-select[\s\S]*?max-width: min\(120px, calc\(100vw - 236px\)\)/);
         expect(css).toMatch(/@media \(max-width: 480px\)[\s\S]*?\.ai-chat-conversation-title[\s\S]*?display: none/);
     });
