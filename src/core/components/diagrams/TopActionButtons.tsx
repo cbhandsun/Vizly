@@ -17,6 +17,7 @@ import {
     shouldCloseDocumentMenuFromKey,
     shouldOpenDocumentMenuFromKey,
 } from './documentMenuKeyboard';
+import { consumePresentationFocusReturnRequest } from '../presentation/presentationFocusReturn';
 
 const AdvancedExportModal = React.lazy(() => import('./ui/AdvancedExportModal').then(module => ({
     default: module.AdvancedExportModal,
@@ -309,6 +310,7 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
 
     const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
     const [contextPortalTarget, setContextPortalTarget] = useState<HTMLElement | null>(null);
+    const [portalLookupComplete, setPortalLookupComplete] = useState(false);
 
     useEffect(() => {
         const timer = window.setTimeout(() => {
@@ -320,9 +322,17 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
             if (contextTarget) {
                 setContextPortalTarget(contextTarget);
             }
+            setPortalLookupComplete(true);
         }, 0);
         return () => window.clearTimeout(timer);
     }, []);
+
+    useEffect(() => {
+        if (!portalLookupComplete || !documentMenuButtonRef.current) return;
+        if (consumePresentationFocusReturnRequest()) {
+            documentMenuButtonRef.current.focus();
+        }
+    }, [portalLookupComplete, portalTarget]);
 
     // 统一按钮样式 (与 ModernFlowchartToolbar 保持一致)
     const tbtn = "w-8 h-8 p-0 flex items-center justify-center border-none rounded-[6px] text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] transition-colors";

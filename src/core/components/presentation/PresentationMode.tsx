@@ -7,9 +7,14 @@
  * - 平滑 fitView 过渡
  * - 键盘/鼠标双导航
  */
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { FaChevronLeft, FaChevronRight, FaTimes } from 'react-icons/fa';
 import { PresentationSlide } from '../../hooks/usePresentationSlides';
+import {
+  buildPresentationEdgeSelector,
+  buildPresentationNodeSelector,
+} from './presentationSelectorSafety';
+import { requestPresentationFocusReturn } from './presentationFocusReturn';
 import './PresentationMode.css';
 
 interface PresentationModeProps {
@@ -20,8 +25,24 @@ interface PresentationModeProps {
 
 const PresentationMode: React.FC<PresentationModeProps> = ({ slides, onFocusNodes, onExit }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const exitButtonRef = useRef<HTMLButtonElement>(null);
   const totalSlides = slides.length;
   const currentSlide = slides[currentIndex];
+
+  useEffect(() => {
+    const previouslyFocused = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    exitButtonRef.current?.focus();
+
+    return () => {
+      if (previouslyFocused?.isConnected && previouslyFocused !== document.body) {
+        previouslyFocused.focus();
+        return;
+      }
+    };
+  }, []);
 
   // 聚焦当前 slide 的节点
   const focusCurrent = useCallback(() => {
@@ -40,16 +61,43 @@ const PresentationMode: React.FC<PresentationModeProps> = ({ slides, onFocusNode
     if (currentIndex > 0) setCurrentIndex(i => i - 1);
   }, [currentIndex]);
 
+  const handleExit = useCallback(() => {
+    requestPresentationFocusReturn();
+    onExit();
+  }, [onExit]);
+
   // 键盘导航
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Tab') {
+        const controls = Array.from(
+          overlayRef.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? [],
+        );
+        if (controls.length === 0) return;
+
+        const firstControl = controls[0];
+        const lastControl = controls[controls.length - 1];
+        const activeElement = document.activeElement;
+        const focusIsInside = activeElement instanceof HTMLElement
+          && overlayRef.current?.contains(activeElement);
+
+        if (!focusIsInside || (e.shiftKey && activeElement === firstControl)) {
+          e.preventDefault();
+          (e.shiftKey ? lastControl : firstControl).focus();
+        } else if (!e.shiftKey && activeElement === lastControl) {
+          e.preventDefault();
+          firstControl.focus();
+        }
+        return;
+      }
+
       switch (e.key) {
         case 'ArrowRight': case 'ArrowDown': case ' ':
           e.preventDefault(); goNext(); break;
         case 'ArrowLeft': case 'ArrowUp':
           e.preventDefault(); goPrev(); break;
         case 'Escape':
-          e.preventDefault(); onExit(); break;
+          e.preventDefault(); handleExit(); break;
         case 'Home':
           e.preventDefault(); setCurrentIndex(0); break;
         case 'End':
@@ -58,7 +106,7 @@ const PresentationMode: React.FC<PresentationModeProps> = ({ slides, onFocusNode
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [goNext, goPrev, onExit, totalSlides]);
+  }, [goNext, goPrev, handleExit, totalSlides]);
 
   // 🎯 动态高亮：淡化非焦点 + 发光焦点（Lucidchart Spotlight 风格）
   const highlightCSS = useMemo(() => {
@@ -80,13 +128,11 @@ const PresentationMode: React.FC<PresentationModeProps> = ({ slides, onFocusNode
 
     const containerIds = currentSlide.containerIds || [];
     const focusedContainer = ids.filter(id => containerIds.includes(id))
-      .map(id => `.react-flow__node[data-id="${id}"]`).join(',\n');
+      .map(buildPresentationNodeSelector).join(',\n');
     const focusedNormal = ids.filter(id => !containerIds.includes(id))
-      .map(id => `.react-flow__node[data-id="${id}"]`).join(',\n');
+      .map(buildPresentationNodeSelector).join(',\n');
       
-    const focusedEdge = ids.map(id =>
-      `.react-flow__edge[data-source="${id}"], .react-flow__edge[data-target="${id}"]`
-    ).join(',\n');
+    const focusedEdge = ids.map(buildPresentationEdgeSelector).join(',\n');
 
     return `
       /* 🔑 脉冲呼吸灯动画 */
@@ -146,7 +192,13 @@ const PresentationMode: React.FC<PresentationModeProps> = ({ slides, onFocusNode
   const progress = totalSlides > 1 ? (currentIndex / (totalSlides - 1)) * 100 : 100;
 
   return (
-    <div className="presentation-overlay" role="dialog" aria-modal="true" aria-label="演示模式">
+    <div
+      ref={overlayRef}
+      className="presentation-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-label="演示模式"
+    >
       <style>{highlightCSS}</style>
 
       {/* 顶部标题栏 */}
@@ -155,14 +207,17 @@ const PresentationMode: React.FC<PresentationModeProps> = ({ slides, onFocusNode
           <span className="presentation-badge-dot" />
           演示中
         </div>
-        <div className="presentation-title">{currentSlide.title}</div>
+        <div className="presentation-title" aria-live="polite" aria-atomic="true">
+          {currentSlide.title}
+        </div>
         <div className="presentation-counter">
           {currentIndex + 1}<span className="presentation-counter-sep">/</span>{totalSlides}
         </div>
         <button
+          ref={exitButtonRef}
           type="button"
           className="presentation-exit"
-          onClick={onExit}
+          onClick={handleExit}
           title="退出演示 (ESC)"
           aria-label="退出演示"
         >
@@ -182,7 +237,15 @@ const PresentationMode: React.FC<PresentationModeProps> = ({ slides, onFocusNode
           <FaChevronLeft aria-hidden="true" />
         </button>
 
-        <div className="presentation-progress-bar">
+        <div
+          className="presentation-progress-bar"
+          role="progressbar"
+          aria-label="演示进度"
+          aria-valuemin={1}
+          aria-valuemax={totalSlides}
+          aria-valuenow={currentIndex + 1}
+          aria-valuetext={`第 ${currentIndex + 1} 页，共 ${totalSlides} 页`}
+        >
           <div className="presentation-progress-fill" style={{ width: `${progress}%` }} />
           {slides.map((_, i) => (
             <button

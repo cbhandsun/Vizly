@@ -488,6 +488,7 @@
             "dragToMove": "拖动移动工具栏（双击重置位置）",
             "share": "分享",
             "presentationMode": "演示模式",
+            "presentationEmpty": "请先添加至少一个节点再开始演示",
             "diffView": "差异对比",
             "historyPanel": "历史记录",
             "smartOptimize": "智能全图优化 (解决重叠与对齐)",

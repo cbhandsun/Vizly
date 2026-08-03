@@ -29,6 +29,7 @@ vi.mock('../ui/CollaborationAvatars', () => ({
 }));
 
 import { TopActionButtons } from '../TopActionButtons';
+import { requestPresentationFocusReturn } from '../../presentation/presentationFocusReturn';
 
 describe('TopActionButtons document menu', () => {
     beforeEach(() => {
@@ -72,6 +73,19 @@ describe('TopActionButtons document menu', () => {
             expect(trigger.getAttribute('aria-expanded')).toBe('false');
             expect(document.activeElement).toBe(trigger);
         });
+    });
+
+    it('restores focus after the presentation header is remounted', async () => {
+        requestPresentationFocusReturn();
+        render(
+            <TopActionButtons
+                disablePortal
+                onStartPresentation={vi.fn()}
+            />,
+        );
+
+        const trigger = screen.getByRole('button', { name: '文档操作' });
+        await waitFor(() => expect(document.activeElement).toBe(trigger));
     });
 
     it('separates operation history from version snapshots and invokes the snapshot entry', async () => {

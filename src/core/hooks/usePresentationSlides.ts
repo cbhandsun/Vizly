@@ -36,6 +36,8 @@ export function generateSlides(
   nodes: SlideNode[],
   direction: 'vertical' | 'horizontal' = 'vertical'
 ): PresentationSlide[] {
+  if (nodes.length === 0) return [];
+
   // 构建子节点关系查找表（支持 explicit parentId 和 semantic domain/subDomain 映射）
   const reactFlowNodes = nodes as unknown as Node[];
   const childrenMap = buildChildrenMap(reactFlowNodes);

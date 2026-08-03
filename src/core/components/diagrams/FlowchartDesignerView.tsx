@@ -327,6 +327,13 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                 onEditJson: handleOpenJsonEditor,
                                 onStartPresentation: () => {
                                     const slides = generateSlides(nodesRef.current, 'vertical');
+                                    if (slides.length === 0) {
+                                        appMessage.info(t(
+                                            'designer.toolbar.presentationEmpty',
+                                            '请先添加至少一个节点再开始演示',
+                                        ));
+                                        return;
+                                    }
                                     setPresentationSlides(slides);
                                     setPresentationActive(true);
                                 },

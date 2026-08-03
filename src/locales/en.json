@@ -484,6 +484,7 @@
             "dragToMove": "Drag to move toolbar (double-click to reset)",
             "share": "Share",
             "presentationMode": "Presentation Mode",
+            "presentationEmpty": "Add at least one node before starting a presentation",
             "diffView": "Diff View",
             "historyPanel": "History",
             "smartOptimize": "Smart Optimize (resolve overlaps & align)",
