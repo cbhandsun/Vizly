@@ -162,6 +162,7 @@ export const AIChatViewLayout: React.FC<AIChatViewLayoutProps> = ({
                 <div className="ai-chat-sidebar-header">
                     <Typography.Text strong>{t('aiChat.historyTitle')}</Typography.Text>
                     <Button
+                        className="ai-chat-new-conversation"
                         size="small"
                         icon={<PlusOutlined />}
                         aria-label={t('aiChat.newConversation')}
@@ -175,11 +176,11 @@ export const AIChatViewLayout: React.FC<AIChatViewLayoutProps> = ({
                             <div
                                 key={conv.id}
                                 role="listitem"
-                                onClick={() => { handleSwitchChat(conv.id); setIsSidebarOpen(false); }}
                                 className={`ai-chat-history-item ${activeId === conv.id ? 'active' : ''}`}
                             >
                                 {editingId === conv.id ? (
                                     <Input
+                                        aria-label={t('aiChat.renameConversation', { title: conv.title })}
                                         size="small"
                                         value={editingTitle}
                                         onChange={e => setEditingTitle(e.target.value)}
@@ -189,24 +190,41 @@ export const AIChatViewLayout: React.FC<AIChatViewLayoutProps> = ({
                                         onClick={e => e.stopPropagation()}
                                     />
                                 ) : (
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13, flex: 1, marginRight: 8 }}>
-                                            {conv.title}
-                                        </div>
-                                        <div className="item-actions" style={{ display: 'none' }}>
+                                    <>
+                                        <button
+                                            type="button"
+                                            className="ai-chat-history-main"
+                                            aria-current={activeId === conv.id ? 'true' : undefined}
+                                            onClick={() => { handleSwitchChat(conv.id); setIsSidebarOpen(false); }}
+                                        >
+                                            <span className="ai-chat-history-title" title={conv.title}>{conv.title}</span>
+                                        </button>
+                                        <div className="item-actions">
                                             <Space size={4}>
-                                                <EditOutlined style={{ fontSize: 13, color: '#999' }} onClick={(e) => handleStartRename(conv, e)} />
+                                                <Button
+                                                    className="ai-chat-history-action"
+                                                    type="text"
+                                                    icon={<EditOutlined />}
+                                                    aria-label={t('aiChat.renameConversation', { title: conv.title })}
+                                                    onClick={(event) => handleStartRename(conv, event)}
+                                                />
                                                 <Popconfirm
                                                     title={t('aiChat.deleteConversation')}
                                                     onConfirm={() => handleDeleteChat(conv.id)}
                                                     onCancel={e => e?.stopPropagation()}
                                                     placement="right"
                                                 >
-                                                    <DeleteOutlined style={{ fontSize: 13, color: '#ff4d4f' }} onClick={e => e.stopPropagation()} />
+                                                    <Button
+                                                        className="ai-chat-history-action"
+                                                        type="text"
+                                                        danger
+                                                        icon={<DeleteOutlined />}
+                                                        aria-label={t('aiChat.deleteConversationLabel', { title: conv.title })}
+                                                    />
                                                 </Popconfirm>
                                             </Space>
                                         </div>
-                                    </div>
+                                    </>
                                 )}
                             </div>
                         ))}
@@ -217,7 +235,7 @@ export const AIChatViewLayout: React.FC<AIChatViewLayoutProps> = ({
             {/* Main Content Area */}
             {/* Inline Header */}
             <div className="ai-chat-inline-header">
-                <Space size={4}>
+                <Space className="ai-chat-inline-primary" size={4}>
                     <Button
                         className="ai-chat-inline-action"
                         icon={<MenuFoldOutlined />}
@@ -228,6 +246,7 @@ export const AIChatViewLayout: React.FC<AIChatViewLayoutProps> = ({
                         aria-label={t('aiChat.viewHistory')}
                     />
                     <Select
+                        className="ai-chat-model-select"
                         aria-label={t('aiChat.modelSelectLabel')}
                         size="small"
                         variant="borderless"
@@ -240,11 +259,11 @@ export const AIChatViewLayout: React.FC<AIChatViewLayoutProps> = ({
                         )}
                         style={{ maxWidth: 160, fontWeight: 500 }}
                     />
-                    <Typography.Text type="secondary" style={{ fontSize: 12, maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-block', verticalAlign: 'middle', marginLeft: 4 }} title={activeConversation?.title}>
+                    <Typography.Text className="ai-chat-conversation-title" type="secondary" title={activeConversation?.title}>
                         {activeConversation?.title || ''}
                     </Typography.Text>
                 </Space>
-                <Space size={4}>
+                <Space className="ai-chat-inline-secondary" size={4}>
                     {user ? (
                         <Tooltip title={t('aiChat.loggedIn', { email: user.email })}>
                             <CloudServerOutlined style={{ color: '#52c41a', fontSize: 14 }} />
@@ -310,14 +329,15 @@ export const AIChatViewLayout: React.FC<AIChatViewLayoutProps> = ({
             {showCommands && (
                 <div className="ai-chat-commands">
                     {filteredCommands.map(cmd => (
-                        <div
+                        <button
+                            type="button"
                             key={cmd.key}
                             onClick={() => handleSelectCommand(cmd)}
                             className="ai-chat-command-item"
                         >
                             <Typography.Text code>{cmd.label}</Typography.Text>
                             <Typography.Text type="secondary">{cmd.description}</Typography.Text>
-                        </div>
+                        </button>
                     ))}
                 </div>
             )}
@@ -332,7 +352,9 @@ export const AIChatViewLayout: React.FC<AIChatViewLayoutProps> = ({
                         onPressEnter={(e) => {
                             if (!e.shiftKey) {
                                 e.preventDefault();
-                                handleSendMessage();
+                                if (configurationState.ready) {
+                                    handleSendMessage();
+                                }
                             }
                         }}
                         placeholder={t('aiChat.inputPlaceholder')}
@@ -359,9 +381,19 @@ export const AIChatViewLayout: React.FC<AIChatViewLayoutProps> = ({
                                 shape="circle"
                                 icon={loading ? <StopOutlined /> : <SendOutlined />}
                                 onClick={loading ? handleStopGeneration : handleSendMessage}
-                                disabled={!loading && !inputValue.trim()}
-                                aria-label={loading ? t('aiChat.stopGeneration') : t('aiChat.sendMessage')}
-                                title={loading ? t('aiChat.stopGeneration') : t('aiChat.sendMessage')}
+                                disabled={!loading && (!inputValue.trim() || !configurationState.ready)}
+                                aria-label={loading
+                                    ? t('aiChat.stopGeneration')
+                                    : configurationState.ready
+                                        ? t('aiChat.sendMessage')
+                                        : `${t('aiChat.sendMessage')}: ${t(`aiChat.configReason.${configurationState.reason}`, {
+                                            provider: configurationState.providerName ?? '',
+                                        })}`}
+                                title={loading
+                                    ? t('aiChat.stopGeneration')
+                                    : configurationState.ready
+                                        ? t('aiChat.sendMessage')
+                                        : t('aiChat.configureBeforeSending')}
                                 className="ai-chat-send-btn"
                             />
                         </Space>
@@ -379,16 +411,20 @@ export const AIChatViewLayout: React.FC<AIChatViewLayoutProps> = ({
                 cancelText={t('aiChat.cancel')}
             >
                 <div style={{ padding: '10px 0' }}>
-                    <div style={{ marginBottom: 8 }}>名称:</div>
+                    <label className="ai-chat-save-label" htmlFor="ai-chat-save-title">
+                        {t('aiChat.nameLabel')}
+                    </label>
                     <Input
+                        id="ai-chat-save-title"
                         value={saveTitle}
                         onChange={e => setSaveTitle(e.target.value)}
                         placeholder={t('aiChat.namePlaceholder')}
+                        maxLength={200}
                         onPressEnter={executeSave}
                         autoFocus
                     />
-                    <div style={{ marginTop: 8, fontSize: 12, color: '#999' }}>
-                        将保存到: <span style={{ color: '#1677ff' }}>{saveTarget === 'local' ? '本地' : (saveTarget === 's3' ? 'S3' : 'Supabase')}</span>
+                    <div className="ai-chat-save-target">
+                        {t('aiChat.saveTarget')} <span>{saveTarget === 'local' ? t('aiChat.localTarget') : (saveTarget === 's3' ? 'S3' : 'Supabase')}</span>
                     </div>
                 </div>
             </Modal>

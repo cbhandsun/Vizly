@@ -51,6 +51,8 @@ export const shouldFreezeDesignerRightSidebarDuringDrag = (
 
 export const MOBILE_DESIGNER_PANEL_DOCK_CLEARANCE =
     'calc(88px + env(safe-area-inset-bottom, 0px))';
+export const MOBILE_DESIGNER_PANEL_WIDTH =
+    'calc(100vw / var(--commercial-ui-scale, 1))';
 
 export const createDesignerRightSidebarLayout = ({
     isCollapsed,
@@ -70,7 +72,7 @@ export const createDesignerRightSidebarLayout = ({
             bottom: MOBILE_DESIGNER_PANEL_DOCK_CLEARANCE,
             maxHeight: 'calc(100% - 176px)',
             height: isCollapsed ? 0 : 'min(85vh, calc(100% - 176px))',
-            width: '100%',
+            width: MOBILE_DESIGNER_PANEL_WIDTH,
         };
     }
 

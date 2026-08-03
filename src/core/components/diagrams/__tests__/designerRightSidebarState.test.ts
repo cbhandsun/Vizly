@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
     createDesignerRightSidebarLayout,
     MOBILE_DESIGNER_PANEL_DOCK_CLEARANCE,
+    MOBILE_DESIGNER_PANEL_WIDTH,
     shouldActivateDesignerPropertyTab,
     shouldExpandDesignerRightSidebar,
     shouldFreezeDesignerRightSidebarDuringDrag,
@@ -22,7 +23,7 @@ describe('createDesignerRightSidebarLayout', () => {
             bottom: MOBILE_DESIGNER_PANEL_DOCK_CLEARANCE,
             maxHeight: 'calc(100% - 176px)',
             height: 'min(85vh, calc(100% - 176px))',
-            width: '100%',
+            width: MOBILE_DESIGNER_PANEL_WIDTH,
         });
     });
 

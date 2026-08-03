@@ -209,6 +209,7 @@ export const DiagramLayout: React.FC<DiagramLayoutProps> = ({
           overflow: 'hidden',
           minHeight: 0,
           zoom: uiScale,
+          '--commercial-ui-scale': uiScale,
           '--commercial-touch-target': `${resolvePhysicalTouchTargetSize(uiScale)}px`,
           transition: 'zoom 0.2s ease-out, height 0.2s ease-out, width 0.2s ease-out'
         } as React.CSSProperties}

@@ -13,6 +13,7 @@ import {
     logBlockedAutonomousCommand,
 } from './aiLogging';
 import './AIChatPanel.css';
+import './AIChatCommercialInteractions.css';
 import { appMessage } from '@/core/utils/antdStaticBridge';
 import type { PluginContext } from '@/core/types/plugin';
 import { useAIChatDiagramSave } from './useAIChatDiagramSave';
@@ -617,7 +618,7 @@ const AIChatPanel: React.FC<AIChatPanelProps> = (props) => {
     if (!props.open) return null;
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', overflow: 'hidden' }}>
+        <div className="ai-chat-panel-shell">
             <AIChatView {...props} />
         </div>
     );

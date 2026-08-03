@@ -13,6 +13,7 @@ import {
 } from '../../utils/layoutStorage';
 import {
     createDesignerRightSidebarLayout,
+    MOBILE_DESIGNER_PANEL_WIDTH,
     shouldActivateDesignerPropertyTab,
     shouldExpandDesignerRightSidebar,
     shouldFreezeDesignerRightSidebarDuringDrag,
@@ -262,6 +263,8 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
                 boxShadow: 'var(--designer-shadow, 0 24px 48px -12px rgba(0,0,0,0.15))',
                 border: `1px solid var(--designer-border, rgba(255,255,255,0.45))`,
                 borderRadius: '16px',
+                boxSizing: 'border-box',
+                maxWidth: isMobile ? MOBILE_DESIGNER_PANEL_WIDTH : '100vw',
                 zIndex: 110,
                 // 只在收起/展开时加动画，拖拽时关闭动画避免卡顿
                 transition: isMobile ? 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
@@ -450,7 +453,7 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
                                 key: 'ai',
                                 label: <span style={{ display: 'flex', alignItems: 'center' }}>{t('aiChat.title')} {showAiCrown && <span style={{ marginLeft: 4, fontSize: '13px' }} title="Pro 功能">👑</span>}</span>,
                                 children: (
-                                    <div style={{ height: '100%', padding: '0 8px' }}>
+                                    <div style={{ height: '100%', minWidth: 0, overflow: 'hidden', padding: '0 8px' }}>
                                         {activeTab === 'ai'
                                             ? renderAIChatPanel({ onClose: closeAiPanel })
                                             : null}
@@ -458,7 +461,7 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
                                 )
                             }] : [])
                         ]}
-                        style={{ height: '100%' }}
+                        style={{ height: '100%', minWidth: 0 }}
                         tabBarStyle={{
                             margin: 0,
                             padding: '0 16px',

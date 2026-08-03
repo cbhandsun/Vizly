@@ -1,10 +1,15 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
+const readAIChatStyles = () => [
+    readFileSync('src/components/ai/AIChatPanel.css', 'utf8'),
+    readFileSync('src/components/ai/AIChatCommercialInteractions.css', 'utf8'),
+].join('\n');
+
 describe('AIChatViewLayout accessibility contract', () => {
     it('names the composer controls and keeps circular actions touch sized', () => {
         const source = readFileSync('src/components/ai/AIChatViewLayout.tsx', 'utf8');
-        const css = readFileSync('src/components/ai/AIChatPanel.css', 'utf8');
+        const css = readAIChatStyles();
 
         expect(source).toContain("aria-label={t('aiChat.inputLabel')}");
         expect(source).toContain("aria-label={t('aiChat.modelSelectLabel')}");
@@ -17,12 +22,40 @@ describe('AIChatViewLayout accessibility contract', () => {
 
     it('exposes configuration recovery before a remote request can fail', () => {
         const source = readFileSync('src/components/ai/AIChatViewLayout.tsx', 'utf8');
-        const css = readFileSync('src/components/ai/AIChatPanel.css', 'utf8');
+        const css = readAIChatStyles();
 
         expect(source).toContain('role="status"');
         expect(source).toContain("t('aiChat.configStatusTitle')");
         expect(source).toContain("t('aiChat.configureNow')");
+        expect(source).toContain('disabled={!loading && (!inputValue.trim() || !configurationState.ready)}');
+        expect(source).toContain("t('aiChat.configureBeforeSending')");
         expect(css).toMatch(/\.ai-chat-configuration-status[\s\S]*?min-height: var\(--commercial-touch-target, 44px\)/);
+    });
+
+    it('uses keyboard-native history actions and exposes them on touch devices', () => {
+        const source = readFileSync('src/components/ai/AIChatViewLayout.tsx', 'utf8');
+        const css = readAIChatStyles();
+
+        expect(source).toContain('className="ai-chat-history-main"');
+        expect(source).toContain('className="ai-chat-history-action"');
+        expect(source).toContain("aria-label={t('aiChat.renameConversation', { title: conv.title })}");
+        expect(source).toContain("aria-label={t('aiChat.deleteConversationLabel', { title: conv.title })}");
+        expect(source).not.toContain('className="item-actions" style={{ display: \'none\' }}');
+        expect(css).toMatch(/\.ai-chat-new-conversation\.ant-btn,[\s\S]*?\.ai-chat-history-action\.ant-btn[\s\S]*?width: var\(--commercial-touch-target, 44px\)[\s\S]*?height: var\(--commercial-touch-target, 44px\)/);
+        expect(css).toMatch(/@media \(hover: none\), \(pointer: coarse\)[\s\S]*?\.item-actions[\s\S]*?opacity: 1/);
+    });
+
+    it('constrains the full AI surface and reflows its header on narrow screens', () => {
+        const source = readFileSync('src/components/ai/AIChatPanel.tsx', 'utf8');
+        const layoutSource = readFileSync('src/core/components/diagrams/DesignerRightSidebar.tsx', 'utf8');
+        const css = readAIChatStyles();
+
+        expect(source).toContain('className="ai-chat-panel-shell"');
+        expect(layoutSource).toContain("maxWidth: isMobile ? MOBILE_DESIGNER_PANEL_WIDTH : '100vw'");
+        expect(layoutSource).toContain("boxSizing: 'border-box'");
+        expect(css).toMatch(/\.ai-chat-panel-shell,[\s\S]*?\.ai-chat-container[\s\S]*?max-width: 100%;[\s\S]*?min-width: 0/);
+        expect(css).toMatch(/@media \(max-width: 480px\)[\s\S]*?\.ai-chat-model-select[\s\S]*?max-width: min\(120px, calc\(100vw - 236px\)\)/);
+        expect(css).toMatch(/@media \(max-width: 480px\)[\s\S]*?\.ai-chat-conversation-title[\s\S]*?display: none/);
     });
 
     it('keeps AI configuration controls named, guarded, and mobile-safe', () => {
