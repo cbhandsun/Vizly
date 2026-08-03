@@ -91,6 +91,8 @@ export interface DesignerCanvasFeaturesLayerProps {
         | 'onReplaceNode'
         | 'onReplaceAll'
         | 'onBeforeReplace'
+        | 'replaceVisible'
+        | 'onReplaceVisibleChange'
     >;
 }
 

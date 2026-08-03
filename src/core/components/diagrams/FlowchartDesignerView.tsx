@@ -61,6 +61,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
         canRedo,
         canUndo,
         canvasBg,
+        canvasSearchReplaceVisible,
         canvasSearchVisible,
         closeMenu,
         connectPreview,
@@ -191,6 +192,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
         setActiveRightTab,
         setAiChatVisible,
         setAutoRoutingEnabled,
+        setCanvasSearchReplaceVisible,
         setCanvasSearchVisible,
         setCommandPaletteVisible,
         setDiffResult,
@@ -406,7 +408,10 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                 gridVariant,
                                 toggleGrid: handleGridRotate,
                                 onShowShortcuts: () => setShowShortcuts(),
-                                onShowCanvasSearch: () => setCanvasSearchVisible(true),
+                                onShowCanvasSearch: () => {
+                                    setCanvasSearchReplaceVisible(false);
+                                    setCanvasSearchVisible(true);
+                                },
                                 onStrategyLayout: handleStrategyLayout,
                                 lastDomainStrategy,
                                 lastDomainDirection,
@@ -618,12 +623,17 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                         }}
                                         search={{
                                             visible: canvasSearchVisible,
-                                            onClose: () => setCanvasSearchVisible(false),
+                                            onClose: () => {
+                                                setCanvasSearchVisible(false);
+                                                setCanvasSearchReplaceVisible(false);
+                                            },
                                             nodes,
                                             onHighlightNode: setHighlightedNodeId,
                                             onReplaceNode: handleSearchReplaceNode,
                                             onReplaceAll: handleSearchReplaceAll,
                                             onBeforeReplace: handleBeforeReplace,
+                                            replaceVisible: canvasSearchReplaceVisible,
+                                            onReplaceVisibleChange: setCanvasSearchReplaceVisible,
                                         }}
                                     />}
                                     {editingEnabled && <FreehandDrawingLayer

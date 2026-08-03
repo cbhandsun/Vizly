@@ -191,7 +191,8 @@ export const useFlowchartDesignerController = ({
     const {
         isSidebarHidden, leftDrawerOpen, setLeftDrawerOpen, leftDrawerWidth, setLeftDrawerWidth, rightSidebarWidth, setRightSidebarWidth,
         isDrawingMode, setIsDrawingMode, historyPanelVisible, setHistoryPanelVisible, jsonEditorVisible, setJsonEditorVisible,
-        presentationActive, setPresentationActive, laserEnabled, diffResult, setDiffResult, canvasSearchVisible, setCanvasSearchVisible,
+        presentationActive, setPresentationActive, laserEnabled, diffResult, setDiffResult,
+        canvasSearchVisible, setCanvasSearchVisible, canvasSearchReplaceVisible, setCanvasSearchReplaceVisible,
         mobileRequestedPanel, setMobileRequestedPanel, mobilePropertyDrawerVisible, setMobilePropertyDrawerVisible,
         exportModalVisible, setExportModalVisible, pluginManagerVisible, setPluginManagerVisible,
         aiChatVisible, setAiChatVisible, activeRightTab, setActiveRightTab, commandPaletteVisible, setCommandPaletteVisible,
@@ -376,7 +377,8 @@ export const useFlowchartDesignerController = ({
         canAlign, canDistribute, handleAlign, handleDistribute,
         handleGroup, handleUngroup,
         nodesRef, edgesRef,
-        setCommandPaletteVisible: handleCommandPaletteVisibility, setShortcutHelpVisible, setCanvasSearchVisible,
+        setCommandPaletteVisible: handleCommandPaletteVisibility, setShortcutHelpVisible,
+        setCanvasSearchVisible, setCanvasSearchReplaceVisible,
         copyStyle, pasteStyle, hasCopiedStyle, saveAsTemplate,
         toggleGroupCollapse
     });
@@ -658,7 +660,7 @@ export const useFlowchartDesignerController = ({
 
     const viewModel = {
         ANNOTATION_COLORS, activeLayerId, activePlugin, activeRightTab, activeUsers, addAnnotation, aiChatVisible, annotationMode, annotations, autoRoutingEnabled,
-        canRedo, canUndo, canvasBg, canvasSearchVisible, closeMenu, commandPaletteItems, commandPaletteVisible, connectPreview, copyStyle, createLayer,
+        canRedo, canUndo, canvasBg, canvasSearchVisible, canvasSearchReplaceVisible, closeMenu, commandPaletteItems, commandPaletteVisible, connectPreview, copyStyle, createLayer,
         currentZoom, deleteAnnotation, deleteLayer, deleteTemplate, diagramIdForExport, diffResult, dynamicEdgeTypes, dynamicNodeTypes, edges,
         edgesRef, enhancedOnConnect, enhancedOnConnectEnd, exportModalVisible, extraExportItems, fileInputRef,
         getPreviousState, getReactFlowSnapshot, gridColor, gridVariant, groupedTemplates, guides, handleAddMindMap, handleAddNode, handleAddStickyNote, handleAlign,
@@ -678,7 +680,7 @@ export const useFlowchartDesignerController = ({
         presentationActive, presentationSlides, preset, quickAddMenu, reactFlowInstance, reactFlowWrapper, redo, renameLayer, renameTemplate, renderAIChatPanel,
         renderAIConfigModal, renderShareDialog, renderThemeSelector, renderVersionHistoryPanel, reorderLayers, rightSidebarWidth, saveState: displayedSaveState, saveTarget: displayedSaveTarget, selectedEdges, selectedNodes, setActiveLayerId,
         setActiveRightTab, setAiChatVisible, setAutoRoutingEnabled, setCanvasSearchVisible, setCommandPaletteVisible: handleCommandPaletteVisibility, setDiffResult, setEdges,
-        setExportModalVisible, setHighlightedNodeId, setHistoryPanelVisible, setIsCommentMode, setIsDrawingMode, setIsMarqueeActive, setJsonEditorVisible,
+        setCanvasSearchReplaceVisible, setExportModalVisible, setHighlightedNodeId, setHistoryPanelVisible, setIsCommentMode, setIsDrawingMode, setIsMarqueeActive, setJsonEditorVisible,
         setLayerColor, setLeftDrawerOpen, setLeftDrawerWidth, mobileRequestedPanel, setMobileRequestedPanel, setMobilePropertyDrawerVisible, setNodes, setOnboardingDismissed,
         setPluginManagerVisible, setPresentationActive, setPresentationSlides, setQuickConnectPreview, setRightSidebarWidth, setShortcutHelpVisible,
         setShowMinimap, setShowRuler, setShowShortcuts, setShowShortcutsModal, setSnapEnabled, shortcutHelpVisible, showAiCrown, showGrid, showMinimap,

@@ -154,4 +154,13 @@ describe('other-function commercial interaction safeguards', () => {
         expect(source).toContain('if (isSaving || previewVersion) return;');
         expect(source).toContain('退出预览后才能创建新快照');
     });
+
+    it('opens find and replace through explicit state instead of delayed DOM coupling', () => {
+        const handlerSource = readSource('../hooks/useDesignerEventHandlers.ts');
+
+        expect(handlerSource).toContain('setCanvasSearchReplaceVisible(false);');
+        expect(handlerSource).toContain('setCanvasSearchReplaceVisible(true);');
+        expect(handlerSource).not.toContain('document.querySelector(\'[title="查找替换 (Ctrl+H)"]\')');
+        expect(handlerSource).not.toContain('setTimeout(() =>');
+    });
 });

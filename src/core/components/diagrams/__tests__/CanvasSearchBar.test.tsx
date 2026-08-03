@@ -18,6 +18,7 @@ vi.mock('@xyflow/react', async () => {
 });
 
 import { CanvasSearchBar } from '../CanvasSearchBar';
+import { buildPresentationNodeSelector } from '../../presentation/presentationSelectorSafety';
 
 describe('CanvasSearchBar', () => {
     it('exposes named search, replace, navigation, and close controls', () => {
@@ -63,5 +64,50 @@ describe('CanvasSearchBar', () => {
 
         expect(css).toMatch(/@media \(max-width: 767px\)[\s\S]*?\.canvas-search-bar[\s\S]*?top: 96px/);
         expect(css).toMatch(/\.canvas-search-icon-button[\s\S]*?min-width: var\(--commercial-touch-target, 44px\) !important[\s\S]*?height: var\(--commercial-touch-target, 44px\) !important/);
+    });
+
+    it('opens replace mode from controlled shortcut state without a delayed DOM click', () => {
+        const onReplaceVisibleChange = vi.fn();
+        render(
+            <CanvasSearchBar
+                visible
+                replaceVisible
+                onReplaceVisibleChange={onReplaceVisibleChange}
+                onClose={vi.fn()}
+                nodes={[]}
+                onReplaceNode={vi.fn()}
+                onReplaceAll={vi.fn()}
+            />,
+        );
+
+        expect(screen.getByRole('textbox', { name: '替换为' })).toBeTruthy();
+        expect(screen.getByRole('status').textContent).toContain('画布暂无节点');
+        fireEvent.click(screen.getByRole('button', { name: '关闭替换' }));
+        expect(onReplaceVisibleChange).toHaveBeenCalledWith(false);
+    });
+
+    it('escapes imported node ids before composing highlight selectors', () => {
+        const unsafeId = 'node-1"] { color: red; } /*';
+        render(
+            <CanvasSearchBar
+                visible
+                onClose={vi.fn()}
+                nodes={[{
+                    id: unsafeId,
+                    position: { x: 0, y: 0 },
+                    data: { label: 'Unsafe imported node' },
+                }]}
+            />,
+        );
+
+        fireEvent.change(screen.getByRole('textbox', { name: '搜索画布节点' }), {
+            target: { value: 'Unsafe imported node' },
+        });
+
+        const styleText = Array.from(document.querySelectorAll('style'))
+            .map(style => style.textContent ?? '')
+            .join('\n');
+        expect(styleText).toContain(buildPresentationNodeSelector(unsafeId));
+        expect(styleText).not.toContain(`data-id="${unsafeId}"`);
     });
 });

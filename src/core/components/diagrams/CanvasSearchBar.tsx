@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { theme } from 'antd';
 import { FaSearch, FaChevronUp, FaChevronDown, FaTimes, FaExchangeAlt } from 'react-icons/fa';
 import { Node, useReactFlow } from '@xyflow/react';
+import { buildPresentationNodeSelector } from '../presentation/presentationSelectorSafety';
 
 export interface CanvasSearchBarProps {
     visible: boolean;
@@ -15,6 +16,9 @@ export interface CanvasSearchBarProps {
     onReplaceAll?: (matches: string[], newLabel: string) => void;
     /** 替换前记录快照 */
     onBeforeReplace?: () => void;
+    /** 受控替换栏状态，用于可靠响应 Ctrl+H 等外部入口 */
+    replaceVisible?: boolean;
+    onReplaceVisibleChange?: (visible: boolean) => void;
 }
 
 type ThemeToken = ReturnType<typeof theme.useToken>['token'];
@@ -31,6 +35,8 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
     onReplaceNode,
     onReplaceAll,
     onBeforeReplace,
+    replaceVisible,
+    onReplaceVisibleChange,
 }) => {
     const { token } = theme.useToken();
     const reactFlow = useReactFlow();
@@ -41,7 +47,12 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
 
     // Phase 2：替换功能
     const [replaceText, setReplaceText] = useState('');
-    const [showReplace, setShowReplace] = useState(false);
+    const [internalReplaceVisible, setInternalReplaceVisible] = useState(false);
+    const showReplace = replaceVisible ?? internalReplaceVisible;
+    const setShowReplace = useCallback((visible: boolean) => {
+        if (replaceVisible === undefined) setInternalReplaceVisible(visible);
+        onReplaceVisibleChange?.(visible);
+    }, [onReplaceVisibleChange, replaceVisible]);
 
     const focusNode = useCallback((nodeId: string) => {
         const node = nodes.find(n => n.id === nodeId);
@@ -145,7 +156,7 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
 
         // 当前匹配项：脉冲蓝色高亮
         const currentSelector = currentMatchId
-            ? `.react-flow__node[data-id="${currentMatchId}"] { 
+            ? `${buildPresentationNodeSelector(currentMatchId)} {
                 outline: 3px solid rgba(59, 130, 246, 0.8) !important; 
                 outline-offset: 4px !important;
                 border-radius: 8px;
@@ -157,7 +168,7 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
         // 其他匹配项：subtle 高亮
         const otherSelectors = matchIds
             .filter(id => id !== currentMatchId)
-            .map(id => `.react-flow__node[data-id="${id}"]`)
+            .map(buildPresentationNodeSelector)
             .join(',\n');
         const otherStyles = otherSelectors
             ? `${otherSelectors} { 
@@ -170,7 +181,7 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
         // 非匹配项：降低透明度
         const dimSelectors = nodes
             .filter(n => !matchIds.includes(n.id))
-            .map(n => `.react-flow__node[data-id="${n.id}"]`)
+            .map(n => buildPresentationNodeSelector(n.id))
             .join(',\n');
         const dimStyles = dimSelectors
             ? `${dimSelectors} { opacity: 0.35 !important; transition: opacity 0.3s ease !important; }`
@@ -245,7 +256,7 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
                         <button
                             className="canvas-search-icon-button"
                             aria-label={showReplace ? '关闭替换' : '打开查找替换'}
-                            onClick={() => setShowReplace(v => !v)}
+                            onClick={() => setShowReplace(!showReplace)}
                             title="查找替换 (Ctrl+H)"
                             style={{
                                 ...navBtnStyle(true, token),
@@ -260,6 +271,16 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
                         <FaTimes size={11} />
                     </button>
                 </div>
+
+                {nodes.length === 0 && (
+                    <div role="status" aria-live="polite" style={{
+                        padding: '0 10px 8px 28px',
+                        color: token.colorTextTertiary,
+                        fontSize: 11,
+                    }}>
+                        画布暂无节点，请先添加节点
+                    </div>
+                )}
 
                 {/* ── 替换行（可折叠）── */}
                 {showReplace && (

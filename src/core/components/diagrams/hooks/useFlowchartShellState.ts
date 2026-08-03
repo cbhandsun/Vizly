@@ -44,6 +44,7 @@ export function useFlowchartShellState(themeGrid: unknown, initialShowMinimap = 
     const [laserEnabled, setLaserEnabled] = useState(false);
     const [diffResult, setDiffResult] = useState<DiffResult | null>(null);
     const [canvasSearchVisible, setCanvasSearchVisible] = useState(false);
+    const [canvasSearchReplaceVisible, setCanvasSearchReplaceVisible] = useState(false);
     const [mobileRequestedPanel, setMobileRequestedPanel] = useState<MobileIconRailPanelRequest | null>(null);
     const [mobilePropertyDrawerVisible, setMobilePropertyDrawerVisible] = useState(false);
     const [exportModalVisible, setExportModalVisible] = useState(false);
@@ -90,7 +91,8 @@ export function useFlowchartShellState(themeGrid: unknown, initialShowMinimap = 
         isSidebarHidden: false,
         leftDrawerOpen, setLeftDrawerOpen, leftDrawerWidth, setLeftDrawerWidth, rightSidebarWidth, setRightSidebarWidth,
         isDrawingMode, setIsDrawingMode, historyPanelVisible, setHistoryPanelVisible, jsonEditorVisible, setJsonEditorVisible,
-        presentationActive, setPresentationActive, laserEnabled, diffResult, setDiffResult, canvasSearchVisible, setCanvasSearchVisible,
+        presentationActive, setPresentationActive, laserEnabled, diffResult, setDiffResult,
+        canvasSearchVisible, setCanvasSearchVisible, canvasSearchReplaceVisible, setCanvasSearchReplaceVisible,
         mobileRequestedPanel, setMobileRequestedPanel, mobilePropertyDrawerVisible, setMobilePropertyDrawerVisible,
         exportModalVisible, setExportModalVisible, pluginManagerVisible, setPluginManagerVisible,
         aiChatVisible, setAiChatVisible, activeRightTab, setActiveRightTab,

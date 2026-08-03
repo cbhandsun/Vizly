@@ -52,6 +52,7 @@ export interface UseDesignerEventHandlersProps {
     setCommandPaletteVisible: (visible: boolean) => void;
     setShortcutHelpVisible: (visible: boolean) => void;
     setCanvasSearchVisible: (visible: boolean) => void;
+    setCanvasSearchReplaceVisible: (visible: boolean) => void;
     copyStyle: (node: Node) => void;
     pasteStyle: (nodeIds: string[]) => void;
     hasCopiedStyle: boolean;
@@ -72,7 +73,7 @@ export function useDesignerEventHandlers({
     handleGroup, handleUngroup,
     nodesRef, edgesRef,
     setCommandPaletteVisible, setShortcutHelpVisible,
-    setCanvasSearchVisible,
+    setCanvasSearchVisible, setCanvasSearchReplaceVisible,
     copyStyle, pasteStyle, hasCopiedStyle, saveAsTemplate,
     toggleGroupCollapse
 }: UseDesignerEventHandlersProps) {
@@ -205,13 +206,14 @@ export function useDesignerEventHandlers({
                 const target = e.target as HTMLElement;
                 if (!['INPUT', 'TEXTAREA'].includes(target.tagName) && !target.isContentEditable) {
                     e.preventDefault();
+                    setCanvasSearchReplaceVisible(false);
                     setCanvasSearchVisible(true);
                 }
             }
         };
         window.addEventListener('keydown', handleCtrlF);
         return () => window.removeEventListener('keydown', handleCtrlF);
-    }, [setCanvasSearchVisible]);
+    }, [setCanvasSearchReplaceVisible, setCanvasSearchVisible]);
 
     // Ctrl+H：打开查找替换
     useEffect(() => {
@@ -220,18 +222,14 @@ export function useDesignerEventHandlers({
                 const target = e.target as HTMLElement;
                 if (!['INPUT', 'TEXTAREA'].includes(target.tagName) && !target.isContentEditable) {
                     e.preventDefault();
+                    setCanvasSearchReplaceVisible(true);
                     setCanvasSearchVisible(true);
-                    // 延迟点击替换切换按钮（组件挂载后）
-                    setTimeout(() => {
-                        const replaceToggle = document.querySelector('[title="查找替换 (Ctrl+H)"]') as HTMLButtonElement;
-                        replaceToggle?.click();
-                    }, 80);
                 }
             }
         };
         window.addEventListener('keydown', handleCtrlH);
         return () => window.removeEventListener('keydown', handleCtrlH);
-    }, [setCanvasSearchVisible]);
+    }, [setCanvasSearchReplaceVisible, setCanvasSearchVisible]);
 
     // Tab / Shift+Tab：在节点间循环导航
     useEffect(() => {
