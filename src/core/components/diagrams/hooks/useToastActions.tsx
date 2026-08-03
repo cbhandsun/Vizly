@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next';
 import type { Node, Edge } from '@xyflow/react';
 import type { MessageInstance } from 'antd/es/message/interface';
 import type { NotificationInstance } from 'antd/es/notification/interface';
-import { parseClipboardJson } from '../../../utils/flowchartClipboard';
 import type { DiagramActionTarget } from './useDiagramActions';
 
 /**
@@ -21,7 +20,7 @@ interface UseToastActionsProps {
     handleDuplicate: (target?: DiagramActionTarget) => void;
     // Clipboard actions
     handleCopy: () => void;
-    handlePaste: () => void;
+    handlePaste: () => Promise<boolean>;
     handleCut: () => void;
     // Group actions
     handleGroup: () => void;
@@ -35,8 +34,6 @@ interface UseToastActionsProps {
     selectedEdges: Edge[];
     nodesRef: React.RefObject<Node[]>;
     edgesRef: React.RefObject<Edge[]>;
-    // Clipboard key
-    clipboardKey: string;
 }
 
 export function useToastActions({
@@ -55,7 +52,6 @@ export function useToastActions({
     selectedEdges,
     nodesRef,
     edgesRef,
-    clipboardKey,
 }: UseToastActionsProps) {
     const { t } = useTranslation();
 
@@ -87,33 +83,26 @@ export function useToastActions({
     // --- Copy / Paste / Cut ---
     // 📋 Copy 操作静默执行（行业标准：Figma/Miro 的 Ctrl+C 不弹 toast）
     const handleCopyWithToast = useCallback(() => {
-        if (selectedNodes.length === 0 && selectedEdges.length === 0) {
+        if (selectedNodes.length === 0) {
             return; // 无选中 → 静默忽略
         }
         handleCopy();
-    }, [handleCopy, selectedEdges.length, selectedNodes.length]);
+    }, [handleCopy, selectedNodes.length]);
 
-    const handlePasteWithToast = useCallback(() => {
-        const raw = localStorage.getItem(clipboardKey);
-        if (!raw) {
+    const handlePasteWithToast = useCallback(async () => {
+        const didPaste = await handlePaste();
+        if (!didPaste) {
             messageApi.info(t('designer.flowchart.toast.nothingToPaste'));
-            return;
         }
-        const parsed = parseClipboardJson(raw);
-        if (!parsed) {
-            messageApi.info(t('designer.flowchart.toast.nothingToPaste'));
-            return;
-        }
-        handlePaste();
-    }, [clipboardKey, handlePaste, messageApi, t]);
+    }, [handlePaste, messageApi, t]);
 
     const handleCutWithToast = useCallback(() => {
-        if (selectedNodes.length === 0 && selectedEdges.length === 0) {
+        if (selectedNodes.length === 0) {
             messageApi.info(t('designer.flowchart.toast.nothingToCut'));
             return;
         }
         handleCut();
-    }, [handleCut, messageApi, selectedEdges.length, selectedNodes.length, t]);
+    }, [handleCut, messageApi, selectedNodes.length, t]);
 
     // --- Delete / Duplicate ---
     const getDeleteCounts = useCallback((target?: DiagramActionTarget) => {
@@ -201,7 +190,7 @@ export function useToastActions({
             return;
         }
         if (action === 'paste') {
-            handlePasteWithToast();
+            void handlePasteWithToast();
             return;
         }
         if (action === 'reverseEdge') {

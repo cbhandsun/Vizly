@@ -104,7 +104,8 @@ export function useDesignerEventHandlers({
     });
 
     const { handleCopy, handlePaste, handleCut } = useClipboard({
-        nodes, edges, selectedNodes, selectedEdges, setNodes, setEdges, takeSnapshot
+        nodesRef, edgesRef, selectedNodes, selectedEdges, setNodes, setEdges, takeSnapshot,
+        clipboardKey: FLOWCHART_CLIPBOARD_KEY,
     });
 
     const {
@@ -114,7 +115,6 @@ export function useDesignerEventHandlers({
     } = useToastActions({
         messageApi, notificationApi, handleDelete, handleDuplicate, handleCopy, handlePaste, handleCut,
         handleGroup, handleUngroup, onContextMenuAction, undo, selectedNodes, selectedEdges, nodesRef, edgesRef,
-        clipboardKey: FLOWCHART_CLIPBOARD_KEY,
     });
 
     const { layoutContainer } = useContainerAutoLayout();
@@ -177,7 +177,7 @@ export function useDesignerEventHandlers({
         onRedo: () => { if (editingEnabled) redo(); },
         onSelectAll: handleSelectAll,
         onCopy: () => { if (!isDraggingRef.current) handleCopyWithToast(); },
-        onPaste: () => { if (editingEnabled) handlePasteWithToast(); },
+        onPaste: () => { if (editingEnabled) void handlePasteWithToast(); },
         onCut: () => { if (editingEnabled && !isDraggingRef.current) handleCutWithToast(); },
         onGroup: () => { if (editingEnabled) handleGroupWithToast(); },
         onUngroup: () => { if (editingEnabled) handleUngroupWithToast(); },

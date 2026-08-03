@@ -16,8 +16,8 @@ import {
 } from './clipboardLogging';
 
 interface UseClipboardProps {
-    nodes: Node[];
-    edges: Edge[];
+    nodesRef: React.RefObject<Node[]>;
+    edgesRef: React.RefObject<Edge[]>;
     selectedNodes: Node[];
     selectedEdges: Edge[];
     setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
@@ -35,8 +35,8 @@ const PASTE_OFFSET = 20;
  * 2. 跨应用粘贴：从系统剪贴板读取 JSON 或 Mermaid 文本
  */
 export const useClipboard = ({
-    nodes,
-    edges,
+    nodesRef,
+    edgesRef,
     selectedNodes,
     selectedEdges,
     setNodes,
@@ -48,22 +48,30 @@ export const useClipboard = ({
     const handleCopy = useCallback(() => {
         if (selectedNodes.length === 0) return;
 
-        const clipboardData: ClipboardData = buildFlowchartClipboardData(selectedNodes, edges);
+        const clipboardData: ClipboardData = buildFlowchartClipboardData(selectedNodes, edgesRef.current);
+        let serializedClipboard: string;
 
         try {
-            localStorage.setItem(clipboardKey, JSON.stringify(clipboardData));
+            serializedClipboard = JSON.stringify(clipboardData);
+        } catch (error) {
+            logClipboardWriteFailure(error);
+            return;
+        }
 
-            // 同时写入系统剪贴板（跨应用支持）
-            if (navigator.clipboard && window.isSecureContext) {
-                navigator.clipboard.writeText(JSON.stringify(clipboardData, null, 2))
-                    .catch((error) => {
-                        logClipboardSystemWriteFailure(error);
-                    });
-            }
+        try {
+            localStorage.setItem(clipboardKey, serializedClipboard);
         } catch (error) {
             logClipboardWriteFailure(error);
         }
-    }, [selectedNodes, edges, clipboardKey]);
+
+        // 两个剪贴板通道相互独立：本地存储失败时仍应保留跨应用复制能力。
+        if (navigator.clipboard && window.isSecureContext) {
+            void navigator.clipboard.writeText(serializedClipboard)
+                .catch((error) => {
+                    logClipboardSystemWriteFailure(error);
+                });
+        }
+    }, [clipboardKey, edgesRef, selectedNodes]);
 
     /**
      * 尝试解析文本为 ClipboardData
@@ -112,9 +120,9 @@ export const useClipboard = ({
             }
         }
 
-        if (!clipboardData || clipboardData.nodes.length === 0) return;
+        if (!clipboardData || clipboardData.nodes.length === 0) return false;
 
-        takeSnapshot(nodes, edges);
+        takeSnapshot(nodesRef.current, edgesRef.current);
 
         // 生成新 ID
         const idMap = new Map<string, string>();
@@ -147,13 +155,15 @@ export const useClipboard = ({
             ...eds.map(e => ({ ...e, selected: false })),
             ...newEdges,
         ]);
-    }, [nodes, edges, setNodes, setEdges, takeSnapshot, parseClipboardText, clipboardKey]);
+        return true;
+    }, [clipboardKey, edgesRef, nodesRef, parseClipboardText, setEdges, setNodes, takeSnapshot]);
 
     const handleCut = useCallback(() => {
-        if (selectedNodes.length === 0 && selectedEdges.length === 0) return;
+        // 连线没有可独立粘贴的载荷；与右键菜单一致，禁止仅剪切连线后不可恢复地删除。
+        if (selectedNodes.length === 0) return;
 
         handleCopy();
-        takeSnapshot(nodes, edges);
+        takeSnapshot(nodesRef.current, edgesRef.current);
 
         const selectedNodeIds = new Set(selectedNodes.map(n => n.id));
         const selectedEdgeIds = new Set(selectedEdges.map(e => e.id));
@@ -164,7 +174,7 @@ export const useClipboard = ({
             !selectedNodeIds.has(e.source) &&
             !selectedNodeIds.has(e.target)
         ));
-    }, [selectedNodes, selectedEdges, nodes, edges, setNodes, setEdges, takeSnapshot, handleCopy]);
+    }, [edgesRef, handleCopy, nodesRef, selectedEdges, selectedNodes, setEdges, setNodes, takeSnapshot]);
 
     return { handleCopy, handlePaste, handleCut };
 };
