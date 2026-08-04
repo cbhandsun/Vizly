@@ -10,8 +10,8 @@ import { useDiagramHostStorage } from '@/core/hooks/useDiagramHostStorage';
 import { useSubscription } from '../context/useSubscription';
 
 import { LayeredConfigManager, ConfigLayer } from '@/core/config/LayeredConfigManager';
-import { useYjsCollaboration } from './diagrams/collaboration/YjsProviderHooks';
 import { useCloudSave } from './diagrams/hooks/useCloudSave';
+import { useDiagramViewerCollaboration } from './useDiagramViewerCollaboration';
 import { parseAIDiagramJson } from './ai/aiDiagramImport';
 import {
     logDiagramViewerBridgeCleanupFailure,
@@ -60,12 +60,6 @@ import { ensureDiagramSwitchConfirmed } from './diagramViewerSwitchGuard';
 import { parseRemoteDiagramContent } from '@/services/remoteDiagramContent';
 import { coerceToStandardDiagramData } from '@/core/utils/coerceDiagram';
 import { importMermaidGraphToBridge } from './diagramViewerMermaidImport';
-import {
-    normalizeCollaborationRoomName,
-    normalizeCollaborationServerUrl,
-    normalizeCollaborationToken,
-} from './diagrams/collaboration/collaborationSecurity';
-
 import {
     coerceRemoteDiagramSelection,
     selectDiagramViewerTemplate,
@@ -132,20 +126,22 @@ const DiagramViewer: React.FC = () => {
     const [refreshNonce, setRefreshNonce] = useState(0);
 
     // =============== Phase 5: IoC 依赖注入层 =================
-    const YJS_WS_URL = normalizeCollaborationServerUrl(import.meta.env.VITE_YJS_WEBSOCKET_URL || '') || '';
     const roomFromUrl = getDiagramViewerRouteParam(searchParams, browserLocation, 'room');
-    const [collabModalVisible, setCollabModalVisible] = useState(false);
-    const roomName = normalizeCollaborationRoomName(roomFromUrl || `vizly-room-${selectedDiagramId}`);
-    
-    // Enable if user specifically clicks Share, OR if the url has ?room=, OR cloud-sync is active
-    const wantsCollaboration = !!roomFromUrl || collabModalVisible || hasFeature('cloud-sync');
-    const isCollabEnabled = Boolean(YJS_WS_URL) && wantsCollaboration;
-
-    const { isSynced: isYjsSynced, pushLocalChangesToYjs, activeUsers, provider } = useYjsCollaboration({
+    const {
+        activeUsers,
+        collaborationStatus,
+        collabModalVisible,
+        isSynced: isYjsSynced,
+        openCollaborationModal,
+        provider,
+        pushLocalChangesToYjs,
         roomName,
-        serverUrl: YJS_WS_URL,
-        token: normalizeCollaborationToken(jwtToken),
-        enabled: isCollabEnabled
+        setCollabModalVisible,
+    } = useDiagramViewerCollaboration({
+        cloudSyncEnabled: hasFeature('cloud-sync'),
+        jwtToken,
+        roomFromUrl,
+        selectedDiagramId,
     });
 
     const { saveToCloud, shareDialogOpen, openShareDialog, closeShareDialog, ensureSaved } = useCloudSave(selectedDiagramId);
@@ -658,6 +654,8 @@ const DiagramViewer: React.FC = () => {
             refreshNonce={refreshNonce}
             onExportPermissionCheck={handleExportPermissionCheck}
             isYjsSynced={isYjsSynced}
+            collaborationStatus={collaborationStatus}
+            openCollaborationModal={openCollaborationModal}
             pushLocalChangesToYjs={pushLocalChangesToYjs}
             provider={provider ?? null}
             saveToCloud={saveToCloud}

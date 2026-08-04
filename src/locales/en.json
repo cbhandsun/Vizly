@@ -1107,6 +1107,7 @@
         "options": "Export Options",
         "export": "Export",
         "fileGroup": "File export",
+        "fileGroupEmpty": "File export (add content first)",
         "cloudGroup": "Cloud and sharing",
         "png": "PNG Format",
         "pdf": "PDF Format",
@@ -2218,7 +2219,10 @@
         "offlineMode": "Offline Mode",
         "connecting": "Connecting to collaboration service...",
         "connected": "Connected to collaboration service",
-        "disconnected": "Collaboration connection lost"
+        "disconnected": "Collaboration connection lost",
+        "unavailable": "Collaboration service is not configured",
+        "activeCount": "{{count}} collaborator(s) active",
+        "openDetails": "Open collaboration details: {{status}}"
     },
     "services": {
         "docGen": {

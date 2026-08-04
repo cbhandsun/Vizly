@@ -1208,6 +1208,7 @@
         "options": "导出选项",
         "export": "导出",
         "fileGroup": "文件导出",
+        "fileGroupEmpty": "文件导出（请先添加内容）",
         "cloudGroup": "云端与分享",
         "png": "PNG 格式",
         "pdf": "PDF 格式",
@@ -2096,7 +2097,10 @@
         "offlineMode": "离线模式",
         "connecting": "正在连接协作服务...",
         "connected": "已连接协作服务",
-        "disconnected": "协作连接已断开"
+        "disconnected": "协作连接已断开",
+        "unavailable": "协作服务尚未配置",
+        "activeCount": "{{count}} 位在协作",
+        "openDetails": "打开协作详情：{{status}}"
     },
     "storageConfig": {
         "headerTitle": "存储配置",

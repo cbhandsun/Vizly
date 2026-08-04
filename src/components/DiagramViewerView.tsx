@@ -5,8 +5,11 @@ import { ConfigProvider } from 'antd';
 
 import { CommandPalette } from '@/core/components/ui/CommandPalette';
 import type { CommandItem } from '@/core/types/plugin';
-import type { DiagramExportFormat } from '@/core/types/diagram-components';
-import type { DiagramComponentProps } from '@/core/types/diagram-components';
+import type {
+    DiagramCollaborationStatus,
+    DiagramComponentProps,
+    DiagramExportFormat,
+} from '@/core/types/diagram-components';
 import DiagramControlBridge from '@/core/components/shared/DiagramControlBridge';
 import { DiagramThemeProvider } from '@/core/themes/DiagramThemeProvider';
 import { appMessage } from '@/core/utils/antdStaticBridge';
@@ -73,6 +76,8 @@ interface DiagramViewerViewProps {
     refreshNonce: number;
     onExportPermissionCheck: (format: DiagramExportFormat) => boolean;
     isYjsSynced: boolean;
+    collaborationStatus: DiagramCollaborationStatus;
+    openCollaborationModal: () => void;
     pushLocalChangesToYjs: NonNullable<DiagramComponentProps['onSyncPush']>;
     provider: { awareness?: DiagramComponentProps['yAwareness'] } | null;
     saveToCloud: DiagramComponentProps['onCloudSave'];
@@ -137,6 +142,8 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
     refreshNonce,
     onExportPermissionCheck,
     isYjsSynced,
+    collaborationStatus,
+    openCollaborationModal,
     pushLocalChangesToYjs,
     provider,
     saveToCloud,
@@ -268,6 +275,8 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
                                                 onReadonlyChange={onReadonlyChange}
                                                 onExportPermissionCheck={onExportPermissionCheck}
                                                 isYjsSynced={isYjsSynced}
+                                                collaborationStatus={collaborationStatus}
+                                                onOpenCollaboration={openCollaborationModal}
                                                 onSyncPush={pushLocalChangesToYjs}
                                                 activeUsers={activeUsers || []}
                                                 yAwareness={provider?.awareness}

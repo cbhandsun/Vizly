@@ -20,6 +20,19 @@
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+.presence-glass-button {
+    appearance: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+    text-align: left;
+}
+
+.presence-glass-button:focus-visible {
+    outline: 3px solid rgba(26, 115, 232, 0.45);
+    outline-offset: 2px;
+}
+
 .presence-glass-capsule:hover {
     background: rgba(255, 255, 255, 0.6);
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
@@ -49,6 +62,15 @@
     letter-spacing: -0.01em;
 }
 
+.presence-count .ant-badge-status-dot {
+    margin-right: 6px;
+}
+
+.presence-users-count {
+    font-size: 11px;
+    color: #64748b;
+}
+
 [data-theme='dark'] .presence-glass-capsule {
     background: rgba(30, 30, 46, 0.5);
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -61,6 +83,10 @@
 
 [data-theme='dark'] .presence-count {
     color: rgba(255, 255, 255, 0.85);
+}
+
+[data-theme='dark'] .presence-users-count {
+    color: rgba(255, 255, 255, 0.6);
 }
 
 .presence-avatar-badge .ant-badge-status-dot {

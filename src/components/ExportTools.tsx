@@ -11,7 +11,7 @@ import { useSubscription } from '@/context/useSubscription';
 import { tryAttachDiagramSnapshot } from '@/core/utils/diagramSnapshot';
 import { invalidateRemoteDiagramPreview } from '@/services/remoteDiagramPreview';
 import { appMessage } from '@/core/utils/antdStaticBridge';
-import { getFlowDataBridge, getStandardFlowDataBridge } from '@/core/utils/flowDataBridge';
+import { getFlowDataBridge, getFlowDataBridgeNodes, getStandardFlowDataBridge } from '@/core/utils/flowDataBridge';
 import { logCloudSaveEnsureFailure, logCloudSaveFailure } from '@/components/diagrams/hooks/diagramStorageLogging';
 import { downloadFile } from '@/core/utils/downloadUtils';
 import { escapeMarkdownInlineText, escapeMarkdownTableCell, escapeMermaidLabel, toMermaidNodeId } from '@/core/utils/exportTextSecurity';
@@ -22,6 +22,7 @@ import {
   readDiagramExportEventDetail,
 } from './diagramExportEvent';
 import { resolveExportPopupContainer } from './exportPopupContainer';
+import { resolveExportableNodeCount, resolveExportMenuAvailability } from './exportMenuAvailability';
 
 const ShareDialog = React.lazy(() => import('@/components/diagrams/ShareDialog'));
 const CloudStorageManagerModal = React.lazy(() => import('@/components/storage/CloudStorageManagerModal').then(async (m) => {
@@ -84,6 +85,15 @@ const ExportTools: React.FC<ExportToolsProps> = ({
   const [exportProgress, setExportProgress] = useState<number>(0);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [cloudManagerOpen, setCloudManagerOpen] = useState(false);
+  const [exportableNodeCount, setExportableNodeCount] = useState(0);
+  const readExportableNodeCount = useCallback(() => resolveExportableNodeCount(
+    reactFlowInstance.getNodes().length,
+    getFlowDataBridgeNodes(diagramId).length,
+  ), [diagramId, reactFlowInstance]);
+  const handleExportMenuOpenChange = useCallback((open: boolean) => {
+    if (open) setExportableNodeCount(readExportableNodeCount());
+  }, [readExportableNodeCount]);
+  const exportMenuAvailability = resolveExportMenuAvailability(exportableNodeCount, isExporting);
 
   /**
    * 等待浏览器完成一次绘制（使用 requestAnimationFrame）。
@@ -355,35 +365,35 @@ ${mermaid}
       label: t('export.png'),
       icon: <FaFileImage />,
       onClick: handleExportPNG,
-      disabled: isExporting
+      disabled: exportMenuAvailability.fileExportDisabled
     },
     {
       key: 'pdf',
       label: t('export.pdf'),
       icon: <FaFilePdf />,
       onClick: handleExportPDF,
-      disabled: isExporting
+      disabled: exportMenuAvailability.fileExportDisabled
     },
     {
       key: 'svg',
       label: t('export.svg'),
       icon: <FaFileCode />,
       onClick: handleExportSVG,
-      disabled: isExporting
+      disabled: exportMenuAvailability.fileExportDisabled
     },
     {
       key: 'gif',
       label: t('export.gif'),
       icon: <FaFileVideo />,
       onClick: handleExportGIF,
-      disabled: isExporting
+      disabled: exportMenuAvailability.fileExportDisabled
     },
     {
       key: 'markdown',
       label: t('export.markdown'),
       icon: <FaFileCode />,
       onClick: handleExportMarkdown,
-      disabled: isExporting
+      disabled: exportMenuAvailability.fileExportDisabled
     },
   ];
   const cloudItems: MenuProps['items'] = [
@@ -413,7 +423,7 @@ ${mermaid}
     {
       key: 'file-export-group',
       type: 'group',
-      label: t('export.fileGroup'),
+      label: t(exportMenuAvailability.fileGroupLabelKey),
       children: fileExportItems,
     },
     { type: 'divider' },
@@ -501,6 +511,7 @@ ${mermaid}
         <Dropdown
           menu={{ items }}
           trigger={['click']}
+          onOpenChange={handleExportMenuOpenChange}
           placement="bottomRight"
           getPopupContainer={() => resolveExportPopupContainer(document)}
         >

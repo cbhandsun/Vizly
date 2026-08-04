@@ -8,7 +8,10 @@ import { TopActionButtons } from '../TopActionButtons';
 import { ModernFlowchartToolbar } from '../ModernFlowchartToolbar';
 import type { ReactFlowRenderSnapshot } from '../../../rendering/reactFlowScene';
 import type { CollaborationPresenceUser } from '../collaborationPresence';
-import type { DiagramExportFormat } from '../../../types/diagram-components';
+import type {
+    DiagramCollaborationStatus,
+    DiagramExportFormat,
+} from '../../../types/diagram-components';
 
 type TopActionProps = React.ComponentProps<typeof TopActionButtons>;
 type ToolbarProps = React.ComponentProps<typeof ModernFlowchartToolbar>;
@@ -30,6 +33,8 @@ export interface DesignerHeaderLayerProps {
         rightOffset: number;
         extraExportItems?: TopActionProps['extraExportItems'];
         isYjsSynced?: boolean;
+        collaborationStatus?: DiagramCollaborationStatus;
+        onOpenCollaboration?: () => void;
         isReadonly: boolean;
         onReadonlyChange: (v: boolean) => void;
         onOpenSettings?: () => void;
@@ -118,6 +123,10 @@ export const DesignerHeaderLayer = React.memo(
         toolbar
     }: DesignerHeaderLayerProps) => {
         const { t } = useTranslation();
+        const showCollaborationPresence = (
+            topActions.collaborationStatus !== undefined
+            && topActions.collaborationStatus !== 'inactive'
+        ) || (topActions.activeUsers?.length ?? 0) > 0;
 
         return (
             <>
@@ -181,9 +190,13 @@ export const DesignerHeaderLayer = React.memo(
                 )}
 
                 {/* GAP-02: Premium Collaboration Presence */}
-                {topActions.activeUsers && topActions.activeUsers.length > 0 && (
+                {showCollaborationPresence && (
                     <div style={{ position: 'absolute', top: 16, right: topActions.rightOffset + 280, zIndex: 110 }} className="designer-top-presence">
-                        <PresenceHeader activeUsers={topActions.activeUsers} />
+                        <PresenceHeader
+                            activeUsers={topActions.activeUsers}
+                            status={topActions.collaborationStatus}
+                            onOpen={topActions.onOpenCollaboration}
+                        />
                     </div>
                 )}
                 

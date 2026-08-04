@@ -7,6 +7,13 @@ import { LayoutType } from './layout';
 
 export type DiagramExportFormat = 'pdf' | 'svg';
 
+export type DiagramCollaborationStatus =
+  | 'inactive'
+  | 'unavailable'
+  | 'connecting'
+  | 'connected'
+  | 'disconnected';
+
 export interface DiagramPanelRenderControls {
   onClose: () => void;
 }
@@ -89,6 +96,10 @@ export interface DiagramComponentProps {
   // ==========================================
   /** (IoC) YJS/云同步是否已连接 */
   isYjsSynced?: boolean;
+  /** (IoC) 协作会话的可见连接状态。 */
+  collaborationStatus?: DiagramCollaborationStatus;
+  /** (IoC) 打开实时协作详情。 */
+  onOpenCollaboration?: () => void;
   /** (IoC) 本地状态改变时推送给云协作端 */
   onSyncPush?: (nodes: Node[], edges: Edge[]) => void;
   /** (IoC) Active remote users for cursors */
