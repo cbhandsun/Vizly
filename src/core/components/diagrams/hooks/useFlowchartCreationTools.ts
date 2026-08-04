@@ -13,8 +13,10 @@ interface FlowchartCreationToolsOptions {
     editingEnabled: boolean;
     isDrawingMode: boolean;
     isMarqueeActive: boolean;
+    isCommentMode: boolean;
     setIsDrawingMode: Dispatch<SetStateAction<boolean>>;
     setIsMarqueeActive: Dispatch<SetStateAction<boolean>>;
+    setIsCommentMode: (enabled: boolean) => void;
     activeLayerId: string;
     nodesRef: MutableRefObject<Node[]>;
     edgesRef: MutableRefObject<Edge[]>;
@@ -28,8 +30,10 @@ export const useFlowchartCreationTools = ({
     editingEnabled,
     isDrawingMode,
     isMarqueeActive,
+    isCommentMode,
     setIsDrawingMode,
     setIsMarqueeActive,
+    setIsCommentMode,
     activeLayerId,
     nodesRef,
     edgesRef,
@@ -38,29 +42,44 @@ export const useFlowchartCreationTools = ({
     takeSnapshot,
     t,
 }: FlowchartCreationToolsOptions) => {
-    const modeActions = useFlowchartToolModeShortcuts({
-        editingEnabled,
-        isDrawingMode,
-        isMarqueeActive,
-        setIsDrawingMode,
-        setIsMarqueeActive,
-    });
-
-    const handleAddStickyNote = useCallback(() => {
-        if (!reactFlowInstance) return;
+    const addStickyNote = useCallback(() => {
+        if (!editingEnabled || !reactFlowInstance) return;
         takeSnapshot(nodesRef.current, edgesRef.current);
         addFlowchartStickyNote({ layer: activeLayerId, setNodes });
-    }, [activeLayerId, edgesRef, nodesRef, reactFlowInstance, setNodes, takeSnapshot]);
+    }, [activeLayerId, edgesRef, editingEnabled, nodesRef, reactFlowInstance, setNodes, takeSnapshot]);
 
-    const handleAddMindMap = useCallback(() => {
-        if (!reactFlowInstance) return;
+    const addMindMap = useCallback(() => {
+        if (!editingEnabled || !reactFlowInstance) return;
         takeSnapshot(nodesRef.current, edgesRef.current);
         addFlowchartMindMapNode({
             layer: activeLayerId,
             label: t('designer.flowchart.mindMapCenter'),
             setNodes,
         });
-    }, [activeLayerId, edgesRef, nodesRef, reactFlowInstance, setNodes, t, takeSnapshot]);
+    }, [activeLayerId, edgesRef, editingEnabled, nodesRef, reactFlowInstance, setNodes, t, takeSnapshot]);
+
+    const modeActions = useFlowchartToolModeShortcuts({
+        editingEnabled,
+        isDrawingMode,
+        isMarqueeActive,
+        isCommentMode,
+        setIsDrawingMode,
+        setIsMarqueeActive,
+        setIsCommentMode,
+        onAddStickyNote: addStickyNote,
+        onAddMindMap: addMindMap,
+    });
+    const { activatePointer } = modeActions;
+
+    const handleAddStickyNote = useCallback(() => {
+        activatePointer();
+        addStickyNote();
+    }, [activatePointer, addStickyNote]);
+
+    const handleAddMindMap = useCallback(() => {
+        activatePointer();
+        addMindMap();
+    }, [activatePointer, addMindMap]);
 
     const handleAddFreehandStroke = useCallback((stroke: FreehandStroke) => {
         const node = createFreehandNode(stroke, activeLayerId);

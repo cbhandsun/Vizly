@@ -521,7 +521,7 @@
             "marqueeExit": "Exit Marquee (Esc)",
             "drawingMode": "Freehand Draw (P)",
             "stickyNote": "Sticky Note (S)",
-            "mindMap": "Mind Map (M)",
+            "mindMap": "Mind Map (Shift+M)",
             "moreActions": "More Actions",
             "fitWidth": "Fit Width",
             "highlightMainFlow": "Highlight Main Flow",

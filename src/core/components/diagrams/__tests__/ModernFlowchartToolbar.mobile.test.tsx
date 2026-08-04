@@ -72,6 +72,7 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
         const toggleSelectionMode = vi.fn();
         const onToggleDrawingMode = vi.fn();
         const onAddStickyNote = vi.fn();
+        const onAddMindMap = vi.fn();
 
         render(
             <ModernFlowchartToolbar
@@ -93,6 +94,7 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
                 toggleSelectionMode={toggleSelectionMode}
                 onToggleDrawingMode={onToggleDrawingMode}
                 onAddStickyNote={onAddStickyNote}
+                onAddMindMap={onAddMindMap}
             />,
         );
 
@@ -105,9 +107,12 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
         fireEvent.click(await screen.findByRole('button', { name: /更多操作|moreActions/i }));
         expect(await screen.findByRole('menuitem', { name: /自由画笔/ })).toBeTruthy();
         expect(screen.getByRole('menuitem', { name: /便签/ })).toBeTruthy();
+        expect(screen.getByRole('menuitem', { name: /思维导图 \(Shift\+M\)/ })).toBeTruthy();
+        expect(screen.queryByRole('menuitem', { name: /思维导图 \(M\)/ })).toBeNull();
         expect(onActivatePointer).not.toHaveBeenCalled();
         expect(onToggleDrawingMode).not.toHaveBeenCalled();
         expect(onAddStickyNote).not.toHaveBeenCalled();
+        expect(onAddMindMap).not.toHaveBeenCalled();
     });
 
     it('exposes canvas search through the mobile more menu', async () => {

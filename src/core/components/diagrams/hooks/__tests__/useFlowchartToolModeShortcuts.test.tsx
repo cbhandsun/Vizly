@@ -1,21 +1,36 @@
 // @vitest-environment jsdom
 import { act, renderHook } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { useState } from 'react';
 
 import { useFlowchartToolModeShortcuts } from '../useFlowchartToolModeShortcuts';
 
-const useHarness = (editingEnabled = true) => {
+const useHarness = (
+    editingEnabled = true,
+    onAddStickyNote?: () => void,
+    onAddMindMap?: () => void,
+) => {
     const [isDrawingMode, setIsDrawingMode] = useState(false);
     const [isMarqueeActive, setIsMarqueeActive] = useState(false);
+    const [isCommentMode, setIsCommentMode] = useState(false);
     const actions = useFlowchartToolModeShortcuts({
         editingEnabled,
         isDrawingMode,
         isMarqueeActive,
+        isCommentMode,
         setIsDrawingMode,
         setIsMarqueeActive,
+        setIsCommentMode,
+        onAddStickyNote,
+        onAddMindMap,
     });
-    return { isDrawingMode, isMarqueeActive, ...actions };
+    return {
+        isDrawingMode,
+        isMarqueeActive,
+        isCommentMode,
+        setRawCommentMode: setIsCommentMode,
+        ...actions,
+    };
 };
 
 describe('useFlowchartToolModeShortcuts', () => {
@@ -29,16 +44,42 @@ describe('useFlowchartToolModeShortcuts', () => {
         expect(result.current.isDrawingMode).toBe(false);
     });
 
-    it('keeps drawing and marquee mutually exclusive and lets active toolbar buttons exit', () => {
+    it('keeps drawing, marquee, and comment modes mutually exclusive', () => {
         const { result } = renderHook(() => useHarness());
 
+        act(() => result.current.toggleCommentMode());
+        expect(result.current.isCommentMode).toBe(true);
         act(() => result.current.toggleMarqueeMode());
         expect(result.current.isMarqueeActive).toBe(true);
+        expect(result.current.isCommentMode).toBe(false);
         act(() => result.current.toggleDrawingMode());
         expect(result.current.isDrawingMode).toBe(true);
         expect(result.current.isMarqueeActive).toBe(false);
-        act(() => result.current.toggleDrawingMode());
+        act(() => result.current.setCommentMode(true));
         expect(result.current.isDrawingMode).toBe(false);
+        expect(result.current.isCommentMode).toBe(true);
+    });
+
+    it('arbitrates externally activated comment mode and supports the advertised shortcuts', () => {
+        const addStickyNote = vi.fn();
+        const addMindMap = vi.fn();
+        const { result } = renderHook(() => useHarness(true, addStickyNote, addMindMap));
+
+        act(() => result.current.toggleDrawingMode());
+        act(() => result.current.setRawCommentMode(true));
+        expect(result.current.isDrawingMode).toBe(false);
+        expect(result.current.isCommentMode).toBe(true);
+
+        act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'c', bubbles: true })));
+        expect(result.current.isCommentMode).toBe(false);
+        act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'm', bubbles: true })));
+        expect(result.current.isMarqueeActive).toBe(true);
+        act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'v', bubbles: true })));
+        expect(result.current.isMarqueeActive).toBe(false);
+        act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 's', bubbles: true })));
+        expect(addStickyNote).toHaveBeenCalledOnce();
+        act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'M', shiftKey: true, bubbles: true })));
+        expect(addMindMap).toHaveBeenCalledOnce();
     });
 
     it('does not steal typing focus or enable tools in readonly mode', () => {
@@ -50,9 +91,13 @@ describe('useFlowchartToolModeShortcuts', () => {
 
         act(() => input.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', bubbles: true })));
         expect(result.current.isDrawingMode).toBe(false);
+        act(() => input.dispatchEvent(new KeyboardEvent('keydown', { key: 'c', bubbles: true })));
+        expect(result.current.isCommentMode).toBe(false);
         rerender({ enabled: false });
         act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', bubbles: true })));
         expect(result.current.isDrawingMode).toBe(false);
+        act(() => result.current.setCommentMode(true));
+        expect(result.current.isCommentMode).toBe(false);
         input.remove();
     });
 });

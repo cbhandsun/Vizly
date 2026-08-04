@@ -326,12 +326,15 @@ export const useFlowchartDesignerController = ({
         onDragOver, onDrop, wrappedOnNodeDragStart, onNodeDrag, onNodeDragStop,
         isDraggingNode
     } = interactionsParams;
+    const isCommentMode = annotationMode;
+    const setStoredCommentMode = useDiagramStore(state => state.setIsCommentMode);
     const {
-        activatePointer, toggleDrawingMode, toggleMarqueeMode,
+        activatePointer, setCommentMode: setIsCommentMode, toggleDrawingMode, toggleMarqueeMode,
         handleAddFreehandStroke, handleAddMindMap, handleAddStickyNote,
     } = useFlowchartCreationTools({
         editingEnabled: !isReadonly && !presentationActive,
-        isDrawingMode, isMarqueeActive, setIsDrawingMode, setIsMarqueeActive,
+        isDrawingMode, isMarqueeActive, isCommentMode,
+        setIsDrawingMode, setIsMarqueeActive, setIsCommentMode: setStoredCommentMode,
         activeLayerId, nodesRef, edgesRef, reactFlowInstance, setNodes, takeSnapshot, t,
     });
     
@@ -347,8 +350,6 @@ export const useFlowchartDesignerController = ({
     // 协作层 diagramId：优先使用 id prop，回退到导出 ID，避免多画布协作时 ID 冲突
     const diagramId = id || diagramIdForExport || 'default';
     const { updateLocalCursor } = useDiagramCollaboration(diagramId, !isReadonly);
-    const isCommentMode = useDiagramStore(state => state.isCommentMode);
-    const setIsCommentMode = useDiagramStore(state => state.setIsCommentMode);
     const setComments = useDiagramStore(state => state.setComments);
     const setActiveCommentId = useDiagramStore(state => state.setActiveCommentId);
 

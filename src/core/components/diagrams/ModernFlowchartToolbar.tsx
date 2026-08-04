@@ -372,7 +372,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                     }] : []),
                     ...(onAddMindMap ? [{
                         key: 'mind-map',
-                        label: t('toolbar.mindMap', '思维导图 (M)'),
+                        label: t('toolbar.mindMap', '思维导图 (Shift+M)'),
                         icon: <FaSitemap />,
                         onClick: onAddMindMap,
                     }] : []),
@@ -490,7 +490,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                 <Tooltip title={t('toolbar.stickyNote', '便签 (S)')}>
                     <Button type="text" onClick={onAddStickyNote} icon={<FaStickyNote className="text-[14px] text-amber-500" />} className="w-9 h-9 p-0 border-none hover:bg-slate-200 dark:hover:bg-white/5" />
                 </Tooltip>
-                <Tooltip title={t('toolbar.mindMap', '思维导图 (M)')}>
+                <Tooltip title={t('toolbar.mindMap', '思维导图 (Shift+M)')}>
                     <Button type="text" onClick={onAddMindMap} icon={<FaSitemap className="text-[14px] text-sky-500" />} className="w-9 h-9 p-0 border-none hover:bg-slate-200 dark:hover:bg-white/5" />
                 </Tooltip>
             </div>

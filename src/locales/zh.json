@@ -525,7 +525,7 @@
             "marqueeExit": "退出框选模式 (Esc)",
             "drawingMode": "自由画笔 (P)",
             "stickyNote": "便签 (S)",
-            "mindMap": "思维导图 (M)",
+            "mindMap": "思维导图 (Shift+M)",
             "moreActions": "更多操作",
             "fitWidth": "适应宽度",
             "highlightMainFlow": "高亮主干链路",
