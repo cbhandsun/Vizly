@@ -13,6 +13,21 @@ const readRelativeFile = (relativePath: string) => readFileSync(
     'utf8',
 );
 
+const readLocaleString = (relativePath: string, path: string[]) => {
+    const source: unknown = JSON.parse(readRelativeFile(relativePath));
+    const value = path.reduce<unknown>((current, key) => (
+        current && typeof current === 'object' && !Array.isArray(current)
+            ? (current as Record<string, unknown>)[key]
+            : undefined
+    ), source);
+
+    if (typeof value !== 'string') {
+        throw new Error(`Missing locale string: ${path.join('.')}`);
+    }
+
+    return value;
+};
+
 describe('flowchart interaction copy', () => {
     it('uses translations for alignment and primary shape labels', () => {
         const toolbarSource = readRelativeFile('../FloatingContextToolbar.tsx');
@@ -72,6 +87,30 @@ describe('flowchart interaction copy', () => {
             expect(read(zh, ['workspace', key])).toBeTypeOf('string');
             expect(read(en, ['workspace', key])).toBeTypeOf('string');
         }
+    });
+
+    it('states the scoped and irreversible impact of resetting local editor state', () => {
+        const path = ['designer', 'toolbar', 'clearCacheContent'];
+        const zhContent = readLocaleString('../../../../locales/zh.json', path);
+        const enContent = readLocaleString('../../../../locales/en.json', path);
+
+        expect(zhContent).not.toContain('所有本地缓存');
+        expect(zhContent).toContain('当前图表');
+        expect(zhContent).toContain('AI 配置');
+        expect(zhContent).toContain('存储设置');
+        expect(zhContent).toContain('其他图表');
+        expect(zhContent).toContain('无法撤销');
+        expect(zhContent).toMatch(/保存|导出/);
+        expect(zhContent).toContain('刷新');
+
+        expect(enContent.toLowerCase()).not.toContain('all local cache');
+        expect(enContent).toContain('current diagram');
+        expect(enContent).toContain('AI configuration');
+        expect(enContent).toContain('storage settings');
+        expect(enContent).toContain('other diagrams');
+        expect(enContent).toContain('cannot be undone');
+        expect(enContent).toMatch(/save|export/);
+        expect(enContent).toContain('reload');
     });
 
     it('resolves safe localized defaults for quick-cloned shapes', () => {
