@@ -22,6 +22,11 @@ import {
 } from '../../../rendering/reactFlowScene';
 import { buildSvgPreviewModel, type SvgPreviewModel } from '../../../export/svgPreviewModel';
 import { isSafeExportDataUrl } from '../../shared/exportUtils';
+import {
+  COMMERCIAL_VIEWPORT_MODAL_CLASS,
+  COMMERCIAL_VIEWPORT_MODAL_Z_INDEX,
+  getViewportOverlayContainer,
+} from '../../ui/viewportOverlayPortal';
 import './AdvancedExportModal.css';
 
 
@@ -231,7 +236,9 @@ export const AdvancedExportModal: React.FC<AdvancedExportModalProps> = ({
 
   return (
     <Modal
-      rootClassName="advanced-export-modal"
+      getContainer={getViewportOverlayContainer}
+      rootClassName={`${COMMERCIAL_VIEWPORT_MODAL_CLASS} advanced-export-modal`}
+      zIndex={COMMERCIAL_VIEWPORT_MODAL_Z_INDEX}
       title={<span><DownloadOutlined /> {t('advancedExport.title')}</span>}
       open={visible}
       onCancel={onClose}

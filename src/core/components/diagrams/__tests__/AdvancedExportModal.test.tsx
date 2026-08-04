@@ -183,6 +183,23 @@ describe('AdvancedExportModeNotice', () => {
 });
 
 describe('AdvancedExportModal commercial controls', () => {
+  it('renders above the persistent mobile shell in the viewport-level modal layer', () => {
+    render(
+      <AdvancedExportModal
+        visible
+        onClose={vi.fn()}
+        diagramId="diagram-1"
+        diagramTitle="Audit diagram"
+      />,
+    );
+
+    const modalRoot = document.querySelector('.commercial-viewport-modal.advanced-export-modal');
+    const modalWrap = modalRoot?.querySelector<HTMLElement>('.ant-modal-wrap');
+
+    expect(modalRoot).toBeTruthy();
+    expect(modalWrap?.style.zIndex).toBe('2200');
+  });
+
   it('names the format, resolution, options, close, and PNG clipboard actions', () => {
     render(
       <AdvancedExportModal
