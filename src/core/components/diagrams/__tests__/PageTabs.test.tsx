@@ -220,6 +220,29 @@ describe('PageTabs', () => {
         expect(onDeletePage).not.toHaveBeenCalled();
     });
 
+    it('renders the destructive confirmation outside the clipped page-tab item', async () => {
+        render(
+            <PageTabs
+                pages={[
+                    { id: 'page-1', name: '页面 1', nodes: [], edges: [] },
+                    { id: 'page-2', name: '页面 2', nodes: [], edges: [] },
+                ]}
+                activePageId="page-2"
+                onSwitchPage={vi.fn()}
+                onAddPage={vi.fn()}
+                onDeletePage={vi.fn()}
+                onRenamePage={vi.fn()}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: '删除页面 页面 2' }));
+        const title = await screen.findByText('删除「页面 2」？');
+        const popover = title.closest('.ant-popover');
+
+        expect(popover).toBeTruthy();
+        expect(popover?.parentElement).toBe(document.body);
+    });
+
     it('restores keyboard focus to the adjacent active page after deletion', async () => {
         const PageTabsHarness = () => {
             const [pages, setPages] = useState([

@@ -2099,6 +2099,12 @@
         "connected": "已连接协作服务",
         "disconnected": "协作连接已断开",
         "unavailable": "协作服务尚未配置",
+        "inviteStatus": {
+            "inactive": "协作尚未启动，请稍后重试。",
+            "unavailable": "此部署未配置实时协作服务，当前无法生成有效邀请。请联系管理员完成配置后再邀请成员。",
+            "connecting": "正在建立实时协作连接。连接成功后即可复制邀请链接。",
+            "disconnected": "实时协作连接已断开。请恢复网络或服务连接后再邀请成员。"
+        },
         "activeCount": "{{count}} 位在协作",
         "openDetails": "打开协作详情：{{status}}"
     },

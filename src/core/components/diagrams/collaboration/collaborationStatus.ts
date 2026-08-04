@@ -6,10 +6,10 @@ type CollaborationSocketStatus = Extract<
 >;
 
 export const resolveDiagramCollaborationStatus = (
-  roomFromUrl: string | null,
+  collaborationRequested: boolean,
   serverUrl: string,
   socketStatus: CollaborationSocketStatus,
 ): DiagramCollaborationStatus => {
-  if (!roomFromUrl) return 'inactive';
+  if (!collaborationRequested) return 'inactive';
   return serverUrl ? socketStatus : 'unavailable';
 };

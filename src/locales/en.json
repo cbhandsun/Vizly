@@ -2221,6 +2221,12 @@
         "connected": "Connected to collaboration service",
         "disconnected": "Collaboration connection lost",
         "unavailable": "Collaboration service is not configured",
+        "inviteStatus": {
+            "inactive": "Collaboration has not started yet. Please try again shortly.",
+            "unavailable": "This deployment has no live collaboration service configured, so a working invite cannot be created. Ask an administrator to configure the service before inviting teammates.",
+            "connecting": "The live collaboration connection is being established. You can copy an invite after it connects.",
+            "disconnected": "The live collaboration connection was lost. Restore the network or service connection before inviting teammates."
+        },
         "activeCount": "{{count}} collaborator(s) active",
         "openDetails": "Open collaboration details: {{status}}"
     },

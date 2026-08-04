@@ -32,7 +32,7 @@ export const useDiagramViewerCollaboration = ({
     enabled: Boolean(serverUrl) && wantsCollaboration,
   });
   const collaborationStatus = resolveDiagramCollaborationStatus(
-    roomFromUrl,
+    wantsCollaboration,
     serverUrl,
     collaboration.wsStatus,
   );

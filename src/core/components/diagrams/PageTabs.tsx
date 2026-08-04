@@ -8,6 +8,7 @@ import type { DiagramPage } from './hooks/useMultiPage';
 import { MAX_DIAGRAM_PAGE_NAME_LENGTH, MAX_DIAGRAM_PAGES } from './multiPagePersistence';
 import { isPageNameAvailable, normalizePageName } from './multiPageNaming';
 import { resolvePageTabTargetIndex } from './pageTabKeyboard';
+import { getViewportOverlayContainer } from '../ui/viewportOverlayPortal';
 import './PageTabs.css';
 
 interface PageTabsProps {
@@ -185,6 +186,7 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                             <Popconfirm
                                 title={t('designer.pages.deleteConfirm', { name: page.name, defaultValue: '删除「{{name}}」？' })}
                                 description={t('designer.pages.deleteDescription', { defaultValue: '此页面及其全部内容将永久删除，且无法撤销。' })}
+                                getPopupContainer={getViewportOverlayContainer}
                                 placement="top"
                                 autoAdjustOverflow={false}
                                 open={confirmingPageId === page.id}

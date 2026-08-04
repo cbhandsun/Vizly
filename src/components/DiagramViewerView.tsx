@@ -231,6 +231,7 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
                             onClose={() => setCollabModalVisible(false)}
                             activeUsers={activeUsers || []}
                             roomName={roomName}
+                            status={collaborationStatus}
                         />
                     </Suspense>
                 )}

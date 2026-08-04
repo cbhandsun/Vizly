@@ -25,13 +25,13 @@ import { resolveDiagramCollaborationStatus } from '../collaborationStatus';
 
 describe('resolveDiagramCollaborationStatus', () => {
   it('keeps ordinary editor sessions inactive', () => {
-    expect(resolveDiagramCollaborationStatus(null, 'wss://collab.example', 'connected')).toBe('inactive');
+    expect(resolveDiagramCollaborationStatus(false, 'wss://collab.example', 'connected')).toBe('inactive');
   });
 
   it('distinguishes unavailable services from live socket states', () => {
-    expect(resolveDiagramCollaborationStatus('room-a', '', 'disconnected')).toBe('unavailable');
-    expect(resolveDiagramCollaborationStatus('room-a', 'wss://collab.example', 'connecting')).toBe('connecting');
-    expect(resolveDiagramCollaborationStatus('room-a', 'wss://collab.example', 'disconnected')).toBe('disconnected');
+    expect(resolveDiagramCollaborationStatus(true, '', 'disconnected')).toBe('unavailable');
+    expect(resolveDiagramCollaborationStatus(true, 'wss://collab.example', 'connecting')).toBe('connecting');
+    expect(resolveDiagramCollaborationStatus(true, 'wss://collab.example', 'disconnected')).toBe('disconnected');
   });
 });
 

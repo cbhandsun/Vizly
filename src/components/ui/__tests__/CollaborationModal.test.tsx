@@ -39,6 +39,8 @@ const translations: Record<string, string> = {
     'collaboration.unknownUser': '未命名成员',
     'collaboration.localUser': '你',
     'collaboration.noOnlineUsers': '当前房间内没有在线成员',
+    'collaboration.unavailable': '协作服务尚未配置',
+    'collaboration.inviteStatus.unavailable': '此部署未配置实时协作服务，当前无法生成有效邀请。',
 };
 
 vi.mock('react-i18next', () => ({
@@ -59,7 +61,7 @@ describe('CollaborationModal commercial copy recovery', () => {
 
     it('confirms a successful invite-link copy', async () => {
         clipboardMocks.copy.mockResolvedValue(true);
-        render(<CollaborationModal open onClose={vi.fn()} activeUsers={[]} roomName="room-alpha" />);
+        render(<CollaborationModal open onClose={vi.fn()} activeUsers={[]} roomName="room-alpha" status="connected" />);
 
         fireEvent.click(await screen.findByRole('button', { name: '复制' }));
 
@@ -69,7 +71,7 @@ describe('CollaborationModal commercial copy recovery', () => {
 
     it('keeps the invite link visible and offers retry when clipboard access fails', async () => {
         clipboardMocks.copy.mockResolvedValue(false);
-        render(<CollaborationModal open onClose={vi.fn()} activeUsers={[]} roomName="room-alpha" />);
+        render(<CollaborationModal open onClose={vi.fn()} activeUsers={[]} roomName="room-alpha" status="connected" />);
 
         const linkInput = await screen.findByRole('textbox', { name: '邀请链接' });
         fireEvent.click(screen.getByRole('button', { name: '复制' }));
@@ -78,5 +80,15 @@ describe('CollaborationModal commercial copy recovery', () => {
         expect(screen.getByRole('button', { name: '重试复制' })).toBeTruthy();
         expect((linkInput as HTMLInputElement).value).toContain('room=room-alpha');
         await waitFor(() => expect(clipboardMocks.copy).toHaveBeenCalledTimes(1));
+    });
+
+    it('blocks dead invite links when the collaboration service is unavailable', async () => {
+        render(<CollaborationModal open onClose={vi.fn()} activeUsers={[]} roomName="room-alpha" status="unavailable" />);
+
+        expect(await screen.findByText('协作服务尚未配置')).toBeTruthy();
+        expect(screen.getByText('此部署未配置实时协作服务，当前无法生成有效邀请。')).toBeTruthy();
+        expect(screen.queryByRole('textbox', { name: '邀请链接' })).toBeNull();
+        expect(screen.queryByRole('button', { name: '复制' })).toBeNull();
+        expect(clipboardMocks.copy).not.toHaveBeenCalled();
     });
 });
