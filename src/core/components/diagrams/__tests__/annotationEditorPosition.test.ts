@@ -18,4 +18,12 @@ describe('resolveAnnotationEditorPosition', () => {
         expect(resolveAnnotationEditorPosition({ x: -500, y: 9999 }, { width: Number.NaN, height: 0 }))
             .toEqual({ x: 12, y: 240 });
     });
+
+    it('keeps the larger existing-comment editor inside a narrow viewport', () => {
+        expect(resolveAnnotationEditorPosition(
+            { x: 390, y: 700 },
+            { width: 406, height: 844 },
+            { maxWidth: 300, estimatedHeight: 280 },
+        )).toEqual({ x: 94, y: 412 });
+    });
 });

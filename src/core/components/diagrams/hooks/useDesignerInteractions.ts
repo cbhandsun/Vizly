@@ -19,6 +19,7 @@ import type { LayerConfig } from './useLayerManagement';
 import type { CommentThread } from '../../../store/useDiagramStore';
 import type { HistorySnapshotOptions } from '../../../hooks/useDiagramHistory';
 import { normalizeCommentPageId } from '../commentPageScope';
+import { parseAnnotationContent } from '../annotationContent';
 
 export interface UseDesignerInteractionsProps {
     nodes: Node[];
@@ -222,6 +223,8 @@ export function useDesignerInteractions({
     }, [originalOnNodeDragStop]);
 
     const addAnnotation = useCallback((x: number, y: number, text: string, pageId?: string) => {
+        const parsedContent = parseAnnotationContent(text);
+        if (!Number.isFinite(x) || !Number.isFinite(y) || !parsedContent.ok) return false;
         const user = useDiagramStore.getState().user;
         addComment({
             id: `comment-${Date.now()}`,
@@ -229,16 +232,27 @@ export function useDesignerInteractions({
             authorId: user.id,
             authorName: user.name,
             authorColor: user.color,
-            content: text,
+            content: parsedContent.value,
             createdAt: Date.now(),
             isResolved: false,
             color: ANNOTATION_COLORS[0],
             replies: [],
             pageId: normalizeCommentPageId(pageId),
         });
+        return true;
     }, [addComment]);
 
-    const updateAnnotation = useCallback((id: string, updates: Partial<CommentThread>) => updateComment(id, updates), [updateComment]);
+    const updateAnnotation = useCallback((id: string, updates: Partial<CommentThread>) => {
+        if (!useDiagramStore.getState().comments.some(comment => comment.id === id)) return false;
+        if (updates.content === undefined) {
+            updateComment(id, updates);
+            return true;
+        }
+        const parsedContent = parseAnnotationContent(updates.content);
+        if (!parsedContent.ok) return false;
+        updateComment(id, { ...updates, content: parsedContent.value });
+        return true;
+    }, [updateComment]);
     const deleteAnnotation = useCallback((id: string) => removeComment(id), [removeComment]);
     const toggleResolved = useCallback((id: string) => {
         // 通过 getState() 避免将 comments 加入 deps，防止每条评论变化时重建回调
