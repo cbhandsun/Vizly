@@ -613,6 +613,7 @@
             "renameFailed": "页面重命名失败，请重试",
             "delete": "删除页面 {{name}}",
             "deleteConfirm": "删除「{{name}}」？",
+            "deleteDescription": "此页面及其全部内容将永久删除，且无法撤销。",
             "deleteAction": "删除"
         },
         "flowchart": {

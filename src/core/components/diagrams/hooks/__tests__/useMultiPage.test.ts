@@ -78,6 +78,51 @@ describe('useMultiPage', () => {
     expect(setNodes).toHaveBeenCalledWith([]);
   });
 
+  it('keeps deletion context by selecting the adjacent page and ignores missing ids', () => {
+    const setNodes = vi.fn();
+    const setEdges = vi.fn();
+    const removeScope = vi.fn();
+    const { result } = renderHook(() => useMultiPage(
+      () => [],
+      () => [],
+      setNodes,
+      setEdges,
+      { switchScope: vi.fn(), removeScope },
+    ));
+
+    act(() => {
+      result.current.restorePersistedMetadata({
+        multiPage: {
+          version: 1,
+          activePageId: 'page-3',
+          pages: [
+            { id: 'page-1', name: '页面 1', nodes: [node('page-1-node')], edges: [] },
+            { id: 'page-2', name: '页面 2', nodes: [node('page-2-node')], edges: [] },
+            { id: 'page-3', name: '页面 3', nodes: [node('page-3-node')], edges: [] },
+          ],
+        },
+      });
+    });
+
+    let deleted = false;
+    act(() => {
+      deleted = result.current.deletePage('page-3');
+    });
+
+    expect(deleted).toBe(true);
+    expect(result.current.activePageId).toBe('page-2');
+    expect(setNodes).toHaveBeenLastCalledWith([node('page-2-node')]);
+    expect(removeScope).toHaveBeenCalledWith('page-3');
+
+    removeScope.mockClear();
+    act(() => {
+      deleted = result.current.deletePage('missing-page');
+    });
+    expect(deleted).toBe(false);
+    expect(result.current.pages.map(page => page.id)).toEqual(['page-1', 'page-2']);
+    expect(removeScope).not.toHaveBeenCalled();
+  });
+
   it('restores a validated active page and exposes all pages for autosave', () => {
     const latestNodes = [node('latest-active-node')];
     const { result } = renderHook(() => useMultiPage(

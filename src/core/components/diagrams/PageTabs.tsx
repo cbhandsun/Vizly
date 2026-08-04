@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { CloseOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
 import { Input, Popconfirm, theme, Tooltip } from 'antd';
 import type { InputRef } from 'antd';
@@ -15,7 +15,7 @@ interface PageTabsProps {
     activePageId: string;
     onSwitchPage: (id: string) => void;
     onAddPage: () => void;
-    onDeletePage: (id: string) => void;
+    onDeletePage: (id: string) => boolean;
     onRenamePage: (id: string, name: string) => boolean;
     disabled?: boolean;
 }
@@ -32,7 +32,14 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
     const [confirmingPageId, setConfirmingPageId] = useState<string | null>(null);
     const inputRef = useRef<InputRef>(null);
     const tabButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+    const restoreFocusAfterDeleteRef = useRef(false);
     const pageLimitReached = pages.length >= MAX_DIAGRAM_PAGES;
+
+    useEffect(() => {
+        if (!restoreFocusAfterDeleteRef.current) return;
+        restoreFocusAfterDeleteRef.current = false;
+        requestAnimationFrame(() => tabButtonRefs.current.get(activePageId)?.focus());
+    }, [activePageId, pages]);
 
     const handleStartRename = useCallback((page: DiagramPage) => {
         setConfirmingPageId(null);
@@ -177,11 +184,15 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                         {pages.length > 1 && !isEditing && (
                             <Popconfirm
                                 title={t('designer.pages.deleteConfirm', { name: page.name, defaultValue: '删除「{{name}}」？' })}
+                                description={t('designer.pages.deleteDescription', { defaultValue: '此页面及其全部内容将永久删除，且无法撤销。' })}
+                                placement="top"
+                                autoAdjustOverflow={false}
                                 open={confirmingPageId === page.id}
                                 onOpenChange={open => setConfirmingPageId(open ? page.id : null)}
                                 onConfirm={() => {
+                                    const deleted = onDeletePage(page.id);
+                                    restoreFocusAfterDeleteRef.current = deleted;
                                     setConfirmingPageId(null);
-                                    onDeletePage(page.id);
                                 }}
                                 onCancel={() => setConfirmingPageId(null)}
                                 okText={t('designer.pages.deleteAction', { defaultValue: '删除' })}

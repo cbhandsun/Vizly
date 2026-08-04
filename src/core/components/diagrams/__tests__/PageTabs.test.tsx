@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { useState } from 'react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { PageTabs } from '../PageTabs';
@@ -19,6 +20,7 @@ vi.mock('react-i18next', () => ({
                 'designer.pages.renameFailed': '页面重命名失败，请重试',
                 'designer.pages.delete': '删除页面 {{name}}',
                 'designer.pages.deleteConfirm': '删除「{{name}}」？',
+                'designer.pages.deleteDescription': '此页面及其全部内容将永久删除，且无法撤销。',
                 'designer.pages.deleteAction': '删除',
                 'common.cancel': '取消',
             };
@@ -210,11 +212,49 @@ describe('PageTabs', () => {
         expect(deleteButton.classList.contains('page-tabs__delete')).toBe(true);
         fireEvent.click(deleteButton);
         expect(await screen.findByText('删除「页面 2」？')).toBeTruthy();
+        expect(screen.getByText('此页面及其全部内容将永久删除，且无法撤销。')).toBeTruthy();
         fireEvent.click(screen.getByRole('button', { name: /取\s*消/ }));
 
         await waitFor(() => expect(deleteButton.getAttribute('aria-describedby')).toBeNull());
         expect(onSwitchPage).not.toHaveBeenCalled();
         expect(onDeletePage).not.toHaveBeenCalled();
+    });
+
+    it('restores keyboard focus to the adjacent active page after deletion', async () => {
+        const PageTabsHarness = () => {
+            const [pages, setPages] = useState([
+                { id: 'page-1', name: '页面 1', nodes: [], edges: [] },
+                { id: 'page-2', name: '页面 2', nodes: [], edges: [] },
+                { id: 'page-3', name: '页面 3', nodes: [], edges: [] },
+            ]);
+            const [activePageId, setActivePageId] = useState('page-3');
+            return (
+                <PageTabs
+                    pages={pages}
+                    activePageId={activePageId}
+                    onSwitchPage={setActivePageId}
+                    onAddPage={vi.fn()}
+                    onDeletePage={pageId => {
+                        const deletedIndex = pages.findIndex(page => page.id === pageId);
+                        if (deletedIndex < 0) return false;
+                        const adjacentPage = pages[deletedIndex + 1] ?? pages[deletedIndex - 1];
+                        setPages(current => current.filter(page => page.id !== pageId));
+                        if (pageId === activePageId && adjacentPage) setActivePageId(adjacentPage.id);
+                        return true;
+                    }}
+                    onRenamePage={vi.fn(() => true)}
+                />
+            );
+        };
+
+        render(<PageTabsHarness />);
+        fireEvent.click(screen.getByRole('button', { name: '删除页面 页面 3' }));
+        fireEvent.click(screen.getByRole('button', { name: /^删\s*除$/ }));
+
+        const adjacentTab = await screen.findByRole('tab', { name: '页面 2' });
+        await waitFor(() => expect(document.activeElement).toBe(adjacentTab));
+        expect(adjacentTab.getAttribute('aria-selected')).toBe('true');
+        expect(screen.queryByRole('tab', { name: '页面 3' })).toBeNull();
     });
 
     it('blocks page mutations while the initial diagram is loading', () => {

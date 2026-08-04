@@ -128,22 +128,27 @@ export const useMultiPage = (
 
     // 删除页面
     const deletePage = useCallback((pageId: string) => {
-        if (pagesRef.current.length <= 1) return; // 至少保留一页
+        const currentPages = pagesRef.current;
+        if (currentPages.length <= 1) return false; // 至少保留一页
 
-        const remainingPages = pagesRef.current.filter(p => p.id !== pageId);
+        const deletedIndex = currentPages.findIndex(page => page.id === pageId);
+        if (deletedIndex < 0) return false;
+        const remainingPages = currentPages.filter(page => page.id !== pageId);
         pagesRef.current = remainingPages;
         setPages(remainingPages);
 
-        // 如果删除的是当前页，切换到第一页
-        if (pageId === activePageId) {
-            const first = remainingPages[0];
-            setNodes(first.nodes);
-            setEdges(first.edges);
-            activePageIdRef.current = first.id;
-            setActivePageId(first.id);
+        // 删除当前页后优先选择右侧相邻页；删除末页时回到左侧相邻页，避免跳回首页打断上下文。
+        if (pageId === activePageIdRef.current) {
+            const adjacentPage = currentPages[deletedIndex + 1] ?? currentPages[deletedIndex - 1];
+            if (!adjacentPage) return false;
+            setNodes(adjacentPage.nodes);
+            setEdges(adjacentPage.edges);
+            activePageIdRef.current = adjacentPage.id;
+            setActivePageId(adjacentPage.id);
         }
         removeHistoryScope?.(pageId);
-    }, [activePageId, removeHistoryScope, setNodes, setEdges]);
+        return true;
+    }, [removeHistoryScope, setNodes, setEdges]);
 
     // 重命名页面
     const renamePage = useCallback((pageId: string, newName: string) => {
