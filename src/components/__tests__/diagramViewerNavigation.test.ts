@@ -55,6 +55,23 @@ describe('diagramViewerNavigation', () => {
     expect(openWindow).toHaveBeenLastCalledWith('/?diagram=beta', '_blank', 'noopener,noreferrer');
   });
 
+  it('replaces the active hash-routed diagram when opening a new tab', () => {
+    const openWindow = vi.fn();
+
+    openDiagramViewerInNewTab({
+      id: 'target diagram',
+      currentHref: 'https://example.com/app?theme=dark&diagram=stale#/?diagram=current&room=old-room',
+      openWindow,
+      logFailure: vi.fn(),
+    });
+
+    expect(openWindow).toHaveBeenCalledWith(
+      'https://example.com/app?theme=dark#/?diagram=target%20diagram',
+      '_blank',
+      'noopener,noreferrer',
+    );
+  });
+
   it('only finalizes seed navigation after confirmation and normalization', async () => {
     const ensureSwitchConfirmed = vi.fn().mockResolvedValue(true);
     const normalizeSeedData = vi.fn().mockResolvedValue({ normalized: true });

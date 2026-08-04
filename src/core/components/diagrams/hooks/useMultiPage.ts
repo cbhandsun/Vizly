@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { Node, Edge } from '@xyflow/react';
 import {
     createMultiPageMetadata,
@@ -38,7 +38,12 @@ export interface MultiPageHistoryScopes {
     switchScope: (pageId: string) => void;
     removeScope: (pageId: string) => void;
     clearSelection?: () => void;
+    scopeId?: string;
 }
+
+export const createMultiPageHistoryScopeKey = (scopeId: string, pageId: string): string => (
+    `${encodeURIComponent(scopeId)}::${encodeURIComponent(pageId)}`
+);
 
 /**
  * 多页画布管理 Hook
@@ -63,6 +68,19 @@ export const useMultiPage = (
     const switchHistoryScope = historyScopes?.switchScope;
     const removeHistoryScope = historyScopes?.removeScope;
     const clearSelection = historyScopes?.clearSelection;
+    const historyScopeId = historyScopes?.scopeId?.trim() ?? '';
+    const getHistoryScopeKey = useMemo(
+        () => historyScopeId
+            ? (pageId: string) => createMultiPageHistoryScopeKey(historyScopeId, pageId)
+            : (pageId: string) => pageId,
+        [historyScopeId],
+    );
+    const activateHistoryScope = useCallback((pageId: string) => {
+        switchHistoryScope?.(getHistoryScopeKey(pageId));
+    }, [getHistoryScopeKey, switchHistoryScope]);
+    const removePageHistoryScope = useCallback((pageId: string) => {
+        removeHistoryScope?.(getHistoryScopeKey(pageId));
+    }, [getHistoryScopeKey, removeHistoryScope]);
 
     useEffect(() => {
         pagesRef.current = pages;
@@ -72,9 +90,9 @@ export const useMultiPage = (
         activePageIdRef.current = activePageId;
     }, [activePageId]);
 
-    useEffect(() => {
-        switchHistoryScope?.(activePageId);
-    }, [activePageId, switchHistoryScope]);
+    useLayoutEffect(() => {
+        activateHistoryScope(activePageId);
+    }, [activateHistoryScope, activePageId]);
 
     // 切换页面
     const switchPage = useCallback((targetPageId: string) => {
@@ -84,6 +102,7 @@ export const useMultiPage = (
         if (!targetPage) return;
 
         pageOperationVersionRef.current += 1;
+        activateHistoryScope(targetPageId);
         clearSelection?.();
 
         // 保存当前页面状态
@@ -101,13 +120,13 @@ export const useMultiPage = (
             return nextPages;
         });
 
-        // 加载目标页面；历史作用域由 activePageId effect 统一切换，避免同一事件重复同步。
+        // 加载目标页面；历史作用域已在替换画布前同步切换。
         setNodes(clearedTargetPage.nodes);
         setEdges(clearedTargetPage.edges);
 
         activePageIdRef.current = targetPageId;
         setActivePageId(targetPageId);
-    }, [activePageId, clearSelection, getCurrentNodes, getCurrentEdges, setNodes, setEdges]);
+    }, [activePageId, activateHistoryScope, clearSelection, getCurrentNodes, getCurrentEdges, setNodes, setEdges]);
 
     // 添加页面
     const addPage = useCallback(() => {
@@ -122,6 +141,7 @@ export const useMultiPage = (
         const newPage = createPage(newId, newName);
 
         pageOperationVersionRef.current += 1;
+        activateHistoryScope(newId);
         clearSelection?.();
 
         setPages(prev => {
@@ -137,14 +157,14 @@ export const useMultiPage = (
             return nextPages;
         });
 
-        // 切换到新页面（空画布）；历史作用域由 activePageId effect 统一隔离。
+        // 切换到新页面（空画布）；历史作用域已在替换画布前同步隔离。
         setNodes([]);
         setEdges([]);
         activePageIdRef.current = newId;
         setActivePageId(newId);
 
         return newId;
-    }, [activePageId, clearSelection, getCurrentNodes, getCurrentEdges, setNodes, setEdges]);
+    }, [activePageId, activateHistoryScope, clearSelection, getCurrentNodes, getCurrentEdges, setNodes, setEdges]);
 
     // 删除页面
     const deletePage = useCallback((pageId: string) => {
@@ -164,6 +184,7 @@ export const useMultiPage = (
                 page.id === clearedAdjacentPage.id ? clearedAdjacentPage : page
             );
             pageOperationVersionRef.current += 1;
+            activateHistoryScope(adjacentPage.id);
             clearSelection?.();
             setNodes(clearedAdjacentPage.nodes);
             setEdges(clearedAdjacentPage.edges);
@@ -172,9 +193,9 @@ export const useMultiPage = (
         }
         pagesRef.current = remainingPages;
         setPages(remainingPages);
-        removeHistoryScope?.(pageId);
+        removePageHistoryScope(pageId);
         return true;
-    }, [clearSelection, removeHistoryScope, setNodes, setEdges]);
+    }, [activateHistoryScope, clearSelection, removePageHistoryScope, setNodes, setEdges]);
 
     // 重命名页面
     const renamePage = useCallback((pageId: string, newName: string) => {
@@ -203,12 +224,13 @@ export const useMultiPage = (
         const clearedPages = restored.pages.map(clearPageSelection);
         clearSelection?.();
         pageOperationVersionRef.current += 1;
+        activateHistoryScope(restored.activePageId);
         pagesRef.current = clearedPages;
         activePageIdRef.current = restored.activePageId;
         setPages(clearedPages);
         setActivePageId(restored.activePageId);
         return clearedPages.find(page => page.id === restored.activePageId) ?? null;
-    }, [clearSelection]);
+    }, [activateHistoryScope, clearSelection]);
 
     const getPageOperationScope = useCallback(
         () => `${activePageIdRef.current}:${pageOperationVersionRef.current}`,

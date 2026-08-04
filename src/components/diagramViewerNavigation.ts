@@ -26,7 +26,13 @@ export const openDiagramViewerInNewTab = ({
 }) => {
   try {
     const url = new URL(currentHref);
-    url.searchParams.set('diagram', String(id));
+    const normalizedId = String(id);
+    if (url.hash.startsWith('#/')) {
+      url.searchParams.delete('diagram');
+      url.hash = `#/?diagram=${encodeURIComponent(normalizedId)}`;
+    } else {
+      url.searchParams.set('diagram', normalizedId);
+    }
     openWindow(url.toString(), '_blank', 'noopener,noreferrer');
   } catch (error) {
     logFailure(String(id), error);

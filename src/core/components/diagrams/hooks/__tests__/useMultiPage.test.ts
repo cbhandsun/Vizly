@@ -4,7 +4,7 @@ import { act, renderHook } from '@testing-library/react';
 import type { Edge, Node } from '@xyflow/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { useMultiPage } from '../useMultiPage';
+import { createMultiPageHistoryScopeKey, useMultiPage } from '../useMultiPage';
 
 const node = (id: string): Node => ({
   id,
@@ -48,6 +48,49 @@ describe('useMultiPage', () => {
     expect(setNodes).not.toHaveBeenCalled();
     expect(result.current.activePageId).toBe(newPageId);
     expect(result.current.getPageOperationScope()).toBe(`${newPageId}:1`);
+  });
+
+  it('isolates same-named page histories by diagram and activates the scope before replacing the canvas', () => {
+    const setNodes = vi.fn();
+    const setEdges = vi.fn();
+    const switchScope = vi.fn();
+    const removeScope = vi.fn();
+    const { result } = renderHook(() => useMultiPage(
+      () => [],
+      () => [],
+      setNodes,
+      setEdges,
+      { switchScope, removeScope, scopeId: 'diagram::alpha' },
+    ));
+
+    expect(switchScope).toHaveBeenCalledWith(
+      createMultiPageHistoryScopeKey('diagram::alpha', 'page-1'),
+    );
+
+    switchScope.mockClear();
+    let newPageId: string | null = null;
+    act(() => {
+      newPageId = result.current.addPage();
+    });
+    if (!newPageId) throw new Error('Expected a page to be created');
+    const createdPageId = newPageId;
+
+    expect(switchScope).toHaveBeenCalledWith(
+      createMultiPageHistoryScopeKey('diagram::alpha', createdPageId),
+    );
+    expect(switchScope.mock.invocationCallOrder.at(0)).toBeLessThan(
+      setNodes.mock.invocationCallOrder.at(-1) ?? Number.POSITIVE_INFINITY,
+    );
+    expect(createMultiPageHistoryScopeKey('diagram::alpha', 'page-1')).not.toBe(
+      createMultiPageHistoryScopeKey('diagram::beta', 'page-1'),
+    );
+
+    act(() => {
+      result.current.deletePage(createdPageId);
+    });
+    expect(removeScope).toHaveBeenCalledWith(
+      createMultiPageHistoryScopeKey('diagram::alpha', createdPageId),
+    );
   });
 
   it('updates the active page scope synchronously for pending async operations', () => {

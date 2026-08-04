@@ -379,6 +379,7 @@ export const useFlowchartDesignerController = ({
             switchScope: switchHistoryScope,
             removeScope: removeHistoryScope,
             clearSelection,
+            scopeId: diagramId,
         },
     );
     const getOperationScope = useDiagramOperationScope(diagramId, multiPage.getPageOperationScope);
