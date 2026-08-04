@@ -456,6 +456,8 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                     <Button 
                         type="text" 
                         onClick={onActivatePointer} 
+                        aria-label={t('toolbar.pointer', '普通选择器 (V)')}
+                        aria-pressed={!isDrawingMode && !isMarqueeActive}
                         icon={<FaMousePointer className={`text-[12px] ${(!isDrawingMode && !isMarqueeActive) ? 'text-indigo-500' : 'text-slate-500'}`} />} 
                         className={`w-9 h-9 p-0 border-none transition-all ${(!isDrawingMode && !isMarqueeActive) ? 'bg-white dark:bg-slate-800 shadow-sm text-indigo-500' : 'hover:bg-slate-200 dark:hover:bg-white/5'}`} 
                     />
@@ -464,14 +466,18 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                     <Button 
                         type="text" 
                         onClick={toggleSelectionMode} 
+                        aria-label={isMarqueeActive ? t('toolbar.marqueeExit', '退出框选 (Esc)') : t('toolbar.marqueeEnter', '框选模式 (M)')}
+                        aria-pressed={isMarqueeActive}
                         icon={<FaObjectGroup className={`text-[14px] ${isMarqueeActive ? 'text-indigo-500' : 'text-slate-500'}`} />} 
                         className={`w-9 h-9 p-0 border-none transition-all ${isMarqueeActive ? 'bg-white dark:bg-slate-800 shadow-sm text-indigo-500' : 'hover:bg-slate-200 dark:hover:bg-white/5'}`} 
                     />
                 </Tooltip>
-                <Tooltip title={t('toolbar.drawingMode', '自由画笔 (P)')}>
+                <Tooltip title={isDrawingMode ? t('toolbar.drawingModeExit', '退出自由画笔 (Esc)') : t('toolbar.drawingMode', '自由画笔 (P)')}>
                     <Button 
                         type="text" 
                         onClick={onToggleDrawingMode} 
+                        aria-label={isDrawingMode ? t('toolbar.drawingModeExit', '退出自由画笔 (Esc)') : t('toolbar.drawingMode', '自由画笔 (P)')}
+                        aria-pressed={isDrawingMode}
                         icon={<FaPen className={`text-[13px] ${isDrawingMode ? 'text-indigo-500' : 'text-slate-500'}`} />} 
                         className={`w-9 h-9 p-0 border-none transition-all ${isDrawingMode ? 'bg-white dark:bg-slate-800 shadow-sm text-indigo-500' : 'hover:bg-slate-200 dark:hover:bg-white/5'}`} 
                     />

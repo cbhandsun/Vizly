@@ -31,10 +31,6 @@ import { useDesignerCommands } from './hooks/useDesignerCommands';
 import {
     focusFlowchartNode,
 } from './flowchartFocusEntity';
-import {
-    addFlowchartMindMapNode,
-    addFlowchartStickyNote,
-} from './flowchartDesignerCanvasActions';
 import { createFlowchartImportHandler, type FlowchartImportEvent } from './flowchartImportHandler';
 import { scheduleFlowchartInitialFit } from './flowchartInitialFit';
 import { registerImportedFlowchartDiagram } from './flowchartImportRegistration';
@@ -49,6 +45,7 @@ import { useFlowchartChromeCoordination } from './hooks/useFlowchartChromeCoordi
 import { useFlowchartHostActions } from './hooks/useFlowchartHostActions';
 import { useMobileFlowchartViewportGuard, useScheduledFlowchartFit } from './hooks/useMobileFlowchartViewportGuard';
 import { useFlowchartSearchReplaceActions } from './hooks/useFlowchartSearchReplaceActions';
+import { useFlowchartCreationTools } from './hooks/useFlowchartCreationTools';
 
 export const useFlowchartDesignerController = ({
     id,
@@ -329,6 +326,14 @@ export const useFlowchartDesignerController = ({
         onDragOver, onDrop, wrappedOnNodeDragStart, onNodeDrag, onNodeDragStop,
         isDraggingNode
     } = interactionsParams;
+    const {
+        activatePointer, toggleDrawingMode, toggleMarqueeMode,
+        handleAddFreehandStroke, handleAddMindMap, handleAddStickyNote,
+    } = useFlowchartCreationTools({
+        editingEnabled: !isReadonly && !presentationActive,
+        isDrawingMode, isMarqueeActive, setIsDrawingMode, setIsMarqueeActive,
+        activeLayerId, nodesRef, edgesRef, reactFlowInstance, setNodes, takeSnapshot, t,
+    });
     
     // 2.5 Linter Layer (Phase 8 integration)
     useTopologyLinter(nodesWithGhost, finalEdgesWithGhost, { enabled: !isReadonly });
@@ -599,25 +604,6 @@ export const useFlowchartDesignerController = ({
         });
     }, [id, setReactFlowInstance]);
 
-    const handleAddStickyNote = useCallback(() => {
-        if (!reactFlowInstance) return;
-        takeSnapshot(nodesRef.current, edgesRef.current);
-        addFlowchartStickyNote({
-            layer: activeLayerId,
-            setNodes,
-        });
-    }, [activeLayerId, edgesRef, nodesRef, reactFlowInstance, setNodes, takeSnapshot]);
-
-    const handleAddMindMap = useCallback(() => {
-        if (!reactFlowInstance) return;
-        takeSnapshot(nodesRef.current, edgesRef.current);
-        addFlowchartMindMapNode({
-            layer: activeLayerId,
-            label: t('designer.flowchart.mindMapCenter'),
-            setNodes,
-        });
-    }, [activeLayerId, edgesRef, nodesRef, reactFlowInstance, setNodes, t, takeSnapshot]);
-
     const onPaneMouseMove = useCallback((event: React.MouseEvent) => {
         if (!reactFlowInstance) return;
         const position = reactFlowInstance.screenToFlowPosition({ x: event.clientX, y: event.clientY });
@@ -656,7 +642,7 @@ export const useFlowchartDesignerController = ({
         canRedo, canUndo, canvasBg, canvasSearchVisible, canvasSearchReplaceVisible, closeMenu, commandPaletteItems, commandPaletteVisible, connectPreview, copyStyle, createLayer,
         currentZoom, deleteAnnotation, deleteLayer, deleteTemplate, diagramIdForExport, diffResult, dynamicEdgeTypes, dynamicNodeTypes, edges,
         edgesRef, enhancedOnConnect, enhancedOnConnectEnd, exportModalVisible, extraExportItems, fileInputRef,
-        getPreviousState, getReactFlowSnapshot, gridColor, gridVariant, groupedTemplates, guides, handleAddMindMap, handleAddNode, handleAddStickyNote, handleAlign,
+        getPreviousState, getReactFlowSnapshot, gridColor, gridVariant, groupedTemplates, guides, handleAddFreehandStroke, handleAddMindMap, handleAddNode, handleAddStickyNote, handleAlign,
         handleBeforeUpdate, handleBringToFront, handleContextMenuAction, handleDeleteWithToast, handleDistribute, handleDuplicateWithToast,
         handleEdgeDoubleClick, handleFitView, handleFocusNode, handleGridRotate, handleImport, handleLock, handleOpacity,
         handleOpenJsonEditor, handleOpenSettings, handlePaneClick, handlePresentationFocus, handleReactFlowInit, handleReadonlyChange, handleReconnect,
@@ -678,6 +664,7 @@ export const useFlowchartDesignerController = ({
         setPluginManagerVisible, setPresentationActive, setPresentationSlides, setQuickConnectPreview, setRightSidebarWidth, setShortcutHelpVisible,
         setShowMinimap, setShowRuler, setShowShortcuts, setShowShortcutsModal, setSnapEnabled, shortcutHelpVisible, showAiCrown, showGrid, showMinimap,
         showOnlyMainFlow, showOverlay, showPerformanceDashboard, showRuler, showShortcuts, snapEnabled, t, takeSnapshot, templates, theme, toggleLock,
+        activatePointer, toggleDrawingMode, toggleMarqueeMode,
         title, toggleGroupCollapse, toggleResolved, toggleVisibility, topActionArea, undo, updateAnnotation, updateEdgesBatch, updateNodesBatch, viewport, visibleEdges,
         wrappedOnNodeDragStart, yAwareness,
     };

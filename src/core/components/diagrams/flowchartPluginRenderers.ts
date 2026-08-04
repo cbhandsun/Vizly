@@ -21,6 +21,7 @@ const MindMapNode = createLazyNodeRenderer(() => import('../custom-nodes/MindMap
 const MindMapBoundaryNode = createLazyNodeRenderer(() => import('../custom-nodes/MindMapBoundaryNode'));
 const CommentNode = createLazyNodeRenderer(() => import('../custom-nodes/CommentNode'));
 const ERDatabaseNode = createLazyNodeRenderer(() => import('../custom-nodes/ERDatabaseNode'));
+const FreehandNode = createLazyNodeRenderer(() => import('../custom-nodes/FreehandNode'));
 
 const DEFAULT_NODE_TYPES: NodeTypes = {
     custom: CustomNode,
@@ -36,6 +37,7 @@ const DEFAULT_NODE_TYPES: NodeTypes = {
     iconNode: IconNode,
     erNode: ERDatabaseNode,
     'vizly:comment': CommentNode,
+    freehand: FreehandNode,
     system: CustomNode,
     actor: CustomNode,
     process: CustomNode,

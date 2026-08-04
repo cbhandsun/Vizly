@@ -88,6 +88,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
         gridColor,
         gridVariant,
         guides,
+        handleAddFreehandStroke,
         handleAddMindMap,
         handleAddNode,
         handleAddStickyNote,
@@ -205,8 +206,6 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
         setHighlightedNodeId,
         setHistoryPanelVisible,
         setIsCommentMode,
-        setIsDrawingMode,
-        setIsMarqueeActive,
         setMobileRequestedPanel,
         setNodes,
         setOnboardingDismissed,
@@ -228,6 +227,9 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
         t,
         takeSnapshot,
         theme,
+        activatePointer,
+        toggleDrawingMode,
+        toggleMarqueeMode,
         toggleResolved,
         topActionArea,
         undo,
@@ -462,18 +464,9 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                 hideUndoRedoControls: activePlugin?.hideUndoRedoControls,
                                 isDrawingMode,
                                 isMarqueeActive,
-                                toggleSelectionMode: () => {
-                                    setIsMarqueeActive(true);
-                                    setIsDrawingMode(false);
-                                },
-                                onToggleDrawingMode: () => {
-                                    setIsDrawingMode(true);
-                                    setIsMarqueeActive(false);
-                                },
-                                onActivatePointer: () => {
-                                    setIsDrawingMode(false);
-                                    setIsMarqueeActive(false);
-                                },
+                                toggleSelectionMode: toggleMarqueeMode,
+                                onToggleDrawingMode: toggleDrawingMode,
+                                onActivatePointer: activatePointer,
                                 onAddStickyNote: handleAddStickyNote,
                                 onAddMindMap: handleAddMindMap,
                                 onExport: () => setExportModalVisible(true),
@@ -650,10 +643,12 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                         }}
                                     />}
                                     {editingEnabled && <FreehandDrawingLayer
+                                        key={`${multiPage.activePageId}-${isDrawingMode ? 'active' : 'inactive'}`}
                                         isDrawingMode={isDrawingMode}
                                         zoom={viewport.zoom}
                                         pan={{ x: viewport.x, y: viewport.y }}
                                         currentColor={preset.name === 'sketch' ? '#555555' : '#000000'}
+                                        onDrawEnd={handleAddFreehandStroke}
                                     />}
                                     {editingEnabled && resolveFlowchartPluginContribution(
                                         'canvas',
