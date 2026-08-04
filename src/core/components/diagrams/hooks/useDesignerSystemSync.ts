@@ -2,28 +2,17 @@ import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateActio
 import { MarkerType, type Edge, type Node, type ReactFlowInstance } from '@xyflow/react';
 import type { MessageInstance } from 'antd/es/message/interface';
 import { useAutoSave } from './useAutoSave';
-import { PluginRegistry } from '../../../services/PluginRegistry';
 import { EdgeRoutingCoordinator } from '../../../services/EdgeRoutingCoordinator';
-import { cancelLayoutTransition, suspendLayoutTransitions } from '../../../utils/animateLayoutTransition';
 import { readReactFlowCanvasSize } from '../../../utils/domViewport';
-import { loadStandardPresetCanvas } from './standardPresetCanvasCache';
 import { useDesignerPresetInitialization } from './useDesignerPresetInitialization';
 import {
     logDesignerSystemSyncAutoSaveFailure,
-    logDesignerSystemSyncAutosaveRecalculationFailure,
-    logDesignerSystemSyncDataRegistryImportFailure,
     logDesignerSystemSyncDataRegistryWriteFailure,
     logDesignerSystemSyncImportDataFailure,
-    logDesignerSystemSyncStaleAutosaveDetected,
-    logDesignerSystemSyncStandardDataToCanvasFailure,
 } from './designerSystemSyncLogging';
 import { getApplicationDiagramRuntime } from '../../../ports/applicationDiagramRuntime';
-import {
-    clearDesignerFreshSeedFlag,
-    mergePresetExplicitEdgeHandles,
-    recalculateAutosaveNodeSizes,
-    shouldUseGlobalDesignerPerformanceMode,
-} from './designerSystemSyncPersistence';
+import { shouldUseGlobalDesignerPerformanceMode } from './designerSystemSyncPersistence';
+import { useDesignerInitialDiagramLoad } from './useDesignerInitialDiagramLoad';
 import {
     analyzeDesignerCanvas,
     projectDesignerStandardEdges,
@@ -35,13 +24,6 @@ import {
     type FlowDataBridgeEntry,
 } from '../../../utils/flowDataBridge';
 import type { StandardDiagramData } from '../../../models/DiagramModels';
-
-const PLUGIN_EMPTY_CANVAS_IDS = new Set(['flowchart']);
-
-const getPluginEmptyState = (pluginId: string) => {
-    const plugin = PluginRegistry.getInstance().getPlugin(pluginId);
-    return plugin?.getEmptyState();
-};
 
 export interface UseDesignerSystemSyncProps {
     id?: string;
@@ -493,163 +475,20 @@ export function useDesignerSystemSync({
         setAutosaveEnabled(shouldEnableAutosave);
     }
 
-    useEffect(() => {
-        if (isCurrentDiagramInitialized) return;
-        cancelLayoutTransition(setNodes);
-        setNodes([]);
-        setEdges([]);
-        if (!activePresetLookup.ready || activePresetLookup.id !== id) return;
-
-        const preset = activePresetLookup.preset;
-        const isStandardPreset = !!preset && !String(id || '').startsWith('custom:');
-
-        // Seed switching now uses localStorage + reload exclusively.
-        // useDiagramSeedStore is no longer used for handoff.
-        let saved = loadSaved();
-        saved = mergePresetExplicitEdgeHandles(saved, preset);
-        let shouldLoadAutosave = false;
-
-        if (isStandardPreset && saved) {
-            // Standard presets are source templates, not editable documents.
-            // Ordinary autosave state for their ids is stale user/session state and must not mask PRESET_MAP.
-            // Fresh seed was previously allowed here, but it can preserve old template layout output after
-            // strategy iterations. The preset map is now the single source of truth for standard templates.
-            clearSaved();
-            saved = null;
-        }
-        
-        if (saved) {
-            if (saved.diagramId && saved.diagramId !== id) {
-                // Check for stale autosave leaking across diagrams
-                logDesignerSystemSyncStaleAutosaveDetected(id, saved.diagramId);
-                clearSaved();
-            } else {
-                // Guard against corrupted autosave that contains RAW Standard Nodes instead of Canvas Nodes.
-                // Also explicitly allow length 0 (valid empty canvas).
-                // isFreshSeed shortcut: if the flag is set AND within the 5-minute TTL,
-                // trust the data unconditionally (any node type, written by seedAutoSaveAndNavigate).
-                // If isFreshSeed is set but older than 5 min → stale crash remnant, ignore the flag.
-                const FRESH_SEED_TTL_MS = 5 * 60 * 1000;
-                const isFreshAndValid = saved.isFreshSeed && saved.timestamp &&
-                    (Date.now() - saved.timestamp) < FRESH_SEED_TTL_MS;
-
-                // [FIX-AUTOSAVE] 放宽验证逻辑：只要节点有 data 字段就认定为有效 canvas 数据。
-                // 原来的白名单（flowchart/titleGroup/subGroup...）对用户在空白画布上新建的节点过于严格，
-                // 导致 autosave 数据存在但负载失败，画布被重置。
-                const isCanvasData = isFreshAndValid || (saved.nodes !== undefined && (
-                    saved.nodes.length === 0 ||
-                    saved.nodes.some((node) => node.data !== undefined)
-                ));
-                
-                // If the isFreshSeed flag is stale (crash remnant), strip it from storage
-                if (saved.isFreshSeed && !isFreshAndValid) {
-                    clearDesignerFreshSeedFlag(`flowchart-autosave-v2-${id || 'default'}`);
-                    saved = { ...saved, isFreshSeed: false };
-                }
-                
-                shouldLoadAutosave = !!isCanvasData;
-            }
-        }
-
-        if (shouldLoadAutosave && saved) {
-            const restoredActivePage = restoreAutoSaveMetadata?.(saved.metadata);
-            const restoredNodes = restoredActivePage?.nodes ?? saved.nodes;
-            const restoredEdges = restoredActivePage?.edges ?? saved.edges;
-            void recalculateAutosaveNodeSizes(restoredNodes).then((recalculatedNodes) => {
-                cancelLayoutTransition(setNodes);
-                setNodes(recalculatedNodes);
-                setEdges(restoredEdges);
-                needsInitialFitView.current = true;
-                markCurrentDiagramInitialized();
-
-                // [COLD-START FIX] 冻结路由器，阻止在节点尺寸未稳定前触发大量 A* 计算。
-                // 根据 CDP 调试，34节点图加载时出现 A* openSet exhausted (iterations=23892)，
-                // 原因是节点 measured 不稳定，Worker 被反复触发，导致 1-2 秒连线白屏。
-                // freeze() 后所有 route() 请求会被积压在 latestRequests 里，
-                // 等 unfreeze() 调用后一次性批量计算。
-                EdgeRoutingCoordinator.getInstance().freeze();
-
-                // ★ After consuming the fresh seed, clear the isFreshSeed flag from localStorage
-                // so that subsequent autosave cycles are no longer blocked by the guard.
-                if (saved.isFreshSeed) {
-                    messageApi?.success('加载模板成功');
-                    clearDesignerFreshSeedFlag(`flowchart-autosave-v2-${id || 'default'}`);
-                } else {
-                    messageApi?.info('已恢复上次编辑内容');
-                }
-            }).catch((error) => {
-                markCurrentDiagramInitialized();
-                logDesignerSystemSyncAutosaveRecalculationFailure(error);
-            });
-        } else {
-            // Core Fallback & Preset Injection Logic
-            if (preset) {
-                // IF the requested diagram matches a known standard preset map
-                // WE securely run standardDataToCanvas to apply ELK.js layout mapping!
-                loadStandardPresetCanvas(String(id || ''), preset).then(({ nodes: newNodes, edges: newEdges }) => {
-                    suspendLayoutTransitions(setNodes);
-                    setNodes(newNodes);
-                    setEdges(newEdges);
-                    needsInitialFitView.current = true;
-                    markCurrentDiagramInitialized();
-                }).catch(e => {
-                    markCurrentDiagramInitialized();
-                    logDesignerSystemSyncStandardDataToCanvasFailure('preset', e);
-                });
-            } else if (PLUGIN_EMPTY_CANVAS_IDS.has(String(id || ''))) {
-                const emptyState = getPluginEmptyState(pluginId);
-                if (emptyState) {
-                    setNodes(emptyState.nodes);
-                    setEdges(emptyState.edges);
-                    needsInitialFitView.current = true;
-                }
-                queueMicrotask(markCurrentDiagramInitialized);
-            } else {
-                // Try DataRegistry for imported/general templates before falling back to empty state
-                getApplicationDiagramRuntime().loadDiagram(id || '', { initialize: true }).then(async (existing) => {
-                    if (existing) {
-                        import('../designerUtils').then(({ standardDataToCanvas }) => {
-                            standardDataToCanvas(existing).then(({ nodes: newNodes, edges: newEdges }) => {
-                                cancelLayoutTransition(setNodes);
-                                setNodes(newNodes);
-                                setEdges(newEdges);
-                                needsInitialFitView.current = true;
-                                markCurrentDiagramInitialized();
-                            }).catch(e => {
-                                markCurrentDiagramInitialized();
-                                logDesignerSystemSyncStandardDataToCanvasFailure('registry', e);
-                            });
-                        });
-                    } else {
-                        // Normal plugin fallback empty state
-                        const emptyState = getPluginEmptyState(pluginId);
-                        if (emptyState) {
-                            setNodes(emptyState.nodes);
-                            setEdges(emptyState.edges);
-                            // ALWAYS trigger initial viewport adjustment, even for empty canvases
-                            needsInitialFitView.current = true;
-                        }
-                        markCurrentDiagramInitialized();
-                    }
-                }).catch(e => {
-                    markCurrentDiagramInitialized();
-                    logDesignerSystemSyncDataRegistryImportFailure(e);
-                });
-            }
-        }
-    }, [
-        activePresetLookup,
-        clearSaved,
+    useDesignerInitialDiagramLoad({
         id,
-        isCurrentDiagramInitialized,
-        loadSaved,
-        markCurrentDiagramInitialized,
-        messageApi,
         pluginId,
+        activePresetLookup,
+        isCurrentDiagramInitialized,
+        markCurrentDiagramInitialized,
+        loadSaved,
+        clearSaved,
         restoreAutoSaveMetadata,
-        setEdges,
+        messageApi,
         setNodes,
-    ]);
+        setEdges,
+        needsInitialFitView,
+    });
 
     // Deferred view adjustment: waits for reactFlowInstance to become available
     useEffect(() => {
