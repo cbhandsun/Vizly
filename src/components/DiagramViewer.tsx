@@ -151,12 +151,12 @@ const DiagramViewer: React.FC = () => {
     const { saveToCloud, shareDialogOpen, openShareDialog, closeShareDialog, ensureSaved } = useCloudSave(selectedDiagramId);
     
     // --- Phase 6: Mermaid Import Logic ---
-    const handleImportMermaidNodes = useCallback(async (nodes: unknown[], edges: unknown[]) => {
+    const handleImportMermaidNodes = useCallback(async (nodes: unknown[], edges: unknown[]): Promise<boolean> => {
         const bridge = getFlowDataBridge(selectedDiagramId);
         const addNode = bridge?.addNode;
         if (!bridge || !addNode) {
             appMessage.error(t('diagramViewer.canvasNotFound'));
-            return;
+            return false;
         }
 
         try {
@@ -166,9 +166,11 @@ const DiagramViewer: React.FC = () => {
             setTimeout(() => {
                 window.dispatchEvent(new CustomEvent('editor:command', { detail: { action: 'smart-layout' } }));
             }, 500);
+            return true;
         } catch (err) {
             logDiagramViewerMermaidImportFailure(err);
             appMessage.error('导入过程中发生错误');
+            return false;
         }
     }, [selectedDiagramId, t]);
     const [aiConfigVisible, setAiConfigVisible] = useState(false);
