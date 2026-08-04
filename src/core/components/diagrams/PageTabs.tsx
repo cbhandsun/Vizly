@@ -5,7 +5,8 @@ import type { InputRef } from 'antd';
 import { useTranslation } from 'react-i18next';
 
 import type { DiagramPage } from './hooks/useMultiPage';
-import { MAX_DIAGRAM_PAGES } from './multiPagePersistence';
+import { MAX_DIAGRAM_PAGE_NAME_LENGTH, MAX_DIAGRAM_PAGES } from './multiPagePersistence';
+import { isPageNameAvailable, normalizePageName } from './multiPageNaming';
 import { resolvePageTabTargetIndex } from './pageTabKeyboard';
 import './PageTabs.css';
 
@@ -15,7 +16,7 @@ interface PageTabsProps {
     onSwitchPage: (id: string) => void;
     onAddPage: () => void;
     onDeletePage: (id: string) => void;
-    onRenamePage: (id: string, name: string) => void;
+    onRenamePage: (id: string, name: string) => boolean;
     disabled?: boolean;
 }
 
@@ -27,6 +28,7 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
     const { t } = useTranslation();
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editName, setEditName] = useState('');
+    const [renameError, setRenameError] = useState<string | null>(null);
     const [confirmingPageId, setConfirmingPageId] = useState<string | null>(null);
     const inputRef = useRef<InputRef>(null);
     const tabButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
@@ -36,15 +38,28 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
         setConfirmingPageId(null);
         setEditingId(page.id);
         setEditName(page.name);
+        setRenameError(null);
         setTimeout(() => inputRef.current?.focus(), 50);
     }, []);
 
     const handleFinishRename = useCallback(() => {
-        if (editingId && editName.trim()) {
-            onRenamePage(editingId, editName.trim());
+        if (!editingId) return;
+        const normalizedName = normalizePageName(editName);
+        if (!normalizedName) {
+            setRenameError(t('designer.pages.nameRequired', { defaultValue: '页面名称不能为空' }));
+            return;
         }
+        if (!isPageNameAvailable(pages, normalizedName, editingId)) {
+            setRenameError(t('designer.pages.duplicateName', { defaultValue: '页面名称不能重复' }));
+            return;
+        }
+        if (!onRenamePage(editingId, normalizedName)) {
+            setRenameError(t('designer.pages.renameFailed', { defaultValue: '页面重命名失败，请重试' }));
+            return;
+        }
+        setRenameError(null);
         setEditingId(null);
-    }, [editingId, editName, onRenamePage]);
+    }, [editingId, editName, onRenamePage, pages, t]);
 
     const handleRenameKeyDown = useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
         if (event.key !== 'Escape' || !editingId) return;
@@ -52,6 +67,7 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
         const cancelledPageId = editingId;
         setEditingId(null);
         setEditName('');
+        setRenameError(null);
         requestAnimationFrame(() => tabButtonRefs.current.get(cancelledPageId)?.focus());
     }, [editingId]);
 
@@ -100,17 +116,29 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                 return (
                     <div key={page.id} className="page-tabs__item">
                         {isEditing ? (
-                            <Input
-                                ref={inputRef}
-                                aria-label={t('designer.pages.rename', { name: page.name, defaultValue: '重命名页面 {{name}}' })}
-                                size="small"
-                                value={editName}
-                                onChange={event => setEditName(event.target.value)}
-                                onBlur={handleFinishRename}
-                                onPressEnter={handleFinishRename}
-                                onKeyDown={handleRenameKeyDown}
-                                className="page-tabs__rename"
-                            />
+                            <Tooltip
+                                open={Boolean(renameError)}
+                                title={renameError}
+                                placement="top"
+                            >
+                                <Input
+                                    ref={inputRef}
+                                    aria-label={t('designer.pages.rename', { name: page.name, defaultValue: '重命名页面 {{name}}' })}
+                                    aria-invalid={Boolean(renameError)}
+                                    size="small"
+                                    value={editName}
+                                    maxLength={MAX_DIAGRAM_PAGE_NAME_LENGTH}
+                                    status={renameError ? 'error' : undefined}
+                                    onChange={event => {
+                                        setEditName(event.target.value);
+                                        setRenameError(null);
+                                    }}
+                                    onBlur={handleFinishRename}
+                                    onPressEnter={handleFinishRename}
+                                    onKeyDown={handleRenameKeyDown}
+                                    className="page-tabs__rename"
+                                />
+                            </Tooltip>
                         ) : (
                             <button
                                 ref={element => {

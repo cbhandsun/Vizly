@@ -3,6 +3,7 @@ import type { Edge, Node } from '@xyflow/react';
 import { coerceClipboardData } from '../../utils/flowchartClipboard';
 
 import type { DiagramPage } from './hooks/useMultiPage';
+import { createPageNameKey } from './multiPageNaming';
 
 const MULTI_PAGE_VERSION = 1;
 export const MAX_DIAGRAM_PAGES = 50;
@@ -39,6 +40,19 @@ const coercePage = (value: unknown): DiagramPage | null => {
     return canvas ? { id, name, nodes: canvas.nodes, edges: canvas.edges } : null;
 };
 
+const createUniquePersistedPageName = (name: string, pageNames: Set<string>): string => {
+    if (!pageNames.has(createPageNameKey(name))) return name;
+
+    for (let suffix = 2; suffix <= MAX_DIAGRAM_PAGES; suffix += 1) {
+        const suffixText = ` (${suffix})`;
+        const baseName = name.slice(0, MAX_DIAGRAM_PAGE_NAME_LENGTH - suffixText.length).trimEnd();
+        const candidate = `${baseName}${suffixText}`;
+        if (!pageNames.has(createPageNameKey(candidate))) return candidate;
+    }
+
+    return name;
+};
+
 export const parseMultiPageMetadata = (metadata: unknown): PersistedMultiPageState | null => {
     if (!isRecord(metadata) || !isRecord(metadata.multiPage)) return null;
     const candidate = metadata.multiPage;
@@ -47,10 +61,17 @@ export const parseMultiPageMetadata = (metadata: unknown): PersistedMultiPageSta
 
     const pages: DiagramPage[] = [];
     const pageIds = new Set<string>();
+    const pageNames = new Set<string>();
     for (const rawPage of candidate.pages) {
-        const page = coercePage(rawPage);
-        if (!page || pageIds.has(page.id)) return null;
+        const parsedPage = coercePage(rawPage);
+        if (!parsedPage || pageIds.has(parsedPage.id)) return null;
+        const page = {
+            ...parsedPage,
+            name: createUniquePersistedPageName(parsedPage.name, pageNames),
+        };
+        const pageNameKey = createPageNameKey(page.name);
         pageIds.add(page.id);
+        pageNames.add(pageNameKey);
         pages.push(page);
     }
 

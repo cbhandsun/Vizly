@@ -85,6 +85,21 @@ describe('multiPagePersistence', () => {
         expect(parseMultiPageMetadata(metadata)).toBeNull();
     });
 
+    it('repairs duplicate persisted names without dropping existing pages', () => {
+        const parsed = parseMultiPageMetadata({
+            multiPage: {
+                version: 1,
+                activePageId: 'page-1',
+                pages: [
+                    { id: 'page-1', name: 'Page', nodes: [], edges: [] },
+                    { id: 'page-2', name: 'Ｐａｇｅ', nodes: [], edges: [] },
+                ],
+            },
+        });
+
+        expect(parsed?.pages.map(page => page.name)).toEqual(['Page', 'Ｐａｇｅ (2)']);
+    });
+
     it('rejects extreme page counts and overlong names', () => {
         const tooManyPages = Array.from({ length: 51 }, (_, index) => ({
             id: `page-${index}`,

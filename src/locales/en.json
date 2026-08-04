@@ -597,6 +597,9 @@
             "limitReached": "You can create up to {{count}} pages",
             "rename": "Rename page {{name}}",
             "renameAction": "Rename page {{name}}",
+            "nameRequired": "Page name is required",
+            "duplicateName": "Page names must be unique",
+            "renameFailed": "Could not rename the page. Try again.",
             "delete": "Delete page {{name}}",
             "deleteConfirm": "Delete “{{name}}”?",
             "deleteAction": "Delete"

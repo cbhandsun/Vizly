@@ -14,6 +14,9 @@ vi.mock('react-i18next', () => ({
                 'designer.pages.limitReached': '最多可创建 {{count}} 个页面',
                 'designer.pages.rename': '重命名页面 {{name}}',
                 'designer.pages.renameAction': '重命名页面 {{name}}',
+                'designer.pages.nameRequired': '页面名称不能为空',
+                'designer.pages.duplicateName': '页面名称不能重复',
+                'designer.pages.renameFailed': '页面重命名失败，请重试',
                 'designer.pages.delete': '删除页面 {{name}}',
                 'designer.pages.deleteConfirm': '删除「{{name}}」？',
                 'designer.pages.deleteAction': '删除',
@@ -109,6 +112,33 @@ describe('PageTabs', () => {
 
         fireEvent.click(screen.getByRole('button', { name: '重命名页面 页面 1' }));
         expect(screen.getByRole('textbox', { name: '重命名页面 页面 1' })).toBeTruthy();
+    });
+
+    it('keeps duplicate page names in edit mode and exposes a visible error', async () => {
+        const onRenamePage = vi.fn(() => true);
+        render(
+            <PageTabs
+                pages={[
+                    { id: 'page-1', name: '页面 1', nodes: [], edges: [] },
+                    { id: 'page-2', name: '页面 2', nodes: [], edges: [] },
+                ]}
+                activePageId="page-2"
+                onSwitchPage={vi.fn()}
+                onAddPage={vi.fn()}
+                onDeletePage={vi.fn()}
+                onRenamePage={onRenamePage}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: '重命名页面 页面 2' }));
+        const input = screen.getByRole('textbox', { name: '重命名页面 页面 2' });
+        fireEvent.change(input, { target: { value: ' 页面 1 ' } });
+        fireEvent.keyDown(input, { key: 'Enter' });
+
+        expect(await screen.findByText('页面名称不能重复')).toBeTruthy();
+        expect(input.getAttribute('aria-invalid')).toBe('true');
+        expect(input.getAttribute('maxlength')).toBe('80');
+        expect(onRenamePage).not.toHaveBeenCalled();
     });
 
     it('cancels inline rename with Escape and restores tab focus', async () => {

@@ -6,7 +6,7 @@ import {
     MAX_DIAGRAM_PAGES,
     parseMultiPageMetadata,
 } from '../multiPagePersistence';
-import { createNextPageName } from '../multiPageNaming';
+import { createNextPageName, isPageNameAvailable, normalizePageName } from '../multiPageNaming';
 
 export interface DiagramPage {
     id: string;
@@ -147,8 +147,8 @@ export const useMultiPage = (
 
     // 重命名页面
     const renamePage = useCallback((pageId: string, newName: string) => {
-        const normalizedName = newName.trim().slice(0, MAX_DIAGRAM_PAGE_NAME_LENGTH);
-        if (!normalizedName) return;
+        const normalizedName = normalizePageName(newName).slice(0, MAX_DIAGRAM_PAGE_NAME_LENGTH);
+        if (!isPageNameAvailable(pagesRef.current, normalizedName, pageId)) return false;
         setPages(prev => {
             const nextPages = prev.map(p =>
                 p.id === pageId ? { ...p, name: normalizedName } : p
@@ -156,6 +156,7 @@ export const useMultiPage = (
             pagesRef.current = nextPages;
             return nextPages;
         });
+        return true;
     }, []);
 
     const getPersistedMetadata = useCallback(() => createMultiPageMetadata(

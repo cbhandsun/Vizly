@@ -608,6 +608,9 @@
             "limitReached": "最多可创建 {{count}} 个页面",
             "rename": "重命名页面 {{name}}",
             "renameAction": "重命名页面 {{name}}",
+            "nameRequired": "页面名称不能为空",
+            "duplicateName": "页面名称不能重复",
+            "renameFailed": "页面重命名失败，请重试",
             "delete": "删除页面 {{name}}",
             "deleteConfirm": "删除「{{name}}」？",
             "deleteAction": "删除"

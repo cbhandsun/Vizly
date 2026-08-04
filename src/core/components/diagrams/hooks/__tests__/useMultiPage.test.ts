@@ -132,6 +132,30 @@ describe('useMultiPage', () => {
     expect(result.current.pages[0]?.name).toHaveLength(80);
   });
 
+  it('rejects duplicate page names after trimming and Unicode normalization', () => {
+    const { result } = renderHook(() => useMultiPage(
+      () => [],
+      () => [],
+      vi.fn(),
+      vi.fn(),
+    ));
+
+    let secondPageId: string | null = null;
+    act(() => {
+      secondPageId = result.current.addPage();
+    });
+    if (!secondPageId) throw new Error('Expected a page to be created');
+    const createdPageId = secondPageId;
+
+    let renamed = true;
+    act(() => {
+      renamed = result.current.renamePage(createdPageId, '  页面 1  ');
+    });
+
+    expect(renamed).toBe(false);
+    expect(result.current.pages.map(page => page.name)).toEqual(['页面 1', '页面 2']);
+  });
+
   it('keeps generated page names unique after deletion', () => {
     const { result } = renderHook(() => useMultiPage(
       () => [],
