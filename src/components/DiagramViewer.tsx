@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useDiagramControls } from '@/core/hooks/useDiagramControls';
 import { useUIState } from '@/core/hooks/useUIState';
 import { diagramDefinitions } from '../data/diagram-definitions';
-import { DiagramSettingsPanel } from './ui/DiagramSettingsPanel';
+import { DiagramViewerSettingsPanel } from './DiagramViewerSettingsPanel';
 import { useConfigIntegration, useConfigValue } from '@/core/hooks/useConfigIntegration';
 import { useDiagramHostStorage } from '@/core/hooks/useDiagramHostStorage';
 import { useSubscription } from '../context/useSubscription';
@@ -526,21 +526,23 @@ const DiagramViewer: React.FC = () => {
 
     // Diagram Settings Popover Content
     const settingsPanel = (
-        <DiagramSettingsPanel
+        <DiagramViewerSettingsPanel
             selectedDiagram={selectedDiagram}
             selectedDiagramId={selectedDiagramId}
             edgeMode={String(edgeMode || 'native')}
-            onEdgeModeChange={async (val) => setEdgeMode(val)}
+            setEdgeMode={setEdgeMode}
             layoutStrategy={String(layoutStrategy || '')}
-            onLayoutStrategyChange={async (val) => setLayoutStrategy(val)}
+            setLayoutStrategy={setLayoutStrategy}
             nodeLayoutStrategy={String(nodeLayoutStrategy)}
-            onNodeLayoutStrategyChange={async (val) => setNodeLayoutStrategy(val)}
+            setNodeLayoutStrategy={setNodeLayoutStrategy}
             elkAlgorithm={String(elkAlgorithm)}
-            onElkAlgorithmChange={async (val) => setElkAlgorithm(val)}
+            setElkAlgorithm={setElkAlgorithm}
             linkOrientationEnabled={!!linkOrientationEnabled}
             showOnlyMainFlow={showOnlyMainFlow}
-            onShowOnlyMainFlowChange={setShowOnlyMainFlow}
-            onRefreshRequest={() => setRefreshNonce(n => n + 1)}
+            setShowOnlyMainFlow={setShowOnlyMainFlow}
+            setRefreshNonce={setRefreshNonce}
+            isReadonly={isReadonly}
+            isPresentationMode={isPresentationMode}
         />
     );
 

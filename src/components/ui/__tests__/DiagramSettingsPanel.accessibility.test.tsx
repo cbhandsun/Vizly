@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import '@testing-library/jest-dom/vitest';
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
@@ -70,5 +71,39 @@ describe('DiagramSettingsPanel accessibility', () => {
         expect(screen.getByRole('combobox', { name: 'designer.settings.layoutStrategy' })).toBeTruthy();
         expect(screen.getByRole('combobox', { name: 'designer.settings.nodeLayout' })).toBeTruthy();
         expect(screen.getByRole('switch', { name: 'designer.settings.showMainFlow' })).toBeTruthy();
+    });
+
+    it('keeps view preferences available while disabling document mutations on a locked canvas', () => {
+        const onNodeLayoutStrategyChange = vi.fn();
+
+        render(
+            <DiagramSettingsPanel
+                selectedDiagramId="diagram-1"
+                edgeMode="advanced-smart"
+                onEdgeModeChange={vi.fn()}
+                layoutStrategy="DomainVerticalLayout"
+                onLayoutStrategyChange={vi.fn()}
+                nodeLayoutStrategy="UnsupportedLayout"
+                onNodeLayoutStrategyChange={onNodeLayoutStrategyChange}
+                elkAlgorithm="layered"
+                onElkAlgorithmChange={vi.fn()}
+                linkOrientationEnabled={false}
+                showOnlyMainFlow={false}
+                onShowOnlyMainFlowChange={vi.fn()}
+                onRefreshRequest={vi.fn()}
+                editingEnabled={false}
+            />,
+        );
+
+        expect(screen.getByRole('status')).toHaveTextContent('画布已锁定');
+        expect(screen.getByRole('button', { name: '颜色主题' })).toBeEnabled();
+        expect(screen.getByRole('button', { name: '线条风格' })).toBeEnabled();
+        expect(screen.getByRole('switch', { name: 'designer.settings.showMainFlow' })).toBeEnabled();
+        expect(screen.getAllByRole('combobox')).toHaveLength(3);
+        for (const control of screen.getAllByRole('combobox')) {
+            expect(control).toBeDisabled();
+        }
+        expect(screen.getByRole('button', { name: /designer.settings.advancedConfig/ })).toBeDisabled();
+        expect(onNodeLayoutStrategyChange).not.toHaveBeenCalled();
     });
 });

@@ -10,6 +10,7 @@ import {
     ChevronRight,
     Cpu,
     Sparkles,
+    LockKeyhole,
     type LucideIcon
 } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -47,6 +48,7 @@ interface DiagramSettingsPanelProps {
     showOnlyMainFlow: boolean;
     onShowOnlyMainFlowChange: (val: boolean) => void;
     onRefreshRequest: () => void;
+    editingEnabled?: boolean;
 }
 
 interface SettingRowProps {
@@ -76,12 +78,17 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
     linkOrientationEnabled,
     showOnlyMainFlow,
     onShowOnlyMainFlowChange,
-    onRefreshRequest
+    onRefreshRequest,
+    editingEnabled = true
 }) => {
     const { t } = useTranslation();
     const [isPanelOpen, setIsPanelOpen] = useState(false);
     const isLayoutSwitchSupported = !selectedDiagram || !!selectedDiagram.supportsLayoutSwitch;
     const isMainFlowToggleSupported = !selectedDiagram || !!selectedDiagram.supportsMainFlowToggle;
+    const editingDisabledReason = t(
+        'designer.settings.lockedReason',
+        '画布已锁定 · 解锁后可修改'
+    );
     const nodeLayoutLabel = (() => {
         const normalizedLayout = normalizeLayoutName(layoutStrategy);
         const isDomainElk = normalizedLayout === 'domainelk' || normalizedLayout === 'domainelklayout';
@@ -90,6 +97,7 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
 
     // 节点布局策略自动修正逻辑
     useEffect(() => {
+        if (!editingEnabled) return;
         const checkStrategies = async () => {
             const selectable = LayoutStrategyManager.getShared().isNodeLayoutExternallySelectable(layoutStrategy);
             const all = LayoutStrategyManager.getShared().getAvailableNodeStrategies();
@@ -113,7 +121,7 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
             }
         };
         checkStrategies();
-    }, [layoutStrategy, nodeLayoutStrategy, onNodeLayoutStrategyChange, onRefreshRequest]);
+    }, [editingEnabled, layoutStrategy, nodeLayoutStrategy, onNodeLayoutStrategyChange, onRefreshRequest]);
 
     const renderStrategyOptionContent = (strategy: Pick<ILayoutStrategy, 'getName' | 'getDescription'>) => {
         const name = strategy.getName();
@@ -127,7 +135,10 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
     };
 
     const SettingRow = ({ icon: Icon, label, children, description, disabled = false }: SettingRowProps) => (
-        <div className={`group flex items-start justify-between gap-4 px-5 py-3.5 transition-all duration-300 ${disabled ? 'opacity-40 pointer-events-none' : 'hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'}`}>
+        <div
+            aria-disabled={disabled || undefined}
+            className={`group flex items-start justify-between gap-4 px-5 py-3.5 transition-all duration-300 ${disabled ? 'opacity-55' : 'hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'}`}
+        >
             <div className="flex items-start gap-4 min-w-0 flex-1">
                 <div className="flex-shrink-0 mt-0 w-9 h-9 rounded-[6px] bg-black/[0.03] dark:bg-white/5 border border-black/[0.04] dark:border-white/[0.04] flex items-center justify-center group-hover:scale-105 group-hover:shadow-sm group-hover:bg-white dark:group-hover:bg-white/10 transition-all duration-300">
                     <Icon size={18} className="text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white" />
@@ -158,6 +169,23 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
             {/* 遵循全局令牌系统的响应式滚动容器 */}
             <div className="flex-1 overflow-y-auto custom-scrollbar px-7 py-5">
                 <div className="w-full max-w-full sm:max-w-2xl lg:max-w-5xl mx-auto flex flex-col gap-1.5">
+
+                {!editingEnabled && (
+                    <div
+                        role="status"
+                        className="mb-3 flex items-start gap-3 rounded-[var(--glass-radius)] border border-amber-200/80 bg-amber-50/90 px-4 py-3 text-amber-900 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-100"
+                    >
+                        <LockKeyhole size={17} className="mt-0.5 flex-none" aria-hidden="true" />
+                        <div className="flex flex-col gap-0.5">
+                            <span className="text-[13px] font-semibold">
+                                {t('designer.settings.lockedTitle', '画布已锁定')}
+                            </span>
+                            <span className="text-[12px] leading-relaxed opacity-80">
+                                {t('designer.settings.lockedDescription', '外观和视图设置仍可使用；连线、布局与高级配置需解锁后修改。')}
+                            </span>
+                        </div>
+                    </div>
+                )}
                 
                 {/* 视觉风格组 */}
                 <SectionHeader title={t('designer.settings.group.visual', '外观视觉')} first={true} />
@@ -210,15 +238,17 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                     <SettingRow 
                         icon={Zap} 
                         label={t('designer.settings.edgeMode')}
-                        description={t('designer.settings.edgeModeDesc', '决定连线的避障与寻路逻辑')}
+                        description={editingEnabled ? t('designer.settings.edgeModeDesc', '决定连线的避障与寻路逻辑') : editingDisabledReason}
+                        disabled={!editingEnabled}
                     >
                         <Select
                             aria-label={t('designer.settings.edgeMode')}
                             variant="borderless"
                             className="text-right font-bold text-indigo-600 dark:text-indigo-400 min-w-[140px]"
                             value={normalizeDiagramEdgeMode(edgeMode)}
+                            disabled={!editingEnabled}
                             onChange={(val) => {
-                                if (isDiagramEdgeMode(val)) void onEdgeModeChange(val);
+                                if (editingEnabled && isDiagramEdgeMode(val)) void onEdgeModeChange(val);
                             }}
                             popupMatchSelectWidth={false}
                         >
@@ -232,16 +262,17 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                     <SettingRow 
                         icon={Layers} 
                         label={t('designer.settings.layoutStrategy')}
-                        description={t('designer.settings.layoutStrategyDesc', '全局拓扑排列的核心算法')}
-                        disabled={!isLayoutSwitchSupported}
+                        description={!editingEnabled ? editingDisabledReason : t('designer.settings.layoutStrategyDesc', '全局拓扑排列的核心算法')}
+                        disabled={!editingEnabled || !isLayoutSwitchSupported}
                     >
                         <Select
                             aria-label={t('designer.settings.layoutStrategy')}
                             variant="borderless"
                             className="text-right font-bold text-gray-700 dark:text-gray-300 min-w-[140px]"
                             value={layoutStrategy}
-                            disabled={!isLayoutSwitchSupported}
+                            disabled={!editingEnabled || !isLayoutSwitchSupported}
                             onChange={async (val) => {
+                                if (!editingEnabled) return;
                                 const hierarchyStrategies = LayoutStrategyManager.getShared().getAvailableHierarchyStrategies();
                                 if (!isAvailableStrategyType(val, hierarchyStrategies)) return;
                                 const next = val;
@@ -290,7 +321,8 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                     <SettingRow 
                         icon={Cpu} 
                         label={nodeLayoutLabel}
-                        description={t('designer.settings.nodeLayoutDesc', '子域内节点的排布微调')}
+                        description={editingEnabled ? t('designer.settings.nodeLayoutDesc', '子域内节点的排布微调') : editingDisabledReason}
+                        disabled={!editingEnabled}
                     >
                         {(() => {
                             const norm = normalizeLayoutName(layoutStrategy);
@@ -302,7 +334,10 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                                         variant="borderless"
                                         className="text-right font-bold text-gray-700 dark:text-gray-300 min-w-[140px]"
                                         value={normalizeElkAlgorithm(elkAlgorithm)}
-                                        onChange={(val) => void onElkAlgorithmChange(normalizeElkAlgorithm(val))}
+                                        disabled={!editingEnabled}
+                                        onChange={(val) => {
+                                            if (editingEnabled) void onElkAlgorithmChange(normalizeElkAlgorithm(val));
+                                        }}
                                         popupMatchSelectWidth={false}
                                         optionLabelProp="label"
                                     >
@@ -336,7 +371,9 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                                         variant="borderless"
                                         className="text-right font-bold text-gray-700 dark:text-gray-300 min-w-[140px]"
                                         value={currentPreset}
+                                        disabled={!editingEnabled}
                                         onChange={(val) => {
+                                            if (!editingEnabled) return;
                                             const preset = parseLayoutPresetValue(val);
                                             if (!preset) return;
                                             try {
@@ -365,6 +402,7 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                                     className="text-right font-bold text-gray-700 dark:text-gray-300 min-w-[140px]"
                                     value={nodeLayoutStrategy}
                                     onChange={async (val) => {
+                                        if (!editingEnabled) return;
                                         const allNodeStrategies = LayoutStrategyManager.getShared().getAvailableNodeStrategies();
                                         const norm = normalizeLayoutName(layoutStrategy);
                                         const isDomainVert = (norm === 'domainvertical' || norm === 'domainverticallayout');
@@ -384,7 +422,7 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                                         }));
                                         onRefreshRequest();
                                     }}
-                                    disabled={!selectable}
+                                    disabled={!editingEnabled || !selectable}
                                     popupMatchSelectWidth={false}
                                     optionLabelProp="label"
                                 >
@@ -451,8 +489,13 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                     transition={{ delay: 0.3 }}
                     className="mt-6 mb-2">
                     <button
-                        className="w-full group relative flex items-center justify-between p-4 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 border border-black/[0.08] dark:border-white/10 rounded-[var(--glass-radius)] cursor-pointer shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition-all duration-300 active:scale-[0.99]"
-                        onClick={() => setIsPanelOpen(true)}
+                        type="button"
+                        disabled={!editingEnabled}
+                        aria-describedby={!editingEnabled ? 'diagram-settings-advanced-locked' : undefined}
+                        className="w-full group relative flex items-center justify-between p-4 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 border border-black/[0.08] dark:border-white/10 rounded-[var(--glass-radius)] cursor-pointer shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition-all duration-300 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:bg-white dark:disabled:hover:bg-white/5 disabled:active:scale-100"
+                        onClick={() => {
+                            if (editingEnabled) setIsPanelOpen(true);
+                        }}
                     >
                         <div className="flex items-center gap-4">
                             <div className="w-10 h-10 rounded-[6px] bg-gradient-to-b from-gray-800 to-black hover:from-gray-700 hover:to-gray-900 dark:from-gray-200 dark:to-white flex items-center justify-center text-white dark:text-black shadow-[0_1px_2px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.1)] transition-transform duration-300">
@@ -460,7 +503,9 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                             </div>
                             <div className="flex flex-col text-left">
                                 <span className="text-[14px] font-semibold text-gray-800 dark:text-gray-100">{t('designer.settings.advancedConfig')}</span>
-                                <span className="text-[12px] text-gray-500 dark:text-gray-400 mt-0.5 leading-tight pr-2">{t('designer.settings.advancedConfigDesc', '精细化几何参数与避障权重调节')}</span>
+                                <span id={!editingEnabled ? 'diagram-settings-advanced-locked' : undefined} className="text-[12px] text-gray-500 dark:text-gray-400 mt-0.5 leading-tight pr-2">
+                                    {editingEnabled ? t('designer.settings.advancedConfigDesc', '精细化几何参数与避障权重调节') : editingDisabledReason}
+                                </span>
                             </div>
                         </div>
                         <div className="w-7 h-7 rounded-[6px] bg-black/[0.03] dark:bg-white/5 flex items-center justify-center group-hover:bg-black/[0.08] dark:group-hover:bg-white/10 text-gray-500 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white transition-all">
@@ -472,7 +517,7 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
         </div>
             
         <ConfigurationPanel
-                isOpen={isPanelOpen}
+                isOpen={editingEnabled && isPanelOpen}
                 onClose={() => setIsPanelOpen(false)}
             />
         </div>

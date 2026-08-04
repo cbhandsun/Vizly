@@ -23,6 +23,7 @@ const exportToPDFMock = vi.fn();
 const exportToSVGMock = vi.fn();
 const exportToGIFMock = vi.fn();
 const openShareDialogMock = vi.fn();
+const configValueSetterMock = vi.fn();
 const useDiagramControlsMock = vi.fn((
     _diagramId: string,
     _ready: boolean,
@@ -67,7 +68,7 @@ vi.mock('@/core/hooks/useUIState', () => ({
 
 vi.mock('@/core/hooks/useConfigIntegration', () => ({
     useConfigIntegration: () => ([{ isReady: false }, { removeConfig: vi.fn(), setConfig: vi.fn() }]),
-    useConfigValue: (initialValue: unknown) => [initialValue, vi.fn()],
+    useConfigValue: (initialValue: unknown) => [initialValue, configValueSetterMock],
 }));
 
 vi.mock('@/core/hooks/diagramHostStorage', () => ({
@@ -112,7 +113,22 @@ vi.mock('../layout/DiagramLayout', () => ({
 }));
 
 vi.mock('../ui/DiagramSettingsPanel', () => ({
-    DiagramSettingsPanel: () => <div />,
+    DiagramSettingsPanel: (props: {
+        editingEnabled?: boolean;
+        onEdgeModeChange: (value: 'advanced-smart' | 'native') => Promise<void>;
+        onLayoutStrategyChange: (value: string) => Promise<void>;
+        onNodeLayoutStrategyChange: (value: string) => Promise<void>;
+        onElkAlgorithmChange: (value: string) => Promise<void>;
+        onRefreshRequest: () => void;
+    }) => (
+        <div data-testid="settings-panel" data-editing-enabled={String(props.editingEnabled)}>
+            <button type="button" onClick={() => void props.onEdgeModeChange('native')}>mutate-edge</button>
+            <button type="button" onClick={() => void props.onLayoutStrategyChange('layout')}>mutate-layout</button>
+            <button type="button" onClick={() => void props.onNodeLayoutStrategyChange('node-layout')}>mutate-node-layout</button>
+            <button type="button" onClick={() => void props.onElkAlgorithmChange('force')}>mutate-elk</button>
+            <button type="button" onClick={props.onRefreshRequest}>refresh-settings</button>
+        </div>
+    ),
 }));
 
 vi.mock('../ui/EnhancedThemeSelector', () => ({
@@ -131,9 +147,13 @@ vi.mock('@/core/components/ui/commandPaletteStorage', () => ({
     readRecentCommandIds: () => [],
 }));
 
-vi.mock('../ui/DraggableSettingsPanel', () => ({
-    default: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-}));
+vi.mock('../ui/DraggableSettingsPanel', () => {
+    const MockDraggableSettingsPanel = ({ children }: { children: React.ReactNode }) => <div>{children}</div>;
+    return {
+        default: MockDraggableSettingsPanel,
+        DraggableSettingsPanel: MockDraggableSettingsPanel,
+    };
+});
 
 vi.mock('../diagrams/ui/TemplateCascaderMenu', () => ({
     default: () => <div />,
@@ -253,10 +273,12 @@ vi.mock('@/data/diagram-definitions', () => ({
         component: (props: {
             isReadonly?: boolean;
             onOpenShareDialog?: () => void;
+            onOpenSettings?: () => void;
             onReadonlyChange?: (value: boolean) => void;
         }) => (
             <div data-testid="diagram" data-readonly={String(props.isReadonly)}>
                 <button type="button" onClick={props.onOpenShareDialog}>share</button>
+                <button type="button" onClick={props.onOpenSettings}>open-settings</button>
                 <button type="button" onClick={() => props.onReadonlyChange?.(true)}>lock</button>
             </div>
         ),
@@ -355,5 +377,28 @@ describe('DiagramViewer regression', () => {
         expect(screen.getByTestId('diagram')).toHaveAttribute('data-readonly', 'false');
         fireEvent.click(screen.getByRole('button', { name: 'lock' }));
         expect(screen.getByTestId('diagram')).toHaveAttribute('data-readonly', 'true');
+    });
+
+    it('guards settings document mutations after the designer locks the canvas', async () => {
+        configValueSetterMock.mockClear();
+
+        render(
+            <MemoryRouter initialEntries={['/diagram?diagram=test-diagram']}>
+                <DiagramViewer />
+            </MemoryRouter>
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'open-settings' }));
+        expect(await screen.findByTestId('settings-panel')).toHaveAttribute('data-editing-enabled', 'true');
+        fireEvent.click(screen.getByRole('button', { name: 'lock' }));
+        expect(screen.getByTestId('settings-panel')).toHaveAttribute('data-editing-enabled', 'false');
+
+        fireEvent.click(screen.getByRole('button', { name: 'mutate-edge' }));
+        fireEvent.click(screen.getByRole('button', { name: 'mutate-layout' }));
+        fireEvent.click(screen.getByRole('button', { name: 'mutate-node-layout' }));
+        fireEvent.click(screen.getByRole('button', { name: 'mutate-elk' }));
+        fireEvent.click(screen.getByRole('button', { name: 'refresh-settings' }));
+
+        expect(configValueSetterMock).not.toHaveBeenCalled();
     });
 });

@@ -14,6 +14,7 @@ import {
     createDiagramViewerCommandItems,
     getDiagramViewerCommandModifierLabel,
 } from './diagramViewerCommandItems';
+import { canMutateDiagramDocument } from './diagramViewerPermissions';
 import { createDiagramViewerGlobalKeydownHandler } from './diagramViewerKeyboard';
 import {
     logDiagramViewerCommandPaletteStateFailure,
@@ -69,7 +70,7 @@ export function useDiagramViewerCommands({
     setMermaidModalVisible,
     exitPresentation,
 }: UseDiagramViewerCommandsOptions): DiagramViewerCommandsState {
-    const editingEnabled = !isReadonly && !isPresentationMode;
+    const editingEnabled = canMutateDiagramDocument({ isReadonly, isPresentationMode });
     const [showDebugPanel, setShowDebugPanel] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isCommandOpen, setIsCommandOpen] = useState(false);
