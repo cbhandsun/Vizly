@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { useEffect, useMemo, useRef, type Dispatch, type SetStateAction } from 'react';
 import { MarkerType, type Edge, type Node, type ReactFlowInstance } from '@xyflow/react';
 import type { MessageInstance } from 'antd/es/message/interface';
 import { useAutoSave } from './useAutoSave';
@@ -425,7 +425,15 @@ export function useDesignerSystemSync({
         }
     }, [globalPerformanceMode]);
 
-    const [autosaveEnabled, setAutosaveEnabled] = useState(false);
+    const needsInitialFitView = useRef(false);
+    const {
+        activePresetLookup,
+        isCurrentDiagramInitialized,
+        markCurrentDiagramInitialized,
+    } = useDesignerPresetInitialization(id);
+    const autosaveEnabled = activePresetLookup.ready
+        && isCurrentDiagramInitialized
+        && !(activePresetLookup.preset && !String(id || '').startsWith('custom:'));
 
     const { loadSaved, clearSaved, saveNow, saveState } = useAutoSave(nodes, edges, {
         interval: 60000,
@@ -437,43 +445,24 @@ export function useDesignerSystemSync({
         getMetadata: getAutoSaveMetadata,
     });
 
-    // 节点/边变化后 3 秒防抖保存；跳过 mount 与 autosave 恢复的前两次触发。
+    // Only debounce after the active diagram has completed initialization.
+    // Restored autosaves are deduplicated by useAutoSave; registry-loaded canvases
+    // still receive their first durable local snapshot.
     const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const skipCountRef = useRef(0);
-    const isMountedRef = useRef(true);
-    useEffect(() => {
-        isMountedRef.current = true;
-        return () => { isMountedRef.current = false; };
-    }, []);
     useEffect(() => {
         if (!autosaveEnabled) return;
-        if (skipCountRef.current < 2) {
-            skipCountRef.current++;
-            return;
-        }
         if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
         saveTimerRef.current = setTimeout(() => {
-            // 只在组件仍挂载时执行（beforeunload 负责卸载后的最终保存）
-            if (isMountedRef.current) saveNow();
+            saveTimerRef.current = null;
+            void saveNow();
         }, 3000);
-        // 注意：cleanup 只清除「因 deps 变化」导致的旧计时器，
-        // 不影响 beforeunload 的同步保存（它们是独立的机制）
         return () => {
-            if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+            if (saveTimerRef.current) {
+                clearTimeout(saveTimerRef.current);
+                saveTimerRef.current = null;
+            }
         };
     }, [nodes, edges, saveNow, autosaveEnabled]);
-
-    const needsInitialFitView = useRef(false);
-    const {
-        activePresetLookup,
-        isCurrentDiagramInitialized,
-        markCurrentDiagramInitialized,
-    } = useDesignerPresetInitialization(id);
-    const shouldEnableAutosave = activePresetLookup.ready
-        && !(activePresetLookup.preset && !String(id || '').startsWith('custom:'));
-    if (autosaveEnabled !== shouldEnableAutosave) {
-        setAutosaveEnabled(shouldEnableAutosave);
-    }
 
     useDesignerInitialDiagramLoad({
         id,

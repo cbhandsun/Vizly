@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useCallback, useState } from 'react';
 import { Node, Edge } from '@xyflow/react';
 import { appMessage } from '../../../utils/antdStaticBridge';
 import {
@@ -32,6 +32,18 @@ export interface AutoSaveOptions {
     onSaveError?: (error: Error) => void;
     getMetadata?: () => unknown;
 }
+
+const createAutoSaveScopeKey = (storageKey: string, diagramId?: string) => (
+    JSON.stringify([storageKey, diagramId ?? null])
+);
+
+const createAutoSaveContentKey = (
+    storageKey: string,
+    diagramId: string | undefined,
+    nodes: Node[],
+    edges: Edge[],
+    metadata: unknown,
+) => JSON.stringify({ storageKey, diagramId: diagramId ?? null, nodes, edges, metadata });
 
 /** GC: remove autosave entries not accessed in 7 days */
 function gcAutosaveEntries() {
@@ -79,7 +91,10 @@ export const useAutoSave = (
         error: null
     });
 
-    // Track content hash + timestamp + dirty flag
+    const scopeKey = createAutoSaveScopeKey(storageKey, diagramId);
+
+    // Track the active diagram scope, content hash, and retry lifecycle.
+    const scopeKeyRef = useRef(scopeKey);
     const lastSavedContentRef = useRef<string>('');
     const retryCountRef = useRef(0);
     const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -90,10 +105,23 @@ export const useAutoSave = (
     const nodesRef = useRef(nodes);
     const edgesRef = useRef(edges);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         nodesRef.current = nodes;
         edgesRef.current = edges;
     }, [nodes, edges]);
+
+    useLayoutEffect(() => {
+        if (scopeKeyRef.current === scopeKey) return;
+
+        scopeKeyRef.current = scopeKey;
+        lastSavedContentRef.current = '';
+        retryCountRef.current = 0;
+        if (retryTimerRef.current) {
+            clearTimeout(retryTimerRef.current);
+            retryTimerRef.current = null;
+        }
+        setSaveState({ lastSaved: null, saving: false, error: null });
+    }, [scopeKey]);
 
     // GC: run once on mount to clean up stale entries older than 7 days
     useEffect(() => {
@@ -102,12 +130,20 @@ export const useAutoSave = (
 
     // Core save logic with dedup check
     const save = useCallback(async () => {
+        if (scopeKeyRef.current !== scopeKey) return;
+
         try {
             // Only write if content (nodes + edges) actually changed since last save
             const currentNodes = nodesRef.current;
             const currentEdges = edgesRef.current;
             const metadata = getMetadata?.();
-            const contentKey = JSON.stringify({ nodes: currentNodes, edges: currentEdges, metadata });
+            const contentKey = createAutoSaveContentKey(
+                storageKey,
+                diagramId,
+                currentNodes,
+                currentEdges,
+                metadata,
+            );
             if (contentKey === lastSavedContentRef.current) {
                 return;
             }
@@ -145,24 +181,29 @@ export const useAutoSave = (
 
             onSaveSuccess?.();
         } catch (error) {
-            const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+            const normalizedError = error instanceof Error ? error : new Error('Unknown error');
+            const errorMsg = normalizedError.message;
             setSaveState(prev => ({ ...prev, saving: false, error: errorMsg }));
 
             // Retry with exponential backoff, up to MAX_RETRIES
             if (retryCountRef.current < MAX_RETRIES) {
                 retryCountRef.current++;
                 const retryDelay = Math.pow(2, retryCountRef.current - 1) * 1000;
+                const retryScopeKey = scopeKey;
                 retryTimerRef.current = setTimeout(() => {
-                    saveRef.current?.();
+                    retryTimerRef.current = null;
+                    if (scopeKeyRef.current === retryScopeKey) {
+                        void saveRef.current?.();
+                    }
                 }, retryDelay);
             } else {
-                onSaveError?.(error as Error);
+                onSaveError?.(normalizedError);
                 appMessage.error(`Auto-save failed: ${errorMsg}`);
             }
         }
-    }, [storageKey, diagramId, onSaveSuccess, onSaveError, getMetadata]);
+    }, [storageKey, diagramId, onSaveSuccess, onSaveError, getMetadata, scopeKey]);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         saveRef.current = save;
         return () => {
             if (retryTimerRef.current) {
@@ -177,7 +218,7 @@ export const useAutoSave = (
         if (!enabled) return;
 
         const timer = setInterval(() => {
-            save();
+            void save();
         }, interval);
 
         return () => clearInterval(timer);
@@ -187,14 +228,22 @@ export const useAutoSave = (
     // 核心问题：React 在页面卸载时会运行 useEffect cleanup，取消所有防抖计时器。
     // 用户刷新时 -> 组件卸载 -> cleanup 删除计时器 -> save 永远不发生。
     // beforeunload 在页面卸载前触发，localStorage.setItem 是同步操作，完全可靠。
-    useEffect(() => {
+    useLayoutEffect(() => {
         const handleBeforeUnload = () => {
+            if (scopeKeyRef.current !== scopeKey) return;
+
             // 同步保存：直接操作 localStorage，不经过 async/await
             const currentNodes = nodesRef.current;
             const currentEdges = edgesRef.current;
             if (!currentNodes || !enabled) return;
             const metadata = getMetadata?.();
-            const contentKey = JSON.stringify({ nodes: currentNodes, edges: currentEdges, metadata });
+            const contentKey = createAutoSaveContentKey(
+                storageKey,
+                diagramId,
+                currentNodes,
+                currentEdges,
+                metadata,
+            );
             if (contentKey === lastSavedContentRef.current) return; // 无变化无需写入
             try {
                 const data = createAutoSavePayload({
@@ -213,12 +262,10 @@ export const useAutoSave = (
         };
         window.addEventListener('beforeunload', handleBeforeUnload);
         return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-    }, [enabled, storageKey, diagramId, getMetadata]);
+    }, [enabled, storageKey, diagramId, getMetadata, scopeKey]);
 
     // Manual save trigger
-    const saveNow = useCallback(() => {
-        save();
-    }, [save]);
+    const saveNow = useCallback(() => save(), [save]);
 
     // Load saved data, also refreshes lastAccessedAt to prevent GC expiry
     const loadSaved = useCallback((): Pick<AutoSavePayload, 'diagramId' | 'nodes' | 'edges' | 'isFreshSeed' | 'timestamp' | 'metadata'> | null => {
@@ -239,6 +286,14 @@ export const useAutoSave = (
                 logAutoSaveAccessRefreshFailure(storageKey, error);
             }
 
+            lastSavedContentRef.current = createAutoSaveContentKey(
+                storageKey,
+                data.diagramId,
+                data.nodes,
+                data.edges,
+                data.metadata,
+            );
+
             return {
                 diagramId: data.diagramId,
                 nodes: data.nodes || [],
@@ -257,6 +312,11 @@ export const useAutoSave = (
     const clearSaved = useCallback(() => {
         localStorage.removeItem(storageKey);
         lastSavedContentRef.current = '';
+        retryCountRef.current = 0;
+        if (retryTimerRef.current) {
+            clearTimeout(retryTimerRef.current);
+            retryTimerRef.current = null;
+        }
     }, [storageKey]);
 
     return {

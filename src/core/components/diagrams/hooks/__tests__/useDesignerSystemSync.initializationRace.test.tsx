@@ -9,9 +9,13 @@ const mocks = vi.hoisted(() => {
   const lookups = new Map<string, { id: string; ready: true; preset: { id: string } }>();
   const markFunctions = new Map<string, () => void>();
   const marks: string[] = [];
+  const initializedIds = new Set<string>();
+  const autoSaveEnabledValues: boolean[] = [];
 
   return {
     marks,
+    initializedIds,
+    autoSaveEnabledValues,
     loadSaved: vi.fn(() => null),
     clearSaved: vi.fn(),
     saveNow: vi.fn(),
@@ -37,12 +41,19 @@ const mocks = vi.hoisted(() => {
 });
 
 vi.mock('../useAutoSave', () => ({
-  useAutoSave: () => ({
-    loadSaved: mocks.loadSaved,
-    clearSaved: mocks.clearSaved,
-    saveNow: mocks.saveNow,
-    saveState: { status: 'idle' },
-  }),
+  useAutoSave: (
+    _nodes: unknown,
+    _edges: unknown,
+    options: { enabled?: boolean } = {},
+  ) => {
+    mocks.autoSaveEnabledValues.push(options.enabled ?? true);
+    return {
+      loadSaved: mocks.loadSaved,
+      clearSaved: mocks.clearSaved,
+      saveNow: mocks.saveNow,
+      saveState: { status: 'idle' },
+    };
+  },
 }));
 
 vi.mock('../useDesignerPresetInitialization', () => ({
@@ -50,7 +61,7 @@ vi.mock('../useDesignerPresetInitialization', () => ({
     const stableId = id ?? '';
     return {
       activePresetLookup: mocks.getLookup(stableId),
-      isCurrentDiagramInitialized: false,
+      isCurrentDiagramInitialized: mocks.initializedIds.has(stableId),
       markCurrentDiagramInitialized: mocks.getMarkFunction(stableId),
     };
   },
@@ -134,6 +145,8 @@ describe('useDesignerSystemSync initialization race safety', () => {
   beforeEach(() => {
     pending.clear();
     mocks.marks.length = 0;
+    mocks.initializedIds.clear();
+    mocks.autoSaveEnabledValues.length = 0;
     mocks.loadSaved.mockClear();
     mocks.clearSaved.mockClear();
     mocks.saveNow.mockClear();
@@ -218,5 +231,18 @@ describe('useDesignerSystemSync initialization race safety', () => {
 
     expect(mocks.logPresetFailure).not.toHaveBeenCalled();
     expect(mocks.marks).toEqual(['diagram-b']);
+  });
+
+  it('keeps custom-diagram autosave disabled until initialization completes', () => {
+    renderSync('custom:loading');
+
+    expect(mocks.autoSaveEnabledValues.at(-1)).toBe(false);
+  });
+
+  it('enables custom-diagram autosave once the active diagram is initialized', () => {
+    mocks.initializedIds.add('custom:ready');
+    renderSync('custom:ready');
+
+    expect(mocks.autoSaveEnabledValues.at(-1)).toBe(true);
   });
 });
