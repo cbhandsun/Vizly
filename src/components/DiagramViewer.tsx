@@ -350,7 +350,7 @@ const DiagramViewer: React.FC = () => {
     // Phase 6: 高级图表展示安全防护与多级存管
     // ==========================================
     /** 图表锁定防误触：禁止所有拖拽连线编排 */
-    const [isReadonly] = useState<boolean>(false);
+    const [isReadonly, setIsReadonly] = useState<boolean>(false);
 
     /** 沉浸式演示模式：隐藏 UI 侧边栏与工具栏 */
     const [isPresentationMode, setIsPresentationMode] = useState<boolean>(false);
@@ -611,6 +611,7 @@ const DiagramViewer: React.FC = () => {
         t,
         isFullscreen,
         isPresentationMode,
+        isReadonly,
         handleToggleFullscreen,
         exitFullscreen: handleFsControl,
         handleSelectDiagram,
@@ -635,6 +636,7 @@ const DiagramViewer: React.FC = () => {
             mainFlowAnimationEnabled={mainFlowAnimationEnabled}
             setMainFlowAnimationEnabled={setMainFlowAnimationEnabled}
             isReadonly={isReadonly}
+            onReadonlyChange={setIsReadonly}
             isPresentationMode={isPresentationMode}
             setIsPresentationMode={setIsPresentationMode}
             isFullscreen={isFullscreen}

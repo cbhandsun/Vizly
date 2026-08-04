@@ -47,6 +47,7 @@ describe('diagramViewerKeyboard', () => {
 
     const handler = createDiagramViewerGlobalKeydownHandler({
       isPresentationMode: true,
+      editingEnabled: true,
       isFullscreenActive: () => true,
       exitFullscreen,
       onFullscreenExitFailure,
@@ -92,6 +93,7 @@ describe('diagramViewerKeyboard', () => {
     const onFullscreenExitFailure = vi.fn();
     const handler = createDiagramViewerGlobalKeydownHandler({
       isPresentationMode: false,
+      editingEnabled: true,
       isFullscreenActive: () => true,
       exitFullscreen: () => {
         throw new Error('boom');
@@ -122,6 +124,7 @@ describe('diagramViewerKeyboard', () => {
     const openCommandPalette = vi.fn();
     const handler = createDiagramViewerGlobalKeydownHandler({
       isPresentationMode: false,
+      editingEnabled: true,
       isFullscreenActive: () => false,
       exitFullscreen: vi.fn(),
       onFullscreenExitFailure: vi.fn(),
@@ -145,5 +148,37 @@ describe('diagramViewerKeyboard', () => {
     } as unknown as KeyboardEvent);
 
     expect(openCommandPalette).not.toHaveBeenCalled();
+  });
+
+  it('consumes editing shortcuts without dispatching mutations when the canvas is locked', () => {
+    const triggerEditorCommand = vi.fn();
+    const triggerAi = vi.fn();
+    const handler = createDiagramViewerGlobalKeydownHandler({
+      isPresentationMode: false,
+      editingEnabled: false,
+      isFullscreenActive: () => false,
+      exitFullscreen: vi.fn(),
+      onFullscreenExitFailure: vi.fn(),
+      toggleDebugPanel: vi.fn(),
+      openCommandPalette: vi.fn(),
+      openSettings: vi.fn(),
+      triggerEditorCommand,
+      triggerAi,
+      triggerTheme: vi.fn(),
+      exitPresentation: vi.fn(),
+    });
+
+    for (const event of [
+      { key: 'N', ctrlKey: false, metaKey: false, shiftKey: false, altKey: true },
+      { key: 'J', ctrlKey: true, metaKey: false, shiftKey: false, altKey: false },
+      { key: 'L', ctrlKey: true, metaKey: false, shiftKey: true, altKey: false },
+    ]) {
+      const preventDefault = vi.fn();
+      handler({ ...event, preventDefault } as unknown as KeyboardEvent);
+      expect(preventDefault).toHaveBeenCalledTimes(1);
+    }
+
+    expect(triggerEditorCommand).not.toHaveBeenCalled();
+    expect(triggerAi).not.toHaveBeenCalled();
   });
 });

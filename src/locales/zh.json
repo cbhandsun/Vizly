@@ -370,7 +370,8 @@
             "collapseMenu": "收起左侧菜单",
             "docs": "打开文档预览",
             "manage": "打开图表管理",
-            "clearFavorites": "清空收藏图表"
+            "clearFavorites": "清空收藏图表",
+            "readonlyDisabled": "画布已锁定 · 解锁后可编辑"
         },
         "settings": {
             "title": "图表设置",

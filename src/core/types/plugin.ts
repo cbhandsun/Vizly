@@ -11,6 +11,7 @@ export interface CommandItem {
   id: string;
   group: CommandGroup;
   title: string;
+  disabled?: boolean;
   description?: string;
   keywords?: string[];
   meta?: string[];

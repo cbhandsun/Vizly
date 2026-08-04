@@ -1,6 +1,7 @@
 // @vitest-environment node
 
 import { describe, expect, it, vi } from 'vitest';
+import type { TFunction } from 'i18next';
 
 import {
   createDiagramViewerCommandItems,
@@ -25,12 +26,13 @@ describe('diagramViewerCommandItems', () => {
     const triggerAiButton = vi.fn();
     const triggerThemeButton = vi.fn();
     const clearFavorites = vi.fn();
-    const t = ((_: string, fallback: string) => fallback) as any;
+    const t = ((_: string, fallback: string) => fallback) as unknown as TFunction;
 
     const items = createDiagramViewerCommandItems({
       t,
       modifierLabel: 'Ctrl',
       isFullscreen: false,
+      editingEnabled: true,
       commandFavorites: ['b'],
       commandRecent: ['a', 'b'],
       commandRecentOps: ['op:smartLayout'],
@@ -71,5 +73,49 @@ describe('diagramViewerCommandItems', () => {
     favoriteDiagram?.onAltSelect?.();
     expect(handleSelectDiagram).toHaveBeenCalledWith('b');
     expect(openDiagramInNewTab).toHaveBeenCalledWith('b');
+  });
+
+  it('keeps view commands available while blocking every canvas mutation when locked', () => {
+    const triggerEditorCommand = vi.fn();
+    const triggerAiButton = vi.fn();
+    const setMermaidModalVisible = vi.fn();
+    const t = ((_: string, fallback: string) => fallback) as unknown as TFunction;
+
+    const items = createDiagramViewerCommandItems({
+      t,
+      modifierLabel: 'Ctrl',
+      isFullscreen: false,
+      editingEnabled: false,
+      commandFavorites: [],
+      commandRecent: [],
+      commandRecentOps: ['op:clearCanvas'],
+      diagramDefinitions: [],
+      setIsShortcutsOpen: vi.fn(),
+      setIsSettingsOpen: vi.fn(),
+      setMermaidModalVisible,
+      handleToggleFullscreen: vi.fn(),
+      handleSelectDiagram: vi.fn(),
+      openDiagramInNewTab: vi.fn(),
+      navigate: vi.fn(),
+      triggerEditorCommand,
+      triggerAiButton,
+      triggerThemeButton: vi.fn(),
+      clearFavorites: vi.fn(),
+    });
+
+    for (const id of ['op:smartLayout', 'op:addNode', 'op:triggerAi', 'op:importMermaid', 'op:clearCanvas']) {
+      const item = items.find(candidate => candidate.id === id);
+      expect(item).toMatchObject({
+        disabled: true,
+        description: 'Canvas locked · Unlock to edit',
+      });
+      item?.onSelect();
+    }
+
+    expect(items.find(item => item.id === 'op:exportPng')?.disabled).not.toBe(true);
+    expect(items.find(item => item.id === 'op:settings')?.disabled).not.toBe(true);
+    expect(triggerEditorCommand).not.toHaveBeenCalled();
+    expect(triggerAiButton).not.toHaveBeenCalled();
+    expect(setMermaidModalVisible).not.toHaveBeenCalled();
   });
 });

@@ -68,6 +68,7 @@ export const resolveDiagramViewerKeyboardActions = ({
 
 export const createDiagramViewerGlobalKeydownHandler = ({
   isPresentationMode,
+  editingEnabled,
   isFullscreenActive,
   exitFullscreen,
   onFullscreenExitFailure,
@@ -80,6 +81,7 @@ export const createDiagramViewerGlobalKeydownHandler = ({
   exitPresentation,
 }: {
   isPresentationMode: boolean;
+  editingEnabled: boolean;
   isFullscreenActive: () => boolean;
   exitFullscreen: () => void;
   onFullscreenExitFailure: (error: unknown) => void;
@@ -103,6 +105,14 @@ export const createDiagramViewerGlobalKeydownHandler = ({
     });
 
     for (const action of actions) {
+      if (!editingEnabled && (
+        action === 'addNode'
+        || action === 'triggerAi'
+        || action === 'smartLayout'
+      )) {
+        event.preventDefault();
+        continue;
+      }
       switch (action) {
         case 'exitFullscreen':
           event.preventDefault();

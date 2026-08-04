@@ -26,6 +26,7 @@ interface UseDiagramViewerCommandsOptions {
     t: TFunction;
     isFullscreen: boolean;
     isPresentationMode: boolean;
+    isReadonly: boolean;
     handleToggleFullscreen: () => void;
     exitFullscreen: () => void;
     handleSelectDiagram: (id: string) => void;
@@ -60,6 +61,7 @@ export function useDiagramViewerCommands({
     t,
     isFullscreen,
     isPresentationMode,
+    isReadonly,
     handleToggleFullscreen,
     exitFullscreen,
     handleSelectDiagram,
@@ -67,6 +69,7 @@ export function useDiagramViewerCommands({
     setMermaidModalVisible,
     exitPresentation,
 }: UseDiagramViewerCommandsOptions): DiagramViewerCommandsState {
+    const editingEnabled = !isReadonly && !isPresentationMode;
     const [showDebugPanel, setShowDebugPanel] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isCommandOpen, setIsCommandOpen] = useState(false);
@@ -106,6 +109,7 @@ export function useDiagramViewerCommands({
     useEffect(() => {
         const onKeyDown = createDiagramViewerGlobalKeydownHandler({
             isPresentationMode,
+            editingEnabled,
             isFullscreenActive: () => Boolean(document.fullscreenElement),
             exitFullscreen,
             onFullscreenExitFailure: logDiagramViewerFullscreenExitFailure,
@@ -119,7 +123,7 @@ export function useDiagramViewerCommands({
         });
         window.addEventListener('keydown', onKeyDown);
         return () => window.removeEventListener('keydown', onKeyDown);
-    }, [exitFullscreen, exitPresentation, isPresentationMode]);
+    }, [editingEnabled, exitFullscreen, exitPresentation, isPresentationMode]);
 
     const openDiagramInNewTab = useCallback((id: string) => {
         openDiagramViewerInNewTab({
@@ -136,6 +140,7 @@ export function useDiagramViewerCommands({
             platform: typeof navigator !== 'undefined' ? navigator.platform || '' : '',
         }),
         isFullscreen,
+        editingEnabled,
         commandFavorites,
         commandRecent,
         commandRecentOps,
@@ -160,6 +165,7 @@ export function useDiagramViewerCommands({
         commandRecentOps,
         handleSelectDiagram,
         handleToggleFullscreen,
+        editingEnabled,
         isFullscreen,
         navigate,
         openDiagramInNewTab,

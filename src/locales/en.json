@@ -371,7 +371,8 @@
             "collapseMenu": "Collapse left menu",
             "docs": "Open docs preview",
             "manage": "Open diagram manager",
-            "clearFavorites": "Clear favorites"
+            "clearFavorites": "Clear favorites",
+            "readonlyDisabled": "Canvas locked · Unlock to edit"
         },
         "settings": {
             "title": "Diagram Settings",

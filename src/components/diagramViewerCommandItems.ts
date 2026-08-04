@@ -20,6 +20,7 @@ export const createDiagramViewerCommandItems = ({
   t,
   modifierLabel,
   isFullscreen,
+  editingEnabled,
   commandFavorites,
   commandRecent,
   commandRecentOps,
@@ -39,6 +40,7 @@ export const createDiagramViewerCommandItems = ({
   t: TFunction;
   modifierLabel: string;
   isFullscreen: boolean;
+  editingEnabled: boolean;
   commandFavorites: string[];
   commandRecent: string[];
   commandRecentOps: string[];
@@ -55,6 +57,20 @@ export const createDiagramViewerCommandItems = ({
   triggerThemeButton: () => void;
   clearFavorites: () => void;
 }): CommandItem[] => {
+  const editingUnavailable = (item: CommandItem): CommandItem => {
+    if (editingEnabled) return item;
+    return {
+      ...item,
+      disabled: true,
+      description: t(
+        'designer.commandItems.readonlyDisabled',
+        'Canvas locked · Unlock to edit',
+      ),
+      onSelect: () => undefined,
+      onAltSelect: undefined,
+    };
+  };
+
   const ops: CommandItem[] = [
     {
       id: 'op:shortcuts',
@@ -82,37 +98,37 @@ export const createDiagramViewerCommandItems = ({
       shortcut: 'Esc',
       onSelect: () => handleToggleFullscreen(),
     },
-    {
+    editingUnavailable({
       id: 'op:smartLayout',
       group: 'actions',
       title: t('designer.commandItems.smartLayout', '智能布局 / Smart Layout'),
       keywords: ['布局', '整理', 'layout', 'smart'],
       shortcut: `${modifierLabel}+Shift+L`,
       onSelect: () => triggerEditorCommand('smart-layout'),
-    },
-    {
+    }),
+    editingUnavailable({
       id: 'op:addNode',
       group: 'actions',
       title: t('designer.commandItems.addNode', '添加节点 / Add Node'),
       keywords: ['创建', '节点', 'add', 'node', 'create'],
       shortcut: 'Alt+N',
       onSelect: () => triggerEditorCommand('add-node'),
-    },
-    {
+    }),
+    editingUnavailable({
       id: 'op:triggerAi',
       group: 'actions',
       title: t('designer.commandItems.triggerAi', 'AI 助手 / AI Assistant'),
       keywords: ['ai', 'assistant', '助手', '生成'],
       onSelect: () => triggerAiButton(),
-    },
-    {
+    }),
+    editingUnavailable({
       id: 'op:importMermaid',
       group: 'actions',
       title: t('designer.commandItems.importMermaid', '从 Mermaid 导入 / Import Mermaid'),
       keywords: ['mermaid', 'import', 'code', 'markdown', '导入', '代码'],
       shortcut: `${modifierLabel}+Shift+M`,
       onSelect: () => setMermaidModalVisible(true),
-    },
+    }),
     {
       id: 'op:themeNext',
       group: 'actions',
@@ -129,13 +145,13 @@ export const createDiagramViewerCommandItems = ({
       shortcut: `${modifierLabel}+Shift+E`,
       onSelect: () => triggerEditorCommand('export-png'),
     },
-    {
+    editingUnavailable({
       id: 'op:clearCanvas',
       group: 'actions',
       title: t('designer.commandItems.clearCanvas', '清空画布 / Clear Canvas'),
       keywords: ['清空', '重置', 'clear', 'reset'],
       onSelect: () => triggerEditorCommand('clear-canvas'),
-    },
+    }),
     {
       id: 'op:docs',
       group: 'actions',

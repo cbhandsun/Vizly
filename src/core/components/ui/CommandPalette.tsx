@@ -126,7 +126,10 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, i
       .map((g) => ({ group: g, items: map.get(g) || [] }));
   }, [scored]);
 
-  const flat = useMemo(() => grouped.flatMap((g) => g.items), [grouped]);
+  const flat = useMemo(
+    () => grouped.flatMap((g) => g.items).filter((item) => item.disabled !== true),
+    [grouped],
+  );
   const indexById = useMemo(() => {
     const map = new Map<string, number>();
     flat.forEach((it, i) => map.set(it.id, i));
@@ -176,6 +179,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, i
   }, []);
 
   const runItem = useCallback((it: CommandItem, alt: boolean) => {
+    if (it.disabled) return;
     bumpUsage(it.id);
     bumpRecent(it.id);
     if (alt && it.onAltSelect) {
@@ -309,7 +313,8 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, i
                 <div>
                   {g.items.map((it) => {
                     const idx = indexById.get(it.id) ?? -1;
-                    const active = idx === activeIndex;
+                    const disabled = it.disabled === true;
+                    const active = !disabled && idx === activeIndex;
                     return (
                       <button
                         type="button"
@@ -317,6 +322,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, i
                         key={it.id}
                         role="option"
                         aria-selected={active}
+                        disabled={disabled}
                         ref={(el) => {
                           if (!el || idx < 0) {
                             if (idx >= 0) itemRefs.current.delete(idx);
@@ -324,7 +330,9 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, i
                           }
                           itemRefs.current.set(idx, el);
                         }}
-                        onMouseEnter={() => setActiveIndex(idx)}
+                        onMouseEnter={() => {
+                          if (!disabled) setActiveIndex(idx);
+                        }}
                         onClick={(e) => {
                           runItem(it, !!(e.ctrlKey || e.metaKey));
                         }}
@@ -334,10 +342,10 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, i
                           width: '100%',
                           display: 'block',
                           textAlign: 'left',
-                          color: token.colorText,
+                          color: disabled ? token.colorTextDisabled : token.colorText,
                           padding: '10px 12px',
                           minHeight: 'var(--commercial-touch-target, 44px)',
-                          cursor: 'pointer',
+                          cursor: disabled ? 'not-allowed' : 'pointer',
                           background: active ? token.colorFillSecondary : 'transparent',
                           outline: active ? `1px solid ${token.colorPrimaryBorder}` : '1px solid transparent'
                         }}

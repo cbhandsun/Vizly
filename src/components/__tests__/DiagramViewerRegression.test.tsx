@@ -250,8 +250,15 @@ vi.mock('@/data/diagram-definitions', () => ({
     diagramDefinitions: [{
         id: 'test-diagram',
         name: 'test',
-        component: (props: { onOpenShareDialog?: () => void }) => (
-            <button data-testid="diagram" onClick={props.onOpenShareDialog}>diagram</button>
+        component: (props: {
+            isReadonly?: boolean;
+            onOpenShareDialog?: () => void;
+            onReadonlyChange?: (value: boolean) => void;
+        }) => (
+            <div data-testid="diagram" data-readonly={String(props.isReadonly)}>
+                <button type="button" onClick={props.onOpenShareDialog}>share</button>
+                <button type="button" onClick={() => props.onReadonlyChange?.(true)}>lock</button>
+            </div>
         ),
     }],
 }));
@@ -334,7 +341,19 @@ describe('DiagramViewer regression', () => {
             </MemoryRouter>
         );
 
-        fireEvent.click(screen.getByTestId('diagram'));
+        fireEvent.click(screen.getByRole('button', { name: 'share' }));
         expect(openShareDialogMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('synchronizes the selected designer lock state back into the viewer host', () => {
+        render(
+            <MemoryRouter initialEntries={['/diagram?diagram=test-diagram']}>
+                <DiagramViewer />
+            </MemoryRouter>
+        );
+
+        expect(screen.getByTestId('diagram')).toHaveAttribute('data-readonly', 'false');
+        fireEvent.click(screen.getByRole('button', { name: 'lock' }));
+        expect(screen.getByTestId('diagram')).toHaveAttribute('data-readonly', 'true');
     });
 });

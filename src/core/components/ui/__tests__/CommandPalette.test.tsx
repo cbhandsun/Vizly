@@ -63,4 +63,37 @@ describe('CommandPalette commercial interaction contract', () => {
     fireEvent.click(close);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+
+  it('shows locked commands as disabled and skips them during keyboard execution', async () => {
+    const lockedAction = vi.fn();
+    const viewAction = vi.fn();
+
+    render(
+      <CommandPalette
+        open
+        onClose={vi.fn()}
+        items={[
+          {
+            id: 'op:locked',
+            group: 'actions',
+            title: 'Clear canvas',
+            description: 'Canvas locked · Unlock to edit',
+            disabled: true,
+            onSelect: lockedAction,
+          },
+          { id: 'op:view', group: 'actions', title: 'Fit view', onSelect: viewAction },
+        ]}
+      />,
+    );
+
+    const locked = await screen.findByRole('option', { name: /Clear canvas/ });
+    expect((locked as HTMLButtonElement).disabled).toBe(true);
+    expect(locked.getAttribute('aria-selected')).toBe('false');
+
+    const search = screen.getByRole('combobox', { name: 'Search commands or diagrams' });
+    fireEvent.keyDown(search, { key: 'Enter' });
+
+    expect(lockedAction).not.toHaveBeenCalled();
+    expect(viewAction).toHaveBeenCalledTimes(1);
+  });
 });

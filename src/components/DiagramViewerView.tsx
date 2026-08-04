@@ -53,6 +53,7 @@ interface DiagramViewerViewProps {
     mainFlowAnimationEnabled: boolean;
     setMainFlowAnimationEnabled: (value: boolean) => void;
     isReadonly: boolean;
+    onReadonlyChange: (value: boolean) => void;
     isPresentationMode: boolean;
     setIsPresentationMode: (value: boolean) => void;
     isFullscreen: boolean;
@@ -116,6 +117,7 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
     mainFlowAnimationEnabled,
     setMainFlowAnimationEnabled,
     isReadonly,
+    onReadonlyChange,
     isPresentationMode,
     setIsPresentationMode,
     isFullscreen,
@@ -263,6 +265,7 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
                                                 onMainFlowAnimationChange={setMainFlowAnimationEnabled}
                                                 highlightMainFlow={mainFlowAnimationEnabled}
                                                 isReadonly={isReadonly}
+                                                onReadonlyChange={onReadonlyChange}
                                                 onExportPermissionCheck={onExportPermissionCheck}
                                                 isYjsSynced={isYjsSynced}
                                                 onSyncPush={pushLocalChangesToYjs}
