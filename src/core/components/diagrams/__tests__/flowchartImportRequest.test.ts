@@ -104,4 +104,30 @@ describe('flowchart import request', () => {
         expect(openFilePicker).not.toHaveBeenCalled();
         expect(showConfirmation).not.toHaveBeenCalled();
     });
+
+    it('blocks duplicate import requests while another import is active', () => {
+        const onImportInProgress = vi.fn();
+        const openFilePicker = vi.fn();
+        const showConfirmation = vi.fn();
+
+        const result = requestFlowchartImport({
+            editingEnabled: true,
+            importInProgress: true,
+            nodes: [{ id: 'node-1' }],
+            edges: [],
+            title: 'Replace current page?',
+            content: 'Content',
+            okText: 'Choose file',
+            cancelText: 'Cancel',
+            onEditingUnavailable: vi.fn(),
+            onImportInProgress,
+            openFilePicker,
+            showConfirmation,
+        });
+
+        expect(result).toBe('busy');
+        expect(onImportInProgress).toHaveBeenCalledTimes(1);
+        expect(openFilePicker).not.toHaveBeenCalled();
+        expect(showConfirmation).not.toHaveBeenCalled();
+    });
 });

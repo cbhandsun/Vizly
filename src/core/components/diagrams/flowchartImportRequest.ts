@@ -25,12 +25,14 @@ export const buildFlowchartImportConfirm = ({
 });
 
 export type FlowchartImportRequestResult =
+    | 'busy'
     | 'blocked'
     | 'opened'
     | 'confirmation-requested';
 
 export const requestFlowchartImport = <NodeShape, EdgeShape>({
     editingEnabled,
+    importInProgress = false,
     nodes,
     edges,
     title,
@@ -38,10 +40,12 @@ export const requestFlowchartImport = <NodeShape, EdgeShape>({
     okText,
     cancelText,
     onEditingUnavailable,
+    onImportInProgress,
     openFilePicker,
     showConfirmation,
 }: {
     editingEnabled: boolean;
+    importInProgress?: boolean;
     nodes: NodeShape[];
     edges: EdgeShape[];
     title: string;
@@ -49,9 +53,15 @@ export const requestFlowchartImport = <NodeShape, EdgeShape>({
     okText: string;
     cancelText: string;
     onEditingUnavailable: () => void;
+    onImportInProgress?: () => void;
     openFilePicker: () => void;
     showConfirmation: (config: ReturnType<typeof buildFlowchartImportConfirm>) => void;
 }): FlowchartImportRequestResult => {
+    if (importInProgress) {
+        onImportInProgress?.();
+        return 'busy';
+    }
+
     if (!editingEnabled) {
         onEditingUnavailable();
         return 'blocked';

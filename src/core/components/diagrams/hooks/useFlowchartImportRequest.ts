@@ -11,6 +11,7 @@ export const useFlowchartImportRequest = ({
     nodesRef,
     edgesRef,
     fileInputRef,
+    importInFlightRef,
     messageApi,
     t,
 }: {
@@ -18,6 +19,7 @@ export const useFlowchartImportRequest = ({
     nodesRef: RefObject<Node[]>;
     edgesRef: RefObject<Edge[]>;
     fileInputRef: RefObject<HTMLInputElement | null>;
+    importInFlightRef: RefObject<boolean>;
     messageApi: MessageInstance;
     t: TFunction;
 }) => useCallback(() => {
@@ -26,6 +28,7 @@ export const useFlowchartImportRequest = ({
     const openFilePicker = () => fileInputRef.current?.click();
     requestFlowchartImport({
         editingEnabled,
+        importInProgress: importInFlightRef.current,
         nodes: currentNodes,
         edges: currentEdges,
         title: t('designer.flowchart.import.confirmTitle'),
@@ -38,7 +41,10 @@ export const useFlowchartImportRequest = ({
         onEditingUnavailable: () => {
             messageApi.info(t('designer.flowchart.import.editingRequired'));
         },
+        onImportInProgress: () => {
+            messageApi.info(t('designer.flowchart.import.inProgress'));
+        },
         openFilePicker,
         showConfirmation: appModal.confirm,
     });
-}, [editingEnabled, edgesRef, fileInputRef, messageApi, nodesRef, t]);
+}, [editingEnabled, edgesRef, fileInputRef, importInFlightRef, messageApi, nodesRef, t]);

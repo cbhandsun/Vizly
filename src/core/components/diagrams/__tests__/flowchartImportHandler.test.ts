@@ -30,6 +30,7 @@ const makeEvent = (file?: File) => ({
 describe('flowchartImportHandler', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        importPipelineState.runFlowchartImportPipeline.mockResolvedValue(true);
     });
 
     it('reports validation errors and clears the input', async () => {
@@ -94,7 +95,8 @@ describe('flowchartImportHandler', () => {
             options.onReactFlowSuccess({ nodes: [{ id: 'n1' }], edges: [{ id: 'e1' }] });
             options.onMermaidSuccess();
             options.onMermaidLayoutHint(300);
-            options.onJsonImportFailure('bad json');
+            options.onJsonImportFailure();
+            return true;
         });
 
         const messageApi = makeMessageApi();
@@ -127,7 +129,7 @@ describe('flowchartImportHandler', () => {
         expect(messageApi.info).toHaveBeenCalledWith('designer.flowchart.import.rfSuccess:{"nodes":1,"edges":1}');
         expect(messageApi.info).toHaveBeenCalledWith('designer.flowchart.import.mermaidSuccess');
         expect(messageApi.info).toHaveBeenCalledWith('designer.flowchart.import.mermaidLayout');
-        expect(messageApi.error).toHaveBeenCalledWith('designer.flowchart.import.jsonFailed:{"message":"bad json"}');
+        expect(messageApi.error).toHaveBeenCalledWith('designer.flowchart.import.jsonFailed');
         expect(fitView).toHaveBeenCalled();
         expect(event.target.value).toBe('');
     });
@@ -152,7 +154,106 @@ describe('flowchartImportHandler', () => {
 
         await handler(event);
 
-        expect(messageApi.error).toHaveBeenCalledWith('designer.flowchart.import.invalidFormat');
+        expect(messageApi.error).toHaveBeenCalledWith('designer.flowchart.import.readFailed');
+        expect(event.target.value).toBe('');
+    });
+
+    it('holds a shared lock until the real import result settles and blocks duplicates', async () => {
+        importFileState.validateFlowchartImportFile.mockReturnValue({ ok: true, importKind: 'json' });
+        importFileState.readFlowchartImportFileText.mockResolvedValue('{"nodes":[],"edges":[]}');
+        let resolveImport: ((value: boolean) => void) | undefined;
+        importPipelineState.runFlowchartImportPipeline.mockImplementation(() => new Promise<boolean>((resolve) => {
+            resolveImport = resolve;
+        }));
+        const messageApi = makeMessageApi();
+        const importInFlightRef = { current: false };
+        const onImportStarted = vi.fn();
+        const onImportFinished = vi.fn();
+        const handler = createFlowchartImportHandler({
+            t: (key) => key,
+            messageApi,
+            setNodes: vi.fn(),
+            setEdges: vi.fn(),
+            onBeforeCanvasReplace: vi.fn(),
+            fitView: vi.fn(),
+            registerStandardReload: vi.fn(async () => undefined),
+            importInFlightRef,
+            onImportStarted,
+            onImportFinished,
+        });
+
+        const firstEvent = makeEvent(new File(['{}'], 'first.json', { type: 'application/json' }));
+        const secondEvent = makeEvent(new File(['{}'], 'second.json', { type: 'application/json' }));
+        const firstImport = handler(firstEvent);
+        await Promise.resolve();
+        await handler(secondEvent);
+
+        expect(importPipelineState.runFlowchartImportPipeline).toHaveBeenCalledTimes(1);
+        expect(importInFlightRef.current).toBe(true);
+        expect(onImportStarted).toHaveBeenCalledTimes(1);
+        expect(messageApi.info).toHaveBeenCalledWith('designer.flowchart.import.inProgress');
+        expect(secondEvent.target.value).toBe('');
+
+        resolveImport?.(true);
+        await firstImport;
+        expect(importInFlightRef.current).toBe(false);
+        expect(onImportFinished).toHaveBeenCalledWith({ ok: true });
+    });
+
+    it('keeps pipeline errors out of the UI and reports a recoverable failed result', async () => {
+        importFileState.validateFlowchartImportFile.mockReturnValue({ ok: true, importKind: 'json' });
+        importFileState.readFlowchartImportFileText.mockResolvedValue('{"nodes":[],"edges":[]}');
+        importPipelineState.runFlowchartImportPipeline.mockImplementation(async (options) => {
+            options.onJsonImportFailure();
+            return false;
+        });
+        const messageApi = makeMessageApi();
+        const onImportFinished = vi.fn();
+        const handler = createFlowchartImportHandler({
+            t: (key) => key,
+            messageApi,
+            setNodes: vi.fn(),
+            setEdges: vi.fn(),
+            onBeforeCanvasReplace: vi.fn(),
+            fitView: vi.fn(),
+            registerStandardReload: vi.fn(async () => undefined),
+            onImportFinished,
+        });
+
+        await handler(makeEvent(new File(['{}'], 'secret.json', { type: 'application/json' })));
+
+        expect(messageApi.error).toHaveBeenCalledWith('designer.flowchart.import.jsonFailed');
+        expect(JSON.stringify(messageApi.error.mock.calls)).not.toContain('secret');
+        expect(onImportFinished).toHaveBeenCalledWith({ ok: false });
+    });
+
+    it('releases the shared lock when the import-start lifecycle callback fails', async () => {
+        importFileState.validateFlowchartImportFile.mockReturnValue({ ok: true, importKind: 'json' });
+        const messageApi = makeMessageApi();
+        const importInFlightRef = { current: false };
+        const onImportFinished = vi.fn();
+        const event = makeEvent(new File(['{}'], 'diagram.json', { type: 'application/json' }));
+        const handler = createFlowchartImportHandler({
+            t: (key) => key,
+            messageApi,
+            setNodes: vi.fn(),
+            setEdges: vi.fn(),
+            onBeforeCanvasReplace: vi.fn(),
+            fitView: vi.fn(),
+            registerStandardReload: vi.fn(async () => undefined),
+            importInFlightRef,
+            onImportStarted: () => {
+                throw new Error('notification unavailable');
+            },
+            onImportFinished,
+        });
+
+        await handler(event);
+
+        expect(importFileState.readFlowchartImportFileText).not.toHaveBeenCalled();
+        expect(importInFlightRef.current).toBe(false);
+        expect(messageApi.error).toHaveBeenCalledWith('designer.flowchart.import.readFailed');
+        expect(onImportFinished).toHaveBeenCalledWith({ ok: false });
         expect(event.target.value).toBe('');
     });
 });

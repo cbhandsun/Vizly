@@ -39,6 +39,9 @@ export interface CreateFlowchartImportHandlerOptions {
         currentId: string;
         title: string;
     }) => Promise<void>;
+    importInFlightRef?: { current: boolean };
+    onImportStarted?: () => void;
+    onImportFinished?: (result: { ok: boolean }) => void;
 }
 
 const DEFAULT_DELAY_SCHEDULER = (callback: () => void, delayMs: number): void => {
@@ -58,9 +61,18 @@ export const createFlowchartImportHandler = ({
     fitView,
     scheduleDelay = DEFAULT_DELAY_SCHEDULER,
     registerStandardReload,
+    importInFlightRef,
+    onImportStarted,
+    onImportFinished,
 }: CreateFlowchartImportHandlerOptions) => async (event: FlowchartImportEvent): Promise<void> => {
     const file = event.target.files?.[0];
     if (!file) return;
+
+    if (importInFlightRef?.current) {
+        messageApi.info(t('designer.flowchart.import.inProgress'));
+        event.target.value = '';
+        return;
+    }
 
     if (!editingEnabled) {
         messageApi.info(t('designer.flowchart.import.editingRequired'));
@@ -72,13 +84,17 @@ export const createFlowchartImportHandler = ({
     const validation = validateFlowchartImportFile(file, invalidFormatMessage);
     if (!validation.ok) {
         messageApi.error(validation.error);
+        onImportFinished?.({ ok: false });
         event.target.value = '';
         return;
     }
 
+    if (importInFlightRef) importInFlightRef.current = true;
+    let imported = false;
     try {
+        onImportStarted?.();
         const content = await readFlowchartImportFileText(file);
-        await runFlowchartImportPipeline({
+        imported = await runFlowchartImportPipeline({
             content,
             importKind: validation.importKind,
             invalidFormatMessage,
@@ -108,8 +124,8 @@ export const createFlowchartImportHandler = ({
                 }));
                 scheduleDelay(() => fitView(), 500);
             },
-            onJsonImportFailure: (message) => {
-                messageApi.error(t('designer.flowchart.import.jsonFailed', { message }));
+            onJsonImportFailure: () => {
+                messageApi.error(t('designer.flowchart.import.jsonFailed'));
             },
             onMermaidSuccess: () => {
                 messageApi.info(t('designer.flowchart.import.mermaidSuccess'));
@@ -124,8 +140,10 @@ export const createFlowchartImportHandler = ({
             },
         });
     } catch {
-        messageApi.error(invalidFormatMessage);
+        messageApi.error(t('designer.flowchart.import.readFailed'));
     } finally {
+        if (importInFlightRef) importInFlightRef.current = false;
+        onImportFinished?.({ ok: imported });
         event.target.value = '';
     }
 };

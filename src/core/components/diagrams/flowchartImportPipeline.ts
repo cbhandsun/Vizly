@@ -16,10 +16,6 @@ const readImportedDiagramTitle = (data: unknown, fallbackTitle: string): string 
     return typeof name === 'string' ? name : fallbackTitle;
 };
 
-const readImportErrorMessage = (error: unknown, fallbackMessage: string): string => (
-    error instanceof Error ? error.message : fallbackMessage
-);
-
 export const runFlowchartImportPipeline = async ({
     content,
     importKind,
@@ -60,11 +56,11 @@ export const runFlowchartImportPipeline = async ({
     }) => Promise<void>;
     onStandardReloadQueued: (currentId: string) => void;
     onReactFlowSuccess: (payload: { nodes: Node[]; edges: Edge[] }) => void;
-    onJsonImportFailure: (message: string) => void;
+    onJsonImportFailure: () => void;
     onMermaidSuccess: () => void;
     onMermaidLayoutHint: (delayMs: number) => void;
     onMermaidImportFailure: () => void;
-}): Promise<void> => {
+}): Promise<boolean> => {
     if (importKind === 'json') {
         try {
             const data = parseDiagramJson(content);
@@ -90,10 +86,11 @@ export const runFlowchartImportPipeline = async ({
                 onStandardReloadQueued,
                 onReactFlowSuccess,
             });
-        } catch (error: unknown) {
-            onJsonImportFailure(readImportErrorMessage(error, invalidFormatMessage));
+            return true;
+        } catch (_error: unknown) {
+            onJsonImportFailure();
+            return false;
         }
-        return;
     }
 
     try {
@@ -106,8 +103,10 @@ export const runFlowchartImportPipeline = async ({
             onMermaidSuccess,
             onMermaidLayoutHint,
         });
+        return true;
     } catch (error) {
         logFlowchartDesignerMermaidImportFailure(error);
         onMermaidImportFailure();
+        return false;
     }
 };

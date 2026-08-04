@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState, useEffect, useRef } from 'react';
-import { message, notification } from 'antd';
+import { Button, message, notification } from 'antd';
 import { ReactFlowInstance, addEdge, type Connection, type Edge } from '@xyflow/react';
 
 import { useDesignerCanvasState } from './hooks/useDesignerCanvasState';
@@ -224,9 +224,39 @@ export const useFlowchartDesignerController = ({
     const reactFlowWrapper = useRef<HTMLDivElement>(null);
     const [isDragging, setIsDragging] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const importInFlightRef = useRef(false);
 
     const [messageApi, messageContextHolder] = message.useMessage();
     const [notificationApi, notificationContextHolder] = notification.useNotification();
+    const importNotificationKey = 'flowchart-file-import-status';
+    const handleImportStarted = useCallback(() => {
+        notificationApi.open({
+            key: importNotificationKey,
+            type: 'info',
+            message: t('designer.flowchart.import.importingTitle'),
+            description: t('designer.flowchart.import.importingDescription'),
+            duration: 0,
+        });
+    }, [notificationApi, t]);
+    const handleImportFinished = useCallback(({ ok }: { ok: boolean }) => {
+        if (ok) {
+            notificationApi.destroy(importNotificationKey);
+            return;
+        }
+        notificationApi.open({
+            key: importNotificationKey,
+            type: 'error',
+            message: t('designer.flowchart.import.failedTitle'),
+            description: t('designer.flowchart.import.failedDescription'),
+            duration: 0,
+            btn: React.createElement(Button, {
+                onClick: () => {
+                    notificationApi.destroy(importNotificationKey);
+                    fileInputRef.current?.click();
+                },
+            }, t('designer.flowchart.import.retry')),
+        });
+    }, [notificationApi, t]);
     const getCurrentNodes = useCallback(() => nodesRef.current, [nodesRef]);
     const getCurrentEdges = useCallback(() => edgesRef.current, [edgesRef]);
     const editingEnabled = !isReadonly && !presentationActive;
@@ -235,6 +265,7 @@ export const useFlowchartDesignerController = ({
         nodesRef,
         edgesRef,
         fileInputRef,
+        importInFlightRef,
         messageApi,
         t,
     });
@@ -525,7 +556,10 @@ export const useFlowchartDesignerController = ({
         editingEnabled,
         fitView: handleFitView,
         registerStandardReload: registerImportedFlowchartDiagram,
-    })(event), [t, messageApi, activePlugin, businessData?.id, id, setNodes, setEdges, handleBeforeUpdate, editingEnabled, handleFitView]);
+        importInFlightRef,
+        onImportStarted: handleImportStarted,
+        onImportFinished: handleImportFinished,
+    })(event), [t, messageApi, activePlugin, businessData?.id, id, setNodes, setEdges, handleBeforeUpdate, editingEnabled, handleFitView, handleImportFinished, handleImportStarted]);
 
     const onSelectionChange = useCanonicalSelectionChange({
         nodesRef,

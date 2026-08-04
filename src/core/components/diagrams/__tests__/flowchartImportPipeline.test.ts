@@ -13,7 +13,7 @@ describe('flowchartImportPipeline', () => {
     const onJsonImportFailure = vi.fn();
     const onBeforeCanvasReplace = vi.fn();
 
-    await runFlowchartImportPipeline({
+    const result = await runFlowchartImportPipeline({
       content: JSON.stringify({
         nodes: [
           {
@@ -58,13 +58,14 @@ describe('flowchartImportPipeline', () => {
     expect(onJsonImportFailure).not.toHaveBeenCalled();
     expect(onBeforeCanvasReplace).toHaveBeenCalledTimes(1);
     expect(onBeforeCanvasReplace.mock.invocationCallOrder[0]).toBeLessThan(setNodes.mock.invocationCallOrder[0]);
+    expect(result).toBe(true);
   });
 
   it('reports json import failures through the provided callback', async () => {
     const onJsonImportFailure = vi.fn();
     const onBeforeCanvasReplace = vi.fn();
 
-    await runFlowchartImportPipeline({
+    const result = await runFlowchartImportPipeline({
       content: '{invalid-json',
       importKind: 'json',
       invalidFormatMessage: 'Invalid format',
@@ -85,12 +86,13 @@ describe('flowchartImportPipeline', () => {
 
     expect(onJsonImportFailure).toHaveBeenCalled();
     expect(onBeforeCanvasReplace).not.toHaveBeenCalled();
+    expect(result).toBe(false);
   });
 
   it('uses the invalid-format message when a plugin throws a non-error value', async () => {
     const onJsonImportFailure = vi.fn();
 
-    await runFlowchartImportPipeline({
+    const result = await runFlowchartImportPipeline({
       content: JSON.stringify({ nodes: [], edges: [] }),
       importKind: 'json',
       invalidFormatMessage: 'Invalid format',
@@ -114,7 +116,8 @@ describe('flowchartImportPipeline', () => {
       onMermaidImportFailure: vi.fn(),
     });
 
-    expect(onJsonImportFailure).toHaveBeenCalledWith('Invalid format');
+    expect(onJsonImportFailure).toHaveBeenCalledWith();
+    expect(result).toBe(false);
   });
 
   it('routes mermaid imports through the mermaid plan/apply pipeline', async () => {
@@ -125,7 +128,7 @@ describe('flowchartImportPipeline', () => {
     const onMermaidImportFailure = vi.fn();
     const onBeforeCanvasReplace = vi.fn();
 
-    await runFlowchartImportPipeline({
+    const result = await runFlowchartImportPipeline({
       content: 'flowchart TD\nA-->B',
       importKind: 'mermaid',
       invalidFormatMessage: 'Invalid format',
@@ -151,5 +154,6 @@ describe('flowchartImportPipeline', () => {
     expect(onMermaidImportFailure).not.toHaveBeenCalled();
     expect(onBeforeCanvasReplace).toHaveBeenCalledTimes(1);
     expect(onBeforeCanvasReplace.mock.invocationCallOrder[0]).toBeLessThan(setNodes.mock.invocationCallOrder[0]);
+    expect(result).toBe(true);
   });
 });
