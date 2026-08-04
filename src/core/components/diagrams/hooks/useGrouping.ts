@@ -1,10 +1,13 @@
 import { useCallback } from 'react';
 import { Node, Edge } from '@xyflow/react';
 import { createGroupingPlan, deselectEdgesForGrouping } from './groupingOperations';
+import { hasMutationLockedNode, resolveTargetNodes } from '../nodeLockPolicy';
 
 interface UseGroupingProps {
     nodes: Node[];
     edges: Edge[];
+    nodesRef?: React.MutableRefObject<Node[]>;
+    edgesRef?: React.MutableRefObject<Edge[]>;
     setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
     setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
     selectedNodes: Node[];
@@ -17,6 +20,8 @@ interface UseGroupingProps {
 export const useGrouping = ({
     nodes,
     edges,
+    nodesRef,
+    edgesRef,
     setNodes,
     setEdges,
     selectedNodes,
@@ -27,9 +32,13 @@ export const useGrouping = ({
 }: UseGroupingProps) => {
 
     const handleGroup = useCallback(() => {
+        const selectedIds = new Set(selectedNodes.map(node => node.id));
+        const currentSelection = resolveTargetNodes(nodes, selectedIds);
+        if (hasMutationLockedNode(currentSelection)) return;
+
         const plan = createGroupingPlan({
             nodes,
-            selectedNodes,
+            selectedNodes: currentSelection,
             groupId: `group-${Date.now()}`,
             defaultGroupLabel,
             defaultGroupDescription,
@@ -37,21 +46,28 @@ export const useGrouping = ({
         if (!plan) return;
 
         takeSnapshot(nodes, edges);
+        const nextEdges = deselectEdgesForGrouping(edges);
+        if (nodesRef) nodesRef.current = plan.nodes;
+        if (edgesRef) edgesRef.current = nextEdges;
         setNodes(plan.nodes);
-        setEdges(deselectEdgesForGrouping);
+        setEdges(nextEdges);
         setSelectedNodes([plan.groupNode]);
-    }, [defaultGroupDescription, defaultGroupLabel, selectedNodes, nodes, edges, takeSnapshot, setNodes, setEdges, setSelectedNodes]);
+    }, [defaultGroupDescription, defaultGroupLabel, selectedNodes, nodes, edges, nodesRef, edgesRef, takeSnapshot, setNodes, setEdges, setSelectedNodes]);
 
     const handleUngroup = useCallback(() => {
-        const groupsToUngroup = selectedNodes.filter(n => n.type === 'titleGroup' || n.type === 'subGroup');
+        const selectedIds = new Set(selectedNodes.map(node => node.id));
+        const groupsToUngroup = resolveTargetNodes(nodes, selectedIds)
+            .filter(n => n.type === 'titleGroup' || n.type === 'subGroup');
         if (groupsToUngroup.length === 0) return;
+
+        const groupIds = new Set(groupsToUngroup.map(group => group.id));
+        const affectedNodes = nodes.filter(node => groupIds.has(node.id) || (node.parentId ? groupIds.has(node.parentId) : false));
+        if (hasMutationLockedNode(affectedNodes)) return;
 
         takeSnapshot(nodes, edges);
 
         setNodes(nds => {
             let nextNodes = [...nds];
-            const groupIds = new Set(groupsToUngroup.map(g => g.id));
-
             // Process children
             nextNodes = nextNodes.map(n => {
                 if (n.parentId && groupIds.has(n.parentId)) {
@@ -84,12 +100,18 @@ export const useGrouping = ({
             });
 
             // Remove groups
-            return nextNodes.filter(n => !groupIds.has(n.id));
+            const ungroupedNodes = nextNodes.filter(n => !groupIds.has(n.id));
+            if (nodesRef) nodesRef.current = ungroupedNodes;
+            return ungroupedNodes;
         });
 
-        setEdges(deselectEdgesForGrouping);
+        setEdges(currentEdges => {
+            const nextEdges = deselectEdgesForGrouping(currentEdges);
+            if (edgesRef) edgesRef.current = nextEdges;
+            return nextEdges;
+        });
         setSelectedNodes([]);
-    }, [selectedNodes, nodes, edges, takeSnapshot, setNodes, setEdges, setSelectedNodes]);
+    }, [selectedNodes, nodes, edges, nodesRef, edgesRef, takeSnapshot, setNodes, setEdges, setSelectedNodes]);
 
     return {
         handleGroup,

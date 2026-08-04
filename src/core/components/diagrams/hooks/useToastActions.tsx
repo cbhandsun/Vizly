@@ -5,7 +5,7 @@ import type { Node, Edge } from '@xyflow/react';
 import type { MessageInstance } from 'antd/es/message/interface';
 import type { NotificationInstance } from 'antd/es/notification/interface';
 import type { DiagramActionTarget } from './useDiagramActions';
-import { hasMutationLockedNode } from '../nodeLockPolicy';
+import { hasMutationLockedNode, resolveTargetNodes } from '../nodeLockPolicy';
 
 /**
  * 🚀 P2 性能优化：从 FlowchartDesigner 提取的 Toast 包装层
@@ -187,8 +187,13 @@ export function useToastActions({
             messageApi.warning(t('designer.flowchart.toast.groupSameLevel'));
             return;
         }
+        const selectedIds = new Set(selectedNodes.map(node => node.id));
+        if (hasMutationLockedNode(resolveTargetNodes(nodesRef.current, selectedIds))) {
+            messageApi.warning(t('designer.flowchart.toast.lockedSelection', '节点已锁定，请先解锁后再操作'));
+            return;
+        }
         handleGroup();
-    }, [handleGroup, messageApi, selectedNodes, t]);
+    }, [handleGroup, messageApi, nodesRef, selectedNodes, t]);
 
     const handleUngroupWithToast = useCallback(() => {
         const groups = selectedNodes.filter(n => n.type === 'titleGroup' || n.type === 'subGroup');
@@ -196,8 +201,15 @@ export function useToastActions({
             messageApi.info(t('designer.flowchart.toast.nothingToUngroup'));
             return;
         }
+        const groupIds = new Set(groups.map(group => group.id));
+        const affectedNodes = nodesRef.current.filter(node =>
+            groupIds.has(node.id) || (node.parentId ? groupIds.has(node.parentId) : false));
+        if (hasMutationLockedNode(affectedNodes)) {
+            messageApi.warning(t('designer.flowchart.toast.lockedSelection', '节点已锁定，请先解锁后再操作'));
+            return;
+        }
         handleUngroup();
-    }, [handleUngroup, messageApi, selectedNodes, t]);
+    }, [handleUngroup, messageApi, nodesRef, selectedNodes, t]);
 
     // --- Context menu combined handler ---
     const onContextMenuActionWithToast = useCallback((action: string, targetId?: string) => {

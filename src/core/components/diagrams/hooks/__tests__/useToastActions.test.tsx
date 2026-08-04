@@ -66,6 +66,42 @@ describe('useToastActions clipboard feedback', () => {
     expect(props.handleDuplicate).not.toHaveBeenCalled();
   });
 
+  it('explains why locked grouping and ungrouping transactions are blocked', () => {
+    const { props, warning } = createProps(vi.fn().mockResolvedValue(false));
+    const lockedNode: Node = {
+      id: 'locked',
+      position: { x: 0, y: 0 },
+      data: { locked: true },
+    };
+    const peerNode: Node = {
+      id: 'peer',
+      position: { x: 100, y: 0 },
+      data: {},
+    };
+    props.selectedNodes = [lockedNode, peerNode];
+    props.nodesRef.current = [lockedNode, peerNode];
+    const { result, rerender } = renderHook(() => useToastActions(props));
+
+    act(() => result.current.handleGroupWithToast());
+
+    const groupNode: Node = {
+      id: 'group',
+      type: 'titleGroup',
+      position: { x: 0, y: 0 },
+      data: {},
+    };
+    const lockedChild = { ...lockedNode, parentId: groupNode.id };
+    props.selectedNodes = [groupNode];
+    props.nodesRef.current = [groupNode, lockedChild];
+    rerender();
+
+    act(() => result.current.handleUngroupWithToast());
+
+    expect(warning).toHaveBeenCalledTimes(2);
+    expect(props.handleGroup).not.toHaveBeenCalled();
+    expect(props.handleUngroup).not.toHaveBeenCalled();
+  });
+
   it('delegates paste to the clipboard boundary even when local storage is empty', async () => {
     const handlePaste = vi.fn().mockResolvedValue(true);
     const { info, props } = createProps(handlePaste);

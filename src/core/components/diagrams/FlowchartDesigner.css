@@ -1900,3 +1900,7 @@ html[data-theme='dark'] body.performance-mode .modern-sidebar-container {
     }
 }
 
+.react-flow__node.vizly-collapse-hidden {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}

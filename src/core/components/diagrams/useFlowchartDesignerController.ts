@@ -8,7 +8,6 @@ import { useDesignerEventHandlers } from './hooks/useDesignerEventHandlers';
 import { useDesignerSystemSync } from './hooks/useDesignerSystemSync';
 import { useDiagramScopedSelection } from './hooks/useDiagramScopedSelection';
 import { useCanonicalSelectionChange } from './hooks/useCanonicalSelectionChange';
-import { computeFlowchartCollapsedStateHash } from './flowchartCollapsedState';
 import { DiagramComponentProps } from '../../types/diagram-components';
 import { useTranslation } from 'react-i18next';
 import { useComponentPerformance, useInteractionPerformance } from '../../hooks/usePerformanceMonitor';
@@ -20,7 +19,6 @@ import { useDiagramStore } from '../../store/useDiagramStore';
 import { useMobileInteractions } from '../../hooks/useMobileInteractions';
 import { useCollapsibleGroups } from './hooks/useCollapsibleGroups';
 import { useLayerManagement } from './hooks/useLayerManagement';
-import { useContainerAutoLayout } from './hooks/useContainerAutoLayout';
 // useAnnotations removed (GAP-02 Unified)
 import { useMultiPage } from './hooks/useMultiPage';
 import { dispatchDiagramControl } from '../shared/diagramControl';
@@ -260,11 +258,18 @@ export const useFlowchartDesignerController = ({
         onMobileNodeAdded: handleMobilePluginNodeAdded,
         notifyNodeAdded: notifyPluginNodeAdded,
     });
-    const { nodesWithCollapseState, edgesWithCollapseState, toggleGroupCollapse } = useCollapsibleGroups({ nodes, edges, setNodes, takeSnapshot });
+    const { nodesWithCollapseState, edgesWithCollapseState, toggleGroupCollapse } = useCollapsibleGroups({
+        nodes,
+        edges,
+        nodesRef,
+        edgesRef,
+        setNodes,
+        takeSnapshot,
+    });
 
     // 2. Interactions Domain Controller
     const interactionsParams = useDesignerInteractions({
-        nodes, edges, setNodes, setEdges,
+        nodes, edges, nodesRef, edgesRef, setNodes, setEdges,
         selectedNodes, setSelectedNodes,
         takeSnapshot, notifyHistoryChanged, reactFlowInstance,
         isDragging, setIsDragging,
@@ -393,8 +398,6 @@ export const useFlowchartDesignerController = ({
         }
     }, [isCommentMode, contextMenuPaneClick]);
 
-    useContainerAutoLayout();
-
     // Features
     const multiPage = useMultiPage(
         () => nodesRef.current,
@@ -417,30 +420,6 @@ export const useFlowchartDesignerController = ({
         diagramId: diagramIdForExport,
         loadLayoutPresetMap,
     });
-    
-    // 监听折叠状态变化，自动触发排版微调，让周围节点紧凑排列
-    const collapsedHash = useMemo(() => {
-        return computeFlowchartCollapsedStateHash(nodes);
-    }, [nodes]);
-
-    const initialCollapsedRef = useRef(collapsedHash);
-    const hasObservedInitialCollapseStateRef = useRef(false);
-
-    useEffect(() => {
-        if (!hasObservedInitialCollapseStateRef.current) {
-            initialCollapsedRef.current = collapsedHash;
-            if (nodes.length > 0) {
-                hasObservedInitialCollapseStateRef.current = true;
-            }
-            return;
-        }
-
-        if (initialCollapsedRef.current !== collapsedHash) {
-            initialCollapsedRef.current = collapsedHash;
-            // 触发自动布局
-            handleStrategyLayout(lastDomainStrategy, lastNodeLayout, lastDomainDirection);
-        }
-    }, [collapsedHash, nodes.length, handleStrategyLayout, lastDomainStrategy, lastNodeLayout, lastDomainDirection]);
     
     // Auto-Routing: Sync internal `autoRoutingEnabled` with the exposed edgeMode from config/topbar
     useEffect(() => {
@@ -685,7 +664,7 @@ export const useFlowchartDesignerController = ({
         setPluginManagerVisible, setPresentationActive, setPresentationSlides, setQuickConnectPreview, setRightSidebarWidth, setShortcutHelpVisible,
         setShowMinimap, setShowRuler, setShowShortcuts, setShowShortcutsModal, setSnapEnabled, shortcutHelpVisible, showAiCrown, showGrid, showMinimap,
         showOnlyMainFlow, showOverlay, showPerformanceDashboard, showRuler, showShortcuts, snapEnabled, t, takeSnapshot, templates, theme, toggleLock,
-        title, toggleResolved, toggleVisibility, topActionArea, undo, updateAnnotation, updateEdgesBatch, updateNodesBatch, viewport, visibleEdges,
+        title, toggleGroupCollapse, toggleResolved, toggleVisibility, topActionArea, undo, updateAnnotation, updateEdgesBatch, updateNodesBatch, viewport, visibleEdges,
         wrappedOnNodeDragStart, yAwareness,
     };
 

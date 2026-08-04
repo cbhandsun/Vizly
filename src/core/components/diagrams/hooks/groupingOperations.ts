@@ -106,7 +106,7 @@ export const createGroupingPlan = ({
             height: maxY - minY + padding * 2,
         },
         selected: true,
-        zIndex: -1,
+        zIndex: 0,
     };
     const selectedIds = new Set(selectedNodes.map(node => node.id));
     const reparentedNodes = nodes.map((node) => {

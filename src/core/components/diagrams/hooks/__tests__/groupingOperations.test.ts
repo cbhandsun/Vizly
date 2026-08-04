@@ -34,6 +34,7 @@ describe('createGroupingPlan', () => {
             type: 'titleGroup',
             position: { x: 60, y: 110 },
             selected: true,
+            zIndex: 0,
         });
         expect(plan?.nodes[1]).toMatchObject({
             parentId: 'group-1',

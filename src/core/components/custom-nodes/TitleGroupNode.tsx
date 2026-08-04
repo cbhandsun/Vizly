@@ -219,7 +219,7 @@ const TitleGroupNode = React.memo(({ id, data, selected }: NodeProps<Node<TitleG
               className="title-group-collapse-btn"
               onClick={(e) => {
                 e.stopPropagation();
-                toggleCollapse();
+                toggleCollapse(e.currentTarget);
               }}
               aria-label={t(isCollapsed
                 ? 'designer.flowchart.expandContainerChildren'

@@ -117,7 +117,7 @@ export function useDesignerEventHandlers({
         handleGroup, handleUngroup, onContextMenuAction, undo, selectedNodes, selectedEdges, nodesRef, edgesRef,
     });
 
-    const { layoutContainer } = useContainerAutoLayout();
+    const { layoutContainer } = useContainerAutoLayout(takeSnapshot);
 
     const handleContextMenuActionWithContainer = useCallback((action: string, targetId?: string) => {
         if (action === 'autoLayoutContainer' && targetId) {

@@ -23,6 +23,10 @@ import { UnifiedDesignerShell } from './UnifiedDesignerShell';
 import { persistFlowchartOnboardingDismissed } from './flowchartOnboardingStorage';
 import { shouldOpenDesignerAiSidebar } from './designerRightSidebarState';
 import {
+    CONTAINER_COLLAPSE_REQUEST_EVENT,
+    readContainerCollapseRequest,
+} from './containerCollapseRequest';
+import {
     resolveFlowchartPluginContribution,
     type FlowchartDesignerViewModel,
 } from './flowchartDesignerViewModel';
@@ -184,6 +188,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
         quickAddMenu,
         reactFlowInstance,
         reactFlowWrapper,
+        toggleGroupCollapse,
         redo,
         renderThemeSelector,
         rightSidebarWidth,
@@ -234,6 +239,15 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
         wrappedOnNodeDragStart,
         yAwareness,
     } = model;
+
+    React.useEffect(() => {
+        const handleCollapseRequest = (event: Event) => {
+            const nodeId = readContainerCollapseRequest(event);
+            if (nodeId) toggleGroupCollapse(nodeId);
+        };
+        window.addEventListener(CONTAINER_COLLAPSE_REQUEST_EVENT, handleCollapseRequest);
+        return () => window.removeEventListener(CONTAINER_COLLAPSE_REQUEST_EVENT, handleCollapseRequest);
+    }, [toggleGroupCollapse]);
 
     const actualLeftOffset = resolveFlowchartLeftClearance({
         isSidebarHidden,

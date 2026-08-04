@@ -22,6 +22,8 @@ import type { HistorySnapshotOptions } from '../../../hooks/useDiagramHistory';
 export interface UseDesignerInteractionsProps {
     nodes: Node[];
     edges: Edge[];
+    nodesRef: React.MutableRefObject<Node[]>;
+    edgesRef: React.MutableRefObject<Edge[]>;
     setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
     setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
     selectedNodes: Node[];
@@ -64,7 +66,7 @@ export interface UseDesignerInteractionsProps {
 const ANNOTATION_COLORS = ['#facc15', '#f87171', '#60a5fa', '#34d399', '#c084fc', '#fb923c'];
 
 export function useDesignerInteractions({
-    nodes, edges, setNodes, setEdges,
+    nodes, edges, nodesRef, edgesRef, setNodes, setEdges,
     selectedNodes, setSelectedNodes,
     takeSnapshot, notifyHistoryChanged, reactFlowInstance,
     isDragging, setIsDragging,
@@ -97,7 +99,7 @@ export function useDesignerInteractions({
     const enhancedEdges = visibleEdges;
 
     const { handleGroup, handleUngroup } = useGrouping({
-        nodes, edges, setNodes, setEdges, selectedNodes, setSelectedNodes, takeSnapshot,
+        nodes, edges, nodesRef, edgesRef, setNodes, setEdges, selectedNodes, setSelectedNodes, takeSnapshot,
         defaultGroupLabel: '组件', defaultGroupDescription: '组件'
     });
 

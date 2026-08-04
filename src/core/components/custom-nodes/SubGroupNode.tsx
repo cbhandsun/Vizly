@@ -237,7 +237,7 @@ const SubGroupNode = ({ id, data, zIndex, selected, isConnectable }: NodeProps<N
               className="sub-group-collapse-btn"
               onClick={(e) => {
                 e.stopPropagation();
-                toggleCollapse();
+                toggleCollapse(e.currentTarget);
               }}
               aria-label={t(isCollapsed
                 ? 'designer.flowchart.expandContainerChildren'
