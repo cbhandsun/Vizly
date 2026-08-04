@@ -74,7 +74,7 @@ describe('TopActionButtons document menu', () => {
         });
     });
 
-    it('exposes a stable presentation focus-return target', () => {
+    it('exposes stable focus-return targets for document modes', () => {
         render(
             <TopActionButtons
                 disablePortal
@@ -84,6 +84,7 @@ describe('TopActionButtons document menu', () => {
 
         const trigger = screen.getByRole('button', { name: '文档操作' });
         expect(trigger.hasAttribute('data-presentation-focus-return')).toBe(true);
+        expect(trigger.hasAttribute('data-diff-focus-return')).toBe(true);
     });
 
     it('separates operation history from version snapshots and invokes the snapshot entry', async () => {
