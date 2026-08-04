@@ -3,8 +3,7 @@ import type { Dispatch, SetStateAction } from 'react';
 import type { Edge, Node } from '@xyflow/react';
 
 import {
-    replaceFlowchartNodeLabel,
-    replaceFlowchartNodeLabels,
+    planFlowchartLabelReplacement,
 } from '../flowchartSearchReplace';
 
 interface UseFlowchartSearchReplaceActionsParams {
@@ -20,21 +19,26 @@ export const useFlowchartSearchReplaceActions = ({
     getEdges,
     takeSnapshot,
 }: UseFlowchartSearchReplaceActionsParams) => {
-    const handleSearchReplaceNode = useCallback((nodeId: string, newLabel: string) => {
-        setNodes((nodes) => replaceFlowchartNodeLabel(nodes, nodeId, newLabel));
-    }, [setNodes]);
+    const applyReplacement = useCallback((targetIds: string[], query: string, replacement: string) => {
+        const currentNodes = getNodes();
+        const result = planFlowchartLabelReplacement(currentNodes, targetIds, query, replacement);
+        if (result.changedIds.length > 0) {
+            takeSnapshot(currentNodes, getEdges());
+            setNodes(result.nodes);
+        }
+        return result;
+    }, [getEdges, getNodes, setNodes, takeSnapshot]);
 
-    const handleSearchReplaceAll = useCallback((matchIds: string[], newLabel: string) => {
-        setNodes((nodes) => replaceFlowchartNodeLabels(nodes, matchIds, newLabel));
-    }, [setNodes]);
+    const handleSearchReplaceNode = useCallback((nodeId: string, query: string, replacement: string) => (
+        applyReplacement([nodeId], query, replacement)
+    ), [applyReplacement]);
 
-    const handleBeforeReplace = useCallback(() => {
-        takeSnapshot(getNodes(), getEdges());
-    }, [getEdges, getNodes, takeSnapshot]);
+    const handleSearchReplaceAll = useCallback((matchIds: string[], query: string, replacement: string) => (
+        applyReplacement(matchIds, query, replacement)
+    ), [applyReplacement]);
 
     return {
         handleSearchReplaceNode,
         handleSearchReplaceAll,
-        handleBeforeReplace,
     };
 };

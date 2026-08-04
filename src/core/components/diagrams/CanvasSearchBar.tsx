@@ -1,8 +1,14 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import { theme } from 'antd';
+import { Popconfirm, theme } from 'antd';
 import { FaSearch, FaChevronUp, FaChevronDown, FaTimes, FaExchangeAlt } from 'react-icons/fa';
 import { Node, useReactFlow } from '@xyflow/react';
 import { buildPresentationNodeSelector } from '../presentation/presentationSelectorSafety';
+import {
+    FLOWCHART_REPLACE_TEXT_MAX_LENGTH,
+    FLOWCHART_SEARCH_QUERY_MAX_LENGTH,
+    planFlowchartLabelReplacement,
+    type FlowchartReplaceResult,
+} from './flowchartSearchReplace';
 
 export interface CanvasSearchBarProps {
     visible: boolean;
@@ -11,11 +17,9 @@ export interface CanvasSearchBarProps {
     /** 外部控制高亮节点 */
     onHighlightNode?: (nodeId: string | null) => void;
     /** 替换功能：更新节点数据 */
-    onReplaceNode?: (nodeId: string, newLabel: string) => void;
+    onReplaceNode?: (nodeId: string, query: string, replacement: string) => FlowchartReplaceResult;
     /** 批量替换 */
-    onReplaceAll?: (matches: string[], newLabel: string) => void;
-    /** 替换前记录快照 */
-    onBeforeReplace?: () => void;
+    onReplaceAll?: (matches: string[], query: string, replacement: string) => FlowchartReplaceResult;
     /** 受控替换栏状态，用于可靠响应 Ctrl+H 等外部入口 */
     replaceVisible?: boolean;
     onReplaceVisibleChange?: (visible: boolean) => void;
@@ -34,7 +38,6 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
     onHighlightNode,
     onReplaceNode,
     onReplaceAll,
-    onBeforeReplace,
     replaceVisible,
     onReplaceVisibleChange,
 }) => {
@@ -47,6 +50,7 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
 
     // Phase 2：替换功能
     const [replaceText, setReplaceText] = useState('');
+    const [replaceStatus, setReplaceStatus] = useState('');
     const [internalReplaceVisible, setInternalReplaceVisible] = useState(false);
     const showReplace = replaceVisible ?? internalReplaceVisible;
     const setShowReplace = useCallback((visible: boolean) => {
@@ -90,6 +94,15 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
         ? Math.min(currentIndex, matchIds.length - 1)
         : 0;
     const currentMatchId = matchIds[boundedCurrentIndex] ?? null;
+    const matchIdSet = useMemo(() => new Set(matchIds), [matchIds]);
+    const allReplacePlan = useMemo(() => planFlowchartLabelReplacement(
+        nodes,
+        matchIds,
+        query,
+        replaceText,
+    ), [matchIds, nodes, query, replaceText]);
+    const currentReplaceEligible = currentMatchId !== null
+        && allReplacePlan.changedIds.includes(currentMatchId);
 
     useEffect(() => {
         if (currentMatchId) {
@@ -106,6 +119,21 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
         setQuery(value);
         setExcludedMatchIds([]);
         setCurrentIndex(0);
+        setReplaceStatus('');
+    }, []);
+
+    const handleReplaceTextChange = useCallback((value: string) => {
+        setReplaceText(value);
+        setReplaceStatus('');
+    }, []);
+
+    const formatReplaceResult = useCallback((result: FlowchartReplaceResult) => {
+        const parts = [`已替换 ${result.changedIds.length} 个节点标签`];
+        if (result.skippedLockedIds.length > 0) parts.push(`跳过 ${result.skippedLockedIds.length} 个锁定节点`);
+        if (result.skippedBlankIds.length > 0) parts.push(`跳过 ${result.skippedBlankIds.length} 个空标签结果`);
+        if (result.ignoredNonLabelMatchIds.length > 0) parts.push(`忽略 ${result.ignoredNonLabelMatchIds.length} 个非标签匹配`);
+        if (result.truncatedIds.length > 0) parts.push(`${result.truncatedIds.length} 个标签已截断`);
+        return parts.join('；');
     }, []);
 
     const goNext = useCallback(() => {
@@ -122,24 +150,34 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
 
     // ── 替换当前匹配 ──
     const handleReplaceCurrent = useCallback(() => {
-        if (matchIds.length === 0 || !onReplaceNode) return;
-        const targetId = matchIds[boundedCurrentIndex];
-        onBeforeReplace?.();
-        onReplaceNode(targetId, replaceText);
-        setExcludedMatchIds(ids => [...ids, targetId]);
-        const newIds = matchIds.filter(id => id !== targetId);
+        if (!currentReplaceEligible || !currentMatchId || !onReplaceNode) return;
+        const result = onReplaceNode(currentMatchId, query, replaceText);
+        setReplaceStatus(formatReplaceResult(result));
+        setExcludedMatchIds(ids => [...ids, currentMatchId]);
+        const newIds = matchIds.filter(id => id !== currentMatchId);
         const nextIndex = Math.min(boundedCurrentIndex, newIds.length - 1);
         setCurrentIndex(Math.max(0, nextIndex));
-    }, [boundedCurrentIndex, matchIds, onBeforeReplace, onReplaceNode, replaceText]);
+    }, [boundedCurrentIndex, currentMatchId, currentReplaceEligible, formatReplaceResult, matchIds, onReplaceNode, query, replaceText]);
 
     // ── 全部替换 ──
     const handleReplaceAll = useCallback(() => {
-        if (matchIds.length === 0 || !onReplaceAll) return;
-        onBeforeReplace?.();
-        onReplaceAll(matchIds, replaceText);
-        setExcludedMatchIds(ids => Array.from(new Set([...ids, ...matchIds])));
+        if (allReplacePlan.changedIds.length === 0 || !onReplaceAll) return;
+        const result = onReplaceAll(matchIds, query, replaceText);
+        setReplaceStatus(formatReplaceResult(result));
+        setExcludedMatchIds(ids => Array.from(new Set([...ids, ...result.changedIds])));
         setCurrentIndex(0);
-    }, [matchIds, replaceText, onReplaceAll, onBeforeReplace]);
+    }, [allReplacePlan.changedIds.length, formatReplaceResult, matchIds, onReplaceAll, query, replaceText]);
+
+    const replacePreviewMessage = useMemo(() => {
+        if (!showReplace || !query.trim() || replaceStatus) return replaceStatus;
+        if (currentMatchId && allReplacePlan.skippedLockedIds.includes(currentMatchId)) return '当前结果已锁定，不会被替换';
+        if (currentMatchId && allReplacePlan.skippedBlankIds.includes(currentMatchId)) return '替换后标签不能为空';
+        if (currentMatchId && allReplacePlan.ignoredNonLabelMatchIds.includes(currentMatchId)) return '当前结果仅在描述、域名或 ID 中匹配，不会修改标签';
+        if (allReplacePlan.changedIds.length > 0 && allReplacePlan.skippedLockedIds.length > 0) {
+            return `可替换 ${allReplacePlan.changedIds.length} 个标签，将跳过 ${allReplacePlan.skippedLockedIds.length} 个锁定节点`;
+        }
+        return replaceStatus;
+    }, [allReplacePlan, currentMatchId, query, replaceStatus, showReplace]);
 
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
         if (e.key === 'Escape') {
@@ -180,7 +218,7 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
 
         // 非匹配项：降低透明度
         const dimSelectors = nodes
-            .filter(n => !matchIds.includes(n.id))
+            .filter(n => !matchIdSet.has(n.id))
             .map(n => buildPresentationNodeSelector(n.id))
             .join(',\n');
         const dimStyles = dimSelectors
@@ -200,7 +238,7 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
         }`;
 
         return `${keyframes}\n${currentSelector}\n${otherStyles}\n${dimStyles}\n${reducedMotionStyles}`;
-    }, [query, matchIds, currentMatchId, nodes]);
+    }, [query, matchIds, matchIdSet, currentMatchId, nodes]);
 
     const hasReplaceFns = !!(onReplaceNode && onReplaceAll);
 
@@ -225,6 +263,7 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
                         autoFocus
                         value={query}
                         onChange={e => handleQueryChange(e.target.value)}
+                        maxLength={FLOWCHART_SEARCH_QUERY_MAX_LENGTH}
                         onKeyDown={handleKeyDown}
                         aria-label="搜索画布节点"
                         placeholder="搜索节点..."
@@ -292,7 +331,8 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
                         <FaExchangeAlt size={11} style={{ color: token.colorTextTertiary, flexShrink: 0 }} />
                         <input
                             value={replaceText}
-                            onChange={e => setReplaceText(e.target.value)}
+                            onChange={e => handleReplaceTextChange(e.target.value)}
+                            maxLength={FLOWCHART_REPLACE_TEXT_MAX_LENGTH}
                             onKeyDown={e => { if (e.key === 'Enter') handleReplaceCurrent(); }}
                             aria-label="替换为"
                             placeholder="替换为..."
@@ -305,22 +345,40 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
                             className="canvas-search-action-button"
                             aria-label="替换当前匹配"
                             onClick={handleReplaceCurrent}
-                            disabled={matchIds.length === 0}
+                            disabled={!currentReplaceEligible}
                             title="替换当前"
-                            style={actionBtnStyle(matchIds.length > 0, token)}
+                            style={actionBtnStyle(currentReplaceEligible, token)}
                         >
                             替换
                         </button>
-                        <button
-                            className="canvas-search-action-button"
-                            aria-label={`全部替换，共 ${matchIds.length} 处`}
-                            onClick={handleReplaceAll}
-                            disabled={matchIds.length === 0}
-                            title={`全部替换 (${matchIds.length} 处)`}
-                            style={actionBtnStyle(matchIds.length > 0, token)}
+                        <Popconfirm
+                            placement="bottomRight"
+                            title={`替换 ${allReplacePlan.changedIds.length} 个节点标签？`}
+                            description="此操作可通过撤销恢复；锁定节点不会被修改。"
+                            okText="确认替换"
+                            cancelText="取消"
+                            onConfirm={handleReplaceAll}
+                            disabled={allReplacePlan.changedIds.length === 0}
                         >
-                            全部({matchIds.length})
-                        </button>
+                            <button
+                                className="canvas-search-action-button"
+                                aria-label={`全部替换，共 ${allReplacePlan.changedIds.length} 个可修改标签`}
+                                disabled={allReplacePlan.changedIds.length === 0}
+                                title={`全部替换 (${allReplacePlan.changedIds.length} 个可修改标签)`}
+                                style={actionBtnStyle(allReplacePlan.changedIds.length > 0, token)}
+                            >
+                                全部({allReplacePlan.changedIds.length})
+                            </button>
+                        </Popconfirm>
+                    </div>
+                )}
+                {replacePreviewMessage && (
+                    <div role="status" aria-label="替换操作状态" aria-live="polite" aria-atomic="true" style={{
+                        padding: '0 10px 8px 28px',
+                        color: token.colorTextSecondary,
+                        fontSize: 11,
+                    }}>
+                        {replacePreviewMessage}
                     </div>
                 )}
             </div>

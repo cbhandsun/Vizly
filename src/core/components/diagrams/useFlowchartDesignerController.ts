@@ -583,7 +583,6 @@ export const useFlowchartDesignerController = ({
     const {
         handleSearchReplaceNode,
         handleSearchReplaceAll,
-        handleBeforeReplace,
     } = useFlowchartSearchReplaceActions({
         setNodes,
         getNodes: getCurrentNodes,
@@ -658,7 +657,7 @@ export const useFlowchartDesignerController = ({
         currentZoom, deleteAnnotation, deleteLayer, deleteTemplate, diagramIdForExport, diffResult, dynamicEdgeTypes, dynamicNodeTypes, edges,
         edgesRef, enhancedOnConnect, enhancedOnConnectEnd, exportModalVisible, extraExportItems, fileInputRef,
         getPreviousState, getReactFlowSnapshot, gridColor, gridVariant, groupedTemplates, guides, handleAddMindMap, handleAddNode, handleAddStickyNote, handleAlign,
-        handleBeforeReplace, handleBeforeUpdate, handleBringToFront, handleContextMenuAction, handleDeleteWithToast, handleDistribute, handleDuplicateWithToast,
+        handleBeforeUpdate, handleBringToFront, handleContextMenuAction, handleDeleteWithToast, handleDistribute, handleDuplicateWithToast,
         handleEdgeDoubleClick, handleFitView, handleFocusNode, handleGridRotate, handleImport, handleLock, handleOpacity,
         handleOpenJsonEditor, handleOpenSettings, handlePaneClick, handlePresentationFocus, handleReactFlowInit, handleReadonlyChange, handleReconnect,
         handleReconnectEnd, handleReconnectStart, handleSearchReplaceAll, handleSearchReplaceNode, handleSendToBack, handleSmartOptimize, handleStrategyLayout,

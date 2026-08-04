@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs';
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 const { setCenterMock } = vi.hoisted(() => ({
     setCenterMock: vi.fn(),
@@ -19,6 +19,19 @@ vi.mock('@xyflow/react', async () => {
 
 import { CanvasSearchBar } from '../CanvasSearchBar';
 import { buildPresentationNodeSelector } from '../../presentation/presentationSelectorSafety';
+import { planFlowchartLabelReplacement } from '../flowchartSearchReplace';
+
+beforeAll(() => {
+    vi.stubGlobal('ResizeObserver', class ResizeObserver {
+        observe() { /* jsdom layout is not observed in these interaction tests. */ }
+        unobserve() { /* jsdom layout is not observed in these interaction tests. */ }
+        disconnect() { /* jsdom layout is not observed in these interaction tests. */ }
+    });
+});
+
+afterAll(() => {
+    vi.unstubAllGlobals();
+});
 
 describe('CanvasSearchBar', () => {
     it('exposes named search, replace, navigation, and close controls', () => {
@@ -52,8 +65,11 @@ describe('CanvasSearchBar', () => {
         fireEvent.click(screen.getByRole('button', { name: '打开查找替换' }));
 
         expect(screen.getByRole('textbox', { name: '替换为' })).toBeTruthy();
+        fireEvent.change(screen.getByRole('textbox', { name: '替换为' }), {
+            target: { value: 'Shape' },
+        });
         expect(screen.getByRole('button', { name: '替换当前匹配' })).toBeTruthy();
-        expect(screen.getByRole('button', { name: '全部替换，共 1 处' })).toBeTruthy();
+        expect(screen.getByRole('button', { name: '全部替换，共 1 个可修改标签' })).toBeTruthy();
     });
 
     it('keeps the mobile search below the second toolbar row with touch-sized actions', () => {
@@ -84,6 +100,78 @@ describe('CanvasSearchBar', () => {
         expect(screen.getByRole('status').textContent).toContain('画布暂无节点');
         fireEvent.click(screen.getByRole('button', { name: '关闭替换' }));
         expect(onReplaceVisibleChange).toHaveBeenCalledWith(false);
+
+        const featureLayerSource = readFileSync(
+            'src/core/components/diagrams/ui/DesignerCanvasFeaturesLayer.tsx',
+            'utf8',
+        );
+        expect(featureLayerSource).toContain('replaceVisible={search.replaceVisible}');
+        expect(featureLayerSource).toContain('onReplaceVisibleChange={search.onReplaceVisibleChange}');
+    });
+
+    it('requires confirmation before replacing all eligible labels', () => {
+        const nodes = [{
+            id: 'node-1',
+            position: { x: 10, y: 20 },
+            data: { label: 'Circle circle' },
+        }];
+        const onReplaceAll = vi.fn((ids: string[], query: string, replacement: string) => (
+            planFlowchartLabelReplacement(nodes, ids, query, replacement)
+        ));
+        render(
+            <CanvasSearchBar
+                visible
+                replaceVisible
+                onClose={vi.fn()}
+                nodes={nodes}
+                onReplaceNode={(id, query, replacement) => (
+                    planFlowchartLabelReplacement(nodes, [id], query, replacement)
+                )}
+                onReplaceAll={onReplaceAll}
+            />,
+        );
+
+        fireEvent.change(screen.getByRole('textbox', { name: '搜索画布节点' }), {
+            target: { value: 'circle' },
+        });
+        fireEvent.change(screen.getByRole('textbox', { name: '替换为' }), {
+            target: { value: 'Square' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: '全部替换，共 1 个可修改标签' }));
+
+        expect(onReplaceAll).not.toHaveBeenCalled();
+        expect(screen.getByText('替换 1 个节点标签？')).toBeTruthy();
+        fireEvent.click(screen.getByRole('button', { name: '确认替换' }));
+        expect(onReplaceAll).toHaveBeenCalledWith(['node-1'], 'circle', 'Square');
+    });
+
+    it('disables replacement and explains why a matching node is protected', () => {
+        render(
+            <CanvasSearchBar
+                visible
+                replaceVisible
+                onClose={vi.fn()}
+                nodes={[{
+                    id: 'node-1',
+                    position: { x: 10, y: 20 },
+                    data: { label: 'Circle', locked: true },
+                }]}
+                onReplaceNode={vi.fn()}
+                onReplaceAll={vi.fn()}
+            />,
+        );
+
+        fireEvent.change(screen.getByRole('textbox', { name: '搜索画布节点' }), {
+            target: { value: 'Circle' },
+        });
+        fireEvent.change(screen.getByRole('textbox', { name: '替换为' }), {
+            target: { value: 'Square' },
+        });
+
+        expect(screen.getByRole('button', { name: '替换当前匹配' })).toHaveProperty('disabled', true);
+        expect(screen.getByRole('button', { name: '全部替换，共 0 个可修改标签' })).toHaveProperty('disabled', true);
+        expect(screen.getByRole('status', { name: '替换操作状态' }).textContent)
+            .toBe('当前结果已锁定，不会被替换');
     });
 
     it('escapes imported node ids before composing highlight selectors', () => {

@@ -92,7 +92,6 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
         handleAddNode,
         handleAddStickyNote,
         handleAlign,
-        handleBeforeReplace,
         handleBringToFront,
         handleContextMenuAction,
         handleDeleteWithToast,
@@ -646,7 +645,6 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                             onHighlightNode: setHighlightedNodeId,
                                             onReplaceNode: handleSearchReplaceNode,
                                             onReplaceAll: handleSearchReplaceAll,
-                                            onBeforeReplace: handleBeforeReplace,
                                             replaceVisible: canvasSearchReplaceVisible,
                                             onReplaceVisibleChange: setCanvasSearchReplaceVisible,
                                         }}

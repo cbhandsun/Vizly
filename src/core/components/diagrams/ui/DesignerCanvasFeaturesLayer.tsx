@@ -90,7 +90,6 @@ export interface DesignerCanvasFeaturesLayerProps {
         | 'onHighlightNode'
         | 'onReplaceNode'
         | 'onReplaceAll'
-        | 'onBeforeReplace'
         | 'replaceVisible'
         | 'onReplaceVisibleChange'
     >;
@@ -182,7 +181,8 @@ export const DesignerCanvasFeaturesLayer = React.memo(
                         onHighlightNode={search.onHighlightNode}
                         onReplaceNode={search.onReplaceNode}
                         onReplaceAll={search.onReplaceAll}
-                        onBeforeReplace={search.onBeforeReplace}
+                        replaceVisible={search.replaceVisible}
+                        onReplaceVisibleChange={search.onReplaceVisibleChange}
                     />
                 </React.Suspense>
             )}
