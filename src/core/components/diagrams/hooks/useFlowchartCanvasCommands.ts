@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import type React from 'react';
 import type { TFunction } from 'i18next';
 import { BackgroundVariant, type Edge, type Node, type ReactFlowInstance } from '@xyflow/react';
@@ -69,6 +69,8 @@ export function useFlowchartCanvasCommands({
     selectedNodes,
     updateNodesBatch,
 }: UseFlowchartCanvasCommandsOptions) {
+    const smartOptimizeInFlightRef = useRef(false);
+
     const handleSmartLayout = useCallback(async () => {
         const { recommendLayout } = await import('../../../utils/layoutRecommender');
         const recommendation = recommendLayout(getNodes(), getEdges());
@@ -84,20 +86,56 @@ export function useFlowchartCanvasCommands({
     }, [getEdges, getNodes, handleStrategyLayout, t]);
 
     const handleSmartOptimize = useCallback(async () => {
-        const intelligence = DiagramIntelligenceService.getInstance();
-        const result = await runFlowchartSmartOptimize({
-            nodes: getNodes(),
-            edges: getEdges(),
-            takeSnapshot,
-            optimize: intelligence.optimize.bind(intelligence),
+        if (isReadonly) {
+            appMessage.info(t('designer.flowchart.optimizeReadonly'));
+            return;
+        }
+        if (smartOptimizeInFlightRef.current) {
+            appMessage.info(t('designer.flowchart.optimizeInProgress'));
+            return;
+        }
+
+        smartOptimizeInFlightRef.current = true;
+        const messageKey = 'flowchart-smart-optimize';
+        appMessage.open({
+            key: messageKey,
+            type: 'loading',
+            content: t('designer.flowchart.optimizing'),
+            duration: 0,
         });
-        setNodes(result.nodes);
-        setEdges(result.edges);
-        appMessage.success(t('designer.flowchart.optimize', {
-            overlaps: result.stats.rectifiedOverlaps,
-            nodes: result.stats.alignedNodes,
-        }));
-    }, [getEdges, getNodes, setEdges, setNodes, t, takeSnapshot]);
+        try {
+            const intelligence = DiagramIntelligenceService.getInstance();
+            const outcome = await runFlowchartSmartOptimize({
+                nodes: getNodes(),
+                edges: getEdges(),
+                takeSnapshot,
+                optimize: intelligence.optimize.bind(intelligence),
+            });
+            if (outcome.status === 'empty') {
+                appMessage.open({ key: messageKey, type: 'info', content: t('designer.flowchart.optimizeEmpty') });
+                return;
+            }
+            if (outcome.status === 'unchanged') {
+                appMessage.open({ key: messageKey, type: 'info', content: t('designer.flowchart.optimizeUnchanged') });
+                return;
+            }
+
+            setNodes(outcome.result.nodes);
+            setEdges(outcome.result.edges);
+            appMessage.open({
+                key: messageKey,
+                type: 'success',
+                content: t('designer.flowchart.optimize', {
+                    overlaps: outcome.result.stats.rectifiedOverlaps,
+                    nodes: outcome.result.stats.alignedNodes,
+                }),
+            });
+        } catch {
+            appMessage.open({ key: messageKey, type: 'error', content: t('designer.flowchart.optimizeFailed') });
+        } finally {
+            smartOptimizeInFlightRef.current = false;
+        }
+    }, [getEdges, getNodes, isReadonly, setEdges, setNodes, t, takeSnapshot]);
 
     const handleEdgeDoubleClick = useCallback((_event: React.MouseEvent, edge: Edge) => {
         if (isReadonly) return;
