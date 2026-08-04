@@ -6,12 +6,13 @@ import type { Edge, Node } from '@xyflow/react';
 import type { MessageInstance } from 'antd/es/message/interface';
 import type { NotificationInstance } from 'antd/es/notification/interface';
 import { useToastActions } from '../useToastActions';
+import type { ClipboardPasteResult } from '../useClipboard';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
-const createProps = (handlePaste: () => Promise<boolean>) => {
+const createProps = (handlePaste: () => Promise<ClipboardPasteResult>) => {
   const info = vi.fn();
   const warning = vi.fn();
   const nodesRef = { current: [] as Node[] };
@@ -42,7 +43,7 @@ const createProps = (handlePaste: () => Promise<boolean>) => {
 
 describe('useToastActions clipboard feedback', () => {
   it('explains why locked destructive actions are blocked', () => {
-    const { props, warning } = createProps(vi.fn().mockResolvedValue(false));
+    const { props, warning } = createProps(vi.fn().mockResolvedValue('empty'));
     const lockedNode: Node = {
       id: 'locked',
       position: { x: 0, y: 0 },
@@ -67,7 +68,7 @@ describe('useToastActions clipboard feedback', () => {
   });
 
   it('explains why locked grouping and ungrouping transactions are blocked', () => {
-    const { props, warning } = createProps(vi.fn().mockResolvedValue(false));
+    const { props, warning } = createProps(vi.fn().mockResolvedValue('empty'));
     const lockedNode: Node = {
       id: 'locked',
       position: { x: 0, y: 0 },
@@ -103,7 +104,7 @@ describe('useToastActions clipboard feedback', () => {
   });
 
   it('delegates paste to the clipboard boundary even when local storage is empty', async () => {
-    const handlePaste = vi.fn().mockResolvedValue(true);
+    const handlePaste = vi.fn().mockResolvedValue('pasted');
     const { info, props } = createProps(handlePaste);
     localStorage.clear();
 
@@ -118,7 +119,7 @@ describe('useToastActions clipboard feedback', () => {
   });
 
   it('reports an empty clipboard only after both clipboard channels fail', async () => {
-    const handlePaste = vi.fn().mockResolvedValue(false);
+    const handlePaste = vi.fn().mockResolvedValue('empty');
     const { info, props } = createProps(handlePaste);
 
     const { result } = renderHook(() => useToastActions(props));
@@ -128,5 +129,19 @@ describe('useToastActions clipboard feedback', () => {
     });
 
     expect(info).toHaveBeenCalledWith('designer.flowchart.toast.nothingToPaste');
+  });
+
+  it('explains when a pending paste is cancelled by a page or diagram change', async () => {
+    const handlePaste = vi.fn().mockResolvedValue('scope-changed');
+    const { info, warning, props } = createProps(handlePaste);
+
+    const { result } = renderHook(() => useToastActions(props));
+
+    await act(async () => {
+      await result.current.handlePasteWithToast();
+    });
+
+    expect(warning).toHaveBeenCalledWith('designer.flowchart.toast.pasteScopeChanged');
+    expect(info).not.toHaveBeenCalled();
   });
 });

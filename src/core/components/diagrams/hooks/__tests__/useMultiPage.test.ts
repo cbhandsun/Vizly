@@ -38,6 +38,7 @@ describe('useMultiPage', () => {
     expect(switchScope).toHaveBeenCalledWith(newPageId);
     expect(setNodes).toHaveBeenLastCalledWith([]);
     expect(result.current.activePageId).toBe(newPageId);
+    expect(result.current.getPageOperationScope()).toBe(`${newPageId}:1`);
 
     switchScope.mockClear();
     setNodes.mockClear();
@@ -46,6 +47,56 @@ describe('useMultiPage', () => {
     expect(switchScope).not.toHaveBeenCalled();
     expect(setNodes).not.toHaveBeenCalled();
     expect(result.current.activePageId).toBe(newPageId);
+    expect(result.current.getPageOperationScope()).toBe(`${newPageId}:1`);
+  });
+
+  it('updates the active page scope synchronously for pending async operations', () => {
+    const { result } = renderHook(() => useMultiPage(
+      () => [],
+      () => [],
+      vi.fn(),
+      vi.fn(),
+    ));
+
+    expect(result.current.getPageOperationScope()).toBe('page-1:0');
+
+    let secondPageId: string | null = null;
+    let pageIdDuringAdd = '';
+    act(() => {
+      secondPageId = result.current.addPage();
+      pageIdDuringAdd = result.current.getPageOperationScope();
+    });
+    if (!secondPageId) throw new Error('Expected a page to be created');
+    const createdSecondPageId = secondPageId;
+    expect(pageIdDuringAdd).toBe(`${createdSecondPageId}:1`);
+
+    let pageIdDuringSwitch = '';
+    act(() => {
+      result.current.switchPage('page-1');
+      pageIdDuringSwitch = result.current.getPageOperationScope();
+    });
+    expect(pageIdDuringSwitch).toBe('page-1:2');
+
+    let pageIdAfterRoundTrip = '';
+    act(() => {
+      result.current.switchPage(createdSecondPageId);
+      pageIdAfterRoundTrip = result.current.getPageOperationScope();
+    });
+    expect(pageIdAfterRoundTrip).toBe(`${createdSecondPageId}:3`);
+    expect(pageIdAfterRoundTrip).not.toBe(pageIdDuringAdd);
+
+    let pageIdDuringRestore = '';
+    act(() => {
+      result.current.restorePersistedMetadata({
+        multiPage: {
+          version: 1,
+          activePageId: 'restored-page',
+          pages: [{ id: 'restored-page', name: '恢复页', nodes: [], edges: [] }],
+        },
+      });
+      pageIdDuringRestore = result.current.getPageOperationScope();
+    });
+    expect(pageIdDuringRestore).toBe('restored-page:4');
   });
 
   it('removes a deleted page history scope and restores the remaining active page', () => {

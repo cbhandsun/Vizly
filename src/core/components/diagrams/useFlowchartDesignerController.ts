@@ -392,6 +392,18 @@ export const useFlowchartDesignerController = ({
     // 协作层 diagramId：优先使用 id prop，回退到导出 ID，避免多画布协作时 ID 冲突
     const diagramId = id || diagramIdForExport || 'default';
     const { updateLocalCursor } = useDiagramCollaboration(diagramId, !isReadonly);
+    const multiPage = useMultiPage(
+        () => nodesRef.current,
+        () => edgesRef.current,
+        setNodes,
+        setEdges,
+        {
+            switchScope: switchHistoryScope,
+            removeScope: removeHistoryScope,
+            clearSelection,
+        },
+    );
+    const deletePageWithComments = useCommentAwarePageDeletion(multiPage.deletePage);
     // 3. Event Handlers Domain Controller
     // commandPaletteVisible and shortcutHelpVisible already declared in Component root state section
 
@@ -421,7 +433,7 @@ export const useFlowchartDesignerController = ({
     } = useDesignerEventHandlers({
         nodes, edges, setNodes, setEdges,
         selectedNodes, selectedEdges,
-        takeSnapshot, undo, redo,
+        takeSnapshot, clipboardDiagramId: diagramId, getPageOperationScope: multiPage.getPageOperationScope, undo, redo,
         reactFlowInstance, reactFlowWrapper,
         isDragging, editingEnabled: !isReadonly && !presentationActive, pluginCtx, activePlugin,
         messageApi, notificationApi,
@@ -446,19 +458,6 @@ export const useFlowchartDesignerController = ({
     }, [isCommentMode, contextMenuPaneClick]);
 
     // Features
-    const multiPage = useMultiPage(
-        () => nodesRef.current,
-        () => edgesRef.current,
-        setNodes,
-        setEdges,
-        {
-            switchScope: switchHistoryScope,
-            removeScope: removeHistoryScope,
-            clearSelection,
-        },
-    );
-    const deletePageWithComments = useCommentAwarePageDeletion(multiPage.deletePage);
-
     const { autoRoutingEnabled, setAutoRoutingEnabled, isLayoutStable, handleStrategyLayout, lastDomainStrategy, lastDomainDirection, lastNodeLayout } = useAutoRouting({
         setNodes,
         setEdges,

@@ -5,6 +5,7 @@ import type { Node, Edge } from '@xyflow/react';
 import type { MessageInstance } from 'antd/es/message/interface';
 import type { NotificationInstance } from 'antd/es/notification/interface';
 import type { DiagramActionTarget } from './useDiagramActions';
+import type { ClipboardPasteResult } from './useClipboard';
 import { hasMutationLockedNode, resolveTargetNodes } from '../nodeLockPolicy';
 
 /**
@@ -21,7 +22,7 @@ interface UseToastActionsProps {
     handleDuplicate: (target?: DiagramActionTarget) => void;
     // Clipboard actions
     handleCopy: () => void;
-    handlePaste: () => Promise<boolean>;
+    handlePaste: () => Promise<ClipboardPasteResult>;
     handleCut: () => void;
     // Group actions
     handleGroup: () => void;
@@ -91,8 +92,15 @@ export function useToastActions({
     }, [handleCopy, selectedNodes.length]);
 
     const handlePasteWithToast = useCallback(async () => {
-        const didPaste = await handlePaste();
-        if (!didPaste) {
+        const result = await handlePaste();
+        if (result === 'scope-changed') {
+            messageApi.warning(t(
+                'designer.flowchart.toast.pasteScopeChanged',
+                '页面或图表已切换，粘贴已取消，请重试',
+            ));
+            return;
+        }
+        if (result === 'empty') {
             messageApi.info(t('designer.flowchart.toast.nothingToPaste'));
         }
     }, [handlePaste, messageApi, t]);

@@ -758,6 +758,7 @@
             "toast": {
                 "nothingToCopy": "Nothing to copy",
                 "nothingToPaste": "Nothing to paste",
+                "pasteScopeChanged": "The page or diagram changed, so paste was cancelled. Try again.",
                 "nothingToCut": "Nothing to cut",
                 "nothingToDuplicate": "No nodes to duplicate",
                 "needTwoNodesToGroup": "Select at least two nodes to group",

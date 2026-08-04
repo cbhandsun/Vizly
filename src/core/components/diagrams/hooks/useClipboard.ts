@@ -24,8 +24,11 @@ interface UseClipboardProps {
     setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
     setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
     takeSnapshot: (nodes: Node[], edges: Edge[]) => void;
+    getOperationScope: () => string;
     clipboardKey?: string;
 }
+
+export type ClipboardPasteResult = 'pasted' | 'empty' | 'scope-changed';
 
 const PASTE_OFFSET = 20;
 
@@ -43,6 +46,7 @@ export const useClipboard = ({
     setNodes,
     setEdges,
     takeSnapshot,
+    getOperationScope,
     clipboardKey = 'flowchart-clipboard',
 }: UseClipboardProps) => {
 
@@ -99,6 +103,8 @@ export const useClipboard = ({
     }, []);
 
     const handlePaste = useCallback(async () => {
+        const operationScope = getOperationScope();
+
         // 1. 首先尝试系统剪贴板（跨应用粘贴）
         let clipboardData: ClipboardData | null = null;
 
@@ -121,7 +127,10 @@ export const useClipboard = ({
             }
         }
 
-        if (!clipboardData || clipboardData.nodes.length === 0) return false;
+        // 系统剪贴板读取可能等待权限或跨进程响应。期间页面或图表若已切换，
+        // 旧请求不得把结果提交到新的操作上下文。
+        if (operationScope !== getOperationScope()) return 'scope-changed';
+        if (!clipboardData || clipboardData.nodes.length === 0) return 'empty';
 
         takeSnapshot(nodesRef.current, edgesRef.current);
 
@@ -156,8 +165,8 @@ export const useClipboard = ({
             ...eds.map(e => ({ ...e, selected: false })),
             ...newEdges,
         ]);
-        return true;
-    }, [clipboardKey, edgesRef, nodesRef, parseClipboardText, setEdges, setNodes, takeSnapshot]);
+        return 'pasted';
+    }, [clipboardKey, edgesRef, getOperationScope, nodesRef, parseClipboardText, setEdges, setNodes, takeSnapshot]);
 
     const handleCut = useCallback(() => {
         // 连线没有可独立粘贴的载荷；与右键菜单一致，禁止仅剪切连线后不可恢复地删除。

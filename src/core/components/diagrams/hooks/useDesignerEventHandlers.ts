@@ -10,6 +10,7 @@ import { useKeyboardShortcuts } from '../useKeyboardShortcuts';
 import { useContainerAutoLayout } from './useContainerAutoLayout';
 import { useDiagramActions } from './useDiagramActions';
 import { useSpacePan } from './useSpacePan';
+import { useClipboardOperationScope } from './useClipboardOperationScope';
 import type { DiagramTypePlugin, PluginContext } from '../../../types/plugin';
 import type { LayerConfig } from './useLayerManagement';
 import {
@@ -25,6 +26,8 @@ export interface UseDesignerEventHandlersProps {
     selectedNodes: Node[];
     selectedEdges: Edge[];
     takeSnapshot: (nodes: Node[], edges: Edge[]) => void;
+    clipboardDiagramId: string;
+    getPageOperationScope: () => string;
     undo: () => void;
     redo: () => void;
     reactFlowInstance: ReactFlowInstance | null;
@@ -64,7 +67,7 @@ export interface UseDesignerEventHandlersProps {
 export function useDesignerEventHandlers({
     nodes, edges, setNodes, setEdges,
     selectedNodes, selectedEdges,
-    takeSnapshot, undo, redo,
+    takeSnapshot, clipboardDiagramId, getPageOperationScope, undo, redo,
     reactFlowInstance, reactFlowWrapper,
     isDragging, editingEnabled, pluginCtx, activePlugin,
     messageApi, notificationApi,
@@ -103,8 +106,10 @@ export function useDesignerEventHandlers({
         activePlugin,
     });
 
+    const getClipboardOperationScope = useClipboardOperationScope(clipboardDiagramId, getPageOperationScope);
     const { handleCopy, handlePaste, handleCut } = useClipboard({
         nodesRef, edgesRef, selectedNodes, selectedEdges, setNodes, setEdges, takeSnapshot,
+        getOperationScope: getClipboardOperationScope,
         clipboardKey: FLOWCHART_CLIPBOARD_KEY,
     });
 

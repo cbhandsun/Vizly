@@ -680,6 +680,7 @@
             "toast": {
                 "nothingToCopy": "没有可复制的内容",
                 "nothingToPaste": "没有可粘贴的内容",
+                "pasteScopeChanged": "页面或图表已切换，粘贴已取消，请重试",
                 "nothingToCut": "没有可剪切的内容",
                 "nothingToDuplicate": "没有可复制的节点",
                 "needTwoNodesToGroup": "至少选择两个节点才能成组",

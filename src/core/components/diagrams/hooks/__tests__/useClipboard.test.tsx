@@ -24,6 +24,7 @@ const selectedNodes: Node[] = [
 ];
 
 const selectedEdges: Edge[] = [];
+const getOperationScope = () => 'diagram-1:page-1';
 
 describe('useClipboard', () => {
   beforeEach(() => {
@@ -59,6 +60,7 @@ describe('useClipboard', () => {
         setNodes,
         setEdges,
         takeSnapshot,
+        getOperationScope,
       })
     );
 
@@ -93,15 +95,16 @@ describe('useClipboard', () => {
         setNodes,
         setEdges,
         takeSnapshot,
+        getOperationScope,
       })
     );
 
-    let didPaste = false;
+    let pasteResult = 'empty';
     await act(async () => {
-      didPaste = await result.current.handlePaste();
+      pasteResult = await result.current.handlePaste();
     });
 
-    expect(didPaste).toBe(true);
+    expect(pasteResult).toBe('pasted');
     expect(loggingState.logClipboardReadFailure).toHaveBeenCalled();
     expect(takeSnapshot).toHaveBeenCalledWith([], []);
     expect(setNodes).toHaveBeenCalledTimes(1);
@@ -130,6 +133,7 @@ describe('useClipboard', () => {
         setNodes,
         setEdges,
         takeSnapshot,
+        getOperationScope,
       })
     );
 
@@ -163,6 +167,7 @@ describe('useClipboard', () => {
         setNodes,
         setEdges,
         takeSnapshot,
+        getOperationScope,
       })
     );
 
@@ -173,5 +178,44 @@ describe('useClipboard', () => {
     expect(setEdges).not.toHaveBeenCalled();
     expect(writeText).not.toHaveBeenCalled();
     expect(localStorage.getItem('flowchart-clipboard')).toBeNull();
+  });
+
+  it('cancels a pending paste when the active page or diagram scope changes', async () => {
+    let currentScope = 'diagram-1:page-1';
+    let resolveClipboard: ((text: string) => void) | undefined;
+    const readText = vi.fn(() => new Promise<string>((resolve) => {
+      resolveClipboard = resolve;
+    }));
+    Object.assign(navigator, { clipboard: { writeText: vi.fn(), readText } });
+
+    const setNodes = vi.fn();
+    const setEdges = vi.fn();
+    const takeSnapshot = vi.fn();
+    const { result } = renderHook(() => useClipboard({
+      nodesRef: { current: [] },
+      edgesRef: { current: [] },
+      selectedNodes: [],
+      selectedEdges: [],
+      setNodes,
+      setEdges,
+      takeSnapshot,
+      getOperationScope: () => currentScope,
+    }));
+
+    let pastePromise: Promise<'pasted' | 'empty' | 'scope-changed'> | undefined;
+    act(() => {
+      pastePromise = result.current.handlePaste();
+    });
+    expect(readText).toHaveBeenCalledTimes(1);
+
+    currentScope = 'diagram-1:page-2';
+    await act(async () => {
+      resolveClipboard?.(JSON.stringify({ nodes: selectedNodes, edges: [] }));
+      expect(await pastePromise).toBe('scope-changed');
+    });
+
+    expect(takeSnapshot).not.toHaveBeenCalled();
+    expect(setNodes).not.toHaveBeenCalled();
+    expect(setEdges).not.toHaveBeenCalled();
   });
 });

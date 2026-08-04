@@ -59,6 +59,7 @@ export const useMultiPage = (
     const [activePageId, setActivePageId] = useState(DEFAULT_PAGE_ID);
     const pagesRef = useRef(pages);
     const activePageIdRef = useRef(activePageId);
+    const pageOperationVersionRef = useRef(0);
     const switchHistoryScope = historyScopes?.switchScope;
     const removeHistoryScope = historyScopes?.removeScope;
     const clearSelection = historyScopes?.clearSelection;
@@ -82,6 +83,7 @@ export const useMultiPage = (
         const targetPage = pagesRef.current.find(p => p.id === targetPageId);
         if (!targetPage) return;
 
+        pageOperationVersionRef.current += 1;
         clearSelection?.();
 
         // 保存当前页面状态
@@ -119,6 +121,7 @@ export const useMultiPage = (
         const newName = createNextPageName(pagesRef.current);
         const newPage = createPage(newId, newName);
 
+        pageOperationVersionRef.current += 1;
         clearSelection?.();
 
         setPages(prev => {
@@ -160,6 +163,7 @@ export const useMultiPage = (
             remainingPages = remainingPages.map(page =>
                 page.id === clearedAdjacentPage.id ? clearedAdjacentPage : page
             );
+            pageOperationVersionRef.current += 1;
             clearSelection?.();
             setNodes(clearedAdjacentPage.nodes);
             setEdges(clearedAdjacentPage.edges);
@@ -198,6 +202,7 @@ export const useMultiPage = (
         if (!restored) return null;
         const clearedPages = restored.pages.map(clearPageSelection);
         clearSelection?.();
+        pageOperationVersionRef.current += 1;
         pagesRef.current = clearedPages;
         activePageIdRef.current = restored.activePageId;
         setPages(clearedPages);
@@ -205,9 +210,15 @@ export const useMultiPage = (
         return clearedPages.find(page => page.id === restored.activePageId) ?? null;
     }, [clearSelection]);
 
+    const getPageOperationScope = useCallback(
+        () => `${activePageIdRef.current}:${pageOperationVersionRef.current}`,
+        [],
+    );
+
     return {
         pages,
         activePageId,
+        getPageOperationScope,
         switchPage,
         addPage,
         deletePage,
