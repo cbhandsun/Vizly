@@ -23,7 +23,7 @@ describe('other-function commercial interaction safeguards', () => {
         const source = readSource('../ui/AdvancedExportModal.tsx');
         const css = readSource('../ui/AdvancedExportModal.css');
 
-        expect(source).toContain('rootClassName="advanced-export-modal"');
+        expect(source).toContain('rootClassName={`${COMMERCIAL_VIEWPORT_MODAL_CLASS} advanced-export-modal`}');
         expect(source).toContain("'aria-label': t('common.close')");
         expect(source).toContain('aria-label={t(\'advancedExport.formatLabel\')}');
         expect(source).toContain('aria-label={t(\'advancedExport.dpiLabel\')}');
@@ -47,6 +47,10 @@ describe('other-function commercial interaction safeguards', () => {
         expect(source).toContain('className="plugin-card-switch-target"');
         expect(source).toContain("isActive ? 'pluginMarketplace.disablePlugin' : 'pluginMarketplace.enablePlugin'");
         expect(source).toContain("appMessage.error(t('pluginMarketplace.statusChangeFailed'))");
+        expect(source).toContain('pendingDisableId');
+        expect(source).toContain('pluginMarketplace.confirmDisableDescription');
+        expect(source).toContain('pluginMarketplace.clearSearch');
+        expect(source).toContain('role="status" aria-live="polite"');
         expect(source).toContain('alt=""');
         expect(source).toContain('aria-hidden="true"');
         expect(css).toMatch(/\.plugin-manager-modal \.ant-modal[\s\S]*?width: calc\(100vw - 16px\) !important/);

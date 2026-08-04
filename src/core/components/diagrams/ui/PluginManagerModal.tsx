@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal, Input, Tabs, Switch, Tag, Button, Typography, Space, Empty, Badge, Skeleton } from 'antd';
+import { Alert, Modal, Input, Tabs, Switch, Tag, Button, Typography, Space, Empty, Badge, Skeleton } from 'antd';
 import { 
   SearchOutlined, 
   UserOutlined,
@@ -9,6 +9,7 @@ import {
   CloudDownloadOutlined,
   CheckCircleFilled,
   StarFilled,
+  CloseCircleFilled,
   CloseOutlined
 } from '@ant-design/icons';
 import { PluginRegistry } from '../../../services/PluginRegistry';
@@ -39,6 +40,7 @@ export const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ visible,
   const [activeMap, setActiveMap] = useState<Record<string, boolean>>({});
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('all');
+  const [pendingDisableId, setPendingDisableId] = useState<string | null>(null);
 
   const registry = useMemo(() => PluginRegistry.getInstance(), []);
 
@@ -65,12 +67,32 @@ export const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ visible,
     }
   }, [visible, registry]);
 
-  const togglePlugin = (id: string, active: boolean) => {
+  const commitPluginStatus = (id: string, active: boolean): boolean => {
     if (!registry.setPluginActive(id, active)) {
       appMessage.error(t('pluginMarketplace.statusChangeFailed'));
-      return;
+      return false;
     }
     setActiveMap(prev => ({ ...prev, [id]: active }));
+    return true;
+  };
+
+  const requestPluginToggle = (id: string, active: boolean) => {
+    if (active) {
+      commitPluginStatus(id, true);
+      return;
+    }
+    setPendingDisableId(id);
+  };
+
+  const pendingDisablePlugin = pendingDisableId
+    ? plugins.find(plugin => plugin.id === pendingDisableId)
+    : undefined;
+
+  const confirmDisablePlugin = () => {
+    if (!pendingDisablePlugin) return;
+    if (!commitPluginStatus(pendingDisablePlugin.id, false)) return;
+    setPendingDisableId(null);
+    if (activeTab === 'installed') setActiveTab('all');
   };
 
   const filteredPlugins = useMemo(() => {
@@ -148,11 +170,12 @@ export const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ visible,
               isActive ? 'pluginMarketplace.disablePlugin' : 'pluginMarketplace.enablePlugin',
               { name: plugin.name },
             )}
-            onClick={() => togglePlugin(plugin.id, !isActive)}
+            aria-describedby={pendingDisableId === plugin.id ? 'plugin-disable-warning' : undefined}
+            onClick={() => requestPluginToggle(plugin.id, !isActive)}
             onKeyDown={(event) => {
               if (event.key !== 'Enter' && event.key !== ' ') return;
               event.preventDefault();
-              togglePlugin(plugin.id, !isActive);
+              requestPluginToggle(plugin.id, !isActive);
             }}
           >
             <Switch size="small" checked={isActive} tabIndex={-1} aria-hidden="true" />
@@ -252,10 +275,52 @@ export const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ visible,
                         style={{ width: 240, borderRadius: 20 }}
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
-                        allowClear
+                        suffix={searchQuery ? (
+                          <Button
+                            type="text"
+                            className="plugin-search-clear"
+                            aria-label={t('pluginMarketplace.clearSearch')}
+                            icon={<CloseCircleFilled aria-hidden="true" />}
+                            onClick={() => setSearchQuery('')}
+                          />
+                        ) : null}
                     />
                 </Space>
             </div>
+
+            <div className="plugin-results-status" role="status" aria-live="polite" aria-atomic="true">
+              {loading
+                ? t('pluginMarketplace.loading')
+                : t('pluginMarketplace.resultsCount', { count: filteredPlugins.length })}
+            </div>
+
+            {pendingDisablePlugin && (
+              <Alert
+                id="plugin-disable-warning"
+                className="plugin-disable-warning"
+                type="warning"
+                showIcon
+                title={t('pluginMarketplace.confirmDisableTitle', { name: pendingDisablePlugin.name })}
+                description={(
+                  <div>
+                    <div>{t('pluginMarketplace.confirmDisableDescription')}</div>
+                    <Space className="plugin-disable-warning-actions" wrap>
+                      <Button aria-label={t('common.cancel')} onClick={() => setPendingDisableId(null)}>
+                        {t('common.cancel')}
+                      </Button>
+                      <Button
+                        aria-label={t('pluginMarketplace.confirmDisableAction')}
+                        danger
+                        type="primary"
+                        onClick={confirmDisablePlugin}
+                      >
+                        {t('pluginMarketplace.confirmDisableAction')}
+                      </Button>
+                    </Space>
+                  </div>
+                )}
+              />
+            )}
 
             {/* Plugin Grid */}
             {loading ? (

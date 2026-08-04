@@ -2105,8 +2105,13 @@
         "tabAll": "All",
         "tabCore": "Core",
         "tabProductivity": "Productivity",
-        "tabInstalled": "Installed",
-        "searchPlaceholder": "Search plugins..."
+        "tabInstalled": "Enabled",
+        "searchPlaceholder": "Search plugins...",
+        "clearSearch": "Clear plugin search",
+        "resultsCount": "Showing {{count}} plugins",
+        "confirmDisableTitle": "Disable plugin: {{name}}?",
+        "confirmDisableDescription": "Diagrams that use this plugin will no longer be available to view or edit. The plugin card will remain visible so you can restore it immediately.",
+        "confirmDisableAction": "Disable plugin"
     },
     "comment": {
         "pageScope": "Current page: {{name}}",
