@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { act, renderHook } from '@testing-library/react';
-import type { Node } from '@xyflow/react';
+import type { Edge, Node } from '@xyflow/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { useMultiPage } from '../useMultiPage';
@@ -249,5 +249,84 @@ describe('useMultiPage', () => {
     expect(createdPageId).toBeNull();
     expect(result.current.pages).toHaveLength(50);
     expect(getCurrentNodes).not.toHaveBeenCalled();
+  });
+
+  it('clears stale node and edge selections only when the active page content changes', () => {
+    let currentNodes: Node[] = [{ ...node('selected-node'), selected: true }];
+    let currentEdges: Edge[] = [{
+      id: 'selected-edge',
+      source: 'selected-node',
+      target: 'peer-node',
+      selected: true,
+    }];
+    const setNodes = vi.fn((nodes: Node[]) => {
+      currentNodes = nodes;
+    });
+    const setEdges = vi.fn((edges: Edge[]) => {
+      currentEdges = edges;
+    });
+    const clearSelection = vi.fn();
+    const { result } = renderHook(() => useMultiPage(
+      () => currentNodes,
+      () => currentEdges,
+      setNodes,
+      setEdges,
+      {
+        switchScope: vi.fn(),
+        removeScope: vi.fn(),
+        clearSelection,
+      },
+    ));
+
+    let secondPageId: string | null = null;
+    act(() => {
+      secondPageId = result.current.addPage();
+    });
+    if (!secondPageId) throw new Error('Expected a page to be created');
+    const createdPageId = secondPageId;
+
+    expect(clearSelection).toHaveBeenCalledTimes(1);
+
+    act(() => result.current.switchPage('page-1'));
+    expect(clearSelection).toHaveBeenCalledTimes(2);
+    expect(setNodes).toHaveBeenLastCalledWith([
+      expect.objectContaining({ id: 'selected-node', selected: false }),
+    ]);
+    expect(setEdges).toHaveBeenLastCalledWith([
+      expect.objectContaining({ id: 'selected-edge', selected: false }),
+    ]);
+
+    act(() => result.current.deletePage(createdPageId));
+    expect(clearSelection).toHaveBeenCalledTimes(2);
+
+    act(() => {
+      result.current.restorePersistedMetadata({
+        multiPage: {
+          version: 1,
+          activePageId: 'page-3',
+          pages: [{
+            id: 'page-3',
+            name: '页面 3',
+            nodes: [{ ...node('restored-node'), selected: true }],
+            edges: [{
+              id: 'restored-edge',
+              source: 'restored-node',
+              target: 'restored-peer',
+              selected: true,
+            }],
+          }],
+        },
+      });
+    });
+    expect(result.current.pages[0]?.nodes[0]?.selected).toBe(false);
+    expect(result.current.pages[0]?.edges[0]?.selected).not.toBe(true);
+    expect(clearSelection).toHaveBeenCalledTimes(3);
+
+    act(() => {
+      result.current.switchPage('page-3');
+      result.current.switchPage('missing-page');
+      result.current.deletePage('missing-page');
+    });
+    expect(clearSelection).toHaveBeenCalledTimes(3);
   });
 });

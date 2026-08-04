@@ -15,7 +15,6 @@ import { useResponsive } from '../../../hooks/useResponsive';
 import { useDiagramCollaboration } from '../../hooks/useDiagramCollaboration';
 import { useTopologyLinter } from '../../hooks/useTopologyLinter';
 import { useDiagramStore } from '../../store/useDiagramStore';
-import { removeCommentsForPage } from './commentPageScope';
 
 import { useMobileInteractions } from '../../hooks/useMobileInteractions';
 import { useCollapsibleGroups } from './hooks/useCollapsibleGroups';
@@ -47,6 +46,7 @@ import { useMobileFlowchartViewportGuard, useScheduledFlowchartFit } from './hoo
 import { useFlowchartSearchReplaceActions } from './hooks/useFlowchartSearchReplaceActions';
 import { useFlowchartCreationTools } from './hooks/useFlowchartCreationTools';
 import { useFlowchartImportRequest } from './hooks/useFlowchartImportRequest';
+import { useCommentAwarePageDeletion } from './hooks/useCommentAwarePageDeletion';
 
 export const useFlowchartDesignerController = ({
     id,
@@ -151,6 +151,7 @@ export const useFlowchartDesignerController = ({
         selectedEdges,
         setSelectedNodes,
         setSelectedEdges,
+        clearSelection,
     } = useDiagramScopedSelection(id, nodes, edges);
     const [isContextToolbarHidden] = useState(false);
     const handleBeforeUpdate = useCallback(() => {
@@ -391,9 +392,6 @@ export const useFlowchartDesignerController = ({
     // 协作层 diagramId：优先使用 id prop，回退到导出 ID，避免多画布协作时 ID 冲突
     const diagramId = id || diagramIdForExport || 'default';
     const { updateLocalCursor } = useDiagramCollaboration(diagramId, !isReadonly);
-    const setComments = useDiagramStore(state => state.setComments);
-    const setActiveCommentId = useDiagramStore(state => state.setActiveCommentId);
-
     // 3. Event Handlers Domain Controller
     // commandPaletteVisible and shortcutHelpVisible already declared in Component root state section
 
@@ -456,21 +454,10 @@ export const useFlowchartDesignerController = ({
         {
             switchScope: switchHistoryScope,
             removeScope: removeHistoryScope,
+            clearSelection,
         },
     );
-    const deletePage = multiPage.deletePage;
-    const deletePageWithComments = useCallback((pageId: string) => {
-        const deleted = deletePage(pageId);
-        if (!deleted) return false;
-
-        const state = useDiagramStore.getState();
-        const nextComments = removeCommentsForPage(state.comments, pageId);
-        if (state.activeCommentId && !nextComments.some(comment => comment.id === state.activeCommentId)) {
-            setActiveCommentId(null);
-        }
-        setComments(nextComments);
-        return true;
-    }, [deletePage, setActiveCommentId, setComments]);
+    const deletePageWithComments = useCommentAwarePageDeletion(multiPage.deletePage);
 
     const { autoRoutingEnabled, setAutoRoutingEnabled, isLayoutStable, handleStrategyLayout, lastDomainStrategy, lastDomainDirection, lastNodeLayout } = useAutoRouting({
         setNodes,

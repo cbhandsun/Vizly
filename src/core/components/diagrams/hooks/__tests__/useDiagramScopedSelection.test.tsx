@@ -89,4 +89,36 @@ describe('useDiagramScopedSelection', () => {
         expect(result.current.selectedEdges[0]).toBe(restoredEdge);
         expect(result.current.selectedEdges[0].data?.label).toBe('Restored edge');
     });
+
+    it('clears node and edge ids through a stable page-lifecycle boundary', () => {
+        const selectedNode: Node = {
+            id: 'node-a',
+            position: { x: 0, y: 0 },
+            data: {},
+        };
+        const selectedEdge: Edge = {
+            id: 'edge-a',
+            source: 'node-a',
+            target: 'node-b',
+        };
+        const { result, rerender } = renderHook(
+            ({ nodes }) => useDiagramScopedSelection('diagram-a', nodes, [selectedEdge]),
+            { initialProps: { nodes: [selectedNode] } },
+        );
+        const initialClearSelection = result.current.clearSelection;
+
+        act(() => {
+            result.current.setSelectedNodes([selectedNode]);
+            result.current.setSelectedEdges([selectedEdge]);
+        });
+        expect(result.current.selectedNodes).toHaveLength(1);
+        expect(result.current.selectedEdges).toHaveLength(1);
+
+        rerender({ nodes: [{ ...selectedNode, data: { updated: true } }] });
+        expect(result.current.clearSelection).toBe(initialClearSelection);
+
+        act(() => result.current.clearSelection());
+        expect(result.current.selectedNodes).toEqual([]);
+        expect(result.current.selectedEdges).toEqual([]);
+    });
 });

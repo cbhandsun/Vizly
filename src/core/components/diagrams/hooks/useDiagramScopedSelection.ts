@@ -89,10 +89,19 @@ export const useDiagramScopedSelection = (
         });
     }, [diagramId, edgeById]);
 
+    const clearSelection = useCallback(() => {
+        setSelection({
+            diagramId,
+            nodeIds: [],
+            edgeIds: [],
+        });
+    }, [diagramId]);
+
     return {
         selectedNodes,
         selectedEdges,
         setSelectedNodes,
         setSelectedEdges,
+        clearSelection,
     };
 };
