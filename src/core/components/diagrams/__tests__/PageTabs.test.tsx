@@ -20,14 +20,16 @@ vi.mock('react-i18next', () => ({
                 'designer.pages.renameFailed': '页面重命名失败，请重试',
                 'designer.pages.delete': '删除页面 {{name}}',
                 'designer.pages.deleteConfirm': '删除「{{name}}」？',
-                'designer.pages.deleteDescription': '此页面及其全部内容将永久删除，且无法撤销。',
+                'designer.pages.deleteDescription': '将永久删除此页面中的 {{nodeCount}} 个节点和 {{edgeCount}} 条连线，且无法撤销。',
                 'designer.pages.deleteAction': '删除',
                 'common.cancel': '取消',
             };
             const template = translations[key] ?? key;
             return template
                 .replace('{{name}}', String(options?.name ?? ''))
-                .replace('{{count}}', String(options?.count ?? ''));
+                .replace('{{count}}', String(options?.count ?? ''))
+                .replace('{{nodeCount}}', String(options?.nodeCount ?? ''))
+                .replace('{{edgeCount}}', String(options?.edgeCount ?? ''));
         },
     }),
 }));
@@ -198,7 +200,12 @@ describe('PageTabs', () => {
             <PageTabs
                 pages={[
                     { id: 'page-1', name: '页面 1', nodes: [], edges: [] },
-                    { id: 'page-2', name: '页面 2', nodes: [], edges: [] },
+                    {
+                        id: 'page-2',
+                        name: '页面 2',
+                        nodes: [{ id: 'node-1', position: { x: 0, y: 0 }, data: {} }],
+                        edges: [],
+                    },
                 ]}
                 activePageId="page-1"
                 onSwitchPage={onSwitchPage}
@@ -212,7 +219,7 @@ describe('PageTabs', () => {
         expect(deleteButton.classList.contains('page-tabs__delete')).toBe(true);
         fireEvent.click(deleteButton);
         expect(await screen.findByText('删除「页面 2」？')).toBeTruthy();
-        expect(screen.getByText('此页面及其全部内容将永久删除，且无法撤销。')).toBeTruthy();
+        expect(screen.getByText('将永久删除此页面中的 1 个节点和 0 条连线，且无法撤销。')).toBeTruthy();
         fireEvent.click(screen.getByRole('button', { name: /取\s*消/ }));
 
         await waitFor(() => expect(deleteButton.getAttribute('aria-describedby')).toBeNull());

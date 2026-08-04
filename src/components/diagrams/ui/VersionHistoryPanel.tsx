@@ -98,9 +98,11 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
             size="default"
             styles={{
                 header: { padding: '16px 20px', borderBottom: '1px solid #f0f0f0' },
-                body: { padding: 0, display: 'flex', flexDirection: 'column' }
+                body: { padding: 0, display: 'flex', flexDirection: 'column' },
+                mask: { background: 'transparent', cursor: 'not-allowed' },
             }}
-            mask={false} // Don't block interactions behind it, user might want to see the preview
+            mask={Boolean(previewVersion)}
+            maskClosable={false}
         >
             {/* Create Snapshot Area */}
             <div style={{ padding: '20px', background: '#fafafa', borderBottom: '1px solid #f0f0f0' }}>
@@ -157,7 +159,9 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
                             <EyeOutlined style={{ color: '#1677ff' }} />
                             <Text strong style={{ color: '#1677ff', fontSize: 13 }}>正在预览：{previewVersion.message}</Text>
                         </Space>
-                        <Text style={{ color: '#1677ff', fontSize: 12 }}>退出预览后才能创建新快照</Text>
+                        <Text style={{ color: '#1677ff', fontSize: 12 }}>
+                            预览为只读模式；退出预览后才能继续编辑或创建新快照
+                        </Text>
                     </Space>
                     <Button
                         size="small"

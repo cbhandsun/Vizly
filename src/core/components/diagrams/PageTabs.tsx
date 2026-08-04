@@ -185,7 +185,11 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                         {pages.length > 1 && !isEditing && (
                             <Popconfirm
                                 title={t('designer.pages.deleteConfirm', { name: page.name, defaultValue: '删除「{{name}}」？' })}
-                                description={t('designer.pages.deleteDescription', { defaultValue: '此页面及其全部内容将永久删除，且无法撤销。' })}
+                                description={t('designer.pages.deleteDescription', {
+                                    nodeCount: page.nodes.length,
+                                    edgeCount: page.edges.length,
+                                    defaultValue: '将永久删除此页面中的 {{nodeCount}} 个节点和 {{edgeCount}} 条连线，且无法撤销。',
+                                })}
                                 getPopupContainer={getViewportOverlayContainer}
                                 placement="top"
                                 autoAdjustOverflow={false}

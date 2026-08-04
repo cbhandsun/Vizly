@@ -87,7 +87,7 @@ describe('VersionHistoryPanel commercial preview safeguards', () => {
         expect((screen.getByRole('button', { name: /保存/ }) as HTMLButtonElement).disabled).toBe(false);
     });
 
-    it('prevents saving a new snapshot while an older version is being previewed', () => {
+    it('makes version preview read-only and prevents saving a new snapshot', () => {
         historyMocks.previewVersion = { id: 'version-1', message: '发布候选版本' };
         render(<VersionHistoryPanel diagramId="diagram-1" isOpen onClose={vi.fn()} />);
 
@@ -96,7 +96,12 @@ describe('VersionHistoryPanel commercial preview safeguards', () => {
 
         expect(input.disabled).toBe(true);
         expect(saveButton.disabled).toBe(true);
-        expect(screen.getByRole('status').textContent).toContain('退出预览后才能创建新快照');
+        expect(screen.getByRole('status').textContent).toContain('预览为只读模式');
+
+        const interactionShield = document.querySelector('.ant-drawer-mask');
+        expect(interactionShield).toBeTruthy();
+        expect(interactionShield?.getAttribute('style')).toContain('background: transparent');
+        expect(interactionShield?.getAttribute('style')).toContain('cursor: not-allowed');
 
         fireEvent.click(saveButton);
         expect(historyMocks.saveVersion).not.toHaveBeenCalled();

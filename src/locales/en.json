@@ -603,7 +603,7 @@
             "renameFailed": "Could not rename the page. Try again.",
             "delete": "Delete page {{name}}",
             "deleteConfirm": "Delete “{{name}}”?",
-            "deleteDescription": "This page and all of its content will be permanently deleted. This cannot be undone.",
+            "deleteDescription": "This permanently deletes {{nodeCount}} node(s) and {{edgeCount}} connection(s) from this page and cannot be undone.",
             "deleteAction": "Delete"
         },
         "flowchart": {
