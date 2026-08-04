@@ -24,6 +24,11 @@ vi.mock('react-i18next', () => ({
         'advancedExport.includeBackground': '包含底色背景',
         'advancedExport.embedMetadata': '注入元数据',
         'advancedExport.copyClipboard': '复制 PNG 到剪贴板',
+        'advancedExport.clipboardRecoveryTitle': '无法写入图片剪贴板',
+        'advancedExport.clipboardRecoveryDescription': '当前浏览器可能未开放图片剪贴板权限，可改用 PNG 下载保存。',
+        'advancedExport.downloadPngFallback': '下载 PNG',
+        'advancedExport.exportRecoveryTitle': '导出未完成',
+        'advancedExport.exportRecoveryDescription': '请检查画布内容，或降低图片清晰度后重试。',
         'advancedExport.cancel': '取消',
         'advancedExport.confirm': '确认导出',
         'common.close': '关闭',
@@ -56,6 +61,7 @@ vi.mock('../advancedExportActions', () => ({
 }));
 
 import { runAdvancedExport } from '../advancedExportActions';
+import { copyImageToClipboard } from '../../../utils/imageExporter';
 
 const installReactFlowInstance = () => {
   (window as any).reactFlowInstance = {
@@ -240,5 +246,61 @@ describe('AdvancedExportModal commercial controls', () => {
     });
     expect(runAdvancedExport).not.toHaveBeenCalled();
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('prevents duplicate clipboard operations and locks competing actions while copying', async () => {
+    let resolveCopy: ((value: boolean) => void) | undefined;
+    vi.mocked(copyImageToClipboard).mockImplementation(() => new Promise<boolean>((resolve) => {
+      resolveCopy = resolve;
+    }));
+    const onClose = vi.fn();
+
+    render(<AdvancedExportModal visible onClose={onClose} diagramId="diagram-1" />);
+
+    const copyButton = screen.getByRole('button', { name: '复制 PNG 到剪贴板' });
+    fireEvent.click(copyButton);
+    fireEvent.click(copyButton);
+
+    expect(copyImageToClipboard).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'download 确认导出' }).hasAttribute('disabled')).toBe(true);
+    expect(screen.getByRole('button', { name: '取 消' }).hasAttribute('disabled')).toBe(true);
+
+    resolveCopy?.(true);
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+  });
+
+  it('offers a PNG download fallback after clipboard access fails', async () => {
+    vi.mocked(copyImageToClipboard).mockResolvedValue(false);
+    vi.mocked(runAdvancedExport).mockResolvedValue('fallback');
+    const onClose = vi.fn();
+
+    render(<AdvancedExportModal visible onClose={onClose} diagramId="diagram-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: '复制 PNG 到剪贴板' }));
+
+    const recovery = await screen.findByTestId('advanced-export-recovery');
+    expect(recovery.textContent).toContain('无法写入图片剪贴板');
+    expect(recovery.textContent).toContain('PNG 下载');
+    expect(onClose).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: '下载 PNG' }));
+    await waitFor(() => {
+      expect(runAdvancedExport).toHaveBeenCalledWith(expect.objectContaining({ format: 'png' }));
+    });
+  });
+
+  it('keeps a safe, actionable message visible when export fails', async () => {
+    vi.mocked(runAdvancedExport).mockRejectedValue(new Error('Authorization: Bearer export-secret'));
+    const onClose = vi.fn();
+
+    render(<AdvancedExportModal visible onClose={onClose} diagramId="diagram-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'download 确认导出' }));
+
+    const recovery = await screen.findByTestId('advanced-export-recovery');
+    expect(recovery.textContent).toContain('导出未完成');
+    expect(recovery.textContent).toContain('降低图片清晰度');
+    expect(document.body.textContent).not.toContain('export-secret');
+    expect(onClose).not.toHaveBeenCalled();
   });
 });

@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { Modal, Radio, Checkbox, Select, Button, Space, Divider } from 'antd';
+import React, { useMemo, useRef, useState } from 'react';
+import { Alert, Modal, Radio, Checkbox, Select, Button, Space, Divider } from 'antd';
 import { 
   DownloadOutlined, 
   CopyOutlined, 
@@ -38,6 +38,9 @@ interface AdvancedExportModalProps {
   getReactFlowSnapshot?: () => ReactFlowRenderSnapshot | null | undefined;
   onExportPermissionCheck?: (format: DiagramExportFormat) => boolean;
 }
+
+type AdvancedExportOperation = 'export' | 'clipboard';
+type AdvancedExportFailure = AdvancedExportOperation | null;
 
 export const AdvancedExportModeNotice: React.FC<{
   format: ExportOptions['format'];
@@ -190,49 +193,81 @@ export const AdvancedExportModal: React.FC<AdvancedExportModalProps> = ({
   const [pixelRatio, setPixelRatio] = useState<number>(2);
   const [includeBackground, setIncludeBackground] = useState<boolean>(true);
   const [embedMetadata, setEmbedMetadata] = useState<boolean>(true);
-  const [exporting, setExporting] = useState(false);
+  const [activeOperation, setActiveOperation] = useState<AdvancedExportOperation | null>(null);
+  const [failedOperation, setFailedOperation] = useState<AdvancedExportFailure>(null);
+  const activeOperationRef = useRef<AdvancedExportOperation | null>(null);
 
-  const handleExport = async () => {
+  const beginOperation = (operation: AdvancedExportOperation) => {
+    if (activeOperationRef.current !== null) return false;
+    activeOperationRef.current = operation;
+    setActiveOperation(operation);
+    setFailedOperation(null);
+    return true;
+  };
+
+  const finishOperation = () => {
+    activeOperationRef.current = null;
+    setActiveOperation(null);
+  };
+
+  const runExport = async (requestedFormat: ExportOptions['format']) => {
+    if (activeOperationRef.current !== null) return;
     if (
-      (format === 'pdf' || format === 'svg')
-      && onExportPermissionCheck?.(format) === false
+      (requestedFormat === 'pdf' || requestedFormat === 'svg')
+      && onExportPermissionCheck?.(requestedFormat) === false
     ) {
       onClose();
       return;
     }
+    if (!beginOperation('export')) return;
 
-    setExporting(true);
     try {
       const currentNodes = useDiagramStore.getState().nodes;
       await runAdvancedExport({
         diagramId,
         diagramTitle,
         nodes: currentNodes,
-        format,
+        format: requestedFormat,
         pixelRatio,
         includeBackground,
         embedMetadata,
         getReactFlowSnapshot,
       });
-      appMessage.success(t('advancedExport.successMsg', { format: format.toUpperCase() }));
+      appMessage.success(t('advancedExport.successMsg', { format: requestedFormat.toUpperCase() }));
       onClose();
     } catch (_e) {
+      setFailedOperation('export');
       appMessage.error(t('advancedExport.errorMsg'));
     } finally {
-      setExporting(false);
+      finishOperation();
     }
   };
 
+  const handleExport = () => runExport(format);
+
   const handleCopyClipboard = async () => {
-    const currentNodes = useDiagramStore.getState().nodes;
-    const success = await copyImageToClipboard(currentNodes);
-    if (success) {
-      appMessage.success(t('advancedExport.copySuccess'));
-      onClose();
-    } else {
+    if (!beginOperation('clipboard')) return;
+    try {
+      const currentNodes = useDiagramStore.getState().nodes;
+      const success = await copyImageToClipboard(currentNodes);
+      if (success) {
+        appMessage.success(t('advancedExport.copySuccess'));
+        onClose();
+        return;
+      }
+      setFailedOperation('clipboard');
       appMessage.error(t('advancedExport.copyFailed'));
+    } catch (_error) {
+      setFailedOperation('clipboard');
+      appMessage.error(t('advancedExport.copyFailed'));
+    } finally {
+      finishOperation();
     }
   };
+
+  const operationInProgress = activeOperation !== null;
+  const exporting = activeOperation === 'export';
+  const copying = activeOperation === 'clipboard';
 
   return (
     <Modal
@@ -244,24 +279,25 @@ export const AdvancedExportModal: React.FC<AdvancedExportModalProps> = ({
       onCancel={onClose}
       closable={{
         'aria-label': t('common.close'),
-        disabled: exporting,
+        disabled: operationInProgress,
       }}
-      keyboard={!exporting}
-      mask={{ closable: !exporting }}
+      keyboard={!operationInProgress}
+      mask={{ closable: !operationInProgress }}
       footer={[
         <Button
           key="copy"
           icon={<CopyOutlined />}
           aria-label={t('advancedExport.copyClipboard')}
           disabled={exporting}
+          loading={copying}
           onClick={handleCopyClipboard}
         >
           {t('advancedExport.copyClipboard')}
         </Button>,
-        <Button key="cancel" disabled={exporting} onClick={onClose}>
+        <Button key="cancel" disabled={operationInProgress} onClick={onClose}>
           {t('advancedExport.cancel')}
         </Button>,
-        <Button key="submit" type="primary" icon={<DownloadOutlined />} loading={exporting} onClick={handleExport}>
+        <Button key="submit" type="primary" icon={<DownloadOutlined />} disabled={copying} loading={exporting} onClick={handleExport}>
           {t('advancedExport.confirm')}
         </Button>,
       ]}
@@ -272,8 +308,12 @@ export const AdvancedExportModal: React.FC<AdvancedExportModalProps> = ({
         <Radio.Group
           className="advanced-export-format-group"
           aria-label={t('advancedExport.formatLabel')}
+          disabled={operationInProgress}
           value={format} 
-          onChange={(e) => setFormat(e.target.value)}
+          onChange={(e) => {
+            setFailedOperation(null);
+            setFormat(e.target.value);
+          }}
           buttonStyle="solid"
         >
           <Radio.Button value="png"><FileImageOutlined /> PNG</Radio.Button>
@@ -290,7 +330,7 @@ export const AdvancedExportModal: React.FC<AdvancedExportModalProps> = ({
           className="advanced-export-dpi-select"
           aria-label={t('advancedExport.dpiLabel')}
           value={pixelRatio} 
-          disabled={format === 'json' || format === 'svg'}
+          disabled={operationInProgress || format === 'json' || format === 'svg'}
           onChange={setPixelRatio}
           style={{ width: '100%' }}
           options={[
@@ -307,7 +347,7 @@ export const AdvancedExportModal: React.FC<AdvancedExportModalProps> = ({
             aria-label={t('advancedExport.includeBackground')}
             checked={includeBackground} 
             onChange={(e) => setIncludeBackground(e.target.checked)}
-            disabled={format === 'pdf' || format === 'jpg'}
+            disabled={operationInProgress || format === 'pdf' || format === 'jpg'}
           >
             {t('advancedExport.includeBackground')}
           </Checkbox>
@@ -315,12 +355,44 @@ export const AdvancedExportModal: React.FC<AdvancedExportModalProps> = ({
             aria-label={t('advancedExport.embedMetadata')}
             checked={embedMetadata} 
             onChange={(e) => setEmbedMetadata(e.target.checked)}
+            disabled={operationInProgress}
           >
             {t('advancedExport.embedMetadata')}
           </Checkbox>
         </div>
 
         <SvgExportPreview visible={visible && format === 'svg'} getReactFlowSnapshot={getReactFlowSnapshot} />
+
+        {failedOperation === 'clipboard' ? (
+          <Alert
+            data-testid="advanced-export-recovery"
+            type="warning"
+            showIcon
+            message={t('advancedExport.clipboardRecoveryTitle')}
+            description={t('advancedExport.clipboardRecoveryDescription')}
+            action={(
+              <Button
+                size="small"
+                type="primary"
+                disabled={operationInProgress}
+                loading={exporting}
+                onClick={() => runExport('png')}
+              >
+                {t('advancedExport.downloadPngFallback')}
+              </Button>
+            )}
+            style={{ marginTop: 16 }}
+          />
+        ) : failedOperation === 'export' ? (
+          <Alert
+            data-testid="advanced-export-recovery"
+            type="error"
+            showIcon
+            message={t('advancedExport.exportRecoveryTitle')}
+            description={t('advancedExport.exportRecoveryDescription')}
+            style={{ marginTop: 16 }}
+          />
+        ) : null}
 
         <AdvancedExportModeNotice
           format={format}
