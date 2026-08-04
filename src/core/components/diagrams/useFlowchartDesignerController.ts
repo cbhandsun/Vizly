@@ -46,6 +46,7 @@ import { useFlowchartHostActions } from './hooks/useFlowchartHostActions';
 import { useMobileFlowchartViewportGuard, useScheduledFlowchartFit } from './hooks/useMobileFlowchartViewportGuard';
 import { useFlowchartSearchReplaceActions } from './hooks/useFlowchartSearchReplaceActions';
 import { useFlowchartCreationTools } from './hooks/useFlowchartCreationTools';
+import { useFlowchartImportRequest } from './hooks/useFlowchartImportRequest';
 
 export const useFlowchartDesignerController = ({
     id,
@@ -228,6 +229,15 @@ export const useFlowchartDesignerController = ({
     const [notificationApi, notificationContextHolder] = notification.useNotification();
     const getCurrentNodes = useCallback(() => nodesRef.current, [nodesRef]);
     const getCurrentEdges = useCallback(() => edgesRef.current, [edgesRef]);
+    const editingEnabled = !isReadonly && !presentationActive;
+    const handleRequestImport = useFlowchartImportRequest({
+        editingEnabled,
+        nodesRef,
+        edgesRef,
+        fileInputRef,
+        messageApi,
+        t,
+    });
     useMobileFlowchartViewportGuard({
         isMobile,
         getNodes: getCurrentNodes,
@@ -512,9 +522,10 @@ export const useFlowchartDesignerController = ({
         setNodes,
         setEdges,
         onBeforeCanvasReplace: handleBeforeUpdate,
+        editingEnabled,
         fitView: handleFitView,
         registerStandardReload: registerImportedFlowchartDiagram,
-    })(event), [t, messageApi, activePlugin, businessData?.id, id, setNodes, setEdges, handleBeforeUpdate, handleFitView]);
+    })(event), [t, messageApi, activePlugin, businessData?.id, id, setNodes, setEdges, handleBeforeUpdate, editingEnabled, handleFitView]);
 
     const onSelectionChange = useCanonicalSelectionChange({
         nodesRef,
@@ -562,7 +573,8 @@ export const useFlowchartDesignerController = ({
         handleExport: handleOpenExportModal,
         handleExportMermaid, 
         handleCopyAsMermaid,
-        fileInputRef, 
+        handleImport: handleRequestImport,
+        editingEnabled,
         handleOpenJsonEditor,
         handleStrategyLayout, 
         handleSmartLayout,
@@ -645,7 +657,7 @@ export const useFlowchartDesignerController = ({
         edgesRef, enhancedOnConnect, enhancedOnConnectEnd, exportModalVisible, extraExportItems, fileInputRef,
         getPreviousState, getReactFlowSnapshot, gridColor, gridVariant, groupedTemplates, guides, handleAddFreehandStroke, handleAddMindMap, handleAddNode, handleAddStickyNote, handleAlign,
         handleBeforeUpdate, handleBringToFront, handleContextMenuAction, handleDeleteWithToast, handleDistribute, handleDuplicateWithToast,
-        handleEdgeDoubleClick, handleFitView, handleFocusNode, handleGridRotate, handleImport, handleLock, handleOpacity,
+        handleEdgeDoubleClick, handleFitView, handleFocusNode, handleGridRotate, handleImport, handleRequestImport, handleLock, handleOpacity,
         handleOpenJsonEditor, handleOpenSettings, handlePaneClick, handlePresentationFocus, handleReactFlowInit, handleReadonlyChange, handleReconnect,
         handleReconnectEnd, handleReconnectStart, handleSearchReplaceAll, handleSearchReplaceNode, handleSendToBack, handleSmartOptimize, handleStrategyLayout,
         handleToggleHighlightMainFlow, handleToggleShowOnlyMainFlow, handleTouchEnd, handleTouchStart, handleUseTemplate, handleWrappedCloudSave,

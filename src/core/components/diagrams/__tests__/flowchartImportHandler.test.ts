@@ -56,6 +56,29 @@ describe('flowchartImportHandler', () => {
         expect(importPipelineState.runFlowchartImportPipeline).not.toHaveBeenCalled();
     });
 
+    it('blocks file imports when editing is unavailable', async () => {
+        const messageApi = makeMessageApi();
+        const handler = createFlowchartImportHandler({
+            t: (key) => key,
+            messageApi,
+            editingEnabled: false,
+            setNodes: vi.fn(),
+            setEdges: vi.fn(),
+            onBeforeCanvasReplace: vi.fn(),
+            fitView: vi.fn(),
+            registerStandardReload: vi.fn(async () => undefined),
+        });
+        const event = makeEvent(new File(['{}'], 'diagram.json', { type: 'application/json' }));
+
+        await handler(event);
+
+        expect(messageApi.info).toHaveBeenCalledWith('designer.flowchart.import.editingRequired');
+        expect(importFileState.validateFlowchartImportFile).not.toHaveBeenCalled();
+        expect(importFileState.readFlowchartImportFileText).not.toHaveBeenCalled();
+        expect(importPipelineState.runFlowchartImportPipeline).not.toHaveBeenCalled();
+        expect(event.target.value).toBe('');
+    });
+
     it('routes valid imports through the import pipeline with message callbacks', async () => {
         importFileState.validateFlowchartImportFile.mockReturnValue({
             ok: true,

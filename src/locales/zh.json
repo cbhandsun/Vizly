@@ -789,7 +789,11 @@
                 "mermaidSuccess": "成功导入 Mermaid 文本",
                 "mermaidLayout": "建议点击\"智能布局\"整理节点",
                 "mermaidFailed": "Mermaid解析失败",
-                "reverseSuccess": "成功从 [{{filename}}] 恢复画布内容"
+                "reverseSuccess": "成功从 [{{filename}}] 恢复画布内容",
+                "confirmTitle": "导入将替换当前页面",
+                "confirmContent": "当前页面的 {{nodes}} 个节点和 {{edges}} 条连线将被导入文件替换。其他页面与评论不会受影响，可在导入后使用撤销恢复。",
+                "confirmOk": "继续选择文件",
+                "editingRequired": "只读或演示模式下不能导入文件"
             },
             "mermaidCopied": "已复制 Mermaid 代码到剪贴板",
             "templateApplied": "已应用模板",

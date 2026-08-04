@@ -675,7 +675,11 @@
                 "mermaidSuccess": "Mermaid text imported successfully",
                 "mermaidLayout": "Tip: click \"Smart Layout\" to organize nodes",
                 "mermaidFailed": "Mermaid parse failed",
-                "reverseSuccess": "Canvas restored from [{{filename}}]"
+                "reverseSuccess": "Canvas restored from [{{filename}}]",
+                "confirmTitle": "Import will replace this page",
+                "confirmContent": "The current page's {{nodes}} nodes and {{edges}} edges will be replaced by the imported file. Other pages and comments are unaffected, and Undo can restore this page after import.",
+                "confirmOk": "Continue to file picker",
+                "editingRequired": "Files cannot be imported in read-only or presentation mode"
             },
             "mermaidCopied": "Mermaid code copied to clipboard",
             "templateApplied": "Template applied",

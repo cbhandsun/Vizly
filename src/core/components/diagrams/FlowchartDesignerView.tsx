@@ -102,6 +102,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
         handleFitView,
         handleGridRotate,
         handleImport,
+        handleRequestImport,
         handleLock,
         handleOpacity,
         handleOpenJsonEditor,
@@ -278,6 +279,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                     style={{ display: 'none' }}
                     accept=".json,.mmd,.mermaid,.txt"
                     onChange={handleImport}
+                    disabled={!editingEnabled}
                     aria-label={t('designer.toolbar.import')}
                     title={t('designer.toolbar.import')}
                 />
@@ -470,7 +472,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                 onAddStickyNote: handleAddStickyNote,
                                 onAddMindMap: handleAddMindMap,
                                 onExport: () => setExportModalVisible(true),
-                                onImportClick: () => fileInputRef.current?.click(),
+                                onImportClick: editingEnabled ? handleRequestImport : undefined,
                                 renderThemeSelector,
                                 historyCount: pastEntries?.length ?? 0,
                                 onAlign: handleAlign,

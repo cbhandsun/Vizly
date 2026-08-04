@@ -31,6 +31,7 @@ export interface CreateFlowchartImportHandlerOptions {
     setNodes: (nodes: Node[]) => void;
     setEdges: (edges: Edge[]) => void;
     onBeforeCanvasReplace: () => void;
+    editingEnabled?: boolean;
     fitView: () => void;
     scheduleDelay?: (callback: () => void, delayMs: number) => void;
     registerStandardReload: (payload: {
@@ -53,12 +54,19 @@ export const createFlowchartImportHandler = ({
     setNodes,
     setEdges,
     onBeforeCanvasReplace,
+    editingEnabled = true,
     fitView,
     scheduleDelay = DEFAULT_DELAY_SCHEDULER,
     registerStandardReload,
 }: CreateFlowchartImportHandlerOptions) => async (event: FlowchartImportEvent): Promise<void> => {
     const file = event.target.files?.[0];
     if (!file) return;
+
+    if (!editingEnabled) {
+        messageApi.info(t('designer.flowchart.import.editingRequired'));
+        event.target.value = '';
+        return;
+    }
 
     const invalidFormatMessage = t('designer.flowchart.import.invalidFormat');
     const validation = validateFlowchartImportFile(file, invalidFormatMessage);

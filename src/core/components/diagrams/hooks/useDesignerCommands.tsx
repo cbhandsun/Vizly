@@ -41,7 +41,8 @@ interface UseDesignerCommandsProps {
     handleExport: () => void;
     handleExportMermaid: () => void;
     handleCopyAsMermaid: () => void;
-    fileInputRef: React.RefObject<HTMLInputElement | null>;
+    handleImport: () => void;
+    editingEnabled: boolean;
     handleOpenJsonEditor: () => void;
     // Layout
     handleStrategyLayout: (strategyName: string, nodeLayout?: string, direction?: 'TB' | 'LR') => void;
@@ -96,7 +97,8 @@ export function useDesignerCommands(props: UseDesignerCommandsProps) {
         handleExport,
         handleExportMermaid,
         handleCopyAsMermaid,
-        fileInputRef,
+        handleImport,
+        editingEnabled,
         handleOpenJsonEditor,
         handleStrategyLayout,
         handleSmartLayout,
@@ -152,7 +154,7 @@ export function useDesignerCommands(props: UseDesignerCommandsProps) {
             { id: 'file.export', label: '高级导出 (High-DPI Export)...', category: 'File', keywords: ['export', 'png', 'svg', 'pdf', 'high-dpi', '导出', '打印'], icon: <FaSave />, action: handleExport },
             { id: 'file.exportMermaid', label: '导出为 Mermaid 文件', category: 'File', icon: <FaProjectDiagram />, action: handleExportMermaid },
             { id: 'file.copyMermaid', label: '复制为 Mermaid (剪贴板)', category: 'File', icon: <FaCopy />, action: handleCopyAsMermaid },
-            { id: 'file.import', label: t('designer.toolbar.import'), category: 'File', icon: <FaFolderOpen />, action: () => fileInputRef.current?.click() },
+            { id: 'file.import', label: t('designer.toolbar.import'), category: 'File', icon: <FaFolderOpen />, enabled: editingEnabled, action: handleImport },
             { id: 'file.editJson', label: t('designer.toolbar.edit'), category: 'File', icon: <FaEdit />, action: handleOpenJsonEditor },
             { id: 'file.plugins', label: '插件管理 (Plugin Manager)...', category: 'General', keywords: ['plugins', 'management', 'extensions', '插件', '管理'], icon: <FaProjectDiagram />, action: () => onOpenPlugins?.() },
 
@@ -201,7 +203,7 @@ export function useDesignerCommands(props: UseDesignerCommandsProps) {
         canRedo,
         canUndo,
         copyStyle,
-        fileInputRef,
+        editingEnabled,
         handleCopyAsMermaid,
         handleCopyWithToast,
         handleCutWithToast,
@@ -212,6 +214,7 @@ export function useDesignerCommands(props: UseDesignerCommandsProps) {
         handleFitView,
         handleGridRotate,
         handleGroupWithToast,
+        handleImport,
         handleMatchSize,
         handleOpenJsonEditor,
         handlePasteWithToast,
