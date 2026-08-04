@@ -7,6 +7,7 @@ import {
     normalizeHistoryLabel,
     resolveHistoryTime,
 } from '../historyPanelPresentation';
+import { runHistoryActionWithFeedback } from '../historyActionFeedback';
 
 describe('historyPanelPresentation', () => {
     it('normalizes labels without letting control characters or unbounded text reach the panel', () => {
@@ -32,5 +33,36 @@ describe('historyPanelPresentation', () => {
         expect(resolveHistoryTime(now - 7_200_000, now)).toEqual({ kind: 'clock', timestamp: now - 7_200_000 });
         expect(resolveHistoryTime(Number.NaN, now)).toEqual({ kind: 'unknown' });
         expect(resolveHistoryTime(now + 120_000, now)).toEqual({ kind: 'unknown' });
+    });
+});
+
+describe('history action feedback', () => {
+    it('announces a successful undo or redo through a stable live-message key', () => {
+        const calls: unknown[] = [];
+        const changed = runHistoryActionWithFeedback(
+            () => true,
+            { open: config => calls.push(config) },
+            '已撤销上一步，可使用重做恢复',
+        );
+
+        expect(changed).toBe(true);
+        expect(calls).toEqual([{
+            key: 'flowchart-history-feedback',
+            type: 'success',
+            content: '已撤销上一步，可使用重做恢复',
+            duration: 2,
+        }]);
+    });
+
+    it('stays silent when no history state can change', () => {
+        const calls: unknown[] = [];
+        const changed = runHistoryActionWithFeedback(
+            () => false,
+            { open: config => calls.push(config) },
+            '不应显示',
+        );
+
+        expect(changed).toBe(false);
+        expect(calls).toEqual([]);
     });
 });

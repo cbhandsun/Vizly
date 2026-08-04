@@ -195,7 +195,7 @@ const createOverlaysModel = (
     presentationActive: false,
     presentationSlides: [],
     reactFlowInstance: null,
-    redo: () => undefined,
+    redo: () => false,
     renderAIConfigModal: undefined,
     renderShareDialog: undefined,
     renderVersionHistoryPanel: undefined,
@@ -218,7 +218,7 @@ const createOverlaysModel = (
     shortcutHelpVisible: false,
     showPerformanceDashboard: false,
     showShortcuts: false,
-    undo: () => undefined,
+    undo: () => false,
     ...overrides,
 });
 

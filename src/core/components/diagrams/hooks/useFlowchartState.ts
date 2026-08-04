@@ -178,12 +178,18 @@ export const useFlowchartState = (edgeMode: 'advanced-smart' | 'native' = 'advan
 
     const handleUndo = useCallback(() => {
         const prevState = undo(nodesRef.current, edgesRef.current); // 🚀 ref
-        if (prevState) { setNodes(prevState.nodes); setEdges(prevState.edges); }
+        if (!prevState) return false;
+        setNodes(prevState.nodes);
+        setEdges(prevState.edges);
+        return true;
     }, [setEdges, setNodes, undo]);
 
     const handleRedo = useCallback(() => {
         const nextState = redo(nodesRef.current, edgesRef.current); // 🚀 ref
-        if (nextState) { setNodes(nextState.nodes); setEdges(nextState.edges); }
+        if (!nextState) return false;
+        setNodes(nextState.nodes);
+        setEdges(nextState.edges);
+        return true;
     }, [redo, setEdges, setNodes]);
 
     return {

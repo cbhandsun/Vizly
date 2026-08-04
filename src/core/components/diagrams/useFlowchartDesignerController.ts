@@ -49,6 +49,7 @@ import { useFlowchartImportRequest } from './hooks/useFlowchartImportRequest';
 import { useCommentAwarePageDeletion } from './hooks/useCommentAwarePageDeletion';
 import { useDiagramOperationScope } from './hooks/useDiagramOperationScope';
 import { useFlowchartImportNotifications } from './hooks/useFlowchartImportNotifications';
+import { useHistoryFeedbackActions } from './historyActionFeedback';
 
 export const useFlowchartDesignerController = ({
     id,
@@ -146,7 +147,7 @@ export const useFlowchartDesignerController = ({
     useInteractionPerformance();
 
     const {
-        takeSnapshot, notifyHistoryChanged, undo, redo, canUndo, canRedo,
+        takeSnapshot, notifyHistoryChanged, undo: performUndo, redo: performRedo, canUndo, canRedo,
         pastEntries, getPreviousState, jumpTo, switchScope: switchHistoryScope,
         removeScope: removeHistoryScope,
     } = diagramHistory;
@@ -233,6 +234,10 @@ export const useFlowchartDesignerController = ({
 
     const [messageApi, messageContextHolder] = message.useMessage();
     const [notificationApi, notificationContextHolder] = notification.useNotification();
+    const { undo, redo } = useHistoryFeedbackActions(
+        performUndo, performRedo, messageApi,
+        t('designer.historyPanel.undoStatus'), t('designer.historyPanel.redoStatus'),
+    );
     const { handleImportStarted, handleImportFinished } = useFlowchartImportNotifications({
         notificationApi,
         fileInputRef,

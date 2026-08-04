@@ -1162,7 +1162,7 @@
         "roleEditor": "Editor",
         "roleEditorComingSoon": "Editor (coming soon)",
         "roleLabel": "Collaborator permission",
-        "inviteHint": "Registered users can currently be invited with view-only access.",
+        "inviteHint": "Invite a registered user and choose view-only or edit access.",
         "emailRequired": "Enter a collaborator email.",
         "emailInvalid": "Enter a valid email address.",
         "emailTooLong": "This email address is too long. Check it and try again.",

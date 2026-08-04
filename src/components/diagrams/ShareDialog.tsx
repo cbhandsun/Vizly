@@ -305,7 +305,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
                         />
                         <Select<InviteRole> value={inviteRole} onChange={setInviteRole} aria-label={t('share.roleLabel')}>
                             <Select.Option value="viewer">{t('share.roleViewer')}</Select.Option>
-                            <Select.Option value="editor" disabled>{t('share.roleEditorComingSoon')}</Select.Option>
+                            <Select.Option value="editor">{t('share.roleEditor')}</Select.Option>
                         </Select>
                         <Button type="primary" icon={<FaUserPlus />} loading={inviting} onClick={handleInvite} disabled={!user || !parsedInviteEmail.ok}>
                             {t('share.inviteBtn')}

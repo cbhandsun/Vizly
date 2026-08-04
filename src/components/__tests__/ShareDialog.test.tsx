@@ -78,7 +78,7 @@ const translations: Record<string, string> = {
   'share.roleViewer': '只读 (Viewer)',
   'share.roleEditor': '编辑 (Editor)',
   'share.inviteBtn': '邀请',
-  'share.inviteHint': '目前支持邀请已注册用户以只读方式查看。',
+  'share.inviteHint': '邀请已注册用户，并选择只读或编辑权限。',
   'share.emailRequired': '请输入协作者邮箱。',
   'share.emailInvalid': '请输入有效的邮箱地址。',
   'share.emailTooLong': '邮箱地址过长，请检查后重试。',
@@ -162,6 +162,29 @@ describe('ShareDialog commercial failure handling', () => {
     expect(await screen.findByText('请输入有效的邮箱地址。')).toBeTruthy();
     expect((screen.getByRole('button', { name: '邀请' }) as HTMLButtonElement).disabled).toBe(true);
     expect(serviceMocks.addCollaborator).not.toHaveBeenCalled();
+  });
+
+  it('allows an owner to invite a collaborator with editor permission', async () => {
+    authMocks.user = { id: USER_ID };
+    serviceMocks.addCollaborator.mockResolvedValue({ success: true, user_id: USER_ID });
+    const ensureSaved = vi.fn(async () => DIAGRAM_ID);
+    render(
+      <ShareDialog open onClose={vi.fn()} diagramId={DIAGRAM_ID} onEnsureSaved={ensureSaved} />,
+    );
+
+    const email = await screen.findByPlaceholderText('输入用户的注册邮箱...');
+    fireEvent.change(email, { target: { value: 'editor@example.com' } });
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: '协作者权限' }));
+    fireEvent.click(await screen.findByText('编辑 (Editor)'));
+    fireEvent.click(screen.getByRole('button', { name: '邀请' }));
+
+    await waitFor(() => {
+      expect(serviceMocks.addCollaborator).toHaveBeenCalledWith(
+        DIAGRAM_ID,
+        'editor@example.com',
+        'editor',
+      );
+    });
   });
 
   it('shows a retry action instead of treating collaborator load failure as an empty list', async () => {
