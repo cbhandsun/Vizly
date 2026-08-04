@@ -35,6 +35,7 @@ import {
     FlowchartDesignerOverlaysRegion,
     FlowchartDesignerRightSidebarRegion,
 } from './FlowchartDesignerShellRegions';
+import { filterCommentsForPage } from './commentPageScope';
 
 export type { FlowchartDesignerViewModel } from './flowchartDesignerViewModel';
 
@@ -607,9 +608,9 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                         }}
                                         smartGuides={{ guides }}
                                         annotations={{
-                                            items: annotations,
+                                            items: filterCommentsForPage(annotations, multiPage.activePageId),
                                             mode: annotationMode,
-                                            onAdd: addAnnotation,
+                                            onAdd: (x, y, text) => addAnnotation(x, y, text, multiPage.activePageId),
                                             onUpdate: updateAnnotation,
                                             onDelete: deleteAnnotation,
                                             onToggleResolved: toggleResolved,

@@ -14,6 +14,7 @@ const storeState = vi.hoisted(() => ({
         replies: unknown[];
         x: number;
         y: number;
+        pageId?: string;
     }>,
     removeComment: vi.fn(),
     updateComment: vi.fn(),
@@ -29,7 +30,14 @@ vi.mock('@xyflow/react', () => ({
     useReactFlow: () => ({ setCenter: vi.fn() }),
 }));
 vi.mock('react-i18next', () => ({
-    useTranslation: () => ({ t: (key: string, fallback?: string) => fallback ?? key }),
+    useTranslation: () => ({
+        t: (key: string, options?: string | { name?: string }) => {
+            if (key === 'comment.pageScope' && typeof options === 'object') {
+                return `当前页面：${options.name ?? ''}`;
+            }
+            return typeof options === 'string' ? options : key;
+        },
+    }),
 }));
 
 import { CommentPanel } from '../CommentPanel';
@@ -123,5 +131,36 @@ describe('CommentPanel', () => {
         expect(storeState.removeComment).not.toHaveBeenCalled();
         fireEvent.click(await screen.findByRole('button', { name: /删\s*除/ }));
         expect(storeState.removeComment).toHaveBeenCalledWith('comment-1');
+    });
+
+    it('shows only comments that belong to the active page and names the scope', () => {
+        storeState.comments = [{
+            id: 'legacy-page-1',
+            content: '页面 1 历史评论',
+            authorName: '测试用户',
+            authorColor: '#3b82f6',
+            createdAt: 1,
+            isResolved: false,
+            replies: [],
+            x: 10,
+            y: 20,
+        }, {
+            id: 'page-2-comment',
+            content: '页面 2 专属评论',
+            authorName: '测试用户',
+            authorColor: '#3b82f6',
+            createdAt: 2,
+            isResolved: false,
+            replies: [],
+            x: 30,
+            y: 40,
+            pageId: 'page-2',
+        }];
+
+        render(<CommentPanel activePageId="page-2" activePageName="页面 2" />);
+
+        expect(screen.getByText('当前页面：页面 2')).toBeTruthy();
+        expect(screen.getByText('页面 2 专属评论')).toBeTruthy();
+        expect(screen.queryByText('页面 1 历史评论')).toBeNull();
     });
 });

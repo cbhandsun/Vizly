@@ -2098,6 +2098,7 @@
         "searchPlaceholder": "Search plugins..."
     },
     "comment": {
+        "pageScope": "Current page: {{name}}",
         "searchPlaceholder": "Search comments or authors...",
         "filterUnresolved": "Unresolved",
         "filterResolved": "Resolved",

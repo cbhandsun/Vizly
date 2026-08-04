@@ -18,6 +18,7 @@ import type { FlowStylePreset } from '../../shared/DiagramStyleManager';
 import type { LayerConfig } from './useLayerManagement';
 import type { CommentThread } from '../../../store/useDiagramStore';
 import type { HistorySnapshotOptions } from '../../../hooks/useDiagramHistory';
+import { normalizeCommentPageId } from '../commentPageScope';
 
 export interface UseDesignerInteractionsProps {
     nodes: Node[];
@@ -220,7 +221,7 @@ export function useDesignerInteractions({
         setIsDraggingNode(false);
     }, [originalOnNodeDragStop]);
 
-    const addAnnotation = useCallback((x: number, y: number, text: string) => {
+    const addAnnotation = useCallback((x: number, y: number, text: string, pageId?: string) => {
         const user = useDiagramStore.getState().user;
         addComment({
             id: `comment-${Date.now()}`,
@@ -232,7 +233,8 @@ export function useDesignerInteractions({
             createdAt: Date.now(),
             isResolved: false,
             color: ANNOTATION_COLORS[0],
-            replies: []
+            replies: [],
+            pageId: normalizeCommentPageId(pageId),
         });
     }, [addComment]);
 

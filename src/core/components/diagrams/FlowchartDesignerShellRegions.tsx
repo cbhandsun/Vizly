@@ -25,6 +25,7 @@ export type FlowchartDesignerLeftSidebarModel = Omit<Pick<FlowchartDesignerViewM
     | 'isSidebarHidden'
     | 'layers'
     | 'mobileRequestedPanel'
+    | 'multiPage'
     | 'nodes'
     | 'pluginCtx'
     | 'presentationActive'
@@ -135,6 +136,7 @@ export function FlowchartDesignerLeftSidebar({ model }: { model: FlowchartDesign
         isSidebarHidden,
         layers,
         mobileRequestedPanel,
+        multiPage,
         nodes,
         pluginCtx,
         presentationActive,
@@ -164,6 +166,8 @@ export function FlowchartDesignerLeftSidebar({ model }: { model: FlowchartDesign
 
     return (
         <IconRailSidebar
+            activePageId={multiPage.activePageId}
+            activePageName={multiPage.pages.find(page => page.id === multiPage.activePageId)?.name ?? multiPage.activePageId}
             nodes={nodes}
             onFocusNode={(node: Node) => handleFocusNode(node.id)}
             layers={layers}

@@ -5,10 +5,19 @@ import { useTranslation } from 'react-i18next';
 import { useDiagramStore, type CommentThread } from '../../store/useDiagramStore';
 import { useReactFlow } from '@xyflow/react';
 import { formatRelativeTime } from '../../utils/formatRelativeTime';
+import { DEFAULT_COMMENT_PAGE_ID, filterCommentsForPage } from './commentPageScope';
 
 const { Text } = Typography;
 
-export const CommentPanel: React.FC = () => {
+export interface CommentPanelProps {
+    activePageId?: string;
+    activePageName?: string;
+}
+
+export const CommentPanel: React.FC<CommentPanelProps> = ({
+    activePageId = DEFAULT_COMMENT_PAGE_ID,
+    activePageName = activePageId,
+}) => {
     const { t } = useTranslation();
     const { token } = theme.useToken();
     const comments = useDiagramStore(state => state.comments);
@@ -30,8 +39,13 @@ export const CommentPanel: React.FC = () => {
         if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
     }, []);
 
+    const pageComments = useMemo(
+        () => filterCommentsForPage(comments || [], activePageId),
+        [activePageId, comments],
+    );
+
     const filteredComments = useMemo(() => {
-        return (comments || []).filter(c => {
+        return pageComments.filter(c => {
             const matchesSearch = (c.content || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                                  (c.authorName || '').toLowerCase().includes(searchTerm.toLowerCase());
             const matchesFilter = filter === 'all' || 
@@ -39,7 +53,7 @@ export const CommentPanel: React.FC = () => {
                                  (filter === 'unresolved' && !c.isResolved);
             return matchesSearch && matchesFilter;
         }).sort((a, b) => b.createdAt - a.createdAt);
-    }, [comments, searchTerm, filter]);
+    }, [pageComments, searchTerm, filter]);
 
     const handleFocus = (c: CommentThread) => {
         if (c.x !== undefined && c.y !== undefined) {
@@ -63,7 +77,7 @@ export const CommentPanel: React.FC = () => {
         removeComment(id);
     };
 
-    const hasComments = comments.length > 0;
+    const hasComments = pageComments.length > 0;
     const resetCommentFilters = () => {
         setSearchTerm('');
         setFilter('all');
@@ -72,6 +86,9 @@ export const CommentPanel: React.FC = () => {
     return (
         <Flex vertical style={{ height: '100%', overflow: 'hidden' }} className="comment-panel">
             <div style={{ padding: '12px 16px', borderBottom: `1px solid ${token.colorBorderSecondary}` }}>
+                <Text type="secondary" style={{ display: 'block', marginBottom: 8, fontSize: 12 }}>
+                    {t('comment.pageScope', { name: activePageName })}
+                </Text>
                 <Input
                     prefix={<FaSearch style={{ color: token.colorTextDescription }} />}
                     placeholder={t('comment.searchPlaceholder')}

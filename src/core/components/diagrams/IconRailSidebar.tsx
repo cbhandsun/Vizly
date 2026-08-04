@@ -7,6 +7,7 @@ import {
 } from 'react-icons/fa';
 import { Node } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
+import { DEFAULT_COMMENT_PAGE_ID } from './commentPageScope';
 import { FlowchartNodeData } from '../custom-nodes/FlowchartNode';
 import { usePanelZoom } from '../../hooks/usePanelZoom';
 import {
@@ -47,6 +48,8 @@ const CommentPanel = React.lazy(() => import('./CommentPanel').then(module => ({
 type _DrawerPanel = 'shapes' | 'navigator' | 'layers' | 'templates' | null;
 
 interface IconRailSidebarProps {
+    activePageId?: string;
+    activePageName?: string;
     nodes?: Node[];
     onFocusNode?: (node: Node) => void;
     // Layer Management Props
@@ -86,6 +89,8 @@ interface NavigatorTreeNode extends DataNode {
 }
 
 export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
+    activePageId = DEFAULT_COMMENT_PAGE_ID,
+    activePageName = activePageId,
     nodes = [],
     onFocusNode,
     layers = [],
@@ -400,7 +405,7 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
             case 'comments':
                 return (
                     <React.Suspense fallback={null}>
-                        <CommentPanel />
+                        <CommentPanel activePageId={activePageId} activePageName={activePageName} />
                     </React.Suspense>
                 );
             default:

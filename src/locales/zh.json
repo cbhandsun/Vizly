@@ -1985,6 +1985,7 @@
         }
     },
     "comment": {
+        "pageScope": "当前页面：{{name}}",
         "searchPlaceholder": "搜索评论或作者...",
         "filterUnresolved": "未解决",
         "filterResolved": "已解决",

@@ -36,6 +36,8 @@ export interface CommentThread {
     color: string; // ⭐ [GAP-02] 用于 Pin 的视觉颜色标识
     replies: CommentReply[];
     nodeId?: string;
+    /** 所属流程图页面；历史单页评论缺省时按 page-1 处理。 */
+    pageId?: string;
 }
 
 export type Comment = CommentThread;

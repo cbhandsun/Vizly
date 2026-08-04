@@ -15,6 +15,7 @@ import { useResponsive } from '../../../hooks/useResponsive';
 import { useDiagramCollaboration } from '../../hooks/useDiagramCollaboration';
 import { useTopologyLinter } from '../../hooks/useTopologyLinter';
 import { useDiagramStore } from '../../store/useDiagramStore';
+import { removeCommentsForPage } from './commentPageScope';
 
 import { useMobileInteractions } from '../../hooks/useMobileInteractions';
 import { useCollapsibleGroups } from './hooks/useCollapsibleGroups';
@@ -343,7 +344,8 @@ export const useFlowchartDesignerController = ({
     const { updateLocalCursor } = useDiagramCollaboration(diagramId, !isReadonly);
     const isCommentMode = useDiagramStore(state => state.isCommentMode);
     const setIsCommentMode = useDiagramStore(state => state.setIsCommentMode);
-    const _addComment = useDiagramStore(state => state.addComment);
+    const setComments = useDiagramStore(state => state.setComments);
+    const setActiveCommentId = useDiagramStore(state => state.setActiveCommentId);
 
     // 3. Event Handlers Domain Controller
     // commandPaletteVisible and shortcutHelpVisible already declared in Component root state section
@@ -409,6 +411,19 @@ export const useFlowchartDesignerController = ({
             removeScope: removeHistoryScope,
         },
     );
+    const deletePage = multiPage.deletePage;
+    const deletePageWithComments = useCallback((pageId: string) => {
+        const deleted = deletePage(pageId);
+        if (!deleted) return false;
+
+        const state = useDiagramStore.getState();
+        const nextComments = removeCommentsForPage(state.comments, pageId);
+        if (state.activeCommentId && !nextComments.some(comment => comment.id === state.activeCommentId)) {
+            setActiveCommentId(null);
+        }
+        setComments(nextComments);
+        return true;
+    }, [deletePage, setActiveCommentId, setComments]);
 
     const { autoRoutingEnabled, setAutoRoutingEnabled, isLayoutStable, handleStrategyLayout, lastDomainStrategy, lastDomainDirection, lastNodeLayout } = useAutoRouting({
         setNodes,
@@ -652,7 +667,7 @@ export const useFlowchartDesignerController = ({
         isDirectSaveDisabled, isDragging, isDraggingNode, isDrawingMode, isInitialDiagramLoading, isLayoutStable, isMarqueeActive, isMobile, isReadonly,
         isSidebarHidden, isSpacePressed, isValidConnection, isVersionHistoryOpen, isYjsSynced, jsonEditorInitialContent, jsonEditorVisible, jumpTo, laserEnabled,
         lastDomainDirection, lastDomainStrategy, lastNodeLayout, layerSyncedNodes, layers, leftDrawerOpen, leftDrawerWidth, messageContextHolder,
-        mobilePropertyDrawerVisible, multiPage, nodes, nodesRef, notificationContextHolder, onAiTabIntercept, onCloudSave, onConnectStart, onDirectSave,
+        mobilePropertyDrawerVisible, multiPage: { ...multiPage, deletePage: deletePageWithComments }, nodes, nodesRef, notificationContextHolder, onAiTabIntercept, onCloudSave, onConnectStart, onDirectSave,
         onDragOver, onDrop, onEdgeContextMenu, onEdgesChangeWithLock, onNodeContextMenu, onNodeDrag, onNodeDragStop, onNodesChangeWithLock, onSmartNodeDrag,
         onExportPermissionCheck, onOpenSettings, onOpenShareDialog, onOpenVersionHistory, onPaneContextMenu, onPaneDoubleClick, onPaneMouseLeave, onPaneMouseMove,
         onSelectionChange, onVersionHistoryClose, onboardingDismissed, pastEntries, pasteStyle, performanceMode, pluginCtx, pluginId, pluginManagerVisible,
