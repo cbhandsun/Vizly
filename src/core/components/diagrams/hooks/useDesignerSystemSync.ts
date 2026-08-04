@@ -79,6 +79,10 @@ export function useDesignerSystemSync({
                 domains: {},
                 isCustom: true,
             },
+            getCanvasSnapshot: () => ({
+                nodes: nodesRef.current,
+                edges: edgesRef.current,
+            }),
         };
 
         Object.defineProperties(standardData, {
@@ -432,8 +436,7 @@ export function useDesignerSystemSync({
         markCurrentDiagramInitialized,
     } = useDesignerPresetInitialization(id);
     const autosaveEnabled = activePresetLookup.ready
-        && isCurrentDiagramInitialized
-        && !(activePresetLookup.preset && !String(id || '').startsWith('custom:'));
+        && isCurrentDiagramInitialized;
 
     const { loadSaved, clearSaved, saveNow, saveState } = useAutoSave(nodes, edges, {
         interval: 60000,

@@ -78,14 +78,8 @@ export const useDesignerInitialDiagramLoad = ({
         };
 
         const preset = activePresetLookup.preset;
-        const isStandardPreset = !!preset && !String(id || '').startsWith('custom:');
         let saved = mergePresetExplicitEdgeHandles(loadSaved(), preset);
         let shouldLoadAutosave = false;
-
-        if (isStandardPreset && saved) {
-            clearSaved();
-            saved = null;
-        }
 
         if (saved) {
             if (saved.diagramId && saved.diagramId !== id) {
@@ -125,7 +119,11 @@ export const useDesignerInitialDiagramLoad = ({
                         messageApi?.success('加载模板成功');
                         clearDesignerFreshSeedFlag(`flowchart-autosave-v2-${id || 'default'}`);
                     } else {
-                        messageApi?.info('已恢复上次编辑内容');
+                        messageApi?.info({
+                            key: 'flowchart-autosave-recovery',
+                            content: '已恢复上次编辑内容，请检查后继续',
+                            duration: 5,
+                        });
                     }
                 });
             }).catch((error) => {

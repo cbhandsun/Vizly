@@ -24,6 +24,7 @@ export interface FlowDataBridgeEntry extends Record<string, unknown> {
     exportMindmapMd?: () => unknown;
     export?: (payload: unknown) => unknown;
     connectNodes?: (payload: unknown) => unknown;
+    getCanvasSnapshot?: () => unknown;
     replaceCanvasSnapshot?: (snapshot: unknown) => unknown;
 }
 

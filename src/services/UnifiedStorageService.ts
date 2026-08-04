@@ -13,6 +13,16 @@ const S3_CONFIG_KEY = 'diagram_storage_config';
 const S3_SECRET_SESSION_KEY = `${S3_CONFIG_KEY}_secret`;
 const MAX_S3_STORAGE_CONFIG_JSON_CHARS = 2 * 1024 * 1024;
 
+const mergeVersionLists = (
+    remoteVersions: DiagramVersion[],
+    localVersions: DiagramVersion[],
+): DiagramVersion[] => {
+    const versionsById = new Map<string, DiagramVersion>();
+    localVersions.forEach(version => versionsById.set(version.id, version));
+    remoteVersions.forEach(version => versionsById.set(version.id, version));
+    return Array.from(versionsById.values()).sort((a, b) => b.createdAt - a.createdAt);
+};
+
 const isSupabaseConfigured = () => {
     return Boolean(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY);
 };
@@ -201,9 +211,13 @@ export class UnifiedStorageService implements IStorageProvider {
 
     // === Versioning Methods with Local Fallback ===
     async saveVersion(diagramId: string, data: unknown, message?: string): Promise<DiagramVersion> {
+        const provider = this.activeProvider;
+        if (!provider.isConfigured()) {
+            return localVersionDB.saveVersion(diagramId, data, message);
+        }
         try {
-            if (this.activeProvider.saveVersion) {
-                return await this.activeProvider.saveVersion(diagramId, data, message);
+            if (provider.saveVersion) {
+                return await provider.saveVersion(diagramId, data, message);
             }
         } catch (e) {
             safeLog.warn('Active provider saveVersion failed, falling back to local db', redactSensitiveLogValue(e));
@@ -213,9 +227,20 @@ export class UnifiedStorageService implements IStorageProvider {
     }
 
     async listVersions(diagramId: string): Promise<DiagramVersion[]> {
+        const provider = this.activeProvider;
+        if (!provider.isConfigured()) {
+            return localVersionDB.listVersions(diagramId);
+        }
         try {
-            if (this.activeProvider.listVersions) {
-                return await this.activeProvider.listVersions(diagramId);
+            const remoteVersions = provider.listVersions
+                ? await provider.listVersions(diagramId)
+                : [];
+            try {
+                const localVersions = await localVersionDB.listVersions(diagramId);
+                return mergeVersionLists(remoteVersions, localVersions);
+            } catch (e) {
+                safeLog.warn('Local version list failed, returning remote versions only', redactSensitiveLogValue(e));
+                return remoteVersions;
             }
         } catch (e) {
             safeLog.warn('Active provider listVersions failed, falling back to local db', redactSensitiveLogValue(e));
@@ -224,11 +249,13 @@ export class UnifiedStorageService implements IStorageProvider {
     }
 
     async loadVersion(diagramId: string, versionId: string): Promise<DiagramVersion | null> {
+        const provider = this.activeProvider;
+        if (!provider.isConfigured()) {
+            return localVersionDB.loadVersion(diagramId, versionId);
+        }
         try {
-            // Priority try local since we might have cached it, but actually cloud is source of truth if we use cloud.
-            // Wait, if it failed previously it might only be in local. Let's try active provider first.
-            if (this.activeProvider.loadVersion) {
-                const ver = await this.activeProvider.loadVersion(diagramId, versionId);
+            if (provider.loadVersion) {
+                const ver = await provider.loadVersion(diagramId, versionId);
                 if (ver) return ver;
             }
         } catch (e) {

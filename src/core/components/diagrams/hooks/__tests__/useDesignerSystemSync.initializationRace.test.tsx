@@ -5,6 +5,15 @@ import type { Edge, Node } from '@xyflow/react';
 import type { SetStateAction } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+interface SavedCanvas {
+  diagramId: string;
+  nodes: Node[];
+  edges: Edge[];
+  isFreshSeed: boolean;
+  timestamp: number;
+  metadata?: unknown;
+}
+
 const mocks = vi.hoisted(() => {
   const lookups = new Map<string, { id: string; ready: true; preset: { id: string } }>();
   const markFunctions = new Map<string, () => void>();
@@ -16,9 +25,10 @@ const mocks = vi.hoisted(() => {
     marks,
     initializedIds,
     autoSaveEnabledValues,
-    loadSaved: vi.fn(() => null),
+    loadSaved: vi.fn<() => SavedCanvas | null>(() => null),
     clearSaved: vi.fn(),
     saveNow: vi.fn(),
+    recalculateAutosaveNodeSizes: vi.fn(async (nodes: Node[]) => nodes),
     loadStandardPresetCanvas: vi.fn(),
     logPresetFailure: vi.fn(),
     getLookup(id: string) {
@@ -74,7 +84,7 @@ vi.mock('../standardPresetCanvasCache', () => ({
 vi.mock('../designerSystemSyncPersistence', () => ({
   clearDesignerFreshSeedFlag: vi.fn(),
   mergePresetExplicitEdgeHandles: (saved: unknown) => saved,
-  recalculateAutosaveNodeSizes: vi.fn(),
+  recalculateAutosaveNodeSizes: mocks.recalculateAutosaveNodeSizes,
   shouldUseGlobalDesignerPerformanceMode: () => false,
 }));
 
@@ -147,9 +157,10 @@ describe('useDesignerSystemSync initialization race safety', () => {
     mocks.marks.length = 0;
     mocks.initializedIds.clear();
     mocks.autoSaveEnabledValues.length = 0;
-    mocks.loadSaved.mockClear();
+    mocks.loadSaved.mockReset().mockReturnValue(null);
     mocks.clearSaved.mockClear();
     mocks.saveNow.mockClear();
+    mocks.recalculateAutosaveNodeSizes.mockReset().mockImplementation(async (nodes: Node[]) => nodes);
     mocks.loadStandardPresetCanvas.mockReset();
     mocks.logPresetFailure.mockClear();
     mocks.loadStandardPresetCanvas.mockImplementation((id: string) => {
@@ -244,5 +255,37 @@ describe('useDesignerSystemSync initialization race safety', () => {
     renderSync('custom:ready');
 
     expect(mocks.autoSaveEnabledValues.at(-1)).toBe(true);
+  });
+
+  it('enables standard-preset autosave once initialization completes', () => {
+    mocks.initializedIds.add('blank-canvas-template');
+    renderSync('blank-canvas-template');
+
+    expect(mocks.autoSaveEnabledValues.at(-1)).toBe(true);
+  });
+
+  it('restores a standard-preset autosave instead of clearing it', async () => {
+    const restoredCanvas = canvasFor('restored-standard-node');
+    mocks.loadSaved.mockReturnValue({
+      diagramId: 'blank-canvas-template',
+      nodes: restoredCanvas.nodes,
+      edges: restoredCanvas.edges,
+      timestamp: Date.now(),
+      isFreshSeed: false,
+    });
+
+    const { setNodes } = renderSync('blank-canvas-template');
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const committedNodeIds = setNodes.mock.calls.flatMap(([value]) => (
+      Array.isArray(value) && value[0] ? [value[0].id] : []
+    ));
+    expect(committedNodeIds).toEqual(['restored-standard-node']);
+    expect(mocks.clearSaved).not.toHaveBeenCalled();
+    expect(mocks.loadStandardPresetCanvas).not.toHaveBeenCalled();
   });
 });

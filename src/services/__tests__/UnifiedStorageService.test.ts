@@ -111,6 +111,71 @@ describe('UnifiedStorageService', () => {
         expect(loadVersionMock).toHaveBeenCalledWith('diagram-2', 'local-version-2');
     });
 
+    it('uses the local version db consistently when the selected provider is not configured', async () => {
+        const localVersion: DiagramVersion = {
+            id: 'local-version-3',
+            diagramId: 'diagram-3',
+            snapshotData: { nodes: [], edges: [] },
+            message: 'local only',
+            createdAt: Date.parse('2026-06-24T00:00:00.000Z'),
+            authorId: 'local-user',
+        };
+        saveVersionMock.mockResolvedValueOnce(localVersion);
+        listVersionsMock.mockResolvedValueOnce([localVersion]);
+        loadVersionMock.mockResolvedValueOnce(localVersion);
+        const remoteSaveVersion = vi.fn();
+        const remoteListVersions = vi.fn();
+        const remoteLoadVersion = vi.fn();
+
+        const { UnifiedStorageService } = await loadUnifiedStorageModule();
+        const service = new UnifiedStorageService();
+        const mutableService = service as unknown as {
+            providers: Record<'supabase' | 's3', IStorageProvider>;
+        };
+        mutableService.providers.supabase = createProvider({
+            isConfigured: () => false,
+            saveVersion: remoteSaveVersion,
+            listVersions: remoteListVersions,
+            loadVersion: remoteLoadVersion,
+        });
+        service.setProvider('supabase');
+
+        await expect(service.saveVersion('diagram-3', { nodes: [], edges: [] }, 'save')).resolves.toEqual(localVersion);
+        await expect(service.listVersions('diagram-3')).resolves.toEqual([localVersion]);
+        await expect(service.loadVersion('diagram-3', 'local-version-3')).resolves.toEqual(localVersion);
+        expect(saveVersionMock).toHaveBeenCalledWith('diagram-3', { nodes: [], edges: [] }, 'save');
+        expect(listVersionsMock).toHaveBeenCalledWith('diagram-3');
+        expect(loadVersionMock).toHaveBeenCalledWith('diagram-3', 'local-version-3');
+        expect(remoteSaveVersion).not.toHaveBeenCalled();
+        expect(remoteListVersions).not.toHaveBeenCalled();
+        expect(remoteLoadVersion).not.toHaveBeenCalled();
+    });
+
+    it('keeps locally-fallbacked versions visible when a configured provider returns an empty list', async () => {
+        const localVersion: DiagramVersion = {
+            id: 'local-version-4',
+            diagramId: 'diagram-4',
+            snapshotData: null,
+            message: 'local fallback remains visible',
+            createdAt: Date.parse('2026-06-25T00:00:00.000Z'),
+            authorId: 'local-user',
+        };
+        listVersionsMock.mockResolvedValueOnce([localVersion]);
+        const remoteListVersions = vi.fn().mockResolvedValueOnce([]);
+
+        const { UnifiedStorageService } = await loadUnifiedStorageModule();
+        const service = new UnifiedStorageService();
+        const mutableService = service as unknown as {
+            providers: Record<'supabase' | 's3', IStorageProvider>;
+        };
+        mutableService.providers.supabase = createProvider({ listVersions: remoteListVersions });
+        service.setProvider('supabase');
+
+        await expect(service.listVersions('diagram-4')).resolves.toEqual([localVersion]);
+        expect(remoteListVersions).toHaveBeenCalledWith('diagram-4');
+        expect(listVersionsMock).toHaveBeenCalledWith('diagram-4');
+    });
+
     it('redacts storage preference bootstrap errors before logging them', async () => {
         const getItemSpy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation((key: string) => {
             if (key === 'DiagramView.StorageProvider') {

@@ -5,6 +5,14 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 beforeAll(() => {
+    Object.defineProperty(globalThis, 'ResizeObserver', {
+        configurable: true,
+        value: class ResizeObserverMock {
+            observe() { return undefined; }
+            unobserve() { return undefined; }
+            disconnect() { return undefined; }
+        },
+    });
     Object.defineProperty(window, 'matchMedia', {
         configurable: true,
         value: (query: string) => ({
@@ -28,6 +36,13 @@ const reactFlowMocks = vi.hoisted(() => ({
 }));
 
 const historyMocks = vi.hoisted(() => ({
+    versions: [] as Array<{
+        id: string;
+        diagramId: string;
+        snapshotData: null;
+        createdAt: number;
+        message: string;
+    }>,
     previewVersion: null as null | { id: string; message: string },
     saveVersion: vi.fn(async () => true),
     enterPreview: vi.fn(async () => true),
@@ -41,7 +56,7 @@ vi.mock('@xyflow/react', () => ({
 
 vi.mock('../../hooks/useVersionHistory', () => ({
     useVersionHistory: () => ({
-        versions: [],
+        versions: historyMocks.versions,
         loading: false,
         previewVersion: historyMocks.previewVersion,
         saveVersion: historyMocks.saveVersion,
@@ -55,6 +70,7 @@ import { VersionHistoryPanel } from '../VersionHistoryPanel';
 
 describe('VersionHistoryPanel commercial preview safeguards', () => {
     beforeEach(() => {
+        historyMocks.versions = [];
         historyMocks.previewVersion = null;
         historyMocks.saveVersion.mockClear();
         historyMocks.enterPreview.mockClear();
@@ -84,5 +100,20 @@ describe('VersionHistoryPanel commercial preview safeguards', () => {
 
         fireEvent.click(saveButton);
         expect(historyMocks.saveVersion).not.toHaveBeenCalled();
+    });
+
+    it('explains that restore is protected by an automatic safety backup', async () => {
+        historyMocks.versions = [{
+            id: 'version-1',
+            diagramId: 'diagram-1',
+            snapshotData: null,
+            createdAt: 1,
+            message: '发布候选版本',
+        }];
+        render(<VersionHistoryPanel diagramId="diagram-1" isOpen onClose={vi.fn()} />);
+
+        fireEvent.click(screen.getByLabelText('恢复版本：发布候选版本'));
+
+        expect(await screen.findByText('恢复前会自动备份当前画布；若备份失败，将取消恢复。确定恢复此版本吗？')).toBeTruthy();
     });
 });

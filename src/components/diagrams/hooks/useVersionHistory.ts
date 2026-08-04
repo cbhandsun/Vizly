@@ -2,9 +2,8 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import type { Edge, Node } from '@xyflow/react';
 import { DiagramVersion } from '@/services/storage/types';
-import { tryAttachDiagramSnapshot } from '@/core/utils/diagramSnapshot';
 import { appMessage } from '@/core/utils/antdStaticBridge';
-import { getFlowDataBridge, getStandardFlowDataBridge } from '@/core/utils/flowDataBridge';
+import { getFlowDataBridge } from '@/core/utils/flowDataBridge';
 import { coerceClipboardData } from '@/core/utils/flowchartClipboard';
 import {
     logVersionHistoryLoadFailure,
@@ -14,6 +13,15 @@ import {
 } from './diagramStorageLogging';
 
 const loadUnifiedStorage = async () => (await import('@/services/UnifiedStorageService')).unifiedStorage;
+const RESTORE_BACKUP_MESSAGE = '恢复前自动备份';
+
+const readBridgeCanvasSnapshot = (bridge: ReturnType<typeof getFlowDataBridge>) => {
+    if (!bridge) return null;
+    const candidate = typeof bridge.getCanvasSnapshot === 'function'
+        ? bridge.getCanvasSnapshot()
+        : { nodes: bridge.nodes, edges: bridge.edges };
+    return coerceClipboardData(candidate);
+};
 
 export function useVersionHistory(diagramId: string) {
     const [versions, setVersions] = useState<DiagramVersion[]>([]);
@@ -41,16 +49,14 @@ export function useVersionHistory(diagramId: string) {
 
         try {
             const unifiedStorage = await loadUnifiedStorage();
-            const bridge = getStandardFlowDataBridge(diagramId);
-            if (!bridge) {
+            const bridge = getFlowDataBridge(diagramId);
+            const snapshot = readBridgeCanvasSnapshot(bridge);
+            if (!snapshot) {
                 appMessage.error('无法提取当前图表数据');
                 return false;
             }
 
-            const snap = await tryAttachDiagramSnapshot(bridge, diagramId);
-            const dataToSave = snap?.diagram || bridge;
-
-            const newVersion = await unifiedStorage.saveVersion(diagramId, dataToSave, commitMessage);
+            const newVersion = await unifiedStorage.saveVersion(diagramId, snapshot, commitMessage);
             
             // Add new version to list without refetching all
             setVersions(prev => [newVersion, ...prev]);
@@ -126,31 +132,57 @@ export function useVersionHistory(diagramId: string) {
             return false;
         }
 
+        const snapshot = coerceClipboardData(fullVersion.snapshotData);
+        if (!snapshot) {
+            appMessage.error("无法恢复：快照结构无效");
+            return false;
+        }
+
+        const bridge = getFlowDataBridge(diagramId);
+        if (!bridge) {
+            appMessage.error('无法提取当前图表数据');
+            return false;
+        }
+
+        const backupSnapshot = previewBaseRef.current
+            ? coerceClipboardData(previewBaseRef.current)
+            : readBridgeCanvasSnapshot(bridge);
+        if (!backupSnapshot) {
+            appMessage.error('未能创建恢复前备份，已取消恢复');
+            return false;
+        }
+
         try {
-            // Restore functionality using the active bridge
-            const bridge = getFlowDataBridge(diagramId);
-            if (bridge) {
-                const snapshot = coerceClipboardData(fullVersion.snapshotData);
-                if (!snapshot) {
-                    appMessage.error("无法恢复：快照结构无效");
-                    return false;
-                }
-                // If it exposes actions directly
-                if (typeof bridge.replaceCanvasSnapshot === 'function') {
-                    bridge.replaceCanvasSnapshot(snapshot);
-                } else {
-                    setNodes(snapshot.nodes);
-                    setEdges(snapshot.edges);
-                }
-                
-                appMessage.success(`已恢复至快照: ${fullVersion.message || fullVersion.id.substring(0, 8)}`);
-                previewBaseRef.current = null;
-                setPreviewVersion(null);
-                return true;
-            }
+            const unifiedStorage = await loadUnifiedStorage();
+            const backupVersion = await unifiedStorage.saveVersion(
+                diagramId,
+                backupSnapshot,
+                RESTORE_BACKUP_MESSAGE,
+            );
+            setVersions(prev => [backupVersion, ...prev]);
         } catch (e) {
             logVersionHistoryRestoreFailure(e);
-            appMessage.error("恢复出错");
+            appMessage.error('未能创建恢复前备份，已取消恢复');
+            return false;
+        }
+
+        try {
+            if (typeof bridge.replaceCanvasSnapshot === 'function') {
+                bridge.replaceCanvasSnapshot(snapshot);
+            } else {
+                setNodes(snapshot.nodes);
+                setEdges(snapshot.edges);
+            }
+
+            appMessage.success(
+                `已恢复至快照：${fullVersion.message || fullVersion.id.substring(0, 8)}；恢复前内容已自动备份`,
+            );
+            previewBaseRef.current = null;
+            setPreviewVersion(null);
+            return true;
+        } catch (e) {
+            logVersionHistoryRestoreFailure(e);
+            appMessage.error('恢复出错；恢复前内容已安全备份');
         }
         return false;
     }, [diagramId, previewVersion, loadVersionData]);

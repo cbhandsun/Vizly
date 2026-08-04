@@ -200,7 +200,7 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
                                 <Popconfirm
                                     key="restore"
                                     title="恢复版本"
-                                    description="恢复后，当前未保存的更改将丢失。确定恢复此版本吗？"
+                                    description="恢复前会自动备份当前画布；若备份失败，将取消恢复。确定恢复此版本吗？"
                                     onConfirm={() => void handleRestore(item.id)}
                                     okText="恢复"
                                     cancelText="取消"

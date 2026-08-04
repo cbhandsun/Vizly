@@ -21,10 +21,6 @@ vi.mock('@/core/utils/antdStaticBridge', () => ({
     appMessage: messageMocks,
 }));
 
-vi.mock('@/core/utils/diagramSnapshot', () => ({
-    tryAttachDiagramSnapshot: vi.fn(async (diagram) => ({ diagram })),
-}));
-
 import { useVersionHistory } from '../useVersionHistory';
 
 const originalNodes: Node[] = [{
@@ -56,11 +52,22 @@ const makeVersion = () => ({
     message: 'Preview version',
 });
 
+const makeBackupVersion = () => ({
+    id: 'backup-version-1',
+    diagramId: 'diagram-1',
+    snapshotData: {
+        nodes: originalNodes,
+        edges: originalEdges,
+    },
+    createdAt: 2,
+    message: '恢复前自动备份',
+});
+
 describe('useVersionHistory', () => {
     beforeEach(() => {
         storageMocks.listVersions.mockReset().mockResolvedValue([]);
         storageMocks.loadVersion.mockReset().mockResolvedValue(makeVersion());
-        storageMocks.saveVersion.mockReset();
+        storageMocks.saveVersion.mockReset().mockResolvedValue(makeBackupVersion());
         messageMocks.error.mockReset();
         messageMocks.success.mockReset();
         delete (window as any).__flowDataBridge;
@@ -122,6 +129,11 @@ describe('useVersionHistory', () => {
         });
 
         expect(restored).toBe(true);
+        expect(storageMocks.saveVersion).toHaveBeenCalledWith(
+            'diagram-1',
+            { nodes: originalNodes, edges: originalEdges },
+            '恢复前自动备份',
+        );
         expect(bridge.replaceCanvasSnapshot).toHaveBeenCalledWith({ nodes: previewNodes, edges: previewEdges });
         expect(bridge.nodes).toEqual(previewNodes);
         expect(bridge.edges).toEqual(previewEdges);
@@ -132,7 +144,12 @@ describe('useVersionHistory', () => {
 
     it('returns success and appends a saved snapshot', async () => {
         storageMocks.saveVersion.mockResolvedValue(makeVersion());
-        const bridge = { id: 'diagram-1', nodes: originalNodes, edges: originalEdges };
+        const bridge = {
+            id: 'diagram-1',
+            nodes: [{ id: 'standard-node', metadata: { canvasPosition: { x: 0, y: 0 } } }],
+            edges: [],
+            getCanvasSnapshot: vi.fn(() => ({ nodes: originalNodes, edges: originalEdges })),
+        };
         (window as unknown as { __flowDataBridge: Record<string, typeof bridge> }).__flowDataBridge = { 'diagram-1': bridge };
         const { result } = renderHook(() => useVersionHistory('diagram-1'));
         await waitFor(() => expect(storageMocks.listVersions).toHaveBeenCalled());
@@ -145,10 +162,62 @@ describe('useVersionHistory', () => {
         expect(saved).toBe(true);
         expect(storageMocks.saveVersion).toHaveBeenCalledWith(
             'diagram-1',
-            expect.objectContaining({ id: 'diagram-1', nodes: expect.any(Array), edges: [] }),
+            { nodes: originalNodes, edges: originalEdges },
             '发布候选版本',
         );
+        expect(bridge.getCanvasSnapshot).toHaveBeenCalledTimes(1);
         expect(result.current.versions[0]?.id).toBe('version-1');
+    });
+
+    it('rejects invalid active canvas data before persistence', async () => {
+        const bridge = { id: 'diagram-1', nodes: 'invalid', edges: originalEdges };
+        (window as unknown as { __flowDataBridge: Record<string, typeof bridge> }).__flowDataBridge = { 'diagram-1': bridge };
+        const { result } = renderHook(() => useVersionHistory('diagram-1'));
+        await waitFor(() => expect(storageMocks.listVersions).toHaveBeenCalled());
+
+        let saved = true;
+        await act(async () => {
+            saved = await result.current.saveVersion('非法画布');
+        });
+
+        expect(saved).toBe(false);
+        expect(storageMocks.saveVersion).not.toHaveBeenCalled();
+        expect(messageMocks.error).toHaveBeenCalledWith('无法提取当前图表数据');
+    });
+
+    it('cancels restore and preserves the preview when the safety backup fails', async () => {
+        storageMocks.saveVersion.mockRejectedValue(new Error('backup unavailable'));
+        const setNodes = vi.fn();
+        const setEdges = vi.fn();
+        const bridge = {
+            id: 'diagram-1',
+            nodes: originalNodes,
+            edges: originalEdges,
+            replaceCanvasSnapshot: vi.fn(),
+        };
+        (window as unknown as { __flowDataBridge: Record<string, typeof bridge> }).__flowDataBridge = { 'diagram-1': bridge };
+        const { result } = renderHook(() => useVersionHistory('diagram-1'));
+        await waitFor(() => expect(storageMocks.listVersions).toHaveBeenCalled());
+
+        await act(async () => {
+            await result.current.enterPreview('version-1', setNodes, setEdges, originalNodes, originalEdges);
+        });
+        await waitFor(() => expect(result.current.previewVersion?.id).toBe('version-1'));
+
+        let restored = true;
+        await act(async () => {
+            restored = await result.current.restoreVersion('version-1', setNodes, setEdges);
+        });
+
+        expect(restored).toBe(false);
+        expect(storageMocks.saveVersion).toHaveBeenCalledWith(
+            'diagram-1',
+            { nodes: originalNodes, edges: originalEdges },
+            '恢复前自动备份',
+        );
+        expect(bridge.replaceCanvasSnapshot).not.toHaveBeenCalled();
+        expect(result.current.previewVersion?.id).toBe('version-1');
+        expect(messageMocks.error).toHaveBeenCalledWith('未能创建恢复前备份，已取消恢复');
     });
 
     it('returns failure when persistence rejects', async () => {
