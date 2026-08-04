@@ -53,6 +53,24 @@ describe('layerStorage', () => {
         ]);
     });
 
+    it('repairs duplicate and invisible-format stored names without dropping layers', () => {
+        const layers = coerceLayers([
+            { id: 'layer-review', name: '默\u200B认', visible: true, locked: false, zIndex: 0 },
+            { id: 'layer-0', name: '默认', visible: false, locked: true, zIndex: 1 },
+            { id: 'layer-review-2', name: '默认 (2)', visible: true, locked: false, zIndex: 2 },
+        ]);
+
+        expect(layers.map(layer => ({ id: layer.id, name: layer.name }))).toEqual([
+            { id: 'layer-review', name: '默认 (2)' },
+            { id: 'layer-0', name: '默认' },
+            { id: 'layer-review-2', name: '默认 (3)' },
+        ]);
+        expect(layers.find(layer => layer.id === 'layer-0')).toMatchObject({
+            visible: false,
+            locked: true,
+        });
+    });
+
     it('falls back to default layer for malformed storage', () => {
         expect(readLayers()).toEqual([DEFAULT_LAYER]);
 

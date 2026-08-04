@@ -100,7 +100,7 @@ const createLeftModel = (
 ): FlowchartDesignerLeftSidebarModel => ({
     activeLayerId: 'default',
     activePlugin: undefined,
-    createLayer: () => undefined,
+    createLayer: () => true,
     deleteLayer: () => undefined,
     deleteTemplate: () => undefined,
     groupedTemplates: {},
@@ -124,7 +124,7 @@ const createLeftModel = (
     nodes: [],
     pluginCtx: null,
     presentationActive: false,
-    renameLayer: () => undefined,
+    renameLayer: () => true,
     renameTemplate: () => undefined,
     reorderLayers: () => undefined,
     setActiveLayerId: () => undefined,

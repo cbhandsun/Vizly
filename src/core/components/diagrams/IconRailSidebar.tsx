@@ -58,8 +58,8 @@ interface IconRailSidebarProps {
     onSetActiveLayer?: (layerId: string) => void;
     onToggleLayerVisibility?: (layerId: string) => void;
     onToggleLayerLock?: (layerId: string) => void;
-    onRenameLayer?: (layerId: string, newName: string) => void;
-    onCreateLayer?: (name: string) => void;
+    onRenameLayer?: (layerId: string, newName: string) => boolean | void;
+    onCreateLayer?: (name: string) => boolean | void;
     onDeleteLayer?: (layerId: string) => void;
     onReorderLayers?: (fromIndex: number, toIndex: number) => void;
     onSetLayerColor?: (layerId: string, color: string | undefined) => void;
@@ -382,7 +382,7 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
                             onSetActive={onSetActiveLayer || (() => { })}
                             onToggleVisibility={onToggleLayerVisibility || (() => { })}
                             onToggleLock={onToggleLayerLock || (() => { })}
-                            onRename={onRenameLayer || (() => { })}
+                            onRename={onRenameLayer || (() => false)}
                             onCreate={onCreateLayer!}
                             onDelete={onDeleteLayer || (() => { })}
                             onReorder={onReorderLayers || (() => { })}

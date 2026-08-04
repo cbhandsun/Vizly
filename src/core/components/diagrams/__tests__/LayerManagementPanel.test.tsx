@@ -124,6 +124,94 @@ describe('LayerManagementPanel', () => {
         expect(screen.queryByRole('textbox', { name: '新图层名称' })).toBeNull();
     });
 
+    it('keeps duplicate layer creation in place with an associated error', () => {
+        const onCreate = vi.fn(() => true);
+
+        render(
+            <LayerManagementPanel
+                layers={[layer, reviewLayer]}
+                activeLayerId="layer-review"
+                onSetActive={vi.fn()}
+                onToggleVisibility={vi.fn()}
+                onToggleLock={vi.fn()}
+                onRename={vi.fn(() => true)}
+                onCreate={onCreate}
+                onDelete={vi.fn()}
+                onReorder={vi.fn()}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: '新建图层' }));
+        fireEvent.change(screen.getByRole('textbox', { name: '新图层名称' }), {
+            target: { value: '  评审\u200B图层  ' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: '创建图层' }));
+
+        const input = screen.getByRole('textbox', { name: '新图层名称' });
+        const alert = screen.getByRole('alert');
+        expect(alert.textContent).toContain('图层名称不能重复');
+        expect(input.getAttribute('aria-invalid')).toBe('true');
+        expect(input.getAttribute('aria-describedby')).toBe(alert.id);
+        expect(document.activeElement).toBe(input);
+        expect(onCreate).not.toHaveBeenCalled();
+    });
+
+    it('keeps duplicate rename validation editable', () => {
+        const onRename = vi.fn(() => true);
+
+        render(
+            <LayerManagementPanel
+                layers={[layer, reviewLayer]}
+                activeLayerId="layer-review"
+                onSetActive={vi.fn()}
+                onToggleVisibility={vi.fn()}
+                onToggleLock={vi.fn()}
+                onRename={onRename}
+                onCreate={vi.fn(() => true)}
+                onDelete={vi.fn()}
+                onReorder={vi.fn()}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: '重命名图层：评审图层' }));
+        const input = screen.getByRole('textbox', { name: '重命名图层：评审图层' });
+
+        fireEvent.change(input, { target: { value: '默认图层' } });
+        fireEvent.keyDown(input, { key: 'Enter' });
+        const alert = screen.getByRole('alert');
+        expect(alert.textContent).toContain('图层名称不能重复');
+        expect(input.getAttribute('aria-describedby')).toBe(alert.id);
+        expect(onRename).not.toHaveBeenCalled();
+    });
+
+    it('keeps host-rejected renames editable with a retry message', () => {
+        const onRename = vi.fn(() => false);
+
+        render(
+            <LayerManagementPanel
+                layers={[layer, reviewLayer]}
+                activeLayerId="layer-review"
+                onSetActive={vi.fn()}
+                onToggleVisibility={vi.fn()}
+                onToggleLock={vi.fn()}
+                onRename={onRename}
+                onCreate={vi.fn(() => true)}
+                onDelete={vi.fn()}
+                onReorder={vi.fn()}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: '重命名图层：评审图层' }));
+        const input = screen.getByRole('textbox', { name: '重命名图层：评审图层' });
+
+        fireEvent.change(input, { target: { value: '已校验的新名称' } });
+        fireEvent.keyDown(input, { key: 'Enter' });
+        const alert = screen.getByRole('alert');
+        expect(alert.textContent).toContain('图层重命名失败，请重试');
+        expect(onRename).toHaveBeenCalledWith('layer-review', '已校验的新名称');
+        expect(screen.getByRole('textbox', { name: '重命名图层：评审图层' })).toBe(input);
+    });
+
     it('names the rename input and cancels only the edit when Escape is pressed', () => {
         const onRename = vi.fn();
 

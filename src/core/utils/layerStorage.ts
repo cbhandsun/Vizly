@@ -1,4 +1,5 @@
 import type { LayerConfig } from '../components/diagrams/hooks/useLayerManagement';
+import { normalizeLayerNameInput, resolveUniqueLayerName } from './layerName';
 import { logUiStorageReadFailure, logUiStorageWriteFailure } from './uiStorageLogging';
 
 export const FLOWCHART_LAYERS_STORAGE_KEY = 'flowchart.layers';
@@ -14,7 +15,6 @@ export const DEFAULT_LAYER: LayerConfig = {
 
 const MAX_LAYERS = 50;
 const MAX_LAYER_ID_LENGTH = 80;
-const MAX_LAYER_NAME_LENGTH = 80;
 const MAX_LAYER_STORAGE_JSON_LENGTH = 2 * 1024 * 1024;
 const SAFE_LAYER_ID = /^[\w:-]+$/u;
 const SAFE_COLOR = /^#[0-9a-fA-F]{6}$/u;
@@ -26,9 +26,7 @@ const isSafeLayerId = (value: unknown): value is string =>
     && SAFE_LAYER_ID.test(value.trim());
 
 const normalizeLayerName = (value: unknown, fallback: string): string => {
-    if (typeof value !== 'string') return fallback;
-    const trimmed = value.trim().slice(0, MAX_LAYER_NAME_LENGTH);
-    return trimmed || fallback;
+    return normalizeLayerNameInput(value) ?? fallback;
 };
 
 const coerceLayer = (value: unknown, zIndex: number): LayerConfig | null => {
@@ -63,18 +61,28 @@ export const coerceLayers = (value: unknown): LayerConfig[] => {
         layers.push(layer);
     }
 
-    const defaultIndex = layers.findIndex(layer => layer.id === DEFAULT_LAYER.id);
-    if (defaultIndex === -1) {
+    if (!layers.some(layer => layer.id === DEFAULT_LAYER.id)) {
         layers.unshift({ ...DEFAULT_LAYER });
-    } else {
-        layers[defaultIndex] = {
-            ...layers[defaultIndex],
-            id: DEFAULT_LAYER.id,
-            name: layers[defaultIndex].name || DEFAULT_LAYER.name,
-        };
     }
 
-    return layers.map((layer, index) => ({ ...layer, zIndex: index }));
+    const defaultLayer = layers.find(layer => layer.id === DEFAULT_LAYER.id) ?? DEFAULT_LAYER;
+    const defaultName = normalizeLayerNameInput(defaultLayer.name) ?? DEFAULT_LAYER.name;
+    const usedNames = [defaultName];
+    const resolvedNames = new Map<string, string>([[DEFAULT_LAYER.id, defaultName]]);
+
+    for (const layer of layers) {
+        if (layer.id === DEFAULT_LAYER.id) continue;
+        const uniqueName = resolveUniqueLayerName(usedNames, layer.name);
+        if (!uniqueName) continue;
+        usedNames.push(uniqueName);
+        resolvedNames.set(layer.id, uniqueName);
+    }
+
+    return layers.map((layer, index) => ({
+        ...layer,
+        name: resolvedNames.get(layer.id) ?? layer.id,
+        zIndex: index,
+    }));
 };
 
 export const coerceActiveLayerId = (value: unknown, layers: LayerConfig[]): string => {

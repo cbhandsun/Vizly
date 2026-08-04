@@ -12,7 +12,7 @@ import {
     BgColorsOutlined
 } from '@ant-design/icons';
 import type { LayerConfig } from './hooks/useLayerManagement';
-import { normalizeLayerNameInput } from './layerNameInput';
+import { isLayerNameAvailable, normalizeLayerNameInput } from '../../utils/layerName';
 import { resolveLayerTouchTargetSize } from './layerInteractionMetrics';
 import { getUiScale } from '../shared/viewportStore';
 
@@ -24,6 +24,7 @@ const LAYER_COLORS = [
 ];
 
 const CREATE_ERROR_ID = 'layer-create-name-error';
+const EDIT_ERROR_ID = 'layer-edit-name-error';
 
 interface LayerManagementPanelProps {
     layers: LayerConfig[];
@@ -31,8 +32,8 @@ interface LayerManagementPanelProps {
     onSetActive: (layerId: string) => void;
     onToggleVisibility: (layerId: string) => void;
     onToggleLock: (layerId: string) => void;
-    onRename: (layerId: string, newName: string) => void;
-    onCreate: (name: string) => void;
+    onRename: (layerId: string, newName: string) => boolean | void;
+    onCreate: (name: string) => boolean | void;
     onDelete: (layerId: string) => void;
     onReorder: (fromIndex: number, toIndex: number) => void;
     onSetColor?: (layerId: string, color: string | undefined) => void;
@@ -105,8 +106,10 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
     const [createError, setCreateError] = useState<string | null>(null);
     const [editingLayerId, setEditingLayerId] = useState<string | null>(null);
     const [editName, setEditName] = useState('');
+    const [editError, setEditError] = useState<string | null>(null);
     const [pendingDeleteLayer, setPendingDeleteLayer] = useState<LayerConfig | null>(null);
     const createInputRef = useRef<InputRef>(null);
+    const editInputRef = useRef<InputRef>(null);
     const skipNextEditBlurRef = useRef(false);
     const touchTargetSize = useMemo(
         () => resolveLayerTouchTargetSize(getUiScale()),
@@ -132,7 +135,16 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
             createInputRef.current?.focus();
             return;
         }
-        onCreate(name);
+        if (!isLayerNameAvailable(layers, name)) {
+            setCreateError('图层名称不能重复');
+            createInputRef.current?.focus();
+            return;
+        }
+        if (onCreate(name) === false) {
+            setCreateError('图层创建失败，请重试');
+            createInputRef.current?.focus();
+            return;
+        }
         cancelCreate();
     };
 
@@ -140,13 +152,27 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
         skipNextEditBlurRef.current = false;
         setEditingLayerId(layer.id);
         setEditName(layer.name);
+        setEditError(null);
     };
 
     const finishEdit = (layerId: string) => {
         const name = normalizeLayerNameInput(editName);
-        if (name) {
-            onRename(layerId, name);
+        if (!name) {
+            setEditError('请输入图层名称');
+            requestAnimationFrame(() => editInputRef.current?.focus());
+            return;
         }
+        if (!isLayerNameAvailable(layers, name, layerId)) {
+            setEditError('图层名称不能重复');
+            requestAnimationFrame(() => editInputRef.current?.focus());
+            return;
+        }
+        if (onRename(layerId, name) === false) {
+            setEditError('图层重命名失败，请重试');
+            requestAnimationFrame(() => editInputRef.current?.focus());
+            return;
+        }
+        setEditError(null);
         setEditingLayerId(null);
         setEditName('');
     };
@@ -155,6 +181,7 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
         skipNextEditBlurRef.current = true;
         setEditingLayerId(null);
         setEditName('');
+        setEditError(null);
     };
 
     return (
@@ -260,8 +287,12 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
                                     )}
                                     {editingLayerId === layer.id ? (
                                         <Input
+                                            ref={editInputRef}
                                             value={editName}
-                                            onChange={(e) => setEditName(e.target.value)}
+                                            onChange={(e) => {
+                                                setEditName(e.target.value);
+                                                if (editError) setEditError(null);
+                                            }}
                                             onBlur={() => {
                                                 if (skipNextEditBlurRef.current) {
                                                     skipNextEditBlurRef.current = false;
@@ -279,6 +310,9 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
                                             autoFocus
                                             maxLength={80}
                                             aria-label={`重命名图层：${layer.name}`}
+                                            aria-invalid={Boolean(editError)}
+                                            aria-describedby={editError ? EDIT_ERROR_ID : undefined}
+                                            status={editError ? 'error' : undefined}
                                             data-preserve-drawer-on-escape="true"
                                             size="small"
                                             style={{ width: '100%' }}
@@ -294,6 +328,15 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
                                         </span>
                                     )}
                                 </div>
+                                {editingLayerId === layer.id && editError ? (
+                                    <div
+                                        id={EDIT_ERROR_ID}
+                                        role="alert"
+                                        style={{ color: '#cf1322', fontSize: 12, marginBottom: 8 }}
+                                    >
+                                        {editError}
+                                    </div>
+                                ) : null}
 
                                 {/* 操作按钮组 */}
                                 <Space size={4}>

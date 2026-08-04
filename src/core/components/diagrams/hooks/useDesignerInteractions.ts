@@ -54,11 +54,11 @@ export interface UseDesignerInteractionsProps {
     layers: LayerConfig[];
     activeLayerId: string | null;
     setActiveLayerId: (layerId: string) => void;
-    createLayer: (name: string) => void;
+    createLayer: (name: string) => boolean | void;
     deleteLayer: (layerId: string) => void;
     toggleVisibility: (layerId: string) => void;
     toggleLock: (layerId: string) => void;
-    renameLayer: (layerId: string, name: string) => void;
+    renameLayer: (layerId: string, name: string) => boolean | void;
     reorderLayers: (fromIndex: number, toIndex: number) => void;
     getLayer: (layerId: string) => LayerConfig | undefined;
     setLayerColor: (layerId: string, color: string | undefined) => void;

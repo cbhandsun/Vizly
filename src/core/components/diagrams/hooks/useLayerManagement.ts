@@ -9,7 +9,7 @@ import {
     writeActiveLayerId,
     writeLayers,
 } from '../../../utils/layerStorage';
-import { normalizeLayerNameInput } from '../layerNameInput';
+import { isLayerNameAvailable, normalizeLayerNameInput } from '../../../utils/layerName';
 
 export interface LayerConfig {
     id: string;            // 图层 ID
@@ -55,7 +55,11 @@ export const useLayerManagement = () => {
         const normalizedName = normalizeLayerNameInput(name);
         if (!normalizedName) {
             appMessage.warning('图层名称不能为空');
-            return;
+            return false;
+        }
+        if (!isLayerNameAvailable(layers, normalizedName)) {
+            appMessage.warning('图层名称不能重复');
+            return false;
         }
         const newLayer: LayerConfig = {
             id: `layer-${Date.now()}`,
@@ -67,7 +71,8 @@ export const useLayerManagement = () => {
         setLayers(prev => coerceLayers([...prev, newLayer]));
         setActiveLayerId(newLayer.id);
         appMessage.success(`已创建图层 "${normalizedName}"`);
-    }, [layers.length]);
+        return true;
+    }, [layers]);
 
     const deleteLayer = useCallback((layerId: string) => {
         if (layerId === DEFAULT_LAYER.id) {
@@ -97,11 +102,20 @@ export const useLayerManagement = () => {
 
     const renameLayer = useCallback((layerId: string, newName: string) => {
         const normalizedName = normalizeLayerNameInput(newName);
-        if (!normalizedName) return;
+        if (!normalizedName) {
+            appMessage.warning('图层名称不能为空');
+            return false;
+        }
+        if (!layers.some(layer => layer.id === layerId)) return false;
+        if (!isLayerNameAvailable(layers, normalizedName, layerId)) {
+            appMessage.warning('图层名称不能重复');
+            return false;
+        }
         setLayers(prev => coerceLayers(prev.map(l =>
             l.id === layerId ? { ...l, name: normalizedName } : l
         )));
-    }, []);
+        return true;
+    }, [layers]);
 
     const reorderLayers = useCallback((fromIndex: number, toIndex: number) => {
         setLayers(prev => {
