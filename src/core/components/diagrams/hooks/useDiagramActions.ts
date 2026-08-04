@@ -48,7 +48,7 @@ interface UseDiagramActionsProps {
     setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
     selectedNodes: Node[];
     selectedEdges: Edge[];
-    takeSnapshot: (nodes: Node[], edges: Edge[]) => void;
+    takeSnapshot: (nodes: Node[], edges: Edge[], label?: string) => void;
     reactFlowInstance: ReactFlowInstance | null;
     pluginCtx?: PluginContext;
     activePlugin?: DiagramTypePlugin | null;
@@ -142,7 +142,9 @@ export const useDiagramActions = ({
 
             if (nodeIdsToDelete.size === 0 && edgeIdsToDelete.size === 0) return;
 
-            takeSnapshot(currentNodes, currentEdges);
+            takeSnapshot(currentNodes, currentEdges, t('designer.historyPanel.beforeDelete', {
+                count: nodeIdsToDelete.size + edgeIdsToDelete.size,
+            }));
             setNodes(nds => nds.filter(n => !nodeIdsToDelete.has(n.id)));
             setEdges(eds => eds.filter(e =>
                 !edgeIdsToDelete.has(e.id) &&
@@ -150,7 +152,7 @@ export const useDiagramActions = ({
                 !nodeIdsToDelete.has(e.target)
             ));
         }
-    }, [nodes, edges, nodesRef, edgesRef, selectedNodes, selectedEdges, setNodes, setEdges, takeSnapshot, activePlugin, pluginCtx]);
+    }, [nodes, edges, nodesRef, edgesRef, selectedNodes, selectedEdges, setNodes, setEdges, takeSnapshot, activePlugin, pluginCtx, t]);
 
     const handleDuplicate = useCallback((target?: DiagramActionTarget) => {
         const currentNodes = nodesRef?.current ?? nodes;
@@ -163,7 +165,9 @@ export const useDiagramActions = ({
         if (nodesToDuplicate.length === 0) return;
         if (hasMutationLockedNode(nodesToDuplicate)) return;
 
-        takeSnapshot(currentNodes, currentEdges);
+        takeSnapshot(currentNodes, currentEdges, t('designer.historyPanel.beforeDuplicate', {
+            count: nodesToDuplicate.length,
+        }));
 
         const newNodes = nodesToDuplicate.map(node => ({
             ...node,

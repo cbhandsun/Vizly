@@ -119,7 +119,22 @@ export const useDiagramHistory = (_initialNodes: Node[], _initialEdges: Edge[]) 
         const patch = shouldBuildPatch
             ? compare(previousState ?? EMPTY_HISTORY_STATE, state)
             : [];
-        if (options?.dedupe !== false && previousState && patch.length === 0) return;
+        if (options?.dedupe !== false && previousState && patch.length === 0) {
+            const previousEntry = scope.past.at(-1);
+            if (label && previousEntry) {
+                previousEntry.entry = {
+                    ...previousEntry.entry,
+                    timestamp: Date.now(),
+                    label,
+                };
+            }
+            // A silent gesture snapshot may already hold this exact state. A
+            // later named operation must still surface that snapshot in the UI,
+            // and starting a new branch invalidates any stale redo states.
+            scope.future = [];
+            if (options?.notify !== false) updateInfo();
+            return;
+        }
 
         scope.snapshotCounter += 1;
         scope.past.push({

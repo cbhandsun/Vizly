@@ -813,6 +813,26 @@
             "pluginMissing": "插件缺失 [{{type}}]",
             "relationshipEdgeLabel": "相关说明"
         },
+        "historyPanel": {
+            "title": "历史记录",
+            "undo": "撤销",
+            "redo": "重做",
+            "close": "关闭历史记录",
+            "empty": "暂无历史记录",
+            "current": "当前状态",
+            "unknownOperation": "未命名操作",
+            "restoreEntry": "恢复到 {{label}}，{{time}}",
+            "changeCount": "{{count}} 项变动",
+            "justNow": "刚才",
+            "secondsAgo": "{{count}} 秒前",
+            "minutesAgo": "{{count}} 分钟前",
+            "unknownTime": "时间未知",
+            "undoStatus": "已撤销上一步，可使用重做恢复",
+            "redoStatus": "已重做上一步",
+            "restoredStatus": "已恢复到“{{label}}”，可使用重做返回恢复前状态",
+            "beforeDelete": "删除 {{count}} 项前",
+            "beforeDuplicate": "复制 {{count}} 个节点前"
+        },
         "flowchartShortcuts": {
             "title": "流程图快捷键",
             "subtitle": "这些快捷键在流程图画布中可用；系统会自动使用 {{mod}}。",

@@ -12,6 +12,8 @@ vi.mock('react-i18next', () => ({
         t: (key: string, options?: Record<string, unknown>) => {
             if (key === 'designer.flowchart.newNode') return 'Node';
             if (key === 'designer.flowchart.duplicateLabel') return `${String(options?.label ?? 'Node')} (Copy)`;
+            if (key === 'designer.historyPanel.beforeDuplicate') return `复制 ${String(options?.count ?? 0)} 个节点前`;
+            if (key === 'designer.historyPanel.beforeDelete') return `删除 ${String(options?.count ?? 0)} 项前`;
             return key;
         },
     }),
@@ -26,6 +28,29 @@ const node = (id: string, selected = false): Node => ({
 });
 
 describe('useDiagramActions explicit selection targets', () => {
+    it('records a meaningful pre-operation label before duplicating nodes', () => {
+        const takeSnapshot = vi.fn();
+        const targetNode = node('node-1');
+        const { result } = renderHook(() => useDiagramActions({
+            nodes: [targetNode],
+            edges: [],
+            setNodes: vi.fn(),
+            setEdges: vi.fn(),
+            selectedNodes: [targetNode],
+            selectedEdges: [],
+            takeSnapshot,
+            reactFlowInstance: null,
+        }));
+
+        act(() => result.current.handleDuplicate());
+
+        expect(takeSnapshot).toHaveBeenCalledWith(
+            [targetNode],
+            [],
+            '复制 1 个节点前',
+        );
+    });
+
     it.each(['delete', 'duplicate'] as const)('blocks %s when an explicit target is locked', async actionName => {
         const lockedNode = { ...node('node-1', true), draggable: false, data: { label: 'node-1', locked: true } };
         const setNodes = vi.fn();
@@ -108,7 +133,7 @@ describe('useDiagramActions explicit selection targets', () => {
 
         act(() => result.current.handleDuplicate(['node-1']));
 
-        expect(takeSnapshot).toHaveBeenCalledWith(initialNodes, []);
+        expect(takeSnapshot).toHaveBeenCalledWith(initialNodes, [], '复制 1 个节点前');
         expect(currentNodes).toHaveLength(3);
         expect(currentNodes.at(-1)).toMatchObject({
             selected: true,

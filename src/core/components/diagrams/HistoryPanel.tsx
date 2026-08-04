@@ -1,8 +1,14 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { theme } from 'antd';
 import { FaHistory, FaUndoAlt, FaRedoAlt, FaClock } from 'react-icons/fa';
+import { useTranslation } from 'react-i18next';
 import type { HistoryEntry } from '../../hooks/useDiagramHistory';
+import {
+    normalizeHistoryChangeCount,
+    normalizeHistoryLabel,
+    resolveHistoryTime,
+} from './historyPanelPresentation';
 
 export interface HistoryPanelProps {
     visible: boolean;
@@ -13,16 +19,6 @@ export interface HistoryPanelProps {
     onUndo: () => void;
     onRedo: () => void;
     onJumpTo: (index: number) => void;
-}
-
-/** 格式化时间戳为用户友好的相对时间 */
-function formatTime(ts: number): string {
-    const diff = Date.now() - ts;
-    if (diff < 5000) return '刚才';
-    if (diff < 60000) return `${Math.floor(diff / 1000)}秒前`;
-    if (diff < 3600000) return `${Math.floor(diff / 60000)}分前`;
-    const d = new Date(ts);
-    return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
 }
 
 export const HistoryPanel: React.FC<HistoryPanelProps> = ({
@@ -36,30 +32,78 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
     onJumpTo,
 }) => {
     const { token } = theme.useToken();
+    const { t, i18n } = useTranslation();
+    const panelRef = useRef<HTMLDivElement>(null);
+    const [statusMessage, setStatusMessage] = useState('');
+    const [now, setNow] = useState(() => Date.now());
+
+    const closePanel = useCallback(() => {
+        setStatusMessage('');
+        onClose();
+    }, [onClose]);
+
+    const formatTime = (timestamp: number): string => {
+        const presentation = resolveHistoryTime(timestamp, now);
+        switch (presentation.kind) {
+            case 'justNow':
+                return t('designer.historyPanel.justNow');
+            case 'secondsAgo':
+                return t('designer.historyPanel.secondsAgo', { count: presentation.count });
+            case 'minutesAgo':
+                return t('designer.historyPanel.minutesAgo', { count: presentation.count });
+            case 'clock':
+                try {
+                    return new Intl.DateTimeFormat(i18n.resolvedLanguage || i18n.language, {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                    }).format(new Date(presentation.timestamp));
+                } catch {
+                    return t('designer.historyPanel.unknownTime');
+                }
+            default:
+                return t('designer.historyPanel.unknownTime');
+        }
+    };
 
     // 反转显示（最新在上）
     const reversedEntries = useMemo(
-        () => pastEntries.map((e, i) => ({ ...e, index: i })).reverse(),
-        [pastEntries]
+        () => pastEntries.map((entry, index) => ({
+            ...entry,
+            index,
+            label: normalizeHistoryLabel(entry.label, t('designer.historyPanel.unknownOperation')),
+            changeCount: normalizeHistoryChangeCount(entry.changeCount, entry.patch?.length),
+        })).reverse(),
+        [pastEntries, t]
     );
+
+    useEffect(() => {
+        if (!visible) return;
+
+        panelRef.current?.focus({ preventScroll: true });
+        const timer = window.setInterval(() => setNow(Date.now()), 30_000);
+        return () => window.clearInterval(timer);
+    }, [visible]);
 
     useEffect(() => {
         if (!visible) return;
         const handleEscape = (event: KeyboardEvent) => {
             if (event.key !== 'Escape') return;
             event.preventDefault();
-            onClose();
+            closePanel();
         };
         document.addEventListener('keydown', handleEscape);
         return () => document.removeEventListener('keydown', handleEscape);
-    }, [onClose, visible]);
+    }, [closePanel, visible]);
 
     if (!visible) return null;
 
     return createPortal(
         <div
-            role="region"
-            aria-label="历史记录"
+            ref={panelRef}
+            role="dialog"
+            aria-modal="false"
+            aria-labelledby="history-panel-title"
+            tabIndex={-1}
             style={{
                 position: 'fixed',
                 right: 16,
@@ -87,8 +131,8 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
                 borderBottom: `1px solid ${token.colorBorderSecondary}`,
             }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, fontSize: 13, color: token.colorText }}>
-                    <FaHistory size={13} />
-                    <span>历史记录</span>
+                    <FaHistory size={13} aria-hidden="true" />
+                    <span id="history-panel-title">{t('designer.historyPanel.title')}</span>
                     <span style={{ fontSize: 11, color: token.colorTextTertiary, fontWeight: 400 }}>
                         ({pastEntries.length})
                     </span>
@@ -96,10 +140,13 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
                 <div style={{ display: 'flex', gap: 4 }}>
                     <button
                         type="button"
-                        onClick={onUndo}
+                        onClick={() => {
+                            onUndo();
+                            setStatusMessage(t('designer.historyPanel.undoStatus'));
+                        }}
                         disabled={!canUndo}
-                        title="撤销"
-                        aria-label="撤销"
+                        title={t('designer.historyPanel.undo')}
+                        aria-label={t('designer.historyPanel.undo')}
                         style={{
                             border: 'none',
                             background: canUndo ? token.colorFillTertiary : 'transparent',
@@ -112,14 +159,17 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                         }}
                     >
-                        <FaUndoAlt size={11} />
+                        <FaUndoAlt size={11} aria-hidden="true" />
                     </button>
                     <button
                         type="button"
-                        onClick={onRedo}
+                        onClick={() => {
+                            onRedo();
+                            setStatusMessage(t('designer.historyPanel.redoStatus'));
+                        }}
                         disabled={!canRedo}
-                        title="重做"
-                        aria-label="重做"
+                        title={t('designer.historyPanel.redo')}
+                        aria-label={t('designer.historyPanel.redo')}
                         style={{
                             border: 'none',
                             background: canRedo ? token.colorFillTertiary : 'transparent',
@@ -132,13 +182,13 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                         }}
                     >
-                        <FaRedoAlt size={11} />
+                        <FaRedoAlt size={11} aria-hidden="true" />
                     </button>
                     <button
                         type="button"
-                        onClick={onClose}
-                        title="关闭"
-                        aria-label="关闭历史记录"
+                        onClick={closePanel}
+                        title={t('designer.historyPanel.close')}
+                        aria-label={t('designer.historyPanel.close')}
                         style={{
                             border: 'none',
                             background: 'transparent',
@@ -160,6 +210,25 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
                 </div>
             </div>
 
+            {statusMessage && (
+                <div
+                    role="status"
+                    aria-live="polite"
+                    aria-atomic="true"
+                    style={{
+                        margin: '8px 12px 4px',
+                        padding: '8px 10px',
+                        border: `1px solid ${token.colorSuccessBorder}`,
+                        borderRadius: token.borderRadius,
+                        background: token.colorSuccessBg,
+                        color: token.colorText,
+                        fontSize: 12,
+                    }}
+                >
+                    {statusMessage}
+                </div>
+            )}
+
             {/* Timeline */}
             <div style={{ overflowY: 'auto', flex: 1, padding: '4px 0' }}>
                 {reversedEntries.length === 0 && (
@@ -169,7 +238,7 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
                         color: token.colorTextTertiary,
                         fontSize: 12,
                     }}>
-                        暂无历史记录
+                        {t('designer.historyPanel.empty')}
                     </div>
                 )}
 
@@ -188,15 +257,21 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
                         boxShadow: '0 0 0 3px rgba(16,185,129,0.2)',
                         flexShrink: 0,
                     }} />
-                    <span style={{ fontWeight: 600, color: token.colorText }}>当前状态</span>
+                    <span style={{ fontWeight: 600, color: token.colorText }}>{t('designer.historyPanel.current')}</span>
                 </div>
 
                 {reversedEntries.map((entry) => (
                     <button
                         type="button"
                         key={`${entry.index}-${entry.timestamp}`}
-                        onClick={() => onJumpTo(entry.index)}
-                        aria-label={`恢复到 ${entry.label}，${formatTime(entry.timestamp)}`}
+                        onClick={() => {
+                            onJumpTo(entry.index);
+                            setStatusMessage(t('designer.historyPanel.restoredStatus', { label: entry.label }));
+                        }}
+                        aria-label={t('designer.historyPanel.restoreEntry', {
+                            label: entry.label,
+                            time: formatTime(entry.timestamp),
+                        })}
                         style={{
                             padding: '6px 12px',
                             minHeight: 'var(--commercial-touch-target, 44px)',
@@ -241,10 +316,10 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
                                 alignItems: 'center',
                                 gap: 3,
                             }}>
-                                <FaClock size={8} />
+                                <FaClock size={8} aria-hidden="true" />
                                 {formatTime(entry.timestamp)}
                                 <span style={{ marginLeft: 4 }}>
-                                    {entry.changeCount ?? entry.patch.length} 变动
+                                    {t('designer.historyPanel.changeCount', { count: entry.changeCount })}
                                 </span>
                             </span>
                         </span>

@@ -47,6 +47,28 @@ describe('useDiagramHistory', () => {
         });
     });
 
+    it('surfaces and relabels a matching silent snapshot for the next named operation', () => {
+        const initial = [node('node-1', 0)];
+        const { result } = renderHook(() => useDiagramHistory([], []));
+
+        act(() => {
+            result.current.takeSnapshot(initial, [], '移动节点', {
+                notify: false,
+                dedupe: false,
+            });
+            result.current.takeSnapshot(initial, [], '复制 1 个节点前');
+        });
+
+        expect(result.current.canUndo).toBe(true);
+        expect(result.current.canRedo).toBe(false);
+        expect(result.current.pastEntries).toHaveLength(1);
+        expect(result.current.pastEntries[0]).toMatchObject({
+            label: '复制 1 个节点前',
+            patch: [],
+            changeCount: 1,
+        });
+    });
+
     it('undoes and redoes the first edit using the live current state', () => {
         const initial = [node('node-1', 0)];
         const moved = [node('node-1', 100)];
