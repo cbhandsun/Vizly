@@ -16,6 +16,7 @@ import {
 } from './diagramViewerCommandItems';
 import { canMutateDiagramDocument } from './diagramViewerPermissions';
 import { createDiagramViewerGlobalKeydownHandler } from './diagramViewerKeyboard';
+import { hasVisibleModalDialog } from '@/core/components/ui/modalDialogState';
 import {
     logDiagramViewerCommandPaletteStateFailure,
     logDiagramViewerFullscreenExitFailure,
@@ -111,6 +112,7 @@ export function useDiagramViewerCommands({
         const onKeyDown = createDiagramViewerGlobalKeydownHandler({
             isPresentationMode,
             editingEnabled,
+            isGlobalShortcutBlocked: hasVisibleModalDialog,
             isFullscreenActive: () => Boolean(document.fullscreenElement),
             exitFullscreen,
             onFullscreenExitFailure: logDiagramViewerFullscreenExitFailure,

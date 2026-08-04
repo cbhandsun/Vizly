@@ -150,6 +150,48 @@ describe('diagramViewerKeyboard', () => {
     expect(openCommandPalette).not.toHaveBeenCalled();
   });
 
+  it('does not dispatch global shortcuts behind a visible modal dialog', () => {
+    const openCommandPalette = vi.fn();
+    const exitFullscreen = vi.fn();
+    const handler = createDiagramViewerGlobalKeydownHandler({
+      isPresentationMode: true,
+      editingEnabled: true,
+      isGlobalShortcutBlocked: () => true,
+      isFullscreenActive: () => true,
+      exitFullscreen,
+      onFullscreenExitFailure: vi.fn(),
+      toggleDebugPanel: vi.fn(),
+      openCommandPalette,
+      openSettings: vi.fn(),
+      triggerEditorCommand: vi.fn(),
+      triggerAi: vi.fn(),
+      triggerTheme: vi.fn(),
+      exitPresentation: vi.fn(),
+    });
+
+    const preventDefault = vi.fn();
+    handler({
+      key: 'k',
+      ctrlKey: true,
+      metaKey: false,
+      shiftKey: false,
+      altKey: false,
+      preventDefault,
+    } as unknown as KeyboardEvent);
+    handler({
+      key: 'Escape',
+      ctrlKey: false,
+      metaKey: false,
+      shiftKey: false,
+      altKey: false,
+      preventDefault,
+    } as unknown as KeyboardEvent);
+
+    expect(openCommandPalette).not.toHaveBeenCalled();
+    expect(exitFullscreen).not.toHaveBeenCalled();
+    expect(preventDefault).not.toHaveBeenCalled();
+  });
+
   it('consumes editing shortcuts without dispatching mutations when the canvas is locked', () => {
     const triggerEditorCommand = vi.fn();
     const triggerAi = vi.fn();

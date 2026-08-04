@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { hasVisibleModalDialog } from '../ui/modalDialogState';
 
 interface UseKeyboardShortcutsProps {
     onDelete: () => void;
@@ -21,6 +22,7 @@ interface UseKeyboardShortcutsProps {
     onShowShortcuts?: () => void;
     pluginShortcuts?: import('../../types/plugin').KeyboardShortcut[];
     pluginCtx?: import('../../types/plugin').PluginContext;
+    isGlobalShortcutBlocked?: () => boolean;
 }
 
 export const useKeyboardShortcuts = ({
@@ -43,10 +45,13 @@ export const useKeyboardShortcuts = ({
     onOpenCommandPalette,
     onShowShortcuts,
     pluginShortcuts,
-    pluginCtx
+    pluginCtx,
+    isGlobalShortcutBlocked = hasVisibleModalDialog,
 }: UseKeyboardShortcutsProps) => {
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.defaultPrevented || isGlobalShortcutBlocked()) return;
+
             // Ignore if input/textarea is focused or inside a contentEditable
             const target = event.target as HTMLElement;
             if (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable) {
@@ -176,5 +181,5 @@ export const useKeyboardShortcuts = ({
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [onDelete, onDuplicate, onUndo, onRedo, onSelectAll, onCopy, onPaste, onCut, onGroup, onUngroup, onNudge, onZoomIn, onZoomOut, onFitView, onEnterEdit, onEscapeEdit, onOpenCommandPalette, onShowShortcuts, pluginShortcuts, pluginCtx]);
+    }, [onDelete, onDuplicate, onUndo, onRedo, onSelectAll, onCopy, onPaste, onCut, onGroup, onUngroup, onNudge, onZoomIn, onZoomOut, onFitView, onEnterEdit, onEscapeEdit, onOpenCommandPalette, onShowShortcuts, pluginShortcuts, pluginCtx, isGlobalShortcutBlocked]);
 };

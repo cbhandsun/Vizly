@@ -69,6 +69,7 @@ export const resolveDiagramViewerKeyboardActions = ({
 export const createDiagramViewerGlobalKeydownHandler = ({
   isPresentationMode,
   editingEnabled,
+  isGlobalShortcutBlocked = () => false,
   isFullscreenActive,
   exitFullscreen,
   onFullscreenExitFailure,
@@ -82,6 +83,7 @@ export const createDiagramViewerGlobalKeydownHandler = ({
 }: {
   isPresentationMode: boolean;
   editingEnabled: boolean;
+  isGlobalShortcutBlocked?: () => boolean;
   isFullscreenActive: () => boolean;
   exitFullscreen: () => void;
   onFullscreenExitFailure: (error: unknown) => void;
@@ -95,6 +97,10 @@ export const createDiagramViewerGlobalKeydownHandler = ({
 }) => {
   return (event: KeyboardEvent) => {
     if (event.defaultPrevented) {
+      return;
+    }
+
+    if (isGlobalShortcutBlocked()) {
       return;
     }
 

@@ -1243,6 +1243,8 @@
         "expiresAt": "过期于",
         "shareButton": "分享",
         "loginRequired": "请先登录后才能使用分享功能",
+        "loginRequiredHint": "登录后将返回当前分享流程，不会丢失图表。",
+        "loginAction": "立即登录",
         "savingFirst": "正在保存图表到云端...",
         "loadingShared": "正在加载分享的图表...",
         "loadingCanvas": "正在准备只读画布...",

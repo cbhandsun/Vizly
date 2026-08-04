@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, Button, Select, Space, Typography, Tooltip, List, Tag, Popconfirm, Spin, theme, Tabs, Input, Avatar, Empty, Alert } from 'antd';
 import { FaCopy, FaLink, FaTrash, FaUserPlus } from 'react-icons/fa';
-import { LinkOutlined, TeamOutlined, UserOutlined, CheckCircleFilled, SafetyOutlined, LockOutlined } from '@ant-design/icons';
+import { LinkOutlined, TeamOutlined, UserOutlined, CheckCircleFilled, SafetyOutlined, LockOutlined, LoginOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { shareService, ShareRecord, CollaboratorRecord } from '@/services/ShareService';
 import { useAuth } from '@/context/useAuth';
@@ -19,6 +19,9 @@ import {
 } from '@/core/components/ui/viewportOverlayPortal';
 import './ShareDialog.css';
 
+const AuthModal = React.lazy(() => import('@/components/auth/AuthModal').then(module => ({
+    default: module.AuthModal,
+})));
 
 const { Text } = Typography;
 
@@ -63,6 +66,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
     const { token } = theme.useToken();
     const { user } = useAuth();
     const [activeTab, setActiveTab] = useState('invite');
+    const [authModalOpen, setAuthModalOpen] = useState(false);
 
     // Link Share State
     const [expiration, setExpiration] = useState<ExpirationOption>('never');
@@ -269,6 +273,26 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
         )
         : null;
 
+    const loginRequiredAlert = !user ? (
+        <Alert
+            type="warning"
+            showIcon
+            title={t('share.loginRequired')}
+            description={t('share.loginRequiredHint', '登录后将返回当前分享流程，不会丢失图表。')}
+            action={(
+                <Button
+                    type="primary"
+                    icon={<LoginOutlined />}
+                    aria-label={t('share.loginAction', '立即登录')}
+                    onClick={() => setAuthModalOpen(true)}
+                >
+                    {t('share.loginAction', '立即登录')}
+                </Button>
+            )}
+            style={{ marginBottom: 16 }}
+        />
+    ) : null;
+
     // ===== UI Renders =====
     const items = [
         {
@@ -276,14 +300,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
             label: <span><TeamOutlined style={{ marginRight: 6 }} />{t('share.tabs.invite')}</span>,
             children: (
                 <div style={{ paddingTop: 8 }}>
-                    {!user && (
-                        <Alert
-                            type="warning"
-                            showIcon
-                            title={t('share.loginRequired')}
-                            style={{ marginBottom: 16 }}
-                        />
-                    )}
+                    {loginRequiredAlert}
                     <div className="share-dialog-invite-controls">
                         <Input
                             className="share-dialog-invite-email"
@@ -301,9 +318,10 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
                             status={inviteEmailError ? 'error' : undefined}
                             aria-invalid={Boolean(inviteEmailError)}
                             aria-describedby="share-dialog-email-help"
+                            disabled={!user}
                             style={inputBorderStyle}
                         />
-                        <Select<InviteRole> value={inviteRole} onChange={setInviteRole} aria-label={t('share.roleLabel')}>
+                        <Select<InviteRole> value={inviteRole} onChange={setInviteRole} aria-label={t('share.roleLabel')} disabled={!user}>
                             <Select.Option value="viewer">{t('share.roleViewer')}</Select.Option>
                             <Select.Option value="editor">{t('share.roleEditor')}</Select.Option>
                         </Select>
@@ -412,12 +430,13 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
                                 { value: '30days', label: t('share.30days') },
                             ]}
                             aria-label={t('share.expiration')}
+                            disabled={!user}
                         />
                         <Button type="primary" icon={<FaLink />} loading={creatingLink} onClick={handleCreateLink} disabled={!user}>
                             {t('share.generateLink')}
                         </Button>
                     </div>
-                    {!user && <Text type="warning" style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>{t('share.loginRequired')}</Text>}
+                    {loginRequiredAlert}
 
                     {/* 链接复制成功高亮提示 */}
                     {shareLinkResult && (
@@ -529,29 +548,41 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
     ];
 
     return (
-        <Modal
-            open={open}
-            onCancel={onClose}
-            getContainer={getViewportOverlayContainer}
-            rootClassName={`${COMMERCIAL_VIEWPORT_MODAL_CLASS} share-dialog-viewport-modal`}
-            zIndex={COMMERCIAL_VIEWPORT_MODAL_Z_INDEX}
-            title={
-                <Space>
-                    <SafetyOutlined style={{ color: token.colorPrimary }} />
-                    <span>{t('share.title')}</span>
-                </Space>
-            }
-            footer={
-                <Text type="secondary" className="share-dialog-footer-note">
-                    <LockOutlined aria-hidden="true" style={{ marginRight: 6 }} />
-                    分享的图表可随时撤销访问权限
-                </Text>
-            }
-            width={600}
-            styles={{ body: { padding: '0 var(--glass-padding-md, 24px) var(--glass-padding-md, 24px)' } }}
-        >
-            <Tabs defaultActiveKey="invite" activeKey={activeTab} onChange={setActiveTab} items={items} />
-        </Modal>
+        <>
+            <Modal
+                open={open}
+                onCancel={onClose}
+                getContainer={getViewportOverlayContainer}
+                rootClassName={`${COMMERCIAL_VIEWPORT_MODAL_CLASS} share-dialog-viewport-modal`}
+                zIndex={COMMERCIAL_VIEWPORT_MODAL_Z_INDEX}
+                title={
+                    <Space>
+                        <SafetyOutlined style={{ color: token.colorPrimary }} />
+                        <span>{t('share.title')}</span>
+                    </Space>
+                }
+                footer={
+                    <Text type="secondary" className="share-dialog-footer-note">
+                        <LockOutlined aria-hidden="true" style={{ marginRight: 6 }} />
+                        分享的图表可随时撤销访问权限
+                    </Text>
+                }
+                width={600}
+                styles={{ body: { padding: '0 var(--glass-padding-md, 24px) var(--glass-padding-md, 24px)' } }}
+            >
+                <Tabs defaultActiveKey="invite" activeKey={activeTab} onChange={setActiveTab} items={items} />
+            </Modal>
+            {authModalOpen && (
+                <React.Suspense fallback={null}>
+                    <AuthModal
+                        open={authModalOpen}
+                        onCancel={() => setAuthModalOpen(false)}
+                        onAuthenticated={() => setAuthModalOpen(false)}
+                        zIndex={COMMERCIAL_VIEWPORT_MODAL_Z_INDEX + 100}
+                    />
+                </React.Suspense>
+            )}
+        </>
     );
 };
 

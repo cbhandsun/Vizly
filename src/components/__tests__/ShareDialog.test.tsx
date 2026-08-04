@@ -86,6 +86,8 @@ const translations: Record<string, string> = {
   'share.roleEditorComingSoon': '编辑（即将支持）',
   'share.collaborators': '协作者',
   'share.loginRequired': '请先登录后才能使用分享功能',
+  'share.loginRequiredHint': '登录后将返回当前分享流程，不会丢失图表。',
+  'share.loginAction': '立即登录',
   'share.never': '永不过期',
   'share.1day': '1 天',
   'share.7days': '7 天',
@@ -147,6 +149,20 @@ describe('ShareDialog commercial failure handling', () => {
 
     expect(await screen.findByText('请先登录后才能使用分享功能')).toBeTruthy();
     expect((screen.getByRole('button', { name: '邀请' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByPlaceholderText('输入用户的注册邮箱...') as HTMLInputElement).disabled).toBe(true);
+    expect(screen.getByRole('button', { name: '立即登录' })).toBeTruthy();
+  });
+
+  it('opens authentication directly and preserves the sharing dialog underneath', async () => {
+    render(
+      <ShareDialog open onClose={vi.fn()} diagramId={DIAGRAM_ID} onEnsureSaved={vi.fn()} />,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: '立即登录' }));
+
+    await waitFor(() => expect(screen.getAllByRole('dialog')).toHaveLength(2));
+    expect(screen.getByText('auth.modal.loginButton')).toBeTruthy();
+    expect(screen.getByText('分享图表')).toBeTruthy();
   });
 
   it('blocks an invalid email locally and explains how to recover', async () => {

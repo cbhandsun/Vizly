@@ -1142,6 +1142,8 @@
         "expiresAt": "Expires",
         "shareButton": "Share",
         "loginRequired": "Please sign in to use sharing",
+        "loginRequiredHint": "After signing in, you will return to this sharing flow without losing the diagram.",
+        "loginAction": "Sign in now",
         "savingFirst": "Saving diagram to cloud...",
         "loadingShared": "Loading shared diagram...",
         "loadingCanvas": "Preparing the read-only canvas...",
