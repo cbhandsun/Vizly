@@ -3,14 +3,14 @@
 import { renderHook } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { useClipboardOperationScope } from '../useClipboardOperationScope';
+import { useDiagramOperationScope } from '../useDiagramOperationScope';
 
-describe('useClipboardOperationScope', () => {
+describe('useDiagramOperationScope', () => {
   it('keeps a stable getter while tracking committed diagram and active page changes', () => {
     let pageOperationScope = 'page-1:0';
     const getPageOperationScope = () => pageOperationScope;
     const { result, rerender } = renderHook(
-      ({ diagramId }) => useClipboardOperationScope(diagramId, getPageOperationScope),
+      ({ diagramId }) => useDiagramOperationScope(diagramId, getPageOperationScope),
       { initialProps: { diagramId: 'diagram-1' } },
     );
     const getScope = result.current;

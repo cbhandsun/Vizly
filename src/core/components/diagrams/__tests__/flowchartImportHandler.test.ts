@@ -123,7 +123,7 @@ describe('flowchartImportHandler', () => {
             importKind: 'json',
             businessDataId: 'biz-1',
             diagramId: 'diagram-1',
-            registerStandardReload,
+            registerStandardReload: expect.any(Function),
             onBeforeCanvasReplace,
         }));
         expect(messageApi.info).toHaveBeenCalledWith('designer.flowchart.import.rfSuccess:{"nodes":1,"edges":1}');
@@ -197,7 +197,7 @@ describe('flowchartImportHandler', () => {
         resolveImport?.(true);
         await firstImport;
         expect(importInFlightRef.current).toBe(false);
-        expect(onImportFinished).toHaveBeenCalledWith({ ok: true });
+        expect(onImportFinished).toHaveBeenCalledWith({ status: 'success' });
     });
 
     it('keeps pipeline errors out of the UI and reports a recoverable failed result', async () => {
@@ -224,7 +224,7 @@ describe('flowchartImportHandler', () => {
 
         expect(messageApi.error).toHaveBeenCalledWith('designer.flowchart.import.jsonFailed');
         expect(JSON.stringify(messageApi.error.mock.calls)).not.toContain('secret');
-        expect(onImportFinished).toHaveBeenCalledWith({ ok: false });
+        expect(onImportFinished).toHaveBeenCalledWith({ status: 'failure' });
     });
 
     it('releases the shared lock when the import-start lifecycle callback fails', async () => {
@@ -253,7 +253,82 @@ describe('flowchartImportHandler', () => {
         expect(importFileState.readFlowchartImportFileText).not.toHaveBeenCalled();
         expect(importInFlightRef.current).toBe(false);
         expect(messageApi.error).toHaveBeenCalledWith('designer.flowchart.import.readFailed');
-        expect(onImportFinished).toHaveBeenCalledWith({ ok: false });
+        expect(onImportFinished).toHaveBeenCalledWith({ status: 'failure' });
         expect(event.target.value).toBe('');
+    });
+
+    it('cancels a deferred file read when the page or diagram scope changes', async () => {
+        importFileState.validateFlowchartImportFile.mockReturnValue({ ok: true, importKind: 'json' });
+        let resolveRead: ((value: string) => void) | undefined;
+        importFileState.readFlowchartImportFileText.mockImplementation(() => new Promise<string>((resolve) => {
+            resolveRead = resolve;
+        }));
+        let operationScope = 'diagram-1:page-1:0';
+        const messageApi = makeMessageApi();
+        const importInFlightRef = { current: false };
+        const onImportFinished = vi.fn();
+        const handler = createFlowchartImportHandler({
+            t: (key) => key,
+            messageApi,
+            setNodes: vi.fn(),
+            setEdges: vi.fn(),
+            onBeforeCanvasReplace: vi.fn(),
+            fitView: vi.fn(),
+            registerStandardReload: vi.fn(async () => undefined),
+            importInFlightRef,
+            onImportFinished,
+            getOperationScope: () => operationScope,
+        });
+        const event = makeEvent(new File(['{}'], 'diagram.json', { type: 'application/json' }));
+
+        const pendingImport = handler(event);
+        await Promise.resolve();
+        operationScope = 'diagram-1:page-2:1';
+        resolveRead?.('{"nodes":[],"edges":[]}');
+        await pendingImport;
+
+        expect(importPipelineState.runFlowchartImportPipeline).not.toHaveBeenCalled();
+        expect(onImportFinished).toHaveBeenCalledWith({ status: 'scope-changed' });
+        expect(importInFlightRef.current).toBe(false);
+        expect(messageApi.error).not.toHaveBeenCalled();
+        expect(event.target.value).toBe('');
+    });
+
+    it('suppresses late canvas writes and delayed follow-up actions after the scope changes', async () => {
+        importFileState.validateFlowchartImportFile.mockReturnValue({ ok: true, importKind: 'json' });
+        importFileState.readFlowchartImportFileText.mockResolvedValue('{"nodes":[],"edges":[]}');
+        let operationScope = 'diagram-1:page-1:0';
+        const setNodes = vi.fn();
+        const setEdges = vi.fn();
+        const fitView = vi.fn();
+        const scheduledCallbacks: Array<() => void> = [];
+        const onImportFinished = vi.fn();
+        importPipelineState.runFlowchartImportPipeline.mockImplementation(async (options) => {
+            options.onReactFlowSuccess({ nodes: [], edges: [] });
+            operationScope = 'diagram-1:page-2:1';
+            options.setNodes([{ id: 'late-node' }]);
+            options.setEdges([{ id: 'late-edge' }]);
+            return true;
+        });
+        const handler = createFlowchartImportHandler({
+            t: (key) => key,
+            messageApi: makeMessageApi(),
+            setNodes,
+            setEdges,
+            onBeforeCanvasReplace: vi.fn(),
+            fitView,
+            scheduleDelay: (callback) => scheduledCallbacks.push(callback),
+            registerStandardReload: vi.fn(async () => undefined),
+            onImportFinished,
+            getOperationScope: () => operationScope,
+        });
+
+        await handler(makeEvent(new File(['{}'], 'diagram.json', { type: 'application/json' })));
+        scheduledCallbacks.forEach((callback) => callback());
+
+        expect(setNodes).not.toHaveBeenCalled();
+        expect(setEdges).not.toHaveBeenCalled();
+        expect(fitView).not.toHaveBeenCalled();
+        expect(onImportFinished).toHaveBeenCalledWith({ status: 'scope-changed' });
     });
 });

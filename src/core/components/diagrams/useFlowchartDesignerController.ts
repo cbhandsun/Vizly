@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState, useEffect, useRef } from 'react';
-import { Button, message, notification } from 'antd';
+import { message, notification } from 'antd';
 import { ReactFlowInstance, addEdge, type Connection, type Edge } from '@xyflow/react';
 
 import { useDesignerCanvasState } from './hooks/useDesignerCanvasState';
@@ -47,6 +47,8 @@ import { useFlowchartSearchReplaceActions } from './hooks/useFlowchartSearchRepl
 import { useFlowchartCreationTools } from './hooks/useFlowchartCreationTools';
 import { useFlowchartImportRequest } from './hooks/useFlowchartImportRequest';
 import { useCommentAwarePageDeletion } from './hooks/useCommentAwarePageDeletion';
+import { useDiagramOperationScope } from './hooks/useDiagramOperationScope';
+import { useFlowchartImportNotifications } from './hooks/useFlowchartImportNotifications';
 
 export const useFlowchartDesignerController = ({
     id,
@@ -229,35 +231,11 @@ export const useFlowchartDesignerController = ({
 
     const [messageApi, messageContextHolder] = message.useMessage();
     const [notificationApi, notificationContextHolder] = notification.useNotification();
-    const importNotificationKey = 'flowchart-file-import-status';
-    const handleImportStarted = useCallback(() => {
-        notificationApi.open({
-            key: importNotificationKey,
-            type: 'info',
-            message: t('designer.flowchart.import.importingTitle'),
-            description: t('designer.flowchart.import.importingDescription'),
-            duration: 0,
-        });
-    }, [notificationApi, t]);
-    const handleImportFinished = useCallback(({ ok }: { ok: boolean }) => {
-        if (ok) {
-            notificationApi.destroy(importNotificationKey);
-            return;
-        }
-        notificationApi.open({
-            key: importNotificationKey,
-            type: 'error',
-            message: t('designer.flowchart.import.failedTitle'),
-            description: t('designer.flowchart.import.failedDescription'),
-            duration: 0,
-            btn: React.createElement(Button, {
-                onClick: () => {
-                    notificationApi.destroy(importNotificationKey);
-                    fileInputRef.current?.click();
-                },
-            }, t('designer.flowchart.import.retry')),
-        });
-    }, [notificationApi, t]);
+    const { handleImportStarted, handleImportFinished } = useFlowchartImportNotifications({
+        notificationApi,
+        fileInputRef,
+        t,
+    });
     const getCurrentNodes = useCallback(() => nodesRef.current, [nodesRef]);
     const getCurrentEdges = useCallback(() => edgesRef.current, [edgesRef]);
     const editingEnabled = !isReadonly && !presentationActive;
@@ -403,6 +381,7 @@ export const useFlowchartDesignerController = ({
             clearSelection,
         },
     );
+    const getOperationScope = useDiagramOperationScope(diagramId, multiPage.getPageOperationScope);
     const deletePageWithComments = useCommentAwarePageDeletion(multiPage.deletePage);
     // 3. Event Handlers Domain Controller
     // commandPaletteVisible and shortcutHelpVisible already declared in Component root state section
@@ -433,7 +412,7 @@ export const useFlowchartDesignerController = ({
     } = useDesignerEventHandlers({
         nodes, edges, setNodes, setEdges,
         selectedNodes, selectedEdges,
-        takeSnapshot, clipboardDiagramId: diagramId, getPageOperationScope: multiPage.getPageOperationScope, undo, redo,
+        takeSnapshot, getOperationScope, undo, redo,
         reactFlowInstance, reactFlowWrapper,
         isDragging, editingEnabled: !isReadonly && !presentationActive, pluginCtx, activePlugin,
         messageApi, notificationApi,
@@ -545,7 +524,8 @@ export const useFlowchartDesignerController = ({
         importInFlightRef,
         onImportStarted: handleImportStarted,
         onImportFinished: handleImportFinished,
-    })(event), [t, messageApi, activePlugin, businessData?.id, id, setNodes, setEdges, handleBeforeUpdate, editingEnabled, handleFitView, handleImportFinished, handleImportStarted]);
+        getOperationScope,
+    })(event), [t, messageApi, activePlugin, businessData?.id, id, setNodes, setEdges, handleBeforeUpdate, editingEnabled, handleFitView, handleImportFinished, handleImportStarted, getOperationScope]);
 
     const onSelectionChange = useCanonicalSelectionChange({
         nodesRef,

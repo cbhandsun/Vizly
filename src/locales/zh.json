@@ -794,6 +794,8 @@
                 "importingDescription": "正在读取并验证内容，完成前不会替换当前页面。",
                 "failedTitle": "导入未完成",
                 "failedDescription": "当前页面未被替换。请检查文件格式与内容后重试。",
+                "cancelledTitle": "导入已取消",
+                "scopeChanged": "页面或图表已切换，导入文件没有替换新页面。请在当前页面重新选择文件。",
                 "retry": "重新选择文件",
                 "mermaidSuccess": "成功导入 Mermaid 文本",
                 "mermaidLayout": "建议点击\"智能布局\"整理节点",

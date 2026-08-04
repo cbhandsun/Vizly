@@ -1,10 +1,10 @@
 import { useCallback, useLayoutEffect, useRef } from 'react';
 
 /**
- * Returns a stable getter so pending clipboard reads compare against the latest
- * diagram after React commits a route or document change.
+ * Returns a stable getter so pending asynchronous operations compare against
+ * the latest diagram and page after React commits a document change.
  */
-export const useClipboardOperationScope = (
+export const useDiagramOperationScope = (
     diagramId: string,
     getPageOperationScope: () => string,
 ) => {

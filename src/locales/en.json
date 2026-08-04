@@ -679,6 +679,8 @@
                 "importingDescription": "Reading and validating content. The current page will not be replaced until this completes.",
                 "failedTitle": "Import not completed",
                 "failedDescription": "The current page was not replaced. Check the file format and content, then try again.",
+                "cancelledTitle": "Import cancelled",
+                "scopeChanged": "The page or diagram changed, so the imported file did not replace the new page. Choose the file again on the current page.",
                 "retry": "Choose another file",
                 "mermaidSuccess": "Mermaid text imported successfully",
                 "mermaidLayout": "Tip: click \"Smart Layout\" to organize nodes",

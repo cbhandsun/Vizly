@@ -16,6 +16,8 @@ export type FlowchartImportEvent = {
     };
 };
 
+export type FlowchartImportStatus = 'success' | 'failure' | 'scope-changed';
+
 type MessageApiLike = {
     success: (message: string) => void;
     info: (message: string) => void;
@@ -41,7 +43,8 @@ export interface CreateFlowchartImportHandlerOptions {
     }) => Promise<void>;
     importInFlightRef?: { current: boolean };
     onImportStarted?: () => void;
-    onImportFinished?: (result: { ok: boolean }) => void;
+    onImportFinished?: (result: { status: FlowchartImportStatus }) => void;
+    getOperationScope?: () => string;
 }
 
 const DEFAULT_DELAY_SCHEDULER = (callback: () => void, delayMs: number): void => {
@@ -64,6 +67,7 @@ export const createFlowchartImportHandler = ({
     importInFlightRef,
     onImportStarted,
     onImportFinished,
+    getOperationScope,
 }: CreateFlowchartImportHandlerOptions) => async (event: FlowchartImportEvent): Promise<void> => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -84,17 +88,30 @@ export const createFlowchartImportHandler = ({
     const validation = validateFlowchartImportFile(file, invalidFormatMessage);
     if (!validation.ok) {
         messageApi.error(validation.error);
-        onImportFinished?.({ ok: false });
+        onImportFinished?.({ status: 'failure' });
         event.target.value = '';
         return;
     }
 
     if (importInFlightRef) importInFlightRef.current = true;
-    let imported = false;
+    const initialOperationScope = getOperationScope?.();
+    const isOperationCurrent = () => (
+        initialOperationScope === undefined || getOperationScope?.() === initialOperationScope
+    );
+    const scheduleIfCurrent = (callback: () => void, delayMs: number) => {
+        scheduleDelay(() => {
+            if (isOperationCurrent()) callback();
+        }, delayMs);
+    };
+    let status: FlowchartImportStatus = 'failure';
     try {
         onImportStarted?.();
         const content = await readFlowchartImportFileText(file);
-        imported = await runFlowchartImportPipeline({
+        if (!isOperationCurrent()) {
+            status = 'scope-changed';
+            return;
+        }
+        const imported = await runFlowchartImportPipeline({
             content,
             importKind: validation.importKind,
             invalidFormatMessage,
@@ -103,47 +120,67 @@ export const createFlowchartImportHandler = ({
             diagramId,
             fallbackTitle: 'Imported Diagram',
             openedAt: new Date().toISOString(),
-            setNodes,
-            setEdges,
+            setNodes: (nextNodes) => {
+                if (isOperationCurrent()) setNodes(nextNodes);
+            },
+            setEdges: (nextEdges) => {
+                if (isOperationCurrent()) setEdges(nextEdges);
+            },
             onBeforeCanvasReplace,
             onStandardPluginSuccess: (count) => {
+                if (!isOperationCurrent()) return;
                 messageApi.success(t('designer.flowchart.import.standardSuccess', { count }));
-                scheduleDelay(() => fitView(), 500);
+                scheduleIfCurrent(fitView, 500);
             },
-            registerStandardReload,
+            registerStandardReload: async (payload) => {
+                if (!isOperationCurrent()) return;
+                await registerStandardReload(payload);
+            },
             onStandardReloadQueued: (reloadId) => {
+                if (!isOperationCurrent()) return;
                 messageApi.success(t('designer.flowchart.import.reloading'));
-                scheduleDelay(() => {
+                scheduleIfCurrent(() => {
                     window.location.href = `/?diagram=${encodeURIComponent(reloadId)}`;
                 }, 500);
             },
             onReactFlowSuccess: ({ nodes: importedNodes, edges: importedEdges }) => {
+                if (!isOperationCurrent()) return;
                 messageApi.info(t('designer.flowchart.import.rfSuccess', {
                     nodes: importedNodes.length,
                     edges: importedEdges.length,
                 }));
-                scheduleDelay(() => fitView(), 500);
+                scheduleIfCurrent(fitView, 500);
             },
             onJsonImportFailure: () => {
+                if (!isOperationCurrent()) return;
                 messageApi.error(t('designer.flowchart.import.jsonFailed'));
             },
             onMermaidSuccess: () => {
+                if (!isOperationCurrent()) return;
                 messageApi.info(t('designer.flowchart.import.mermaidSuccess'));
             },
             onMermaidLayoutHint: (delayMs) => {
-                scheduleDelay(() => {
+                scheduleIfCurrent(() => {
                     messageApi.info(t('designer.flowchart.import.mermaidLayout'));
                 }, delayMs);
             },
             onMermaidImportFailure: () => {
+                if (!isOperationCurrent()) return;
                 messageApi.error(t('designer.flowchart.import.mermaidFailed'));
             },
         });
+        status = isOperationCurrent()
+            ? (imported ? 'success' : 'failure')
+            : 'scope-changed';
     } catch {
-        messageApi.error(t('designer.flowchart.import.readFailed'));
+        if (isOperationCurrent()) {
+            messageApi.error(t('designer.flowchart.import.readFailed'));
+        } else {
+            status = 'scope-changed';
+        }
     } finally {
         if (importInFlightRef) importInFlightRef.current = false;
-        onImportFinished?.({ ok: imported });
+        onImportFinished?.({ status });
         event.target.value = '';
     }
 };
