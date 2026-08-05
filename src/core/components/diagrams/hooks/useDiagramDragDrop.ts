@@ -18,6 +18,13 @@ import {
     getNodeAbsolutePosition,
     mergeDraggedNodesIntoGraph,
 } from './diagramNodeParenting';
+import {
+    applyContainerDrop,
+    applySnapDeltaToNodes,
+    collectDraggedNodeIds,
+    detachDraggedNodesFromParents,
+    resolveDraggedNodeParenting,
+} from './diagramContainerDrop';
 
 interface UseDiagramDragDropProps {
     nodes: Node[];
@@ -292,7 +299,7 @@ export const useDiagramDragDrop = ({
         }
 
         // 🚀 P2: 使用 Ref 替代直接依赖 nodes/edges，避免回调在拖动期间重建
-        takeSnapshot(nodesRef.current, edgesRef.current, undefined, {
+        takeSnapshot(nodesRef.current, edgesRef.current, '移动节点', {
             notify: false,
             dedupe: false,
         });
@@ -393,7 +400,8 @@ export const useDiagramDragDrop = ({
             node,
             draggedNodes,
         );
-        const targetId = findNodeParentCandidate(node, graphNodes)?.id ?? null;
+        const draggedNodeIds = collectDraggedNodeIds(node, draggedNodes);
+        const primaryParentCandidate = findNodeParentCandidate(node, graphNodes);
 
         // 清理 CSS 高亮（使用 DOM 操作，避免触发 React 重新渲染）
         if (dragTargetIdRef.current) {
@@ -402,110 +410,62 @@ export const useDiagramDragDrop = ({
         }
         dragTargetIdRef.current = null;
 
-        const parentCandidate = targetId ? graphNodes.find(n => n.id === targetId) : null;
-
-        if (parentCandidate) {
+        if (primaryParentCandidate) {
             // [DDD] Mind Map Domain Event (Delegate reparenting to Orchestrator)
-            if (node.type === 'mindmap' && parentCandidate.type === 'mindmap') {
+            if (node.type === 'mindmap' && primaryParentCandidate.type === 'mindmap') {
                 if (typeof window !== 'undefined') {
                     const finalPosition = lastMindmapDropPosRef.current || 'inside';
                     window.dispatchEvent(new CustomEvent('mindmap:reparent', {
-                        detail: { nodeId: node.id, targetId: parentCandidate.id, position: finalPosition }
+                        detail: { nodeId: node.id, targetId: primaryParentCandidate.id, position: finalPosition }
                     }));
                     lastMindmapDropPosRef.current = null;
                 }
                 return; // Stop standard Group parenting execution
             }
+        }
 
-            // Parent Found!
-            // 1. Check if already parented to this one to avoid churn
-            if (node.parentId === parentCandidate.id) return;
+        const { containerGroups, canvasNodeIds } = resolveDraggedNodeParenting(
+            graphNodes,
+            draggedNodeIds,
+        );
+        const graphById = new Map(graphNodes.map(graphNode => [graphNode.id, graphNode]));
+        const parentedCanvasNodeIds = canvasNodeIds.filter(id => graphById.get(id)?.parentId);
 
-            setNodes((nds) => {
-                const CONTAINER_PADDING = 24;
-                const parentAbsolute = getNodeAbsolutePosition(parentCandidate, nds);
-                const childAbsolute = getNodeAbsolutePosition(node, nds);
+        if (containerGroups.length > 0 || parentedCanvasNodeIds.length > 0) {
+            setNodes(nds => {
+                const reparented = containerGroups.reduce((currentNodes, group) => (
+                    applyContainerDrop({
+                        nodes: currentNodes,
+                        graphNodes,
+                        draggedNodeIds: group.draggedNodeIds,
+                        parentCandidate: group.parentCandidate,
+                        snapDelta: finalSnapDelta,
+                    })
+                ), nds);
 
-                // Child's new relative position inside parent
-                const childRelX = childAbsolute.x - parentAbsolute.x;
-                const childRelY = childAbsolute.y - parentAbsolute.y;
-                const childW = node.measured?.width || node.width || 140;
-                const childH = node.measured?.height || node.height || 70;
-
-                // Current parent size
-                const parentW = Number(parentCandidate.style?.width) || parentCandidate.measured?.width || parentCandidate.width || 400;
-                const parentH = Number(parentCandidate.style?.height) || parentCandidate.measured?.height || parentCandidate.height || 300;
-
-                // 🆕 Auto-Expand: calculate needed size
-                const neededW = Math.max(parentW, childRelX + childW + CONTAINER_PADDING);
-                const neededH = Math.max(parentH, childRelY + childH + CONTAINER_PADDING);
-                const needsExpand = neededW > parentW || neededH > parentH;
-
-                return nds.map((n) => {
-                    if (n.id === node.id) {
-                        return {
-                            ...n,
-                            parentId: parentCandidate.id,
-                            extent: 'parent',
-                            position: {
-                                x: childRelX + (finalSnapDelta ? finalSnapDelta.x : 0),
-                                y: childRelY + (finalSnapDelta ? finalSnapDelta.y : 0)
-                            },
-                            data: {
-                                ...n.data,
-                                domain: parentCandidate.data.domain || parentCandidate.data.domainClass
-                            }
-                        };
-                    }
-                    // 🆕 Auto-Expand: resize parent if needed
-                    if (n.id === parentCandidate.id && needsExpand) {
-                        return {
-                            ...n,
-                            style: {
-                                ...n.style,
-                                width: neededW,
-                                height: neededH,
-                            }
-                        };
-                    }
-                    return n;
-                });
+                return parentedCanvasNodeIds.length > 0
+                    ? detachDraggedNodesFromParents({
+                        nodes: reparented,
+                        graphNodes,
+                        draggedNodeIds: parentedCanvasNodeIds,
+                        snapDelta: finalSnapDelta,
+                    })
+                    : reparented;
             });
-        } else {
-            // No parent found (dropped on canvas)
-            if (node.parentId) {
-                // Was parented, now unparenting
-                setNodes((nds) => nds.map((n) => {
-                    if (n.id === node.id) {
-                        // Convert relative back to absolute
-                        const absolute = getNodeAbsolutePosition(node, graphNodes);
+        }
 
-                        const { parentId: _p, extent: _e, ...rest } = n; // Remove parentId/extent
-                        return {
-                            ...rest,
-                            position: { 
-                                x: absolute.x + (finalSnapDelta ? finalSnapDelta.x : 0),
-                                y: absolute.y + (finalSnapDelta ? finalSnapDelta.y : 0),
-                            }
-                        };
-                    }
-                    return n;
-                }));
-            } else if (finalSnapDelta && (finalSnapDelta.x !== 0 || finalSnapDelta.y !== 0)) {
-                // Std top-level drop on canvas: re-apply the snapDelta asynchronously to override React Flow's native snapToGrid update
-                setTimeout(() => {
-                    setNodes((nds) => nds.map((n) => {
-                        if (n.id !== node.id) return n;
-                        return {
-                            ...n,
-                            position: {
-                                x: n.position.x + finalSnapDelta.x,
-                                y: n.position.y + finalSnapDelta.y
-                            }
-                        };
-                    }));
-                }, 0);
-            }
+        const topLevelCanvasNodeIds = new Set(
+            canvasNodeIds.filter(id => !graphById.get(id)?.parentId),
+        );
+        if (
+            topLevelCanvasNodeIds.size > 0
+            && finalSnapDelta
+            && (finalSnapDelta.x !== 0 || finalSnapDelta.y !== 0)
+        ) {
+            // Std top-level drop on canvas: re-apply the snapDelta asynchronously to override React Flow's native snapToGrid update
+            setTimeout(() => {
+                setNodes(nds => applySnapDeltaToNodes(nds, topLevelCanvasNodeIds, finalSnapDelta));
+            }, 0);
         }
     }, [setIsDragging, setNodes, clearGuides, notifyHistoryChanged, snapDeltaRef]);
 

@@ -55,6 +55,23 @@ describe('useDiagramDragDrop drag performance boundary', () => {
     expect(props.setNodes).not.toHaveBeenCalled();
   });
 
+  it('records a labeled pre-drag snapshot for undo without refreshing history early', () => {
+    const props = createProps();
+    const { result } = renderHook(() => useDiagramDragDrop(props));
+
+    act(() => {
+      result.current.onNodeDragStart(new MouseEvent('mousedown'), node);
+    });
+
+    expect(props.takeSnapshot).toHaveBeenCalledWith(
+      [node],
+      [],
+      '移动节点',
+      { notify: false, dedupe: false },
+    );
+    expect(props.notifyHistoryChanged).not.toHaveBeenCalled();
+  });
+
   it('still persists the last smart-guide offset after release', () => {
     vi.useFakeTimers();
     const props = createProps();
