@@ -357,32 +357,7 @@ export const useFlowchartDesignerController = ({
     } = useFlowchartCreationTools({
         editingEnabled: !isReadonly && !presentationActive,
         isDrawingMode, isMarqueeActive, isCommentMode,
-        setIsDrawingMode, setIsMarqueeActive, setIsCommentMode: setStoredCommentMode,
-        activeLayerId, nodesRef, edgesRef, reactFlowInstance, setNodes, takeSnapshot, t,
-    });
-    
-    // 2.5 Linter Layer (Phase 8 integration)
-    useTopologyLinter(nodesWithGhost, finalEdgesWithGhost, { enabled: !isReadonly });
-    
-
-
-
-
-
-
-    // 协作层 diagramId：优先使用 id prop，回退到导出 ID，避免多画布协作时 ID 冲突
-    const diagramId = id || diagramIdForExport || 'default';
-    const { updateLocalCursor } = useDiagramCollaboration(diagramId, !isReadonly);
-    const multiPage = useMultiPage(
-        () => nodesRef.current,
-        () => edgesRef.current,
-        setNodes,
-        setEdges,
-        {
-            switchScope: switchHistoryScope,
-            removeScope: removeHistoryScope,
-            clearSelection,
-            scopeId: diagramId,
+        setIsDrawingMode, s�ͭ�G����ƭy�peId: diagramId,
         },
     );
     const getOperationScope = useDiagramOperationScope(diagramId, multiPage.getPageOperationScope);
@@ -660,7 +635,7 @@ export const useFlowchartDesignerController = ({
         currentZoom, deleteAnnotation, deleteLayer, deleteTemplate, diagramIdForExport, diffResult, dynamicEdgeTypes, dynamicNodeTypes, edges,
         edgesRef, enhancedOnConnect, enhancedOnConnectEnd, exportModalVisible, extraExportItems, fileInputRef,
         getPreviousState, getReactFlowSnapshot, gridColor, gridVariant, groupedTemplates, guides, handleAddFreehandStroke, handleAddMindMap, handleAddNode, handleAddStickyNote, handleAlign,
-        handleBeforeUpdate, handleBringToFront, handleContextMenuAction, handleDeleteWithToast, handleDistribute, handleDuplicateWithToast,
+        handleBeforeUpdate, handleBringToFront, handleContextMenuAction, handleDeleteWithToast, handleDistribute, handleDuplicateWithToast, handleGroupWithToast, handleUngroupWithToast,
         handleEdgeDoubleClick, handleFitView, handleFocusNode, handleGridRotate, handleImport, handleRequestImport, handleLock, handleOpacity,
         handleOpenJsonEditor, handleOpenSettings, handlePaneClick, handlePresentationFocus, handleReactFlowInit, handleReadonlyChange, handleReconnect,
         handleReconnectEnd, handleReconnectStart, handleSearchReplaceAll, handleSearchReplaceNode, handleSendToBack, handleSmartOptimize, handleStrategyLayout,

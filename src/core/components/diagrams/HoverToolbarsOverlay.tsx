@@ -27,6 +27,8 @@ interface HoverToolbarsOverlayProps {
     // Commands
     handleDeleteWithToast: (target?: DiagramActionTarget) => void;
     handleDuplicateWithToast: (target?: DiagramActionTarget) => void;
+    handleGroupWithToast: () => void;
+    handleUngroupWithToast: (targetId?: string) => void;
     handleLock: (target?: DiagramActionTarget, locked?: boolean) => void;
     handleOpacity: (opacity: number) => void;
     handleBringToFront: (id?: string) => void;
@@ -74,6 +76,8 @@ export const HoverToolbarsOverlay: React.FC<HoverToolbarsOverlayProps> = ({
     onUpdateNodes,
     handleDeleteWithToast,
     handleDuplicateWithToast,
+    handleGroupWithToast,
+    handleUngroupWithToast,
     handleLock,
     handleOpacity,
     handleBringToFront,
@@ -108,6 +112,8 @@ export const HoverToolbarsOverlay: React.FC<HoverToolbarsOverlayProps> = ({
                     onUpdateNodes={onUpdateNodes!}
                     onDelete={() => handleDeleteWithToast(selectedNodeIds)}
                     onDuplicate={() => handleDuplicateWithToast(selectedNodeIds)}
+                    onGroup={handleGroupWithToast}
+                    onUngroup={() => handleUngroupWithToast(selectedNodes[0]?.id)}
                     onChangeColor={(color) => {
                         // Real-time preview (disable snapshot to prevent flooding the undo/redo stack)
                         updateNodesBatch(selectedNodes.map((node) => node.id), {

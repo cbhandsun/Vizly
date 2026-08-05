@@ -26,7 +26,7 @@ interface UseToastActionsProps {
     handleCut: () => void;
     // Group actions
     handleGroup: () => void;
-    handleUngroup: () => void;
+    handleUngroup: (targetNodeIds?: string[]) => void;
     // Context menu action
     onContextMenuAction: (action: string, targetId?: string) => void;
     // History
@@ -203,8 +203,11 @@ export function useToastActions({
         handleGroup();
     }, [handleGroup, messageApi, nodesRef, selectedNodes, t]);
 
-    const handleUngroupWithToast = useCallback(() => {
-        const groups = selectedNodes.filter(n => n.type === 'titleGroup' || n.type === 'subGroup');
+    const handleUngroupWithToast = useCallback((targetId?: string) => {
+        const candidates = targetId
+            ? nodesRef.current.filter(node => node.id === targetId)
+            : selectedNodes;
+        const groups = candidates.filter(n => n.type === 'titleGroup' || n.type === 'subGroup');
         if (groups.length === 0) {
             messageApi.info(t('designer.flowchart.toast.nothingToUngroup'));
             return;
@@ -216,7 +219,7 @@ export function useToastActions({
             messageApi.warning(t('designer.flowchart.toast.lockedSelection', '节点已锁定，请先解锁后再操作'));
             return;
         }
-        handleUngroup();
+        handleUngroup(groups.map(group => group.id));
     }, [handleUngroup, messageApi, nodesRef, selectedNodes, t]);
 
     // --- Context menu combined handler ---

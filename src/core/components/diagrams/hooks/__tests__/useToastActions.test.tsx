@@ -118,6 +118,22 @@ describe('useToastActions clipboard feedback', () => {
     expect(info).not.toHaveBeenCalled();
   });
 
+  it('passes an explicit context-menu group target to ungrouping', () => {
+    const { props } = createProps(vi.fn().mockResolvedValue('empty'));
+    const groupNode: Node = {
+      id: 'group',
+      type: 'titleGroup',
+      position: { x: 0, y: 0 },
+      data: {},
+    };
+    props.nodesRef.current = [groupNode];
+    const { result } = renderHook(() => useToastActions(props));
+
+    act(() => result.current.handleUngroupWithToast(groupNode.id));
+
+    expect(props.handleUngroup).toHaveBeenCalledWith([groupNode.id]);
+  });
+
   it('reports an empty clipboard only after both clipboard channels fail', async () => {
     const handlePaste = vi.fn().mockResolvedValue('empty');
     const { info, props } = createProps(handlePaste);

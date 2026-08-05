@@ -54,8 +54,8 @@ export const useGrouping = ({
         setSelectedNodes([plan.groupNode]);
     }, [defaultGroupDescription, defaultGroupLabel, selectedNodes, nodes, edges, nodesRef, edgesRef, takeSnapshot, setNodes, setEdges, setSelectedNodes]);
 
-    const handleUngroup = useCallback(() => {
-        const selectedIds = new Set(selectedNodes.map(node => node.id));
+    const handleUngroup = useCallback((targetNodeIds?: string[]) => {
+        const selectedIds = new Set(targetNodeIds ?? selectedNodes.map(node => node.id));
         const groupsToUngroup = resolveTargetNodes(nodes, selectedIds)
             .filter(n => n.type === 'titleGroup' || n.type === 'subGroup');
         if (groupsToUngroup.length === 0) return;

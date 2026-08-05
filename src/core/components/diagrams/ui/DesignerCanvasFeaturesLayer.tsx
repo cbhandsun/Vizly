@@ -45,6 +45,8 @@ export interface DesignerCanvasFeaturesLayerProps {
         | 'onUpdateNodes'
         | 'handleDeleteWithToast'
         | 'handleDuplicateWithToast'
+        | 'handleGroupWithToast'
+        | 'handleUngroupWithToast'
         | 'handleLock'
         | 'handleOpacity'
         | 'handleBringToFront'
@@ -125,6 +127,8 @@ export const DesignerCanvasFeaturesLayer = React.memo(
                 onUpdateNodes={hoverToolbar.onUpdateNodes}
                 handleDeleteWithToast={hoverToolbar.handleDeleteWithToast}
                 handleDuplicateWithToast={hoverToolbar.handleDuplicateWithToast}
+                handleGroupWithToast={hoverToolbar.handleGroupWithToast}
+                handleUngroupWithToast={hoverToolbar.handleUngroupWithToast}
                 handleLock={hoverToolbar.handleLock}
                 handleOpacity={hoverToolbar.handleOpacity}
                 handleBringToFront={hoverToolbar.handleBringToFront}

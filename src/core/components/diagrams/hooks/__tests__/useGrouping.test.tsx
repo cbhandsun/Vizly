@@ -65,4 +65,21 @@ describe('useGrouping mutation boundaries', () => {
         expect(state.setEdges).toHaveBeenCalledTimes(1);
         expect(state.setSelectedNodes).toHaveBeenCalledTimes(1);
     });
+
+    it('ungroups an explicit context-menu target instead of an unrelated selection', () => {
+        const group = node('group', { type: 'titleGroup', position: { x: 100, y: 80 } });
+        const child = node('child', { parentId: group.id, position: { x: 20, y: 30 }, extent: 'parent' });
+        const unrelated = node('unrelated');
+        const state = setup([group, child, unrelated], [unrelated]);
+
+        act(() => state.result.current.handleUngroup([group.id]));
+
+        expect(state.takeSnapshot).toHaveBeenCalledTimes(1);
+        const updater = state.setNodes.mock.calls[0]?.[0] as (current: Node[]) => Node[];
+        expect(updater([group, child, unrelated])).toEqual([
+            expect.objectContaining({ id: child.id, position: { x: 120, y: 110 } }),
+            unrelated,
+        ]);
+        expect(state.setSelectedNodes).toHaveBeenCalledWith([]);
+    });
 });

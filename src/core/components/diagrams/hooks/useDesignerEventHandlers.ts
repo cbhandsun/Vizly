@@ -135,9 +135,11 @@ export function useDesignerEventHandlers({
         if (action === 'zoomIn') { reactFlowInstance?.zoomIn(); return; }
         if (action === 'zoomOut') { reactFlowInstance?.zoomOut(); return; }
         if (action === 'selectAll') { handleSelectAll(); return; }
+        if (action === 'group') { handleGroupWithToast(); return; }
+        if (action === 'ungroup') { handleUngroupWithToast(targetId); return; }
         
         onContextMenuActionWithToast(action, targetId);
-    }, [layoutContainer, toggleGroupCollapse, onContextMenuActionWithToast, undo, redo, reactFlowInstance, handleSelectAll]);
+    }, [layoutContainer, toggleGroupCollapse, onContextMenuActionWithToast, undo, redo, reactFlowInstance, handleSelectAll, handleGroupWithToast, handleUngroupWithToast]);
 
     const handleNudge = useCallback((direction: 'up' | 'down' | 'left' | 'right', distance: number) => {
         if (!editingEnabled) return;

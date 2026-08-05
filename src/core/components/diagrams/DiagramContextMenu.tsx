@@ -165,6 +165,14 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
             label: isCollapsed ? '展开组 (Expand Group)' : '折叠组 (Collapse Group)',
             disabled: isLocked,
           });
+          if (targetNode.type === 'titleGroup' || targetNode.type === 'subGroup') {
+            items.push({
+              key: 'ungroup',
+              icon: <GroupOutlined rotate={180} />,
+              label: '取消组合 (Ungroup)',
+              disabled: isLocked,
+            });
+          }
         }
       }
 

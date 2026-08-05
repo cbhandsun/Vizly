@@ -6,7 +6,7 @@ import type { LayerConfig } from './hooks/useLayerManagement';
 import type { AggregationColor } from 'antd/es/color-picker/color';
 import {
     FaTrash, FaCopy, FaLock, FaLockOpen, FaLayerGroup,
-    FaArrowsAlt, FaShapes, FaStar, FaPaintBrush
+    FaArrowsAlt, FaShapes, FaStar, FaPaintBrush, FaObjectGroup, FaRegObjectGroup
 } from 'react-icons/fa';
 import {
     MdAlignHorizontalLeft, MdAlignHorizontalCenter, MdAlignHorizontalRight,
@@ -85,6 +85,8 @@ export interface FloatingContextToolbarProps {
     onCopyStyle?: () => void;
     onPasteStyle?: () => void;
     hasCopiedStyle?: boolean;
+    onGroup?: () => void;
+    onUngroup?: () => void;
     extraToolbarContent?: React.ReactNode; // Support for node-specific injected tools
     excludeToolbarFeatures?: ToolbarFeature[]; // Support for node-specific hiding of generic tools
     overrideDefaultToolbar?: boolean; // If true, replaces ALL default buttons and uses square borders
@@ -167,7 +169,7 @@ export const FloatingContextToolbar: React.FC<FloatingContextToolbarProps> = Rea
     onChangeColorComplete,
     onLock, onOpacity, onBringToFront, onSendToBack, onUpdateStyle, onUpdateNodes,
     layers, onMoveToLayer, onChangeShape, onSaveAsComponent, onChangeDomainClass,
-    onCopyStyle, onPasteStyle, hasCopiedStyle, extraToolbarContent, excludeToolbarFeatures,
+    onCopyStyle, onPasteStyle, hasCopiedStyle, onGroup, onUngroup, extraToolbarContent, excludeToolbarFeatures,
     overrideDefaultToolbar
 }) => {
     // ─── Hooks (must be called unconditionally) ──────────────────────────────
@@ -208,6 +210,7 @@ export const FloatingContextToolbar: React.FC<FloatingContextToolbarProps> = Rea
     const isHide = (feature: ToolbarFeature) => excludeToolbarFeatures?.includes(feature);
     const allLocked = selectedNodes.every(node => node.data?.locked === true || node.draggable === false);
     const hasLockedSelection = hasMutationLockedNode(selectedNodes);
+    const hasUngroupableSelection = selectedNodes.some(node => node.type === 'titleGroup' || node.type === 'subGroup');
     const lockedActionLabel = (label: string) => hasLockedSelection ? `${label}（请先解锁）` : label;
 
     const currentOpacity = selectedNodes.reduce((acc, n) => {
@@ -317,6 +320,14 @@ export const FloatingContextToolbar: React.FC<FloatingContextToolbarProps> = Rea
                             disabled: hasLockedSelection,
                         }] : []),
                         ...(onSaveAsComponent ? [{ key: 'save', icon: <FaStar />, label: '保存为组件', onClick: onSaveAsComponent }] : []),
+                        ...(onGroup && selectedNodes.length > 1 ? [{
+                            key: 'group', icon: <FaObjectGroup />, label: '组合 (Ctrl+G)', onClick: onGroup,
+                            disabled: hasLockedSelection,
+                        }] : []),
+                        ...(onUngroup && hasUngroupableSelection ? [{
+                            key: 'ungroup', icon: <FaRegObjectGroup />, label: '取消组合 (Ctrl+Shift+G)', onClick: onUngroup,
+                            disabled: hasLockedSelection,
+                        }] : []),
                         ...(onCopyStyle && onPasteStyle ? [{
                             key: 'format', icon: <FaPaintBrush />,
                             label: hasCopiedStyle ? '粘贴样式' : '复制样式',
