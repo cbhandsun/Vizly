@@ -1,3 +1,5 @@
+import { shouldPreserveParentDialogOnEscape } from '@/core/components/ui/dialogEscapeLayer';
+
 const DIALOG_FOCUSABLE_SELECTOR = [
     'a[href]',
     'button:not([disabled])',
@@ -68,14 +70,12 @@ export const trapDialogTab = (
 export const bindDialogEscapeClose = (
     target: Window,
     closeDialog: () => void,
+    dialog?: HTMLElement | null,
 ): (() => void) => {
     const onKeyDown = (event: KeyboardEvent) => {
         if (event.key !== 'Escape') return;
 
-        const eventTarget = event.target;
-        const preservesDialog = eventTarget instanceof Element
-            && eventTarget.closest('[data-preserve-dialog-on-escape="true"]');
-        if (!preservesDialog) closeDialog();
+        if (!shouldPreserveParentDialogOnEscape(event.target, dialog)) closeDialog();
     };
 
     target.addEventListener('keydown', onKeyDown, true);

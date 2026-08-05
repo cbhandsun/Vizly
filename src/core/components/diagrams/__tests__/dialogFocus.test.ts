@@ -92,4 +92,36 @@ describe('dialog focus helpers', () => {
         regular.remove();
         preserved.remove();
     });
+
+    it('keeps the parent dialog open when Escape belongs to a nested interaction layer', () => {
+        const closeDialog = vi.fn();
+        const dialog = document.createElement('div');
+        dialog.setAttribute('role', 'dialog');
+        const dialogButton = document.createElement('button');
+        dialog.appendChild(dialogButton);
+
+        const nestedDialog = document.createElement('div');
+        nestedDialog.setAttribute('role', 'dialog');
+        const nestedDialogButton = document.createElement('button');
+        nestedDialog.appendChild(nestedDialogButton);
+
+        const nestedMenu = document.createElement('div');
+        nestedMenu.setAttribute('role', 'menu');
+        const nestedMenuItem = document.createElement('button');
+        nestedMenu.appendChild(nestedMenuItem);
+        document.body.append(dialog, nestedDialog, nestedMenu);
+
+        const unbind = bindDialogEscapeClose(window, closeDialog, dialog);
+        nestedDialogButton.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        nestedMenuItem.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        expect(closeDialog).not.toHaveBeenCalled();
+
+        dialogButton.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        expect(closeDialog).toHaveBeenCalledTimes(1);
+
+        unbind();
+        dialog.remove();
+        nestedDialog.remove();
+        nestedMenu.remove();
+    });
 });

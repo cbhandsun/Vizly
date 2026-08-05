@@ -4,6 +4,7 @@ import type { TextAreaRef } from 'antd/es/input/TextArea';
 import { describe, expect, it, vi } from 'vitest';
 
 import { AIChatViewLayout } from '../AIChatViewLayout';
+import { shouldCloseAIChatOnKeyDown } from '../aiChatEscape';
 
 type LayoutProps = React.ComponentProps<typeof AIChatViewLayout>;
 
@@ -126,5 +127,40 @@ describe('AIChatViewLayout commercial interactions', () => {
         expect((sendButton as HTMLButtonElement).disabled).toBe(false);
         fireEvent.click(sendButton);
         expect(handleSendMessage).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the chat open when Escape belongs to a nested interaction layer', () => {
+        const parentDialog = document.createElement('div');
+        parentDialog.setAttribute('role', 'dialog');
+        const chatInput = document.createElement('textarea');
+        parentDialog.appendChild(chatInput);
+
+        const nestedDialog = document.createElement('div');
+        nestedDialog.setAttribute('role', 'dialog');
+        const nestedDialogButton = document.createElement('button');
+        nestedDialog.appendChild(nestedDialogButton);
+
+        const nestedMenu = document.createElement('div');
+        nestedMenu.setAttribute('role', 'menu');
+        const nestedMenuItem = document.createElement('button');
+        nestedMenu.appendChild(nestedMenuItem);
+        document.body.append(parentDialog, nestedDialog, nestedMenu);
+
+        expect(shouldCloseAIChatOnKeyDown({ key: 'Enter', target: chatInput }, parentDialog)).toBe(false);
+        expect(shouldCloseAIChatOnKeyDown({ key: 'Escape', target: chatInput }, parentDialog)).toBe(true);
+        expect(shouldCloseAIChatOnKeyDown({ key: 'Escape', target: nestedDialogButton }, parentDialog)).toBe(false);
+        expect(shouldCloseAIChatOnKeyDown({ key: 'Escape', target: nestedMenuItem }, parentDialog)).toBe(false);
+
+        parentDialog.remove();
+        nestedDialog.remove();
+        nestedMenu.remove();
+    });
+
+    it('closes a docked chat without a parent dialog when no overlay owns Escape', () => {
+        const chatInput = document.createElement('textarea');
+        document.body.appendChild(chatInput);
+
+        expect(shouldCloseAIChatOnKeyDown({ key: 'Escape', target: chatInput })).toBe(true);
+        chatInput.remove();
     });
 });

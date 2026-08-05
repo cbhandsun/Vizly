@@ -79,4 +79,13 @@ describe('AIChatViewLayout accessibility contract', () => {
         expect(css).toMatch(/@media \(max-width: 640px\)[\s\S]*?\.ai-config-layout[\s\S]*?flex-direction: column/);
         expect(css).toMatch(/\.ai-config-provider-select:focus-visible[\s\S]*?outline: 2px solid/);
     });
+
+    it('keeps the lazy AI configuration modal mounted after first open so focus can return', () => {
+        const viewerSource = readFileSync('src/components/DiagramViewerView.tsx', 'utf8');
+
+        expect(viewerSource).toContain('const [hasMountedAIConfig, setHasMountedAIConfig] = useState(aiConfigVisible)');
+        expect(viewerSource).toContain('setHasMountedAIConfig(true)');
+        expect(viewerSource).toContain('renderAIConfigModal={hasMountedAIConfig ? (');
+        expect(viewerSource).not.toContain('renderAIConfigModal={aiConfigVisible ? (');
+    });
 });

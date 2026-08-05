@@ -173,6 +173,12 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
     setShowDebugPanel,
 }) => {
     const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(false);
+    const [hasMountedAIConfig, setHasMountedAIConfig] = useState(aiConfigVisible);
+
+    const openAIConfig = () => {
+        setHasMountedAIConfig(true);
+        setAiConfigVisible(true);
+    };
 
     return (
         <DiagramThemeProvider>
@@ -295,7 +301,7 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
                                                 renderAIChatPanel={({ onClose }) => (
                                                     <Suspense fallback={<div className="p-4 text-center text-gray-500">Loading AI...</div>}>
                                                         <AIChatView
-                                                            onOpenConfig={() => setAiConfigVisible(true)}
+                                                            onOpenConfig={openAIConfig}
                                                             pluginId={resolvedPluginId || 'flowchart-diagram'}
                                                             diagramId={selectedDiagramId}
                                                             onPreviewJson={handlePreviewAIJson}
@@ -311,7 +317,7 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
                                                 renderThemeSelector={
                                                     <EnhancedThemeSelector />
                                                 }
-                                                renderAIConfigModal={aiConfigVisible ? (
+                                                renderAIConfigModal={hasMountedAIConfig ? (
                                                     <Suspense fallback={<div />}>
                                                         <AIConfigModal
                                                             open={aiConfigVisible}

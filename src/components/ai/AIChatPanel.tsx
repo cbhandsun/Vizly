@@ -22,6 +22,7 @@ import { createAIChatMessageId } from './aiChatConversationModel';
 import { AIChatViewLayout, type AIChatSlashCommand } from './AIChatViewLayout';
 import { useAIChatRequestLifecycle } from './useAIChatRequestLifecycle';
 import { getAIChatConfigurationState } from './aiChatRequestConfig';
+import { shouldCloseAIChatOnKeyDown } from './aiChatEscape';
 
 // --- Message Item Component (with Memo) ---
 /**
@@ -191,7 +192,8 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
     // --- Keyboard Shortcuts ---
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') {
+            const parentDialog = messagesEndRef.current?.closest<HTMLElement>('[role="dialog"]') ?? null;
+            if (shouldCloseAIChatOnKeyDown(e, parentDialog)) {
                 onClose();
             }
             // Alt + / Toggle Sidebar

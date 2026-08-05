@@ -252,7 +252,7 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
 
     useEffect(() => {
         if (!mobileDialogOpen) return;
-        return bindDialogEscapeClose(window, closeMobileDialog);
+        return bindDialogEscapeClose(window, closeMobileDialog, sidebarRef.current);
     }, [closeMobileDialog, mobileDialogOpen]);
 
     useEffect(() => () => {
