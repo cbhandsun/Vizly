@@ -139,9 +139,15 @@ describe('PageTabs', () => {
         fireEvent.change(input, { target: { value: ' 页面 1 ' } });
         fireEvent.keyDown(input, { key: 'Enter' });
 
-        expect(await screen.findByText('页面名称不能重复')).toBeTruthy();
+        const visibleError = await screen.findByRole('tooltip');
+        expect(visibleError.textContent).toBe('页面名称不能重复');
         expect(input.getAttribute('aria-invalid')).toBe('true');
         expect(input.getAttribute('maxlength')).toBe('80');
+        const describedBy = input.getAttribute('aria-describedby');
+        expect(describedBy).toBeTruthy();
+        const announcedError = document.getElementById(describedBy ?? '');
+        expect(announcedError?.getAttribute('role')).toBe('alert');
+        expect(announcedError?.textContent).toBe('页面名称不能重复');
         expect(onRenamePage).not.toHaveBeenCalled();
     });
 
@@ -248,6 +254,8 @@ describe('PageTabs', () => {
 
         expect(popover).toBeTruthy();
         expect(popover?.parentElement).toBe(document.body);
+        expect((popover as HTMLElement | null)?.style.maxWidth)
+            .toBe('calc(100vw - 16px)');
     });
 
     it('restores keyboard focus to the adjacent active page after deletion', async () => {

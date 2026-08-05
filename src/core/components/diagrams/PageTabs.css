@@ -92,6 +92,21 @@
     font-size: 12px;
 }
 
+.page-tabs__rename-anchor {
+    display: inline-flex;
+}
+
+.page-tabs__sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
 @media (max-width: 768px) {
     .page-tabs {
         right: 8px;

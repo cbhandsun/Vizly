@@ -32,6 +32,7 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
     const [renameError, setRenameError] = useState<string | null>(null);
     const [confirmingPageId, setConfirmingPageId] = useState<string | null>(null);
     const inputRef = useRef<InputRef>(null);
+    const renameErrorId = React.useId();
     const tabButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
     const restoreFocusAfterDeleteRef = useRef(false);
     const pageLimitReached = pages.length >= MAX_DIAGRAM_PAGES;
@@ -124,29 +125,39 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                 return (
                     <div key={page.id} className="page-tabs__item">
                         {isEditing ? (
-                            <Tooltip
-                                open={Boolean(renameError)}
-                                title={renameError}
-                                placement="top"
-                            >
-                                <Input
-                                    ref={inputRef}
-                                    aria-label={t('designer.pages.rename', { name: page.name, defaultValue: '重命名页面 {{name}}' })}
-                                    aria-invalid={Boolean(renameError)}
-                                    size="small"
-                                    value={editName}
-                                    maxLength={MAX_DIAGRAM_PAGE_NAME_LENGTH}
-                                    status={renameError ? 'error' : undefined}
-                                    onChange={event => {
-                                        setEditName(event.target.value);
-                                        setRenameError(null);
-                                    }}
-                                    onBlur={handleFinishRename}
-                                    onPressEnter={handleFinishRename}
-                                    onKeyDown={handleRenameKeyDown}
-                                    className="page-tabs__rename"
-                                />
-                            </Tooltip>
+                            <>
+                                <Tooltip
+                                    open={Boolean(renameError)}
+                                    title={renameError}
+                                    placement="top"
+                                >
+                                    <span className="page-tabs__rename-anchor">
+                                        <Input
+                                            ref={inputRef}
+                                            aria-label={t('designer.pages.rename', { name: page.name, defaultValue: '重命名页面 {{name}}' })}
+                                            aria-invalid={Boolean(renameError)}
+                                            aria-describedby={renameError ? renameErrorId : undefined}
+                                            size="small"
+                                            value={editName}
+                                            maxLength={MAX_DIAGRAM_PAGE_NAME_LENGTH}
+                                            status={renameError ? 'error' : undefined}
+                                            onChange={event => {
+                                                setEditName(event.target.value);
+                                                setRenameError(null);
+                                            }}
+                                            onBlur={handleFinishRename}
+                                            onPressEnter={handleFinishRename}
+                                            onKeyDown={handleRenameKeyDown}
+                                            className="page-tabs__rename"
+                                        />
+                                    </span>
+                                </Tooltip>
+                                {renameError && (
+                                    <span id={renameErrorId} role="alert" className="page-tabs__sr-only">
+                                        {renameError}
+                                    </span>
+                                )}
+                            </>
                         ) : (
                             <button
                                 ref={element => {
@@ -192,7 +203,8 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                                 })}
                                 getPopupContainer={getViewportOverlayContainer}
                                 placement="top"
-                                autoAdjustOverflow={false}
+                                autoAdjustOverflow
+                                styles={{ root: { maxWidth: 'calc(100vw - 16px)' } }}
                                 open={confirmingPageId === page.id}
                                 onOpenChange={open => setConfirmingPageId(open ? page.id : null)}
                                 onConfirm={() => {
