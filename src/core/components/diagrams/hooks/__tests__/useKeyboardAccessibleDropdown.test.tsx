@@ -9,16 +9,20 @@ interface HarnessProps {
     disabledFirst?: boolean;
     empty?: boolean;
     onActivate?: () => void;
+    onBeforeOpen?: () => void;
 }
 
-const Harness: React.FC<HarnessProps> = ({ disabledFirst = false, empty = false, onActivate }) => {
+const Harness: React.FC<HarnessProps> = ({ disabledFirst = false, empty = false, onActivate, onBeforeOpen }) => {
     const {
         open,
         triggerRef,
         handleMenuKeyDown,
         handleOpenChange,
         handleTriggerKeyDown,
-    } = useKeyboardAccessibleDropdown({ overlayClassName: 'test-menu-overlay' });
+    } = useKeyboardAccessibleDropdown({
+        overlayClassName: 'test-menu-overlay',
+        onBeforeOpen,
+    });
 
     const activate = () => {
         onActivate?.();
@@ -32,6 +36,7 @@ const Harness: React.FC<HarnessProps> = ({ disabledFirst = false, empty = false,
                 type="button"
                 aria-haspopup="menu"
                 aria-expanded={open}
+                onClick={() => handleOpenChange(!open, { source: 'trigger' })}
                 onKeyDown={handleTriggerKeyDown}
             >
                 操作
@@ -73,6 +78,19 @@ describe('useKeyboardAccessibleDropdown', () => {
         const firstItem = await screen.findByRole('menuitem', { name: '第一项' });
         await waitFor(() => expect(document.activeElement).toBe(firstItem));
         expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    });
+
+    it('prepares dynamic menu state before keyboard and pointer opening', () => {
+        const onBeforeOpen = vi.fn();
+        render(<Harness onBeforeOpen={onBeforeOpen} />);
+        const trigger = screen.getByRole('button', { name: '操作' });
+
+        fireEvent.keyDown(trigger, { key: 'Enter' });
+        expect(onBeforeOpen).toHaveBeenCalledTimes(1);
+
+        fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+        fireEvent.click(trigger);
+        expect(onBeforeOpen).toHaveBeenCalledTimes(2);
     });
 
     it('skips disabled items and restores trigger focus after Escape', async () => {

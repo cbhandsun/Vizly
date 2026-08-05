@@ -4,6 +4,7 @@ const MENU_OPEN_KEYS = new Set(['ArrowDown', 'Enter', ' ']);
 
 interface KeyboardAccessibleDropdownOptions {
     overlayClassName: string;
+    onBeforeOpen?: () => void;
 }
 
 interface DropdownOpenChangeInfo {
@@ -25,6 +26,7 @@ const focusFirstEnabledMenuItem = (overlayClassName: string): boolean => {
 
 export const useKeyboardAccessibleDropdown = ({
     overlayClassName,
+    onBeforeOpen,
 }: KeyboardAccessibleDropdownOptions) => {
     const [open, setOpen] = useState(false);
     const triggerRef = useRef<HTMLButtonElement>(null);
@@ -53,9 +55,10 @@ export const useKeyboardAccessibleDropdown = ({
     const handleTriggerKeyDown = useCallback((event: React.KeyboardEvent<HTMLButtonElement>) => {
         if (!MENU_OPEN_KEYS.has(event.key)) return;
         event.preventDefault();
+        onBeforeOpen?.();
         setOpen(true);
         focusFirstItem();
-    }, [focusFirstItem]);
+    }, [focusFirstItem, onBeforeOpen]);
 
     const handleMenuKeyDown = useCallback((event: React.KeyboardEvent<HTMLElement>) => {
         if (event.key === ' ') {
@@ -80,9 +83,10 @@ export const useKeyboardAccessibleDropdown = ({
     }, []);
 
     const handleOpenChange = useCallback((nextOpen: boolean, info?: DropdownOpenChangeInfo) => {
+        if (nextOpen) onBeforeOpen?.();
         setOpen(nextOpen);
         if (!nextOpen && info?.source === 'menu') restoreTriggerFocusIfLost();
-    }, [restoreTriggerFocusIfLost]);
+    }, [onBeforeOpen, restoreTriggerFocusIfLost]);
 
     return {
         open,

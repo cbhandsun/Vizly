@@ -23,6 +23,7 @@ import {
 } from './diagramExportEvent';
 import { resolveExportPopupContainer } from './exportPopupContainer';
 import { resolveExportableNodeCount, resolveExportMenuAvailability } from './exportMenuAvailability';
+import { useKeyboardAccessibleDropdown } from '@/core/components/diagrams/hooks/useKeyboardAccessibleDropdown';
 
 const ShareDialog = React.lazy(() => import('@/components/diagrams/ShareDialog'));
 const CloudStorageManagerModal = React.lazy(() => import('@/components/storage/CloudStorageManagerModal').then(async (m) => {
@@ -37,6 +38,7 @@ const loadDataService = async () => {
 
 const MARKDOWN_EXPORT_MAX_NODES = 1000;
 const MARKDOWN_EXPORT_MAX_EDGES = 2000;
+const EXPORT_MENU_OVERLAY_CLASS = 'vizly-export-actions-menu';
 
 interface ExportToolsProps {
   diagramId: string;
@@ -90,9 +92,19 @@ const ExportTools: React.FC<ExportToolsProps> = ({
     reactFlowInstance.getNodes().length,
     getFlowDataBridgeNodes(diagramId).length,
   ), [diagramId, reactFlowInstance]);
-  const handleExportMenuOpenChange = useCallback((open: boolean) => {
-    if (open) setExportableNodeCount(readExportableNodeCount());
+  const refreshExportableNodeCount = useCallback(() => {
+    setExportableNodeCount(readExportableNodeCount());
   }, [readExportableNodeCount]);
+  const {
+    open: exportMenuOpen,
+    triggerRef: exportMenuButtonRef,
+    handleMenuKeyDown: handleExportMenuKeyDown,
+    handleOpenChange: handleExportMenuOpenChange,
+    handleTriggerKeyDown: handleExportMenuButtonKeyDown,
+  } = useKeyboardAccessibleDropdown({
+    overlayClassName: EXPORT_MENU_OVERLAY_CLASS,
+    onBeforeOpen: refreshExportableNodeCount,
+  });
   const exportMenuAvailability = resolveExportMenuAvailability(exportableNodeCount, isExporting);
 
   /**
@@ -509,23 +521,37 @@ ${mermaid}
         )}
 
         <Dropdown
-          menu={{ items }}
+          menu={{ items, onKeyDown: handleExportMenuKeyDown }}
           trigger={['click']}
+          open={exportMenuOpen}
           onOpenChange={handleExportMenuOpenChange}
+          overlayClassName={EXPORT_MENU_OVERLAY_CLASS}
           placement="bottomRight"
           getPopupContainer={() => resolveExportPopupContainer(document)}
         >
           {variant === 'compact' ? (
             <Button
+              ref={exportMenuButtonRef}
+              data-id="toolbar-export-btn"
               type="text"
               aria-label={t('common.export', '导出')}
+              aria-haspopup="menu"
+              aria-expanded={exportMenuOpen}
+              onKeyDown={handleExportMenuButtonKeyDown}
               icon={<FaDownload className="text-[13px]" />}
               className="w-8 h-8 p-0 border-none flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] rounded-[6px] transition-colors"
               disabled={isExporting}
             />
           ) : (
             <Button
+              ref={exportMenuButtonRef}
+              data-id="toolbar-export-btn"
+              aria-label={t('common.export', '导出')}
+              aria-haspopup="menu"
+              aria-expanded={exportMenuOpen}
+              onKeyDown={handleExportMenuButtonKeyDown}
               icon={<FaDownload size={14} />}
+              disabled={isExporting}
               style={variant === 'inline' ? {
                 height: 32,
                 display: 'flex',
