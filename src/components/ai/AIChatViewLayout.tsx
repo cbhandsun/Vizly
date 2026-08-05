@@ -26,6 +26,7 @@ import type { Conversation, Message } from '@/services/ai/AIConversationService'
 import type { AIChatSaveTarget } from './aiChatSave';
 import type { AIChatConfigurationState } from './aiChatRequestConfig';
 import { MemoizedMessageItem } from './AIChatMessageItem';
+import { useModalFocusTrap } from '@/hooks/useModalFocusTrap';
 
 export interface AIChatSlashCommand {
     key: string;
@@ -152,85 +153,117 @@ export const AIChatViewLayout: React.FC<AIChatViewLayoutProps> = ({
     setSaveTitle,
     saveTarget,
 }) => {
+    const historyNewConversationRef = React.useRef<HTMLButtonElement>(null);
+    const closeHistorySidebar = React.useCallback(() => {
+        setIsSidebarOpen(false);
+    }, [setIsSidebarOpen]);
+    const {
+        containerRef: historySidebarRef,
+        handleKeyDown: handleHistorySidebarKeyDown,
+    } = useModalFocusTrap<HTMLDivElement>({
+        active: isSidebarOpen,
+        initialFocusRef: historyNewConversationRef,
+        onClose: closeHistorySidebar,
+    });
+
     return (
         <div className="ai-chat-container">
             {/* Overlay Sidebar: Conversations List */}
             {isSidebarOpen && (
-                <div className="ai-chat-sidebar-overlay" onClick={() => setIsSidebarOpen(false)} />
+                <div
+                    className="ai-chat-sidebar-overlay"
+                    aria-hidden="true"
+                    onClick={closeHistorySidebar}
+                />
             )}
-            <div className={`ai-chat-sidebar ${isSidebarOpen ? 'open' : 'closed'}`}>
-                <div className="ai-chat-sidebar-header">
-                    <Typography.Text strong>{t('aiChat.historyTitle')}</Typography.Text>
-                    <Button
-                        className="ai-chat-new-conversation"
-                        size="small"
-                        icon={<PlusOutlined />}
-                        aria-label={t('aiChat.newConversation')}
-                        onClick={() => { handleNewChat(); setIsSidebarOpen(false); }}
-                        type="text"
-                    />
-                </div>
-                <div className="ai-chat-sidebar-list">
-                    <div role="list" aria-label={t('aiChat.historyTitle')}>
-                        {conversations.map(conv => (
-                            <div
-                                key={conv.id}
-                                role="listitem"
-                                className={`ai-chat-history-item ${activeId === conv.id ? 'active' : ''}`}
-                            >
-                                {editingId === conv.id ? (
-                                    <Input
-                                        aria-label={t('aiChat.renameConversation', { title: conv.title })}
-                                        size="small"
-                                        value={editingTitle}
-                                        onChange={e => setEditingTitle(e.target.value)}
-                                        onPressEnter={() => handleSaveRename(conv.id)}
-                                        onBlur={() => handleSaveRename(conv.id)}
-                                        autoFocus
-                                        onClick={e => e.stopPropagation()}
-                                    />
-                                ) : (
-                                    <>
-                                        <button
-                                            type="button"
-                                            className="ai-chat-history-main"
-                                            aria-current={activeId === conv.id ? 'true' : undefined}
-                                            onClick={() => { handleSwitchChat(conv.id); setIsSidebarOpen(false); }}
-                                        >
-                                            <span className="ai-chat-history-title" title={conv.title}>{conv.title}</span>
-                                        </button>
-                                        <div className="item-actions">
-                                            <Space size={4}>
-                                                <Button
-                                                    className="ai-chat-history-action"
-                                                    type="text"
-                                                    icon={<EditOutlined />}
-                                                    aria-label={t('aiChat.renameConversation', { title: conv.title })}
-                                                    onClick={(event) => handleStartRename(conv, event)}
-                                                />
-                                                <Popconfirm
-                                                    title={t('aiChat.deleteConversation')}
-                                                    onConfirm={() => handleDeleteChat(conv.id)}
-                                                    onCancel={e => e?.stopPropagation()}
-                                                    placement="right"
-                                                >
+            {isSidebarOpen && (
+                <div
+                    id="ai-chat-history-dialog"
+                    ref={historySidebarRef}
+                    className="ai-chat-sidebar open"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="ai-chat-history-title"
+                    data-preserve-dialog-on-escape="true"
+                    tabIndex={-1}
+                    onKeyDown={handleHistorySidebarKeyDown}
+                >
+                    <div className="ai-chat-sidebar-header">
+                        <Typography.Text id="ai-chat-history-title" strong>
+                            {t('aiChat.historyTitle')}
+                        </Typography.Text>
+                        <Button
+                            ref={historyNewConversationRef}
+                            className="ai-chat-new-conversation"
+                            size="small"
+                            icon={<PlusOutlined />}
+                            aria-label={t('aiChat.newConversation')}
+                            onClick={() => { handleNewChat(); closeHistorySidebar(); }}
+                            type="text"
+                        />
+                    </div>
+                    <div className="ai-chat-sidebar-list">
+                        <div role="list" aria-label={t('aiChat.historyTitle')}>
+                            {conversations.map(conv => (
+                                <div
+                                    key={conv.id}
+                                    role="listitem"
+                                    className={`ai-chat-history-item ${activeId === conv.id ? 'active' : ''}`}
+                                >
+                                    {editingId === conv.id ? (
+                                        <Input
+                                            aria-label={t('aiChat.renameConversation', { title: conv.title })}
+                                            size="small"
+                                            value={editingTitle}
+                                            onChange={e => setEditingTitle(e.target.value)}
+                                            onPressEnter={() => handleSaveRename(conv.id)}
+                                            onBlur={() => handleSaveRename(conv.id)}
+                                            autoFocus
+                                            onClick={e => e.stopPropagation()}
+                                        />
+                                    ) : (
+                                        <>
+                                            <button
+                                                type="button"
+                                                className="ai-chat-history-main"
+                                                aria-current={activeId === conv.id ? 'true' : undefined}
+                                                onClick={() => { handleSwitchChat(conv.id); closeHistorySidebar(); }}
+                                            >
+                                                <span className="ai-chat-history-title" title={conv.title}>{conv.title}</span>
+                                            </button>
+                                            <div className="item-actions">
+                                                <Space size={4}>
                                                     <Button
                                                         className="ai-chat-history-action"
                                                         type="text"
-                                                        danger
-                                                        icon={<DeleteOutlined />}
-                                                        aria-label={t('aiChat.deleteConversationLabel', { title: conv.title })}
+                                                        icon={<EditOutlined />}
+                                                        aria-label={t('aiChat.renameConversation', { title: conv.title })}
+                                                        onClick={(event) => handleStartRename(conv, event)}
                                                     />
-                                                </Popconfirm>
-                                            </Space>
-                                        </div>
-                                    </>
-                                )}
-                            </div>
-                        ))}
+                                                    <Popconfirm
+                                                        title={t('aiChat.deleteConversation')}
+                                                        onConfirm={() => handleDeleteChat(conv.id)}
+                                                        onCancel={e => e?.stopPropagation()}
+                                                        placement="right"
+                                                    >
+                                                        <Button
+                                                            className="ai-chat-history-action"
+                                                            type="text"
+                                                            danger
+                                                            icon={<DeleteOutlined />}
+                                                            aria-label={t('aiChat.deleteConversationLabel', { title: conv.title })}
+                                                        />
+                                                    </Popconfirm>
+                                                </Space>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </div>
-            </div>
+            )}
 
             {/* Main Content Area */}
             {/* Inline Header */}
@@ -244,6 +277,8 @@ export const AIChatViewLayout: React.FC<AIChatViewLayoutProps> = ({
                         onClick={() => setIsSidebarOpen(true)}
                         title={t('aiChat.viewHistory')}
                         aria-label={t('aiChat.viewHistory')}
+                        aria-expanded={isSidebarOpen}
+                        aria-controls="ai-chat-history-dialog"
                     />
                     <Select
                         className="ai-chat-model-select"

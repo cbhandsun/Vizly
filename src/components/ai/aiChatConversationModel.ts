@@ -16,6 +16,41 @@ export const resolveAIChatActiveConversationId = (
     return conversations[0]?.id ?? null;
 };
 
+export const isPristineAIChatConversation = (
+    conversation: Conversation | null | undefined,
+    welcomeMessage: unknown,
+): boolean => {
+    if (!conversation || typeof welcomeMessage !== 'string') return false;
+    if (conversation.messages.length === 0) return true;
+    if (conversation.messages.length !== 1) return false;
+
+    const [message] = conversation.messages;
+    return message.role === 'assistant' && message.content === welcomeMessage;
+};
+
+export interface AIChatConversationReuse {
+    conversationId: string;
+    redundantConversationIds: string[];
+}
+
+export const resolvePristineAIChatConversationReuse = (
+    conversations: Conversation[],
+    welcomeMessage: unknown,
+): AIChatConversationReuse | null => {
+    const pristineConversations = conversations.filter(conversation => (
+        isPristineAIChatConversation(conversation, welcomeMessage)
+    ));
+    const reusableConversation = pristineConversations[0];
+    if (!reusableConversation) return null;
+
+    return {
+        conversationId: reusableConversation.id,
+        redundantConversationIds: pristineConversations
+            .slice(1)
+            .map(conversation => conversation.id),
+    };
+};
+
 export const normalizeAIChatConversationTitle = (
     value: unknown,
     fallback: string,

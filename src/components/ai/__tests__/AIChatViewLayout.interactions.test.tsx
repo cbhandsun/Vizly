@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { TextAreaRef } from 'antd/es/input/TextArea';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -97,6 +97,37 @@ describe('AIChatViewLayout commercial interactions', () => {
         expect(screen.getByRole('button', {
             name: `aiChat.deleteConversationLabel: ${conversation.title}`,
         })).not.toBeNull();
+    });
+
+    it('treats history as a modal layer, closes only that layer on Escape, and restores focus', async () => {
+        const StatefulHistoryLayout = () => {
+            const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
+            return (
+                <AIChatViewLayout
+                    {...createProps({ isSidebarOpen, setIsSidebarOpen })}
+                />
+            );
+        };
+
+        render(<StatefulHistoryLayout />);
+
+        const trigger = screen.getByRole('button', { name: 'aiChat.viewHistory' });
+        expect(screen.queryByRole('dialog', { name: 'aiChat.historyTitle' })).toBeNull();
+        trigger.focus();
+        fireEvent.click(trigger);
+
+        const historyDialog = screen.getByRole('dialog', { name: 'aiChat.historyTitle' });
+        const newConversation = screen.getByRole('button', { name: 'aiChat.newConversation' });
+        expect(trigger.getAttribute('aria-expanded')).toBe('true');
+        await waitFor(() => expect(document.activeElement).toBe(newConversation));
+
+        fireEvent.keyDown(historyDialog, { key: 'Escape' });
+
+        await waitFor(() => {
+            expect(screen.queryByRole('dialog', { name: 'aiChat.historyTitle' })).toBeNull();
+            expect(document.activeElement).toBe(trigger);
+        });
+        expect(screen.getByRole('textbox', { name: 'aiChat.inputLabel' })).not.toBeNull();
     });
 
     it('keeps the draft editable but blocks click and Enter submission until configuration is ready', () => {

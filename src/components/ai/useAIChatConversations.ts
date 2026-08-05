@@ -10,6 +10,7 @@ import {
     createAIChatMessageId,
     normalizeAIChatConversationTitle,
     resolveAIChatActiveConversationId,
+    resolvePristineAIChatConversationReuse,
 } from './aiChatConversationModel';
 import { logAIChatConversationSyncFailure } from './aiLogging';
 
@@ -58,6 +59,20 @@ export function useAIChatConversations({ userId, welcomeMessage }: UseAIChatConv
     }, [userId]);
 
     const handleNewChat = useCallback(() => {
+        const reusableConversation = resolvePristineAIChatConversationReuse(
+            conversations,
+            welcomeMessage,
+        );
+        if (reusableConversation) {
+            reusableConversation.redundantConversationIds.forEach(id => {
+                void aiConversationService.deleteConversation(id);
+            });
+            setConversations(aiConversationService.getConversations());
+            setActiveId(reusableConversation.conversationId);
+            aiConversationService.setActiveConversationId(reusableConversation.conversationId);
+            return;
+        }
+
         const welcome: Message = {
             id: createAIChatMessageId(),
             role: 'assistant',
@@ -66,7 +81,7 @@ export function useAIChatConversations({ userId, welcomeMessage }: UseAIChatConv
         const conversation = aiConversationService.createConversation(welcome);
         setConversations(aiConversationService.getConversations());
         setActiveId(conversation.id);
-    }, [welcomeMessage]);
+    }, [conversations, welcomeMessage]);
 
     useEffect(() => {
         if (userId || conversations.length > 0) return;
