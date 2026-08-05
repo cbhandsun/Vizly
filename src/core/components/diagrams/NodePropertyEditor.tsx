@@ -268,7 +268,40 @@ export function useNodePropertyItems(params: UseNodePropertyItemsParams): Collap
                                 { label: t('propertyPanel.options.shape.diamond'), value: 'diamond' },
                                 { label: t('propertyPanel.options.shape.hexagon'), value: 'hexagon' },
                                 { label: t('propertyPanel.options.shape.star'), value: 'star' },
-   ÷­­¢G§²ÚîÆ­yÝ,
+                                { label: t('propertyPanel.options.shape.pill'), value: 'pill' },
+                                { label: t('propertyPanel.options.shape.parallelogram'), value: 'parallelogram' },
+                                { label: t('propertyPanel.options.shape.database'), value: 'database' },
+                                { label: t('propertyPanel.options.shape.document'), value: 'document' },
+                                { label: t('propertyPanel.options.shape.cloud'), value: 'cloud' },
+                                { label: t('propertyPanel.options.shape.manualInput'), value: 'manual-input' },
+                                { label: t('propertyPanel.options.shape.preparation'), value: 'preparation' },
+                                { label: t('propertyPanel.options.shape.delay'), value: 'delay' },
+                                { label: t('propertyPanel.options.shape.display'), value: 'display' },
+                                { label: t('propertyPanel.options.shape.note'), value: 'note' },
+                            ]} />
+                    </Form.Item>
+                    <Form.Item label={t('propertyPanel.icon')} htmlFor={fieldIds.icon}>
+                        <Space.Compact style={{ width: '100%' }}>
+                            <Select 
+                                id={fieldIds.icon}
+                                aria-label={t('propertyPanel.icon')}
+                                value={commonNodeIcon}
+                                onChange={val => updateNodes({ icon: typeof val === 'string' ? val : undefined })}
+                                onOpenChange={(open) => { if (open) armSnapshot(); }}
+                                placeholder={commonNodeIcon === undefined ? mixedLabel : selectLabel}
+                                allowClear 
+                                disabled={disabled}
+                                style={{ flex: 1 }}
+                                options={[
+                                    { label: t('propertyPanel.options.icon.play'), value: 'play' },
+                                    { label: t('propertyPanel.options.icon.square'), value: 'square' },
+                                    { label: t('propertyPanel.options.icon.cog'), value: 'cog' },
+                                    { label: t('propertyPanel.options.icon.stop'), value: 'stop' },
+                                    { label: t('propertyPanel.options.icon.database'), value: 'database' },
+                                    { label: t('propertyPanel.options.icon.question'), value: 'question' },
+                                    { label: t('propertyPanel.options.icon.arrow'), value: 'arrow' },
+                                    { label: t('propertyPanel.options.icon.group'), value: 'group' },
+                                    { label: t('propertyPanel.options.icon.box'), value: 'box' },
                                     { label: t('propertyPanel.options.icon.thLarge'), value: 'th-large' },
                                     { label: t('propertyPanel.options.icon.image'), value: 'image' },
                                     { label: t('propertyPanel.options.icon.eye'), value: 'eye' },
