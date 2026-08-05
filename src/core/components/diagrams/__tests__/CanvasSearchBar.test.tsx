@@ -141,6 +141,8 @@ describe('CanvasSearchBar', () => {
 
         expect(onReplaceAll).not.toHaveBeenCalled();
         expect(screen.getByText('替换 1 个节点标签？')).toBeTruthy();
+        expect(readFileSync('src/core/components/diagrams/CanvasSearchBar.tsx', 'utf8'))
+            .toMatch(/placement="bottomRight"\s+autoAdjustOverflow=\{false\}\s+zIndex=\{2600\}\s+getPopupContainer=\{\(\) => document\.body\}/);
         fireEvent.click(screen.getByRole('button', { name: '确认替换' }));
         expect(onReplaceAll).toHaveBeenCalledWith(['node-1'], 'circle', 'Square');
     });

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Input, Modal, Space, theme } from 'antd';
 import { SearchOutlined } from '@ant-design/icons';
 import { FaKeyboard } from 'react-icons/fa';
@@ -111,6 +111,26 @@ export const KeyboardShortcutPanel: React.FC<KeyboardShortcutPanelProps> = ({ vi
             }))
             .filter((group) => group.items.length > 0);
     }, [searchText, shortcutGroups]);
+
+    useEffect(() => {
+        if (!visible) return;
+
+        let canCloseFromShortcut = false;
+        queueMicrotask(() => {
+            canCloseFromShortcut = true;
+        });
+
+        const handleShortcutPanelToggle = (event: KeyboardEvent) => {
+            const isHelpShortcut = event.key === '?' || (event.key === '/' && event.shiftKey);
+            if (!canCloseFromShortcut || !isHelpShortcut) return;
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            onClose();
+        };
+
+        window.addEventListener('keydown', handleShortcutPanelToggle, { capture: true });
+        return () => window.removeEventListener('keydown', handleShortcutPanelToggle, { capture: true });
+    }, [onClose, visible]);
 
     return (
         <Modal

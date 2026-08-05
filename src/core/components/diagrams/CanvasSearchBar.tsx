@@ -353,6 +353,9 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
                         </button>
                         <Popconfirm
                             placement="bottomRight"
+                            autoAdjustOverflow={false}
+                            zIndex={2600}
+                            getPopupContainer={() => document.body}
                             title={`替换 ${allReplacePlan.changedIds.length} 个节点标签？`}
                             description="此操作可通过撤销恢复；锁定节点不会被修改。"
                             okText="确认替换"

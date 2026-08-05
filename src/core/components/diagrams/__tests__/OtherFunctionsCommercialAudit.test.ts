@@ -156,7 +156,7 @@ describe('other-function commercial interaction safeguards', () => {
         expect(source).toContain('aria-describedby={previewVersion');
         expect(source).toContain('留空时将使用“手动保存的版本快照”');
         expect(source).toContain('if (isSaving || previewVersion) return;');
-        expect(source).toContain('退出预览后才能创建新快照');
+        expect(source).toContain('退出预览后才能继续编辑或创建新快照');
     });
 
     it('opens find and replace through explicit state instead of delayed DOM coupling', () => {

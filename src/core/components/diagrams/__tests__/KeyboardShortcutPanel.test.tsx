@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { KeyboardShortcutPanel } from '../KeyboardShortcutPanel';
 
@@ -38,5 +38,33 @@ describe('KeyboardShortcutPanel', () => {
 
         fireEvent.change(search, { target: { value: '不存在的动作' } });
         expect(screen.getByRole('status').textContent).toContain('未找到匹配的快捷键');
+    });
+
+    it('closes when the help shortcut is pressed again inside the open panel', async () => {
+        const onClose = vi.fn();
+        render(<KeyboardShortcutPanel visible onClose={onClose} />);
+
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        const search = screen.getByRole('textbox', { name: '搜索快捷键或动作' });
+        search.focus();
+        fireEvent.keyDown(search, { key: '?' });
+
+        expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('also closes for browsers that report the help chord as Shift+Slash', async () => {
+        const onClose = vi.fn();
+        render(<KeyboardShortcutPanel visible onClose={onClose} />);
+
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        fireEvent.keyDown(window, { key: '/', shiftKey: true });
+
+        expect(onClose).toHaveBeenCalledTimes(1);
     });
 });
