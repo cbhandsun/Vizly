@@ -45,4 +45,22 @@ describe('resolveFloatingToolbarHorizontalPosition', () => {
             viewportWidth: 320,
         })).toBe(160);
     });
+
+    it('reserves a mobile left rail and keeps both toolbar edges reachable', () => {
+        expect(resolveFloatingToolbarHorizontalPosition({
+            screenCenterX: 10,
+            viewportWidth: 534,
+            mobileLeftInset: 60,
+        })).toBe(252);
+        expect(resolveFloatingToolbarHorizontalPosition({
+            screenCenterX: 520,
+            viewportWidth: 534,
+            mobileLeftInset: 60,
+        })).toBe(342);
+        expect(resolveFloatingToolbarHorizontalPosition({
+            screenCenterX: 10,
+            viewportWidth: 320,
+            mobileLeftInset: 60,
+        })).toBe(190);
+    });
 });

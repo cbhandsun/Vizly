@@ -31,6 +31,8 @@ export interface UseFloatingPositionConfig {
     offset?: number;
     /** 顶部安全区高度（用于判断是否该放到下方） */
     topSafeZone?: number;
+    /** 移动端左侧常驻控件占用的安全区宽度 */
+    mobileLeftInset?: number;
     /** 隐藏条件（拖拽中、连接中等） */
     hidden?: boolean;
 }
@@ -47,17 +49,33 @@ export interface FloatingPositionResult {
 export const resolveFloatingToolbarHorizontalPosition = ({
     screenCenterX,
     viewportWidth,
+    mobileLeftInset = 0,
 }: {
     screenCenterX: number;
     viewportWidth: number;
+    mobileLeftInset?: number;
 }): number | string => {
     const toolbarEdgeAllowance = 176;
     if (viewportWidth <= 768) {
-        const maximumCenter = viewportWidth - toolbarEdgeAllowance;
-        if (maximumCenter < toolbarEdgeAllowance) return viewportWidth / 2;
+        if (mobileLeftInset === 0) {
+            const maximumCenter = viewportWidth - toolbarEdgeAllowance;
+            if (maximumCenter < toolbarEdgeAllowance) return viewportWidth / 2;
+            return Math.min(
+                maximumCenter,
+                Math.max(toolbarEdgeAllowance, screenCenterX),
+            );
+        }
+        const viewportGutter = 16;
+        const availableWidth = Math.max(
+            0,
+            viewportWidth - mobileLeftInset - viewportGutter * 2,
+        );
+        const effectiveHalfWidth = Math.min(toolbarEdgeAllowance, availableWidth / 2);
+        const minimumCenter = mobileLeftInset + viewportGutter + effectiveHalfWidth;
+        const maximumCenter = viewportWidth - viewportGutter - effectiveHalfWidth;
         return Math.min(
             maximumCenter,
-            Math.max(toolbarEdgeAllowance, screenCenterX),
+            Math.max(minimumCenter, screenCenterX),
         );
     }
     return `clamp(calc(var(--left-sidebar-offset, 0px) + ${toolbarEdgeAllowance}px), ${screenCenterX}px, calc(100vw - var(--right-sidebar-offset, 340px) - ${toolbarEdgeAllowance}px))`;
@@ -113,6 +131,7 @@ export function useFloatingPosition({
     placement = 'auto',
     offset = 20,
     topSafeZone = 140,
+    mobileLeftInset = 0,
     hidden = false,
 }: UseFloatingPositionConfig): FloatingPositionResult {
     const { x: vX, y: vY, zoom } = useViewport();
@@ -145,6 +164,7 @@ export function useFloatingPosition({
         const safeX = resolveFloatingToolbarHorizontalPosition({
             screenCenterX,
             viewportWidth: window.innerWidth,
+            mobileLeftInset,
         });
 
         const style: React.CSSProperties = {
@@ -161,7 +181,7 @@ export function useFloatingPosition({
             visible: true,
             actualPlacement,
         };
-    }, [worldBounds, vX, vY, zoom, placement, offset, topSafeZone, hidden]);
+    }, [worldBounds, vX, vY, zoom, placement, offset, topSafeZone, mobileLeftInset, hidden]);
 }
 
 // ─── 边中点定位变体 ──────────────────────────────────────────────────────────

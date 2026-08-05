@@ -273,8 +273,6 @@ export function useFlowchartPluginRuntime({
         reactFlowWrapper,
         setEdges,
         setNodes,
-        setSelectedEdges,
-        setSelectedNodes,
         t,
         takeSnapshot,
         updateEdgesBatch,

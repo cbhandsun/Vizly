@@ -249,7 +249,7 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
         expect(buttons[4].getAttribute('aria-pressed')).toBe('true');
     });
 
-    it('names multi-selection actions and preserves a physical mobile touch target', async () => {
+    it('does not duplicate multi-selection actions in the mobile top toolbar', async () => {
         const onAlign = vi.fn();
         const onDistribute = vi.fn();
 
@@ -275,18 +275,9 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
             />,
         );
 
-        const actionNames = ['左对齐', '水平居中', '右对齐', '顶对齐', '垂直居中', '底对齐', '水平均分', '垂直均分'];
-        const buttons = await Promise.all(actionNames.map(name => screen.findByRole('button', { name })));
-
-        for (const button of buttons) {
-            expect(button.style.minWidth).toBe('var(--commercial-touch-target, 44px)');
-            expect(button.style.width).toBe(button.style.minWidth);
-            expect(button.style.height).toBe(button.style.minWidth);
-        }
-
-        fireEvent.click(screen.getByRole('button', { name: '左对齐' }));
-        fireEvent.click(screen.getByRole('button', { name: '水平均分' }));
-        expect(onAlign).toHaveBeenCalledWith('left');
-        expect(onDistribute).toHaveBeenCalledWith('horizontal');
+        expect(screen.queryByRole('toolbar', { name: '多选对齐与分布' })).toBeNull();
+        expect(screen.queryByRole('button', { name: '左对齐' })).toBeNull();
+        expect(onAlign).not.toHaveBeenCalled();
+        expect(onDistribute).not.toHaveBeenCalled();
     });
 });

@@ -276,6 +276,10 @@
         padding: 8px 10px;
         font-size: 14px;
     }
+
+    .floating-context-toolbar {
+        max-width: calc(100vw - 92px);
+    }
 }
 
 /* ─── Reduced motion ─── */

@@ -654,7 +654,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
     return (
         <>
             {createPortal(MainWorkflowTools, portalTarget)}
-            {contextPortalTarget && (selectedNodesCount || 0) > 1 && createPortal(
+            {!isMobile && contextPortalTarget && (selectedNodesCount || 0) > 1 && createPortal(
                 <FlowchartAlignmentTools
                     isMobile={isMobile}
                     selectedNodesCount={selectedNodesCount || 0}

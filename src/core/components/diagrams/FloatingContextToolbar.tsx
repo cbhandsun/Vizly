@@ -197,6 +197,7 @@ export const FloatingContextToolbar: React.FC<FloatingContextToolbarProps> = Rea
         worldBounds,
         placement: 'auto',
         offset: toolbarOffset,
+        mobileLeftInset: 60,
         hidden: nodesDragging || selectedNodes.length === 0,
     });
 
@@ -229,6 +230,7 @@ export const FloatingContextToolbar: React.FC<FloatingContextToolbarProps> = Rea
     // ─── Render ──────────────────────────────────────────────────────────────
     return (
         <ToolbarContainer
+            className="floating-context-toolbar"
             positioning="positioned"
             square={overrideDefaultToolbar}
             style={positionStyle}
