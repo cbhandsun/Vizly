@@ -15,7 +15,7 @@ interface PageTabsProps {
     pages: DiagramPage[];
     activePageId: string;
     onSwitchPage: (id: string) => void;
-    onAddPage: () => void;
+    onAddPage: () => string | null;
     onDeletePage: (id: string) => boolean;
     onRenamePage: (id: string, name: string) => boolean;
     disabled?: boolean;
@@ -35,13 +35,29 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
     const renameErrorId = React.useId();
     const tabButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
     const restoreFocusAfterDeleteRef = useRef(false);
+    const addedPageFocusTargetRef = useRef<string | null>(null);
     const pageLimitReached = pages.length >= MAX_DIAGRAM_PAGES;
+
+    const focusPageTab = useCallback((pageId: string) => {
+        const tab = tabButtonRefs.current.get(pageId);
+        if (!tab) return;
+        tab.focus({ preventScroll: true });
+        tab.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+    }, []);
 
     useEffect(() => {
         if (!restoreFocusAfterDeleteRef.current) return;
         restoreFocusAfterDeleteRef.current = false;
-        requestAnimationFrame(() => tabButtonRefs.current.get(activePageId)?.focus());
-    }, [activePageId, pages]);
+        requestAnimationFrame(() => focusPageTab(activePageId));
+    }, [activePageId, focusPageTab, pages]);
+
+    useEffect(() => {
+        const targetPageId = addedPageFocusTargetRef.current;
+        if (!targetPageId || activePageId !== targetPageId) return;
+        if (!pages.some(page => page.id === targetPageId)) return;
+        addedPageFocusTargetRef.current = null;
+        requestAnimationFrame(() => focusPageTab(targetPageId));
+    }, [activePageId, focusPageTab, pages]);
 
     const handleStartRename = useCallback((page: DiagramPage) => {
         setConfirmingPageId(null);
@@ -77,8 +93,13 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
         setEditingId(null);
         setEditName('');
         setRenameError(null);
-        requestAnimationFrame(() => tabButtonRefs.current.get(cancelledPageId)?.focus());
-    }, [editingId]);
+        requestAnimationFrame(() => focusPageTab(cancelledPageId));
+    }, [editingId, focusPageTab]);
+
+    const handleAddPage = useCallback(() => {
+        const newPageId = onAddPage();
+        if (newPageId) addedPageFocusTargetRef.current = newPageId;
+    }, [onAddPage]);
 
     const handleTabKeyDown = useCallback((
         event: React.KeyboardEvent<HTMLButtonElement>,
@@ -99,8 +120,8 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
         const targetPage = pages[targetIndex];
         if (!targetPage) return;
         onSwitchPage(targetPage.id);
-        tabButtonRefs.current.get(targetPage.id)?.focus();
-    }, [disabled, onSwitchPage, pages]);
+        focusPageTab(targetPage.id);
+    }, [disabled, focusPageTab, onSwitchPage, pages]);
 
     return (
         <div
@@ -238,7 +259,7 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                 <button
                     type="button"
                     aria-label={t('designer.pages.new', { defaultValue: '新建页面' })}
-                    onClick={onAddPage}
+                    onClick={handleAddPage}
                     className="page-tabs__add"
                     disabled={disabled || pageLimitReached}
                 >

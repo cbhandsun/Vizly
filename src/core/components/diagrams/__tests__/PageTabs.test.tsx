@@ -102,6 +102,42 @@ describe('PageTabs', () => {
         expect(screen.getByRole('textbox', { name: '重命名页面 页面 1' })).toBeTruthy();
     });
 
+    it('moves focus to the newly active page after creation', async () => {
+        const PageTabsHarness = () => {
+            const [pages, setPages] = useState([
+                { id: 'page-1', name: '页面 1', nodes: [], edges: [] },
+            ]);
+            const [activePageId, setActivePageId] = useState('page-1');
+            return (
+                <PageTabs
+                    pages={pages}
+                    activePageId={activePageId}
+                    onSwitchPage={setActivePageId}
+                    onAddPage={() => {
+                        const newPageId = 'page-2';
+                        setPages(current => [
+                            ...current,
+                            { id: newPageId, name: '页面 2', nodes: [], edges: [] },
+                        ]);
+                        setActivePageId(newPageId);
+                        return newPageId;
+                    }}
+                    onDeletePage={vi.fn()}
+                    onRenamePage={vi.fn()}
+                />
+            );
+        };
+
+        render(<PageTabsHarness />);
+        const addPageButton = screen.getByRole('button', { name: '新建页面' });
+        addPageButton.focus();
+        fireEvent.click(addPageButton);
+
+        const createdPageTab = await screen.findByRole('tab', { name: '页面 2' });
+        await waitFor(() => expect(document.activeElement).toBe(createdPageTab));
+        expect(createdPageTab.getAttribute('aria-selected')).toBe('true');
+    });
+
     it('offers an explicit rename action for the active page', () => {
         render(
             <PageTabs
