@@ -2,21 +2,28 @@
 
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useKeyboardAccessibleDropdown } from '../useKeyboardAccessibleDropdown';
 
 interface HarnessProps {
     disabledFirst?: boolean;
     empty?: boolean;
+    onActivate?: () => void;
 }
 
-const Harness: React.FC<HarnessProps> = ({ disabledFirst = false, empty = false }) => {
+const Harness: React.FC<HarnessProps> = ({ disabledFirst = false, empty = false, onActivate }) => {
     const {
         open,
         triggerRef,
         handleMenuKeyDown,
+        handleOpenChange,
         handleTriggerKeyDown,
     } = useKeyboardAccessibleDropdown({ overlayClassName: 'test-menu-overlay' });
+
+    const activate = () => {
+        onActivate?.();
+        handleOpenChange(false, { source: 'menu' });
+    };
 
     return (
         <>
@@ -34,7 +41,12 @@ const Harness: React.FC<HarnessProps> = ({ disabledFirst = false, empty = false 
                     <ul role="menu" onKeyDown={handleMenuKeyDown}>
                         {!empty && (
                             <>
-                                <li role="menuitem" tabIndex={-1} aria-disabled={disabledFirst || undefined}>
+                                <li
+                                    role="menuitem"
+                                    tabIndex={-1}
+                                    aria-disabled={disabledFirst || undefined}
+                                    onClick={disabledFirst ? undefined : activate}
+                                >
                                     第一项
                                 </li>
                                 <li role="menuitem" tabIndex={-1}>第二项</li>
@@ -77,6 +89,40 @@ describe('useKeyboardAccessibleDropdown', () => {
             expect(screen.queryByRole('menu')).toBeNull();
             expect(document.activeElement).toBe(trigger);
         });
+    });
+
+    it('activates the focused item with Space and restores focus after the menu closes', async () => {
+        const onActivate = vi.fn();
+        render(<Harness onActivate={onActivate} />);
+        const trigger = screen.getByRole('button', { name: '操作' });
+
+        fireEvent.keyDown(trigger, { key: 'ArrowDown' });
+        const firstItem = await screen.findByRole('menuitem', { name: '第一项' });
+        await waitFor(() => expect(document.activeElement).toBe(firstItem));
+
+        fireEvent.keyDown(firstItem, { key: ' ' });
+
+        expect(onActivate).toHaveBeenCalledTimes(1);
+        await waitFor(() => {
+            expect(screen.queryByRole('menu')).toBeNull();
+            expect(document.activeElement).toBe(trigger);
+        });
+    });
+
+    it('does not steal focus when a menu action moves it to a dialog control', async () => {
+        render(<Harness onActivate={() => document.getElementById('dialog-action')?.focus()} />);
+        const dialogAction = document.createElement('button');
+        dialogAction.id = 'dialog-action';
+        document.body.appendChild(dialogAction);
+
+        const trigger = screen.getByRole('button', { name: '操作' });
+        fireEvent.keyDown(trigger, { key: 'Enter' });
+        const firstItem = await screen.findByRole('menuitem', { name: '第一项' });
+        await waitFor(() => expect(document.activeElement).toBe(firstItem));
+
+        fireEvent.click(firstItem);
+
+        await waitFor(() => expect(document.activeElement).toBe(dialogAction));
     });
 
     it('ignores unrelated keys and safely handles an empty menu', async () => {
