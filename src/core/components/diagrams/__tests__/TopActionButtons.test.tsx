@@ -54,7 +54,7 @@ describe('TopActionButtons document menu', () => {
         });
     });
 
-    it('opens with ArrowDown, focuses the first item, and closes with Escape', async () => {
+    it.each(['ArrowDown', 'Enter', ' '])('opens with %s, focuses the first item, and closes with Escape', async key => {
         render(
             <TopActionButtons
                 disablePortal
@@ -63,13 +63,36 @@ describe('TopActionButtons document menu', () => {
         );
 
         const trigger = screen.getByRole('button', { name: '文档操作' });
-        fireEvent.keyDown(trigger, { key: 'ArrowDown' });
+        fireEvent.keyDown(trigger, { key });
 
         const firstItem = await screen.findByRole('menuitem', { name: /演示模式/ });
         await waitFor(() => expect(document.activeElement).toBe(firstItem));
         expect(trigger.getAttribute('aria-expanded')).toBe('true');
 
         fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+        await waitFor(() => {
+            expect(trigger.getAttribute('aria-expanded')).toBe('false');
+            expect(document.activeElement).toBe(trigger);
+        });
+    });
+
+    it('runs a focused document action with Space and restores trigger focus', async () => {
+        const onStartPresentation = vi.fn();
+        render(
+            <TopActionButtons
+                disablePortal
+                onStartPresentation={onStartPresentation}
+            />,
+        );
+
+        const trigger = screen.getByRole('button', { name: '文档操作' });
+        fireEvent.keyDown(trigger, { key: 'Enter' });
+        const firstItem = await screen.findByRole('menuitem', { name: /演示模式/ });
+        await waitFor(() => expect(document.activeElement).toBe(firstItem));
+
+        fireEvent.keyDown(firstItem, { key: ' ' });
+
+        expect(onStartPresentation).toHaveBeenCalledTimes(1);
         await waitFor(() => {
             expect(trigger.getAttribute('aria-expanded')).toBe('false');
             expect(document.activeElement).toBe(trigger);

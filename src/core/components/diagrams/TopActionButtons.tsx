@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Button, Dropdown, Tooltip, MenuProps, Grid } from 'antd';
 import { useTranslation } from 'react-i18next';
@@ -11,12 +11,7 @@ import { CollaborationAvatars } from './ui/CollaborationAvatars';
 import { ApiOutlined } from '@ant-design/icons';
 import type { ReactFlowRenderSnapshot } from '../../rendering/reactFlowScene';
 import type { DiagramExportFormat } from '../../types/diagram-components';
-import {
-    DOCUMENT_MENU_OVERLAY_CLASS,
-    focusFirstEnabledDocumentMenuItem,
-    shouldCloseDocumentMenuFromKey,
-    shouldOpenDocumentMenuFromKey,
-} from './documentMenuKeyboard';
+import { DOCUMENT_MENU_OVERLAY_CLASS } from './documentMenuKeyboard';
 import { DropdownMenuTriggerButton } from './DropdownMenuTriggerButton';
 import { useKeyboardAccessibleDropdown } from './hooks/useKeyboardAccessibleDropdown';
 
@@ -104,33 +99,15 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
     const { t } = useTranslation();
     const screens = Grid.useBreakpoint();
     const isSmallMobile = !screens.md;
-    const [documentMenuOpen, setDocumentMenuOpen] = useState(false);
-    const documentMenuButtonRef = useRef<HTMLButtonElement>(null);
-
-    const focusDocumentMenuTrigger = useCallback(() => {
-        documentMenuButtonRef.current?.focus();
-    }, []);
-
-    const focusDocumentMenuFirstItem = useCallback(() => {
-        window.setTimeout(() => {
-            focusFirstEnabledDocumentMenuItem(document);
-        }, 0);
-    }, []);
-
-    const handleDocumentMenuButtonKeyDown = useCallback((event: React.KeyboardEvent<HTMLButtonElement>) => {
-        if (!shouldOpenDocumentMenuFromKey(event.key)) return;
-        event.preventDefault();
-        setDocumentMenuOpen(true);
-        focusDocumentMenuFirstItem();
-    }, [focusDocumentMenuFirstItem]);
-
-    const handleDocumentMenuKeyDown = useCallback((event: React.KeyboardEvent<HTMLUListElement>) => {
-        if (!shouldCloseDocumentMenuFromKey(event.key)) return;
-        event.preventDefault();
-        event.stopPropagation();
-        setDocumentMenuOpen(false);
-        window.setTimeout(focusDocumentMenuTrigger, 0);
-    }, [focusDocumentMenuTrigger]);
+    const {
+        open: documentMenuOpen,
+        triggerRef: documentMenuButtonRef,
+        handleMenuKeyDown: handleDocumentMenuKeyDown,
+        handleOpenChange: handleDocumentMenuOpenChange,
+        handleTriggerKeyDown: handleDocumentMenuButtonKeyDown,
+    } = useKeyboardAccessibleDropdown({
+        overlayClassName: DOCUMENT_MENU_OVERLAY_CLASS,
+    });
 
     const handleReadonlyToggle = useCallback(() => {
         if (!onReadonlyChange) return;
@@ -415,7 +392,7 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
                     placement="bottomRight"
                     trigger={['click']}
                     open={documentMenuOpen}
-                    onOpenChange={setDocumentMenuOpen}
+                    onOpenChange={handleDocumentMenuOpenChange}
                     classNames={{ root: DOCUMENT_MENU_OVERLAY_CLASS }}
                 >
                     <Tooltip title={t('designer.toolbar.documentActions')}>
