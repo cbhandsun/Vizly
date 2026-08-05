@@ -482,6 +482,7 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
                     flexDirection: 'column',
                     overflow: 'hidden',
                     minWidth: 0,
+                    minHeight: 0,
                     animation: isMobile ? 'none' : 'drawerSlideIn 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                     paddingBottom: isMobile ? 'env(safe-area-inset-bottom, 20px)' : 0,
                     marginRight: isMobile ? COMMERCIAL_TOUCH_TARGET : 0,
@@ -504,7 +505,16 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
                                 key: 'property',
                                 label: t('propertyPanel.title'),
                                 children: (
-                                    <div style={{ height: '100%', overflow: 'auto', padding: '0 8px' }}>
+                                    <div
+                                        data-testid="designer-property-scroll-region"
+                                        style={{
+                                            height: '100%',
+                                            minHeight: 0,
+                                            overflowY: 'auto',
+                                            overscrollBehavior: 'contain',
+                                            padding: '0 8px',
+                                        }}
+                                    >
                                 {(() => {
                                     const CustomPanel = activePlugin?.renderCustomPropertyPanel && pluginCtx 
                                         ? activePlugin.renderCustomPropertyPanel(pluginCtx, selectedNodes, selectedEdges) 
@@ -542,7 +552,29 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
                                 )
                             }] : [])
                         ]}
-                        style={{ height: '100%', minWidth: 0 }}
+                        style={{
+                            height: '100%',
+                            minWidth: 0,
+                            minHeight: 0,
+                            display: 'flex',
+                            flexDirection: 'column',
+                        }}
+                        styles={{
+                            body: {
+                                flex: 1,
+                                height: '100%',
+                                maxHeight: '100%',
+                                minHeight: 0,
+                                overflow: 'hidden',
+                            },
+                            content: {
+                                display: 'flex',
+                                height: '100%',
+                                maxHeight: '100%',
+                                minHeight: 0,
+                                overflow: 'hidden',
+                            },
+                        }}
                         tabBarStyle={{
                             margin: 0,
                             padding: '0 16px',

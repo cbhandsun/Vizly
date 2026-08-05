@@ -83,6 +83,7 @@ describe('DesignerRightSidebar mobile dialog accessibility', () => {
         expect(rail.style.zIndex).toBe('2');
         expect(rail.style.backgroundColor).not.toBe('');
         expect(screen.getByTestId('designer-right-sidebar-content').style.marginRight).not.toBe('');
+        expect(screen.getByTestId('designer-right-sidebar-content').style.minHeight).toBe('0px');
         const closeButton = screen.getByRole('button', { name: '收起面板' });
         await waitFor(() => expect(document.activeElement).toBe(closeButton));
 
@@ -105,5 +106,41 @@ describe('DesignerRightSidebar mobile dialog accessibility', () => {
         fireEvent.keyDown(closeButton, { key: 'Escape' });
 
         await waitFor(() => expect(document.activeElement).toBe(trigger));
+    });
+
+    it('keeps the property panel inside a bounded scroll region on mobile', async () => {
+        render(
+            <DesignerRightSidebar
+                activeTab="property"
+                onTabChange={vi.fn()}
+                aiChatVisible={false}
+                setAiChatVisible={vi.fn()}
+                selectedNodes={[]}
+                selectedEdges={[]}
+                updateNodesBatch={vi.fn()}
+                updateEdgesBatch={vi.fn()}
+                onBeforeUpdate={vi.fn()}
+                isDraggingNode={false}
+                isMobile
+                mobileOpen
+                onMobileOpenChange={vi.fn()}
+            />,
+        );
+
+        const scrollRegion = await screen.findByTestId('designer-property-scroll-region');
+        expect(scrollRegion.style.height).toBe('100%');
+        expect(scrollRegion.style.minHeight).toBe('0px');
+        expect(scrollRegion.style.overflowY).toBe('auto');
+        expect(scrollRegion.style.overscrollBehavior).toBe('contain');
+
+        const tabsBody = document.querySelector<HTMLElement>('.ant-tabs-body');
+        const tabsContent = document.querySelector<HTMLElement>('.ant-tabs-content-active');
+        expect(tabsBody?.style.height).toBe('100%');
+        expect(tabsBody?.style.maxHeight).toBe('100%');
+        expect(tabsBody?.style.overflow).toBe('hidden');
+        expect(tabsContent?.style.display).toBe('flex');
+        expect(tabsContent?.style.height).toBe('100%');
+        expect(tabsContent?.style.maxHeight).toBe('100%');
+        expect(tabsContent?.style.overflow).toBe('hidden');
     });
 });

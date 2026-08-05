@@ -27,7 +27,6 @@ import {
     AlignLeftOutlined,
     AlignCenterOutlined,
     AlignRightOutlined,
-    CloseCircleOutlined,
 } from '@ant-design/icons';
 import { FaSearch } from 'react-icons/fa';
 import { Clock } from 'lucide-react';
@@ -36,6 +35,7 @@ import type { CollapseProps } from 'antd';
 
 import { ArrowTimelineEventsEditor } from './ArrowTimelineEventsEditor';
 import { ArchitectureNodeEditor } from './ArchitectureNodeEditor';
+import { AccessibleInputClearIcon } from './AccessibleInputClearIcon';
 import { LocalizedInputNumber } from './LocalizedInputNumber';
 
 const { Text } = Typography;
@@ -163,11 +163,7 @@ export function useNodePropertyItems(params: UseNodePropertyItemsParams): Collap
                             ? mixedLabel
                             : t('propertyPanel.placeholders.label')}
                         allowClear={{
-                            clearIcon: (
-                                <CloseCircleOutlined
-                                    aria-label={t('propertyPanel.clearLabel')}
-                                />
-                            ),
+                            clearIcon: <AccessibleInputClearIcon label={t('propertyPanel.clearLabel')} />,
                         }}
                         disabled={disabled} />
                 </Form.Item>
@@ -272,40 +268,7 @@ export function useNodePropertyItems(params: UseNodePropertyItemsParams): Collap
                                 { label: t('propertyPanel.options.shape.diamond'), value: 'diamond' },
                                 { label: t('propertyPanel.options.shape.hexagon'), value: 'hexagon' },
                                 { label: t('propertyPanel.options.shape.star'), value: 'star' },
-                                { label: t('propertyPanel.options.shape.pill'), value: 'pill' },
-                                { label: t('propertyPanel.options.shape.parallelogram'), value: 'parallelogram' },
-                                { label: t('propertyPanel.options.shape.database'), value: 'database' },
-                                { label: t('propertyPanel.options.shape.document'), value: 'document' },
-                                { label: t('propertyPanel.options.shape.cloud'), value: 'cloud' },
-                                { label: t('propertyPanel.options.shape.manualInput'), value: 'manual-input' },
-                                { label: t('propertyPanel.options.shape.preparation'), value: 'preparation' },
-                                { label: t('propertyPanel.options.shape.delay'), value: 'delay' },
-                                { label: t('propertyPanel.options.shape.display'), value: 'display' },
-                                { label: t('propertyPanel.options.shape.note'), value: 'note' },
-                            ]} />
-                    </Form.Item>
-                    <Form.Item label={t('propertyPanel.icon')} htmlFor={fieldIds.icon}>
-                        <Space.Compact style={{ width: '100%' }}>
-                            <Select 
-                                id={fieldIds.icon}
-                                aria-label={t('propertyPanel.icon')}
-                                value={commonNodeIcon}
-                                onChange={val => updateNodes({ icon: typeof val === 'string' ? val : undefined })}
-                                onOpenChange={(open) => { if (open) armSnapshot(); }}
-                                placeholder={commonNodeIcon === undefined ? mixedLabel : selectLabel}
-                                allowClear 
-                                disabled={disabled}
-                                style={{ flex: 1 }}
-                                options={[
-                                    { label: t('propertyPanel.options.icon.play'), value: 'play' },
-                                    { label: t('propertyPanel.options.icon.square'), value: 'square' },
-                                    { label: t('propertyPanel.options.icon.cog'), value: 'cog' },
-                                    { label: t('propertyPanel.options.icon.stop'), value: 'stop' },
-                                    { label: t('propertyPanel.options.icon.database'), value: 'database' },
-                                    { label: t('propertyPanel.options.icon.question'), value: 'question' },
-                                    { label: t('propertyPanel.options.icon.arrow'), value: 'arrow' },
-                                    { label: t('propertyPanel.options.icon.group'), value: 'group' },
-                                    { label: t('propertyPanel.options.icon.box'), value: 'box' },
+   ˜≠≠¢Gß≤⁄Óù∆≠y›,
                                     { label: t('propertyPanel.options.icon.thLarge'), value: 'th-large' },
                                     { label: t('propertyPanel.options.icon.image'), value: 'image' },
                                     { label: t('propertyPanel.options.icon.eye'), value: 'eye' },
@@ -323,6 +286,7 @@ export function useNodePropertyItems(params: UseNodePropertyItemsParams): Collap
                             <Button 
                                 icon={<FaSearch />} 
                                 onClick={onShowIconExplorer}
+                                aria-label={t('iconExplorer.open', 'ÊµèËßàÊõ¥Â§öÂõæÊ†á')}
                                 title={t('iconExplorer.open', 'ÊµèËßàÊõ¥Â§öÂõæÊ†á')}
                                 disabled={disabled}
                             />
@@ -338,6 +302,7 @@ export function useNodePropertyItems(params: UseNodePropertyItemsParams): Collap
                     </Form.Item>
                     <Form.Item label={t('propertyPanel.borderRadius')}>
                         <Slider min={0} max={50} value={commonBorderRadius ?? 10}
+                            ariaLabelForHandle={t('propertyPanel.borderRadius')}
                             onChange={(val: number) => { armSnapshot(); updateNodes({ style: { borderRadius: val } }); }}
                             disabled={disabled} marks={{ 0: '0', 10: '10', 25: '25', 50: '50' }} />
                     </Form.Item>
@@ -345,13 +310,14 @@ export function useNodePropertyItems(params: UseNodePropertyItemsParams): Collap
                         <Radio.Group value={commonTextAlign ?? 'center'}
                             onChange={e => { armSnapshot(); updateNodes({ data: { textAlign: e.target.value } }); }}
                             optionType="button" buttonStyle="solid" size="small" style={{ width: '100%' }} disabled={disabled}>
-                            <Radio.Button value="left" style={{ width: '33.3%', textAlign: 'center' }}><AlignLeftOutlined /></Radio.Button>
-                            <Radio.Button value="center" style={{ width: '33.3%', textAlign: 'center' }}><AlignCenterOutlined /></Radio.Button>
-                            <Radio.Button value="right" style={{ width: '33.3%', textAlign: 'center' }}><AlignRightOutlined /></Radio.Button>
+                            <Radio.Button aria-label={t('propertyPanel.alignLeft')} value="left" style={{ width: '33.3%', textAlign: 'center' }}><AlignLeftOutlined aria-hidden="true" /></Radio.Button>
+                            <Radio.Button aria-label={t('propertyPanel.alignCenter')} value="center" style={{ width: '33.3%', textAlign: 'center' }}><AlignCenterOutlined aria-hidden="true" /></Radio.Button>
+                            <Radio.Button aria-label={t('propertyPanel.alignRight')} value="right" style={{ width: '33.3%', textAlign: 'center' }}><AlignRightOutlined aria-hidden="true" /></Radio.Button>
                         </Radio.Group>
                     </Form.Item>
                     <Form.Item label={t('propertyPanel.borderWidth')}>
                         <InputNumber style={{ width: '100%' }} value={commonNodeStrokeWidth ?? 2}
+                            aria-label={t('propertyPanel.borderWidth')}
                             onChange={(val) => { armSnapshot(); updateNodes({ style: { strokeWidth: typeof val === 'number' ? val : 2 } }); }}
                             min={0} max={8} disabled={disabled} />
                     </Form.Item>

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { render, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { Node } from '@xyflow/react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -75,7 +75,28 @@ describe('PropertyPanel field synchronization', () => {
         expect(Array.from(inputs).some(input => input.value === 'Decision')).toBe(true);
         expect(container.querySelector<HTMLTextAreaElement>('textarea')?.value)
             .toBe('Decision description');
-        expect(container.querySelector('[aria-label="propertyPanel.clearLabel"]')).not.toBeNull();
+        expect(screen.getByRole('button', { name: 'propertyPanel.clearLabel' })).toBeTruthy();
+    });
+
+    it('labels appearance controls that otherwise rely on icons or visual form labels', () => {
+        render(
+            <PropertyPanel
+                selectedNodes={[createNode('Appearance')]}
+                selectedEdges={[]}
+                onUpdateNodes={vi.fn()}
+                onUpdateEdges={vi.fn()}
+                docked
+            />,
+        );
+
+        fireEvent.click(screen.getByText('propertyPanel.appearance'));
+
+        expect(screen.getByRole('button', { name: 'iconExplorer.open' })).toBeTruthy();
+        expect(screen.getByRole('slider', { name: 'propertyPanel.borderRadius' })).toBeTruthy();
+        expect(screen.getByRole('radio', { name: 'propertyPanel.alignLeft' })).toBeTruthy();
+        expect(screen.getByRole('radio', { name: 'propertyPanel.alignCenter' })).toBeTruthy();
+        expect(screen.getByRole('radio', { name: 'propertyPanel.alignRight' })).toBeTruthy();
+        expect(screen.getByRole('spinbutton', { name: 'propertyPanel.borderWidth' })).toBeTruthy();
     });
 
     it('refreshes local fields when history restores the selected node data', async () => {
