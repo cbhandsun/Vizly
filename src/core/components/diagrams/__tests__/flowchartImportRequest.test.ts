@@ -15,6 +15,7 @@ describe('flowchart import request', () => {
 
     it('builds a destructive confirmation that preserves the supplied copy and action', () => {
         const onConfirm = vi.fn();
+        const onClosed = vi.fn();
 
         const config = buildFlowchartImportConfirm({
             title: 'Replace current page?',
@@ -22,6 +23,7 @@ describe('flowchart import request', () => {
             okText: 'Choose file',
             cancelText: 'Cancel',
             onConfirm,
+            onClosed,
         });
 
         expect(config).toEqual(expect.objectContaining({
@@ -30,8 +32,16 @@ describe('flowchart import request', () => {
             okText: 'Choose file',
             cancelText: 'Cancel',
             okButtonProps: { danger: true },
-            onOk: onConfirm,
+            autoFocusButton: 'cancel',
         }));
+
+        config.afterClose();
+        expect(onClosed).toHaveBeenCalledTimes(1);
+
+        config.onOk();
+        config.afterClose();
+        expect(onConfirm).toHaveBeenCalledTimes(1);
+        expect(onClosed).toHaveBeenCalledTimes(1);
     });
 
     it('opens the picker immediately for an empty editable page', () => {
@@ -58,6 +68,7 @@ describe('flowchart import request', () => {
 
     it('requires confirmation before opening the picker for a populated page', () => {
         const openFilePicker = vi.fn();
+        const onConfirmationClosed = vi.fn();
         const showConfirmation = vi.fn();
 
         const result = requestFlowchartImport({
@@ -70,6 +81,7 @@ describe('flowchart import request', () => {
             cancelText: 'Cancel',
             onEditingUnavailable: vi.fn(),
             openFilePicker,
+            onConfirmationClosed,
             showConfirmation,
         });
 
@@ -77,8 +89,17 @@ describe('flowchart import request', () => {
         expect(openFilePicker).not.toHaveBeenCalled();
         expect(showConfirmation).toHaveBeenCalledWith(expect.objectContaining({
             okButtonProps: { danger: true },
-            onOk: openFilePicker,
+            autoFocusButton: 'cancel',
         }));
+
+        const confirmation = showConfirmation.mock.calls[0]?.[0];
+        confirmation?.afterClose();
+        expect(onConfirmationClosed).toHaveBeenCalledTimes(1);
+
+        confirmation?.onOk();
+        confirmation?.afterClose();
+        expect(openFilePicker).toHaveBeenCalledTimes(1);
+        expect(onConfirmationClosed).toHaveBeenCalledTimes(1);
     });
 
     it('blocks import requests when editing is unavailable', () => {

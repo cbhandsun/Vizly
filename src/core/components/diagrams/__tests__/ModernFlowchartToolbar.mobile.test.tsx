@@ -65,6 +65,7 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
 
         const moreButton = await screen.findByRole('button', { name: /更多操作|moreActions/i });
         expect(moreButton.hasAttribute('disabled')).toBe(false);
+        expect(moreButton.getAttribute('data-flowchart-import-focus-return')).toBe('true');
     });
 
     it('exposes selection and creation tools through the mobile more menu', async () => {

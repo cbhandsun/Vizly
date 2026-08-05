@@ -4,6 +4,7 @@ import type { MessageInstance } from 'antd/es/message/interface';
 import type { Edge, Node } from '@xyflow/react';
 
 import { appModal } from '@/core/utils/antdStaticBridge';
+import { focusFlowchartImportTrigger } from '../flowchartImportFocus';
 import { requestFlowchartImport } from '../flowchartImportRequest';
 
 export const useFlowchartImportRequest = ({
@@ -45,6 +46,7 @@ export const useFlowchartImportRequest = ({
             messageApi.info(t('designer.flowchart.import.inProgress'));
         },
         openFilePicker,
+        onConfirmationClosed: focusFlowchartImportTrigger,
         showConfirmation: appModal.confirm,
     });
 }, [editingEnabled, edgesRef, fileInputRef, importInFlightRef, messageApi, nodesRef, t]);

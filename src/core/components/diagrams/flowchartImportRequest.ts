@@ -9,20 +9,33 @@ export const buildFlowchartImportConfirm = ({
     okText,
     cancelText,
     onConfirm,
+    onClosed,
 }: {
     title: string;
     content: string;
     okText: string;
     cancelText: string;
     onConfirm: () => void;
-}) => ({
-    title,
-    content,
-    okText,
-    cancelText,
-    okButtonProps: { danger: true },
-    onOk: onConfirm,
-});
+    onClosed?: () => void;
+}) => {
+    let shouldRestoreFocus = true;
+
+    return {
+        title,
+        content,
+        okText,
+        cancelText,
+        okButtonProps: { danger: true },
+        autoFocusButton: 'cancel' as const,
+        onOk: () => {
+            shouldRestoreFocus = false;
+            onConfirm();
+        },
+        afterClose: () => {
+            if (shouldRestoreFocus) onClosed?.();
+        },
+    };
+};
 
 export type FlowchartImportRequestResult =
     | 'busy'
@@ -42,6 +55,7 @@ export const requestFlowchartImport = <NodeShape, EdgeShape>({
     onEditingUnavailable,
     onImportInProgress,
     openFilePicker,
+    onConfirmationClosed,
     showConfirmation,
 }: {
     editingEnabled: boolean;
@@ -55,6 +69,7 @@ export const requestFlowchartImport = <NodeShape, EdgeShape>({
     onEditingUnavailable: () => void;
     onImportInProgress?: () => void;
     openFilePicker: () => void;
+    onConfirmationClosed?: () => void;
     showConfirmation: (config: ReturnType<typeof buildFlowchartImportConfirm>) => void;
 }): FlowchartImportRequestResult => {
     if (importInProgress) {
@@ -78,6 +93,7 @@ export const requestFlowchartImport = <NodeShape, EdgeShape>({
         okText,
         cancelText,
         onConfirm: openFilePicker,
+        onClosed: onConfirmationClosed,
     }));
     return 'confirmation-requested';
 };

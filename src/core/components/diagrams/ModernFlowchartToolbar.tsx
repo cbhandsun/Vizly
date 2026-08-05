@@ -634,6 +634,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                     >
                         <DropdownMenuTriggerButton
                             ref={moreDropdown.triggerRef}
+                            data-flowchart-import-focus-return={onImportClick ? 'true' : undefined}
                             ariaLabel={t('designer.toolbar.moreActions')}
                             open={moreDropdown.open}
                             onTriggerKeyDown={moreDropdown.handleTriggerKeyDown}
@@ -656,6 +657,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                 >
                     <DropdownMenuTriggerButton
                         ref={moreDropdown.triggerRef}
+                        data-flowchart-import-focus-return={onImportClick ? 'true' : undefined}
                         ariaLabel={t('designer.toolbar.moreActions')}
                         open={moreDropdown.open}
                         onTriggerKeyDown={moreDropdown.handleTriggerKeyDown}
