@@ -67,7 +67,8 @@ export const MobileBottomDock: React.FC<MobileBottomDockProps> = ({
                         onClick={onPropertyClick}
                         disabled={editingDisabled}
                         aria-label={propertyLabel}
-                        aria-pressed={activeTab === 'property'}
+                        aria-haspopup="dialog"
+                        aria-expanded={activeTab === 'property'}
                     >
                         <Badge count={selectedCount} size="small" offset={[2, -2]}>
                             <FaBars style={{ fontSize: 18 }} />
@@ -94,7 +95,8 @@ export const MobileBottomDock: React.FC<MobileBottomDockProps> = ({
                         onClick={onAiClick}
                         disabled={editingDisabled}
                         aria-label={t('designer.mobileDock.ai', 'AI 助手')}
-                        aria-pressed={activeTab === 'ai'}
+                        aria-haspopup="dialog"
+                        aria-expanded={activeTab === 'ai'}
                     >
                         <FaRobot />
                         <span className="dock-label">{t('designer.mobileDock.aiShort', 'AI')}</span>

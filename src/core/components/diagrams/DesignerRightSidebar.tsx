@@ -18,6 +18,11 @@ import {
     shouldExpandDesignerRightSidebar,
     shouldFreezeDesignerRightSidebarDuringDrag,
 } from './designerRightSidebarState';
+import {
+    bindDialogEscapeClose,
+    findExpandedDialogTrigger,
+    trapDialogTab,
+} from './dialogFocus';
 import { hasMutationLockedNode } from './nodeLockPolicy';
 
 const PropertyPanel = React.lazy(() => import('./PropertyPanel'));
@@ -84,6 +89,9 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
     const hasLockedSelection = hasMutationLockedNode(selectedNodes);
     const previousAiChatVisibleRef = React.useRef(aiChatVisible);
     const previousHasSelectionRef = React.useRef(false);
+    const sidebarRef = React.useRef<HTMLDivElement>(null);
+    const mobileDialogTriggerRef = React.useRef<HTMLElement | null>(null);
+    const previousMobileDialogOpenRef = React.useRef(false);
 
     // 折叠状态持久化
     const [collapsedState, setCollapsedState] = useState(() => {
@@ -95,6 +103,7 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
     const isControlledMobile = isMobile && mobileOpen !== undefined;
     const persistedCollapsed = collapsedState.diagramId === diagramId ? collapsedState.value : true;
     const isCollapsed = isControlledMobile ? !mobileOpen : persistedCollapsed;
+    const mobileDialogOpen = isControlledMobile && !isCollapsed;
     const setIsCollapsed = useCallback((update: React.SetStateAction<boolean>) => {
         if (isControlledMobile) {
             const nextCollapsed = typeof update === 'function' ? update(!mobileOpen) : update;
@@ -219,6 +228,38 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
         setIsCollapsed(true);
     }, [setAiChatVisible, setIsCollapsed]);
 
+    const closeMobileDialog = useCallback(() => {
+        if (activeTab === 'ai' && aiChatVisible) {
+            setAiChatVisible(false);
+        }
+        setIsCollapsed(true);
+    }, [activeTab, aiChatVisible, setAiChatVisible, setIsCollapsed]);
+
+    React.useLayoutEffect(() => {
+        const wasOpen = previousMobileDialogOpenRef.current;
+        previousMobileDialogOpenRef.current = mobileDialogOpen;
+
+        if (mobileDialogOpen && !mobileDialogTriggerRef.current && sidebarRef.current) {
+            mobileDialogTriggerRef.current = findExpandedDialogTrigger(document, sidebarRef.current);
+        }
+
+        if (!mobileDialogOpen && wasOpen) {
+            const trigger = mobileDialogTriggerRef.current;
+            mobileDialogTriggerRef.current = null;
+            if (trigger?.isConnected) trigger.focus();
+        }
+    }, [mobileDialogOpen]);
+
+    useEffect(() => {
+        if (!mobileDialogOpen) return;
+        return bindDialogEscapeClose(window, closeMobileDialog);
+    }, [closeMobileDialog, mobileDialogOpen]);
+
+    useEffect(() => () => {
+        const trigger = mobileDialogTriggerRef.current;
+        if (trigger?.isConnected) trigger.focus();
+    }, []);
+
     // 通知父组件当前面板实际宽度（用 ref 避免依赖变化）
     const onWidthChangeRef = React.useRef(onWidthChange);
     useEffect(() => {
@@ -245,10 +286,33 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
         isMobile,
         panelWidth,
     });
+    const mobileDialogLabel = activeTab === 'ai'
+        ? t('aiChat.title')
+        : t('propertyPanel.title');
 
     return (
         <div
+            ref={sidebarRef}
             className="designer-right-sidebar"
+            role={mobileDialogOpen ? 'dialog' : undefined}
+            aria-modal={mobileDialogOpen || undefined}
+            aria-label={mobileDialogOpen ? mobileDialogLabel : undefined}
+            aria-hidden={isControlledMobile && isCollapsed ? true : undefined}
+            tabIndex={mobileDialogOpen ? -1 : undefined}
+            onKeyDown={(event) => {
+                if (mobileDialogOpen) trapDialogTab(event, event.currentTarget);
+            }}
+            onFocusCapture={(event) => {
+                if (!mobileDialogOpen || mobileDialogTriggerRef.current) return;
+                const previousFocus = event.relatedTarget;
+                if (
+                    previousFocus instanceof HTMLElement
+                    && previousFocus !== document.body
+                    && !event.currentTarget.contains(previousFocus)
+                ) {
+                    mobileDialogTriggerRef.current = previousFocus;
+                }
+            }}
             onPointerDown={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
@@ -296,7 +360,9 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
             )}
 
             {/* Icon Rail (始终显示) */}
-            <div style={{
+            <div
+                data-testid="designer-right-sidebar-rail"
+                style={{
                 width: COMMERCIAL_TOUCH_TARGET,
                 flexShrink: 0,
                 display: 'flex',
@@ -305,6 +371,12 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
                 paddingTop: 8,
                 gap: 2,
                 borderLeft: isCollapsed ? 'none' : `1px solid ${token.colorBorderSecondary}`,
+                position: isMobile ? 'absolute' : 'relative',
+                right: isMobile ? 0 : undefined,
+                top: isMobile ? 0 : undefined,
+                bottom: isMobile ? 0 : undefined,
+                zIndex: 2,
+                backgroundColor: isMobile ? token.colorBgContainer : 'transparent',
             }}>
                 {railButtons.map(btn => (
                     <Tooltip 
@@ -376,8 +448,11 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
                     getPopupContainer={(node) => node.closest('.diagram-root') as HTMLElement || document.body}
                 >
                     <Button
+                        key={mobileDialogOpen ? 'mobile-dialog-close' : 'sidebar-toggle'}
                         type="text"
                         aria-label={isCollapsed ? '展开面板' : '收起面板'}
+                        data-dialog-initial-focus={mobileDialogOpen ? 'true' : undefined}
+                        autoFocus={mobileDialogOpen}
                         onClick={(e) => { e.stopPropagation(); toggle(); }}
                         icon={isCollapsed ? <FaChevronLeft /> : <FaChevronRight />}
                         style={{
@@ -399,7 +474,9 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
 
             {/* Panel Content (折叠时隐藏) */}
             {!isCollapsed && (
-                <div style={{
+                <div
+                    data-testid="designer-right-sidebar-content"
+                    style={{
                     flex: 1,
                     display: 'flex',
                     flexDirection: 'column',
@@ -407,6 +484,7 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
                     minWidth: 0,
                     animation: isMobile ? 'none' : 'drawerSlideIn 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                     paddingBottom: isMobile ? 'env(safe-area-inset-bottom, 20px)' : 0,
+                    marginRight: isMobile ? COMMERCIAL_TOUCH_TARGET : 0,
                 }}>
                     <Tabs
                         activeKey={activeTab}

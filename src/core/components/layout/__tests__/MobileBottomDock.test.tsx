@@ -33,12 +33,16 @@ describe('MobileBottomDock', () => {
 
         fireEvent.click(screen.getByRole('button', { name: '添加组件' }));
         expect(onAddClick).toHaveBeenCalledTimes(1);
-        expect(screen.getByRole('button', { name: '属性（已选择 {{count}} 项）' }).getAttribute('aria-pressed')).toBe('true');
+        const propertyButton = screen.getByRole('button', { name: '属性（已选择 {{count}} 项）' });
+        expect(propertyButton.getAttribute('aria-haspopup')).toBe('dialog');
+        expect(propertyButton.getAttribute('aria-expanded')).toBe('true');
         const layerButton = screen.getByRole('button', { name: '图层' });
         expect(layerButton.getAttribute('aria-haspopup')).toBe('dialog');
         fireEvent.click(layerButton);
         expect(onLayerClick).toHaveBeenCalledTimes(1);
-        expect(screen.getByRole('button', { name: 'AI 助手' })).toBeTruthy();
+        const aiButton = screen.getByRole('button', { name: 'AI 助手' });
+        expect(aiButton.getAttribute('aria-haspopup')).toBe('dialog');
+        expect(aiButton.getAttribute('aria-expanded')).toBe('false');
         expect((screen.getByRole('button', { name: '撤销' }) as HTMLButtonElement).disabled).toBe(true);
         expect((screen.getByRole('button', { name: '重做' }) as HTMLButtonElement).disabled).toBe(true);
         expect(screen.getByRole('button', { name: '设置' })).toBeTruthy();
