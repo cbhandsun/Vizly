@@ -1052,12 +1052,21 @@
         "discoveryModelToggleLabel": "选择或取消选择模型 {{name}}",
         "connection": {
             "needsSetup": "需配置",
-            "ready": "连接配置已就绪",
+            "ready": "连接配置已填写",
+            "untested": "配置已填写，尚未测试连接",
+            "testing": "正在测试连接…",
+            "syncing": "正在同步模型…",
+            "verified": "连接测试成功",
+            "models-verified": "模型服务连接成功",
+            "test-failed": "连接测试失败",
+            "sync-failed": "模型同步失败",
             "missing-base-url": "请先填写 Base URL",
             "invalid-base-url": "Base URL 必须使用 HTTPS，或本机 HTTP",
             "missing-api-key": "远程平台需要 API Key",
             "localNotice": "本机服务可以不填写密钥；请求只会发送到当前本机地址。",
-            "remoteNotice": "测试或同步时，请求会发送到当前 Base URL；密钥不会写入日志。"
+            "remoteNotice": "测试或同步时，请求会发送到当前 Base URL；密钥不会写入日志。",
+            "verifiedNotice": "已使用当前 Base URL 和凭据完成真实请求；修改连接配置后需要重新测试。",
+            "failureNotice": "请求未完成，请检查网络、Base URL 和凭据后重新测试。"
         }
     },
     "header": {

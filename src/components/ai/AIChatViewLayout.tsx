@@ -187,7 +187,7 @@ export const AIChatViewLayout: React.FC<AIChatViewLayoutProps> = ({
             ).find(button => button.dataset.aiChatRenameId === conversationId);
             renameTrigger?.focus();
         });
-    }, [editingId, isSidebarOpen]);
+    }, [editingId, historySidebarRef, isSidebarOpen]);
 
     const handleRenameKeyDown = React.useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
         if (event.key !== 'Escape') return;

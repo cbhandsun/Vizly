@@ -2010,12 +2010,21 @@
         "discoveryModelToggleLabel": "Select or clear model {{name}}",
         "connection": {
             "needsSetup": "Setup",
-            "ready": "Connection settings are ready",
+            "ready": "Connection settings are complete",
+            "untested": "Configuration complete; connection not tested",
+            "testing": "Testing connection…",
+            "syncing": "Syncing models…",
+            "verified": "Connection test succeeded",
+            "models-verified": "Model service connection succeeded",
+            "test-failed": "Connection test failed",
+            "sync-failed": "Model sync failed",
             "missing-base-url": "Enter a Base URL first",
             "invalid-base-url": "Base URL must use HTTPS or local HTTP",
             "missing-api-key": "Remote providers require an API Key",
             "localNotice": "Local services can omit the key; requests are sent only to the current local address.",
-            "remoteNotice": "Tests and model sync send requests to the current Base URL; keys are not written to logs."
+            "remoteNotice": "Tests and model sync send requests to the current Base URL; keys are not written to logs.",
+            "verifiedNotice": "A real request succeeded with the current Base URL and credentials; test again after changing connection settings.",
+            "failureNotice": "The request did not complete. Check the network, Base URL, and credentials, then retry."
         }
     },
     "storageConfig": {

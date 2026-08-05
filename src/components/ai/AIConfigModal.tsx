@@ -10,7 +10,6 @@ import Space from 'antd/es/space';
 import Tag from 'antd/es/tag';
 import Divider from 'antd/es/divider';
 import Collapse from 'antd/es/collapse';
-import Alert from 'antd/es/alert';
 import {
     PlusOutlined,
     DeleteOutlined,
@@ -48,6 +47,14 @@ import {
 import { filterAIModels, filterAIProviders, groupAIModels } from './aiConfigModelCollections';
 import { createCustomAIProvider } from './aiConfigProviderMutations';
 import { getAIProviderConnectionReadiness } from './aiProviderConnectionReadiness';
+import {
+    createAIProviderConnectionFailure,
+    invalidateAIProviderConnectionStatus,
+    setAIProviderConnectionStatus,
+    type AIProviderConnectionStatus,
+    type AIProviderConnectionStatusMap,
+} from './aiProviderConnectionStatus';
+import { AIConfigConnectionStatusAlert } from './AIConfigConnectionStatusAlert';
 import { AIConfigProviderSidebar } from './AIConfigProviderSidebar';
 import { AIConfigModelDiscoveryModal } from './AIConfigModelDiscoveryModal';
 import { useAIConfigModalConfig } from './useAIConfigModalConfig';
@@ -74,6 +81,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
     const [selectedProviderId, setSelectedProviderId] = useState<string>('global_settings');
     const [searchText, setSearchText] = useState('');
     const [isApiKeyVisible, setIsApiKeyVisible] = useState(false);
+    const [connectionStatuses, setConnectionStatuses] = useState<AIProviderConnectionStatusMap>({});
 
     // For adding new models
     const [newModelFormVisible, setNewModelFormVisible] = useState(false);
@@ -131,11 +139,18 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
         }
 
         window.dispatchEvent(new Event('aiConfigChanged'));
+        setConnectionStatuses({});
         onSave();
+    };
+
+    const handleCancel = () => {
+        setConnectionStatuses({});
+        onCancel();
     };
 
     // --- Provider Actions ---
     const toggleProvider = (id: string, checked: boolean) => {
+        setConnectionStatuses(prev => invalidateAIProviderConnectionStatus(prev, id));
         setConfig(prev => ({
             ...prev,
             providers: prev.providers.map(p => {
@@ -156,6 +171,9 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
     };
 
     const updateProvider = (id: string, updates: Partial<AIProviderConfig>) => {
+        if ('baseUrl' in updates || 'apiKey' in updates) {
+            setConnectionStatuses(prev => invalidateAIProviderConnectionStatus(prev, id));
+        }
         setConfig(prev => ({
             ...prev,
             providers: prev.providers.map(p => p.id === id ? { ...p, ...updates } : p)
@@ -245,6 +263,9 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
     const selectedProviderReadiness = selectedProvider
         ? getAIProviderConnectionReadiness(selectedProvider)
         : null;
+    const updateConnectionStatus = (providerId: string, status: AIProviderConnectionStatus) => {
+        setConnectionStatuses(prev => setAIProviderConnectionStatus(prev, providerId, status));
+    };
 
     // Derived state for rendering
     const filteredProviders = filterAIProviders(config.providers, searchText);
@@ -267,19 +288,27 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
             resolveAIProviderEndpoint(provider, '/chat/completions');
         } catch (error) {
             logAIConfigEndpointValidationFailure(provider.name, 'testConnection', error);
+            updateConnectionStatus(provider.id, createAIProviderConnectionFailure(
+                'test-connection',
+                formatAIProviderRequestError(error, 100),
+            ));
             appMessage.warning(`${provider.name} 的 Base URL 必须使用 HTTPS，或本机 HTTP localhost/127.0.0.1。`);
             return;
         }
+        updateConnectionStatus(provider.id, { kind: 'testing', operation: 'test-connection' });
         setIsTesting(true);
         try {
             await requestAIChatCompletion(provider, {
                 model: provider.models[0]?.id || 'test-model',
                 messages: [{ role: 'user', content: 'Hello, please reply with "OK".' }]
             }, { timeoutMs: 30_000 });
+            updateConnectionStatus(provider.id, { kind: 'success', operation: 'test-connection' });
             appMessage.success(t('aiConfig.testSuccess'));
         } catch (error) {
             logAIConfigRequestFailure('testConnection', provider.name, error);
-            appMessage.error(t('aiConfig.testError', { message: formatAIProviderRequestError(error, 100) }));
+            const message = formatAIProviderRequestError(error, 100);
+            updateConnectionStatus(provider.id, createAIProviderConnectionFailure('test-connection', message));
+            appMessage.error(t('aiConfig.testError', { message }));
         } finally {
             setIsTesting(false);
         }
@@ -339,13 +368,19 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
             resolveAIProviderEndpoint(provider, '/models');
         } catch (error) {
             logAIConfigEndpointValidationFailure(provider.name, 'fetchModels', error);
+            updateConnectionStatus(provider.id, createAIProviderConnectionFailure(
+                'model-sync',
+                formatAIProviderRequestError(error, 100),
+            ));
             appMessage.warning(`${provider.name} 的 Base URL 必须使用 HTTPS，或本机 HTTP localhost/127.0.0.1。`);
             return;
         }
+        updateConnectionStatus(provider.id, { kind: 'testing', operation: 'model-sync' });
         setIsFetchingModels(true);
         try {
             const models = normalizeAIModelsResponse(await requestAIModels(provider, { timeoutMs: 30_000 }));
             if (models.length > 0) {
+                updateConnectionStatus(provider.id, { kind: 'success', operation: 'model-sync' });
                 const existingModelIds = new Set(provider.models.map(m => m.id));
                 const newModels = models
                     .filter((m) => !existingModelIds.has(m.id))
@@ -374,11 +409,17 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                     appMessage.info(t('aiConfig.fetchModelsNoNew'));
                 }
             } else {
+                updateConnectionStatus(provider.id, createAIProviderConnectionFailure(
+                    'model-sync',
+                    t('aiConfig.fetchModelsInvalidData'),
+                ));
                 appMessage.error(t('aiConfig.fetchModelsInvalidData'));
             }
         } catch (error) {
             logAIConfigRequestFailure('fetchModels', provider.name, error);
-            appMessage.error(t('aiConfig.testError', { message: formatAIProviderRequestError(error, 100) }));
+            const message = formatAIProviderRequestError(error, 100);
+            updateConnectionStatus(provider.id, createAIProviderConnectionFailure('model-sync', message));
+            appMessage.error(t('aiConfig.testError', { message }));
         } finally {
             setIsFetchingModels(false);
         }
@@ -394,13 +435,13 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                         className="ai-config-modal-close"
                         icon={<CloseOutlined />}
                         aria-label={t('aiConfig.close')}
-                        onClick={onCancel}
+                        onClick={handleCancel}
                     />
                 </div>
             )}
             open={open}
             onOk={handleSave}
-            onCancel={onCancel}
+            onCancel={handleCancel}
             closable={false}
             getContainer={getViewportOverlayContainer}
             okText={t('aiConfig.saveAll')}
@@ -470,6 +511,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                                         <Input
                                             aria-label={t('aiConfig.baseUrlLabel')}
                                             value={selectedProvider.baseUrl}
+                                            disabled={isTesting || isFetchingModels}
                                             onChange={e => updateProvider(selectedProvider.id, { baseUrl: e.target.value })}
                                             placeholder="https://..."
                                         />
@@ -484,6 +526,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                                                 type={isApiKeyVisible ? 'text' : 'password'}
                                                 autoComplete="off"
                                                 value={selectedProvider.apiKey}
+                                                disabled={isTesting || isFetchingModels}
                                                 onChange={e => updateProvider(selectedProvider.id, { apiKey: e.target.value })}
                                                 placeholder="sk-..."
                                             />
@@ -497,16 +540,10 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                                         </Space.Compact>
                                     </Form.Item>
                                     {selectedProviderReadiness && (
-                                        <Alert
-                                            className="ai-config-readiness-alert"
-                                            type={selectedProviderReadiness.ready ? 'success' : 'warning'}
-                                            showIcon
-                                            message={t(selectedProviderReadiness.ready
-                                                ? 'aiConfig.connection.ready'
-                                                : `aiConfig.connection.${selectedProviderReadiness.issue}`)}
-                                            description={t(selectedProviderReadiness.authMode === 'optional-local'
-                                                ? 'aiConfig.connection.localNotice'
-                                                : 'aiConfig.connection.remoteNotice')}
+                                        <AIConfigConnectionStatusAlert
+                                            providerId={selectedProvider.id}
+                                            readiness={selectedProviderReadiness}
+                                            statuses={connectionStatuses}
                                         />
                                     )}
                                     {selectedProvider.id.startsWith('custom_') && (

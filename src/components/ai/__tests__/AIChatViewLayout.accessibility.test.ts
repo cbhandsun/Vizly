@@ -61,6 +61,7 @@ describe('AIChatViewLayout accessibility contract', () => {
 
     it('keeps AI configuration controls named, guarded, and mobile-safe', () => {
         const modalSource = readFileSync('src/components/ai/AIConfigModal.tsx', 'utf8');
+        const statusAlertSource = readFileSync('src/components/ai/AIConfigConnectionStatusAlert.tsx', 'utf8');
         const sidebarSource = readFileSync('src/components/ai/AIConfigProviderSidebar.tsx', 'utf8');
         const discoverySource = readFileSync('src/components/ai/AIConfigModelDiscoveryModal.tsx', 'utf8');
         const css = readFileSync('src/components/ai/AIConfigModal.css', 'utf8');
@@ -71,7 +72,11 @@ describe('AIChatViewLayout accessibility contract', () => {
         expect(modalSource).toContain("aria-label={t('aiConfig.apiKeyLabel')}");
         expect(modalSource).toContain('disabled={!selectedProviderReadiness?.ready || isFetchingModels}');
         expect(modalSource).toContain('disabled={!selectedProviderReadiness?.ready || isTesting}');
-        expect(modalSource).toContain('className="ai-config-readiness-alert"');
+        expect(statusAlertSource).toContain('className="ai-config-readiness-alert"');
+        expect(modalSource).toContain('<AIConfigConnectionStatusAlert');
+        expect(statusAlertSource).toContain("type={readiness.ready ? feedback.tone : 'warning'}");
+        expect(statusAlertSource).not.toContain("readiness.ready ? 'success' : 'warning'");
+        expect(statusAlertSource).toContain("role={readiness.ready ? feedback.role : 'status'}");
         expect(sidebarSource).toContain("aria-label={t('aiConfig.searchLabel')}");
         expect(sidebarSource).toContain("aria-label={t('aiConfig.providerToggleLabel', { name: provider.name })}");
         expect(sidebarSource).toContain('type="button"');
