@@ -362,7 +362,19 @@ export const useFlowchartDesignerController = ({
     });
     
     // 2.5 Linter Layer (Phase 8 integration)
-    useTopologyLinter(nodes�mm�G����ƭy�    () => nodesRef.current,
+    useTopologyLinter(nodesWithGhost, finalEdgesWithGhost, { enabled: !isReadonly });
+    
+
+
+
+
+
+
+    // 协作层 diagramId：优先使用 id prop，回退到导出 ID，避免多画布协作时 ID 冲突
+    const diagramId = id || diagramIdForExport || 'default';
+    const { updateLocalCursor } = useDiagramCollaboration(diagramId, !isReadonly);
+    const multiPage = useMultiPage(
+        () => nodesRef.current,
         () => edgesRef.current,
         setNodes,
         setEdges,

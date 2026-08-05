@@ -388,5 +388,297 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                 onShare: onOpenShareDialog,
                                 rightOffset: rightSidebarWidth,
                                 extraExportItems,
-                    ×nö¶‰Ëkºwµç@€€€€€€€€€€€€€€€€€€€€¥˜€¡Í•±•Ñ•‘9½‘•Ì¹±•¹Ñ €ø€ÀñğÍ•±•Ñ•‘‘•Ì¹±•¹Ñ €ø€À¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Í•ÑÑ¥Ù•I¥¡ÑQ…ˆ ÁÉ½Á•ÉÑäœ¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ô°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€…¥¡…ÑÑ¥Ù”è…¥¡…ÑY¥Í¥‰±”°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¹½‘•½Õ¹Ğè¹½‘•Ì¹±•¹Ñ °(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€•‘•½Õ¹Ğè•‘•Ì¹±•¹Ñ °(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Í•±•Ñ•‘9½‘•Í½Õ¹ĞèÍ•±•Ñ•‘9½‘•Ì¹±•¹Ñ °(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Í•±•Ñ•‘‘•Í½Õ¹ĞèÍ•±•Ñ•‘‘•Ì¹±•¹Ñ °(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€é½½µA•É•¹Ğè5…Ñ ¹É½Õ¹¡Ù¥•İÁ½ÉĞ¹é½½´€¨€ÄÀÀ¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Í¹…ÁQ½É¥èÍ¹…Á¹…‰±•°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹Q½±•M¹…Àè€ ¤€ôøÍ•ÑM¹…Á¹…‰±• ¡•¹…‰±•è‰½½±•…¸¤€ôø€…•¹…‰±•¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¡¥‘•i½½µ½¹ÑÉ½±Ìè…Ñ¥Ù•A±Õ¥¸ü¹¡¥‘•i½½µ½¹ÑÉ½±Ì°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¡¥‘•1…å½ÕÑ½¹ÑÉ½±Ìè…Ñ¥Ù•A±Õ¥¸ü¹¡¥‘•1…å½ÕÑ½¹ÑÉ½±Ì°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¡¥‘•É¥‘½¹ÑÉ½±Ìè…Ñ¥Ù•A±Õ¥¸ü¹¡¥‘•É¥‘½¹ÑÉ½±Ì°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¡¥‘•±½İ½ÕÍ½¹ÑÉ½±Ìè…Ñ¥Ù•A±Õ¥¸ü¹¡¥‘•±½İ½ÕÍ½¹ÑÉ½±Ì°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¡¥‘•U¹‘½I•‘½½¹ÑÉ½±Ìè…Ñ¥Ù•A±Õ¥¸ü¹¡¥‘•U¹‘½I•‘½½¹ÑÉ½±Ì°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¥ÍÉ…İ¥¹5½‘”°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¥Í5…ÉÅÕ••Ñ¥Ù”°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Ñ½±•M•±•Ñ¥½¹5½‘”èÑ½±•5…ÉÅÕ••5½‘”°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹Q½±•É…İ¥¹5½‘”èÑ½±•É…İ¥¹5½‘”°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹Ñ¥Ù…Ñ•A½¥¹Ñ•Èè…Ñ¥Ù…Ñ•A½¥¹Ñ•È°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹‘‘MÑ¥­å9½Ñ”è¡…¹‘±•‘‘MÑ¥­å9½Ñ”°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹‘‘5¥¹‘5…Àè¡…¹‘±•‘‘5¥¹‘5…À°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹áÁ½ÉĞè€ ¤€ôøÍ•ÑáÁ½ÉÑ5½‘…±Y¥Í¥‰±”¡ÑÉÕ”¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹%µÁ½ÉÑ±¥¬è•‘¥Ñ¥¹¹…‰±•€ü¡…¹‘±•I•ÅÕ•ÍÑ%µÁ½ÉĞ€èÕ¹‘•™¥¹•°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€É•¹‘•ÉQ¡•µ•M•±•Ñ½È°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¡¥ÍÑ½Éå½Õ¹ĞèÁ…ÍÑ¹ÑÉ¥•Ìü¹±•¹Ñ €üü€À°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹±¥¸è¡…¹‘±•±¥¸°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹¥ÍÑÉ¥‰ÕÑ”è¡…¹‘±•¥ÍÑÉ¥‰ÕÑ”°(€€€€€€€€€€€€€€€€€€€€€€€€€€€õô(€€€€€€€€€€€€€€€€€€€€€€€€¼ùô((€€€€€€€€€€€€€€€€€€€€€€€í¥ÍI•…‘½¹±ä€˜˜€…ÁÉ•Í•¹Ñ…Ñ¥½¹Ñ¥Ù”€˜˜€ (€€€€€€€€€€€€€€€€€€€€€€€€€€€€ñ‘¥Ø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€É½±”ô‰ÍÑ…ÑÕÌˆ(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€…É¥„µ±¥Ù”ô‰Á½±¥Ñ”ˆ(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ÍÑå±”õíì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Á½Í¥Ñ¥½¸è€…‰Í½±ÕÑ”œ°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Ñ½Àè€ÜÈ°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€±•™Ğè€œÔÀ”œ°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ÑÉ…¹Í™½É´è€ÑÉ…¹Í±…Ñ•` ´ÔÀ”¤œ°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€é%¹‘•àè€ÄÈÀ°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Á…‘‘¥¹œè€œáÁà€ÄÑÁàœ°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€‰½É‘•ÉI…‘¥ÕÌè€äää°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€‰…­É½Õ¹è€É‰„ ÄÔ°€ÈÌ°€ĞÈ°€À¸ä¤œ°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½±½Èè€œ™™˜œ°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€™½¹ÑM¥é”è€ÄÌ°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€™½¹Ñ]•¥¡Ğè€ØÀÀ°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Á½¥¹Ñ•ÉÙ•¹ÑÌè€¹½¹”œ°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€õô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€ø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€íĞ ‘•Í¥¹•È¹Ñ½½±‰…È¹É•…‘½¹±åMÑ…ÑÕÌœ°€ŸRï–â–ŞË¦R–ºhƒ
-Üƒ’î–>¿š~—r,œ¥ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€ğ½‘¥Øø(€€€€€€€€€€€€€€€€€€€€€€€€¥ô((€€€€€€€€€€€€€€€€€€€€€€€€ñ¥…É…µ‘¥Ñ¥¹AÉ½Ù¥‘•ÈÙ…±Õ”õí•‘¥Ñ¥¹¹…‰±•‘ôø(€€€€€€€€€€€€€€€€€€€€€€€€ñ1…å½ÕÑMÑ…‰¥±¥Ñå½¹Ñ•áĞ¹AÉ½Ù¥‘•ÈÙ…±Õ”õí¥Í1…å½ÕÑMÑ…‰±•ôø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€ñ‘¥Ø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€±…ÍÍ9…µ”ô‰…¹Ù…ÌµÑ½Õ µİÉ…ÁÁ•Èˆ(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ÍÑå±”õíìİ¥‘Ñ è€œÄÀÀ”œ°¡•¥¡Ğè€œÄÀÀ”œ°Á½Í¥Ñ¥½¸è€É•±…Ñ¥Ù”œõô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹Q½Õ¡MÑ…ÉĞõí¡…¹‘±•Q½Õ¡MÑ…ÉÑô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹Q½Õ¡¹õí¡…¹‘±•Q½Õ¡¹‘ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€ø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ñ•ÍÑÕÉ•=Ù•É±…äé½½´õíÕÉÉ•¹Ñi½½µôÙ¥Í¥‰±”õíÍ¡½İ=Ù•É±…åô€¼ø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ñ±½İ¡…ÉÑ…¹Ù…ÍM¡•±°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¹½‘•Ìõí¥Í%¹¥Ñ¥…±¥…É…µ1½…‘¥¹œ(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ümt(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€èÁ•É™½Éµ…¹•5½‘”(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ü¹½‘•Ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€è±…å•ÉMå¹•‘9½‘•Íô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€‘¥ÍÁ±…å‘•Ìõí¥Í%¹¥Ñ¥…±¥…É…µ1½…‘¥¹œ€ümt€èÙ¥Í¥‰±•‘•Íô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¹½‘•QåÁ•Ìõí‘å¹…µ¥9½‘•QåÁ•Íô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€•‘•QåÁ•Ìõí‘å¹…µ¥‘•QåÁ•Íô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹%¹¥Ğõí¡…¹‘±•I•…Ñ±½İ%¹¥Ñô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹9½‘•Í¡…¹”õí½¹9½‘•Í¡…¹•]¥Ñ¡1½­ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹‘•Í¡…¹”õí½¹‘•Í¡…¹•]¥Ñ¡1½­ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹½¹¹•Ğõí•¹¡…¹•‘=¹½¹¹•Ñô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹½¹¹•ÑMÑ…ÉĞõí½¹½¹¹•ÑMÑ…ÉÑô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹½¹¹•Ñ¹õí•¹¡…¹•‘=¹½¹¹•Ñ¹‘ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹M•±•Ñ¥½¹¡…¹”õí½¹M•±•Ñ¥½¹¡…¹•ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹A…¹•±¥¬õí¡…¹‘±•A…¹•±¥­ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹A…¹•5½ÕÍ•5½Ù”õí½¹A…¹•5½ÕÍ•5½Ù•ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹A…¹•5½ÕÍ•1•…Ù”õí½¹A…¹•5½ÕÍ•1•…Ù•ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹A…¹•½Õ‰±•±¥¬õí½¹A…¹•½Õ‰±•±¥­ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹9½‘•½¹Ñ•áÑ5•¹Ôõí½¹9½‘•½¹Ñ•áÑ5•¹Õô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹‘•½¹Ñ•áÑ5•¹Ôõí½¹‘•½¹Ñ•áÑ5•¹Õô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹‘•½Õ‰±•±¥¬õí¡…¹‘±•‘•½Õ‰±•±¥­ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹A…¹•½¹Ñ•áÑ5•¹Ôõí½¹A…¹•½¹Ñ•áÑ5•¹Õô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹9½‘•É…MÑ…ÉĞõíİÉ…ÁÁ•‘=¹9½‘•É…MÑ…ÉÑô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹9½‘•É…œõí½¹9½‘•É…ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹Mµ…ÉÑ9½‘•É…œõí½¹Mµ…ÉÑ9½‘•É…ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹9½‘•É…MÑ½Àõí½¹9½‘•É…MÑ½Áô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹I•½¹¹•Ğõí¡…¹‘±•I•½¹¹•Ñô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹I•½¹¹•ÑMÑ…ÉĞõí¡…¹‘±•I•½¹¹•ÑMÑ…ÉÑô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹I•½¹¹•Ñ¹õí¡…¹‘±•I•½¹¹•Ñ¹‘ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€…ÕÑ½I½ÕÑ¥¹¹…‰±•õí…ÕÑ½I½ÕÑ¥¹¹…‰±•‘ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€•¹…‰±•Mµ…ÉÑ‘•ÌõíÑÉÕ•ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Í¡½İ5¥¹¥µ…ÀõíÍ¡½İ‘¥Ñ¥¹¡É½µ”€˜˜Í¡½İ5¥¹¥µ…Áô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Í¡½İÉ¥õíÍ¡½İÉ¥‘ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€É¥‘Y…É¥…¹ĞõíÉ¥‘Y…É¥…¹Ñô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€‰…­É½Õ¹‘É¥‘½±½ÈõíÉ¥‘½±½Éô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¥ÍMÁ…•AÉ•ÍÍ•õí¥ÍMÁ…•AÉ•ÍÍ•‘ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¥Í½¹¹•Ñ¥¹œõí¥Í½¹¹•Ñ¥¹ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹¹•ÑAÉ•Ù¥•Üõí½¹¹•ÑAÉ•Ù¥•İô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹¹•Ñ¥½¹5½‘”õí½¹¹•Ñ¥½¹5½‘”¹1½½Í•ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Í•±•Ñ¥½¹5½‘”õíM•±•Ñ¥½¹5½‘”¹A…ÉÑ¥…±ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¥ÍY…±¥‘½¹¹•Ñ¥½¸õí¥ÍY…±¥‘½¹¹•Ñ¥½¹ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Í¹…Á¹…‰±•õíÍ¹…Á¹…‰±•‘ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¥ÍÉ…¥¹œõí¥ÍÉ…¥¹ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€•‘¥Ñ¥¹¹…‰±•õí•‘¥Ñ¥¹¹…‰±•‘ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ñI•µ½Ñ•ÕÉÍ½ÉÌ€¼ø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€í•‘¥Ñ¥¹¹…‰±•€˜˜€ñ•Í¥¹•É…¹Ù…Í•…ÑÕÉ•Í1…å•È(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ÅÕ¥­½¹¹•Ğõíì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Ù¥Í¥‰±”è€„…ÅÕ¥­‘‘5•¹Ôü¹Ù¥Í¥‰±”°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€àèÅÕ¥­‘‘5•¹Ôü¹±¥•¹Ñ`ñğ€À°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€äèÅÕ¥­‘‘5•¹Ôü¹±¥•¹Ñdñğ€À°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Í½ÕÉ•9½‘•%èÅÕ¥­‘‘5•¹Ôü¹Í½ÕÉ•9½‘•%°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹M•±•Ğè¡…¹‘±•‘‘9½‘”°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹±½Í”è±½Í•5•¹Ô°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹AÉ•Ù¥•ÜèÍ•ÑEÕ¥­½¹¹•ÑAÉ•Ù¥•Ü°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€õô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¡½Ù•ÉQ½½±‰…Èõíì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Í•±•Ñ•‘9½‘•Ì°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Í•±•Ñ•‘‘•Ì°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¹½‘•QåÁ•Ìè‘å¹…µ¥9½‘•QåÁ•Ì°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Á±Õ¥¹ÑàèÁ±Õ¥¹Ñà€üüÕ¹‘•™¥¹•°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€…Ñ¥Ù•A±Õ¥¸°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ÅÕ¥­‘‘5•¹ÕY¥Í¥‰±”è€„…ÅÕ¥­‘‘5•¹Ôü¹Ù¥Í¥‰±”°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¥Í½¹Ñ•áÑQ½½±‰…É!¥‘‘•¸è¥Í½¹Ñ•áÑQ½½±‰…É!¥‘‘•¸ñğ	½½±•…¸¡±•™ÑÉ…İ•É=Á•¸¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¥ÍÉ…¥¹œ°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¥Í½¹¹•Ñ¥¹œ°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ÕÁ‘…Ñ•9½‘•Í	…Ñ °(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ÕÁ‘…Ñ•‘•Í	…Ñ °(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹UÁ‘…Ñ•9½‘•Ìè€¡ÕÁ‘…Ñ•Ìè9½‘•A½Í¥Ñ¥½¹UÁ‘…Ñ•mt¤€ôøì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Ñ…­•M¹…ÁÍ¡½Ğ¡¹½‘•ÍI•˜¹ÕÉÉ•¹Ğ°•‘•ÍI•˜¹ÕÉÉ•¹Ğ¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹ÍĞÕÁ‘…Ñ•Í5…À€ô¹•Ü5…À¡ÕÁ‘…Ñ•Ì¹µ…À¡ÕÁ‘…Ñ”€ôømÕÁ‘…Ñ”¹¥°ÕÁ‘…Ñ•t¤¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Í•Ñ9½‘•Ì ¡ÕÉÉ•¹Ñ9½‘•Ìè9½‘•mt¤€ôøÕÉÉ•¹Ñ9½‘•Ì¹µ…À ¡¹½‘”¤€ôøì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹ÍĞÕÁ‘…Ñ”€ôÕÁ‘…Ñ•Í5…À¹•Ğ¡¹½‘”¹¥¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€É•ÑÕÉ¸€¡ÕÁ‘…Ñ”€˜˜ÕÁ‘…Ñ”¹Á½Í¥Ñ¥½¸¤€üì€¸¸¹¹½‘”°Á½Í¥Ñ¥½¸èÕÁ‘…Ñ”¹Á½Í¥Ñ¥½¸ô€è¹½‘”ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ô¤¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ô°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¡…¹‘±••±•Ñ•]¥Ñ¡Q½…ÍĞ°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¡…¹‘±•ÕÁ±¥…Ñ•]¥Ñ¡Q½…ÍĞ°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¡…¹‘±•É½ÕÁ]¥Ñ¡Q½…ÍĞ°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¡…¹‘±•U¹É½ÕÁ]¥Ñ¡Q½…ÍĞ°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¡…¹‘±•1½¬°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¡…¹‘±•=Á…¥Ñä°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¡…¹‘±•	É¥¹Q½É½¹Ğ°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¡…¹‘±•M•¹‘Q½	…¬°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½ÁåMÑå±”°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Á…ÍÑ•MÑå±”°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¡…Í½Á¥•‘MÑå±”°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€õô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Íµ…ÉÑÕ¥‘•ÌõíìÕ¥‘•Ìõô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€…¹¹½Ñ…Ñ¥½¹Ìõíì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¥Ñ•µÌè™¥±Ñ•É½µµ•¹ÑÍ½ÉA…”¡…¹¹½Ñ…Ñ¥½¹Ì°µÕ±Ñ¥A…”¹…Ñ¥Ù•A…•%¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€µ½‘”è…¹¹½Ñ…Ñ¥½¹5½‘”°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹‘è€¡à°ä°Ñ•áĞ¤€ôø…‘‘¹¹½Ñ…Ñ¥½¸¡à°ä°Ñ•áĞ°µÕ±Ñ¥A…”¹…Ñ¥Ù•A…•%¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹UÁ‘…Ñ”èÕÁ‘…Ñ•¹¹½Ñ…Ñ¥½¸°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹•±•Ñ”è‘•±•Ñ•¹¹½Ñ…Ñ¥½¸°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹Q½±•I•Í½±Ù•èÑ½±•I•Í½±Ù•°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€…Ñ¥Ù•A…•%èµÕ±Ñ¥A…”¹…Ñ¥Ù•A…•%°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½±½ÉÌè99=QQ%=9}=1=IL°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€õô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Á…•Ìõíì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¥Ñ•µÌèµÕ±Ñ¥A…”¹Á…•Ì°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€…Ñ¥Ù•A…•%èµÕ±Ñ¥A…”¹…Ñ¥Ù•A…•%°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹Mİ¥Ñ¡A…”èµÕ±Ñ¥A…”¹Íİ¥Ñ¡A…”°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹‘‘A…”èµÕ±Ñ¥A…”¹…‘‘A…”°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹•±•Ñ•A…”èµÕ±Ñ¥A…”¹‘•±•Ñ•A…”°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹I•¹…µ•A…”èµÕ±Ñ¥A…”¹É•¹…µ•A…”°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€‘¥Í…‰±•è¥Í%¹¥Ñ¥…±¥…É…µ1½…‘¥¹œ°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€õô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¡¥ÍÑ½Éäõíì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Ù¥Í¥‰±”è¡¥ÍÑ½ÉåA…¹•±Y¥Í¥‰±”°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹±½Í”è€ ¤€ôøÍ•Ñ!¥ÍÑ½ÉåA…¹•±Y¥Í¥‰±”¡™…±Í”¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Á…ÍÑ¹ÑÉ¥•ÌèÁ…ÍÑ¹ÑÉ¥•Ìñğmt°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€…¹U¹‘¼°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€…¹I•‘¼°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹U¹‘¼èÕ¹‘¼°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹I•‘¼èÉ•‘¼°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹)ÕµÁQ¼è©ÕµÁQ¼°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€õô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Í•…É õíì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Ù¥Í¥‰±”è…¹Ù…ÍM•…É¡Y¥Í¥‰±”°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹±½Í”è€ ¤€ôøì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Í•Ñ…¹Ù…ÍM•…É¡Y¥Í¥‰±”¡™…±Í”¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Í•Ñ…¹Ù…ÍM•…É¡I•Á±…•Y¥Í¥‰±”¡™…±Í”¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ô°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¹½‘•Ì°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹!¥¡±¥¡Ñ9½‘”èÍ•Ñ!¥¡±¥¡Ñ•‘9½‘•%°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹I•Á±…•9½‘”è¡…¹‘±•M•…É¡I•Á±…•9½‘”°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹I•Á±…•±°è¡…¹‘±•M•…É¡I•Á±…•±°°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€É•Á±…•Y¥Í¥‰±”è…¹Ù…ÍM•…É¡I•Á±…•Y¥Í¥‰±”°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹I•Á±…•Y¥Í¥‰±•¡…¹”èÍ•Ñ…¹Ù…ÍM•…É¡I•Á±…•Y¥Í¥‰±”°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€õô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¼ùô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€í•‘¥Ñ¥¹¹…‰±•€˜˜€ñÉ••¡…¹‘É…İ¥¹1…å•È(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€­•äõí€‘íµÕ±Ñ¥A…”¹…Ñ¥Ù•A…•%‘ô´‘í¥ÍÉ…İ¥¹5½‘”€ü€…Ñ¥Ù”œ€è€¥¹…Ñ¥Ù”õô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¥ÍÉ…İ¥¹5½‘”õí¥ÍÉ…İ¥¹5½‘•ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€é½½´õíÙ¥•İÁ½ÉĞ¹é½½µô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Á…¸õíìàèÙ¥•İÁ½ÉĞ¹à°äèÙ¥•İÁ½ÉĞ¹äõô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ÕÉÉ•¹Ñ½±½ÈõíÁÉ•Í•Ğ¹¹…µ”€ôôô€Í­•Ñ œ€ü€œŒÔÔÔÔÔÔœ€è€œŒÀÀÀÀÀÀô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹É…İ¹õí¡…¹‘±•‘‘É••¡…¹‘MÑÉ½­•ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¼ùô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€í•‘¥Ñ¥¹¹…‰±•€˜˜É•Í½±Ù•±½İ¡…ÉÑA±Õ¥¹½¹ÑÉ¥‰ÕÑ¥½¸ (€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€…¹Ù…Ìœ°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Á±Õ¥¹Ñà€˜˜…Ñ¥Ù•A±Õ¥¸ü¹½¹ÑÉ¥‰ÕÑ•…¹Ù…Í½µÁ½¹•¹ÑÌ(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ü€ ¤€ôø…Ñ¥Ù•A±Õ¥¸¹½¹ÑÉ¥‰ÕÑ•…¹Ù…Í½µÁ½¹•¹ÑÌü¸¡Á±Õ¥¹Ñà¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€è¹Õ±°°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¹Õ±°°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¥ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€í…Ñ¥Ù•UÍ•ÉÌ¹±•¹Ñ €ø€À€˜˜åİ…É•¹•ÍÌ€˜˜€ (€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ñ1¥Ù•ÕÉÍ½ÉÌ…Ñ¥Ù•UÍ•ÉÌõí…Ñ¥Ù•UÍ•ÉÍôåİ…É•¹•ÍÌõíåİ…É•¹•ÍÍô€¼ø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¥ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ğ½±½İ¡…ÉÑ…¹Ù…ÍM¡•±°ø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€ğ½‘¥Øø(€€€€€€€€€€€€€€€€€€€€€€€€ğ½1…å½ÕÑMÑ…‰¥±¥Ñå½¹Ñ•áĞ¹AÉ½Ù¥‘•Èø(€€€€€€€€€€€€€€€€€€€€€€€€ğ½¥…É…µ‘¥Ñ¥¹AÉ½Ù¥‘•Èø(€€€€€€€€€€€€€€€€€€€€ğ½‘¥Øø(€€€€€€€€€€€€€€€€ğ¼ø(€€€€€€€€€€€ô(€€€€€€€€€€€É¥¡ÑM¥‘•‰…Èõí•‘¥Ñ¥¹¹…‰±•€ü€ñ±½İ¡…ÉÑ•Í¥¹•ÉI¥¡ÑM¥‘•‰…ÉI•¥½¸µ½‘•°õíµ½‘•±ô€¼ø€è¹Õ±±ô(€€€€€€€€€€€½Ù•É±…åÌõìñ±½İ¡…ÉÑ•Í¥¹•É=Ù•É±…åÍI•¥½¸µ½‘•°õíµ½‘•±ô€¼ùô(€€€€€€€€¼ø(€€€€¤ì)ô(
+                                isYjsSynced,
+                                collaborationStatus,
+                                onOpenCollaboration,
+                                isReadonly,
+                                onReadonlyChange: handleReadonlyChange,
+                                onOpenSettings: onOpenSettings ? handleOpenSettings : undefined,
+                                onSmartOptimize: handleSmartOptimize,
+                                activeUsers,
+                                highlightMainFlow,
+                                handleToggleHighlightMainFlow,
+                                showOnlyMainFlow,
+                                handleToggleShowOnlyMainFlow,
+                                topActionArea,
+                                exportModalVisible,
+                                setExportModalVisible,
+                                getReactFlowSnapshot,
+                                onExportPermissionCheck,
+                                pluginManagerVisible,
+                                setPluginManagerVisible,
+                                isCommentMode,
+                                setIsCommentMode,
+                                pluginToolbar: resolveFlowchartPluginContribution(
+                                    'toolbar',
+                                    pluginCtx && activePlugin?.contributeToolbar
+                                        ? () => activePlugin.contributeToolbar?.(pluginCtx)
+                                        : null,
+                                    null,
+                                ),
+                            }}
+                            toolbar={{
+                                canUndo,
+                                canRedo,
+                                onUndo: undo,
+                                onRedo: redo,
+                                onZoomIn: () => reactFlowInstance?.zoomIn(),
+                                onZoomOut: () => reactFlowInstance?.zoomOut(),
+                                onFitView: handleFitView,
+                                onFitWidth: () => dispatchDiagramControl('top', id),
+                                autoRouting: autoRoutingEnabled,
+                                toggleAutoRouting: () => setAutoRoutingEnabled(!autoRoutingEnabled),
+                                showGrid,
+                                gridVariant,
+                                toggleGrid: handleGridRotate,
+                                onShowShortcuts: () => setShowShortcuts(),
+                                onShowCanvasSearch: () => {
+                                    setCanvasSearchReplaceVisible(false);
+                                    setCanvasSearchVisible(true);
+                                },
+                                onStrategyLayout: handleStrategyLayout,
+                                lastDomainStrategy,
+                                lastDomainDirection,
+                                lastNodeLayout,
+                                showRuler,
+                                toggleRuler: () => setShowRuler((previous: boolean) => !previous),
+                                showMinimap,
+                                toggleMinimap: () => setShowMinimap((previous: boolean) => !previous),
+                                showAiCrown,
+                                onToggleAI: () => {
+                                    if (onAiTabIntercept && !onAiTabIntercept()) return;
+                                    if (shouldOpenDesignerAiSidebar(activeRightTab, aiChatVisible)) {
+                                        setActiveRightTab('ai');
+                                        setAiChatVisible(true);
+                                    } else {
+                                        setAiChatVisible(false);
+                                        if (selectedNodes.length > 0 || selectedEdges.length > 0) {
+                                            setActiveRightTab('property');
+                                        }
+                                    }
+                                },
+                                aiChatActive: aiChatVisible,
+                                nodeCount: nodes.length,
+                                edgeCount: edges.length,
+                                selectedNodesCount: selectedNodes.length,
+                                selectedEdgesCount: selectedEdges.length,
+                                zoomPercent: Math.round(viewport.zoom * 100),
+                                snapToGrid: snapEnabled,
+                                onToggleSnap: () => setSnapEnabled((enabled: boolean) => !enabled),
+                                hideZoomControls: activePlugin?.hideZoomControls,
+                                hideLayoutControls: activePlugin?.hideLayoutControls,
+                                hideGridControls: activePlugin?.hideGridControls,
+                                hideFlowFocusControls: activePlugin?.hideFlowFocusControls,
+                                hideUndoRedoControls: activePlugin?.hideUndoRedoControls,
+                                isDrawingMode,
+                                isMarqueeActive,
+                                toggleSelectionMode: toggleMarqueeMode,
+                                onToggleDrawingMode: toggleDrawingMode,
+                                onActivatePointer: activatePointer,
+                                onAddStickyNote: handleAddStickyNote,
+                                onAddMindMap: handleAddMindMap,
+                                onExport: () => setExportModalVisible(true),
+                                onImportClick: editingEnabled ? handleRequestImport : undefined,
+                                renderThemeSelector,
+                                historyCount: pastEntries?.length ?? 0,
+                                onAlign: handleAlign,
+                                onDistribute: handleDistribute,
+                            }}
+                        />}
+
+                        {isReadonly && !presentationActive && (
+                            <div
+                                role="status"
+                                aria-live="polite"
+                                style={{
+                                    position: 'absolute',
+                                    top: 72,
+                                    left: '50%',
+                                    transform: 'translateX(-50%)',
+                                    zIndex: 120,
+                                    padding: '8px 14px',
+                                    borderRadius: 999,
+                                    background: 'rgba(15, 23, 42, 0.9)',
+                                    color: '#fff',
+                                    fontSize: 13,
+                                    fontWeight: 600,
+                                    pointerEvents: 'none',
+                                }}
+                            >
+                                {t('designer.toolbar.readonlyStatus', 'ç”»å¸ƒå·²é”å®š Â· ä»…å¯æŸ¥çœ‹')}
+                            </div>
+                        )}
+
+                        <DiagramEditingProvider value={editingEnabled}>
+                        <LayoutStabilityContext.Provider value={isLayoutStable}>
+                            <div
+                                className="canvas-touch-wrapper"
+                                style={{ width: '100%', height: '100%', position: 'relative' }}
+                                onTouchStart={handleTouchStart}
+                                onTouchEnd={handleTouchEnd}
+                            >
+                                <GestureOverlay zoom={currentZoom} visible={showOverlay} />
+                                <FlowchartCanvasShell
+                                    nodes={isInitialDiagramLoading
+                                        ? []
+                                        : performanceMode
+                                            ? nodes
+                                            : layerSyncedNodes}
+                                    displayEdges={isInitialDiagramLoading ? [] : visibleEdges}
+                                    nodeTypes={dynamicNodeTypes}
+                                    edgeTypes={dynamicEdgeTypes}
+                                    onInit={handleReactFlowInit}
+                                    onNodesChange={onNodesChangeWithLock}
+                                    onEdgesChange={onEdgesChangeWithLock}
+                                    onConnect={enhancedOnConnect}
+                                    onConnectStart={onConnectStart}
+                                    onConnectEnd={enhancedOnConnectEnd}
+                                    onSelectionChange={onSelectionChange}
+                                    onPaneClick={handlePaneClick}
+                                    onPaneMouseMove={onPaneMouseMove}
+                                    onPaneMouseLeave={onPaneMouseLeave}
+                                    onPaneDoubleClick={onPaneDoubleClick}
+                                    onNodeContextMenu={onNodeContextMenu}
+                                    onEdgeContextMenu={onEdgeContextMenu}
+                                    onEdgeDoubleClick={handleEdgeDoubleClick}
+                                    onPaneContextMenu={onPaneContextMenu}
+                                    onNodeDragStart={wrappedOnNodeDragStart}
+                                    onNodeDrag={onNodeDrag}
+                                    onSmartNodeDrag={onSmartNodeDrag}
+                                    onNodeDragStop={onNodeDragStop}
+                                    onReconnect={handleReconnect}
+                                    onReconnectStart={handleReconnectStart}
+                                    onReconnectEnd={handleReconnectEnd}
+                                    autoRoutingEnabled={autoRoutingEnabled}
+                                    enableSmartEdges={true}
+                                    showMinimap={showEditingChrome && showMinimap}
+                                    showGrid={showGrid}
+                                    gridVariant={gridVariant}
+                                    backgroundGridColor={gridColor}
+                                    isSpacePressed={isSpacePressed}
+                                    isConnecting={isConnecting}
+                                    connectPreview={connectPreview}
+                                    connectionMode={ConnectionMode.Loose}
+                                    selectionMode={SelectionMode.Partial}
+                                    isValidConnection={isValidConnection}
+                                    snapEnabled={snapEnabled}
+                                    isDragging={isDragging}
+                                    editingEnabled={editingEnabled}
+                                >
+                                    <RemoteCursors />
+                                    {editingEnabled && <DesignerCanvasFeaturesLayer
+                                        quickConnect={{
+                                            visible: !!quickAddMenu?.visible,
+                                            x: quickAddMenu?.clientX || 0,
+                                            y: quickAddMenu?.clientY || 0,
+                                            sourceNodeId: quickAddMenu?.sourceNodeId,
+                                            onSelect: handleAddNode,
+                                            onClose: closeMenu,
+                                            onPreview: setQuickConnectPreview,
+                                        }}
+                                        hoverToolbar={{
+                                            selectedNodes,
+                                            selectedEdges,
+                                            nodeTypes: dynamicNodeTypes,
+                                            pluginCtx: pluginCtx ?? undefined,
+                                            activePlugin,
+                                            quickAddMenuVisible: !!quickAddMenu?.visible,
+                                            isContextToolbarHidden: isContextToolbarHidden || Boolean(leftDrawerOpen),
+                                            isDragging,
+                                            isConnecting,
+                                            updateNodesBatch,
+                                            updateEdgesBatch,
+                                            onUpdateNodes: (updates: NodePositionUpdate[]) => {
+                                                takeSnapshot(nodesRef.current, edgesRef.current);
+                                                const updatesMap = new Map(updates.map(update => [update.id, update]));
+                                                setNodes((currentNodes: Node[]) => currentNodes.map((node) => {
+                                                    const update = updatesMap.get(node.id);
+                                                    return (update && update.position) ? { ...node, position: update.position } : node;
+                                                }));
+                                            },
+                                            handleDeleteWithToast,
+                                            handleDuplicateWithToast,
+                                            handleGroupWithToast,
+                                            handleUngroupWithToast,
+                                            handleLock,
+                                            handleOpacity,
+                                            handleBringToFront,
+                                            handleSendToBack,
+                                            copyStyle,
+                                            pasteStyle,
+                                            hasCopiedStyle,
+                                        }}
+                                        smartGuides={{ guides }}
+                                        annotations={{
+                                            items: filterCommentsForPage(annotations, multiPage.activePageId),
+                                            mode: annotationMode,
+                                            onAdd: (x, y, text) => addAnnotation(x, y, text, multiPage.activePageId),
+                                            onUpdate: updateAnnotation,
+                                            onDelete: deleteAnnotation,
+                                            onToggleResolved: toggleResolved,
+                                            activePageId: multiPage.activePageId,
+                                            colors: ANNOTATION_COLORS,
+                                        }}
+                                        pages={{
+                                            items: multiPage.pages,
+                                            activePageId: multiPage.activePageId,
+                                            onSwitchPage: multiPage.switchPage,
+                                            onAddPage: multiPage.addPage,
+                                            onDeletePage: multiPage.deletePage,
+                                            onRenamePage: multiPage.renamePage,
+                                            disabled: isInitialDiagramLoading,
+                                        }}
+                                        history={{
+                                            visible: historyPanelVisible,
+                                            onClose: () => setHistoryPanelVisible(false),
+                                            pastEntries: pastEntries || [],
+                                            canUndo,
+                                            canRedo,
+                                            onUndo: undo,
+                                            onRedo: redo,
+                                            onJumpTo: jumpTo,
+                                        }}
+                                        search={{
+                                            visible: canvasSearchVisible,
+                                            onClose: () => {
+                                                setCanvasSearchVisible(false);
+                                                setCanvasSearchReplaceVisible(false);
+                                            },
+                                            nodes,
+                                            onHighlightNode: setHighlightedNodeId,
+                                            onReplaceNode: handleSearchReplaceNode,
+                                            onReplaceAll: handleSearchReplaceAll,
+                                            replaceVisible: canvasSearchReplaceVisible,
+                                            onReplaceVisibleChange: setCanvasSearchReplaceVisible,
+                                        }}
+                                    />}
+                                    {editingEnabled && <FreehandDrawingLayer
+                                        key={`${multiPage.activePageId}-${isDrawingMode ? 'active' : 'inactive'}`}
+                                        isDrawingMode={isDrawingMode}
+                                        zoom={viewport.zoom}
+                                        pan={{ x: viewport.x, y: viewport.y }}
+                                        currentColor={preset.name === 'sketch' ? '#555555' : '#000000'}
+                                        onDrawEnd={handleAddFreehandStroke}
+                                    />}
+                                    {editingEnabled && resolveFlowchartPluginContribution(
+                                        'canvas',
+                                        pluginCtx && activePlugin?.contributeCanvasComponents
+                                            ? () => activePlugin.contributeCanvasComponents?.(pluginCtx)
+                                            : null,
+                                        null,
+                                    )}
+                                    {activeUsers.length > 0 && yAwareness && (
+                                        <LiveCursors activeUsers={activeUsers} yAwareness={yAwareness} />
+                                    )}
+                                </FlowchartCanvasShell>
+                            </div>
+                        </LayoutStabilityContext.Provider>
+                        </DiagramEditingProvider>
+                    </div>
+                </>
+            }
+            rightSidebar={editingEnabled ? <FlowchartDesignerRightSidebarRegion model={model} /> : null}
+            overlays={<FlowchartDesignerOverlaysRegion model={model} />}
+        />
+    );
+}
