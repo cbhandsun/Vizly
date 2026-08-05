@@ -14,7 +14,10 @@ import { useDiagramStore } from '../../../store/useDiagramStore';
 import { appMessage } from '@/core/utils/antdStaticBridge';
 import type { DiagramExportFormat } from '@/core/types/diagram-components';
 import { runAdvancedExport } from '../advancedExportActions';
-import { isSceneBasedAdvancedExportFormat } from '../advancedExportMode';
+import {
+  getAdvancedExportCapabilities,
+  isSceneBasedAdvancedExportFormat,
+} from '../advancedExportMode';
 import {
   buildRenderSceneFromGlobalReactFlow,
   buildRenderSceneFromReactFlowSnapshot,
@@ -268,6 +271,28 @@ export const AdvancedExportModal: React.FC<AdvancedExportModalProps> = ({
   const operationInProgress = activeOperation !== null;
   const exporting = activeOperation === 'export';
   const copying = activeOperation === 'clipboard';
+  const capabilities = getAdvancedExportCapabilities(format);
+  const footer = [
+    ...(capabilities.clipboard ? [(
+      <Button
+        key="copy"
+        className="advanced-export-copy-button"
+        icon={<CopyOutlined />}
+        aria-label={t('advancedExport.copyClipboard')}
+        disabled={exporting}
+        loading={copying}
+        onClick={handleCopyClipboard}
+      >
+        {t('advancedExport.copyClipboard')}
+      </Button>
+    )] : []),
+    <Button key="cancel" disabled={operationInProgress} onClick={onClose}>
+      {t('advancedExport.cancel')}
+    </Button>,
+    <Button key="submit" type="primary" icon={<DownloadOutlined />} disabled={copying} loading={exporting} onClick={handleExport}>
+      {t('advancedExport.confirm')}
+    </Button>,
+  ];
 
   return (
     <Modal
@@ -283,24 +308,7 @@ export const AdvancedExportModal: React.FC<AdvancedExportModalProps> = ({
       }}
       keyboard={!operationInProgress}
       mask={{ closable: !operationInProgress }}
-      footer={[
-        <Button
-          key="copy"
-          icon={<CopyOutlined />}
-          aria-label={t('advancedExport.copyClipboard')}
-          disabled={exporting}
-          loading={copying}
-          onClick={handleCopyClipboard}
-        >
-          {t('advancedExport.copyClipboard')}
-        </Button>,
-        <Button key="cancel" disabled={operationInProgress} onClick={onClose}>
-          {t('advancedExport.cancel')}
-        </Button>,
-        <Button key="submit" type="primary" icon={<DownloadOutlined />} disabled={copying} loading={exporting} onClick={handleExport}>
-          {t('advancedExport.confirm')}
-        </Button>,
-      ]}
+      footer={footer}
       width={480}
     >
       <div style={{ padding: 'var(--glass-padding-md, 24px) 0' }}>
@@ -323,43 +331,53 @@ export const AdvancedExportModal: React.FC<AdvancedExportModalProps> = ({
           <Radio.Button value="json"><CodeOutlined /> JSON</Radio.Button>
         </Radio.Group>
 
-        <Divider style={{ margin: '16px 0' }} />
+        {capabilities.pixelRatio ? (
+          <>
+            <Divider style={{ margin: '16px 0' }} />
+            <p style={{ fontWeight: 500, marginBottom: 8 }}>{t('advancedExport.dpiLabel')}</p>
+            <Select
+              className="advanced-export-dpi-select"
+              aria-label={t('advancedExport.dpiLabel')}
+              value={pixelRatio}
+              disabled={operationInProgress}
+              onChange={setPixelRatio}
+              style={{ width: '100%' }}
+              options={[
+                { label: t('advancedExport.dpi1x'), value: 1 },
+                { label: t('advancedExport.dpi2x'), value: 2 },
+                { label: t('advancedExport.dpi4x'), value: 4 },
+              ]}
+            />
+          </>
+        ) : null}
 
-        <p style={{ fontWeight: 500, marginBottom: 8 }}>{t('advancedExport.dpiLabel')}</p>
-        <Select
-          className="advanced-export-dpi-select"
-          aria-label={t('advancedExport.dpiLabel')}
-          value={pixelRatio} 
-          disabled={operationInProgress || format === 'json' || format === 'svg'}
-          onChange={setPixelRatio}
-          style={{ width: '100%' }}
-          options={[
-            { label: t('advancedExport.dpi1x'), value: 1 },
-            { label: t('advancedExport.dpi2x'), value: 2 },
-            { label: t('advancedExport.dpi4x'), value: 4 },
-          ]}
-        />
-
-        <Divider style={{ margin: '16px 0' }} />
-
-        <div className="advanced-export-options">
-          <Checkbox
-            aria-label={t('advancedExport.includeBackground')}
-            checked={includeBackground} 
-            onChange={(e) => setIncludeBackground(e.target.checked)}
-            disabled={operationInProgress || format === 'pdf' || format === 'jpg'}
-          >
-            {t('advancedExport.includeBackground')}
-          </Checkbox>
-          <Checkbox
-            aria-label={t('advancedExport.embedMetadata')}
-            checked={embedMetadata} 
-            onChange={(e) => setEmbedMetadata(e.target.checked)}
-            disabled={operationInProgress}
-          >
-            {t('advancedExport.embedMetadata')}
-          </Checkbox>
-        </div>
+        {capabilities.background || capabilities.metadata ? (
+          <>
+            <Divider style={{ margin: '16px 0' }} />
+            <div className="advanced-export-options">
+              {capabilities.background ? (
+                <Checkbox
+                  aria-label={t('advancedExport.includeBackground')}
+                  checked={includeBackground}
+                  onChange={(e) => setIncludeBackground(e.target.checked)}
+                  disabled={operationInProgress}
+                >
+                  {t('advancedExport.includeBackground')}
+                </Checkbox>
+              ) : null}
+              {capabilities.metadata ? (
+                <Checkbox
+                  aria-label={t('advancedExport.embedMetadata')}
+                  checked={embedMetadata}
+                  onChange={(e) => setEmbedMetadata(e.target.checked)}
+                  disabled={operationInProgress}
+                >
+                  {t('advancedExport.embedMetadata')}
+                </Checkbox>
+              ) : null}
+            </div>
+          </>
+        ) : null}
 
         <SvgExportPreview visible={visible && format === 'svg'} getReactFlowSnapshot={getReactFlowSnapshot} />
 

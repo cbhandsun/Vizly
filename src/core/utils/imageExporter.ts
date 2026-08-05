@@ -63,6 +63,63 @@ export const imageExportDataUrlToBlob = (dataUrl: string): Blob => {
     return new Blob([bytes], { type: mime });
 };
 
+type MetadataCapableExportFormat = Extract<ExportOptions['format'], 'png' | 'jpg' | 'svg'>;
+
+export const attachVizlyExportMetadata = async (
+    dataUrl: string,
+    format: MetadataCapableExportFormat,
+    rawData: unknown,
+): Promise<string> => {
+    try {
+        const stateJson = JSON.stringify({
+            vizly: true,
+            version: '1.0',
+            data: rawData,
+            exportedAt: new Date().toISOString(),
+        });
+
+        if (new TextEncoder().encode(stateJson).byteLength > MAX_METADATA_BYTES) {
+            return dataUrl;
+        }
+
+        if (format === 'svg') {
+            if (!isSafeImageExportDataUrl(dataUrl)) return dataUrl;
+            const separatorIndex = dataUrl.indexOf(',');
+            if (separatorIndex < 0) return dataUrl;
+            const decoded = decodeURIComponent(dataUrl.slice(separatorIndex + 1));
+            if (!decoded.includes('</svg>')) return dataUrl;
+            const metadataTag = `<metadata id="vizly-state">${escapeXmlText(stateJson)}</metadata>`;
+            const updatedSvg = decoded.replace('</svg>', `${metadataTag}</svg>`);
+            return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(updatedSvg)}`;
+        }
+
+        const blob = imageExportDataUrlToBlob(dataUrl);
+        const buffer = await blob.arrayBuffer();
+        const metaMarkerStart = '\nVIZLY_META_START\n';
+        const metaMarkerEnd = '\nVIZLY_META_END\n';
+        const encoder = new TextEncoder();
+        const markerStartBytes = encoder.encode(metaMarkerStart);
+        const markerEndBytes = encoder.encode(metaMarkerEnd);
+        const dataBytes = encoder.encode(stateJson);
+        const finalBuffer = new Uint8Array(
+            buffer.byteLength + markerStartBytes.byteLength + dataBytes.byteLength + markerEndBytes.byteLength,
+        );
+        finalBuffer.set(new Uint8Array(buffer), 0);
+        finalBuffer.set(markerStartBytes, buffer.byteLength);
+        finalBuffer.set(dataBytes, buffer.byteLength + markerStartBytes.byteLength);
+        finalBuffer.set(
+            markerEndBytes,
+            buffer.byteLength + markerStartBytes.byteLength + dataBytes.byteLength,
+        );
+
+        const finalBlob = new Blob([finalBuffer], { type: blob.type });
+        return URL.createObjectURL(finalBlob);
+    } catch (error) {
+        safeLog.warn('Metadata injection failed:', redactSensitiveLogValue(error));
+        return dataUrl;
+    }
+};
+
 const assertExportBounds = (width: number, height: number, pixelRatio: number): void => {
     if (
         width <= 0 ||
@@ -137,79 +194,31 @@ export const downloadImage = async (
         'vizly-diagram',
     );
 
-    // 辅助函数：注入元数据 (PNG/SVG)
-    const injectMetadata = async (dataUrl: string, rawData: unknown) => {
-        if (!embedMetadata) return dataUrl;
-        
-        const stateJson = JSON.stringify({
-            vizly: true,
-            version: '1.0',
-            data: rawData,
-            exportedAt: new Date().toISOString()
-        });
-
-        if (new TextEncoder().encode(stateJson).byteLength > MAX_METADATA_BYTES) {
-            return dataUrl;
-        }
-
-        if (format === 'svg') {
-            if (!isSafeImageExportDataUrl(dataUrl)) return dataUrl;
-            // SVG: 插入 metadata 标签
-            const decoded = decodeURIComponent(dataUrl.replace('data:image/svg+xml;charset=utf-8,', ''));
-            const metadataTag = `<metadata id="vizly-state">${escapeXmlText(stateJson)}</metadata>`;
-            const updatedSvg = decoded.replace('</svg>', `${metadataTag}</svg>`);
-            return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(updatedSvg)}`;
-        }
-
-        if (format === 'png' || format === 'jpg') {
-            // PNG/JPG: 在末尾追加数据
-            try {
-                const blob = imageExportDataUrlToBlob(dataUrl);
-                const buffer = await blob.arrayBuffer();
-                
-                const metaMarkerStart = '\nVIZLY_META_START\n';
-                const metaMarkerEnd = '\nVIZLY_META_END\n';
-                const encoder = new TextEncoder();
-                const markerStartBytes = encoder.encode(metaMarkerStart);
-                const markerEndBytes = encoder.encode(metaMarkerEnd);
-                const dataBytes = encoder.encode(stateJson);
-
-                const finalBuffer = new Uint8Array(buffer.byteLength + markerStartBytes.byteLength + dataBytes.byteLength + markerEndBytes.byteLength);
-                finalBuffer.set(new Uint8Array(buffer), 0);
-                finalBuffer.set(markerStartBytes, buffer.byteLength);
-                finalBuffer.set(dataBytes, buffer.byteLength + markerStartBytes.byteLength);
-                finalBuffer.set(markerEndBytes, buffer.byteLength + markerStartBytes.byteLength + dataBytes.byteLength);
-
-                const finalBlob = new Blob([finalBuffer], { type: blob.type });
-                return URL.createObjectURL(finalBlob);
-            } catch (err) {
-                safeLog.warn('Metadata injection failed:', redactSensitiveLogValue(err));
-                return dataUrl;
-            }
-        }
-
-        return dataUrl;
-    };
-
     switch (format) {
         case 'png': {
             const { toPng } = await import('html-to-image');
             const dataUrl = await toPng(viewportElem, exportOptions);
-            const finalUrl = await injectMetadata(dataUrl, { nodes });
+            const finalUrl = embedMetadata
+                ? await attachVizlyExportMetadata(dataUrl, 'png', { nodes })
+                : dataUrl;
             downloadHref(finalUrl, `${filename}.png`);
             break;
         }
         case 'jpg': {
             const { toJpeg } = await import('html-to-image');
             const dataUrl = await toJpeg(viewportElem, exportOptions);
-            const finalUrl = await injectMetadata(dataUrl, { nodes });
+            const finalUrl = embedMetadata
+                ? await attachVizlyExportMetadata(dataUrl, 'jpg', { nodes })
+                : dataUrl;
             downloadHref(finalUrl, `${filename}.jpg`);
             break;
         }
         case 'svg': {
             const { toSvg } = await import('html-to-image');
             const dataUrl = await toSvg(viewportElem, exportOptions);
-            const finalUrl = await injectMetadata(dataUrl, { nodes });
+            const finalUrl = embedMetadata
+                ? await attachVizlyExportMetadata(dataUrl, 'svg', { nodes })
+                : dataUrl;
             downloadHref(finalUrl, `${filename}.svg`);
             break;
         }

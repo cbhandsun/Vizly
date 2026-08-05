@@ -39,6 +39,16 @@ describe('svgExport', () => {
     expect(isSafeExportDataUrl(dataUrl)).toBe(true);
   });
 
+  it('omits the canvas background when transparent output is requested', () => {
+    const scene = buildRenderSceneFromReactFlow(nodes, edges, { padding: 20 });
+    const opaqueSvg = exportRenderSceneToSvg(scene, { includeBackground: true });
+    const transparentSvg = exportRenderSceneToSvg(scene, { includeBackground: false });
+    const backgroundRect = `<rect x="${scene.bounds.minX}" y="${scene.bounds.minY}" width="${scene.bounds.width}" height="${scene.bounds.height}" fill="${scene.theme.background}"/>`;
+
+    expect(opaqueSvg).toContain(backgroundRect);
+    expect(transparentSvg).not.toContain(backgroundRect);
+  });
+
   it('rejects oversized scenes', () => {
     const scene = buildRenderSceneFromReactFlow([], []);
     scene.bounds.width = 60_000;

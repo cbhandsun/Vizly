@@ -8,7 +8,11 @@ import {
   buildExportFileName,
   triggerDownload,
 } from '../shared/exportUtils';
-import { downloadImage, type ExportOptions } from '../../utils/imageExporter';
+import {
+  attachVizlyExportMetadata,
+  downloadImage,
+  type ExportOptions,
+} from '../../utils/imageExporter';
 
 export interface RunAdvancedExportOptions {
   diagramId?: string;
@@ -36,13 +40,17 @@ export const runAdvancedExport = async ({
   getReactFlowSnapshot,
 }: RunAdvancedExportOptions): Promise<'scene' | 'fallback'> => {
   const title = diagramTitle?.trim() || diagramId?.trim() || 'advanced-export';
-  const snapshot = canUseSceneExport(format) ? getReactFlowSnapshot?.() : null;
-  if (snapshot) {
+  const sceneFormat = canUseSceneExport(format) ? format : null;
+  const snapshot = sceneFormat ? getReactFlowSnapshot?.() : null;
+  if (snapshot && sceneFormat) {
     const scene = buildRenderSceneFromReactFlowSnapshot(snapshot, { padding: 40 });
-    const dataUrl = format === 'png'
-      ? await exportRenderSceneToPngDataUrl(scene, { title, pixelRatio })
-      : exportRenderSceneToSvgDataUrl(scene, { title });
-    triggerDownload(dataUrl, buildExportFileName(title, format));
+    const baseDataUrl = sceneFormat === 'png'
+      ? await exportRenderSceneToPngDataUrl(scene, { title, pixelRatio, includeBackground })
+      : exportRenderSceneToSvgDataUrl(scene, { title, includeBackground });
+    const dataUrl = embedMetadata
+      ? await attachVizlyExportMetadata(baseDataUrl, sceneFormat, { nodes })
+      : baseDataUrl;
+    triggerDownload(dataUrl, buildExportFileName(title, sceneFormat));
     return 'scene';
   }
 

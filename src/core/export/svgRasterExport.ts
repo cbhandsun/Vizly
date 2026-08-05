@@ -111,8 +111,10 @@ export const exportRenderSceneToPngDataUrl = async (
     throw new SvgRasterExportError('SVG_RASTER_CANVAS_UNAVAILABLE', 'Canvas 2D context is unavailable');
   }
 
-  context.fillStyle = '#ffffff';
-  context.fillRect(0, 0, canvas.width, canvas.height);
+  if (options.includeBackground !== false) {
+    context.fillStyle = scene.theme.background;
+    context.fillRect(0, 0, canvas.width, canvas.height);
+  }
   context.drawImage(image, 0, 0, canvas.width, canvas.height);
   return canvas.toDataURL('image/png');
 };

@@ -31,7 +31,7 @@ describe('other-function commercial interaction safeguards', () => {
         expect(css).toContain('.advanced-export-modal .advanced-export-dpi-select,');
         expect(css).toMatch(/\.advanced-export-format-group\.ant-radio-group[\s\S]*?grid-template-columns: repeat\(5, minmax\(0, 1fr\)\)/);
         expect(css).toMatch(/@media \(max-width: 480px\)[\s\S]*?grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/);
-        expect(css).toMatch(/\.advanced-export-modal \.ant-modal-footer \.ant-btn:first-child[\s\S]*?grid-column: 1 \/ -1/);
+        expect(css).toMatch(/\.advanced-export-modal \.ant-modal-footer \.advanced-export-copy-button[\s\S]*?grid-column: 1 \/ -1/);
     });
 
     it('reflows plugin discovery and management controls on narrow viewports', () => {

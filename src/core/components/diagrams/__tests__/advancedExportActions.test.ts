@@ -5,6 +5,7 @@ const exportRenderSceneToPngDataUrl = vi.fn(async () => 'data:image/png;base64,a
 const exportRenderSceneToSvgDataUrl = vi.fn(() => 'data:image/svg+xml;charset=utf-8,%3Csvg%3E%3C%2Fsvg%3E');
 const triggerDownload = vi.fn();
 const downloadImage = vi.fn(async () => undefined);
+const attachVizlyExportMetadata = vi.fn(async (dataUrl: string) => `${dataUrl}#metadata`);
 
 vi.mock('../../../export/svgRasterExport', () => ({
   exportRenderSceneToPngDataUrl,
@@ -20,6 +21,7 @@ vi.mock('../../shared/exportUtils', () => ({
 }));
 
 vi.mock('../../../utils/imageExporter', () => ({
+  attachVizlyExportMetadata,
   downloadImage,
 }));
 
@@ -51,7 +53,7 @@ describe('runAdvancedExport', () => {
     expect(result).toBe('scene');
     expect(exportRenderSceneToPngDataUrl).toHaveBeenCalledWith(
       expect.objectContaining({ nodes: [expect.objectContaining({ id: 'a' })] }),
-      { title: 'diagram-1', pixelRatio: 2 },
+      { title: 'diagram-1', pixelRatio: 2, includeBackground: true },
     );
     expect(triggerDownload).toHaveBeenCalledWith('data:image/png;base64,aGVsbG8=', 'diagram-1.png');
     expect(downloadImage).not.toHaveBeenCalled();
@@ -72,7 +74,7 @@ describe('runAdvancedExport', () => {
 
     expect(exportRenderSceneToPngDataUrl).toHaveBeenCalledWith(
       expect.any(Object),
-      { title: '客户入驻流程', pixelRatio: 2 },
+      { title: '客户入驻流程', pixelRatio: 2, includeBackground: true },
     );
     expect(triggerDownload).toHaveBeenCalledWith(
       'data:image/png;base64,aGVsbG8=',
@@ -95,10 +97,15 @@ describe('runAdvancedExport', () => {
 
     expect(exportRenderSceneToSvgDataUrl).toHaveBeenCalledWith(
       expect.any(Object),
-      { title: 'diagram-2' },
+      { title: 'diagram-2', includeBackground: true },
+    );
+    expect(attachVizlyExportMetadata).toHaveBeenCalledWith(
+      'data:image/svg+xml;charset=utf-8,%3Csvg%3E%3C%2Fsvg%3E',
+      'svg',
+      { nodes: [] },
     );
     expect(triggerDownload).toHaveBeenCalledWith(
-      'data:image/svg+xml;charset=utf-8,%3Csvg%3E%3C%2Fsvg%3E',
+      'data:image/svg+xml;charset=utf-8,%3Csvg%3E%3C%2Fsvg%3E#metadata',
       'diagram-2.svg',
     );
   });
@@ -118,9 +125,39 @@ describe('runAdvancedExport', () => {
     expect(result).toBe('scene');
     expect(exportRenderSceneToSvgDataUrl).toHaveBeenCalledWith(
       expect.objectContaining({ nodes: [expect.objectContaining({ id: 'a' })] }),
-      { title: 'diagram-2' },
+      { title: 'diagram-2', includeBackground: true },
     );
-    expect(triggerDownload).toHaveBeenCalledWith('data:image/svg+xml;charset=utf-8,%3Csvg%3E%3C%2Fsvg%3E', 'diagram-2.svg');
+    expect(triggerDownload).toHaveBeenCalledWith(
+      'data:image/svg+xml;charset=utf-8,%3Csvg%3E%3C%2Fsvg%3E#metadata',
+      'diagram-2.svg',
+    );
+  });
+
+  it('applies transparent background and metadata to scene-based PNG exports', async () => {
+    const { runAdvancedExport } = await import('../advancedExportActions');
+    await runAdvancedExport({
+      diagramId: 'diagram-transparent',
+      nodes: [{ id: 'metadata-node' }],
+      format: 'png',
+      pixelRatio: 4,
+      includeBackground: false,
+      embedMetadata: true,
+      getReactFlowSnapshot: () => snapshot as unknown as ReactFlowRenderSnapshot,
+    });
+
+    expect(exportRenderSceneToPngDataUrl).toHaveBeenCalledWith(
+      expect.any(Object),
+      { title: 'diagram-transparent', pixelRatio: 4, includeBackground: false },
+    );
+    expect(attachVizlyExportMetadata).toHaveBeenCalledWith(
+      'data:image/png;base64,aGVsbG8=',
+      'png',
+      { nodes: [{ id: 'metadata-node' }] },
+    );
+    expect(triggerDownload).toHaveBeenCalledWith(
+      'data:image/png;base64,aGVsbG8=#metadata',
+      'diagram-transparent.png',
+    );
   });
 
   it('falls back to legacy image export for unsupported formats or missing snapshots', async () => {

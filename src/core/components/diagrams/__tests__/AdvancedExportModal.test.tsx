@@ -9,7 +9,10 @@ import {
   AdvancedExportModeNotice,
   SvgExportPreview,
 } from '../ui/AdvancedExportModal';
-import { isSceneBasedAdvancedExportFormat } from '../advancedExportMode';
+import {
+  getAdvancedExportCapabilities,
+  isSceneBasedAdvancedExportFormat,
+} from '../advancedExportMode';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -155,6 +158,39 @@ describe('AdvancedExportModal SVG preview', () => {
 });
 
 describe('AdvancedExportModeNotice', () => {
+  it('maps every format to only the controls that affect its output', () => {
+    expect(getAdvancedExportCapabilities('png')).toEqual({
+      pixelRatio: true,
+      background: true,
+      metadata: true,
+      clipboard: true,
+    });
+    expect(getAdvancedExportCapabilities('jpg')).toEqual({
+      pixelRatio: true,
+      background: false,
+      metadata: true,
+      clipboard: false,
+    });
+    expect(getAdvancedExportCapabilities('svg')).toEqual({
+      pixelRatio: false,
+      background: true,
+      metadata: true,
+      clipboard: false,
+    });
+    expect(getAdvancedExportCapabilities('pdf')).toEqual({
+      pixelRatio: true,
+      background: false,
+      metadata: false,
+      clipboard: false,
+    });
+    expect(getAdvancedExportCapabilities('json')).toEqual({
+      pixelRatio: false,
+      background: false,
+      metadata: false,
+      clipboard: false,
+    });
+  });
+
   it('classifies PNG and SVG as scene-based advanced export formats', () => {
     expect(isSceneBasedAdvancedExportFormat('png')).toBe(true);
     expect(isSceneBasedAdvancedExportFormat('svg')).toBe(true);
@@ -222,6 +258,40 @@ describe('AdvancedExportModal commercial controls', () => {
     expect(screen.getByRole('checkbox', { name: '注入元数据' })).toBeTruthy();
     expect(screen.getByRole('button', { name: '复制 PNG 到剪贴板' })).toBeTruthy();
     expect(screen.getByRole('button', { name: '关闭' })).toBeTruthy();
+  });
+
+  it('removes image-only controls when JSON is selected', () => {
+    render(
+      <AdvancedExportModal
+        visible
+        onClose={vi.fn()}
+        diagramId="diagram-1"
+        diagramTitle="Audit diagram"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('radio', { name: 'code JSON' }));
+
+    expect(screen.queryByRole('combobox', { name: '图片清晰度 (DPI)' })).toBeNull();
+    expect(screen.queryByRole('checkbox', { name: '包含底色背景' })).toBeNull();
+    expect(screen.queryByRole('checkbox', { name: '注入元数据' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '复制 PNG 到剪贴板' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'download 确认导出' })).toBeTruthy();
+  });
+
+  it('keeps only the applicable controls for SVG and PDF', () => {
+    render(<AdvancedExportModal visible onClose={vi.fn()} diagramId="diagram-1" />);
+
+    fireEvent.click(screen.getByRole('radio', { name: 'SVG' }));
+    expect(screen.queryByRole('combobox', { name: '图片清晰度 (DPI)' })).toBeNull();
+    expect(screen.getByRole('checkbox', { name: '包含底色背景' })).toBeTruthy();
+    expect(screen.getByRole('checkbox', { name: '注入元数据' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: '复制 PNG 到剪贴板' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('radio', { name: 'file-pdf PDF' }));
+    expect(screen.getByRole('combobox', { name: '图片清晰度 (DPI)' })).toBeTruthy();
+    expect(screen.queryByRole('checkbox', { name: '包含底色背景' })).toBeNull();
+    expect(screen.queryByRole('checkbox', { name: '注入元数据' })).toBeNull();
   });
 
   it('blocks gated PDF exports before the advanced export action runs', async () => {

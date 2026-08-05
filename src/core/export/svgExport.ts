@@ -10,6 +10,7 @@ const MAX_EXPORT_EDGES = 4_000;
 
 export interface SvgExportOptions {
   title?: string;
+  includeBackground?: boolean;
 }
 
 export type SvgExportErrorCode =
@@ -310,7 +311,9 @@ export const exportRenderSceneToSvg = (scene: DiagramRenderScene, options: SvgEx
   const markers = collectMarkers(scene);
   const defs = markers.length ? `<defs>${markers.map(marker => markerDef(namespace, marker)).join('')}</defs>` : '';
   const title = options.title ? `<title>${escapeXml(options.title)}</title>` : '';
-  const background = `<rect${attr('x', scene.bounds.minX)}${attr('y', scene.bounds.minY)}${attr('width', scene.bounds.width)}${attr('height', scene.bounds.height)}${attr('fill', scene.theme.background)}/>`;
+  const background = options.includeBackground === false
+    ? ''
+    : `<rect${attr('x', scene.bounds.minX)}${attr('y', scene.bounds.minY)}${attr('width', scene.bounds.width)}${attr('height', scene.bounds.height)}${attr('fill', scene.theme.background)}/>`;
   const edges = scene.edges.map(edge => edgeToSvg(edge, namespace)).join('');
   const nodes = scene.nodes.map(nodeToSvg).join('');
   const svg = [

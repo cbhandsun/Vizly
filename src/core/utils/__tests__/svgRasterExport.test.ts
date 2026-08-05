@@ -30,7 +30,7 @@ const installCanvasMock = (context: CanvasRenderingContext2D | null = {
     if (String(tagName).toLowerCase() === 'canvas') return canvas;
     return originalCreateElement(tagName, options);
   });
-  return { canvas, spy };
+  return { canvas, context, spy };
 };
 
 const installImageMock = (mode: 'load' | 'error' = 'load') => {
@@ -63,7 +63,7 @@ afterEach(() => {
 describe('svgRasterExport', () => {
   it('rasterizes a render scene through deterministic SVG', async () => {
     installImageMock();
-    const { canvas } = installCanvasMock();
+    const { canvas, context } = installCanvasMock();
 
     const dataUrl = await exportRenderSceneToPngDataUrl(buildScene(), { pixelRatio: 2, title: 'unit' });
 
@@ -71,6 +71,17 @@ describe('svgRasterExport', () => {
     expect(canvas.width).toBe(240);
     expect(canvas.height).toBe(160);
     expect(canvas.getContext).toHaveBeenCalledWith('2d');
+    expect(context?.fillRect).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves a transparent PNG canvas when the background is disabled', async () => {
+    installImageMock();
+    const { context } = installCanvasMock();
+
+    await exportRenderSceneToPngDataUrl(buildScene(), { includeBackground: false });
+
+    expect(context?.fillRect).not.toHaveBeenCalled();
+    expect(context?.drawImage).toHaveBeenCalledTimes(1);
   });
 
   it('rejects raster dimensions above the configured limits', async () => {
