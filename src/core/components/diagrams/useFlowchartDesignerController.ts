@@ -19,17 +19,12 @@ import { useDiagramStore } from '../../store/useDiagramStore';
 import { useMobileInteractions } from '../../hooks/useMobileInteractions';
 import { useCollapsibleGroups } from './hooks/useCollapsibleGroups';
 import { useLayerManagement } from './hooks/useLayerManagement';
-// useAnnotations removed (GAP-02 Unified)
 import { useMultiPage } from './hooks/useMultiPage';
 import { dispatchDiagramControl } from '../shared/diagramControl';
 import { useDesignerBatchUpdates } from './hooks/useDesignerBatchUpdates';
 import { useAutoRouting } from './hooks/useAutoRouting';
 import { useFlowchartExportControls } from './hooks/useFlowchartExportControls';
 import { useDesignerCommands } from './hooks/useDesignerCommands';
-// useLayerManagement already imported above
-import {
-    focusFlowchartNode,
-} from './flowchartFocusEntity';
 import { createFlowchartImportHandler, type FlowchartImportEvent } from './flowchartImportHandler';
 import { scheduleFlowchartInitialFit } from './flowchartInitialFit';
 import { registerImportedFlowchartDiagram } from './flowchartImportRegistration';
@@ -50,6 +45,7 @@ import { useCommentAwarePageDeletion } from './hooks/useCommentAwarePageDeletion
 import { useDiagramOperationScope } from './hooks/useDiagramOperationScope';
 import { useFlowchartImportNotifications } from './hooks/useFlowchartImportNotifications';
 import { useHistoryFeedbackActions } from './historyActionFeedback';
+import { useFlowchartNodeFocus } from './hooks/useFlowchartNodeFocus';
 
 export const useFlowchartDesignerController = ({
     id,
@@ -162,16 +158,14 @@ export const useFlowchartDesignerController = ({
     const handleBeforeUpdate = useCallback(() => {
         takeSnapshot(nodesRef.current, edgesRef.current);
     }, [edgesRef, nodesRef, takeSnapshot]);
-    const handleFocusNode = useCallback((nodeId: string) => {
-        focusFlowchartNode({
-            reactFlowInstance,
-            nodes: nodesRef.current,
-            nodeId,
-            setSelectedNodes,
-            duration: 800,
-            zoom: 1.2,
-        });
-    }, [nodesRef, reactFlowInstance, setSelectedNodes]);
+    const handleFocusNode = useFlowchartNodeFocus({
+        reactFlowInstance,
+        nodesRef,
+        setNodes,
+        setEdges,
+        setSelectedNodes,
+        setSelectedEdges,
+    });
 
     const handlePresentationFocus = useCallback((ids: string[]) => {
         if (ids && ids.length > 0) handleFocusNode(ids[0]);
@@ -272,6 +266,8 @@ export const useFlowchartDesignerController = ({
         getEdges: getCurrentEdges,
         setNodes,
         setEdges,
+        setSelectedNodes,
+        setSelectedEdges,
         updateNodesBatch,
         updateEdgesBatch,
         takeSnapshot,

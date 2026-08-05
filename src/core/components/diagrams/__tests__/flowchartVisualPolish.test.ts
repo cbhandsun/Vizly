@@ -46,17 +46,30 @@ describe('flowchart visual polish stylesheet', () => {
         );
     });
 
-    it('keeps the floating drawer above the fixed minimap', () => {
+    it('keeps the floating drawer above the fixed minimap and positioned node toolbar', () => {
         const drawerStylesheet = readRelativeFile('../IconRailSidebar.css');
         const minimapStylesheet = readRelativeFile('../../shared/FixedMiniMap.css');
+        const toolbarStylesheet = readRelativeFile('../../shared/FloatingToolbar/FloatingToolbar.css');
         const drawerZIndex = Number(
             drawerStylesheet.match(/\.side-drawer\s*\{[\s\S]*?z-index:\s*(\d+);/)?.[1]
         );
         const minimapZIndex = Number(
             minimapStylesheet.match(/\.fixed-minimap-container\s*\{[\s\S]*?z-index:\s*(\d+);/)?.[1]
         );
+        const toolbarZIndex = Number(
+            toolbarStylesheet.match(/\.floating-toolbar-container--positioned\s*\{[\s\S]*?z-index:\s*(\d+);/)?.[1]
+        );
 
         expect(drawerZIndex).toBeGreaterThan(minimapZIndex);
+        expect(drawerZIndex).toBeGreaterThan(toolbarZIndex);
+    });
+
+    it('suppresses the selected-node toolbar while a left drawer is open', () => {
+        const viewSource = readRelativeFile('../FlowchartDesignerView.tsx');
+
+        expect(viewSource).toContain(
+            'isContextToolbarHidden: isContextToolbarHidden || Boolean(leftDrawerOpen)',
+        );
     });
 
     it('does not promote every node to a compositor layer during dragging', () => {

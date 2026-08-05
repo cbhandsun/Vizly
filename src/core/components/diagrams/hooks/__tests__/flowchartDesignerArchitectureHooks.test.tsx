@@ -10,6 +10,7 @@ import { useFlowchartCanvasCommands } from '../useFlowchartCanvasCommands';
 import { useFlowchartExternalEvents } from '../useFlowchartExternalEvents';
 import { useFlowchartPluginRuntime } from '../useFlowchartPluginRuntime';
 import { useFlowchartShellState } from '../useFlowchartShellState';
+import { useFlowchartNodeFocus } from '../useFlowchartNodeFocus';
 
 const makePlugin = (id: string): DiagramTypePlugin => ({
     id,
@@ -164,13 +165,51 @@ describe('flowchart designer architecture hooks', () => {
         expect(takeSnapshot).toHaveBeenCalledWith(nodes, edges);
     });
 
-    it('initializes and destroys plugin runtime while sanitizing added nodes', () => {
+    it('keeps controlled and visual node selection aligned after navigator focus', () => {
+        const nodes = [
+            { id: 'node-1', position: { x: 10, y: 20 }, data: {}, selected: true },
+            { id: 'node-2', position: { x: 100, y: 120 }, data: {}, selected: false },
+        ] as Node[];
+        const edges = [
+            { id: 'edge-1', source: 'node-1', target: 'node-2', selected: true },
+        ] as Edge[];
+        let renderedNodes = nodes;
+        let renderedEdges = edges;
+        const setSelectedNodes = vi.fn();
+        const setSelectedEdges = vi.fn();
+        const setCenter = vi.fn();
+        const { result } = renderHook(() => useFlowchartNodeFocus({
+            reactFlowInstance: { getZoom: vi.fn(() => 1), setCenter } as never,
+            nodesRef: { current: nodes },
+            setNodes: (update) => {
+                renderedNodes = typeof update === 'function' ? update(renderedNodes) : update;
+            },
+            setEdges: (update) => {
+                renderedEdges = typeof update === 'function' ? update(renderedEdges) : update;
+            },
+            setSelectedNodes,
+            setSelectedEdges,
+        }));
+
+        act(() => result.current('node-2'));
+
+        expect(setCenter).toHaveBeenCalledWith(150, 145, { duration: 800, zoom: 1.2 });
+        expect(setSelectedNodes).toHaveBeenCalledWith([nodes[1]]);
+        expect(setSelectedEdges).toHaveBeenCalledWith([]);
+        expect(renderedNodes.map(node => node.selected)).toEqual([false, true]);
+        expect(renderedEdges[0].selected).toBe(false);
+    });
+
+    it('initializes and destroys plugin runtime while sanitizing added nodes', async () => {
         const plugin = makePlugin('flowchart-hook-test');
         plugin.onInit = vi.fn();
         plugin.onDestroy = vi.fn();
         const registry = PluginRegistry.getInstance();
         registry.register(plugin);
         const setNodes = vi.fn();
+        const setEdges = vi.fn();
+        const setSelectedNodes = vi.fn();
+        const setSelectedEdges = vi.fn();
         const takeSnapshot = vi.fn();
 
         const { result, unmount } = renderHook(() => useFlowchartPluginRuntime({
@@ -179,7 +218,9 @@ describe('flowchart designer architecture hooks', () => {
             getNodes: () => [],
             getEdges: () => [],
             setNodes,
-            setEdges: vi.fn(),
+            setEdges,
+            setSelectedNodes,
+            setSelectedEdges,
             updateNodesBatch: vi.fn(),
             updateEdgesBatch: vi.fn(),
             takeSnapshot,
@@ -193,20 +234,39 @@ describe('flowchart designer architecture hooks', () => {
         }));
 
         expect(plugin.onInit).toHaveBeenCalledWith(result.current.pluginCtx);
-        let appendedNodes: Node[] = [];
+        let appendedNodes: Node[] = [{
+            id: 'existing',
+            position: { x: 0, y: 0 },
+            data: {},
+            selected: true,
+        }];
+        let updatedEdges: Edge[] = [{
+            id: 'existing-edge',
+            source: 'existing',
+            target: 'existing',
+            selected: true,
+        }];
         setNodes.mockImplementation((updater) => {
-            appendedNodes = updater([]);
+            appendedNodes = updater(appendedNodes);
+        });
+        setEdges.mockImplementation((updater) => {
+            updatedEdges = updater(updatedEdges);
         });
         act(() => {
             result.current.pluginCtx?.addNode('unsafe/type', ['invalid-data'], { x: 1, y: 2 });
         });
 
         expect(takeSnapshot).toHaveBeenCalledWith([], []);
-        expect(appendedNodes[0]).toMatchObject({
+        expect(appendedNodes[0].selected).toBe(false);
+        expect(appendedNodes[1]).toMatchObject({
             type: 'custom',
             position: { x: 1, y: 2 },
             data: { label: 'designer.flowchart.newNode', layer: 'default' },
+            selected: true,
         });
+        expect(updatedEdges[0].selected).toBe(false);
+        await waitFor(() => expect(setSelectedNodes).toHaveBeenCalledWith([appendedNodes[1]]));
+        expect(setSelectedEdges).toHaveBeenCalledWith([]);
 
         unmount();
         expect(plugin.onDestroy).toHaveBeenCalled();

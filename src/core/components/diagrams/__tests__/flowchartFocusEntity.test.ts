@@ -2,6 +2,8 @@ import type { Edge, Node } from '@xyflow/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  applyFlowchartNodeVisualSelection,
+  clearFlowchartEdgeVisualSelection,
   coerceFlowchartFocusEntityDetail,
   createFlowchartFocusEntityEventHandler,
   focusFlowchartEdge,
@@ -40,6 +42,21 @@ const createReactFlowInstance = (zoom = 1.75) => ({
 });
 
 describe('flowchartFocusEntity', () => {
+  it('synchronizes the controlled canvas selection without rewriting unchanged entities', () => {
+    const selectedNodes = applyFlowchartNodeVisualSelection([
+      { ...nodes[0], selected: true },
+      nodes[1],
+    ], 'node-2');
+    const clearedEdges = clearFlowchartEdgeVisualSelection([
+      { ...edges[0], selected: true },
+      { id: 'edge-2', source: 'node-2', target: 'node-1', selected: false },
+    ]);
+
+    expect(selectedNodes.map((node) => node.selected)).toEqual([false, true]);
+    expect(clearedEdges.map((edge) => edge.selected)).toEqual([false, false]);
+    expect(clearFlowchartEdgeVisualSelection([])).toEqual([]);
+  });
+
   it('coerces focus event detail and rejects ambiguous or unsafe values', () => {
     expect(coerceFlowchartFocusEntityDetail({
       nodeId: ' node-1 ',

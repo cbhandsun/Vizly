@@ -86,6 +86,18 @@ const getTargetZoom = (
     return detail.preserveZoom ? reactFlowInstance.getZoom() : (detail.zoom || 1.2);
 };
 
+export const applyFlowchartNodeVisualSelection = (
+    nodes: Node[],
+    nodeId: string,
+): Node[] => nodes.map((node) => {
+    const selected = node.id === nodeId;
+    return node.selected === selected ? node : { ...node, selected };
+});
+
+export const clearFlowchartEdgeVisualSelection = (edges: Edge[]): Edge[] => (
+    edges.map((edge) => (edge.selected ? { ...edge, selected: false } : edge))
+);
+
 export const focusFlowchartNode = ({
     reactFlowInstance,
     nodes,

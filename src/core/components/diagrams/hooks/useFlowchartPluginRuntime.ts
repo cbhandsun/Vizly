@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import type React from 'react';
+import { useState, type Dispatch, type SetStateAction } from 'react';
 import type { TFunction } from 'i18next';
 import { MarkerType, type Edge, type Node, type ReactFlowInstance } from '@xyflow/react';
 
@@ -30,8 +30,10 @@ interface UseFlowchartPluginRuntimeOptions {
     diagramId: string;
     getNodes: () => Node[];
     getEdges: () => Edge[];
-    setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
-    setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
+    setNodes: Dispatch<SetStateAction<Node[]>>;
+    setEdges: Dispatch<SetStateAction<Edge[]>>;
+    setSelectedNodes: Dispatch<SetStateAction<Node[]>>;
+    setSelectedEdges: Dispatch<SetStateAction<Edge[]>>;
     updateNodesBatch: (ids: string[], updates: NodeDataUpdate, options?: { snapshot?: boolean }) => void;
     updateEdgesBatch: (ids: string[], updates: EdgeDataUpdate) => void;
     takeSnapshot: (nodes: Node[], edges: Edge[]) => void;
@@ -58,6 +60,8 @@ export function useFlowchartPluginRuntime({
     getEdges,
     setNodes,
     setEdges,
+    setSelectedNodes,
+    setSelectedEdges,
     updateNodesBatch,
     updateEdgesBatch,
     takeSnapshot,
@@ -69,6 +73,7 @@ export function useFlowchartPluginRuntime({
     onMobileNodeAdded,
     notifyNodeAdded,
 }: UseFlowchartPluginRuntimeOptions): FlowchartPluginRuntime {
+    const [pendingSelectedNode, setPendingSelectedNode] = useState<Node | null>(null);
     const activePlugin = useMemo(
         () => PluginRegistry.getInstance().getPlugin(pluginId),
         [pluginId],
@@ -97,6 +102,8 @@ export function useFlowchartPluginRuntime({
                 drawerWidth: drawerRect?.width,
                 drawerHeight: drawerRect?.height,
                 drawerVisible: Boolean(
+                    !isMobile
+                    &&
                     drawer
                     && drawerRect
                     && getComputedStyle(drawer).visibility !== 'hidden'
@@ -174,9 +181,11 @@ export function useFlowchartPluginRuntime({
             ]);
             if (selectAddedNode) {
                 setEdges(currentEdges => currentEdges.map(edge => ({ ...edge, selected: false })));
+                setPendingSelectedNode(newNode);
             }
             notifyNodeAdded(resolveFlowchartPluginNodeNotificationLabel(newNode.data, type));
             if (isMobile) onMobileNodeAdded();
+            window.setTimeout(() => ensureAddedNodeVisible(position), 80);
             return id;
         };
 
@@ -193,7 +202,7 @@ export function useFlowchartPluginRuntime({
             setEdges,
             reactFlowInstance,
             addNode: (requestedType, requestedData = {}, requestedPosition) => (
-                addPluginNode(requestedType, requestedData, requestedPosition)
+                addPluginNode(requestedType, requestedData, requestedPosition, true)
             ),
             addConnectedNode: (requestedType, requestedData = {}) => {
                 const type = normalizeFlowchartPluginNodeType(requestedType);
@@ -236,6 +245,7 @@ export function useFlowchartPluginRuntime({
                     ...edges.map(edge => ({ ...edge, selected: false })),
                     newEdge,
                 ]);
+                setPendingSelectedNode(newNode);
                 notifyNodeAdded(resolveFlowchartPluginNodeNotificationLabel(newNode.data, type));
                 if (isMobile) onMobileNodeAdded();
                 window.setTimeout(() => ensureAddedNodeVisible(plan.position), 80);
@@ -263,11 +273,40 @@ export function useFlowchartPluginRuntime({
         reactFlowWrapper,
         setEdges,
         setNodes,
+        setSelectedEdges,
+        setSelectedNodes,
         t,
         takeSnapshot,
         updateEdgesBatch,
         updateNodesBatch,
     ]);
+
+    useEffect(() => {
+        if (!pendingSelectedNode) return;
+        const selectedNodeId = pendingSelectedNode.id;
+        const frameId = window.requestAnimationFrame(() => {
+            setNodes(currentNodes => currentNodes.map(node => ({
+                ...node,
+                selected: node.id === selectedNodeId,
+            })));
+            setEdges(currentEdges => currentEdges.map(edge => ({
+                ...edge,
+                selected: false,
+            })));
+            setSelectedNodes([pendingSelectedNode]);
+            setSelectedEdges([]);
+            reactFlowInstance?.setNodes(currentNodes => currentNodes.map(node => ({
+                ...node,
+                selected: node.id === selectedNodeId,
+            })));
+            reactFlowInstance?.setEdges(currentEdges => currentEdges.map(edge => ({
+                ...edge,
+                selected: false,
+            })));
+            setPendingSelectedNode(null);
+        });
+        return () => window.cancelAnimationFrame(frameId);
+    }, [pendingSelectedNode, reactFlowInstance, setEdges, setNodes, setSelectedEdges, setSelectedNodes]);
 
     useEffect(() => {
         if (!activePlugin || !pluginCtx) return;

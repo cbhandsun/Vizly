@@ -180,6 +180,10 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
 
         return { treeData: filterTree(roots), expandedKeys };
     }, [nodes, searchTerm, activePanel]);
+    const navigatorSelectedKeys = useMemo(
+        () => nodes.filter(node => node.selected).map(node => node.id),
+        [nodes],
+    );
 
     const [expandedKeys, setExpandedKeys] = useState<React.Key[]>([]);
     const [autoExpandParent, setAutoExpandParent] = useState(true);
@@ -320,7 +324,9 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
                         <div style={{ flex: 1, overflowY: 'auto', padding: '0 8px' }}>
                             {navigatorTreeData.length > 0 ? (
                                 <Tree
+                                    aria-label={t('designer.sidebar.navigator')}
                                     treeData={navigatorTreeData}
+                                    selectedKeys={navigatorSelectedKeys}
                                     blockNode
                                     expandedKeys={expandedKeys}
                                     autoExpandParent={autoExpandParent}

@@ -581,7 +581,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                             pluginCtx: pluginCtx ?? undefined,
                                             activePlugin,
                                             quickAddMenuVisible: !!quickAddMenu?.visible,
-                                            isContextToolbarHidden,
+                                            isContextToolbarHidden: isContextToolbarHidden || Boolean(leftDrawerOpen),
                                             isDragging,
                                             isConnecting,
                                             updateNodesBatch,
