@@ -145,7 +145,32 @@
   }
 
   .workspace-view-controls {
-    display: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .workspace-sort-trigger {
+    flex: 1;
+    justify-content: flex-start;
+    width: auto;
+    min-width: 0;
+    padding: 0 12px;
+  }
+
+  .workspace-sort-trigger-label {
+    display: inline;
+  }
+
+  .workspace-view-controls .view-toggle {
+    flex: none;
+  }
+
+  .workspace-view-controls .view-toggle-btn {
+    width: 44px;
+    height: 40px;
   }
 }
 

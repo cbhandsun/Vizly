@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -69,5 +70,33 @@ describe('WorkspaceDiagramCollection', () => {
     };
 
     expect(renderCollection(item)).not.toContain('remote-diagram-cover');
+  });
+
+  it('exposes the active filter and current sort mode without relying on color', () => {
+    const item: UnifiedDiagramItem = {
+      id: 'template-accessible',
+      title: 'Accessible template',
+      updatedAt: 1,
+      source: 'template',
+      role: 'template',
+      raw: { id: 'template-accessible' } as never,
+    };
+
+    const html = renderCollection(item);
+
+    expect(html).toMatch(/class="filter-tab active" aria-pressed="true"[\s\S]*?workspace\.industryTemplates/);
+    expect(html).toContain('aria-label="workspace.sortBy: workspace.lastModified"');
+    expect(html).toContain('aria-haspopup="menu"');
+    expect(html).toContain('workspace-sort-trigger-label">workspace.lastModified</span>');
+  });
+
+  it('keeps sort and view controls available at the mobile breakpoint', () => {
+    const css = readFileSync(new URL('../WorkspaceDashboard.mobile.css', import.meta.url), 'utf8');
+    const mobileControlsRule = css.match(/\.workspace-view-controls\s*{([^}]*)}/)?.[1];
+
+    expect(mobileControlsRule).toContain('display: flex;');
+    expect(mobileControlsRule).toContain('width: 100%;');
+    expect(mobileControlsRule).not.toContain('display: none;');
+    expect(css).toMatch(/\.workspace-sort-trigger-label\s*{[\s\S]*?display: inline;/);
   });
 });

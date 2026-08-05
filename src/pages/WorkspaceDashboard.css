@@ -399,6 +399,18 @@ html[data-theme='dark'] .create-btn-primary:hover {
   gap: 6px;
 }
 
+.workspace-sort-trigger {
+  gap: 8px;
+}
+
+.workspace-sort-trigger-label {
+  display: none;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .view-toggle {
   display: flex;
   background: rgba(0, 0, 0, 0.04);

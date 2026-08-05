@@ -108,6 +108,11 @@ export const WorkspaceDiagramCollection = ({
   const localCount = unifiedItems.filter(item => item.source === 'local').length;
   const cloudCount = unifiedItems.filter(item => item.source === 's3' || item.source === 'supabase').length;
   const sharedCount = unifiedItems.filter(item => item.role === 'viewer').length;
+  const currentSortLabel = {
+    updated: t('workspace.lastModified'),
+    name: t('workspace.name'),
+    type: t('workspace.type'),
+  } satisfies Record<SortKey, string>;
 
   const getCardMenu = (item: UnifiedDiagramItem): MenuProps['items'] => {
     if (isTemplateItem(item)) {
@@ -138,27 +143,27 @@ export const WorkspaceDiagramCollection = ({
                     {/* Filter Tabs with Counts */}
                     <div className="workspace-matrix-header">
                         <div className="workspace-filter-tabs">
-                            <button type="button" className={`filter-tab ${activeView === 'recent' ? 'active' : ''}`} onClick={() => onActiveViewChange('recent')}>
+                            <button type="button" className={`filter-tab ${activeView === 'recent' ? 'active' : ''}`} aria-pressed={activeView === 'recent'} onClick={() => onActiveViewChange('recent')}>
                                 <Clock size={14} strokeWidth={2} /> {t('workspace.recent')}
                                 <span className="filter-tab-count">{unifiedItems.filter(i => i.source !== 'template' && i.source !== 'general_template').length}</span>
                             </button>
-                            <button type="button" className={`filter-tab ${activeView === 'local' ? 'active' : ''}`} onClick={() => onActiveViewChange('local')}>
+                            <button type="button" className={`filter-tab ${activeView === 'local' ? 'active' : ''}`} aria-pressed={activeView === 'local'} onClick={() => onActiveViewChange('local')}>
                                 <Laptop size={14} strokeWidth={2} /> {t('workspace.local')}
                                 <span className="filter-tab-count">{localCount}</span>
                             </button>
-                            <button type="button" className={`filter-tab ${activeView === 'cloud' ? 'active' : ''}`} onClick={() => onActiveViewChange('cloud')}>
+                            <button type="button" className={`filter-tab ${activeView === 'cloud' ? 'active' : ''}`} aria-pressed={activeView === 'cloud'} onClick={() => onActiveViewChange('cloud')}>
                                 <Cloud size={14} strokeWidth={2} /> {t('workspace.cloud')}
                                 <span className="filter-tab-count">{cloudCount}</span>
                             </button>
-                            <button type="button" className={`filter-tab ${activeView === 'shared' ? 'active' : ''}`} onClick={() => onActiveViewChange('shared')}>
+                            <button type="button" className={`filter-tab ${activeView === 'shared' ? 'active' : ''}`} aria-pressed={activeView === 'shared'} onClick={() => onActiveViewChange('shared')}>
                                 <Share2 size={14} strokeWidth={2} /> {t('workspace.shared')}
                                 <span className="filter-tab-count">{sharedCount}</span>
                             </button>
-                            <button type="button" className={`filter-tab ${activeView === 'templates' ? 'active' : ''}`} onClick={() => onActiveViewChange('templates')}>
+                            <button type="button" className={`filter-tab ${activeView === 'templates' ? 'active' : ''}`} aria-pressed={activeView === 'templates'} onClick={() => onActiveViewChange('templates')}>
                                 <LayoutGrid size={14} strokeWidth={2} /> {t('workspace.industryTemplates')}
                                 <span className="filter-tab-count">{unifiedItems.filter(i => i.source === 'template').length}</span>
                             </button>
-                            <button type="button" className={`filter-tab ${activeView === 'general_templates' ? 'active' : ''}`} onClick={() => onActiveViewChange('general_templates')}>
+                            <button type="button" className={`filter-tab ${activeView === 'general_templates' ? 'active' : ''}`} aria-pressed={activeView === 'general_templates'} onClick={() => onActiveViewChange('general_templates')}>
                                 <Blocks size={14} strokeWidth={2} /> {t('workspace.generalTemplates')}
                                 <span className="filter-tab-count">{unifiedItems.filter(i => i.source === 'general_template').length}</span>
                             </button>
@@ -176,8 +181,15 @@ export const WorkspaceDiagramCollection = ({
                                 }}
                                 trigger={['click']}
                             >
-                                <button type="button" className="workspace-icon-btn" title={t('workspace.sortBy')} aria-label={t('workspace.sortBy')}>
+                                <button
+                                    type="button"
+                                    className="workspace-icon-btn workspace-sort-trigger"
+                                    title={`${t('workspace.sortBy')}: ${currentSortLabel[sortKey]}`}
+                                    aria-label={`${t('workspace.sortBy')}: ${currentSortLabel[sortKey]}`}
+                                    aria-haspopup="menu"
+                                >
                                     <ArrowUpAZ size={16} strokeWidth={2} />
+                                    <span className="workspace-sort-trigger-label">{currentSortLabel[sortKey]}</span>
                                 </button>
                             </Dropdown>
                             <div className="view-toggle">
