@@ -75,6 +75,32 @@ describe('dialog focus helpers', () => {
         dialog.remove();
     });
 
+    it('lets a nested dialog own Tab traversal instead of wrapping the parent dialog', () => {
+        const parentDialog = document.createElement('div');
+        parentDialog.setAttribute('role', 'dialog');
+        const parentButton = document.createElement('button');
+        parentDialog.appendChild(parentButton);
+
+        const nestedDialog = document.createElement('div');
+        nestedDialog.setAttribute('role', 'dialog');
+        const nestedButton = document.createElement('button');
+        nestedDialog.appendChild(nestedButton);
+        parentDialog.appendChild(nestedDialog);
+        document.body.appendChild(parentDialog);
+        const preventDefault = vi.fn();
+
+        nestedButton.focus();
+        expect(trapDialogTab({
+            key: 'Tab',
+            shiftKey: false,
+            target: nestedButton,
+            preventDefault,
+        }, parentDialog)).toBe(false);
+        expect(preventDefault).not.toHaveBeenCalled();
+        expect(document.activeElement).toBe(nestedButton);
+        parentDialog.remove();
+    });
+
     it('closes on Escape unless the focused control preserves the dialog', () => {
         const closeDialog = vi.fn();
         const unbind = bindDialogEscapeClose(window, closeDialog);

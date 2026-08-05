@@ -970,6 +970,7 @@
         "historyTitle": "Chat History",
         "newConversation": "New conversation",
         "deleteConversation": "Delete conversation?",
+        "deleteConversationDescription": "“{{title}}” will be permanently deleted. This action cannot be undone.",
         "deleteConversationLabel": "Delete {{title}}",
         "renameConversation": "Rename {{title}}",
         "viewHistory": "View history",

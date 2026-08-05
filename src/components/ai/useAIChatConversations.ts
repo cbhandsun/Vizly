@@ -122,6 +122,11 @@ export function useAIChatConversations({ userId, welcomeMessage }: UseAIChatConv
         setEditingId(null);
     }, [conversations, editingTitle]);
 
+    const handleCancelRename = useCallback(() => {
+        setEditingId(null);
+        setEditingTitle('');
+    }, []);
+
     const addLocalMessage = useCallback((role: 'user' | 'assistant', content: string) => {
         if (!activeId) return;
         const message: Message = { id: createAIChatMessageId(), role, content };
@@ -147,6 +152,7 @@ export function useAIChatConversations({ userId, welcomeMessage }: UseAIChatConv
         handleDeleteChat,
         handleStartRename,
         handleSaveRename,
+        handleCancelRename,
         addLocalMessage,
     };
 }

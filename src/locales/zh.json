@@ -1071,6 +1071,7 @@
         "historyTitle": "历史对话",
         "newConversation": "新建对话",
         "deleteConversation": "删除对话？",
+        "deleteConversationDescription": "“{{title}}”将被永久删除，此操作无法撤销。",
         "deleteConversationLabel": "删除 {{title}}",
         "renameConversation": "重命名 {{title}}",
         "viewHistory": "查看历史话题",

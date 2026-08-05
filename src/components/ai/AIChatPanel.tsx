@@ -64,6 +64,7 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
         handleDeleteChat,
         handleStartRename,
         handleSaveRename,
+        handleCancelRename,
         addLocalMessage,
     } = useAIChatConversations({
         userId: user?.id,
@@ -580,6 +581,7 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
             handleDeleteChat={handleDeleteChat}
             handleStartRename={handleStartRename}
             handleSaveRename={handleSaveRename}
+            handleCancelRename={handleCancelRename}
             isSidebarOpen={isSidebarOpen}
             setIsSidebarOpen={setIsSidebarOpen}
             aiConfig={aiConfig}

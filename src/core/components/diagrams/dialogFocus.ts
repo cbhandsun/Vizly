@@ -12,6 +12,7 @@ const DIALOG_FOCUSABLE_SELECTOR = [
 interface DialogTabEvent {
     key: string;
     shiftKey: boolean;
+    target?: EventTarget | null;
     preventDefault: () => void;
 }
 
@@ -45,6 +46,11 @@ export const trapDialogTab = (
     container: HTMLElement,
 ): boolean => {
     if (event.key !== 'Tab') return false;
+
+    if (event.target instanceof Element) {
+        const activeDialog = event.target.closest<HTMLElement>('[role="dialog"], [role="alertdialog"]');
+        if (activeDialog && activeDialog !== container) return false;
+    }
 
     const focusable = getFocusableDialogElements(container);
     if (focusable.length === 0) {

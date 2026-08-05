@@ -36,6 +36,7 @@
     min-height: var(--commercial-touch-target, 44px);
     padding: 4px;
     cursor: default;
+    overflow: visible;
 }
 
 .ai-chat-history-main {
@@ -82,6 +83,36 @@
     display: flex !important;
     opacity: 1;
     pointer-events: auto;
+}
+
+.ai-chat-delete-dialog-mask {
+    position: fixed;
+    inset: 0;
+    z-index: 1300;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    background: rgba(15, 23, 42, 0.45);
+}
+
+.ai-chat-delete-dialog {
+    width: min(360px, calc(100vw - 32px));
+    padding: 20px;
+    border: 1px solid var(--designer-border, rgba(15, 23, 42, 0.12));
+    border-radius: 12px;
+    background: var(--designer-panel-bg, #fff);
+    box-shadow: 0 24px 64px rgba(15, 23, 42, 0.24);
+}
+
+.ai-chat-delete-dialog .ant-typography {
+    margin-top: 0;
+}
+
+.ai-chat-delete-dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 20px;
 }
 
 .ai-chat-inline-header {

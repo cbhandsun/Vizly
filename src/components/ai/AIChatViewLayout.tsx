@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import type { TFunction } from 'i18next';
 import type { TextAreaRef } from 'antd/es/input/TextArea';
 import Modal from 'antd/es/modal';
@@ -8,7 +9,6 @@ import Select from 'antd/es/select';
 import Space from 'antd/es/space';
 import Tooltip from 'antd/es/tooltip';
 import Typography from 'antd/es/typography';
-import Popconfirm from 'antd/es/popconfirm';
 import {
     AudioOutlined,
     CloudServerOutlined,
@@ -75,6 +75,7 @@ interface AIChatViewLayoutProps {
     handleDeleteChat: (id: string, event?: React.MouseEvent) => void;
     handleStartRename: (conversation: Conversation, event: React.MouseEvent) => void;
     handleSaveRename: (id: string) => void;
+    handleCancelRename: () => void;
     isSidebarOpen: boolean;
     setIsSidebarOpen: (open: boolean) => void;
     aiConfig: { activeModelKey: string };
@@ -122,6 +123,7 @@ export const AIChatViewLayout: React.FC<AIChatViewLayoutProps> = ({
     handleDeleteChat,
     handleStartRename,
     handleSaveRename,
+    handleCancelRename,
     isSidebarOpen,
     setIsSidebarOpen,
     aiConfig,
@@ -154,6 +156,13 @@ export const AIChatViewLayout: React.FC<AIChatViewLayoutProps> = ({
     saveTarget,
 }) => {
     const historyNewConversationRef = React.useRef<HTMLButtonElement>(null);
+    const renameFocusReturnIdRef = React.useRef<string | null>(null);
+    const deleteTriggerRef = React.useRef<HTMLElement | null>(null);
+    const deleteCancelButtonRef = React.useRef<HTMLButtonElement>(null);
+    const previousEditingIdRef = React.useRef<string | null>(editingId);
+    const previousPendingDeleteIdRef = React.useRef<string | null>(null);
+    const [pendingDeleteId, setPendingDeleteId] = React.useState<string | null>(null);
+    const pendingDeleteConversation = conversations.find(conversation => conversation.id === pendingDeleteId) ?? null;
     const closeHistorySidebar = React.useCallback(() => {
         setIsSidebarOpen(false);
     }, [setIsSidebarOpen]);
@@ -165,6 +174,74 @@ export const AIChatViewLayout: React.FC<AIChatViewLayoutProps> = ({
         initialFocusRef: historyNewConversationRef,
         onClose: closeHistorySidebar,
     });
+
+    React.useEffect(() => {
+        const previousEditingId = previousEditingIdRef.current;
+        previousEditingIdRef.current = editingId;
+        if (!previousEditingId || editingId !== null || !isSidebarOpen) return;
+        const conversationId = renameFocusReturnIdRef.current;
+        renameFocusReturnIdRef.current = null;
+        queueMicrotask(() => {
+            const renameTrigger = Array.from(
+                historySidebarRef.current?.querySelectorAll<HTMLButtonElement>('[data-ai-chat-rename-id]') ?? [],
+            ).find(button => button.dataset.aiChatRenameId === conversationId);
+            renameTrigger?.focus();
+        });
+    }, [editingId, isSidebarOpen]);
+
+    const handleRenameKeyDown = React.useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
+        if (event.key !== 'Escape') return;
+        event.preventDefault();
+        event.stopPropagation();
+        handleCancelRename();
+    }, [handleCancelRename]);
+
+    const openDeleteConfirmation = React.useCallback((
+        id: string,
+        event: React.MouseEvent<HTMLElement>,
+    ) => {
+        event.stopPropagation();
+        deleteTriggerRef.current = event.currentTarget;
+        setPendingDeleteId(id);
+    }, []);
+
+    const closeDeleteConfirmation = React.useCallback(() => {
+        setPendingDeleteId(null);
+    }, []);
+
+    const confirmDeleteConversation = React.useCallback(() => {
+        if (!pendingDeleteId) return;
+        handleDeleteChat(pendingDeleteId);
+        setPendingDeleteId(null);
+    }, [handleDeleteChat, pendingDeleteId]);
+
+    const restoreDeleteFocus = React.useCallback(() => {
+        const trigger = deleteTriggerRef.current;
+        deleteTriggerRef.current = null;
+        queueMicrotask(() => {
+            if (trigger?.isConnected) {
+                trigger.focus();
+            } else if (historyNewConversationRef.current?.isConnected) {
+                historyNewConversationRef.current.focus();
+            }
+        });
+    }, []);
+
+    const {
+        containerRef: deleteDialogRef,
+        handleKeyDown: handleDeleteDialogKeyDown,
+    } = useModalFocusTrap<HTMLDivElement>({
+        active: pendingDeleteConversation !== null,
+        initialFocusRef: deleteCancelButtonRef,
+        onClose: closeDeleteConfirmation,
+    });
+
+    React.useEffect(() => {
+        const previousPendingDeleteId = previousPendingDeleteIdRef.current;
+        previousPendingDeleteIdRef.current = pendingDeleteId;
+        if (!previousPendingDeleteId || pendingDeleteId !== null) return;
+        restoreDeleteFocus();
+    }, [pendingDeleteId, restoreDeleteFocus]);
 
     return (
         <div className="ai-chat-container">
@@ -218,7 +295,10 @@ export const AIChatViewLayout: React.FC<AIChatViewLayoutProps> = ({
                                             onChange={e => setEditingTitle(e.target.value)}
                                             onPressEnter={() => handleSaveRename(conv.id)}
                                             onBlur={() => handleSaveRename(conv.id)}
+                                            onKeyDown={handleRenameKeyDown}
                                             autoFocus
+                                            maxLength={200}
+                                            data-preserve-dialog-on-escape="true"
                                             onClick={e => e.stopPropagation()}
                                         />
                                     ) : (
@@ -238,22 +318,20 @@ export const AIChatViewLayout: React.FC<AIChatViewLayoutProps> = ({
                                                         type="text"
                                                         icon={<EditOutlined />}
                                                         aria-label={t('aiChat.renameConversation', { title: conv.title })}
-                                                        onClick={(event) => handleStartRename(conv, event)}
+                                                        data-ai-chat-rename-id={conv.id}
+                                                        onClick={(event) => {
+                                                            renameFocusReturnIdRef.current = conv.id;
+                                                            handleStartRename(conv, event);
+                                                        }}
                                                     />
-                                                    <Popconfirm
-                                                        title={t('aiChat.deleteConversation')}
-                                                        onConfirm={() => handleDeleteChat(conv.id)}
-                                                        onCancel={e => e?.stopPropagation()}
-                                                        placement="right"
-                                                    >
-                                                        <Button
-                                                            className="ai-chat-history-action"
-                                                            type="text"
-                                                            danger
-                                                            icon={<DeleteOutlined />}
-                                                            aria-label={t('aiChat.deleteConversationLabel', { title: conv.title })}
-                                                        />
-                                                    </Popconfirm>
+                                                    <Button
+                                                        className="ai-chat-history-action"
+                                                        type="text"
+                                                        danger
+                                                        icon={<DeleteOutlined />}
+                                                        aria-label={t('aiChat.deleteConversationLabel', { title: conv.title })}
+                                                        onClick={(event) => openDeleteConfirmation(conv.id, event)}
+                                                    />
                                                 </Space>
                                             </div>
                                         </>
@@ -263,6 +341,39 @@ export const AIChatViewLayout: React.FC<AIChatViewLayoutProps> = ({
                         </div>
                     </div>
                 </div>
+            )}
+
+            {pendingDeleteConversation && createPortal(
+                <div className="ai-chat-delete-dialog-mask">
+                    <div
+                        ref={deleteDialogRef}
+                        className="ai-chat-delete-dialog"
+                        role="alertdialog"
+                        aria-modal="true"
+                        aria-labelledby="ai-chat-delete-conversation-title"
+                        aria-describedby="ai-chat-delete-conversation-description"
+                        tabIndex={-1}
+                        onKeyDown={handleDeleteDialogKeyDown}
+                    >
+                        <Typography.Title id="ai-chat-delete-conversation-title" level={5}>
+                            {t('aiChat.deleteConversation')}
+                        </Typography.Title>
+                        <Typography.Paragraph id="ai-chat-delete-conversation-description">
+                            {t('aiChat.deleteConversationDescription', {
+                                title: pendingDeleteConversation.title,
+                            })}
+                        </Typography.Paragraph>
+                        <div className="ai-chat-delete-dialog-actions">
+                            <Button ref={deleteCancelButtonRef} onClick={closeDeleteConfirmation}>
+                                {t('common.cancel')}
+                            </Button>
+                            <Button type="primary" danger onClick={confirmDeleteConversation}>
+                                {t('common.delete')}
+                            </Button>
+                        </div>
+                    </div>
+                </div>,
+                document.body,
             )}
 
             {/* Main Content Area */}

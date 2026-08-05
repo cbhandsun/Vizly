@@ -48,6 +48,7 @@ const createProps = (overrides: Partial<LayoutProps> = {}): LayoutProps => ({
     handleDeleteChat: vi.fn(),
     handleStartRename: vi.fn(),
     handleSaveRename: vi.fn(),
+    handleCancelRename: vi.fn(),
     isSidebarOpen: true,
     setIsSidebarOpen: vi.fn(),
     aiConfig: { activeModelKey: 'provider:model' },
@@ -128,6 +129,58 @@ describe('AIChatViewLayout commercial interactions', () => {
             expect(document.activeElement).toBe(trigger);
         });
         expect(screen.getByRole('textbox', { name: 'aiChat.inputLabel' })).not.toBeNull();
+    });
+
+    it('cancels inline rename on Escape without closing history and restores the rename trigger', async () => {
+        const StatefulRenameLayout = () => {
+            const [editingId, setEditingId] = React.useState<string | null>(null);
+            return (
+                <AIChatViewLayout
+                    {...createProps({
+                        editingId,
+                        editingTitle: conversation.title,
+                        handleStartRename: () => setEditingId(conversation.id),
+                        handleCancelRename: () => setEditingId(null),
+                    })}
+                />
+            );
+        };
+
+        render(<StatefulRenameLayout />);
+
+        const renameTrigger = screen.getByRole('button', {
+            name: `aiChat.renameConversation: ${conversation.title}`,
+        });
+        fireEvent.click(renameTrigger);
+
+        const renameInput = screen.getByRole('textbox', {
+            name: `aiChat.renameConversation: ${conversation.title}`,
+        });
+        await waitFor(() => expect(document.activeElement).toBe(renameInput));
+        fireEvent.keyDown(renameInput, { key: 'Escape' });
+
+        expect(screen.getByRole('dialog', { name: 'aiChat.historyTitle' })).not.toBeNull();
+        await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', {
+            name: `aiChat.renameConversation: ${conversation.title}`,
+        })));
+    });
+
+    it('uses a localized, viewport-level dialog for destructive confirmation and restores focus on cancel', async () => {
+        render(<AIChatViewLayout {...createProps()} />);
+
+        const deleteTrigger = screen.getByRole('button', {
+            name: `aiChat.deleteConversationLabel: ${conversation.title}`,
+        });
+        fireEvent.click(deleteTrigger);
+
+        const confirmation = await screen.findByRole('alertdialog', { name: 'aiChat.deleteConversation' });
+        expect(document.body.contains(confirmation)).toBe(true);
+        expect(screen.getByText(`aiChat.deleteConversationDescription: ${conversation.title}`)).not.toBeNull();
+        expect(screen.getByRole('button', { name: 'common.delete' })).not.toBeNull();
+
+        fireEvent.click(screen.getByRole('button', { name: 'common.cancel' }));
+        await waitFor(() => expect(screen.queryByRole('alertdialog', { name: 'aiChat.deleteConversation' })).toBeNull());
+        await waitFor(() => expect(document.activeElement).toBe(deleteTrigger));
     });
 
     it('keeps the draft editable but blocks click and Enter submission until configuration is ready', () => {

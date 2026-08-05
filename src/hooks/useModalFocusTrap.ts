@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from 'react';
 
+import { shouldPreserveParentDialogOnEscape } from '@/core/components/ui/dialogEscapeLayer';
+
 interface UseModalFocusTrapOptions {
   active: boolean;
   initialFocusRef?: RefObject<HTMLElement | null>;
@@ -27,6 +29,7 @@ export const useModalFocusTrap = <T extends HTMLElement>({
 
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
+      if (shouldPreserveParentDialogOnEscape(event.target, containerRef.current)) return;
       event.preventDefault();
       event.stopImmediatePropagation();
       onCloseRef.current();
@@ -45,18 +48,17 @@ export const useModalFocusTrap = <T extends HTMLElement>({
     )).filter(element => !element.hasAttribute('hidden'));
     if (focusable.length === 0) {
       event.preventDefault();
+      event.stopPropagation();
       containerRef.current.focus();
       return;
     }
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault();
-      last.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault();
-      first.focus();
-    }
+    const activeIndex = focusable.indexOf(document.activeElement as HTMLElement);
+    const nextIndex = activeIndex < 0
+      ? (event.shiftKey ? focusable.length - 1 : 0)
+      : (activeIndex + (event.shiftKey ? -1 : 1) + focusable.length) % focusable.length;
+    event.preventDefault();
+    event.stopPropagation();
+    focusable[nextIndex].focus();
   }, []);
 
   return { containerRef, handleKeyDown };

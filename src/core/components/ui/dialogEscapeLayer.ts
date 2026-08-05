@@ -11,7 +11,8 @@ export const shouldPreserveParentDialogOnEscape = (
 ): boolean => {
     if (!(eventTarget instanceof Element)) return false;
 
-    if (eventTarget.closest('[data-preserve-dialog-on-escape="true"]')) {
+    const preservedLayer = eventTarget.closest<HTMLElement>('[data-preserve-dialog-on-escape="true"]');
+    if (preservedLayer && preservedLayer !== parentDialog) {
         return true;
     }
 
