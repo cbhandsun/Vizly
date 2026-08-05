@@ -17,6 +17,10 @@ export type FlowchartImportEvent = {
 };
 
 export type FlowchartImportStatus = 'success' | 'failure' | 'scope-changed';
+export type FlowchartImportResult = {
+    status: FlowchartImportStatus;
+    detail?: string;
+};
 
 type MessageApiLike = {
     success: (message: string) => void;
@@ -43,7 +47,7 @@ export interface CreateFlowchartImportHandlerOptions {
     }) => Promise<void>;
     importInFlightRef?: { current: boolean };
     onImportStarted?: () => void;
-    onImportFinished?: (result: { status: FlowchartImportStatus }) => void;
+    onImportFinished?: (result: FlowchartImportResult) => void;
     getOperationScope?: () => string;
 }
 
@@ -85,10 +89,15 @@ export const createFlowchartImportHandler = ({
     }
 
     const invalidFormatMessage = t('designer.flowchart.import.invalidFormat');
-    const validation = validateFlowchartImportFile(file, invalidFormatMessage);
+    const validation = validateFlowchartImportFile(file, {
+        invalidFormat: invalidFormatMessage,
+        emptyFile: t('designer.flowchart.import.emptyFile'),
+        invalidSize: t('designer.flowchart.import.invalidSize'),
+        tooLarge: (params) => t('designer.flowchart.import.tooLarge', params),
+    });
     if (!validation.ok) {
         messageApi.error(validation.error);
-        onImportFinished?.({ status: 'failure' });
+        onImportFinished?.({ status: 'failure', detail: validation.error });
         event.target.value = '';
         return;
     }
@@ -104,11 +113,17 @@ export const createFlowchartImportHandler = ({
         }, delayMs);
     };
     let status: FlowchartImportStatus = 'failure';
+    let failureDetail: string | undefined;
     try {
         onImportStarted?.();
         const content = await readFlowchartImportFileText(file);
         if (!isOperationCurrent()) {
             status = 'scope-changed';
+            return;
+        }
+        if (!content.trim()) {
+            failureDetail = t('designer.flowchart.import.emptyFile');
+            messageApi.error(failureDetail);
             return;
         }
         const imported = await runFlowchartImportPipeline({
@@ -153,7 +168,8 @@ export const createFlowchartImportHandler = ({
             },
             onJsonImportFailure: () => {
                 if (!isOperationCurrent()) return;
-                messageApi.error(t('designer.flowchart.import.jsonFailed'));
+                failureDetail = t('designer.flowchart.import.jsonFailed');
+                messageApi.error(failureDetail);
             },
             onMermaidSuccess: () => {
                 if (!isOperationCurrent()) return;
@@ -166,7 +182,8 @@ export const createFlowchartImportHandler = ({
             },
             onMermaidImportFailure: () => {
                 if (!isOperationCurrent()) return;
-                messageApi.error(t('designer.flowchart.import.mermaidFailed'));
+                failureDetail = t('designer.flowchart.import.mermaidFailed');
+                messageApi.error(failureDetail);
             },
         });
         status = isOperationCurrent()
@@ -174,13 +191,16 @@ export const createFlowchartImportHandler = ({
             : 'scope-changed';
     } catch {
         if (isOperationCurrent()) {
-            messageApi.error(t('designer.flowchart.import.readFailed'));
+            failureDetail = t('designer.flowchart.import.readFailed');
+            messageApi.error(failureDetail);
         } else {
             status = 'scope-changed';
         }
     } finally {
         if (importInFlightRef) importInFlightRef.current = false;
-        onImportFinished?.({ status });
+        onImportFinished?.(status === 'failure' && failureDetail
+            ? { status, detail: failureDetail }
+            : { status });
         event.target.value = '';
     }
 };

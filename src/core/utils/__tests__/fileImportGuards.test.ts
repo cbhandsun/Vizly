@@ -5,6 +5,7 @@ import {
     getImageFileImportError,
     getReverseImportImageFileError,
     REVERSE_IMPORT_IMAGE_MAX_BYTES,
+    sanitizeFileNameForDisplay,
 } from '../fileImportGuards';
 
 describe('fileImportGuards', () => {
@@ -21,6 +22,13 @@ describe('fileImportGuards', () => {
     it('returns an actionable error when the file exceeds the limit', () => {
         expect(getFileSizeLimitError({ name: 'huge.json', size: 6 * 1024 * 1024 }, 5 * 1024 * 1024, 'JSON'))
             .toBe('huge.json is too large (6 MB). The JSON import limit is 5 MB.');
+    });
+
+    it('normalizes filenames before displaying them in import feedback', () => {
+        expect(sanitizeFileNameForDisplay('  report\n\u202Egnp.json  ')).toBe('report gnp.json');
+        expect(sanitizeFileNameForDisplay('', 'diagram.json')).toBe('diagram.json');
+        expect(sanitizeFileNameForDisplay(null, 'diagram.json')).toBe('diagram.json');
+        expect(sanitizeFileNameForDisplay('x'.repeat(200))).toHaveLength(120);
     });
 
     it('defines a bounded reverse-image import limit', () => {

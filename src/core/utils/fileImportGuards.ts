@@ -23,6 +23,31 @@ export const formatFileSize = (bytes: number): string => {
     return `${Number(mb.toFixed(mb >= 10 ? 0 : 1))} MB`;
 };
 
+const MAX_FILE_NAME_DISPLAY_CHARS = 120;
+
+const isUnsafeFileNameCodePoint = (codePoint: number): boolean => (
+    codePoint <= 0x1f ||
+    (codePoint >= 0x7f && codePoint <= 0x9f) ||
+    (codePoint >= 0x202a && codePoint <= 0x202e) ||
+    (codePoint >= 0x2066 && codePoint <= 0x2069)
+);
+
+export const sanitizeFileNameForDisplay = (
+    value: unknown,
+    fallback = 'file'
+): string => {
+    if (typeof value !== 'string') return fallback;
+    const normalized = Array.from(value, (character) => (
+        isUnsafeFileNameCodePoint(character.codePointAt(0) ?? 0)
+            ? ' '
+            : character
+    )).join('')
+        .replace(/\s+/g, ' ')
+        .trim();
+    if (!normalized) return fallback;
+    return normalized.slice(0, MAX_FILE_NAME_DISPLAY_CHARS);
+};
+
 export const getFileSizeLimitError = (
     file: Pick<File, 'name' | 'size'>,
     maxBytes: number,

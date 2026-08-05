@@ -158,6 +158,36 @@ describe('flowchartImportHandler', () => {
         expect(event.target.value).toBe('');
     });
 
+    it('rejects whitespace-only files before the canvas replacement pipeline', async () => {
+        importFileState.validateFlowchartImportFile.mockReturnValue({ ok: true, importKind: 'json' });
+        importFileState.readFlowchartImportFileText.mockResolvedValue('\uFEFF  \n\t');
+        const messageApi = makeMessageApi();
+        const onBeforeCanvasReplace = vi.fn();
+        const onImportFinished = vi.fn();
+        const handler = createFlowchartImportHandler({
+            t: (key) => key,
+            messageApi,
+            setNodes: vi.fn(),
+            setEdges: vi.fn(),
+            onBeforeCanvasReplace,
+            fitView: vi.fn(),
+            registerStandardReload: vi.fn(async () => undefined),
+            onImportFinished,
+        });
+        const event = makeEvent(new File([' '], 'empty.json', { type: 'application/json' }));
+
+        await handler(event);
+
+        expect(messageApi.error).toHaveBeenCalledWith('designer.flowchart.import.emptyFile');
+        expect(importPipelineState.runFlowchartImportPipeline).not.toHaveBeenCalled();
+        expect(onBeforeCanvasReplace).not.toHaveBeenCalled();
+        expect(onImportFinished).toHaveBeenCalledWith({
+            status: 'failure',
+            detail: 'designer.flowchart.import.emptyFile',
+        });
+        expect(event.target.value).toBe('');
+    });
+
     it('holds a shared lock until the real import result settles and blocks duplicates', async () => {
         importFileState.validateFlowchartImportFile.mockReturnValue({ ok: true, importKind: 'json' });
         importFileState.readFlowchartImportFileText.mockResolvedValue('{"nodes":[],"edges":[]}');
@@ -224,7 +254,10 @@ describe('flowchartImportHandler', () => {
 
         expect(messageApi.error).toHaveBeenCalledWith('designer.flowchart.import.jsonFailed');
         expect(JSON.stringify(messageApi.error.mock.calls)).not.toContain('secret');
-        expect(onImportFinished).toHaveBeenCalledWith({ status: 'failure' });
+        expect(onImportFinished).toHaveBeenCalledWith({
+            status: 'failure',
+            detail: 'designer.flowchart.import.jsonFailed',
+        });
     });
 
     it('releases the shared lock when the import-start lifecycle callback fails', async () => {
@@ -253,7 +286,10 @@ describe('flowchartImportHandler', () => {
         expect(importFileState.readFlowchartImportFileText).not.toHaveBeenCalled();
         expect(importInFlightRef.current).toBe(false);
         expect(messageApi.error).toHaveBeenCalledWith('designer.flowchart.import.readFailed');
-        expect(onImportFinished).toHaveBeenCalledWith({ status: 'failure' });
+        expect(onImportFinished).toHaveBeenCalledWith({
+            status: 'failure',
+            detail: 'designer.flowchart.import.readFailed',
+        });
         expect(event.target.value).toBe('');
     });
 

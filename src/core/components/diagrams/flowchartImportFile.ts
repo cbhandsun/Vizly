@@ -1,7 +1,8 @@
 import {
     FLOWCHART_JSON_IMPORT_MAX_BYTES,
     FLOWCHART_TEXT_IMPORT_MAX_BYTES,
-    getFileSizeLimitError,
+    formatFileSize,
+    sanitizeFileNameForDisplay,
 } from '@/core/utils/fileImportGuards';
 import { getDiagramImportKind, type DiagramImportKind } from '@/core/utils/diagramJsonImport';
 
@@ -15,29 +16,55 @@ export type FlowchartImportFileValidation =
         error: string;
     };
 
+export type FlowchartImportFileMessages = {
+    invalidFormat: string;
+    emptyFile: string;
+    invalidSize: string;
+    tooLarge: (params: {
+        filename: string;
+        size: string;
+        limit: string;
+    }) => string;
+};
+
 export const validateFlowchartImportFile = (
     file: File,
-    invalidFormatMessage: string
+    messages: FlowchartImportFileMessages
 ): FlowchartImportFileValidation => {
     const importKind = getDiagramImportKind(file.name);
     if (!importKind) {
         return {
             ok: false,
-            error: invalidFormatMessage,
+            error: messages.invalidFormat,
         };
     }
 
     const isJsonImport = importKind === 'json';
-    const sizeError = getFileSizeLimitError(
-        file,
-        isJsonImport ? FLOWCHART_JSON_IMPORT_MAX_BYTES : FLOWCHART_TEXT_IMPORT_MAX_BYTES,
-        isJsonImport ? 'JSON' : 'text'
-    );
-
-    if (sizeError) {
+    const maxBytes = isJsonImport
+        ? FLOWCHART_JSON_IMPORT_MAX_BYTES
+        : FLOWCHART_TEXT_IMPORT_MAX_BYTES;
+    if (!Number.isFinite(file.size) || file.size < 0) {
         return {
             ok: false,
-            error: sizeError,
+            error: messages.invalidSize,
+        };
+    }
+
+    if (file.size === 0) {
+        return {
+            ok: false,
+            error: messages.emptyFile,
+        };
+    }
+
+    if (file.size > maxBytes) {
+        return {
+            ok: false,
+            error: messages.tooLarge({
+                filename: sanitizeFileNameForDisplay(file.name, isJsonImport ? 'diagram.json' : 'diagram.txt'),
+                size: formatFileSize(file.size),
+                limit: formatFileSize(maxBytes),
+            }),
         };
     }
 

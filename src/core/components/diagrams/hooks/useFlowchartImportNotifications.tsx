@@ -2,7 +2,7 @@ import React, { useCallback, type RefObject } from 'react';
 import { Button } from 'antd';
 import type { NotificationInstance } from 'antd/es/notification/interface';
 
-import type { FlowchartImportStatus } from '../flowchartImportHandler';
+import type { FlowchartImportResult } from '../flowchartImportHandler';
 
 const IMPORT_NOTIFICATION_KEY = 'flowchart-file-import-status';
 type ImportNotificationApi = Pick<NotificationInstance, 'destroy' | 'open'>;
@@ -27,7 +27,7 @@ export const useFlowchartImportNotifications = ({
         });
     }, [notificationApi, t]);
 
-    const handleImportFinished = useCallback(({ status }: { status: FlowchartImportStatus }) => {
+    const handleImportFinished = useCallback(({ status, detail }: FlowchartImportResult) => {
         if (status === 'success') {
             notificationApi.destroy(IMPORT_NOTIFICATION_KEY);
             return;
@@ -40,9 +40,9 @@ export const useFlowchartImportNotifications = ({
             message: t(scopeChanged
                 ? 'designer.flowchart.import.cancelledTitle'
                 : 'designer.flowchart.import.failedTitle'),
-            description: t(scopeChanged
-                ? 'designer.flowchart.import.scopeChanged'
-                : 'designer.flowchart.import.failedDescription'),
+            description: scopeChanged
+                ? t('designer.flowchart.import.scopeChanged')
+                : (detail || t('designer.flowchart.import.failedDescription')),
             duration: scopeChanged ? 8 : 0,
             btn: React.createElement(Button, {
                 onClick: () => {
