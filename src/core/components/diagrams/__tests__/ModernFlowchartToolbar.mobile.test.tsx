@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('react-i18next', () => ({
@@ -176,6 +176,41 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
         expect(onToggleSnap).toHaveBeenCalledTimes(1);
     });
 
+    it('opens the mobile more menu from the keyboard and restores focus on Escape', async () => {
+        render(
+            <ModernFlowchartToolbar
+                canUndo={false}
+                canRedo={false}
+                onUndo={vi.fn()}
+                onRedo={vi.fn()}
+                onZoomIn={vi.fn()}
+                onZoomOut={vi.fn()}
+                onFitView={vi.fn()}
+                autoRouting={false}
+                toggleAutoRouting={vi.fn()}
+                showGrid
+                toggleGrid={vi.fn()}
+                onShowShortcuts={vi.fn()}
+                showRuler={false}
+                toggleRuler={vi.fn()}
+                onImportClick={vi.fn()}
+            />,
+        );
+
+        const trigger = await screen.findByRole('button', { name: /更多操作|moreActions/i });
+        fireEvent.keyDown(trigger, { key: 'Enter' });
+
+        const firstItem = await screen.findByRole('menuitem', { name: /打开本地 JSON|import/i });
+        await waitFor(() => expect(document.activeElement).toBe(firstItem));
+        expect(trigger.getAttribute('aria-expanded')).toBe('true');
+
+        fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+        await waitFor(() => {
+            expect(trigger.getAttribute('aria-expanded')).toBe('false');
+            expect(document.activeElement).toBe(trigger);
+        });
+    });
+
     it('opens the automatic-layout menu by click and runs the selected strategy', async () => {
         const onStrategyLayout = vi.fn();
 
@@ -208,6 +243,35 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
         expect(layoutButton.getAttribute('aria-expanded')).toBe('true');
         fireEvent.click(await screen.findByRole('menuitem', { name: /树形.*上→下/ }));
         expect(onStrategyLayout).toHaveBeenCalledWith('tree', undefined, 'TB');
+    });
+
+    it('opens the automatic-layout menu with ArrowDown and focuses its first action', async () => {
+        render(
+            <ModernFlowchartToolbar
+                canUndo={false}
+                canRedo={false}
+                onUndo={vi.fn()}
+                onRedo={vi.fn()}
+                onZoomIn={vi.fn()}
+                onZoomOut={vi.fn()}
+                onFitView={vi.fn()}
+                autoRouting={false}
+                toggleAutoRouting={vi.fn()}
+                showGrid
+                toggleGrid={vi.fn()}
+                onShowShortcuts={vi.fn()}
+                showRuler={false}
+                toggleRuler={vi.fn()}
+                onStrategyLayout={vi.fn()}
+            />,
+        );
+
+        const trigger = await screen.findByRole('button', { name: /layout\.tooltip|自动布局/i });
+        fireEvent.keyDown(trigger, { key: 'ArrowDown' });
+
+        const firstItem = await screen.findByRole('menuitem', { name: /树形.*上→下/ });
+        await waitFor(() => expect(document.activeElement).toBe(firstItem));
+        expect(trigger.getAttribute('aria-expanded')).toBe('true');
     });
 
     it('provides commercial touch targets and a programmatic routing state', async () => {

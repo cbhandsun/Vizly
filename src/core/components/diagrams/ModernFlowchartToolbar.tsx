@@ -16,6 +16,8 @@ import { clearFlowchartCache } from '../../utils/clearFlowchartCache';
 import { coerceDiagramId, getQueryOrHashParamFromLocation } from '../../utils/inputBoundary';
 import { FlowchartAlignmentTools } from './FlowchartAlignmentTools';
 import { FlowchartCanvasSettingsContent } from './FlowchartCanvasSettingsContent';
+import { DropdownMenuTriggerButton } from './DropdownMenuTriggerButton';
+import { useKeyboardAccessibleDropdown } from './hooks/useKeyboardAccessibleDropdown';
 
 interface FlowchartToolbarProps {
     canUndo: boolean;
@@ -146,7 +148,12 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
     const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
     const [contextPortalTarget, setContextPortalTarget] = useState<HTMLElement | null>(null);
     const [bottomPortalTarget, setBottomPortalTarget] = useState<HTMLElement | null>(null);
-    const [layoutMenuOpen, setLayoutMenuOpen] = useState(false);
+    const layoutDropdown = useKeyboardAccessibleDropdown({
+        overlayClassName: 'flowchart-layout-menu',
+    });
+    const moreDropdown = useKeyboardAccessibleDropdown({
+        overlayClassName: isMobile ? 'flowchart-mobile-more-menu' : 'flowchart-more-menu',
+    });
 
     useEffect(() => {
         const timer = window.setTimeout(() => {
@@ -547,23 +554,27 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
             {!hideLayoutControls && (
                 <>
                     <Dropdown
-                        menu={{ items: layoutMenu, selectedKeys: selectedLayoutKeys, selectable: true }}
+                        menu={{
+                            items: layoutMenu,
+                            selectedKeys: selectedLayoutKeys,
+                            selectable: true,
+                            onKeyDown: layoutDropdown.handleMenuKeyDown,
+                        }}
                         placement="bottom"
                         trigger={['click']}
-                        open={layoutMenuOpen}
-                        onOpenChange={setLayoutMenuOpen}
+                        open={layoutDropdown.open}
+                        onOpenChange={layoutDropdown.handleOpenChange}
+                        overlayClassName="flowchart-layout-menu"
                     >
-                        <Tooltip title={t('designer.flowchart.layout.tooltip')}>
-                            <Button
-                                type="text"
-                                aria-label={t('designer.flowchart.layout.tooltip')}
-                                aria-haspopup="menu"
-                                aria-expanded={layoutMenuOpen}
-                                icon={<FaSitemap size={13} />}
-                                className={tbtn}
-                                style={mobileToolbarButtonStyle}
-                            />
-                        </Tooltip>
+                        <DropdownMenuTriggerButton
+                            ref={layoutDropdown.triggerRef}
+                            ariaLabel={t('designer.flowchart.layout.tooltip')}
+                            open={layoutDropdown.open}
+                            onTriggerKeyDown={layoutDropdown.handleTriggerKeyDown}
+                            icon={<FaSitemap size={13} />}
+                            className={tbtn}
+                            style={mobileToolbarButtonStyle}
+                        />
                     </Dropdown>
                     <Tooltip title={autoRouting ? t('designer.toolbar.autoRouting') + ' ' + onLabel : t('designer.toolbar.autoRouting') + ' ' + offLabel}>
                         <Button
@@ -613,31 +624,45 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                         </Tooltip>
                     </Popover>
 
-                    <Dropdown menu={{ items: moreMenuItems }} placement="bottomRight" trigger={['click']}>
-                        <Tooltip title={t('designer.toolbar.moreActions')}>
-                            <Button type="text" aria-label={t('designer.toolbar.moreActions')} icon={<FaEllipsisH className="text-[13px]" />} className={tbtn} />
-                        </Tooltip>
+                    <Dropdown
+                        menu={{ items: moreMenuItems, onKeyDown: moreDropdown.handleMenuKeyDown }}
+                        placement="bottomRight"
+                        trigger={['click']}
+                        open={moreDropdown.open}
+                        onOpenChange={moreDropdown.handleOpenChange}
+                        overlayClassName="flowchart-more-menu"
+                    >
+                        <DropdownMenuTriggerButton
+                            ref={moreDropdown.triggerRef}
+                            ariaLabel={t('designer.toolbar.moreActions')}
+                            open={moreDropdown.open}
+                            onTriggerKeyDown={moreDropdown.handleTriggerKeyDown}
+                            icon={<FaEllipsisH className="text-[13px]" />}
+                            className={tbtn}
+                        />
                     </Dropdown>
                 </>
             )}
 
             {isMobile && (
                 <Dropdown
-                    menu={{ items: moreMenuItems }}
+                    menu={{ items: moreMenuItems, onKeyDown: moreDropdown.handleMenuKeyDown }}
                     placement="bottomRight"
                     trigger={['click']}
                     autoAdjustOverflow
                     overlayClassName="flowchart-mobile-more-menu"
+                    open={moreDropdown.open}
+                    onOpenChange={moreDropdown.handleOpenChange}
                 >
-                    <Tooltip title={t('designer.toolbar.moreActions')}>
-                        <Button
-                            type="text"
-                            aria-label={t('designer.toolbar.moreActions')}
-                            icon={<FaEllipsisH className="text-[13px]" />}
-                            className={tbtn}
-                            style={mobileToolbarButtonStyle}
-                        />
-                    </Tooltip>
+                    <DropdownMenuTriggerButton
+                        ref={moreDropdown.triggerRef}
+                        ariaLabel={t('designer.toolbar.moreActions')}
+                        open={moreDropdown.open}
+                        onTriggerKeyDown={moreDropdown.handleTriggerKeyDown}
+                        icon={<FaEllipsisH className="text-[13px]" />}
+                        className={tbtn}
+                        style={mobileToolbarButtonStyle}
+                    />
                 </Dropdown>
             )}
 
