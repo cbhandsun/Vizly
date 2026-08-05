@@ -357,7 +357,20 @@ export const useFlowchartDesignerController = ({
     } = useFlowchartCreationTools({
         editingEnabled: !isReadonly && !presentationActive,
         isDrawingMode, isMarqueeActive, isCommentMode,
-        setIsDrawingMode, sÛÍ­¢G§²ÚîÆ­yßpeId: diagramId,
+        setIsDrawingMode, setIsMarqueeActive, setIsCommentMode: setStoredCommentMode,
+        activeLayerId, nodesRef, edgesRef, reactFlowInstance, setNodes, takeSnapshot, t,
+    });
+    
+    // 2.5 Linter Layer (Phase 8 integration)
+    useTopologyLinter(nodes×mm¢G§²ÚîÆ­yÐ    () => nodesRef.current,
+        () => edgesRef.current,
+        setNodes,
+        setEdges,
+        {
+            switchScope: switchHistoryScope,
+            removeScope: removeHistoryScope,
+            clearSelection,
+            scopeId: diagramId,
         },
     );
     const getOperationScope = useDiagramOperationScope(diagramId, multiPage.getPageOperationScope);
