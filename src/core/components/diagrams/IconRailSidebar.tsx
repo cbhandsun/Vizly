@@ -24,7 +24,11 @@ import { createIconRailDrawerStyle } from './iconRailSidebarLayout';
 import type { NodeTemplate } from './hooks/useNodeTemplates';
 import type { LayerConfig } from './hooks/useLayerManagement';
 import type { DataNode } from 'antd/es/tree';
-import { bindIconRailEscapeClose } from './iconRailKeyboard';
+import {
+    bindIconRailEscapeClose,
+    focusIconRailDrawerEntry,
+    trapIconRailDrawerTab,
+} from './iconRailKeyboard';
 import {
     resolveNavigatorNodeLabel,
     resolveNavigatorNodeTypeLabelKey,
@@ -127,6 +131,11 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
         }) ? 'shapes' : null;
     const [activePanel, setActivePanel] = useState<string | null>(initialPanel);
     const autoOpenedEmptyPanelRef = useRef(initialPanel === 'shapes');
+    const drawerRef = useRef<HTMLDivElement>(null);
+    const drawerReturnFocusRef = useRef<HTMLElement | null>(null);
+    const shouldFocusDrawerRef = useRef(false);
+    const drawerId = React.useId();
+    const drawerTitleId = React.useId();
     const [searchTerm, setSearchTerm] = useState('');
     const panelZoom = usePanelZoom({ storageKey: 'designer.sidebar.zoom', defaultScale: 1, minScale: 0.75, maxScale: 1.35 });
 
@@ -232,22 +241,50 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
         document.body.style.userSelect = 'none';
     }, [drawerWidth]);
 
-    const togglePanel = useCallback((panel: string) => {
-        setActivePanel(prev => prev === panel ? null : panel);
+    const closeDrawer = useCallback((restoreFocus = true) => {
+        const returnFocus = restoreFocus ? drawerReturnFocusRef.current : null;
+        drawerReturnFocusRef.current = null;
+        shouldFocusDrawerRef.current = false;
+        setActivePanel(null);
+        if (returnFocus) {
+            window.setTimeout(() => {
+                if (returnFocus.isConnected) returnFocus.focus();
+            }, 0);
+        }
     }, []);
 
-    const closeDrawer = useCallback(() => {
-        setActivePanel(null);
+    const openPanelFromTrigger = useCallback((panel: string, trigger: HTMLElement) => {
+        drawerReturnFocusRef.current = trigger;
+        shouldFocusDrawerRef.current = true;
+        setActivePanel(panel);
     }, []);
+
+    const togglePanel = useCallback((panel: string, trigger: HTMLElement) => {
+        if (activePanel === panel) {
+            closeDrawer();
+            return;
+        }
+        openPanelFromTrigger(panel, trigger);
+    }, [activePanel, closeDrawer, openPanelFromTrigger]);
 
     useEffect(() => {
         if (!requestedPanel) return;
         const timer = window.setTimeout(() => {
-            setActivePanel(resolveIconRailRequestedPanel(requestedPanel));
+            const resolvedPanel = resolveIconRailRequestedPanel(requestedPanel);
+            if (resolvedPanel) {
+                const trigger = document.activeElement;
+                if (trigger instanceof HTMLElement && trigger !== document.body) {
+                    drawerReturnFocusRef.current = trigger;
+                    shouldFocusDrawerRef.current = true;
+                }
+                setActivePanel(resolvedPanel);
+            } else {
+                closeDrawer(false);
+            }
             onRequestedPanelHandled?.();
         }, 0);
         return () => window.clearTimeout(timer);
-    }, [onRequestedPanelHandled, requestedPanel]);
+    }, [closeDrawer, onRequestedPanelHandled, requestedPanel]);
 
     useEffect(() => {
         if (!shouldAutoOpenShapesPanel({
@@ -277,6 +314,17 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
     useEffect(() => {
         onDrawerVisibleChange?.(activePanel !== null);
     }, [activePanel, onDrawerVisibleChange]);
+
+    useEffect(() => {
+        if (!activePanel || !shouldFocusDrawerRef.current) return;
+        const timer = window.setTimeout(() => {
+            const drawer = drawerRef.current;
+            if (!drawer) return;
+            focusIconRailDrawerEntry(drawer);
+            shouldFocusDrawerRef.current = false;
+        }, 0);
+        return () => window.clearTimeout(timer);
+    }, [activePanel]);
 
     // Esc 键关闭 Drawer
     useEffect(() => {
@@ -443,7 +491,10 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
                             className={`icon-rail-btn ${activePanel === btn.key ? 'active' : ''}`}
                             aria-label={btn.label}
                             aria-pressed={activePanel === btn.key}
-                            onClick={() => togglePanel(btn.key)}
+                            aria-haspopup="dialog"
+                            aria-expanded={activePanel === btn.key}
+                            aria-controls={activePanel === btn.key ? drawerId : undefined}
+                            onClick={(event) => togglePanel(btn.key, event.currentTarget)}
                         >
                             {btn.icon}
                         </button>
@@ -459,8 +510,11 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
                         type="button"
                         className={`icon-rail-btn ${activePanel === 'shapes' && searchTerm ? 'active' : ''}`}
                         aria-label={t('designer.sidebar.searchComponents')}
-                        onClick={() => {
-                            if (activePanel !== 'shapes') togglePanel('shapes');
+                        aria-haspopup="dialog"
+                        aria-expanded={activePanel === 'shapes'}
+                        aria-controls={activePanel === 'shapes' ? drawerId : undefined}
+                        onClick={(event) => {
+                            if (activePanel !== 'shapes') openPanelFromTrigger('shapes', event.currentTarget);
                             // Focus the search input after panel opens
                         }}
                     >
@@ -473,13 +527,22 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
             {activePanel && (
                 <>
                     {/* 透明遮罩，点击关闭 */}
-                    <div className="side-drawer-backdrop" onClick={closeDrawer} />
+                    <div className="side-drawer-backdrop" onClick={() => closeDrawer()} />
                     <div 
+                        id={drawerId}
+                        ref={drawerRef}
                         className={`side-drawer ${isMobile ? 'mobile-drawer' : ''}`} 
                         style={createIconRailDrawerStyle(isMobile, drawerWidth)}
+                        role="dialog"
+                        aria-modal={isMobile || undefined}
+                        aria-labelledby={drawerTitleId}
+                        tabIndex={-1}
+                        onKeyDown={(event) => {
+                            if (isMobile) trapIconRailDrawerTab(event, event.currentTarget);
+                        }}
                     >
                         <div className="side-drawer-header">
-                            <div className="side-drawer-header-title">
+                            <div id={drawerTitleId} className="side-drawer-header-title">
                                 {getDrawerTitle()}
                             </div>
                             <Flex align="center" gap={4}>
@@ -535,8 +598,9 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
                                     type="text"
                                     size="small"
                                     aria-label={t('common.close', '关闭')}
+                                    data-icon-rail-initial-focus="true"
                                     icon={<FaTimes />}
-                                    onClick={closeDrawer}
+                                    onClick={() => closeDrawer()}
                                 />
                             </Flex>
                         </div>

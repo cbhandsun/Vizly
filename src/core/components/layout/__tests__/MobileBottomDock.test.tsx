@@ -14,11 +14,12 @@ vi.mock('react-i18next', () => ({
 describe('MobileBottomDock', () => {
     it('exposes named mobile actions and keeps disabled history controls inert', () => {
         const onAddClick = vi.fn();
+        const onLayerClick = vi.fn();
         render(
             <MobileBottomDock
                 onAddClick={onAddClick}
                 onPropertyClick={vi.fn()}
-                onLayerClick={vi.fn()}
+                onLayerClick={onLayerClick}
                 onSettingsClick={vi.fn()}
                 onAiClick={vi.fn()}
                 onUndo={vi.fn()}
@@ -33,7 +34,10 @@ describe('MobileBottomDock', () => {
         fireEvent.click(screen.getByRole('button', { name: '添加组件' }));
         expect(onAddClick).toHaveBeenCalledTimes(1);
         expect(screen.getByRole('button', { name: '属性（已选择 {{count}} 项）' }).getAttribute('aria-pressed')).toBe('true');
-        expect(screen.getByRole('button', { name: '图层' })).toBeTruthy();
+        const layerButton = screen.getByRole('button', { name: '图层' });
+        expect(layerButton.getAttribute('aria-haspopup')).toBe('dialog');
+        fireEvent.click(layerButton);
+        expect(onLayerClick).toHaveBeenCalledTimes(1);
         expect(screen.getByRole('button', { name: 'AI 助手' })).toBeTruthy();
         expect((screen.getByRole('button', { name: '撤销' }) as HTMLButtonElement).disabled).toBe(true);
         expect((screen.getByRole('button', { name: '重做' }) as HTMLButtonElement).disabled).toBe(true);

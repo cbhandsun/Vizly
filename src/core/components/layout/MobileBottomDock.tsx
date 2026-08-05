@@ -81,6 +81,7 @@ export const MobileBottomDock: React.FC<MobileBottomDockProps> = ({
                         className="mobile-dock-btn"
                         onClick={onLayerClick}
                         aria-label={t('designer.mobileDock.layers', '图层')}
+                        aria-haspopup="dialog"
                     >
                         <FaLayerGroup />
                         <span className="dock-label">{t('designer.mobileDock.layers', '图层')}</span>
