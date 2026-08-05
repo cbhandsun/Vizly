@@ -31,8 +31,8 @@ interface HoverToolbarsOverlayProps {
     handleUngroupWithToast: (targetId?: string) => void;
     handleLock: (target?: DiagramActionTarget, locked?: boolean) => void;
     handleOpacity: (opacity: number) => void;
-    handleBringToFront: (id?: string) => void;
-    handleSendToBack: (id?: string) => void;
+    handleBringToFront: (target?: DiagramActionTarget) => void;
+    handleSendToBack: (target?: DiagramActionTarget) => void;
     copyStyle: (node: Node) => void;
     pasteStyle: (ids: string[]) => void;
     hasCopiedStyle: boolean;
@@ -137,8 +137,8 @@ export const HoverToolbarsOverlay: React.FC<HoverToolbarsOverlayProps> = ({
 
                     onLock={(locked) => handleLock(selectedNodeIds, locked)}
                     onOpacity={handleOpacity}
-                    onBringToFront={() => handleBringToFront(selectedNodes[0]?.id)}
-                    onSendToBack={() => handleSendToBack(selectedNodes[0]?.id)}
+                    onBringToFront={() => handleBringToFront(selectedNodeIds)}
+                    onSendToBack={() => handleSendToBack(selectedNodeIds)}
                     onUpdateStyle={(style) => {
                         updateNodesBatch(selectedNodes.map((node) => node.id), { style });
                     }}

@@ -225,4 +225,78 @@ describe('useDiagramActions explicit selection targets', () => {
         act(() => result.current.handleLock(['node-1', 'node-2'], false));
         expect(takeSnapshot).toHaveBeenCalledTimes(2);
     });
+
+    it('moves every explicit layer target in one history step', () => {
+        const initialNodes = [
+            node('parent-a'),
+            node('parent-b'),
+            { ...node('a-1'), parentId: 'parent-a' },
+            { ...node('a-2'), parentId: 'parent-a' },
+            { ...node('b-1'), parentId: 'parent-b' },
+            { ...node('b-2'), parentId: 'parent-b' },
+        ];
+        const nodesRef = { current: initialNodes };
+        let currentNodes = initialNodes;
+        const setNodes = vi.fn((update: SetStateAction<Node[]>) => {
+            currentNodes = typeof update === 'function' ? update(currentNodes) : update;
+        });
+        const takeSnapshot = vi.fn();
+
+        const { result } = renderHook(() => useDiagramActions({
+            nodes: [],
+            edges: [],
+            nodesRef,
+            edgesRef: { current: [] },
+            setNodes,
+            setEdges: vi.fn(),
+            selectedNodes: [],
+            selectedEdges: [],
+            takeSnapshot,
+            reactFlowInstance: null,
+        }));
+
+        act(() => result.current.handleBringToFront(['a-1', 'b-1']));
+
+        expect(currentNodes.map(item => item.id)).toEqual([
+            'parent-a',
+            'parent-b',
+            'a-2',
+            'a-1',
+            'b-2',
+            'b-1',
+        ]);
+        expect(nodesRef.current).toBe(currentNodes);
+        expect(takeSnapshot).toHaveBeenCalledTimes(1);
+        expect(takeSnapshot).toHaveBeenCalledWith(initialNodes, []);
+    });
+
+    it('blocks a batch layer action when any target is protected', () => {
+        const unlocked = node('node-1');
+        const locked = {
+            ...node('node-2'),
+            draggable: false,
+            data: { label: 'node-2', locked: true },
+        };
+        const initialNodes = [unlocked, locked, node('node-3')];
+        const setNodes = vi.fn();
+        const takeSnapshot = vi.fn();
+
+        const { result } = renderHook(() => useDiagramActions({
+            nodes: [],
+            edges: [],
+            nodesRef: { current: initialNodes },
+            edgesRef: { current: [] },
+            setNodes,
+            setEdges: vi.fn(),
+            selectedNodes: [],
+            selectedEdges: [],
+            takeSnapshot,
+            reactFlowInstance: null,
+        }));
+
+        act(() => result.current.handleSendToBack(['node-2', 'node-3']));
+
+        expect(takeSnapshot).not.toHaveBeenCalled();
+        expect(setNodes).not.toHaveBeenCalled();
+    });
 });

@@ -3,7 +3,8 @@ import { Node, Edge, ReactFlowInstance } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import { PluginContext, DiagramTypePlugin } from '../../../types/plugin';
 import { useDiagramStore } from '../../../store/useDiagramStore';
-import { hasMutationLockedNode, isNodeMutationLocked, resolveTargetNodes } from '../nodeLockPolicy';
+import { hasMutationLockedNode, resolveTargetNodes } from '../nodeLockPolicy';
+import { reorderNodesWithinParentScopes } from './nodeLayerOrdering';
 
 type AlignmentType = 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom';
 type DistributionType = 'horizontal' | 'vertical';
@@ -187,31 +188,37 @@ export const useDiagramActions = ({
         setNodes(nds => [...nds.map(n => ({ ...n, selected: false })), ...newNodes]);
     }, [nodes, edges, nodesRef, edgesRef, selectedNodes, setNodes, takeSnapshot, t]);
 
-    const handleBringToFront = useCallback((targetId?: string) => {
-        if (!targetId) return;
+    const handleBringToFront = useCallback((target?: DiagramActionTarget) => {
         const currentNodes = nodesRef?.current ?? nodes;
         const currentEdges = edgesRef?.current ?? edges;
-        if (currentNodes.some(node => node.id === targetId && isNodeMutationLocked(node))) return;
-        takeSnapshot(currentNodes, currentEdges);
-        setNodes(nds => {
-            const node = nds.find(n => n.id === targetId);
-            if (!node) return nds;
-            return [...nds.filter(n => n.id !== targetId), node];
-        });
-    }, [nodes, edges, nodesRef, edgesRef, setNodes, takeSnapshot]);
+        const targetIds = target
+            ? toTargetIds(target)
+            : new Set(selectedNodes.map(node => node.id));
+        const targetNodes = resolveTargetNodes(currentNodes, targetIds);
+        if (targetNodes.length === 0 || hasMutationLockedNode(targetNodes)) return;
 
-    const handleSendToBack = useCallback((targetId?: string) => {
-        if (!targetId) return;
+        const result = reorderNodesWithinParentScopes(currentNodes, targetIds, 'front');
+        if (!result.changed) return;
+        takeSnapshot(currentNodes, currentEdges);
+        if (nodesRef) nodesRef.current = result.nodes;
+        setNodes(result.nodes);
+    }, [nodes, edges, nodesRef, edgesRef, selectedNodes, setNodes, takeSnapshot]);
+
+    const handleSendToBack = useCallback((target?: DiagramActionTarget) => {
         const currentNodes = nodesRef?.current ?? nodes;
         const currentEdges = edgesRef?.current ?? edges;
-        if (currentNodes.some(node => node.id === targetId && isNodeMutationLocked(node))) return;
+        const targetIds = target
+            ? toTargetIds(target)
+            : new Set(selectedNodes.map(node => node.id));
+        const targetNodes = resolveTargetNodes(currentNodes, targetIds);
+        if (targetNodes.length === 0 || hasMutationLockedNode(targetNodes)) return;
+
+        const result = reorderNodesWithinParentScopes(currentNodes, targetIds, 'back');
+        if (!result.changed) return;
         takeSnapshot(currentNodes, currentEdges);
-        setNodes(nds => {
-            const node = nds.find(n => n.id === targetId);
-            if (!node) return nds;
-            return [node, ...nds.filter(n => n.id !== targetId)];
-        });
-    }, [nodes, edges, nodesRef, edgesRef, setNodes, takeSnapshot]);
+        if (nodesRef) nodesRef.current = result.nodes;
+        setNodes(result.nodes);
+    }, [nodes, edges, nodesRef, edgesRef, selectedNodes, setNodes, takeSnapshot]);
 
     const handleLock = useCallback((target?: DiagramActionTarget, locked: boolean = true) => {
         const targetIds = target ? toTargetIds(target) : new Set(selectedNodes.map(node => node.id));
