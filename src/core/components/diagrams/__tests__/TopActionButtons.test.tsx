@@ -8,6 +8,8 @@ vi.mock('react-i18next', () => ({
     useTranslation: () => ({
         t: (key: string, fallback?: string) => fallback ?? ({
             'designer.toolbar.documentActions': '文档操作',
+            'designer.toolbar.saveOptions': '保存选项',
+            'designer.toolbar.saveToCloud': '保存到云端',
             'designer.toolbar.presentationMode': '演示模式',
             'designer.toolbar.pluginManager': '插件管理',
             'designer.toolbar.commentMode': '评论模式',
@@ -68,6 +70,31 @@ describe('TopActionButtons document menu', () => {
         expect(trigger.getAttribute('aria-expanded')).toBe('true');
 
         fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+        await waitFor(() => {
+            expect(trigger.getAttribute('aria-expanded')).toBe('false');
+            expect(document.activeElement).toBe(trigger);
+        });
+    });
+
+    it('opens save options from the keyboard and runs the focused item with Space', async () => {
+        const onSaveToCloud = vi.fn().mockResolvedValue(undefined);
+        render(
+            <TopActionButtons
+                disablePortal
+                onSaveToCloud={onSaveToCloud}
+            />,
+        );
+
+        const trigger = screen.getByRole('button', { name: '保存选项' });
+        fireEvent.keyDown(trigger, { key: 'Enter' });
+
+        const saveItem = await screen.findByRole('menuitem', { name: '保存到云端' });
+        await waitFor(() => expect(document.activeElement).toBe(saveItem));
+        expect(trigger.getAttribute('aria-expanded')).toBe('true');
+
+        fireEvent.keyDown(saveItem, { key: ' ' });
+
+        expect(onSaveToCloud).toHaveBeenCalledTimes(1);
         await waitFor(() => {
             expect(trigger.getAttribute('aria-expanded')).toBe('false');
             expect(document.activeElement).toBe(trigger);

@@ -17,6 +17,10 @@ import {
     shouldCloseDocumentMenuFromKey,
     shouldOpenDocumentMenuFromKey,
 } from './documentMenuKeyboard';
+import { DropdownMenuTriggerButton } from './DropdownMenuTriggerButton';
+import { useKeyboardAccessibleDropdown } from './hooks/useKeyboardAccessibleDropdown';
+
+const SAVE_MENU_OVERLAY_CLASS = 'vizly-save-actions-menu';
 
 const AdvancedExportModal = React.lazy(() => import('./ui/AdvancedExportModal').then(module => ({
     default: module.AdvancedExportModal,
@@ -307,6 +311,16 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
         }] : []),
     ], [isDirectSaveDisabled, onDirectSave, onSaveToCloud, t]);
 
+    const {
+        open: saveMenuOpen,
+        triggerRef: saveMenuButtonRef,
+        handleMenuKeyDown: handleSaveMenuKeyDown,
+        handleOpenChange: handleSaveMenuOpenChange,
+        handleTriggerKeyDown: handleSaveMenuButtonKeyDown,
+    } = useKeyboardAccessibleDropdown({
+        overlayClassName: SAVE_MENU_OVERLAY_CLASS,
+    });
+
     const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
     const [contextPortalTarget, setContextPortalTarget] = useState<HTMLElement | null>(null);
 
@@ -331,15 +345,22 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
     const content = (
         <div className="flex items-center gap-0.5">
             {saveMenu.length > 0 && (
-                <Dropdown menu={{ items: saveMenu }} placement="bottomRight" trigger={['click']}>
-                    <Tooltip title={t('designer.toolbar.saveOptions')}>
-                        <Button
-                            type="text"
-                            aria-label={t('designer.toolbar.saveOptions')}
-                            icon={<FaSave className="text-[13px]" />}
-                            className={tbtn}
-                        />
-                    </Tooltip>
+                <Dropdown
+                    menu={{ items: saveMenu, onKeyDown: handleSaveMenuKeyDown }}
+                    placement="bottomRight"
+                    trigger={['click']}
+                    open={saveMenuOpen}
+                    onOpenChange={handleSaveMenuOpenChange}
+                    overlayClassName={SAVE_MENU_OVERLAY_CLASS}
+                >
+                    <DropdownMenuTriggerButton
+                        ref={saveMenuButtonRef}
+                        ariaLabel={t('designer.toolbar.saveOptions')}
+                        open={saveMenuOpen}
+                        onTriggerKeyDown={handleSaveMenuButtonKeyDown}
+                        icon={<FaSave className="text-[13px]" />}
+                        className={tbtn}
+                    />
                 </Dropdown>
             )}
 
