@@ -21,6 +21,7 @@ interface WorkspaceGlobalHeaderProps {
   onClearSearch: () => void;
   onNavigateHome: () => void;
   settingsMenu: MenuProps['items'];
+  settingsTriggerRef?: RefObject<HTMLButtonElement | null>;
   isAuthenticated: boolean;
   avatarUrl?: string;
 }
@@ -33,13 +34,15 @@ export const WorkspaceGlobalHeader = ({
   onClearSearch,
   onNavigateHome,
   settingsMenu,
+  settingsTriggerRef: externalSettingsTriggerRef,
   isAuthenticated,
   avatarUrl,
 }: WorkspaceGlobalHeaderProps) => {
   const { t } = useTranslation();
   const [theme, setTheme] = useTheme();
   const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
-  const settingsTriggerRef = useRef<HTMLButtonElement>(null);
+  const internalSettingsTriggerRef = useRef<HTMLButtonElement>(null);
+  const settingsTriggerRef = externalSettingsTriggerRef ?? internalSettingsTriggerRef;
   const restoreSettingsFocusRef = useRef(false);
   const search = getWorkspaceSearchFeedback(searchTerm, searchResultCount);
   const searchStatus = search.isActive

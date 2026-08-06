@@ -359,6 +359,18 @@ describe('workspace menu interaction model', () => {
     expect(focusWorkspaceTarget(preferred, fallback)).toBe(true);
     expect(document.activeElement).toBe(fallback);
   });
+
+  it('uses the fallback when a connected preferred target cannot receive focus', () => {
+    const preferred = document.createElement('button');
+    const fallback = document.createElement('main');
+    fallback.tabIndex = -1;
+    document.body.append(preferred, fallback);
+    preferred.focus = vi.fn();
+
+    expect(focusWorkspaceTarget(preferred, fallback)).toBe(true);
+    expect(preferred.focus).toHaveBeenCalledOnce();
+    expect(document.activeElement).toBe(fallback);
+  });
 });
 
 const createDeleteOptions = (

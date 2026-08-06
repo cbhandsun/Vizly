@@ -49,12 +49,13 @@ export const focusWorkspaceTarget = (
   preferred: HTMLElement | null | undefined,
   fallback?: HTMLElement | null,
 ): boolean => {
-  const target = preferred?.isConnected
-    ? preferred
-    : fallback?.isConnected
-      ? fallback
-      : null;
-  if (!target) return false;
-  target.focus({ preventScroll: true });
-  return document.activeElement === target;
+  const focusConnectedTarget = (target: HTMLElement | null | undefined): boolean => {
+    if (!target?.isConnected) return false;
+    target.focus({ preventScroll: true });
+    return document.activeElement === target;
+  };
+
+  if (focusConnectedTarget(preferred)) return true;
+  if (fallback === preferred) return false;
+  return focusConnectedTarget(fallback);
 };
