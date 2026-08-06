@@ -98,6 +98,22 @@ describe('useKeyboardAccessibleDropdown', () => {
         expect(trigger.getAttribute('aria-expanded')).toBe('true');
     });
 
+    it('moves focus into a pointer-opened menu and restores the trigger after Escape', async () => {
+        render(<Harness />);
+        const trigger = screen.getByRole('button', { name: '操作' });
+
+        fireEvent.click(trigger);
+
+        const firstItem = await screen.findByRole('menuitem', { name: '第一项' });
+        await waitFor(() => expect(document.activeElement).toBe(firstItem));
+
+        fireEvent.keyDown(firstItem, { key: 'Escape' });
+        await waitFor(() => {
+            expect(screen.queryByRole('menu')).toBeNull();
+            expect(document.activeElement).toBe(trigger);
+        });
+    });
+
     it('prepares dynamic menu state before keyboard and pointer opening', () => {
         const onBeforeOpen = vi.fn();
         render(<Harness onBeforeOpen={onBeforeOpen} />);

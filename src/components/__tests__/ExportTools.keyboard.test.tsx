@@ -128,6 +128,29 @@ describe('ExportTools keyboard menu', () => {
     });
   });
 
+  it('moves focus into a pointer-opened menu and closes it with Escape', async () => {
+    render(
+      <ExportTools
+        diagramId="diagram-1"
+        diagramName="Diagram"
+        showControls={false}
+        variant="compact"
+      />,
+    );
+
+    const trigger = screen.getByRole('button', { name: '导出' });
+    fireEvent.click(trigger);
+
+    const firstItem = await screen.findByRole('menuitem', { name: 'PNG 图片' });
+    await waitFor(() => expect(document.activeElement).toBe(firstItem));
+
+    fireEvent.keyDown(firstItem, { key: 'Escape' });
+    await waitFor(() => {
+      expect(trigger.getAttribute('aria-expanded')).toBe('false');
+      expect(document.activeElement).toBe(trigger);
+    });
+  });
+
   it('announces an active export as a polite busy status', async () => {
     render(
       <ExportTools

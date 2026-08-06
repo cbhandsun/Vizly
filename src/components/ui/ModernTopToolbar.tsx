@@ -41,6 +41,7 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
   const [isMoreOpen, setIsMoreOpen] = useState(false);
   const [isDiagramSwitcherOpen, setIsDiagramSwitcherOpen] = useState(false);
   const moreTriggerRef = useRef<HTMLButtonElement>(null);
+  const moreContentRef = useRef<HTMLDivElement>(null);
   const diagramSwitcherTriggerRef = useRef<HTMLButtonElement>(null);
   const diagramSwitcherContentRef = useRef<HTMLDivElement>(null);
   const morePopoverInstanceId = React.useId().replace(/[^a-zA-Z0-9_-]/g, '');
@@ -74,6 +75,15 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
     closeMoreAndRestoreFocus();
   }, [closeMoreAndRestoreFocus]);
 
+  const handleMoreAfterOpenChange = useCallback((open: boolean) => {
+    if (!open) return;
+
+    const focusTarget = moreContentRef.current?.querySelector<HTMLElement>(
+      '[role="combobox"], input, select, button, [tabindex]:not([tabindex="-1"])',
+    );
+    focusTarget?.focus();
+  }, []);
+
   const closeDiagramSwitcherAndRestoreFocus = useCallback(() => {
     setIsDiagramSwitcherOpen(false);
     window.requestAnimationFrame(() => diagramSwitcherTriggerRef.current?.focus());
@@ -103,6 +113,7 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
   /* ── Menu Content ── */
   const moreContent = useMemo(() => (
     <div
+      ref={moreContentRef}
       id={morePopoverId}
       role="dialog"
       aria-label={moreSettingsLabel}
@@ -287,6 +298,7 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
               placement="bottomRight"
               open={isMoreOpen}
               onOpenChange={setIsMoreOpen}
+              afterOpenChange={handleMoreAfterOpenChange}
             >
               <button
                 ref={moreTriggerRef}

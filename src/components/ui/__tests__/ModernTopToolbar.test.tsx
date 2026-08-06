@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const breakpointState = vi.hoisted(() => ({ md: false }));
@@ -11,10 +11,30 @@ vi.mock('antd', () => ({
   Grid: {
     useBreakpoint: () => breakpointState,
   },
-  Popover: ({ children, content }: { children: React.ReactNode; content?: React.ReactNode }) => (
+  Popover: ({
+    children,
+    content,
+    open = false,
+    onOpenChange,
+    afterOpenChange,
+  }: {
+    children: React.ReactNode;
+    content?: React.ReactNode;
+    open?: boolean;
+    onOpenChange?: (open: boolean) => void;
+    afterOpenChange?: (open: boolean) => void;
+  }) => (
     <>
-      {children}
-      {content}
+      <div
+        onClick={() => {
+          const nextOpen = !open;
+          onOpenChange?.(nextOpen);
+          window.setTimeout(() => afterOpenChange?.(nextOpen), 0);
+        }}
+      >
+        {children}
+      </div>
+      {open ? content : null}
     </>
   ),
   Select: ({ 'aria-label': ariaLabel }: { 'aria-label'?: string }) => <select aria-label={ariaLabel} />,
@@ -68,7 +88,12 @@ const renderToolbar = () => render(
 
 describe('ModernTopToolbar responsive layout', () => {
   beforeEach(() => {
+    vi.restoreAllMocks();
     commandOpenState.setOpen.mockClear();
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      callback(0);
+      return 1;
+    });
   });
 
   it('moves the main canvas tools to a second row on mobile', () => {
@@ -96,17 +121,18 @@ describe('ModernTopToolbar responsive layout', () => {
     expect(screen.getByTestId('export-tools').getAttribute('data-show-controls')).toBe('true');
   });
 
-  it('exposes diagram switching and command search as keyboard-operable controls', () => {
+  it('exposes diagram switching and command search as keyboard-operable controls', async () => {
     breakpointState.md = true;
     renderToolbar();
 
     const diagramSwitcher = screen.getByRole('button', { name: '切换图表：Untitled flowchart' });
     expect(diagramSwitcher.getAttribute('aria-haspopup')).toBe('dialog');
     expect(diagramSwitcher.getAttribute('aria-expanded')).toBe('false');
-    expect(screen.getByRole('dialog', { name: '切换图表：Untitled flowchart' })).toBeTruthy();
-    expect(screen.getByRole('textbox', { name: '筛选图表' })).toBeTruthy();
+    expect(screen.queryByRole('dialog', { name: '切换图表：Untitled flowchart' })).toBeNull();
     fireEvent.click(diagramSwitcher);
     expect(diagramSwitcher.getAttribute('aria-expanded')).toBe('true');
+    expect(await screen.findByRole('dialog', { name: '切换图表：Untitled flowchart' })).toBeTruthy();
+    expect(screen.getByRole('textbox', { name: '筛选图表' })).toBeTruthy();
 
     const commandSearch = screen.getByRole('button', { name: '打开命令搜索' });
     expect(commandSearch.getAttribute('aria-haspopup')).toBe('dialog');
@@ -115,15 +141,26 @@ describe('ModernTopToolbar responsive layout', () => {
     expect(commandOpenState.setOpen).toHaveBeenCalledWith(true);
   });
 
-  it('exposes the system settings trigger and its fields to assistive technology', () => {
+  it('moves focus into system settings and restores it after Escape', async () => {
     breakpointState.md = false;
     renderToolbar();
 
     const trigger = screen.getByRole('button', { name: '设置：连线模式、语言' });
     expect(trigger.getAttribute('aria-haspopup')).toBe('dialog');
     expect(trigger.getAttribute('aria-expanded')).toBe('false');
-    expect(screen.getByRole('dialog', { name: '设置：连线模式、语言' })).toBeTruthy();
-    expect(screen.getByRole('combobox', { name: '连线模式' })).toBeTruthy();
+    expect(screen.queryByRole('dialog', { name: '设置：连线模式、语言' })).toBeNull();
+
+    fireEvent.click(trigger);
+
+    expect(await screen.findByRole('dialog', { name: '设置：连线模式、语言' })).toBeTruthy();
+    const edgeMode = screen.getByRole('combobox', { name: '连线模式' });
     expect(screen.getByRole('combobox', { name: '语言 / Language' })).toBeTruthy();
+    await waitFor(() => expect(document.activeElement).toBe(edgeMode));
+
+    fireEvent.keyDown(edgeMode, { key: 'Escape' });
+    await waitFor(() => {
+      expect(trigger.getAttribute('aria-expanded')).toBe('false');
+      expect(document.activeElement).toBe(trigger);
+    });
   });
 });

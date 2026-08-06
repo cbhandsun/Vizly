@@ -99,10 +99,13 @@ export const useKeyboardAccessibleDropdown = ({
     }, []);
 
     const handleOpenChange = useCallback((nextOpen: boolean, info?: DropdownOpenChangeInfo) => {
-        if (nextOpen) onBeforeOpen?.();
+        if (nextOpen) {
+            onBeforeOpen?.();
+            focusFirstItem();
+        }
         setOpen(nextOpen);
         if (!nextOpen && info?.source === 'menu') restoreTriggerFocusIfLost();
-    }, [onBeforeOpen, restoreTriggerFocusIfLost]);
+    }, [focusFirstItem, onBeforeOpen, restoreTriggerFocusIfLost]);
 
     return {
         open,
