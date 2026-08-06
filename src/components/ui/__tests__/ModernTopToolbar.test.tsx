@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 
 import React from 'react';
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const breakpointState = vi.hoisted(() => ({ md: false }));
+const commandOpenState = vi.hoisted(() => ({ setOpen: vi.fn() }));
 
 vi.mock('antd', () => ({
   Grid: {
@@ -59,11 +60,17 @@ const renderToolbar = () => render(
     onRenameDiagram={async () => undefined}
     edgeMode="native"
     onEdgeModeChange={() => undefined}
+    leftChildren={<input aria-label="筛选图表" />}
     centerChildren={<button type="button">center</button>}
+    setIsCommandOpen={commandOpenState.setOpen}
   />,
 );
 
 describe('ModernTopToolbar responsive layout', () => {
+  beforeEach(() => {
+    commandOpenState.setOpen.mockClear();
+  });
+
   it('moves the main canvas tools to a second row on mobile', () => {
     breakpointState.md = false;
     const { container } = renderToolbar();
@@ -74,6 +81,8 @@ describe('ModernTopToolbar responsive layout', () => {
     expect(centerSection?.className).toContain('top-[48px]');
     expect(screen.getByTestId('export-tools').getAttribute('data-show-controls')).toBe('false');
     expect(screen.getByRole('button', { name: 'rename-title' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: '切换图表：Untitled flowchart' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: '打开命令搜索' })).toBeNull();
   });
 
   it('keeps the main canvas tools inline on desktop', () => {
@@ -85,6 +94,25 @@ describe('ModernTopToolbar responsive layout', () => {
     expect(centerSection?.className).not.toContain('absolute');
     expect(centerSection?.className).toContain('flex-1');
     expect(screen.getByTestId('export-tools').getAttribute('data-show-controls')).toBe('true');
+  });
+
+  it('exposes diagram switching and command search as keyboard-operable controls', () => {
+    breakpointState.md = true;
+    renderToolbar();
+
+    const diagramSwitcher = screen.getByRole('button', { name: '切换图表：Untitled flowchart' });
+    expect(diagramSwitcher.getAttribute('aria-haspopup')).toBe('dialog');
+    expect(diagramSwitcher.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.getByRole('dialog', { name: '切换图表：Untitled flowchart' })).toBeTruthy();
+    expect(screen.getByRole('textbox', { name: '筛选图表' })).toBeTruthy();
+    fireEvent.click(diagramSwitcher);
+    expect(diagramSwitcher.getAttribute('aria-expanded')).toBe('true');
+
+    const commandSearch = screen.getByRole('button', { name: '打开命令搜索' });
+    expect(commandSearch.getAttribute('aria-haspopup')).toBe('dialog');
+    expect(commandSearch.getAttribute('aria-keyshortcuts')).toBe('Control+K');
+    fireEvent.click(commandSearch);
+    expect(commandOpenState.setOpen).toHaveBeenCalledWith(true);
   });
 
   it('exposes the system settings trigger and its fields to assistive technology', () => {

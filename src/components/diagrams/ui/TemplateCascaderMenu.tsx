@@ -21,6 +21,7 @@ export interface TemplateCascaderMenuProps {
   allowClear?: boolean;
   templatesOnly?: boolean;
   children?: React.ReactElement;
+  ariaLabel?: string;
 }
 
 interface CascaderOption extends DefaultOptionType {
@@ -36,7 +37,8 @@ export const TemplateCascaderMenu: React.FC<TemplateCascaderMenuProps> = ({
   placeholder = "搜索或选择图表...",
   allowClear = true,
   templatesOnly = false,
-  children
+  children,
+  ariaLabel = '搜索或选择图表',
 }) => {
   const { s3Diagrams, supabaseDiagrams, systemTemplates, fetchCloudList } = useDiagramStorage();
   const hasFetchedCloudListRef = React.useRef(false);
@@ -124,6 +126,7 @@ export const TemplateCascaderMenu: React.FC<TemplateCascaderMenuProps> = ({
 
   return (
     <Cascader
+      aria-label={ariaLabel}
       key={cascaderKey}
       onOpenChange={(visible) => {
         if (visible && !hasFetchedCloudListRef.current) {

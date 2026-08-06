@@ -39,9 +39,14 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
   const { t } = useTranslation();
   const screens = Grid.useBreakpoint();
   const [isMoreOpen, setIsMoreOpen] = useState(false);
+  const [isDiagramSwitcherOpen, setIsDiagramSwitcherOpen] = useState(false);
   const moreTriggerRef = useRef<HTMLButtonElement>(null);
+  const diagramSwitcherTriggerRef = useRef<HTMLButtonElement>(null);
+  const diagramSwitcherContentRef = useRef<HTMLDivElement>(null);
   const morePopoverInstanceId = React.useId().replace(/[^a-zA-Z0-9_-]/g, '');
+  const diagramSwitcherInstanceId = React.useId().replace(/[^a-zA-Z0-9_-]/g, '');
   const morePopoverId = `toolbar-system-settings-${morePopoverInstanceId}`;
+  const diagramSwitcherId = `toolbar-diagram-switcher-${diagramSwitcherInstanceId}`;
   
   // Responsive flags
   const isMobile = !screens.md;  // < 768px
@@ -51,6 +56,10 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
 
   const islandBaseClass = "flex items-center h-[40px] bg-white dark:bg-[#2d2d2d] border border-[rgba(0,0,0,0.12)] dark:border-[rgba(255,255,255,0.12)] rounded-[10px] shadow-[0_2px_8px_rgba(0,0,0,0.08)] transition-all duration-200 pointer-events-auto";
   const moreSettingsLabel = `${t('common.settings', '设置')}：${t('header.edgeMode', '连线模式')}、${t('common.language', '语言')}`;
+  const diagramSwitcherLabel = title
+    ? `${t('diagramViewer.switchDiagram', '切换图表')}：${title}`
+    : t('diagramViewer.switchDiagram', '切换图表');
+  const commandSearchLabel = t('commandPalette.open', '打开命令搜索');
 
   const closeMoreAndRestoreFocus = useCallback(() => {
     setIsMoreOpen(false);
@@ -64,6 +73,32 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
     event.stopPropagation();
     closeMoreAndRestoreFocus();
   }, [closeMoreAndRestoreFocus]);
+
+  const closeDiagramSwitcherAndRestoreFocus = useCallback(() => {
+    setIsDiagramSwitcherOpen(false);
+    window.requestAnimationFrame(() => diagramSwitcherTriggerRef.current?.focus());
+  }, []);
+
+  const handleDiagramSwitcherOpenChange = useCallback((open: boolean) => {
+    setIsDiagramSwitcherOpen(open);
+  }, []);
+
+  const handleDiagramSwitcherAfterOpenChange = useCallback((open: boolean) => {
+    if (!open) return;
+
+    const focusTarget = diagramSwitcherContentRef.current?.querySelector<HTMLElement>(
+      '[role="combobox"], input, button, [tabindex]:not([tabindex="-1"])',
+    );
+    focusTarget?.focus();
+  }, []);
+
+  const handleDiagramSwitcherKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'Escape') return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    closeDiagramSwitcherAndRestoreFocus();
+  }, [closeDiagramSwitcherAndRestoreFocus]);
 
   /* ── Menu Content ── */
   const moreContent = useMemo(() => (
@@ -135,7 +170,14 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
               <RightOutlined className="text-[10px] text-slate-300 dark:text-slate-600 mx-1.5 flex-shrink-0" />
               <Popover
                 content={
-                  <div className="w-[360px] p-1">
+                  <div
+                    ref={diagramSwitcherContentRef}
+                    id={diagramSwitcherId}
+                    role="dialog"
+                    aria-label={diagramSwitcherLabel}
+                    className="w-[360px] max-w-[calc(100vw-24px)] p-1"
+                    onKeyDown={handleDiagramSwitcherKeyDown}
+                  >
                     <div className="px-3 py-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 dark:border-white/5 mb-2 flex items-center justify-between">
                       <span>{t('diagramViewer.switchDiagram', '切换图表')}</span>
                     </div>
@@ -144,14 +186,26 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
                 }
                 trigger="click"
                 placement="bottomLeft"
+                open={isDiagramSwitcherOpen}
+                onOpenChange={handleDiagramSwitcherOpenChange}
+                afterOpenChange={handleDiagramSwitcherAfterOpenChange}
               >
                 <Tooltip title={t('diagramViewer.switchDiagram', '切换图表')} mouseEnterDelay={0.6}>
-                  <div className="flex items-center gap-1.5 px-2.5 h-[32px] rounded-[6px] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] cursor-pointer transition-colors active:scale-[0.97] min-w-0 group">
+                  <button
+                    ref={diagramSwitcherTriggerRef}
+                    type="button"
+                    onClick={() => setIsDiagramSwitcherOpen((open) => !open)}
+                    className="flex items-center gap-1.5 px-2.5 h-[32px] appearance-none border-0 bg-transparent rounded-[6px] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] cursor-pointer transition-colors active:scale-[0.97] min-w-0 group"
+                    aria-label={diagramSwitcherLabel}
+                    aria-haspopup="dialog"
+                    aria-expanded={isDiagramSwitcherOpen}
+                    aria-controls={isDiagramSwitcherOpen ? diagramSwitcherId : undefined}
+                  >
                     <span className="font-semibold text-[14px] text-slate-700 dark:text-slate-200 truncate max-w-[80px] sm:max-w-[160px] lg:max-w-[240px]">
                       {title}
                     </span>
-                    <FaChevronDown className="text-[9px] text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors flex-shrink-0" />
-                  </div>
+                    <FaChevronDown aria-hidden="true" className="text-[9px] text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors flex-shrink-0" />
+                  </button>
                 </Tooltip>
               </Popover>
               {onRenameDiagram && (
@@ -164,15 +218,20 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
           {!isMobile && setIsCommandOpen && (
             <>
               <div className="w-[1px] h-[18px] bg-slate-200 dark:bg-white/10 mx-1.5 flex-shrink-0" />
-              <div 
-                className="flex items-center gap-2 px-2 h-[32px] rounded-[6px] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] cursor-pointer transition-colors group"
+              <button
+                type="button"
+                className="flex items-center gap-2 px-2 h-[32px] appearance-none border-0 bg-transparent rounded-[6px] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] cursor-pointer transition-colors group"
                 onClick={() => setIsCommandOpen(true)}
+                aria-label={commandSearchLabel}
+                aria-haspopup="dialog"
+                aria-keyshortcuts={isMac ? 'Meta+K' : 'Control+K'}
+                title={`${commandSearchLabel} (${commandShortcutLabel})`}
               >
-                <SearchOutlined className="text-[15px] text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300" />
+                <SearchOutlined aria-hidden="true" className="text-[15px] text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300" />
                 <div className="flex items-center px-1.5 py-[3px] bg-black/[0.04] dark:bg-white/[0.06] rounded-[4px] border border-black/[0.02] dark:border-white/[0.04]">
                   <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 tracking-wider leading-none">{commandShortcutLabel}</span>
                 </div>
-              </div>
+              </button>
             </>
           )}
         </div>
