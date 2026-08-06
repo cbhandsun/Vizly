@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import App from 'antd/es/app';
 import type { MenuProps } from 'antd/es/menu';
 import { coerceDiagramId, getQueryOrHashParamFromLocation, type LocationLike } from '@/core/utils/inputBoundary';
-import { ExternalLink, Pencil, Trash2 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import type { ManageStorageProvider } from '@/components/ui/ManageTopToolbar';
@@ -26,6 +25,8 @@ import { redactSensitiveLogValue } from '@/core/utils/logSecurity';
 import { WorkspaceCompactHeader } from './WorkspaceCompactHeader';
 import { WorkspaceDiagramCollection } from './WorkspaceDiagramCollection';
 import { WorkspaceGlobalHeader } from './WorkspaceGlobalHeader';
+import { WorkspaceContextMenu } from './WorkspaceContextMenu';
+import { createWorkspaceDeleteConfirmation } from './workspaceDeleteConfirmation';
 import { createWorkspaceDiagramActions } from './diagramManagementActions';
 import { createWorkspaceSettingsMenu } from './workspaceSettingsMenu';
 
@@ -58,13 +59,29 @@ const WorkspaceDashboardPage: React.FC = () => {
         return readStoredCloudProvider();
     });
 
-    const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; item: UnifiedDiagramItem } | null>(null);
-    const ctxMenuRef = useRef<HTMLDivElement>(null);
+    const [ctxMenu, setCtxMenu] = useState<{
+        x: number;
+        y: number;
+        item: UnifiedDiagramItem;
+        returnFocusTarget: HTMLElement | null;
+    } | null>(null);
+    const workspaceMainRef = useRef<HTMLElement>(null);
 
     const handleContextMenu = useCallback((e: React.MouseEvent, item: UnifiedDiagramItem) => {
         e.preventDefault();
         e.stopPropagation();
-        setCtxMenu({ x: e.clientX, y: e.clientY, item });
+        const eventTarget = e.target instanceof HTMLElement
+            ? e.target.closest<HTMLElement>('button')
+            : null;
+        const fallbackTarget = e.currentTarget.querySelector<HTMLElement>(
+            '.diagram-card-primary-action, .diagram-list-primary-action',
+        );
+        setCtxMenu({
+            x: e.clientX,
+            y: e.clientY,
+            item,
+            returnFocusTarget: eventTarget ?? fallbackTarget,
+        });
     }, []);
 
     const openDiagramInNewTab = useCallback((item: UnifiedDiagramItem) => {
@@ -85,19 +102,6 @@ const WorkspaceDashboardPage: React.FC = () => {
         }
         navigate(`/?diagram=${encodeURIComponent(diagramId)}`);
     }, [navigate]);
-
-    // Dismiss on click outside or Escape
-    useEffect(() => {
-        if (!ctxMenu) return;
-        const dismiss = () => setCtxMenu(null);
-        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') dismiss(); };
-        document.addEventListener('click', dismiss);
-        document.addEventListener('keydown', onKey);
-        return () => {
-            document.removeEventListener('click', dismiss);
-            document.removeEventListener('keydown', onKey);
-        };
-    }, [ctxMenu]);
 
     const loadAllData = useCallback(async () => {
         setLoading(true);
@@ -154,29 +158,30 @@ const WorkspaceDashboardPage: React.FC = () => {
         }
     };
 
-    const handleDeleteDiagram = async (e: { stopPropagation: () => void }, item: UnifiedDiagramItem) => {
+    const handleDeleteDiagram = (
+        e: { stopPropagation: () => void },
+        item: UnifiedDiagramItem,
+        returnFocusTarget: HTMLElement | null = document.activeElement instanceof HTMLElement
+            ? document.activeElement
+            : null,
+    ) => {
         e.stopPropagation();
-        modal.confirm({
+        modal.confirm(createWorkspaceDeleteConfirmation({
             title: t('workspace.deleteConfirmTitle'),
-            content: t('workspace.deleteConfirmDescription'),
-            okText: t('common.delete'),
-            okType: 'danger',
-            cancelText: t('common.cancel'),
-            onOk: async () => {
-                try {
-                    const result = await workspaceDiagramActions.deleteDiagram(item);
-                    if (result === 'invalid-id') {
-                        appMessage.error('Unable to delete diagram: missing diagram id.');
-                        return;
-                    }
-                    appMessage.success(t('workspace.deleteSuccess'));
-                    loadAllData();
-                } catch (error: unknown) {
-                    safeLog.error('Failed to delete workspace diagram', redactSensitiveLogValue(error));
-                    appMessage.error(t('workspace.deleteFailed'));
-                }
-            }
-        });
+            description: t('workspace.deleteConfirmDescription'),
+            deleteLabel: t('common.delete'),
+            cancelLabel: t('common.cancel'),
+            returnFocusTarget,
+            fallbackFocusTarget: workspaceMainRef.current,
+            deleteItem: () => workspaceDiagramActions.deleteDiagram(item),
+            reloadItems: loadAllData,
+            onInvalidId: () => appMessage.error('Unable to delete diagram: missing diagram id.'),
+            onSuccess: () => appMessage.success(t('workspace.deleteSuccess')),
+            onFailure: (error: unknown) => {
+                safeLog.error('Failed to delete workspace diagram', redactSensitiveLogValue(error));
+                appMessage.error(t('workspace.deleteFailed'));
+            },
+        }));
     };
 
     // Advanced Creation Router mapping to correct domains
@@ -224,7 +229,12 @@ const WorkspaceDashboardPage: React.FC = () => {
                 avatarUrl={typeof user?.user_metadata?.avatar_url === 'string' ? user.user_metadata.avatar_url : undefined}
             />
             {/* Main Content Viewport */}
-            <main className="workspace-main">
+            <main
+                ref={workspaceMainRef}
+                className="workspace-main"
+                tabIndex={-1}
+                aria-label={t('workspace.title')}
+            >
                 
                 {!searchTerm && (
                     <WorkspaceCompactHeader
@@ -252,30 +262,17 @@ const WorkspaceDashboardPage: React.FC = () => {
 
             {/* Context Menu (Phase 1.3) */}
             {ctxMenu && (
-                <div
-                    ref={ctxMenuRef}
-                    className="diagram-context-menu"
-                    style={{ left: ctxMenu.x, top: ctxMenu.y }}
-                    onClick={e => e.stopPropagation()}
-                >
-                    <button className="ctx-menu-item" onClick={() => { handleOpenDiagram(ctxMenu.item); setCtxMenu(null); }}>
-                        <Pencil size={14} strokeWidth={2} /> Open
-                    </button>
-                    <button className="ctx-menu-item" onClick={() => {
-                        openDiagramInNewTab(ctxMenu.item);
-                        setCtxMenu(null);
-                    }}>
-                        <ExternalLink size={14} strokeWidth={2} /> Open in new tab
-                    </button>
-                    {ctxMenu.item.role === 'owner' && (
-                        <>
-                            <div className="ctx-menu-divider" />
-                            <button className="ctx-menu-item danger" onClick={(e) => { handleDeleteDiagram(e, ctxMenu.item); setCtxMenu(null); }}>
-                                <Trash2 size={14} strokeWidth={2} /> Delete
-                            </button>
-                        </>
-                    )}
-                </div>
+                <WorkspaceContextMenu
+                    key={`${ctxMenu.item.source}:${ctxMenu.item.id}:${ctxMenu.x}:${ctxMenu.y}`}
+                    x={ctxMenu.x}
+                    y={ctxMenu.y}
+                    item={ctxMenu.item}
+                    returnFocusTarget={ctxMenu.returnFocusTarget}
+                    onOpen={handleOpenDiagram}
+                    onOpenInNewTab={openDiagramInNewTab}
+                    onDelete={handleDeleteDiagram}
+                    onDismiss={() => setCtxMenu(null)}
+                />
             )}
 
             {isAuthModalOpen && (

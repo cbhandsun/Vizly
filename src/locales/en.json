@@ -15,6 +15,7 @@
         "error": "Error",
         "success": "Success",
         "confirm": "Confirm",
+        "open": "Open",
         "delete": "Delete",
         "proFeature": "Pro Feature"
     },

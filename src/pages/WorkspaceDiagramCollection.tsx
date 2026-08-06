@@ -35,6 +35,7 @@ import {
 } from './diagramManagementPage.helpers';
 import { DiagramCardSkeleton } from './DiagramCardSkeleton';
 import { WorkspaceEmptyState } from './WorkspaceEmptyState';
+import { focusWorkspaceTarget } from './workspaceMenuInteraction';
 
 const RemoteDiagramCover = React.lazy(() => import('@/components/shared/RemoteDiagramCover'));
 const LocalDiagramCover = React.lazy(() => import('./LocalDiagramCover'));
@@ -65,7 +66,11 @@ interface WorkspaceDiagramCollectionProps {
   onOpenDiagram: (item: UnifiedDiagramItem) => void | Promise<void>;
   onOpenDiagramInNewTab: (item: UnifiedDiagramItem) => void;
   onContextMenu: (event: React.MouseEvent, item: UnifiedDiagramItem) => void;
-  onDeleteDiagram: (event: { stopPropagation: () => void }, item: UnifiedDiagramItem) => void;
+  onDeleteDiagram: (
+    event: { stopPropagation: () => void },
+    item: UnifiedDiagramItem,
+    returnFocusTarget?: HTMLElement | null,
+  ) => void;
   onCreateBlank: () => void;
 }
 
@@ -108,11 +113,31 @@ export const WorkspaceDiagramCollection = ({
   const localCount = unifiedItems.filter(item => item.source === 'local').length;
   const cloudCount = unifiedItems.filter(item => item.source === 's3' || item.source === 'supabase').length;
   const sharedCount = unifiedItems.filter(item => item.role === 'viewer').length;
+  const [openCardMenuKey, setOpenCardMenuKey] = React.useState<string | null>(null);
+  const [sortMenuOpen, setSortMenuOpen] = React.useState(false);
+  const cardMenuTriggerRefs = React.useRef(new Map<string, HTMLButtonElement>());
   const currentSortLabel = {
     updated: t('workspace.lastModified'),
     name: t('workspace.name'),
     type: t('workspace.type'),
   } satisfies Record<SortKey, string>;
+
+  const getCardMenuKey = (item: UnifiedDiagramItem): string => `${item.source}:${item.id}`;
+
+  const setCardMenuTriggerRef = React.useCallback((
+    key: string,
+    trigger: HTMLButtonElement | null,
+  ) => {
+    if (trigger) cardMenuTriggerRefs.current.set(key, trigger);
+    else cardMenuTriggerRefs.current.delete(key);
+  }, []);
+
+  const handleCardMenuOpenChange = (key: string, open: boolean) => {
+    setOpenCardMenuKey(open ? key : null);
+    if (!open) {
+      queueMicrotask(() => focusWorkspaceTarget(cardMenuTriggerRefs.current.get(key)));
+    }
+  };
 
   const getCardMenu = (item: UnifiedDiagramItem): MenuProps['items'] => {
     if (isTemplateItem(item)) {
@@ -133,8 +158,9 @@ export const WorkspaceDiagramCollection = ({
     item: UnifiedDiagramItem,
   ) => {
     event.domEvent.stopPropagation();
+    const returnFocusTarget = cardMenuTriggerRefs.current.get(getCardMenuKey(item));
     if (event.key === 'apply_template') void onOpenDiagram(item);
-    else if (event.key === 'delete') onDeleteDiagram(event.domEvent, item);
+    else if (event.key === 'delete') onDeleteDiagram(event.domEvent, item, returnFocusTarget);
     else if (event.key === 'open_new') onOpenDiagramInNewTab(item);
   };
 
@@ -180,6 +206,8 @@ export const WorkspaceDiagramCollection = ({
                                     selectedKeys: [sortKey]
                                 }}
                                 trigger={['click']}
+                                open={sortMenuOpen}
+                                onOpenChange={setSortMenuOpen}
                             >
                                 <button
                                     type="button"
@@ -187,6 +215,7 @@ export const WorkspaceDiagramCollection = ({
                                     title={`${t('workspace.sortBy')}: ${currentSortLabel[sortKey]}`}
                                     aria-label={`${t('workspace.sortBy')}: ${currentSortLabel[sortKey]}`}
                                     aria-haspopup="menu"
+                                    aria-expanded={sortMenuOpen}
                                 >
                                     <ArrowUpAZ size={16} strokeWidth={2} />
                                     <span className="workspace-sort-trigger-label">{currentSortLabel[sortKey]}</span>
@@ -229,6 +258,7 @@ export const WorkspaceDiagramCollection = ({
                             {filteredItems.map(item => {
                                 const diagramType = detectDiagramType(item);
                                 const nodeCount = getNodeCount(item);
+                                const cardMenuKey = getCardMenuKey(item);
 
                                 if (viewMode === 'list') {
                                     return (
@@ -253,8 +283,18 @@ export const WorkspaceDiagramCollection = ({
                                                     menu={{ items: getCardMenu(item), onClick: (e) => handleMenuClick(e, item) }}
                                                     trigger={['click']}
                                                     placement="bottomRight"
+                                                    open={openCardMenuKey === cardMenuKey}
+                                                    onOpenChange={open => handleCardMenuOpenChange(cardMenuKey, open)}
                                                 >
-                                                    <button type="button" className="action-btn-glass" onClick={e => e.stopPropagation()} aria-label={t('workspace.moreActions', { title: item.title })}>
+                                                    <button
+                                                        ref={trigger => setCardMenuTriggerRef(cardMenuKey, trigger)}
+                                                        type="button"
+                                                        className="action-btn-glass"
+                                                        onClick={e => e.stopPropagation()}
+                                                        aria-label={t('workspace.moreActions', { title: item.title })}
+                                                        aria-haspopup="menu"
+                                                        aria-expanded={openCardMenuKey === cardMenuKey}
+                                                    >
                                                         <Ellipsis size={16} strokeWidth={2} />
                                                     </button>
                                                 </Dropdown>
@@ -292,8 +332,18 @@ export const WorkspaceDiagramCollection = ({
                                                 menu={{ items: getCardMenu(item), onClick: (e) => handleMenuClick(e, item) }}
                                                 trigger={['click']}
                                                 placement="bottomRight"
+                                                open={openCardMenuKey === cardMenuKey}
+                                                onOpenChange={open => handleCardMenuOpenChange(cardMenuKey, open)}
                                             >
-                                                <button type="button" className="action-btn-glass" onClick={e => e.stopPropagation()} aria-label={t('workspace.moreActions', { title: item.title })}>
+                                                <button
+                                                    ref={trigger => setCardMenuTriggerRef(cardMenuKey, trigger)}
+                                                    type="button"
+                                                    className="action-btn-glass"
+                                                    onClick={e => e.stopPropagation()}
+                                                    aria-label={t('workspace.moreActions', { title: item.title })}
+                                                    aria-haspopup="menu"
+                                                    aria-expanded={openCardMenuKey === cardMenuKey}
+                                                >
                                                     <Ellipsis size={16} strokeWidth={2} />
                                                 </button>
                                             </Dropdown>

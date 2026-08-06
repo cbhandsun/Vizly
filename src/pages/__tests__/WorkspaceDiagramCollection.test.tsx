@@ -87,7 +87,9 @@ describe('WorkspaceDiagramCollection', () => {
     expect(html).toMatch(/class="filter-tab active" aria-pressed="true"[\s\S]*?workspace\.industryTemplates/);
     expect(html).toContain('aria-label="workspace.sortBy: workspace.lastModified"');
     expect(html).toContain('aria-haspopup="menu"');
+    expect(html).toContain('aria-expanded="false"');
     expect(html).toContain('workspace-sort-trigger-label">workspace.lastModified</span>');
+    expect(html).toMatch(/aria-label="More actions for Accessible template" aria-haspopup="menu" aria-expanded="false"/);
   });
 
   it('keeps sort and view controls available at the mobile breakpoint', () => {

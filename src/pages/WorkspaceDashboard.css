@@ -1291,12 +1291,15 @@ html[data-theme='dark'] .diagram-context-menu {
   text-align: left;
 }
 
-.ctx-menu-item:hover {
+.ctx-menu-item:hover,
+.ctx-menu-item:focus-visible {
   background: var(--vz-brand-subtle);
   color: var(--vz-brand-from);
+  outline: none;
 }
 
-.ctx-menu-item.danger:hover {
+.ctx-menu-item.danger:hover,
+.ctx-menu-item.danger:focus-visible {
   background: rgba(239, 68, 68, 0.08);
   color: #ef4444;
 }
