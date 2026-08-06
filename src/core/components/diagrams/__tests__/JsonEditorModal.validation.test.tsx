@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { JsonEditorModal } from '../JsonEditorModal';
 
@@ -15,6 +15,12 @@ const modalMocks = vi.hoisted(() => ({
 
 const conversionMocks = vi.hoisted(() => ({
     nodes: [{ id: 'applied-node', position: { x: 0, y: 0 }, data: {} }],
+}));
+
+const appMessageMocks = vi.hoisted(() => ({
+    error: vi.fn(),
+    info: vi.fn(),
+    success: vi.fn(),
 }));
 
 vi.mock('react-i18next', () => ({
@@ -49,11 +55,7 @@ vi.mock('react-i18next', () => ({
 }));
 
 vi.mock('@/core/utils/antdStaticBridge', () => ({
-    appMessage: {
-        error: vi.fn(),
-        info: vi.fn(),
-        success: vi.fn(),
-    },
+    appMessage: appMessageMocks,
     appModal: {
         confirm: modalMocks.confirm,
     },
@@ -82,6 +84,7 @@ class ResizeObserverMock {
 
 beforeAll(() => vi.stubGlobal('ResizeObserver', ResizeObserverMock));
 afterAll(() => vi.unstubAllGlobals());
+beforeEach(() => vi.clearAllMocks());
 
 describe('JsonEditorModal validation feedback', () => {
     it('keeps invalid JSON visible and explains the failure inside the dialog', async () => {
@@ -108,6 +111,9 @@ describe('JsonEditorModal validation feedback', () => {
         expect((editor as HTMLTextAreaElement).value).toBe('{');
         expect(editor.getAttribute('aria-invalid')).toBe('true');
         expect(editor.getAttribute('aria-describedby')).toBe('json-editor-validation-error');
+        await waitFor(() => expect(document.activeElement).toBe(editor));
+        expect(appMessageMocks.error).not.toHaveBeenCalled();
+        expect(screen.getAllByRole('alert')).toHaveLength(1);
 
         fireEvent.change(editor, { target: { value: '{}' } });
         expect(screen.queryByRole('alert')).toBeNull();

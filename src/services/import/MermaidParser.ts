@@ -1,4 +1,5 @@
 import { Node, Edge } from '@xyflow/react';
+import { requireMermaidDocumentDeclaration } from '@/core/utils/mermaidDocumentBoundary';
 
 // Default branch color palette for auto-assigned mindmap branch colors
 const MINDMAP_PALETTE = ['#6366f1', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4'];
@@ -31,8 +32,8 @@ export class MermaidParser {
 
   public parse(input: string): { nodes: Node[]; edges: Edge[] } {
     const trimmed = this.prepareInput(input);
-    // Auto-detect Mermaid mindmap syntax
-    if (/^mindmap\b/i.test(trimmed)) {
+    const declaration = requireMermaidDocumentDeclaration(this.getSafeLines(trimmed, true));
+    if (declaration.kind === 'mindmap') {
       return this.parseMindmap(trimmed);
     }
     return this.parseFlowchart(trimmed);

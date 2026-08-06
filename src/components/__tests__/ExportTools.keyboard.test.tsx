@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { exportToPNG } = vi.hoisted(() => ({
@@ -117,11 +117,43 @@ describe('ExportTools keyboard menu', () => {
     await waitFor(() => expect(document.activeElement).toBe(firstItem));
     expect(firstItem.getAttribute('aria-disabled')).not.toBe('true');
     expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    expect(trigger.getAttribute('aria-controls')).toBe('diagram-export-actions-menu');
+    const menu = screen.getByRole('menu', { name: '导出操作' });
+    expect(menu.id).toBe('diagram-export-actions-menu');
 
-    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+    fireEvent.keyDown(menu, { key: 'Escape' });
     await waitFor(() => {
       expect(trigger.getAttribute('aria-expanded')).toBe('false');
       expect(document.activeElement).toBe(trigger);
     });
+  });
+
+  it('announces an active export as a polite busy status', async () => {
+    render(
+      <ExportTools
+        diagramId="diagram-1"
+        diagramName="Diagram"
+        showControls={false}
+        variant="compact"
+      />,
+    );
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent('diagramExportStart', {
+        detail: { diagramId: 'diagram-1', type: 'png' },
+      }));
+    });
+
+    const status = await screen.findByRole('status');
+    expect(status.getAttribute('aria-live')).toBe('polite');
+    expect(status.getAttribute('aria-atomic')).toBe('true');
+    expect(status.getAttribute('aria-busy')).toBe('true');
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent('diagramExportComplete', {
+        detail: { diagramId: 'diagram-1', type: 'png' },
+      }));
+    });
+    await waitFor(() => expect(screen.queryByRole('status')).toBeNull());
   });
 });

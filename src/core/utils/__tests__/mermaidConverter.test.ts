@@ -160,6 +160,17 @@ describe('mermaidConverter', () => {
             });
         });
 
+        it('should reject headerless text before creating React Flow data', () => {
+            expect(() => fromMermaid('not a mermaid')).toThrow('document declaration is required');
+        });
+
+        it('should accept comments before a valid flowchart declaration', () => {
+            const { nodes, edges } = fromMermaid('%% comment\nflowchart TD\nA --> B');
+
+            expect(nodes.map(node => node.id)).toEqual(expect.arrayContaining(['A', 'B']));
+            expect(edges).toHaveLength(1);
+        });
+
         it('should reject oversized Mermaid imports', () => {
             expect(() => fromMermaid('x'.repeat(MERMAID_CONVERTER_MAX_CHARS + 1))).toThrow('too large');
         });

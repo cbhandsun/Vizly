@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Alert, Button, Modal, Segmented } from 'antd';
 import { UploadOutlined } from '@ant-design/icons';
 import { Node, Edge, ReactFlowInstance } from '@xyflow/react';
@@ -53,6 +53,7 @@ export const JsonEditorModal: React.FC<JsonEditorModalProps> = ({
     const [editorMode, setEditorMode] = useState<LazyMonacoEditorMode>('loading');
     const [editorVisible, setEditorVisible] = useState(visible);
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+    const editorRef = useRef<HTMLTextAreaElement>(null);
     if (editorVisible !== visible) {
         setEditorVisible(visible);
         if (visible) {
@@ -75,7 +76,7 @@ export const JsonEditorModal: React.FC<JsonEditorModalProps> = ({
         const reason = t(reasonKey);
         const message = t('designer.flowchart.invalidJson', { reason });
         setValidationError(message);
-        appMessage.error(message);
+        queueMicrotask(() => editorRef.current?.focus());
     }, [t]);
 
     // 当首次打开且无初始内容时，自动转换当前画布数据并与已存在的 Diagram 数据壳合并（防止布局配置等丢失）
@@ -315,6 +316,7 @@ export const JsonEditorModal: React.FC<JsonEditorModalProps> = ({
             )}
             <div style={{ flex: 1, border: '1px solid #eee', borderRadius: 4, overflow: 'hidden' }}>
                 <LazyMonacoEditor
+                        inputRef={editorRef}
                         onModeChange={setEditorMode}
                         value={editorDisplayContent}
                         onChange={(val: string | undefined) => {

@@ -64,6 +64,8 @@ describe('MermaidImportModal', () => {
         expect(document.getElementById('mermaid-import-error')?.textContent).toContain('解析失败');
         expect(editor.getAttribute('aria-invalid')).toBe('true');
         expect(editor.getAttribute('aria-describedby')).toBe('mermaid-import-error');
+        await waitFor(() => expect(document.activeElement).toBe(editor));
+        expect(document.querySelector('.mermaid-import-modal__editor')).toBeTruthy();
         expect(onImport).not.toHaveBeenCalled();
     });
 
@@ -128,6 +130,9 @@ describe('MermaidImportModal', () => {
         const recovery = document.getElementById('mermaid-import-error');
         expect(recovery?.textContent).toContain('导入未完成');
         expect(recovery?.textContent).toContain('当前画布未被替换');
+        await waitFor(() => expect(document.activeElement).toBe(
+            screen.getByRole('textbox', { name: 'Mermaid 基础编辑器' }),
+        ));
         expect(onClose).not.toHaveBeenCalled();
     });
 

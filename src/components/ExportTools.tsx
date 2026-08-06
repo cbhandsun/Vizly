@@ -39,6 +39,7 @@ const loadDataService = async () => {
 const MARKDOWN_EXPORT_MAX_NODES = 1000;
 const MARKDOWN_EXPORT_MAX_EDGES = 2000;
 const EXPORT_MENU_OVERLAY_CLASS = 'vizly-export-actions-menu';
+const EXPORT_MENU_ID = 'diagram-export-actions-menu';
 
 interface ExportToolsProps {
   diagramId: string;
@@ -452,6 +453,10 @@ ${mermaid}
       {/* 导出遮罩 */}
       {isExporting && createPortal(
         <div
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          aria-busy="true"
           style={{
             position: 'fixed',
             top: 0,
@@ -521,7 +526,12 @@ ${mermaid}
         )}
 
         <Dropdown
-          menu={{ items, onKeyDown: handleExportMenuKeyDown }}
+          menu={{
+            id: EXPORT_MENU_ID,
+            'aria-label': t('export.menuLabel', '导出操作'),
+            items,
+            onKeyDown: handleExportMenuKeyDown,
+          }}
           trigger={['click']}
           open={exportMenuOpen}
           onOpenChange={handleExportMenuOpenChange}
@@ -537,6 +547,7 @@ ${mermaid}
               aria-label={t('common.export', '导出')}
               aria-haspopup="menu"
               aria-expanded={exportMenuOpen}
+              aria-controls={exportMenuOpen ? EXPORT_MENU_ID : undefined}
               onKeyDown={handleExportMenuButtonKeyDown}
               icon={<FaDownload className="text-[13px]" />}
               className="w-8 h-8 p-0 border-none flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] rounded-[6px] transition-colors"
@@ -549,6 +560,7 @@ ${mermaid}
               aria-label={t('common.export', '导出')}
               aria-haspopup="menu"
               aria-expanded={exportMenuOpen}
+              aria-controls={exportMenuOpen ? EXPORT_MENU_ID : undefined}
               onKeyDown={handleExportMenuButtonKeyDown}
               icon={<FaDownload size={14} />}
               disabled={isExporting}

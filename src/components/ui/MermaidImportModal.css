@@ -9,6 +9,13 @@
   min-height: var(--commercial-touch-target, 44px);
 }
 
+.mermaid-import-modal__editor {
+  height: 400px;
+  overflow: hidden;
+  border: 1px solid var(--ant-color-border, #d9d9d9);
+  border-radius: 4px;
+}
+
 @media (max-width: 640px) {
   .mermaid-import-modal .ant-modal {
     margin: 16px auto;
@@ -22,5 +29,10 @@
 
   .mermaid-import-modal .ant-modal-body {
     padding-inline: 16px;
+  }
+
+  .mermaid-import-modal__editor {
+    height: min(32dvh, 260px);
+    min-height: 160px;
   }
 }

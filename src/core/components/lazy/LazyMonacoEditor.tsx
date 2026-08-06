@@ -20,6 +20,8 @@ export interface LazyMonacoEditorProps {
     ariaLabel?: string;
     ariaInvalid?: boolean;
     ariaDescribedBy?: string;
+    inputRef?: React.Ref<HTMLTextAreaElement>;
+    minHeight?: React.CSSProperties['minHeight'];
 }
 
 export const LazyMonacoEditor: React.FC<LazyMonacoEditorProps> = ({
@@ -30,6 +32,8 @@ export const LazyMonacoEditor: React.FC<LazyMonacoEditorProps> = ({
     ariaLabel,
     ariaInvalid,
     ariaDescribedBy,
+    inputRef,
+    minHeight,
 }) => {
     const { t } = useTranslation();
 
@@ -39,6 +43,7 @@ export const LazyMonacoEditor: React.FC<LazyMonacoEditorProps> = ({
 
     return (
         <textarea
+            ref={inputRef}
             aria-label={ariaLabel ?? t('designer.jsonEditor.basicEditorLabel', { defaultValue: 'JSON 基础编辑器' })}
             aria-invalid={ariaInvalid || undefined}
             aria-describedby={ariaDescribedBy}
@@ -50,7 +55,7 @@ export const LazyMonacoEditor: React.FC<LazyMonacoEditorProps> = ({
             style={{
                 width: '100%',
                 height: '100%',
-                minHeight: 240,
+                minHeight: minHeight ?? 240,
                 resize: 'none',
                 border: 0,
                 outline: 0,

@@ -29,6 +29,21 @@ describe('MermaidParser', () => {
     expect(nodeC?.data.shape).toBe('diamond');
   });
 
+  it('应该拒绝没有 Mermaid 文档声明的普通文本', () => {
+    expect(() => parser.parse('not a mermaid')).toThrow('document declaration is required');
+  });
+
+  it('应该允许前置空行和注释后出现有效声明', () => {
+    const { nodes, edges } = parser.parse(`
+      %% audit comment
+      flowchart LR
+      A[Start] --> B[End]
+    `);
+
+    expect(nodes.map(node => node.id)).toEqual(expect.arrayContaining(['A', 'B']));
+    expect(edges).toHaveLength(1);
+  });
+
   it('应该能识别架构组件子类型', () => {
     const input = `
       graph LR

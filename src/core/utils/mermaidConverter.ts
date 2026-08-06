@@ -1,5 +1,6 @@
 import { Node, Edge, MarkerType } from '@xyflow/react';
 import { escapeMermaidLabel, toMermaidNodeId, toSafeMermaidColor } from './exportTextSecurity';
+import { requireMermaidDocumentDeclaration } from './mermaidDocumentBoundary';
 
 /**
  * mermaidConverter — 双向转换 React Flow ↔ Mermaid flowchart 语法
@@ -292,9 +293,8 @@ function parseEdgeLine(line: string): ParsedEdgeLine | null {
 
 export function fromMermaid(code: string): ParsedGraph {
     const lines = prepareMermaidImport(code);
-
-    const headerIdx = lines.findIndex(l => /^(flowchart|graph)\s+(TB|TD|LR|RL|BT)/i.test(l));
-    const bodyLines = headerIdx >= 0 ? lines.slice(headerIdx + 1) : lines;
+    const declaration = requireMermaidDocumentDeclaration(lines, ['flowchart']);
+    const bodyLines = lines.slice(declaration.lineIndex + 1);
 
     const nodeMap = new Map<string, {
         label: string;

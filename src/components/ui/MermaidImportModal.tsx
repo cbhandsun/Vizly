@@ -32,6 +32,12 @@ export const MermaidImportModal: React.FC<MermaidImportModalProps> = ({ visible,
   const [error, setError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const importInFlightRef = useRef(false);
+  const editorRef = useRef<HTMLTextAreaElement>(null);
+
+  const showImportError = (message: string) => {
+    setError(message);
+    queueMicrotask(() => editorRef.current?.focus());
+  };
 
   const handleImport = async () => {
     if (importInFlightRef.current) return;
@@ -42,7 +48,7 @@ export const MermaidImportModal: React.FC<MermaidImportModalProps> = ({ visible,
       const parser = MermaidParser.getInstance();
       parsed = parser.parse(code);
     } catch (error: unknown) {
-      setError(
+      showImportError(
         error instanceof Error && error.message === 'Mermaid input is too large.'
           ? 'Mermaid 内容过大，请缩减后重试。'
           : '解析失败，请检查 Mermaid 语法。',
@@ -51,7 +57,7 @@ export const MermaidImportModal: React.FC<MermaidImportModalProps> = ({ visible,
     }
 
     if (parsed.nodes.length === 0) {
-      setError('未能从代码中提取到有效节点，请补充节点或连线后重试。');
+      showImportError('未能从代码中提取到有效节点，请补充节点或连线后重试。');
       return;
     }
 
@@ -60,13 +66,13 @@ export const MermaidImportModal: React.FC<MermaidImportModalProps> = ({ visible,
     try {
       const imported = await onImport(parsed.nodes, parsed.edges);
       if (!imported) {
-        setError('导入未完成，当前画布未被替换。请检查画布状态后重试。');
+        showImportError('导入未完成，当前画布未被替换。请检查画布状态后重试。');
         return;
       }
       appMessage.success(`成功导入 ${parsed.nodes.length} 个节点和 ${parsed.edges.length} 条连线！`);
       onClose();
     } catch (_error: unknown) {
-      setError('导入未完成，当前画布未被替换。请检查画布状态后重试。');
+      showImportError('导入未完成，当前画布未被替换。请检查画布状态后重试。');
     } finally {
       importInFlightRef.current = false;
       setImporting(false);
@@ -111,12 +117,15 @@ export const MermaidImportModal: React.FC<MermaidImportModalProps> = ({ visible,
           title="目前仅支持 Flowchart (graph/flowchart) 基础语法。导入后可手动微调布局。"
           type="info" 
           showIcon 
+          role="note"
         />
         
         {error && <Alert id="mermaid-import-error" title={error} type="error" showIcon role="alert" />}
 
-        <div style={{ height: '400px', border: '1px solid #d9d9d9', borderRadius: '4px', overflow: 'hidden' }}>
+        <div className="mermaid-import-modal__editor">
           <LazyMonacoEditor
+            inputRef={editorRef}
+            minHeight={0}
             ariaLabel="Mermaid 基础编辑器"
             ariaInvalid={Boolean(error)}
             ariaDescribedBy={error ? 'mermaid-import-error' : undefined}
