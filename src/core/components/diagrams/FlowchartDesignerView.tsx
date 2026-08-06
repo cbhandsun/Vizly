@@ -14,6 +14,7 @@ import { DiagramEditingProvider } from './DiagramEditingContext';
 import { DesignerHeaderLayer } from './ui/DesignerHeaderLayer';
 import { FlowchartCanvasShell } from './FlowchartCanvasShell';
 import { FlowchartEmptyState } from './FlowchartEmptyState';
+import { FlowchartFileDropOverlay } from './FlowchartFileDropOverlay';
 import { FlowchartOnboardingHint } from './FlowchartOnboardingHint';
 import { shouldShowFlowchartOnboarding } from './flowchartResponsiveChrome';
 import { resolveFlowchartLeftClearance } from './flowchartChromeLayout';
@@ -36,6 +37,7 @@ import {
     FlowchartDesignerRightSidebarRegion,
 } from './FlowchartDesignerShellRegions';
 import { filterCommentsForPage } from './commentPageScope';
+import { useFlowchartFileDrop } from './hooks/useFlowchartFileDrop';
 
 export type { FlowchartDesignerViewModel } from './flowchartDesignerViewModel';
 
@@ -263,13 +265,21 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
     });
     const editingEnabled = !isReadonly && !presentationActive;
     const showEditingChrome = !presentationActive;
+    const fileDrop = useFlowchartFileDrop({
+        importFile: handleImport, requestImport: handleRequestImport,
+        onCanvasDragOver: onDragOver, onCanvasDrop: onDrop,
+        confirmOkText: t('designer.flowchart.import.confirmDropOk', '继续导入'),
+        enabled: editingEnabled,
+    });
 
     return (
         <UnifiedDesignerShell
             id={id || diagramIdForExport}
             isDragging={isDragging}
-            onDragOver={onDragOver}
-            onDrop={onDrop}
+            onDragEnter={fileDrop.handleDragEnter}
+            onDragOver={fileDrop.handleDragOver}
+            onDragLeave={fileDrop.handleDragLeave}
+            onDrop={fileDrop.handleDrop}
             messageContextHolder={messageContextHolder}
             notificationContextHolder={notificationContextHolder}
             canvasBg={canvasBg}
@@ -678,7 +688,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                 </>
             }
             rightSidebar={editingEnabled ? <FlowchartDesignerRightSidebarRegion model={model} /> : null}
-            overlays={<FlowchartDesignerOverlaysRegion model={model} />}
+            overlays={<>{fileDrop.isFileDragActive ? <FlowchartFileDropOverlay t={t} /> : null}<FlowchartDesignerOverlaysRegion model={model} /></>}
         />
     );
 }

@@ -7,6 +7,12 @@ import { appModal } from '@/core/utils/antdStaticBridge';
 import { focusFlowchartImportTrigger } from '../flowchartImportFocus';
 import { requestFlowchartImport } from '../flowchartImportRequest';
 
+export interface FlowchartImportRequestOptions {
+    startImport?: () => void;
+    okText?: string;
+    onConfirmationClosed?: () => void;
+}
+
 export const useFlowchartImportRequest = ({
     editingEnabled,
     nodesRef,
@@ -23,10 +29,10 @@ export const useFlowchartImportRequest = ({
     importInFlightRef: RefObject<boolean>;
     messageApi: MessageInstance;
     t: TFunction;
-}) => useCallback(() => {
+}) => useCallback((options?: FlowchartImportRequestOptions) => {
     const currentNodes = nodesRef.current ?? [];
     const currentEdges = edgesRef.current ?? [];
-    const openFilePicker = () => fileInputRef.current?.click();
+    const startImport = options?.startImport ?? (() => fileInputRef.current?.click());
     requestFlowchartImport({
         editingEnabled,
         importInProgress: importInFlightRef.current,
@@ -37,7 +43,7 @@ export const useFlowchartImportRequest = ({
             nodes: currentNodes.length,
             edges: currentEdges.length,
         }),
-        okText: t('designer.flowchart.import.confirmOk'),
+        okText: options?.okText ?? t('designer.flowchart.import.confirmOk'),
         cancelText: t('common.cancel'),
         onEditingUnavailable: () => {
             messageApi.info(t('designer.flowchart.import.editingRequired'));
@@ -45,8 +51,8 @@ export const useFlowchartImportRequest = ({
         onImportInProgress: () => {
             messageApi.info(t('designer.flowchart.import.inProgress'));
         },
-        openFilePicker,
-        onConfirmationClosed: focusFlowchartImportTrigger,
+        openFilePicker: startImport,
+        onConfirmationClosed: options?.onConfirmationClosed ?? focusFlowchartImportTrigger,
         showConfirmation: appModal.confirm,
     });
 }, [editingEnabled, edgesRef, fileInputRef, importInFlightRef, messageApi, nodesRef, t]);

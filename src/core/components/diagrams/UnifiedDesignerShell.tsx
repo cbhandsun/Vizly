@@ -3,7 +3,9 @@ import React from 'react';
 export interface UnifiedDesignerShellProps {
     id: string;
     isDragging?: boolean;
+    onDragEnter?: (e: React.DragEvent) => void;
     onDragOver?: (e: React.DragEvent) => void;
+    onDragLeave?: (e: React.DragEvent) => void;
     onDrop?: (e: React.DragEvent) => void;
 
     messageContextHolder?: React.ReactNode;
@@ -27,7 +29,9 @@ export interface UnifiedDesignerShellProps {
 export const UnifiedDesignerShell: React.FC<UnifiedDesignerShellProps> = ({
     id,
     isDragging,
+    onDragEnter,
     onDragOver,
+    onDragLeave,
     onDrop,
     messageContextHolder,
     notificationContextHolder,
@@ -46,7 +50,9 @@ export const UnifiedDesignerShell: React.FC<UnifiedDesignerShellProps> = ({
             id={`diagram-${id}`}
             className={isDragging ? 'diagram-root diagram-dragging' : 'diagram-root'}
             style={style}
+            onDragEnter={onDragEnter}
             onDragOver={onDragOver}
+            onDragLeave={onDragLeave}
             onDrop={onDrop}
         >
             {messageContextHolder}

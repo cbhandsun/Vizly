@@ -5,7 +5,7 @@ import type { SnapDelta } from '../../../hooks/useSmartGuides';
 import type { ClipboardData } from '../../../utils/flowchartClipboard';
 import type { HistorySnapshotOptions } from '../../../hooks/useDiagramHistory';
 import { parseDragNodeTemplate, parseReverseImportDiagramState } from '../../../utils/dragDropPayload';
-import { getReverseImportImageFileError } from '../../../utils/fileImportGuards';
+import { getReverseImportImageFileError, isImageLikeImportFile } from '../../../utils/fileImportGuards';
 import {
     logDiagramDragDropFailure,
     logDiagramDragDropImportRejected,
@@ -88,7 +88,7 @@ export const useDiagramDragDrop = ({
             const files = Array.from(event.dataTransfer.files);
             if (files.length > 0) {
                 const file = files[0];
-                const isImage = file.type.startsWith('image/') || /\.(png|jpe?g|gif|webp|avif|svg)$/i.test(file.name);
+                const isImage = isImageLikeImportFile(file);
                 
                 if (isImage) {
                     try {

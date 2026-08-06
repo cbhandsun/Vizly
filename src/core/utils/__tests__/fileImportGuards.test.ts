@@ -4,6 +4,7 @@ import {
     getFileSizeLimitError,
     getImageFileImportError,
     getReverseImportImageFileError,
+    isImageLikeImportFile,
     REVERSE_IMPORT_IMAGE_MAX_BYTES,
     sanitizeFileNameForDisplay,
 } from '../fileImportGuards';
@@ -33,6 +34,13 @@ describe('fileImportGuards', () => {
 
     it('defines a bounded reverse-image import limit', () => {
         expect(REVERSE_IMPORT_IMAGE_MAX_BYTES).toBe(10 * 1024 * 1024);
+    });
+
+    it('recognizes image-like drops from either MIME type or file extension', () => {
+        expect(isImageLikeImportFile({ name: 'diagram', type: 'image/png' })).toBe(true);
+        expect(isImageLikeImportFile({ name: 'diagram.webp', type: '' })).toBe(true);
+        expect(isImageLikeImportFile({ name: 'diagram.svg', type: 'application/octet-stream' })).toBe(true);
+        expect(isImageLikeImportFile({ name: 'diagram.mmd', type: 'text/plain' })).toBe(false);
     });
 
     it('rejects unsupported image uploads before reading file data', () => {

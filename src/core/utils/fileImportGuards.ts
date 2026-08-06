@@ -14,6 +14,13 @@ const SAFE_IMAGE_IMPORT_MIME_TYPES = new Set([
 ]);
 const SAFE_IMAGE_IMPORT_EXTENSIONS = /\.(png|jpe?g|gif|webp|avif)$/i;
 
+export const isImageLikeImportFile = (
+    file: Pick<File, 'name' | 'type'>
+): boolean => (
+    String(file.type || '').toLowerCase().startsWith('image/')
+    || /\.(png|jpe?g|gif|webp|avif|svg)$/i.test(file.name || '')
+);
+
 export const formatFileSize = (bytes: number): string => {
     if (!Number.isFinite(bytes) || bytes < 0) return '0 B';
     if (bytes < 1024) return `${bytes} B`;
