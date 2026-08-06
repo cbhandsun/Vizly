@@ -11,10 +11,17 @@ import type { LayeredConfigChangeEvent } from '@/core/config/LayeredConfigTypes'
 import { useKeyboardAccessibleDropdown } from '@/core/components/diagrams/hooks/useKeyboardAccessibleDropdown';
 import { parseSupportedLanguage } from '@/core/utils/languagePreference';
 
-export const LanguageSwitcher: React.FC<{ variant?: 'select' | 'icon', className?: string }> = ({ variant = 'select', className }) => {
+interface LanguageSwitcherProps {
+    variant?: 'select' | 'icon';
+    className?: string;
+    ariaLabel?: string;
+}
+
+export const LanguageSwitcher: React.FC<LanguageSwitcherProps> = ({ variant = 'select', className, ariaLabel }) => {
     const { i18n, t } = useTranslation();
     const currentLanguage = i18n.resolvedLanguage || i18n.language;
     const selectedLanguage = parseSupportedLanguage(currentLanguage) ?? 'en';
+    const languageLabel = ariaLabel ?? t('common.language');
     const menuInstanceId = React.useId().replace(/[^a-zA-Z0-9_-]/g, '');
     const menuId = `language-switcher-menu-${menuInstanceId}`;
     const overlayClassName = `language-switcher-overlay-${menuInstanceId}`;
@@ -75,13 +82,13 @@ export const LanguageSwitcher: React.FC<{ variant?: 'select' | 'icon', className
 
     if (variant === 'icon') {
         const currentOption = options.find(option => option.key === selectedLanguage) ?? options[0];
-        const triggerLabel = `${t('common.language')}: ${currentOption.languageLabel}`;
+        const triggerLabel = `${languageLabel}: ${currentOption.languageLabel}`;
 
         return (
             <Dropdown
                 menu={{
                     id: menuId,
-                    'aria-label': t('common.language'),
+                    'aria-label': languageLabel,
                     items: options.map(option => ({
                         key: option.key,
                         role: 'menuitemradio',
@@ -122,6 +129,7 @@ export const LanguageSwitcher: React.FC<{ variant?: 'select' | 'icon', className
 
     return (
         <Select
+            aria-label={languageLabel}
             variant="filled"
             value={selectedLanguage}
             onChange={handleChange}

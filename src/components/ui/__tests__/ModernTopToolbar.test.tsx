@@ -10,8 +10,13 @@ vi.mock('antd', () => ({
   Grid: {
     useBreakpoint: () => breakpointState,
   },
-  Popover: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  Select: () => <select aria-label="edge-mode" />,
+  Popover: ({ children, content }: { children: React.ReactNode; content?: React.ReactNode }) => (
+    <>
+      {children}
+      {content}
+    </>
+  ),
+  Select: ({ 'aria-label': ariaLabel }: { 'aria-label'?: string }) => <select aria-label={ariaLabel} />,
   Tooltip: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
@@ -36,7 +41,9 @@ vi.mock('../EnhancedThemeSelector', () => ({
 }));
 
 vi.mock('../../shared/LanguageSwitcher', () => ({
-  LanguageSwitcher: () => <div data-testid="language-switcher" />,
+  LanguageSwitcher: ({ ariaLabel }: { ariaLabel?: string }) => (
+    <select data-testid="language-switcher" aria-label={ariaLabel} />
+  ),
 }));
 
 vi.mock('../../auth/AuthStatus', () => ({
@@ -78,5 +85,17 @@ describe('ModernTopToolbar responsive layout', () => {
     expect(centerSection?.className).not.toContain('absolute');
     expect(centerSection?.className).toContain('flex-1');
     expect(screen.getByTestId('export-tools').getAttribute('data-show-controls')).toBe('true');
+  });
+
+  it('exposes the system settings trigger and its fields to assistive technology', () => {
+    breakpointState.md = false;
+    renderToolbar();
+
+    const trigger = screen.getByRole('button', { name: '设置：连线模式、语言' });
+    expect(trigger.getAttribute('aria-haspopup')).toBe('dialog');
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.getByRole('dialog', { name: '设置：连线模式、语言' })).toBeTruthy();
+    expect(screen.getByRole('combobox', { name: '连线模式' })).toBeTruthy();
+    expect(screen.getByRole('combobox', { name: '语言 / Language' })).toBeTruthy();
   });
 });

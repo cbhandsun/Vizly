@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Grid, Select, Tooltip, Popover } from 'antd';
 import { SearchOutlined, RightOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
@@ -38,6 +38,10 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
 }) => {
   const { t } = useTranslation();
   const screens = Grid.useBreakpoint();
+  const [isMoreOpen, setIsMoreOpen] = useState(false);
+  const moreTriggerRef = useRef<HTMLButtonElement>(null);
+  const morePopoverInstanceId = React.useId().replace(/[^a-zA-Z0-9_-]/g, '');
+  const morePopoverId = `toolbar-system-settings-${morePopoverInstanceId}`;
   
   // Responsive flags
   const isMobile = !screens.md;  // < 768px
@@ -46,15 +50,36 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
   const commandShortcutLabel = isMac ? '⌘K' : 'Ctrl+K';
 
   const islandBaseClass = "flex items-center h-[40px] bg-white dark:bg-[#2d2d2d] border border-[rgba(0,0,0,0.12)] dark:border-[rgba(255,255,255,0.12)] rounded-[10px] shadow-[0_2px_8px_rgba(0,0,0,0.08)] transition-all duration-200 pointer-events-auto";
+  const moreSettingsLabel = `${t('common.settings', '设置')}：${t('header.edgeMode', '连线模式')}、${t('common.language', '语言')}`;
+
+  const closeMoreAndRestoreFocus = useCallback(() => {
+    setIsMoreOpen(false);
+    window.requestAnimationFrame(() => moreTriggerRef.current?.focus());
+  }, []);
+
+  const handleMoreContentKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'Escape') return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    closeMoreAndRestoreFocus();
+  }, [closeMoreAndRestoreFocus]);
 
   /* ── Menu Content ── */
   const moreContent = useMemo(() => (
-    <div className="min-w-[220px] py-2 flex flex-col font-sans">
+    <div
+      id={morePopoverId}
+      role="dialog"
+      aria-label={moreSettingsLabel}
+      className="min-w-[220px] py-2 flex flex-col font-sans"
+      onKeyDown={handleMoreContentKeyDown}
+    >
       <div className="px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
         <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">
           {t('header.edgeMode', '连线模式')}
         </div>
         <Select
+          aria-label={t('header.edgeMode', '连线模式')}
           variant="filled"
           value={edgeMode}
           onChange={(value) => {
@@ -75,10 +100,10 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
         <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">
           {t('common.language', '语言 / Language')}
         </div>
-        <LanguageSwitcher />
+        <LanguageSwitcher ariaLabel={t('common.language', '语言 / Language')} />
       </div>
     </div>
-  ), [edgeMode, onEdgeModeChange, t]);
+  ), [edgeMode, handleMoreContentKeyDown, morePopoverId, moreSettingsLabel, onEdgeModeChange, t]);
 
   return (
     <div
@@ -197,10 +222,25 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
               />
             )}
             
-            <Popover content={moreContent} trigger="click" placement="bottomRight">
-              <div className="w-8 h-8 flex items-center justify-center hover:bg-black/[0.06] dark:hover:bg-white/[0.08] rounded-[6px] cursor-pointer text-slate-500 dark:text-slate-400 transition-colors">
+            <Popover
+              content={moreContent}
+              trigger="click"
+              placement="bottomRight"
+              open={isMoreOpen}
+              onOpenChange={setIsMoreOpen}
+            >
+              <button
+                ref={moreTriggerRef}
+                type="button"
+                className="w-8 h-8 flex items-center justify-center appearance-none border-0 bg-transparent p-0 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] rounded-[6px] cursor-pointer text-slate-500 dark:text-slate-400 transition-colors"
+                aria-label={moreSettingsLabel}
+                aria-haspopup="dialog"
+                aria-expanded={isMoreOpen}
+                aria-controls={isMoreOpen ? morePopoverId : undefined}
+                title={moreSettingsLabel}
+              >
                 <FaEllipsisV className="text-[13px]" />
-              </div>
+              </button>
             </Popover>
           </div>
 

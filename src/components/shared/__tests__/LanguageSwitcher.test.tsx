@@ -104,7 +104,9 @@ vi.mock('antd', () => ({
       </div>
     );
   },
-  Select: () => null,
+  Select: ({ 'aria-label': ariaLabel }: { 'aria-label'?: string }) => (
+    <select aria-label={ariaLabel} />
+  ),
 }));
 
 import { LanguageSwitcher } from '../LanguageSwitcher';
@@ -152,6 +154,12 @@ describe('LanguageSwitcher', () => {
     render(<LanguageSwitcher variant="icon" />);
 
     expect(languageState.changeLanguage).not.toHaveBeenCalled();
+  });
+
+  it('labels the select variant for assistive technology', () => {
+    render(<LanguageSwitcher ariaLabel="Interface language" />);
+
+    expect(screen.getByRole('combobox', { name: 'Interface language' })).toBeTruthy();
   });
 
   it('normalizes supported regional language values', () => {
