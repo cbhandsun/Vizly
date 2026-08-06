@@ -2,10 +2,17 @@
 
 import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { WorkspaceDiagramCollection } from '../WorkspaceDiagramCollection';
 import { WorkspaceContextMenu } from '../WorkspaceContextMenu';
-import type { UnifiedDiagramItem } from '../diagramManagementPage.helpers';
+import type {
+  FilterViewType,
+  SortKey,
+  UnifiedDiagramItem,
+  ViewMode,
+} from '../diagramManagementPage.helpers';
 import {
   createWorkspaceDeleteConfirmation,
   type WorkspaceDeleteConfirmationOptions,
@@ -18,17 +25,44 @@ import {
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, options?: { title?: string }) => {
+    t: (key: string, options?: { title?: string; view?: string }) => {
       const values: Record<string, string> = {
         'common.delete': 'Delete',
         'common.open': 'Open',
+        'workspace.recent': 'Recent',
+        'workspace.local': 'Local',
+        'workspace.cloud': 'Cloud',
+        'workspace.shared': 'Shared',
+        'workspace.industryTemplates': 'Industry templates',
+        'workspace.generalTemplates': 'General templates',
+        'workspace.lastModified': 'Last modified',
+        'workspace.name': 'Name',
+        'workspace.type': 'Type',
+        'workspace.sortBy': 'Sort diagrams',
+        'workspace.filterBy': 'Filter diagrams',
+        'workspace.viewMode': 'Diagram view',
+        'workspace.gridView': 'Grid view',
+        'workspace.listView': 'List view',
+        'workspace.viewRecent': 'View recent diagrams',
+        'workspace.empty.filterTitle': `No diagrams in ${options?.view ?? ''}`,
+        'workspace.empty.filterDescription': `The ${options?.view ?? ''} view is empty.`,
         'workspace.openInNewTab': 'Open in new tab',
       };
       if (key === 'workspace.moreActions') return `More actions for ${options?.title ?? ''}`;
       return values[key] ?? key;
     },
+    i18n: { language: 'en', resolvedLanguage: 'en' },
   }),
 }));
+
+Object.defineProperty(globalThis, 'ResizeObserver', {
+  configurable: true,
+  value: class ResizeObserverMock {
+    observe(): void {}
+    unobserve(): void {}
+    disconnect(): void {}
+  },
+});
 
 const item: UnifiedDiagramItem = {
   id: 'diagram-1',
@@ -37,6 +71,33 @@ const item: UnifiedDiagramItem = {
   source: 'local',
   role: 'owner',
   raw: { id: 'diagram-1' } as UnifiedDiagramItem['raw'],
+};
+
+const WorkspaceControlsHarness = () => {
+  const [activeView, setActiveView] = useState<FilterViewType>('cloud');
+  const [sortKey, setSortKey] = useState<SortKey>('updated');
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+
+  return (
+    <WorkspaceDiagramCollection
+      activeView={activeView}
+      onActiveViewChange={setActiveView}
+      unifiedItems={[item]}
+      filteredItems={[]}
+      sortKey={sortKey}
+      onSortKeyChange={setSortKey}
+      viewMode={viewMode}
+      onViewModeChange={setViewMode}
+      loading={false}
+      onOpenDiagram={vi.fn()}
+      onOpenDiagramInNewTab={vi.fn()}
+      onContextMenu={vi.fn()}
+      onDeleteDiagram={vi.fn()}
+      onCreateBlank={vi.fn()}
+      searchQuery=""
+      onClearSearch={vi.fn()}
+    />
+  );
 };
 
 afterEach(() => {
@@ -102,6 +163,36 @@ describe('WorkspaceContextMenu', () => {
 
     fireEvent.click(screen.getByRole('menuitem', { name: 'Delete' }));
     expect(onDelete).toHaveBeenCalledWith(expect.anything(), item, origin);
+  });
+});
+
+describe('WorkspaceDiagramCollection controls', () => {
+  it('recovers an empty filtered view to Recent and restores focus to that filter', async () => {
+    render(<WorkspaceControlsHarness />);
+
+    expect(screen.getByRole('heading', { name: 'No diagrams in Cloud' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'View recent diagrams' }));
+
+    const recent = screen.getByRole('button', { name: /Recent/ });
+    expect(recent).toHaveAttribute('aria-pressed', 'true');
+    await waitFor(() => expect(document.activeElement).toBe(recent));
+  });
+
+  it.each(['Enter', ' ', 'ArrowDown'])('opens the named sort menu with %j and moves focus into it', async key => {
+    render(<WorkspaceControlsHarness />);
+    const trigger = screen.getByRole('button', { name: 'Sort diagrams: Last modified' });
+
+    trigger.focus();
+    fireEvent.keyDown(trigger, { key });
+
+    const menu = await screen.findByRole('menu', { name: 'Sort diagrams' });
+    const firstItem = screen.getByRole('menuitem', { name: 'Last modified' });
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    await waitFor(() => expect(document.activeElement).toBe(firstItem));
+
+    fireEvent.keyDown(menu, { key: 'Escape' });
+    await waitFor(() => expect(trigger).toHaveAttribute('aria-expanded', 'false'));
+    await waitFor(() => expect(document.activeElement).toBe(trigger));
   });
 });
 
