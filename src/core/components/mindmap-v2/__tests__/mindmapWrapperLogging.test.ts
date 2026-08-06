@@ -36,6 +36,7 @@ describe('mindmapWrapperLogging', () => {
     logging.logMindmapWrapperShapeSyncFailure(new Error('token=shape-sync-secret'));
     logging.logMindmapWrapperCopyTopicFailure(new Error('cookie=copy-topic-secret'));
     logging.logMindmapWrapperNotePreviewFailure(new Error('secret=note-preview-secret'));
+    logging.logMindmapWrapperInitialViewportFailure(new Error('token=viewport-secret'));
 
     const errorPayload = JSON.stringify(safeLogState.error.mock.calls);
     const warnPayload = JSON.stringify(safeLogState.warn.mock.calls);
@@ -55,6 +56,7 @@ describe('mindmapWrapperLogging', () => {
     expect(warnPayload).toContain('[MindElixirWrapper] shape sync failed:');
     expect(warnPayload).toContain('[MindElixirWrapper] copy topic shortcut failed:');
     expect(warnPayload).toContain('[MindElixirWrapper] note preview failed:');
+    expect(warnPayload).toContain('[MindElixirWrapper] initial viewport fit failed:');
     expect(errorPayload).toContain('[redacted]');
     expect(warnPayload).toContain('[redacted]');
     expect(warnPayload).not.toContain('save-secret');
@@ -72,5 +74,6 @@ describe('mindmapWrapperLogging', () => {
     expect(warnPayload).not.toContain('shape-sync-secret');
     expect(warnPayload).not.toContain('copy-topic-secret');
     expect(warnPayload).not.toContain('note-preview-secret');
+    expect(warnPayload).not.toContain('viewport-secret');
   });
 });
