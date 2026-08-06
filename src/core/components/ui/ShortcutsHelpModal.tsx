@@ -16,7 +16,7 @@ export const ShortcutsHelpModal: React.FC<{
   open: boolean;
   onClose: () => void;
   getContainer?: () => HTMLElement;
-}> = ({ open, onClose }) => {
+}> = ({ open, onClose, getContainer }) => {
   const { t } = useTranslation();
   const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/i.test(navigator.platform || '');
 
@@ -40,7 +40,7 @@ export const ShortcutsHelpModal: React.FC<{
       title={t('designer.shortcuts.title')}
       width={720}
       centered
-      getContainer={() => document.body}
+      getContainer={getContainer ?? (() => document.body)}
       rootClassName="commercial-shortcuts-modal"
     >
       <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>

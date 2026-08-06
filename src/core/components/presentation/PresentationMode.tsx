@@ -26,8 +26,13 @@ const PresentationMode: React.FC<PresentationModeProps> = ({ slides, onFocusNode
   const [currentIndex, setCurrentIndex] = useState(0);
   const overlayRef = useRef<HTMLDivElement>(null);
   const exitButtonRef = useRef<HTMLButtonElement>(null);
+  const onFocusNodesRef = useRef(onFocusNodes);
   const totalSlides = slides.length;
   const currentSlide = slides[currentIndex];
+
+  useEffect(() => {
+    onFocusNodesRef.current = onFocusNodes;
+  }, [onFocusNodes]);
 
   useEffect(() => {
     const previouslyFocused = document.activeElement instanceof HTMLElement
@@ -36,21 +41,27 @@ const PresentationMode: React.FC<PresentationModeProps> = ({ slides, onFocusNode
     exitButtonRef.current?.focus();
 
     return () => {
-      if (previouslyFocused?.isConnected && previouslyFocused !== document.body) {
-        previouslyFocused.focus();
-        return;
-      }
+      const persistentFocusTarget = document.querySelector<HTMLButtonElement>(
+        '[data-presentation-focus-return]',
+      );
+      const focusTarget = persistentFocusTarget?.isConnected
+        ? persistentFocusTarget
+        : previouslyFocused?.isConnected && previouslyFocused !== document.body
+          ? previouslyFocused
+          : null;
+      focusTarget?.focus();
+      queueMicrotask(() => {
+        if (focusTarget?.isConnected) focusTarget.focus();
+      });
     };
   }, []);
 
   // 聚焦当前 slide 的节点
-  const focusCurrent = useCallback(() => {
+  useEffect(() => {
     if (currentSlide) {
-      onFocusNodes(currentSlide.nodeIds);
+      onFocusNodesRef.current(currentSlide.nodeIds);
     }
-  }, [currentSlide, onFocusNodes]);
-
-  useEffect(() => { focusCurrent(); }, [focusCurrent]);
+  }, [currentSlide]);
 
   const goNext = useCallback(() => {
     if (currentIndex < totalSlides - 1) setCurrentIndex(i => i + 1);
@@ -62,11 +73,6 @@ const PresentationMode: React.FC<PresentationModeProps> = ({ slides, onFocusNode
 
   const handleExit = useCallback(() => {
     onExit();
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        document.querySelector<HTMLButtonElement>('[data-presentation-focus-return]')?.focus();
-      });
-    });
   }, [onExit]);
 
   // 键盘导航

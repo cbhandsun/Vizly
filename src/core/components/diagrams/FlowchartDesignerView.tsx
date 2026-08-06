@@ -353,7 +353,8 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                     <div ref={reactFlowWrapper} style={{ position: 'relative', height: '100%' }}>
                         {editingEnabled && <ContextMenuLayer onAction={handleContextMenuAction} activePlugin={activePlugin} pluginCtx={pluginCtx ?? undefined} />}
 
-                        {showEditingChrome && <DesignerHeaderLayer
+                        <div hidden={!showEditingChrome}>
+                            <DesignerHeaderLayer
                             diagramId={diagramIdForExport}
                             diagramTitle={model.title}
                             topActions={{
@@ -494,7 +495,8 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                 onAlign: handleAlign,
                                 onDistribute: handleDistribute,
                             }}
-                        />}
+                            />
+                        </div>
 
                         {isReadonly && !presentationActive && (
                             <div

@@ -37,22 +37,44 @@ describe('PresentationMode', () => {
         expect(onExit).toHaveBeenCalledTimes(1);
     });
 
+    it('focuses only when the active slide changes, not when the callback identity changes', () => {
+        const firstFocus = vi.fn();
+        const nextFocus = vi.fn();
+        const { rerender } = render(
+            <PresentationMode slides={slides} onFocusNodes={firstFocus} onExit={vi.fn()} />,
+        );
+
+        expect(firstFocus).toHaveBeenCalledTimes(1);
+        expect(firstFocus).toHaveBeenLastCalledWith(['a']);
+
+        rerender(<PresentationMode slides={slides} onFocusNodes={nextFocus} onExit={vi.fn()} />);
+
+        expect(firstFocus).toHaveBeenCalledTimes(1);
+        expect(nextFocus).not.toHaveBeenCalled();
+
+        fireEvent.click(screen.getByRole('button', { name: '下一页' }));
+        expect(nextFocus).toHaveBeenCalledTimes(1);
+        expect(nextFocus).toHaveBeenLastCalledWith(['b']);
+    });
+
     it('returns focus to the persistent document trigger after exit', () => {
-        const requestAnimationFrameSpy = vi.spyOn(window, 'requestAnimationFrame')
-            .mockImplementation(callback => {
-                callback(0);
-                return 1;
-            });
+        const transientTrigger = document.createElement('button');
         const focusTarget = document.createElement('button');
         focusTarget.dataset.presentationFocusReturn = '';
-        document.body.append(focusTarget);
+        document.body.append(transientTrigger, focusTarget);
+        transientTrigger.focus();
 
-        render(<PresentationMode slides={slides} onFocusNodes={vi.fn()} onExit={vi.fn()} />);
+        const onExit = vi.fn();
+        const { unmount } = render(
+            <PresentationMode slides={slides} onFocusNodes={vi.fn()} onExit={onExit} />,
+        );
+        transientTrigger.remove();
         fireEvent.click(screen.getByRole('button', { name: '退出演示' }));
+        expect(onExit).toHaveBeenCalledTimes(1);
+        unmount();
 
         expect(document.activeElement).toBe(focusTarget);
         focusTarget.remove();
-        requestAnimationFrameSpy.mockRestore();
     });
 
     it('moves focus into the dialog, traps it, and restores the trigger on unmount', () => {

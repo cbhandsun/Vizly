@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { TFunction } from 'i18next';
 import type { NavigateFunction } from 'react-router';
 
@@ -45,6 +45,7 @@ export interface DiagramViewerCommandsState {
     setIsSettingsOpen: (open: boolean) => void;
     isShortcutsOpen: boolean;
     setIsShortcutsOpen: (open: boolean) => void;
+    restoreCommandPaletteFocus: () => void;
     showDebugPanel: boolean;
     setShowDebugPanel: (open: boolean) => void;
 }
@@ -74,11 +75,36 @@ export function useDiagramViewerCommands({
     const editingEnabled = canMutateDiagramDocument({ isReadonly, isPresentationMode });
     const [showDebugPanel, setShowDebugPanel] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-    const [isCommandOpen, setIsCommandOpen] = useState(false);
+    const [isCommandOpen, setCommandOpen] = useState(false);
+    const commandPaletteFocusReturnRef = useRef<HTMLElement | null>(null);
     const [commandFavorites, setCommandFavorites] = useState<string[]>([]);
     const [commandRecent, setCommandRecent] = useState<string[]>([]);
     const [commandRecentOps, setCommandRecentOps] = useState<string[]>([]);
     const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
+
+    const setIsCommandOpen = useCallback((open: boolean) => {
+        if (open) {
+            const activeElement = document.activeElement;
+            commandPaletteFocusReturnRef.current = activeElement instanceof HTMLElement
+                && activeElement !== document.body
+                ? activeElement
+                : null;
+        }
+        setCommandOpen(open);
+    }, []);
+
+    const restoreCommandPaletteFocus = useCallback(() => {
+        window.requestAnimationFrame(() => {
+            window.requestAnimationFrame(() => {
+                const capturedTarget = commandPaletteFocusReturnRef.current;
+                const fallbackTarget = document.querySelector<HTMLElement>('[data-command-palette-focus-return]');
+                const target = capturedTarget?.isConnected && capturedTarget !== document.body
+                    ? capturedTarget
+                    : fallbackTarget;
+                target?.focus();
+            });
+        });
+    }, []);
 
     useEffect(() => {
         if (!isCommandOpen) return;
@@ -184,6 +210,7 @@ export function useDiagramViewerCommands({
         setIsSettingsOpen,
         isShortcutsOpen,
         setIsShortcutsOpen,
+        restoreCommandPaletteFocus,
         showDebugPanel,
         setShowDebugPanel,
     };

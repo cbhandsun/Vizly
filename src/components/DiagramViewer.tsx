@@ -603,6 +603,7 @@ const DiagramViewer: React.FC = () => {
         setIsSettingsOpen,
         isShortcutsOpen,
         setIsShortcutsOpen,
+        restoreCommandPaletteFocus,
         showDebugPanel,
         setShowDebugPanel,
     } = useDiagramViewerCommands({
@@ -646,6 +647,7 @@ const DiagramViewer: React.FC = () => {
             setIsCommandOpen={setIsCommandOpen}
             isShortcutsOpen={isShortcutsOpen}
             setIsShortcutsOpen={setIsShortcutsOpen}
+            restoreCommandPaletteFocus={restoreCommandPaletteFocus}
             collabModalVisible={collabModalVisible}
             setCollabModalVisible={setCollabModalVisible}
             activeUsers={activeUsers || []}

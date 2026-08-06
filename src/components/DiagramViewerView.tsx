@@ -68,6 +68,7 @@ interface DiagramViewerViewProps {
     setIsCommandOpen: (open: boolean) => void;
     isShortcutsOpen: boolean;
     setIsShortcutsOpen: (open: boolean) => void;
+    restoreCommandPaletteFocus: () => void;
     collabModalVisible: boolean;
     setCollabModalVisible: (open: boolean) => void;
     activeUsers: CollaborationModalProps['activeUsers'];
@@ -134,6 +135,7 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
     setIsCommandOpen,
     isShortcutsOpen,
     setIsShortcutsOpen,
+    restoreCommandPaletteFocus,
     collabModalVisible,
     setCollabModalVisible,
     activeUsers,
@@ -226,7 +228,10 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
                     <Suspense fallback={null}>
                         <ShortcutsHelpModal
                             open={isShortcutsOpen}
-                            onClose={() => setIsShortcutsOpen(false)}
+                            onClose={() => {
+                                setIsShortcutsOpen(false);
+                                restoreCommandPaletteFocus();
+                            }}
                             getContainer={() => document.getElementById('app-root-layout') || document.body}
                         />
                     </Suspense>

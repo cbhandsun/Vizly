@@ -231,6 +231,7 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
               <div className="w-[1px] h-[18px] bg-slate-200 dark:bg-white/10 mx-1.5 flex-shrink-0" />
               <button
                 type="button"
+                data-command-palette-focus-return
                 className="flex items-center gap-2 px-2 h-[32px] appearance-none border-0 bg-transparent rounded-[6px] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] cursor-pointer transition-colors group"
                 onClick={() => setIsCommandOpen(true)}
                 aria-label={commandSearchLabel}
