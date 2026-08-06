@@ -1,41 +1,57 @@
 import { useCallback, useRef, useState } from 'react';
 
 const MENU_OPEN_KEYS = new Set(['ArrowDown', 'Enter', ' ']);
+const MENU_ITEM_SELECTOR = [
+    '[role="menuitem"]',
+    '[role="menuitemcheckbox"]',
+    '[role="menuitemradio"]',
+].join(', ');
 
 interface KeyboardAccessibleDropdownOptions {
     overlayClassName: string;
     onBeforeOpen?: () => void;
+    preferredItemSelector?: string;
 }
 
 interface DropdownOpenChangeInfo {
     source: 'trigger' | 'menu';
 }
 
-const focusFirstEnabledMenuItem = (overlayClassName: string): boolean => {
-    const items = document.querySelectorAll<HTMLElement>(
-        `.${overlayClassName} [role="menuitem"]`,
-    );
-    const firstEnabled = Array.from(items).find(item => (
+const focusFirstEnabledMenuItem = (
+    overlayClassName: string,
+    preferredItemSelector?: string,
+): boolean => {
+    const overlay = document.querySelector<HTMLElement>(`.${overlayClassName}`);
+    if (!overlay) return false;
+
+    const enabledItems = Array.from(
+        overlay.querySelectorAll<HTMLElement>(MENU_ITEM_SELECTOR),
+    ).filter(item => (
         item.getAttribute('aria-disabled') !== 'true'
         && !item.hasAttribute('disabled')
     ));
-    if (!firstEnabled) return false;
-    firstEnabled.focus();
+    const preferredItem = preferredItemSelector
+        ? enabledItems.find(item => item.matches(preferredItemSelector))
+        : undefined;
+    const focusTarget = preferredItem ?? enabledItems[0];
+    if (!focusTarget) return false;
+    focusTarget.focus();
     return true;
 };
 
 export const useKeyboardAccessibleDropdown = ({
     overlayClassName,
     onBeforeOpen,
+    preferredItemSelector,
 }: KeyboardAccessibleDropdownOptions) => {
     const [open, setOpen] = useState(false);
     const triggerRef = useRef<HTMLButtonElement>(null);
 
     const focusFirstItem = useCallback(() => {
         window.setTimeout(() => {
-            focusFirstEnabledMenuItem(overlayClassName);
+            focusFirstEnabledMenuItem(overlayClassName, preferredItemSelector);
         }, 0);
-    }, [overlayClassName]);
+    }, [overlayClassName, preferredItemSelector]);
 
     const restoreTriggerFocusIfLost = useCallback(() => {
         window.setTimeout(() => {
@@ -63,7 +79,7 @@ export const useKeyboardAccessibleDropdown = ({
     const handleMenuKeyDown = useCallback((event: React.KeyboardEvent<HTMLElement>) => {
         if (event.key === ' ') {
             const target = event.target instanceof Element
-                ? event.target.closest<HTMLElement>('[role="menuitem"]')
+                ? event.target.closest<HTMLElement>(MENU_ITEM_SELECTOR)
                 : null;
             const isDisabled = target?.getAttribute('aria-disabled') === 'true'
                 || target?.hasAttribute('disabled');

@@ -10,9 +10,16 @@ interface HarnessProps {
     empty?: boolean;
     onActivate?: () => void;
     onBeforeOpen?: () => void;
+    radioItems?: boolean;
 }
 
-const Harness: React.FC<HarnessProps> = ({ disabledFirst = false, empty = false, onActivate, onBeforeOpen }) => {
+const Harness: React.FC<HarnessProps> = ({
+    disabledFirst = false,
+    empty = false,
+    onActivate,
+    onBeforeOpen,
+    radioItems = false,
+}) => {
     const {
         open,
         triggerRef,
@@ -22,6 +29,9 @@ const Harness: React.FC<HarnessProps> = ({ disabledFirst = false, empty = false,
     } = useKeyboardAccessibleDropdown({
         overlayClassName: 'test-menu-overlay',
         onBeforeOpen,
+        preferredItemSelector: radioItems
+            ? '[role="menuitemradio"][aria-checked="true"]'
+            : undefined,
     });
 
     const activate = () => {
@@ -47,14 +57,22 @@ const Harness: React.FC<HarnessProps> = ({ disabledFirst = false, empty = false,
                         {!empty && (
                             <>
                                 <li
-                                    role="menuitem"
+                                    role={radioItems ? 'menuitemradio' : 'menuitem'}
                                     tabIndex={-1}
+                                    aria-checked={radioItems ? false : undefined}
                                     aria-disabled={disabledFirst || undefined}
                                     onClick={disabledFirst ? undefined : activate}
                                 >
                                     第一项
                                 </li>
-                                <li role="menuitem" tabIndex={-1}>第二项</li>
+                                <li
+                                    role={radioItems ? 'menuitemradio' : 'menuitem'}
+                                    tabIndex={-1}
+                                    aria-checked={radioItems ? true : undefined}
+                                    onClick={activate}
+                                >
+                                    第二项
+                                </li>
                             </>
                         )}
                     </ul>
@@ -119,6 +137,25 @@ describe('useKeyboardAccessibleDropdown', () => {
         await waitFor(() => expect(document.activeElement).toBe(firstItem));
 
         fireEvent.keyDown(firstItem, { key: ' ' });
+
+        expect(onActivate).toHaveBeenCalledTimes(1);
+        await waitFor(() => {
+            expect(screen.queryByRole('menu')).toBeNull();
+            expect(document.activeElement).toBe(trigger);
+        });
+    });
+
+    it('focuses and activates the checked radio item', async () => {
+        const onActivate = vi.fn();
+        render(<Harness radioItems onActivate={onActivate} />);
+        const trigger = screen.getByRole('button', { name: '操作' });
+
+        fireEvent.keyDown(trigger, { key: 'ArrowDown' });
+        const checkedItem = await screen.findByRole('menuitemradio', { name: '第二项' });
+        expect(checkedItem.getAttribute('aria-checked')).toBe('true');
+        await waitFor(() => expect(document.activeElement).toBe(checkedItem));
+
+        fireEvent.keyDown(checkedItem, { key: ' ' });
 
         expect(onActivate).toHaveBeenCalledTimes(1);
         await waitFor(() => {

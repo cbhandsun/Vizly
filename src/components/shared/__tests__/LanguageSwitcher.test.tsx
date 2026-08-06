@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import type { ReactNode } from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { cloneElement, type KeyboardEventHandler, type MouseEventHandler, type ReactElement, type ReactNode } from 'react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   coerceSupportedLanguage,
@@ -41,29 +41,69 @@ vi.mock('@/core/config/LayeredConfigManager', () => ({
 }));
 
 interface MockMenuItem {
-  key: string;
-  label: ReactNode;
+    key: string;
+    label: ReactNode;
+    role?: 'menuitem' | 'menuitemradio';
+    'aria-checked'?: boolean;
 }
 
 interface MockDropdownProps {
-  children: ReactNode;
+  children: ReactElement<{
+    onClick?: MouseEventHandler<HTMLButtonElement>;
+  }>;
+  onOpenChange?: (open: boolean, info: { source: 'trigger' | 'menu' }) => void;
+  open?: boolean;
+  overlayClassName?: string;
   menu: {
+    id?: string;
+    'aria-label'?: string;
     items?: Array<MockMenuItem | null>;
     onClick?: (info: { key: string }) => void;
+    onKeyDown?: KeyboardEventHandler<HTMLUListElement>;
   };
 }
 
 vi.mock('antd', () => ({
-  Dropdown: ({ children, menu }: MockDropdownProps) => (
-    <div>
-      {children}
-      {(menu.items ?? []).flatMap(item => item ? [(
-        <button type="button" key={item.key} onClick={() => menu.onClick?.({ key: item.key })}>
-          {item.label}
-        </button>
-      )] : [])}
-    </div>
-  ),
+  Dropdown: ({ children, menu, onOpenChange, open = false, overlayClassName }: MockDropdownProps) => {
+    const trigger = cloneElement(children, {
+      onClick: event => {
+        children.props.onClick?.(event);
+        onOpenChange?.(!open, { source: 'trigger' });
+      },
+    });
+
+    return (
+      <div>
+        {trigger}
+        {open ? (
+          <div className={overlayClassName}>
+            <ul
+              id={menu.id}
+              role="menu"
+              aria-label={menu['aria-label']}
+              onKeyDown={menu.onKeyDown}
+            >
+              {(menu.items ?? []).flatMap(item => item ? [(
+                <li
+                  key={item.key}
+                  role={item.role ?? 'menuitem'}
+                  aria-checked={item['aria-checked']}
+                  tabIndex={-1}
+                  onClick={event => {
+                    event.stopPropagation();
+                    menu.onClick?.({ key: item.key });
+                    onOpenChange?.(false, { source: 'menu' });
+                  }}
+                >
+                  {item.label}
+                </li>
+              )] : [])}
+            </ul>
+          </div>
+        ) : null}
+      </div>
+    );
+  },
   Select: () => null,
 }));
 
@@ -75,14 +115,36 @@ describe('LanguageSwitcher', () => {
     languageState.get.mockReturnValue(null);
   });
 
-  it('switches to a supported language and persists the preference', () => {
+  it('switches to a supported language, persists the preference, and restores focus', async () => {
     render(<LanguageSwitcher variant="icon" />);
 
-    expect(screen.getByRole('button', { name: 'Language' })).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: '🇨🇳 中文' }));
+    const trigger = screen.getByRole('button', { name: 'Language: English' });
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole('menuitemradio', { name: '中文' }));
 
     expect(languageState.changeLanguage).toHaveBeenCalledWith('zh');
     expect(languageState.set).toHaveBeenCalledWith('i18n.language', 'zh', 'user');
+    await waitFor(() => {
+      expect(screen.queryByRole('menu')).toBeNull();
+      expect(document.activeElement).toBe(trigger);
+    });
+  });
+
+  it('exposes popup state and focuses the checked language for keyboard users', async () => {
+    render(<LanguageSwitcher variant="icon" />);
+
+    const trigger = screen.getByRole('button', { name: 'Language: English' });
+    expect(trigger.getAttribute('aria-haspopup')).toBe('menu');
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+
+    fireEvent.keyDown(trigger, { key: 'ArrowDown' });
+
+    const menu = await screen.findByRole('menu', { name: 'Language' });
+    const selectedItem = screen.getByRole('menuitemradio', { name: 'English' });
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    expect(trigger.getAttribute('aria-controls')).toBe(menu.id);
+    expect(selectedItem.getAttribute('aria-checked')).toBe('true');
+    await waitFor(() => expect(document.activeElement).toBe(selectedItem));
   });
 
   it('ignores an unsupported stored language', () => {
