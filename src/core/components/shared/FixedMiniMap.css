@@ -33,7 +33,6 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    cursor: pointer;
 }
 
 /* Drag Handle */
@@ -42,7 +41,7 @@
     top: 0;
     left: 0;
     right: 0;
-    height: 24px;
+    height: var(--commercial-touch-target, 44px);
     background: linear-gradient(to bottom, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.1));
     border-bottom: 1px solid rgba(0, 0, 0, 0.05);
     cursor: grab;
@@ -67,24 +66,25 @@
 /* Controls */
 .minimap-controls {
     position: absolute;
-    bottom: 8px;
-    right: 8px;
+    top: 0;
+    right: 0;
     display: flex;
     gap: 4px;
-    z-index: 20;
+    z-index: 30;
+    pointer-events: auto;
 }
 
 .minimap-control-btn {
-    width: 24px;
-    height: 24px;
-    border-radius: 6px;
-    background: rgba(255, 255, 255, 0.8);
-    border: 1px solid rgba(0, 0, 0, 0.1);
+    width: var(--commercial-touch-target, 44px);
+    height: var(--commercial-touch-target, 44px);
+    border-radius: 50%;
+    background: transparent;
+    border: none;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    color: var(--color-slate-600);
+    color: var(--color-slate-400);
     transition: all 0.2s;
 }
 
@@ -92,6 +92,27 @@
     background: var(--color-primary-50);
     color: var(--color-primary-600);
     border-color: var(--color-primary-200);
+}
+
+.minimap-control-btn:focus-visible,
+.minimap-expand-button:focus-visible {
+    outline: 2px solid var(--color-primary-500, #667eea);
+    outline-offset: -3px;
+}
+
+.minimap-expand-button {
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--color-slate-600);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
 }
 
 /* Minimized Icon */

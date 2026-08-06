@@ -8,8 +8,10 @@ import { useConfigIntegration } from '../../hooks/useConfigIntegration';
 import { getDomainTheme } from '../../utils/domainKey';
 import { hexToRgba } from '../shared/layoutUtils';
 import { subscribeViewport, getUiScale, type Viewport } from './viewportStore';
-import { FaExpand, FaCompress, FaGripVertical } from 'react-icons/fa';
+import { FaGripVertical } from 'react-icons/fa';
 import './FixedMiniMap.css';
+
+import { MinimapCollapseControl } from './MinimapCollapseControl';
 
 import { safeNumber } from './hooks/useMinimapMath';
 import { useMinimapOverlay } from './hooks/useMinimapOverlay';
@@ -335,7 +337,6 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
           ref={containerRef}
           className={`fixed-minimap-container ${overlay.isMinimized ? 'minimized' : ''} ${overlay.isDragging ? 'dragging' : ''} ${isNodeDragging ? 'drag-frozen' : ''}`}
           style={containerStyle}
-          onClick={overlay.isMinimized ? overlay.toggleMinimize : undefined}
           onMouseDown={!overlay.isMinimized ? (e) => {
             const target = e.target as HTMLElement;
             if (target.closest('.minimap-drag-handle')) {
@@ -343,37 +344,22 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
             }
           } : undefined}
         >
-          {overlay.isMinimized ? (
-            <span title="展开缩略图" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' }}>
-              <FaExpand />
-            </span>
-          ) : (
+          <MinimapCollapseControl
+            expandLabel={t('designer.toolbar.expandMinimap', '展开小地图')}
+            isMinimized={overlay.isMinimized}
+            minimizeLabel={t('designer.toolbar.minimizeMinimap', '最小化小地图')}
+            onToggle={overlay.toggleMinimize}
+          />
+          {!overlay.isMinimized && (
             <>
               <div className="minimap-drag-handle" title="拖拽移动缩略图">
                 <FaGripVertical className="minimap-drag-icon" />
-              </div>
-              <div
-                className="minimap-controls"
-                style={{
-                  position: 'absolute', top: '4px', right: '4px',
-                  display: 'flex', gap: '4px', zIndex: 30, pointerEvents: 'auto'
-                }}
-              >
-                <button
-                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); overlay.toggleMinimize(); }}
-                  title="最小化小地图"
-                  className="minimap-control-btn"
-                  style={{ borderRadius: '50%', background: 'transparent', border: 'none', color: 'var(--color-slate-400)', boxShadow: 'none' }}
-                  type="button"
-                >
-                  <FaCompress />
-                </button>
               </div>
 
               <div
                 ref={setMinimapRef}
                 style={{
-                  position: 'absolute', top: '30px', left: '2px', right: '2px', bottom: '2px',
+                  position: 'absolute', top: '44px', left: '2px', right: '2px', bottom: '2px',
                   pointerEvents: 'auto', cursor: nav.isMinimapDragging ? 'grabbing' : 'crosshair'
                 }}
                 onClick={(e) => nav.handleMiniMapClick(e, overlay.isDragging)}
