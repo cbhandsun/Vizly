@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 beforeAll(() => {
     Object.defineProperty(globalThis, 'ResizeObserver', {
@@ -78,6 +78,10 @@ describe('VersionHistoryPanel commercial preview safeguards', () => {
         historyMocks.restoreVersion.mockClear();
     });
 
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
     it('uses a concise localized title and keeps snapshot creation available normally', () => {
         render(<VersionHistoryPanel diagramId="diagram-1" isOpen onClose={vi.fn()} />);
 
@@ -120,5 +124,31 @@ describe('VersionHistoryPanel commercial preview safeguards', () => {
         fireEvent.click(screen.getByLabelText('恢复版本：发布候选版本'));
 
         expect(await screen.findByText('恢复前会自动备份当前画布；若备份失败，将取消恢复。确定恢复此版本吗？')).toBeTruthy();
+    });
+
+    it('returns focus to document actions after the drawer closes', () => {
+        let restoreFocus: FrameRequestCallback | undefined;
+        vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+            restoreFocus = callback;
+            return 1;
+        });
+
+        const trigger = document.createElement('button');
+        trigger.setAttribute('data-version-history-focus-return', '');
+        trigger.textContent = '文档操作';
+        document.body.appendChild(trigger);
+
+        const onClose = vi.fn();
+        render(<VersionHistoryPanel diagramId="diagram-1" isOpen onClose={onClose} />);
+        const closeButton = screen.getByRole('button', { name: 'Close' });
+        closeButton.focus();
+
+        fireEvent.click(closeButton);
+        expect(onClose).toHaveBeenCalledTimes(1);
+        expect(document.activeElement).not.toBe(trigger);
+
+        restoreFocus?.(0);
+        expect(document.activeElement).toBe(trigger);
+        trigger.remove();
     });
 });

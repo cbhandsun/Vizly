@@ -12,6 +12,8 @@ import './VersionHistoryPanel.css';
 
 const { Text, Title } = Typography;
 
+const VERSION_HISTORY_FOCUS_RETURN_SELECTOR = '[data-version-history-focus-return]';
+
 interface VersionHistoryPanelProps {
     diagramId: string;
     isOpen: boolean;
@@ -38,6 +40,23 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
     const [isSaving, setIsSaving] = useState(false);
     const [previewingVersionId, setPreviewingVersionId] = useState<string | null>(null);
     const [restoringVersionId, setRestoringVersionId] = useState<string | null>(null);
+
+    const handleClose = () => {
+        const previewBase = exitPreview();
+        if (previewBase) {
+            setNodes(previewBase.nodes);
+            setEdges(previewBase.edges);
+        }
+        onClose();
+
+        window.requestAnimationFrame(() => {
+            const returnTarget = document.querySelector<HTMLButtonElement>(
+                VERSION_HISTORY_FOCUS_RETURN_SELECTOR,
+            );
+            if (!returnTarget?.isConnected || returnTarget.disabled) return;
+            returnTarget.focus();
+        });
+    };
 
     const handleSave = async () => {
         if (isSaving || previewVersion) return;
@@ -83,14 +102,7 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
         <Drawer
             title="版本历史"
             placement="right"
-            onClose={() => {
-                const previewBase = exitPreview();
-                if (previewBase) {
-                    setNodes(previewBase.nodes);
-                    setEdges(previewBase.edges);
-                }
-                onClose();
-            }}
+            onClose={handleClose}
             open={isOpen}
             rootClassName="version-history-drawer"
             getContainer={() => document.body}
