@@ -16,6 +16,7 @@ class MockResizeObserver implements ResizeObserver {
 }
 
 import { ModernFlowchartToolbar } from '../ModernFlowchartToolbar';
+import { buildToolModeMenuItems } from '../flowchartToolbarToolModeMenu';
 
 describe('ModernFlowchartToolbar mobile file actions', () => {
     beforeEach(() => {
@@ -38,6 +39,33 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
             <div id="vizly-plugin-context-toolbar-portal"></div>
             <div id="vizly-plugin-bottom-island-portal"></div>
         `;
+    });
+
+    it('normalizes conflicting tool flags to a single checked menu item', () => {
+        const items = buildToolModeMenuItems({
+            isDrawingMode: true,
+            isMarqueeActive: true,
+            labels: {
+                drawing: 'drawing',
+                marquee: 'marquee',
+                mindMap: 'mind-map',
+                pointer: 'pointer',
+                stickyNote: 'sticky-note',
+            },
+            onActivatePointer: vi.fn(),
+            onToggleDrawingMode: vi.fn(),
+            toggleSelectionMode: vi.fn(),
+        });
+
+        const checkedItems = items.filter((item) => (
+            typeof item === 'object'
+            && item !== null
+            && 'aria-checked' in item
+            && item['aria-checked'] === true
+        ));
+
+        expect(checkedItems).toHaveLength(1);
+        expect(checkedItems[0]).toMatchObject({ key: 'marquee' });
     });
 
     it('keeps the file-actions trigger available when the desktop breakpoint is absent', async () => {
@@ -68,14 +96,14 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
         expect(moreButton.getAttribute('data-flowchart-import-focus-return')).toBe('true');
     });
 
-    it('exposes selection and creation tools through the mobile more menu', async () => {
+    it('exposes the active selection tool as a selected radio item in the mobile more menu', async () => {
         const onActivatePointer = vi.fn();
         const toggleSelectionMode = vi.fn();
         const onToggleDrawingMode = vi.fn();
         const onAddStickyNote = vi.fn();
         const onAddMindMap = vi.fn();
 
-        render(
+        const { rerender } = render(
             <ModernFlowchartToolbar
                 canUndo={false}
                 canRedo={false}
@@ -101,17 +129,83 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
 
         fireEvent.click(await screen.findByRole('button', { name: /更多操作|moreActions/i }));
 
-        expect(await screen.findByRole('menuitem', { name: /普通选择器/ })).toBeTruthy();
-        fireEvent.click(screen.getByRole('menuitem', { name: /框选模式/ }));
+        const pointerItem = await screen.findByRole('menuitemradio', { name: /普通选择器/ });
+        expect(pointerItem.getAttribute('aria-checked')).toBe('true');
+        expect(pointerItem.className).toContain('ant-dropdown-menu-item-selected');
+
+        const marqueeItem = screen.getByRole('menuitemradio', { name: /框选模式/ });
+        expect(marqueeItem.getAttribute('aria-checked')).toBe('false');
+        fireEvent.click(marqueeItem);
         expect(toggleSelectionMode).toHaveBeenCalledTimes(1);
 
+        rerender(
+            <ModernFlowchartToolbar
+                canUndo={false}
+                canRedo={false}
+                onUndo={vi.fn()}
+                onRedo={vi.fn()}
+                onZoomIn={vi.fn()}
+                onZoomOut={vi.fn()}
+                onFitView={vi.fn()}
+                autoRouting={false}
+                toggleAutoRouting={vi.fn()}
+                showGrid
+                toggleGrid={vi.fn()}
+                onShowShortcuts={vi.fn()}
+                showRuler={false}
+                toggleRuler={vi.fn()}
+                onActivatePointer={onActivatePointer}
+                isMarqueeActive
+                toggleSelectionMode={toggleSelectionMode}
+                onToggleDrawingMode={onToggleDrawingMode}
+                onAddStickyNote={onAddStickyNote}
+                onAddMindMap={onAddMindMap}
+            />,
+        );
+
         fireEvent.click(await screen.findByRole('button', { name: /更多操作|moreActions/i }));
-        expect(await screen.findByRole('menuitem', { name: /自由画笔/ })).toBeTruthy();
+        const activeMarqueeItem = await screen.findByRole('menuitemradio', { name: /退出框选/ });
+        expect(activeMarqueeItem.getAttribute('aria-checked')).toBe('true');
+        expect(activeMarqueeItem.className).toContain('ant-dropdown-menu-item-selected');
+        const drawingItem = screen.getByRole('menuitemradio', { name: /自由画笔/ });
+        expect(drawingItem.getAttribute('aria-checked')).toBe('false');
         expect(screen.getByRole('menuitem', { name: /便签/ })).toBeTruthy();
         expect(screen.getByRole('menuitem', { name: /思维导图 \(Shift\+M\)/ })).toBeTruthy();
         expect(screen.queryByRole('menuitem', { name: /思维导图 \(M\)/ })).toBeNull();
+
+        fireEvent.click(drawingItem);
+        rerender(
+            <ModernFlowchartToolbar
+                canUndo={false}
+                canRedo={false}
+                onUndo={vi.fn()}
+                onRedo={vi.fn()}
+                onZoomIn={vi.fn()}
+                onZoomOut={vi.fn()}
+                onFitView={vi.fn()}
+                autoRouting={false}
+                toggleAutoRouting={vi.fn()}
+                showGrid
+                toggleGrid={vi.fn()}
+                onShowShortcuts={vi.fn()}
+                showRuler={false}
+                toggleRuler={vi.fn()}
+                onActivatePointer={onActivatePointer}
+                isDrawingMode
+                toggleSelectionMode={toggleSelectionMode}
+                onToggleDrawingMode={onToggleDrawingMode}
+                onAddStickyNote={onAddStickyNote}
+                onAddMindMap={onAddMindMap}
+            />,
+        );
+
+        fireEvent.click(await screen.findByRole('button', { name: /更多操作|moreActions/i }));
+        const activeDrawingItem = await screen.findByRole('menuitemradio', { name: /退出自由画笔/ });
+        expect(activeDrawingItem.getAttribute('aria-checked')).toBe('true');
+        expect(activeDrawingItem.className).toContain('ant-dropdown-menu-item-selected');
+        expect(screen.getByRole('menuitemradio', { name: /普通选择器/ }).getAttribute('aria-checked')).toBe('false');
         expect(onActivatePointer).not.toHaveBeenCalled();
-        expect(onToggleDrawingMode).not.toHaveBeenCalled();
+        expect(onToggleDrawingMode).toHaveBeenCalledTimes(1);
         expect(onAddStickyNote).not.toHaveBeenCalled();
         expect(onAddMindMap).not.toHaveBeenCalled();
     });

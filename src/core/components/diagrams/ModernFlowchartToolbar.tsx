@@ -17,6 +17,7 @@ import { coerceDiagramId, getQueryOrHashParamFromLocation } from '../../utils/in
 import { FlowchartAlignmentTools } from './FlowchartAlignmentTools';
 import { FlowchartCanvasSettingsContent } from './FlowchartCanvasSettingsContent';
 import { DropdownMenuTriggerButton } from './DropdownMenuTriggerButton';
+import { buildToolModeMenuItems, resolveActiveToolModeKey } from './flowchartToolbarToolModeMenu';
 import { useKeyboardAccessibleDropdown } from './hooks/useKeyboardAccessibleDropdown';
 
 interface FlowchartToolbarProps {
@@ -348,42 +349,26 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                 key: 'creation-group',
                 label: t('toolbar.creationTools', '操作工具'),
                 type: 'group' as const,
-                children: [
-                    ...(onActivatePointer ? [{
-                        key: 'pointer',
-                        label: t('toolbar.pointer', '普通选择器 (V)'),
-                        icon: <FaMousePointer />,
-                        onClick: onActivatePointer,
-                    }] : []),
-                    ...(toggleSelectionMode ? [{
-                        key: 'marquee',
-                        label: isMarqueeActive
-                            ? t('toolbar.marqueeExit', '退出框选 (Esc)')
-                            : t('toolbar.marqueeEnter', '框选模式 (M)'),
-                        icon: <FaObjectGroup />,
-                        onClick: toggleSelectionMode,
-                    }] : []),
-                    ...(onToggleDrawingMode ? [{
-                        key: 'drawing',
-                        label: isDrawingMode
+                children: buildToolModeMenuItems({
+                    isDrawingMode,
+                    isMarqueeActive,
+                    labels: {
+                        drawing: isDrawingMode
                             ? t('toolbar.drawingModeExit', '退出自由画笔 (Esc)')
                             : t('toolbar.drawingMode', '自由画笔 (P)'),
-                        icon: <FaPen />,
-                        onClick: onToggleDrawingMode,
-                    }] : []),
-                    ...(onAddStickyNote ? [{
-                        key: 'sticky-note',
-                        label: t('toolbar.stickyNote', '便签 (S)'),
-                        icon: <FaStickyNote />,
-                        onClick: onAddStickyNote,
-                    }] : []),
-                    ...(onAddMindMap ? [{
-                        key: 'mind-map',
-                        label: t('toolbar.mindMap', '思维导图 (Shift+M)'),
-                        icon: <FaSitemap />,
-                        onClick: onAddMindMap,
-                    }] : []),
-                ],
+                        marquee: isMarqueeActive
+                            ? t('toolbar.marqueeExit', '退出框选 (Esc)')
+                            : t('toolbar.marqueeEnter', '框选模式 (M)'),
+                        mindMap: t('toolbar.mindMap', '思维导图 (Shift+M)'),
+                        pointer: t('toolbar.pointer', '普通选择器 (V)'),
+                        stickyNote: t('toolbar.stickyNote', '便签 (S)'),
+                    },
+                    onActivatePointer,
+                    onAddMindMap,
+                    onAddStickyNote,
+                    onToggleDrawingMode,
+                    toggleSelectionMode,
+                }),
             },
         ] : []),
         { type: 'divider' as const },
@@ -442,6 +427,15 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
         onShowShortcuts, onShowCanvasSearch, onImportClick, onExport, onActivatePointer, toggleSelectionMode,
         onToggleDrawingMode, onAddStickyNote, onAddMindMap, isMarqueeActive, isDrawingMode,
     ]);
+
+    const selectedToolModeKey = resolveActiveToolModeKey(isMarqueeActive, isDrawingMode);
+
+    const moreMenu = useMemo(() => ({
+        items: moreMenuItems,
+        selectedKeys: [selectedToolModeKey],
+        selectable: true,
+        onKeyDown: moreDropdown.handleMenuKeyDown,
+    }), [moreMenuItems, moreDropdown.handleMenuKeyDown, selectedToolModeKey]);
 
     const CanvasSettingsContent = (
         <FlowchartCanvasSettingsContent
@@ -625,7 +619,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                     </Popover>
 
                     <Dropdown
-                        menu={{ items: moreMenuItems, onKeyDown: moreDropdown.handleMenuKeyDown }}
+                        menu={moreMenu}
                         placement="bottomRight"
                         trigger={['click']}
                         open={moreDropdown.open}
@@ -647,7 +641,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
 
             {isMobile && (
                 <Dropdown
-                    menu={{ items: moreMenuItems, onKeyDown: moreDropdown.handleMenuKeyDown }}
+                    menu={moreMenu}
                     placement="bottomRight"
                     trigger={['click']}
                     autoAdjustOverflow
