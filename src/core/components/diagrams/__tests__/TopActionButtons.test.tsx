@@ -198,4 +198,37 @@ describe('TopActionButtons document menu', () => {
         expect(setIsCommentMode).toHaveBeenCalledWith(false);
         expect(onReadonlyChange).toHaveBeenCalledWith(true);
     });
+
+    it('returns focus to document actions after closing the plugin manager', async () => {
+        let restoreFocus: FrameRequestCallback | undefined;
+        vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+            restoreFocus = callback;
+            return 1;
+        });
+
+        const ControlledTopActions = () => {
+            const [pluginManagerVisible, setPluginManagerVisible] = React.useState(false);
+            return (
+                <TopActionButtons
+                    disablePortal
+                    pluginManagerVisible={pluginManagerVisible}
+                    setPluginManagerVisible={setPluginManagerVisible}
+                />
+            );
+        };
+        render(<ControlledTopActions />);
+
+        const trigger = screen.getByRole('button', { name: '文档操作' });
+        fireEvent.click(trigger);
+        fireEvent.click(await screen.findByRole('menuitem', { name: /插件管理/ }));
+        const closeButton = await screen.findByRole('button', { name: 'common.close' });
+        closeButton.focus();
+        expect(document.activeElement).toBe(closeButton);
+
+        fireEvent.click(closeButton);
+        expect(document.activeElement).not.toBe(trigger);
+        restoreFocus?.(0);
+
+        await waitFor(() => expect(document.activeElement).toBe(trigger));
+    });
 });

@@ -118,6 +118,16 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
         onReadonlyChange(nextReadonly);
     }, [isCommentMode, isReadonly, onReadonlyChange, setIsCommentMode]);
 
+    const closePluginManager = useCallback(() => {
+        const trigger = documentMenuButtonRef.current;
+        setPluginManagerVisible(false);
+
+        window.requestAnimationFrame(() => {
+            if (!trigger?.isConnected || trigger.disabled) return;
+            trigger.focus();
+        });
+    }, [documentMenuButtonRef, setPluginManagerVisible]);
+
     // [Fix] Modals must render regardless of portal vs fallback path.
     // Extract them here so both branches can render the portal content + these modals.
     const modals = (
@@ -138,7 +148,7 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
                 <React.Suspense fallback={null}>
                     <PluginManagerModal
                         visible
-                        onClose={() => setPluginManagerVisible(false)}
+                        onClose={closePluginManager}
                     />
                 </React.Suspense>
             )}
