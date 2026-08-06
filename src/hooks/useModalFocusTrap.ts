@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from 'react';
 
 import { shouldPreserveParentDialogOnEscape } from '@/core/components/ui/dialogEscapeLayer';
+import { useNestedModalRegistration } from './modalNestingContext';
 
 interface UseModalFocusTrapOptions {
   active: boolean;
@@ -15,6 +16,7 @@ export const useModalFocusTrap = <T extends HTMLElement>({
 }: UseModalFocusTrapOptions) => {
   const containerRef = useRef<T>(null);
   const onCloseRef = useRef(onClose);
+  useNestedModalRegistration(active);
 
   useEffect(() => {
     onCloseRef.current = onClose;

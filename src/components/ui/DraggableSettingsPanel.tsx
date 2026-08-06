@@ -1,8 +1,9 @@
-import React, { ReactNode, useEffect, useId, useMemo, useRef } from 'react';
+import React, { ReactNode, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ConfigProvider } from 'antd';
 import { MdDragIndicator } from 'react-icons/md';
 import { useDraggablePanel } from '../../hooks/useDraggablePanel';
+import { ModalNestingBoundary } from '../../hooks/ModalNestingBoundary';
 
 interface DraggableSettingsPanelProps {
     children: ReactNode;
@@ -19,7 +20,11 @@ export const DraggableSettingsPanel: React.FC<DraggableSettingsPanelProps> = ({ 
         y: Math.max(16, Math.min(80, window.innerHeight - 160)),
     }), []);
     const titleId = useId();
+    const [hasActiveNestedModal, setHasActiveNestedModal] = useState(false);
     const onCloseRef = useRef(onClose);
+    const handleNestedModalChange = useCallback((active: boolean) => {
+        setHasActiveNestedModal(active);
+    }, []);
     useEffect(() => {
         onCloseRef.current = onClose;
     }, [onClose]);
@@ -83,7 +88,8 @@ export const DraggableSettingsPanel: React.FC<DraggableSettingsPanelProps> = ({ 
         <div
             ref={panelRef}
             role="dialog"
-            aria-modal="true"
+            aria-modal={hasActiveNestedModal ? undefined : true}
+            aria-hidden={hasActiveNestedModal ? true : undefined}
             aria-labelledby={titleId}
             tabIndex={-1}
             onKeyDown={handleDialogKeyDown}
@@ -142,7 +148,9 @@ export const DraggableSettingsPanel: React.FC<DraggableSettingsPanelProps> = ({ 
                     overflowY: 'auto',
                     overflowX: 'hidden'
                 }}>
-                    {children}
+                    <ModalNestingBoundary onActiveChange={handleNestedModalChange}>
+                        {children}
+                    </ModalNestingBoundary>
                 </div>
             </ConfigProvider>
         </div>
