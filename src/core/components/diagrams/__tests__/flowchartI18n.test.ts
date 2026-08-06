@@ -42,6 +42,7 @@ describe('flowchart interaction copy', () => {
         expect(toolbarSource).toContain("labelKey: 'propertyPanel.options.shape.rectangle'");
         expect(shapesSource).not.toContain("label: 'Circle'");
         expect(shapesSource).toContain("t('designer.sidebar.searchComponents')");
+        expect(shapesSource.match(/data-icon-rail-search-focus="true"/g)).toHaveLength(1);
         expect(sidebarSource).not.toContain("renderDraggableItem('Circle'");
         expect(sidebarSource).not.toContain("renderDraggableItem('Swimlane'");
         expect(sidebarSource).toContain("t('propertyPanel.options.shape.circle')");

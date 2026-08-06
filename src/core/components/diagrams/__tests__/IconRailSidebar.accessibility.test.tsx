@@ -5,7 +5,9 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { IconRailSidebar } from '../IconRailSidebar';
+import { FlowchartShapesPanel } from '../FlowchartShapesPanel';
 import type { MobileIconRailPanelRequest } from '../iconRailSidebarState';
+import type { PluginContext } from '../../../types/plugin';
 
 vi.mock('react-i18next', () => ({
     useTranslation: () => ({
@@ -31,6 +33,19 @@ const Harness = () => {
             />
         </>
     );
+};
+
+const pluginContext: PluginContext = {
+    getNodes: () => [],
+    getEdges: () => [],
+    updateNodesBatch: vi.fn(),
+    updateEdgesBatch: vi.fn(),
+    takeSnapshot: vi.fn(),
+    nodes: [],
+    edges: [],
+    setNodes: vi.fn(),
+    setEdges: vi.fn(),
+    addNode: vi.fn(() => 'node-1'),
 };
 
 describe('IconRailSidebar drawer accessibility', () => {
@@ -71,6 +86,45 @@ describe('IconRailSidebar drawer accessibility', () => {
         await waitFor(() => {
             expect(screen.queryByRole('dialog')).toBeNull();
             expect(document.activeElement).toBe(trigger);
+        });
+    });
+
+    it('routes the component-search trigger directly to the drawer search field', async () => {
+        render(
+            <IconRailSidebar
+                isMobile
+                autoOpenShapes={false}
+                pluginPanels={[{
+                    id: 'shapes',
+                    title: '基础形状',
+                    icon: <span aria-hidden="true">S</span>,
+                    content: <FlowchartShapesPanel ctx={pluginContext} />,
+                }]}
+            />,
+        );
+
+        const searchTrigger = screen.getByRole('button', {
+            name: 'designer.sidebar.searchComponents',
+        });
+        fireEvent.click(searchTrigger);
+
+        const searchInput = await screen.findByRole('textbox', {
+            name: 'designer.sidebar.searchComponents',
+        });
+        await waitFor(() => expect(document.activeElement).toBe(searchInput));
+
+        fireEvent.change(searchInput, { target: { value: 'designer.sidebar.database' } });
+        await waitFor(() => {
+            expect(screen.getByRole('textbox', {
+                name: 'designer.sidebar.searchComponents',
+            })).toBe(searchInput);
+            expect(document.activeElement).toBe(searchInput);
+        });
+
+        fireEvent.keyDown(searchInput, { key: 'Escape' });
+        await waitFor(() => {
+            expect(screen.queryByRole('dialog')).toBeNull();
+            expect(document.activeElement).toBe(searchTrigger);
         });
     });
 });

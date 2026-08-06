@@ -7,6 +7,11 @@ const ICON_RAIL_FOCUSABLE_SELECTOR = [
     '[tabindex]:not([tabindex="-1"])',
 ].join(',');
 
+export type IconRailDrawerFocusTarget = 'default' | 'search';
+
+const ICON_RAIL_DEFAULT_FOCUS_SELECTOR = '[data-icon-rail-initial-focus="true"]';
+const ICON_RAIL_SEARCH_FOCUS_SELECTOR = '[data-icon-rail-search-focus="true"]';
+
 interface IconRailTabEvent {
     key: string;
     shiftKey: boolean;
@@ -21,9 +26,15 @@ const getFocusableDrawerElements = (container: HTMLElement): HTMLElement[] => (
         ))
 );
 
-export const focusIconRailDrawerEntry = (container: HTMLElement): boolean => {
-    const preferred = container.querySelector<HTMLElement>('[data-icon-rail-initial-focus="true"]');
-    const target = preferred ?? getFocusableDrawerElements(container)[0] ?? container;
+export const focusIconRailDrawerEntry = (
+    container: HTMLElement,
+    requestedTarget: IconRailDrawerFocusTarget = 'default',
+): boolean => {
+    const requested = requestedTarget === 'search'
+        ? container.querySelector<HTMLElement>(ICON_RAIL_SEARCH_FOCUS_SELECTOR)
+        : null;
+    const preferred = container.querySelector<HTMLElement>(ICON_RAIL_DEFAULT_FOCUS_SELECTOR);
+    const target = requested ?? preferred ?? getFocusableDrawerElements(container)[0] ?? container;
     target.focus();
     return document.activeElement === target;
 };

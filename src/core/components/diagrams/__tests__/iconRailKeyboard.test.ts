@@ -74,6 +74,30 @@ describe('bindIconRailEscapeClose', () => {
         expect(document.activeElement).toBe(preferred);
     });
 
+    it('focuses the requested search control ahead of the generic drawer entry', () => {
+        const drawer = document.createElement('div');
+        const closeButton = document.createElement('button');
+        closeButton.dataset.iconRailInitialFocus = 'true';
+        const searchInput = document.createElement('input');
+        searchInput.dataset.iconRailSearchFocus = 'true';
+        drawer.append(closeButton, searchInput);
+        document.body.append(drawer);
+
+        expect(focusIconRailDrawerEntry(drawer, 'search')).toBe(true);
+        expect(document.activeElement).toBe(searchInput);
+    });
+
+    it('falls back to the generic drawer entry when a requested search target is absent', () => {
+        const drawer = document.createElement('div');
+        const closeButton = document.createElement('button');
+        closeButton.dataset.iconRailInitialFocus = 'true';
+        drawer.append(closeButton);
+        document.body.append(drawer);
+
+        expect(focusIconRailDrawerEntry(drawer, 'search')).toBe(true);
+        expect(document.activeElement).toBe(closeButton);
+    });
+
     it('wraps mobile drawer focus in both directions', () => {
         const drawer = document.createElement('div');
         const first = document.createElement('button');

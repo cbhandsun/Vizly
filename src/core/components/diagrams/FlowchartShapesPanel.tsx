@@ -273,39 +273,6 @@ export const FlowchartShapesPanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) 
         ? ALL_ITEMS.filter(it => it.label.toLowerCase().includes(search.toLowerCase()))
         : null;
 
-    if (filteredItems) {
-        return (
-            <div style={{ padding: '8px 10px' }}>
-                <Input
-                    prefix={<SearchOutlined style={{ color: '#8c8c8c' }} />}
-                    placeholder={t('designer.sidebar.searchComponents')}
-                    aria-label={t('designer.sidebar.searchComponents')}
-                    size="small"
-                    allowClear={{ clearIcon: <AccessibleInputClearIcon label={t('designer.sidebar.clearSearch')} /> }}
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                    style={{ 
-                        marginBottom: 10, 
-                        borderRadius: 10, 
-                        border: '1px solid rgba(0, 0, 0, 0.08)', 
-                        background: 'rgba(255, 255, 255, 0.5)',
-                        backdropFilter: 'blur(10px)',
-                        padding: '6px 12px',
-                        fontSize: '13px',
-                        boxShadow: 'inset 0 1px 4px rgba(0,0,0,0.03)' 
-                    }}
-                />
-                {filteredItems.length === 0 ? (
-                    <div style={{ color: '#bfbfbf', textAlign: 'center', padding: 16, fontSize: 12 }}>无匹配组件</div>
-                ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6 }}>
-                        {filteredItems.map(it => renderDraggableItem(it.label, it.icon, it.type, it.typeName, it.config as NodeConfig))}
-                    </div>
-                )}
-            </div>
-        );
-    }
-
     const CategoryGroup = ({ cat }: { cat: {key: string, title: string} }) => {
         const [expanded, setExpanded] = useState(true);
         const childrenItems = ALL_ITEMS.filter(it => it.category === cat.key);
@@ -353,6 +320,7 @@ export const FlowchartShapesPanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) 
              }}>
                 <div
                     role="note"
+                    hidden={Boolean(filteredItems)}
                     style={{
                         marginBottom: 10,
                         padding: '8px 10px',
@@ -370,6 +338,7 @@ export const FlowchartShapesPanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) 
                     prefix={<SearchOutlined style={{ color: '#8c8c8c' }} />}
                     placeholder={t('designer.sidebar.searchComponents')}
                     aria-label={t('designer.sidebar.searchComponents')}
+                    data-icon-rail-search-focus="true"
                     size="small"
                     allowClear={{ clearIcon: <AccessibleInputClearIcon label={t('designer.sidebar.clearSearch')} /> }}
                     value={search}
@@ -387,7 +356,23 @@ export const FlowchartShapesPanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) 
             </div>
             
             <div style={{ marginTop: 4 }}>
-                {CATEGORIES_DEF.map(cat => (
+                {filteredItems ? (
+                    filteredItems.length === 0 ? (
+                        <div style={{ color: '#bfbfbf', textAlign: 'center', padding: 16, fontSize: 12 }}>
+                            无匹配组件
+                        </div>
+                    ) : (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6 }}>
+                            {filteredItems.map(it => renderDraggableItem(
+                                it.label,
+                                it.icon,
+                                it.type,
+                                it.typeName,
+                                it.config as NodeConfig,
+                            ))}
+                        </div>
+                    )
+                ) : CATEGORIES_DEF.map(cat => (
                     <CategoryGroup key={cat.key} cat={cat} />
                 ))}
             </div>

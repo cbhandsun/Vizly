@@ -28,6 +28,7 @@ import {
     bindIconRailEscapeClose,
     focusIconRailDrawerEntry,
     trapIconRailDrawerTab,
+    type IconRailDrawerFocusTarget,
 } from './iconRailKeyboard';
 import {
     resolveNavigatorNodeLabel,
@@ -134,6 +135,7 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
     const drawerRef = useRef<HTMLDivElement>(null);
     const drawerReturnFocusRef = useRef<HTMLElement | null>(null);
     const shouldFocusDrawerRef = useRef(false);
+    const drawerFocusTargetRef = useRef<IconRailDrawerFocusTarget>('default');
     const drawerId = React.useId();
     const drawerTitleId = React.useId();
     const [searchTerm, setSearchTerm] = useState('');
@@ -245,6 +247,7 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
         const returnFocus = restoreFocus ? drawerReturnFocusRef.current : null;
         drawerReturnFocusRef.current = null;
         shouldFocusDrawerRef.current = false;
+        drawerFocusTargetRef.current = 'default';
         setActivePanel(null);
         if (returnFocus) {
             window.setTimeout(() => {
@@ -253,8 +256,13 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
         }
     }, []);
 
-    const openPanelFromTrigger = useCallback((panel: string, trigger: HTMLElement) => {
+    const openPanelFromTrigger = useCallback((
+        panel: string,
+        trigger: HTMLElement,
+        focusTarget: IconRailDrawerFocusTarget = 'default',
+    ) => {
         drawerReturnFocusRef.current = trigger;
+        drawerFocusTargetRef.current = focusTarget;
         shouldFocusDrawerRef.current = true;
         setActivePanel(panel);
     }, []);
@@ -275,6 +283,7 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
                 const trigger = document.activeElement;
                 if (trigger instanceof HTMLElement && trigger !== document.body) {
                     drawerReturnFocusRef.current = trigger;
+                    drawerFocusTargetRef.current = 'default';
                     shouldFocusDrawerRef.current = true;
                 }
                 setActivePanel(resolvedPanel);
@@ -320,7 +329,8 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
         const timer = window.setTimeout(() => {
             const drawer = drawerRef.current;
             if (!drawer) return;
-            focusIconRailDrawerEntry(drawer);
+            focusIconRailDrawerEntry(drawer, drawerFocusTargetRef.current);
+            drawerFocusTargetRef.current = 'default';
             shouldFocusDrawerRef.current = false;
         }, 0);
         return () => window.clearTimeout(timer);
@@ -514,8 +524,13 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
                         aria-expanded={activePanel === 'shapes'}
                         aria-controls={activePanel === 'shapes' ? drawerId : undefined}
                         onClick={(event) => {
-                            if (activePanel !== 'shapes') openPanelFromTrigger('shapes', event.currentTarget);
-                            // Focus the search input after panel opens
+                            if (activePanel !== 'shapes') {
+                                openPanelFromTrigger('shapes', event.currentTarget, 'search');
+                                return;
+                            }
+                            drawerReturnFocusRef.current = event.currentTarget;
+                            const drawer = drawerRef.current;
+                            if (drawer) focusIconRailDrawerEntry(drawer, 'search');
                         }}
                     >
                         <FaSearch />
