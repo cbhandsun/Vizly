@@ -34,6 +34,7 @@ import { TopActionButtons } from '../TopActionButtons';
 
 describe('TopActionButtons document menu', () => {
     beforeEach(() => {
+        vi.restoreAllMocks();
         vi.stubGlobal('ResizeObserver', class {
             observe() {}
             unobserve() {}
@@ -155,6 +156,12 @@ describe('TopActionButtons document menu', () => {
     });
 
     it('keeps comment and read-only modes visible with direct recovery actions', async () => {
+        const pendingFrames: FrameRequestCallback[] = [];
+        vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+            pendingFrames.push(callback);
+            return 1;
+        });
+
         const setIsCommentMode = vi.fn();
         const commentView = render(
             <TopActionButtons
@@ -164,8 +171,14 @@ describe('TopActionButtons document menu', () => {
             />,
         );
 
-        fireEvent.click(screen.getByRole('button', { name: '退出评论模式' }));
+        const commentTrigger = screen.getByRole('button', { name: '文档操作' });
+        const commentExit = screen.getByRole('button', { name: '退出评论模式' });
+        commentExit.focus();
+        fireEvent.click(commentExit);
         expect(setIsCommentMode).toHaveBeenCalledWith(false);
+        expect(document.activeElement).not.toBe(commentTrigger);
+        pendingFrames.shift()?.(0);
+        await waitFor(() => expect(document.activeElement).toBe(commentTrigger));
         commentView.unmount();
 
         const onReadonlyChange = vi.fn();
@@ -177,8 +190,14 @@ describe('TopActionButtons document menu', () => {
             />,
         );
 
-        fireEvent.click(screen.getByRole('button', { name: '解锁画布' }));
+        const readonlyTrigger = screen.getByRole('button', { name: '文档操作' });
+        const readonlyExit = screen.getByRole('button', { name: '解锁画布' });
+        readonlyExit.focus();
+        fireEvent.click(readonlyExit);
         expect(onReadonlyChange).toHaveBeenCalledWith(false);
+        expect(document.activeElement).not.toBe(readonlyTrigger);
+        pendingFrames.shift()?.(0);
+        await waitFor(() => expect(document.activeElement).toBe(readonlyTrigger));
     });
 
     it('exits comment mode before locking the canvas', async () => {

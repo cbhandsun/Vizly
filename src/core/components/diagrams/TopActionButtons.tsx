@@ -109,6 +109,14 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
         overlayClassName: DOCUMENT_MENU_OVERLAY_CLASS,
     });
 
+    const restoreDocumentMenuFocus = useCallback(() => {
+        window.requestAnimationFrame(() => {
+            const trigger = documentMenuButtonRef.current;
+            if (!trigger?.isConnected || trigger.disabled) return;
+            trigger.focus();
+        });
+    }, [documentMenuButtonRef]);
+
     const handleReadonlyToggle = useCallback(() => {
         if (!onReadonlyChange) return;
         const nextReadonly = !isReadonly;
@@ -118,15 +126,20 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
         onReadonlyChange(nextReadonly);
     }, [isCommentMode, isReadonly, onReadonlyChange, setIsCommentMode]);
 
-    const closePluginManager = useCallback(() => {
-        const trigger = documentMenuButtonRef.current;
-        setPluginManagerVisible(false);
+    const handleReadonlyStatusExit = useCallback(() => {
+        handleReadonlyToggle();
+        restoreDocumentMenuFocus();
+    }, [handleReadonlyToggle, restoreDocumentMenuFocus]);
 
-        window.requestAnimationFrame(() => {
-            if (!trigger?.isConnected || trigger.disabled) return;
-            trigger.focus();
-        });
-    }, [documentMenuButtonRef, setPluginManagerVisible]);
+    const handleCommentModeExit = useCallback(() => {
+        setIsCommentMode(false);
+        restoreDocumentMenuFocus();
+    }, [restoreDocumentMenuFocus, setIsCommentMode]);
+
+    const closePluginManager = useCallback(() => {
+        setPluginManagerVisible(false);
+        restoreDocumentMenuFocus();
+    }, [restoreDocumentMenuFocus, setPluginManagerVisible]);
 
     // [Fix] Modals must render regardless of portal vs fallback path.
     // Extract them here so both branches can render the portal content + these modals.
@@ -373,7 +386,7 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
                         aria-pressed="true"
                         aria-label={t('designer.toolbar.commentModeExit')}
                         icon={<FaRegComment aria-hidden="true" />}
-                        onClick={() => setIsCommentMode(false)}
+                        onClick={handleCommentModeExit}
                         style={MODE_STATUS_BUTTON_STYLE}
                     >
                         {t('designer.toolbar.commentModeStatus')}
@@ -387,7 +400,7 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
                         type="default"
                         aria-label={t('designer.toolbar.unlockCanvas')}
                         icon={<FaUnlock aria-hidden="true" />}
-                        onClick={handleReadonlyToggle}
+                        onClick={handleReadonlyStatusExit}
                         style={MODE_STATUS_BUTTON_STYLE}
                     >
                         {t('designer.toolbar.readonlyStatusAction')}
