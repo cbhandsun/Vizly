@@ -147,6 +147,20 @@ describe('useToastActions clipboard feedback', () => {
     expect(info).toHaveBeenCalledWith('designer.flowchart.toast.nothingToPaste');
   });
 
+  it('explains supported formats when system clipboard content cannot be pasted', async () => {
+    const handlePaste = vi.fn().mockResolvedValue('unsupported');
+    const { info, warning, props } = createProps(handlePaste);
+
+    const { result } = renderHook(() => useToastActions(props));
+
+    await act(async () => {
+      await result.current.handlePasteWithToast();
+    });
+
+    expect(warning).toHaveBeenCalledWith('designer.flowchart.toast.unsupportedClipboard');
+    expect(info).not.toHaveBeenCalled();
+  });
+
   it('explains when a pending paste is cancelled by a page or diagram change', async () => {
     const handlePaste = vi.fn().mockResolvedValue('scope-changed');
     const { info, warning, props } = createProps(handlePaste);

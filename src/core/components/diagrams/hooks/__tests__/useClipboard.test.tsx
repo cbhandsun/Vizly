@@ -111,6 +111,71 @@ describe('useClipboard', () => {
     expect(setEdges).toHaveBeenCalledTimes(1);
   });
 
+  it('does not replace unsupported system clipboard text with stale local content', async () => {
+    const setNodes = vi.fn();
+    const setEdges = vi.fn();
+    const takeSnapshot = vi.fn();
+    const readText = vi.fn().mockResolvedValue('not a diagram');
+    Object.assign(navigator, { clipboard: { writeText: vi.fn(), readText } });
+
+    localStorage.setItem('flowchart-clipboard', JSON.stringify({
+      nodes: selectedNodes,
+      edges: selectedEdges,
+    }));
+    const storageRead = vi.spyOn(Storage.prototype, 'getItem');
+
+    const { result } = renderHook(() => useClipboard({
+      nodesRef: { current: [] },
+      edgesRef: { current: [] },
+      selectedNodes: [],
+      selectedEdges: [],
+      setNodes,
+      setEdges,
+      takeSnapshot,
+      getOperationScope,
+    }));
+
+    let pasteResult: 'pasted' | 'empty' | 'unsupported' | 'scope-changed' = 'empty';
+    await act(async () => {
+      pasteResult = await result.current.handlePaste();
+    });
+
+    expect(pasteResult).toBe('unsupported');
+    expect(storageRead).not.toHaveBeenCalled();
+    expect(takeSnapshot).not.toHaveBeenCalled();
+    expect(setNodes).not.toHaveBeenCalled();
+    expect(setEdges).not.toHaveBeenCalled();
+  });
+
+  it('does not paste stale local content when the system clipboard is empty', async () => {
+    const setNodes = vi.fn();
+    const setEdges = vi.fn();
+    const takeSnapshot = vi.fn();
+    Object.assign(navigator, {
+      clipboard: { writeText: vi.fn(), readText: vi.fn().mockResolvedValue('') },
+    });
+    localStorage.setItem('flowchart-clipboard', JSON.stringify({
+      nodes: selectedNodes,
+      edges: selectedEdges,
+    }));
+
+    const { result } = renderHook(() => useClipboard({
+      nodesRef: { current: [] },
+      edgesRef: { current: [] },
+      selectedNodes: [],
+      selectedEdges: [],
+      setNodes,
+      setEdges,
+      takeSnapshot,
+      getOperationScope,
+    }));
+
+    await expect(result.current.handlePaste()).resolves.toBe('empty');
+    expect(takeSnapshot).not.toHaveBeenCalled();
+    expect(setNodes).not.toHaveBeenCalled();
+    expect(setEdges).not.toHaveBeenCalled();
+  });
+
   it('does not delete an edge-only selection because it has no pasteable payload', () => {
     const edgeOnlySelection: Edge[] = [{
       id: 'edge-1',
@@ -202,7 +267,7 @@ describe('useClipboard', () => {
       getOperationScope: () => currentScope,
     }));
 
-    let pastePromise: Promise<'pasted' | 'empty' | 'scope-changed'> | undefined;
+    let pastePromise: Promise<'pasted' | 'empty' | 'unsupported' | 'scope-changed'> | undefined;
     act(() => {
       pastePromise = result.current.handlePaste();
     });

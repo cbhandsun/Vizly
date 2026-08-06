@@ -28,7 +28,7 @@ interface UseClipboardProps {
     clipboardKey?: string;
 }
 
-export type ClipboardPasteResult = 'pasted' | 'empty' | 'scope-changed';
+export type ClipboardPasteResult = 'pasted' | 'empty' | 'unsupported' | 'scope-changed';
 
 const PASTE_OFFSET = 20;
 
@@ -108,10 +108,18 @@ export const useClipboard = ({
         // 1. 首先尝试系统剪贴板（跨应用粘贴）
         let clipboardData: ClipboardData | null = null;
 
-        if (navigator.clipboard && window.isSecureContext) {
+        if (navigator.clipboard?.readText && window.isSecureContext) {
             try {
                 const text = await navigator.clipboard.readText();
                 clipboardData = parseClipboardText(text);
+                if (operationScope !== getOperationScope()) return 'scope-changed';
+
+                // A successful system read is authoritative. Falling back to the
+                // persisted internal clipboard here can paste stale content that
+                // the user did not ask for when the current clipboard is empty or
+                // contains unrelated text.
+                if (!text.trim()) return 'empty';
+                if (!clipboardData || clipboardData.nodes.length === 0) return 'unsupported';
             } catch (error) {
                 logClipboardReadFailure(error);
             }

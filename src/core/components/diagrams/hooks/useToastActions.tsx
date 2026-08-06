@@ -100,6 +100,13 @@ export function useToastActions({
             ));
             return;
         }
+        if (result === 'unsupported') {
+            messageApi.warning(t(
+                'designer.flowchart.toast.unsupportedClipboard',
+                '剪贴板内容不受支持，请复制 Vizly 节点或完整 Mermaid 流程图后重试',
+            ));
+            return;
+        }
         if (result === 'empty') {
             messageApi.info(t('designer.flowchart.toast.nothingToPaste'));
         }
