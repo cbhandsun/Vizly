@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { WorkspaceDiagramCollection } from '../WorkspaceDiagramCollection';
+import { WorkspaceCompactHeader } from '../WorkspaceCompactHeader';
 import { WorkspaceContextMenu } from '../WorkspaceContextMenu';
 import type {
   FilterViewType,
@@ -47,6 +48,16 @@ vi.mock('react-i18next', () => ({
         'workspace.empty.filterTitle': `No diagrams in ${options?.view ?? ''}`,
         'workspace.empty.filterDescription': `The ${options?.view ?? ''} view is empty.`,
         'workspace.openInNewTab': 'Open in new tab',
+        'workspace.title': 'Workspace',
+        'workspace.documentCount': '1 diagram',
+        'workspace.newFlowchart': 'New flowchart',
+        'workspace.chooseDiagramType': 'Choose a diagram type',
+        'workspace.diagramTypes.mindmap': 'Mind map',
+        'workspace.diagramTypes.timeline': 'Timeline',
+        'workspace.diagramTypes.architecture': 'Architecture',
+        'workspace.diagramTypeDescriptions.mindmap': 'Map ideas and relationships',
+        'workspace.diagramTypeDescriptions.timeline': 'Plan milestones and schedules',
+        'workspace.diagramTypeDescriptions.architecture': 'Model systems and dependencies',
       };
       if (key === 'workspace.moreActions') return `More actions for ${options?.title ?? ''}`;
       return values[key] ?? key;
@@ -193,6 +204,45 @@ describe('WorkspaceDiagramCollection controls', () => {
     fireEvent.keyDown(menu, { key: 'Escape' });
     await waitFor(() => expect(trigger).toHaveAttribute('aria-expanded', 'false'));
     await waitFor(() => expect(document.activeElement).toBe(trigger));
+  });
+});
+
+describe('WorkspaceCompactHeader create menu', () => {
+  it.each(['Enter', ' ', 'ArrowDown'])(
+    'opens the named diagram type menu with %j and restores focus on Escape',
+    async key => {
+      render(<WorkspaceCompactHeader documentCount={1} onCreateTemplate={vi.fn()} />);
+      const trigger = screen.getByRole('button', { name: 'Choose a diagram type' });
+
+      expect(trigger).toHaveAttribute('aria-haspopup', 'menu');
+      expect(trigger).toHaveAttribute('aria-expanded', 'false');
+      expect(trigger).toHaveAttribute('aria-controls', 'workspace-create-diagram-type-menu');
+
+      trigger.focus();
+      fireEvent.keyDown(trigger, { key });
+
+      const menu = await screen.findByRole('menu', { name: 'Choose a diagram type' });
+      const firstItem = screen.getByRole('menuitem', { name: /Mind map/ });
+      expect(menu).toHaveAttribute('id', 'workspace-create-diagram-type-menu');
+      expect(trigger).toHaveAttribute('aria-expanded', 'true');
+      await waitFor(() => expect(document.activeElement).toBe(firstItem));
+
+      fireEvent.keyDown(menu, { key: 'Escape' });
+      await waitFor(() => expect(trigger).toHaveAttribute('aria-expanded', 'false'));
+      await waitFor(() => expect(document.activeElement).toBe(trigger));
+    },
+  );
+
+  it('creates the selected secondary diagram type and closes the menu', async () => {
+    const onCreateTemplate = vi.fn();
+    render(<WorkspaceCompactHeader documentCount={1} onCreateTemplate={onCreateTemplate} />);
+    const trigger = screen.getByRole('button', { name: 'Choose a diagram type' });
+
+    fireEvent.click(trigger);
+    fireEvent.click(await screen.findByRole('menuitem', { name: /Timeline/ }));
+
+    expect(onCreateTemplate).toHaveBeenCalledWith('timeline');
+    await waitFor(() => expect(trigger).toHaveAttribute('aria-expanded', 'false'));
   });
 });
 
