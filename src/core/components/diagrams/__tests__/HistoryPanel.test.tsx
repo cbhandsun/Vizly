@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import React, { useState } from 'react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('react-i18next', () => ({
     useTranslation: () => ({
@@ -30,6 +31,19 @@ vi.mock('react-i18next', () => ({
 import { HistoryPanel } from '../HistoryPanel';
 
 describe('HistoryPanel', () => {
+    const installAnimationFrameQueue = () => {
+        const callbacks: FrameRequestCallback[] = [];
+        vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+            callbacks.push(callback);
+            return 1;
+        });
+        return () => {
+            while (callbacks.length > 0) callbacks.shift()?.(0);
+        };
+    };
+
+    afterEach(() => vi.unstubAllGlobals());
+
     it('stays inside narrow viewports and exposes named physical touch targets', () => {
         render(
             <HistoryPanel
@@ -53,26 +67,36 @@ describe('HistoryPanel', () => {
         expect(document.activeElement).toBe(panel);
     });
 
-    it('closes on Escape', () => {
-        const onClose = vi.fn();
-        render(
-            <HistoryPanel
-                visible
-                onClose={onClose}
-                pastEntries={[]}
-                canUndo={false}
-                canRedo={false}
-                onUndo={vi.fn()}
-                onRedo={vi.fn()}
-                onJumpTo={vi.fn()}
-            />,
-        );
+    it('closes on Escape and returns focus to the document action trigger', () => {
+        const flushAnimationFrames = installAnimationFrameQueue();
+        const Harness = () => {
+            const [visible, setVisible] = useState(true);
+            return (
+                <>
+                    <button type="button" data-history-focus-return>文档操作</button>
+                    <HistoryPanel
+                        visible={visible}
+                        onClose={() => setVisible(false)}
+                        pastEntries={[]}
+                        canUndo={false}
+                        canRedo={false}
+                        onUndo={vi.fn()}
+                        onRedo={vi.fn()}
+                        onJumpTo={vi.fn()}
+                    />
+                </>
+            );
+        };
+        render(<Harness />);
 
         fireEvent.keyDown(document, { key: 'Escape' });
-        expect(onClose).toHaveBeenCalledOnce();
+        act(flushAnimationFrames);
+        expect(screen.queryByRole('dialog', { name: '历史记录' })).toBeNull();
+        expect(document.activeElement).toBe(screen.getByRole('button', { name: '文档操作' }));
     });
 
     it('announces a reversible recovery after jumping to a named history entry', () => {
+        const flushAnimationFrames = installAnimationFrameQueue();
         const onJumpTo = vi.fn();
         render(
             <HistoryPanel
@@ -93,8 +117,40 @@ describe('HistoryPanel', () => {
         );
 
         fireEvent.click(screen.getByRole('button', { name: '恢复到 复制 1 个节点前，刚才' }));
+        act(flushAnimationFrames);
 
         expect(onJumpTo).toHaveBeenCalledWith(0);
         expect(screen.getByRole('status').textContent).toContain('可使用重做返回恢复前状态');
+        expect(document.activeElement).toBe(screen.getByRole('button', { name: '恢复到 复制 1 个节点前，刚才' }));
+    });
+
+    it('keeps focus inside the panel when a recovery removes the selected entry', () => {
+        const flushAnimationFrames = installAnimationFrameQueue();
+        const Harness = () => {
+            const [entries, setEntries] = useState([{
+                patch: [],
+                changeCount: 1,
+                timestamp: Date.now(),
+                label: '操作 #1',
+            }]);
+            return (
+                <HistoryPanel
+                    visible
+                    onClose={vi.fn()}
+                    pastEntries={entries}
+                    canUndo={entries.length > 0}
+                    canRedo={false}
+                    onUndo={vi.fn()}
+                    onRedo={vi.fn()}
+                    onJumpTo={() => setEntries([])}
+                />
+            );
+        };
+        render(<Harness />);
+
+        fireEvent.click(screen.getByRole('button', { name: '恢复到 操作 #1，刚才' }));
+        act(flushAnimationFrames);
+
+        expect(document.activeElement).toBe(screen.getByRole('dialog', { name: '历史记录' }));
     });
 });

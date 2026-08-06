@@ -424,6 +424,7 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
                             ref={documentMenuButtonRef}
                             data-presentation-focus-return
                             data-diff-focus-return
+                            data-history-focus-return
                             data-version-history-focus-return
                             type="text"
                             aria-label={t('designer.toolbar.documentActions')}

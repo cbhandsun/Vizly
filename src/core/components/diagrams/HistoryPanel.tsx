@@ -21,6 +21,20 @@ export interface HistoryPanelProps {
     onJumpTo: (index: number) => void;
 }
 
+const HISTORY_FOCUS_RETURN_SELECTOR = '[data-history-focus-return]';
+
+function focusAfterHistoryUpdate(preferredTarget?: HTMLButtonElement): void {
+    window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
+            if (preferredTarget?.isConnected && !preferredTarget.disabled) {
+                preferredTarget.focus({ preventScroll: true });
+                return;
+            }
+            document.querySelector<HTMLDivElement>('[data-history-panel]')?.focus({ preventScroll: true });
+        });
+    });
+}
+
 export const HistoryPanel: React.FC<HistoryPanelProps> = ({
     visible,
     onClose,
@@ -40,7 +54,30 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
     const closePanel = useCallback(() => {
         setStatusMessage('');
         onClose();
+        window.requestAnimationFrame(() => {
+            window.requestAnimationFrame(() => {
+                document.querySelector<HTMLButtonElement>(HISTORY_FOCUS_RETURN_SELECTOR)?.focus({ preventScroll: true });
+            });
+        });
     }, [onClose]);
+
+    const handleUndo = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+        onUndo();
+        setStatusMessage(t('designer.historyPanel.undoStatus'));
+        focusAfterHistoryUpdate(event.currentTarget);
+    }, [onUndo, t]);
+
+    const handleRedo = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+        onRedo();
+        setStatusMessage(t('designer.historyPanel.redoStatus'));
+        focusAfterHistoryUpdate(event.currentTarget);
+    }, [onRedo, t]);
+
+    const handleJumpTo = useCallback((event: React.MouseEvent<HTMLButtonElement>, index: number, label: string) => {
+        onJumpTo(index);
+        setStatusMessage(t('designer.historyPanel.restoredStatus', { label }));
+        focusAfterHistoryUpdate(event.currentTarget);
+    }, [onJumpTo, t]);
 
     const formatTime = (timestamp: number): string => {
         const presentation = resolveHistoryTime(timestamp, now);
@@ -100,6 +137,7 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
     return createPortal(
         <div
             ref={panelRef}
+            data-history-panel
             role="dialog"
             aria-modal="false"
             aria-labelledby="history-panel-title"
@@ -140,10 +178,7 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
                 <div style={{ display: 'flex', gap: 4 }}>
                     <button
                         type="button"
-                        onClick={() => {
-                            onUndo();
-                            setStatusMessage(t('designer.historyPanel.undoStatus'));
-                        }}
+                        onClick={handleUndo}
                         disabled={!canUndo}
                         title={t('designer.historyPanel.undo')}
                         aria-label={t('designer.historyPanel.undo')}
@@ -163,10 +198,7 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
                     </button>
                     <button
                         type="button"
-                        onClick={() => {
-                            onRedo();
-                            setStatusMessage(t('designer.historyPanel.redoStatus'));
-                        }}
+                        onClick={handleRedo}
                         disabled={!canRedo}
                         title={t('designer.historyPanel.redo')}
                         aria-label={t('designer.historyPanel.redo')}
@@ -264,10 +296,7 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
                     <button
                         type="button"
                         key={`${entry.index}-${entry.timestamp}`}
-                        onClick={() => {
-                            onJumpTo(entry.index);
-                            setStatusMessage(t('designer.historyPanel.restoredStatus', { label: entry.label }));
-                        }}
+                        onClick={(event) => handleJumpTo(event, entry.index, entry.label)}
                         aria-label={t('designer.historyPanel.restoreEntry', {
                             label: entry.label,
                             time: formatTime(entry.timestamp),

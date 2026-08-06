@@ -46,6 +46,33 @@ const IGNORED_EDGE_KEYS = new Set([
   'style', 'className', 'animated',
 ]);
 
+const DIFF_LABEL_MAX_LENGTH = 120;
+
+function normalizeDiffLabel(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+
+  const boldTitle = value.match(/<(?:b|strong)\b[^>]*>([\s\S]*?)<\/(?:b|strong)>/i)?.[1];
+  const candidate = boldTitle ?? value;
+  const plainText = candidate
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;|&#160;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return plainText ? plainText.slice(0, DIFF_LABEL_MAX_LENGTH) : undefined;
+}
+
+function resolveNodeDiffLabel(node: Node): string | undefined {
+  return normalizeDiffLabel(node.data?.label)
+    ?? normalizeDiffLabel(node.data?.title)
+    ?? normalizeDiffLabel(node.data?.description);
+}
+
 /**
  * 深度比较两个值
  */
@@ -124,7 +151,7 @@ export function diffDiagrams(
     if (!afterNodeMap.has(node.id)) {
       result.removedNodes.push({
         id: node.id,
-        label: typeof node.data?.label === 'string' ? node.data.label : undefined,
+        label: resolveNodeDiffLabel(node),
         position: node.position,
       });
     }
@@ -138,7 +165,7 @@ export function diffDiagrams(
       if (changes.length > 0) {
         result.modifiedNodes.push({
           id: node.id,
-          label: typeof node.data?.label === 'string' ? node.data.label : undefined,
+          label: resolveNodeDiffLabel(node) ?? resolveNodeDiffLabel(prev),
           changes,
         });
       }

@@ -35,6 +35,53 @@ describe('diagram geometry tools', () => {
     expect(diffSummary(result)).toContain('+1 节点');
   });
 
+  it('uses validated node descriptions for diff labels when the canvas has no legacy label', () => {
+    const beforeNodes = [node('carrier', 0, {
+      description: '<b>承运商门户/EDI</b><br/>• 招投标/运力发布',
+    })];
+    const afterNodes = [{
+      ...beforeNodes[0],
+      data: {
+        description: '<b>承运商门户/EDI</b><br/>• 招投标/运力发布',
+        locked: true,
+      },
+    }];
+
+    const result = diffDiagrams(
+      { nodes: beforeNodes, edges: [] },
+      { nodes: afterNodes, edges: [] },
+    );
+
+    expect(result.modifiedNodes).toEqual([
+      expect.objectContaining({ id: 'carrier', label: '承运商门户/EDI' }),
+    ]);
+  });
+
+  it('contains empty, invalid, oversized, and markup-heavy diff labels', () => {
+    const beforeNodes = [
+      node('unsafe', 0, { description: '<b><img src=x onerror=alert(1)>Unsafe &amp; Label</b>' }),
+      node('oversized', 0, { description: 'x'.repeat(300) }),
+      node('invalid', 0, { label: 42, description: null }),
+      node('empty', 0, { label: '   ', description: '' }),
+    ];
+    const afterNodes = beforeNodes.map(item => ({
+      ...item,
+      position: { x: item.position.x + 1, y: item.position.y },
+    }));
+
+    const result = diffDiagrams(
+      { nodes: beforeNodes, edges: [] },
+      { nodes: afterNodes, edges: [] },
+    );
+
+    expect(result.modifiedNodes).toEqual([
+      expect.objectContaining({ id: 'unsafe', label: 'Unsafe & Label' }),
+      expect.objectContaining({ id: 'oversized', label: 'x'.repeat(120) }),
+      expect.objectContaining({ id: 'invalid', label: undefined }),
+      expect.objectContaining({ id: 'empty', label: undefined }),
+    ]);
+  });
+
   it('moves overlapping business nodes without mutating the input array nodes', () => {
     const first = node('first', 0);
     const second = node('second', 10);

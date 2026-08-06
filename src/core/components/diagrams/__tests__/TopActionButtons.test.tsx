@@ -136,6 +136,7 @@ describe('TopActionButtons document menu', () => {
         const trigger = screen.getByRole('button', { name: '文档操作' });
         expect(trigger.hasAttribute('data-presentation-focus-return')).toBe(true);
         expect(trigger.hasAttribute('data-diff-focus-return')).toBe(true);
+        expect(trigger.hasAttribute('data-history-focus-return')).toBe(true);
         expect(trigger.hasAttribute('data-version-history-focus-return')).toBe(true);
     });
 
