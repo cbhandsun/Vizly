@@ -42,3 +42,26 @@ export const focusFlowchartNodeById = (
     node.focus({ preventScroll: true });
     return true;
 };
+
+/**
+ * Hands interaction context to a newly-created node after mobile chrome closes.
+ * Prefer the selected semantic tree item so assistive technology receives the
+ * node's selected state; fall back to React Flow's focusable node container.
+ */
+export const focusAddedFlowchartNodeById = (
+    root: ParentNode,
+    nodeId: string,
+): boolean => {
+    if (!nodeId || nodeId.length > 1_024) return false;
+    const wrapper = Array.from(
+        root.querySelectorAll<HTMLElement>('.react-flow__node[data-id]'),
+    ).find(candidate => candidate.dataset.id === nodeId);
+    if (!wrapper) return false;
+
+    const selectedTreeItem = wrapper.querySelector<HTMLElement>(
+        '[role="treeitem"][aria-selected="true"][tabindex]',
+    );
+    const target = selectedTreeItem ?? wrapper;
+    target.focus({ preventScroll: true });
+    return target.ownerDocument.activeElement === target;
+};

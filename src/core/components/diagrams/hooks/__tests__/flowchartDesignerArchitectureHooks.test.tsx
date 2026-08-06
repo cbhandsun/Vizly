@@ -271,4 +271,72 @@ describe('flowchart designer architecture hooks', () => {
         unmount();
         expect(plugin.onDestroy).toHaveBeenCalled();
     });
+
+    it('moves mobile focus into the selected node after a plugin add closes the drawer', async () => {
+        const plugin = makePlugin('flowchart-hook-test');
+        PluginRegistry.getInstance().register(plugin);
+        const animationFrames: FrameRequestCallback[] = [];
+        const cancelledAnimationFrames = new Set<number>();
+        vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+            animationFrames.push(callback);
+            return animationFrames.length;
+        });
+        vi.spyOn(window, 'cancelAnimationFrame').mockImplementation((frameId) => {
+            cancelledAnimationFrames.add(frameId);
+        });
+        const onMobileNodeAdded = vi.fn();
+        let renderedNodes: Node[] = [];
+
+        const { result } = renderHook(() => useFlowchartPluginRuntime({
+            pluginId: plugin.id,
+            diagramId: 'diagram-mobile',
+            getNodes: () => renderedNodes,
+            getEdges: () => [],
+            setNodes: (update) => {
+                renderedNodes = typeof update === 'function' ? update(renderedNodes) : update;
+            },
+            setEdges: vi.fn(),
+            setSelectedNodes: vi.fn(),
+            setSelectedEdges: vi.fn(),
+            updateNodesBatch: vi.fn(),
+            updateEdgesBatch: vi.fn(),
+            takeSnapshot: vi.fn(),
+            reactFlowInstance: null,
+            reactFlowWrapper: { current: null },
+            activeLayerId: 'default',
+            isMobile: true,
+            t: ((key: string) => key) as never,
+            onMobileNodeAdded,
+            notifyNodeAdded: vi.fn(),
+        }));
+
+        act(() => {
+            result.current.pluginCtx?.addNode('flowchart', { label: '数据库' });
+        });
+        expect(renderedNodes).toHaveLength(1);
+        expect(onMobileNodeAdded).toHaveBeenCalledOnce();
+        await waitFor(() => expect(animationFrames).toHaveLength(1));
+
+        act(() => animationFrames[0](0));
+        expect(animationFrames).toHaveLength(2);
+        expect(cancelledAnimationFrames).not.toContain(2);
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'react-flow__node';
+        wrapper.dataset.id = renderedNodes[0].id;
+        wrapper.tabIndex = 0;
+        const selectedTarget = document.createElement('div');
+        selectedTarget.setAttribute('role', 'treeitem');
+        selectedTarget.setAttribute('aria-selected', 'true');
+        selectedTarget.tabIndex = 0;
+        wrapper.append(selectedTarget);
+        document.body.append(wrapper);
+
+        act(() => {
+            if (!cancelledAnimationFrames.has(2)) animationFrames[1](16);
+        });
+
+        expect(document.activeElement).toBe(selectedTarget);
+        wrapper.remove();
+    });
 });

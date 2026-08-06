@@ -24,6 +24,7 @@ import {
     calculateCanvasVisibleRight,
     calculateQuickCloneViewportAdjustment,
 } from '../../custom-nodes/flowchartQuickClone';
+import { focusAddedFlowchartNodeById } from '../flowchartTabNavigation';
 
 interface UseFlowchartPluginRuntimeOptions {
     pluginId: string;
@@ -74,6 +75,7 @@ export function useFlowchartPluginRuntime({
     notifyNodeAdded,
 }: UseFlowchartPluginRuntimeOptions): FlowchartPluginRuntime {
     const [pendingSelectedNode, setPendingSelectedNode] = useState<Node | null>(null);
+    const [pendingFocusNodeId, setPendingFocusNodeId] = useState<string | null>(null);
     const activePlugin = useMemo(
         () => PluginRegistry.getInstance().getPlugin(pluginId),
         [pluginId],
@@ -282,7 +284,7 @@ export function useFlowchartPluginRuntime({
     useEffect(() => {
         if (!pendingSelectedNode) return;
         const selectedNodeId = pendingSelectedNode.id;
-        const frameId = window.requestAnimationFrame(() => {
+        const selectionFrameId = window.requestAnimationFrame(() => {
             setNodes(currentNodes => currentNodes.map(node => ({
                 ...node,
                 selected: node.id === selectedNodeId,
@@ -301,10 +303,22 @@ export function useFlowchartPluginRuntime({
                 ...edge,
                 selected: false,
             })));
+            if (isMobile) setPendingFocusNodeId(selectedNodeId);
             setPendingSelectedNode(null);
         });
-        return () => window.cancelAnimationFrame(frameId);
-    }, [pendingSelectedNode, reactFlowInstance, setEdges, setNodes, setSelectedEdges, setSelectedNodes]);
+        return () => {
+            window.cancelAnimationFrame(selectionFrameId);
+        };
+    }, [isMobile, pendingSelectedNode, reactFlowInstance, setEdges, setNodes, setSelectedEdges, setSelectedNodes]);
+
+    useEffect(() => {
+        if (!pendingFocusNodeId) return;
+        const focusFrameId = window.requestAnimationFrame(() => {
+            focusAddedFlowchartNodeById(document, pendingFocusNodeId);
+            setPendingFocusNodeId(null);
+        });
+        return () => window.cancelAnimationFrame(focusFrameId);
+    }, [pendingFocusNodeId]);
 
     useEffect(() => {
         if (!activePlugin || !pluginCtx) return;

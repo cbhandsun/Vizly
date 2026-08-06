@@ -2,6 +2,7 @@
 
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+    focusAddedFlowchartNodeById,
     focusFlowchartNodeById,
     shouldHandleFlowchartCanvasTab,
 } from '../flowchartTabNavigation';
@@ -68,5 +69,27 @@ describe('flowchartTabNavigation', () => {
         expect(focusFlowchartNodeById(document, '')).toBe(false);
         expect(focusFlowchartNodeById(document, 'x'.repeat(1_025))).toBe(false);
         expect(focusFlowchartNodeById(document, 'missing')).toBe(false);
+    });
+
+    it('hands added-node focus to the selected semantic target with a safe container fallback', () => {
+        document.body.innerHTML = `
+            <div class="react-flow__node" data-id="node-1" tabindex="0">
+                <div id="selected-target" role="treeitem" aria-selected="true" tabindex="0"></div>
+            </div>
+            <div class="react-flow__node" data-id="node-2" tabindex="0"></div>
+        `;
+        const selectedTarget = document.querySelector<HTMLElement>('#selected-target');
+        const fallbackTarget = document.querySelector<HTMLElement>('[data-id="node-2"]');
+        if (!selectedTarget || !fallbackTarget) throw new Error('test fixture missing');
+
+        expect(focusAddedFlowchartNodeById(document, 'node-1')).toBe(true);
+        expect(document.activeElement).toBe(selectedTarget);
+        expect(focusAddedFlowchartNodeById(document, 'node-2')).toBe(true);
+        expect(document.activeElement).toBe(fallbackTarget);
+
+        expect(focusAddedFlowchartNodeById(document, '')).toBe(false);
+        expect(focusAddedFlowchartNodeById(document, 'x'.repeat(1_025))).toBe(false);
+        expect(focusAddedFlowchartNodeById(document, 'missing')).toBe(false);
+        expect(focusAddedFlowchartNodeById(document, 'node-1"] .unsafe')).toBe(false);
     });
 });
