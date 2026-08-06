@@ -34,6 +34,7 @@ import {
   type ViewMode,
 } from './diagramManagementPage.helpers';
 import { DiagramCardSkeleton } from './DiagramCardSkeleton';
+import { WorkspaceCardActionsMenu } from './WorkspaceCardActionsMenu';
 import { WorkspaceEmptyState } from './WorkspaceEmptyState';
 import { focusWorkspaceTarget } from './workspaceMenuInteraction';
 
@@ -146,13 +147,6 @@ export const WorkspaceDiagramCollection = ({
     if (trigger) cardMenuTriggerRefs.current.set(key, trigger);
     else cardMenuTriggerRefs.current.delete(key);
   }, []);
-
-  const handleCardMenuOpenChange = (key: string, open: boolean) => {
-    setOpenCardMenuKey(open ? key : null);
-    if (!open) {
-      queueMicrotask(() => focusWorkspaceTarget(cardMenuTriggerRefs.current.get(key)));
-    }
-  };
 
   const handleSortMenuOpenChange = (open: boolean) => {
     setSortMenuOpen(open);
@@ -352,25 +346,16 @@ export const WorkspaceDiagramCollection = ({
                                                 <span className="node-count-chip"><Boxes size={14} strokeWidth={2} /> {nodeCount}</span>
                                             )}
                                             <div className="diagram-card-actions" style={{ position: 'relative', opacity: 1 }}>
-                                                <Dropdown
-                                                    menu={{ items: getCardMenu(item), onClick: (e) => handleMenuClick(e, item) }}
-                                                    trigger={['click']}
-                                                    placement="bottomRight"
-                                                    open={openCardMenuKey === cardMenuKey}
-                                                    onOpenChange={open => handleCardMenuOpenChange(cardMenuKey, open)}
-                                                >
-                                                    <button
-                                                        ref={trigger => setCardMenuTriggerRef(cardMenuKey, trigger)}
-                                                        type="button"
-                                                        className="action-btn-glass"
-                                                        onClick={e => e.stopPropagation()}
-                                                        aria-label={t('workspace.moreActions', { title: item.title })}
-                                                        aria-haspopup="menu"
-                                                        aria-expanded={openCardMenuKey === cardMenuKey}
-                                                    >
-                                                        <Ellipsis size={16} strokeWidth={2} />
-                                                    </button>
-                                                </Dropdown>
+                                                <WorkspaceCardActionsMenu
+                                                    activeMenuKey={openCardMenuKey}
+                                                    label={t('workspace.moreActions', { title: item.title })}
+                                                    menuItems={getCardMenu(item)}
+                                                    menuKey={cardMenuKey}
+                                                    onActiveMenuChange={setOpenCardMenuKey}
+                                                    onMenuClick={event => handleMenuClick(event, item)}
+                                                    onTriggerRefChange={setCardMenuTriggerRef}
+                                                    triggerIcon={<Ellipsis size={16} strokeWidth={2} />}
+                                                />
                                             </div>
                                         </article>
                                     );
@@ -401,25 +386,16 @@ export const WorkspaceDiagramCollection = ({
                                         )}
 
                                         <div className="diagram-card-actions">
-                                            <Dropdown
-                                                menu={{ items: getCardMenu(item), onClick: (e) => handleMenuClick(e, item) }}
-                                                trigger={['click']}
-                                                placement="bottomRight"
-                                                open={openCardMenuKey === cardMenuKey}
-                                                onOpenChange={open => handleCardMenuOpenChange(cardMenuKey, open)}
-                                            >
-                                                <button
-                                                    ref={trigger => setCardMenuTriggerRef(cardMenuKey, trigger)}
-                                                    type="button"
-                                                    className="action-btn-glass"
-                                                    onClick={e => e.stopPropagation()}
-                                                    aria-label={t('workspace.moreActions', { title: item.title })}
-                                                    aria-haspopup="menu"
-                                                    aria-expanded={openCardMenuKey === cardMenuKey}
-                                                >
-                                                    <Ellipsis size={16} strokeWidth={2} />
-                                                </button>
-                                            </Dropdown>
+                                            <WorkspaceCardActionsMenu
+                                                activeMenuKey={openCardMenuKey}
+                                                label={t('workspace.moreActions', { title: item.title })}
+                                                menuItems={getCardMenu(item)}
+                                                menuKey={cardMenuKey}
+                                                onActiveMenuChange={setOpenCardMenuKey}
+                                                onMenuClick={event => handleMenuClick(event, item)}
+                                                onTriggerRefChange={setCardMenuTriggerRef}
+                                                triggerIcon={<Ellipsis size={16} strokeWidth={2} />}
+                                            />
                                         </div>
 
                                         <div className="diagram-card-cover">

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import '@testing-library/jest-dom/vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -131,6 +131,33 @@ const WorkspaceControlsHarness = () => {
   );
 };
 
+const WorkspaceCardMenuHarness = ({
+  viewMode = 'grid',
+  items = [item],
+}: {
+  viewMode?: ViewMode;
+  items?: UnifiedDiagramItem[];
+}) => (
+  <WorkspaceDiagramCollection
+    activeView="recent"
+    onActiveViewChange={vi.fn()}
+    unifiedItems={items}
+    filteredItems={items}
+    sortKey="updated"
+    onSortKeyChange={vi.fn()}
+    viewMode={viewMode}
+    onViewModeChange={vi.fn()}
+    loading={false}
+    onOpenDiagram={vi.fn()}
+    onOpenDiagramInNewTab={vi.fn()}
+    onContextMenu={vi.fn()}
+    onDeleteDiagram={vi.fn()}
+    onCreateBlank={vi.fn()}
+    searchQuery=""
+    onClearSearch={vi.fn()}
+  />
+);
+
 afterEach(() => {
   document.body.replaceChildren();
   themeMock.current = { mode: 'light' };
@@ -226,6 +253,70 @@ describe('WorkspaceDiagramCollection controls', () => {
     fireEvent.keyDown(menu, { key: 'Escape' });
     await waitFor(() => expect(trigger).toHaveAttribute('aria-expanded', 'false'));
     await waitFor(() => expect(document.activeElement).toBe(trigger));
+  });
+
+  it.each(['Enter', ' ', 'ArrowDown'])(
+    'opens the named card actions menu with %j and restores focus on Escape',
+    async key => {
+      render(<WorkspaceCardMenuHarness />);
+      const trigger = screen.getByRole('button', { name: 'More actions for Commercial flow' });
+      const menuId = trigger.getAttribute('aria-controls');
+
+      expect(menuId).toMatch(/^workspace-card-actions-menu-/);
+      expect(trigger).toHaveAttribute('aria-expanded', 'false');
+      trigger.focus();
+      fireEvent.keyDown(trigger, { key });
+
+      const menu = await screen.findByRole('menu', { name: 'More actions for Commercial flow' });
+      const firstItem = screen.getByRole('menuitem', { name: 'Open in new tab' });
+      expect(menu).toHaveAttribute('id', menuId);
+      expect(trigger).toHaveAttribute('aria-expanded', 'true');
+      await waitFor(() => expect(document.activeElement).toBe(firstItem));
+
+      fireEvent.keyDown(menu, { key: 'Escape' });
+      await waitFor(() => expect(trigger).toHaveAttribute('aria-expanded', 'false'));
+      await waitFor(() => expect(document.activeElement).toBe(trigger));
+    },
+  );
+
+  it('keeps the list-view card actions menu on the same keyboard contract', async () => {
+    render(<WorkspaceCardMenuHarness viewMode="list" />);
+    const trigger = screen.getByRole('button', { name: 'More actions for Commercial flow' });
+
+    fireEvent.keyDown(trigger, { key: 'ArrowDown' });
+
+    const menu = await screen.findByRole('menu', { name: 'More actions for Commercial flow' });
+    await waitFor(() => expect(document.activeElement).toBe(
+      screen.getByRole('menuitem', { name: 'Open in new tab' }),
+    ));
+    fireEvent.keyDown(menu, { key: 'Escape' });
+    await waitFor(() => expect(document.activeElement).toBe(trigger));
+  });
+
+  it('closes a previous card menu when another card menu opens', async () => {
+    const secondItem: UnifiedDiagramItem = {
+      ...item,
+      id: 'diagram-2',
+      title: 'Secondary flow',
+      raw: { id: 'diagram-2' } as UnifiedDiagramItem['raw'],
+    };
+    render(<WorkspaceCardMenuHarness items={[item, secondItem]} />);
+    const firstTrigger = screen.getByRole('button', { name: 'More actions for Commercial flow' });
+    const secondTrigger = screen.getByRole('button', { name: 'More actions for Secondary flow' });
+
+    fireEvent.keyDown(firstTrigger, { key: 'ArrowDown' });
+    expect(await screen.findByRole('menu', { name: 'More actions for Commercial flow' })).toBeTruthy();
+
+    fireEvent.keyDown(secondTrigger, { key: 'ArrowDown' });
+    const secondMenu = await screen.findByRole('menu', { name: 'More actions for Secondary flow' });
+    await waitFor(() => {
+      expect(firstTrigger).toHaveAttribute('aria-expanded', 'false');
+      expect(secondTrigger).toHaveAttribute('aria-expanded', 'true');
+      expect(document.activeElement).toBe(
+        within(secondMenu).getByRole('menuitem', { name: 'Open in new tab' }),
+      );
+    });
+    expect(secondMenu).toHaveAttribute('id', secondTrigger.getAttribute('aria-controls'));
   });
 });
 
