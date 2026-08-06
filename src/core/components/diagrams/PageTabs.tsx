@@ -34,6 +34,7 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
     const inputRef = useRef<InputRef>(null);
     const renameErrorId = React.useId();
     const tabButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+    const deleteButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
     const restoreFocusAfterDeleteRef = useRef(false);
     const addedPageFocusTargetRef = useRef<string | null>(null);
     const pageLimitReached = pages.length >= MAX_DIAGRAM_PAGES;
@@ -43,6 +44,10 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
         if (!tab) return;
         tab.focus({ preventScroll: true });
         tab.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+    }, []);
+
+    const focusDeleteButton = useCallback((pageId: string) => {
+        deleteButtonRefs.current.get(pageId)?.focus({ preventScroll: true });
     }, []);
 
     useEffect(() => {
@@ -227,18 +232,28 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                                 autoAdjustOverflow
                                 styles={{ root: { maxWidth: 'calc(100vw - 16px)' } }}
                                 open={confirmingPageId === page.id}
-                                onOpenChange={open => setConfirmingPageId(open ? page.id : null)}
+                                onOpenChange={open => {
+                                    setConfirmingPageId(open ? page.id : null);
+                                    if (!open) requestAnimationFrame(() => focusDeleteButton(page.id));
+                                }}
                                 onConfirm={() => {
                                     const deleted = onDeletePage(page.id);
                                     restoreFocusAfterDeleteRef.current = deleted;
                                     setConfirmingPageId(null);
                                 }}
-                                onCancel={() => setConfirmingPageId(null)}
+                                onCancel={() => {
+                                    setConfirmingPageId(null);
+                                    requestAnimationFrame(() => focusDeleteButton(page.id));
+                                }}
                                 okText={t('designer.pages.deleteAction', { defaultValue: '删除' })}
                                 cancelText={t('common.cancel', { defaultValue: '取消' })}
                                 destroyOnHidden
                             >
                                 <button
+                                    ref={element => {
+                                        if (element) deleteButtonRefs.current.set(page.id, element);
+                                        else deleteButtonRefs.current.delete(page.id);
+                                    }}
                                     type="button"
                                     aria-label={t('designer.pages.delete', { name: page.name, defaultValue: '删除页面 {{name}}' })}
                                     className="page-tabs__delete"

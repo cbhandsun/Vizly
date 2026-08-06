@@ -265,6 +265,7 @@ describe('PageTabs', () => {
         fireEvent.click(screen.getByRole('button', { name: /取\s*消/ }));
 
         await waitFor(() => expect(deleteButton.getAttribute('aria-describedby')).toBeNull());
+        await waitFor(() => expect(document.activeElement).toBe(deleteButton));
         expect(onSwitchPage).not.toHaveBeenCalled();
         expect(onDeletePage).not.toHaveBeenCalled();
     });
