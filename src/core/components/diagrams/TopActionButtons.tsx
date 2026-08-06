@@ -344,6 +344,7 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
             {onShare && (
                 <Button
                     type="primary"
+                    data-share-dialog-trigger
                     aria-label={t('designer.toolbar.share')}
                     icon={<FaShareAlt className="text-[11px]" />}
                     onClick={onShare}

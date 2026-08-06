@@ -170,4 +170,67 @@ describe('useCloudSave', () => {
         expect(savedId).toBe(false);
         expect(messageMocks.error).toHaveBeenCalledTimes(1);
     });
+
+    it('restores focus to the share trigger after the dialog closes', () => {
+        let restoreFocus: FrameRequestCallback | undefined;
+        vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+            restoreFocus = callback;
+            return 1;
+        });
+        const trigger = document.createElement('button');
+        document.body.appendChild(trigger);
+        trigger.focus();
+        const { result } = renderHook(() => useCloudSave('diagram-1'));
+
+        act(() => result.current.openShareDialog());
+        expect(result.current.shareDialogOpen).toBe(true);
+        document.body.focus();
+        act(() => result.current.closeShareDialog());
+        act(() => restoreFocus?.(0));
+
+        expect(result.current.shareDialogOpen).toBe(false);
+        expect(document.activeElement).toBe(trigger);
+        trigger.remove();
+    });
+
+    it('captures the declared share trigger when pointer activation leaves focus on the page body', () => {
+        let restoreFocus: FrameRequestCallback | undefined;
+        vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+            restoreFocus = callback;
+            return 1;
+        });
+        const trigger = document.createElement('button');
+        trigger.dataset.shareDialogTrigger = '';
+        document.body.appendChild(trigger);
+        const { result } = renderHook(() => useCloudSave('diagram-1'));
+
+        act(() => result.current.openShareDialog());
+        act(() => result.current.closeShareDialog());
+        act(() => restoreFocus?.(0));
+
+        expect(document.activeElement).toBe(trigger);
+        trigger.remove();
+    });
+
+    it('does not move focus when the original share trigger is no longer connected', () => {
+        let restoreFocus: FrameRequestCallback | undefined;
+        vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+            restoreFocus = callback;
+            return 1;
+        });
+        const trigger = document.createElement('button');
+        const fallback = document.createElement('button');
+        document.body.append(trigger, fallback);
+        trigger.focus();
+        const { result } = renderHook(() => useCloudSave('diagram-1'));
+
+        act(() => result.current.openShareDialog());
+        trigger.remove();
+        fallback.focus();
+        act(() => result.current.closeShareDialog());
+        act(() => restoreFocus?.(0));
+
+        expect(document.activeElement).toBe(fallback);
+        fallback.remove();
+    });
 });

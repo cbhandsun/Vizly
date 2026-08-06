@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { tryAttachDiagramSnapshot } from '@/core/utils/diagramSnapshot';
 import { invalidateRemoteDiagramPreview } from '@/services/remoteDiagramPreview';
 import type { StandardDiagramData } from '@/core/models/DiagramModels';
@@ -21,6 +21,7 @@ class CloudSaveBoundaryError extends Error {
  */
 export function useCloudSave(diagramId: string, diagramName?: string) {
     const [shareDialogOpen, setShareDialogOpen] = useState(false);
+    const shareDialogTriggerRef = useRef<HTMLElement | null>(null);
 
     const saveToCloud = useCallback(async () => {
         let hideLoading: (() => void) | undefined;
@@ -106,11 +107,23 @@ export function useCloudSave(diagramId: string, diagramName?: string) {
     }, [diagramId, diagramName]);
 
     const openShareDialog = useCallback(() => {
+        const activeElement = document.activeElement;
+        const activeTrigger = activeElement instanceof HTMLElement && activeElement !== document.body
+            ? activeElement
+            : document.querySelector<HTMLElement>('[data-share-dialog-trigger]');
+        shareDialogTriggerRef.current = activeTrigger?.isConnected ? activeTrigger : null;
         setShareDialogOpen(true);
     }, []);
 
     const closeShareDialog = useCallback(() => {
+        const trigger = shareDialogTriggerRef.current;
+        shareDialogTriggerRef.current = null;
         setShareDialogOpen(false);
+
+        window.requestAnimationFrame(() => {
+            if (!trigger?.isConnected || trigger.hasAttribute('disabled')) return;
+            trigger.focus();
+        });
     }, []);
 
     /** 确保已保存再分享，返回云端 ID 或 false */
