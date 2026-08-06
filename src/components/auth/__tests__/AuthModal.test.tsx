@@ -100,7 +100,7 @@ describe('AuthModal', () => {
         const onCancel = vi.fn();
         render(<AuthModal open onCancel={onCancel} />);
 
-        fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+        fireEvent.click(screen.getByRole('button', { name: 'common.close' }));
 
         expect(onCancel).toHaveBeenCalledOnce();
     });
@@ -144,7 +144,7 @@ describe('AuthModal', () => {
         fireEvent.click(submit);
 
         await waitFor(() => expect(signInWithPasswordMock).toHaveBeenCalledOnce());
-        expect(screen.queryByRole('button', { name: 'Close' })).toBeNull();
+        expect(screen.queryByRole('button', { name: 'common.close' })).toBeNull();
 
         view.rerender(<AuthModal open={false} onCancel={onCancel} />);
         await act(async () => {

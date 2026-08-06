@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import React from 'react';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.stubGlobal('ResizeObserver', class ResizeObserverStub {
@@ -70,6 +70,33 @@ vi.mock('@/components/shareDialogLogging', () => ({
   logShareDialogMutationFailure: loggingMocks.mutationFailure,
 }));
 
+vi.mock('@/components/auth/AuthModal', async () => {
+  const ReactModule = await import('react');
+  return {
+    AuthModal: ({
+      open,
+      onCancel,
+      onAfterClose,
+    }: {
+      open: boolean;
+      onCancel: () => void;
+      onAfterClose?: () => void;
+    }) => {
+      ReactModule.useEffect(() => {
+        if (!open) onAfterClose?.();
+      }, [onAfterClose, open]);
+
+      if (!open) return null;
+      return (
+        <div role="dialog" aria-label="认证">
+          <button type="button" aria-label="关闭" onClick={onCancel}>关闭</button>
+          <span>auth.modal.loginButton</span>
+        </div>
+      );
+    },
+  };
+});
+
 const translations: Record<string, string> = {
   'share.title': '分享图表',
   'share.tabs.invite': '定向邀请',
@@ -101,6 +128,7 @@ const translations: Record<string, string> = {
   'share.generateRetryHint': '请确认图表已保存到云端并稍后重试。',
   'share.inviteFailedSafe': '邀请未发送',
   'share.inviteRetryHint': '请确认对方已注册，或稍后重试。',
+  'common.close': '关闭',
   'common.retry': '重试',
 };
 
@@ -163,6 +191,23 @@ describe('ShareDialog commercial failure handling', () => {
     await waitFor(() => expect(screen.getAllByRole('dialog')).toHaveLength(2));
     expect(screen.getByText('auth.modal.loginButton')).toBeTruthy();
     expect(screen.getByText('分享图表')).toBeTruthy();
+  });
+
+  it('restores focus to the login action after nested authentication closes', async () => {
+    render(
+      <ShareDialog open onClose={vi.fn()} diagramId={DIAGRAM_ID} onEnsureSaved={vi.fn()} />,
+    );
+
+    const loginAction = await screen.findByRole('button', { name: '立即登录' });
+    fireEvent.click(loginAction);
+
+    const authContent = await screen.findByText('auth.modal.loginButton');
+    const authDialog = authContent.closest('[role="dialog"]');
+    expect(authDialog).toBeTruthy();
+    fireEvent.click(within(authDialog as HTMLElement).getByRole('button', { name: '关闭' }));
+
+    await waitFor(() => expect(screen.getAllByRole('dialog')).toHaveLength(1));
+    await waitFor(() => expect(document.activeElement).toBe(loginAction));
   });
 
   it('blocks an invalid email locally and explains how to recover', async () => {

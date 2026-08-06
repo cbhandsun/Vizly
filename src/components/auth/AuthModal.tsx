@@ -19,6 +19,7 @@ interface AuthModalProps {
     open: boolean;
     onCancel: () => void;
     onAuthenticated?: () => void;
+    onAfterClose?: () => void;
     zIndex?: number;
 }
 
@@ -30,6 +31,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     open,
     onCancel,
     onAuthenticated,
+    onAfterClose,
     zIndex = AUTH_MODAL_Z_INDEX,
 }) => {
     const { t } = useTranslation();
@@ -58,6 +60,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         operation.invalidate();
         setMagicLinkSent(false);
         setActiveTab('password');
+        onAfterClose?.();
     };
 
     // ===== Password Login =====
@@ -354,7 +357,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             title={null}
             open={open}
             onCancel={handleClose}
-            closable={!operation.busy}
+            closable={operation.busy ? false : { 'aria-label': t('common.close') }}
             keyboard={!operation.busy}
             mask={{ closable: !operation.busy }}
             afterClose={resetTransientState}

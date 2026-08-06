@@ -67,6 +67,8 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
     const { user } = useAuth();
     const [activeTab, setActiveTab] = useState('invite');
     const [authModalOpen, setAuthModalOpen] = useState(false);
+    const [authModalMounted, setAuthModalMounted] = useState(false);
+    const loginActionRef = useRef<HTMLButtonElement>(null);
 
     // Link Share State
     const [expiration, setExpiration] = useState<ExpirationOption>('never');
@@ -93,6 +95,24 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
         () => parseCollaboratorEmail(inviteEmail),
         [inviteEmail],
     );
+
+    const openAuthModal = useCallback(() => {
+        setAuthModalMounted(true);
+        setAuthModalOpen(true);
+    }, []);
+
+    const closeAuthModal = useCallback(() => {
+        setAuthModalOpen(false);
+    }, []);
+
+    const handleAuthModalAfterClose = useCallback(() => {
+        setAuthModalMounted(false);
+        if (open && !user) loginActionRef.current?.focus();
+    }, [open, user]);
+
+    useEffect(() => {
+        if (!open) setAuthModalOpen(false);
+    }, [open]);
 
     // 云端 UUID（保存后获得，用于替代本地 diagramId）
     const [cloudDiagramId, setCloudDiagramId] = useState<string | null>(null);
@@ -281,10 +301,11 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
             description={t('share.loginRequiredHint', '登录后将返回当前分享流程，不会丢失图表。')}
             action={(
                 <Button
+                    ref={loginActionRef}
                     type="primary"
                     icon={<LoginOutlined />}
                     aria-label={t('share.loginAction', '立即登录')}
-                    onClick={() => setAuthModalOpen(true)}
+                    onClick={openAuthModal}
                 >
                     {t('share.loginAction', '立即登录')}
                 </Button>
@@ -552,6 +573,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
             <Modal
                 open={open}
                 onCancel={onClose}
+                closable={{ 'aria-label': t('common.close') }}
                 getContainer={getViewportOverlayContainer}
                 rootClassName={`${COMMERCIAL_VIEWPORT_MODAL_CLASS} share-dialog-viewport-modal`}
                 zIndex={COMMERCIAL_VIEWPORT_MODAL_Z_INDEX}
@@ -572,16 +594,17 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
             >
                 <Tabs defaultActiveKey="invite" activeKey={activeTab} onChange={setActiveTab} items={items} />
             </Modal>
-            {authModalOpen && (
+            {authModalMounted ? (
                 <React.Suspense fallback={null}>
                     <AuthModal
                         open={authModalOpen}
-                        onCancel={() => setAuthModalOpen(false)}
-                        onAuthenticated={() => setAuthModalOpen(false)}
+                        onCancel={closeAuthModal}
+                        onAuthenticated={closeAuthModal}
+                        onAfterClose={handleAuthModalAfterClose}
                         zIndex={COMMERCIAL_VIEWPORT_MODAL_Z_INDEX + 100}
                     />
                 </React.Suspense>
-            )}
+            ) : null}
         </>
     );
 };
