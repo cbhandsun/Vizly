@@ -54,6 +54,7 @@ import {
     logMindmapWrapperClipboardPayloadBlocked,
     logMindmapWrapperCopyTopicFailure,
     logMindmapWrapperHyperlinkOpenFailure,
+    logMindmapWrapperInitialViewportFailure,
     logMindmapWrapperNotePreviewFailure,
     logMindmapWrapperSafePasteFailure,
     logMindmapWrapperSafeShortcutFailure,
@@ -65,6 +66,7 @@ import { applyMindElixirPalette, clearMindElixirPalette } from './mindElixirThem
 import { useMindElixirFileDrop } from './useMindElixirFileDrop';
 import type { FlowDataBridgeEntry } from '../../utils/flowDataBridge';
 import { loadMindElixirData, saveMindElixirData } from './mindElixirPersistence';
+import { scheduleMindMapInitialViewport } from './mindmapInitialViewport';
 
 function isMindMapTextEditingTarget(target: EventTarget | null): boolean {
     if (!(target instanceof HTMLElement)) return false;
@@ -137,6 +139,14 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
         });
 
         mind.init(initialData);
+        const cancelInitialViewportFit = scheduleMindMapInitialViewport({
+            measure: () => ({
+                width: containerRef.current?.clientWidth ?? 0,
+                height: containerRef.current?.clientHeight ?? 0,
+            }),
+            applyFit: () => mind.scaleFit(),
+            onFailure: logMindmapWrapperInitialViewportFailure,
+        });
         mindRef.current = mind;
         setInstance(mind);
         registerMindElixirInstance(mind);  // expose to toolbar and other out-of-tree consumers
@@ -348,6 +358,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
         mind.container?.addEventListener('mouseout', handleNoteOut);
 
         return () => {
+            cancelInitialViewportFit();
             mq.removeEventListener('change', handleColorScheme);
             unbindOperationEffects();
             mind.container.removeEventListener('paste', handleSafeMindElixirPaste, true);
