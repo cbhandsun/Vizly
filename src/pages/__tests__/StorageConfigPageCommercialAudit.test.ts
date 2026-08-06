@@ -20,6 +20,8 @@ describe('storage configuration commercial safeguards', () => {
     it('keeps controls touch-safe and stacks actions on narrow screens', () => {
         const css = readSource('../StorageConfigPage.css');
 
+        expect(css).toMatch(/\.storage-config-page\s*\{[\s\S]*?height:\s*100dvh;[\s\S]*?min-height:\s*0;[\s\S]*?overflow-y:\s*auto;/);
+        expect(css).toContain('overscroll-behavior-y: contain');
         expect(css).toMatch(/\.storage-config-form \.ant-btn,[\s\S]*?min-height: var\(--commercial-touch-target, 44px\)/);
         expect(css).toMatch(/@media \(max-width: 640px\)[\s\S]*?\.storage-config-actions \.ant-btn[\s\S]*?width: 100%/);
         expect(css).toContain('.storage-config-brand:focus-visible');

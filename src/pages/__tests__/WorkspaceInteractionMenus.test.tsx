@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { WorkspaceDiagramCollection } from '../WorkspaceDiagramCollection';
 import { WorkspaceCompactHeader } from '../WorkspaceCompactHeader';
 import { WorkspaceContextMenu } from '../WorkspaceContextMenu';
+import { WorkspaceGlobalHeader } from '../WorkspaceGlobalHeader';
 import type {
   FilterViewType,
   SortKey,
@@ -23,6 +24,15 @@ import {
   focusWorkspaceTarget,
   getNextWorkspaceMenuIndex,
 } from '../workspaceMenuInteraction';
+
+const themeMock = vi.hoisted(() => ({
+  current: { mode: 'light' as 'light' | 'dark' },
+  setTheme: vi.fn(),
+}));
+
+vi.mock('@/core/themes/useCoreTheme', () => ({
+  useTheme: () => [themeMock.current, themeMock.setTheme],
+}));
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -58,6 +68,16 @@ vi.mock('react-i18next', () => ({
         'workspace.diagramTypeDescriptions.mindmap': 'Map ideas and relationships',
         'workspace.diagramTypeDescriptions.timeline': 'Plan milestones and schedules',
         'workspace.diagramTypeDescriptions.architecture': 'Model systems and dependencies',
+        'workspace.goHome': 'Go to workspace',
+        'workspace.search': 'Search workspace',
+        'workspace.searchPlaceholder': 'Find your diagrams...',
+        'workspace.clearSearch': 'Clear search',
+        'workspace.searchResultsStatus': '1 matching diagram',
+        'workspace.searchNoResultsStatus': 'No matching diagrams',
+        'workspace.settings': 'Settings',
+        'workspace.toggleTheme': 'Toggle theme',
+        'designer.menu.theme.light': 'Light',
+        'designer.menu.theme.dark': 'Dark',
       };
       if (key === 'workspace.moreActions') return `More actions for ${options?.title ?? ''}`;
       return values[key] ?? key;
@@ -113,6 +133,8 @@ const WorkspaceControlsHarness = () => {
 
 afterEach(() => {
   document.body.replaceChildren();
+  themeMock.current = { mode: 'light' };
+  themeMock.setTheme.mockReset();
 });
 
 describe('WorkspaceContextMenu', () => {
@@ -243,6 +265,66 @@ describe('WorkspaceCompactHeader create menu', () => {
 
     expect(onCreateTemplate).toHaveBeenCalledWith('timeline');
     await waitFor(() => expect(trigger).toHaveAttribute('aria-expanded', 'false'));
+  });
+});
+
+const renderWorkspaceGlobalHeader = () => render(
+  <WorkspaceGlobalHeader
+    searchTerm=""
+    onSearchTermChange={vi.fn()}
+    searchInputRef={{ current: null }}
+    searchResultCount={1}
+    onClearSearch={vi.fn()}
+    onNavigateHome={vi.fn()}
+    settingsMenu={[
+      { key: 'storage', label: 'Storage and sync' },
+      { key: 'account', label: 'Sign in' },
+    ]}
+    isAuthenticated={false}
+  />,
+);
+
+describe('WorkspaceGlobalHeader preferences', () => {
+  it.each(['Enter', ' ', 'ArrowDown'])(
+    'opens the named settings menu with %j and restores focus on Escape',
+    async key => {
+      renderWorkspaceGlobalHeader();
+      const trigger = screen.getByRole('button', { name: 'Settings' });
+
+      expect(trigger).toHaveAttribute('aria-haspopup', 'menu');
+      expect(trigger).toHaveAttribute('aria-expanded', 'false');
+      expect(trigger).toHaveAttribute('aria-controls', 'workspace-settings-menu');
+
+      trigger.focus();
+      fireEvent.keyDown(trigger, { key });
+
+      const menu = await screen.findByRole('menu', { name: 'Settings' });
+      const firstItem = screen.getByRole('menuitem', { name: 'Storage and sync' });
+      expect(menu).toHaveAttribute('id', 'workspace-settings-menu');
+      expect(trigger).toHaveAttribute('aria-expanded', 'true');
+      await waitFor(() => expect(document.activeElement).toBe(firstItem));
+
+      fireEvent.keyDown(menu, { key: 'Escape' });
+      await waitFor(() => expect(trigger).toHaveAttribute('aria-expanded', 'false'));
+      await waitFor(() => expect(document.activeElement).toBe(trigger));
+    },
+  );
+
+  it('exposes the current theme state and switches through the persistent theme manager path', () => {
+    const { unmount } = renderWorkspaceGlobalHeader();
+    const switchToDark = screen.getByRole('button', { name: 'Toggle theme: Dark' });
+
+    expect(switchToDark).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(switchToDark);
+    expect(themeMock.setTheme).toHaveBeenCalledWith('dark');
+
+    unmount();
+    themeMock.current = { mode: 'dark' };
+    renderWorkspaceGlobalHeader();
+    const switchToLight = screen.getByRole('button', { name: 'Toggle theme: Light' });
+    expect(switchToLight).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(switchToLight);
+    expect(themeMock.setTheme).toHaveBeenCalledWith('light');
   });
 });
 

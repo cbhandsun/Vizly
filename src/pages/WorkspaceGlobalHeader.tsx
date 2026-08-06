@@ -2,12 +2,17 @@ import type { MenuProps } from 'antd/es/menu';
 import Avatar from 'antd/es/avatar';
 import Dropdown from 'antd/es/dropdown';
 import { Palette, Search, Settings, User, X } from 'lucide-react';
-import type { RefObject } from 'react';
+import { useRef, useState, type KeyboardEvent, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { LanguageSwitcher } from '@/components/shared/LanguageSwitcher';
+import { useTheme } from '@/core/themes/useCoreTheme';
 import { toSafeImageUrl } from '@/core/utils/sanitizeHtml';
+import { focusWorkspaceTarget } from './workspaceMenuInteraction';
 import { getWorkspaceSearchFeedback, MAX_WORKSPACE_SEARCH_LENGTH } from './workspaceSearch';
+
+const WORKSPACE_SETTINGS_MENU_ID = 'workspace-settings-menu';
+
 interface WorkspaceGlobalHeaderProps {
   searchTerm: string;
   onSearchTermChange: (value: string) => void;
@@ -32,12 +37,53 @@ export const WorkspaceGlobalHeader = ({
   avatarUrl,
 }: WorkspaceGlobalHeaderProps) => {
   const { t } = useTranslation();
+  const [theme, setTheme] = useTheme();
+  const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
+  const settingsTriggerRef = useRef<HTMLButtonElement>(null);
+  const restoreSettingsFocusRef = useRef(false);
   const search = getWorkspaceSearchFeedback(searchTerm, searchResultCount);
   const searchStatus = search.isActive
     ? search.resultCount === 0
       ? t('workspace.searchNoResultsStatus', { query: search.query })
       : t('workspace.searchResultsStatus', { count: search.resultCount })
     : '';
+  const isDarkTheme = theme?.mode === 'dark';
+  const nextThemeLabel = t(isDarkTheme ? 'designer.menu.theme.light' : 'designer.menu.theme.dark');
+  const themeActionLabel = `${t('workspace.toggleTheme')}: ${nextThemeLabel}`;
+
+  const handleSettingsMenuOpenChange = (open: boolean) => {
+    setSettingsMenuOpen(open);
+    if (open) {
+      requestAnimationFrame(() => {
+        const firstItem = document.querySelector<HTMLElement>(
+          `#${WORKSPACE_SETTINGS_MENU_ID} [role="menuitem"]`,
+        );
+        focusWorkspaceTarget(firstItem);
+      });
+      return;
+    }
+
+    if (restoreSettingsFocusRef.current) {
+      restoreSettingsFocusRef.current = false;
+      queueMicrotask(() => focusWorkspaceTarget(settingsTriggerRef.current));
+    }
+  };
+
+  const handleSettingsTriggerKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    if (event.key === 'Escape' && settingsMenuOpen) {
+      event.preventDefault();
+      restoreSettingsFocusRef.current = true;
+      handleSettingsMenuOpenChange(false);
+      return;
+    }
+    if (!['Enter', ' ', 'ArrowDown'].includes(event.key)) return;
+    event.preventDefault();
+    handleSettingsMenuOpenChange(true);
+  };
+
+  const handleSettingsMenuKeyDown = (event: KeyboardEvent<HTMLUListElement>) => {
+    if (event.key === 'Escape') restoreSettingsFocusRef.current = true;
+  };
 
   return (
   <header className="workspace-global-header">
@@ -112,24 +158,39 @@ export const WorkspaceGlobalHeader = ({
 
     <div className="workspace-header-actions">
       <button
+        type="button"
         className="workspace-icon-btn"
-        onClick={() => {
-          const html = document.documentElement;
-          const isDark = html.getAttribute('data-theme') === 'dark';
-          html.setAttribute('data-theme', isDark ? 'light' : 'dark');
-        }}
-        aria-label={t('workspace.toggleTheme')}
-        title={t('workspace.toggleTheme')}
+        onClick={() => void setTheme(isDarkTheme ? 'light' : 'dark')}
+        aria-label={themeActionLabel}
+        aria-pressed={isDarkTheme}
+        title={themeActionLabel}
       >
         <Palette size={16} strokeWidth={2} />
       </button>
       <LanguageSwitcher variant="icon" className="workspace-icon-btn" />
-      <Dropdown menu={{ items: settingsMenu }} trigger={['click']} placement="bottomRight">
+      <Dropdown
+        menu={{
+          id: WORKSPACE_SETTINGS_MENU_ID,
+          items: settingsMenu,
+          'aria-label': t('workspace.settings'),
+          onClick: () => { restoreSettingsFocusRef.current = true; },
+          onKeyDown: handleSettingsMenuKeyDown,
+        }}
+        trigger={['click']}
+        open={settingsMenuOpen}
+        onOpenChange={handleSettingsMenuOpenChange}
+        placement="bottomRight"
+      >
         <button
+          ref={settingsTriggerRef}
           type="button"
           className="workspace-settings-trigger"
           aria-label={t('workspace.settings')}
+          aria-haspopup="menu"
+          aria-expanded={settingsMenuOpen}
+          aria-controls={WORKSPACE_SETTINGS_MENU_ID}
           title={t('workspace.settings')}
+          onKeyDown={handleSettingsTriggerKeyDown}
         >
           {isAuthenticated
             ? <Avatar size={24} src={avatarUrl ? toSafeImageUrl(avatarUrl) ?? undefined : undefined} icon={<User size={14} strokeWidth={2} />} />

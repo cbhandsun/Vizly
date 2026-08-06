@@ -5,8 +5,11 @@
     --vz-text-primary: #0f172a;
     --vz-text-secondary: #475569;
     --vz-border: rgba(15, 23, 42, 0.08);
-    min-height: 100dvh;
+    height: 100dvh;
+    min-height: 0;
     overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
     background: var(--vz-dashboard-bg, #fcfcfc);
     color: var(--vz-text-primary);
 }

@@ -39,7 +39,25 @@ export function useTheme(_options: Record<string, unknown> = {}): [Theme | null,
             const unsubscribe = tm.addThemeChangeListener((newTheme) => {
                 setTheme(newTheme || null);
             });
-            return () => unsubscribe && unsubscribe();
+            let active = true;
+
+            // The manager initializes asynchronously in its constructor. Its initial
+            // theme event can therefore fire between render and this subscription.
+            // Re-read the current value after subscribing so the UI cannot remain
+            // stuck on the fallback state after a persisted theme is restored.
+            queueMicrotask(() => {
+                if (!active) return;
+                try {
+                    setTheme(tm.getCurrentTheme() || null);
+                } catch {
+                    // Keep the live subscription even if the immediate snapshot fails.
+                }
+            });
+
+            return () => {
+                active = false;
+                if (unsubscribe) unsubscribe();
+            };
         } catch {
             return () => {};
         }
