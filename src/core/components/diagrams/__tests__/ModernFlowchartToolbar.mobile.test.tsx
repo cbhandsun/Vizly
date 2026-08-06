@@ -336,8 +336,54 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
         fireEvent.click(layoutButton);
 
         expect(layoutButton.getAttribute('aria-expanded')).toBe('true');
-        fireEvent.click(await screen.findByRole('menuitem', { name: /树形.*上→下/ }));
+        fireEvent.click(await screen.findByRole('menuitemradio', { name: /树形.*上→下/ }));
         expect(onStrategyLayout).toHaveBeenCalledWith('tree', undefined, 'TB');
+    });
+
+    it('announces the current compound layout and exposes both checked radio states', async () => {
+        render(
+            <ModernFlowchartToolbar
+                canUndo={false}
+                canRedo={false}
+                onUndo={vi.fn()}
+                onRedo={vi.fn()}
+                onZoomIn={vi.fn()}
+                onZoomOut={vi.fn()}
+                onFitView={vi.fn()}
+                autoRouting={false}
+                toggleAutoRouting={vi.fn()}
+                showGrid
+                toggleGrid={vi.fn()}
+                onShowShortcuts={vi.fn()}
+                showRuler={false}
+                toggleRuler={vi.fn()}
+                onStrategyLayout={vi.fn()}
+                lastDomainStrategy="domain-dagre"
+                lastDomainDirection="TB"
+                lastNodeLayout="dagre"
+            />,
+        );
+
+        const trigger = await screen.findByRole('button', {
+            name: /自动布局：DomainDagre.*Dagre分层/,
+        });
+        fireEvent.click(trigger);
+
+        const domainLayout = await screen.findByRole('menuitemradio', {
+            name: /DomainDagre.*上→下/,
+        });
+        const nodeLayout = screen.getByRole('menuitemradio', {
+            name: /Dagre分层/,
+        });
+        const inactiveLayout = screen.getByRole('menuitemradio', {
+            name: /树形.*上→下/,
+        });
+
+        expect(domainLayout.getAttribute('aria-checked')).toBe('true');
+        expect(nodeLayout.getAttribute('aria-checked')).toBe('true');
+        expect(inactiveLayout.getAttribute('aria-checked')).toBe('false');
+        expect(domainLayout.className).toContain('ant-dropdown-menu-item-selected');
+        expect(nodeLayout.className).toContain('ant-dropdown-menu-item-selected');
     });
 
     it('opens the automatic-layout menu with ArrowDown and focuses its first action', async () => {
@@ -364,7 +410,7 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
         const trigger = await screen.findByRole('button', { name: /layout\.tooltip|自动布局/i });
         fireEvent.keyDown(trigger, { key: 'ArrowDown' });
 
-        const firstItem = await screen.findByRole('menuitem', { name: /树形.*上→下/ });
+        const firstItem = await screen.findByRole('menuitemradio', { name: /树形.*上→下/ });
         await waitFor(() => expect(document.activeElement).toBe(firstItem));
         expect(trigger.getAttribute('aria-expanded')).toBe('true');
     });

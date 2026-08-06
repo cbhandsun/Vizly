@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import {
     FaUndo, FaRedo, FaSearchPlus, FaSearchMinus, FaCompressArrowsAlt,
     FaMagic, FaTh, FaKeyboard, FaBorderAll, FaBorderNone,
-    FaSitemap, FaObjectGroup, FaRegObjectGroup, FaRuler,
+    FaSitemap, FaObjectGroup, FaRuler,
     FaEllipsisH, FaTrashAlt,
     FaMagnet, FaPen, FaStickyNote, FaMousePointer,
     FaFolderOpen, FaFileExport, FaMap, FaSearch,
@@ -17,6 +17,7 @@ import { coerceDiagramId, getQueryOrHashParamFromLocation } from '../../utils/in
 import { FlowchartAlignmentTools } from './FlowchartAlignmentTools';
 import { FlowchartCanvasSettingsContent } from './FlowchartCanvasSettingsContent';
 import { DropdownMenuTriggerButton } from './DropdownMenuTriggerButton';
+import { buildFlowchartLayoutMenuModel } from './flowchartToolbarLayoutMenu';
 import { buildToolModeMenuItems, resolveActiveToolModeKey } from './flowchartToolbarToolModeMenu';
 import { useKeyboardAccessibleDropdown } from './hooks/useKeyboardAccessibleDropdown';
 
@@ -168,123 +169,18 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
         return () => window.clearTimeout(timer);
     }, []);
 
-    const activeLayoutKey = useMemo(() => {
-        if (!lastDomainStrategy) return undefined;
-        if (lastDomainStrategy === 'force') return 'force';
-        if (lastDomainStrategy === 'domain-vertical') return 'domain-vertical';
-        if (lastDomainStrategy === 'domain-horizontal') return 'domain-horizontal';
-        if (lastDomainDirection) {
-            return `${lastDomainStrategy}-${lastDomainDirection.toLowerCase()}`;
-        }
-        return lastDomainStrategy;
-    }, [lastDomainStrategy, lastDomainDirection]);
+    const layoutMenuModel = useMemo(() => buildFlowchartLayoutMenuModel({
+        lastDomainDirection,
+        lastDomainStrategy,
+        lastNodeLayout,
+        onStrategyLayout,
+        translate: (key, fallback) => t(key, fallback),
+    }), [lastDomainDirection, lastDomainStrategy, lastNodeLayout, onStrategyLayout, t]);
 
-    const activeNodeLayoutKey = lastNodeLayout ? `node-${lastNodeLayout}` : undefined;
-    const selectedLayoutKeys = useMemo(
-        () => [activeLayoutKey, activeNodeLayoutKey].filter(Boolean) as string[],
-        [activeLayoutKey, activeNodeLayoutKey]
-    );
-
-    const layoutMenu: MenuProps['items'] = useMemo(() => [
-        // ── 树形布局 ──
-        {
-            key: 'group-tree', label: t('designer.flowchart.layout.treeGroup', '树形布局'), type: 'group' as const, children: [
-                {
-                    key: 'tree-tb',
-                    label: t('designer.flowchart.layout.treeTB', '↕ 树形 (上→下)'),
-                    icon: <FaSitemap />,
-                    onClick: () => onStrategyLayout?.('tree', undefined, 'TB')
-                },
-                {
-                    key: 'tree-lr',
-                    label: t('designer.flowchart.layout.treeLR', '↔ 树形 (左→右)'),
-                    icon: <FaSitemap style={{ transform: 'rotate(-90deg)' }} />,
-                    onClick: () => onStrategyLayout?.('tree', undefined, 'LR')
-                },
-            ]
-        },
-        // ── 力导向 ──
-        { type: 'divider' as const },
-        {
-            key: 'group-force', label: t('designer.flowchart.layout.forceGroup', '力导向'), type: 'group' as const, children: [
-                {
-                    key: 'force',
-                    label: t('designer.flowchart.layout.force', '⊙ 力导向'),
-                    onClick: () => onStrategyLayout?.('force', undefined, 'TB')
-                },
-            ]
-        },
-        // ── 域感知布局（仅当回调可用时显示）──
-        ...(onStrategyLayout ? [
-            { type: 'divider' as const },
-            {
-                key: 'group-domain', label: t('designer.flowchart.layout.domainGroup', '域感知布局'), type: 'group' as const, children: [
-                    {
-                        key: 'domain-dagre-lr',
-                        label: t('designer.flowchart.layout.domainDagreLR', '◈ DomainDagre (左→右)'),
-                        icon: <FaRegObjectGroup style={{ transform: 'rotate(-90deg)' }} />,
-                        onClick: () => onStrategyLayout('domain-dagre', lastNodeLayout, 'LR')
-                    },
-                    {
-                        key: 'domain-dagre-tb',
-                        label: t('designer.flowchart.layout.domainDagreTB', '◈ DomainDagre (上→下) (默认)'),
-                        icon: <FaRegObjectGroup />,
-                        onClick: () => onStrategyLayout('domain-dagre', lastNodeLayout, 'TB')
-                    },
-                    {
-                        key: 'domain-dagre-sub-horizontal-tb',
-                        label: t('designer.flowchart.layout.domainDagreSubHorizontalTB', '◈ DomainDagre (子域水平)'),
-                        icon: <FaRegObjectGroup />,
-                        onClick: () => onStrategyLayout('domain-dagre-sub-horizontal', 'dagre', 'TB')
-                    },
-                    { type: 'divider' as const },
-                    {
-                        key: 'domain-vertical',
-                        label: t('designer.flowchart.layout.domainVertical', '▥ DomainVertical (上→下)'),
-                        icon: <FaObjectGroup />,
-                        onClick: () => onStrategyLayout('domain-vertical', lastNodeLayout, 'TB')
-                    },
-                    {
-                        key: 'domain-horizontal',
-                        label: t('designer.flowchart.layout.domainHorizontal', '▦ DomainHorizontal (左→右)'),
-                        icon: <FaObjectGroup style={{ transform: 'rotate(-90deg)' }} />,
-                        onClick: () => onStrategyLayout('domain-horizontal', lastNodeLayout, 'LR')
-                    },
-                ]
-            },
-            // ── 域内节点排布 ──
-            { type: 'divider' as const },
-            {
-                key: 'group-node-layout', label: t('designer.flowchart.layout.nodeLayoutGroup', '域内节点排布'), type: 'group' as const, children: [
-                    {
-                        key: 'node-flow',
-                        label: t('designer.flowchart.layout.nodeFlow', '▷ 流式'),
-                        onClick: () => onStrategyLayout(lastDomainStrategy || 'domain-dagre', 'flow', lastDomainDirection || 'TB')
-                    },
-                    {
-                        key: 'node-grid',
-                        label: t('designer.flowchart.layout.nodeGrid', '⊞ 网格'),
-                        onClick: () => onStrategyLayout(lastDomainStrategy || 'domain-dagre', 'grid', lastDomainDirection || 'TB')
-                    },
-                    {
-                        key: 'node-horizontal',
-                        label: t('designer.flowchart.layout.nodeHorizontal', '⊟ 水平'),
-                        onClick: () => onStrategyLayout(lastDomainStrategy || 'domain-dagre', 'horizontal', lastDomainDirection || 'TB')
-                    },
-                    {
-                        key: 'node-vertical',
-                        label: t('designer.flowchart.layout.nodeVertical', '⊞ 垂直'),
-                        onClick: () => onStrategyLayout(lastDomainStrategy || 'domain-dagre', 'vertical', lastDomainDirection || 'TB')
-                    },
-                    {
-                        key: 'node-dagre',
-                        label: t('designer.flowchart.layout.nodeDagre', '◈ Dagre分层 (默认)'),
-                        onClick: () => onStrategyLayout(lastDomainStrategy || 'domain-dagre', 'dagre', lastDomainDirection || 'TB')
-                    },
-                ]
-            },
-        ] : []),
-    ], [t, onStrategyLayout, lastNodeLayout, lastDomainStrategy, lastDomainDirection]);
+    const layoutBaseLabel = t('designer.flowchart.layout.tooltip', '自动布局');
+    const layoutTriggerLabel = layoutMenuModel.statusText
+        ? `${layoutBaseLabel}：${layoutMenuModel.statusText}`
+        : layoutBaseLabel;
 
     const gridInfo = useMemo(() => {
         if (!showGrid) return { title: t('designer.toolbar.gridOff'), icon: <FaBorderNone /> };
@@ -549,8 +445,8 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                 <>
                     <Dropdown
                         menu={{
-                            items: layoutMenu,
-                            selectedKeys: selectedLayoutKeys,
+                            items: layoutMenuModel.items,
+                            selectedKeys: layoutMenuModel.selectedKeys,
                             selectable: true,
                             onKeyDown: layoutDropdown.handleMenuKeyDown,
                         }}
@@ -562,7 +458,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                     >
                         <DropdownMenuTriggerButton
                             ref={layoutDropdown.triggerRef}
-                            ariaLabel={t('designer.flowchart.layout.tooltip')}
+                            ariaLabel={layoutTriggerLabel}
                             open={layoutDropdown.open}
                             onTriggerKeyDown={layoutDropdown.handleTriggerKeyDown}
                             icon={<FaSitemap size={13} />}
