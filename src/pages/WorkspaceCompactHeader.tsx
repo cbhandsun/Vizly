@@ -1,22 +1,66 @@
+import React from 'react';
 import Dropdown from 'antd/es/dropdown';
+import type { MenuProps } from 'antd/es/menu';
 import { BrainCircuit, ChevronDown, Clock3, Network, Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import type { TemplateKey } from './diagramManagementPage.helpers';
+import { focusWorkspaceTarget } from './workspaceMenuInteraction';
+
 interface WorkspaceCompactHeaderProps {
   documentCount: number;
   onCreateTemplate: (templateKey: TemplateKey) => void;
 }
 
 export const PRIMARY_WORKSPACE_TEMPLATE: TemplateKey = 'flowchart';
+const WORKSPACE_CREATE_MENU_ID = 'workspace-create-diagram-type-menu';
+
+const isSecondaryWorkspaceTemplate = (key: React.Key): key is TemplateKey =>
+  key === 'mindmap' || key === 'timeline' || key === 'architecture';
 
 export const WorkspaceCompactHeader = ({
   documentCount,
   onCreateTemplate,
 }: WorkspaceCompactHeaderProps) => {
   const { t } = useTranslation();
+  const [createMenuOpen, setCreateMenuOpen] = React.useState(false);
+  const createMenuTriggerRef = React.useRef<HTMLButtonElement>(null);
+  const restoreCreateMenuFocusRef = React.useRef(false);
 
-  const templateItems = [
+  const handleCreateMenuOpenChange = (open: boolean) => {
+    setCreateMenuOpen(open);
+    if (open) {
+      requestAnimationFrame(() => {
+        const firstItem = document.querySelector<HTMLElement>(
+          `#${WORKSPACE_CREATE_MENU_ID} [role="menuitem"]`,
+        );
+        focusWorkspaceTarget(firstItem);
+      });
+      return;
+    }
+    if (restoreCreateMenuFocusRef.current) {
+      restoreCreateMenuFocusRef.current = false;
+      queueMicrotask(() => focusWorkspaceTarget(createMenuTriggerRef.current));
+    }
+  };
+
+  const handleCreateMenuTriggerKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (!['Enter', ' ', 'ArrowDown'].includes(event.key)) return;
+    event.preventDefault();
+    handleCreateMenuOpenChange(true);
+  };
+
+  const handleCreateMenuKeyDown = (event: React.KeyboardEvent<HTMLUListElement>) => {
+    if (event.key === 'Escape') restoreCreateMenuFocusRef.current = true;
+  };
+
+  const handleCreateMenuClick: NonNullable<MenuProps['onClick']> = event => {
+    if (!isSecondaryWorkspaceTemplate(event.key)) return;
+    restoreCreateMenuFocusRef.current = true;
+    onCreateTemplate(event.key);
+  };
+
+  const templateItems: MenuProps['items'] = [
     {
       key: 'mindmap',
       icon: <BrainCircuit size={18} aria-hidden="true" />,
@@ -26,7 +70,6 @@ export const WorkspaceCompactHeader = ({
           <small>{t('workspace.diagramTypeDescriptions.mindmap')}</small>
         </span>
       ),
-      onClick: () => onCreateTemplate('mindmap'),
     },
     {
       key: 'timeline',
@@ -37,7 +80,6 @@ export const WorkspaceCompactHeader = ({
           <small>{t('workspace.diagramTypeDescriptions.timeline')}</small>
         </span>
       ),
-      onClick: () => onCreateTemplate('timeline'),
     },
     {
       key: 'architecture',
@@ -48,7 +90,6 @@ export const WorkspaceCompactHeader = ({
           <small>{t('workspace.diagramTypeDescriptions.architecture')}</small>
         </span>
       ),
-      onClick: () => onCreateTemplate('architecture'),
     },
   ];
 
@@ -69,16 +110,29 @@ export const WorkspaceCompactHeader = ({
             {t('workspace.newFlowchart')}
           </button>
           <Dropdown
-            menu={{ items: templateItems }}
+            menu={{
+              id: WORKSPACE_CREATE_MENU_ID,
+              items: templateItems,
+              'aria-label': t('workspace.chooseDiagramType'),
+              onClick: handleCreateMenuClick,
+              onKeyDown: handleCreateMenuKeyDown,
+            }}
             trigger={['click']}
+            open={createMenuOpen}
+            onOpenChange={handleCreateMenuOpenChange}
             placement="bottomRight"
             classNames={{ root: 'workspace-create-dropdown' }}
           >
             <button
+              ref={createMenuTriggerRef}
               type="button"
               className="create-btn-primary create-btn-menu"
               aria-label={t('workspace.chooseDiagramType')}
+              aria-haspopup="menu"
+              aria-expanded={createMenuOpen}
+              aria-controls={WORKSPACE_CREATE_MENU_ID}
               title={t('workspace.chooseDiagramType')}
+              onKeyDown={handleCreateMenuTriggerKeyDown}
             >
               <ChevronDown size={14} strokeWidth={2} />
             </button>

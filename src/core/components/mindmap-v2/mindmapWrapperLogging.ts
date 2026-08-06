@@ -52,3 +52,7 @@ export const logMindmapWrapperCopyTopicFailure = (error: unknown): void => {
 export const logMindmapWrapperNotePreviewFailure = (error: unknown): void => {
   safeLog.warn('[MindElixirWrapper] note preview failed:', redactSensitiveLogValue(error));
 };
+
+export const logMindmapWrapperInitialViewportFailure = (error: unknown): void => {
+  safeLog.warn('[MindElixirWrapper] initial viewport fit failed:', redactSensitiveLogValue(error));
+};
