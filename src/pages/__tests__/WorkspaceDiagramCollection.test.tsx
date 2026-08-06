@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
 import { WorkspaceDiagramCollection } from '../WorkspaceDiagramCollection';
-import type { UnifiedDiagramItem } from '../diagramManagementPage.helpers';
+import type { FilterViewType, UnifiedDiagramItem } from '../diagramManagementPage.helpers';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -22,9 +22,10 @@ const renderCollection = (
   item: UnifiedDiagramItem,
   filteredItems: UnifiedDiagramItem[] = [item],
   searchQuery = '',
+  activeView: FilterViewType = 'templates',
 ): string => renderToStaticMarkup(
   <WorkspaceDiagramCollection
-    activeView="templates"
+    activeView={activeView}
     onActiveViewChange={() => undefined}
     unifiedItems={[item]}
     filteredItems={filteredItems}
@@ -94,6 +95,8 @@ describe('WorkspaceDiagramCollection', () => {
     expect(html).toContain('aria-label="workspace.sortBy: workspace.lastModified"');
     expect(html).toContain('aria-haspopup="menu"');
     expect(html).toContain('aria-expanded="false"');
+    expect(html).toContain('role="group" aria-label="workspace.filterBy"');
+    expect(html).toContain('role="group" aria-label="workspace.viewMode"');
     expect(html).toContain('workspace-sort-trigger-label">workspace.lastModified</span>');
     expect(html).toMatch(/aria-label="More actions for Accessible template" aria-haspopup="menu" aria-expanded="false"/);
   });
@@ -116,6 +119,24 @@ describe('WorkspaceDiagramCollection', () => {
     expect(html).not.toContain('workspace.empty.title');
   });
 
+  it('renders a contextual recovery action for an empty filtered view', () => {
+    const item: UnifiedDiagramItem = {
+      id: 'local-only',
+      title: 'Local diagram',
+      updatedAt: 1,
+      source: 'local',
+      role: 'owner',
+      raw: { id: 'local-only' } as never,
+    };
+
+    const html = renderCollection(item, [], '', 'cloud');
+
+    expect(html).toContain('workspace.empty.filterTitle');
+    expect(html).toContain('workspace.empty.filterDescription');
+    expect(html).toContain('workspace.viewRecent');
+    expect(html).not.toContain('workspace.newDiagram');
+  });
+
   it('keeps sort and view controls available at the mobile breakpoint', () => {
     const css = readFileSync(new URL('../WorkspaceDashboard.mobile.css', import.meta.url), 'utf8');
     const mobileControlsRule = css.match(/\.workspace-view-controls\s*{([^}]*)}/)?.[1];
@@ -123,6 +144,11 @@ describe('WorkspaceDiagramCollection', () => {
     expect(mobileControlsRule).toContain('display: flex;');
     expect(mobileControlsRule).toContain('width: 100%;');
     expect(mobileControlsRule).not.toContain('display: none;');
+    expect(css).toMatch(/\.workspace-view-controls \.view-toggle-btn\s*\{[\s\S]*?width: 44px;[\s\S]*?height: 44px;/);
     expect(css).toMatch(/\.workspace-sort-trigger-label\s*{[\s\S]*?display: inline;/);
+
+    const desktopCss = readFileSync(new URL('../WorkspaceDashboard.css', import.meta.url), 'utf8');
+    expect(desktopCss).toMatch(/\.workspace-sort-trigger\s*{[\s\S]*?min-width: 132px;/);
+    expect(desktopCss).toMatch(/\.workspace-sort-trigger-label\s*{[\s\S]*?display: inline;/);
   });
 });

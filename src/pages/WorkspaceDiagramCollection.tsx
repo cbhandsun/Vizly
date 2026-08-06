@@ -120,11 +120,22 @@ export const WorkspaceDiagramCollection = ({
   const [openCardMenuKey, setOpenCardMenuKey] = React.useState<string | null>(null);
   const [sortMenuOpen, setSortMenuOpen] = React.useState(false);
   const cardMenuTriggerRefs = React.useRef(new Map<string, HTMLButtonElement>());
+  const recentFilterRef = React.useRef<HTMLButtonElement>(null);
+  const sortTriggerRef = React.useRef<HTMLButtonElement>(null);
+  const restoreSortFocusRef = React.useRef(false);
   const currentSortLabel = {
     updated: t('workspace.lastModified'),
     name: t('workspace.name'),
     type: t('workspace.type'),
   } satisfies Record<SortKey, string>;
+  const activeViewLabel = {
+    recent: t('workspace.recent'),
+    local: t('workspace.local'),
+    cloud: t('workspace.cloud'),
+    shared: t('workspace.shared'),
+    templates: t('workspace.industryTemplates'),
+    general_templates: t('workspace.generalTemplates'),
+  } satisfies Record<FilterViewType, string>;
 
   const getCardMenuKey = (item: UnifiedDiagramItem): string => `${item.source}:${item.id}`;
 
@@ -141,6 +152,44 @@ export const WorkspaceDiagramCollection = ({
     if (!open) {
       queueMicrotask(() => focusWorkspaceTarget(cardMenuTriggerRefs.current.get(key)));
     }
+  };
+
+  const handleSortMenuOpenChange = (open: boolean) => {
+    setSortMenuOpen(open);
+    if (open) {
+      requestAnimationFrame(() => {
+        const firstItem = document.querySelector<HTMLElement>(
+          '.workspace-sort-dropdown [role="menuitem"]',
+        );
+        focusWorkspaceTarget(firstItem);
+      });
+      return;
+    }
+    if (restoreSortFocusRef.current) {
+      restoreSortFocusRef.current = false;
+      queueMicrotask(() => focusWorkspaceTarget(sortTriggerRef.current));
+    }
+  };
+
+  const handleSortTriggerKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (!['Enter', ' ', 'ArrowDown'].includes(event.key)) return;
+    event.preventDefault();
+    handleSortMenuOpenChange(true);
+  };
+
+  const handleSortMenuKeyDown = (event: React.KeyboardEvent<HTMLUListElement>) => {
+    if (event.key === 'Escape') restoreSortFocusRef.current = true;
+  };
+
+  const handleSortMenuClick: NonNullable<MenuProps['onClick']> = event => {
+    if (event.key !== 'updated' && event.key !== 'name' && event.key !== 'type') return;
+    restoreSortFocusRef.current = true;
+    onSortKeyChange(event.key);
+  };
+
+  const handleClearFilter = () => {
+    onActiveViewChange('recent');
+    queueMicrotask(() => focusWorkspaceTarget(recentFilterRef.current));
   };
 
   const getCardMenu = (item: UnifiedDiagramItem): MenuProps['items'] => {
@@ -172,8 +221,8 @@ export const WorkspaceDiagramCollection = ({
                 <div id="workspace-diagram-results" className="workspace-main-inner">
                     {/* Filter Tabs with Counts */}
                     <div className="workspace-matrix-header">
-                        <div className="workspace-filter-tabs">
-                            <button type="button" className={`filter-tab ${activeView === 'recent' ? 'active' : ''}`} aria-pressed={activeView === 'recent'} onClick={() => onActiveViewChange('recent')}>
+                        <div className="workspace-filter-tabs" role="group" aria-label={t('workspace.filterBy')}>
+                            <button ref={recentFilterRef} type="button" className={`filter-tab ${activeView === 'recent' ? 'active' : ''}`} aria-pressed={activeView === 'recent'} onClick={() => onActiveViewChange('recent')}>
                                 <Clock size={14} strokeWidth={2} /> {t('workspace.recent')}
                                 <span className="filter-tab-count">{unifiedItems.filter(i => i.source !== 'template' && i.source !== 'general_template').length}</span>
                             </button>
@@ -203,29 +252,35 @@ export const WorkspaceDiagramCollection = ({
                             <Dropdown
                                 menu={{
                                     items: [
-                                        { key: 'updated', label: t('workspace.lastModified'), onClick: () => onSortKeyChange('updated') },
-                                        { key: 'name', label: t('workspace.name'), onClick: () => onSortKeyChange('name') },
-                                        { key: 'type', label: t('workspace.type'), onClick: () => onSortKeyChange('type') },
+                                        { key: 'updated', label: t('workspace.lastModified') },
+                                        { key: 'name', label: t('workspace.name') },
+                                        { key: 'type', label: t('workspace.type') },
                                     ],
-                                    selectedKeys: [sortKey]
+                                    selectedKeys: [sortKey],
+                                    'aria-label': t('workspace.sortBy'),
+                                    onClick: handleSortMenuClick,
+                                    onKeyDown: handleSortMenuKeyDown,
                                 }}
                                 trigger={['click']}
                                 open={sortMenuOpen}
-                                onOpenChange={setSortMenuOpen}
+                                onOpenChange={handleSortMenuOpenChange}
+                                classNames={{ root: 'workspace-sort-dropdown' }}
                             >
                                 <button
+                                    ref={sortTriggerRef}
                                     type="button"
                                     className="workspace-icon-btn workspace-sort-trigger"
                                     title={`${t('workspace.sortBy')}: ${currentSortLabel[sortKey]}`}
                                     aria-label={`${t('workspace.sortBy')}: ${currentSortLabel[sortKey]}`}
                                     aria-haspopup="menu"
                                     aria-expanded={sortMenuOpen}
+                                    onKeyDown={handleSortTriggerKeyDown}
                                 >
                                     <ArrowUpAZ size={16} strokeWidth={2} />
                                     <span className="workspace-sort-trigger-label">{currentSortLabel[sortKey]}</span>
                                 </button>
                             </Dropdown>
-                            <div className="view-toggle">
+                            <div className="view-toggle" role="group" aria-label={t('workspace.viewMode')}>
                                 <button
                                     type="button"
                                     className={`view-toggle-btn ${viewMode === 'grid' ? 'active' : ''}`}
@@ -261,6 +316,12 @@ export const WorkspaceDiagramCollection = ({
                                 mode="search"
                                 query={searchQuery}
                                 onClearSearch={onClearSearch}
+                            />
+                        ) : activeView !== 'recent' ? (
+                            <WorkspaceEmptyState
+                                mode="filter"
+                                viewLabel={activeViewLabel[activeView]}
+                                onClearFilter={handleClearFilter}
                             />
                         ) : (
                             <WorkspaceEmptyState onCreate={onCreateBlank} />

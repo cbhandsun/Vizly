@@ -30,6 +30,8 @@
         "name": "Name",
         "type": "Type",
         "sortBy": "Sort diagrams",
+        "filterBy": "Filter diagrams",
+        "viewMode": "Diagram view",
         "gridView": "Grid view",
         "listView": "List view",
         "openInNewTab": "Open in new tab",
@@ -58,6 +60,7 @@
         "clearSearch": "Clear search",
         "searchResultsStatus": "{{count}} matching diagrams",
         "searchNoResultsStatus": "No diagrams match {{query}}",
+        "viewRecent": "View recent diagrams",
         "toggleTheme": "Toggle theme",
         "settings": "Settings",
         "storageSettings": "Storage and sync",
@@ -78,7 +81,9 @@
             "title": "No diagrams yet",
             "description": "Create a diagram or use the command menu to get started.",
             "searchTitle": "No matching diagrams",
-            "searchDescription": "No diagrams match “{{query}}”. Clear search to see all diagrams."
+            "searchDescription": "No diagrams match “{{query}}”. Clear search to see all diagrams.",
+            "filterTitle": "No diagrams in {{view}}",
+            "filterDescription": "The {{view}} view is empty. View recent diagrams to continue."
         }
     },
     "templates": {
