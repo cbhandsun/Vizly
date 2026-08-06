@@ -1,14 +1,19 @@
 import type { MenuProps } from 'antd/es/menu';
 import Avatar from 'antd/es/avatar';
 import Dropdown from 'antd/es/dropdown';
-import { Palette, Search, Settings, User } from 'lucide-react';
+import { Palette, Search, Settings, User, X } from 'lucide-react';
+import type { RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { LanguageSwitcher } from '@/components/shared/LanguageSwitcher';
 import { toSafeImageUrl } from '@/core/utils/sanitizeHtml';
+import { getWorkspaceSearchFeedback, MAX_WORKSPACE_SEARCH_LENGTH } from './workspaceSearch';
 interface WorkspaceGlobalHeaderProps {
   searchTerm: string;
   onSearchTermChange: (value: string) => void;
+  searchInputRef: RefObject<HTMLInputElement | null>;
+  searchResultCount: number;
+  onClearSearch: () => void;
   onNavigateHome: () => void;
   settingsMenu: MenuProps['items'];
   isAuthenticated: boolean;
@@ -18,12 +23,21 @@ interface WorkspaceGlobalHeaderProps {
 export const WorkspaceGlobalHeader = ({
   searchTerm,
   onSearchTermChange,
+  searchInputRef,
+  searchResultCount,
+  onClearSearch,
   onNavigateHome,
   settingsMenu,
   isAuthenticated,
   avatarUrl,
 }: WorkspaceGlobalHeaderProps) => {
   const { t } = useTranslation();
+  const search = getWorkspaceSearchFeedback(searchTerm, searchResultCount);
+  const searchStatus = search.isActive
+    ? search.resultCount === 0
+      ? t('workspace.searchNoResultsStatus', { query: search.query })
+      : t('workspace.searchResultsStatus', { count: search.resultCount })
+    : '';
 
   return (
   <header className="workspace-global-header">
@@ -55,12 +69,45 @@ export const WorkspaceGlobalHeader = ({
       <div className="workspace-search">
         <Search size={16} strokeWidth={2} style={{ color: 'var(--vz-brand-from)', opacity: 0.7 }} />
         <input
+          ref={searchInputRef}
+          type="search"
           aria-label={t('workspace.search')}
+          aria-controls="workspace-diagram-results"
+          aria-describedby="workspace-search-status"
           placeholder={t('workspace.searchPlaceholder')}
           value={searchTerm}
+          maxLength={MAX_WORKSPACE_SEARCH_LENGTH}
+          autoComplete="off"
+          spellCheck={false}
           onChange={event => onSearchTermChange(event.target.value)}
+          onKeyDown={event => {
+            if (event.key === 'Escape' && search.value.length > 0) {
+              event.preventDefault();
+              onClearSearch();
+            }
+          }}
         />
+        {search.value.length > 0 && (
+          <button
+            type="button"
+            className="workspace-search-clear"
+            onClick={onClearSearch}
+            aria-label={t('workspace.clearSearch')}
+            title={t('workspace.clearSearch')}
+          >
+            <X size={15} strokeWidth={2} />
+          </button>
+        )}
       </div>
+      <span
+        id="workspace-search-status"
+        className="workspace-visually-hidden"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        {searchStatus}
+      </span>
     </div>
 
     <div className="workspace-header-actions">

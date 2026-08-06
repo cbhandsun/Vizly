@@ -29,6 +29,7 @@ import { WorkspaceContextMenu } from './WorkspaceContextMenu';
 import { createWorkspaceDeleteConfirmation } from './workspaceDeleteConfirmation';
 import { createWorkspaceDiagramActions } from './diagramManagementActions';
 import { createWorkspaceSettingsMenu } from './workspaceSettingsMenu';
+import { useWorkspaceSearch } from './useWorkspaceSearch';
 
 const AuthModal = React.lazy(() => import('@/components/auth/AuthModal').then(module => ({
     default: module.AuthModal,
@@ -48,7 +49,7 @@ const WorkspaceDashboardPage: React.FC = () => {
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
     const [activeView, setActiveView] = useState<FilterViewType>(initialView);
     const [loading, setLoading] = useState(true);
-    const [searchTerm, setSearchTerm] = useState('');
+    const { searchTerm, searchQuery, searchInputRef, updateSearchTerm, clearSearch } = useWorkspaceSearch();
     const [viewMode, setViewMode] = useState<ViewMode>('grid');
     const [sortKey, setSortKey] = useState<SortKey>('updated');
     
@@ -200,8 +201,8 @@ const WorkspaceDashboardPage: React.FC = () => {
 
     // --- Computed Views ---
     const filteredItems = useMemo(
-        () => filterAndSortItems(unifiedItems, activeView, searchTerm, sortKey),
-        [unifiedItems, activeView, searchTerm, sortKey]
+        () => filterAndSortItems(unifiedItems, activeView, searchQuery, sortKey),
+        [unifiedItems, activeView, searchQuery, sortKey]
     );
 
     // --- Settings Menu ---
@@ -222,7 +223,10 @@ const WorkspaceDashboardPage: React.FC = () => {
         <div className="workspace-dashboard">
             <WorkspaceGlobalHeader
                 searchTerm={searchTerm}
-                onSearchTermChange={setSearchTerm}
+                onSearchTermChange={updateSearchTerm}
+                searchInputRef={searchInputRef}
+                searchResultCount={filteredItems.length}
+                onClearSearch={clearSearch}
                 onNavigateHome={() => navigate('/manage')}
                 settingsMenu={settingsMenu}
                 isAuthenticated={Boolean(user)}
@@ -236,7 +240,7 @@ const WorkspaceDashboardPage: React.FC = () => {
                 aria-label={t('workspace.title')}
             >
                 
-                {!searchTerm && (
+                {!searchQuery && (
                     <WorkspaceCompactHeader
                         documentCount={unifiedItems.length}
                         onCreateTemplate={handleCreateTemplate}
@@ -257,6 +261,8 @@ const WorkspaceDashboardPage: React.FC = () => {
                     onContextMenu={handleContextMenu}
                     onDeleteDiagram={handleDeleteDiagram}
                     onCreateBlank={() => handleCreateTemplate('blank')}
+                    searchQuery={searchQuery}
+                    onClearSearch={clearSearch}
                 />
             </main>
 

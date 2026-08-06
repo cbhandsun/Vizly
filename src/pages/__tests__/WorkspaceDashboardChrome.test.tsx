@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, options?: { count?: number }) => {
+    t: (key: string, options?: { count?: number; query?: string }) => {
       const values: Record<string, string> = {
         'common.language': 'Language',
         'workspace.chooseDiagramType': 'Choose a diagram type',
@@ -21,10 +21,16 @@ vi.mock('react-i18next', () => ({
         'workspace.diagramTypeDescriptions.timeline': 'Plan milestones and schedules',
         'workspace.search': 'Search workspace',
         'workspace.searchPlaceholder': 'Find your diagrams...',
+        'workspace.clearSearch': 'Clear search',
+        'workspace.searchResultsStatus': `${options?.count ?? 0} matching diagrams`,
+        'workspace.searchNoResultsStatus': `No diagrams match ${options?.query ?? ''}`,
         'workspace.settings': 'Settings',
         'workspace.title': 'Workspace',
         'workspace.toggleTheme': 'Toggle theme',
       };
+      if (key === 'workspace.empty.searchDescription') {
+        return `No diagrams match ${options?.query ?? ''}`;
+      }
       return values[key] ?? key;
     },
     i18n: {
@@ -73,6 +79,9 @@ describe('WorkspaceDashboardChrome', () => {
       <WorkspaceGlobalHeader
         searchTerm="query"
         onSearchTermChange={() => undefined}
+        searchInputRef={{ current: null }}
+        searchResultCount={0}
+        onClearSearch={() => undefined}
         onNavigateHome={() => undefined}
         settingsMenu={[]}
         isAuthenticated
@@ -82,6 +91,21 @@ describe('WorkspaceDashboardChrome', () => {
 
     expect(html).toContain('Find your diagrams');
     expect(html).toContain('aria-label="Search workspace"');
+    expect(html).toContain('type="search"');
+    expect(html).toContain('aria-controls="workspace-diagram-results"');
+    expect(html).toContain('Clear search');
+    expect(html).toContain('role="status"');
     expect(html).not.toContain('javascript:');
+  });
+
+  it('distinguishes search results from a truly empty workspace', () => {
+    const html = renderToStaticMarkup(
+      <WorkspaceEmptyState mode="search" query={'<img src=x>'} onClearSearch={() => undefined} />,
+    );
+
+    expect(html).toContain('workspace.empty.searchTitle');
+    expect(html).toContain('Clear search');
+    expect(html).toContain('&lt;img src=x&gt;');
+    expect(html).not.toContain('New diagram');
   });
 });

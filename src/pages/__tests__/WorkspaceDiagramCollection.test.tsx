@@ -18,12 +18,16 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
-const renderCollection = (item: UnifiedDiagramItem): string => renderToStaticMarkup(
+const renderCollection = (
+  item: UnifiedDiagramItem,
+  filteredItems: UnifiedDiagramItem[] = [item],
+  searchQuery = '',
+): string => renderToStaticMarkup(
   <WorkspaceDiagramCollection
     activeView="templates"
     onActiveViewChange={() => undefined}
     unifiedItems={[item]}
-    filteredItems={[item]}
+    filteredItems={filteredItems}
     sortKey="updated"
     onSortKeyChange={() => undefined}
     viewMode="grid"
@@ -34,6 +38,8 @@ const renderCollection = (item: UnifiedDiagramItem): string => renderToStaticMar
     onContextMenu={() => undefined}
     onDeleteDiagram={() => undefined}
     onCreateBlank={() => undefined}
+    searchQuery={searchQuery}
+    onClearSearch={() => undefined}
   />,
 );
 
@@ -90,6 +96,24 @@ describe('WorkspaceDiagramCollection', () => {
     expect(html).toContain('aria-expanded="false"');
     expect(html).toContain('workspace-sort-trigger-label">workspace.lastModified</span>');
     expect(html).toMatch(/aria-label="More actions for Accessible template" aria-haspopup="menu" aria-expanded="false"/);
+  });
+
+  it('renders a recoverable search result state instead of the true-empty state', () => {
+    const item: UnifiedDiagramItem = {
+      id: 'existing-diagram',
+      title: 'Existing diagram',
+      updatedAt: 1,
+      source: 'local',
+      role: 'owner',
+      raw: { id: 'existing-diagram' } as never,
+    };
+
+    const html = renderCollection(item, [], 'missing');
+
+    expect(html).toContain('id="workspace-diagram-results"');
+    expect(html).toContain('workspace.empty.searchTitle');
+    expect(html).toContain('workspace.clearSearch');
+    expect(html).not.toContain('workspace.empty.title');
   });
 
   it('keeps sort and view controls available at the mobile breakpoint', () => {

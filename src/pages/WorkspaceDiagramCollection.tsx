@@ -72,6 +72,8 @@ interface WorkspaceDiagramCollectionProps {
     returnFocusTarget?: HTMLElement | null,
   ) => void;
   onCreateBlank: () => void;
+  searchQuery: string;
+  onClearSearch: () => void;
 }
 
 const formatTimeAgo = (
@@ -106,6 +108,8 @@ export const WorkspaceDiagramCollection = ({
   onContextMenu,
   onDeleteDiagram,
   onCreateBlank,
+  searchQuery,
+  onClearSearch,
 }: WorkspaceDiagramCollectionProps) => {
   const { t, i18n } = useTranslation();
   const locale = i18n.resolvedLanguage || i18n.language || 'en';
@@ -165,7 +169,7 @@ export const WorkspaceDiagramCollection = ({
   };
 
   return (
-                <div className="workspace-main-inner">
+                <div id="workspace-diagram-results" className="workspace-main-inner">
                     {/* Filter Tabs with Counts */}
                     <div className="workspace-matrix-header">
                         <div className="workspace-filter-tabs">
@@ -252,7 +256,15 @@ export const WorkspaceDiagramCollection = ({
                             {Array(8).fill(0).map((_, i) => <DiagramCardSkeleton key={i} />)}
                         </div>
                     ) : filteredItems.length === 0 ? (
-                        <WorkspaceEmptyState onCreate={onCreateBlank} />
+                        searchQuery ? (
+                            <WorkspaceEmptyState
+                                mode="search"
+                                query={searchQuery}
+                                onClearSearch={onClearSearch}
+                            />
+                        ) : (
+                            <WorkspaceEmptyState onCreate={onCreateBlank} />
+                        )
                     ) : (
                         <div className={viewMode === 'grid' ? 'diagram-grid' : 'diagram-list'}>
                             {filteredItems.map(item => {

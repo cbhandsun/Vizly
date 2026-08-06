@@ -54,6 +54,9 @@
         "goHome": "返回工作区",
         "search": "搜索工作区",
         "searchPlaceholder": "搜索你的图表...",
+        "clearSearch": "清除搜索",
+        "searchResultsStatus": "找到 {{count}} 个匹配图表",
+        "searchNoResultsStatus": "没有匹配“{{query}}”的图表",
         "toggleTheme": "切换主题",
         "settings": "设置",
         "storageSettings": "存储与同步",
@@ -72,7 +75,9 @@
         },
         "empty": {
             "title": "还没有图表",
-            "description": "新建一个图表，或打开命令菜单开始使用。"
+            "description": "新建一个图表，或打开命令菜单开始使用。",
+            "searchTitle": "未找到匹配图表",
+            "searchDescription": "没有图表匹配“{{query}}”。清除搜索可查看全部图表。"
         }
     },
     "templates": {

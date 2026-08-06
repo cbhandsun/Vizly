@@ -55,6 +55,9 @@
         "goHome": "Go to workspace",
         "search": "Search workspace",
         "searchPlaceholder": "Find your diagrams...",
+        "clearSearch": "Clear search",
+        "searchResultsStatus": "{{count}} matching diagrams",
+        "searchNoResultsStatus": "No diagrams match {{query}}",
         "toggleTheme": "Toggle theme",
         "settings": "Settings",
         "storageSettings": "Storage and sync",
@@ -73,7 +76,9 @@
         },
         "empty": {
             "title": "No diagrams yet",
-            "description": "Create a diagram or use the command menu to get started."
+            "description": "Create a diagram or use the command menu to get started.",
+            "searchTitle": "No matching diagrams",
+            "searchDescription": "No diagrams match “{{query}}”. Clear search to see all diagrams."
         }
     },
     "templates": {
