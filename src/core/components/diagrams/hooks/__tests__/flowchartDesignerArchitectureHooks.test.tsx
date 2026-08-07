@@ -124,6 +124,81 @@ describe('flowchart designer architecture hooks', () => {
         expect(baseOptions.setShowGrid).toHaveBeenLastCalledWith(true);
     });
 
+    it('selects and focuses the node inserted by double-clicking an edge', () => {
+        const animationFrames: FrameRequestCallback[] = [];
+        vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+            animationFrames.push(callback);
+            return animationFrames.length;
+        });
+        const nodes = [
+            { id: 'source', position: { x: 0, y: 0 }, data: {}, selected: false },
+            { id: 'target', position: { x: 200, y: 0 }, data: {}, selected: true },
+        ] as Node[];
+        const edge = {
+            id: 'edge-1',
+            source: 'source',
+            target: 'target',
+            selected: true,
+        } as Edge;
+        const unrelatedEdge = {
+            id: 'edge-2',
+            source: 'target',
+            target: 'source',
+            selected: true,
+        } as Edge;
+        const setNodes = vi.fn();
+        const setEdges = vi.fn();
+        const takeSnapshot = vi.fn();
+        const { result } = renderHook(() => useFlowchartCanvasCommands({
+            t: ((key: string) => key) as never,
+            getNodes: () => nodes,
+            getEdges: () => [edge, unrelatedEdge],
+            setNodes,
+            setEdges,
+            takeSnapshot,
+            handleStrategyLayout: vi.fn(),
+            isReadonly: false,
+            showGrid: true,
+            gridVariant: BackgroundVariant.Lines,
+            setGridVariant: vi.fn(),
+            setShowGrid: vi.fn(),
+            reactFlowInstance: null,
+            viewport: { x: 0, y: 0, zoom: 1 },
+            createFromTemplate: vi.fn(() => ({ nodes: [], edges: [] })),
+            templates: [],
+            selectedNodes: [nodes[1]],
+            updateNodesBatch: vi.fn(),
+        }));
+
+        act(() => result.current.handleEdgeDoubleClick({} as never, edge));
+
+        expect(takeSnapshot).toHaveBeenCalledWith(nodes, [edge, unrelatedEdge]);
+        const committedNodes = setNodes.mock.calls[0][0] as Node[];
+        const committedEdges = setEdges.mock.calls[0][0] as Edge[];
+        expect(committedNodes.map(node => node.selected)).toEqual([false, false, true]);
+        expect(committedEdges.map(candidate => candidate.selected)).toEqual([false, false, false]);
+        expect(animationFrames).toHaveLength(1);
+
+        act(() => animationFrames[0](0));
+        expect(animationFrames).toHaveLength(2);
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'react-flow__node';
+        wrapper.dataset.id = committedNodes[2].id;
+        wrapper.tabIndex = 0;
+        const selectedTarget = document.createElement('div');
+        selectedTarget.setAttribute('role', 'treeitem');
+        selectedTarget.setAttribute('aria-selected', 'true');
+        selectedTarget.tabIndex = 0;
+        wrapper.append(selectedTarget);
+        document.body.append(wrapper);
+
+        act(() => animationFrames[1](16));
+
+        expect(document.activeElement).toBe(selectedTarget);
+        wrapper.remove();
+    });
+
     it('binds external snapshot events to current canvas getters', () => {
         const nodes = [{ id: 'node-1' }] as Node[];
         const edges = [{ id: 'edge-1', source: 'node-1', target: 'node-1' }] as Edge[];

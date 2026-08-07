@@ -18,6 +18,11 @@ const getNodeCenter = (node: Node): { x: number; y: number } => ({
     y: node.position.y + (node.measured?.height ?? DEFAULT_MEASURED_HEIGHT) / 2,
 });
 
+export interface FlowchartEdgeInsertionPlan {
+    node: Node;
+    replacementEdges: [Edge, Edge];
+}
+
 export const buildFlowchartEdgeInsertionPlan = ({
     edge,
     nodes,
@@ -30,10 +35,7 @@ export const buildFlowchartEdgeInsertionPlan = ({
     label: string;
     createNodeId?: () => string;
     createEdgeId?: (source: string, target: string) => string;
-}): {
-    node: Node;
-    replacementEdges: [Edge, Edge];
-} | null => {
+}): FlowchartEdgeInsertionPlan | null => {
     const sourceNode = nodes.find((node) => node.id === edge.source);
     const targetNode = nodes.find((node) => node.id === edge.target);
     if (!sourceNode || !targetNode) {
@@ -79,3 +81,26 @@ export const buildFlowchartEdgeInsertionPlan = ({
         ],
     };
 };
+
+export const commitFlowchartEdgeInsertion = ({
+    nodes,
+    edges,
+    replacedEdgeId,
+    plan,
+}: {
+    nodes: Node[];
+    edges: Edge[];
+    replacedEdgeId: string;
+    plan: FlowchartEdgeInsertionPlan;
+}): { nodes: Node[]; edges: Edge[] } => ({
+    nodes: [
+        ...nodes.map(node => node.selected ? { ...node, selected: false } : node),
+        { ...plan.node, selected: true },
+    ],
+    edges: [
+        ...edges
+            .filter(edge => edge.id !== replacedEdgeId)
+            .map(edge => edge.selected ? { ...edge, selected: false } : edge),
+        ...plan.replacementEdges.map(edge => ({ ...edge, selected: false })),
+    ],
+});

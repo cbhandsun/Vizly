@@ -1,7 +1,10 @@
 import type { Edge, Node } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
 
-import { buildFlowchartEdgeInsertionPlan } from '../flowchartEdgeInsertion';
+import {
+  buildFlowchartEdgeInsertionPlan,
+  commitFlowchartEdgeInsertion,
+} from '../flowchartEdgeInsertion';
 
 describe('flowchartEdgeInsertion', () => {
   const nodes: Node[] = [
@@ -77,5 +80,43 @@ describe('flowchartEdgeInsertion', () => {
       nodes: [nodes[0]],
       label: 'New Node',
     })).toBeNull();
+  });
+
+  it('selects the inserted node and clears stale node and edge selection', () => {
+    const plan = buildFlowchartEdgeInsertionPlan({
+      edge,
+      nodes,
+      label: 'New Node',
+      createNodeId: () => 'inserted-fixed',
+      createEdgeId: (source, target) => `${source}->${target}`,
+    });
+    expect(plan).not.toBeNull();
+    if (!plan) {
+      throw new Error('Expected a valid insertion plan');
+    }
+
+    const committed = commitFlowchartEdgeInsertion({
+      nodes: [
+        { ...nodes[0], selected: true },
+        nodes[1],
+      ],
+      edges: [
+        { ...edge, selected: true },
+        { id: 'unrelated', source: 'target', target: 'source', selected: true },
+      ],
+      replacedEdgeId: edge.id,
+      plan,
+    });
+
+    expect(committed.nodes.map(node => [node.id, node.selected])).toEqual([
+      ['source', false],
+      ['target', undefined],
+      ['inserted-fixed', true],
+    ]);
+    expect(committed.edges.map(candidate => [candidate.id, candidate.selected])).toEqual([
+      ['unrelated', false],
+      ['source->inserted-fixed', false],
+      ['inserted-fixed->target', false],
+    ]);
   });
 });

@@ -11,7 +11,11 @@ import {
     copyFlowchartAsMermaid,
     exportFlowchartAsMermaid,
 } from '../flowchartDesignerCanvasActions';
-import { buildFlowchartEdgeInsertionPlan } from '../flowchartEdgeInsertion';
+import {
+    buildFlowchartEdgeInsertionPlan,
+    commitFlowchartEdgeInsertion,
+} from '../flowchartEdgeInsertion';
+import { focusAddedFlowchartNodeById } from '../flowchartTabNavigation';
 import {
     buildFlowchartClearCanvasConfirm,
     clearFlowchartCanvas,
@@ -149,8 +153,21 @@ export function useFlowchartCanvasCommands({
         if (!insertionPlan) return;
 
         takeSnapshot(currentNodes, currentEdges);
-        setNodes(nodes => [...nodes, insertionPlan.node]);
-        setEdges(edges => [...edges.filter(candidate => candidate.id !== edge.id), ...insertionPlan.replacementEdges]);
+        const committedInsertion = commitFlowchartEdgeInsertion({
+            nodes: currentNodes,
+            edges: currentEdges,
+            replacedEdgeId: edge.id,
+            plan: insertionPlan,
+        });
+        setNodes(committedInsertion.nodes);
+        setEdges(committedInsertion.edges);
+        window.requestAnimationFrame(() => {
+            if (!focusAddedFlowchartNodeById(document, insertionPlan.node.id)) {
+                window.requestAnimationFrame(() => {
+                    focusAddedFlowchartNodeById(document, insertionPlan.node.id);
+                });
+            }
+        });
         appMessage.success(t('designer.flowchart.edgeNodeInserted'));
     }, [getEdges, getNodes, isReadonly, setEdges, setNodes, t, takeSnapshot]);
 
