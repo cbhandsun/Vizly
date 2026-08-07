@@ -1,5 +1,5 @@
 import React from 'react';
-import { Flex, Badge } from 'antd';
+import { Badge } from 'antd';
 import {
     FaPlus, FaLayerGroup, FaCogs, FaRobot,
     FaBars, FaUndo, FaRedo
@@ -48,7 +48,7 @@ export const MobileBottomDock: React.FC<MobileBottomDockProps> = ({
     return (
         <div className="mobile-bottom-dock-wrapper">
             <div className="mobile-bottom-dock">
-                <Flex align="center" justify="space-around" style={{ width: '100%', height: '100%' }}>
+                <div className="mobile-bottom-dock-actions">
                     {/* Add Button - Primary Action */}
                     <button
                         type="button"
@@ -103,39 +103,35 @@ export const MobileBottomDock: React.FC<MobileBottomDockProps> = ({
                     </button>
 
                     {/* History / More */}
-                    <div className="mobile-dock-group">
-                        <div className="mobile-dock-history">
-                            <button 
-                                type="button"
-                                className="mobile-dock-btn mini" 
-                                disabled={!canUndo} 
-                                onClick={onUndo}
-                                aria-label={t('designer.toolbar.undo', '撤销')}
-                            >
-                                <FaUndo />
-                            </button>
-                            <button 
-                                type="button"
-                                className="mobile-dock-btn mini" 
-                                disabled={!canRedo} 
-                                onClick={onRedo}
-                                aria-label={t('designer.toolbar.redo', '重做')}
-                            >
-                                <FaRedo />
-                            </button>
-                        </div>
-                        {onSettingsClick && (
-                            <button
-                                type="button"
-                                className="mobile-dock-btn"
-                                onClick={onSettingsClick}
-                                aria-label={t('designer.mobileDock.settings', '设置')}
-                            >
-                                <FaCogs />
-                            </button>
-                        )}
-                    </div>
-                </Flex>
+                    <button
+                        type="button"
+                        className="mobile-dock-btn mini"
+                        disabled={!canUndo}
+                        onClick={onUndo}
+                        aria-label={t('designer.toolbar.undo', '撤销')}
+                    >
+                        <FaUndo />
+                    </button>
+                    <button
+                        type="button"
+                        className="mobile-dock-btn mini"
+                        disabled={!canRedo}
+                        onClick={onRedo}
+                        aria-label={t('designer.toolbar.redo', '重做')}
+                    >
+                        <FaRedo />
+                    </button>
+                    {onSettingsClick && (
+                        <button
+                            type="button"
+                            className="mobile-dock-btn settings"
+                            onClick={onSettingsClick}
+                            aria-label={t('designer.mobileDock.settings', '设置')}
+                        >
+                            <FaCogs />
+                        </button>
+                    )}
+                </div>
             </div>
             {/* iOS Home Indicator Safe Area Spacer */}
             <div className="mobile-safe-area-bottom" />
