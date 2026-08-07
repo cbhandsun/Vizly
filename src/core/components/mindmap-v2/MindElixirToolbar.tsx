@@ -15,7 +15,7 @@
  */
 
 import React, { useCallback, useEffect, useState, useRef } from 'react';
-import { Select, Divider, Tooltip, Dropdown } from 'antd';
+import { Divider, Tooltip, Dropdown } from 'antd';
 import {
     MenuFoldOutlined,
     MenuUnfoldOutlined,
@@ -74,6 +74,7 @@ import { useMindElixirExportActions } from './useMindElixirExportActions';
 import { useMindElixirCanvasPreferences } from './useMindElixirCanvasPreferences';
 import MindMapToolbarIconButton from './MindMapToolbarIconButton';
 import { MindMapThemeSelector } from './MindMapThemeSelector';
+import { MindMapDirectionSelector } from './MindMapDirectionSelector';
 import { useMindMapFocusMode } from './useMindMapFocusMode';
 import { getViewportPopupContainer } from '../ui/viewportOverlayPortal';
 import { appMessage } from '@/core/utils/antdStaticBridge';
@@ -81,13 +82,7 @@ import { createMindMapSummaryForSelection } from './mindMapSummaryCreation';
 import './MindElixirToolbar.css';
 
 
-const DIRECTION_OPTIONS = [
-    { label: '双向展开', value: 'LR' },
-    { label: '向右展开', value: 'R' },
-    { label: '向左展开', value: 'L' },
-];
-
-type MindMapToolbarMenu = 'background' | 'export' | 'import' | 'theme';
+type MindMapToolbarMenu = 'background' | 'direction' | 'export' | 'import' | 'theme';
 
 const MindElixirToolbar: React.FC = () => {
     // Subscribe to store so we re-render when instance becomes available
@@ -392,15 +387,11 @@ const MindElixirToolbar: React.FC = () => {
             role="toolbar"
         >
             {/* Direction selector */}
-            <Select
-                size="small"
-                variant="borderless"
-                value={currentDir}
+            <MindMapDirectionSelector
+                currentDirection={currentDir}
                 onChange={handleDirectionChange}
-                aria-label="思维导图布局方向"
-                className="mind-elixir-toolbar-direction"
-                getPopupContainer={getViewportPopupContainer}
-                options={DIRECTION_OPTIONS}
+                open={openMenu === 'direction'}
+                onOpenChange={open => setOpenMenu(open ? 'direction' : null)}
             />
 
             <Divider orientation="vertical" style={{ height: 16, margin: '0 2px' }} />
@@ -409,6 +400,7 @@ const MindElixirToolbar: React.FC = () => {
             <MindMapThemeSelector
                 activeThemeKey={activeThemeKey}
                 open={openMenu === 'theme'}
+                suppressTooltip={openMenu !== null}
                 onOpenChange={open => setOpenMenu(open ? 'theme' : null)}
                 onThemeChange={handleThemeChange}
             />

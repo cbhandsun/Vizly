@@ -10,6 +10,7 @@ interface MindMapThemeSelectorProps {
     onOpenChange: (open: boolean) => void;
     onThemeChange: (themeKey: string) => void;
     open: boolean;
+    suppressTooltip?: boolean;
 }
 
 const getNextThemeIndex = (key: string, currentIndex: number, count: number): number | null => {
@@ -25,6 +26,7 @@ export const MindMapThemeSelector: React.FC<MindMapThemeSelectorProps> = ({
     onOpenChange,
     onThemeChange,
     open,
+    suppressTooltip = false,
 }) => {
     const { token } = antdTheme.useToken();
     const menuId = useId();
@@ -104,7 +106,7 @@ export const MindMapThemeSelector: React.FC<MindMapThemeSelectorProps> = ({
     );
 
     return (
-        <Tooltip title={`切换主题，当前${activeLabel}`} open={open ? false : undefined}>
+        <Tooltip title={`切换主题，当前${activeLabel}`} open={open || suppressTooltip ? false : undefined}>
             <Dropdown
                 autoAdjustOverflow
                 popupRender={() => menu}
