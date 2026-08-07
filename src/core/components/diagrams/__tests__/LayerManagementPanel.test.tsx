@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
-import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import React, { useState } from 'react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { LayerManagementPanel } from '../LayerManagementPanel';
 
 const layer = {
@@ -20,6 +20,15 @@ const reviewLayer = {
     locked: false,
     zIndex: 1,
 };
+
+class ResizeObserverMock {
+    observe(): void {}
+    unobserve(): void {}
+    disconnect(): void {}
+}
+
+beforeAll(() => vi.stubGlobal('ResizeObserver', ResizeObserverMock));
+afterAll(() => vi.unstubAllGlobals());
 
 describe('LayerManagementPanel', () => {
     afterEach(() => {
@@ -59,6 +68,101 @@ describe('LayerManagementPanel', () => {
         fireEvent.click(visibilityButton);
         expect(onToggleVisibility).toHaveBeenCalledWith('layer-0');
         expect(onSetActive).toHaveBeenCalledTimes(1);
+    });
+
+    it('uses roving layer focus and arrow keys without tabbing through inactive actions', async () => {
+        const onSetActive = vi.fn();
+
+        render(
+            <LayerManagementPanel
+                layers={[layer, reviewLayer]}
+                activeLayerId="layer-review"
+                onSetActive={onSetActive}
+                onToggleVisibility={vi.fn()}
+                onToggleLock={vi.fn()}
+                onRename={vi.fn()}
+                onCreate={vi.fn()}
+                onDelete={vi.fn()}
+                onReorder={vi.fn()}
+                onSetColor={vi.fn()}
+            />,
+        );
+
+        const rows = screen.getAllByRole('listitem');
+        const reviewRow = rows.find(row => row.textContent?.includes('评审图层'));
+        const defaultRow = rows.find(row => row.textContent?.includes('默认图层'));
+
+        expect(reviewRow?.getAttribute('tabindex')).toBe('0');
+        expect(defaultRow?.getAttribute('tabindex')).toBe('-1');
+        expect(screen.getByRole('button', { name: '隐藏图层：默认图层' }).getAttribute('tabindex')).toBe('-1');
+
+        reviewRow?.focus();
+        fireEvent.keyDown(reviewRow as HTMLElement, { key: 'ArrowDown' });
+
+        expect(onSetActive).toHaveBeenCalledWith('layer-0');
+        await waitFor(() => expect(document.activeElement).toBe(defaultRow));
+    });
+
+    it('exposes working layer-order controls only for the active layer', () => {
+        const onReorder = vi.fn();
+
+        render(
+            <LayerManagementPanel
+                layers={[layer, reviewLayer]}
+                activeLayerId="layer-review"
+                onSetActive={vi.fn()}
+                onToggleVisibility={vi.fn()}
+                onToggleLock={vi.fn()}
+                onRename={vi.fn()}
+                onCreate={vi.fn()}
+                onDelete={vi.fn()}
+                onReorder={onReorder}
+                onSetColor={vi.fn()}
+            />,
+        );
+
+        expect(screen.getByRole('button', { name: '上移图层：评审图层' }).hasAttribute('disabled')).toBe(true);
+        fireEvent.click(screen.getByRole('button', { name: '下移图层：评审图层' }));
+        expect(onReorder).toHaveBeenCalledWith(1, 0);
+        expect(screen.queryByRole('button', { name: '上移图层：默认图层' })).toBeNull();
+    });
+
+    it('uses one-tab-stop radio semantics and readable names for layer colors', async () => {
+        const LayerColorHarness = () => {
+            const [color, setColor] = useState<string | undefined>();
+            return (
+                <LayerManagementPanel
+                    layers={[{ ...layer, color }]}
+                    activeLayerId="layer-0"
+                    onSetActive={vi.fn()}
+                    onToggleVisibility={vi.fn()}
+                    onToggleLock={vi.fn()}
+                    onRename={vi.fn()}
+                    onCreate={vi.fn()}
+                    onDelete={vi.fn()}
+                    onReorder={vi.fn()}
+                    onSetColor={(_layerId, nextColor) => setColor(nextColor)}
+                />
+            );
+        };
+
+        render(<LayerColorHarness />);
+        fireEvent.click(screen.getByRole('button', { name: '设置图层颜色：默认图层' }));
+
+        const radios = await screen.findAllByRole('radio');
+        const noColor = screen.getByRole('radio', { name: '图层颜色：无颜色' });
+        expect(radios).toHaveLength(13);
+        expect(radios.filter(radio => radio.getAttribute('tabindex') === '0')).toHaveLength(1);
+        expect(noColor.getAttribute('aria-checked')).toBe('true');
+
+        noColor.focus();
+        fireEvent.keyDown(noColor, { key: 'ArrowRight' });
+        const red = screen.getByRole('radio', { name: '图层颜色：红色' });
+        await waitFor(() => {
+            expect(red.getAttribute('aria-checked')).toBe('true');
+            expect(document.activeElement).toBe(red);
+        });
+        expect(screen.getAllByRole('radio').filter(radio => radio.getAttribute('tabindex') === '0')).toHaveLength(1);
     });
 
     it('creates a normalized layer name without relying on a browser prompt', () => {
