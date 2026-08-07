@@ -148,11 +148,14 @@ describe('ModernTopToolbar responsive layout', () => {
     const diagramSwitcher = screen.getByRole('button', { name: '切换图表：Untitled flowchart' });
     expect(diagramSwitcher.className).toContain('h-[44px]');
     expect(diagramSwitcher.style.minHeight).toBe('var(--commercial-touch-target, 44px)');
-    const systemActions = screen.getByRole('button', { name: '系统操作：导出、主题、连线模式、语言、工作台' });
+    const systemActions = screen.getByRole('button', { name: '系统操作' });
     expect(systemActions.className).toContain('min-w-[44px]');
     expect(systemActions.className).toContain('min-h-[44px]');
     expect(systemActions.style.width).toBe('var(--commercial-touch-target, 44px)');
     expect(systemActions.style.minHeight).toBe('var(--commercial-touch-target, 44px)');
+    const leftIsland = container.querySelector('[data-toolbar-left-island]');
+    expect(leftIsland?.className).toContain('min-w-0');
+    expect(leftIsland?.className).not.toContain('shrink-0');
     expect(screen.queryByRole('button', { name: '打开命令搜索' })).toBeNull();
   });
 
@@ -194,14 +197,16 @@ describe('ModernTopToolbar responsive layout', () => {
     breakpointState.md = false;
     renderToolbar();
 
-    const trigger = screen.getByRole('button', { name: '系统操作：导出、主题、连线模式、语言、工作台' });
+    const trigger = screen.getByRole('button', { name: '系统操作' });
     expect(trigger.getAttribute('aria-haspopup')).toBe('dialog');
     expect(trigger.getAttribute('aria-expanded')).toBe('false');
-    expect(screen.queryByRole('dialog', { name: '系统操作：导出、主题、连线模式、语言、工作台' })).toBeNull();
+    expect(trigger.getAttribute('aria-controls')).toMatch(/^toolbar-system-settings-/);
+    expect(screen.queryByRole('dialog', { name: '系统操作' })).toBeNull();
 
     fireEvent.click(trigger);
 
-    expect(await screen.findByRole('dialog', { name: '系统操作：导出、主题、连线模式、语言、工作台' })).toBeTruthy();
+    expect(await screen.findByRole('dialog', { name: '系统操作' })).toBeTruthy();
+    expect(screen.getByText('文件操作')).toBeTruthy();
     const exportTools = screen.getByTestId('export-tools');
     expect(exportTools.getAttribute('data-variant')).toBe('inline');
     expect(exportTools.getAttribute('data-commercial-touch-target')).toBe('true');
@@ -211,6 +216,15 @@ describe('ModernTopToolbar responsive layout', () => {
     expect(screen.getByRole('combobox', { name: '语言 / Language' })).toBeTruthy();
     expect(screen.getByRole('button', { name: '工作台' })).toBeTruthy();
     await waitFor(() => expect(document.activeElement).toBe(exportTools));
+
+    const workspaceButton = screen.getByRole('button', { name: '工作台' });
+    workspaceButton.focus();
+    fireEvent.keyDown(workspaceButton, { key: 'Tab' });
+    expect(document.activeElement).toBe(exportTools);
+
+    exportTools.focus();
+    fireEvent.keyDown(exportTools, { key: 'Tab', shiftKey: true });
+    expect(document.activeElement).toBe(workspaceButton);
 
     fireEvent.keyDown(exportTools, { key: 'Escape' });
     await waitFor(() => {

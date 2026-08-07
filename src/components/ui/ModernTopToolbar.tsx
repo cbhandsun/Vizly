@@ -10,6 +10,7 @@ import { FaChevronDown, FaEllipsisV, FaHome } from 'react-icons/fa';
 import type { TopToolbarProps } from './TopToolbar';
 import { getToolbarPopupContainer, isToolbarEdgeMode } from './topToolbarGuards';
 import { DiagramTitleEditor } from './DiagramTitleEditor';
+import { focusDialogEntry, trapDialogTab } from '@/core/components/diagrams/dialogFocus';
 
 export type { TopToolbarProps };
 
@@ -67,9 +68,16 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
   const commandShortcutLabel = isMac ? '⌘K' : 'Ctrl+K';
 
   const islandBaseClass = `flex items-center ${isMobile ? 'min-h-[44px]' : 'h-[40px]'} bg-white dark:bg-[#2d2d2d] border border-[rgba(0,0,0,0.12)] dark:border-[rgba(255,255,255,0.12)] rounded-[10px] shadow-[0_2px_8px_rgba(0,0,0,0.08)] transition-all duration-200 pointer-events-auto`;
-  const moreSettingsLabel = isMobile
-    ? `${t('common.systemActions', '系统操作')}：${t('common.export', '导出')}、${t('common.theme', '主题')}、${t('header.edgeMode', '连线模式')}、${t('common.language', '语言')}、${t('designer.manage.title', '工作台')}`
-    : `${t('common.settings', '设置')}：${t('header.edgeMode', '连线模式')}、${t('common.language', '语言')}`;
+  const moreDialogLabel = isMobile
+    ? t('common.systemActions', '系统操作')
+    : t('common.settings', '设置');
+  const moreSettingsSummary = `${moreDialogLabel}：${[
+    ...(isMobile && showExport ? [t('common.export', '导出')] : []),
+    ...(isMobile && showThemeSelector ? [t('common.theme', '主题')] : []),
+    t('header.edgeMode', '连线模式'),
+    t('common.language', '语言'),
+    ...(isMobile ? [t('designer.manage.title', '工作台')] : []),
+  ].join('、')}`;
   const diagramSwitcherLabel = title
     ? `${t('diagramViewer.switchDiagram', '切换图表')}：${title}`
     : t('diagramViewer.switchDiagram', '切换图表');
@@ -81,6 +89,10 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
   }, []);
 
   const handleMoreContentKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Tab') {
+      trapDialogTab(event, event.currentTarget);
+      return;
+    }
     if (event.key !== 'Escape') return;
 
     event.preventDefault();
@@ -90,11 +102,7 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
 
   const handleMoreAfterOpenChange = useCallback((open: boolean) => {
     if (!open) return;
-
-    const focusTarget = moreContentRef.current?.querySelector<HTMLElement>(
-      '[role="combobox"], input, select, button, [tabindex]:not([tabindex="-1"])',
-    );
-    focusTarget?.focus();
+    if (moreContentRef.current) focusDialogEntry(moreContentRef.current);
   }, []);
 
   const closeDiagramSwitcherAndRestoreFocus = useCallback(() => {
@@ -129,14 +137,20 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
       ref={moreContentRef}
       id={morePopoverId}
       role="dialog"
-      aria-label={moreSettingsLabel}
+      aria-label={moreDialogLabel}
+      tabIndex={-1}
       className="min-w-[220px] py-2 flex flex-col font-sans"
       onKeyDown={handleMoreContentKeyDown}
     >
+      {isMobile && (
+        <div className="px-4 pb-2 text-[13px] font-semibold text-slate-700 dark:text-slate-200">
+          {moreDialogLabel}
+        </div>
+      )}
       {isMobile && showExport && (
         <div className="px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
           <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">
-            {t('common.export', '导出')}
+            {t('designer.toolbar.fileGroup', '文件操作')}
           </div>
           <ExportTools
             diagramId={diagramId}
@@ -224,7 +238,7 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
     isFullscreen,
     isMobile,
     morePopoverId,
-    moreSettingsLabel,
+    moreDialogLabel,
     onEdgeModeChange,
     onToggleFullscreen,
     showExport,
@@ -241,7 +255,11 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
       
       {/* ── LEFT SECTION: Brand + Project + Search (unified pill) ── */}
       <div className="flex-[0_1_auto] flex items-center min-w-0">
-        <div className={`${islandBaseClass} gap-1 shrink-0`} style={{ paddingLeft: '14px', paddingRight: '14px' }}>
+        <div
+          data-toolbar-left-island
+          className={`${islandBaseClass} gap-1 ${isMobile ? 'min-w-0 max-w-full' : 'shrink-0'}`}
+          style={{ paddingLeft: '14px', paddingRight: '14px' }}
+        >
           {!isMobile && (
             <a
               href="#/manage"
@@ -392,11 +410,11 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
                 type="button"
                 className={`${isMobile ? 'w-[44px] min-w-[44px] h-[44px] min-h-[44px]' : 'w-8 h-8'} flex items-center justify-center appearance-none border-0 bg-transparent p-0 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] rounded-[6px] cursor-pointer text-slate-500 dark:text-slate-400 transition-colors`}
                 style={isMobile ? MOBILE_SQUARE_TOUCH_TARGET_STYLE : undefined}
-                aria-label={moreSettingsLabel}
+                aria-label={moreDialogLabel}
                 aria-haspopup="dialog"
                 aria-expanded={isMoreOpen}
-                aria-controls={isMoreOpen ? morePopoverId : undefined}
-                title={moreSettingsLabel}
+                aria-controls={morePopoverId}
+                title={moreSettingsSummary}
               >
                 <FaEllipsisV className="text-[13px]" />
               </button>
