@@ -233,7 +233,9 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
             />,
         );
 
-        fireEvent.click(await screen.findByRole('button', { name: /更多操作|moreActions/i }));
+        const moreButton = await screen.findByRole('button', { name: /更多操作|moreActions/i });
+        expect(moreButton.getAttribute('data-flowchart-search-focus-return')).toBe('true');
+        fireEvent.click(moreButton);
         fireEvent.click(await screen.findByRole('menuitem', { name: /搜索画布节点/ }));
 
         expect(onShowCanvasSearch).toHaveBeenCalledTimes(1);

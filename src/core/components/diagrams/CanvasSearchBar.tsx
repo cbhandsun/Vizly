@@ -1,6 +1,6 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { Popconfirm, theme } from 'antd';
-import { FaSearch, FaChevronUp, FaChevronDown, FaTimes, FaExchangeAlt } from 'react-icons/fa';
+import { FaSearch, FaChevronUp, FaChevronDown, FaTimes, FaTimesCircle, FaExchangeAlt } from 'react-icons/fa';
 import { Node, useReactFlow } from '@xyflow/react';
 import { buildPresentationNodeSelector } from '../presentation/presentationSelectorSafety';
 import {
@@ -26,6 +26,7 @@ export interface CanvasSearchBarProps {
 }
 
 type ThemeToken = ReturnType<typeof theme.useToken>['token'];
+const CANVAS_SEARCH_FOCUS_RETURN_SELECTOR = '[data-flowchart-search-focus-return="true"]';
 
 /**
  * 画布内搜索栏 — Ctrl+F / Ctrl+H 触发
@@ -43,6 +44,7 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
 }) => {
     const { token } = theme.useToken();
     const reactFlow = useReactFlow();
+    const searchInputRef = useRef<HTMLInputElement>(null);
 
     const [query, setQuery] = useState('');
     const [excludedMatchIds, setExcludedMatchIds] = useState<string[]>([]);
@@ -61,11 +63,13 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
     const focusNode = useCallback((nodeId: string) => {
         const node = nodes.find(n => n.id === nodeId);
         if (!node) return;
-        const w = node.measured?.width || node.width || 120;
-        const h = node.measured?.height || node.height || 60;
+        const internalNode = reactFlow.getInternalNode?.(nodeId);
+        const absolutePosition = internalNode?.internals.positionAbsolute ?? node.position;
+        const w = internalNode?.measured.width || node.measured?.width || node.width || 120;
+        const h = internalNode?.measured.height || node.measured?.height || node.height || 60;
         reactFlow.setCenter(
-            node.position.x + w / 2,
-            node.position.y + h / 2,
+            absolutePosition.x + w / 2,
+            absolutePosition.y + h / 2,
             { zoom: 1.2, duration: 300 }
         );
         onHighlightNode?.(nodeId);
@@ -121,6 +125,21 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
         setCurrentIndex(0);
         setReplaceStatus('');
     }, []);
+
+    const handleClearQuery = useCallback(() => {
+        handleQueryChange('');
+        window.requestAnimationFrame(() => searchInputRef.current?.focus({ preventScroll: true }));
+    }, [handleQueryChange]);
+
+    const closeSearch = useCallback(() => {
+        onClose();
+        window.requestAnimationFrame(() => {
+            window.requestAnimationFrame(() => {
+                document.querySelector<HTMLButtonElement>(CANVAS_SEARCH_FOCUS_RETURN_SELECTOR)
+                    ?.focus({ preventScroll: true });
+            });
+        });
+    }, [onClose]);
 
     const handleReplaceTextChange = useCallback((value: string) => {
         setReplaceText(value);
@@ -181,12 +200,12 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
 
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
         if (e.key === 'Escape') {
-            onClose();
+            closeSearch();
         } else if (e.key === 'Enter') {
             if (e.shiftKey) goPrev();
             else goNext();
         }
-    }, [onClose, goNext, goPrev]);
+    }, [closeSearch, goNext, goPrev]);
 
     // --- 动态注入搜索高亮样式 ---
     const highlightStyle = useMemo(() => {
@@ -260,6 +279,7 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px' }}>
                     <FaSearch size={12} style={{ color: token.colorTextTertiary, flexShrink: 0 }} />
                     <input
+                        ref={searchInputRef}
                         autoFocus
                         value={query}
                         onChange={e => handleQueryChange(e.target.value)}
@@ -282,6 +302,16 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
                         }}>
                             {matchIds.length > 0 ? `${boundedCurrentIndex + 1}/${matchIds.length}` : '无结果'}
                         </span>
+                    )}
+                    {query && (
+                        <button
+                            className="canvas-search-icon-button"
+                            aria-label="清空搜索"
+                            onClick={handleClearQuery}
+                            style={navBtnStyle(true, token)}
+                        >
+                            <FaTimesCircle size={11} />
+                        </button>
                     )}
                     {/* 上下导航 */}
                     <button className="canvas-search-icon-button" aria-label="上一个搜索结果" onClick={goPrev} disabled={matchIds.length === 0} style={navBtnStyle(matchIds.length > 0, token)}>
@@ -306,7 +336,7 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
                         </button>
                     )}
                     {/* 关闭 */}
-                    <button className="canvas-search-icon-button" aria-label="关闭画布搜索" onClick={onClose} style={navBtnStyle(true, token)}>
+                    <button className="canvas-search-icon-button" aria-label="关闭画布搜索" onClick={closeSearch} style={navBtnStyle(true, token)}>
                         <FaTimes size={11} />
                     </button>
                 </div>

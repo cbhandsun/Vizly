@@ -2,10 +2,11 @@
 
 import { readFileSync } from 'node:fs';
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { setCenterMock } = vi.hoisted(() => ({
+const { getInternalNodeMock, setCenterMock } = vi.hoisted(() => ({
+    getInternalNodeMock: vi.fn(),
     setCenterMock: vi.fn(),
 }));
 
@@ -13,7 +14,10 @@ vi.mock('@xyflow/react', async () => {
     const actual = await vi.importActual<typeof import('@xyflow/react')>('@xyflow/react');
     return {
         ...actual,
-        useReactFlow: () => ({ setCenter: setCenterMock }),
+        useReactFlow: () => ({
+            getInternalNode: getInternalNodeMock,
+            setCenter: setCenterMock,
+        }),
     };
 });
 
@@ -34,6 +38,11 @@ afterAll(() => {
 });
 
 describe('CanvasSearchBar', () => {
+    beforeEach(() => {
+        getInternalNodeMock.mockReset();
+        setCenterMock.mockReset();
+    });
+
     it('exposes named search, replace, navigation, and close controls', () => {
         render(
             <CanvasSearchBar
@@ -80,6 +89,80 @@ describe('CanvasSearchBar', () => {
 
         expect(css).toMatch(/@media \(max-width: 767px\)[\s\S]*?\.canvas-search-bar[\s\S]*?top: 96px/);
         expect(css).toMatch(/\.canvas-search-icon-button[\s\S]*?min-width: var\(--commercial-touch-target, 44px\) !important[\s\S]*?height: var\(--commercial-touch-target, 44px\) !important/);
+    });
+
+    it('centers nested search matches with their rendered absolute position', async () => {
+        getInternalNodeMock.mockReturnValue({
+            measured: { width: 200, height: 100 },
+            internals: { positionAbsolute: { x: 500, y: 700 } },
+        });
+        render(
+            <CanvasSearchBar
+                visible
+                onClose={vi.fn()}
+                nodes={[{
+                    id: 'nested-node',
+                    parentId: 'group-node',
+                    position: { x: 20, y: 30 },
+                    data: { label: 'Nested result' },
+                }]}
+            />,
+        );
+
+        fireEvent.change(screen.getByRole('textbox', { name: '搜索画布节点' }), {
+            target: { value: 'Nested' },
+        });
+
+        await waitFor(() => expect(setCenterMock).toHaveBeenLastCalledWith(
+            600,
+            750,
+            { zoom: 1.2, duration: 300 },
+        ));
+    });
+
+    it('clears the active query and keeps keyboard focus in search', async () => {
+        render(
+            <CanvasSearchBar
+                visible
+                onClose={vi.fn()}
+                nodes={[{
+                    id: 'node-1',
+                    position: { x: 10, y: 20 },
+                    data: { label: 'Circle' },
+                }]}
+            />,
+        );
+        const input = screen.getByRole('textbox', { name: '搜索画布节点' }) as HTMLInputElement;
+        fireEvent.change(input, { target: { value: 'Circle' } });
+
+        fireEvent.click(screen.getByRole('button', { name: '清空搜索' }));
+
+        expect(input.value).toBe('');
+        await waitFor(() => expect(document.activeElement).toBe(input));
+        expect(screen.queryByRole('button', { name: '清空搜索' })).toBeNull();
+    });
+
+    it('restores focus to the persistent toolbar trigger after closing', async () => {
+        const SearchHarness = () => {
+            const [visible, setVisible] = React.useState(true);
+            return (
+                <>
+                    <button type="button" data-flowchart-search-focus-return="true">更多操作</button>
+                    <CanvasSearchBar
+                        visible={visible}
+                        onClose={() => setVisible(false)}
+                        nodes={[]}
+                    />
+                </>
+            );
+        };
+        render(<SearchHarness />);
+        const returnTarget = screen.getByRole('button', { name: '更多操作' });
+
+        fireEvent.click(screen.getByRole('button', { name: '关闭画布搜索' }));
+
+        await waitFor(() => expect(document.activeElement).toBe(returnTarget));
+        expect(screen.queryByRole('search', { name: '画布节点查找与替换' })).toBeNull();
     });
 
     it('opens replace mode from controlled shortcut state without a delayed DOM click', () => {
