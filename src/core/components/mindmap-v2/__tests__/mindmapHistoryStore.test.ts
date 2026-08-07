@@ -62,4 +62,24 @@ describe('mindmapHistoryStore', () => {
         expect(list).toHaveLength(1);
         expect(JSON.parse(list[0].data).children[0].id).toBe('child-1');
     });
+
+    it('keeps explicit close and keyboard toggle state synchronized', async () => {
+        const {
+            emitToggleHistory,
+            getHistoryOpen,
+            setHistoryOpen,
+            subscribeToggleHistory,
+        } = await importStore();
+        const states: boolean[] = [];
+        const unsubscribe = subscribeToggleHistory(open => states.push(open));
+
+        expect(states).toEqual([false]);
+        setHistoryOpen(true);
+        setHistoryOpen(false);
+        emitToggleHistory();
+
+        expect(states).toEqual([false, true, false, true]);
+        expect(getHistoryOpen()).toBe(true);
+        unsubscribe();
+    });
 });

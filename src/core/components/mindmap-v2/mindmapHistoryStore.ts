@@ -16,13 +16,19 @@ type ToggleHistoryListener = (open: boolean) => void;
 const toggleListeners = new Set<ToggleHistoryListener>();
 let _historyOpen = false;
 
-export function emitToggleHistory() {
-    _historyOpen = !_historyOpen;
+export function setHistoryOpen(open: boolean) {
+    if (_historyOpen === open) return;
+    _historyOpen = open;
     toggleListeners.forEach(fn => fn(_historyOpen));
+}
+
+export function emitToggleHistory() {
+    setHistoryOpen(!_historyOpen);
 }
 
 export function subscribeToggleHistory(fn: ToggleHistoryListener) {
     toggleListeners.add(fn);
+    fn(_historyOpen);
     return () => toggleListeners.delete(fn);
 }
 

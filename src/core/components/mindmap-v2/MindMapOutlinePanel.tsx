@@ -4,8 +4,18 @@
  */
 import React, { useEffect, useState, useCallback } from 'react';
 import type { MindElixirData, NodeObj } from 'mind-elixir';
+import {
+    CloseOutlined,
+    DeleteOutlined,
+    DownloadOutlined,
+    FileTextOutlined,
+    LinkOutlined,
+    OrderedListOutlined,
+    PlusOutlined,
+    SearchOutlined,
+} from '@ant-design/icons';
 import { getMindElixirInstance, subscribeMindElixir } from './mindElixirStore';
-import { subscribeOutline } from './mindmapOutlineStore';
+import { setOutlineOpen, subscribeOutline } from './mindmapOutlineStore';
 import { nodeObjToMarkdown, downloadText, findNodeById } from './migrate';
 import { cleanMindMapData, cleanMindMapTopic } from './mindmapTreeSanitizer';
 import { cleanMindMapChildNode } from './mindmapBridgeSecurity';
@@ -20,6 +30,7 @@ import {
     logMindmapOutlineSelectFailure,
     logMindmapOutlineUpdateFailure,
 } from './mindmapPanelLogging';
+import sidePanelStyles from './MindMapSidePanel.module.css';
 
 // ─── Flatten tree → array ─────────────────────────────────────────────────────
 interface FlatNode {
@@ -412,76 +423,56 @@ const MindMapOutlinePanel: React.FC = () => {
         d === 0 ? '#a5b4fc' : d === 1 ? '#c4b5fd' : d === 2 ? '#d8b4fe' : 'rgba(255,255,255,0.5)';
 
     return (
-        <div style={{
-            position: 'absolute',
-            right: 0, top: 0, bottom: 0, width: 262,
-            background: 'rgba(9,9,15,0.93)',
-            backdropFilter: 'blur(24px)',
-            borderLeft: '1px solid rgba(255,255,255,0.07)',
-            zIndex: 800,
-            display: 'flex', flexDirection: 'column',
-            animation: 'outlineIn 0.16s ease',
-        }}>
-            <style>{`
-                @keyframes outlineIn {
-                    from { opacity:0; transform:translateX(16px); }
-                    to   { opacity:1; transform:translateX(0); }
-                }
-                .outline-item:hover { background: rgba(255,255,255,0.04) !important; }
-                .outline-item .actions { opacity: 0; transition: opacity 0.12s ease; display: flex; gap: 6px; margin: 0 4px; }
-                .outline-item:hover .actions { opacity: 1; }
-                .outline-scroll::-webkit-scrollbar { width: 3px; }
-                .outline-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 2px; }
-            `}</style>
+        <aside className={sidePanelStyles.panel} aria-label="思维导图大纲">
 
             {/* Header */}
-            <div style={{
-                padding: '10px 12px 8px',
-                borderBottom: '1px solid rgba(255,255,255,0.06)',
-                display: 'flex', alignItems: 'center', gap: 8,
-            }}>
-                <span style={{ fontSize: 13 }}>📋</span>
-                <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.7)', flex: 1 }}>大纲视图</span>
-                <button onClick={handleExportMarkdown} style={{
-                    background: 'none', border: 'none', cursor: 'pointer',
-                    color: 'rgba(255,255,255,0.4)', fontSize: 11, marginRight: 6,
-                    transition: 'color 0.12s', display: 'flex', alignItems: 'center', gap: 2,
-                }}
-                title="导出 Markdown 大纲"
-                onMouseEnter={e => (e.currentTarget.style.color = '#6366f1')}
-                onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.4)')}
+            <div className={sidePanelStyles.header}>
+                <OrderedListOutlined className={sidePanelStyles.headerIcon} aria-hidden="true" />
+                <span className={sidePanelStyles.title}>大纲视图</span>
+                <button
+                    type="button"
+                    className={sidePanelStyles.headerAction}
+                    onClick={handleExportMarkdown}
+                    aria-label="导出 Markdown 大纲"
+                    title="导出 Markdown 大纲"
                 >
-                    📥 导出
+                    <DownloadOutlined aria-hidden="true" />
+                    导出
                 </button>
-                <button onClick={() => setOpen(false)} style={{
-                    background: 'none', border: 'none', cursor: 'pointer',
-                    color: 'rgba(255,255,255,0.3)', fontSize: 16, lineHeight: 1,
-                }} title="关闭 (Alt+O)">×</button>
+                <button
+                    type="button"
+                    className={sidePanelStyles.closeButton}
+                    onClick={() => setOutlineOpen(false)}
+                    aria-label="关闭大纲视图"
+                    title="关闭大纲视图 (Alt+O)"
+                >
+                    <CloseOutlined aria-hidden="true" />
+                </button>
             </div>
 
             {/* Search */}
-            <div style={{ padding: '7px 10px 4px' }}>
+            <div className={sidePanelStyles.searchWrap}>
+                <SearchOutlined className={sidePanelStyles.searchIcon} aria-hidden="true" />
                 <input
+                    type="search"
                     value={query}
                     onChange={e => setQuery(e.target.value)}
-                    placeholder="🔍 搜索节点..."
-                    style={{
-                        width: '100%', boxSizing: 'border-box',
-                        padding: '4px 9px', borderRadius: 6,
-                        border: '1px solid rgba(255,255,255,0.09)',
-                        background: 'rgba(255,255,255,0.05)',
-                        color: 'rgba(255,255,255,0.75)',
-                        fontSize: 11, outline: 'none',
-                    }}
+                    aria-label="搜索大纲节点"
+                    placeholder="搜索节点"
+                    className={sidePanelStyles.searchInput}
                 />
             </div>
 
             {/* Node list */}
-            <div className="outline-scroll" style={{ flex: 1, overflowY: 'auto', padding: '2px 5px 8px' }}>
+            <div className={sidePanelStyles.scrollArea} role="tree" aria-label="大纲节点列表">
                 {filtered.map(n => (
                     <div
                         key={n.id}
-                        className="outline-item"
+                        className={sidePanelStyles.outlineItem}
+                        role="treeitem"
+                        tabIndex={0}
+                        aria-level={n.depth + 1}
+                        aria-selected={activeId === n.id}
                         draggable={n.id !== 'root' && editingId !== n.id}
                         onDragStart={(e) => handleDragStart(e, n.id)}
                         onDragOver={(e) => handleDragOver(e, n.id)}
@@ -490,18 +481,25 @@ const MindMapOutlinePanel: React.FC = () => {
                         onDrop={(e) => handleDrop(e, n.id)}
                         onClick={() => handleClick(n.id)}
                         onDoubleClick={() => startEdit(n.id, n.topic)}
+                        onKeyDown={(event) => {
+                            if (event.target !== event.currentTarget) return;
+                            if (event.key === 'Enter' || event.key === ' ') {
+                                event.preventDefault();
+                                handleClick(n.id);
+                            } else if (event.key === 'F2') {
+                                event.preventDefault();
+                                startEdit(n.id, n.topic);
+                            }
+                        }}
                         title={editingId === n.id ? undefined : "双击编辑，单击定位 (拖拽排序)"}
                         style={{
-                            display: 'flex', alignItems: 'center', gap: 5,
                             padding: `4px 8px 4px ${8 + n.depth * INDENT}px`,
-                            borderRadius: 5, cursor: 'pointer', marginBottom: 1,
                             borderTop: dragOverId === n.id && dropPosition === 'before' ? '2px solid #6366f1' : undefined,
                             borderBottom: dragOverId === n.id && dropPosition === 'after' ? '2px solid #6366f1' : undefined,
                             background: dragOverId === n.id && dropPosition === 'inside'
                                 ? 'rgba(99, 102, 241, 0.24) !important'
                                 : (activeId === n.id ? 'rgba(99,102,241,0.14)' : 'transparent'),
                             borderLeft: `2px solid ${activeId === n.id ? '#6366f1' : 'transparent'}`,
-                            transition: 'background 0.1s',
                         }}
                     >
                         {n.depth > 0 && (
@@ -510,7 +508,7 @@ const MindMapOutlinePanel: React.FC = () => {
                                 background: depthColor(n.depth), opacity: 0.7,
                             }} />
                         )}
-                        {n.depth === 0 && <span style={{ fontSize: 11, flexShrink: 0 }}>🧠</span>}
+                        {n.depth === 0 && <OrderedListOutlined aria-hidden="true" />}
                         
                         {editingId === n.id ? (
                             <input
@@ -562,72 +560,58 @@ const MindMapOutlinePanel: React.FC = () => {
                                 onClick={e => e.stopPropagation()}
                             />
                         ) : (
-                            <span style={{
-                                flex: 1, fontSize: 11,
+                            <span className={sidePanelStyles.outlineTopic} style={{
+                                fontSize: 11,
                                 color: activeId === n.id ? '#c7d2fe' : depthColor(n.depth),
                                 fontWeight: n.depth <= 1 ? 600 : 400,
-                                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                             }}>
                                 {n.topic}
                             </span>
                         )}
 
-                        <div className="actions" onClick={e => e.stopPropagation()}>
+                        <div className={sidePanelStyles.outlineActions} onClick={e => e.stopPropagation()}>
                             <button
+                                type="button"
+                                className={sidePanelStyles.rowAction}
                                 title="添加子节点"
+                                aria-label={`为“${n.topic}”添加子节点`}
                                 onClick={(e) => handleAddChild(e, n.id)}
-                                style={{
-                                    background: 'transparent', border: 'none', cursor: 'pointer',
-                                    color: 'rgba(255,255,255,0.4)', fontSize: 11, padding: '0 2px',
-                                    transition: 'color 0.12s', display: 'flex', alignItems: 'center'
-                                }}
-                                onMouseEnter={e => (e.currentTarget.style.color = '#6366f1')}
-                                onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.4)')}
                             >
-                                ➕
+                                <PlusOutlined aria-hidden="true" />
                             </button>
                             {n.depth > 0 && (
                                 <button
+                                    type="button"
+                                    className={`${sidePanelStyles.rowAction} ${sidePanelStyles.dangerAction}`}
                                     title="删除节点"
+                                    aria-label={`删除节点“${n.topic}”`}
                                     onClick={(e) => handleDeleteNode(e, n.id)}
-                                    style={{
-                                        background: 'transparent', border: 'none', cursor: 'pointer',
-                                        color: 'rgba(255,255,255,0.4)', fontSize: 11, padding: '0 2px',
-                                        transition: 'color 0.12s', display: 'flex', alignItems: 'center'
-                                    }}
-                                    onMouseEnter={e => (e.currentTarget.style.color = '#ef4444')}
-                                    onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.4)')}
                                 >
-                                    🗑️
+                                    <DeleteOutlined aria-hidden="true" />
                                 </button>
                             )}
                         </div>
 
-                        <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
+                        <div className={sidePanelStyles.nodeMeta}>
                             {n.icons.map(ic => <span key={ic} style={{ fontSize: 9 }}>{ic}</span>)}
-                            {n.hasNote && <span title="有备注" style={{ fontSize: 9, opacity: 0.45 }}>📝</span>}
-                            {n.hasLink && <span title="有超链接" style={{ fontSize: 9, opacity: 0.45 }}>🔗</span>}
+                            {n.hasNote && <FileTextOutlined title="有备注" aria-label="有备注" />}
+                            {n.hasLink && <LinkOutlined title="有超链接" aria-label="有超链接" />}
                         </div>
                     </div>
                 ))}
                 {filtered.length === 0 && (
-                    <div style={{ padding: '24px', textAlign: 'center', color: 'rgba(255,255,255,0.25)', fontSize: 11 }}>
+                    <div className={sidePanelStyles.emptyState} role="status">
                         {query ? '无匹配节点' : '暂无节点'}
                     </div>
                 )}
             </div>
 
             {/* Footer */}
-            <div style={{
-                padding: '5px 14px',
-                borderTop: '1px solid rgba(255,255,255,0.05)',
-                fontSize: 10, color: 'rgba(255,255,255,0.25)',
-                display: 'flex', justifyContent: 'space-between',
-            }}>
+            <div className={sidePanelStyles.footer}>
                 <span>共 {nodes.length} 个节点</span>
                 <span>Alt+O 切换</span>
             </div>
-        </div>
+        </aside>
     );
 };
 

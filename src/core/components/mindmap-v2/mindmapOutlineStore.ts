@@ -3,12 +3,19 @@ type Listener = (open: boolean) => void;
 const listeners = new Set<Listener>();
 let _isOpen = false;
 
-export function emitToggleOutline() {
-    _isOpen = !_isOpen;
+export function setOutlineOpen(open: boolean) {
+    if (_isOpen === open) return;
+    _isOpen = open;
     listeners.forEach(fn => fn(_isOpen));
 }
+
+export function emitToggleOutline() {
+    setOutlineOpen(!_isOpen);
+}
+
 export function subscribeOutline(fn: Listener): () => void {
     listeners.add(fn);
+    fn(_isOpen);
     return () => {
         listeners.delete(fn);
     };
