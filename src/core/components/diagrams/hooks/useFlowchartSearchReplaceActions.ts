@@ -3,11 +3,13 @@ import type { Dispatch, SetStateAction } from 'react';
 import type { Edge, Node } from '@xyflow/react';
 
 import {
-    planFlowchartLabelReplacement,
+    planFlowchartCanvasTextReplacement,
+    type FlowchartCanvasSearchMatch,
 } from '../flowchartSearchReplace';
 
 interface UseFlowchartSearchReplaceActionsParams {
     setNodes: Dispatch<SetStateAction<Node[]>>;
+    setEdges: Dispatch<SetStateAction<Edge[]>>;
     getNodes: () => Node[];
     getEdges: () => Edge[];
     takeSnapshot: (nodes: Node[], edges: Edge[]) => void;
@@ -15,30 +17,33 @@ interface UseFlowchartSearchReplaceActionsParams {
 
 export const useFlowchartSearchReplaceActions = ({
     setNodes,
+    setEdges,
     getNodes,
     getEdges,
     takeSnapshot,
 }: UseFlowchartSearchReplaceActionsParams) => {
-    const applyReplacement = useCallback((targetIds: string[], query: string, replacement: string) => {
+    const applyReplacement = useCallback((matches: FlowchartCanvasSearchMatch[], query: string, replacement: string) => {
         const currentNodes = getNodes();
-        const result = planFlowchartLabelReplacement(currentNodes, targetIds, query, replacement);
-        if (result.changedIds.length > 0) {
-            takeSnapshot(currentNodes, getEdges());
-            setNodes(result.nodes);
+        const currentEdges = getEdges();
+        const result = planFlowchartCanvasTextReplacement(currentNodes, currentEdges, matches, query, replacement);
+        if (result.changedMatches.length > 0) {
+            takeSnapshot(currentNodes, currentEdges);
+            if (result.changedMatches.some(match => match.kind === 'node')) setNodes(result.nodes);
+            if (result.changedMatches.some(match => match.kind === 'edge')) setEdges(result.edges);
         }
         return result;
-    }, [getEdges, getNodes, setNodes, takeSnapshot]);
+    }, [getEdges, getNodes, setEdges, setNodes, takeSnapshot]);
 
-    const handleSearchReplaceNode = useCallback((nodeId: string, query: string, replacement: string) => (
-        applyReplacement([nodeId], query, replacement)
+    const handleSearchReplaceMatch = useCallback((match: FlowchartCanvasSearchMatch, query: string, replacement: string) => (
+        applyReplacement([match], query, replacement)
     ), [applyReplacement]);
 
-    const handleSearchReplaceAll = useCallback((matchIds: string[], query: string, replacement: string) => (
-        applyReplacement(matchIds, query, replacement)
+    const handleSearchReplaceAll = useCallback((matches: FlowchartCanvasSearchMatch[], query: string, replacement: string) => (
+        applyReplacement(matches, query, replacement)
     ), [applyReplacement]);
 
     return {
-        handleSearchReplaceNode,
+        handleSearchReplaceMatch,
         handleSearchReplaceAll,
     };
 };

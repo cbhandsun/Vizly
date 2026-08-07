@@ -61,8 +61,8 @@ const createShortcutGroups = (isMac: boolean): ShortcutGroup[] => [
         title: '高级功能',
         items: [
             { keys: ['Ctrl', 'K'], label: '命令面板' },
-            { keys: [isMac ? '⌘' : 'Ctrl', 'F'], label: '搜索画布节点' },
-            { keys: [isMac ? '⌘' : 'Ctrl', 'H'], label: '查找并替换节点文本' },
+            { keys: [isMac ? '⌘' : 'Ctrl', 'F'], label: '搜索画布内容' },
+            { keys: [isMac ? '⌘' : 'Ctrl', 'H'], label: '查找并替换画布文本' },
             { keys: ['Alt', '拖拽'], label: '拖拽复制节点' },
             { keys: ['Shift', '点击'], label: '多选节点' },
             { keys: ['?'], label: '显示快捷键面板' },

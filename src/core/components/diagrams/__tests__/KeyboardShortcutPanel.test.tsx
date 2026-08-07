@@ -29,11 +29,11 @@ describe('KeyboardShortcutPanel', () => {
         render(<KeyboardShortcutPanel visible onClose={vi.fn()} />);
 
         const search = screen.getByRole('textbox', { name: '搜索快捷键或动作' });
-        expect(screen.getByText('搜索画布节点')).toBeTruthy();
-        expect(screen.getByText('查找并替换节点文本')).toBeTruthy();
+        expect(screen.getByText('搜索画布内容')).toBeTruthy();
+        expect(screen.getByText('查找并替换画布文本')).toBeTruthy();
 
         fireEvent.change(search, { target: { value: '画布' } });
-        expect(screen.getByText('搜索画布节点')).toBeTruthy();
+        expect(screen.getByText('搜索画布内容')).toBeTruthy();
         expect(screen.queryByText('撤销')).toBeNull();
 
         fireEvent.change(search, { target: { value: '不存在的动作' } });

@@ -2,7 +2,7 @@
 
 import { readFileSync } from 'node:fs';
 import React from 'react';
-import type { Node } from '@xyflow/react';
+import type { Edge, Node } from '@xyflow/react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -23,8 +23,14 @@ vi.mock('@xyflow/react', async () => {
 });
 
 import { CanvasSearchBar } from '../CanvasSearchBar';
-import { buildPresentationNodeSelector } from '../../presentation/presentationSelectorSafety';
-import { planFlowchartLabelReplacement } from '../flowchartSearchReplace';
+import {
+    buildPresentationEdgeIdSelector,
+    buildPresentationNodeSelector,
+} from '../../presentation/presentationSelectorSafety';
+import {
+    planFlowchartCanvasTextReplacement,
+    type FlowchartCanvasSearchMatch,
+} from '../flowchartSearchReplace';
 
 beforeAll(() => {
     vi.stubGlobal('ResizeObserver', class ResizeObserver {
@@ -54,20 +60,20 @@ describe('CanvasSearchBar', () => {
                     position: { x: 10, y: 20 },
                     data: { label: 'Circle' },
                 }]}
-                onReplaceNode={vi.fn()}
+                onReplaceMatch={vi.fn()}
                 onReplaceAll={vi.fn()}
             />,
         );
 
-        expect(screen.getByRole('search', { name: '画布节点查找与替换' }).classList)
+        expect(screen.getByRole('search', { name: '画布内容查找与替换' }).classList)
             .toContain('canvas-search-bar');
-        expect(screen.getByRole('textbox', { name: '搜索画布节点' })).toBeTruthy();
+        expect(screen.getByRole('textbox', { name: '搜索画布内容' })).toBeTruthy();
         expect(screen.getByRole('button', { name: '关闭画布搜索' })).toBeTruthy();
 
-        fireEvent.change(screen.getByRole('textbox', { name: '搜索画布节点' }), {
+        fireEvent.change(screen.getByRole('textbox', { name: '搜索画布内容' }), {
             target: { value: 'Circle' },
         });
-        expect(screen.getByRole('status').textContent).toBe('1/1');
+        expect(screen.getByRole('status', { name: '搜索结果位置' }).textContent).toBe('1/1');
         expect(Array.from(document.querySelectorAll('style')).some(style =>
             style.textContent?.includes('@media (prefers-reduced-motion: reduce)'),
         )).toBe(true);
@@ -79,7 +85,7 @@ describe('CanvasSearchBar', () => {
             target: { value: 'Shape' },
         });
         expect(screen.getByRole('button', { name: '替换当前匹配' })).toBeTruthy();
-        expect(screen.getByRole('button', { name: '全部替换，共 1 个可修改节点文本' })).toBeTruthy();
+        expect(screen.getByRole('button', { name: '全部替换，共 1 个节点文本' })).toBeTruthy();
         await waitFor(() => expect(document.activeElement)
             .toBe(screen.getByRole('textbox', { name: '替换为' })));
     });
@@ -112,7 +118,7 @@ describe('CanvasSearchBar', () => {
             />,
         );
 
-        fireEvent.change(screen.getByRole('textbox', { name: '搜索画布节点' }), {
+        fireEvent.change(screen.getByRole('textbox', { name: '搜索画布内容' }), {
             target: { value: 'Nested' },
         });
 
@@ -135,7 +141,7 @@ describe('CanvasSearchBar', () => {
                 }]}
             />,
         );
-        const input = screen.getByRole('textbox', { name: '搜索画布节点' }) as HTMLInputElement;
+        const input = screen.getByRole('textbox', { name: '搜索画布内容' }) as HTMLInputElement;
         fireEvent.change(input, { target: { value: 'Circle' } });
 
         fireEvent.click(screen.getByRole('button', { name: '清空搜索' }));
@@ -165,7 +171,7 @@ describe('CanvasSearchBar', () => {
         fireEvent.click(screen.getByRole('button', { name: '关闭画布搜索' }));
 
         await waitFor(() => expect(document.activeElement).toBe(returnTarget));
-        expect(screen.queryByRole('search', { name: '画布节点查找与替换' })).toBeNull();
+        expect(screen.queryByRole('search', { name: '画布内容查找与替换' })).toBeNull();
     });
 
     it('opens replace mode from controlled shortcut state without a delayed DOM click', () => {
@@ -177,13 +183,13 @@ describe('CanvasSearchBar', () => {
                 onReplaceVisibleChange={onReplaceVisibleChange}
                 onClose={vi.fn()}
                 nodes={[]}
-                onReplaceNode={vi.fn()}
+                onReplaceMatch={vi.fn()}
                 onReplaceAll={vi.fn()}
             />,
         );
 
         expect(screen.getByRole('textbox', { name: '替换为' })).toBeTruthy();
-        expect(screen.getByRole('status').textContent).toContain('画布暂无节点');
+        expect(screen.getByRole('status').textContent).toContain('画布暂无可搜索内容');
         fireEvent.click(screen.getByRole('button', { name: '关闭替换' }));
         expect(onReplaceVisibleChange).toHaveBeenCalledWith(false);
 
@@ -201,8 +207,8 @@ describe('CanvasSearchBar', () => {
             position: { x: 10, y: 20 },
             data: { label: 'Circle circle' },
         }];
-        const onReplaceAll = vi.fn((ids: string[], query: string, replacement: string) => (
-            planFlowchartLabelReplacement(nodes, ids, query, replacement)
+        const onReplaceAll = vi.fn((matches: FlowchartCanvasSearchMatch[], query: string, replacement: string) => (
+            planFlowchartCanvasTextReplacement(nodes, [], matches, query, replacement)
         ));
         render(
             <CanvasSearchBar
@@ -210,29 +216,84 @@ describe('CanvasSearchBar', () => {
                 replaceVisible
                 onClose={vi.fn()}
                 nodes={nodes}
-                onReplaceNode={(id, query, replacement) => (
-                    planFlowchartLabelReplacement(nodes, [id], query, replacement)
+                onReplaceMatch={(match, query, replacement) => (
+                    planFlowchartCanvasTextReplacement(nodes, [], [match], query, replacement)
                 )}
                 onReplaceAll={onReplaceAll}
             />,
         );
 
-        fireEvent.change(screen.getByRole('textbox', { name: '搜索画布节点' }), {
+        fireEvent.change(screen.getByRole('textbox', { name: '搜索画布内容' }), {
             target: { value: 'circle' },
         });
         fireEvent.change(screen.getByRole('textbox', { name: '替换为' }), {
             target: { value: 'Square' },
         });
-        fireEvent.click(screen.getByRole('button', { name: '全部替换，共 1 个可修改节点文本' }));
+        fireEvent.click(screen.getByRole('button', { name: '全部替换，共 1 个节点文本' }));
 
         expect(onReplaceAll).not.toHaveBeenCalled();
         expect(screen.getByText('替换 1 个节点文本？')).toBeTruthy();
         expect(readFileSync('src/core/components/diagrams/CanvasSearchBar.tsx', 'utf8'))
             .toMatch(/placement="bottomRight"\s+autoAdjustOverflow=\{false\}\s+zIndex=\{2600\}\s+getPopupContainer=\{\(\) => document\.body\}/);
         fireEvent.click(screen.getByRole('button', { name: '确认替换' }));
-        expect(onReplaceAll).toHaveBeenCalledWith(['node-1'], 'circle', 'Square');
+        expect(onReplaceAll).toHaveBeenCalledWith([{ kind: 'node', id: 'node-1' }], 'circle', 'Square');
         await waitFor(() => expect(document.activeElement)
             .toBe(screen.getByRole('textbox', { name: '替换为' })));
+    });
+
+    it('finds, centers, highlights, and replaces a visible edge label', async () => {
+        const nodes: Node[] = [
+            { id: 'source', position: { x: 0, y: 0 }, data: { label: 'Source' } },
+            { id: 'target', position: { x: 300, y: 0 }, data: { label: 'Target' } },
+        ];
+        const edges: Edge[] = [{
+            id: 'edge-fee',
+            source: 'source',
+            target: 'target',
+            label: '运输费用',
+        }];
+        const onReplaceMatch = vi.fn((match: FlowchartCanvasSearchMatch, query: string, replacement: string) => (
+            planFlowchartCanvasTextReplacement(nodes, edges, [match], query, replacement)
+        ));
+        render(
+            <CanvasSearchBar
+                visible
+                replaceVisible
+                onClose={vi.fn()}
+                nodes={nodes}
+                edges={edges}
+                onReplaceMatch={onReplaceMatch}
+                onReplaceAll={vi.fn()}
+            />,
+        );
+
+        fireEvent.change(screen.getByRole('textbox', { name: '搜索画布内容' }), {
+            target: { value: '运输费用' },
+        });
+
+        expect(screen.getByRole('status', { name: '搜索结果位置' }).textContent).toBe('1/1');
+        await waitFor(() => expect(setCenterMock).toHaveBeenLastCalledWith(
+            210,
+            30,
+            { zoom: 1.2, duration: 300 },
+        ));
+        const styleText = Array.from(document.querySelectorAll('style'))
+            .map(style => style.textContent ?? '')
+            .join('\n');
+        expect(styleText).toContain(buildPresentationEdgeIdSelector('edge-fee'));
+
+        fireEvent.change(screen.getByRole('textbox', { name: '替换为' }), {
+            target: { value: '配送费用' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: '替换当前匹配' }));
+
+        expect(onReplaceMatch).toHaveBeenCalledWith(
+            { kind: 'edge', id: 'edge-fee' },
+            '运输费用',
+            '配送费用',
+        );
+        expect(screen.getByRole('status', { name: '替换操作状态' }).textContent)
+            .toBe('已替换 1 个连线标签');
     });
 
     it('disables replacement and explains why a matching node is protected', () => {
@@ -246,12 +307,12 @@ describe('CanvasSearchBar', () => {
                     position: { x: 10, y: 20 },
                     data: { label: 'Circle', locked: true },
                 }]}
-                onReplaceNode={vi.fn()}
+                onReplaceMatch={vi.fn()}
                 onReplaceAll={vi.fn()}
             />,
         );
 
-        fireEvent.change(screen.getByRole('textbox', { name: '搜索画布节点' }), {
+        fireEvent.change(screen.getByRole('textbox', { name: '搜索画布内容' }), {
             target: { value: 'Circle' },
         });
         fireEvent.change(screen.getByRole('textbox', { name: '替换为' }), {
@@ -259,7 +320,7 @@ describe('CanvasSearchBar', () => {
         });
 
         expect(screen.getByRole('button', { name: '替换当前匹配' })).toHaveProperty('disabled', true);
-        expect(screen.getByRole('button', { name: '全部替换，共 0 个可修改节点文本' })).toHaveProperty('disabled', true);
+        expect(screen.getByRole('button', { name: '全部替换，共 0 项内容' })).toHaveProperty('disabled', true);
         expect(screen.getByRole('status', { name: '替换操作状态' }).textContent)
             .toBe('当前结果已锁定，不会被替换');
     });
@@ -282,8 +343,8 @@ describe('CanvasSearchBar', () => {
         ];
         const SearchUndoHarness = () => {
             const [nodes, setNodes] = React.useState(originalNodes);
-            const replace = (ids: string[], query: string, replacement: string) => {
-                const result = planFlowchartLabelReplacement(nodes, ids, query, replacement);
+            const replace = (matches: FlowchartCanvasSearchMatch[], query: string, replacement: string) => {
+                const result = planFlowchartCanvasTextReplacement(nodes, [], matches, query, replacement);
                 setNodes(result.nodes);
                 return result;
             };
@@ -295,14 +356,14 @@ describe('CanvasSearchBar', () => {
                         replaceVisible
                         onClose={vi.fn()}
                         nodes={nodes}
-                        onReplaceNode={(id, query, replacement) => replace([id], query, replacement)}
+                        onReplaceMatch={(match, query, replacement) => replace([match], query, replacement)}
                         onReplaceAll={replace}
                     />
                 </>
             );
         };
         render(<SearchUndoHarness />);
-        const searchInput = screen.getByRole('textbox', { name: '搜索画布节点' });
+        const searchInput = screen.getByRole('textbox', { name: '搜索画布内容' });
         const replacementInput = screen.getByRole('textbox', { name: '替换为' });
         fireEvent.change(searchInput, { target: { value: '物流' } });
         fireEvent.change(replacementInput, { target: { value: '运输' } });
@@ -334,7 +395,7 @@ describe('CanvasSearchBar', () => {
             />,
         );
 
-        fireEvent.change(screen.getByRole('textbox', { name: '搜索画布节点' }), {
+        fireEvent.change(screen.getByRole('textbox', { name: '搜索画布内容' }), {
             target: { value: 'Unsafe imported node' },
         });
 

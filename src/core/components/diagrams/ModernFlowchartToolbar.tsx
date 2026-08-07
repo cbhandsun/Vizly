@@ -270,7 +270,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
         { type: 'divider' as const },
         ...(onShowCanvasSearch ? [{
             key: 'canvas-search',
-            label: t('designer.toolbar.searchCanvas', '搜索画布节点 (Ctrl+F)'),
+            label: t('designer.toolbar.searchCanvas', '搜索画布内容 (Ctrl+F)'),
             icon: <FaSearch />,
             onClick: onShowCanvasSearch,
         }, { type: 'divider' as const }] : []),

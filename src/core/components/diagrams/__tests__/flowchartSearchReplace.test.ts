@@ -1,10 +1,12 @@
-import type { Node } from '@xyflow/react';
+import type { Edge, Node } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
 
 import {
   FLOWCHART_REPLACE_TEXT_MAX_LENGTH,
+  buildFlowchartCanvasSearchResults,
   coerceFlowchartReplaceText,
   coerceFlowchartSearchText,
+  planFlowchartCanvasTextReplacement,
   planFlowchartLabelReplacement,
 } from '../flowchartSearchReplace';
 
@@ -21,6 +23,21 @@ describe('flowchartSearchReplace', () => {
       type: 'custom',
       position: { x: 10, y: 10 },
       data: { label: 'Beta', description: 'Alpha in description', meta: 2 },
+    },
+  ];
+  const edges: Edge[] = [
+    {
+      id: 'edge-fee',
+      source: 'node-1',
+      target: 'node-2',
+      label: '运输费用',
+      data: { label: '运输费用', route: 'alpha' },
+    },
+    {
+      id: 'edge-status',
+      source: 'node-2',
+      target: 'node-1',
+      data: { label: '状态数据' },
     },
   ];
 
@@ -138,5 +155,65 @@ describe('flowchartSearchReplace', () => {
 
     expect(result.changedIds).toEqual([]);
     expect(result.nodes[0]).toBe(source[0]);
+  });
+
+  it('discovers visible edge labels alongside node text without treating endpoint ids as text', () => {
+    expect(buildFlowchartCanvasSearchResults(nodes, edges, '运输费用')).toEqual([
+      { kind: 'edge', id: 'edge-fee' },
+    ]);
+    expect(buildFlowchartCanvasSearchResults(nodes, edges, '状态数据')).toEqual([
+      { kind: 'edge', id: 'edge-status' },
+    ]);
+    expect(buildFlowchartCanvasSearchResults(nodes, edges, 'node-1')).toEqual([
+      { kind: 'node', id: 'node-1' },
+    ]);
+  });
+
+  it('replaces edge labels in both rendering fields while preserving unrelated data', () => {
+    const result = planFlowchartCanvasTextReplacement(
+      nodes,
+      edges,
+      [{ kind: 'edge', id: 'edge-fee' }],
+      '运输',
+      '配送',
+    );
+
+    expect(result.changedMatches).toEqual([{ kind: 'edge', id: 'edge-fee' }]);
+    expect(result.nodes).toEqual(nodes);
+    expect(result.edges[0]).toEqual({
+      ...edges[0],
+      label: '配送费用',
+      data: { label: '配送费用', route: 'alpha' },
+    });
+    expect(result.edges[1]).toBe(edges[1]);
+  });
+
+  it('protects locked, blank, metadata-only, and oversized edge replacement boundaries', () => {
+    const protectedEdges: Edge[] = [
+      { ...edges[0], deletable: false },
+      { ...edges[1], id: 'edge-blank', data: { label: 'Alpha' } },
+      { ...edges[1], id: 'alpha-edge', data: { label: 'Visible' } },
+      { ...edges[1], id: 'edge-long', data: { label: 'Alpha suffix' } },
+    ];
+    const matches = protectedEdges.map(edge => ({ kind: 'edge' as const, id: edge.id }));
+
+    const locked = planFlowchartCanvasTextReplacement(nodes, protectedEdges, [matches[0]], '运输', '配送');
+    expect(locked.skippedLockedMatches).toEqual([matches[0]]);
+
+    const blank = planFlowchartCanvasTextReplacement(nodes, protectedEdges, [matches[1]], 'Alpha', '   ');
+    expect(blank.skippedBlankMatches).toEqual([matches[1]]);
+
+    const metadata = planFlowchartCanvasTextReplacement(nodes, protectedEdges, [matches[2]], 'alpha', 'Gamma');
+    expect(metadata.ignoredMetadataMatches).toEqual([matches[2]]);
+
+    const oversized = planFlowchartCanvasTextReplacement(
+      nodes,
+      protectedEdges,
+      [matches[3]],
+      'Alpha',
+      'x'.repeat(FLOWCHART_REPLACE_TEXT_MAX_LENGTH + 100),
+    );
+    expect(oversized.truncatedMatches).toEqual([matches[3]]);
+    expect(String(oversized.edges[3].label)).toHaveLength(FLOWCHART_REPLACE_TEXT_MAX_LENGTH);
   });
 });

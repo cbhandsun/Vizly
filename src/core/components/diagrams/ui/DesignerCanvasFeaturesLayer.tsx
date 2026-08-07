@@ -89,8 +89,9 @@ export interface DesignerCanvasFeaturesLayerProps {
         | 'visible'
         | 'onClose'
         | 'nodes'
+        | 'edges'
         | 'onHighlightNode'
-        | 'onReplaceNode'
+        | 'onReplaceMatch'
         | 'onReplaceAll'
         | 'replaceVisible'
         | 'onReplaceVisibleChange'
@@ -182,8 +183,9 @@ export const DesignerCanvasFeaturesLayer = React.memo(
                         visible
                         onClose={search.onClose}
                         nodes={search.nodes}
+                        edges={search.edges}
                         onHighlightNode={search.onHighlightNode}
-                        onReplaceNode={search.onReplaceNode}
+                        onReplaceMatch={search.onReplaceMatch}
                         onReplaceAll={search.onReplaceAll}
                         replaceVisible={search.replaceVisible}
                         onReplaceVisibleChange={search.onReplaceVisibleChange}
@@ -231,6 +233,7 @@ export const DesignerCanvasFeaturesLayer = React.memo(
       if (prev.search.visible !== next.search.visible) return false;
       if (prev.search.visible) {
           if (prev.search.nodes !== next.search.nodes) return false;
+          if (prev.search.edges !== next.search.edges) return false;
       }
 
       return true;

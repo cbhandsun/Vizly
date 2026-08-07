@@ -36,3 +36,6 @@ export const buildPresentationEdgeSelector = (nodeId: string): string => {
   const safeNodeId = escapePresentationSelectorValue(nodeId);
   return `.react-flow__edge[data-source="${safeNodeId}"], .react-flow__edge[data-target="${safeNodeId}"]`;
 };
+
+export const buildPresentationEdgeIdSelector = (edgeId: string): string =>
+  `.react-flow__edge[data-id="${escapePresentationSelectorValue(edgeId)}"]`;

@@ -1,27 +1,34 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { Popconfirm, theme } from 'antd';
 import { FaSearch, FaChevronUp, FaChevronDown, FaTimes, FaTimesCircle, FaExchangeAlt } from 'react-icons/fa';
-import { Node, useReactFlow } from '@xyflow/react';
-import { buildPresentationNodeSelector } from '../presentation/presentationSelectorSafety';
+import { useReactFlow, type Edge, type Node } from '@xyflow/react';
+import {
+    buildPresentationEdgeIdSelector,
+    buildPresentationNodeSelector,
+} from '../presentation/presentationSelectorSafety';
 import {
     FLOWCHART_REPLACE_TEXT_MAX_LENGTH,
     FLOWCHART_SEARCH_QUERY_MAX_LENGTH,
-    buildFlowchartNodeSearchSignature,
-    flowchartNodeMatchesSearch,
-    planFlowchartLabelReplacement,
-    type FlowchartReplaceResult,
+    buildFlowchartCanvasSearchMatchKey,
+    buildFlowchartCanvasSearchResults,
+    buildFlowchartCanvasSearchSignature,
+    flowchartCanvasMatchMatchesSearch,
+    planFlowchartCanvasTextReplacement,
+    type FlowchartCanvasReplaceResult,
+    type FlowchartCanvasSearchMatch,
 } from './flowchartSearchReplace';
 
 export interface CanvasSearchBarProps {
     visible: boolean;
     onClose: () => void;
     nodes: Node[];
+    edges?: Edge[];
     /** 外部控制高亮节点 */
     onHighlightNode?: (nodeId: string | null) => void;
-    /** 替换功能：更新节点数据 */
-    onReplaceNode?: (nodeId: string, query: string, replacement: string) => FlowchartReplaceResult;
+    /** 替换功能：更新当前节点文本或连线标签 */
+    onReplaceMatch?: (match: FlowchartCanvasSearchMatch, query: string, replacement: string) => FlowchartCanvasReplaceResult;
     /** 批量替换 */
-    onReplaceAll?: (matches: string[], query: string, replacement: string) => FlowchartReplaceResult;
+    onReplaceAll?: (matches: FlowchartCanvasSearchMatch[], query: string, replacement: string) => FlowchartCanvasReplaceResult;
     /** 受控替换栏状态，用于可靠响应 Ctrl+H 等外部入口 */
     replaceVisible?: boolean;
     onReplaceVisibleChange?: (visible: boolean) => void;
@@ -31,7 +38,7 @@ type ThemeToken = ReturnType<typeof theme.useToken>['token'];
 const CANVAS_SEARCH_FOCUS_RETURN_SELECTOR = '[data-flowchart-search-focus-return="true"]';
 
 interface ExcludedCanvasSearchMatch {
-    id: string;
+    key: string;
     signature: string;
 }
 
@@ -42,14 +49,15 @@ interface ReplaceStatusTracking {
 
 /**
  * 画布内搜索栏 — Ctrl+F / Ctrl+H 触发
- * 支持关键词匹配节点标签/描述/ID/域名，上/下导航结果，聚焦视口 + 脉冲高亮
+ * 支持关键词匹配节点文本、连线标签及 ID，上/下导航结果，聚焦视口 + 脉冲高亮
  * Phase 2：新增查找替换功能
  */
 const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = ({
     onClose,
     nodes,
+    edges = [],
     onHighlightNode,
-    onReplaceNode,
+    onReplaceMatch,
     onReplaceAll,
     replaceVisible,
     onReplaceVisibleChange,
@@ -75,55 +83,88 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
         onReplaceVisibleChange?.(visible);
     }, [onReplaceVisibleChange, replaceVisible]);
 
-    const focusNode = useCallback((nodeId: string) => {
-        const node = nodes.find(n => n.id === nodeId);
-        if (!node) return;
-        const internalNode = reactFlow.getInternalNode?.(nodeId);
+    const getNodeCenter = useCallback((node: Node) => {
+        const internalNode = reactFlow.getInternalNode?.(node.id);
         const absolutePosition = internalNode?.internals.positionAbsolute ?? node.position;
-        const w = internalNode?.measured.width || node.measured?.width || node.width || 120;
-        const h = internalNode?.measured.height || node.measured?.height || node.height || 60;
+        const width = internalNode?.measured.width || node.measured?.width || node.width || 120;
+        const height = internalNode?.measured.height || node.measured?.height || node.height || 60;
+        return {
+            x: absolutePosition.x + width / 2,
+            y: absolutePosition.y + height / 2,
+        };
+    }, [reactFlow]);
+
+    const focusMatch = useCallback((match: FlowchartCanvasSearchMatch) => {
+        if (match.kind === 'edge') {
+            const edge = edges.find(candidate => candidate.id === match.id);
+            const sourceNode = edge && nodes.find(node => node.id === edge.source);
+            const targetNode = edge && nodes.find(node => node.id === edge.target);
+            onHighlightNode?.(null);
+            if (!sourceNode || !targetNode) return;
+            const sourceCenter = getNodeCenter(sourceNode);
+            const targetCenter = getNodeCenter(targetNode);
+            reactFlow.setCenter(
+                (sourceCenter.x + targetCenter.x) / 2,
+                (sourceCenter.y + targetCenter.y) / 2,
+                { zoom: 1.2, duration: 300 },
+            );
+            return;
+        }
+        const node = nodes.find(candidate => candidate.id === match.id);
+        if (!node) return;
+        const center = getNodeCenter(node);
         reactFlow.setCenter(
-            absolutePosition.x + w / 2,
-            absolutePosition.y + h / 2,
+            center.x,
+            center.y,
             { zoom: 1.2, duration: 300 }
         );
-        onHighlightNode?.(nodeId);
-    }, [nodes, reactFlow, onHighlightNode]);
+        onHighlightNode?.(match.id);
+    }, [edges, getNodeCenter, nodes, onHighlightNode, reactFlow]);
 
-    // 搜索结果由输入和节点直接派生，避免维护第二套易失步状态。
-    const matchIds = useMemo(() => {
+    // 搜索结果由输入和画布内容直接派生，避免维护第二套易失步状态。
+    const matches = useMemo(() => {
         if (!query.trim()) return [];
         const excluded = new Set(excludedMatches
             .filter((entry) => {
-                const node = nodes.find(candidate => candidate.id === entry.id);
-                return node && buildFlowchartNodeSearchSignature(node) === entry.signature;
+                const candidate = buildFlowchartCanvasSearchResults(nodes, edges, query)
+                    .find(match => buildFlowchartCanvasSearchMatchKey(match) === entry.key);
+                return candidate
+                    && buildFlowchartCanvasSearchSignature(candidate, nodes, edges) === entry.signature;
             })
-            .map(entry => entry.id));
-        return nodes
-            .filter(n => !excluded.has(n.id) && flowchartNodeMatchesSearch(n, query))
-            .map(n => n.id);
-    }, [excludedMatches, nodes, query]);
-    const boundedCurrentIndex = matchIds.length > 0
-        ? Math.min(currentIndex, matchIds.length - 1)
+            .map(entry => entry.key));
+        return buildFlowchartCanvasSearchResults(nodes, edges, query)
+            .filter(match => !excluded.has(buildFlowchartCanvasSearchMatchKey(match)));
+    }, [edges, excludedMatches, nodes, query]);
+    const boundedCurrentIndex = matches.length > 0
+        ? Math.min(currentIndex, matches.length - 1)
         : 0;
-    const currentMatchId = matchIds[boundedCurrentIndex] ?? null;
-    const matchIdSet = useMemo(() => new Set(matchIds), [matchIds]);
-    const allReplacePlan = useMemo(() => planFlowchartLabelReplacement(
+    const currentMatch = matches[boundedCurrentIndex] ?? null;
+    const currentMatchKey = currentMatch ? buildFlowchartCanvasSearchMatchKey(currentMatch) : null;
+    const nodeMatchIds = useMemo(() => new Set(
+        matches.filter(match => match.kind === 'node').map(match => match.id),
+    ), [matches]);
+    const edgeMatchIds = useMemo(() => new Set(
+        matches.filter(match => match.kind === 'edge').map(match => match.id),
+    ), [matches]);
+    const allReplacePlan = useMemo(() => planFlowchartCanvasTextReplacement(
         nodes,
-        matchIds,
+        edges,
+        matches,
         query,
         replaceText,
-    ), [matchIds, nodes, query, replaceText]);
-    const currentReplaceEligible = currentMatchId !== null
-        && allReplacePlan.changedIds.includes(currentMatchId);
+    ), [edges, matches, nodes, query, replaceText]);
+    const changedMatchKeys = useMemo(() => new Set(
+        allReplacePlan.changedMatches.map(buildFlowchartCanvasSearchMatchKey),
+    ), [allReplacePlan.changedMatches]);
+    const currentReplaceEligible = currentMatchKey !== null && changedMatchKeys.has(currentMatchKey);
 
     useEffect(() => {
-        if (currentMatchId) {
-            focusNode(currentMatchId);
+        if (currentMatch) {
+            focusMatch(currentMatch);
         } else {
             onHighlightNode?.(null);
         }
-    }, [currentMatchId, focusNode, onHighlightNode]);
+    }, [currentMatch, focusMatch, onHighlightNode]);
     useEffect(() => {
         return () => onHighlightNode?.(null);
     }, [onHighlightNode]);
@@ -132,9 +173,19 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
         const tracking = replaceStatusTrackingRef.current;
         if (!tracking) return;
         const allExpectedValuesPresent = Array.from(tracking.expectedSignatures.entries())
-            .every(([id, signature]) => {
-                const node = nodes.find(candidate => candidate.id === id);
-                return node && buildFlowchartNodeSearchSignature(node) === signature;
+            .every(([key, signature]) => {
+                const match = buildFlowchartCanvasSearchResults(nodes, edges, query)
+                    .find(candidate => buildFlowchartCanvasSearchMatchKey(candidate) === key)
+                    ?? (() => {
+                        const separatorIndex = key.indexOf(':');
+                        const kind = key.slice(0, separatorIndex);
+                        const id = key.slice(separatorIndex + 1);
+                        return kind === 'node' || kind === 'edge'
+                            ? { kind, id } as FlowchartCanvasSearchMatch
+                            : null;
+                    })();
+                return match
+                    && buildFlowchartCanvasSearchSignature(match, nodes, edges) === signature;
             });
         if (allExpectedValuesPresent) {
             tracking.observedAppliedState = true;
@@ -146,7 +197,7 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
             });
             return () => window.cancelAnimationFrame(animationFrame);
         }
-    }, [nodes]);
+    }, [edges, nodes, query]);
 
     const handleQueryChange = useCallback((value: string) => {
         setQuery(value);
@@ -203,80 +254,97 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
         if (opened && query.trim()) focusReplacementInput();
     }, [focusReplacementInput, query, showReplace]);
 
-    const formatReplaceResult = useCallback((result: FlowchartReplaceResult) => {
-        const parts = [`已替换 ${result.changedIds.length} 个节点文本`];
-        if (result.skippedLockedIds.length > 0) parts.push(`跳过 ${result.skippedLockedIds.length} 个锁定节点`);
-        if (result.skippedBlankIds.length > 0) parts.push(`跳过 ${result.skippedBlankIds.length} 个空标签结果`);
-        if (result.ignoredNonLabelMatchIds.length > 0) parts.push(`忽略 ${result.ignoredNonLabelMatchIds.length} 个仅在域名或 ID 中的匹配`);
-        if (result.truncatedIds.length > 0) parts.push(`${result.truncatedIds.length} 个标签已截断`);
-        return parts.join('；');
+    const formatMatchCounts = useCallback((items: readonly FlowchartCanvasSearchMatch[]) => {
+        const nodeCount = items.filter(item => item.kind === 'node').length;
+        const edgeCount = items.length - nodeCount;
+        return [
+            nodeCount > 0 ? `${nodeCount} 个节点文本` : '',
+            edgeCount > 0 ? `${edgeCount} 个连线标签` : '',
+        ].filter(Boolean).join('、') || '0 项内容';
     }, []);
 
-    const goNext = useCallback(() => {
-        if (matchIds.length === 0) return;
-        const next = (boundedCurrentIndex + 1) % matchIds.length;
-        setCurrentIndex(next);
-    }, [boundedCurrentIndex, matchIds.length]);
+    const formatReplaceResult = useCallback((result: FlowchartCanvasReplaceResult) => {
+        const parts = [`已替换 ${formatMatchCounts(result.changedMatches)}`];
+        if (result.skippedLockedMatches.length > 0) {
+            parts.push(`跳过 ${formatMatchCounts(result.skippedLockedMatches)}（已锁定）`);
+        }
+        if (result.skippedBlankMatches.length > 0) parts.push(`跳过 ${result.skippedBlankMatches.length} 个空文本结果`);
+        if (result.ignoredMetadataMatches.length > 0) parts.push(`忽略 ${result.ignoredMetadataMatches.length} 个仅在元数据中匹配的结果`);
+        if (result.truncatedMatches.length > 0) parts.push(`${result.truncatedMatches.length} 个文本已截断`);
+        return parts.join('；');
+    }, [formatMatchCounts]);
 
-    const recordReplacementResult = useCallback((result: FlowchartReplaceResult) => {
-        const changedNodes = result.nodes.filter(node => result.changedIds.includes(node.id));
+    const goNext = useCallback(() => {
+        if (matches.length === 0) return;
+        const next = (boundedCurrentIndex + 1) % matches.length;
+        setCurrentIndex(next);
+    }, [boundedCurrentIndex, matches.length]);
+
+    const recordReplacementResult = useCallback((result: FlowchartCanvasReplaceResult) => {
         replaceStatusTrackingRef.current = {
-            expectedSignatures: new Map(changedNodes.map(node => [
-                node.id,
-                buildFlowchartNodeSearchSignature(node),
-            ])),
+            expectedSignatures: new Map(result.changedMatches.flatMap(match => {
+                const signature = buildFlowchartCanvasSearchSignature(match, result.nodes, result.edges);
+                return signature ? [[buildFlowchartCanvasSearchMatchKey(match), signature]] : [];
+            })),
             observedAppliedState: false,
         };
-        const stillMatching = changedNodes
-            .filter(node => flowchartNodeMatchesSearch(node, query))
-            .map(node => ({ id: node.id, signature: buildFlowchartNodeSearchSignature(node) }));
+        const stillMatching = result.changedMatches.flatMap(match => {
+            if (!flowchartCanvasMatchMatchesSearch(match, result.nodes, result.edges, query)) return [];
+            const signature = buildFlowchartCanvasSearchSignature(match, result.nodes, result.edges);
+            return signature ? [{ key: buildFlowchartCanvasSearchMatchKey(match), signature }] : [];
+        });
         if (stillMatching.length > 0) {
             setExcludedMatches(current => {
-                const nextById = new Map(current.map(entry => [entry.id, entry]));
-                stillMatching.forEach(entry => nextById.set(entry.id, entry));
-                return Array.from(nextById.values());
+                const nextByKey = new Map(current.map(entry => [entry.key, entry]));
+                stillMatching.forEach(entry => nextByKey.set(entry.key, entry));
+                return Array.from(nextByKey.values());
             });
         }
     }, [query]);
 
     const goPrev = useCallback(() => {
-        if (matchIds.length === 0) return;
-        const prev = (boundedCurrentIndex - 1 + matchIds.length) % matchIds.length;
+        if (matches.length === 0) return;
+        const prev = (boundedCurrentIndex - 1 + matches.length) % matches.length;
         setCurrentIndex(prev);
-    }, [boundedCurrentIndex, matchIds.length]);
+    }, [boundedCurrentIndex, matches.length]);
 
     // ── 替换当前匹配 ──
     const handleReplaceCurrent = useCallback(() => {
-        if (!currentReplaceEligible || !currentMatchId || !onReplaceNode) return;
-        const result = onReplaceNode(currentMatchId, query, replaceText);
+        if (!currentReplaceEligible || !currentMatch || !onReplaceMatch) return;
+        const result = onReplaceMatch(currentMatch, query, replaceText);
         setReplaceStatus(formatReplaceResult(result));
         recordReplacementResult(result);
-        const newIds = matchIds.filter(id => id !== currentMatchId);
-        const nextIndex = Math.min(boundedCurrentIndex, newIds.length - 1);
+        const remainingMatches = matches.filter(match => (
+            buildFlowchartCanvasSearchMatchKey(match) !== buildFlowchartCanvasSearchMatchKey(currentMatch)
+        ));
+        const nextIndex = Math.min(boundedCurrentIndex, remainingMatches.length - 1);
         setCurrentIndex(Math.max(0, nextIndex));
         focusReplacementInput();
-    }, [boundedCurrentIndex, currentMatchId, currentReplaceEligible, focusReplacementInput, formatReplaceResult, matchIds, onReplaceNode, query, recordReplacementResult, replaceText]);
+    }, [boundedCurrentIndex, currentMatch, currentReplaceEligible, focusReplacementInput, formatReplaceResult, matches, onReplaceMatch, query, recordReplacementResult, replaceText]);
 
     // ── 全部替换 ──
     const handleReplaceAll = useCallback(() => {
-        if (allReplacePlan.changedIds.length === 0 || !onReplaceAll) return;
-        const result = onReplaceAll(matchIds, query, replaceText);
+        if (allReplacePlan.changedMatches.length === 0 || !onReplaceAll) return;
+        const result = onReplaceAll(matches, query, replaceText);
         setReplaceStatus(formatReplaceResult(result));
         recordReplacementResult(result);
         setCurrentIndex(0);
         focusReplacementInput();
-    }, [allReplacePlan.changedIds.length, focusReplacementInput, formatReplaceResult, matchIds, onReplaceAll, query, recordReplacementResult, replaceText]);
+    }, [allReplacePlan.changedMatches.length, focusReplacementInput, formatReplaceResult, matches, onReplaceAll, query, recordReplacementResult, replaceText]);
 
     const replacePreviewMessage = useMemo(() => {
         if (!showReplace || !query.trim() || replaceStatus) return replaceStatus;
-        if (currentMatchId && allReplacePlan.skippedLockedIds.includes(currentMatchId)) return '当前结果已锁定，不会被替换';
-        if (currentMatchId && allReplacePlan.skippedBlankIds.includes(currentMatchId)) return '替换后标签不能为空';
-        if (currentMatchId && allReplacePlan.ignoredNonLabelMatchIds.includes(currentMatchId)) return '当前结果仅在域名或 ID 中匹配，不会修改节点文本';
-        if (allReplacePlan.changedIds.length > 0 && allReplacePlan.skippedLockedIds.length > 0) {
-            return `可替换 ${allReplacePlan.changedIds.length} 个节点文本，将跳过 ${allReplacePlan.skippedLockedIds.length} 个锁定节点`;
+        const currentKey = currentMatch ? buildFlowchartCanvasSearchMatchKey(currentMatch) : null;
+        const includesCurrent = (items: readonly FlowchartCanvasSearchMatch[]) => currentKey !== null
+            && items.some(item => buildFlowchartCanvasSearchMatchKey(item) === currentKey);
+        if (includesCurrent(allReplacePlan.skippedLockedMatches)) return '当前结果已锁定，不会被替换';
+        if (includesCurrent(allReplacePlan.skippedBlankMatches)) return '替换后文本不能为空';
+        if (includesCurrent(allReplacePlan.ignoredMetadataMatches)) return '当前结果仅在元数据中匹配，不会修改可见文本';
+        if (allReplacePlan.changedMatches.length > 0 && allReplacePlan.skippedLockedMatches.length > 0) {
+            return `可替换 ${formatMatchCounts(allReplacePlan.changedMatches)}，将跳过 ${formatMatchCounts(allReplacePlan.skippedLockedMatches)}`;
         }
         return replaceStatus;
-    }, [allReplacePlan, currentMatchId, query, replaceStatus, showReplace]);
+    }, [allReplacePlan, currentMatch, formatMatchCounts, query, replaceStatus, showReplace]);
 
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
         if (e.key === 'Escape') {
@@ -289,11 +357,10 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
 
     // --- 动态注入搜索高亮样式 ---
     const highlightStyle = useMemo(() => {
-        if (!query.trim() || matchIds.length === 0) return '';
+        if (!query.trim() || matches.length === 0) return '';
 
-        // 当前匹配项：脉冲蓝色高亮
-        const currentSelector = currentMatchId
-            ? `${buildPresentationNodeSelector(currentMatchId)} {
+        const currentNodeStyles = currentMatch?.kind === 'node'
+            ? `${buildPresentationNodeSelector(currentMatch.id)} {
                 outline: 3px solid rgba(59, 130, 246, 0.8) !important; 
                 outline-offset: 4px !important;
                 border-radius: 8px;
@@ -301,52 +368,89 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
                 z-index: 1000 !important;
             }`
             : '';
+        const currentEdgeStyles = currentMatch?.kind === 'edge'
+            ? `${buildPresentationEdgeIdSelector(currentMatch.id)} .react-flow__edge-path {
+                stroke: rgba(37, 99, 235, 1) !important;
+                stroke-width: 4px !important;
+                filter: drop-shadow(0 0 5px rgba(59, 130, 246, 0.65));
+                animation: search-edge-pulse 1.5s ease-in-out infinite !important;
+            }`
+            : '';
 
-        // 其他匹配项：subtle 高亮
-        const otherSelectors = matchIds
-            .filter(id => id !== currentMatchId)
-            .map(buildPresentationNodeSelector)
+        const otherNodeSelectors = matches
+            .filter(match => match.kind === 'node' && buildFlowchartCanvasSearchMatchKey(match) !== currentMatchKey)
+            .map(match => buildPresentationNodeSelector(match.id))
             .join(',\n');
-        const otherStyles = otherSelectors
-            ? `${otherSelectors} { 
+        const otherNodeStyles = otherNodeSelectors
+            ? `${otherNodeSelectors} {
                 outline: 2px solid rgba(59, 130, 246, 0.35) !important;
                 outline-offset: 3px !important;
                 border-radius: 8px;
             }`
             : '';
-
-        // 非匹配项：降低透明度
-        const dimSelectors = nodes
-            .filter(n => !matchIdSet.has(n.id))
-            .map(n => buildPresentationNodeSelector(n.id))
+        const otherEdgeSelectors = matches
+            .filter(match => match.kind === 'edge' && buildFlowchartCanvasSearchMatchKey(match) !== currentMatchKey)
+            .map(match => `${buildPresentationEdgeIdSelector(match.id)} .react-flow__edge-path`)
             .join(',\n');
-        const dimStyles = dimSelectors
-            ? `${dimSelectors} { opacity: 0.35 !important; transition: opacity 0.3s ease !important; }`
+        const otherEdgeStyles = otherEdgeSelectors
+            ? `${otherEdgeSelectors} {
+                stroke: rgba(59, 130, 246, 0.72) !important;
+                stroke-width: 3px !important;
+            }`
+            : '';
+
+        const dimNodeSelectors = nodeMatchIds.size > 0 ? nodes
+            .filter(node => !nodeMatchIds.has(node.id))
+            .map(node => buildPresentationNodeSelector(node.id))
+            .join(',\n') : '';
+        const dimNodeStyles = dimNodeSelectors
+            ? `${dimNodeSelectors} { opacity: 0.35 !important; transition: opacity 0.3s ease !important; }`
+            : '';
+        const dimEdgeSelectors = edgeMatchIds.size > 0 ? edges
+            .filter(edge => !edgeMatchIds.has(edge.id))
+            .map(edge => buildPresentationEdgeIdSelector(edge.id))
+            .join(',\n') : '';
+        const dimEdgeStyles = dimEdgeSelectors
+            ? `${dimEdgeSelectors} { opacity: 0.22 !important; transition: opacity 0.3s ease !important; }`
             : '';
 
         const keyframes = `@keyframes search-pulse {
             0%, 100% { outline-color: rgba(59, 130, 246, 0.8); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
             50% { outline-color: rgba(59, 130, 246, 1); box-shadow: 0 0 16px 4px rgba(59, 130, 246, 0.25); }
+        }
+        @keyframes search-edge-pulse {
+            0%, 100% { filter: drop-shadow(0 0 3px rgba(59, 130, 246, 0.45)); }
+            50% { filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.9)); }
         }`;
 
         const reducedMotionStyles = `@media (prefers-reduced-motion: reduce) {
-            .react-flow__node {
+            .react-flow__node,
+            .react-flow__edge-path {
                 animation: none !important;
                 transition: none !important;
             }
         }`;
 
-        return `${keyframes}\n${currentSelector}\n${otherStyles}\n${dimStyles}\n${reducedMotionStyles}`;
-    }, [query, matchIds, matchIdSet, currentMatchId, nodes]);
+        return [
+            keyframes,
+            currentNodeStyles,
+            currentEdgeStyles,
+            otherNodeStyles,
+            otherEdgeStyles,
+            dimNodeStyles,
+            dimEdgeStyles,
+            reducedMotionStyles,
+        ].filter(Boolean).join('\n');
+    }, [currentMatch, currentMatchKey, edgeMatchIds, edges, matches, nodeMatchIds, nodes, query]);
 
-    const hasReplaceFns = !!(onReplaceNode && onReplaceAll);
+    const hasReplaceFns = !!(onReplaceMatch && onReplaceAll);
 
     return (
         <>
             {/* 动态搜索高亮样式 */}
             {highlightStyle && <style>{highlightStyle}</style>}
 
-            <div className="canvas-search-bar" role="search" aria-label="画布节点查找与替换" style={{
+            <div className="canvas-search-bar" role="search" aria-label="画布内容查找与替换" style={{
                 zIndex: 1600,
                 background: token.colorBgContainer,
                 border: `1px solid ${token.colorBorderSecondary}`,
@@ -365,8 +469,8 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
                         onChange={e => handleQueryChange(e.target.value)}
                         maxLength={FLOWCHART_SEARCH_QUERY_MAX_LENGTH}
                         onKeyDown={handleKeyDown}
-                        aria-label="搜索画布节点"
-                        placeholder="搜索节点..."
+                        aria-label="搜索画布内容"
+                        placeholder="搜索节点或连线标签..."
                         style={{
                             border: 'none', outline: 'none', background: 'transparent',
                             fontSize: 13, flex: 1, minWidth: 0, color: token.colorText, fontFamily: 'inherit',
@@ -374,13 +478,13 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
                     />
                     {/* 结果计数 */}
                     {query && (
-                        <span role="status" aria-live="polite" aria-atomic="true" style={{
+                        <span role="status" aria-label="搜索结果位置" aria-live="polite" aria-atomic="true" style={{
                             fontSize: 11,
-                            color: matchIds.length > 0 ? token.colorTextSecondary : '#ef4444',
+                            color: matches.length > 0 ? token.colorTextSecondary : '#ef4444',
                             whiteSpace: 'nowrap',
                             fontVariantNumeric: 'tabular-nums',
                         }}>
-                            {matchIds.length > 0 ? `${boundedCurrentIndex + 1}/${matchIds.length}` : '无结果'}
+                            {matches.length > 0 ? `${boundedCurrentIndex + 1}/${matches.length}` : '无结果'}
                         </span>
                     )}
                     {query && (
@@ -394,10 +498,10 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
                         </button>
                     )}
                     {/* 上下导航 */}
-                    <button className="canvas-search-icon-button" aria-label="上一个搜索结果" onClick={goPrev} disabled={matchIds.length === 0} style={navBtnStyle(matchIds.length > 0, token)}>
+                    <button className="canvas-search-icon-button" aria-label="上一个搜索结果" onClick={goPrev} disabled={matches.length === 0} style={navBtnStyle(matches.length > 0, token)}>
                         <FaChevronUp size={11} />
                     </button>
-                    <button className="canvas-search-icon-button" aria-label="下一个搜索结果" onClick={goNext} disabled={matchIds.length === 0} style={navBtnStyle(matchIds.length > 0, token)}>
+                    <button className="canvas-search-icon-button" aria-label="下一个搜索结果" onClick={goNext} disabled={matches.length === 0} style={navBtnStyle(matches.length > 0, token)}>
                         <FaChevronDown size={11} />
                     </button>
                     {/* 切换替换模式 */}
@@ -421,13 +525,13 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
                     </button>
                 </div>
 
-                {nodes.length === 0 && (
+                {nodes.length === 0 && edges.length === 0 && (
                     <div role="status" aria-live="polite" style={{
                         padding: '0 10px 8px 28px',
                         color: token.colorTextTertiary,
                         fontSize: 11,
                     }}>
-                        画布暂无节点，请先添加节点
+                        画布暂无可搜索内容，请先添加节点或连线
                     </div>
                 )}
 
@@ -467,21 +571,21 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
                             autoAdjustOverflow={false}
                             zIndex={2600}
                             getPopupContainer={() => document.body}
-                            title={`替换 ${allReplacePlan.changedIds.length} 个节点文本？`}
-                            description="此操作可通过撤销恢复；锁定节点不会被修改。"
+                            title={`替换 ${formatMatchCounts(allReplacePlan.changedMatches)}？`}
+                            description="此操作可通过撤销恢复；锁定节点或连线不会被修改。"
                             okText="确认替换"
                             cancelText="取消"
                             onConfirm={handleReplaceAll}
-                            disabled={allReplacePlan.changedIds.length === 0}
+                            disabled={allReplacePlan.changedMatches.length === 0}
                         >
                             <button
                                 className="canvas-search-action-button"
-                                aria-label={`全部替换，共 ${allReplacePlan.changedIds.length} 个可修改节点文本`}
-                                disabled={allReplacePlan.changedIds.length === 0}
-                                title={`全部替换 (${allReplacePlan.changedIds.length} 个可修改节点文本)`}
-                                style={actionBtnStyle(allReplacePlan.changedIds.length > 0, token)}
+                                aria-label={`全部替换，共 ${formatMatchCounts(allReplacePlan.changedMatches)}`}
+                                disabled={allReplacePlan.changedMatches.length === 0}
+                                title={`全部替换 (${formatMatchCounts(allReplacePlan.changedMatches)})`}
+                                style={actionBtnStyle(allReplacePlan.changedMatches.length > 0, token)}
                             >
-                                全部({allReplacePlan.changedIds.length})
+                                全部({allReplacePlan.changedMatches.length})
                             </button>
                         </Popconfirm>
                     </div>

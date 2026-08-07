@@ -1,4 +1,4 @@
-import type { Node } from '@xyflow/react';
+import type { Edge, Node } from '@xyflow/react';
 
 import { isNodeMutationLocked } from './nodeLockPolicy';
 import {
@@ -24,6 +24,21 @@ export interface FlowchartReplaceResult {
     ignoredNonLabelMatchIds: string[];
     truncatedIds: string[];
     queryValid: boolean;
+}
+
+export type FlowchartCanvasSearchMatch =
+  | { kind: 'node'; id: string }
+  | { kind: 'edge'; id: string };
+
+export interface FlowchartCanvasReplaceResult {
+  nodes: Node[];
+  edges: Edge[];
+  changedMatches: FlowchartCanvasSearchMatch[];
+  skippedLockedMatches: FlowchartCanvasSearchMatch[];
+  skippedBlankMatches: FlowchartCanvasSearchMatch[];
+  ignoredMetadataMatches: FlowchartCanvasSearchMatch[];
+  truncatedMatches: FlowchartCanvasSearchMatch[];
+  queryValid: boolean;
 }
 
 export const coerceFlowchartSearchText = (value: unknown): string => (
@@ -62,6 +77,21 @@ const getNodeVisibleDescription = (node: Node): string => normalizeNodeDescripti
   node.data?.description,
 );
 
+const getEdgeData = (edge: Edge): Record<string, unknown> => (
+  edge.data && typeof edge.data === 'object' ? edge.data as Record<string, unknown> : {}
+);
+
+export const getFlowchartEdgeVisibleLabel = (edge: Edge): string => {
+  const dataLabel = getEdgeData(edge).label;
+  if (typeof dataLabel === 'string') return dataLabel;
+  return typeof edge.label === 'string' ? edge.label : '';
+};
+
+const isEdgeMutationLocked = (edge: Edge): boolean => {
+  const data = getEdgeData(edge);
+  return data.locked === true || data.isLocked === true || edge.deletable === false;
+};
+
 export const buildFlowchartNodeSearchSignature = (node: Node): string => JSON.stringify([
   getNodeLabel(node),
   getNodeVisibleDescription(node),
@@ -78,6 +108,68 @@ export const flowchartNodeMatchesSearch = (node: Node, rawQuery: unknown): boole
     typeof node.data?.domain === 'string' ? node.data.domain : '',
     node.id,
   ].some(value => value.toLocaleLowerCase().includes(query));
+};
+
+export const buildFlowchartEdgeSearchSignature = (edge: Edge): string => JSON.stringify([
+  getFlowchartEdgeVisibleLabel(edge),
+  edge.id,
+  edge.source,
+  edge.target,
+]);
+
+export const flowchartEdgeMatchesSearch = (edge: Edge, rawQuery: unknown): boolean => {
+  const query = coerceFlowchartSearchText(rawQuery).trim().toLocaleLowerCase();
+  if (!query) return false;
+  return [getFlowchartEdgeVisibleLabel(edge), edge.id]
+    .some(value => value.toLocaleLowerCase().includes(query));
+};
+
+export const buildFlowchartCanvasSearchMatchKey = (
+  match: FlowchartCanvasSearchMatch,
+): string => `${match.kind}:${match.id}`;
+
+export const buildFlowchartCanvasSearchSignature = (
+  match: FlowchartCanvasSearchMatch,
+  nodes: readonly Node[],
+  edges: readonly Edge[],
+): string | null => {
+  if (match.kind === 'node') {
+    const node = nodes.find(candidate => candidate.id === match.id);
+    return node ? buildFlowchartNodeSearchSignature(node) : null;
+  }
+  const edge = edges.find(candidate => candidate.id === match.id);
+  return edge ? buildFlowchartEdgeSearchSignature(edge) : null;
+};
+
+export const flowchartCanvasMatchMatchesSearch = (
+  match: FlowchartCanvasSearchMatch,
+  nodes: readonly Node[],
+  edges: readonly Edge[],
+  rawQuery: unknown,
+): boolean => {
+  if (match.kind === 'node') {
+    const node = nodes.find(candidate => candidate.id === match.id);
+    return node ? flowchartNodeMatchesSearch(node, rawQuery) : false;
+  }
+  const edge = edges.find(candidate => candidate.id === match.id);
+  return edge ? flowchartEdgeMatchesSearch(edge, rawQuery) : false;
+};
+
+export const buildFlowchartCanvasSearchResults = (
+  nodes: readonly Node[],
+  edges: readonly Edge[],
+  rawQuery: unknown,
+): FlowchartCanvasSearchMatch[] => {
+  const query = coerceFlowchartSearchText(rawQuery).trim();
+  if (!query) return [];
+  return [
+    ...nodes
+      .filter(node => flowchartNodeMatchesSearch(node, query))
+      .map(node => ({ kind: 'node' as const, id: node.id })),
+    ...edges
+      .filter(edge => flowchartEdgeMatchesSearch(edge, query))
+      .map(edge => ({ kind: 'edge' as const, id: edge.id })),
+  ];
 };
 
 /**
@@ -171,4 +263,88 @@ export const planFlowchartLabelReplacement = (
         truncatedIds,
         queryValid: true,
     };
+};
+
+export const planFlowchartCanvasTextReplacement = (
+  nodes: readonly Node[],
+  edges: readonly Edge[],
+  matches: readonly FlowchartCanvasSearchMatch[],
+  rawQuery: unknown,
+  rawReplacement: unknown,
+): FlowchartCanvasReplaceResult => {
+  const query = coerceFlowchartSearchText(rawQuery).trim();
+  const replacement = coerceFlowchartReplaceText(rawReplacement);
+  const nodeMatches = matches.filter(match => match.kind === 'node');
+  const edgeMatches = matches.filter(match => match.kind === 'edge');
+  const nodeResult = planFlowchartLabelReplacement(
+    nodes,
+    nodeMatches.map(match => match.id),
+    query,
+    replacement,
+  );
+  const changedMatches: FlowchartCanvasSearchMatch[] = nodeResult.changedIds
+    .map(id => ({ kind: 'node', id }));
+  const skippedLockedMatches: FlowchartCanvasSearchMatch[] = nodeResult.skippedLockedIds
+    .map(id => ({ kind: 'node', id }));
+  const skippedBlankMatches: FlowchartCanvasSearchMatch[] = nodeResult.skippedBlankIds
+    .map(id => ({ kind: 'node', id }));
+  const ignoredMetadataMatches: FlowchartCanvasSearchMatch[] = nodeResult.ignoredNonLabelMatchIds
+    .map(id => ({ kind: 'node', id }));
+  const truncatedMatches: FlowchartCanvasSearchMatch[] = nodeResult.truncatedIds
+    .map(id => ({ kind: 'node', id }));
+  const targetEdgeIds = new Set(edgeMatches.map(match => match.id));
+
+  if (!query) {
+    return {
+      nodes: nodeResult.nodes,
+      edges: [...edges],
+      changedMatches,
+      skippedLockedMatches,
+      skippedBlankMatches,
+      ignoredMetadataMatches,
+      truncatedMatches,
+      queryValid: false,
+    };
+  }
+
+  const matcher = new RegExp(escapeRegExp(query), 'iu');
+  const nextEdges = edges.map(edge => {
+    if (!targetEdgeIds.has(edge.id)) return edge;
+    const label = getFlowchartEdgeVisibleLabel(edge);
+    if (!matcher.test(label)) {
+      ignoredMetadataMatches.push({ kind: 'edge', id: edge.id });
+      return edge;
+    }
+    if (isEdgeMutationLocked(edge)) {
+      skippedLockedMatches.push({ kind: 'edge', id: edge.id });
+      return edge;
+    }
+    const unboundedLabel = replaceLiteralIgnoreCase(label, query, replacement);
+    if (!unboundedLabel.trim()) {
+      skippedBlankMatches.push({ kind: 'edge', id: edge.id });
+      return edge;
+    }
+    const nextLabel = unboundedLabel.slice(0, FLOWCHART_REPLACE_TEXT_MAX_LENGTH);
+    if (nextLabel === label) return edge;
+    if (nextLabel.length < unboundedLabel.length) {
+      truncatedMatches.push({ kind: 'edge', id: edge.id });
+    }
+    changedMatches.push({ kind: 'edge', id: edge.id });
+    return {
+      ...edge,
+      label: nextLabel,
+      data: { ...getEdgeData(edge), label: nextLabel },
+    };
+  });
+
+  return {
+    nodes: nodeResult.nodes,
+    edges: nextEdges,
+    changedMatches,
+    skippedLockedMatches,
+    skippedBlankMatches,
+    ignoredMetadataMatches,
+    truncatedMatches,
+    queryValid: true,
+  };
 };
