@@ -70,6 +70,13 @@ const MODE_STATUS_BUTTON_STYLE: React.CSSProperties = {
     fontWeight: 600,
 };
 
+const MOBILE_TOUCH_TARGET_STYLE: React.CSSProperties = {
+    width: 'var(--commercial-touch-target, 44px)',
+    minWidth: 'var(--commercial-touch-target, 44px)',
+    height: 'var(--commercial-touch-target, 44px)',
+    minHeight: 'var(--commercial-touch-target, 44px)',
+};
+
 export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
     diagramId, diagramTitle, onEditJson,
     onStartPresentation, onShowDiff,
@@ -168,6 +175,24 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
         </>
     );
 
+    const saveMenu: MenuProps['items'] = useMemo(() => [
+        ...(onDirectSave ? [{
+            key: 'direct-save',
+            label: isDirectSaveDisabled
+                ? t('designer.toolbar.directSaveDisabled')
+                : t('designer.toolbar.directSave', '覆盖保存'),
+            icon: <FaSave />,
+            disabled: isDirectSaveDisabled,
+            onClick: onDirectSave,
+        }] : []),
+        ...(onSaveToCloud ? [{
+            key: 'cloud-save',
+            label: t('designer.toolbar.saveToCloud', '保存到云端'),
+            icon: <FaCloudUploadAlt />,
+            onClick: onSaveToCloud,
+        }] : []),
+    ], [isDirectSaveDisabled, onDirectSave, onSaveToCloud, t]);
+
     const documentMenu: MenuProps['items'] = useMemo(() => {
         const viewItems: NonNullable<MenuProps['items']> = [
             ...(onStartPresentation ? [{
@@ -262,6 +287,7 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
         }] : []),
         ];
         const sections = [
+            ...(isSmallMobile && saveMenu.length > 0 ? [saveMenu] : []),
             viewItems,
             toolItems,
             collaborationItems,
@@ -278,6 +304,7 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
         handleReadonlyToggle,
         isCommentMode,
         isReadonly,
+        isSmallMobile,
         isYjsSynced,
         onEditJson,
         onOpenSettings,
@@ -290,26 +317,9 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
         onToggleAI,
         setIsCommentMode,
         setPluginManagerVisible,
+        saveMenu,
         t,
     ]);
-
-    const saveMenu: MenuProps['items'] = useMemo(() => [
-        ...(onDirectSave ? [{
-            key: 'direct-save',
-            label: isDirectSaveDisabled
-                ? t('designer.toolbar.directSaveDisabled')
-                : t('designer.toolbar.directSave', '覆盖保存'),
-            icon: <FaSave />,
-            disabled: isDirectSaveDisabled,
-            onClick: onDirectSave,
-        }] : []),
-        ...(onSaveToCloud ? [{
-            key: 'cloud-save',
-            label: t('designer.toolbar.saveToCloud', '保存到云端'),
-            icon: <FaCloudUploadAlt />,
-            onClick: onSaveToCloud,
-        }] : []),
-    ], [isDirectSaveDisabled, onDirectSave, onSaveToCloud, t]);
 
     const {
         open: saveMenuOpen,
@@ -341,10 +351,12 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
     // 统一按钮样式 (与 ModernFlowchartToolbar 保持一致)
     const tbtn = "w-8 h-8 p-0 flex items-center justify-center border-none rounded-[6px] text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] transition-colors";
     const tbtnActive = "w-8 h-8 p-0 flex items-center justify-center border-none rounded-[6px] bg-[#e8f0fe] dark:bg-[rgba(138,180,248,0.15)] text-[#1a73e8] dark:text-[#8ab4f8] transition-colors hover:bg-[#d2e3fc] dark:hover:bg-[rgba(138,180,248,0.22)]";
+    const mobileTbtn = "w-[44px] min-w-[44px] h-[44px] min-h-[44px] p-0 flex items-center justify-center border-none rounded-[6px] text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] transition-colors";
+    const mobileTbtnActive = "w-[44px] min-w-[44px] h-[44px] min-h-[44px] p-0 flex items-center justify-center border-none rounded-[6px] bg-[#e8f0fe] dark:bg-[rgba(138,180,248,0.15)] text-[#1a73e8] dark:text-[#8ab4f8] transition-colors hover:bg-[#d2e3fc] dark:hover:bg-[rgba(138,180,248,0.22)]";
 
     const content = (
         <div className="flex items-center gap-0.5">
-            {saveMenu.length > 0 && (
+            {!isSmallMobile && saveMenu.length > 0 && (
                 <Dropdown
                     menu={{ items: saveMenu, onKeyDown: handleSaveMenuKeyDown }}
                     placement="bottomRight"
@@ -433,7 +445,10 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
                             aria-expanded={documentMenuOpen}
                             onKeyDown={handleDocumentMenuButtonKeyDown}
                             icon={<FaEllipsisH className="text-[13px]" />}
-                            className={aiChatActive || isCommentMode ? tbtnActive : tbtn}
+                            style={isSmallMobile ? MOBILE_TOUCH_TARGET_STYLE : undefined}
+                            className={isSmallMobile
+                                ? (aiChatActive || isCommentMode ? mobileTbtnActive : mobileTbtn)
+                                : (aiChatActive || isCommentMode ? tbtnActive : tbtn)}
                         />
                     </Tooltip>
                 </Dropdown>

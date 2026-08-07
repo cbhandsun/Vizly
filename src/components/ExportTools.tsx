@@ -48,6 +48,7 @@ interface ExportToolsProps {
   isFullscreen?: boolean;
   showControls?: boolean;
   variant?: 'overlay' | 'inline' | 'compact';
+  commercialTouchTarget?: boolean;
   enableMainFlowAnimation?: boolean; // 主流程动线控制参数
   /** 如果提供，云端图表将在设计器中打开 */
   onOpenInDesigner?: (data: StandardDiagramData) => void;
@@ -64,6 +65,7 @@ const ExportTools: React.FC<ExportToolsProps> = ({
   isFullscreen = false,
   showControls = true,
   variant = 'overlay',
+  commercialTouchTarget = false,
   enableMainFlowAnimation = true,
   onOpenInDesigner
 }) => {
@@ -565,7 +567,8 @@ ${mermaid}
               icon={<FaDownload size={14} />}
               disabled={isExporting}
               style={variant === 'inline' ? {
-                height: 32,
+                height: commercialTouchTarget ? 'var(--commercial-touch-target, 44px)' : 32,
+                minHeight: commercialTouchTarget ? 'var(--commercial-touch-target, 44px)' : undefined,
                 display: 'flex',
                 alignItems: 'center',
                 background: token.colorBgContainer,

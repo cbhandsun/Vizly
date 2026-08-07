@@ -9,7 +9,22 @@ import { useTranslation } from 'react-i18next';
 
 const AuthModal = React.lazy(() => import('./AuthModal').then(m => ({ default: m.AuthModal })));
 
-export const AuthStatus: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
+interface AuthStatusProps {
+    compact?: boolean;
+    commercialTouchTarget?: boolean;
+}
+
+const COMMERCIAL_TOUCH_TARGET_STYLE: React.CSSProperties = {
+    width: 'var(--commercial-touch-target, 44px)',
+    minWidth: 'var(--commercial-touch-target, 44px)',
+    height: 'var(--commercial-touch-target, 44px)',
+    minHeight: 'var(--commercial-touch-target, 44px)',
+};
+
+export const AuthStatus: React.FC<AuthStatusProps> = ({
+    compact = false,
+    commercialTouchTarget = false,
+}) => {
     const { t } = useTranslation();
     const { user, signOut } = useAuth();
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -70,6 +85,7 @@ export const AuthStatus: React.FC<{ compact?: boolean }> = ({ compact = false })
                         aria-label={t('auth.login')}
                         icon={<LoginOutlined />}
                         onClick={() => setIsModalOpen(true)}
+                        style={commercialTouchTarget ? COMMERCIAL_TOUCH_TARGET_STYLE : undefined}
                     />
                 </Tooltip>
             ) : (
@@ -84,7 +100,24 @@ export const AuthStatus: React.FC<{ compact?: boolean }> = ({ compact = false })
         </>
     ) : (
         <Dropdown menu={{ items: menuItems, onClick: handleMenuClick }} placement="bottomRight">
-            <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div
+                role="button"
+                tabIndex={0}
+                aria-label={t('auth.accountMenu', '账户菜单')}
+                onKeyDown={(event) => {
+                    if (event.key !== 'Enter' && event.key !== ' ') return;
+                    event.preventDefault();
+                    event.currentTarget.click();
+                }}
+                style={{
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    ...(commercialTouchTarget ? COMMERCIAL_TOUCH_TARGET_STYLE : {}),
+                }}
+            >
                 <Avatar
                     size="small"
                     style={{ backgroundColor: '#1890ff' }}
@@ -123,6 +156,8 @@ export const AuthStatus: React.FC<{ compact?: boolean }> = ({ compact = false })
     );
 };
 
-export const AuthStatusCompact: React.FC = () => {
-    return <AuthStatus compact />;
+export const AuthStatusCompact: React.FC<Pick<AuthStatusProps, 'commercialTouchTarget'>> = ({
+    commercialTouchTarget = false,
+}) => {
+    return <AuthStatus compact commercialTouchTarget={commercialTouchTarget} />;
 };

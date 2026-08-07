@@ -4,9 +4,22 @@ import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const breakpointState = vi.hoisted(() => ({ md: true }));
+
+vi.mock('antd', async () => {
+    const actual = await vi.importActual<typeof import('antd')>('antd');
+    return {
+        ...actual,
+        Grid: {
+            ...actual.Grid,
+            useBreakpoint: () => breakpointState,
+        },
+    };
+});
+
 vi.mock('react-i18next', () => ({
     useTranslation: () => ({
-        t: (key: string, fallback?: string) => fallback ?? ({
+        t: (key: string, fallback?: unknown) => (typeof fallback === 'string' ? fallback : ({
             'designer.toolbar.documentActions': '文档操作',
             'designer.toolbar.saveOptions': '保存选项',
             'designer.toolbar.saveToCloud': '保存到云端',
@@ -22,7 +35,7 @@ vi.mock('react-i18next', () => ({
             'designer.toolbar.unlockCanvas': '解锁画布',
             'designer.toolbar.operationHistory': '操作历史',
             'designer.toolbar.versionHistory': '版本快照',
-        }[key] ?? key),
+        }[key] ?? key)),
     }),
 }));
 
@@ -35,6 +48,7 @@ import { TopActionButtons } from '../TopActionButtons';
 describe('TopActionButtons document menu', () => {
     beforeEach(() => {
         vi.restoreAllMocks();
+        breakpointState.md = true;
         vi.stubGlobal('ResizeObserver', class {
             observe() {}
             unobserve() {}
@@ -123,6 +137,31 @@ describe('TopActionButtons document menu', () => {
             expect(trigger.getAttribute('aria-expanded')).toBe('false');
             expect(document.activeElement).toBe(trigger);
         });
+    });
+
+    it('consolidates save into the 44px document menu on mobile', async () => {
+        breakpointState.md = false;
+        const onSaveToCloud = vi.fn().mockResolvedValue(undefined);
+        render(
+            <TopActionButtons
+                disablePortal
+                onSaveToCloud={onSaveToCloud}
+                onStartPresentation={vi.fn()}
+            />,
+        );
+
+        expect(screen.queryByRole('button', { name: '保存选项' })).toBeNull();
+        const trigger = screen.getByRole('button', { name: '文档操作' });
+        expect(trigger.className).toContain('w-[44px]');
+        expect(trigger.className).toContain('min-h-[44px]');
+        expect(trigger.style.width).toBe('var(--commercial-touch-target, 44px)');
+        expect(trigger.style.minHeight).toBe('var(--commercial-touch-target, 44px)');
+
+        fireEvent.click(trigger);
+
+        const saveItem = await screen.findByRole('menuitem', { name: '保存到云端' });
+        expect(saveItem).toBeTruthy();
+        expect(await screen.findByRole('menuitem', { name: /演示模式/ })).toBeTruthy();
     });
 
     it('exposes stable focus-return targets for document modes', () => {

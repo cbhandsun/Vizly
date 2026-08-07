@@ -26,14 +26,18 @@ vi.mock('antd', () => ({
     children,
     disabled,
     onClick,
+    className,
+    style,
     'aria-label': ariaLabel,
   }: {
     children?: React.ReactNode;
     disabled?: boolean;
     onClick?: () => void;
+    className?: string;
+    style?: React.CSSProperties;
     'aria-label'?: string;
   }) => (
-    <button type="button" disabled={disabled} onClick={onClick} aria-label={ariaLabel}>
+    <button type="button" disabled={disabled} onClick={onClick} className={className} style={style} aria-label={ariaLabel}>
       {children ?? ariaLabel}
     </button>
   ),
@@ -105,5 +109,21 @@ describe('DiagramTitleEditor', () => {
 
     expect((await screen.findByRole('alert')).textContent).toContain('Rename failed');
     expect(screen.getByRole('textbox', { name: 'New diagram name' })).toBeTruthy();
+  });
+
+  it('uses the commercial touch target when requested by a mobile toolbar', () => {
+    render(
+      <DiagramTitleEditor
+        title="Untitled flowchart"
+        onRename={vi.fn(async () => undefined)}
+        commercialTouchTarget
+      />,
+    );
+
+    const trigger = screen.getByRole('button', { name: 'Rename diagram' });
+    expect(trigger.className).toContain('w-[44px]');
+    expect(trigger.className).toContain('min-h-[44px]');
+    expect(trigger.style.width).toBe('var(--commercial-touch-target, 44px)');
+    expect(trigger.style.minHeight).toBe('var(--commercial-touch-target, 44px)');
   });
 });

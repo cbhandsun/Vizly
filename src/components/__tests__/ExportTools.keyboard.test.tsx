@@ -179,4 +179,20 @@ describe('ExportTools keyboard menu', () => {
     });
     await waitFor(() => expect(screen.queryByRole('status')).toBeNull());
   });
+
+  it('uses the commercial touch target inside the mobile system menu', () => {
+    render(
+      <ExportTools
+        diagramId="diagram-1"
+        diagramName="Diagram"
+        showControls={false}
+        variant="inline"
+        commercialTouchTarget
+      />,
+    );
+
+    const trigger = screen.getByRole('button', { name: '导出' });
+    expect(trigger.style.height).toBe('var(--commercial-touch-target, 44px)');
+    expect(trigger.style.minHeight).toBe('var(--commercial-touch-target, 44px)');
+  });
 });

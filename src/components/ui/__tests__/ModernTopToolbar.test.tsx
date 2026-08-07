@@ -48,17 +48,47 @@ vi.mock('react-i18next', () => ({
 }));
 
 vi.mock('../../ExportTools', () => ({
-  default: ({ showControls }: { showControls?: boolean }) => (
-    <div data-testid="export-tools" data-show-controls={String(showControls)} />
+  default: ({
+    showControls,
+    variant,
+    commercialTouchTarget,
+  }: {
+    showControls?: boolean;
+    variant?: string;
+    commercialTouchTarget?: boolean;
+  }) => (
+    <button
+      type="button"
+      data-testid="export-tools"
+      data-show-controls={String(showControls)}
+      data-variant={variant}
+      data-commercial-touch-target={String(commercialTouchTarget)}
+    >
+      export-tools
+    </button>
   ),
 }));
 
 vi.mock('../DiagramTitleEditor', () => ({
-  DiagramTitleEditor: () => <button type="button">rename-title</button>,
+  DiagramTitleEditor: ({ commercialTouchTarget }: { commercialTouchTarget?: boolean }) => (
+    <button
+      type="button"
+      data-testid="rename-title"
+      data-commercial-touch-target={String(commercialTouchTarget)}
+    >
+      rename-title
+    </button>
+  ),
 }));
 
 vi.mock('../EnhancedThemeSelector', () => ({
-  EnhancedThemeSelector: () => <div data-testid="theme-selector" />,
+  EnhancedThemeSelector: ({ variant, borderless }: { variant?: string; borderless?: boolean }) => (
+    <div
+      data-testid="theme-selector"
+      data-variant={variant}
+      data-borderless={String(borderless)}
+    />
+  ),
 }));
 
 vi.mock('../../shared/LanguageSwitcher', () => ({
@@ -68,7 +98,12 @@ vi.mock('../../shared/LanguageSwitcher', () => ({
 }));
 
 vi.mock('../../auth/AuthStatus', () => ({
-  AuthStatusCompact: () => <div data-testid="auth-status" />,
+  AuthStatusCompact: ({ commercialTouchTarget }: { commercialTouchTarget?: boolean }) => (
+    <div
+      data-testid="auth-status"
+      data-commercial-touch-target={String(commercialTouchTarget)}
+    />
+  ),
 }));
 
 import { ModernTopToolbar } from '../ModernTopToolbar';
@@ -104,9 +139,20 @@ describe('ModernTopToolbar responsive layout', () => {
 
     expect(centerSection?.className).toContain('absolute');
     expect(centerSection?.className).toContain('top-[48px]');
-    expect(screen.getByTestId('export-tools').getAttribute('data-show-controls')).toBe('false');
+    expect(screen.queryByTestId('export-tools')).toBeNull();
+    expect(screen.queryByTestId('theme-selector')).toBeNull();
     expect(screen.getByRole('button', { name: 'rename-title' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: '切换图表：Untitled flowchart' })).toBeTruthy();
+    expect(screen.getByTestId('rename-title').getAttribute('data-commercial-touch-target')).toBe('true');
+    expect(screen.getByTestId('auth-status').getAttribute('data-commercial-touch-target')).toBe('true');
+    expect(screen.queryByRole('link')).toBeNull();
+    const diagramSwitcher = screen.getByRole('button', { name: '切换图表：Untitled flowchart' });
+    expect(diagramSwitcher.className).toContain('h-[44px]');
+    expect(diagramSwitcher.style.minHeight).toBe('var(--commercial-touch-target, 44px)');
+    const systemActions = screen.getByRole('button', { name: '系统操作：导出、主题、连线模式、语言、工作台' });
+    expect(systemActions.className).toContain('min-w-[44px]');
+    expect(systemActions.className).toContain('min-h-[44px]');
+    expect(systemActions.style.width).toBe('var(--commercial-touch-target, 44px)');
+    expect(systemActions.style.minHeight).toBe('var(--commercial-touch-target, 44px)');
     expect(screen.queryByRole('button', { name: '打开命令搜索' })).toBeNull();
   });
 
@@ -119,6 +165,9 @@ describe('ModernTopToolbar responsive layout', () => {
     expect(centerSection?.className).not.toContain('absolute');
     expect(centerSection?.className).toContain('flex-1');
     expect(screen.getByTestId('export-tools').getAttribute('data-show-controls')).toBe('true');
+    expect(screen.getByTestId('theme-selector').getAttribute('data-variant')).toBe('icon');
+    expect(screen.getByTestId('auth-status').getAttribute('data-commercial-touch-target')).toBe('false');
+    expect(screen.getByRole('link')).toBeTruthy();
   });
 
   it('exposes diagram switching and command search as keyboard-operable controls', async () => {
@@ -145,19 +194,25 @@ describe('ModernTopToolbar responsive layout', () => {
     breakpointState.md = false;
     renderToolbar();
 
-    const trigger = screen.getByRole('button', { name: '设置：连线模式、语言' });
+    const trigger = screen.getByRole('button', { name: '系统操作：导出、主题、连线模式、语言、工作台' });
     expect(trigger.getAttribute('aria-haspopup')).toBe('dialog');
     expect(trigger.getAttribute('aria-expanded')).toBe('false');
-    expect(screen.queryByRole('dialog', { name: '设置：连线模式、语言' })).toBeNull();
+    expect(screen.queryByRole('dialog', { name: '系统操作：导出、主题、连线模式、语言、工作台' })).toBeNull();
 
     fireEvent.click(trigger);
 
-    expect(await screen.findByRole('dialog', { name: '设置：连线模式、语言' })).toBeTruthy();
-    const edgeMode = screen.getByRole('combobox', { name: '连线模式' });
+    expect(await screen.findByRole('dialog', { name: '系统操作：导出、主题、连线模式、语言、工作台' })).toBeTruthy();
+    const exportTools = screen.getByTestId('export-tools');
+    expect(exportTools.getAttribute('data-variant')).toBe('inline');
+    expect(exportTools.getAttribute('data-commercial-touch-target')).toBe('true');
+    expect(screen.getByTestId('theme-selector').getAttribute('data-variant')).toBe('default');
+    expect(screen.getByTestId('theme-selector').getAttribute('data-borderless')).toBe('true');
+    expect(screen.getByRole('combobox', { name: '连线模式' })).toBeTruthy();
     expect(screen.getByRole('combobox', { name: '语言 / Language' })).toBeTruthy();
-    await waitFor(() => expect(document.activeElement).toBe(edgeMode));
+    expect(screen.getByRole('button', { name: '工作台' })).toBeTruthy();
+    await waitFor(() => expect(document.activeElement).toBe(exportTools));
 
-    fireEvent.keyDown(edgeMode, { key: 'Escape' });
+    fireEvent.keyDown(exportTools, { key: 'Escape' });
     await waitFor(() => {
       expect(trigger.getAttribute('aria-expanded')).toBe('false');
       expect(document.activeElement).toBe(trigger);

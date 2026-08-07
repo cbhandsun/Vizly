@@ -6,12 +6,23 @@ import ExportTools from '../ExportTools';
 import { EnhancedThemeSelector } from './EnhancedThemeSelector';
 import { LanguageSwitcher } from '../shared/LanguageSwitcher';
 import { AuthStatusCompact } from '../auth/AuthStatus';
-import { FaChevronDown, FaEllipsisV } from 'react-icons/fa';
+import { FaChevronDown, FaEllipsisV, FaHome } from 'react-icons/fa';
 import type { TopToolbarProps } from './TopToolbar';
 import { getToolbarPopupContainer, isToolbarEdgeMode } from './topToolbarGuards';
 import { DiagramTitleEditor } from './DiagramTitleEditor';
 
 export type { TopToolbarProps };
+
+const MOBILE_TOUCH_TARGET_STYLE: React.CSSProperties = {
+  minWidth: 'var(--commercial-touch-target, 44px)',
+  minHeight: 'var(--commercial-touch-target, 44px)',
+};
+
+const MOBILE_SQUARE_TOUCH_TARGET_STYLE: React.CSSProperties = {
+  ...MOBILE_TOUCH_TARGET_STYLE,
+  width: 'var(--commercial-touch-target, 44px)',
+  height: 'var(--commercial-touch-target, 44px)',
+};
 
 /**
  * ModernTopToolbar (Hyper-Glass V3.1 - Indestructible Layout)
@@ -55,8 +66,10 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
   const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/i.test(navigator.platform || '');
   const commandShortcutLabel = isMac ? '⌘K' : 'Ctrl+K';
 
-  const islandBaseClass = "flex items-center h-[40px] bg-white dark:bg-[#2d2d2d] border border-[rgba(0,0,0,0.12)] dark:border-[rgba(255,255,255,0.12)] rounded-[10px] shadow-[0_2px_8px_rgba(0,0,0,0.08)] transition-all duration-200 pointer-events-auto";
-  const moreSettingsLabel = `${t('common.settings', '设置')}：${t('header.edgeMode', '连线模式')}、${t('common.language', '语言')}`;
+  const islandBaseClass = `flex items-center ${isMobile ? 'min-h-[44px]' : 'h-[40px]'} bg-white dark:bg-[#2d2d2d] border border-[rgba(0,0,0,0.12)] dark:border-[rgba(255,255,255,0.12)] rounded-[10px] shadow-[0_2px_8px_rgba(0,0,0,0.08)] transition-all duration-200 pointer-events-auto`;
+  const moreSettingsLabel = isMobile
+    ? `${t('common.systemActions', '系统操作')}：${t('common.export', '导出')}、${t('common.theme', '主题')}、${t('header.edgeMode', '连线模式')}、${t('common.language', '语言')}、${t('designer.manage.title', '工作台')}`
+    : `${t('common.settings', '设置')}：${t('header.edgeMode', '连线模式')}、${t('common.language', '语言')}`;
   const diagramSwitcherLabel = title
     ? `${t('diagramViewer.switchDiagram', '切换图表')}：${title}`
     : t('diagramViewer.switchDiagram', '切换图表');
@@ -120,6 +133,39 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
       className="min-w-[220px] py-2 flex flex-col font-sans"
       onKeyDown={handleMoreContentKeyDown}
     >
+      {isMobile && showExport && (
+        <div className="px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">
+            {t('common.export', '导出')}
+          </div>
+          <ExportTools
+            diagramId={diagramId}
+            diagramName={diagramName ?? 'diagram'}
+            onToggleFullscreen={onToggleFullscreen}
+            isFullscreen={isFullscreen}
+            showControls={false}
+            variant="inline"
+            commercialTouchTarget
+          />
+        </div>
+      )}
+
+      {isMobile && showThemeSelector && (
+        <>
+          <div className="h-[1px] bg-slate-100 dark:bg-slate-800 mx-2 my-1" />
+          <div className="px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">
+              {t('common.theme', '主题')}
+            </div>
+            <EnhancedThemeSelector variant="default" borderless />
+          </div>
+        </>
+      )}
+
+      {isMobile && (showExport || showThemeSelector) && (
+        <div className="h-[1px] bg-slate-100 dark:bg-slate-800 mx-2 my-1" />
+      )}
+
       <div className="px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
         <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">
           {t('header.edgeMode', '连线模式')}
@@ -148,8 +194,43 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
         </div>
         <LanguageSwitcher ariaLabel={t('common.language', '语言 / Language')} />
       </div>
+
+      {isMobile && (
+        <>
+          <div className="h-[1px] bg-slate-100 dark:bg-slate-800 mx-2 my-1" />
+          <div className="px-4 py-2">
+            <button
+              type="button"
+              className="w-full min-h-[44px] flex items-center gap-2 px-3 appearance-none border-0 bg-transparent rounded-[6px] text-[13px] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors"
+              style={{ minHeight: 'var(--commercial-touch-target, 44px)' }}
+              onClick={() => {
+                setIsMoreOpen(false);
+                window.location.hash = '#/manage';
+              }}
+              aria-label={t('designer.manage.title', '工作台')}
+            >
+              <FaHome aria-hidden="true" />
+              <span>{t('designer.manage.title', '工作台')}</span>
+            </button>
+          </div>
+        </>
+      )}
     </div>
-  ), [edgeMode, handleMoreContentKeyDown, morePopoverId, moreSettingsLabel, onEdgeModeChange, t]);
+  ), [
+    diagramId,
+    diagramName,
+    edgeMode,
+    handleMoreContentKeyDown,
+    isFullscreen,
+    isMobile,
+    morePopoverId,
+    moreSettingsLabel,
+    onEdgeModeChange,
+    onToggleFullscreen,
+    showExport,
+    showThemeSelector,
+    t,
+  ]);
 
   return (
     <div
@@ -161,20 +242,20 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
       {/* ── LEFT SECTION: Brand + Project + Search (unified pill) ── */}
       <div className="flex-[0_1_auto] flex items-center min-w-0">
         <div className={`${islandBaseClass} gap-1 shrink-0`} style={{ paddingLeft: '14px', paddingRight: '14px' }}>
-          <a 
-            href="#/manage" 
-            className="flex items-center gap-2 px-1.5 py-1 rounded-[6px] hover:bg-black/5 dark:hover:bg-white/5 transition-all no-underline active:scale-95"
-            onClick={(e) => { e.preventDefault(); window.location.hash = '#/manage'; }}
-          >
-            <div className="w-[22px] h-[22px] bg-gradient-to-tr from-indigo-600 to-violet-500 rounded-md flex items-center justify-center shadow-sm">
-              <span className="text-[11px] font-black text-white italic">V</span>
-            </div>
-            {!isMobile && (
+          {!isMobile && (
+            <a
+              href="#/manage"
+              className="flex items-center gap-2 px-1.5 py-1 rounded-[6px] hover:bg-black/5 dark:hover:bg-white/5 transition-all no-underline active:scale-95"
+              onClick={(e) => { e.preventDefault(); window.location.hash = '#/manage'; }}
+            >
+              <div className="w-[22px] h-[22px] bg-gradient-to-tr from-indigo-600 to-violet-500 rounded-md flex items-center justify-center shadow-sm">
+                <span className="text-[11px] font-black text-white italic">V</span>
+              </div>
               <span className="text-[14.5px] font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-violet-500">
                 Vizly
               </span>
-            )}
-          </a>
+            </a>
+          )}
 
           {title && (
             <div className="flex items-center min-w-0">
@@ -206,7 +287,8 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
                     ref={diagramSwitcherTriggerRef}
                     type="button"
                     onClick={() => setIsDiagramSwitcherOpen((open) => !open)}
-                    className="flex items-center gap-1.5 px-2.5 h-[32px] appearance-none border-0 bg-transparent rounded-[6px] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] cursor-pointer transition-colors active:scale-[0.97] min-w-0 group"
+                    className={`flex items-center gap-1.5 px-2.5 appearance-none border-0 bg-transparent rounded-[6px] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] cursor-pointer transition-colors active:scale-[0.97] min-w-0 group ${isMobile ? 'h-[44px] min-h-[44px]' : 'h-[32px]'}`}
+                    style={isMobile ? { minHeight: 'var(--commercial-touch-target, 44px)' } : undefined}
                     aria-label={diagramSwitcherLabel}
                     aria-haspopup="dialog"
                     aria-expanded={isDiagramSwitcherOpen}
@@ -220,7 +302,11 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
                 </Tooltip>
               </Popover>
               {onRenameDiagram && (
-                <DiagramTitleEditor title={title} onRename={onRenameDiagram} />
+                <DiagramTitleEditor
+                  title={title}
+                  onRename={onRenameDiagram}
+                  commercialTouchTarget={isMobile}
+                />
               )}
             </div>
           )}
@@ -282,7 +368,7 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
           {rightChildren}
           
           <div className="flex items-center gap-0.5">
-            {showExport && (
+            {!isMobile && showExport && (
               <ExportTools
                 diagramId={diagramId}
                 diagramName={diagramName ?? 'diagram'}
@@ -304,7 +390,8 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
               <button
                 ref={moreTriggerRef}
                 type="button"
-                className="w-8 h-8 flex items-center justify-center appearance-none border-0 bg-transparent p-0 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] rounded-[6px] cursor-pointer text-slate-500 dark:text-slate-400 transition-colors"
+                className={`${isMobile ? 'w-[44px] min-w-[44px] h-[44px] min-h-[44px]' : 'w-8 h-8'} flex items-center justify-center appearance-none border-0 bg-transparent p-0 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] rounded-[6px] cursor-pointer text-slate-500 dark:text-slate-400 transition-colors`}
+                style={isMobile ? MOBILE_SQUARE_TOUCH_TARGET_STYLE : undefined}
                 aria-label={moreSettingsLabel}
                 aria-haspopup="dialog"
                 aria-expanded={isMoreOpen}
@@ -318,11 +405,14 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
 
           <div className="w-[1px] h-4 bg-slate-200/80 dark:bg-white/10 mx-0.5 flex-shrink-0" />
           <div className="flex items-center gap-1">
-            {showThemeSelector && (
+            {!isMobile && showThemeSelector && (
               <EnhancedThemeSelector variant="icon" />
             )}
-            <div className="w-7 h-7 rounded-full overflow-hidden border border-slate-200/50 dark:border-slate-700 flex-shrink-0 cursor-pointer active:scale-95">
-              <AuthStatusCompact />
+            <div
+              className={`${isMobile ? 'w-[44px] h-[44px]' : 'w-7 h-7'} rounded-full overflow-hidden border border-slate-200/50 dark:border-slate-700 flex-shrink-0 cursor-pointer active:scale-95`}
+              style={isMobile ? MOBILE_SQUARE_TOUCH_TARGET_STYLE : undefined}
+            >
+              <AuthStatusCompact commercialTouchTarget={isMobile} />
             </div>
           </div>
         </div>

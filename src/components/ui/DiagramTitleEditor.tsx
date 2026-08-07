@@ -6,11 +6,13 @@ import { useTranslation } from 'react-i18next';
 interface DiagramTitleEditorProps {
   title: string;
   onRename: (title: string) => Promise<void>;
+  commercialTouchTarget?: boolean;
 }
 
 export const DiagramTitleEditor: React.FC<DiagramTitleEditorProps> = ({
   title,
   onRename,
+  commercialTouchTarget = false,
 }) => {
   const { t } = useTranslation();
   const inputId = useId();
@@ -106,7 +108,13 @@ export const DiagramTitleEditor: React.FC<DiagramTitleEditorProps> = ({
           size="small"
           aria-label={t('diagramViewer.rename.action')}
           icon={<EditOutlined />}
-          className="w-8 h-8 p-0 flex items-center justify-center rounded-[6px] text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+          style={commercialTouchTarget ? {
+            width: 'var(--commercial-touch-target, 44px)',
+            minWidth: 'var(--commercial-touch-target, 44px)',
+            height: 'var(--commercial-touch-target, 44px)',
+            minHeight: 'var(--commercial-touch-target, 44px)',
+          } : undefined}
+          className={`${commercialTouchTarget ? 'w-[44px] min-w-[44px] h-[44px] min-h-[44px]' : 'w-8 h-8'} p-0 flex items-center justify-center rounded-[6px] text-slate-400 hover:text-slate-700 dark:hover:text-slate-200`}
         />
       </Tooltip>
     </Popover>
