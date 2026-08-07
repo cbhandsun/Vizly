@@ -1,5 +1,6 @@
 import type { Edge, Node } from '@xyflow/react';
 
+import { isEdgeMutationLocked } from './edgeMutationPolicy';
 import { isNodeMutationLocked } from './nodeLockPolicy';
 import {
   MAX_NODE_DESCRIPTION_LENGTH,
@@ -85,11 +86,6 @@ export const getFlowchartEdgeVisibleLabel = (edge: Edge): string => {
   const dataLabel = getEdgeData(edge).label;
   if (typeof dataLabel === 'string') return dataLabel;
   return typeof edge.label === 'string' ? edge.label : '';
-};
-
-const isEdgeMutationLocked = (edge: Edge): boolean => {
-  const data = getEdgeData(edge);
-  return data.locked === true || data.isLocked === true || edge.deletable === false;
 };
 
 export const buildFlowchartNodeSearchSignature = (node: Node): string => JSON.stringify([

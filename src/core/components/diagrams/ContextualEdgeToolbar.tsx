@@ -3,6 +3,10 @@ import { Edge } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import type { EdgeDataUpdate } from '../../types/diagram-updates';
 import {
+    coerceFlowchartReplaceText,
+    FLOWCHART_REPLACE_TEXT_MAX_LENGTH,
+} from './flowchartSearchReplace';
+import {
     LineOutlined,
     DashOutlined,
     PlayCircleOutlined,
@@ -54,12 +58,21 @@ export const ContextualEdgeToolbar: React.FC<ContextualEdgeToolbarProps> = ({ ed
     const [isEditingLabel, setIsEditingLabel] = useState(false);
     const [labelText, setLabelText] = useState(edge.label as string || '');
     const labelInputRef = useRef<HTMLInputElement>(null);
+    const labelTriggerRef = useRef<HTMLButtonElement>(null);
+    const restoreLabelTriggerFocusRef = useRef(false);
 
     useEffect(() => {
         if (isEditingLabel && labelInputRef.current) {
             labelInputRef.current.focus();
             labelInputRef.current.select();
         }
+    }, [isEditingLabel]);
+
+    useEffect(() => {
+        if (isEditingLabel || !restoreLabelTriggerFocusRef.current) return;
+        restoreLabelTriggerFocusRef.current = false;
+        const timer = window.setTimeout(() => labelTriggerRef.current?.focus(), 0);
+        return () => window.clearTimeout(timer);
     }, [isEditingLabel]);
 
     // 同步外部 edge.label 变更
@@ -135,12 +148,15 @@ export const ContextualEdgeToolbar: React.FC<ContextualEdgeToolbarProps> = ({ ed
     };
 
     const confirmLabel = () => {
-        onUpdateEdge(edge.id, { label: labelText || undefined });
+        const nextLabel = coerceFlowchartReplaceText(labelText);
+        restoreLabelTriggerFocusRef.current = true;
+        onUpdateEdge(edge.id, { label: nextLabel.trim() ? nextLabel : undefined });
         setIsEditingLabel(false);
     };
 
     const cancelLabel = () => {
         setLabelText(edge.label as string || '');
+        restoreLabelTriggerFocusRef.current = true;
         setIsEditingLabel(false);
     };
 
@@ -226,13 +242,14 @@ export const ContextualEdgeToolbar: React.FC<ContextualEdgeToolbarProps> = ({ ed
                     <input 
                         ref={labelInputRef}
                         value={labelText}
-                        onChange={e => setLabelText(e.target.value)}
+                        onChange={e => setLabelText(coerceFlowchartReplaceText(e.target.value))}
                         onKeyDown={e => {
                             if (e.key === 'Enter') confirmLabel();
                             if (e.key === 'Escape') cancelLabel();
                         }}
                         aria-label={t('edgeToolbar.labelInput')}
                         placeholder={t('edgeToolbar.labelPlaceholder')}
+                        maxLength={FLOWCHART_REPLACE_TEXT_MAX_LENGTH}
                         className="contextual-edge-toolbar-label-input"
                     />
                     <ToolbarButton icon={<CheckOutlined />} label={t('edgeToolbar.confirm')} onClick={confirmLabel} />
@@ -240,6 +257,7 @@ export const ContextualEdgeToolbar: React.FC<ContextualEdgeToolbarProps> = ({ ed
                 </div>
             ) : (
                 <ToolbarButton
+                    ref={labelTriggerRef}
                     icon={<EditOutlined />}
                     label={edge.label
                         ? t('edgeToolbar.currentLabel', { label: String(edge.label) })

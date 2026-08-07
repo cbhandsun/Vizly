@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { Node, Edge, MarkerType, EdgeMarkerType } from '@xyflow/react';
+import { Node, Edge } from '@xyflow/react';
 import { NodeDataUpdate, EdgeDataUpdate } from '../../../types/diagram-updates';
+import { planEdgeBatchUpdate } from '../edgeBatchUpdate';
 import { hasMutationLockedNode, resolveTargetNodes } from '../nodeLockPolicy';
 
 interface UseDesignerBatchUpdatesOptions {
@@ -117,56 +118,20 @@ export function useDesignerBatchUpdates({
     }, [takeSnapshot, updateNodesBatchCore]); // ✅ 移除 nodes 和 edges 依赖
 
     const updateEdgesBatch = useCallback((ids: string[], partialData: EdgeDataUpdate) => {
-        const idSet = new Set(ids);
-        setEdges(eds => {
-            const nextEdges = eds.map(e => {
-                if (idSet.has(e.id)) {
-                    const updated = { ...e };
+        const currentEdges = edgesRefForUpdate.current;
+        const plan = planEdgeBatchUpdate(currentEdges, ids, partialData);
+        if (plan.changedIds.length === 0) return;
 
-                    if (partialData.style) {
-                        updated.style = { ...updated.style, ...partialData.style };
-                    }
+        takeSnapshot(nodesRefForUpdate.current, currentEdges);
+        edgesRefForUpdate.current = plan.edges;
+        setEdges(plan.edges);
 
-                    if (partialData.markerEnd) {
-                        const currentMarker = updated.markerEnd;
-
-                        if (typeof partialData.markerEnd === 'string') {
-                            // Directly override with a simple marker id / type
-                            updated.markerEnd = partialData.markerEnd as EdgeMarkerType;
-                        } else {
-                            const baseMarker: Record<string, unknown> =
-                                typeof currentMarker === 'string'
-                                    ? { type: currentMarker }
-                                    : (currentMarker as Record<string, unknown>) || { type: MarkerType.ArrowClosed };
-
-                            const patch = partialData.markerEnd as Record<string, unknown>;
-
-                            updated.markerEnd = { ...baseMarker, ...patch } as EdgeMarkerType;
-                        }
-                    }
-
-                    if (partialData.data) {
-                        updated.data = { ...(updated.data || {}), ...partialData.data };
-                    }
-
-                    const { style: _style, data: _data, markerEnd: _markerEnd, ...rest } = partialData;
-                    return { ...updated, ...rest };
-                }
-                return e;
-            });
-
-            // Synchronize selection state
-            const updatedSelected = nextEdges.filter(e => idSet.has(e.id));
-            if (updatedSelected.length > 0) {
-                setSelectedEdges(current => current.map(se => {
-                    const findMatched = updatedSelected.find(ue => ue.id === se.id);
-                    return findMatched || se;
-                }));
-            }
-
-            return nextEdges; // Fix: Return the updated edges array
-        });
-    }, [setEdges, setSelectedEdges]);
+        const changedIds = new Set(plan.changedIds);
+        const changedEdges = plan.edges.filter(edge => changedIds.has(edge.id));
+        setSelectedEdges(current => current.map(selectedEdge => (
+            changedEdges.find(edge => edge.id === selectedEdge.id) ?? selectedEdge
+        )));
+    }, [setEdges, setSelectedEdges, takeSnapshot]);
 
     return { updateNodesBatch, updateEdgesBatch };
 }

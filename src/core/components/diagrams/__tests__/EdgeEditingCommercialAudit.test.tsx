@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { readFileSync } from 'node:fs';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { Edge } from '@xyflow/react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -49,6 +49,42 @@ describe('edge editing commercial audit regressions', () => {
         expect(screen.getByRole('textbox', { name: 'edgeToolbar.labelInput' })).toBeTruthy();
         expect(screen.getByRole('button', { name: 'edgeToolbar.confirm' })).toBeTruthy();
         expect(screen.getByRole('button', { name: 'edgeToolbar.cancel' })).toBeTruthy();
+    });
+
+    it('returns focus to the label trigger after confirming or cancelling', async () => {
+        const onUpdateEdge = vi.fn();
+        render(<ContextualEdgeToolbar edge={{ ...createEdge(), label: 'Original' }} onUpdateEdge={onUpdateEdge} />);
+        const getTrigger = () => screen.getByRole('button', { name: 'edgeToolbar.currentLabel' });
+
+        fireEvent.click(getTrigger());
+        const input = screen.getByRole('textbox', { name: 'edgeToolbar.labelInput' });
+        expect(document.activeElement).toBe(input);
+        fireEvent.change(input, { target: { value: 'Updated\u0000' } });
+        fireEvent.keyDown(input, { key: 'Enter' });
+
+        await waitFor(() => expect(document.activeElement).toBe(getTrigger()));
+        expect(onUpdateEdge).toHaveBeenCalledWith('edge-1', { label: 'Updated' });
+
+        fireEvent.click(getTrigger());
+        fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Discarded' } });
+        fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Escape' });
+
+        await waitFor(() => expect(document.activeElement).toBe(getTrigger()));
+        expect(onUpdateEdge).toHaveBeenCalledTimes(1);
+    });
+
+    it('bounds direct label input and emits an explicit clear update', () => {
+        const onUpdateEdge = vi.fn();
+        render(<ContextualEdgeToolbar edge={{ ...createEdge(), label: 'Original' }} onUpdateEdge={onUpdateEdge} />);
+        fireEvent.click(screen.getByRole('button', { name: 'edgeToolbar.currentLabel' }));
+        const input = screen.getByRole('textbox', { name: 'edgeToolbar.labelInput' });
+
+        fireEvent.change(input, { target: { value: 'x'.repeat(1_200) } });
+        expect((input as HTMLInputElement).value).toBe('x'.repeat(1_000));
+        fireEvent.change(input, { target: { value: '   ' } });
+        fireEvent.click(screen.getByRole('button', { name: 'edgeToolbar.confirm' }));
+
+        expect(onUpdateEdge).toHaveBeenCalledWith('edge-1', { label: undefined });
     });
 
     it('gives every edge property control a field-specific accessible name', () => {

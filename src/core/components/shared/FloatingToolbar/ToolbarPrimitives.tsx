@@ -66,12 +66,12 @@ export interface ToolbarButtonProps {
     style?: React.CSSProperties;
 }
 
-export const ToolbarButton: React.FC<ToolbarButtonProps> = ({
+export const ToolbarButton = React.forwardRef<HTMLButtonElement, ToolbarButtonProps>(({
     icon, label, onClick,
     active = false, disabled = false, danger = false,
     color, badge, placement = 'top',
     className = '', style,
-}) => {
+}, ref) => {
     const cls = [
         'floating-toolbar-btn',
         active && 'floating-toolbar-btn--active',
@@ -83,6 +83,7 @@ export const ToolbarButton: React.FC<ToolbarButtonProps> = ({
     return (
         <Tooltip title={label} placement={placement} mouseEnterDelay={0.5}>
             <button
+                ref={ref}
                 className={cls}
                 onClick={disabled ? undefined : onClick}
                 style={{ ...style, ...(color ? { color } : {}) }}
@@ -95,7 +96,9 @@ export const ToolbarButton: React.FC<ToolbarButtonProps> = ({
             </button>
         </Tooltip>
     );
-};
+});
+
+ToolbarButton.displayName = 'ToolbarButton';
 
 // ─── ToolbarColorSwatch ───────────────────────────────────────────────────────
 export interface ToolbarColorSwatchProps {
