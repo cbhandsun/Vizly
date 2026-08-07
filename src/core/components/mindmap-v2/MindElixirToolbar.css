@@ -84,3 +84,59 @@
     cursor: default;
     user-select: none;
 }
+
+.mind-map-theme-menu {
+    width: min(184px, calc(100vw - 16px));
+    margin: 0 8px 0 0;
+    padding: 6px;
+    list-style: none;
+    border: 1px solid;
+    border-radius: 10px;
+}
+
+.mind-map-theme-menu-item {
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr) 16px;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: var(--commercial-touch-target, 44px);
+    padding: 4px 10px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    font: inherit;
+    text-align: left;
+}
+
+.mind-map-theme-menu-item:hover,
+.mind-map-theme-menu-item:focus-visible {
+    background: rgba(99, 102, 241, 0.09);
+    outline: 2px solid rgba(99, 102, 241, 0.48);
+    outline-offset: -2px;
+}
+
+.mind-map-theme-menu-item.is-selected {
+    background: rgba(99, 102, 241, 0.12);
+    font-weight: 600;
+}
+
+.mind-map-theme-menu-swatch {
+    width: 24px;
+    height: 24px;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    border-radius: 6px;
+}
+
+.mind-map-theme-menu-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mind-map-theme-menu-check {
+    color: #6366f1;
+    font-size: 12px;
+}

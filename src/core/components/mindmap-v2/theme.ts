@@ -144,9 +144,9 @@ export const VIZLY_THEMES: Record<string, Theme> = {
 };
 
 export const VIZLY_THEME_OPTIONS = [
-    { key: 'indigo', label: '💜 靛蓝',   theme: VIZLY_HYPER_THEME },
-    { key: 'ocean',  label: '🩵 海洋',   theme: VIZLY_OCEAN_THEME },
-    { key: 'emerald',label: '💚 翡翠',   theme: VIZLY_EMERALD_THEME },
-    { key: 'rose',   label: '🌹 玫瑰',   theme: VIZLY_ROSE_THEME },
-    { key: 'dark',   label: '🌙 深色',   theme: VIZLY_HYPER_DARK_THEME },
+    { key: 'indigo', label: '靛蓝',   theme: VIZLY_HYPER_THEME },
+    { key: 'ocean',  label: '海洋',   theme: VIZLY_OCEAN_THEME },
+    { key: 'emerald',label: '翡翠',   theme: VIZLY_EMERALD_THEME },
+    { key: 'rose',   label: '玫瑰',   theme: VIZLY_ROSE_THEME },
+    { key: 'dark',   label: '深色',   theme: VIZLY_HYPER_DARK_THEME },
 ];

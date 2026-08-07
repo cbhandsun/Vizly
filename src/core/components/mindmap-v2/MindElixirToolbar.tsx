@@ -23,7 +23,6 @@ import {
     UndoOutlined,
     RedoOutlined,
     ExportOutlined,
-    BgColorsOutlined,
     PlusOutlined,
     DownloadOutlined,
     AimOutlined,
@@ -41,7 +40,6 @@ import {
     RobotOutlined,
     DeploymentUnitOutlined,
     AppstoreOutlined,
-    CheckOutlined,
     HistoryOutlined,
     OrderedListOutlined,
     UnorderedListOutlined,
@@ -50,7 +48,7 @@ import { useTranslation } from 'react-i18next';
 import type { MindElixirInstance } from 'mind-elixir';
 import { getMindElixirInstance, subscribeMindElixir, setPresentationState, toggleKanban, subscribeKanban, toggleAIPanel, subscribeAIPanel } from './mindElixirStore';
 import { countNodes, getTreeDepth } from './migrate';
-import { VIZLY_THEME_OPTIONS, VIZLY_THEMES } from './theme';
+import { VIZLY_THEMES } from './theme';
 import { usePresentationMode } from './MindMapPresentationMode';
 import { emitOpenSearch } from './mindmapSearchStore';
 import { emitToggleOutline } from './mindmapOutlineStore';
@@ -75,6 +73,7 @@ import { useMindElixirImportActions } from './useMindElixirImportActions';
 import { useMindElixirExportActions } from './useMindElixirExportActions';
 import { useMindElixirCanvasPreferences } from './useMindElixirCanvasPreferences';
 import MindMapToolbarIconButton from './MindMapToolbarIconButton';
+import { MindMapThemeSelector } from './MindMapThemeSelector';
 import { useMindMapFocusMode } from './useMindMapFocusMode';
 import { getViewportPopupContainer } from '../ui/viewportOverlayPortal';
 import { appMessage } from '@/core/utils/antdStaticBridge';
@@ -407,40 +406,12 @@ const MindElixirToolbar: React.FC = () => {
             <Divider orientation="vertical" style={{ height: 16, margin: '0 2px' }} />
 
             {/* Theme selector */}
-            <Dropdown
+            <MindMapThemeSelector
+                activeThemeKey={activeThemeKey}
                 open={openMenu === 'theme'}
                 onOpenChange={open => setOpenMenu(open ? 'theme' : null)}
-                menu={{
-                    items: VIZLY_THEME_OPTIONS.map(opt => ({
-                        key: opt.key,
-                        label: (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <div style={{
-                                    width: 20, height: 20, borderRadius: 5,
-                                    background: opt.theme.cssVar['--main-bgcolor'],
-                                    flexShrink: 0,
-                                }} />
-                                <span>{opt.label}</span>
-                                {opt.key === activeThemeKey && (
-                                    <CheckOutlined aria-hidden="true" style={{ marginLeft: 'auto', color: '#6366f1', fontSize: 11 }} />
-                                )}
-                            </div>
-                        ),
-                        onClick: () => handleThemeChange(opt.key),
-                    })),
-                }}
-                placement="bottomLeft"
-                getPopupContainer={getViewportPopupContainer}
-                trigger={['click']}
-            >
-                <MindMapToolbarIconButton
-                    aria-expanded={openMenu === 'theme'}
-                    aria-haspopup="menu"
-                    icon={<BgColorsOutlined />}
-                    label={`切换主题，当前${VIZLY_THEME_OPTIONS.find(option => option.key === activeThemeKey)?.label ?? activeThemeKey}`}
-                    style={{ color: VIZLY_THEMES[activeThemeKey]?.palette[0] ?? '#6366f1' }}
-                />
-            </Dropdown>
+                onThemeChange={handleThemeChange}
+            />
 
             <Divider orientation="vertical" style={{ height: 16, margin: '0 2px' }} />
 
