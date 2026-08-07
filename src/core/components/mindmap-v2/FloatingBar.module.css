@@ -178,46 +178,114 @@
     font-size: 10px;
 }
 
-.shapeGrid {
+.shapePopover {
+    width: min(292px, calc(100vw - 24px));
+    box-sizing: border-box;
+    padding: 14px;
+    border: 1px solid rgba(148, 163, 184, 0.24);
+    border-radius: 12px;
+    background: #111827;
+    box-shadow: 0 18px 42px rgba(15, 23, 42, 0.34);
+}
+
+.shapeHeader {
     display: flex;
-    gap: 5px;
-    padding: 4px;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 12px;
+    color: rgba(255, 255, 255, 0.92);
+    font-size: 13px;
+}
+
+.shapeHeader span {
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 10px;
+    font-weight: 400;
+    white-space: nowrap;
+}
+
+.shapeGrid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
 }
 
 .shapeBtn {
-    width: 32px;
-    height: 32px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 14px;
-    text-align: center;
-    display: flex;
-    flex-direction: column;
+    position: relative;
+    width: 100%;
+    min-height: 52px;
+    box-sizing: border-box;
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr) 16px;
     align-items: center;
-    justify-content: center;
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    gap: 8px;
+    padding: 8px 9px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 10px;
+    cursor: pointer;
+    text-align: left;
     background: rgba(255, 255, 255, 0.05);
-    color: rgba(255, 255, 255, 0.7);
-    transition: all 0.15s;
+    color: rgba(255, 255, 255, 0.76);
+    transition: border-color 0.12s, background 0.12s, transform 0.12s;
 }
 
-.shapeBtn:hover {
-    background: rgba(255, 255, 255, 0.1);
+.shapeBtn:hover:not(:disabled) {
+    border-color: rgba(165, 180, 252, 0.62);
+    background: rgba(99, 102, 241, 0.14);
+    transform: translateY(-1px);
+}
+
+.shapeBtn:disabled {
+    cursor: progress;
+    opacity: 0.7;
 }
 
 .shapeBtnActive {
-    border: 2px solid #6366f1;
-    background: rgba(99, 102, 241, 0.2);
+    border-color: #818cf8;
+    background: rgba(99, 102, 241, 0.22);
+    box-shadow: inset 0 0 0 1px rgba(165, 180, 252, 0.28);
+    color: #e0e7ff;
+}
+
+.shapeIcon {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #c7d2fe;
+    font-size: 17px;
+}
+
+.shapeText {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.shapeText strong {
+    font-size: 12px;
+    font-weight: 650;
+}
+
+.shapeText small {
+    overflow: hidden;
+    color: rgba(255, 255, 255, 0.46);
+    font-size: 9px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.shapeSelectedMark {
     color: #a5b4fc;
+    font-size: 13px;
 }
 
-.shapePreview {
+.shapeTriggerIcon {
     font-size: 14px;
-}
-
-.shapeLabel {
-    font-size: 8px;
-    opacity: 0.6;
 }
 
 .notePopover {

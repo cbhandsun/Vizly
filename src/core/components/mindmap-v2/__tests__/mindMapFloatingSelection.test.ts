@@ -1,7 +1,11 @@
 import type { Topic } from 'mind-elixir';
 import { describe, expect, it, vi } from 'vitest';
 
-import { resolveSelectedMindMapTopic } from '../mindMapFloatingSelection';
+import {
+    resolveSelectedMindMapTopic,
+    resolveMindMapNodeAfterSelectionSettles,
+    restoreCurrentMindMapSelectionAfterMutation,
+} from '../mindMapFloatingSelection';
 
 const topicWithSelectedState = (selected: boolean): Topic => ({
     classList: { contains: vi.fn(() => selected) },
@@ -57,5 +61,45 @@ describe('resolveSelectedMindMapTopic', () => {
             container: selectionContainer(),
             findEle: () => { throw new Error('missing'); },
         }, 'node-1')).toBeNull();
+    });
+
+    it('republishes the selected duplicate after a canvas mutation settles', async () => {
+        const selectedTopic = topicWithSelectedState(true);
+        Object.assign(selectedTopic, { dataset: { nodeid: 'copy-1' } });
+        const selectNodes = vi.fn();
+        const fire = vi.fn();
+        const copiedNode = { id: 'copy-1', topic: 'Copy' };
+
+        await expect(restoreCurrentMindMapSelectionAfterMutation({
+            currentNode: selectedTopic,
+            container: selectionContainer(selectedTopic),
+            findEle: () => selectedTopic,
+            getData: () => ({ nodeData: copiedNode }),
+            selectNodes,
+            bus: { fire },
+        })).resolves.toEqual(copiedNode);
+
+        expect(selectNodes).toHaveBeenCalledTimes(3);
+        expect(fire).toHaveBeenCalledWith('selectNodes', [copiedNode]);
+    });
+
+    it('waits through transient empty selection frames before clearing the toolbar', async () => {
+        const selectedTopic = topicWithSelectedState(true);
+        Object.assign(selectedTopic, { dataset: { nodeid: 'copy-1' } });
+        const querySelector = vi.fn()
+            .mockReturnValueOnce(null)
+            .mockReturnValueOnce(null)
+            .mockReturnValueOnce(selectedTopic);
+        const copiedNode = { id: 'copy-1', topic: 'Copy' };
+
+        await expect(resolveMindMapNodeAfterSelectionSettles({
+            currentNode: null,
+            container: { querySelector },
+            findEle: () => null,
+            getData: () => ({ nodeData: copiedNode }),
+            selectNodes: vi.fn(),
+            bus: { fire: vi.fn() },
+        })).resolves.toEqual(copiedNode);
+        expect(querySelector).toHaveBeenCalledTimes(3);
     });
 });

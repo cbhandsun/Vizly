@@ -70,6 +70,7 @@ import { useMindElixirFileDrop } from './useMindElixirFileDrop';
 import type { FlowDataBridgeEntry } from '../../utils/flowDataBridge';
 import { loadMindElixirData, saveMindElixirData } from './mindElixirPersistence';
 import { scheduleMindMapInitialViewport } from './mindmapInitialViewport';
+import { setActiveMindMapSelection } from './mindMapSelectionStore';
 
 function isMindMapTextEditingTarget(target: EventTarget | null): boolean {
     if (!(target instanceof HTMLElement)) return false;
@@ -320,14 +321,17 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
         const handleSelectNodes = (nodes: NodeObj[]) => {
             const nodeObj = nodes[0] ?? null;
             setSelectedNode(nodeObj);
+            setActiveMindMapSelection(nodeObj);
             onNodeSelect?.(nodeObj);
         };
         const handleSelectNewNode = (nodeObj: NodeObj) => {
             setSelectedNode(nodeObj);
+            setActiveMindMapSelection(nodeObj);
             onNodeSelect?.(nodeObj);
         };
         const handleUnselectNodes = () => {
             setSelectedNode(null);
+            setActiveMindMapSelection(null);
             onNodeSelect?.(null);
         };
         mind.bus.addListener('selectNodes', handleSelectNodes);
@@ -379,6 +383,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
             mindRef.current = null;
             setInstance(null);
             setSelectedNode(null);
+            setActiveMindMapSelection(null);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []); // intentionally empty — only init once

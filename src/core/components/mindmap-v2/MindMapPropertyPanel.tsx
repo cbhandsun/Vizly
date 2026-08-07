@@ -24,7 +24,6 @@ import { toSafeExternalUrl, toSafeImageUrl } from '../../utils/sanitizeHtml';
 import { getImageFileImportError, IMAGE_DATA_URL_IMPORT_MAX_BYTES } from '../../utils/fileImportGuards';
 import {
     cleanMindMapColor,
-    cleanMindMapNodePatch,
     cleanMindMapTagObjects,
 } from './mindmapNodePatchSecurity';
 import {
@@ -51,6 +50,8 @@ import {
     TASK_PRIORITY_OPTIONS,
     TASK_STATUS_OPTIONS,
 } from './mindMapPropertyPanelOptions';
+import { updateMindMapNodePatchAndRestoreSelection } from './mindMapNodeMutation';
+import { useMindMapPropertySelection } from './useMindMapPropertySelection';
 
 const { Text } = Typography;
 const { TextArea } = Input;
@@ -124,8 +125,13 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
         if (!mind) return;
         try {
             const tpcEl = mind.findEle(node.id);
-            const cleanPatch = cleanMindMapNodePatch(patch as Partial<NodeObj> & Record<string, unknown>);
-            if (tpcEl) mind.reshapeNode(tpcEl, { ...node, ...cleanPatch } as NodeObj);
+            if (!tpcEl) return;
+            void updateMindMapNodePatchAndRestoreSelection(
+                mind,
+                tpcEl,
+                node,
+                patch as Partial<NodeObj> & Record<string, unknown>,
+            ).catch(logMindmapPropertyReshapeFailure);
         } catch (e) { logMindmapPropertyReshapeFailure(e); }
     }, [mind, node]);
 
@@ -665,25 +671,10 @@ interface MindMapPropertyPanelProps {
 }
 
 const MindMapPropertyPanel: React.FC<MindMapPropertyPanelProps> = ({ activeTheme, onThemeChange }) => {
-    const [selectedNode, setSelectedNode] = useState<NodeObj | null>(null);
     const [, setTick] = useState(0);
     useEffect(() => subscribeMindElixir(() => setTick(t => t + 1)), []);
     const mind = getMindElixirInstance();
-
-    useEffect(() => {
-        if (!mind) return;
-        const onSelectNodes = (nodes: NodeObj[]) => setSelectedNode(nodes[0] ?? null);
-        const onSelectNewNode = (n: NodeObj) => setSelectedNode(n);
-        const onUnselect = () => setSelectedNode(null);
-        mind.bus.addListener('selectNodes', onSelectNodes);
-        mind.bus.addListener('selectNewNode', onSelectNewNode);
-        mind.bus.addListener('unselectNodes', onUnselect);
-        return () => {
-            mind.bus.removeListener('selectNodes', onSelectNodes);
-            mind.bus.removeListener('selectNewNode', onSelectNewNode);
-            mind.bus.removeListener('unselectNodes', onUnselect);
-        };
-    }, [mind]);
+    const selectedNode = useMindMapPropertySelection(mind);
 
     return (
         <div style={{ height: '100%', overflowY: 'auto' }}>

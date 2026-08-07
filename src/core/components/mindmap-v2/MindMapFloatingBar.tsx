@@ -6,7 +6,7 @@
  *  - 覆盖 90% 高频操作：添加子/兄弟、颜色、折叠/展开、删除
  *  - 无需打开侧边属性面板或右键菜单
  */
-import React, { useEffect, useLayoutEffect, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useState, useRef } from 'react';
 import { Tooltip, Popover, Input } from 'antd';
 import type { NodeObj, Topic } from 'mind-elixir';
 import { getMindElixirInstance, subscribeMindElixir } from './mindElixirStore';
@@ -23,19 +23,19 @@ import { MindMapNoteEditorPanel } from './MindMapNoteEditorPanel';
 import { updateMindMapNoteAndRestoreSelection } from './mindMapNoteMutation';
 import { MindMapBranchColorPicker } from './MindMapBranchColorPicker';
 import { updateMindMapBranchColorAndRestoreSelection } from './mindMapBranchColorMutation';
-import { resolveSelectedMindMapTopic } from './mindMapFloatingSelection';
+import { MindMapNodeShapeControl } from './MindMapNodeShapeControl';
+import { updateMindMapNodePatchAndRestoreSelection } from './mindMapNodeMutation';
+import {
+    restoreCurrentMindMapSelectionAfterMutation,
+} from './mindMapFloatingSelection';
+import { useMindMapFloatingSelection } from './useMindMapFloatingSelection';
 import styles from './FloatingBar.module.css';
 
 // ─── Position tracking ────────────────────────────────────────────────────────
-interface BarPos { x: number; y: number; nodeId: string; }
 type ExtendedMindMapNode = NodeObj & {
     shapeClass?: string;
     boundary?: { color: string; title: string };
 };
-interface LegacyUnselectBus {
-    addListener: (type: 'unselectNode', handler: () => void) => void;
-    removeListener: (type: 'unselectNode', handler: () => void) => void;
-}
 
 const errorMessage = (error: unknown, fallback: string): string =>
     error instanceof Error && error.message ? error.message : fallback;
@@ -45,7 +45,6 @@ const MindMapFloatingBar: React.FC = () => {
     const [mind, setMind] = useState(getMindElixirInstance);
     useEffect(() => subscribeMindElixir(() => setMind(getMindElixirInstance())), []);
 
-    const [pos, setPos] = useState<BarPos | null>(null);
     const [colorOpen, setColorOpen] = useState(false);
     const [shapeOpen, setShapeOpen] = useState(false);
     const [noteOpen, setNoteOpen] = useState(false);
@@ -59,92 +58,15 @@ const MindMapFloatingBar: React.FC = () => {
     const barRef = useRef<HTMLDivElement>(null);
     const colorTriggerRef = useRef<HTMLButtonElement>(null);
     const noteTriggerRef = useRef<HTMLButtonElement>(null);
-    const selectedNodeIdRef = useRef<string | null>(null);
     const [barWidth, setBarWidth] = useState(0);
 
-
-    // ── Listen to selectNode / selectNodes events ────────────────────────────
-    useEffect(() => {
-        if (!mind) return;
-
-        const onSelect = (nodes: NodeObj[] | null) => {
-            const node = nodes?.[0] ?? null;
-            if (!node) {
-                // reshapeNode can publish an empty selection even though the
-                // refreshed topic remains selected in the DOM. Treat that as
-                // a transient render event instead of dismissing the toolbar.
-                if (resolveSelectedMindMapTopic(mind, selectedNodeIdRef.current)) return;
-                selectedNodeIdRef.current = null;
-                setPos(null); setColorOpen(false); setShapeOpen(false); setNoteOpen(false); setAiOpen(false);
-                return;
-            }
-            selectedNodeIdRef.current = node.id;
-            // Find the DOM element for the selected node to get its bounding rect
-            try {
-                const tpcEl = mind.findEle(node.id);
-                if (!tpcEl) { setPos(null); return; }
-                const rect = (tpcEl as HTMLElement).getBoundingClientRect();
-                setPos({
-                    x: rect.left + rect.width / 2,
-                    y: rect.top - 8,        // 8px above the node
-                    nodeId: node.id,
-                });
-            } catch (error) {
-                logMindMapFloatingActionFailure('selectPosition', error);
-                setPos(null);
-            }
-        };
-
-        const onDeselect = () => {
-            // Mind Elixir briefly emits an unselect event while reshapeNode
-            // re-renders a selected topic. Keep the bar mounted when the DOM
-            // still marks that topic as selected; a genuine canvas deselect
-            // clears the marker before this handler runs.
-            if (resolveSelectedMindMapTopic(mind, selectedNodeIdRef.current)) return;
-            selectedNodeIdRef.current = null;
-            setPos(null); setColorOpen(false); setShapeOpen(false); setNoteOpen(false); setAiOpen(false);
-        };
-        const onSelectNewNode = (node: NodeObj) => onSelect([node]);
-        const legacyBus = mind.bus as unknown as LegacyUnselectBus;
-
-        // mind-elixir v5: fires 'selectNodes' (array) and 'selectNewNode'
-        mind.bus.addListener('selectNodes', onSelect);
-        mind.bus.addListener('selectNewNode', onSelectNewNode);
-        // Clicking canvas background fires 'unselectNodes'
-        mind.bus.addListener('unselectNodes', onDeselect);
-        legacyBus.addListener('unselectNode', onDeselect);
-        // When map refreshes, deselect
-        mind.bus.addListener('operation', () => {
-            // Delay to let DOM update, then refresh position
-            setTimeout(() => {
-                const currentNode = resolveSelectedMindMapTopic(mind, selectedNodeIdRef.current);
-                if (!currentNode) { setPos(null); return; }
-                const nodeId = currentNode.dataset?.nodeid ?? '';
-                if (!nodeId) { setPos(null); return; }
-                const rect = currentNode.getBoundingClientRect();
-                setPos({ x: rect.left + rect.width / 2, y: rect.top - 8, nodeId });
-            }, 50);
-        });
-
-        // A data refresh can remount this React overlay after Mind Elixir has
-        // already published its selection event. Hydrate from the instance's
-        // scoped selected topic so the toolbar does not disappear after a
-        // successful note save or clear.
-        const existingTopic = resolveSelectedMindMapTopic(mind, null);
-        const existingNodeId = existingTopic?.dataset?.nodeid ?? '';
-        if (existingNodeId) {
-            const existingNode = findNodeById(mind.getData().nodeData, existingNodeId);
-            if (existingNode) onSelect([existingNode]);
-        }
-
-        return () => {
-            mind.bus.removeListener('selectNodes', onSelect);
-            mind.bus.removeListener('selectNewNode', onSelectNewNode);
-            mind.bus.removeListener('unselectNodes', onDeselect);
-            legacyBus.removeListener('unselectNode', onDeselect);
-        };
-    }, [mind]);
-
+    const closeSelectionOverlays = useCallback(() => {
+        setColorOpen(false); setShapeOpen(false); setNoteOpen(false); setAiOpen(false);
+    }, []);
+    const {
+        position: pos,
+        refreshForNode: refreshFloatingBarForNode,
+    } = useMindMapFloatingSelection(mind, closeSelectionOverlays);
     useLayoutEffect(() => {
         const bar = barRef.current;
         if (!pos || !bar) return;
@@ -192,14 +114,6 @@ const MindMapFloatingBar: React.FC = () => {
         }
     };
 
-    const refreshFloatingBarForNode = (nodeId: string) => {
-        const refreshedTopic = mind.findEle(nodeId);
-        if (!refreshedTopic) return;
-        const rect = refreshedTopic.getBoundingClientRect();
-        selectedNodeIdRef.current = nodeId;
-        setPos({ x: rect.left + rect.width / 2, y: rect.top - 8, nodeId });
-    };
-
     const commitNote = async (note: string | undefined, action: 'clearNote' | 'saveNote') => {
         try {
             const tpc = getTpc();
@@ -233,19 +147,28 @@ const MindMapFloatingBar: React.FC = () => {
         closeBranchColorPicker(true);
     };
 
+    const commitNodeShape = async (shapeClass: string | undefined) => {
+        try {
+            const tpc = getTpc();
+            if (tpc) {
+                const result = await updateMindMapNodePatchAndRestoreSelection(
+                    mind,
+                    tpc,
+                    obj,
+                    { shapeClass },
+                );
+                if (result.restored) refreshFloatingBarForNode(obj.id);
+            }
+        } catch (error) {
+            logMindMapFloatingActionFailure('setShapeClass', error);
+        }
+    };
+
     const extendedObj = obj as ExtendedMindMapNode;
 
     const isRoot = pos.nodeId === mind.getData()?.nodeData?.id;
     const hasChildren = (obj.children?.length ?? 0) > 0;
     const isExpanded = obj.expanded !== false;
-
-    const SHAPES = [
-        { key: '',          label: '默认', preview: '▭' },
-        { key: 'oval',      label: '椭圆', preview: '◡' },
-        { key: 'rect',      label: '矩形', preview: '□' },
-        { key: 'underline', label: '下划线', preview: '□̲' },
-        { key: 'diamond',   label: '菱形', preview: '◇' },
-    ];
 
     const act = (fn: () => void) => { fn(); setColorOpen(false); setShapeOpen(false); setAiOpen(false); };
 
@@ -404,6 +327,23 @@ const MindMapFloatingBar: React.FC = () => {
         });
     };
 
+    const handleDuplicate = () => {
+        const tpc = getTpc();
+        if (!tpc) return;
+        setColorOpen(false);
+        setShapeOpen(false);
+        setAiOpen(false);
+        void (async () => {
+            try {
+                await mind.copyNode(tpc, tpc);
+                const restoredNode = await restoreCurrentMindMapSelectionAfterMutation(mind);
+                if (restoredNode) refreshFloatingBarForNode(restoredNode.id);
+            } catch (error) {
+                logMindMapFloatingActionFailure('duplicateNode', error);
+            }
+        })();
+    };
+
     const resolvedBarWidth = barWidth || Math.min(window.innerWidth - 16, 320);
 
     return (
@@ -511,14 +451,7 @@ const MindMapFloatingBar: React.FC = () => {
             {/* Duplicate — not for root */}
             {!isRoot && (
                 <Btn icon="📋" tip="复制为同级 (Ctrl+D)"
-                    onClick={() => act(() => {
-                        try {
-                            const tpc = getTpc();
-                            if (tpc) mind.copyNode(tpc, tpc);
-                        } catch (error) {
-                            logMindMapFloatingActionFailure('duplicateNode', error);
-                        }
-                    })} />
+                    onClick={handleDuplicate} />
             )}
 
             <Div />
@@ -581,45 +514,19 @@ const MindMapFloatingBar: React.FC = () => {
             </Popover>
 
             {/* Shape quick picker */}
-            <Popover
+            <MindMapNodeShapeControl
                 open={shapeOpen}
-                onOpenChange={v => { setShapeOpen(v); if (v) setColorOpen(false); }}
-                trigger="click"
-                placement="top"
-                arrow={false}
-                content={
-                    <div className={styles.shapeGrid}>
-                        {SHAPES.map(({ key, label, preview }) => {
-                            const current = extendedObj.shapeClass ?? '';
-                            return (
-                                <button type="button" key={key || 'default'}
-                                    title={label}
-                                    aria-label={`节点形状：${label}`}
-                                    className={`${styles.shapeBtn} ${current === key ? styles.shapeBtnActive : ''}`}
-                                    onClick={() => {
-                                        try {
-                                            const tpc = getTpc();
-                                            if (tpc) reshapeNodePatch(tpc, obj, { shapeClass: key || undefined });
-                                        } catch (error) {
-                                            logMindMapFloatingActionFailure('setShapeClass', error);
-                                        }
-                                        setShapeOpen(false);
-                                    }}
-                                >
-                                    <div className={styles.shapePreview}>{preview}</div>
-                                    <div className={styles.shapeLabel}>{label}</div>
-                                </button>
-                            );
-                        })}
-                    </div>
-                }
-            >
-                <Tooltip title="节点形状">
-                    <button type="button" className={styles.btn} aria-label="节点形状" title="节点形状" onClick={() => { setShapeOpen(v => !v); setColorOpen(false); }}>
-                        <span aria-hidden="true" style={{ fontSize: 13 }}>◇</span>
-                    </button>
-                </Tooltip>
-            </Popover>
+                currentShape={extendedObj.shapeClass}
+                onOpenChange={v => {
+                    setShapeOpen(v);
+                    if (v) {
+                        setColorOpen(false);
+                        setNoteOpen(false);
+                        setAiOpen(false);
+                    }
+                }}
+                onSelect={commitNodeShape}
+            />
 
             {/* Note quick edit */}
             <Popover
