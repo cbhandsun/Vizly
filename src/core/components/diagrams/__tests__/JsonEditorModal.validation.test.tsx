@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { JsonEditorModal } from '../JsonEditorModal';
@@ -87,6 +87,19 @@ afterAll(() => vi.unstubAllGlobals());
 beforeEach(() => vi.clearAllMocks());
 
 describe('JsonEditorModal validation feedback', () => {
+    const runPendingFocusFrames = () => {
+        const pendingFrames: FrameRequestCallback[] = [];
+        vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+            pendingFrames.push(callback);
+            return pendingFrames.length;
+        });
+        return () => {
+            while (pendingFrames.length > 0) {
+                pendingFrames.shift()?.(0);
+            }
+        };
+    };
+
     it('keeps invalid JSON visible and explains the failure inside the dialog', async () => {
         render(
             <JsonEditorModal
@@ -181,8 +194,12 @@ describe('JsonEditorModal validation feedback', () => {
     });
 
     it('asks before discarding an edited JSON draft', async () => {
+        const flushFocusFrames = runPendingFocusFrames();
         modalMocks.confirm.mockClear();
         const onClose = vi.fn();
+        const trigger = document.createElement('button');
+        trigger.setAttribute('data-json-editor-focus-return', '');
+        document.body.appendChild(trigger);
         render(
             <JsonEditorModal
                 visible
@@ -204,11 +221,44 @@ describe('JsonEditorModal validation feedback', () => {
         expect(modalMocks.confirm).toHaveBeenCalledWith(expect.objectContaining({
             zIndex: 2200,
             title: '放弃未应用的修改？',
+            autoFocusButton: 'cancel',
             okButtonProps: { danger: true },
         }));
 
         const confirmConfig = modalMocks.confirm.mock.calls[0]?.[0] as { onOk?: () => void };
         confirmConfig.onOk?.();
         expect(onClose).toHaveBeenCalledTimes(1);
+        act(flushFocusFrames);
+        expect(document.activeElement).toBe(trigger);
+        trigger.remove();
+    });
+
+    it('restores the document action trigger after a clean close', async () => {
+        const flushFocusFrames = runPendingFocusFrames();
+        const onClose = vi.fn();
+        const trigger = document.createElement('button');
+        trigger.setAttribute('data-json-editor-focus-return', '');
+        document.body.appendChild(trigger);
+
+        render(
+            <JsonEditorModal
+                visible
+                onClose={onClose}
+                nodes={[]}
+                edges={[]}
+                setNodes={vi.fn()}
+                setEdges={vi.fn()}
+                reactFlowInstance={{ fitView: vi.fn() }}
+                initialContent="{}"
+            />,
+        );
+
+        await screen.findByRole('textbox', { name: 'JSON 基础编辑器' });
+        fireEvent.click(screen.getByRole('button', { name: /取\s*消/ }));
+
+        expect(onClose).toHaveBeenCalledTimes(1);
+        act(flushFocusFrames);
+        expect(document.activeElement).toBe(trigger);
+        trigger.remove();
     });
 });

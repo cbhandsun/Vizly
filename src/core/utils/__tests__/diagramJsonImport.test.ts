@@ -82,6 +82,38 @@ describe('diagramJsonImport', () => {
         expect(Object.prototype).not.toHaveProperty('polluted');
     });
 
+    it('keeps exported groups when coercing JSON editor content', () => {
+        const diagram = coerceStandardDiagramImport({
+            name: 'Imported',
+            type: 'flowchart',
+            version: '1.0.0',
+            nodes: [{
+                id: 'child',
+                description: 'Child',
+                domain: 'ops',
+                parentId: 'group-1',
+                metadata: { canvasPosition: { x: 24, y: 32 }, parentId: 'group-1' },
+            }],
+            edges: [],
+            groups: [{
+                id: 'group-1',
+                type: 'group',
+                description: 'Operations',
+                domain: 'ops',
+                position: { x: 300, y: 120 },
+                measured: { width: 600, height: 400 },
+                metadata: { canvasPosition: { x: 300, y: 120 } },
+                data: { label: 'Operations' },
+            }],
+        }, { id: 'fallback', title: 'Fallback' });
+
+        expect(diagram.groups?.[0]).toMatchObject({
+            id: 'group-1',
+            position: { x: 300, y: 120 },
+            measured: { width: 600, height: 400 },
+        });
+    });
+
     it('coerces React Flow imports through clipboard guards', () => {
         const canvas = coerceReactFlowImport(JSON.parse(`{
             "nodes": [{

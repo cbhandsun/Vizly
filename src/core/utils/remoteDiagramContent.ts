@@ -1,4 +1,7 @@
-import { coerceToStandardDiagramDataWithReport } from './coerceDiagram';
+import {
+    coerceToStandardDiagramDataWithReport,
+    MAX_STANDARD_DIAGRAM_GROUPS,
+} from './coerceDiagram';
 
 const MAX_REMOTE_DIAGRAM_JSON_CHARS = 5 * 1024 * 1024;
 const MAX_REMOTE_NODES = 5_000;
@@ -69,6 +72,9 @@ export const coerceRemoteDiagramContent = (content: unknown, fallback: { id: str
     }
     if (Array.isArray(content.edges) && content.edges.length > MAX_REMOTE_EDGES) {
         throw new Error('Remote diagram contains too many edges');
+    }
+    if (Array.isArray(content.groups) && content.groups.length > MAX_STANDARD_DIAGRAM_GROUPS) {
+        throw new Error('Remote diagram contains too many groups');
     }
 
     const sanitized = sanitizeRemoteJson(content);

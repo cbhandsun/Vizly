@@ -12,6 +12,7 @@ vi.mock('../../layout/LayoutOptimizer', () => ({
 
 import type { StandardDiagramData } from '../../../models/DiagramModels';
 import { canvasToPureStandardData, canvasToStandardData, standardDataToCanvas } from '../designerUtils';
+import { coerceStandardDiagramImport } from '../../../utils/diagramJsonImport';
 
 const makeDiagram = (): StandardDiagramData => ({
     id: 'diagram-1',
@@ -81,5 +82,42 @@ describe('standardDataToCanvas', () => {
         expect(standard.edges[0]).toMatchObject({ type: 'main', label: 'Self' });
         expect(pure.nodes[0]).not.toHaveProperty('metadata.canvasPosition');
         expect(pure.edges[0].data).toEqual({ constraints: { keep: true } });
+    });
+
+    it('preserves group and child coordinates through the JSON editor import boundary', async () => {
+        const nodes: Node[] = [
+            {
+                id: 'group-1',
+                type: 'titleGroup',
+                position: { x: 400, y: 200 },
+                measured: { width: 640, height: 420 },
+                data: { label: 'Operations', domain: 'ops' },
+            },
+            {
+                id: 'child-1',
+                type: 'flowchart',
+                parentId: 'group-1',
+                position: { x: 35, y: 55 },
+                measured: { width: 160, height: 80 },
+                data: { label: 'Pick order', domain: 'ops' },
+            },
+        ];
+
+        const exported = canvasToStandardData(nodes, [], 'Round trip');
+        const imported = coerceStandardDiagramImport(JSON.parse(JSON.stringify(exported)), {
+            id: 'fallback',
+            title: 'Fallback',
+        });
+        const restored = await standardDataToCanvas(imported);
+
+        expect(restored.nodes.find(node => node.id === 'group-1')).toMatchObject({
+            type: 'titleGroup',
+            position: { x: 400, y: 200 },
+        });
+        expect(restored.nodes.find(node => node.id === 'child-1')).toMatchObject({
+            parentId: 'group-1',
+            position: { x: 35, y: 55 },
+        });
+        expect(restored.nodes.filter(node => node.id === 'group-1')).toHaveLength(1);
     });
 });

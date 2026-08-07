@@ -61,5 +61,13 @@ describe('remoteDiagramContent', () => {
             id: 'fallback',
             title: 'Fallback',
         })).toThrow('too many nodes');
+
+        expect(() => parseRemoteDiagramContent({
+            ...makeRemoteDiagram(),
+            groups: Array.from({ length: 2001 }, (_, index) => ({ id: `group-${index}` })),
+        }, {
+            id: 'fallback',
+            title: 'Fallback',
+        })).toThrow('too many groups');
     });
 });

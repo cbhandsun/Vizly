@@ -1,4 +1,11 @@
-import type { StandardDiagramData, StandardEdgeData, StandardNodeData, ThemeMetadata, LayoutMetadata } from '../models/DiagramModels';
+import type {
+  GroupNodeData,
+  LayoutMetadata,
+  StandardDiagramData,
+  StandardEdgeData,
+  StandardNodeData,
+  ThemeMetadata,
+} from '../models/DiagramModels';
 
 export type CoerceIssueLevel = 'warn' | 'error';
 
@@ -25,6 +32,7 @@ const coerceDescription = (value: unknown): string => {
 
 const MAX_STANDARD_DIAGRAM_NODES = 5_000;
 const MAX_STANDARD_DIAGRAM_EDGES = 10_000;
+export const MAX_STANDARD_DIAGRAM_GROUPS = 2_000;
 const MAX_STANDARD_DIAGRAM_ID_CHARS = 256;
 const MAX_STANDARD_DIAGRAM_TEXT_CHARS = 20_000;
 const MAX_STANDARD_DIAGRAM_DEPTH = 10;
@@ -98,6 +106,50 @@ const coerceNode = (node: unknown, index: number): StandardNodeData | null => {
   return { ...safeNode, id, description: desc, domain, type, data: nodeData } as StandardNodeData;
 };
 
+const coerceFiniteNumber = (value: unknown, fallback: number, min: number, max: number): number => (
+  typeof value === 'number' && Number.isFinite(value)
+    ? Math.min(max, Math.max(min, value))
+    : fallback
+);
+
+const coerceGroup = (group: unknown, index: number): GroupNodeData | null => {
+  const safeGroup = sanitizeRecord(group);
+  if (!safeGroup) return null;
+
+  const id = coerceSafeIdentifier(safeGroup.id, `group-${index}`);
+  const data = sanitizeRecord(safeGroup.data) ?? {};
+  const metadata = sanitizeRecord(safeGroup.metadata) ?? {};
+  const rawPosition = sanitizeRecord(safeGroup.position);
+  const rawCanvasPosition = sanitizeRecord(metadata.canvasPosition) ?? rawPosition;
+  const position = {
+    x: coerceFiniteNumber(rawPosition?.x, 0, -10_000_000, 10_000_000),
+    y: coerceFiniteNumber(rawPosition?.y, 0, -10_000_000, 10_000_000),
+  };
+  const canvasPosition = {
+    x: coerceFiniteNumber(rawCanvasPosition?.x, position.x, -10_000_000, 10_000_000),
+    y: coerceFiniteNumber(rawCanvasPosition?.y, position.y, -10_000_000, 10_000_000),
+  };
+  const rawMeasured = sanitizeRecord(safeGroup.measured);
+  const measured = {
+    width: coerceFiniteNumber(rawMeasured?.width, 400, 1, 1_000_000),
+    height: coerceFiniteNumber(rawMeasured?.height, 300, 1, 1_000_000),
+  };
+
+  return {
+    ...safeGroup,
+    id,
+    description: coerceDescription(
+      safeGroup.description ?? safeGroup.label ?? data.description ?? data.label
+    ).slice(0, MAX_STANDARD_DIAGRAM_TEXT_CHARS),
+    domain: coerceBoundedString(safeGroup.domain ?? data.domain, 'default'),
+    type: coerceBoundedString(safeGroup.type, 'group'),
+    data,
+    metadata: { ...metadata, canvasPosition },
+    position,
+    measured,
+  } as GroupNodeData;
+};
+
 const coerceEdge = (edge: unknown, index: number, nodeIds: Set<string>): StandardEdgeData | null => {
   const safeEdge = sanitizeRecord(edge);
   if (!safeEdge) return null;
@@ -146,10 +198,12 @@ export const coerceToStandardDiagramDataWithReport = (
 
   const nodesRaw = Array.isArray(raw.nodes) ? raw.nodes.slice(0, MAX_STANDARD_DIAGRAM_NODES) : [];
   const edgesRaw = Array.isArray(raw.edges) ? raw.edges.slice(0, MAX_STANDARD_DIAGRAM_EDGES) : [];
+  const groupsRaw = Array.isArray(raw.groups) ? raw.groups.slice(0, MAX_STANDARD_DIAGRAM_GROUPS) : [];
 
   const nodes = nodesRaw.map(coerceNode).filter(Boolean) as StandardNodeData[];
   const nodeIds = new Set(nodes.map(node => node.id));
   const edges = edgesRaw.map((edge, index) => coerceEdge(edge, index, nodeIds)).filter(Boolean) as StandardEdgeData[];
+  const groups = groupsRaw.map(coerceGroup).filter(Boolean) as GroupNodeData[];
 
   if (!(typeof raw.name === 'string' && raw.name) && !(typeof raw.title === 'string' && raw.title) && !(typeof rawMetadata?.title === 'string' && rawMetadata.title)) {
     issues.push({ level: 'warn', message: 'missing name/title' });
@@ -191,6 +245,12 @@ export const coerceToStandardDiagramDataWithReport = (
     if (dropped > 0) issues.push({ level: 'warn', message: `edges dropped (missing or unknown source/target): ${dropped}` });
   }
 
+  if (raw.groups !== undefined && !Array.isArray(raw.groups)) {
+    issues.push({ level: 'warn', message: 'groups is not an array' });
+  } else if (Array.isArray(raw.groups) && raw.groups.length > MAX_STANDARD_DIAGRAM_GROUPS) {
+    issues.push({ level: 'warn', message: `groups truncated to ${MAX_STANDARD_DIAGRAM_GROUPS}` });
+  }
+
   const version = coerceBoundedString(raw.version, '1.0.0');
   const layout = isPlainRecord(raw.layout) ? ({ ...defaultLayout(), ...raw.layout } as LayoutMetadata) : defaultLayout();
   const theme = isPlainRecord(raw.theme) ? ({ ...defaultTheme(), ...raw.theme } as ThemeMetadata) : defaultTheme();
@@ -204,6 +264,7 @@ export const coerceToStandardDiagramDataWithReport = (
     version,
     nodes,
     edges,
+    ...(Array.isArray(raw.groups) ? { groups } : {}),
     layout,
     theme,
     ...(metadata ? { metadata } : {}),

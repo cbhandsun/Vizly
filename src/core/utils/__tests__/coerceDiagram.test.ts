@@ -95,4 +95,70 @@ describe('coerceDiagram', () => {
     ]);
     expect(Object.prototype).not.toHaveProperty('safe-node');
   });
+
+  it('preserves bounded groups and their saved canvas geometry', () => {
+    const report = coerceToStandardDiagramDataWithReport({
+      nodes: [{
+        id: 'child',
+        description: 'Child',
+        domain: 'ops',
+        parentId: 'group-1',
+        metadata: { canvasPosition: { x: 25, y: 35 }, parentId: 'group-1' },
+      }],
+      edges: [],
+      groups: [{
+        id: 'group-1',
+        type: 'group',
+        description: 'Operations',
+        domain: 'ops',
+        position: { x: 400, y: 200 },
+        measured: { width: 640, height: 420 },
+        metadata: { canvasPosition: { x: 410, y: 210 } },
+        data: { label: 'Operations' },
+      }],
+    }, { id: 'fallback', title: 'Fallback' });
+
+    expect(report.diagram.groups).toEqual([
+      expect.objectContaining({
+        id: 'group-1',
+        position: { x: 400, y: 200 },
+        measured: { width: 640, height: 420 },
+        metadata: expect.objectContaining({ canvasPosition: { x: 410, y: 210 } }),
+      }),
+    ]);
+    expect(report.issues).not.toContainEqual(expect.objectContaining({ message: 'groups is not an array' }));
+  });
+
+  it('sanitizes malformed group geometry and rejects dangerous group identifiers', () => {
+    const diagram = coerceToStandardDiagramData({
+      nodes: [],
+      edges: [],
+      groups: [{
+        id: 'constructor',
+        type: 'group',
+        position: { x: Number.POSITIVE_INFINITY, y: 'bad' },
+        measured: { width: 0, height: 2_000_000 },
+        metadata: { canvasPosition: { x: -20_000_000, y: null } },
+      }],
+    }, { id: 'fallback', title: 'Fallback' });
+
+    expect(diagram.groups).toEqual([
+      expect.objectContaining({
+        id: 'group-0',
+        position: { x: 0, y: 0 },
+        measured: { width: 1, height: 1_000_000 },
+        metadata: expect.objectContaining({ canvasPosition: { x: -10_000_000, y: 0 } }),
+      }),
+    ]);
+  });
+
+  it('drops non-array groups with an explicit report issue', () => {
+    const report = coerceToStandardDiagramDataWithReport({ nodes: [], edges: [], groups: {} }, {
+      id: 'fallback',
+      title: 'Fallback',
+    });
+
+    expect(report.diagram.groups).toBeUndefined();
+    expect(report.issues).toContainEqual({ level: 'warn', message: 'groups is not an array' });
+  });
 });

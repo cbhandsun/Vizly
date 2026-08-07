@@ -28,6 +28,15 @@ export interface JsonEditorModalProps {
 }
 
 type JsonApplyMode = 'canvas-only' | 'persist';
+const JSON_EDITOR_FOCUS_RETURN_SELECTOR = '[data-json-editor-focus-return]';
+
+const restoreJsonEditorTriggerFocus = () => {
+    window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
+            document.querySelector<HTMLButtonElement>(JSON_EDITOR_FOCUS_RETURN_SELECTOR)?.focus();
+        });
+    });
+};
 
 /**
  * JSON 编辑器模态框
@@ -191,18 +200,23 @@ export const JsonEditorModal: React.FC<JsonEditorModalProps> = ({
         if (success) setHasUnsavedChanges(false);
     };
 
+    const closeEditor = useCallback(() => {
+        setHasUnsavedChanges(false);
+        onClose();
+        restoreJsonEditorTriggerFocus();
+    }, [onClose]);
+
     // Save and close
     const handleSave = async () => {
         const success = await applyJsonContentToCanvas(getActiveContent(), 'persist');
         if (success) {
-            setHasUnsavedChanges(false);
-            onClose();
+            closeEditor();
         }
     };
 
     const requestClose = useCallback(() => {
         if (!hasUnsavedChanges) {
-            onClose();
+            closeEditor();
             return;
         }
         appModal.confirm({
@@ -211,13 +225,11 @@ export const JsonEditorModal: React.FC<JsonEditorModalProps> = ({
             content: t('designer.jsonEditor.discardContent'),
             okText: t('designer.jsonEditor.discardConfirm'),
             cancelText: t('designer.jsonEditor.keepEditing'),
+            autoFocusButton: 'cancel',
             okButtonProps: { danger: true },
-            onOk: () => {
-                setHasUnsavedChanges(false);
-                onClose();
-            },
+            onOk: closeEditor,
         });
-    }, [hasUnsavedChanges, onClose, t]);
+    }, [closeEditor, hasUnsavedChanges, t]);
 
     // Derived content based on format mode
     const editorDisplayContent = useMemo(() => {
