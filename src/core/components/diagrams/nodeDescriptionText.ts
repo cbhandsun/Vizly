@@ -1,4 +1,4 @@
-const MAX_NODE_DESCRIPTION_LENGTH = 10_000;
+export const MAX_NODE_DESCRIPTION_LENGTH = 10_000;
 
 const decodeHtmlEntity = (entity: string): string => {
   const named: Record<string, string> = {

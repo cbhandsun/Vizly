@@ -1,6 +1,10 @@
 import type { Node } from '@xyflow/react';
 
 import { isNodeMutationLocked } from './nodeLockPolicy';
+import {
+  MAX_NODE_DESCRIPTION_LENGTH,
+  normalizeNodeDescriptionForEditing,
+} from './nodeDescriptionText';
 
 export const FLOWCHART_SEARCH_QUERY_MAX_LENGTH = 240;
 export const FLOWCHART_REPLACE_TEXT_MAX_LENGTH = 1_000;
@@ -42,9 +46,44 @@ const replaceLiteralIgnoreCase = (
     replacement: string,
 ): string => label.replace(new RegExp(escapeRegExp(query), 'giu'), () => replacement);
 
+const escapeHtmlText = (value: string): string => value.replace(/[&<>"']/g, character => ({
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#39;',
+}[character] as string));
+
+const getNodeLabel = (node: Node): string => (
+  typeof node.data?.label === 'string' ? node.data.label : ''
+);
+
+const getNodeVisibleDescription = (node: Node): string => normalizeNodeDescriptionForEditing(
+  node.data?.description,
+);
+
+export const buildFlowchartNodeSearchSignature = (node: Node): string => JSON.stringify([
+  getNodeLabel(node),
+  getNodeVisibleDescription(node),
+  typeof node.data?.domain === 'string' ? node.data.domain : '',
+  node.id,
+]);
+
+export const flowchartNodeMatchesSearch = (node: Node, rawQuery: unknown): boolean => {
+  const query = coerceFlowchartSearchText(rawQuery).trim().toLocaleLowerCase();
+  if (!query) return false;
+  return [
+    getNodeLabel(node),
+    getNodeVisibleDescription(node),
+    typeof node.data?.domain === 'string' ? node.data.domain : '',
+    node.id,
+  ].some(value => value.toLocaleLowerCase().includes(query));
+};
+
 /**
- * Plans a label-only replacement without mutating the input nodes.
- * Search may match metadata, but this operation intentionally edits labels only.
+ * Plans a visible node-text replacement without mutating the input nodes.
+ * Rich descriptions are normalized to bounded plain text before replacement so
+ * user input remains literal and cannot become executable markup.
  */
 export const planFlowchartLabelReplacement = (
     nodes: readonly Node[],
@@ -77,8 +116,11 @@ export const planFlowchartLabelReplacement = (
     const nextNodes = nodes.map((node) => {
         if (!targetIdSet.has(node.id)) return node;
 
-        const label = typeof node.data?.label === 'string' ? node.data.label : '';
-        if (!matcher.test(label)) {
+        const label = getNodeLabel(node);
+        const description = getNodeVisibleDescription(node);
+        const labelMatches = matcher.test(label);
+        const descriptionMatches = matcher.test(description);
+        if (!labelMatches && !descriptionMatches) {
             ignoredNonLabelMatchIds.push(node.id);
             return node;
         }
@@ -87,15 +129,27 @@ export const planFlowchartLabelReplacement = (
             return node;
         }
 
-        const unboundedLabel = replaceLiteralIgnoreCase(label, query, replacement);
-        if (!unboundedLabel.trim()) {
+        const unboundedLabel = labelMatches
+          ? replaceLiteralIgnoreCase(label, query, replacement)
+          : label;
+        const unboundedDescription = descriptionMatches
+          ? replaceLiteralIgnoreCase(description, query, replacement)
+          : description;
+        const nextVisibleText = description ? unboundedDescription : unboundedLabel;
+        if (!nextVisibleText.trim()) {
             skippedBlankIds.push(node.id);
             return node;
         }
 
         const nextLabel = unboundedLabel.slice(0, FLOWCHART_REPLACE_TEXT_MAX_LENGTH);
-        if (nextLabel === label) return node;
-        if (nextLabel.length < unboundedLabel.length) truncatedIds.push(node.id);
+        const nextDescription = unboundedDescription.slice(0, MAX_NODE_DESCRIPTION_LENGTH);
+        const labelChanged = nextLabel !== label;
+        const descriptionChanged = descriptionMatches && nextDescription !== description;
+        if (!labelChanged && !descriptionChanged) return node;
+        if (
+          nextLabel.length < unboundedLabel.length
+          || nextDescription.length < unboundedDescription.length
+        ) truncatedIds.push(node.id);
         changedIds.push(node.id);
 
         return {
@@ -103,6 +157,7 @@ export const planFlowchartLabelReplacement = (
             data: {
                 ...node.data,
                 label: nextLabel,
+                ...(descriptionChanged ? { description: escapeHtmlText(nextDescription) } : {}),
             },
         };
     });

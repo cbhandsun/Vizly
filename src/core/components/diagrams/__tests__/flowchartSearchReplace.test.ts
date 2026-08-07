@@ -44,12 +44,50 @@ describe('flowchartSearchReplace', () => {
     expect(result.nodes[0].data.label).toBe('Cost $&10 + $&10');
   });
 
-  it('ignores metadata-only matches because replacement edits labels only', () => {
+  it('replaces visible rich-text descriptions and preserves a safe multiline presentation', () => {
     const result = planFlowchartLabelReplacement(nodes, ['node-2'], 'alpha', 'Gamma');
 
-    expect(result.nodes).toEqual(nodes);
+    expect(result.changedIds).toEqual(['node-2']);
+    expect(result.nodes[1]).toEqual({
+      ...nodes[1],
+      data: { label: 'Beta', description: 'Gamma in description', meta: 2 },
+    });
+    expect(result.ignoredNonLabelMatchIds).toEqual([]);
+  });
+
+  it('updates imported rich descriptions without allowing replacement markup to execute', () => {
+    const source = [{
+      ...nodes[0],
+      data: {
+        label: '物流订单中心',
+        description: '<b>物流订单中心</b><br/>• 拆分物流单',
+      },
+    }];
+    const result = planFlowchartLabelReplacement(
+      source,
+      ['node-1'],
+      '物流',
+      '<img src=x onerror=alert(1)>运输',
+    );
+
+    expect(result.changedIds).toEqual(['node-1']);
+    expect(result.nodes[0].data.label).toBe('<img src=x onerror=alert(1)>运输订单中心');
+    expect(result.nodes[0].data.description).toBe(
+      '&lt;img src=x onerror=alert(1)&gt;运输订单中心\n• 拆分&lt;img src=x onerror=alert(1)&gt;运输单',
+    );
+  });
+
+  it('ignores matches that exist only in domain metadata or the node id', () => {
+    const source = [{
+      ...nodes[0],
+      id: 'alpha-node',
+      data: { label: 'Visible', domain: 'alpha-domain' },
+    }];
+    const result = planFlowchartLabelReplacement(source, ['alpha-node'], 'alpha', 'Gamma');
+
+    expect(result.nodes).toEqual(source);
     expect(result.changedIds).toEqual([]);
-    expect(result.ignoredNonLabelMatchIds).toEqual(['node-2']);
+    expect(result.ignoredNonLabelMatchIds).toEqual(['alpha-node']);
   });
 
   it('skips locked and non-draggable nodes', () => {

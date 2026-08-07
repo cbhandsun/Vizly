@@ -2,6 +2,7 @@
 
 import { readFileSync } from 'node:fs';
 import React from 'react';
+import type { Node } from '@xyflow/react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -43,7 +44,7 @@ describe('CanvasSearchBar', () => {
         setCenterMock.mockReset();
     });
 
-    it('exposes named search, replace, navigation, and close controls', () => {
+    it('exposes named search, replace, navigation, and close controls', async () => {
         render(
             <CanvasSearchBar
                 visible
@@ -78,7 +79,9 @@ describe('CanvasSearchBar', () => {
             target: { value: 'Shape' },
         });
         expect(screen.getByRole('button', { name: '替换当前匹配' })).toBeTruthy();
-        expect(screen.getByRole('button', { name: '全部替换，共 1 个可修改标签' })).toBeTruthy();
+        expect(screen.getByRole('button', { name: '全部替换，共 1 个可修改节点文本' })).toBeTruthy();
+        await waitFor(() => expect(document.activeElement)
+            .toBe(screen.getByRole('textbox', { name: '替换为' })));
     });
 
     it('keeps the mobile search below the second toolbar row with touch-sized actions', () => {
@@ -192,7 +195,7 @@ describe('CanvasSearchBar', () => {
         expect(featureLayerSource).toContain('onReplaceVisibleChange={search.onReplaceVisibleChange}');
     });
 
-    it('requires confirmation before replacing all eligible labels', () => {
+    it('requires confirmation before replacing all eligible node text and restores input focus', async () => {
         const nodes = [{
             id: 'node-1',
             position: { x: 10, y: 20 },
@@ -220,14 +223,16 @@ describe('CanvasSearchBar', () => {
         fireEvent.change(screen.getByRole('textbox', { name: '替换为' }), {
             target: { value: 'Square' },
         });
-        fireEvent.click(screen.getByRole('button', { name: '全部替换，共 1 个可修改标签' }));
+        fireEvent.click(screen.getByRole('button', { name: '全部替换，共 1 个可修改节点文本' }));
 
         expect(onReplaceAll).not.toHaveBeenCalled();
-        expect(screen.getByText('替换 1 个节点标签？')).toBeTruthy();
+        expect(screen.getByText('替换 1 个节点文本？')).toBeTruthy();
         expect(readFileSync('src/core/components/diagrams/CanvasSearchBar.tsx', 'utf8'))
             .toMatch(/placement="bottomRight"\s+autoAdjustOverflow=\{false\}\s+zIndex=\{2600\}\s+getPopupContainer=\{\(\) => document\.body\}/);
         fireEvent.click(screen.getByRole('button', { name: '确认替换' }));
         expect(onReplaceAll).toHaveBeenCalledWith(['node-1'], 'circle', 'Square');
+        await waitFor(() => expect(document.activeElement)
+            .toBe(screen.getByRole('textbox', { name: '替换为' })));
     });
 
     it('disables replacement and explains why a matching node is protected', () => {
@@ -254,9 +259,65 @@ describe('CanvasSearchBar', () => {
         });
 
         expect(screen.getByRole('button', { name: '替换当前匹配' })).toHaveProperty('disabled', true);
-        expect(screen.getByRole('button', { name: '全部替换，共 0 个可修改标签' })).toHaveProperty('disabled', true);
+        expect(screen.getByRole('button', { name: '全部替换，共 0 个可修改节点文本' })).toHaveProperty('disabled', true);
         expect(screen.getByRole('status', { name: '替换操作状态' }).textContent)
             .toBe('当前结果已锁定，不会被替换');
+    });
+
+    it('restores replacement focus and resynchronizes results after an external undo', async () => {
+        const originalNodes: Node[] = [
+            {
+                id: 'node-1',
+                position: { x: 10, y: 20 },
+                data: {
+                    label: '物流订单中心',
+                    description: '<b>物流订单中心</b><br/>• 拆分物流单',
+                },
+            },
+            {
+                id: 'node-2',
+                position: { x: 30, y: 40 },
+                data: { label: '物流追踪平台' },
+            },
+        ];
+        const SearchUndoHarness = () => {
+            const [nodes, setNodes] = React.useState(originalNodes);
+            const replace = (ids: string[], query: string, replacement: string) => {
+                const result = planFlowchartLabelReplacement(nodes, ids, query, replacement);
+                setNodes(result.nodes);
+                return result;
+            };
+            return (
+                <>
+                    <button type="button" onClick={() => setNodes(originalNodes)}>撤销替换</button>
+                    <CanvasSearchBar
+                        visible
+                        replaceVisible
+                        onClose={vi.fn()}
+                        nodes={nodes}
+                        onReplaceNode={(id, query, replacement) => replace([id], query, replacement)}
+                        onReplaceAll={replace}
+                    />
+                </>
+            );
+        };
+        render(<SearchUndoHarness />);
+        const searchInput = screen.getByRole('textbox', { name: '搜索画布节点' });
+        const replacementInput = screen.getByRole('textbox', { name: '替换为' });
+        fireEvent.change(searchInput, { target: { value: '物流' } });
+        fireEvent.change(replacementInput, { target: { value: '运输' } });
+
+        fireEvent.click(screen.getByRole('button', { name: '替换当前匹配' }));
+
+        await waitFor(() => expect(document.activeElement).toBe(replacementInput));
+        expect(screen.getByRole('status', { name: '替换操作状态' }).textContent)
+            .toBe('已替换 1 个节点文本');
+
+        fireEvent.click(screen.getByRole('button', { name: '撤销替换' }));
+
+        await waitFor(() => expect(screen.queryByRole('status', { name: '替换操作状态' })).toBeNull());
+        expect(document.activeElement).toBe(replacementInput);
+        expect(screen.getAllByRole('status').some(status => status.textContent === '1/2')).toBe(true);
     });
 
     it('escapes imported node ids before composing highlight selectors', () => {
