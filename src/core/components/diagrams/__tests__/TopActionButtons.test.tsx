@@ -35,6 +35,8 @@ vi.mock('react-i18next', () => ({
             'designer.toolbar.unlockCanvas': '解锁画布',
             'designer.toolbar.operationHistory': '操作历史',
             'designer.toolbar.versionHistory': '版本快照',
+            'designer.toolbar.fileGroup': '文件操作',
+            'designer.toolbar.viewGroup': '视图控制',
         }[key] ?? key)),
     }),
 }));
@@ -162,6 +164,48 @@ describe('TopActionButtons document menu', () => {
         const saveItem = await screen.findByRole('menuitem', { name: '保存到云端' });
         expect(saveItem).toBeTruthy();
         expect(await screen.findByRole('menuitem', { name: /演示模式/ })).toBeTruthy();
+        expect(screen.getByText('文件操作')).toBeTruthy();
+        expect(screen.getByText('视图控制')).toBeTruthy();
+    });
+
+    it('names both menus and associates each trigger with its controlled menu', async () => {
+        render(
+            <TopActionButtons
+                disablePortal
+                onSaveToCloud={vi.fn().mockResolvedValue(undefined)}
+                onStartPresentation={vi.fn()}
+            />,
+        );
+
+        const saveTrigger = screen.getByRole('button', { name: '保存选项' });
+        fireEvent.click(saveTrigger);
+        const saveMenu = await screen.findByRole('menu', { name: '保存选项' });
+        expect(saveMenu.id).toBeTruthy();
+        expect(saveTrigger.getAttribute('aria-controls')).toBe(saveMenu.id);
+
+        fireEvent.keyDown(saveMenu, { key: 'Escape' });
+        const documentTrigger = screen.getByRole('button', { name: '文档操作' });
+        fireEvent.click(documentTrigger);
+        const documentMenu = await screen.findByRole('menu', { name: '文档操作' });
+        expect(documentMenu.id).toBeTruthy();
+        expect(documentTrigger.getAttribute('aria-controls')).toBe(documentMenu.id);
+    });
+
+    it('suppresses the trigger tooltip while the document menu is open', async () => {
+        render(
+            <TopActionButtons
+                disablePortal
+                onStartPresentation={vi.fn()}
+            />,
+        );
+
+        const trigger = screen.getByRole('button', { name: '文档操作' });
+        fireEvent.mouseEnter(trigger);
+        await waitFor(() => expect(trigger.classList.contains('ant-tooltip-open')).toBe(true));
+
+        fireEvent.click(trigger);
+        await screen.findByRole('menu', { name: '文档操作' });
+        await waitFor(() => expect(trigger.classList.contains('ant-tooltip-open')).toBe(false));
     });
 
     it('exposes stable focus-return targets for document modes', () => {

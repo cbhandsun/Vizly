@@ -10,6 +10,7 @@ interface DropdownMenuTriggerButtonProps extends Omit<
     'data-flowchart-import-focus-return'?: 'true';
     'data-flowchart-search-focus-return'?: 'true';
     icon: React.ReactNode;
+    menuId?: string;
     open: boolean;
     onTriggerKeyDown: React.KeyboardEventHandler<HTMLButtonElement>;
     style?: React.CSSProperties;
@@ -18,8 +19,8 @@ interface DropdownMenuTriggerButtonProps extends Omit<
 export const DropdownMenuTriggerButton = React.forwardRef<
     HTMLButtonElement,
     DropdownMenuTriggerButtonProps
->(({ ariaLabel, className, icon, open, onTriggerKeyDown, style, ...triggerProps }, ref) => (
-    <Tooltip title={ariaLabel} {...triggerProps}>
+>(({ ariaLabel, className, icon, menuId, open, onTriggerKeyDown, style, ...triggerProps }, ref) => (
+    <Tooltip title={ariaLabel} open={open ? false : undefined} {...triggerProps}>
         <Button
             ref={ref}
             data-flowchart-import-focus-return={triggerProps['data-flowchart-import-focus-return']}
@@ -28,6 +29,7 @@ export const DropdownMenuTriggerButton = React.forwardRef<
             aria-label={ariaLabel}
             aria-haspopup="menu"
             aria-expanded={open}
+            aria-controls={menuId}
             onKeyDown={onTriggerKeyDown}
             icon={icon}
             className={className}

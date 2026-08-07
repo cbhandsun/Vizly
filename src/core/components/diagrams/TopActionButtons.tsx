@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Button, Dropdown, Tooltip, MenuProps, Grid } from 'antd';
 import { useTranslation } from 'react-i18next';
@@ -104,6 +104,9 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
     onExportPermissionCheck,
 }) => {
     const { t } = useTranslation();
+    const menuInstanceId = useId().replace(/[^a-zA-Z0-9_-]/g, '');
+    const documentMenuId = `vizly-document-actions-menu-${menuInstanceId}`;
+    const saveMenuId = `vizly-save-actions-menu-${menuInstanceId}`;
     const screens = Grid.useBreakpoint();
     const isSmallMobile = !screens.md;
     const {
@@ -286,9 +289,19 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
             onClick: handleReadonlyToggle,
         }] : []),
         ];
-        const sections = [
-            ...(isSmallMobile && saveMenu.length > 0 ? [saveMenu] : []),
-            viewItems,
+        const sections: NonNullable<MenuProps['items']>[] = [
+            ...(isSmallMobile && saveMenu.length > 0 ? [[{
+                key: 'file-group',
+                label: t('designer.toolbar.fileGroup'),
+                type: 'group' as const,
+                children: saveMenu,
+            }]] : []),
+            ...(viewItems.length > 0 ? [[{
+                key: 'view-group',
+                label: t('designer.toolbar.viewGroup'),
+                type: 'group' as const,
+                children: viewItems,
+            }]] : []),
             toolItems,
             collaborationItems,
             extraMoreItems || [],
@@ -358,7 +371,12 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
         <div className="flex items-center gap-0.5">
             {!isSmallMobile && saveMenu.length > 0 && (
                 <Dropdown
-                    menu={{ items: saveMenu, onKeyDown: handleSaveMenuKeyDown }}
+                    menu={{
+                        id: saveMenuId,
+                        'aria-label': t('designer.toolbar.saveOptions'),
+                        items: saveMenu,
+                        onKeyDown: handleSaveMenuKeyDown,
+                    }}
                     placement="bottomRight"
                     trigger={['click']}
                     open={saveMenuOpen}
@@ -368,6 +386,7 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
                     <DropdownMenuTriggerButton
                         ref={saveMenuButtonRef}
                         ariaLabel={t('designer.toolbar.saveOptions')}
+                        menuId={saveMenuId}
                         open={saveMenuOpen}
                         onTriggerKeyDown={handleSaveMenuButtonKeyDown}
                         icon={<FaSave className="text-[13px]" />}
@@ -424,14 +443,22 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
 
             {documentMenu.length > 0 && (
                 <Dropdown
-                    menu={{ items: documentMenu, onKeyDown: handleDocumentMenuKeyDown }}
+                    menu={{
+                        id: documentMenuId,
+                        'aria-label': t('designer.toolbar.documentActions'),
+                        items: documentMenu,
+                        onKeyDown: handleDocumentMenuKeyDown,
+                    }}
                     placement="bottomRight"
                     trigger={['click']}
                     open={documentMenuOpen}
                     onOpenChange={handleDocumentMenuOpenChange}
                     classNames={{ root: DOCUMENT_MENU_OVERLAY_CLASS }}
                 >
-                    <Tooltip title={t('designer.toolbar.documentActions')}>
+                    <Tooltip
+                        title={t('designer.toolbar.documentActions')}
+                        open={documentMenuOpen ? false : undefined}
+                    >
                         <Button
                             ref={documentMenuButtonRef}
                             data-presentation-focus-return
@@ -443,6 +470,7 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
                             aria-label={t('designer.toolbar.documentActions')}
                             aria-haspopup="menu"
                             aria-expanded={documentMenuOpen}
+                            aria-controls={documentMenuId}
                             onKeyDown={handleDocumentMenuButtonKeyDown}
                             icon={<FaEllipsisH className="text-[13px]" />}
                             style={isSmallMobile ? MOBILE_TOUCH_TARGET_STYLE : undefined}
