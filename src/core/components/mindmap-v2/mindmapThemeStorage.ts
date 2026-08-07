@@ -41,6 +41,10 @@ export const resolveMindMapThemeKey = (
   storage: ThemeStorage | null = getBrowserStorage(),
 ): MindMapThemeKey => readStoredMindMapThemeKey(storage) ?? 'indigo';
 
+export const shouldSyncMindMapThemeWithApplication = (
+  storage: ThemeStorage | null = getBrowserStorage(),
+): boolean => readStoredMindMapThemeKey(storage) === null;
+
 export const isStoredApplicationThemeDark = (
   storage: ThemeStorage | null = getBrowserStorage(),
 ): boolean => readStorageValue(APPLICATION_THEME_STORAGE_KEY, storage) === 'dark';

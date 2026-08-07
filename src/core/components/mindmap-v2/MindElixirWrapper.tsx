@@ -48,7 +48,10 @@ import { cleanMindMapData } from './mindmapTreeSanitizer';
 import { cleanMindMapBridgeNode, cleanMindMapChildNode } from './mindmapBridgeSecurity';
 import { parseMindElixirClipboardNodes } from './mindmapClipboardSecurity';
 import { getSafeMindMapShortcutAction } from './mindmapKeyboardSecurity';
-import { readStoredMindMapThemeKey } from './mindmapThemeStorage';
+import {
+    readStoredMindMapThemeKey,
+    shouldSyncMindMapThemeWithApplication,
+} from './mindmapThemeStorage';
 import {
     logMindmapWrapperAiBridgeFailure,
     logMindmapWrapperClipboardPayloadBlocked,
@@ -168,8 +171,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
         const mq = window.matchMedia('(prefers-color-scheme: dark)');
         const handleColorScheme = (e: MediaQueryListEvent) => {
             // 只在用户没有手动选主题时自动切换
-            const hasManualTheme = readStoredMindMapThemeKey();
-            if (hasManualTheme) return;
+            if (!shouldSyncMindMapThemeWithApplication()) return;
             mind.changeTheme(e.matches ? VIZLY_HYPER_DARK_THEME : VIZLY_HYPER_THEME);
         };
         mq.addEventListener('change', handleColorScheme);
@@ -383,7 +385,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
 
     // Sync theme when dark mode changes
     useEffect(() => {
-        if (!mindRef.current) return;
+        if (!mindRef.current || !shouldSyncMindMapThemeWithApplication()) return;
         mindRef.current.changeTheme(isDark ? VIZLY_HYPER_DARK_THEME : VIZLY_HYPER_THEME);
     }, [isDark]);
 

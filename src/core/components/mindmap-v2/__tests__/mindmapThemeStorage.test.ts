@@ -4,6 +4,7 @@ import {
   persistMindMapThemeKey,
   readStoredMindMapThemeKey,
   resolveMindMapThemeKey,
+  shouldSyncMindMapThemeWithApplication,
 } from '../mindmapThemeStorage';
 
 const storage = (values: Record<string, string> = {}) => ({
@@ -22,6 +23,13 @@ describe('mindmapThemeStorage', () => {
   it('reads the application dark-mode flag without accepting other values', () => {
     expect(isStoredApplicationThemeDark(storage({ 'vizly-theme': 'dark' }))).toBe(true);
     expect(isStoredApplicationThemeDark(storage({ 'vizly-theme': 'system' }))).toBe(false);
+  });
+
+  it('syncs the application theme only when no valid manual mind-map theme exists', () => {
+    expect(shouldSyncMindMapThemeWithApplication(storage())).toBe(true);
+    expect(shouldSyncMindMapThemeWithApplication(storage({ vizly_mindmap_theme: '../../evil' }))).toBe(true);
+    expect(shouldSyncMindMapThemeWithApplication(storage({ vizly_mindmap_theme: 'ocean' }))).toBe(false);
+    expect(shouldSyncMindMapThemeWithApplication(storage({ vizly_mindmap_theme: 'dark' }))).toBe(false);
   });
 
   it('degrades safely when storage rejects access', () => {
