@@ -153,22 +153,45 @@
 }
 
 .notePopover {
-    width: 240px;
+    width: min(280px, calc(100vw - 32px));
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 10px;
+    box-sizing: border-box;
+    padding: 14px;
+    border: 1px solid rgba(148, 163, 184, 0.24);
+    border-radius: 12px;
+    background: #111827;
+    box-shadow: 0 18px 42px rgba(15, 23, 42, 0.34);
+}
+
+.noteHeader {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    color: rgba(255, 255, 255, 0.92);
+    font-size: 13px;
+}
+
+.noteHeader span {
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 11px;
+    font-weight: 400;
 }
 
 .noteTextarea {
     width: 100%;
     box-sizing: border-box;
     resize: vertical;
-    padding: 6px 8px;
+    min-height: 116px;
+    max-height: min(260px, 42vh);
+    padding: 10px 12px;
     border-radius: 6px;
     border: 1px solid rgba(255, 255, 255, 0.15);
     background: rgba(255, 255, 255, 0.06);
     color: rgba(255, 255, 255, 0.85);
-    font-size: 12px;
+    font-size: 13px;
+    line-height: 1.5;
     outline: none;
     font-family: inherit;
     transition: border-color 0.2s;
@@ -176,6 +199,15 @@
 
 .noteTextarea:focus {
     border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+}
+
+.noteMeta {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    color: rgba(255, 255, 255, 0.48);
+    font-size: 10px;
 }
 
 .noteActions {
@@ -185,7 +217,9 @@
 }
 
 .noteBtnClear {
-    padding: 3px 10px;
+    min-width: 64px;
+    min-height: 36px;
+    padding: 6px 14px;
     border-radius: 5px;
     border: none;
     cursor: pointer;
@@ -201,7 +235,9 @@
 }
 
 .noteBtnSave {
-    padding: 3px 10px;
+    min-width: 72px;
+    min-height: 36px;
+    padding: 6px 16px;
     border-radius: 5px;
     border: none;
     cursor: pointer;
@@ -215,6 +251,24 @@
 .noteBtnSave:hover {
     background: rgba(99, 102, 241, 0.5);
     color: #fff;
+}
+
+.noteBtnClear:focus-visible,
+.noteBtnSave:focus-visible {
+    outline: 2px solid #c7d2fe;
+    outline-offset: 2px;
+}
+
+.noteBtnClear:disabled,
+.noteBtnSave:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+}
+
+.noteBtnClear:disabled:hover,
+.noteBtnSave:disabled:hover {
+    background: rgba(255, 255, 255, 0.07);
+    color: rgba(255, 255, 255, 0.45);
 }
 
 .aiPopover {

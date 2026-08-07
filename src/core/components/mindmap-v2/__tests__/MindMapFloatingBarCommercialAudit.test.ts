@@ -28,4 +28,9 @@ describe('MindMapFloatingBar commercial interaction contract', () => {
         expect(source).toContain('addEditableMindMapChild(mind, tpc)');
         expect(source).not.toContain('mind.addChild(tpc, cleanMindMapChildNode()); })} />');
     });
+
+    it('rehydrates an existing instance-scoped selection after data refresh remounts', () => {
+        expect(source).toContain('resolveSelectedMindMapTopic(mind, null)');
+        expect(source).toContain('if (existingNode) onSelect([existingNode])');
+    });
 });

@@ -19,6 +19,9 @@ import { PlusOutlined, LoadingOutlined } from '@ant-design/icons';
 import { logMindMapFloatingActionFailure } from './mindmapFloatingLogging';
 import { resolveMindMapFloatingBarLeft } from './mindMapFloatingBarLayout';
 import { addEditableMindMapChild } from './mindMapNodeCreation';
+import { MindMapNoteEditorPanel } from './MindMapNoteEditorPanel';
+import { updateMindMapNoteAndRestoreSelection } from './mindMapNoteMutation';
+import { resolveSelectedMindMapTopic } from './mindMapFloatingSelection';
 import styles from './FloatingBar.module.css';
 
 // ─── Colour palette for quick branch color ─────────────────────────────────
@@ -51,7 +54,6 @@ const MindMapFloatingBar: React.FC = () => {
     const [colorOpen, setColorOpen] = useState(false);
     const [shapeOpen, setShapeOpen] = useState(false);
     const [noteOpen, setNoteOpen] = useState(false);
-    const [noteText, setNoteText] = useState('');
     const [aiOpen, setAiOpen] = useState(false);
     const [aiExpanding, setAiExpanding] = useState(false);
     const [aiSummarizing, setAiSummarizing] = useState(false);
@@ -60,6 +62,8 @@ const MindMapFloatingBar: React.FC = () => {
     const [customAiPrompt, setCustomAiPrompt] = useState('');
     const [aiCustomLoading, setAiCustomLoading] = useState(false);
     const barRef = useRef<HTMLDivElement>(null);
+    const noteTriggerRef = useRef<HTMLButtonElement>(null);
+    const selectedNodeIdRef = useRef<string | null>(null);
     const [barWidth, setBarWidth] = useState(0);
 
 
@@ -69,7 +73,16 @@ const MindMapFloatingBar: React.FC = () => {
 
         const onSelect = (nodes: NodeObj[] | null) => {
             const node = nodes?.[0] ?? null;
-            if (!node) { setPos(null); setColorOpen(false); setShapeOpen(false); setNoteOpen(false); setAiOpen(false); return; }
+            if (!node) {
+                // reshapeNode can publish an empty selection even though the
+                // refreshed topic remains selected in the DOM. Treat that as
+                // a transient render event instead of dismissing the toolbar.
+                if (resolveSelectedMindMapTopic(mind, selectedNodeIdRef.current)) return;
+                selectedNodeIdRef.current = null;
+                setPos(null); setColorOpen(false); setShapeOpen(false); setNoteOpen(false); setAiOpen(false);
+                return;
+            }
+            selectedNodeIdRef.current = node.id;
             // Find the DOM element for the selected node to get its bounding rect
             try {
                 const tpcEl = mind.findEle(node.id);
@@ -87,6 +100,12 @@ const MindMapFloatingBar: React.FC = () => {
         };
 
         const onDeselect = () => {
+            // Mind Elixir briefly emits an unselect event while reshapeNode
+            // re-renders a selected topic. Keep the bar mounted when the DOM
+            // still marks that topic as selected; a genuine canvas deselect
+            // clears the marker before this handler runs.
+            if (resolveSelectedMindMapTopic(mind, selectedNodeIdRef.current)) return;
+            selectedNodeIdRef.current = null;
             setPos(null); setColorOpen(false); setShapeOpen(false); setNoteOpen(false); setAiOpen(false);
         };
         const onSelectNewNode = (node: NodeObj) => onSelect([node]);
@@ -102,7 +121,7 @@ const MindMapFloatingBar: React.FC = () => {
         mind.bus.addListener('operation', () => {
             // Delay to let DOM update, then refresh position
             setTimeout(() => {
-                const currentNode = mind.currentNode;
+                const currentNode = resolveSelectedMindMapTopic(mind, selectedNodeIdRef.current);
                 if (!currentNode) { setPos(null); return; }
                 const nodeId = currentNode.dataset?.nodeid ?? '';
                 if (!nodeId) { setPos(null); return; }
@@ -110,6 +129,17 @@ const MindMapFloatingBar: React.FC = () => {
                 setPos({ x: rect.left + rect.width / 2, y: rect.top - 8, nodeId });
             }, 50);
         });
+
+        // A data refresh can remount this React overlay after Mind Elixir has
+        // already published its selection event. Hydrate from the instance's
+        // scoped selected topic so the toolbar does not disappear after a
+        // successful note save or clear.
+        const existingTopic = resolveSelectedMindMapTopic(mind, null);
+        const existingNodeId = existingTopic?.dataset?.nodeid ?? '';
+        if (existingNodeId) {
+            const existingNode = findNodeById(mind.getData().nodeData, existingNodeId);
+            if (existingNode) onSelect([existingNode]);
+        }
 
         return () => {
             mind.bus.removeListener('selectNodes', onSelect);
@@ -171,6 +201,38 @@ const MindMapFloatingBar: React.FC = () => {
 
     const obj = getObj();
     if (!obj) return null;
+
+    const closeNoteEditor = (restoreFocus = false) => {
+        setNoteOpen(false);
+        if (restoreFocus) {
+            requestAnimationFrame(() => noteTriggerRef.current?.focus());
+        }
+    };
+
+    const commitNote = async (note: string | undefined, action: 'clearNote' | 'saveNote') => {
+        try {
+            const tpc = getTpc();
+            if (tpc) {
+                const restored = await updateMindMapNoteAndRestoreSelection(mind, tpc, obj, note);
+                if (restored) {
+                    const refreshedTopic = mind.findEle(obj.id);
+                    if (refreshedTopic) {
+                        const rect = refreshedTopic.getBoundingClientRect();
+                        selectedNodeIdRef.current = obj.id;
+                        setPos({
+                            x: rect.left + rect.width / 2,
+                            y: rect.top - 8,
+                            nodeId: obj.id,
+                        });
+                    }
+                }
+            }
+        } catch (error) {
+            logMindMapFloatingActionFailure(action, error);
+        }
+        closeNoteEditor(true);
+    };
+
     const extendedObj = obj as ExtendedMindMapNode;
 
     const isRoot = pos.nodeId === mind.getData()?.nodeData?.id;
@@ -567,7 +629,6 @@ const MindMapFloatingBar: React.FC = () => {
                 open={noteOpen}
                 onOpenChange={v => {
                     if (v) {
-                        setNoteText(obj.note ?? '');
                         setColorOpen(false); setShapeOpen(false);
                     }
                     setNoteOpen(v);
@@ -575,55 +636,28 @@ const MindMapFloatingBar: React.FC = () => {
                 trigger="click"
                 placement="top"
                 arrow={false}
+                destroyOnHidden
+                getPopupContainer={() => document.body}
+                styles={{
+                    content: { padding: 0, background: 'transparent', boxShadow: 'none' },
+                }}
                 content={
-                    <div className={styles.notePopover}>
-                        <textarea
-                            className={styles.noteTextarea}
-                            aria-label="节点备注"
-                            value={noteText}
-                            onChange={e => setNoteText(e.target.value)}
-                            placeholder="输入备注（支持 Markdown）..."
-                            rows={4}
-                        />
-                        <div className={styles.noteActions}>
-                            <button
-                                type="button"
-                                className={styles.noteBtnClear}
-                                onClick={() => {
-                                    try {
-                                        const tpc = getTpc();
-                                        if (tpc) reshapeNodePatch(tpc, obj, { note: undefined });
-                                    } catch (error) {
-                                        logMindMapFloatingActionFailure('clearNote', error);
-                                    }
-                                    setNoteOpen(false);
-                                }}
-                            >清除</button>
-                            <button
-                                type="button"
-                                className={styles.noteBtnSave}
-                                onClick={() => {
-                                    try {
-                                        const tpc = getTpc();
-                                        if (tpc) reshapeNodePatch(tpc, obj, { note: noteText || undefined });
-                                    } catch (error) {
-                                        logMindMapFloatingActionFailure('saveNote', error);
-                                    }
-                                    setNoteOpen(false);
-                                }}
-                            >保存</button>
-                        </div>
-                    </div>
+                    <MindMapNoteEditorPanel
+                        initialNote={obj.note}
+                        onCancel={() => closeNoteEditor(true)}
+                        onClear={() => void commitNote(undefined, 'clearNote')}
+                        onSave={note => void commitNote(note, 'saveNote')}
+                    />
                 }
             >
                 <Tooltip title={obj.note ? '编辑备注' : '添加备注'}>
                     <button
+                        ref={noteTriggerRef}
                         type="button"
                         className={styles.btn}
                         aria-label={obj.note ? '编辑备注' : '添加备注'}
                         title={obj.note ? '编辑备注' : '添加备注'}
                         style={{ color: obj.note ? '#f59e0b' : 'rgba(255, 255, 255, 0.7)' }}
-                        onClick={() => setNoteOpen(v => !v)}
                     >
                         <span aria-hidden="true" style={{ fontSize: 13 }}>📝</span>
                     </button>
