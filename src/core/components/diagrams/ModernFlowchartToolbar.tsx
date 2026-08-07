@@ -195,6 +195,11 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
     const layoutTriggerLabel = layoutMenuModel.statusText
         ? `${layoutBaseLabel}：${layoutMenuModel.statusText}`
         : layoutBaseLabel;
+    const normalizedZoomPercent = typeof zoomPercent === 'number' && Number.isFinite(zoomPercent)
+        ? Math.max(0, Math.round(zoomPercent))
+        : undefined;
+    const zoomStatus = normalizedZoomPercent === undefined ? undefined : `${normalizedZoomPercent}%`;
+    const zoomControlLabel = (label: string) => zoomStatus ? `${label} (${zoomStatus})` : label;
 
     const gridInfo = useMemo(() => {
         if (!showGrid) return { title: t('designer.toolbar.gridOff'), icon: <FaBorderNone /> };
@@ -439,16 +444,24 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
             {!hideZoomControls && (
                 <>
                     <Tooltip title={t('designer.toolbar.zoomIn')}>
-                        <Button type="text" aria-label={t('designer.toolbar.zoomIn')} icon={<FaSearchPlus size={13} />} onClick={onZoomIn} className={tbtn} style={mobileToolbarButtonStyle} />
+                        <Button type="text" aria-label={zoomControlLabel(t('designer.toolbar.zoomIn'))} icon={<FaSearchPlus size={13} />} onClick={onZoomIn} className={tbtn} style={mobileToolbarButtonStyle} />
                     </Tooltip>
                     <Tooltip title={t('designer.toolbar.zoomOut')}>
-                        <Button type="text" aria-label={t('designer.toolbar.zoomOut')} icon={<FaSearchMinus size={13} />} onClick={onZoomOut} className={tbtn} style={mobileToolbarButtonStyle} />
+                        <Button type="text" aria-label={zoomControlLabel(t('designer.toolbar.zoomOut'))} icon={<FaSearchMinus size={13} />} onClick={onZoomOut} className={tbtn} style={mobileToolbarButtonStyle} />
                     </Tooltip>
                     <Tooltip title={t('designer.toolbar.fitView')}>
-                        <Button type="text" aria-label={t('designer.toolbar.fitView')} icon={<FaCompressArrowsAlt size={13} />} onClick={onFitView} className={tbtn} style={mobileToolbarButtonStyle} />
+                        <Button type="text" aria-label={zoomControlLabel(t('designer.toolbar.fitView'))} icon={<FaCompressArrowsAlt size={13} />} onClick={onFitView} className={tbtn} style={mobileToolbarButtonStyle} />
                     </Tooltip>
-                    {zoomPercent !== undefined && screens.lg && (
-                        <span className="text-[11px] font-mono font-semibold text-slate-500 dark:text-slate-400 min-w-[32px] text-center tabular-nums">{zoomPercent}%</span>
+                    {zoomStatus && (
+                        <span
+                            role="status"
+                            aria-live="polite"
+                            aria-atomic="true"
+                            aria-label={zoomStatus}
+                            className="text-[10px] sm:text-[11px] font-mono font-semibold text-slate-500 dark:text-slate-400 min-w-[30px] sm:min-w-[32px] text-center tabular-nums"
+                        >
+                            {zoomStatus}
+                        </span>
                     )}
                     <div className={dividerCls} />
                 </>

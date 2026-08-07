@@ -36,13 +36,19 @@ export function useAutoRouting({
     // causing React to unmount the built-in component and mount AdvancedSmartEdge for the
     // first time — showing a deformed fallback path while the Worker hasn't returned yet.
     // Reading the persisted value ensures consistent edge type from the first render.
-    const [autoRoutingEnabled, setAutoRoutingEnabled] = useState(() => {
+    const [autoRoutingEnabled, setAutoRoutingEnabledState] = useState(() => {
         try {
             const cfg = diagramConfigManager.getConfig();
             return (cfg?.edge as EdgeConfig)?.autoPathSelection ?? false;
         } catch { return false; }
     });
     const [isLayoutStable, setIsLayoutStable] = useState(true);
+    const routingPreferenceVersionRef = useRef(0);
+
+    const setAutoRoutingEnabled = useCallback<React.Dispatch<React.SetStateAction<boolean>>>((nextValue) => {
+        routingPreferenceVersionRef.current += 1;
+        setAutoRoutingEnabledState(nextValue);
+    }, []);
 
     // 布局策略
     const { handleStrategyLayout: _handleStrategyLayout, lastDomainStrategy, lastDomainDirection, lastNodeLayout } = useLayoutStrategy({
@@ -58,10 +64,18 @@ export function useAutoRouting({
 
     // 布局时自动启用 autoRouting + 管理稳定性标记
     const handleStrategyLayout = useCallback(async (...args: Parameters<typeof _handleStrategyLayout>) => {
+        const routingPreferenceVersion = routingPreferenceVersionRef.current;
         setIsLayoutStable(false);
-        await _handleStrategyLayout(...args);
-        setAutoRoutingEnabled(true);
-        setIsLayoutStable(true);
+        try {
+            await _handleStrategyLayout(...args);
+            // 用户可能在异步布局执行期间手动关闭自动布线。布局完成只能在
+            // 用户偏好未变化时应用默认开启值，避免迟到响应覆盖最新操作。
+            if (routingPreferenceVersionRef.current === routingPreferenceVersion) {
+                setAutoRoutingEnabledState(true);
+            }
+        } finally {
+            setIsLayoutStable(true);
+        }
     }, [_handleStrategyLayout]);
 
     // 统一路由配置同步（共享模块）

@@ -456,6 +456,41 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
         expect(buttons[4].getAttribute('aria-pressed')).toBe('true');
     });
 
+    it('keeps the current zoom visible and announces zoom changes on narrow screens', async () => {
+        const props = {
+            canUndo: false,
+            canRedo: false,
+            onUndo: vi.fn(),
+            onRedo: vi.fn(),
+            onZoomIn: vi.fn(),
+            onZoomOut: vi.fn(),
+            onFitView: vi.fn(),
+            autoRouting: false,
+            toggleAutoRouting: vi.fn(),
+            showGrid: true,
+            toggleGrid: vi.fn(),
+            onShowShortcuts: vi.fn(),
+            showRuler: false,
+            toggleRuler: vi.fn(),
+        };
+        const { rerender } = render(
+            <ModernFlowchartToolbar {...props} zoomPercent={32} />,
+        );
+
+        const initialStatus = await screen.findByRole('status', { name: '32%' });
+        expect(initialStatus.textContent).toBe('32%');
+        expect(await screen.findByRole('button', { name: /zoomIn.*32%/i })).toBeTruthy();
+        expect(await screen.findByRole('button', { name: /zoomOut.*32%/i })).toBeTruthy();
+        expect(await screen.findByRole('button', { name: /fitView.*32%/i })).toBeTruthy();
+
+        rerender(<ModernFlowchartToolbar {...props} zoomPercent={38} />);
+
+        const updatedStatus = await screen.findByRole('status', { name: '38%' });
+        expect(updatedStatus.textContent).toBe('38%');
+        expect(updatedStatus.getAttribute('aria-live')).toBe('polite');
+        expect(updatedStatus.getAttribute('aria-atomic')).toBe('true');
+    });
+
     it('does not duplicate multi-selection actions in the mobile top toolbar', async () => {
         const onAlign = vi.fn();
         const onDistribute = vi.fn();
