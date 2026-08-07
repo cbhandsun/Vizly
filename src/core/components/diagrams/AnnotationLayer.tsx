@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { theme, Input, Button, Tooltip, Popconfirm } from 'antd';
 import { CheckOutlined, DeleteOutlined, CloseOutlined } from '@ant-design/icons';
@@ -13,6 +13,90 @@ import {
 } from './annotationContent';
 
 const { TextArea } = Input;
+
+const ANNOTATION_COLOR_LABELS: Readonly<Record<string, string>> = {
+    '#facc15': '黄色',
+    '#f87171': '红色',
+    '#60a5fa': '蓝色',
+    '#34d399': '绿色',
+    '#c084fc': '紫色',
+    '#fb923c': '橙色',
+};
+
+const getAnnotationColorLabel = (color: string): string =>
+    ANNOTATION_COLOR_LABELS[color.toLowerCase()] ?? `自定义颜色 ${color}`;
+
+const AnnotationColorPicker: React.FC<{
+    colors: string[];
+    currentColor: string;
+    onChange: (color: string) => void;
+}> = ({ colors, currentColor, onChange }) => {
+    const buttonRefs = useRef(new Map<string, HTMLButtonElement>());
+    const selectedIndex = colors.indexOf(currentColor);
+    const rovingIndex = selectedIndex >= 0 ? selectedIndex : 0;
+
+    const selectAndFocus = useCallback((color: string) => {
+        onChange(color);
+        requestAnimationFrame(() => buttonRefs.current.get(color)?.focus());
+    }, [onChange]);
+
+    const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
+        if (colors.length === 0) return;
+        let nextIndex: number | null = null;
+        if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+            nextIndex = (index + 1) % colors.length;
+        } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+            nextIndex = (index - 1 + colors.length) % colors.length;
+        } else if (event.key === 'Home') {
+            nextIndex = 0;
+        } else if (event.key === 'End') {
+            nextIndex = colors.length - 1;
+        }
+        if (nextIndex === null) return;
+        event.preventDefault();
+        selectAndFocus(colors[nextIndex]);
+    }, [colors, selectAndFocus]);
+
+    if (colors.length === 0) return null;
+
+    return (
+        <div
+            role="radiogroup"
+            aria-label="批注颜色"
+            style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}
+        >
+            {colors.map((color, index) => {
+                const label = getAnnotationColorLabel(color);
+                return (
+                    <button
+                        type="button"
+                        role="radio"
+                        key={color}
+                        ref={(element) => {
+                            if (element) buttonRefs.current.set(color, element);
+                            else buttonRefs.current.delete(color);
+                        }}
+                        tabIndex={index === rovingIndex ? 0 : -1}
+                        aria-label={`批注颜色：${label}`}
+                        aria-checked={color === currentColor}
+                        title={label}
+                        onClick={() => selectAndFocus(color)}
+                        onKeyDown={(event) => handleKeyDown(event, index)}
+                        style={{
+                            width: 44,
+                            height: 44,
+                            borderRadius: '50%',
+                            background: color,
+                            border: color === currentColor ? '2px solid white' : '1px solid rgba(255,255,255,0.5)',
+                            cursor: 'pointer',
+                            padding: 0,
+                        }}
+                    />
+                );
+            })}
+        </div>
+    );
+};
 
 const readViewportSize = () => ({
     width: typeof window === 'undefined' ? 320 : window.innerWidth,
@@ -50,6 +134,12 @@ export const AnnotationLayer: React.FC<AnnotationLayerProps> = ({
         clientY: number;
     } | null>(null);
     const [viewportSize, setViewportSize] = useState(readViewportSize);
+    const pinButtonRefs = useRef(new Map<string, HTMLButtonElement>());
+    const previousActivePageIdRef = useRef(activePageId);
+
+    const focusPin = useCallback((annotationId: string) => {
+        requestAnimationFrame(() => pinButtonRefs.current.get(annotationId)?.focus());
+    }, []);
 
     // 批注模式下点击画布空白处创建新批注
     const handleCanvasClick = useCallback((e: React.MouseEvent) => {
@@ -103,7 +193,8 @@ export const AnnotationLayer: React.FC<AnnotationLayerProps> = ({
         setEditError(null);
         setActiveId(null);
         setActiveEditorPoint(null);
-    }, [activeId, editText, onUpdate]);
+        focusPin(activeId);
+    }, [activeId, editText, focusPin, onUpdate]);
 
     const handleEditTextChange = useCallback((value: string) => {
         setEditText(value);
@@ -118,19 +209,27 @@ export const AnnotationLayer: React.FC<AnnotationLayerProps> = ({
         setEditError(null);
     }, []);
 
+    const closeActiveEditor = useCallback(() => {
+        const annotationId = activeId;
+        closeEditors();
+        if (annotationId) focusPin(annotationId);
+    }, [activeId, closeEditors, focusPin]);
+
     // ESC 关闭
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'Escape') {
-                closeEditors();
+                closeActiveEditor();
             }
         };
         document.addEventListener('keydown', handleKeyDown);
         return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [closeEditors]);
+    }, [closeActiveEditor]);
 
     // 页面切换时重置编辑状态
     useEffect(() => {
+        if (previousActivePageIdRef.current === activePageId) return;
+        previousActivePageIdRef.current = activePageId;
         const timer = window.setTimeout(() => {
             setActiveId(null);
             setActiveEditorPoint(null);
@@ -179,7 +278,7 @@ export const AnnotationLayer: React.FC<AnnotationLayerProps> = ({
                 setEditError(null);
             }}
             onSave={handleSaveEdit}
-            onClose={closeEditors}
+            onClose={closeActiveEditor}
             onDelete={() => {
                 onDelete(ann.id);
                 closeEditors();
@@ -188,6 +287,10 @@ export const AnnotationLayer: React.FC<AnnotationLayerProps> = ({
             onChangeColor={(color) => onUpdate(ann.id, { color })}
             colors={colors}
             token={token}
+            pinButtonRef={(element) => {
+                if (element) pinButtonRefs.current.set(ann.id, element);
+                else pinButtonRefs.current.delete(ann.id);
+            }}
         />
     ));
 
@@ -199,6 +302,8 @@ export const AnnotationLayer: React.FC<AnnotationLayerProps> = ({
     const pendingEditor = pendingPos && editorPosition && createPortal(
         <div
             data-testid="pending-annotation-editor"
+            role="dialog"
+            aria-label="新建批注"
             style={{
                 position: 'fixed',
                 left: editorPosition.x,
@@ -266,7 +371,8 @@ const AnnotationPin: React.FC<{
     onChangeColor: (color: string) => void;
     colors: string[];
     token: ReturnType<typeof theme.useToken>['token'];
-}> = ({ annotation, isActive, isHighlighted, editText, editError, editorPosition, onEditTextChange, onOpen, onSave, onClose, onDelete, onToggleResolved, onChangeColor, colors, token }) => {
+    pinButtonRef: (element: HTMLButtonElement | null) => void;
+}> = ({ annotation, isActive, isHighlighted, editText, editError, editorPosition, onEditTextChange, onOpen, onSave, onClose, onDelete, onToggleResolved, onChangeColor, colors, token, pinButtonRef }) => {
     const { x, y, color, content: text, isResolved: resolved } = annotation;
     const errorMessage = getAnnotationContentErrorMessage(editError);
     const contentIsValid = parseAnnotationContent(editText).ok;
@@ -274,6 +380,8 @@ const AnnotationPin: React.FC<{
     const editor = isActive && editorPosition && createPortal(
         <div
             data-testid="active-annotation-editor"
+            role="dialog"
+            aria-label="编辑批注"
             style={{
                 position: 'fixed',
                 left: editorPosition.x,
@@ -299,26 +407,11 @@ const AnnotationPin: React.FC<{
                     alignItems: 'center',
                     justifyContent: 'space-between',
                 }}>
-                    <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-                        {colors.map(c => (
-                            <button
-                                type="button"
-                                key={c}
-                                aria-label={`选择批注颜色 ${c}`}
-                                aria-pressed={c === color}
-                                onClick={() => onChangeColor(c)}
-                                style={{
-                                    width: 44,
-                                    height: 44,
-                                    borderRadius: '50%',
-                                    background: c,
-                                    border: c === color ? '2px solid white' : '1px solid rgba(255,255,255,0.5)',
-                                    cursor: 'pointer',
-                                    padding: 0,
-                                }}
-                            />
-                        ))}
-                    </div>
+                    <AnnotationColorPicker
+                        colors={colors}
+                        currentColor={color}
+                        onChange={onChangeColor}
+                    />
                     <Button
                         type="text"
                         aria-label="关闭批注编辑器"
@@ -407,6 +500,7 @@ const AnnotationPin: React.FC<{
                 <Tooltip title={text || '空批注'} placement="top">
                     <button
                         type="button"
+                        ref={pinButtonRef}
                         aria-label={`查看批注：${text || '空批注'}`}
                         onClick={event => onOpen({ x: event.clientX, y: event.clientY })}
                         style={{

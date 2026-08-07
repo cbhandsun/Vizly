@@ -40,12 +40,130 @@ describe('AnnotationLayer accessibility', () => {
         const pin = screen.getByRole('button', { name: '查看批注：检查运输节点' });
         expect(pin.style.width).toBe('44px');
         fireEvent.click(pin);
+        expect(screen.getByRole('dialog', { name: '编辑批注' })).toBeTruthy();
         expect(screen.getByRole('textbox', { name: '批注内容' })).toBeTruthy();
         expect(screen.getByTestId('active-annotation-editor').style.position).toBe('fixed');
         expect(screen.getByRole('button', { name: '关闭批注编辑器' })).toBeTruthy();
         expect(screen.getByRole('button', { name: '标记批注为已解决' })).toBeTruthy();
         expect(screen.getByRole('button', { name: '删除批注' })).toBeTruthy();
-        expect(screen.getByRole('button', { name: '选择批注颜色 #facc15' }).getAttribute('aria-pressed')).toBe('true');
+        expect(screen.getByRole('radio', { name: '批注颜色：黄色' }).getAttribute('aria-checked')).toBe('true');
+    });
+
+    it('uses a single-tab-stop color group with arrow-key selection', async () => {
+        const onUpdate = vi.fn();
+        render(
+            <AnnotationLayer
+                annotations={[{
+                    id: 'comment-color',
+                    content: '检查颜色语义',
+                    x: 80,
+                    y: 80,
+                    color: '#facc15',
+                    authorId: 'user-1',
+                    authorName: '测试用户',
+                    authorColor: '#3b82f6',
+                    createdAt: 1,
+                    isResolved: false,
+                    replies: [],
+                }]}
+                annotationMode={false}
+                onAdd={vi.fn()}
+                onUpdate={onUpdate}
+                onDelete={vi.fn()}
+                onToggleResolved={vi.fn()}
+                colors={['#facc15', '#60a5fa', '#34d399']}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: '查看批注：检查颜色语义' }));
+        const radios = screen.getAllByRole('radio');
+        const yellow = screen.getByRole('radio', { name: '批注颜色：黄色' });
+        expect(screen.getByRole('radiogroup', { name: '批注颜色' })).toBeTruthy();
+        expect(radios.filter(radio => radio.getAttribute('tabindex') === '0')).toHaveLength(1);
+
+        yellow.focus();
+        fireEvent.keyDown(yellow, { key: 'ArrowRight' });
+
+        const blue = screen.getByRole('radio', { name: '批注颜色：蓝色' });
+        expect(onUpdate).toHaveBeenCalledWith('comment-color', { color: '#60a5fa' });
+        await waitFor(() => expect(document.activeElement).toBe(blue));
+    });
+
+    it('returns focus to the comment pin after close and a successful save', async () => {
+        const onUpdate = vi.fn(() => true);
+        render(
+            <AnnotationLayer
+                annotations={[{
+                    id: 'comment-focus',
+                    content: '检查焦点',
+                    x: 80,
+                    y: 80,
+                    color: '#facc15',
+                    authorId: 'user-1',
+                    authorName: '测试用户',
+                    authorColor: '#3b82f6',
+                    createdAt: 1,
+                    isResolved: false,
+                    replies: [],
+                }]}
+                annotationMode={false}
+                onAdd={vi.fn()}
+                onUpdate={onUpdate}
+                onDelete={vi.fn()}
+                onToggleResolved={vi.fn()}
+                colors={['#facc15']}
+            />,
+        );
+
+        let pin = screen.getByRole('button', { name: '查看批注：检查焦点' });
+        fireEvent.click(pin);
+        fireEvent.click(screen.getByRole('button', { name: '关闭批注编辑器' }));
+        pin = screen.getByRole('button', { name: '查看批注：检查焦点' });
+        await waitFor(() => expect(document.activeElement).toBe(pin));
+
+        fireEvent.click(pin);
+        fireEvent.change(screen.getByRole('textbox', { name: '批注内容' }), {
+            target: { value: '更新后的检查焦点' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: /保\s*存/ }));
+        pin = screen.getByRole('button', { name: '查看批注：检查焦点' });
+        await waitFor(() => expect(document.activeElement).toBe(pin));
+    });
+
+    it('keeps the initial editor stable and closes it only after an actual page switch', async () => {
+        const annotation = {
+            id: 'comment-page',
+            content: '检查页面切换',
+            x: 80,
+            y: 80,
+            color: '#facc15',
+            authorId: 'user-1',
+            authorName: '测试用户',
+            authorColor: '#3b82f6',
+            createdAt: 1,
+            isResolved: false,
+            replies: [],
+        };
+        const commonProps = {
+            annotations: [annotation],
+            annotationMode: false,
+            onAdd: vi.fn(),
+            onUpdate: vi.fn(),
+            onDelete: vi.fn(),
+            onToggleResolved: vi.fn(),
+            colors: ['#facc15'],
+        };
+        const { rerender } = render(
+            <AnnotationLayer {...commonProps} activePageId="page-1" />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: '查看批注：检查页面切换' }));
+        expect(screen.getByRole('dialog', { name: '编辑批注' })).toBeTruthy();
+        await new Promise(resolve => window.setTimeout(resolve, 0));
+        expect(screen.getByRole('dialog', { name: '编辑批注' })).toBeTruthy();
+
+        rerender(<AnnotationLayer {...commonProps} activePageId="page-2" />);
+        await waitFor(() => expect(screen.queryByRole('dialog', { name: '编辑批注' })).toBeNull());
     });
 
     it('keeps the existing-comment editor within the mobile viewport', async () => {
@@ -188,6 +306,7 @@ describe('AnnotationLayer accessibility', () => {
 
         fireEvent.click(layer, { clientX: 100, clientY: 650 });
         const editor = screen.getByTestId('pending-annotation-editor');
+        expect(screen.getByRole('dialog', { name: '新建批注' })).toBeTruthy();
         expect(editor.style.position).toBe('fixed');
         expect(editor.style.top).toBe('516px');
         fireEvent.change(screen.getByRole('textbox', { name: '新批注内容' }), { target: { value: '移动端批注' } });
