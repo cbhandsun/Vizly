@@ -20,6 +20,7 @@ import {
 } from '../useMindElixirImportActions';
 import { printMindMap } from '../useMindElixirExportActions';
 import {
+    applyMindMapDirection,
     coerceMindMapBackgroundPattern,
     coerceMindMapDirectionKey,
     useMindElixirCanvasPreferences,
@@ -114,17 +115,43 @@ describe('mind elixir wrapper boundaries', () => {
         expect(coerceMindMapDirectionKey('TB')).toBe('L');
         expect(coerceMindMapDirectionKey('diagonal')).toBe('LR');
 
-        const refresh = vi.fn();
+        const initLeft = vi.fn();
+        const initRight = vi.fn();
+        const initSide = vi.fn();
         const mind = {
             direction: 0,
-            getData: () => ({ nodeData: { id: 'root', topic: 'Root', children: [] }, direction: 0 }),
-            refresh,
+            initLeft,
+            initRight,
+            initSide,
         } as unknown as MindElixirInstance;
         const { result } = renderHook(() => useMindElixirCanvasPreferences(mind));
 
         act(() => result.current.changeDirection('L'));
-        expect(refresh).toHaveBeenCalledWith(expect.objectContaining({ direction: 0 }));
+        expect(initLeft).toHaveBeenCalledOnce();
+        expect(result.current.currentDirection).toBe('L');
         expect(localStorage.getItem('vizly_mindmap_dir')).toBe('L');
+
+        act(() => result.current.changeDirection('R'));
+        expect(initRight).toHaveBeenCalledOnce();
+        expect(result.current.currentDirection).toBe('R');
+        expect(localStorage.getItem('vizly_mindmap_dir')).toBe('R');
+
+        act(() => result.current.changeDirection('LR'));
+        expect(initSide).toHaveBeenCalledOnce();
+        expect(result.current.currentDirection).toBe('LR');
+        expect(localStorage.getItem('vizly_mindmap_dir')).toBe('LR');
+    });
+
+    it('uses the native side command for invalid direction input', () => {
+        const initSide = vi.fn();
+        const mind = {
+            initLeft: vi.fn(),
+            initRight: vi.fn(),
+            initSide,
+        } as unknown as MindElixirInstance;
+
+        expect(applyMindMapDirection(mind, 'diagonal')).toBe('LR');
+        expect(initSide).toHaveBeenCalledOnce();
     });
 
     it('removes the exact arrow listener on toggle and disposal', () => {

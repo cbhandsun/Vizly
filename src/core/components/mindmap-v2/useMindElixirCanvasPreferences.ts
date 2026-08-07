@@ -2,12 +2,13 @@ import { useCallback, useEffect, useState } from 'react';
 import MindElixir from 'mind-elixir';
 import type { MindElixirInstance } from 'mind-elixir';
 
-import { directionStringToInt } from './migrate';
-import { coerceMindElixirDirection } from './mindElixirDirection';
-import { cleanAndValidateTree } from './mindmapTreeSanitizer';
-
 export type MindMapBackgroundPattern = 'none' | 'grid' | 'dots';
 export type MindMapDirectionKey = 'LR' | 'R' | 'L';
+
+type MindMapDirectionSelection = {
+    mind: MindElixirInstance;
+    value: MindMapDirectionKey;
+};
 
 const BACKGROUND_STORAGE_KEY = 'vizly_mindmap_bg';
 const DIRECTION_STORAGE_KEY = 'vizly_mindmap_dir';
@@ -49,10 +50,28 @@ const getLiveDirection = (mind: MindElixirInstance | null): MindMapDirectionKey 
     return 'L';
 };
 
+export const applyMindMapDirection = (
+    mind: MindElixirInstance,
+    value: string,
+): MindMapDirectionKey => {
+    const direction = coerceMindMapDirectionKey(value);
+
+    if (direction === 'LR') {
+        mind.initSide();
+    } else if (direction === 'R') {
+        mind.initRight();
+    } else {
+        mind.initLeft();
+    }
+
+    return direction;
+};
+
 export const useMindElixirCanvasPreferences = (mind: MindElixirInstance | null) => {
     const [backgroundPattern, setBackgroundPattern] = useState<MindMapBackgroundPattern>(() =>
         coerceMindMapBackgroundPattern(readStorage(BACKGROUND_STORAGE_KEY))
     );
+    const [directionSelection, setDirectionSelection] = useState<MindMapDirectionSelection | null>(null);
 
     const applyBackgroundPattern = useCallback((value: MindMapBackgroundPattern) => {
         const pattern = coerceMindMapBackgroundPattern(value);
@@ -65,18 +84,14 @@ export const useMindElixirCanvasPreferences = (mind: MindElixirInstance | null) 
         document.getElementById('vizly-mind-elixir-root')?.setAttribute('data-bg', backgroundPattern);
     }, [mind, backgroundPattern]);
 
-    const currentDirection = getLiveDirection(mind)
-        ?? coerceMindMapDirectionKey(readStorage(DIRECTION_STORAGE_KEY));
+    const currentDirection = directionSelection?.mind === mind
+        ? directionSelection.value
+        : getLiveDirection(mind) ?? coerceMindMapDirectionKey(readStorage(DIRECTION_STORAGE_KEY));
 
     const changeDirection = useCallback((value: string) => {
         if (!mind) return;
-        const direction = coerceMindMapDirectionKey(value);
-        const data = mind.getData();
-        mind.refresh({
-            ...data,
-            nodeData: cleanAndValidateTree(data.nodeData, true),
-            direction: coerceMindElixirDirection(directionStringToInt(direction)),
-        });
+        const direction = applyMindMapDirection(mind, value);
+        setDirectionSelection({ mind, value: direction });
         writeStorage(DIRECTION_STORAGE_KEY, direction);
     }, [mind]);
 

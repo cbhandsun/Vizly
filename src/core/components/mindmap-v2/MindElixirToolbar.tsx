@@ -76,6 +76,7 @@ import { useMindElixirExportActions } from './useMindElixirExportActions';
 import { useMindElixirCanvasPreferences } from './useMindElixirCanvasPreferences';
 import MindMapToolbarIconButton from './MindMapToolbarIconButton';
 import { useMindMapFocusMode } from './useMindMapFocusMode';
+import { getViewportPopupContainer } from '../ui/viewportOverlayPortal';
 import './MindElixirToolbar.css';
 
 
@@ -392,6 +393,7 @@ const MindElixirToolbar: React.FC = () => {
                 onChange={handleDirectionChange}
                 aria-label="思维导图布局方向"
                 className="mind-elixir-toolbar-direction"
+                getPopupContainer={getViewportPopupContainer}
                 options={DIRECTION_OPTIONS}
             />
 
@@ -421,6 +423,7 @@ const MindElixirToolbar: React.FC = () => {
                     })),
                 }}
                 placement="bottomLeft"
+                getPopupContainer={getViewportPopupContainer}
                 trigger={['click']}
             >
                 <MindMapToolbarIconButton
@@ -520,6 +523,7 @@ const MindElixirToolbar: React.FC = () => {
                 onOpenChange={open => setOpenMenu(open ? 'export' : null)}
                 menu={{ items: exportMenuItems }}
                 placement="bottomRight"
+                getPopupContainer={getViewportPopupContainer}
                 trigger={['click']}
             >
                 <MindMapToolbarIconButton aria-expanded={openMenu === 'export'} aria-haspopup="menu" label="导出思维导图" icon={<ExportOutlined />} disabled={!mind} />
@@ -545,6 +549,7 @@ const MindElixirToolbar: React.FC = () => {
                     ]
                 }}
                 placement="bottomRight"
+                getPopupContainer={getViewportPopupContainer}
                 trigger={['click']}
             >
                 <MindMapToolbarIconButton aria-expanded={openMenu === 'import'} aria-haspopup="menu" label="导入思维导图" icon={<UploadOutlined />} disabled={!mind} />
@@ -617,6 +622,7 @@ const MindElixirToolbar: React.FC = () => {
                     selectedKeys: [bgPattern],
                 }}
                 placement="bottomRight"
+                getPopupContainer={getViewportPopupContainer}
                 trigger={['click']}
             >
                 <MindMapToolbarIconButton

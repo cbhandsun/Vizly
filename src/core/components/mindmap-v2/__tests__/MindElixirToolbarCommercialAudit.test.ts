@@ -11,6 +11,7 @@ describe('MindElixirToolbar commercial interaction contract', () => {
         expect(source).toContain('role="toolbar"');
         expect(source).toContain('aria-label="思维导图工具"');
         expect(source).toContain('aria-label="思维导图布局方向"');
+        expect(source.match(/getPopupContainer=\{getViewportPopupContainer\}/g)).toHaveLength(5);
         expect(source).toContain("aria-expanded={openMenu === 'theme'}");
         expect(source).toContain("aria-expanded={openMenu === 'export'}");
         expect(source).toContain("aria-expanded={openMenu === 'import'}");
