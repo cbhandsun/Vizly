@@ -29,6 +29,7 @@ describe('mindmapFloatingLogging', () => {
     const { logMindMapFloatingActionFailure } = await import('../mindmapFloatingLogging');
 
     logMindMapFloatingActionFailure('applySuggestion', new Error('token=apply-secret'));
+    logMindMapFloatingActionFailure('addChild', new Error('token=add-child-secret'));
     logMindMapFloatingActionFailure('duplicateNode', new Error('Authorization: Bearer duplicate-secret'));
     logMindMapFloatingActionFailure('setBranchColor', new Error('cookie=color-secret'));
     logMindMapFloatingActionFailure('setShapeClass', new Error('api_key=shape-secret'));
@@ -38,12 +39,13 @@ describe('mindmapFloatingLogging', () => {
     const warnMessages = safeLogState.warn.mock.calls.map(call => String(call[0]));
     expect(warnMessages).toEqual([
       '[MindMapFloatingBar] applySuggestion failed:',
+      '[MindMapFloatingBar] addChild failed:',
       '[MindMapFloatingBar] duplicateNode failed:',
       '[MindMapFloatingBar] setBranchColor failed:',
       '[MindMapFloatingBar] setShapeClass failed:',
       '[MindMapFloatingBar] clearNote failed:',
       '[MindMapFloatingBar] saveNote failed:',
     ]);
-    expect(redactSensitiveLogValue).toHaveBeenCalledTimes(6);
+    expect(redactSensitiveLogValue).toHaveBeenCalledTimes(7);
   });
 });

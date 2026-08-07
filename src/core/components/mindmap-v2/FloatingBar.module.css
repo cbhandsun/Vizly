@@ -12,6 +12,10 @@
     border-radius: 10px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.2);
     transition: left 0.15s ease-out, top 0.15s ease-out;
+    max-width: calc(100vw - 16px);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
 }
 
 .divider {
@@ -40,6 +44,14 @@
 .btn:hover {
     background: rgba(255, 255, 255, 0.15);
     transform: scale(1.1);
+}
+
+.btn:focus-visible,
+.shapeBtn:focus-visible,
+.colorItem:focus-visible,
+.aiSuggestion:focus-visible {
+    outline: 2px solid #a5b4fc;
+    outline-offset: 2px;
 }
 
 .btnDanger {
@@ -91,6 +103,7 @@
     border: 1.5px solid rgba(0, 0, 0, 0.15);
     cursor: pointer;
     transition: transform 0.1s;
+    padding: 0;
 }
 
 .colorItem:hover {
@@ -234,6 +247,9 @@
     align-items: center;
     justify-content: space-between;
     transition: all 0.15s;
+    width: 100%;
+    font: inherit;
+    text-align: left;
 }
 
 .aiSuggestion:hover {

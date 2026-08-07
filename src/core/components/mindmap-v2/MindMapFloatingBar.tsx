@@ -6,7 +6,7 @@
  *  - 覆盖 90% 高频操作：添加子/兄弟、颜色、折叠/展开、删除
  *  - 无需打开侧边属性面板或右键菜单
  */
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useLayoutEffect, useState, useRef } from 'react';
 import { Tooltip, Popover, Input } from 'antd';
 import type { NodeObj, Topic } from 'mind-elixir';
 import { getMindElixirInstance, subscribeMindElixir } from './mindElixirStore';
@@ -17,6 +17,8 @@ import { cleanMindMapData, cleanMindMapTopic, refreshMindElixirWithSanitizedData
 import { cleanMindMapChildNode } from './mindmapBridgeSecurity';
 import { PlusOutlined, LoadingOutlined } from '@ant-design/icons';
 import { logMindMapFloatingActionFailure } from './mindmapFloatingLogging';
+import { resolveMindMapFloatingBarLeft } from './mindMapFloatingBarLayout';
+import { addEditableMindMapChild } from './mindMapNodeCreation';
 import styles from './FloatingBar.module.css';
 
 // ─── Colour palette for quick branch color ─────────────────────────────────
@@ -58,6 +60,7 @@ const MindMapFloatingBar: React.FC = () => {
     const [customAiPrompt, setCustomAiPrompt] = useState('');
     const [aiCustomLoading, setAiCustomLoading] = useState(false);
     const barRef = useRef<HTMLDivElement>(null);
+    const [barWidth, setBarWidth] = useState(0);
 
 
     // ── Listen to selectNode / selectNodes events ────────────────────────────
@@ -127,6 +130,24 @@ const MindMapFloatingBar: React.FC = () => {
         };
         document.addEventListener('mousedown', handler, true);
         return () => document.removeEventListener('mousedown', handler, true);
+    }, [pos]);
+
+    useLayoutEffect(() => {
+        const bar = barRef.current;
+        if (!pos || !bar) return;
+
+        const updateWidth = () => setBarWidth(bar.getBoundingClientRect().width);
+        updateWidth();
+        window.addEventListener('resize', updateWidth);
+        const resizeObserver = typeof ResizeObserver === 'function'
+            ? new ResizeObserver(updateWidth)
+            : null;
+        resizeObserver?.observe(bar);
+
+        return () => {
+            window.removeEventListener('resize', updateWidth);
+            resizeObserver?.disconnect();
+        };
     }, [pos]);
 
     if (!pos || !mind) return null;
@@ -296,10 +317,13 @@ const MindMapFloatingBar: React.FC = () => {
     const Btn: React.FC<{ icon: string; tip: string; danger?: boolean; onClick: () => void }> = ({ icon, tip, danger, onClick }) => (
         <Tooltip title={tip} placement="top" mouseEnterDelay={0.4}>
             <button
+                type="button"
                 className={`${styles.btn} ${danger ? styles.btnDanger : ''}`}
+                aria-label={tip}
+                title={tip}
                 onClick={onClick}
             >
-                {icon}
+                <span aria-hidden="true">{icon}</span>
             </button>
         </Tooltip>
     );
@@ -307,15 +331,31 @@ const MindMapFloatingBar: React.FC = () => {
     // Divider
     const Div = () => <div className={styles.divider} />;
 
-    // ── Position: offset left so bar is truly centered ────────────────────────
-    const BAR_W = isRoot ? 140 : (hasChildren ? 410 : 380); // Adjusted for new AI button
+    const handleAddChild = () => {
+        const tpc = getTpc();
+        if (!tpc) return;
+        setColorOpen(false);
+        setShapeOpen(false);
+        setAiOpen(false);
+        void addEditableMindMapChild(mind, tpc).catch(error => {
+            logMindMapFloatingActionFailure('addChild', error);
+        });
+    };
+
+    const resolvedBarWidth = barWidth || Math.min(window.innerWidth - 16, 320);
 
     return (
         <div
             ref={barRef}
             className={styles.barContainer}
+            role="toolbar"
+            aria-label="节点快捷操作"
             style={{
-                left: Math.min(Math.max(pos.x - BAR_W / 2, 8), window.innerWidth - BAR_W - 8),
+                left: resolveMindMapFloatingBarLeft({
+                    anchorX: pos.x,
+                    measuredWidth: resolvedBarWidth,
+                    viewportWidth: window.innerWidth,
+                }),
                 top: Math.max(pos.y - 44, 8),
             }}
             // stop clicks from deselecting the node in canvas
@@ -348,14 +388,15 @@ const MindMapFloatingBar: React.FC = () => {
                             <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', padding: 4 }}>暂无建议</div>
                         )}
                         {aiSuggestions.map(s => (
-                            <div key={s} onClick={() => { handleAIApply(s); setAiOpen(false); }} className={styles.aiSuggestion}>
+                            <button type="button" key={s} onClick={() => { handleAIApply(s); setAiOpen(false); }} className={styles.aiSuggestion}>
                                 <PlusOutlined style={{ marginRight: 6, color: '#a5b4fc', fontSize: 10 }} />
                                 {s}
-                            </div>
+                            </button>
                         ))}
                         {hasChildren && (
                             <div className={styles.aiSummarizeSection}>
                                 <button
+                                    type="button"
                                     className={styles.aiSummarizeBtn}
                                     onClick={handleAISummarize}
                                     disabled={aiSummarizing}
@@ -382,10 +423,13 @@ const MindMapFloatingBar: React.FC = () => {
             >
                 <Tooltip title="AI 扩展子主题">
                     <button
+                        type="button"
                         className={`${styles.btn} ${styles.btnAi}`}
+                        aria-label="AI 扩展子主题"
+                        title="AI 扩展子主题"
                         onClick={() => setAiOpen(v => !v)}
                     >
-                        <div className={styles.btnAiInner}>✨</div>
+                        <div className={styles.btnAiInner} aria-hidden="true">✨</div>
                     </button>
                 </Tooltip>
             </Popover>
@@ -394,7 +438,7 @@ const MindMapFloatingBar: React.FC = () => {
 
             {/* Add child */}
             <Btn icon="➕" tip="添加子节点 (Tab)"
-                onClick={() => act(() => { const tpc = getTpc(); if (tpc) mind.addChild(tpc, cleanMindMapChildNode()); })} />
+                onClick={handleAddChild} />
 
             {/* Add sibling — not for root */}
             {!isRoot && (
@@ -439,10 +483,12 @@ const MindMapFloatingBar: React.FC = () => {
                 content={
                     <div className={styles.colorGrid}>
                         {QUICK_COLORS.map(c => (
-                            <div
+                            <button
+                                type="button"
                                 key={c}
                                 className={styles.colorItem}
                                 title={c === 'transparent' ? '透明（继承）' : c}
+                                aria-label={c === 'transparent' ? '连线颜色：透明（继承）' : `连线颜色：${c}`}
                                 onClick={() => {
                                     try {
                                         const tpc = getTpc();
@@ -464,13 +510,13 @@ const MindMapFloatingBar: React.FC = () => {
                 }
             >
                 <Tooltip title="连线颜色">
-                    <button className={styles.btn} style={{ gap: 2 }} onClick={() => { setColorOpen(v => !v); setShapeOpen(false); }}>
+                    <button type="button" className={styles.btn} aria-label="连线颜色" title="连线颜色" style={{ gap: 2 }} onClick={() => { setColorOpen(v => !v); setShapeOpen(false); }}>
                         <div style={{
                             width: 10, height: 10, borderRadius: '50%',
                             background: obj.branchColor ?? '#6366f1',
                             border: '1px solid rgba(255,255,255,0.3)',
                         }} />
-                        <span style={{ fontSize: 9 }}>▾</span>
+                        <span aria-hidden="true" style={{ fontSize: 9 }}>▾</span>
                     </button>
                 </Tooltip>
             </Popover>
@@ -487,8 +533,9 @@ const MindMapFloatingBar: React.FC = () => {
                         {SHAPES.map(({ key, label, preview }) => {
                             const current = extendedObj.shapeClass ?? '';
                             return (
-                                <button key={key || 'default'}
+                                <button type="button" key={key || 'default'}
                                     title={label}
+                                    aria-label={`节点形状：${label}`}
                                     className={`${styles.shapeBtn} ${current === key ? styles.shapeBtnActive : ''}`}
                                     onClick={() => {
                                         try {
@@ -509,8 +556,8 @@ const MindMapFloatingBar: React.FC = () => {
                 }
             >
                 <Tooltip title="节点形状">
-                    <button className={styles.btn} onClick={() => { setShapeOpen(v => !v); setColorOpen(false); }}>
-                        <span style={{ fontSize: 13 }}>◇</span>
+                    <button type="button" className={styles.btn} aria-label="节点形状" title="节点形状" onClick={() => { setShapeOpen(v => !v); setColorOpen(false); }}>
+                        <span aria-hidden="true" style={{ fontSize: 13 }}>◇</span>
                     </button>
                 </Tooltip>
             </Popover>
@@ -532,6 +579,7 @@ const MindMapFloatingBar: React.FC = () => {
                     <div className={styles.notePopover}>
                         <textarea
                             className={styles.noteTextarea}
+                            aria-label="节点备注"
                             value={noteText}
                             onChange={e => setNoteText(e.target.value)}
                             placeholder="输入备注（支持 Markdown）..."
@@ -539,6 +587,7 @@ const MindMapFloatingBar: React.FC = () => {
                         />
                         <div className={styles.noteActions}>
                             <button
+                                type="button"
                                 className={styles.noteBtnClear}
                                 onClick={() => {
                                     try {
@@ -551,6 +600,7 @@ const MindMapFloatingBar: React.FC = () => {
                                 }}
                             >清除</button>
                             <button
+                                type="button"
                                 className={styles.noteBtnSave}
                                 onClick={() => {
                                     try {
@@ -568,11 +618,14 @@ const MindMapFloatingBar: React.FC = () => {
             >
                 <Tooltip title={obj.note ? '编辑备注' : '添加备注'}>
                     <button
+                        type="button"
                         className={styles.btn}
+                        aria-label={obj.note ? '编辑备注' : '添加备注'}
+                        title={obj.note ? '编辑备注' : '添加备注'}
                         style={{ color: obj.note ? '#f59e0b' : 'rgba(255, 255, 255, 0.7)' }}
                         onClick={() => setNoteOpen(v => !v)}
                     >
-                        <span style={{ fontSize: 13 }}>📝</span>
+                        <span aria-hidden="true" style={{ fontSize: 13 }}>📝</span>
                     </button>
                 </Tooltip>
             </Popover>
