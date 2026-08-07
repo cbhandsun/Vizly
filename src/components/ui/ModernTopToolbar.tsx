@@ -373,7 +373,7 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
           {/* Contextual Toolbar Pill (Dynamic Actions) */}
           <div 
             id="vizly-plugin-context-toolbar-portal" 
-            className={`${islandBaseClass} min-w-0 max-w-full px-2 empty:hidden`}
+            className={`${islandBaseClass} min-w-0 max-w-full px-2 empty:hidden ${isMobile ? 'flex-1 w-full' : ''}`}
           />
         </div>
       </div>

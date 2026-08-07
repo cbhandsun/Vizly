@@ -7,6 +7,8 @@ const themeSelectorSource = readFileSync(resolve(process.cwd(), 'src/core/compon
 const directionSelectorSource = readFileSync(resolve(process.cwd(), 'src/core/components/mindmap-v2/MindMapDirectionSelector.tsx'), 'utf8');
 const css = readFileSync(resolve(process.cwd(), 'src/core/components/mindmap-v2/MindElixirToolbar.css'), 'utf8');
 const topToolbarSource = readFileSync(resolve(process.cwd(), 'src/components/ui/ModernTopToolbar.tsx'), 'utf8');
+const topActionButtonsSource = readFileSync(resolve(process.cwd(), 'src/core/components/diagrams/TopActionButtons.tsx'), 'utf8');
+const iconButtonSource = readFileSync(resolve(process.cwd(), 'src/core/components/mindmap-v2/MindMapToolbarIconButton.tsx'), 'utf8');
 
 describe('MindElixirToolbar commercial interaction contract', () => {
     it('uses one accessible toolbar button contract and semantic toolbar boundaries', () => {
@@ -25,13 +27,17 @@ describe('MindElixirToolbar commercial interaction contract', () => {
         expect(source).toContain("aria-expanded={openMenu === 'export'}");
         expect(source).toContain("aria-expanded={openMenu === 'import'}");
         expect(source).toContain("aria-expanded={openMenu === 'background'}");
+        expect(source.match(/suppressTooltip=\{openMenu !== null\}/g)).toHaveLength(4);
+        expect(iconButtonSource).toContain('open={suppressTooltip ? false : undefined}');
         expect(source).not.toContain('<Button');
         expect(source).not.toContain('let _isFocused');
-        expect(topToolbarSource).toMatch(/vizly-plugin-context-toolbar-portal[\s\S]*?min-w-0 max-w-full/);
+        expect(topToolbarSource).toMatch(/vizly-plugin-context-toolbar-portal[\s\S]*?min-w-0 max-w-full[\s\S]*?flex-1 w-full/);
+        expect(topActionButtonsSource).toContain("minWidth: 0, maxWidth: '100%', width: '100%'");
     });
 
     it('keeps every tool reachable by touch and keyboard without text-symbol icons', () => {
         expect(css).toMatch(/\.mind-elixir-toolbar-button[\s\S]*?min-width: var\(--commercial-touch-target, 44px\)[\s\S]*?height: var\(--commercial-touch-target, 44px\)/);
+        expect(css).toMatch(/\.mind-elixir-toolbar \{[\s\S]*?width: 100%;[\s\S]*?overflow-x: auto;/);
         expect(css).toMatch(/\.mind-elixir-toolbar-zoom-reset[\s\S]*?min-width: var\(--commercial-touch-target, 44px\)[\s\S]*?height: var\(--commercial-touch-target, 44px\)/);
         expect(source).toContain('<button');
         expect(source).not.toContain('⊞');

@@ -487,7 +487,7 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
     );
 
     const contextContent = children ? (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '2px', minWidth: 0, maxWidth: '100%', width: '100%' }}>
             {children}
         </div>
     ) : null;

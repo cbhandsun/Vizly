@@ -496,7 +496,7 @@ const MindElixirToolbar: React.FC = () => {
                 getPopupContainer={getViewportPopupContainer}
                 trigger={['click']}
             >
-                <MindMapToolbarIconButton aria-expanded={openMenu === 'export'} aria-haspopup="menu" label="导出思维导图" icon={<ExportOutlined />} disabled={!mind} />
+                <MindMapToolbarIconButton aria-expanded={openMenu === 'export'} aria-haspopup="menu" label="导出思维导图" icon={<ExportOutlined />} disabled={!mind} suppressTooltip={openMenu !== null} />
             </Dropdown>
 
             {/* Hidden file inputs */}
@@ -522,7 +522,7 @@ const MindElixirToolbar: React.FC = () => {
                 getPopupContainer={getViewportPopupContainer}
                 trigger={['click']}
             >
-                <MindMapToolbarIconButton aria-expanded={openMenu === 'import'} aria-haspopup="menu" label="导入思维导图" icon={<UploadOutlined />} disabled={!mind} />
+                <MindMapToolbarIconButton aria-expanded={openMenu === 'import'} aria-haspopup="menu" label="导入思维导图" icon={<UploadOutlined />} disabled={!mind} suppressTooltip={openMenu !== null} />
             </Dropdown>
 
             {/* Node stats badge */}
@@ -600,6 +600,7 @@ const MindElixirToolbar: React.FC = () => {
                     aria-haspopup="menu"
                     label={`画布背景，当前${bgPattern === 'grid' ? '网格' : bgPattern === 'dots' ? '点阵' : '纯色'}`}
                     icon={<AppstoreOutlined />}
+                    suppressTooltip={openMenu !== null}
                     style={{ color: bgPattern !== 'none' ? '#6366f1' : 'rgba(255,255,255,0.4)' }}
                 />
             </Dropdown>
