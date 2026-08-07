@@ -39,6 +39,7 @@ export interface MultiPageHistoryScopes {
     removeScope: (pageId: string) => void;
     clearSelection?: () => void;
     scopeId?: string;
+    captureCurrentState?: () => { nodes: Node[]; edges: Edge[] };
 }
 
 export const createMultiPageHistoryScopeKey = (scopeId: string, pageId: string): string => (
@@ -68,6 +69,7 @@ export const useMultiPage = (
     const switchHistoryScope = historyScopes?.switchScope;
     const removeHistoryScope = historyScopes?.removeScope;
     const clearSelection = historyScopes?.clearSelection;
+    const captureCurrentState = historyScopes?.captureCurrentState;
     const historyScopeId = historyScopes?.scopeId?.trim() ?? '';
     const getHistoryScopeKey = useMemo(
         () => historyScopeId
@@ -94,6 +96,14 @@ export const useMultiPage = (
         activateHistoryScope(activePageId);
     }, [activateHistoryScope, activePageId]);
 
+    const readCurrentState = useCallback(() => {
+        const captured = captureCurrentState?.();
+        return {
+            nodes: clearSelectedItems(captured?.nodes ?? getCurrentNodes()),
+            edges: clearSelectedItems(captured?.edges ?? getCurrentEdges()),
+        };
+    }, [captureCurrentState, getCurrentEdges, getCurrentNodes]);
+
     // 切换页面
     const switchPage = useCallback((targetPageId: string) => {
         if (targetPageId === activePageId) return;
@@ -106,8 +116,7 @@ export const useMultiPage = (
         clearSelection?.();
 
         // 保存当前页面状态
-        const currentNodes = clearSelectedItems(getCurrentNodes());
-        const currentEdges = clearSelectedItems(getCurrentEdges());
+        const { nodes: currentNodes, edges: currentEdges } = readCurrentState();
         const clearedTargetPage = clearPageSelection(targetPage);
 
         setPages(prev => {
@@ -126,15 +135,14 @@ export const useMultiPage = (
 
         activePageIdRef.current = targetPageId;
         setActivePageId(targetPageId);
-    }, [activePageId, activateHistoryScope, clearSelection, getCurrentNodes, getCurrentEdges, setNodes, setEdges]);
+    }, [activePageId, activateHistoryScope, clearSelection, readCurrentState, setNodes, setEdges]);
 
     // 添加页面
     const addPage = useCallback(() => {
         if (pagesRef.current.length >= MAX_DIAGRAM_PAGES) return null;
 
         // 先保存当前页面
-        const currentNodes = clearSelectedItems(getCurrentNodes());
-        const currentEdges = clearSelectedItems(getCurrentEdges());
+        const { nodes: currentNodes, edges: currentEdges } = readCurrentState();
 
         const newId = `page-${crypto.randomUUID()}`;
         const newName = createNextPageName(pagesRef.current);
@@ -164,7 +172,7 @@ export const useMultiPage = (
         setActivePageId(newId);
 
         return newId;
-    }, [activePageId, activateHistoryScope, clearSelection, getCurrentNodes, getCurrentEdges, setNodes, setEdges]);
+    }, [activePageId, activateHistoryScope, clearSelection, readCurrentState, setNodes, setEdges]);
 
     // 删除页面
     const deletePage = useCallback((pageId: string) => {
@@ -211,12 +219,15 @@ export const useMultiPage = (
         return true;
     }, []);
 
-    const getPersistedMetadata = useCallback(() => createMultiPageMetadata(
-        pagesRef.current.map(clearPageSelection),
-        activePageIdRef.current,
-        clearSelectedItems(getCurrentNodes()),
-        clearSelectedItems(getCurrentEdges()),
-    ), [getCurrentEdges, getCurrentNodes]);
+    const getPersistedMetadata = useCallback(() => {
+        const currentState = readCurrentState();
+        return createMultiPageMetadata(
+            pagesRef.current.map(clearPageSelection),
+            activePageIdRef.current,
+            currentState.nodes,
+            currentState.edges,
+        );
+    }, [readCurrentState]);
 
     const restorePersistedMetadata = useCallback((metadata: unknown) => {
         const restored = parseMultiPageMetadata(metadata);

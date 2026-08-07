@@ -13,6 +13,37 @@ const node = (id: string): Node => ({
 });
 
 describe('useMultiPage', () => {
+  it('captures plugin-owned canvas data before replacing the active page', () => {
+    let capturedNodes = [node('live-page-one')];
+    const captureCurrentState = vi.fn(() => ({ nodes: capturedNodes, edges: [] as Edge[] }));
+    const { result } = renderHook(() => useMultiPage(
+      () => [node('stale-react-flow-state')],
+      () => [],
+      vi.fn(),
+      vi.fn(),
+      {
+        switchScope: vi.fn(),
+        removeScope: vi.fn(),
+        captureCurrentState,
+      },
+    ));
+
+    act(() => {
+      result.current.addPage();
+    });
+
+    expect(captureCurrentState).toHaveBeenCalledTimes(1);
+    expect(result.current.pages.find(page => page.id === 'page-1')?.nodes).toEqual([
+      node('live-page-one'),
+    ]);
+
+    capturedNodes = [node('live-page-two')];
+    const persisted = result.current.getPersistedMetadata();
+    expect(persisted?.multiPage.pages.find(page => page.id === result.current.activePageId)?.nodes).toEqual([
+      node('live-page-two'),
+    ]);
+  });
+
   it('switches history scope with the active page and ignores invalid page ids', () => {
     const currentNodes = [node('page-one-node')];
     const setNodes = vi.fn();

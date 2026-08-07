@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { PluginContext } from '../../../types/plugin';
-import { loadMindElixirData, saveMindElixirData } from '../mindElixirPersistence';
+import {
+  captureMindElixirPageState,
+  loadMindElixirData,
+  saveMindElixirData,
+} from '../mindElixirPersistence';
 
 const storage = new Map<string, string>();
 
@@ -82,5 +86,31 @@ describe('mindElixirPersistence', () => {
         },
       },
     });
+  });
+
+  it('captures the live mind map synchronously before a page switch', () => {
+    const existingNodes = [{ id: 'keep', position: { x: 0, y: 0 }, data: {} }];
+    const existingEdges = [{ id: 'edge-1', source: 'a', target: 'b' }];
+    const pageState = captureMindElixirPageState(
+      context(existingNodes, existingEdges),
+      {
+        getData: () => ({
+          nodeData: { id: 'root', topic: '第二页主题', root: true, children: [] },
+          direction: 2,
+        }),
+      } as unknown as Parameters<typeof captureMindElixirPageState>[1],
+    );
+
+    expect(pageState.edges).toBe(existingEdges);
+    expect(pageState.nodes.map(node => node.id)).toEqual(['keep', '__mindmap_meta__']);
+    expect(pageState.nodes[1]).toMatchObject({
+      data: {
+        mindmapV2: {
+          _version: 'mindmap-v2',
+          nodeData: { id: 'root', topic: '第二页主题' },
+        },
+      },
+    });
+    expect(existingNodes).toHaveLength(1);
   });
 });

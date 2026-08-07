@@ -1,4 +1,5 @@
 import type { MindElixirData, MindElixirInstance, NodeObj } from 'mind-elixir';
+import type { Edge, Node } from '@xyflow/react';
 
 import type { PluginContext } from '../../types/plugin';
 import { coerceMindElixirDirection } from './mindElixirDirection';
@@ -76,23 +77,50 @@ export const loadMindElixirData = (ctx: PluginContext): MindElixirData => {
   }
 };
 
+export const createMindElixirPersistenceNodes = (
+  previous: Node[],
+  data: MindElixirData,
+): Node[] => {
+  const payload = createSafeMindMapV2Payload(
+    data,
+    resolveMindMapThemeKey(),
+    DEFAULT_DIRECTION,
+  );
+  return [
+    ...previous.filter(node => node.id !== '__mindmap_meta__'),
+    {
+      id: '__mindmap_meta__',
+      type: 'mindmap',
+      position: { x: -9999, y: -9999 },
+      hidden: true,
+      data: { mindmapV2: payload, depth: -1, label: '' },
+    },
+  ];
+};
+
+export const captureMindElixirPageState = (
+  ctx: PluginContext,
+  mind: MindElixirInstance | null,
+): { nodes: Node[]; edges: Edge[] } => {
+  const nodes = ctx.getNodes();
+  const edges = ctx.getEdges();
+  if (!mind) return { nodes, edges };
+
+  try {
+    return {
+      nodes: createMindElixirPersistenceNodes(nodes, mind.getData()),
+      edges,
+    };
+  } catch (error) {
+    logMindmapWrapperSaveFailure(error);
+    return { nodes, edges };
+  }
+};
+
 export const saveMindElixirData = (ctx: PluginContext, mind: MindElixirInstance): void => {
   try {
-    const payload = createSafeMindMapV2Payload(
-      mind.getData(),
-      resolveMindMapThemeKey(),
-      DEFAULT_DIRECTION,
-    );
-    ctx.setNodes(previous => [
-      ...previous.filter(node => node.id !== '__mindmap_meta__'),
-      {
-        id: '__mindmap_meta__',
-        type: 'mindmap',
-        position: { x: -9999, y: -9999 },
-        hidden: true,
-        data: { mindmapV2: payload, depth: -1, label: '' },
-      },
-    ]);
+    const data = mind.getData();
+    ctx.setNodes(previous => createMindElixirPersistenceNodes(previous, data));
   } catch (error) {
     logMindmapWrapperSaveFailure(error);
   }

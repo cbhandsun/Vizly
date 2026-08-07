@@ -16,6 +16,7 @@ import { FlowchartCanvasShell } from './FlowchartCanvasShell';
 import { FlowchartEmptyState } from './FlowchartEmptyState';
 import { FlowchartFileDropOverlay } from './FlowchartFileDropOverlay';
 import { FlowchartOnboardingHint } from './FlowchartOnboardingHint';
+import { PageScopedPluginCanvas } from './PageScopedPluginCanvas';
 import { shouldShowFlowchartOnboarding } from './flowchartResponsiveChrome';
 import { resolveFlowchartLeftClearance } from './flowchartChromeLayout';
 import { FreehandDrawingLayer } from './FreehandDrawingLayer';
@@ -675,12 +676,19 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                         currentColor={preset.name === 'sketch' ? '#555555' : '#000000'}
                                         onDrawEnd={handleAddFreehandStroke}
                                     />}
-                                    {editingEnabled && resolveFlowchartPluginContribution(
-                                        'canvas',
-                                        pluginCtx && activePlugin?.contributeCanvasComponents
-                                            ? () => activePlugin.contributeCanvasComponents?.(pluginCtx)
-                                            : null,
-                                        null,
+                                    {editingEnabled && pluginCtx && activePlugin?.contributeCanvasComponents && (
+                                        <PageScopedPluginCanvas
+                                            pageScope={multiPage.getPageOperationScope()}
+                                            ready={!isInitialDiagramLoading}
+                                            context={pluginCtx}
+                                            nodes={nodes}
+                                            edges={edges}
+                                            renderCanvas={(pageContext) => resolveFlowchartPluginContribution(
+                                                'canvas',
+                                                () => activePlugin.contributeCanvasComponents?.(pageContext),
+                                                null,
+                                            )}
+                                        />
                                     )}
                                     {activeUsers.length > 0 && yAwareness && (
                                         <LiveCursors activeUsers={activeUsers} yAwareness={yAwareness} />

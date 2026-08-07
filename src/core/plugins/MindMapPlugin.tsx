@@ -34,6 +34,7 @@ import {
     resolveMindMapThemeKey,
 } from '../components/mindmap-v2/mindmapThemeStorage';
 import { getFlowDataBridge } from '../utils/flowDataBridge';
+import { captureMindElixirPageState } from '../components/mindmap-v2/mindElixirPersistence';
 
 const isRecord = (value: unknown): value is Record<string, unknown> => (
     Boolean(value && typeof value === 'object' && !Array.isArray(value))
@@ -179,6 +180,10 @@ export class MindMapPlugin extends BaseDiagramPlugin implements DiagramTypePlugi
 
     getNodeTypes(): NodeTypes { return {}; }
     getEdgeTypes() { return {}; }
+
+    capturePageState(ctx: PluginContext) {
+        return captureMindElixirPageState(ctx, getMindElixirInstance());
+    }
 
     // ── Canvas Component ── mind-elixir renders here ──────────────────────────
     contributeCanvasComponents(ctx: PluginContext) {

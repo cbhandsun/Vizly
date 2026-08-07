@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
 import { MarkerType, type Edge, type Node, type ReactFlowInstance } from '@xyflow/react';
 import { useDiagramStylePreset_v2 } from '../../../hooks/useDiagramStylePreset_v2';
 import { diagramStyleManager } from '../../shared/DiagramStyleManager';
@@ -140,7 +140,7 @@ export function useDesignerCanvasState({
 
     const nodesRef = useRef(nodes);
     const edgesRef = useRef(edges);
-    useEffect(() => {
+    useLayoutEffect(() => {
         nodesRef.current = nodes;
         edgesRef.current = edges;
     }, [nodes, edges]);

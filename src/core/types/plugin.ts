@@ -80,6 +80,11 @@ export interface PluginContext {
   setPluginState?: <T>(patch: Partial<T> | ((prev: T) => T)) => void;
 }
 
+export interface PluginPageState {
+  nodes: Node[];
+  edges: Edge[];
+}
+
 export interface DiagramTypePlugin {
   /** 唯一标识 */
   id: string;
@@ -114,6 +119,11 @@ export interface DiagramTypePlugin {
   migrate?(oldData: unknown, oldVersion: string): unknown;
   /** 创建空白画布的初始数据 */
   getEmptyState(): { nodes: Node[]; edges: Edge[] };
+  /**
+   * 在多页面切换前同步捕获插件自渲染画布的最新数据。
+   * 未实现时，设计器直接使用当前 React Flow nodes/edges。
+   */
+  capturePageState?(ctx: PluginContext): PluginPageState;
 
   // ====== 布局 ======
   /** 返回该类型支持的布局策略名称列表 */

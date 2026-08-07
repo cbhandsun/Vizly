@@ -373,16 +373,31 @@ export const useFlowchartDesignerController = ({
     // 协作层 diagramId：优先使用 id prop，回退到导出 ID，避免多画布协作时 ID 冲突
     const diagramId = id || diagramIdForExport || 'default';
     const { updateLocalCursor } = useDiagramCollaboration(diagramId, !isReadonly);
+    const captureCurrentPageState = useCallback(() => {
+        if (activePlugin?.capturePageState && pluginCtx) {
+            return activePlugin.capturePageState(pluginCtx);
+        }
+        return { nodes: nodesRef.current, edges: edgesRef.current };
+    }, [activePlugin, edgesRef, nodesRef, pluginCtx]);
+    const setPageNodes = useCallback((nextNodes: typeof nodes) => {
+        nodesRef.current = nextNodes;
+        setNodes(nextNodes);
+    }, [nodesRef, setNodes]);
+    const setPageEdges = useCallback((nextEdges: typeof edges) => {
+        edgesRef.current = nextEdges;
+        setEdges(nextEdges);
+    }, [edgesRef, setEdges]);
     const multiPage = useMultiPage(
         () => nodesRef.current,
         () => edgesRef.current,
-        setNodes,
-        setEdges,
+        setPageNodes,
+        setPageEdges,
         {
             switchScope: switchHistoryScope,
             removeScope: removeHistoryScope,
             clearSelection,
             scopeId: diagramId,
+            captureCurrentState: captureCurrentPageState,
         },
     );
     const getOperationScope = useDiagramOperationScope(diagramId, multiPage.getPageOperationScope);
