@@ -199,6 +199,53 @@ describe('flowchart designer architecture hooks', () => {
         wrapper.remove();
     });
 
+    it('hands pointer-selected edge focus over after React Flow selection settles', () => {
+        const animationFrames: FrameRequestCallback[] = [];
+        vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+            animationFrames.push(callback);
+            return animationFrames.length;
+        });
+        const edge = { id: 'edge-1', source: 'source', target: 'target' } as Edge;
+        const wrapper = document.createElement('div');
+        wrapper.className = 'react-flow__edge';
+        wrapper.dataset.id = edge.id;
+        wrapper.tabIndex = 0;
+        document.body.append(wrapper);
+        const { result, rerender } = renderHook(
+            ({ isReadonly }) => useFlowchartCanvasCommands({
+                t: ((key: string) => key) as never,
+                getNodes: () => [],
+                getEdges: () => [edge],
+                setNodes: vi.fn(),
+                setEdges: vi.fn(),
+                takeSnapshot: vi.fn(),
+                handleStrategyLayout: vi.fn(),
+                isReadonly,
+                showGrid: true,
+                gridVariant: BackgroundVariant.Lines,
+                setGridVariant: vi.fn(),
+                setShowGrid: vi.fn(),
+                reactFlowInstance: null,
+                viewport: { x: 0, y: 0, zoom: 1 },
+                createFromTemplate: vi.fn(() => ({ nodes: [], edges: [] })),
+                templates: [],
+                selectedNodes: [],
+                updateNodesBatch: vi.fn(),
+            }),
+            { initialProps: { isReadonly: false } },
+        );
+
+        act(() => result.current.handleEdgeClick({} as never, edge));
+        expect(animationFrames).toHaveLength(1);
+        act(() => animationFrames[0](0));
+        expect(document.activeElement).toBe(wrapper);
+
+        rerender({ isReadonly: true });
+        act(() => result.current.handleEdgeClick({} as never, edge));
+        expect(animationFrames).toHaveLength(1);
+        wrapper.remove();
+    });
+
     it('binds external snapshot events to current canvas getters', () => {
         const nodes = [{ id: 'node-1' }] as Node[];
         const edges = [{ id: 'edge-1', source: 'node-1', target: 'node-1' }] as Edge[];

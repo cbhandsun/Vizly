@@ -102,6 +102,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
         handleDuplicateWithToast,
         handleGroupWithToast,
         handleUngroupWithToast,
+        handleEdgeClick,
         handleEdgeDoubleClick,
         handleFitView,
         handleGridRotate,
@@ -552,6 +553,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                     onPaneDoubleClick={onPaneDoubleClick}
                                     onNodeContextMenu={onNodeContextMenu}
                                     onEdgeContextMenu={onEdgeContextMenu}
+                                    onEdgeClick={handleEdgeClick}
                                     onEdgeDoubleClick={handleEdgeDoubleClick}
                                     onPaneContextMenu={onPaneContextMenu}
                                     onNodeDragStart={wrappedOnNodeDragStart}

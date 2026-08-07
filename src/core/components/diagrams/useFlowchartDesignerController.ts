@@ -462,7 +462,7 @@ export const useFlowchartDesignerController = ({
     }, [internalEdgeMode, setAutoRoutingEnabled]);
 
     const {
-        handleSmartLayout, handleSmartOptimize, handleEdgeDoubleClick, handleGridRotate,
+        handleSmartLayout, handleSmartOptimize, handleEdgeClick, handleEdgeDoubleClick, handleGridRotate,
         handleClearCanvasCommand, handleExportMermaid, handleCopyAsMermaid,
         handleUseTemplate, handleOpacity,
     } = useFlowchartCanvasCommands({
@@ -662,7 +662,7 @@ export const useFlowchartDesignerController = ({
         edgesRef, enhancedOnConnect, enhancedOnConnectEnd, exportModalVisible, extraExportItems, fileInputRef,
         getPreviousState, getReactFlowSnapshot, gridColor, gridVariant, groupedTemplates, guides, handleAddFreehandStroke, handleAddMindMap, handleAddNode, handleAddStickyNote, handleAlign,
         handleBeforeUpdate, handleBringToFront, handleContextMenuAction, handleDeleteWithToast, handleDistribute, handleDuplicateWithToast, handleGroupWithToast, handleUngroupWithToast,
-        handleEdgeDoubleClick, handleFitView, handleFocusNode, handleGridRotate, handleImport, handleRequestImport, handleLock, handleOpacity,
+        handleEdgeClick, handleEdgeDoubleClick, handleFitView, handleFocusNode, handleGridRotate, handleImport, handleRequestImport, handleLock, handleOpacity,
         handleOpenJsonEditor, handleOpenSettings, handlePaneClick, handlePresentationFocus, handleReactFlowInit, handleReadonlyChange, handleReconnect,
         handleReconnectEnd, handleReconnectStart, handleSearchReplaceAll, handleSearchReplaceMatch, handleSendToBack, handleSmartOptimize, handleStrategyLayout,
         handleToggleHighlightMainFlow, handleToggleShowOnlyMainFlow, handleTouchEnd, handleTouchStart, handleUseTemplate, handleWrappedCloudSave,

@@ -3,6 +3,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
     focusAddedFlowchartNodeById,
+    focusFlowchartEdgeById,
     focusFlowchartNodeById,
     shouldHandleFlowchartCanvasTab,
 } from '../flowchartTabNavigation';
@@ -91,5 +92,21 @@ describe('flowchartTabNavigation', () => {
         expect(focusAddedFlowchartNodeById(document, 'x'.repeat(1_025))).toBe(false);
         expect(focusAddedFlowchartNodeById(document, 'missing')).toBe(false);
         expect(focusAddedFlowchartNodeById(document, 'node-1"] .unsafe')).toBe(false);
+    });
+
+    it('hands pointer-selected edge focus to its safe focusable container', () => {
+        document.body.innerHTML = `
+            <div class="react-flow__edge" data-id="edge-1" tabindex="0"></div>
+            <div class="react-flow__edge" data-id="edge-2" tabindex="0"></div>
+        `;
+        const edge = document.querySelector<HTMLElement>('[data-id="edge-2"]');
+        if (!edge) throw new Error('test fixture missing');
+
+        expect(focusFlowchartEdgeById(document, 'edge-2')).toBe(true);
+        expect(document.activeElement).toBe(edge);
+        expect(focusFlowchartEdgeById(document, '')).toBe(false);
+        expect(focusFlowchartEdgeById(document, 'x'.repeat(1_025))).toBe(false);
+        expect(focusFlowchartEdgeById(document, 'missing')).toBe(false);
+        expect(focusFlowchartEdgeById(document, 'edge-1"] .unsafe')).toBe(false);
     });
 });

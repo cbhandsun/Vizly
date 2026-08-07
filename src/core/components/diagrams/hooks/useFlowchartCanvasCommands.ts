@@ -15,7 +15,10 @@ import {
     buildFlowchartEdgeInsertionPlan,
     commitFlowchartEdgeInsertion,
 } from '../flowchartEdgeInsertion';
-import { focusAddedFlowchartNodeById } from '../flowchartTabNavigation';
+import {
+    focusAddedFlowchartNodeById,
+    focusFlowchartEdgeById,
+} from '../flowchartTabNavigation';
 import {
     buildFlowchartClearCanvasConfirm,
     clearFlowchartCanvas,
@@ -171,6 +174,13 @@ export function useFlowchartCanvasCommands({
         appMessage.success(t('designer.flowchart.edgeNodeInserted'));
     }, [getEdges, getNodes, isReadonly, setEdges, setNodes, t, takeSnapshot]);
 
+    const handleEdgeClick = useCallback((_event: React.MouseEvent, edge: Edge) => {
+        if (isReadonly) return;
+        window.requestAnimationFrame(() => {
+            focusFlowchartEdgeById(document, edge.id);
+        });
+    }, [isReadonly]);
+
     const handleGridRotate = useCallback(() => {
         const variants = [BackgroundVariant.Lines, BackgroundVariant.Dots, BackgroundVariant.Cross];
         if (!showGrid) {
@@ -255,6 +265,7 @@ export function useFlowchartCanvasCommands({
     return {
         handleSmartLayout,
         handleSmartOptimize,
+        handleEdgeClick,
         handleEdgeDoubleClick,
         handleGridRotate,
         handleClearCanvasCommand,

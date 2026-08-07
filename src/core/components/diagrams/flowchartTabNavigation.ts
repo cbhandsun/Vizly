@@ -44,6 +44,24 @@ export const focusFlowchartNodeById = (
 };
 
 /**
+ * Keeps pointer selection and keyboard context on the same edge. React Flow
+ * selects SVG edges on click but browsers do not focus the SVG group by
+ * default, so focus must be handed over explicitly after selection settles.
+ */
+export const focusFlowchartEdgeById = (
+    root: ParentNode,
+    edgeId: string,
+): boolean => {
+    if (!edgeId || edgeId.length > 1_024) return false;
+    const edge = Array.from(
+        root.querySelectorAll<HTMLElement>('.react-flow__edge[data-id]'),
+    ).find(candidate => candidate.getAttribute('data-id') === edgeId);
+    if (!edge) return false;
+    edge.focus({ preventScroll: true });
+    return edge.ownerDocument.activeElement === edge;
+};
+
+/**
  * Hands interaction context to a newly-created node after mobile chrome closes.
  * Prefer the selected semantic tree item so assistive technology receives the
  * node's selected state; fall back to React Flow's focusable node container.
