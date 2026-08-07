@@ -102,6 +102,28 @@ describe('PageTabs', () => {
         expect(screen.getByRole('textbox', { name: '重命名页面 页面 1' })).toBeTruthy();
     });
 
+    it('selects the current page name when rename starts', async () => {
+        render(
+            <PageTabs
+                pages={[{ id: 'page-1', name: '页面 1', nodes: [], edges: [] }]}
+                activePageId="page-1"
+                onSwitchPage={vi.fn()}
+                onAddPage={vi.fn()}
+                onDeletePage={vi.fn()}
+                onRenamePage={vi.fn()}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: '重命名页面 页面 1' }));
+        const input = screen.getByRole('textbox', { name: '重命名页面 页面 1' }) as HTMLInputElement;
+
+        await waitFor(() => {
+            expect(document.activeElement).toBe(input);
+            expect(input.selectionStart).toBe(0);
+            expect(input.selectionEnd).toBe(input.value.length);
+        });
+    });
+
     it('moves focus to the newly active page after creation', async () => {
         const PageTabsHarness = () => {
             const [pages, setPages] = useState([
@@ -210,6 +232,39 @@ describe('PageTabs', () => {
         expect(onRenamePage).not.toHaveBeenCalled();
     });
 
+    it('restores tab focus after a successful rename', async () => {
+        const PageTabsHarness = () => {
+            const [pages, setPages] = useState([
+                { id: 'page-1', name: '页面 1', nodes: [], edges: [] },
+            ]);
+            return (
+                <PageTabs
+                    pages={pages}
+                    activePageId="page-1"
+                    onSwitchPage={vi.fn()}
+                    onAddPage={vi.fn()}
+                    onDeletePage={vi.fn()}
+                    onRenamePage={(pageId, name) => {
+                        setPages(current => current.map(page => (
+                            page.id === pageId ? { ...page, name } : page
+                        )));
+                        return true;
+                    }}
+                />
+            );
+        };
+
+        render(<PageTabsHarness />);
+        fireEvent.click(screen.getByRole('button', { name: '重命名页面 页面 1' }));
+        const input = screen.getByRole('textbox', { name: '重命名页面 页面 1' });
+        fireEvent.change(input, { target: { value: '总览' } });
+        fireEvent.keyDown(input, { key: 'Enter' });
+
+        const renamedTab = await screen.findByRole('tab', { name: '总览' });
+        await waitFor(() => expect(document.activeElement).toBe(renamedTab));
+        expect(renamedTab.getAttribute('aria-selected')).toBe('true');
+    });
+
     it('disables page creation at the 50-page limit', () => {
         const onAddPage = vi.fn();
         const pages = Array.from({ length: 50 }, (_, index) => ({
@@ -262,7 +317,11 @@ describe('PageTabs', () => {
         fireEvent.click(deleteButton);
         expect(await screen.findByText('删除「页面 2」？')).toBeTruthy();
         expect(screen.getByText('将永久删除此页面中的 1 个节点和 0 条连线，且无法撤销。')).toBeTruthy();
-        fireEvent.click(screen.getByRole('button', { name: /取\s*消/ }));
+        const cancelButton = screen.getByRole('button', { name: /取\s*消/ });
+        const confirmButton = screen.getByRole('button', { name: /^删\s*除$/ });
+        await waitFor(() => expect(document.activeElement).toBe(cancelButton));
+        expect(confirmButton.classList.contains('ant-btn-dangerous')).toBe(true);
+        fireEvent.click(cancelButton);
 
         await waitFor(() => expect(deleteButton.getAttribute('aria-describedby')).toBeNull());
         await waitFor(() => expect(document.activeElement).toBe(deleteButton));

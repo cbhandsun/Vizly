@@ -50,6 +50,14 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
         deleteButtonRefs.current.get(pageId)?.focus({ preventScroll: true });
     }, []);
 
+    const focusDeleteCancelButton = useCallback(() => {
+        setTimeout(() => {
+            getViewportOverlayContainer()
+                .querySelector<HTMLButtonElement>('[data-page-tabs-delete-cancel="true"]')
+                ?.focus({ preventScroll: true });
+        }, 0);
+    }, []);
+
     useEffect(() => {
         if (!restoreFocusAfterDeleteRef.current) return;
         restoreFocusAfterDeleteRef.current = false;
@@ -69,7 +77,10 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
         setEditingId(page.id);
         setEditName(page.name);
         setRenameError(null);
-        setTimeout(() => inputRef.current?.focus(), 50);
+        setTimeout(() => {
+            inputRef.current?.focus();
+            inputRef.current?.select();
+        }, 50);
     }, []);
 
     const handleFinishRename = useCallback(() => {
@@ -87,9 +98,11 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
             setRenameError(t('designer.pages.renameFailed', { defaultValue: '页面重命名失败，请重试' }));
             return;
         }
+        const renamedPageId = editingId;
         setRenameError(null);
         setEditingId(null);
-    }, [editingId, editName, onRenamePage, pages, t]);
+        requestAnimationFrame(() => focusPageTab(renamedPageId));
+    }, [editingId, editName, focusPageTab, onRenamePage, pages, t]);
 
     const handleRenameKeyDown = useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
         if (event.key !== 'Escape' || !editingId) return;
@@ -234,7 +247,8 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                                 open={confirmingPageId === page.id}
                                 onOpenChange={open => {
                                     setConfirmingPageId(open ? page.id : null);
-                                    if (!open) requestAnimationFrame(() => focusDeleteButton(page.id));
+                                    if (open) focusDeleteCancelButton();
+                                    else requestAnimationFrame(() => focusDeleteButton(page.id));
                                 }}
                                 onConfirm={() => {
                                     const deleted = onDeletePage(page.id);
@@ -247,6 +261,8 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                                 }}
                                 okText={t('designer.pages.deleteAction', { defaultValue: '删除' })}
                                 cancelText={t('common.cancel', { defaultValue: '取消' })}
+                                cancelButtonProps={{ 'data-page-tabs-delete-cancel': 'true' }}
+                                okButtonProps={{ danger: true }}
                                 destroyOnHidden
                             >
                                 <button
