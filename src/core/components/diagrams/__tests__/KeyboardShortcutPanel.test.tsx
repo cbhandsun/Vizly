@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import React from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import React, { useState } from 'react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { KeyboardShortcutPanel } from '../KeyboardShortcutPanel';
 
@@ -66,5 +66,33 @@ describe('KeyboardShortcutPanel', () => {
         fireEvent.keyDown(window, { key: '/', shiftKey: true });
 
         expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns focus to the persistent trigger after Escape closes the panel', async () => {
+        const Harness = () => {
+            const [visible, setVisible] = useState(false);
+            return (
+                <>
+                    <button type="button" onClick={() => setVisible(true)}>打开快捷键帮助</button>
+                    {visible && (
+                        <KeyboardShortcutPanel
+                            visible
+                            onClose={() => setVisible(false)}
+                        />
+                    )}
+                </>
+            );
+        };
+
+        render(<Harness />);
+        const trigger = screen.getByRole('button', { name: '打开快捷键帮助' });
+        trigger.focus();
+        fireEvent.click(trigger);
+
+        const closeButton = await screen.findByRole('button', { name: 'Close' });
+        fireEvent.keyDown(closeButton, { key: 'Escape' });
+
+        await waitFor(() => expect(screen.queryByText('键盘快捷键')).toBeNull());
+        await waitFor(() => expect(document.activeElement).toBe(trigger));
     });
 });

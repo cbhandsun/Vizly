@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, memo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react';
 import { createPortal } from 'react-dom';
 import {
     FaUndo, FaRedo, FaSearchPlus, FaSearchMinus, FaCompressArrowsAlt,
@@ -150,12 +150,26 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
     const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
     const [contextPortalTarget, setContextPortalTarget] = useState<HTMLElement | null>(null);
     const [bottomPortalTarget, setBottomPortalTarget] = useState<HTMLElement | null>(null);
+    const [canvasSettingsOpen, setCanvasSettingsOpen] = useState(false);
+    const canvasSettingsTriggerRef = useRef<HTMLButtonElement>(null);
     const layoutDropdown = useKeyboardAccessibleDropdown({
         overlayClassName: 'flowchart-layout-menu',
     });
     const moreDropdown = useKeyboardAccessibleDropdown({
         overlayClassName: isMobile ? 'flowchart-mobile-more-menu' : 'flowchart-more-menu',
     });
+    const moreDropdownTriggerRef = moreDropdown.triggerRef;
+    const handleMoreDropdownOpenChange = moreDropdown.handleOpenChange;
+    const handleShowShortcutsFromCanvasSettings = useCallback(() => {
+        setCanvasSettingsOpen(false);
+        canvasSettingsTriggerRef.current?.focus();
+        onShowShortcuts();
+    }, [onShowShortcuts]);
+    const handleShowShortcutsFromMoreMenu = useCallback(() => {
+        handleMoreDropdownOpenChange(false, { source: 'menu' });
+        moreDropdownTriggerRef.current?.focus();
+        onShowShortcuts();
+    }, [handleMoreDropdownOpenChange, moreDropdownTriggerRef, onShowShortcuts]);
 
     useEffect(() => {
         const timer = window.setTimeout(() => {
@@ -278,7 +292,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
             key: 'shortcuts',
             label: t('designer.toolbar.shortcuts'),
             icon: <FaKeyboard />,
-            onClick: onShowShortcuts,
+            onClick: handleShowShortcutsFromMoreMenu,
         },
         { type: 'divider' as const },
         {
@@ -320,7 +334,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
     ], [
         t, gridInfo, toggleGrid, showRuler, toggleRuler, toggleMinimap, showMinimap, isMobile,
         onToggleSnap, snapToGrid,
-        onShowShortcuts, onShowCanvasSearch, onImportClick, onExport, onActivatePointer, toggleSelectionMode,
+        handleShowShortcutsFromMoreMenu, onShowCanvasSearch, onImportClick, onExport, onActivatePointer, toggleSelectionMode,
         onToggleDrawingMode, onAddStickyNote, onAddMindMap, isMarqueeActive, isDrawingMode,
     ]);
 
@@ -336,7 +350,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
     const CanvasSettingsContent = (
         <FlowchartCanvasSettingsContent
             gridInfo={gridInfo}
-            onShowShortcuts={onShowShortcuts}
+            onShowShortcuts={handleShowShortcutsFromCanvasSettings}
             showGrid={showGrid}
             showMinimap={showMinimap}
             showRuler={showRuler}
@@ -496,9 +510,17 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                         </Tooltip>
                     )}
 
-                    <Popover content={CanvasSettingsContent} trigger="click" placement="bottomRight">
+                    <Popover
+                        content={CanvasSettingsContent}
+                        trigger="click"
+                        placement="bottomRight"
+                        open={canvasSettingsOpen}
+                        onOpenChange={setCanvasSettingsOpen}
+                        destroyOnHidden
+                    >
                         <Tooltip title={t('toolbar.canvasSettings', '画布设置')}>
                             <Button
+                                ref={canvasSettingsTriggerRef}
                                 type="text"
                                 aria-label={t('toolbar.canvasSettings', '画布设置')}
                                 icon={

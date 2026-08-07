@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Input, Modal, Space, theme } from 'antd';
 import { SearchOutlined } from '@ant-design/icons';
 import { FaKeyboard } from 'react-icons/fa';
@@ -94,6 +94,13 @@ const KeyBadge: React.FC<{ children: string; token: ThemeToken }> = ({ children,
 export const KeyboardShortcutPanel: React.FC<KeyboardShortcutPanelProps> = ({ visible, onClose }) => {
     const { token } = theme.useToken();
     const [searchText, setSearchText] = useState('');
+    const returnFocusRef = useRef<HTMLElement | null>(
+        typeof document !== 'undefined'
+        && document.activeElement instanceof HTMLElement
+        && document.activeElement !== document.body
+            ? document.activeElement
+            : null,
+    );
     const shortcutGroups = useMemo(() => createShortcutGroups(
         typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform),
     ), []);
@@ -112,6 +119,16 @@ export const KeyboardShortcutPanel: React.FC<KeyboardShortcutPanelProps> = ({ vi
             .filter((group) => group.items.length > 0);
     }, [searchText, shortcutGroups]);
 
+    const closePanel = useCallback(() => {
+        const returnFocus = returnFocusRef.current;
+        returnFocusRef.current = null;
+        onClose();
+        if (!returnFocus) return;
+        window.setTimeout(() => {
+            if (returnFocus.isConnected) returnFocus.focus();
+        }, 0);
+    }, [onClose]);
+
     useEffect(() => {
         if (!visible) return;
 
@@ -125,18 +142,18 @@ export const KeyboardShortcutPanel: React.FC<KeyboardShortcutPanelProps> = ({ vi
             if (!canCloseFromShortcut || !isHelpShortcut) return;
             event.preventDefault();
             event.stopImmediatePropagation();
-            onClose();
+            closePanel();
         };
 
         window.addEventListener('keydown', handleShortcutPanelToggle, { capture: true });
         return () => window.removeEventListener('keydown', handleShortcutPanelToggle, { capture: true });
-    }, [onClose, visible]);
+    }, [closePanel, visible]);
 
     return (
         <Modal
             title={<Space><FaKeyboard aria-hidden="true" />键盘快捷键</Space>}
             open={visible}
-            onCancel={onClose}
+            onCancel={closePanel}
             footer={null}
             width={520}
             centered

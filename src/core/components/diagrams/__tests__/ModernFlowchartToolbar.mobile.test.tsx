@@ -487,4 +487,86 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
         expect(onAlign).not.toHaveBeenCalled();
         expect(onDistribute).not.toHaveBeenCalled();
     });
+
+    it('closes canvas settings and focuses its trigger before opening shortcut help', async () => {
+        Object.defineProperty(window, 'matchMedia', {
+            configurable: true,
+            value: vi.fn().mockImplementation((query: string) => ({
+                matches: true,
+                media: query,
+                onchange: null,
+                addListener: vi.fn(),
+                removeListener: vi.fn(),
+                addEventListener: vi.fn(),
+                removeEventListener: vi.fn(),
+                dispatchEvent: vi.fn(),
+            })),
+        });
+
+        let settingsTrigger: HTMLButtonElement | null = null;
+        const onShowShortcuts = vi.fn(() => {
+            expect(document.activeElement).toBe(settingsTrigger);
+        });
+        render(
+            <ModernFlowchartToolbar
+                canUndo={false}
+                canRedo={false}
+                onUndo={vi.fn()}
+                onRedo={vi.fn()}
+                onZoomIn={vi.fn()}
+                onZoomOut={vi.fn()}
+                onFitView={vi.fn()}
+                autoRouting={false}
+                toggleAutoRouting={vi.fn()}
+                showGrid
+                toggleGrid={vi.fn()}
+                onShowShortcuts={onShowShortcuts}
+                showRuler={false}
+                toggleRuler={vi.fn()}
+            />,
+        );
+
+        settingsTrigger = await screen.findByRole('button', { name: '画布设置' }) as HTMLButtonElement;
+        fireEvent.click(settingsTrigger);
+        const shortcuts = await screen.findByRole('button', { name: '快捷键' });
+        fireEvent.click(shortcuts);
+
+        expect(onShowShortcuts).toHaveBeenCalledTimes(1);
+        await waitFor(() => expect(document.querySelector('.ant-popover')?.className).toContain('ant-zoom-big-leave'));
+        expect(document.activeElement).toBe(settingsTrigger);
+    });
+
+    it('closes the mobile more menu and focuses its trigger before opening shortcut help', async () => {
+        let moreTrigger: HTMLButtonElement | null = null;
+        const onShowShortcuts = vi.fn(() => {
+            expect(document.activeElement).toBe(moreTrigger);
+        });
+        render(
+            <ModernFlowchartToolbar
+                canUndo={false}
+                canRedo={false}
+                onUndo={vi.fn()}
+                onRedo={vi.fn()}
+                onZoomIn={vi.fn()}
+                onZoomOut={vi.fn()}
+                onFitView={vi.fn()}
+                autoRouting={false}
+                toggleAutoRouting={vi.fn()}
+                showGrid
+                toggleGrid={vi.fn()}
+                onShowShortcuts={onShowShortcuts}
+                showRuler={false}
+                toggleRuler={vi.fn()}
+            />,
+        );
+
+        moreTrigger = await screen.findByRole('button', { name: /更多操作|moreActions/i }) as HTMLButtonElement;
+        fireEvent.click(moreTrigger);
+        const shortcuts = await screen.findByRole('menuitem', { name: /shortcuts|快捷键/i });
+        fireEvent.click(shortcuts);
+
+        expect(onShowShortcuts).toHaveBeenCalledTimes(1);
+        await waitFor(() => expect(document.querySelector('.flowchart-mobile-more-menu')?.className).toContain('ant-slide-up-leave'));
+        expect(document.activeElement).toBe(moreTrigger);
+    });
 });
