@@ -140,3 +140,48 @@
     color: #6366f1;
     font-size: 12px;
 }
+
+.mind-map-search-panel {
+    top: 104px;
+    right: 8px;
+    z-index: 10020;
+    width: min(420px, calc(100% - 16px));
+    min-width: 0;
+}
+
+.mind-map-search-row {
+    display: grid;
+    grid-template-columns: auto minmax(72px, 1fr) auto repeat(4, var(--commercial-touch-target, 44px));
+    align-items: center;
+    gap: 4px;
+    padding: 6px 8px;
+}
+
+.mind-map-search-icon-button {
+    width: var(--commercial-touch-target, 44px);
+    min-width: var(--commercial-touch-target, 44px);
+    height: var(--commercial-touch-target, 44px);
+    padding: 0;
+}
+
+.mind-map-search-replace-row button {
+    min-width: var(--commercial-touch-target, 44px);
+    min-height: var(--commercial-touch-target, 44px);
+}
+
+.mind-map-search-icon-button:focus-visible,
+.mind-map-search-replace-row button:focus-visible {
+    outline: 2px solid rgba(99, 102, 241, 0.72);
+    outline-offset: -2px;
+}
+
+@media (max-width: 420px) {
+    .mind-map-search-row {
+        grid-template-columns: auto minmax(72px, 1fr) auto repeat(2, var(--commercial-touch-target, 44px));
+    }
+
+    .mind-map-search-row > .mind-map-search-icon-button:first-of-type,
+    .mind-map-search-row > .mind-map-search-icon-button:nth-of-type(2) {
+        display: none;
+    }
+}

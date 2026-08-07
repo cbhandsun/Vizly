@@ -4,14 +4,24 @@
  * 在当前选中节点下插入预设子树结构
  * 模板库：SWOT分析、会议记录、项目计划、读书笔记、问题分析
  */
-import React, { useCallback } from 'react';
-import { Dropdown, Button, Tooltip } from 'antd';
-import { AppstoreAddOutlined } from '@ant-design/icons';
+import React, { useCallback, useState } from 'react';
+import { Dropdown } from 'antd';
+import {
+    AppstoreAddOutlined,
+    BulbOutlined,
+    FileTextOutlined,
+    ReadOutlined,
+    RocketOutlined,
+    SearchOutlined,
+    SlidersOutlined,
+} from '@ant-design/icons';
 import MindElixir from 'mind-elixir';
 import { getMindElixirInstance } from './mindElixirStore';
 import { appMessage } from '@/core/utils/antdStaticBridge';
 import { templateToNodeObj, type TemplateNode } from './mindmapTemplateModel';
 import { logMindmapTemplateInsertFailure } from './mindmapPanelLogging';
+import MindMapToolbarIconButton from './MindMapToolbarIconButton';
+import { getViewportPopupContainer } from '../ui/viewportOverlayPortal';
 import type { MindElixirInstance, NodeObj } from 'mind-elixir';
 
 
@@ -19,7 +29,7 @@ import type { MindElixirInstance, NodeObj } from 'mind-elixir';
 
 interface Template {
     key: string;
-    icon: string;
+    icon: React.ReactNode;
     label: string;
     desc: string;
     mode: 'replace' | 'insert';  // replace = new map, insert = add under selection
@@ -31,7 +41,7 @@ type MindWithHistory = MindElixirInstance & { clearHistory?: () => void };
 const TEMPLATES: Template[] = [
     {
         key: 'swot',
-        icon: '⚖️',
+        icon: <SlidersOutlined />,
         label: 'SWOT 分析',
         desc: '优势/劣势/机会/威胁 四象限分析',
         mode: 'replace',
@@ -47,7 +57,7 @@ const TEMPLATES: Template[] = [
     },
     {
         key: 'meeting',
-        icon: '📋',
+        icon: <FileTextOutlined />,
         label: '会议记录',
         desc: '议题/决策/行动项/跟进',
         mode: 'replace',
@@ -64,7 +74,7 @@ const TEMPLATES: Template[] = [
     },
     {
         key: 'project',
-        icon: '🚀',
+        icon: <RocketOutlined />,
         label: '项目计划',
         desc: '目标/里程碑/风险/资源',
         mode: 'replace',
@@ -85,7 +95,7 @@ const TEMPLATES: Template[] = [
     },
     {
         key: 'reading',
-        icon: '📚',
+        icon: <ReadOutlined />,
         label: '读书笔记',
         desc: '主题/要点/感悟/应用',
         mode: 'replace',
@@ -102,7 +112,7 @@ const TEMPLATES: Template[] = [
     },
     {
         key: 'problem',
-        icon: '🔍',
+        icon: <SearchOutlined />,
         label: '问题分析',
         desc: '5W1H 问题根因分析',
         mode: 'replace',
@@ -120,7 +130,7 @@ const TEMPLATES: Template[] = [
     },
     {
         key: 'brainstorm',
-        icon: '🧠',
+        icon: <BulbOutlined />,
         label: '头脑风暴',
         desc: '在当前选中节点下插入发散结构',
         mode: 'insert',
@@ -140,6 +150,7 @@ const TEMPLATES: Template[] = [
 
 const MindMapTemplates: React.FC = () => {
     const mind = getMindElixirInstance();
+    const [open, setOpen] = useState(false);
 
     const applyTemplate = useCallback((tpl: Template) => {
         if (!mind) { appMessage.warning('思维导图未加载'); return; }
@@ -176,7 +187,7 @@ const MindMapTemplates: React.FC = () => {
         key: tpl.key,
         label: (
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '2px 0' }}>
-                <span style={{ fontSize: 18, lineHeight: 1.2, flexShrink: 0 }}>{tpl.icon}</span>
+                <span aria-hidden="true" style={{ fontSize: 16, lineHeight: 1.2, flexShrink: 0 }}>{tpl.icon}</span>
                 <div>
                     <div style={{ fontWeight: 600, fontSize: 13 }}>{tpl.label}</div>
                     <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>{tpl.desc}</div>
@@ -193,19 +204,22 @@ const MindMapTemplates: React.FC = () => {
 
     return (
         <Dropdown
-            menu={{ items: menuItems }}
+            open={open}
+            onOpenChange={setOpen}
+            menu={{ items: menuItems, 'aria-label': '思维导图节点模板' }}
             placement="bottomRight"
+            getPopupContainer={getViewportPopupContainer}
             trigger={['click']}
         >
-            <Tooltip title="节点模板">
-                <Button
-                    size="small"
-                    type="text"
-                    icon={<AppstoreAddOutlined />}
-                    disabled={!mind}
-                    style={{ color: 'rgba(255,255,255,0.55)' }}
-                />
-            </Tooltip>
+            <MindMapToolbarIconButton
+                aria-expanded={open}
+                aria-haspopup="menu"
+                label="打开节点模板"
+                icon={<AppstoreAddOutlined />}
+                disabled={!mind}
+                suppressTooltip={open}
+                style={{ color: 'rgba(255,255,255,0.55)' }}
+            />
         </Dropdown>
     );
 };

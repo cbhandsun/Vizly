@@ -1,7 +1,7 @@
 .panel {
     position: absolute;
     z-index: 800;
-    top: 64px;
+    top: 104px;
     right: 0;
     bottom: 72px;
     display: flex;
@@ -315,7 +315,7 @@
 
 @media (max-width: 767px) {
     .panel {
-        top: 72px;
+        top: 104px;
         right: 8px;
         bottom: calc(164px + env(safe-area-inset-bottom, 0px));
         width: min(320px, calc(100% - 16px));

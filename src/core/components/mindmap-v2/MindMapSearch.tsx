@@ -9,7 +9,14 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Input, type InputRef } from 'antd';
-import { SearchOutlined, CloseOutlined, UpOutlined, DownOutlined } from '@ant-design/icons';
+import {
+    CheckOutlined,
+    CloseOutlined,
+    DownOutlined,
+    SearchOutlined,
+    SwapOutlined,
+    UpOutlined,
+} from '@ant-design/icons';
 import type { NodeObj } from 'mind-elixir';
 import { getMindElixirInstance } from './mindElixirStore';
 import { findNodeById } from './migrate';
@@ -207,7 +214,7 @@ const MindMapSearch: React.FC<MindMapSearchProps> = ({ open, onClose }) => {
         background: 'transparent', border: 'none',
         cursor: disabled ? 'not-allowed' : 'pointer',
         color: disabled ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.7)',
-        padding: '2px 4px', borderRadius: 4, lineHeight: 1, transition: 'color 0.15s',
+        borderRadius: 6, lineHeight: 1, transition: 'color 0.15s',
     });
 
     const replaceBtn = (primary = false): React.CSSProperties => ({
@@ -218,23 +225,27 @@ const MindMapSearch: React.FC<MindMapSearchProps> = ({ open, onClose }) => {
     });
 
     return (
-        <div id="me-search-panel" style={{
+        <div
+            aria-label="搜索并替换思维导图节点"
+            className="mind-map-search-panel"
+            id="me-search-panel"
+            role="search"
+            style={{
             position: 'absolute',
-            top: 12, right: 16, zIndex: 999,
             display: 'flex', flexDirection: 'column', gap: 0,
             background: 'rgba(12,12,20,0.92)',
             backdropFilter: 'blur(20px)',
             border: '1px solid rgba(255,255,255,0.12)',
             borderRadius: 12,
             boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-            minWidth: 300,
             overflow: 'hidden',
         }}>
             {/* ── Search row ─────────────────────────────────────────────── */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px' }}>
+            <div className="mind-map-search-row">
                 <SearchOutlined style={{ color: 'rgba(255,255,255,0.45)', fontSize: 14, flexShrink: 0 }} />
                 <Input
                     ref={inputRef}
+                    aria-label="搜索节点"
                     value={query}
                     onChange={e => setQuery(e.target.value)}
                     onKeyDown={handleKeyDown}
@@ -251,14 +262,18 @@ const MindMapSearch: React.FC<MindMapSearchProps> = ({ open, onClose }) => {
                         {total > 0 ? `${current}/${total}` : '无匹配'}
                     </span>
                 )}
-                <button onClick={goPrev} style={iconBtn(total === 0)} title="上一个 (Shift+Enter)">
+                <button aria-label="上一个搜索结果" className="mind-map-search-icon-button" disabled={total === 0} onClick={goPrev} style={iconBtn(total === 0)} title="上一个 (Shift+Enter)" type="button">
                     <UpOutlined style={{ fontSize: 11 }} />
                 </button>
-                <button onClick={goNext} style={iconBtn(total === 0)} title="下一个 (Enter)">
+                <button aria-label="下一个搜索结果" className="mind-map-search-icon-button" disabled={total === 0} onClick={goNext} style={iconBtn(total === 0)} title="下一个 (Enter)" type="button">
                     <DownOutlined style={{ fontSize: 11 }} />
                 </button>
                 {/* Toggle replace row */}
                 <button
+                    aria-controls="me-search-replace-row"
+                    aria-expanded={showReplace}
+                    aria-label={showReplace ? '收起替换控件' : '展开替换控件'}
+                    className="mind-map-search-icon-button"
                     onClick={() => setShowReplace(v => !v)}
                     title={showReplace ? '关闭替换' : '展开替换 (Ctrl+H)'}
                     style={{
@@ -266,23 +281,25 @@ const MindMapSearch: React.FC<MindMapSearchProps> = ({ open, onClose }) => {
                         fontSize: 12, fontWeight: 700,
                         color: showReplace ? '#6366f1' : 'rgba(255,255,255,0.4)',
                     }}
+                    type="button"
                 >
-                    ⇌
+                    <SwapOutlined style={{ fontSize: 13 }} />
                 </button>
-                <button onClick={onClose} title="关闭 (Esc)" style={iconBtn(false)}>
+                <button aria-label="关闭搜索" className="mind-map-search-icon-button" onClick={onClose} title="关闭 (Esc)" style={iconBtn(false)} type="button">
                     <CloseOutlined style={{ fontSize: 11 }} />
                 </button>
             </div>
 
             {/* ── Replace row ────────────────────────────────────────────── */}
             {showReplace && (
-                <div style={{
+                <div id="me-search-replace-row" className="mind-map-search-replace-row" style={{
                     display: 'flex', alignItems: 'center', gap: 6,
                     padding: '5px 10px 8px',
                     borderTop: '1px solid rgba(255,255,255,0.06)',
                 }}>
-                    <span style={{ fontSize: 12, width: 14, color: 'rgba(255,255,255,0.3)', flexShrink: 0 }}>⇌</span>
+                    <SwapOutlined aria-hidden="true" style={{ fontSize: 12, width: 14, color: 'rgba(255,255,255,0.3)', flexShrink: 0 }} />
                     <Input
+                        aria-label="替换文本"
                         value={replaceText}
                         onChange={e => { setReplaceText(e.target.value); setReplaceCount(null); }}
                         placeholder="替换为..."
@@ -291,15 +308,15 @@ const MindMapSearch: React.FC<MindMapSearchProps> = ({ open, onClose }) => {
                         styles={{ input: { color: '#fff' } }}
                         onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); doReplaceOne(); } }}
                     />
-                    <button onClick={doReplaceOne} disabled={total === 0} style={replaceBtn(false)} title="替换当前 (Enter)">
+                    <button aria-label="替换当前匹配项" onClick={doReplaceOne} disabled={total === 0} style={replaceBtn(false)} title="替换当前 (Enter)" type="button">
                         替换
                     </button>
-                    <button onClick={doReplaceAll} disabled={total === 0} style={replaceBtn(true)} title="全部替换">
+                    <button aria-label="替换所有匹配项" onClick={doReplaceAll} disabled={total === 0} style={replaceBtn(true)} title="全部替换" type="button">
                         全替
                     </button>
                     {replaceCount !== null && (
                         <span style={{ fontSize: 10, color: '#6ee7b7', whiteSpace: 'nowrap' }}>
-                            ✓ {replaceCount} 处
+                            <CheckOutlined aria-hidden="true" /> {replaceCount} 处
                         </span>
                     )}
                 </div>

@@ -310,13 +310,13 @@ export function MindMapAIPanel() {
     const canSummarize = !!targetNode?.children?.length;
 
     return (
-        <div style={panelStyle}>
+        <div aria-label="AI 思维导图助手" role="complementary" style={panelStyle}>
             <div style={headerStyle}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <RobotOutlined style={{ color: '#8b5cf6', fontSize: 18 }} />
                     <span style={{ color: '#fff', fontWeight: 650 }}>AI 思维导图助手</span>
                 </div>
-                <Button type="text" icon={<CloseOutlined />} onClick={() => toggleAIPanel(false)} style={iconButtonStyle} />
+                <Button aria-label="关闭 AI 思维导图助手" title="关闭 AI 思维导图助手" type="text" icon={<CloseOutlined />} onClick={() => toggleAIPanel(false)} style={iconButtonStyle} />
             </div>
 
             <div style={bodyStyle}>
@@ -353,6 +353,7 @@ export function MindMapAIPanel() {
                     <div style={fieldStyle}>
                         <label style={labelStyle}>输入主题或业务问题</label>
                         <TextArea
+                            aria-label="AI 建图主题或业务问题"
                             value={prompt}
                             onChange={event => setPrompt(event.target.value)}
                             placeholder="例如：仓储系统产品规划、B2B 订单履约流程、AI 客服落地方案..."
@@ -398,6 +399,7 @@ export function MindMapAIPanel() {
                     <div style={fieldStyle}>
                         <label style={labelStyle}>处理指令</label>
                         <TextArea
+                            aria-label="AI 思维导图处理指令"
                             value={prompt}
                             onChange={event => setPrompt(event.target.value)}
                             placeholder="例如：翻译成英文；补一段备注；扩写 5 个实施步骤；加上风险标签..."
@@ -476,21 +478,23 @@ export function MindMapAIPanel() {
 
 const panelStyle: React.CSSProperties = {
     position: 'absolute',
-    top: 0,
+    top: 104,
     right: 0,
-    bottom: 0,
-    width: 380,
+    bottom: 72,
+    width: 'min(380px, calc(100% - 20px))',
     zIndex: 10000,
     display: 'flex',
     flexDirection: 'column',
     background: 'rgba(15, 18, 36, 0.92)',
     backdropFilter: 'blur(24px) saturate(180%)',
     borderLeft: '1px solid rgba(255,255,255,0.08)',
+    borderRadius: '14px 0 0 14px',
+    overflow: 'hidden',
     boxShadow: '-10px 0 50px rgba(0,0,0,0.42)',
 };
 
 const headerStyle: React.CSSProperties = {
-    height: 58,
+    minHeight: 58,
     padding: '0 18px',
     display: 'flex',
     alignItems: 'center',
@@ -548,6 +552,9 @@ const suggestionsStyle: React.CSSProperties = {
 };
 
 const iconButtonStyle: React.CSSProperties = {
+    minWidth: 44,
+    width: 44,
+    height: 44,
     color: 'rgba(255,255,255,0.62)',
     border: 'none',
 };
