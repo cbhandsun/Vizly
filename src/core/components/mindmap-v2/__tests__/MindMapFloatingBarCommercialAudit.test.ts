@@ -10,6 +10,10 @@ const css = readFileSync(
     resolve(process.cwd(), 'src/core/components/mindmap-v2/FloatingBar.module.css'),
     'utf8',
 );
+const colorPickerSource = readFileSync(
+    resolve(process.cwd(), 'src/core/components/mindmap-v2/MindMapBranchColorPicker.tsx'),
+    'utf8',
+);
 
 describe('MindMapFloatingBar commercial interaction contract', () => {
     it('keeps node actions named, keyboard visible, and inside narrow viewports', () => {
@@ -32,5 +36,16 @@ describe('MindMapFloatingBar commercial interaction contract', () => {
     it('rehydrates an existing instance-scoped selection after data refresh remounts', () => {
         expect(source).toContain('resolveSelectedMindMapTopic(mind, null)');
         expect(source).toContain('if (existingNode) onSelect([existingNode])');
+    });
+
+    it('uses a portal-safe, touch-sized branch color picker without double-toggling its trigger', () => {
+        expect(source).toContain('<MindMapBranchColorPicker');
+        expect(source).toContain('getPopupContainer={() => document.body}');
+        expect(source).not.toContain('onClick={() => { setColorOpen(v => !v);');
+        expect(source).toContain("event.key !== 'Enter' && event.key !== ' '");
+        expect(colorPickerSource).toContain('role="radiogroup"');
+        expect(colorPickerSource).toContain('aria-checked={isSelected}');
+        expect(colorPickerSource).toContain('方向键选择 · Esc 关闭');
+        expect(css).toMatch(/\.colorItem[\s\S]*?width: 44px;[\s\S]*?height: 44px;/);
     });
 });

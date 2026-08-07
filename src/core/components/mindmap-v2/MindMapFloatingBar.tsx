@@ -21,15 +21,10 @@ import { resolveMindMapFloatingBarLeft } from './mindMapFloatingBarLayout';
 import { addEditableMindMapChild } from './mindMapNodeCreation';
 import { MindMapNoteEditorPanel } from './MindMapNoteEditorPanel';
 import { updateMindMapNoteAndRestoreSelection } from './mindMapNoteMutation';
+import { MindMapBranchColorPicker } from './MindMapBranchColorPicker';
+import { updateMindMapBranchColorAndRestoreSelection } from './mindMapBranchColorMutation';
 import { resolveSelectedMindMapTopic } from './mindMapFloatingSelection';
 import styles from './FloatingBar.module.css';
-
-// ─── Colour palette for quick branch color ─────────────────────────────────
-const QUICK_COLORS = [
-    '#6366f1', '#8b5cf6', '#ec4899', '#ef4444',
-    '#f97316', '#eab308', '#22c55e', '#06b6d4',
-    '#3b82f6', '#64748b', '#ffffff', 'transparent',
-];
 
 // ─── Position tracking ────────────────────────────────────────────────────────
 interface BarPos { x: number; y: number; nodeId: string; }
@@ -62,6 +57,7 @@ const MindMapFloatingBar: React.FC = () => {
     const [customAiPrompt, setCustomAiPrompt] = useState('');
     const [aiCustomLoading, setAiCustomLoading] = useState(false);
     const barRef = useRef<HTMLDivElement>(null);
+    const colorTriggerRef = useRef<HTMLButtonElement>(null);
     const noteTriggerRef = useRef<HTMLButtonElement>(null);
     const selectedNodeIdRef = useRef<string | null>(null);
     const [barWidth, setBarWidth] = useState(0);
@@ -149,19 +145,6 @@ const MindMapFloatingBar: React.FC = () => {
         };
     }, [mind]);
 
-    // Close when clicking outside
-    useEffect(() => {
-        if (!pos) return;
-        const handler = (e: MouseEvent) => {
-            if (barRef.current && !barRef.current.contains(e.target as Node)) {
-                setColorOpen(false);
-                // Also close other popovers if we want to mimic clicking outside
-            }
-        };
-        document.addEventListener('mousedown', handler, true);
-        return () => document.removeEventListener('mousedown', handler, true);
-    }, [pos]);
-
     useLayoutEffect(() => {
         const bar = barRef.current;
         if (!pos || !bar) return;
@@ -209,28 +192,45 @@ const MindMapFloatingBar: React.FC = () => {
         }
     };
 
+    const refreshFloatingBarForNode = (nodeId: string) => {
+        const refreshedTopic = mind.findEle(nodeId);
+        if (!refreshedTopic) return;
+        const rect = refreshedTopic.getBoundingClientRect();
+        selectedNodeIdRef.current = nodeId;
+        setPos({ x: rect.left + rect.width / 2, y: rect.top - 8, nodeId });
+    };
+
     const commitNote = async (note: string | undefined, action: 'clearNote' | 'saveNote') => {
         try {
             const tpc = getTpc();
             if (tpc) {
                 const restored = await updateMindMapNoteAndRestoreSelection(mind, tpc, obj, note);
-                if (restored) {
-                    const refreshedTopic = mind.findEle(obj.id);
-                    if (refreshedTopic) {
-                        const rect = refreshedTopic.getBoundingClientRect();
-                        selectedNodeIdRef.current = obj.id;
-                        setPos({
-                            x: rect.left + rect.width / 2,
-                            y: rect.top - 8,
-                            nodeId: obj.id,
-                        });
-                    }
-                }
+                if (restored) refreshFloatingBarForNode(obj.id);
             }
         } catch (error) {
             logMindMapFloatingActionFailure(action, error);
         }
         closeNoteEditor(true);
+    };
+
+    const closeBranchColorPicker = (restoreFocus = false) => {
+        setColorOpen(false);
+        if (restoreFocus) {
+            requestAnimationFrame(() => colorTriggerRef.current?.focus());
+        }
+    };
+
+    const commitBranchColor = async (color: string | undefined) => {
+        try {
+            const tpc = getTpc();
+            if (tpc) {
+                const restored = await updateMindMapBranchColorAndRestoreSelection(mind, tpc, obj, color);
+                if (restored) refreshFloatingBarForNode(obj.id);
+            }
+        } catch (error) {
+            logMindMapFloatingActionFailure('setBranchColor', error);
+        }
+        closeBranchColorPicker(true);
     };
 
     const extendedObj = obj as ExtendedMindMapNode;
@@ -542,37 +542,34 @@ const MindMapFloatingBar: React.FC = () => {
                 trigger="click"
                 placement="top"
                 arrow={false}
+                destroyOnHidden
+                getPopupContainer={() => document.body}
+                styles={{
+                    content: { padding: 0, background: 'transparent', boxShadow: 'none' },
+                }}
                 content={
-                    <div className={styles.colorGrid}>
-                        {QUICK_COLORS.map(c => (
-                            <button
-                                type="button"
-                                key={c}
-                                className={styles.colorItem}
-                                title={c === 'transparent' ? '透明（继承）' : c}
-                                aria-label={c === 'transparent' ? '连线颜色：透明（继承）' : `连线颜色：${c}`}
-                                onClick={() => {
-                                    try {
-                                        const tpc = getTpc();
-                                        if (tpc) {
-                                            const obj2 = getObj();
-                                            reshapeNodePatch(tpc, obj2, { branchColor: c === 'transparent' ? undefined : c });
-                                        }
-                                    } catch (error) {
-                                        logMindMapFloatingActionFailure('setBranchColor', error);
-                                    }
-                                    setColorOpen(false);
-                                }}
-                                style={{
-                                    background: c === 'transparent' ? 'repeating-conic-gradient(#ccc 0 90deg, #fff 0 180deg) 0 / 10px 10px' : c,
-                                }}
-                            />
-                        ))}
-                    </div>
+                    <MindMapBranchColorPicker
+                        currentColor={obj.branchColor}
+                        onCancel={() => closeBranchColorPicker(true)}
+                        onSelect={commitBranchColor}
+                    />
                 }
             >
                 <Tooltip title="连线颜色">
-                    <button type="button" className={styles.btn} aria-label="连线颜色" title="连线颜色" style={{ gap: 2 }} onClick={() => { setColorOpen(v => !v); setShapeOpen(false); }}>
+                    <button
+                        ref={colorTriggerRef}
+                        type="button"
+                        className={styles.btn}
+                        aria-label="连线颜色"
+                        title="连线颜色"
+                        style={{ gap: 2 }}
+                        onKeyDown={event => {
+                            if (event.key !== 'Enter' && event.key !== ' ') return;
+                            event.preventDefault();
+                            setColorOpen(value => !value);
+                            setShapeOpen(false);
+                        }}
+                    >
                         <div style={{
                             width: 10, height: 10, borderRadius: '50%',
                             background: obj.branchColor ?? '#6366f1',
