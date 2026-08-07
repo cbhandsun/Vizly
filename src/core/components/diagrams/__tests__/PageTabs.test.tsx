@@ -1,10 +1,14 @@
 // @vitest-environment jsdom
 
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { useState } from 'react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { PageTabs } from '../PageTabs';
+
+const pageTabsCss = readFileSync(resolve(process.cwd(), 'src/core/components/diagrams/PageTabs.css'), 'utf8');
 
 vi.mock('react-i18next', () => ({
     useTranslation: () => ({
@@ -44,7 +48,7 @@ beforeAll(() => vi.stubGlobal('ResizeObserver', ResizeObserverMock));
 afterAll(() => vi.unstubAllGlobals());
 
 describe('PageTabs', () => {
-    it('exposes keyboard-operable page tabs and named page actions', () => {
+    it('exposes keyboard-operable page tabs and named page actions', async () => {
         const onSwitchPage = vi.fn();
         const onAddPage = vi.fn();
         render(
@@ -62,16 +66,27 @@ describe('PageTabs', () => {
         );
 
         expect(screen.getByRole('tablist', { name: '页面' })).toBeTruthy();
-        expect(screen.getByRole('tab', { name: '页面 1' }).getAttribute('aria-selected')).toBe('true');
+        const firstTab = screen.getByRole('tab', { name: '页面 1' });
+        const firstPageItemScroll = vi.fn();
+        Object.defineProperty(firstTab.parentElement, 'scrollIntoView', {
+            configurable: true,
+            value: firstPageItemScroll,
+        });
+        await waitFor(() => expect(firstPageItemScroll).toHaveBeenCalled());
+        expect(firstTab.getAttribute('aria-selected')).toBe('true');
+        expect(firstTab.getAttribute('title')).toBe('页面 1');
         const secondTab = screen.getByRole('tab', { name: '页面 2' });
         fireEvent.keyDown(secondTab, { key: 'Enter' });
         expect(onSwitchPage).toHaveBeenCalledWith('page-2');
 
         secondTab.focus();
         fireEvent.keyDown(secondTab, { key: 'ArrowLeft' });
-        const firstTab = screen.getByRole('tab', { name: '页面 1' });
         expect(onSwitchPage).toHaveBeenLastCalledWith('page-1');
         expect(document.activeElement).toBe(firstTab);
+        expect(firstPageItemScroll).toHaveBeenCalledWith({
+            block: 'nearest',
+            inline: 'nearest',
+        });
 
         fireEvent.keyDown(firstTab, { key: 'End' });
         expect(onSwitchPage).toHaveBeenLastCalledWith('page-2');
@@ -81,7 +96,12 @@ describe('PageTabs', () => {
         expect(onSwitchPage).toHaveBeenLastCalledWith('page-1');
         expect(document.activeElement).toBe(firstTab);
 
-        fireEvent.click(screen.getByRole('button', { name: '新建页面' }));
+        const addPageButton = screen.getByRole('button', { name: '新建页面' });
+        const scroller = screen.getByRole('tablist', { name: '页面' }).querySelector('.page-tabs__scroller');
+        expect(scroller).toBeTruthy();
+        expect(scroller?.contains(addPageButton)).toBe(false);
+
+        fireEvent.click(addPageButton);
         expect(onAddPage).toHaveBeenCalledTimes(1);
         expect(screen.getByRole('button', { name: '删除页面 页面 2' })).toBeTruthy();
     });
@@ -115,7 +135,9 @@ describe('PageTabs', () => {
         );
 
         fireEvent.click(screen.getByRole('button', { name: '重命名页面 页面 1' }));
-        const input = screen.getByRole('textbox', { name: '重命名页面 页面 1' }) as HTMLInputElement;
+        const input = screen.getByRole('textbox', {
+            name: '重命名页面 页面 1',
+        }) as HTMLInputElement;
 
         await waitFor(() => {
             expect(document.activeElement).toBe(input);
@@ -126,9 +148,7 @@ describe('PageTabs', () => {
 
     it('moves focus to the newly active page after creation', async () => {
         const PageTabsHarness = () => {
-            const [pages, setPages] = useState([
-                { id: 'page-1', name: '页面 1', nodes: [], edges: [] },
-            ]);
+            const [pages, setPages] = useState([{ id: 'page-1', name: '页面 1', nodes: [], edges: [] }]);
             const [activePageId, setActivePageId] = useState('page-1');
             return (
                 <PageTabs
@@ -137,10 +157,7 @@ describe('PageTabs', () => {
                     onSwitchPage={setActivePageId}
                     onAddPage={() => {
                         const newPageId = 'page-2';
-                        setPages(current => [
-                            ...current,
-                            { id: newPageId, name: '页面 2', nodes: [], edges: [] },
-                        ]);
+                        setPages((current) => [...current, { id: newPageId, name: '页面 2', nodes: [], edges: [] }]);
                         setActivePageId(newPageId);
                         return newPageId;
                     }}
@@ -197,16 +214,28 @@ describe('PageTabs', () => {
         fireEvent.change(input, { target: { value: ' 页面 1 ' } });
         fireEvent.keyDown(input, { key: 'Enter' });
 
-        const visibleError = await screen.findByRole('tooltip');
+        const visibleError = await screen.findByRole('alert');
         expect(visibleError.textContent).toBe('页面名称不能重复');
+        expect(visibleError.classList.contains('page-tabs__rename-error')).toBe(true);
+        expect(document.querySelector('.page-tabs__scroller')?.contains(visibleError)).toBe(false);
         expect(input.getAttribute('aria-invalid')).toBe('true');
         expect(input.getAttribute('maxlength')).toBe('80');
         const describedBy = input.getAttribute('aria-describedby');
         expect(describedBy).toBeTruthy();
         const announcedError = document.getElementById(describedBy ?? '');
-        expect(announcedError?.getAttribute('role')).toBe('alert');
+        expect(announcedError).toBe(visibleError);
         expect(announcedError?.textContent).toBe('页面名称不能重复');
         expect(onRenamePage).not.toHaveBeenCalled();
+    });
+
+    it('keeps long page names bounded and the add action visible on narrow screens', () => {
+        expect(pageTabsCss).toMatch(/\.page-tabs__tab\s*\{[\s\S]*?max-width:\s*180px;[\s\S]*?text-overflow:\s*ellipsis;/);
+        expect(pageTabsCss).toMatch(/\.page-tabs__scroller\s*\{[\s\S]*?overflow-x:\s*auto;/);
+        expect(pageTabsCss).toMatch(/\.page-tabs__add\s*\{[\s\S]*?flex-shrink:\s*0;/);
+        expect(pageTabsCss).toMatch(/@media \(max-width: 768px\)[\s\S]*?\.page-tabs__tab\s*\{[\s\S]*?max-width:\s*120px;/);
+        expect(pageTabsCss).toMatch(/\.page-tabs__rename-error\s*\{[\s\S]*?bottom:\s*calc\(100% \+ 8px\);/);
+        expect(pageTabsCss).toMatch(/\.page-tabs\s*\{[\s\S]*?overflow:\s*visible;/);
+        expect(pageTabsCss).toMatch(/\.page-tabs__item\s*\{[\s\S]*?overflow:\s*visible;/);
     });
 
     it('cancels inline rename with Escape and restores tab focus', async () => {
@@ -234,9 +263,7 @@ describe('PageTabs', () => {
 
     it('restores tab focus after a successful rename', async () => {
         const PageTabsHarness = () => {
-            const [pages, setPages] = useState([
-                { id: 'page-1', name: '页面 1', nodes: [], edges: [] },
-            ]);
+            const [pages, setPages] = useState([{ id: 'page-1', name: '页面 1', nodes: [], edges: [] }]);
             return (
                 <PageTabs
                     pages={pages}
@@ -245,9 +272,7 @@ describe('PageTabs', () => {
                     onAddPage={vi.fn()}
                     onDeletePage={vi.fn()}
                     onRenamePage={(pageId, name) => {
-                        setPages(current => current.map(page => (
-                            page.id === pageId ? { ...page, name } : page
-                        )));
+                        setPages((current) => current.map((page) => (page.id === pageId ? { ...page, name } : page)));
                         return true;
                     }}
                 />
@@ -273,16 +298,7 @@ describe('PageTabs', () => {
             nodes: [],
             edges: [],
         }));
-        render(
-            <PageTabs
-                pages={pages}
-                activePageId="page-1"
-                onSwitchPage={vi.fn()}
-                onAddPage={onAddPage}
-                onDeletePage={vi.fn()}
-                onRenamePage={vi.fn()}
-            />,
-        );
+        render(<PageTabs pages={pages} activePageId="page-1" onSwitchPage={vi.fn()} onAddPage={onAddPage} onDeletePage={vi.fn()} onRenamePage={vi.fn()} />);
 
         const add = screen.getByRole('button', { name: '新建页面' });
         expect(add.hasAttribute('disabled')).toBe(true);
@@ -312,7 +328,9 @@ describe('PageTabs', () => {
             />,
         );
 
-        const deleteButton = screen.getByRole('button', { name: '删除页面 页面 2' });
+        const deleteButton = screen.getByRole('button', {
+            name: '删除页面 页面 2',
+        });
         expect(deleteButton.classList.contains('page-tabs__delete')).toBe(true);
         fireEvent.click(deleteButton);
         expect(await screen.findByText('删除「页面 2」？')).toBeTruthy();
@@ -350,8 +368,7 @@ describe('PageTabs', () => {
 
         expect(popover).toBeTruthy();
         expect(popover?.parentElement).toBe(document.body);
-        expect((popover as HTMLElement | null)?.style.maxWidth)
-            .toBe('calc(100vw - 16px)');
+        expect((popover as HTMLElement | null)?.style.maxWidth).toBe('calc(100vw - 16px)');
     });
 
     it('restores keyboard focus to the adjacent active page after deletion', async () => {
@@ -368,11 +385,11 @@ describe('PageTabs', () => {
                     activePageId={activePageId}
                     onSwitchPage={setActivePageId}
                     onAddPage={vi.fn()}
-                    onDeletePage={pageId => {
-                        const deletedIndex = pages.findIndex(page => page.id === pageId);
+                    onDeletePage={(pageId) => {
+                        const deletedIndex = pages.findIndex((page) => page.id === pageId);
                         if (deletedIndex < 0) return false;
                         const adjacentPage = pages[deletedIndex + 1] ?? pages[deletedIndex - 1];
-                        setPages(current => current.filter(page => page.id !== pageId));
+                        setPages((current) => current.filter((page) => page.id !== pageId));
                         if (pageId === activePageId && adjacentPage) setActivePageId(adjacentPage.id);
                         return true;
                     }}
