@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useState } from 'react';
+import React, { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import type { TFunction } from 'i18next';
 import Spin from 'antd/es/spin';
 import { ConfigProvider } from 'antd';
@@ -16,6 +16,7 @@ import { appMessage } from '@/core/utils/antdStaticBridge';
 import { DiagramLayout } from './layout/DiagramLayout';
 import { EnhancedThemeSelector } from './ui/EnhancedThemeSelector';
 import { ErrorBoundary } from './ui/ErrorBoundary';
+import { subscribeMindMapAIConfigRequest } from '@/core/components/mindmap-v2/mindMapAIConfigEvent';
 
 const RoutingDebugPanel = lazy(() => import('./debug/RoutingDebugPanel').then(module => ({ default: module.RoutingDebugPanel })));
 const ShortcutsHelpModal = lazy(() => import('@/core/components/ui/ShortcutsHelpModal'));
@@ -177,10 +178,12 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
     const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(false);
     const [hasMountedAIConfig, setHasMountedAIConfig] = useState(aiConfigVisible);
 
-    const openAIConfig = () => {
+    const openAIConfig = useCallback(() => {
         setHasMountedAIConfig(true);
         setAiConfigVisible(true);
-    };
+    }, [setAiConfigVisible]);
+
+    useEffect(() => subscribeMindMapAIConfigRequest(openAIConfig), [openAIConfig]);
 
     return (
         <DiagramThemeProvider>

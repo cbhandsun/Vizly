@@ -77,6 +77,8 @@ import { useMindElixirCanvasPreferences } from './useMindElixirCanvasPreferences
 import MindMapToolbarIconButton from './MindMapToolbarIconButton';
 import { useMindMapFocusMode } from './useMindMapFocusMode';
 import { getViewportPopupContainer } from '../ui/viewportOverlayPortal';
+import { appMessage } from '@/core/utils/antdStaticBridge';
+import { createMindMapSummaryForSelection } from './mindMapSummaryCreation';
 import './MindElixirToolbar.css';
 
 
@@ -311,9 +313,14 @@ const MindElixirToolbar: React.FC = () => {
     // ── Summary creation ─────────────────────────────────────────────────────────
     const handleCreateSummary = useCallback(() => {
         if (!mind) return;
-        try {
-            mind.createSummary();
-        } catch (e) { logMindmapToolbarSummaryFailure(e); }
+        const result = createMindMapSummaryForSelection(mind);
+        if (result.ok) {
+            appMessage.success(result.message);
+            return;
+        }
+        if (result.error) logMindmapToolbarSummaryFailure(result.error);
+        if (result.code === 'create-failed') appMessage.error(result.message);
+        else appMessage.warning(result.message);
     }, [mind]);
 
     const [arrowState, setArrowState] = useState<{ mind: MindElixirInstance | null; enabled: boolean }>({

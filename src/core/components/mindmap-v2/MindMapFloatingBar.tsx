@@ -7,15 +7,15 @@
  *  - 无需打开侧边属性面板或右键菜单
  */
 import React, { useCallback, useEffect, useLayoutEffect, useState, useRef } from 'react';
-import { Tooltip, Popover, Input } from 'antd';
-import type { NodeObj, Topic } from 'mind-elixir';
+import { Tooltip, Popover } from 'antd';
+import type { NodeObj } from 'mind-elixir';
 import { getMindElixirInstance, subscribeMindElixir } from './mindElixirStore';
 import { findNodeById } from './migrate';
 import { expandNodeWithAI, getAncestorPath, summarizeNodeWithAI, processNodeWithAICustomAction } from './mindmapAIService';
 import { cleanMindMapNodePatch } from './mindmapNodePatchSecurity';
 import { cleanMindMapData, cleanMindMapTopic, refreshMindElixirWithSanitizedData } from './mindmapTreeSanitizer';
 import { cleanMindMapChildNode } from './mindmapBridgeSecurity';
-import { PlusOutlined, LoadingOutlined } from '@ant-design/icons';
+import { RobotOutlined } from '@ant-design/icons';
 import { logMindMapFloatingActionFailure } from './mindmapFloatingLogging';
 import { resolveMindMapFloatingBarLeft } from './mindMapFloatingBarLayout';
 import { addEditableMindMapChild } from './mindMapNodeCreation';
@@ -25,6 +25,10 @@ import { MindMapBranchColorPicker } from './MindMapBranchColorPicker';
 import { updateMindMapBranchColorAndRestoreSelection } from './mindMapBranchColorMutation';
 import { MindMapNodeShapeControl } from './MindMapNodeShapeControl';
 import { updateMindMapNodePatchAndRestoreSelection } from './mindMapNodeMutation';
+import { MindMapAIQuickPanel } from './MindMapAIQuickPanel';
+import { requestMindMapAIConfig } from './mindMapAIConfigEvent';
+import { MindMapBoundaryControl } from './MindMapBoundaryControl';
+import type { MindMapBoundaryValue } from './MindMapBoundaryEditor';
 import {
     restoreCurrentMindMapSelectionAfterMutation,
 } from './mindMapFloatingSelection';
@@ -49,6 +53,7 @@ const MindMapFloatingBar: React.FC = () => {
     const [shapeOpen, setShapeOpen] = useState(false);
     const [noteOpen, setNoteOpen] = useState(false);
     const [aiOpen, setAiOpen] = useState(false);
+    const [boundaryOpen, setBoundaryOpen] = useState(false);
     const [aiExpanding, setAiExpanding] = useState(false);
     const [aiSummarizing, setAiSummarizing] = useState(false);
     const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
@@ -61,7 +66,7 @@ const MindMapFloatingBar: React.FC = () => {
     const [barWidth, setBarWidth] = useState(0);
 
     const closeSelectionOverlays = useCallback(() => {
-        setColorOpen(false); setShapeOpen(false); setNoteOpen(false); setAiOpen(false);
+        setColorOpen(false); setShapeOpen(false); setNoteOpen(false); setAiOpen(false); setBoundaryOpen(false);
     }, []);
     const {
         position: pos,
@@ -99,11 +104,6 @@ const MindMapFloatingBar: React.FC = () => {
             return null;
         }
     };
-    const reshapeNodePatch = (tpc: Topic, baseObj: NodeObj | null | undefined, patch: Partial<NodeObj> & Record<string, unknown>) => {
-        if (!baseObj) return;
-        mind.reshapeNode(tpc, { ...baseObj, ...cleanMindMapNodePatch(patch) } as NodeObj);
-    };
-
     const obj = getObj();
     if (!obj) return null;
 
@@ -164,13 +164,32 @@ const MindMapFloatingBar: React.FC = () => {
         }
     };
 
+    const commitBoundary = async (boundary: MindMapBoundaryValue | undefined) => {
+        try {
+            const tpc = getTpc();
+            if (tpc) {
+                const result = await updateMindMapNodePatchAndRestoreSelection(
+                    mind,
+                    tpc,
+                    obj,
+                    { boundary },
+                );
+                if (result.restored) refreshFloatingBarForNode(obj.id);
+            }
+        } catch (error) {
+            logMindMapFloatingActionFailure(boundary ? 'saveBoundary' : 'removeBoundary', error);
+        }
+    };
+
     const extendedObj = obj as ExtendedMindMapNode;
 
     const isRoot = pos.nodeId === mind.getData()?.nodeData?.id;
     const hasChildren = (obj.children?.length ?? 0) > 0;
     const isExpanded = obj.expanded !== false;
 
-    const act = (fn: () => void) => { fn(); setColorOpen(false); setShapeOpen(false); setAiOpen(false); };
+    const act = (fn: () => void) => {
+        fn(); setColorOpen(false); setShapeOpen(false); setAiOpen(false); setBoundaryOpen(false);
+    };
 
     // ── AI logic ─────────────────────────────────────────────────────────────
     const handleAIExpand = async () => {
@@ -370,7 +389,7 @@ const MindMapFloatingBar: React.FC = () => {
                 onOpenChange={v => {
                     setAiOpen(v);
                     if (v) {
-                        setColorOpen(false); setShapeOpen(false); setNoteOpen(false);
+                        setColorOpen(false); setShapeOpen(false); setNoteOpen(false); setBoundaryOpen(false);
                         if (aiSuggestions.length === 0 && !aiExpanding) {
                             handleAIExpand();
                         }
@@ -379,59 +398,48 @@ const MindMapFloatingBar: React.FC = () => {
                 trigger="click"
                 placement="top"
                 arrow={false}
+                destroyOnHidden
+                getPopupContainer={() => document.body}
+                styles={{
+                    content: { padding: 0, background: 'transparent', boxShadow: 'none' },
+                }}
                 content={
-                    <div className={styles.aiPopover}>
-                        <div className={styles.aiHeader}>
-                            <span>✨ AI 扩展建议</span>
-                            {aiExpanding && <span style={{ fontSize: 10, opacity: 0.6 }}>生成中...</span>}
-                        </div>
-                        {aiError && <div style={{ color: '#ef4444', fontSize: 12, padding: 4 }}>{aiError}</div>}
-                        {!aiExpanding && aiSuggestions.length === 0 && !aiError && (
-                            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', padding: 4 }}>暂无建议</div>
-                        )}
-                        {aiSuggestions.map(s => (
-                            <button type="button" key={s} onClick={() => { handleAIApply(s); setAiOpen(false); }} className={styles.aiSuggestion}>
-                                <PlusOutlined style={{ marginRight: 6, color: '#a5b4fc', fontSize: 10 }} />
-                                {s}
-                            </button>
-                        ))}
-                        {hasChildren && (
-                            <div className={styles.aiSummarizeSection}>
-                                <button
-                                    type="button"
-                                    className={styles.aiSummarizeBtn}
-                                    onClick={handleAISummarize}
-                                    disabled={aiSummarizing}
-                                >
-                                    {aiSummarizing ? <LoadingOutlined /> : '🪄'} AI 智能归纳当前节点
-                                </button>
-                            </div>
-                        )}
-                        <div style={{ marginTop: 8, borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 8 }}>
-                            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>💬 自定义 AI 指令</div>
-                            <Input.Search
-                                placeholder="如: 翻译成英文、写个详细备注..."
-                                value={customAiPrompt}
-                                onChange={e => setCustomAiPrompt(e.target.value)}
-                                onSearch={handleCustomAISubmit}
-                                enterButton={aiCustomLoading ? <LoadingOutlined /> : "运行"}
-                                loading={aiCustomLoading}
-                                size="small"
-                                style={{ width: '100%' }}
-                            />
-                        </div>
-                    </div>
+                    <MindMapAIQuickPanel
+                        error={aiError}
+                        expanding={aiExpanding}
+                        suggestions={aiSuggestions}
+                        hasChildren={hasChildren}
+                        summarizing={aiSummarizing}
+                        customPrompt={customAiPrompt}
+                        customLoading={aiCustomLoading}
+                        onApplySuggestion={suggestion => {
+                            void handleAIApply(suggestion);
+                            setAiOpen(false);
+                        }}
+                        onSummarize={() => void handleAISummarize()}
+                        onCustomPromptChange={setCustomAiPrompt}
+                        onCustomSubmit={() => void handleCustomAISubmit()}
+                        onOpenConfig={() => {
+                            setAiOpen(false);
+                            requestMindMapAIConfig();
+                        }}
+                    />
                 }
             >
-                <Tooltip title="AI 扩展子主题">
+                <Tooltip title="AI 节点助手">
                     <button
                         type="button"
                         className={`${styles.btn} ${styles.btnAi}`}
-                        aria-label="AI 扩展子主题"
-                        title="AI 扩展子主题"
-                        onClick={() => setAiOpen(v => !v)}
+                        aria-label="AI 节点助手"
+                        title="AI 节点助手"
+                        aria-expanded={aiOpen}
+                        onKeyDown={event => {
+                            if (event.key !== 'Enter' && event.key !== ' ') return;
+                            event.preventDefault();
+                            setAiOpen(value => !value);
+                        }}
                     >
-                        <div className={styles.btnAiInner} aria-hidden="true">✨</div>
+                        <div className={styles.btnAiInner} aria-hidden="true"><RobotOutlined /></div>
                     </button>
                 </Tooltip>
             </Popover>
@@ -471,7 +479,10 @@ const MindMapFloatingBar: React.FC = () => {
             {/* Branch color quick picker */}
             <Popover
                 open={colorOpen}
-                onOpenChange={v => { setColorOpen(v); if (v) setShapeOpen(false); }}
+                onOpenChange={v => {
+                    setColorOpen(v);
+                    if (v) { setShapeOpen(false); setBoundaryOpen(false); }
+                }}
                 trigger="click"
                 placement="top"
                 arrow={false}
@@ -523,6 +534,7 @@ const MindMapFloatingBar: React.FC = () => {
                         setColorOpen(false);
                         setNoteOpen(false);
                         setAiOpen(false);
+                        setBoundaryOpen(false);
                     }
                 }}
                 onSelect={commitNodeShape}
@@ -534,6 +546,7 @@ const MindMapFloatingBar: React.FC = () => {
                 onOpenChange={v => {
                     if (v) {
                         setColorOpen(false); setShapeOpen(false);
+                        setBoundaryOpen(false);
                     }
                     setNoteOpen(v);
                 }}
@@ -568,15 +581,17 @@ const MindMapFloatingBar: React.FC = () => {
                 </Tooltip>
             </Popover>
 
-            {/* Boundary Toggle */}
-            <Btn icon="📌" tip={extendedObj.boundary ? '取消外框分组' : '添加外框分组'}
-                onClick={() => act(() => { 
-                    const tpc = getTpc(); 
-                    if (tpc) {
-                        const newBoundary = extendedObj.boundary ? undefined : { color: '#818cf8', title: '新建分组' };
-                        reshapeNodePatch(tpc, obj, { boundary: newBoundary });
+            <MindMapBoundaryControl
+                boundary={extendedObj.boundary}
+                open={boundaryOpen}
+                onOpenChange={v => {
+                    setBoundaryOpen(v);
+                    if (v) {
+                        setColorOpen(false); setShapeOpen(false); setNoteOpen(false); setAiOpen(false);
                     }
-                })} 
+                }}
+                onRemove={() => commitBoundary(undefined)}
+                onSave={commitBoundary}
             />
 
             {/* Delete — not for root */}

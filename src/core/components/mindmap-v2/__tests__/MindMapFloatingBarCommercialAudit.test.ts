@@ -26,18 +26,49 @@ const selectionHookSource = readFileSync(
     resolve(process.cwd(), 'src/core/components/mindmap-v2/useMindMapFloatingSelection.ts'),
     'utf8',
 );
+const aiPanelSource = readFileSync(
+    resolve(process.cwd(), 'src/core/components/mindmap-v2/MindMapAIQuickPanel.tsx'),
+    'utf8',
+);
+const boundaryControlSource = readFileSync(
+    resolve(process.cwd(), 'src/core/components/mindmap-v2/MindMapBoundaryControl.tsx'),
+    'utf8',
+);
+const boundaryEditorSource = readFileSync(
+    resolve(process.cwd(), 'src/core/components/mindmap-v2/MindMapBoundaryEditor.tsx'),
+    'utf8',
+);
 
 describe('MindMapFloatingBar commercial interaction contract', () => {
     it('keeps node actions named, keyboard visible, and inside narrow viewports', () => {
         expect(source).toContain('role="toolbar"');
         expect(source).toContain('aria-label="节点快捷操作"');
         expect(source).toContain('aria-label={tip}');
-        expect(source).toContain('aria-label="AI 扩展子主题"');
+        expect(source).toContain('aria-label="AI 节点助手"');
         expect(source).toContain('aria-label="连线颜色"');
         expect(shapeControlSource).toContain('aria-label="节点形状"');
         expect(source).toContain("aria-label={obj.note ? '编辑备注' : '添加备注'}");
         expect(css).toMatch(/\.barContainer[\s\S]*?max-width: calc\(100vw - 16px\)[\s\S]*?overflow-x: auto/);
         expect(css).toContain('.btn:focus-visible');
+    });
+
+    it('keeps AI popover state single-sourced and provides a configuration recovery path', () => {
+        expect(source).toContain('<MindMapAIQuickPanel');
+        expect(source).not.toContain('onClick={() => setAiOpen(v => !v)}');
+        expect(aiPanelSource).toContain('role="alert"');
+        expect(aiPanelSource).toContain('打开 AI 配置');
+        expect(aiPanelSource).toContain('aria-label="运行自定义 AI 指令"');
+        expect(aiPanelSource).toContain('disabled={!trimmedPrompt || customLoading}');
+    });
+
+    it('edits boundaries through a portal-safe named dialog with touch-sized colors', () => {
+        expect(source).toContain('<MindMapBoundaryControl');
+        expect(boundaryControlSource).toContain('getPopupContainer={() => document.body}');
+        expect(boundaryControlSource).not.toContain('onClick={() =>');
+        expect(boundaryEditorSource).toContain('role="radiogroup"');
+        expect(boundaryEditorSource).toContain('aria-checked={selected}');
+        expect(boundaryEditorSource).toContain('aria-label="外框标题"');
+        expect(css).toMatch(/\.boundaryColor[\s\S]*?width: 44px;[\s\S]*?height: 44px;/);
     });
 
     it('creates a child through the focus-and-edit helper instead of leaving a placeholder', () => {

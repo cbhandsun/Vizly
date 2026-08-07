@@ -3,6 +3,13 @@ import { createPortal } from 'react-dom';
 import { useMindElixir } from './MindElixirContext';
 import { logMindmapBoundariesWalkFailure } from './mindmapPanelLogging';
 import type { NodeObj } from 'mind-elixir';
+import { PushpinOutlined } from '@ant-design/icons';
+import {
+    measureMindMapBoundaryRect,
+    mindMapBoundaryColorToRgba,
+    resolveMindMapBoundaryTarget,
+    resolveMindMapContainer,
+} from './mindMapBoundaryPresentation';
 
 interface BoundaryBox {
     id: string;
@@ -22,15 +29,15 @@ export default function MindMapBoundaries() {
     const { instance } = useMindElixir();
     const [boundaries, setBoundaries] = useState<BoundaryBox[]>([]);
     const mapContainer = useMemo(
-        () => instance?.container?.querySelector('.map-container') as HTMLElement | null,
+        () => resolveMindMapContainer(instance?.container),
         [instance],
     );
 
     useEffect(() => {
-        if (!instance?.container) return;
-
-        const containerEle = instance.container.querySelector('.map-container') as HTMLElement;
+        if (!instance) return;
+        const containerEle = resolveMindMapContainer(instance.container);
         if (!containerEle) return;
+        let pendingFrame = 0;
 
         const updateBoundaries = () => {
             if (!containerEle) return;
@@ -40,33 +47,24 @@ export default function MindMapBoundaries() {
             const walk = (node: BoundaryNode) => {
                 // If the node has boundary data, render a bounding box
                 if (node.boundary) {
-                    const tpc = instance.findEle(node.id);
+                    let tpc: HTMLElement | null = null;
+                    try {
+                        tpc = instance.findEle(node.id);
+                    } catch {
+                        // Mind Elixir can publish an operation before the replacement topic is mounted.
+                    }
                     if (tpc) {
-                        // For root, it's 'me-root'. For branches, it's 'me-wrapper' which encapsulates topic AND children.
-                        const wrapper = tpc.closest('me-wrapper') as HTMLElement;
-                        const targetElement = wrapper || tpc.closest('me-root') as HTMLElement;
+                        const targetElement = resolveMindMapBoundaryTarget(tpc);
                         
                         if (targetElement) {
-                            // Compute relative position by walking up offsetParents until mapContainer
-                            let el = targetElement;
-                            let x = 0;
-                            let y = 0;
-                            while (el && el !== containerEle && !el.classList.contains('map-container')) {
-                                x += el.offsetLeft;
-                                y += el.offsetTop;
-                                el = el.offsetParent as HTMLElement;
-                            }
+                            const rect = measureMindMapBoundaryRect(containerEle, targetElement);
                             
                             // Extract base color, default to indigo if malformed
                             const baseColor = node.boundary.color || '#6366f1';
                             
                             boxes.push({
                                 id: node.id,
-                                // Add 15px padding around the elements
-                                x: x - 15,
-                                y: y - 15,
-                                width: targetElement.offsetWidth + 30,
-                                height: targetElement.offsetHeight + 30,
+                                ...rect,
                                 color: baseColor,
                                 title: node.boundary.title
                             });
@@ -86,10 +84,16 @@ export default function MindMapBoundaries() {
 
         updateBoundaries();
 
-        // 1. Update on operation (layout changes, add/remove nodes)
-        const handleOp = () => {
-            updateBoundaries();
+        const scheduleBoundaryUpdate = () => {
+            if (pendingFrame) cancelAnimationFrame(pendingFrame);
+            pendingFrame = requestAnimationFrame(() => {
+                pendingFrame = 0;
+                updateBoundaries();
+            });
         };
+
+        // 1. Update on operation (layout changes, add/remove nodes)
+        const handleOp = scheduleBoundaryUpdate;
         instance.bus.addListener('operation', handleOp);
 
         // 2. MutationObserver to watch DOM structure/attribute changes
@@ -99,7 +103,7 @@ export default function MindMapBoundaries() {
                 return target.closest && target.closest('.mindmap-boundary-layer');
             });
             if (!isInternal) {
-                updateBoundaries();
+                scheduleBoundaryUpdate();
             }
         });
         mutationObserver.observe(containerEle, {
@@ -111,7 +115,7 @@ export default function MindMapBoundaries() {
 
         // 3. ResizeObserver to watch container or main layout resizing
         const resizeObserver = new ResizeObserver(() => {
-            updateBoundaries();
+            scheduleBoundaryUpdate();
         });
         const mainEle = containerEle.querySelector('me-main');
         if (mainEle) {
@@ -123,7 +127,7 @@ export default function MindMapBoundaries() {
         const handleLoad = (e: Event) => {
             const target = e.target as HTMLElement;
             if (target.tagName === 'IMG') {
-                updateBoundaries();
+                scheduleBoundaryUpdate();
             }
         };
         containerEle.addEventListener('load', handleLoad, true);
@@ -134,27 +138,12 @@ export default function MindMapBoundaries() {
             }
             mutationObserver.disconnect();
             resizeObserver.disconnect();
+            if (pendingFrame) cancelAnimationFrame(pendingFrame);
             containerEle.removeEventListener('load', handleLoad, true);
         };
     }, [instance]);
 
     if (!mapContainer || boundaries.length === 0) return null;
-
-    // Convert hex to rgba for background filling
-    const hexToRgba = (hex: string, alpha: number) => {
-        const cleanHex = hex.replace('#', '');
-        let r = 99, g = 102, b = 241;
-        if (cleanHex.length === 3) {
-            r = parseInt(cleanHex[0] + cleanHex[0], 16) || 99;
-            g = parseInt(cleanHex[1] + cleanHex[1], 16) || 102;
-            b = parseInt(cleanHex[2] + cleanHex[2], 16) || 241;
-        } else if (cleanHex.length === 6) {
-            r = parseInt(cleanHex.slice(0, 2), 16) || 99;
-            g = parseInt(cleanHex.slice(2, 4), 16) || 102;
-            b = parseInt(cleanHex.slice(4, 6), 16) || 241;
-        }
-        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-    };
 
     const overlay = (
         <div 
@@ -173,8 +162,8 @@ export default function MindMapBoundaries() {
                     top: b.y,
                     width: b.width,
                     height: b.height,
-                    backgroundColor: b.color.startsWith('#') ? hexToRgba(b.color, 0.08) : 'rgba(99,102,241,0.08)',
-                    border: `2px dashed ${b.color.startsWith('#') ? hexToRgba(b.color, 0.6) : 'rgba(99,102,241,0.6)'}`,
+                    backgroundColor: mindMapBoundaryColorToRgba(b.color, 0.08),
+                    border: `2px dashed ${mindMapBoundaryColorToRgba(b.color, 0.6)}`,
                     borderRadius: 16,
                     transition: 'all 0.15s ease-out'
                 }}>
@@ -196,7 +185,7 @@ export default function MindMapBoundaries() {
                             alignItems: 'center',
                             gap: 4
                         }}>
-                            <span>📌</span> {b.title}
+                            <PushpinOutlined aria-hidden="true" /> {b.title}
                         </div>
                     )}
                 </div>

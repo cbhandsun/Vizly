@@ -12,6 +12,8 @@ import { cleanMindMapNodePatch } from './mindmapNodePatchSecurity';
 import { cleanMindMapChildNode } from './mindmapBridgeSecurity';
 import type { NodeObj } from 'mind-elixir';
 import { logMindmapContextMenuFailure } from './mindmapInteractionLogging';
+import { appMessage } from '@/core/utils/antdStaticBridge';
+import { createMindMapSummaryForSelection } from './mindMapSummaryCreation';
 
 interface CtxPos { visible: boolean; x: number; y: number; nodeId: string | null; }
 interface Props extends CtxPos { onClose: () => void; }
@@ -170,11 +172,14 @@ const MindMapContextMenu: React.FC<Props> = ({ visible, x, y, nodeId, onClose })
             )}
             <Item icon="⌥" label="创建汇总括号"
                 onClick={() => act(() => {
-                    try {
-                        mind.createSummary();
-                    } catch (error) {
-                        logMindmapContextMenuFailure('createSummary', error);
+                    const result = createMindMapSummaryForSelection(mind, nodeId);
+                    if (result.ok) {
+                        appMessage.success(result.message);
+                        return;
                     }
+                    if (result.error) logMindmapContextMenuFailure('createSummary', result.error);
+                    if (result.code === 'create-failed') appMessage.error(result.message);
+                    else appMessage.warning(result.message);
                 })} />
 
             {DIVIDER}
