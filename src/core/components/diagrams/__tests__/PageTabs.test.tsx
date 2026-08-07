@@ -14,7 +14,9 @@ vi.mock('react-i18next', () => ({
     useTranslation: () => ({
         t: (key: string, options?: Record<string, unknown>) => {
             const translations: Record<string, string> = {
+                'designer.pages.management': '页面管理',
                 'designer.pages.tabList': '页面',
+                'designer.pages.actions': '{{name}} 页面操作',
                 'designer.pages.new': '新建页面',
                 'designer.pages.limitReached': '最多可创建 {{count}} 个页面',
                 'designer.pages.rename': '重命名页面 {{name}}',
@@ -65,7 +67,8 @@ describe('PageTabs', () => {
             />,
         );
 
-        expect(screen.getByRole('tablist', { name: '页面' })).toBeTruthy();
+        const tabList = screen.getByRole('tablist', { name: '页面' });
+        expect(tabList.classList.contains('page-tabs__scroller')).toBe(true);
         const firstTab = screen.getByRole('tab', { name: '页面 1' });
         const firstPageItemScroll = vi.fn();
         Object.defineProperty(firstTab.parentElement, 'scrollIntoView', {
@@ -97,13 +100,40 @@ describe('PageTabs', () => {
         expect(document.activeElement).toBe(firstTab);
 
         const addPageButton = screen.getByRole('button', { name: '新建页面' });
-        const scroller = screen.getByRole('tablist', { name: '页面' }).querySelector('.page-tabs__scroller');
-        expect(scroller).toBeTruthy();
-        expect(scroller?.contains(addPageButton)).toBe(false);
+        expect(tabList.contains(addPageButton)).toBe(false);
+        expect(tabList.querySelectorAll('button:not([role="tab"])')).toHaveLength(0);
+        expect(screen.getByRole('button', { name: '删除页面 页面 1' })).toBeTruthy();
+        expect(screen.queryByRole('button', { name: '删除页面 页面 2' })).toBeNull();
 
         fireEvent.click(addPageButton);
         expect(onAddPage).toHaveBeenCalledTimes(1);
-        expect(screen.getByRole('button', { name: '删除页面 页面 2' })).toBeTruthy();
+    });
+
+    it('keeps page actions outside the tablist and scopes them to the active page', () => {
+        render(
+            <PageTabs
+                pages={[
+                    { id: 'page-1', name: '页面 1', nodes: [], edges: [] },
+                    { id: 'page-2', name: '页面 2', nodes: [], edges: [] },
+                    { id: 'page-3', name: '页面 3', nodes: [], edges: [] },
+                ]}
+                activePageId="page-2"
+                onSwitchPage={vi.fn()}
+                onAddPage={vi.fn()}
+                onDeletePage={vi.fn()}
+                onRenamePage={vi.fn()}
+            />,
+        );
+
+        const tabList = screen.getByRole('tablist', { name: '页面' });
+        const actions = screen.getByRole('group', { name: '页面 2 页面操作' });
+
+        expect(tabList.querySelectorAll('[role="tab"]')).toHaveLength(3);
+        expect(tabList.querySelectorAll('button:not([role="tab"])')).toHaveLength(0);
+        expect(actions.contains(screen.getByRole('button', { name: '重命名页面 页面 2' }))).toBe(true);
+        expect(actions.contains(screen.getByRole('button', { name: '删除页面 页面 2' }))).toBe(true);
+        expect(screen.queryByRole('button', { name: '删除页面 页面 1' })).toBeNull();
+        expect(screen.queryByRole('button', { name: '删除页面 页面 3' })).toBeNull();
     });
 
     it('labels the inline rename input', () => {
@@ -232,6 +262,7 @@ describe('PageTabs', () => {
         expect(pageTabsCss).toMatch(/\.page-tabs__tab\s*\{[\s\S]*?max-width:\s*180px;[\s\S]*?text-overflow:\s*ellipsis;/);
         expect(pageTabsCss).toMatch(/\.page-tabs__scroller\s*\{[\s\S]*?overflow-x:\s*auto;/);
         expect(pageTabsCss).toMatch(/\.page-tabs__add\s*\{[\s\S]*?flex-shrink:\s*0;/);
+        expect(pageTabsCss).toMatch(/\.page-tabs__actions\s*\{[\s\S]*?flex-shrink:\s*0;/);
         expect(pageTabsCss).toMatch(/@media \(max-width: 768px\)[\s\S]*?\.page-tabs__tab\s*\{[\s\S]*?max-width:\s*120px;/);
         expect(pageTabsCss).toMatch(/\.page-tabs__rename-error\s*\{[\s\S]*?bottom:\s*calc\(100% \+ 8px\);/);
         expect(pageTabsCss).toMatch(/\.page-tabs\s*\{[\s\S]*?overflow:\s*visible;/);
@@ -306,7 +337,7 @@ describe('PageTabs', () => {
         expect(onAddPage).not.toHaveBeenCalled();
     });
 
-    it('keeps the inactive page unchanged when deletion is cancelled', async () => {
+    it('keeps the active page unchanged when deletion is cancelled', async () => {
         const onSwitchPage = vi.fn();
         const onDeletePage = vi.fn();
         render(
@@ -320,7 +351,7 @@ describe('PageTabs', () => {
                         edges: [],
                     },
                 ]}
-                activePageId="page-1"
+                activePageId="page-2"
                 onSwitchPage={onSwitchPage}
                 onAddPage={vi.fn()}
                 onDeletePage={onDeletePage}

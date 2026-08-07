@@ -46,6 +46,13 @@
     border-radius: 6px;
 }
 
+.page-tabs__actions {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    border-left: 1px solid color-mix(in srgb, var(--page-tab-muted-color) 18%, transparent);
+}
+
 .page-tabs__tab,
 .page-tabs__rename-action,
 .page-tabs__delete,

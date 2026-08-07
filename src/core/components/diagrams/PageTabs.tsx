@@ -86,6 +86,7 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({ pages, activePage
     }, [activePageId, focusPageTab, pages]);
 
     const handleStartRename = useCallback((page: DiagramPage) => {
+        if (page.id !== activePageId) onSwitchPage(page.id);
         setConfirmingPageId(null);
         setEditingId(page.id);
         setEditName(page.name);
@@ -94,7 +95,7 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({ pages, activePage
             inputRef.current?.focus();
             inputRef.current?.select();
         }, 50);
-    }, []);
+    }, [activePageId, onSwitchPage]);
 
     const handleFinishRename = useCallback(() => {
         if (!editingId) return;
@@ -169,11 +170,13 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({ pages, activePage
         [disabled, focusPageTab, onSwitchPage, pages],
     );
 
+    const activePage = pages.find((page) => page.id === activePageId) ?? null;
+    const isRenamingActivePage = editingId === activePage?.id;
+
     return (
         <div
-            role="tablist"
-            aria-orientation="horizontal"
-            aria-label={t('designer.pages.tabList', { defaultValue: '页面' })}
+            role="group"
+            aria-label={t('designer.pages.management', { defaultValue: '页面管理' })}
             className="page-tabs"
             style={
                 {
@@ -187,110 +190,125 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({ pages, activePage
                 } as React.CSSProperties
             }
         >
-            <div className="page-tabs__scroller" role="presentation">
+            <div
+                aria-label={t('designer.pages.tabList', { defaultValue: '页面' })}
+                aria-orientation="horizontal"
+                className="page-tabs__scroller"
+                role="tablist"
+            >
                 {pages.map((page) => {
                     const isActive = page.id === activePageId;
-                    const isEditing = editingId === page.id;
 
                     return (
-                        <div key={page.id} className="page-tabs__item">
-                            {isEditing ? (
-                                <span className="page-tabs__rename-anchor">
-                                    <Input
-                                        ref={inputRef}
-                                        aria-label={t('designer.pages.rename', {
-                                            name: page.name,
-                                            defaultValue: '重命名页面 {{name}}',
-                                        })}
-                                        aria-invalid={Boolean(renameError)}
-                                        aria-describedby={renameError ? renameErrorId : undefined}
-                                        size="small"
-                                        value={editName}
-                                        maxLength={MAX_DIAGRAM_PAGE_NAME_LENGTH}
-                                        status={renameError ? 'error' : undefined}
-                                        onChange={(event) => {
-                                            setEditName(event.target.value);
-                                            setRenameError(null);
-                                        }}
-                                        onBlur={handleFinishRename}
-                                        onPressEnter={handleFinishRename}
-                                        onKeyDown={handleRenameKeyDown}
-                                        className="page-tabs__rename"
-                                    />
-                                </span>
-                            ) : (
-                                <button
-                                    ref={(element) => {
-                                        if (element) tabButtonRefs.current.set(page.id, element);
-                                        else tabButtonRefs.current.delete(page.id);
-                                    }}
-                                    type="button"
-                                    role="tab"
-                                    tabIndex={isActive ? 0 : -1}
-                                    aria-selected={isActive}
-                                    aria-label={page.name}
-                                    title={page.name}
-                                    className={`page-tabs__tab${isActive ? ' page-tabs__tab--active' : ''}`}
-                                    disabled={disabled}
-                                    onClick={() => onSwitchPage(page.id)}
-                                    onDoubleClick={() => handleStartRename(page)}
-                                    onKeyDown={(event) => handleTabKeyDown(event, page.id)}
-                                >
-                                    {page.name}
-                                </button>
-                            )}
+                        <div key={page.id} className="page-tabs__item" role="presentation">
+                            <button
+                                ref={(element) => {
+                                    if (element) tabButtonRefs.current.set(page.id, element);
+                                    else tabButtonRefs.current.delete(page.id);
+                                }}
+                                type="button"
+                                role="tab"
+                                tabIndex={isActive ? 0 : -1}
+                                aria-selected={isActive}
+                                aria-label={page.name}
+                                title={page.name}
+                                className={`page-tabs__tab${isActive ? ' page-tabs__tab--active' : ''}`}
+                                disabled={disabled}
+                                onClick={() => onSwitchPage(page.id)}
+                                onDoubleClick={() => handleStartRename(page)}
+                                onKeyDown={(event) => handleTabKeyDown(event, page.id)}
+                            >
+                                {page.name}
+                            </button>
+                        </div>
+                    );
+                })}
+            </div>
 
-                            {isActive && !isEditing && (
-                                <Tooltip
-                                    title={t('designer.pages.renameAction', {
-                                        name: page.name,
+            {activePage && (
+                <div
+                    aria-label={t('designer.pages.actions', {
+                        name: activePage.name,
+                        defaultValue: '{{name}} 页面操作',
+                    })}
+                    className="page-tabs__actions"
+                    role="group"
+                >
+                    {isRenamingActivePage ? (
+                        <span className="page-tabs__rename-anchor">
+                            <Input
+                                ref={inputRef}
+                                aria-label={t('designer.pages.rename', {
+                                    name: activePage.name,
+                                    defaultValue: '重命名页面 {{name}}',
+                                })}
+                                aria-invalid={Boolean(renameError)}
+                                aria-describedby={renameError ? renameErrorId : undefined}
+                                size="small"
+                                value={editName}
+                                maxLength={MAX_DIAGRAM_PAGE_NAME_LENGTH}
+                                status={renameError ? 'error' : undefined}
+                                onChange={(event) => {
+                                    setEditName(event.target.value);
+                                    setRenameError(null);
+                                }}
+                                onBlur={handleFinishRename}
+                                onPressEnter={handleFinishRename}
+                                onKeyDown={handleRenameKeyDown}
+                                className="page-tabs__rename"
+                            />
+                        </span>
+                    ) : (
+                        <>
+                            <Tooltip
+                                title={t('designer.pages.renameAction', {
+                                    name: activePage.name,
+                                    defaultValue: '重命名页面 {{name}}',
+                                })}
+                            >
+                                <button
+                                    type="button"
+                                    aria-label={t('designer.pages.renameAction', {
+                                        name: activePage.name,
                                         defaultValue: '重命名页面 {{name}}',
                                     })}
+                                    className="page-tabs__rename-action"
+                                    disabled={disabled}
+                                    onClick={() => handleStartRename(activePage)}
                                 >
-                                    <button
-                                        type="button"
-                                        aria-label={t('designer.pages.renameAction', {
-                                            name: page.name,
-                                            defaultValue: '重命名页面 {{name}}',
-                                        })}
-                                        className="page-tabs__rename-action"
-                                        disabled={disabled}
-                                        onClick={() => handleStartRename(page)}
-                                    >
-                                        <EditOutlined aria-hidden style={{ fontSize: 12 }} />
-                                    </button>
-                                </Tooltip>
-                            )}
+                                    <EditOutlined aria-hidden style={{ fontSize: 12 }} />
+                                </button>
+                            </Tooltip>
 
-                            {pages.length > 1 && !isEditing && (
+                            {pages.length > 1 && (
                                 <Popconfirm
                                     title={t('designer.pages.deleteConfirm', {
-                                        name: page.name,
+                                        name: activePage.name,
                                         defaultValue: '删除「{{name}}」？',
                                     })}
                                     description={t('designer.pages.deleteDescription', {
-                                        nodeCount: page.nodes.length,
-                                        edgeCount: page.edges.length,
+                                        nodeCount: activePage.nodes.length,
+                                        edgeCount: activePage.edges.length,
                                         defaultValue: '将永久删除此页面中的 {{nodeCount}} 个节点和 {{edgeCount}} 条连线，且无法撤销。',
                                     })}
                                     getPopupContainer={getViewportOverlayContainer}
                                     placement="top"
                                     autoAdjustOverflow
                                     styles={{ root: { maxWidth: 'calc(100vw - 16px)' } }}
-                                    open={confirmingPageId === page.id}
+                                    open={confirmingPageId === activePage.id}
                                     onOpenChange={(open) => {
-                                        setConfirmingPageId(open ? page.id : null);
+                                        setConfirmingPageId(open ? activePage.id : null);
                                         if (open) focusDeleteCancelButton();
-                                        else requestAnimationFrame(() => focusDeleteButton(page.id));
+                                        else requestAnimationFrame(() => focusDeleteButton(activePage.id));
                                     }}
                                     onConfirm={() => {
-                                        const deleted = onDeletePage(page.id);
+                                        const deleted = onDeletePage(activePage.id);
                                         restoreFocusAfterDeleteRef.current = deleted;
                                         setConfirmingPageId(null);
                                     }}
                                     onCancel={() => {
                                         setConfirmingPageId(null);
-                                        requestAnimationFrame(() => focusDeleteButton(page.id));
+                                        requestAnimationFrame(() => focusDeleteButton(activePage.id));
                                     }}
                                     okText={t('designer.pages.deleteAction', {
                                         defaultValue: '删除',
@@ -304,12 +322,12 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({ pages, activePage
                                 >
                                     <button
                                         ref={(element) => {
-                                            if (element) deleteButtonRefs.current.set(page.id, element);
-                                            else deleteButtonRefs.current.delete(page.id);
+                                            if (element) deleteButtonRefs.current.set(activePage.id, element);
+                                            else deleteButtonRefs.current.delete(activePage.id);
                                         }}
                                         type="button"
                                         aria-label={t('designer.pages.delete', {
-                                            name: page.name,
+                                            name: activePage.name,
                                             defaultValue: '删除页面 {{name}}',
                                         })}
                                         className="page-tabs__delete"
@@ -319,10 +337,10 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({ pages, activePage
                                     </button>
                                 </Popconfirm>
                             )}
-                        </div>
-                    );
-                })}
-            </div>
+                        </>
+                    )}
+                </div>
+            )}
 
             {renameError && (
                 <span id={renameErrorId} role="alert" className="page-tabs__rename-error">
