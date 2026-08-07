@@ -21,6 +21,7 @@ import {
 import {
     bindDialogEscapeClose,
     findExpandedDialogTrigger,
+    focusDialogEntry,
     trapDialogTab,
 } from './dialogFocus';
 import { hasMutationLockedNode } from './nodeLockPolicy';
@@ -92,6 +93,7 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
     const sidebarRef = React.useRef<HTMLDivElement>(null);
     const mobileDialogTriggerRef = React.useRef<HTMLElement | null>(null);
     const previousMobileDialogOpenRef = React.useRef(false);
+    const previousMobileActiveTabRef = React.useRef(activeTab);
 
     // 折叠状态持久化
     const [collapsedState, setCollapsedState] = useState(() => {
@@ -249,6 +251,23 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
             if (trigger?.isConnected) trigger.focus();
         }
     }, [mobileDialogOpen]);
+
+    React.useLayoutEffect(() => {
+        const previousActiveTab = previousMobileActiveTabRef.current;
+        previousMobileActiveTabRef.current = activeTab;
+        const sidebar = sidebarRef.current;
+        if (!mobileDialogOpen || previousActiveTab === activeTab || !sidebar) return;
+
+        const nextReturnFocus = document.activeElement;
+        if (
+            !(nextReturnFocus instanceof HTMLElement)
+            || nextReturnFocus === document.body
+            || sidebar.contains(nextReturnFocus)
+        ) return;
+
+        mobileDialogTriggerRef.current = nextReturnFocus;
+        focusDialogEntry(sidebar);
+    }, [activeTab, mobileDialogOpen]);
 
     useEffect(() => {
         if (!mobileDialogOpen) return;

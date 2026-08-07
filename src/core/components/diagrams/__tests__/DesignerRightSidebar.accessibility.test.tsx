@@ -48,6 +48,53 @@ const Harness = () => {
     );
 };
 
+const SwitchingHarness = () => {
+    const [open, setOpen] = useState(false);
+    const [activeTab, setActiveTab] = useState<'property' | 'ai'>('property');
+
+    const openTab = (tab: 'property' | 'ai') => {
+        setActiveTab(tab);
+        setOpen(true);
+    };
+
+    return (
+        <>
+            <button
+                type="button"
+                aria-haspopup="dialog"
+                aria-expanded={open && activeTab === 'property'}
+                onClick={() => openTab('property')}
+            >
+                打开属性抽屉
+            </button>
+            <button
+                type="button"
+                aria-haspopup="dialog"
+                aria-expanded={open && activeTab === 'ai'}
+                onClick={() => openTab('ai')}
+            >
+                打开 AI 抽屉
+            </button>
+            <DesignerRightSidebar
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+                aiChatVisible={activeTab === 'ai'}
+                setAiChatVisible={vi.fn()}
+                selectedNodes={[]}
+                selectedEdges={[]}
+                updateNodesBatch={vi.fn()}
+                updateEdgesBatch={vi.fn()}
+                onBeforeUpdate={vi.fn()}
+                isDraggingNode={false}
+                renderAIChatPanel={() => <button type="button">AI 操作</button>}
+                isMobile
+                mobileOpen={open}
+                onMobileOpenChange={setOpen}
+            />
+        </>
+    );
+};
+
 describe('DesignerRightSidebar mobile dialog accessibility', () => {
     beforeEach(() => {
         vi.stubGlobal('ResizeObserver', class {
@@ -106,6 +153,30 @@ describe('DesignerRightSidebar mobile dialog accessibility', () => {
         fireEvent.keyDown(closeButton, { key: 'Escape' });
 
         await waitFor(() => expect(document.activeElement).toBe(trigger));
+    });
+
+    it('hands focus and close restoration to the dock trigger used to switch tabs', async () => {
+        render(<SwitchingHarness />);
+        const propertyTrigger = screen.getByRole('button', { name: '打开属性抽屉' });
+        const aiTrigger = screen.getByRole('button', { name: '打开 AI 抽屉' });
+
+        propertyTrigger.focus();
+        fireEvent.click(propertyTrigger);
+        expect(screen.getByRole('dialog', { name: '属性设置' })).toBeTruthy();
+        const closeButton = await screen.findByRole('button', { name: '收起面板' });
+        await waitFor(() => expect(document.activeElement).toBe(closeButton));
+
+        aiTrigger.focus();
+        fireEvent.click(aiTrigger);
+
+        expect(screen.getByRole('dialog', { name: 'AI 架构助手' })).toBeTruthy();
+        await waitFor(() => expect(document.activeElement).toBe(closeButton));
+        fireEvent.keyDown(closeButton, { key: 'Escape' });
+
+        await waitFor(() => {
+            expect(screen.queryByRole('dialog')).toBeNull();
+            expect(document.activeElement).toBe(aiTrigger);
+        });
     });
 
     it('keeps the property panel inside a bounded scroll region on mobile', async () => {

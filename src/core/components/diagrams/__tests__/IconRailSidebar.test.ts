@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
 
 const safeLogState = vi.hoisted(() => ({
   debug: vi.fn(),
@@ -138,5 +139,19 @@ describe('IconRailSidebar storage helpers', () => {
       bottom: 'auto',
       borderRadius: 'var(--designer-radius, 10px)',
     });
+  });
+
+  it('uses an opaque mobile drawer surface so the canvas and icon rail cannot bleed through', () => {
+    const css = readFileSync(
+      'src/core/components/diagrams/IconRailSidebar.css',
+      'utf8',
+    );
+
+    expect(css).toMatch(
+      /\.side-drawer\.mobile-drawer\s*\{[^}]*background:\s*#fff;[^}]*backdrop-filter:\s*none;[^}]*-webkit-backdrop-filter:\s*none;/s,
+    );
+    expect(css).toMatch(
+      /\[data-theme='dark'\] \.side-drawer\.mobile-drawer\s*\{[^}]*background:\s*#1e1e2e;/s,
+    );
   });
 });
