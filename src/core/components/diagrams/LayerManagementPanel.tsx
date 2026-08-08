@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Button, Space, Input, Tooltip, Popover, Modal } from 'antd';
 import type { InputRef } from 'antd';
+import { useTranslation } from 'react-i18next';
 import {
     EyeOutlined,
     EyeInvisibleOutlined,
@@ -20,18 +21,18 @@ import { getUiScale } from '../shared/viewportStore';
 
 /** 预定义图层颜色 */
 const LAYER_COLORS = [
-    { value: '#ef4444', label: '红色' },
-    { value: '#f97316', label: '橙色' },
-    { value: '#eab308', label: '黄色' },
-    { value: '#22c55e', label: '绿色' },
-    { value: '#3b82f6', label: '蓝色' },
-    { value: '#8b5cf6', label: '紫色' },
-    { value: '#ec4899', label: '粉色' },
-    { value: '#06b6d4', label: '青色' },
-    { value: '#6366f1', label: '靛蓝色' },
-    { value: '#14b8a6', label: '蓝绿色' },
-    { value: '#f59e0b', label: '琥珀色' },
-    { value: '#10b981', label: '翠绿色' },
+    { value: '#ef4444', labelKey: 'red' },
+    { value: '#f97316', labelKey: 'orange' },
+    { value: '#eab308', labelKey: 'yellow' },
+    { value: '#22c55e', labelKey: 'green' },
+    { value: '#3b82f6', labelKey: 'blue' },
+    { value: '#8b5cf6', labelKey: 'purple' },
+    { value: '#ec4899', labelKey: 'pink' },
+    { value: '#06b6d4', labelKey: 'cyan' },
+    { value: '#6366f1', labelKey: 'indigo' },
+    { value: '#14b8a6', labelKey: 'teal' },
+    { value: '#f59e0b', labelKey: 'amber' },
+    { value: '#10b981', labelKey: 'emerald' },
 ];
 
 const COLOR_PICKER_VALUES = [...LAYER_COLORS.map(option => option.value), undefined] as const;
@@ -58,6 +59,7 @@ const ColorPicker: React.FC<{
     onSelect: (color: string | undefined) => void;
     touchTargetSize: number;
 }> = ({ current, onSelect, touchTargetSize }) => {
+    const { t } = useTranslation();
     const buttonRefs = useRef(new Map<string, HTMLButtonElement>());
 
     const focusAndSelect = useCallback((value: string | undefined) => {
@@ -84,8 +86,10 @@ const ColorPicker: React.FC<{
     }, [focusAndSelect]);
 
     return (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, width: touchTargetSize * 4 + 18 }} aria-label="图层颜色" role="radiogroup">
-        {LAYER_COLORS.map(({ value, label }) => (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, width: touchTargetSize * 4 + 18 }} aria-label={t('designer.layersPanel.colorGroup')} role="radiogroup">
+        {LAYER_COLORS.map(({ value, labelKey }) => {
+            const label = t(`designer.layersPanel.colors.${labelKey}`);
+            return (
             <button
                 type="button"
                 key={value}
@@ -95,7 +99,7 @@ const ColorPicker: React.FC<{
                 }}
                 role="radio"
                 tabIndex={value === current ? 0 : -1}
-                aria-label={`图层颜色：${label}`}
+                aria-label={t('designer.layersPanel.colorOption', { color: label })}
                 aria-checked={value === current}
                 title={label}
                 onClick={() => focusAndSelect(value)}
@@ -113,7 +117,8 @@ const ColorPicker: React.FC<{
                 onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.15)')}
                 onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
             />
-        ))}
+            );
+        })}
         <button
             ref={(element) => {
                 if (element) buttonRefs.current.set('none', element);
@@ -122,9 +127,9 @@ const ColorPicker: React.FC<{
             type="button"
             role="radio"
             tabIndex={current ? -1 : 0}
-            aria-label="图层颜色：无颜色"
+            aria-label={t('designer.layersPanel.colorOption', { color: t('designer.layersPanel.colors.none') })}
             aria-checked={!current}
-            title="无颜色"
+            title={t('designer.layersPanel.colors.none')}
             onClick={() => focusAndSelect(undefined)}
             onKeyDown={(event) => handleKeyDown(event, undefined)}
             style={{
@@ -156,6 +161,7 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
     onReorder,
     onSetColor,
 }) => {
+    const { t } = useTranslation();
     const [isCreating, setIsCreating] = useState(false);
     const [createName, setCreateName] = useState('');
     const [createError, setCreateError] = useState<string | null>(null);
@@ -223,17 +229,17 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
     const handleCreate = () => {
         const name = normalizeLayerNameInput(createName);
         if (!name) {
-            setCreateError('请输入图层名称');
+            setCreateError(t('designer.layersPanel.errors.nameRequired'));
             createInputRef.current?.focus();
             return;
         }
         if (!isLayerNameAvailable(layers, name)) {
-            setCreateError('图层名称不能重复');
+            setCreateError(t('designer.layersPanel.errors.nameDuplicate'));
             createInputRef.current?.focus();
             return;
         }
         if (onCreate(name) === false) {
-            setCreateError('图层创建失败，请重试');
+            setCreateError(t('designer.layersPanel.errors.createFailed'));
             createInputRef.current?.focus();
             return;
         }
@@ -250,17 +256,17 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
     const finishEdit = (layerId: string) => {
         const name = normalizeLayerNameInput(editName);
         if (!name) {
-            setEditError('请输入图层名称');
+            setEditError(t('designer.layersPanel.errors.nameRequired'));
             requestAnimationFrame(() => editInputRef.current?.focus());
             return;
         }
         if (!isLayerNameAvailable(layers, name, layerId)) {
-            setEditError('图层名称不能重复');
+            setEditError(t('designer.layersPanel.errors.nameDuplicate'));
             requestAnimationFrame(() => editInputRef.current?.focus());
             return;
         }
         if (onRename(layerId, name) === false) {
-            setEditError('图层重命名失败，请重试');
+            setEditError(t('designer.layersPanel.errors.renameFailed'));
             requestAnimationFrame(() => editInputRef.current?.focus());
             return;
         }
@@ -279,7 +285,7 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
     return (
         <div style={{ padding: 16, background: '#fafafa', height: '100%', display: 'flex', flexDirection: 'column' }}>
             <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>图层</h3>
+                <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>{t('designer.layersPanel.title')}</h3>
                 {isCreating ? (
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
                         <Space.Compact>
@@ -288,10 +294,10 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
                                 value={createName}
                                 autoFocus
                                 maxLength={80}
-                                aria-label="新图层名称"
+                                aria-label={t('designer.layersPanel.newLayerName')}
                                 aria-invalid={Boolean(createError)}
                                 aria-describedby={createError ? CREATE_ERROR_ID : undefined}
-                                placeholder="输入图层名称"
+                                placeholder={t('designer.layersPanel.namePlaceholder')}
                                 status={createError ? 'error' : undefined}
                                 style={{ width: 180, minHeight: touchTargetSize }}
                                 onChange={(event) => {
@@ -305,18 +311,18 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
                             />
                             <Button
                                 type="primary"
-                                aria-label="创建图层"
+                                aria-label={t('designer.layersPanel.createLayer')}
                                 style={{ minHeight: touchTargetSize }}
                                 onClick={handleCreate}
                             >
-                                创建
+                                {t('designer.layersPanel.create')}
                             </Button>
                             <Button
-                                aria-label="取消新建图层"
+                                aria-label={t('designer.layersPanel.cancelCreate')}
                                 style={{ minHeight: touchTargetSize }}
                                 onClick={cancelCreate}
                             >
-                                取消
+                                {t('common.cancel')}
                             </Button>
                         </Space.Compact>
                         {createError ? (
@@ -329,11 +335,11 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
                     <Button
                         type="primary"
                         icon={<PlusOutlined />}
-                        aria-label="新建图层"
+                        aria-label={t('designer.layersPanel.newLayer')}
                         style={{ minHeight: touchTargetSize }}
                         onClick={() => setIsCreating(true)}
                     >
-                        新建
+                        {t('designer.layersPanel.new')}
                     </Button>
                 )}
             </div>
@@ -353,9 +359,9 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
                         border: 0,
                     }}
                 >
-                    使用上下方向键切换图层，Home 和 End 跳到首尾图层。
+                    {t('designer.layersPanel.keyboardHelp')}
                 </span>
-                <div role="list" aria-label="图层列表">
+                <div role="list" aria-label={t('designer.layersPanel.layerList')}>
                     {displayedLayers.map((layer, displayIndex) => {
                         const isActive = layer.id === keyboardActiveLayerId;
                         const sourceIndex = layers.findIndex(candidate => candidate.id === layer.id);
@@ -420,7 +426,7 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
                                                 }}
                                                 autoFocus
                                                 maxLength={80}
-                                                aria-label={`重命名图层：${layer.name}`}
+                                                aria-label={t('designer.layersPanel.renameLayer', { name: layer.name })}
                                                 aria-invalid={Boolean(editError)}
                                                 aria-describedby={editError ? EDIT_ERROR_ID : undefined}
                                                 status={editError ? 'error' : undefined}
@@ -450,12 +456,12 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
                                     ) : null}
 
                                     <Space size={4}>
-                                        <Tooltip title={layer.visible ? '隐藏' : '显示'}>
+                                        <Tooltip title={t(layer.visible ? 'designer.layersPanel.hide' : 'designer.layersPanel.show')}>
                                             <Button
                                                 type="text"
                                                 tabIndex={isActive ? 0 : -1}
                                                 style={actionButtonStyle}
-                                                aria-label={`${layer.visible ? '隐藏' : '显示'}图层：${layer.name}`}
+                                                aria-label={t(layer.visible ? 'designer.layersPanel.hideLayer' : 'designer.layersPanel.showLayer', { name: layer.name })}
                                                 icon={layer.visible ? <EyeOutlined /> : <EyeInvisibleOutlined />}
                                                 onClick={(event) => {
                                                     event.stopPropagation();
@@ -464,12 +470,12 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
                                             />
                                         </Tooltip>
 
-                                        <Tooltip title={layer.locked ? '解锁' : '锁定'}>
+                                        <Tooltip title={t(layer.locked ? 'designer.layersPanel.unlock' : 'designer.layersPanel.lock')}>
                                             <Button
                                                 type="text"
                                                 tabIndex={isActive ? 0 : -1}
                                                 style={actionButtonStyle}
-                                                aria-label={`${layer.locked ? '解锁' : '锁定'}图层：${layer.name}`}
+                                                aria-label={t(layer.locked ? 'designer.layersPanel.unlockLayer' : 'designer.layersPanel.lockLayer', { name: layer.name })}
                                                 icon={layer.locked ? <LockOutlined /> : <UnlockOutlined />}
                                                 onClick={(event) => {
                                                     event.stopPropagation();
@@ -490,12 +496,12 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
                                                 trigger="click"
                                                 placement="bottom"
                                             >
-                                                <Tooltip title="颜色标记">
+                                                <Tooltip title={t('designer.layersPanel.colorMarker')}>
                                                     <Button
                                                         type="text"
                                                         tabIndex={isActive ? 0 : -1}
                                                         style={actionButtonStyle}
-                                                        aria-label={`设置图层颜色：${layer.name}`}
+                                                        aria-label={t('designer.layersPanel.setLayerColor', { name: layer.name })}
                                                         icon={<BgColorsOutlined style={{ color: layer.color || undefined }} />}
                                                         onClick={(event) => event.stopPropagation()}
                                                     />
@@ -505,11 +511,11 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
 
                                         {isActive && (
                                             <>
-                                                <Tooltip title="上移图层">
+                                                <Tooltip title={t('designer.layersPanel.moveUp')}>
                                                     <Button
                                                         type="text"
                                                         style={actionButtonStyle}
-                                                        aria-label={`上移图层：${layer.name}`}
+                                                        aria-label={t('designer.layersPanel.moveLayerUp', { name: layer.name })}
                                                         disabled={!canMoveUp}
                                                         icon={<ArrowUpOutlined />}
                                                         onClick={(event) => {
@@ -519,11 +525,11 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
                                                     />
                                                 </Tooltip>
 
-                                                <Tooltip title="下移图层">
+                                                <Tooltip title={t('designer.layersPanel.moveDown')}>
                                                     <Button
                                                         type="text"
                                                         style={actionButtonStyle}
-                                                        aria-label={`下移图层：${layer.name}`}
+                                                        aria-label={t('designer.layersPanel.moveLayerDown', { name: layer.name })}
                                                         disabled={!canMoveDown}
                                                         icon={<ArrowDownOutlined />}
                                                         onClick={(event) => {
@@ -535,11 +541,11 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
 
                                                 {layer.id !== 'layer-0' && (
                                                     <>
-                                                        <Tooltip title="重命名">
+                                                        <Tooltip title={t('designer.layersPanel.rename')}>
                                                             <Button
                                                                 type="text"
                                                                 style={actionButtonStyle}
-                                                                aria-label={`重命名图层：${layer.name}`}
+                                                                aria-label={t('designer.layersPanel.renameLayer', { name: layer.name })}
                                                                 icon={<EditOutlined />}
                                                                 onClick={(event) => {
                                                                     event.stopPropagation();
@@ -552,7 +558,7 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
                                                             type="text"
                                                             style={actionButtonStyle}
                                                             danger
-                                                            aria-label={`删除图层：${layer.name}`}
+                                                            aria-label={t('designer.layersPanel.deleteLayer', { name: layer.name })}
                                                             icon={<DeleteOutlined />}
                                                             onClick={(event) => {
                                                                 event.stopPropagation();
@@ -573,11 +579,13 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
 
             <Modal
                 open={Boolean(pendingDeleteLayer)}
-                title={pendingDeleteLayer ? `删除图层“${pendingDeleteLayer.name}”？` : '删除图层？'}
-                okText="删除"
-                cancelText="取消"
-                okButtonProps={{ danger: true, 'aria-label': '确认删除图层' }}
-                cancelButtonProps={{ 'aria-label': '取消删除图层' }}
+                title={pendingDeleteLayer
+                    ? t('designer.layersPanel.deleteTitle', { name: pendingDeleteLayer.name })
+                    : t('designer.layersPanel.deleteFallbackTitle')}
+                okText={t('common.delete')}
+                cancelText={t('common.cancel')}
+                okButtonProps={{ danger: true, 'aria-label': t('designer.layersPanel.confirmDelete') }}
+                cancelButtonProps={{ 'aria-label': t('designer.layersPanel.cancelDelete') }}
                 wrapClassName="commercial-viewport-modal"
                 width={420}
                 zIndex={1100}
@@ -590,7 +598,7 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
                     setPendingDeleteLayer(null);
                 }}
             >
-                <p style={{ margin: 0 }}>此操作无法撤销。</p>
+                <p style={{ margin: 0 }}>{t('designer.layersPanel.deleteWarning')}</p>
             </Modal>
         </div>
     );

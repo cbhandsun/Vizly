@@ -2,6 +2,7 @@
 
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import i18n from '../../../../../i18n';
 
 import {
     FLOWCHART_ACTIVE_LAYER_STORAGE_KEY,
@@ -27,7 +28,8 @@ const seedLayers = () => {
 };
 
 describe('useLayerManagement name boundary', () => {
-    beforeEach(() => {
+    beforeEach(async () => {
+        await i18n.changeLanguage('zh');
         vi.restoreAllMocks();
         localStorage.clear();
         messageState.success.mockReset();
@@ -65,6 +67,27 @@ describe('useLayerManagement name boundary', () => {
         });
         expect(result.current.layers.find(layer => layer.id === 'layer-67')?.name).toBe('发布 层');
         expect(result.current.activeLayerId).toBe('layer-67');
-        expect(messageState.success).toHaveBeenCalledWith('已创建图层 "发布 层"');
+        expect(messageState.success).toHaveBeenCalledWith('已创建图层“发布 层”');
+    });
+
+    it('localizes mutation feedback in English', async () => {
+        await i18n.changeLanguage('en');
+        vi.spyOn(Date, 'now').mockReturnValue(68);
+        const { result } = renderHook(() => useLayerManagement());
+
+        act(() => {
+            expect(result.current.createLayer('Review')).toBe(true);
+        });
+        expect(messageState.success).toHaveBeenCalledWith('Created layer “Review”');
+
+        act(() => {
+            result.current.deleteLayer('layer-68');
+        });
+        expect(messageState.success).toHaveBeenCalledWith('Deleted layer “Review”');
+
+        act(() => {
+            result.current.deleteLayer('layer-0');
+        });
+        expect(messageState.warning).toHaveBeenCalledWith('The default layer cannot be deleted');
     });
 });

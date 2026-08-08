@@ -1,9 +1,13 @@
 // @vitest-environment jsdom
 
 import React, { useState } from 'react';
+import { createInstance } from 'i18next';
+import { I18nextProvider } from 'react-i18next';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LayerManagementPanel } from '../LayerManagementPanel';
+import en from '../../../../locales/en.json';
+import i18n from '../../../../i18n';
 
 const layer = {
     id: 'layer-0',
@@ -31,6 +35,10 @@ beforeAll(() => vi.stubGlobal('ResizeObserver', ResizeObserverMock));
 afterAll(() => vi.unstubAllGlobals());
 
 describe('LayerManagementPanel', () => {
+    beforeEach(async () => {
+        await i18n.changeLanguage('zh');
+    });
+
     afterEach(() => {
         vi.restoreAllMocks();
     });
@@ -369,5 +377,69 @@ describe('LayerManagementPanel', () => {
 
         fireEvent.click(screen.getByRole('button', { name: '确认删除图层' }));
         expect(onDelete).toHaveBeenCalledWith('layer-review');
+    });
+
+    it('localizes layer controls, validation, colors, and deletion in English', async () => {
+        const englishI18n = createInstance();
+        await englishI18n.init({
+            lng: 'en',
+            fallbackLng: 'en',
+            resources: { en: { translation: en } },
+        });
+
+        const { unmount } = render(
+            <I18nextProvider i18n={englishI18n}>
+                <LayerManagementPanel
+                    layers={[layer, reviewLayer]}
+                    activeLayerId="layer-review"
+                    onSetActive={vi.fn()}
+                    onToggleVisibility={vi.fn()}
+                    onToggleLock={vi.fn()}
+                    onRename={vi.fn()}
+                    onCreate={vi.fn()}
+                    onDelete={vi.fn()}
+                    onReorder={vi.fn()}
+                    onSetColor={vi.fn()}
+                />
+            </I18nextProvider>,
+        );
+
+        expect(screen.getByRole('heading', { name: 'Layers' })).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Hide layer: 评审图层' })).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Lock layer: 评审图层' })).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Set layer color: 评审图层' })).toBeTruthy();
+
+        fireEvent.click(screen.getByRole('button', { name: 'New layer' }));
+        const createInput = screen.getByRole('textbox', { name: 'New layer name' });
+        expect(createInput.getAttribute('placeholder')).toBe('Enter a layer name');
+        fireEvent.click(screen.getByRole('button', { name: 'Create layer' }));
+        expect(screen.getByRole('alert').textContent).toContain('Enter a layer name');
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel new layer' }));
+
+        fireEvent.click(screen.getByRole('button', { name: 'Set layer color: 评审图层' }));
+        expect(await screen.findByRole('radiogroup', { name: 'Layer colors' })).toBeTruthy();
+        expect(screen.getByRole('radio', { name: 'Layer color: Red' })).toBeTruthy();
+        unmount();
+
+        render(
+            <I18nextProvider i18n={englishI18n}>
+                <LayerManagementPanel
+                    layers={[layer, reviewLayer]}
+                    activeLayerId="layer-review"
+                    onSetActive={vi.fn()}
+                    onToggleVisibility={vi.fn()}
+                    onToggleLock={vi.fn()}
+                    onRename={vi.fn()}
+                    onCreate={vi.fn()}
+                    onDelete={vi.fn()}
+                    onReorder={vi.fn()}
+                />
+            </I18nextProvider>,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Delete layer: 评审图层' }));
+        expect(await screen.findByRole('dialog', { name: 'Delete layer “评审图层”?' })).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Confirm delete layer' })).toBeTruthy();
+        expect(screen.getByText('This action cannot be undone.')).toBeTruthy();
     });
 });

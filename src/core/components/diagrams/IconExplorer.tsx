@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Input, Spin, Empty, Tooltip, Typography } from 'antd';
 import { SearchOutlined, CloudDownloadOutlined, FireOutlined } from '@ant-design/icons';
 import { Icon } from '@iconify/react';
+import { useTranslation } from 'react-i18next';
 import { PluginContext } from '../../types/plugin';
 import { appMessage } from '@/core/utils/antdStaticBridge';
 import { isSafeIconifyIconName, searchIconifyIcons } from '@/core/utils/iconifySecurity';
@@ -16,12 +17,12 @@ interface IconExplorerProps {
 }
 
 const POPULAR_COLLECTIONS = [
-    { prefix: 'logos', title: '品牌 Logos', icon: 'logos:react' },
-    { prefix: 'logos:aws', title: 'AWS 云服务', icon: 'logos:aws' },
-    { prefix: 'logos:azure', title: 'Azure 云', icon: 'logos:microsoft-azure' },
-    { prefix: 'logos:google-cloud', title: 'Google Cloud', icon: 'logos:google-cloud' },
-    { prefix: 'mdi', title: 'Material Design', icon: 'mdi:material-design' },
-    { prefix: 'carbon', title: 'IBM Carbon', icon: 'carbon:carbon' },
+    { prefix: 'logos', titleKey: 'designer.iconExplorer.collections.brands', icon: 'logos:react' },
+    { prefix: 'logos:aws', titleKey: 'designer.iconExplorer.collections.aws', icon: 'logos:aws' },
+    { prefix: 'logos:azure', titleKey: 'designer.iconExplorer.collections.azure', icon: 'logos:microsoft-azure' },
+    { prefix: 'logos:google-cloud', titleKey: 'designer.iconExplorer.collections.googleCloud', icon: 'logos:google-cloud' },
+    { prefix: 'mdi', titleKey: 'designer.iconExplorer.collections.materialDesign', icon: 'mdi:material-design' },
+    { prefix: 'carbon', titleKey: 'designer.iconExplorer.collections.ibmCarbon', icon: 'carbon:carbon' },
 ];
 
 const createIconNodeData = (iconName: string) => ({
@@ -32,6 +33,7 @@ const createIconNodeData = (iconName: string) => ({
 });
 
 export const IconExplorer: React.FC<IconExplorerProps> = ({ ctx }) => {
+    const { t } = useTranslation();
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<string[]>([]);
     const [loading, setLoading] = useState(false);
@@ -60,7 +62,7 @@ export const IconExplorer: React.FC<IconExplorerProps> = ({ ctx }) => {
             } catch (error) {
                 if (controller.signal.aborted) return;
                 logDiagramIconExplorerFetchFailure(error);
-                appMessage.error('搜索图标失败，请检查网络连接');
+                appMessage.error(t('designer.iconExplorer.searchFailed'));
             } finally {
                 if (!controller.signal.aborted) setLoading(false);
             }
@@ -70,7 +72,7 @@ export const IconExplorer: React.FC<IconExplorerProps> = ({ ctx }) => {
             if (!controller.signal.aborted) void fetchIcons();
         });
         return () => controller.abort();
-    }, [debouncedQuery]);
+    }, [debouncedQuery, t]);
 
     const visibleResults = debouncedQuery.trim() ? results : [];
     const visibleLoading = Boolean(debouncedQuery.trim()) && loading;
@@ -108,9 +110,9 @@ export const IconExplorer: React.FC<IconExplorerProps> = ({ ctx }) => {
             <div style={{ padding: '8px 12px', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
                 <Input
                     prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
-                    placeholder="搜索 100,000+ 图标..."
-                    aria-label="搜索云端图标"
-                    allowClear={{ clearIcon: <AccessibleInputClearIcon label="清除图标搜索" /> }}
+                    placeholder={t('designer.iconExplorer.searchPlaceholder')}
+                    aria-label={t('designer.iconExplorer.searchLabel')}
+                    allowClear={{ clearIcon: <AccessibleInputClearIcon label={t('designer.iconExplorer.clearSearch')} /> }}
                     size="small"
                     value={query}
                     onChange={e => setQuery(e.target.value)}
@@ -123,15 +125,17 @@ export const IconExplorer: React.FC<IconExplorerProps> = ({ ctx }) => {
                 {!query && (
                     <div style={{ marginBottom: 16 }}>
                         <div style={{ fontSize: 12, fontWeight: 600, color: '#8c8c8c', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <FireOutlined style={{ color: '#ff4d4f' }} /> 热门图标库
+                            <FireOutlined style={{ color: '#ff4d4f' }} /> {t('designer.iconExplorer.popularCollections')}
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
-                            {POPULAR_COLLECTIONS.map(item => (
+                            {POPULAR_COLLECTIONS.map(item => {
+                                const title = t(item.titleKey);
+                                return (
                                 <button
                                     type="button"
                                     key={item.prefix}
                                     onClick={() => handlePresetClick(item.prefix)}
-                                    aria-label={`搜索图标库 ${item.title}`}
+                                    aria-label={t('designer.iconExplorer.searchCollection', { collection: title })}
                                     style={{
                                         padding: '10px 8px',
                                         background: 'rgba(255,255,255,0.5)',
@@ -155,16 +159,17 @@ export const IconExplorer: React.FC<IconExplorerProps> = ({ ctx }) => {
                                     }}
                                 >
                                     <Icon icon={item.icon} style={{ fontSize: 24 }} />
-                                    <Text style={{ fontSize: 10, fontWeight: 500 }}>{item.title}</Text>
+                                    <Text style={{ fontSize: 10, fontWeight: 500 }}>{title}</Text>
                                 </button>
-                            ))}
+                                );
+                            })}
                         </div>
                     </div>
                 )}
 
                 {visibleLoading ? (
                     <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}>
-                        <Spin size="small" tip="检索中..." />
+                        <Spin size="small" tip={t('designer.iconExplorer.searching')} />
                     </div>
                 ) : visibleResults.length > 0 ? (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
@@ -175,7 +180,7 @@ export const IconExplorer: React.FC<IconExplorerProps> = ({ ctx }) => {
                                     draggable
                                     onDragStart={(e) => onDragStart(e, iconName)}
                                     onClick={() => ctx.addNode('iconNode', createIconNodeData(iconName))}
-                                    aria-label={`添加图标 ${iconName}`}
+                                    aria-label={t('designer.iconExplorer.addIcon', { icon: iconName })}
                                     style={{
                                         aspectRatio: '1',
                                         display: 'flex',
@@ -203,7 +208,7 @@ export const IconExplorer: React.FC<IconExplorerProps> = ({ ctx }) => {
                         ))}
                     </div>
                 ) : query && !visibleLoading ? (
-                    <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="未找到匹配图标" />
+                    <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('designer.iconExplorer.noResults')} />
                 ) : null}
             </div>
 
@@ -211,7 +216,7 @@ export const IconExplorer: React.FC<IconExplorerProps> = ({ ctx }) => {
             <div style={{ padding: '8px 12px', background: 'rgba(0,0,0,0.02)', borderTop: '1px solid rgba(0,0,0,0.05)' }}>
                 <Text type="secondary" style={{ fontSize: 10 }}>
                     <CloudDownloadOutlined style={{ marginRight: 4 }} />
-                    点击添加，或拖拽到画布指定位置
+                    {t('designer.iconExplorer.addOrDragHint')}
                 </Text>
             </div>
         </div>

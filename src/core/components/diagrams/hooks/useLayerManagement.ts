@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { appMessage } from '../../../utils/antdStaticBridge';
 import {
     coerceActiveLayerId,
@@ -26,6 +27,7 @@ export interface LayersState {
 }
 
 export const useLayerManagement = () => {
+    const { t } = useTranslation();
     // 从 localStorage 恢复图层配置
     const [layers, setLayers] = useState<LayerConfig[]>(() => {
         return readLayers();
@@ -54,11 +56,11 @@ export const useLayerManagement = () => {
     const createLayer = useCallback((name: string) => {
         const normalizedName = normalizeLayerNameInput(name);
         if (!normalizedName) {
-            appMessage.warning('图层名称不能为空');
+            appMessage.warning(t('designer.layersPanel.messages.nameEmpty'));
             return false;
         }
         if (!isLayerNameAvailable(layers, normalizedName)) {
-            appMessage.warning('图层名称不能重复');
+            appMessage.warning(t('designer.layersPanel.messages.nameDuplicate'));
             return false;
         }
         const newLayer: LayerConfig = {
@@ -70,13 +72,13 @@ export const useLayerManagement = () => {
         };
         setLayers(prev => coerceLayers([...prev, newLayer]));
         setActiveLayerId(newLayer.id);
-        appMessage.success(`已创建图层 "${normalizedName}"`);
+        appMessage.success(t('designer.layersPanel.messages.created', { name: normalizedName }));
         return true;
-    }, [layers]);
+    }, [layers, t]);
 
     const deleteLayer = useCallback((layerId: string) => {
         if (layerId === DEFAULT_LAYER.id) {
-            appMessage.warning('无法删除默认图层');
+            appMessage.warning(t('designer.layersPanel.messages.cannotDeleteDefault'));
             return;
         }
         const layer = layers.find(l => l.id === layerId);
@@ -85,8 +87,8 @@ export const useLayerManagement = () => {
         if (activeLayerId === layerId) {
             setActiveLayerId(DEFAULT_LAYER.id);
         }
-        appMessage.success(`已删除图层 "${layer?.name}"`);
-    }, [activeLayerId, layers]);
+        appMessage.success(t('designer.layersPanel.messages.deleted', { name: layer.name }));
+    }, [activeLayerId, layers, t]);
 
     const toggleVisibility = useCallback((layerId: string) => {
         setLayers(prev => coerceLayers(prev.map(l =>
@@ -103,19 +105,19 @@ export const useLayerManagement = () => {
     const renameLayer = useCallback((layerId: string, newName: string) => {
         const normalizedName = normalizeLayerNameInput(newName);
         if (!normalizedName) {
-            appMessage.warning('图层名称不能为空');
+            appMessage.warning(t('designer.layersPanel.messages.nameEmpty'));
             return false;
         }
         if (!layers.some(layer => layer.id === layerId)) return false;
         if (!isLayerNameAvailable(layers, normalizedName, layerId)) {
-            appMessage.warning('图层名称不能重复');
+            appMessage.warning(t('designer.layersPanel.messages.nameDuplicate'));
             return false;
         }
         setLayers(prev => coerceLayers(prev.map(l =>
             l.id === layerId ? { ...l, name: normalizedName } : l
         )));
         return true;
-    }, [layers]);
+    }, [layers, t]);
 
     const reorderLayers = useCallback((fromIndex: number, toIndex: number) => {
         setLayers(prev => {
