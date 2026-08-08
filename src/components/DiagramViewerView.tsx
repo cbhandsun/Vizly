@@ -224,6 +224,10 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
                 <CommandPalette
                     open={isCommandOpen}
                     onClose={() => setIsCommandOpen(false)}
+                    onDismiss={() => {
+                        setIsCommandOpen(false);
+                        restoreCommandPaletteFocus();
+                    }}
                     items={commandItems}
                     getContainer={() => document.getElementById('app-root-layout') || document.body}
                 />

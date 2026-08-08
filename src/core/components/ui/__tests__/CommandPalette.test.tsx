@@ -10,6 +10,9 @@ vi.mock('react-i18next', () => ({
     t: (key: string) => ({
       'common.close': 'Close',
       'designer.commandPalette.searchAria': 'Search commands or diagrams',
+      'designer.commandPalette.clearSearch': 'Clear search',
+      'designer.commandPalette.noResults': 'No matching commands or diagrams',
+      'designer.commandPalette.resultsStatus': 'Matching commands or diagrams',
       'designer.commandPalette.shortcutsHelp': 'Keyboard shortcuts',
     }[key] ?? key),
   }),
@@ -98,6 +101,77 @@ describe('CommandPalette commercial interaction contract', () => {
 
     expect(lockedAction).not.toHaveBeenCalled();
     expect(viewAction).toHaveBeenCalledTimes(1);
+  });
+
+  it('supports circular arrow navigation plus Home and End', async () => {
+    render(
+      <CommandPalette
+        open
+        onClose={vi.fn()}
+        items={[
+          { id: 'op:first', group: 'actions', title: 'First action', onSelect: vi.fn() },
+          { id: 'op:second', group: 'actions', title: 'Second action', onSelect: vi.fn() },
+          { id: 'op:third', group: 'actions', title: 'Third action', onSelect: vi.fn() },
+        ]}
+      />,
+    );
+
+    const search = await screen.findByRole('combobox', { name: 'Search commands or diagrams' });
+    expect(search.getAttribute('aria-activedescendant')).toBe('command-palette-option-op:first');
+
+    fireEvent.keyDown(search, { key: 'ArrowUp' });
+    expect(search.getAttribute('aria-activedescendant')).toBe('command-palette-option-op:third');
+    fireEvent.keyDown(search, { key: 'Home' });
+    expect(search.getAttribute('aria-activedescendant')).toBe('command-palette-option-op:first');
+    fireEvent.keyDown(search, { key: 'End' });
+    expect(search.getAttribute('aria-activedescendant')).toBe('command-palette-option-op:third');
+    fireEvent.keyDown(search, { key: 'ArrowDown' });
+    expect(search.getAttribute('aria-activedescendant')).toBe('command-palette-option-op:first');
+  });
+
+  it('announces result changes and clears an empty search without moving focus', async () => {
+    render(
+      <CommandPalette
+        open
+        onClose={vi.fn()}
+        items={[{ id: 'op:test', group: 'actions', title: 'Run test', onSelect: vi.fn() }]}
+      />,
+    );
+
+    const search = await screen.findByRole('combobox', { name: 'Search commands or diagrams' });
+    fireEvent.change(search, { target: { value: 'missing' } });
+
+    expect(screen.getByRole('status').textContent).toBe('No matching commands or diagrams');
+    const clear = screen.getByRole('button', { name: 'Clear search' });
+    fireEvent.click(clear);
+
+    expect((search as HTMLInputElement).value).toBe('');
+    expect(document.activeElement).toBe(search);
+    expect(screen.getByRole('status').textContent).toBe('Matching commands or diagrams');
+  });
+
+  it('restores focus only for dismissals, not command execution', async () => {
+    const onClose = vi.fn();
+    const onDismiss = vi.fn();
+    const onSelect = vi.fn();
+    render(
+      <CommandPalette
+        open
+        onClose={onClose}
+        onDismiss={onDismiss}
+        items={[{ id: 'op:test', group: 'actions', title: 'Run test', onSelect }]}
+      />,
+    );
+
+    const search = await screen.findByRole('combobox', { name: 'Search commands or diagrams' });
+    fireEvent.keyDown(search, { key: 'Escape' });
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('option', { name: 'Run test' }));
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 });
 

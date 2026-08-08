@@ -19,6 +19,7 @@ import {
 interface CommandPaletteProps {
   open: boolean;
   onClose: () => void;
+  onDismiss?: () => void;
   items: CommandItem[];
   getContainer?: () => HTMLElement;
 }
@@ -26,7 +27,7 @@ interface CommandPaletteProps {
 const GROUP_WEIGHT: Record<CommandGroup, number> = { favorites: 240, recent: 200, actions: 120, diagrams: 10 };
 const GROUP_ORDER: CommandGroup[] = ['favorites', 'recent', 'actions', 'diagrams'];
 
-export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, items, ...props }) => {
+export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, onDismiss, items, ...props }) => {
   const { t } = useTranslation();
   const { token } = theme.useToken();
   const inputRef = useRef<InputRef>(null);
@@ -45,6 +46,9 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, i
   }, [t]);
 
   const shortcutsItem = useMemo(() => items.find(x => x.id === 'op:shortcuts'), [items]);
+  const dismiss = useCallback(() => {
+    (onDismiss ?? onClose)();
+  }, [onClose, onDismiss]);
 
   useEffect(() => {
     if (!open) return;
@@ -196,7 +200,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, i
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
-        onClose();
+        dismiss();
         return;
       }
       if (e.key === '?' && !(e.ctrlKey || e.metaKey || e.altKey)) {
@@ -208,12 +212,22 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, i
       }
       if (e.key === 'ArrowDown') {
         e.preventDefault();
-        setActiveIndex((i) => Math.min(flat.length - 1, i + 1));
+        if (flat.length > 0) setActiveIndex((i) => (i + 1) % flat.length);
         return;
       }
       if (e.key === 'ArrowUp') {
         e.preventDefault();
-        setActiveIndex((i) => Math.max(0, i - 1));
+        if (flat.length > 0) setActiveIndex((i) => (i - 1 + flat.length) % flat.length);
+        return;
+      }
+      if (e.key === 'Home') {
+        e.preventDefault();
+        if (flat.length > 0) setActiveIndex(0);
+        return;
+      }
+      if (e.key === 'End') {
+        e.preventDefault();
+        if (flat.length > 0) setActiveIndex(flat.length - 1);
         return;
       }
       if (e.key === 'Enter') {
@@ -225,15 +239,27 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, i
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [activeIndex, flat, onClose, open, runItem, shortcutsItem]);
+  }, [activeIndex, dismiss, flat, open, runItem, shortcutsItem]);
+
+  const clearQuery = useCallback(() => {
+    setQuery('');
+    setActiveIndex(0);
+    queueMicrotask(() => inputRef.current?.focus());
+  }, []);
+
+  const resultsStatus = flat.length === 0
+    ? t('designer.commandPalette.noResults')
+    : t('designer.commandPalette.resultsStatus', { count: flat.length });
 
   return (
     <Modal
       open={open}
-      onCancel={onClose}
+      onCancel={dismiss}
       footer={null}
       centered
       closable={false}
+      keyboard={false}
+      focusTriggerAfterClose={false}
       width={720}
       styles={{ body: { padding: 0 } }}
       {...props}
@@ -263,16 +289,27 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, i
               aria-label={t('designer.commandPalette.searchAria')}
               aria-controls="command-palette-results"
               aria-activedescendant={flat[activeIndex] ? `command-palette-option-${flat[activeIndex].id}` : undefined}
+              aria-keyshortcuts="ArrowDown ArrowUp Home End Enter Escape"
               placeholder={t('designer.commandPalette.placeholder', { mod: modKeyLabel })}
               size="large"
               autoComplete="off"
               style={{ minHeight: 'var(--commercial-touch-target, 44px)' }}
             />
+            {query && (
+              <Button
+                type="text"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={clearQuery}
+                style={{ minHeight: 'var(--commercial-touch-target, 44px)' }}
+              >
+                {t('designer.commandPalette.clearSearch')}
+              </Button>
+            )}
             <Button
               type="text"
               aria-label={t('common.close')}
               icon={<FaTimes aria-hidden="true" />}
-              onClick={onClose}
+              onClick={dismiss}
               style={{
                 width: 'var(--commercial-touch-target, 44px)',
                 minWidth: 'var(--commercial-touch-target, 44px)',
@@ -281,6 +318,24 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, i
               }}
             />
           </div>
+          <Typography.Text
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+            style={{
+              position: 'absolute',
+              width: 1,
+              height: 1,
+              padding: 0,
+              margin: -1,
+              overflow: 'hidden',
+              clip: 'rect(0, 0, 0, 0)',
+              whiteSpace: 'nowrap',
+              border: 0,
+            }}
+          >
+            {resultsStatus}
+          </Typography.Text>
           <div
             ref={listViewportRef}
             id="command-palette-results"

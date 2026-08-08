@@ -466,6 +466,7 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
                             data-history-focus-return
                             data-version-history-focus-return
                             data-json-editor-focus-return
+                            data-command-palette-focus-return
                             type="text"
                             aria-label={t('designer.toolbar.documentActions')}
                             aria-haspopup="menu"
