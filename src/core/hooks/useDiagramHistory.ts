@@ -97,14 +97,22 @@ export const useDiagramHistory = (_initialNodes: Node[], _initialEdges: Edge[]) 
         updateInfo();
     }, [updateInfo]);
 
-    const removeScope = useCallback((scopeKey: string) => {
-        if (!scopeKey) return;
-        scopesRef.current.delete(scopeKey);
-        if (activeScopeKeyRef.current === scopeKey) {
+    const removeScopes = useCallback((scopeKeys: readonly string[]) => {
+        const keys = new Set(scopeKeys.filter(Boolean));
+        if (keys.size === 0) return;
+
+        for (const scopeKey of keys) {
+            scopesRef.current.delete(scopeKey);
+        }
+        if (keys.has(activeScopeKeyRef.current)) {
             activeScopeKeyRef.current = DEFAULT_HISTORY_SCOPE;
         }
         updateInfo();
     }, [updateInfo]);
+
+    const removeScope = useCallback((scopeKey: string) => {
+        removeScopes([scopeKey]);
+    }, [removeScopes]);
 
     const takeSnapshot = useCallback((
         nodes: Node[],
@@ -222,5 +230,6 @@ export const useDiagramHistory = (_initialNodes: Node[], _initialEdges: Edge[]) 
         getPreviousState: () => getActiveScope().past.at(-1)?.state ?? null,
         switchScope,
         removeScope,
+        removeScopes,
     };
 };

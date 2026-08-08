@@ -37,6 +37,7 @@ const clearPageSelection = (page: DiagramPage): DiagramPage => ({
 export interface MultiPageHistoryScopes {
     switchScope: (pageId: string) => void;
     removeScope: (pageId: string) => void;
+    removeScopes?: (pageIds: readonly string[]) => void;
     clearSelection?: () => void;
     scopeId?: string;
     captureCurrentState?: () => { nodes: Node[]; edges: Edge[] };
@@ -68,6 +69,7 @@ export const useMultiPage = (
     const pageOperationVersionRef = useRef(0);
     const switchHistoryScope = historyScopes?.switchScope;
     const removeHistoryScope = historyScopes?.removeScope;
+    const removeHistoryScopes = historyScopes?.removeScopes;
     const clearSelection = historyScopes?.clearSelection;
     const captureCurrentState = historyScopes?.captureCurrentState;
     const historyScopeId = historyScopes?.scopeId?.trim() ?? '';
@@ -83,6 +85,14 @@ export const useMultiPage = (
     const removePageHistoryScope = useCallback((pageId: string) => {
         removeHistoryScope?.(getHistoryScopeKey(pageId));
     }, [getHistoryScopeKey, removeHistoryScope]);
+    const resetPageHistoryScopes = useCallback((pageIds: readonly string[]) => {
+        const scopeKeys = [...new Set(pageIds.map(getHistoryScopeKey))];
+        if (removeHistoryScopes) {
+            removeHistoryScopes(scopeKeys);
+            return;
+        }
+        for (const scopeKey of scopeKeys) removeHistoryScope?.(scopeKey);
+    }, [getHistoryScopeKey, removeHistoryScope, removeHistoryScopes]);
 
     useEffect(() => {
         pagesRef.current = pages;
@@ -235,13 +245,17 @@ export const useMultiPage = (
         const clearedPages = restored.pages.map(clearPageSelection);
         clearSelection?.();
         pageOperationVersionRef.current += 1;
+        resetPageHistoryScopes([
+            ...pagesRef.current.map(page => page.id),
+            ...clearedPages.map(page => page.id),
+        ]);
         activateHistoryScope(restored.activePageId);
         pagesRef.current = clearedPages;
         activePageIdRef.current = restored.activePageId;
         setPages(clearedPages);
         setActivePageId(restored.activePageId);
         return clearedPages.find(page => page.id === restored.activePageId) ?? null;
-    }, [activateHistoryScope, clearSelection]);
+    }, [activateHistoryScope, clearSelection, resetPageHistoryScopes]);
 
     const getPageOperationScope = useCallback(
         () => `${activePageIdRef.current}:${pageOperationVersionRef.current}`,

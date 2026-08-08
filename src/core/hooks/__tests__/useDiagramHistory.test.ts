@@ -198,4 +198,26 @@ describe('useDiagramHistory', () => {
         expect(result.current.canUndo).toBe(true);
         expect(result.current.getPreviousState()).toEqual({ nodes: pageOneInitial, edges: [] });
     });
+
+    it('removes restored page scopes as one transaction and clears the active history', () => {
+        const firstPageState = [node('page-1-before-restore', 0)];
+        const secondPageState = [node('page-2-before-restore', 0)];
+        const { result } = renderHook(() => useDiagramHistory([], []));
+
+        act(() => {
+            result.current.switchScope('diagram::page-1');
+            result.current.takeSnapshot(firstPageState, []);
+            result.current.switchScope('diagram::page-2');
+            result.current.takeSnapshot(secondPageState, []);
+            result.current.removeScopes(['diagram::page-1', 'diagram::page-2', 'diagram::page-2', '']);
+        });
+
+        expect(result.current.canUndo).toBe(false);
+        expect(result.current.canRedo).toBe(false);
+        expect(result.current.getPreviousState()).toBeNull();
+
+        act(() => result.current.switchScope('diagram::page-1'));
+        expect(result.current.canUndo).toBe(false);
+        expect(result.current.getPreviousState()).toBeNull();
+    });
 });

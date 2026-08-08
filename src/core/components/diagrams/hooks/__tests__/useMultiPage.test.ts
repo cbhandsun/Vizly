@@ -285,6 +285,50 @@ describe('useMultiPage', () => {
     });
   });
 
+  it('clears old and restored page history scopes before activating restored content', () => {
+    const switchScope = vi.fn();
+    const removeScope = vi.fn();
+    const removeScopes = vi.fn();
+    const { result } = renderHook(() => useMultiPage(
+      () => [node('old-live-node')],
+      () => [],
+      vi.fn(),
+      vi.fn(),
+      {
+        switchScope,
+        removeScope,
+        removeScopes,
+        scopeId: 'diagram::restore',
+      },
+    ));
+    switchScope.mockClear();
+
+    act(() => {
+      result.current.restorePersistedMetadata({
+        multiPage: {
+          version: 1,
+          activePageId: 'page-2',
+          pages: [
+            { id: 'page-1', name: '页面 1', nodes: [node('restored-one')], edges: [] },
+            { id: 'page-2', name: '页面 2', nodes: [node('restored-two')], edges: [] },
+          ],
+        },
+      });
+    });
+
+    expect(removeScopes).toHaveBeenCalledWith([
+      createMultiPageHistoryScopeKey('diagram::restore', 'page-1'),
+      createMultiPageHistoryScopeKey('diagram::restore', 'page-2'),
+    ]);
+    expect(removeScope).not.toHaveBeenCalled();
+    expect(removeScopes.mock.invocationCallOrder[0]).toBeLessThan(
+      switchScope.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
+    );
+    expect(switchScope).toHaveBeenCalledWith(
+      createMultiPageHistoryScopeKey('diagram::restore', 'page-2'),
+    );
+  });
+
   it('ignores invalid persisted metadata and bounds renamed page labels', () => {
     const { result } = renderHook(() => useMultiPage(
       () => [],

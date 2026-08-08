@@ -146,7 +146,7 @@ export const useFlowchartDesignerController = ({
     const {
         takeSnapshot, notifyHistoryChanged, undo: performUndo, redo: performRedo, canUndo, canRedo,
         pastEntries, getPreviousState, jumpTo, switchScope: switchHistoryScope,
-        removeScope: removeHistoryScope,
+        removeScope: removeHistoryScope, removeScopes: removeHistoryScopes,
     } = diagramHistory;
     const {
         selectedNodes,
@@ -403,6 +403,7 @@ export const useFlowchartDesignerController = ({
         {
             switchScope: switchHistoryScope,
             removeScope: removeHistoryScope,
+            removeScopes: removeHistoryScopes,
             clearSelection,
             scopeId: diagramId,
             captureCurrentState: captureCurrentPageState,

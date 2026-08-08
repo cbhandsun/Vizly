@@ -44,6 +44,7 @@ export const useFlowchartState = (edgeMode: 'advanced-smart' | 'native' = 'advan
         getPreviousState,
         switchScope,
         removeScope,
+        removeScopes,
     } = useDiagramHistory(nodes, edges);
 
     // Presets
@@ -176,21 +177,26 @@ export const useFlowchartState = (edgeMode: 'advanced-smart' | 'native' = 'advan
         [edgeMode, preset, setEdges, takeSnapshot],
     );
 
+    const commitHistoryState = useCallback((state: { nodes: typeof nodes; edges: typeof edges }) => {
+        nodesRef.current = state.nodes;
+        edgesRef.current = state.edges;
+        setNodes(state.nodes);
+        setEdges(state.edges);
+    }, [setEdges, setNodes]);
+
     const handleUndo = useCallback(() => {
         const prevState = undo(nodesRef.current, edgesRef.current); // 🚀 ref
         if (!prevState) return false;
-        setNodes(prevState.nodes);
-        setEdges(prevState.edges);
+        commitHistoryState(prevState);
         return true;
-    }, [setEdges, setNodes, undo]);
+    }, [commitHistoryState, undo]);
 
     const handleRedo = useCallback(() => {
         const nextState = redo(nodesRef.current, edgesRef.current); // 🚀 ref
         if (!nextState) return false;
-        setNodes(nextState.nodes);
-        setEdges(nextState.edges);
+        commitHistoryState(nextState);
         return true;
-    }, [redo, setEdges, setNodes]);
+    }, [commitHistoryState, redo]);
 
     return {
         nodes,
@@ -212,11 +218,12 @@ export const useFlowchartState = (edgeMode: 'advanced-smart' | 'native' = 'advan
             pastEntries,
             jumpTo: (index: number) => {
                 const target = jumpTo(index, nodesRef.current, edgesRef.current);
-                if (target) { setNodes(target.nodes); setEdges(target.edges); }
+                if (target) commitHistoryState(target);
             },
             getPreviousState,
             switchScope,
             removeScope,
+            removeScopes,
         }
     };
 };
