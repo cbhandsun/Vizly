@@ -1,4 +1,4 @@
-import React, { useCallback, memo, useState, useEffect } from 'react';
+import React, { useCallback, memo, useState, useEffect, useRef } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import { createPortal } from 'react-dom';
 import { FaHome, FaRuler, FaExpand, FaCompress, FaFileImage, FaFilePdf, FaFileCode, FaFileVideo, FaDownload, FaSpinner, FaCloudUploadAlt, FaShareAlt, FaFolderOpen } from 'react-icons/fa';
@@ -91,6 +91,7 @@ const ExportTools: React.FC<ExportToolsProps> = ({
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [cloudManagerOpen, setCloudManagerOpen] = useState(false);
   const [exportableNodeCount, setExportableNodeCount] = useState(0);
+  const exportInFlightRef = useRef(false);
   const readExportableNodeCount = useCallback(() => resolveExportableNodeCount(
     reactFlowInstance.getNodes().length,
     getFlowDataBridgeNodes(diagramId).length,
@@ -170,15 +171,31 @@ const ExportTools: React.FC<ExportToolsProps> = ({
 
   // 导出操作包装
   const wrapExport = async (type: 'png' | 'pdf' | 'svg' | 'gif', fn: () => Promise<void>) => {
+    if (exportInFlightRef.current) return;
+    exportInFlightRef.current = true;
+    let exportFailed = false;
+    const handleExportError = (event: Event) => {
+      const detail = parseDiagramExportEventDetail(readDiagramExportEventDetail(event));
+      if (!detail || detail.type !== type) return;
+      if (detail.diagramId && detail.diagramId !== diagramId) return;
+      exportFailed = true;
+    };
+    window.addEventListener('diagramExportError', handleExportError as EventListener);
     try {
       setIsExporting(true);
       setExportType(type);
       await waitForNextPaint();
       await fn();
-      appMessage.success(t('export.success', { format: type.toUpperCase() }));
+      if (exportFailed) {
+        appMessage.error(t('export.failed', { format: type.toUpperCase() }));
+      } else {
+        appMessage.success(t('export.success', { format: type.toUpperCase() }));
+      }
     } catch {
       appMessage.error(t('export.failed', { format: type.toUpperCase() }));
     } finally {
+      window.removeEventListener('diagramExportError', handleExportError as EventListener);
+      exportInFlightRef.current = false;
       setIsExporting(false);
       setExportType(null);
       setExportProgress(0);

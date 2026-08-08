@@ -4,8 +4,13 @@ import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { exportToPNG } = vi.hoisted(() => ({
-  exportToPNG: vi.fn(async () => undefined),
+const { exportToPNG, appMessageMocks } = vi.hoisted(() => ({
+  exportToPNG: vi.fn<() => Promise<void>>(async () => undefined),
+  appMessageMocks: {
+    error: vi.fn(),
+    loading: vi.fn(() => vi.fn()),
+    success: vi.fn(),
+  },
 }));
 
 vi.mock('@xyflow/react', () => ({
@@ -65,11 +70,7 @@ vi.mock('@/core/utils/flowDataBridge', () => ({
 }));
 
 vi.mock('@/core/utils/antdStaticBridge', () => ({
-  appMessage: {
-    error: vi.fn(),
-    loading: vi.fn(() => vi.fn()),
-    success: vi.fn(),
-  },
+  appMessage: appMessageMocks,
 }));
 
 import ExportTools from '../ExportTools';
@@ -77,6 +78,9 @@ import ExportTools from '../ExportTools';
 describe('ExportTools keyboard menu', () => {
   beforeEach(() => {
     exportToPNG.mockClear();
+    exportToPNG.mockResolvedValue(undefined);
+    appMessageMocks.error.mockClear();
+    appMessageMocks.success.mockClear();
     vi.stubGlobal('ResizeObserver', class {
       observe() {}
       unobserve() {}
@@ -178,6 +182,54 @@ describe('ExportTools keyboard menu', () => {
       }));
     });
     await waitFor(() => expect(screen.queryByRole('status')).toBeNull());
+  });
+
+  it('reports a dispatched export failure without also announcing success', async () => {
+    exportToPNG.mockImplementation(async () => {
+      window.dispatchEvent(new CustomEvent('diagramExportError', {
+        detail: { diagramId: 'diagram-1', type: 'png', error: 'capture_failed' },
+      }));
+    });
+
+    render(
+      <ExportTools
+        diagramId="diagram-1"
+        diagramName="Diagram"
+        showControls={false}
+        variant="compact"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '导出' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'PNG 图片' }));
+
+    await waitFor(() => expect(appMessageMocks.error).toHaveBeenCalledTimes(1));
+    expect(appMessageMocks.success).not.toHaveBeenCalled();
+  });
+
+  it('ignores a duplicate export trigger while the first export is still running', async () => {
+    let resolveExport: (() => void) | undefined;
+    exportToPNG.mockImplementation(() => new Promise<void>((resolve) => {
+      resolveExport = resolve;
+    }));
+
+    render(
+      <ExportTools
+        diagramId="diagram-1"
+        diagramName="Diagram"
+        showControls={false}
+        variant="compact"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '导出' }));
+    const pngItem = await screen.findByRole('menuitem', { name: 'PNG 图片' });
+    fireEvent.click(pngItem);
+    fireEvent.click(pngItem);
+
+    await waitFor(() => expect(exportToPNG).toHaveBeenCalledTimes(1));
+    resolveExport?.();
+    await waitFor(() => expect(appMessageMocks.success).toHaveBeenCalledTimes(1));
   });
 
   it('uses the commercial touch target inside the mobile system menu', () => {
