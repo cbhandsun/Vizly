@@ -9,6 +9,12 @@ import { ArchitecturePlugin } from '../ArchitecturePlugin';
 import type { PluginContext } from '../../types/plugin';
 import { useDiagramStore } from '../../store/useDiagramStore';
 
+const messageMocks = vi.hoisted(() => ({
+    success: vi.fn(),
+}));
+
+vi.mock('@/core/utils/antdStaticBridge', () => ({ appMessage: messageMocks }));
+
 const translations: Record<string, string> = {
     'designer.sidebar.searchComponents': 'Search components...',
     'designer.sidebar.clearSearch': 'Clear search',
@@ -41,6 +47,11 @@ const translations: Record<string, string> = {
     'designer.architecture.validation.inspectIssue': 'Inspect {{ruleId}}: {{message}}',
     'designer.architecture.validation.rules.sec001': 'Client applications must not connect directly to databases.',
     'designer.architecture.validation.rules.iso001': 'This component is isolated and is not connected to the architecture.',
+    'designer.architecture.toolbar.createRelationship': 'Create dependency',
+    'designer.architecture.toolbar.selectTwoComponents': 'Select exactly two components to create a dependency',
+    'designer.architecture.toolbar.duplicateRelationship': 'This dependency already exists',
+    'designer.architecture.toolbar.relationshipCreated': 'Dependency created',
+    'designer.architecture.toolbar.relationshipLabel': 'Dependency',
 };
 
 vi.mock('react-i18next', () => ({
@@ -82,6 +93,11 @@ const renderLinter = () => {
         .find((candidate) => candidate.id === 'arch-linter');
     if (!panel) throw new Error('Architecture validation panel is missing');
     render(<>{panel.content}</>);
+};
+
+const renderToolbar = (pluginContext: PluginContext) => {
+    const toolbar = new ArchitecturePlugin().contributeToolbar(pluginContext);
+    render(<>{toolbar}</>);
 };
 
 const architectureNode = (id: string, type: string): Node => ({
@@ -237,5 +253,78 @@ describe('ArchitecturePlugin validation accessibility', () => {
         const status = screen.getByRole('status');
         expect(status.textContent).toContain('No issues found');
         expect(status.textContent).toContain('Checked 2 component(s) and 1 connection(s).');
+    });
+});
+
+describe('ArchitecturePlugin relationship toolbar', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it('keeps the unique dependency action named and disables it until exactly two components are selected', () => {
+        renderToolbar(context);
+
+        const action = screen.getByRole('button', {
+            name: 'Select exactly two components to create a dependency',
+        });
+        expect((action as HTMLButtonElement).disabled).toBe(true);
+        expect(screen.queryByLabelText('ELK 智能布局')).toBeNull();
+        expect(screen.queryByLabelText('切换流向')).toBeNull();
+    });
+
+    it('snapshots, localizes, and selects a newly created dependency', () => {
+        const source = architectureNode('source', 'frontend');
+        const target = architectureNode('target', 'gateway');
+        source.selected = true;
+        target.selected = true;
+        const toolbarContext: PluginContext = {
+            ...context,
+            getNodes: () => [source, target],
+            getEdges: () => [],
+        };
+
+        renderToolbar(toolbarContext);
+        fireEvent.click(screen.getByRole('button', { name: 'Create dependency' }));
+
+        expect(toolbarContext.takeSnapshot).toHaveBeenCalledTimes(1);
+        const updateNodes = vi.mocked(toolbarContext.setNodes).mock.calls[0]?.[0];
+        expect(typeof updateNodes).toBe('function');
+        if (typeof updateNodes === 'function') {
+            expect(updateNodes([source, target]).map(node => node.selected)).toEqual([false, false]);
+        }
+
+        const updateEdges = vi.mocked(toolbarContext.setEdges).mock.calls[0]?.[0];
+        expect(typeof updateEdges).toBe('function');
+        if (typeof updateEdges === 'function') {
+            const [edge] = updateEdges([]);
+            expect(edge).toMatchObject({
+                source: 'source',
+                target: 'target',
+                type: 'archEdge',
+                selected: true,
+                data: { semantic: 'dependency', label: 'Dependency' },
+            });
+        }
+        expect(messageMocks.success).toHaveBeenCalledWith('Dependency created');
+    });
+
+    it('prevents creating the same directional dependency twice', () => {
+        const source = architectureNode('source', 'frontend');
+        const target = architectureNode('target', 'gateway');
+        source.selected = true;
+        target.selected = true;
+        const toolbarContext: PluginContext = {
+            ...context,
+            getNodes: () => [source, target],
+            getEdges: () => [{ id: 'existing', source: 'source', target: 'target' }],
+        };
+
+        renderToolbar(toolbarContext);
+
+        const action = screen.getByRole('button', { name: 'This dependency already exists' });
+        expect((action as HTMLButtonElement).disabled).toBe(true);
+        fireEvent.click(action);
+        expect(toolbarContext.takeSnapshot).not.toHaveBeenCalled();
+        expect(toolbarContext.setEdges).not.toHaveBeenCalled();
     });
 });

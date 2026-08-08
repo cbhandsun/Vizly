@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { Node, Edge } from '@xyflow/react';
-import { Input, Button, Tooltip, Divider } from 'antd';
+import { Input, Button, Tooltip } from 'antd';
 import { useTranslation } from 'react-i18next';
 import {
   DiagramTypePlugin,
@@ -15,11 +15,16 @@ import {
     ApiOutlined, SwapOutlined, HddOutlined, CloudServerOutlined, LaptopOutlined,
     SearchOutlined, SafetyCertificateOutlined,
     CheckCircleOutlined, WarningOutlined, CloseCircleOutlined, InfoCircleOutlined,
-    ApartmentOutlined, NodeIndexOutlined, PartitionOutlined, LoadingOutlined
+    NodeIndexOutlined, LoadingOutlined
 } from '@ant-design/icons';
 import { useTopologyLinter } from '../hooks/useTopologyLinter';
 import { useDiagramStore } from '../store/useDiagramStore';
 import { AccessibleInputClearIcon } from '../components/diagrams/AccessibleInputClearIcon';
+import { appMessage } from '../utils/antdStaticBridge';
+import {
+    buildArchitectureRelationshipPlan,
+    createArchitectureRelationshipEdge,
+} from './architectureToolbarActions';
 
 const isRecord = (value: unknown): value is Record<string, unknown> => (
   Boolean(value) && typeof value === 'object' && !Array.isArray(value)
@@ -321,56 +326,49 @@ const SEVERITY_CONFIG = {
 
 // ====== 架构图专属工具栏 ======
 const ArchitectureToolbar: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
+    const { t } = useTranslation();
     if (!ctx) return null;
 
-    const handleAutoLayout = () => {
-        // Dispatch layout event to the designer
-        window.dispatchEvent(new CustomEvent('diagram:requestLayout', {
-            detail: { strategy: 'DomainElkLayout' }
-        }));
-    };
+    const relationshipPlan = buildArchitectureRelationshipPlan({
+        nodes: ctx.getNodes(),
+        edges: ctx.getEdges(),
+    });
 
-    const handleToggleDirection = () => {
-        window.dispatchEvent(new CustomEvent('diagram:toggleDirection'));
-    };
+    const actionLabel = relationshipPlan.status === 'ready'
+        ? t('designer.architecture.toolbar.createRelationship')
+        : relationshipPlan.status === 'duplicate'
+            ? t('designer.architecture.toolbar.duplicateRelationship')
+            : t('designer.architecture.toolbar.selectTwoComponents');
 
     const handleAddRelationship = () => {
-        const nodes = ctx.getNodes();
-        const selected = nodes.filter(n => n.selected);
-        if (selected.length === 2) {
-            const newEdge: Edge = {
-                id: `arch-e-${Date.now()}`,
-                source: selected[0].id,
-                target: selected[1].id,
-                type: 'archEdge',
-                data: { semantic: 'dependency', label: '依赖' }
-            };
-            ctx.setEdges(eds => [...eds, newEdge]);
-            
-            // Trigger smart layout after a tiny delay so state resolves
-            setTimeout(() => {
-                window.dispatchEvent(new CustomEvent('diagram:requestLayout', {
-                    detail: { strategy: 'DomainElkLayout' }
-                }));
-            }, 50);
-        }
-    };
+        if (relationshipPlan.status !== 'ready') return;
 
-    const selectedCount = ctx.getNodes().filter(n => n.selected).length;
+        const relationshipEdge = createArchitectureRelationshipEdge({
+            id: `arch-e-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            sourceId: relationshipPlan.sourceId,
+            targetId: relationshipPlan.targetId,
+            label: t('designer.architecture.toolbar.relationshipLabel'),
+        });
+        ctx.takeSnapshot();
+        ctx.setNodes(nodes => nodes.map(node => ({ ...node, selected: false })));
+        ctx.setEdges(edges => [
+            ...edges.map(edge => ({ ...edge, selected: false })),
+            relationshipEdge,
+        ]);
+        appMessage.success(t('designer.architecture.toolbar.relationshipCreated'));
+    };
 
     return (
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '0 8px', borderLeft: '1px solid #e8e8e8', marginLeft: 8 }}>
-            <Tooltip title="ELK 智能布局">
-                <Button size="small" type="text" icon={<ApartmentOutlined />} onClick={handleAutoLayout} />
-            </Tooltip>
-            <Tooltip title="切换流向">
-                <Button size="small" type="text" icon={<PartitionOutlined />} onClick={handleToggleDirection} />
-            </Tooltip>
-
-            <Divider orientation="vertical" style={{ height: 16, margin: '0 2px' }} />
-
-            <Tooltip title={selectedCount === 2 ? '建立依赖关系' : '请选中两个节点'}>
-                <Button size="small" type="text" icon={<NodeIndexOutlined />} onClick={handleAddRelationship} disabled={selectedCount !== 2} />
+            <Tooltip title={actionLabel}>
+                <Button
+                    size="small"
+                    type="text"
+                    aria-label={actionLabel}
+                    icon={<NodeIndexOutlined aria-hidden="true" />}
+                    onClick={handleAddRelationship}
+                    disabled={relationshipPlan.status !== 'ready'}
+                />
             </Tooltip>
         </div>
     );

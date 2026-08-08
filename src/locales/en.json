@@ -718,6 +718,13 @@
                 "mobileDescription": "Add a client, service, data store, or business system to begin.",
                 "primaryAction": "Choose your first architecture component"
             },
+            "toolbar": {
+                "createRelationship": "Create dependency",
+                "selectTwoComponents": "Select exactly two components to create a dependency",
+                "duplicateRelationship": "This dependency already exists",
+                "relationshipCreated": "Dependency created",
+                "relationshipLabel": "Dependency"
+            },
             "validation": {
                 "empty": {
                     "title": "Nothing to validate yet",

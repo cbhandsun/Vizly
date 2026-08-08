@@ -729,6 +729,13 @@
                 "mobileDescription": "添加终端、服务、数据存储或业务系统即可开始。",
                 "primaryAction": "选择第一个架构组件"
             },
+            "toolbar": {
+                "createRelationship": "建立依赖关系",
+                "selectTwoComponents": "请恰好选择两个组件以建立依赖关系",
+                "duplicateRelationship": "该依赖关系已存在",
+                "relationshipCreated": "依赖关系已建立",
+                "relationshipLabel": "依赖"
+            },
             "validation": {
                 "empty": {
                     "title": "暂无可校验内容",

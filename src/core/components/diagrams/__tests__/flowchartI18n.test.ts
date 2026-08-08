@@ -114,6 +114,10 @@ describe('flowchart interaction copy', () => {
             expect(read(zh, ['designer', 'architecture', 'components', key])).toBeTypeOf('string');
             expect(read(en, ['designer', 'architecture', 'components', key])).toBeTypeOf('string');
         }
+        for (const key of ['createRelationship', 'selectTwoComponents', 'duplicateRelationship', 'relationshipCreated', 'relationshipLabel']) {
+            expect(read(zh, ['designer', 'architecture', 'toolbar', key])).toBeTypeOf('string');
+            expect(read(en, ['designer', 'architecture', 'toolbar', key])).toBeTypeOf('string');
+        }
         for (const [section, keys] of Object.entries({
             empty: ['title', 'description'],
             checking: ['title', 'description'],
