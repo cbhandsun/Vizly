@@ -73,7 +73,7 @@ describe('FlowchartCanvasShell', () => {
       pinFit: false,
       nodesFocusable: true,
       edgesFocusable: true,
-      multiSelectionKeyCode: 'Shift',
+      multiSelectionKeyCode: null,
     });
     expect(props).not.toHaveProperty('fitView');
   });
@@ -284,9 +284,16 @@ describe('FlowchartCanvasShell', () => {
     expect(onNodesChange).toHaveBeenCalledWith(changes);
   });
 
-  it('preserves existing selections when a node is Shift-clicked', () => {
+  it('reconciles Shift multi-selection after React Flow finishes its click update', () => {
     const onNodesChange = vi.fn();
+    const onNodeClick = vi.fn();
     const noop = vi.fn();
+    let scheduledSelection: FrameRequestCallback | undefined;
+    vi.stubGlobal('requestAnimationFrame', vi.fn((callback: FrameRequestCallback) => {
+      scheduledSelection = callback;
+      return 1;
+    }));
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
     const nodes = [
       { id: 'A', position: { x: 0, y: 0 }, data: {}, selected: true },
       { id: 'B', position: { x: 50, y: 0 }, data: {}, selected: false },
@@ -312,6 +319,7 @@ describe('FlowchartCanvasShell', () => {
         onSelectionChange={noop}
         onPaneClick={noop}
         onPaneDoubleClick={noop}
+        onNodeClick={onNodeClick}
         selectionMode={'partial' as never}
         onNodeContextMenu={noop}
         onEdgeContextMenu={noop}
@@ -332,6 +340,11 @@ describe('FlowchartCanvasShell', () => {
       );
     });
 
+    expect(props.multiSelectionKeyCode).toBeNull();
+    expect(onNodeClick).toHaveBeenCalledOnce();
+    expect(onNodesChange).not.toHaveBeenCalled();
+
+    act(() => scheduledSelection?.(16));
     expect(onNodesChange).toHaveBeenCalledWith([
       { id: 'A', type: 'select', selected: true },
       { id: 'B', type: 'select', selected: true },

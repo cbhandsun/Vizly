@@ -142,6 +142,46 @@ describe('useDiagramActions explicit selection targets', () => {
         });
     });
 
+    it('duplicates internal edges and leaves outbound edges attached only to the original graph', () => {
+        const initialNodes = [node('node-1', true), node('node-2', true), node('outside')];
+        const initialEdges: Edge[] = [
+            { id: 'inside', source: 'node-1', target: 'node-2', selected: true },
+            { id: 'outbound', source: 'node-2', target: 'outside' },
+        ];
+        let currentNodes = initialNodes;
+        let currentEdges = initialEdges;
+        const setNodes = vi.fn((update: SetStateAction<Node[]>) => {
+            currentNodes = typeof update === 'function' ? update(currentNodes) : update;
+        });
+        const setEdges = vi.fn((update: SetStateAction<Edge[]>) => {
+            currentEdges = typeof update === 'function' ? update(currentEdges) : update;
+        });
+
+        const { result } = renderHook(() => useDiagramActions({
+            nodes: [],
+            edges: [],
+            nodesRef: { current: initialNodes },
+            edgesRef: { current: initialEdges },
+            setNodes,
+            setEdges,
+            selectedNodes: initialNodes.slice(0, 2),
+            selectedEdges: [initialEdges[0]],
+            takeSnapshot: vi.fn(),
+            reactFlowInstance: null,
+        }));
+
+        act(() => result.current.handleDuplicate());
+
+        expect(currentNodes).toHaveLength(5);
+        expect(currentEdges).toHaveLength(3);
+        expect(currentEdges.slice(0, 2).every(edge => edge.selected === false)).toBe(true);
+        expect(currentEdges[2]).toMatchObject({
+            source: currentNodes[3].id,
+            target: currentNodes[4].id,
+            selected: true,
+        });
+    });
+
     it('deletes exactly the explicit toolbar targets', async () => {
         const initialNodes = [node('node-1', true), node('node-2', true), node('node-3')];
         const initialEdges: Edge[] = [

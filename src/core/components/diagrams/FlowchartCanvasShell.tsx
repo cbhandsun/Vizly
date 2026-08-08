@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Node, Edge, BackgroundVariant, ReactFlowInstance, SelectionMode, NodeTypes, EdgeTypes, NodeChange, EdgeChange, Connection, OnConnectStart, OnConnectEnd, ConnectionMode, ConnectionLineType, type IsValidConnection, type OnNodeDrag, type OnReconnect } from '@xyflow/react';
 import BaseReactFlow from '../shared/BaseReactFlow';
 import { useConnectionMicrointeractions } from './hooks/useConnectionMicrointeractions';
@@ -147,6 +147,12 @@ export const FlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> = React.m
         () => addFlowchartAccessibilityLabels(renderedNodes, renderedEdges),
         [renderedEdges, renderedNodes],
     );
+    const shiftSelectionFrameRef = useRef<number | null>(null);
+    useEffect(() => () => {
+        if (shiftSelectionFrameRef.current !== null) {
+            cancelAnimationFrame(shiftSelectionFrameRef.current);
+        }
+    }, []);
     const connectionLineStyle = isConnecting ? {
         stroke: connectPreview ? 'rgba(16, 185, 129, 0.95)' : 'rgba(59, 130, 246, 0.95)',
         strokeWidth: connectPreview ? 3.5 : 2.5,
@@ -157,7 +163,13 @@ export const FlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> = React.m
         if (event.shiftKey) {
             const selectionChanges = buildShiftMultiSelectionChanges(canvasNodes, node.id);
             if (selectionChanges.length > 0) {
-                handleNodesChange(selectionChanges);
+                if (shiftSelectionFrameRef.current !== null) {
+                    cancelAnimationFrame(shiftSelectionFrameRef.current);
+                }
+                shiftSelectionFrameRef.current = requestAnimationFrame(() => {
+                    shiftSelectionFrameRef.current = null;
+                    handleNodesChange(selectionChanges);
+                });
             }
         }
         onNodeClick?.(event, node);
@@ -219,7 +231,7 @@ export const FlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> = React.m
             elementsSelectable={editingEnabled}
             nodesFocusable={editingEnabled}
             edgesFocusable={editingEnabled}
-            multiSelectionKeyCode="Shift"
+            multiSelectionKeyCode={null}
             edgesReconnectable={editingEnabled ? edgesReconnectable : false}
             onReconnect={editingEnabled ? onReconnect : undefined}
             onReconnectStart={editingEnabled ? onReconnectStart : undefined}

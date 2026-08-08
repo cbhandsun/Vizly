@@ -17,6 +17,7 @@ import {
     getEditableEdgeFocusCenter,
     shouldFocusEditableEdge,
 } from '../edgeEditingViewport';
+import { buildDiagramSelectionDuplicate } from '../diagramSelectionDuplication';
 
 type AlignmentType = 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom';
 type DistributionType = 'horizontal' | 'vertical';
@@ -187,23 +188,22 @@ export const useDiagramActions = ({
             count: nodesToDuplicate.length,
         }));
 
-        const newNodes = nodesToDuplicate.map(node => ({
-            ...node,
-            id: `${node.type}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-            position: { x: node.position.x + 50, y: node.position.y + 50 },
-            selected: true,
-            data: {
-                ...node.data,
-                label: t('designer.flowchart.duplicateLabel', {
+        const targetIds = new Set(nodesToDuplicate.map(node => node.id));
+        const batchId = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+        const duplicate = buildDiagramSelectionDuplicate({
+            nodes: currentNodes,
+            edges: currentEdges,
+            targetIds,
+            batchId,
+            getDuplicateLabel: node => t('designer.flowchart.duplicateLabel', {
                     label: String(node.data.label || t('designer.flowchart.newNode', { defaultValue: 'Node' })),
                     defaultValue: '{{label}} (Copy)',
-                }),
-            },
-        }));
+            }),
+        });
 
-        // Deselect originals and add new ones
-        setNodes(nds => [...nds.map(n => ({ ...n, selected: false })), ...newNodes]);
-    }, [nodes, edges, nodesRef, edgesRef, selectedNodes, setNodes, takeSnapshot, t]);
+        setNodes(nds => [...nds.map(n => ({ ...n, selected: false })), ...duplicate.nodes]);
+        setEdges(eds => [...eds.map(edge => ({ ...edge, selected: false })), ...duplicate.edges]);
+    }, [nodes, edges, nodesRef, edgesRef, selectedNodes, setEdges, setNodes, takeSnapshot, t]);
 
     const handleBringToFront = useCallback((target?: DiagramActionTarget) => {
         const currentNodes = nodesRef?.current ?? nodes;
