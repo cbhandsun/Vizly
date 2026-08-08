@@ -276,6 +276,7 @@ export const useAutoSave = (
             const data = parseAutoSavePayload(saved);
             if (!data) {
                 localStorage.removeItem(storageKey);
+                setSaveState({ lastSaved: null, saving: false, error: null });
                 return null;
             }
 
@@ -293,6 +294,11 @@ export const useAutoSave = (
                 data.edges,
                 data.metadata,
             );
+            setSaveState({
+                lastSaved: data.timestamp ?? null,
+                saving: false,
+                error: null,
+            });
 
             return {
                 diagramId: data.diagramId,
@@ -304,6 +310,11 @@ export const useAutoSave = (
             };
         } catch (error) {
             logAutoSaveLoadFailure(error);
+            setSaveState({
+                lastSaved: null,
+                saving: false,
+                error: 'auto-save-load-failed',
+            });
             return null;
         }
     }, [storageKey]);
@@ -317,6 +328,7 @@ export const useAutoSave = (
             clearTimeout(retryTimerRef.current);
             retryTimerRef.current = null;
         }
+        setSaveState({ lastSaved: null, saving: false, error: null });
     }, [storageKey]);
 
     return {

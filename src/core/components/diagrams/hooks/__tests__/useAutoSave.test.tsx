@@ -39,6 +39,7 @@ const AutoSaveProbe: React.FC<{
         <div>
             <span data-testid="saving">{String(api.saveState.saving)}</span>
             <span data-testid="error">{api.saveState.error || ''}</span>
+            <span data-testid="last-saved">{api.saveState.lastSaved ?? ''}</span>
         </div>
     );
 };
@@ -207,11 +208,75 @@ describe('useAutoSave', () => {
         );
         await waitFor(() => expect(api).toBeDefined());
 
-        expect(api?.loadSaved()).toMatchObject({ diagramId: 'test' });
+        act(() => {
+            expect(api?.loadSaved()).toMatchObject({ diagramId: 'test' });
+        });
         const setItemSpy = vi.spyOn(Storage.prototype, 'setItem');
         await act(async () => { await api?.saveNow(); });
 
         expect(setItemSpy).not.toHaveBeenCalled();
+    });
+
+    it('restores the persisted save timestamp and clears the visible state with the entry', async () => {
+        const savedAt = Date.now() - 5_000;
+        const payload = createAutoSavePayload({
+            diagramId: 'test',
+            nodes: [{ id: 'restored', position: { x: 0, y: 0 }, data: {} }],
+            edges: [],
+            timestamp: savedAt,
+        });
+        expect(payload).not.toBeNull();
+        localStorage.setItem('flowchart-autosave-v2-test', JSON.stringify(payload));
+
+        let api: ReturnType<typeof useAutoSave> | undefined;
+        render(
+            <AutoSaveProbe
+                nodes={payload?.nodes ?? []}
+                onReady={(nextApi) => { api = nextApi; }}
+            />
+        );
+        await waitFor(() => expect(api).toBeDefined());
+
+        act(() => {
+            expect(api?.loadSaved()).toMatchObject({ timestamp: savedAt });
+        });
+        await waitFor(() => {
+            expect(screen.getByTestId('last-saved').textContent).toBe(String(savedAt));
+            expect(screen.getByTestId('error').textContent).toBe('');
+        });
+
+        act(() => api?.clearSaved());
+        expect(localStorage.getItem('flowchart-autosave-v2-test')).toBeNull();
+        await waitFor(() => {
+            expect(screen.getByTestId('last-saved').textContent).toBe('');
+            expect(screen.getByTestId('error').textContent).toBe('');
+        });
+    });
+
+    it('shows a safe failure state when browser storage cannot be read', async () => {
+        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+        vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+            throw new Error('token=private-autosave-value');
+        });
+
+        let api: ReturnType<typeof useAutoSave> | undefined;
+        render(
+            <AutoSaveProbe
+                nodes={[]}
+                onReady={(nextApi) => { api = nextApi; }}
+            />
+        );
+        await waitFor(() => expect(api).toBeDefined());
+
+        act(() => {
+            expect(api?.loadSaved()).toBeNull();
+        });
+        await waitFor(() => {
+            expect(screen.getByTestId('last-saved').textContent).toBe('');
+            expect(screen.getByTestId('error').textContent).toBe('auto-save-load-failed');
+        });
+        expect(screen.getByTestId('error').textContent).not.toContain('private-autosave-value');
+        expect(JSON.stringify(consoleError.mock.calls)).not.toContain('private-autosave-value');
     });
 
     it('cancels a failed diagram retry instead of writing into the next diagram scope', async () => {
