@@ -66,6 +66,29 @@ describe('flowchartClipboard', () => {
         expect(result.nodes[1]).toBe(child);
     });
 
+    it('expands a selected container to nested descendants and internal edges', () => {
+        const group = { id: 'group', type: 'titleGroup', position: { x: 100, y: 200 }, data: {} };
+        const subgroup = { id: 'subgroup', type: 'subGroup', parentId: group.id, position: { x: 10, y: 20 }, data: {} };
+        const child = { id: 'child', parentId: subgroup.id, position: { x: 5, y: 8 }, data: {} };
+        const external = { id: 'external', position: { x: 500, y: 500 }, data: {} };
+
+        const result = buildFlowchartClipboardData([group], [
+            { id: 'nested', source: subgroup.id, target: child.id },
+            { id: 'external-edge', source: child.id, target: external.id },
+        ], [group, subgroup, child, external]);
+
+        expect(result.nodes).toEqual([group, subgroup, child]);
+        expect(result.edges.map(edge => edge.id)).toEqual(['nested']);
+    });
+
+    it('bounds malformed parent cycles while expanding a container selection', () => {
+        const group = { id: 'group', type: 'titleGroup', position: { x: 0, y: 0 }, data: {} };
+        const first = { id: 'first', parentId: 'second', position: { x: 0, y: 0 }, data: {} };
+        const second = { id: 'second', parentId: 'first', position: { x: 0, y: 0 }, data: {} };
+
+        expect(buildFlowchartClipboardData([group], [], [group, first, second]).nodes).toEqual([group]);
+    });
+
     it('accepts valid clipboard data and normalizes missing node data', () => {
         const result = coerceClipboardData({
             nodes: [{ id: 'a', position: { x: 1, y: 2 } }],

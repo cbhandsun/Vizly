@@ -27,6 +27,8 @@ const setup = (nodes: Node[], selectedNodes: Node[]) => {
         setEdges: setEdges as unknown as React.Dispatch<React.SetStateAction<Edge[]>>,
         setSelectedNodes: setSelectedNodes as unknown as React.Dispatch<React.SetStateAction<Node[]>>,
         takeSnapshot,
+        getGroupHistoryLabel: count => `Before group: ${count}`,
+        getUngroupHistoryLabel: (groups, children) => `Before ungroup: ${groups}/${children}`,
     }));
 
     return { result, setNodes, setEdges, setSelectedNodes, takeSnapshot };
@@ -60,7 +62,7 @@ describe('useGrouping mutation boundaries', () => {
 
         act(() => state.result.current.handleGroup());
 
-        expect(state.takeSnapshot).toHaveBeenCalledWith(nodes, []);
+        expect(state.takeSnapshot).toHaveBeenCalledWith(nodes, [], 'Before group: 2');
         expect(state.setNodes).toHaveBeenCalledTimes(1);
         expect(state.setEdges).toHaveBeenCalledTimes(1);
         expect(state.setSelectedNodes).toHaveBeenCalledTimes(1);
@@ -75,6 +77,11 @@ describe('useGrouping mutation boundaries', () => {
         act(() => state.result.current.handleUngroup([group.id]));
 
         expect(state.takeSnapshot).toHaveBeenCalledTimes(1);
+        expect(state.takeSnapshot).toHaveBeenCalledWith(
+            [group, child, unrelated],
+            [],
+            'Before ungroup: 1/1',
+        );
         expect(state.setNodes).toHaveBeenCalledWith([
             expect.objectContaining({ id: child.id, position: { x: 120, y: 110 } }),
             unrelated,

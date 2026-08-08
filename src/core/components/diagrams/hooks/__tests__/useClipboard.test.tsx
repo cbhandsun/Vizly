@@ -75,6 +75,34 @@ describe('useClipboard', () => {
     expect(loggingState.logClipboardSystemWriteFailure).toHaveBeenCalled();
   });
 
+  it('copies an explicit context-menu target instead of a stale selection', async () => {
+    const staleSelection = selectedNodes;
+    const contextTarget: Node = {
+      id: 'context-target',
+      position: { x: 200, y: 300 },
+      data: { label: 'Context target' },
+    };
+    Object.assign(navigator, { clipboard: undefined });
+
+    const { result } = renderHook(() => useClipboard({
+      nodesRef: { current: [...staleSelection, contextTarget] },
+      edgesRef: { current: [] },
+      selectedNodes: staleSelection,
+      selectedEdges: [],
+      setNodes: vi.fn(),
+      setEdges: vi.fn(),
+      takeSnapshot: vi.fn(),
+      getOperationScope,
+    }));
+
+    act(() => result.current.handleCopy([contextTarget.id]));
+
+    expect(JSON.parse(localStorage.getItem('flowchart-clipboard') ?? '{}')).toMatchObject({
+      nodes: [{ id: contextTarget.id }],
+      edges: [],
+    });
+  });
+
   it('logs system clipboard read failure and falls back to local storage paste', async () => {
     const setNodes = vi.fn();
     const setEdges = vi.fn();

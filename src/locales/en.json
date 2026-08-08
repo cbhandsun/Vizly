@@ -933,7 +933,9 @@
             "beforeDuplicate": "Before duplicating {{count}} nodes",
             "beforeDuplicate_one": "Before duplicating {{count}} node",
             "beforeDuplicate_other": "Before duplicating {{count}} nodes",
-            "beforePaste": "Before paste — Nodes {{nodes}}, connectors {{edges}}"
+            "beforePaste": "Before paste — Nodes {{nodes}}, connectors {{edges}}",
+            "beforeGroup": "Before grouping {{count}} nodes",
+            "beforeUngroup": "Before ungrouping — Groups {{groups}}, nodes {{nodes}}"
         },
         "versionHistoryPanel": {
             "title": "Version history",

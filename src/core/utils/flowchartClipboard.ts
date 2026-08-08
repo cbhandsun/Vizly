@@ -19,8 +19,32 @@ export const buildFlowchartClipboardData = (
 ): ClipboardData => {
     const selectedNodeIds = new Set(selectedNodes.map(node => node.id));
     const allNodesById = new Map(allNodes.map(node => [node.id, node]));
+    const copiedNodeIds = new Set(selectedNodeIds);
+
+    const hasSelectedAncestor = (node: Node): boolean => {
+        const visited = new Set<string>([node.id]);
+        let parentId = node.parentId;
+        while (parentId && !visited.has(parentId)) {
+            if (selectedNodeIds.has(parentId)) return true;
+            visited.add(parentId);
+            parentId = allNodesById.get(parentId)?.parentId;
+        }
+        return false;
+    };
+
+    for (const node of allNodes) {
+        if (hasSelectedAncestor(node)) copiedNodeIds.add(node.id);
+    }
+
+    const hasExpandedSelection = copiedNodeIds.size > selectedNodeIds.size;
+    const nodesToCopy = hasExpandedSelection
+        ? [
+            ...allNodes.filter(node => copiedNodeIds.has(node.id)),
+            ...selectedNodes.filter(node => !allNodesById.has(node.id)),
+        ]
+        : selectedNodes;
     const edges = allEdges.filter(edge => (
-        selectedNodeIds.has(edge.source) && selectedNodeIds.has(edge.target)
+        copiedNodeIds.has(edge.source) && copiedNodeIds.has(edge.target)
     ));
 
     const resolveAbsolutePosition = (node: Node, visited = new Set<string>()): Node['position'] => {
@@ -37,11 +61,11 @@ export const buildFlowchartClipboardData = (
         };
     };
 
-    const requiresDetachedCopy = selectedNodes.some(node => (
-        node.parentId !== undefined && !selectedNodeIds.has(node.parentId)
+    const requiresDetachedCopy = nodesToCopy.some(node => (
+        node.parentId !== undefined && !copiedNodeIds.has(node.parentId)
     ));
-    const nodes = requiresDetachedCopy ? selectedNodes.map(node => {
-        if (!node.parentId || selectedNodeIds.has(node.parentId)) return node;
+    const nodes = requiresDetachedCopy ? nodesToCopy.map(node => {
+        if (!node.parentId || copiedNodeIds.has(node.parentId)) return node;
 
         const detachedNode: Node = {
             ...node,
@@ -52,7 +76,7 @@ export const buildFlowchartClipboardData = (
         delete detachedNode.expandParent;
         Reflect.deleteProperty(detachedNode, 'parentNode');
         return detachedNode;
-    }) : selectedNodes;
+    }) : nodesToCopy;
 
     return { nodes, edges };
 };

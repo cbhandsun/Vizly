@@ -63,11 +63,15 @@ export const useClipboard = ({
 }: UseClipboardProps) => {
     const pasteCursorRef = useRef<ClipboardPasteCursor | null>(null);
 
-    const writeSelectedNodesToClipboard = useCallback(async (): Promise<boolean> => {
-        if (selectedNodes.length === 0) return false;
+    const writeSelectedNodesToClipboard = useCallback(async (targetNodeIds?: string[]): Promise<boolean> => {
+        const targetIds = targetNodeIds ? new Set(targetNodeIds) : null;
+        const nodesToCopy = targetIds
+            ? nodesRef.current.filter(node => targetIds.has(node.id))
+            : selectedNodes;
+        if (nodesToCopy.length === 0) return false;
 
         const clipboardData: ClipboardData = buildFlowchartClipboardData(
-            selectedNodes,
+            nodesToCopy,
             edgesRef.current,
             nodesRef.current,
         );
@@ -118,8 +122,8 @@ export const useClipboard = ({
         return persistedLocally;
     }, [clipboardKey, edgesRef, nodesRef, selectedNodes]);
 
-    const handleCopy = useCallback(() => {
-        void writeSelectedNodesToClipboard();
+    const handleCopy = useCallback((targetNodeIds?: string[]) => {
+        void writeSelectedNodesToClipboard(targetNodeIds);
     }, [writeSelectedNodesToClipboard]);
 
     /**

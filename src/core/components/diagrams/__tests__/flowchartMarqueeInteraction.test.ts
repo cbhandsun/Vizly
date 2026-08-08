@@ -25,14 +25,14 @@ describe('flowchart marquee canvas interaction', () => {
 
     it('keeps marquee selection node-only so routed lines do not inflate the selection', () => {
         const edges = [
-            { id: 'selectable', source: 'a', target: 'b' },
+            { id: 'selectable', source: 'a', target: 'b', selected: true },
             { id: 'locked', source: 'b', target: 'c', selectable: false },
         ];
 
         const marqueeEdges = getFlowchartMarqueeEdges(edges, true);
 
         expect(marqueeEdges).toEqual([
-            { ...edges[0], selectable: false },
+            { ...edges[0], selectable: false, selected: false },
             edges[1],
         ]);
         expect(marqueeEdges[1]).toBe(edges[1]);

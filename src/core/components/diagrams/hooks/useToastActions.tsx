@@ -21,7 +21,7 @@ interface UseToastActionsProps {
     handleDelete: (target?: DiagramActionTarget) => void;
     handleDuplicate: (target?: DiagramActionTarget) => void;
     // Clipboard actions
-    handleCopy: () => void;
+    handleCopy: (targetNodeIds?: string[]) => void;
     handlePaste: () => Promise<ClipboardPasteResult>;
     handleCut: () => Promise<ClipboardCutResult>;
     // Group actions
@@ -95,12 +95,16 @@ export function useToastActions({
 
     // --- Copy / Paste / Cut ---
     // 📋 Copy 操作静默执行（行业标准：Figma/Miro 的 Ctrl+C 不弹 toast）
-    const handleCopyWithToast = useCallback(() => {
-        if (selectedNodes.length === 0) {
+    const handleCopyWithToast = useCallback((targetId?: string) => {
+        const targetIsSelected = targetId
+            ? selectedNodes.some(node => node.id === targetId)
+            : false;
+        const targetNodeIds = targetId && !targetIsSelected ? [targetId] : undefined;
+        if (!targetNodeIds && selectedNodes.length === 0) {
             return; // 无选中 → 静默忽略
         }
-        handleCopy();
-    }, [handleCopy, selectedNodes.length]);
+        handleCopy(targetNodeIds);
+    }, [handleCopy, selectedNodes]);
 
     const handlePasteWithToast = useCallback(async () => {
         const result = await handlePaste();
@@ -269,7 +273,7 @@ export function useToastActions({
             return;
         }
         if (action === 'copy') {
-            handleCopyWithToast();
+            handleCopyWithToast(targetId);
             return;
         }
         if (action === 'paste') {

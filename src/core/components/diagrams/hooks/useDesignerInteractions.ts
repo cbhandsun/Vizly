@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Node, Edge, Connection, reconnectEdge, SelectionMode, MarkerType, type EdgeChange, type NodeChange, type OnConnect, type ReactFlowInstance } from '@xyflow/react';
 import { useLayeredVirtualization } from './useLayeredVirtualization';
 import { useDesignerEdgeCallbacks } from './useDesignerEdgeCallbacks';
@@ -83,6 +84,8 @@ export function useDesignerInteractions({
     toggleVisibility, toggleLock, renameLayer, reorderLayers, getLayer, setLayerColor
 }: UseDesignerInteractionsProps) {
 
+    const { t } = useTranslation();
+
     const normalizedActiveLayerId = activeLayerId ?? undefined;
 
 
@@ -107,7 +110,13 @@ export function useDesignerInteractions({
 
     const { handleGroup, handleUngroup } = useGrouping({
         nodes, edges, nodesRef, edgesRef, setNodes, setEdges, selectedNodes, setSelectedNodes, takeSnapshot,
-        defaultGroupLabel: '组件', defaultGroupDescription: '组件'
+        defaultGroupLabel: '组件',
+        defaultGroupDescription: '组件',
+        getGroupHistoryLabel: nodeCount => t('designer.historyPanel.beforeGroup', { count: nodeCount }),
+        getUngroupHistoryLabel: (groupCount, nodeCount) => t('designer.historyPanel.beforeUngroup', {
+            groups: groupCount,
+            nodes: nodeCount,
+        }),
     });
 
     const [selectionMode] = useState<SelectionMode>(SelectionMode.Partial);

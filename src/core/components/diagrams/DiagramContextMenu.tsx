@@ -143,7 +143,7 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
           key: 'copy',
           icon: <CopyOutlined />,
           label: t('designer.contextMenu.copy'),
-          disabled: type === 'edge' || hasLockedActionTarget
+          disabled: type === 'edge'
         },
         {
           key: 'paste',

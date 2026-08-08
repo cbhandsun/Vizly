@@ -12,9 +12,11 @@ interface UseGroupingProps {
     setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
     selectedNodes: Node[];
     setSelectedNodes: React.Dispatch<React.SetStateAction<Node[]>>;
-    takeSnapshot: (nodes: Node[], edges: Edge[]) => void;
+    takeSnapshot: (nodes: Node[], edges: Edge[], label?: string) => void;
     defaultGroupLabel?: string;
     defaultGroupDescription?: string;
+    getGroupHistoryLabel?: (nodeCount: number) => string;
+    getUngroupHistoryLabel?: (groupCount: number, nodeCount: number) => string;
 }
 
 export const useGrouping = ({
@@ -28,7 +30,9 @@ export const useGrouping = ({
     setSelectedNodes,
     takeSnapshot,
     defaultGroupLabel,
-    defaultGroupDescription
+    defaultGroupDescription,
+    getGroupHistoryLabel,
+    getUngroupHistoryLabel,
 }: UseGroupingProps) => {
 
     const handleGroup = useCallback(() => {
@@ -45,14 +49,14 @@ export const useGrouping = ({
         });
         if (!plan) return;
 
-        takeSnapshot(nodes, edges);
+        takeSnapshot(nodes, edges, getGroupHistoryLabel?.(currentSelection.length));
         const nextEdges = deselectEdgesForGrouping(edges);
         if (nodesRef) nodesRef.current = plan.nodes;
         if (edgesRef) edgesRef.current = nextEdges;
         setNodes(plan.nodes);
         setEdges(nextEdges);
         setSelectedNodes([plan.groupNode]);
-    }, [defaultGroupDescription, defaultGroupLabel, selectedNodes, nodes, edges, nodesRef, edgesRef, takeSnapshot, setNodes, setEdges, setSelectedNodes]);
+    }, [defaultGroupDescription, defaultGroupLabel, selectedNodes, nodes, edges, nodesRef, edgesRef, takeSnapshot, setNodes, setEdges, setSelectedNodes, getGroupHistoryLabel]);
 
     const handleUngroup = useCallback((targetNodeIds?: string[]) => {
         const selectedIds = new Set(targetNodeIds ?? selectedNodes.map(node => node.id));
@@ -67,7 +71,8 @@ export const useGrouping = ({
         const nextNodes = createUngroupingPlan({ nodes, groupIds });
         if (!nextNodes) return;
 
-        takeSnapshot(nodes, edges);
+        const affectedChildCount = affectedNodes.filter(node => !groupIds.has(node.id)).length;
+        takeSnapshot(nodes, edges, getUngroupHistoryLabel?.(groupsToUngroup.length, affectedChildCount));
         if (nodesRef) nodesRef.current = nextNodes;
         setNodes(nextNodes);
 
@@ -77,7 +82,7 @@ export const useGrouping = ({
             return nextEdges;
         });
         setSelectedNodes([]);
-    }, [selectedNodes, nodes, edges, nodesRef, edgesRef, takeSnapshot, setNodes, setEdges, setSelectedNodes]);
+    }, [selectedNodes, nodes, edges, nodesRef, edgesRef, takeSnapshot, setNodes, setEdges, setSelectedNodes, getUngroupHistoryLabel]);
 
     return {
         handleGroup,

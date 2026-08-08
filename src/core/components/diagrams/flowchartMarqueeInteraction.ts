@@ -22,7 +22,13 @@ export function getFlowchartMarqueeEdges<TEdge extends Edge>(
 ): TEdge[] {
     if (!isMarqueeActive) return edges;
 
-    return edges.map(edge => edge.selectable === false
-        ? edge
-        : { ...edge, selectable: false });
+    return edges.map(edge => {
+        if (edge.selectable === false && edge.selected !== true) return edge;
+
+        return {
+            ...edge,
+            selectable: false,
+            ...(edge.selected === true ? { selected: false } : {}),
+        };
+    });
 }

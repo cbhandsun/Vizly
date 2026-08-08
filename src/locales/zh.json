@@ -934,7 +934,9 @@
             "restoredStatus": "已恢复到“{{label}}”，可使用重做返回恢复前状态",
             "beforeDelete": "删除 {{count}} 项前",
             "beforeDuplicate": "复制 {{count}} 个节点前",
-            "beforePaste": "粘贴前—节点 {{nodes}} 个，连线 {{edges}} 条"
+            "beforePaste": "粘贴前—节点 {{nodes}} 个，连线 {{edges}} 条",
+            "beforeGroup": "分组 {{count}} 个节点前",
+            "beforeUngroup": "取消分组前—分组 {{groups}} 个，节点 {{nodes}} 个"
         },
         "versionHistoryPanel": {
             "title": "版本历史",

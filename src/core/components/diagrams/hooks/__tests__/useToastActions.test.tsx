@@ -168,6 +168,20 @@ describe('useToastActions clipboard feedback', () => {
     expect(props.handleUngroup).toHaveBeenCalledWith([groupNode.id]);
   });
 
+  it('copies an unselected context-menu target instead of the stale selection', () => {
+    const { props } = createProps(vi.fn().mockResolvedValue('empty'));
+    props.selectedNodes = [{ id: 'stale', position: { x: 0, y: 0 }, data: {} }];
+    props.nodesRef.current = [
+      ...props.selectedNodes,
+      { id: 'target', position: { x: 100, y: 0 }, data: {} },
+    ];
+    const { result } = renderHook(() => useToastActions(props));
+
+    act(() => result.current.onContextMenuActionWithToast('copy', 'target'));
+
+    expect(props.handleCopy).toHaveBeenCalledWith(['target']);
+  });
+
   it('only reports edge-operation success when state actually changed', () => {
     const { props, success } = createProps(vi.fn().mockResolvedValue('empty'));
     props.onContextMenuAction = vi.fn()

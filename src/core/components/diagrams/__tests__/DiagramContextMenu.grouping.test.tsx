@@ -35,6 +35,7 @@ vi.mock('antd', () => ({
 const translations: Record<string, string> = {
   'designer.contextMenu.group': 'Group',
   'designer.contextMenu.ungroup': 'Ungroup',
+  'designer.contextMenu.copy': 'Copy',
   'designer.contextMenu.duplicateSelection': 'Duplicate selection',
   'designer.contextMenu.lockSelection': 'Lock selection',
   'designer.contextMenu.bringSelectionToFront': 'Bring selection to front',
@@ -89,6 +90,16 @@ describe('DiagramContextMenu grouping actions', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Ungroup' }));
 
     expect(onAction).toHaveBeenCalledWith('ungroup', group.id);
+  });
+
+  it('allows copying a locked container without enabling mutation actions', () => {
+    const group = node('group', { type: 'titleGroup', data: { locked: true } });
+    const onAction = renderMenu({ type: 'node', target: group, selectedNodes: [group] });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy' }));
+
+    expect(onAction).toHaveBeenCalledWith('copy', group.id);
+    expect((screen.getByRole('button', { name: 'Ungroup' }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   it.each([
