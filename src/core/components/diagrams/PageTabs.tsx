@@ -52,6 +52,7 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
     const renameErrorId = React.useId();
     const tabButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
     const deleteButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+    const deleteCancelFocusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const restoreFocusAfterDeleteRef = useRef(false);
     const addedPageFocusTargetRef = useRef<string | null>(null);
     const pageLimitReached = pages.length >= MAX_DIAGRAM_PAGES;
@@ -84,11 +85,21 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
         deleteButtonRefs.current.get(pageId)?.focus({ preventScroll: true });
     }, []);
 
+    const cancelDeleteCancelFocus = useCallback(() => {
+        if (deleteCancelFocusTimerRef.current === null) return;
+        clearTimeout(deleteCancelFocusTimerRef.current);
+        deleteCancelFocusTimerRef.current = null;
+    }, []);
+
     const focusDeleteCancelButton = useCallback(() => {
-        setTimeout(() => {
+        cancelDeleteCancelFocus();
+        deleteCancelFocusTimerRef.current = setTimeout(() => {
+            deleteCancelFocusTimerRef.current = null;
             getViewportOverlayContainer().querySelector<HTMLButtonElement>('[data-page-tabs-delete-cancel="true"]')?.focus({ preventScroll: true });
         }, 0);
-    }, []);
+    }, [cancelDeleteCancelFocus]);
+
+    useEffect(() => cancelDeleteCancelFocus, [cancelDeleteCancelFocus]);
 
     useEffect(() => {
         if (!restoreFocusAfterDeleteRef.current) return;
@@ -400,14 +411,19 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                                     onOpenChange={(open) => {
                                         setConfirmingPageId(open ? activePage.id : null);
                                         if (open) focusDeleteCancelButton();
-                                        else requestAnimationFrame(() => focusDeleteButton(activePage.id));
+                                        else {
+                                            cancelDeleteCancelFocus();
+                                            requestAnimationFrame(() => focusDeleteButton(activePage.id));
+                                        }
                                     }}
                                     onConfirm={() => {
+                                        cancelDeleteCancelFocus();
                                         const deleted = onDeletePage(activePage.id);
                                         restoreFocusAfterDeleteRef.current = deleted;
                                         setConfirmingPageId(null);
                                     }}
                                     onCancel={() => {
+                                        cancelDeleteCancelFocus();
                                         setConfirmingPageId(null);
                                         requestAnimationFrame(() => focusDeleteButton(activePage.id));
                                     }}

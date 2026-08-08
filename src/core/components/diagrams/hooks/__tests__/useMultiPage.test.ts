@@ -173,6 +173,73 @@ describe('useMultiPage', () => {
     expect(pageIdDuringRestore).toBe('restored-page:4');
   });
 
+  it('preserves each page canvas across consecutive switches before React rerenders', () => {
+    let liveNodes = [node('page-one-live')];
+    const setNodes = vi.fn((nodes: Node[]) => {
+      liveNodes = nodes;
+    });
+    const { result } = renderHook(() => useMultiPage(
+      () => liveNodes,
+      () => [],
+      setNodes,
+      vi.fn(),
+    ));
+
+    act(() => {
+      result.current.restorePersistedMetadata({
+        multiPage: {
+          version: 1,
+          activePageId: 'page-1',
+          pages: [
+            { id: 'page-1', name: '页面 1', nodes: [], edges: [] },
+            { id: 'page-2', name: '页面 2', nodes: [node('page-two')], edges: [] },
+            { id: 'page-3', name: '页面 3', nodes: [node('page-three')], edges: [] },
+          ],
+        },
+      });
+      liveNodes = [node('page-one-live')];
+    });
+
+    act(() => {
+      result.current.switchPage('page-2');
+      result.current.switchPage('page-3');
+    });
+
+    expect(result.current.activePageId).toBe('page-3');
+    expect(result.current.pages.find(page => page.id === 'page-1')?.nodes).toEqual([
+      node('page-one-live'),
+    ]);
+    expect(result.current.pages.find(page => page.id === 'page-2')?.nodes).toEqual([
+      node('page-two'),
+    ]);
+    expect(liveNodes).toEqual([node('page-three')]);
+  });
+
+  it('does not overwrite the previous page when pages are added consecutively', () => {
+    let liveNodes = [node('original-page-content')];
+    const setNodes = vi.fn((nodes: Node[]) => {
+      liveNodes = nodes;
+    });
+    const { result } = renderHook(() => useMultiPage(
+      () => liveNodes,
+      () => [],
+      setNodes,
+      vi.fn(),
+    ));
+
+    act(() => {
+      result.current.addPage();
+      result.current.addPage();
+    });
+
+    expect(result.current.pages).toHaveLength(3);
+    expect(result.current.pages.find(page => page.id === 'page-1')?.nodes).toEqual([
+      node('original-page-content'),
+    ]);
+    expect(result.current.pages[1]?.nodes).toEqual([]);
+    expect(result.current.activePageId).toBe(result.current.pages[2]?.id);
+  });
+
   it('removes a deleted page history scope and restores the remaining active page', () => {
     const setNodes = vi.fn();
     const setEdges = vi.fn();

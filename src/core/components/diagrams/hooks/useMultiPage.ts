@@ -117,7 +117,8 @@ export const useMultiPage = (
 
     // 切换页面
     const switchPage = useCallback((targetPageId: string) => {
-        if (targetPageId === activePageId) return;
+        const currentActivePageId = activePageIdRef.current;
+        if (targetPageId === currentActivePageId) return;
 
         const targetPage = pagesRef.current.find(p => p.id === targetPageId);
         if (!targetPage) return;
@@ -132,7 +133,7 @@ export const useMultiPage = (
 
         setPages(prev => {
             const nextPages = prev.map(p =>
-            p.id === activePageId
+            p.id === currentActivePageId
                 ? { ...p, nodes: currentNodes, edges: currentEdges }
                 : p
             );
@@ -146,11 +147,12 @@ export const useMultiPage = (
 
         activePageIdRef.current = targetPageId;
         setActivePageId(targetPageId);
-    }, [activePageId, activateHistoryScope, clearSelection, readCurrentState, setNodes, setEdges]);
+    }, [activateHistoryScope, clearSelection, readCurrentState, setNodes, setEdges]);
 
     // 添加页面
     const addPage = useCallback(() => {
         if (pagesRef.current.length >= MAX_DIAGRAM_PAGES) return null;
+        const currentActivePageId = activePageIdRef.current;
 
         // 先保存当前页面
         const { nodes: currentNodes, edges: currentEdges } = readCurrentState();
@@ -166,7 +168,7 @@ export const useMultiPage = (
         setPages(prev => {
             const nextPages = [
                 ...prev.map(p =>
-                p.id === activePageId
+                p.id === currentActivePageId
                     ? { ...p, nodes: currentNodes, edges: currentEdges }
                     : p
                 ),
@@ -183,7 +185,7 @@ export const useMultiPage = (
         setActivePageId(newId);
 
         return newId;
-    }, [activePageId, activateHistoryScope, clearSelection, readCurrentState, setNodes, setEdges]);
+    }, [activateHistoryScope, clearSelection, readCurrentState, setNodes, setEdges]);
 
     // 删除页面
     const deletePage = useCallback((pageId: string) => {
