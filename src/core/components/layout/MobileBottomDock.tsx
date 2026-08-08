@@ -124,6 +124,7 @@ export const MobileBottomDock: React.FC<MobileBottomDockProps> = ({
                     {onSettingsClick && (
                         <button
                             type="button"
+                            data-settings-focus-return="primary"
                             className="mobile-dock-btn settings"
                             onClick={onSettingsClick}
                             aria-label={t('designer.mobileDock.settings', '设置')}

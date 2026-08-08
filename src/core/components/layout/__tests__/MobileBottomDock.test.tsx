@@ -56,7 +56,8 @@ describe('MobileBottomDock', () => {
         expect(aiButton.getAttribute('aria-expanded')).toBe('false');
         expect((screen.getByRole('button', { name: '撤销' }) as HTMLButtonElement).disabled).toBe(true);
         expect((screen.getByRole('button', { name: '重做' }) as HTMLButtonElement).disabled).toBe(true);
-        expect(screen.getByRole('button', { name: '设置' })).toBeTruthy();
+        const settingsButton = screen.getByRole('button', { name: '设置' });
+        expect(settingsButton.getAttribute('data-settings-focus-return')).toBe('primary');
     });
 
     it('keeps enabled history actions operable after moving them into the main dock grid', () => {

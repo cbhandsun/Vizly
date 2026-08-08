@@ -387,6 +387,7 @@
             "readonlyDisabled": "画布已锁定 · 解锁后可编辑"
         },
         "settings": {
+            "closePanel": "关闭{{title}}",
             "title": "图表设置",
             "theme": "颜色主题",
             "themeDesc": "定义图表的全局配色方案",

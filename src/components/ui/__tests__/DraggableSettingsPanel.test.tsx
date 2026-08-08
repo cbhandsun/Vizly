@@ -33,7 +33,7 @@ const NestedModal = ({ active }: { active: boolean }) => {
 describe('DraggableSettingsPanel', () => {
     it('blocks app chrome while keeping its own popups above the panel', () => {
         render(
-            <DraggableSettingsPanel title="打开更多设置" onClose={vi.fn()}>
+            <DraggableSettingsPanel title="打开更多设置" closeLabel="关闭打开更多设置" onClose={vi.fn()}>
                 <div>设置内容</div>
             </DraggableSettingsPanel>,
         );
@@ -48,7 +48,7 @@ describe('DraggableSettingsPanel', () => {
 
     it('provides a named close action', () => {
         render(
-            <DraggableSettingsPanel title="打开更多设置" onClose={vi.fn()}>
+            <DraggableSettingsPanel title="打开更多设置" closeLabel="关闭打开更多设置" onClose={vi.fn()}>
                 <div>设置内容</div>
             </DraggableSettingsPanel>,
         );
@@ -61,7 +61,7 @@ describe('DraggableSettingsPanel', () => {
     it('traps focus inside a modal dialog and closes on Escape', () => {
         const onClose = vi.fn();
         render(
-            <DraggableSettingsPanel title="打开更多设置" onClose={onClose}>
+            <DraggableSettingsPanel title="打开更多设置" closeLabel="关闭打开更多设置" onClose={onClose}>
                 <button type="button">内部操作</button>
             </DraggableSettingsPanel>,
         );
@@ -76,7 +76,7 @@ describe('DraggableSettingsPanel', () => {
 
     it('removes the background dialog from the modal accessibility tree while a nested modal is active', async () => {
         const { rerender } = render(
-            <DraggableSettingsPanel title="打开更多设置" onClose={vi.fn()}>
+            <DraggableSettingsPanel title="打开更多设置" closeLabel="关闭打开更多设置" onClose={vi.fn()}>
                 <NestedModal active />
             </DraggableSettingsPanel>,
         );
@@ -89,7 +89,7 @@ describe('DraggableSettingsPanel', () => {
         });
 
         rerender(
-            <DraggableSettingsPanel title="打开更多设置" onClose={vi.fn()}>
+            <DraggableSettingsPanel title="打开更多设置" closeLabel="关闭打开更多设置" onClose={vi.fn()}>
                 <NestedModal active={false} />
             </DraggableSettingsPanel>,
         );
@@ -98,5 +98,35 @@ describe('DraggableSettingsPanel', () => {
             expect(outerDialog?.hasAttribute('aria-hidden')).toBe(false);
             expect(outerDialog?.getAttribute('aria-modal')).toBe('true');
         });
+    });
+
+    it('uses the supplied localized close label without hard-coded language prefixes', () => {
+        render(
+            <DraggableSettingsPanel title="Diagram settings" closeLabel="Close Diagram settings" onClose={vi.fn()}>
+                <div>Settings content</div>
+            </DraggableSettingsPanel>,
+        );
+
+        expect(screen.getByRole('button', { name: 'Close Diagram settings' })).toBeTruthy();
+        expect(screen.queryByRole('button', { name: '关闭Diagram settings' })).toBeNull();
+    });
+
+    it('returns focus to the primary persistent settings trigger when opened from the page body', () => {
+        const fallback = document.createElement('button');
+        fallback.dataset.settingsFocusReturn = 'primary';
+        document.body.append(fallback);
+        document.body.tabIndex = -1;
+        document.body.focus();
+
+        const { unmount } = render(
+            <DraggableSettingsPanel title="图表设置" closeLabel="关闭图表设置" onClose={vi.fn()}>
+                <div>设置内容</div>
+            </DraggableSettingsPanel>,
+        );
+        unmount();
+
+        expect(document.activeElement).toBe(fallback);
+        fallback.remove();
+        document.body.removeAttribute('tabindex');
     });
 });

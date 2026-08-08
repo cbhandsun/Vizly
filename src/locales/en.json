@@ -388,6 +388,7 @@
             "readonlyDisabled": "Canvas locked · Unlock to edit"
         },
         "settings": {
+            "closePanel": "Close {{title}}",
             "title": "Diagram Settings",
             "theme": "Color Theme",
             "themeDesc": "Define the global color palette for the diagram",

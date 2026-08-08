@@ -1,12 +1,13 @@
 import React, { ReactNode, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ConfigProvider } from 'antd';
-import { MdDragIndicator } from 'react-icons/md';
+import { MdClose, MdDragIndicator } from 'react-icons/md';
 import { useDraggablePanel } from '../../hooks/useDraggablePanel';
 import { ModalNestingBoundary } from '../../hooks/ModalNestingBoundary';
 
 interface DraggableSettingsPanelProps {
     children: ReactNode;
+    closeLabel: string;
     onClose: () => void;
     title: string;
 }
@@ -14,7 +15,7 @@ interface DraggableSettingsPanelProps {
 export const SETTINGS_PANEL_Z_INDEX = 1100;
 export const SETTINGS_PANEL_POPUP_Z_INDEX = 1150;
 
-export const DraggableSettingsPanel: React.FC<DraggableSettingsPanelProps> = ({ children, onClose, title }) => {
+export const DraggableSettingsPanel: React.FC<DraggableSettingsPanelProps> = ({ children, closeLabel, onClose, title }) => {
     const initialPos = useMemo(() => ({
         x: Math.max(16, (window.innerWidth - Math.min(480, window.innerWidth - 32)) / 2),
         y: Math.max(16, Math.min(80, window.innerHeight - 160)),
@@ -48,7 +49,12 @@ export const DraggableSettingsPanel: React.FC<DraggableSettingsPanelProps> = ({ 
         document.addEventListener('keydown', handleEscape);
         return () => {
             document.removeEventListener('keydown', handleEscape);
-            previouslyFocused?.focus();
+            const capturedTarget = previouslyFocused?.isConnected && previouslyFocused !== document.body
+                ? previouslyFocused
+                : null;
+            const primaryFallback = document.querySelector<HTMLElement>('[data-settings-focus-return="primary"]');
+            const secondaryFallback = document.querySelector<HTMLElement>('[data-settings-focus-return="fallback"]');
+            (capturedTarget ?? primaryFallback ?? secondaryFallback)?.focus();
         };
     }, [panelRef]);
 
@@ -118,7 +124,7 @@ export const DraggableSettingsPanel: React.FC<DraggableSettingsPanelProps> = ({ 
                 <button
                     type="button"
                     data-settings-close
-                    aria-label={`关闭${title}`}
+                    aria-label={closeLabel}
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={(e) => { e.stopPropagation(); onClose(); }}
                     className="flex items-center justify-center rounded-full bg-transparent hover:bg-black/5 dark:bg-transparent dark:hover:bg-white/10 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors border-none outline-none cursor-pointer"
@@ -128,9 +134,7 @@ export const DraggableSettingsPanel: React.FC<DraggableSettingsPanelProps> = ({ 
                         flexShrink: 0,
                     }}
                 >
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M1 1L13 13M1 13L13 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                    </svg>
+                    <MdClose size={18} aria-hidden="true" />
                 </button>
             </div>
 

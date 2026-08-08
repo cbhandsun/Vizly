@@ -177,6 +177,7 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
 }) => {
     const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(false);
     const [hasMountedAIConfig, setHasMountedAIConfig] = useState(aiConfigVisible);
+    const settingsPanelTitle = t('designer.settings.title');
 
     const openAIConfig = useCallback(() => {
         setHasMountedAIConfig(true);
@@ -356,7 +357,8 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
                                 {isSettingsOpen && (
                                     <Suspense fallback={null}>
                                         <DraggableSettingsPanel
-                                            title={t('designer.commandItems.settings', '配置面板 / Settings')}
+                                            title={settingsPanelTitle}
+                                            closeLabel={t('designer.settings.closePanel', { title: settingsPanelTitle })}
                                             onClose={() => setIsSettingsOpen(false)}
                                         >
                                             {settingsPanel}
