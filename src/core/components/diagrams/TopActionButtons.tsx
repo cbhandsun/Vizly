@@ -248,7 +248,7 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
         const toolItems: NonNullable<MenuProps['items']> = [
         ...(onOpenSettings ? [{
             key: 'settings',
-            label: t('designer.toolbar.settings', '设置'),
+            label: t('common.settings'),
             icon: <FaCog />,
             onClick: onOpenSettings,
         }] : []),

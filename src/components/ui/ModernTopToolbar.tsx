@@ -69,11 +69,11 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
 
   const islandBaseClass = `flex items-center ${isMobile ? 'min-h-[44px]' : 'h-[40px]'} bg-white dark:bg-[#2d2d2d] border border-[rgba(0,0,0,0.12)] dark:border-[rgba(255,255,255,0.12)] rounded-[10px] shadow-[0_2px_8px_rgba(0,0,0,0.08)] transition-all duration-200 pointer-events-auto`;
   const moreDialogLabel = isMobile
-    ? t('common.systemActions', '系统操作')
-    : t('common.settings', '设置');
+    ? t('common.systemActions')
+    : t('common.settings');
   const moreSettingsSummary = `${moreDialogLabel}：${[
-    ...(isMobile && showExport ? [t('common.export', '导出')] : []),
-    ...(isMobile && showThemeSelector ? [t('common.theme', '主题')] : []),
+    ...(isMobile && showExport ? [t('common.export')] : []),
+    ...(isMobile && showThemeSelector ? [t('common.theme')] : []),
     t('header.edgeMode', '连线模式'),
     t('common.language', '语言'),
     ...(isMobile ? [t('designer.manage.title', '工作台')] : []),
@@ -169,7 +169,7 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
           <div className="h-[1px] bg-slate-100 dark:bg-slate-800 mx-2 my-1" />
           <div className="px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
             <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">
-              {t('common.theme', '主题')}
+              {t('common.theme')}
             </div>
             <EnhancedThemeSelector variant="default" borderless />
           </div>

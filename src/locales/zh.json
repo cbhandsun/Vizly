@@ -17,6 +17,10 @@
         "confirm": "确定",
         "open": "打开",
         "delete": "删除",
+        "settings": "设置",
+        "systemActions": "系统操作",
+        "export": "导出",
+        "theme": "主题",
         "proFeature": "Pro 功能"
     },
     "workspace": {
@@ -1053,6 +1057,9 @@
             "zoomOutHint": "缩小（Ctrl+滚轮也可）",
             "zoomLevel": "组件库缩放",
             "layers": "图层",
+            "comments": "评论反馈",
+            "templatesWithCount": "模板 ({{count}})",
+            "iconLibrary": "云端图标库",
             "techIcons": "技术图标",
             "server": "服务器",
             "network": "网络",

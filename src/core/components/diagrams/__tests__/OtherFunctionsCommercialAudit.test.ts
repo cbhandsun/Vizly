@@ -160,6 +160,16 @@ describe('other-function commercial interaction safeguards', () => {
         expect(source).not.toMatch(/[\u3400-\u9fff]/u);
     });
 
+    it('keeps flow-filter actions on maintained toolbar locale keys', () => {
+        const source = readSource('../ui/DesignerHeaderLayer.tsx');
+
+        expect(source).toContain("t('designer.toolbar.unhighlightMainFlow')");
+        expect(source).toContain("t('designer.toolbar.highlightMainFlow')");
+        expect(source).toContain("t('designer.toolbar.restoreFullFlow')");
+        expect(source).toContain("t('designer.toolbar.showOnlyMainFlow')");
+        expect(source).not.toMatch(/关闭主干高亮|仅显示主干流/u);
+    });
+
     it('opens find and replace through explicit state instead of delayed DOM coupling', () => {
         const handlerSource = readSource('../hooks/useDesignerEventHandlers.ts');
 

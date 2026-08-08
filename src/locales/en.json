@@ -17,6 +17,10 @@
         "confirm": "Confirm",
         "open": "Open",
         "delete": "Delete",
+        "settings": "Settings",
+        "systemActions": "System actions",
+        "export": "Export",
+        "theme": "Theme",
         "proFeature": "Pro Feature"
     },
     "workspace": {
@@ -1052,6 +1056,9 @@
             "zoomOutHint": "Zoom Out (Ctrl+Wheel)",
             "zoomLevel": "Component library zoom",
             "layers": "Layers",
+            "comments": "Comments and feedback",
+            "templatesWithCount": "Templates ({{count}})",
+            "iconLibrary": "Cloud icon library",
             "techIcons": "Tech Icons",
             "server": "Server",
             "network": "Network",

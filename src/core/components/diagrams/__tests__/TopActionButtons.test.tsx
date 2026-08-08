@@ -37,6 +37,7 @@ vi.mock('react-i18next', () => ({
             'designer.toolbar.versionHistory': '版本快照',
             'designer.toolbar.fileGroup': '文件操作',
             'designer.toolbar.viewGroup': '视图控制',
+            'common.settings': 'Settings',
         }[key] ?? key)),
     }),
 }));
@@ -246,6 +247,19 @@ describe('TopActionButtons document menu', () => {
         expect(await screen.findByRole('menuitem', { name: /操作历史/ })).toBeTruthy();
         fireEvent.click(screen.getByRole('menuitem', { name: /版本快照/ }));
         expect(onOpenVersionHistory).toHaveBeenCalledTimes(1);
+    });
+
+    it('uses the active locale for the settings menu entry', async () => {
+        render(
+            <TopActionButtons
+                disablePortal
+                onOpenSettings={vi.fn()}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: '文档操作' }));
+        expect(await screen.findByRole('menuitem', { name: 'Settings' })).toBeTruthy();
+        expect(screen.queryByRole('menuitem', { name: '设置' })).toBeNull();
     });
 
     it('keeps comment and read-only modes visible with direct recovery actions', async () => {

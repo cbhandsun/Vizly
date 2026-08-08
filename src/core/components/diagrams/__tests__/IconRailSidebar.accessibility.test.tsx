@@ -11,7 +11,12 @@ import type { PluginContext } from '../../../types/plugin';
 
 vi.mock('react-i18next', () => ({
     useTranslation: () => ({
-        t: (key: string, fallback?: string) => fallback ?? key,
+        t: (key: string, params?: string | { count?: number }) => ({
+            'designer.sidebar.basic': 'Basic Shapes',
+            'designer.sidebar.iconLibrary': 'Cloud icon library',
+            'designer.sidebar.comments': 'Comments and feedback',
+            'designer.sidebar.templatesWithCount': `Templates (${typeof params === 'object' ? params.count ?? 0 : 0})`,
+        }[key] ?? (typeof params === 'string' ? params : key)),
     }),
 }));
 
@@ -87,6 +92,36 @@ describe('IconRailSidebar drawer accessibility', () => {
             expect(screen.queryByRole('dialog')).toBeNull();
             expect(document.activeElement).toBe(trigger);
         });
+    });
+
+    it('localizes known plugin and built-in rail labels instead of exposing Chinese metadata', async () => {
+        render(
+            <IconRailSidebar
+                autoOpenShapes={false}
+                pluginPanels={[
+                    {
+                        id: 'shapes',
+                        title: '基础形状',
+                        icon: <span aria-hidden="true">S</span>,
+                        content: <div>Shapes</div>,
+                    },
+                    {
+                        id: 'icons',
+                        title: '云端图标库',
+                        icon: <span aria-hidden="true">I</span>,
+                        content: <div>Icons</div>,
+                    },
+                ]}
+            />,
+        );
+
+        expect(screen.getByRole('button', { name: 'Basic Shapes' })).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Cloud icon library' })).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Comments and feedback' })).toBeTruthy();
+        expect(screen.queryByRole('button', { name: '基础形状' })).toBeNull();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Basic Shapes' }));
+        expect(await screen.findByRole('dialog', { name: 'Basic Shapes' })).toBeTruthy();
     });
 
     it('routes the component-search trigger directly to the drawer search field', async () => {

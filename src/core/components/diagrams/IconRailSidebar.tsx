@@ -140,6 +140,11 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
     const drawerTitleId = React.useId();
     const [searchTerm, setSearchTerm] = useState('');
     const panelZoom = usePanelZoom({ storageKey: 'designer.sidebar.zoom', defaultScale: 1, minScale: 0.75, maxScale: 1.35 });
+    const getPluginPanelTitle = useCallback((panel: { id: string; title: string }) => {
+        if (panel.id === 'shapes') return t('designer.sidebar.basic');
+        if (panel.id === 'icons') return t('designer.sidebar.iconLibrary');
+        return panel.title;
+    }, [t]);
 
     // ---- 导航树状结构生成 ----
     const { treeData: navigatorTreeData, expandedKeys: searchExpandedKeys } = useMemo(() => {
@@ -347,15 +352,19 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
     // Tooltip/button components to unnecessarily diff on each keystroke/drag.
     const builtInButtons = useMemo(() => [
         { key: 'navigator', icon: <FaCompass />, label: t('designer.sidebar.navigator') },
-        { key: 'comments', icon: <FaRegComment />, label: '评论反馈' },
+        { key: 'comments', icon: <FaRegComment />, label: t('designer.sidebar.comments') },
         ...(onCreateLayer ? [{ key: 'layers', icon: <FaStream />, label: t('designer.sidebar.layers') }] : []),
-        ...(templates && templates.length > 0 ? [{ key: 'templates', icon: <FaStar />, label: `模板 (${templates.length})` }] : []),
+        ...(templates && templates.length > 0 ? [{
+            key: 'templates',
+            icon: <FaStar />,
+            label: t('designer.sidebar.templatesWithCount', { count: templates.length }),
+        }] : []),
     ], [t, onCreateLayer, templates]);
 
     const railButtons = useMemo(() => [
-        ...pluginPanels.map(p => ({ key: p.id, icon: p.icon, label: p.title })),
+        ...pluginPanels.map(p => ({ key: p.id, icon: p.icon, label: getPluginPanelTitle(p) })),
         ...builtInButtons
-    ], [pluginPanels, builtInButtons]);
+    ], [pluginPanels, builtInButtons, getPluginPanelTitle]);
 
     // ---- 渲染 Drawer 内容 ----
     const renderDrawerContent = () => {
@@ -479,13 +488,13 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
 
     const getDrawerTitle = () => {
         const customPanel = pluginPanels.find(p => p.id === activePanel);
-        if (customPanel) return customPanel.title;
+        if (customPanel) return getPluginPanelTitle(customPanel);
 
         switch (activePanel) {
             case 'navigator': return t('designer.sidebar.navigator');
             case 'layers': return t('designer.sidebar.layers');
-            case 'templates': return `模板 (${templates?.length || 0})`;
-            case 'comments': return '评论反馈';
+            case 'templates': return t('designer.sidebar.templatesWithCount', { count: templates?.length || 0 });
+            case 'comments': return t('designer.sidebar.comments');
             default: return '';
         }
     };

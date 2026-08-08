@@ -165,16 +165,16 @@ export const DesignerHeaderLayer = React.memo(
                         {
                             key: 'toggle-highlight-main',
                             label: topActions.highlightMainFlow 
-                                ? t('designer.features.disableHighlight', '关闭主干高亮') 
-                                : t('designer.features.enableHighlight', '主链路高亮'),
+                                ? t('designer.toolbar.unhighlightMainFlow')
+                                : t('designer.toolbar.highlightMainFlow'),
                             icon: <FaProjectDiagram />,
                             onClick: topActions.handleToggleHighlightMainFlow
                         },
                         {
                             key: 'toggle-only-main',
                             label: topActions.showOnlyMainFlow 
-                                ? t('designer.features.showAllFlows', '显示所有连线') 
-                                : t('designer.features.showOnlyMain', '仅显示主干流'),
+                                ? t('designer.toolbar.restoreFullFlow')
+                                : t('designer.toolbar.showOnlyMainFlow'),
                             icon: <FaExchangeAlt />,
                             onClick: topActions.handleToggleShowOnlyMainFlow
                         }

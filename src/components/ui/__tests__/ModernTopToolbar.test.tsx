@@ -43,7 +43,12 @@ vi.mock('antd', () => ({
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, fallback?: string) => fallback ?? key,
+    t: (key: string, fallback?: string) => ({
+      'common.systemActions': 'System actions',
+      'common.settings': 'Settings',
+      'common.export': 'Export',
+      'common.theme': 'Theme',
+    }[key] ?? fallback ?? key),
   }),
 }));
 
@@ -148,7 +153,7 @@ describe('ModernTopToolbar responsive layout', () => {
     const diagramSwitcher = screen.getByRole('button', { name: '切换图表：Untitled flowchart' });
     expect(diagramSwitcher.className).toContain('h-[44px]');
     expect(diagramSwitcher.style.minHeight).toBe('var(--commercial-touch-target, 44px)');
-    const systemActions = screen.getByRole('button', { name: '系统操作' });
+    const systemActions = screen.getByRole('button', { name: 'System actions' });
     expect(systemActions.className).toContain('min-w-[44px]');
     expect(systemActions.className).toContain('min-h-[44px]');
     expect(systemActions.style.width).toBe('var(--commercial-touch-target, 44px)');
@@ -197,15 +202,15 @@ describe('ModernTopToolbar responsive layout', () => {
     breakpointState.md = false;
     renderToolbar();
 
-    const trigger = screen.getByRole('button', { name: '系统操作' });
+    const trigger = screen.getByRole('button', { name: 'System actions' });
     expect(trigger.getAttribute('aria-haspopup')).toBe('dialog');
     expect(trigger.getAttribute('aria-expanded')).toBe('false');
     expect(trigger.getAttribute('aria-controls')).toMatch(/^toolbar-system-settings-/);
-    expect(screen.queryByRole('dialog', { name: '系统操作' })).toBeNull();
+    expect(screen.queryByRole('dialog', { name: 'System actions' })).toBeNull();
 
     fireEvent.click(trigger);
 
-    expect(await screen.findByRole('dialog', { name: '系统操作' })).toBeTruthy();
+    expect(await screen.findByRole('dialog', { name: 'System actions' })).toBeTruthy();
     expect(screen.getByText('文件操作')).toBeTruthy();
     const exportTools = screen.getByTestId('export-tools');
     expect(exportTools.getAttribute('data-variant')).toBe('inline');
