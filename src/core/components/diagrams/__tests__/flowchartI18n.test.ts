@@ -72,6 +72,10 @@ describe('flowchart interaction copy', () => {
             expect(read(zh, ['designer', 'toolbar', key])).toBeTypeOf('string');
             expect(read(en, ['designer', 'toolbar', key])).toBeTypeOf('string');
         }
+        for (const key of ['creationTools', 'pointer', 'marqueeEnter', 'marqueeExit', 'drawingMode', 'drawingModeExit', 'stickyNote', 'mindMap']) {
+            expect(read(zh, ['designer', 'toolbar', key])).toBeTypeOf('string');
+            expect(read(en, ['designer', 'toolbar', key])).toBeTypeOf('string');
+        }
         for (const key of ['nodeAriaLabel', 'nodeSelectedState', 'nodeLockedState', 'doubleClickToEdit', 'quickAddOrConnect', 'quickAddDirection']) {
             expect(read(zh, ['designer', 'flowchart', key])).toBeTypeOf('string');
             expect(read(en, ['designer', 'flowchart', key])).toBeTypeOf('string');

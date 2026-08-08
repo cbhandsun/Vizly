@@ -211,6 +211,40 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
         }
     }, [showGrid, gridVariant, t]);
 
+    const handleResetLocalEditorState = useCallback(() => {
+        const returnFocusTarget = moreDropdownTriggerRef.current;
+
+        appModal.confirm({
+            title: t('designer.toolbar.clearCacheTitle'),
+            content: t('designer.toolbar.clearCacheContent'),
+            okText: t('designer.toolbar.clearCacheConfirm'),
+            cancelText: t('common.cancel'),
+            okButtonProps: { danger: true },
+            afterClose: () => {
+                window.setTimeout(() => {
+                    if (returnFocusTarget?.isConnected) {
+                        returnFocusTarget.focus({ preventScroll: true });
+                    }
+                }, 0);
+            },
+            onOk: () => {
+                const diagramId = coerceDiagramId(
+                    getQueryOrHashParamFromLocation(window.location, 'diagram')
+                ) || localStorage.getItem('diagramMenu.selectedDiagramId');
+
+                clearFlowchartCache(diagramId);
+
+                if (diagramId) {
+                    try {
+                        localStorage.setItem('diagramMenu.selectedDiagramId', diagramId);
+                    } catch { void 0; }
+                }
+
+                window.location.reload();
+            },
+        });
+    }, [moreDropdownTriggerRef, t]);
+
     // ---- "更多"菜单：低频功能收纳 ----
     const moreMenuItems: MenuProps['items'] = useMemo(() => [
         {
@@ -262,21 +296,21 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
             { type: 'divider' as const },
             {
                 key: 'creation-group',
-                label: t('toolbar.creationTools', '操作工具'),
+                label: t('designer.toolbar.creationTools', '操作工具'),
                 type: 'group' as const,
                 children: buildToolModeMenuItems({
                     isDrawingMode,
                     isMarqueeActive,
                     labels: {
                         drawing: isDrawingMode
-                            ? t('toolbar.drawingModeExit', '退出自由画笔 (Esc)')
-                            : t('toolbar.drawingMode', '自由画笔 (P)'),
+                            ? t('designer.toolbar.drawingModeExit', '退出自由画笔 (Esc)')
+                            : t('designer.toolbar.drawingMode', '自由画笔 (P)'),
                         marquee: isMarqueeActive
-                            ? t('toolbar.marqueeExit', '退出框选 (Esc)')
-                            : t('toolbar.marqueeEnter', '框选模式 (M)'),
-                        mindMap: t('toolbar.mindMap', '思维导图 (Shift+M)'),
-                        pointer: t('toolbar.pointer', '普通选择器 (V)'),
-                        stickyNote: t('toolbar.stickyNote', '便签 (S)'),
+                            ? t('designer.toolbar.marqueeExit', '退出框选 (Esc)')
+                            : t('designer.toolbar.marqueeEnter', '框选模式 (M)'),
+                        mindMap: t('designer.toolbar.mindMap', '思维导图 (Shift+M)'),
+                        pointer: t('designer.toolbar.pointer', '普通选择器 (V)'),
+                        stickyNote: t('designer.toolbar.stickyNote', '便签 (S)'),
                     },
                     onActivatePointer,
                     onAddMindMap,
@@ -305,50 +339,21 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
             label: t('designer.toolbar.clearCache'),
             icon: <FaTrashAlt />,
             danger: true,
-            onClick: () => {
-                appModal.confirm({
-                    title: t('designer.toolbar.clearCacheTitle'),
-                    content: t('designer.toolbar.clearCacheContent'),
-                    okText: t('designer.toolbar.clearCacheConfirm'),
-                    cancelText: t('common.cancel'),
-                    okButtonProps: { danger: true },
-                    onOk: () => {
-                        // 1. 先读取当前选中的图表 ID（localStorage 清空前）
-                        const diagramId = coerceDiagramId(
-                            getQueryOrHashParamFromLocation(window.location, 'diagram')
-                        )
-                            || localStorage.getItem('diagramMenu.selectedDiagramId');
-
-                        // 2. 只清理流程图设计器缓存，避免误删 AI 配置、存储密钥和其他图的自动保存
-                        clearFlowchartCache(diagramId);
-
-                        // 3. 把图表 ID 写回 localStorage，让应用重启后能正常恢复
-                        // 这样无需依赖 URL 参数，与 useDiagramHostStorage 的读取逻辑完全对齐
-                        if (diagramId) {
-                            try {
-                                localStorage.setItem('diagramMenu.selectedDiagramId', diagramId);
-                            } catch { void 0; }
-                        }
-
-                        // 4. 硬刷新（不携带 URL 参数，避免参数遗留）
-                        window.location.reload();
-                    },
-                });
-            },
+            onClick: handleResetLocalEditorState,
         },
     ], [
         t, gridInfo, toggleGrid, showRuler, toggleRuler, toggleMinimap, showMinimap, isMobile,
         onToggleSnap, snapToGrid,
         handleShowShortcutsFromMoreMenu, onShowCanvasSearch, onImportClick, onExport, onActivatePointer, toggleSelectionMode,
-        onToggleDrawingMode, onAddStickyNote, onAddMindMap, isMarqueeActive, isDrawingMode,
+        onToggleDrawingMode, onAddStickyNote, onAddMindMap, isMarqueeActive, isDrawingMode, handleResetLocalEditorState,
     ]);
 
     const selectedToolModeKey = resolveActiveToolModeKey(isMarqueeActive, isDrawingMode);
     const mobileMoreHasActiveTool = isMarqueeActive || isDrawingMode;
     const mobileMoreLabel = isMarqueeActive
-        ? `${t('designer.toolbar.moreActions')} · ${t('toolbar.marqueeExit', '退出框选 (Esc)')}`
+        ? `${t('designer.toolbar.moreActions')} · ${t('designer.toolbar.marqueeExit', '退出框选 (Esc)')}`
         : isDrawingMode
-            ? `${t('designer.toolbar.moreActions')} · ${t('toolbar.drawingModeExit', '退出自由画笔 (Esc)')}`
+            ? `${t('designer.toolbar.moreActions')} · ${t('designer.toolbar.drawingModeExit', '退出自由画笔 (Esc)')}`
             : t('designer.toolbar.moreActions');
     const mobileMoreIcon = isMarqueeActive
         ? <FaObjectGroup className="text-[14px]" />
@@ -379,31 +384,31 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
     const CreationTools = (
         <div className="flex items-center gap-1.5 p-1">
             <div className="flex items-center gap-1">
-                <Tooltip title={t('toolbar.pointer', '普通选择器 (V)')}>
+                <Tooltip title={t('designer.toolbar.pointer', '普通选择器 (V)')}>
                     <Button 
                         type="text" 
                         onClick={onActivatePointer} 
-                        aria-label={t('toolbar.pointer', '普通选择器 (V)')}
+                        aria-label={t('designer.toolbar.pointer', '普通选择器 (V)')}
                         aria-pressed={!isDrawingMode && !isMarqueeActive}
                         icon={<FaMousePointer className={`text-[12px] ${(!isDrawingMode && !isMarqueeActive) ? 'text-indigo-500' : 'text-slate-500'}`} />} 
                         className={`w-9 h-9 p-0 border-none transition-all ${(!isDrawingMode && !isMarqueeActive) ? 'bg-white dark:bg-slate-800 shadow-sm text-indigo-500' : 'hover:bg-slate-200 dark:hover:bg-white/5'}`} 
                     />
                 </Tooltip>
-                <Tooltip title={isMarqueeActive ? t('toolbar.marqueeExit', '退出框选 (Esc)') : t('toolbar.marqueeEnter', '框选模式 (M)')}>
+                <Tooltip title={isMarqueeActive ? t('designer.toolbar.marqueeExit', '退出框选 (Esc)') : t('designer.toolbar.marqueeEnter', '框选模式 (M)')}>
                     <Button 
                         type="text" 
                         onClick={toggleSelectionMode} 
-                        aria-label={isMarqueeActive ? t('toolbar.marqueeExit', '退出框选 (Esc)') : t('toolbar.marqueeEnter', '框选模式 (M)')}
+                        aria-label={isMarqueeActive ? t('designer.toolbar.marqueeExit', '退出框选 (Esc)') : t('designer.toolbar.marqueeEnter', '框选模式 (M)')}
                         aria-pressed={isMarqueeActive}
                         icon={<FaObjectGroup className={`text-[14px] ${isMarqueeActive ? 'text-indigo-500' : 'text-slate-500'}`} />} 
                         className={`w-9 h-9 p-0 border-none transition-all ${isMarqueeActive ? 'bg-white dark:bg-slate-800 shadow-sm text-indigo-500' : 'hover:bg-slate-200 dark:hover:bg-white/5'}`} 
                     />
                 </Tooltip>
-                <Tooltip title={isDrawingMode ? t('toolbar.drawingModeExit', '退出自由画笔 (Esc)') : t('toolbar.drawingMode', '自由画笔 (P)')}>
+                <Tooltip title={isDrawingMode ? t('designer.toolbar.drawingModeExit', '退出自由画笔 (Esc)') : t('designer.toolbar.drawingMode', '自由画笔 (P)')}>
                     <Button 
                         type="text" 
                         onClick={onToggleDrawingMode} 
-                        aria-label={isDrawingMode ? t('toolbar.drawingModeExit', '退出自由画笔 (Esc)') : t('toolbar.drawingMode', '自由画笔 (P)')}
+                        aria-label={isDrawingMode ? t('designer.toolbar.drawingModeExit', '退出自由画笔 (Esc)') : t('designer.toolbar.drawingMode', '自由画笔 (P)')}
                         aria-pressed={isDrawingMode}
                         icon={<FaPen className={`text-[13px] ${isDrawingMode ? 'text-indigo-500' : 'text-slate-500'}`} />} 
                         className={`w-9 h-9 p-0 border-none transition-all ${isDrawingMode ? 'bg-white dark:bg-slate-800 shadow-sm text-indigo-500' : 'hover:bg-slate-200 dark:hover:bg-white/5'}`} 
@@ -414,10 +419,10 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
             <div className="w-[1px] h-4 bg-slate-200 dark:bg-white/10 mx-1" />
             
             <div className="flex items-center gap-1">
-                <Tooltip title={t('toolbar.stickyNote', '便签 (S)')}>
+                <Tooltip title={t('designer.toolbar.stickyNote', '便签 (S)')}>
                     <Button type="text" onClick={onAddStickyNote} icon={<FaStickyNote className="text-[14px] text-amber-500" />} className="w-9 h-9 p-0 border-none hover:bg-slate-200 dark:hover:bg-white/5" />
                 </Tooltip>
-                <Tooltip title={t('toolbar.mindMap', '思维导图 (Shift+M)')}>
+                <Tooltip title={t('designer.toolbar.mindMap', '思维导图 (Shift+M)')}>
                     <Button type="text" onClick={onAddMindMap} icon={<FaSitemap className="text-[14px] text-sky-500" />} className="w-9 h-9 p-0 border-none hover:bg-slate-200 dark:hover:bg-white/5" />
                 </Tooltip>
             </div>
@@ -542,11 +547,11 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                         onOpenChange={setCanvasSettingsOpen}
                         destroyOnHidden
                     >
-                        <Tooltip title={t('toolbar.canvasSettings', '画布设置')}>
+                        <Tooltip title={t('designer.toolbar.canvasSettings', '画布设置')}>
                             <Button
                                 ref={canvasSettingsTriggerRef}
                                 type="text"
-                                aria-label={t('toolbar.canvasSettings', '画布设置')}
+                                aria-label={t('designer.toolbar.canvasSettings', '画布设置')}
                                 icon={
                                     <div className="relative">
                                         <FaBorderAll className="text-[13px]" />
