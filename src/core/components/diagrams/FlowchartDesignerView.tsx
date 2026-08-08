@@ -1,5 +1,5 @@
 import React from 'react';
-import { ConnectionMode, Node, SelectionMode } from '@xyflow/react';
+import { ConnectionMode, Node } from '@xyflow/react';
 
 import { LiveCursors } from './collaboration/LiveCursors';
 import { appMessage } from '@/core/utils/antdStaticBridge';
@@ -19,6 +19,7 @@ import { FlowchartOnboardingHint } from './FlowchartOnboardingHint';
 import { PageScopedPluginCanvas } from './PageScopedPluginCanvas';
 import { shouldShowFlowchartOnboarding } from './flowchartResponsiveChrome';
 import { resolveFlowchartLeftClearance } from './flowchartChromeLayout';
+import { getFlowchartMarqueeCanvasInteraction } from './flowchartMarqueeInteraction';
 import { FreehandDrawingLayer } from './FreehandDrawingLayer';
 import { RemoteCursors } from './ui/RemoteCursors';
 import { UnifiedDesignerShell } from './UnifiedDesignerShell';
@@ -267,6 +268,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
     });
     const editingEnabled = !isReadonly && !presentationActive;
     const showEditingChrome = !presentationActive;
+    const marqueeCanvasInteraction = getFlowchartMarqueeCanvasInteraction(isMarqueeActive);
     const fileDrop = useFlowchartFileDrop({
         importFile: handleImport, requestImport: handleRequestImport,
         onCanvasDragOver: onDragOver, onCanvasDrop: onDrop,
@@ -574,7 +576,9 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                     isConnecting={isConnecting}
                                     connectPreview={connectPreview}
                                     connectionMode={ConnectionMode.Loose}
-                                    selectionMode={SelectionMode.Partial}
+                                    selectionMode={marqueeCanvasInteraction.selectionMode}
+                                    selectionOnDrag={marqueeCanvasInteraction.selectionOnDrag}
+                                    panOnDrag={marqueeCanvasInteraction.panOnDrag}
                                     isValidConnection={isValidConnection}
                                     snapEnabled={snapEnabled}
                                     isDragging={isDragging}

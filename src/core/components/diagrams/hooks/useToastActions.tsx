@@ -67,15 +67,26 @@ export function useToastActions({
             content: (
                 <span style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     {actionMsg}
-                    <a 
+                    <button
+                        type="button"
                         onClick={() => {
                             undo();
                             messageApi.destroy(key);
-                        }} 
-                        style={{ fontWeight: 600, textDecoration: 'underline' }}
+                        }}
+                        style={{
+                            appearance: 'none',
+                            border: 0,
+                            padding: 0,
+                            background: 'transparent',
+                            color: 'inherit',
+                            cursor: 'pointer',
+                            font: 'inherit',
+                            fontWeight: 600,
+                            textDecoration: 'underline',
+                        }}
                     >
                         {t('designer.flowchart.undo.action', '撤销')}
-                    </a>
+                    </button>
                 </span>
             ),
             duration: 3,
@@ -165,7 +176,8 @@ export function useToastActions({
             return;
         }
         handleDelete(target);
-    }, [getDeleteCounts, handleDelete, messageApi, nodesRef, selectedNodes, t]);
+        showUndoableMessage(t('designer.flowchart.toast.deleted', counts));
+    }, [getDeleteCounts, handleDelete, messageApi, nodesRef, selectedNodes, showUndoableMessage, t]);
 
     const handleDuplicateWithToast = useCallback((target?: DiagramActionTarget) => {
         const count = Array.isArray(target)

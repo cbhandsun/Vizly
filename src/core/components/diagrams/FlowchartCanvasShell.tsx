@@ -9,6 +9,7 @@ import {
 } from './hooks/useFlowchartDragBuffer';
 import { addFlowchartAccessibilityLabels } from './flowchartCanvasAccessibility';
 import { buildShiftMultiSelectionChanges } from './flowchartMultiSelection';
+import { getFlowchartMarqueeEdges } from './flowchartMarqueeInteraction';
 
 export interface FlowchartCanvasShellProps {
     nodes: Node[];
@@ -136,12 +137,12 @@ export const FlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> = React.m
             : canvasNodes.map(node => node.selected ? { ...node, selected: false } : node),
         [canvasNodes, editingEnabled],
     );
-    const renderedEdges = useMemo(
-        () => editingEnabled
-            ? displayEdges
-            : displayEdges.map(edge => edge.selected ? { ...edge, selected: false } : edge),
-        [displayEdges, editingEnabled],
-    );
+    const renderedEdges = useMemo(() => {
+        if (!editingEnabled) {
+            return displayEdges.map(edge => edge.selected ? { ...edge, selected: false } : edge);
+        }
+        return getFlowchartMarqueeEdges(displayEdges, selectionOnDrag === true);
+    }, [displayEdges, editingEnabled, selectionOnDrag]);
     const accessibleElements = useMemo(
         () => addFlowchartAccessibilityLabels(renderedNodes, renderedEdges),
         [renderedEdges, renderedNodes],

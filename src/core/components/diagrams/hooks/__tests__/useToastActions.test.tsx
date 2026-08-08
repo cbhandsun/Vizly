@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, renderHook } from '@testing-library/react';
+import { act, fireEvent, render, renderHook, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { Edge, Node } from '@xyflow/react';
 import type { MessageInstance } from 'antd/es/message/interface';
@@ -14,6 +14,8 @@ vi.mock('react-i18next', () => ({
 
 const createProps = (handlePaste: () => Promise<ClipboardPasteResult>) => {
   const info = vi.fn();
+  const open = vi.fn();
+  const destroy = vi.fn();
   const warning = vi.fn();
   const success = vi.fn();
   const nodesRef = { current: [] as Node[] };
@@ -21,10 +23,12 @@ const createProps = (handlePaste: () => Promise<ClipboardPasteResult>) => {
 
   return {
     info,
+    open,
+    destroy,
     warning,
     success,
     props: {
-      messageApi: { info, warning, success } as unknown as MessageInstance,
+      messageApi: { destroy, info, open, warning, success } as unknown as MessageInstance,
       notificationApi: {} as NotificationInstance,
       handleDelete: vi.fn(),
       handleDuplicate: vi.fn(),
@@ -67,6 +71,31 @@ describe('useToastActions clipboard feedback', () => {
     expect(props.handleCut).not.toHaveBeenCalled();
     expect(props.handleDelete).not.toHaveBeenCalled();
     expect(props.handleDuplicate).not.toHaveBeenCalled();
+  });
+
+  it('reports successful deletion with a keyboard-accessible undo action', () => {
+    const { destroy, open, props } = createProps(vi.fn().mockResolvedValue('empty'));
+    const nodes = [
+      { id: 'node-1', position: { x: 0, y: 0 }, data: {} },
+      { id: 'node-2', position: { x: 100, y: 0 }, data: {} },
+    ] satisfies Node[];
+    props.selectedNodes = nodes;
+    props.nodesRef.current = nodes;
+    const { result } = renderHook(() => useToastActions(props));
+
+    act(() => result.current.handleDeleteWithToast());
+
+    expect(props.handleDelete).toHaveBeenCalledOnce();
+    expect(open).toHaveBeenCalledOnce();
+    const messageConfig = open.mock.calls[0]?.[0];
+    expect(messageConfig).toMatchObject({ type: 'success', duration: 3 });
+    render(messageConfig.content);
+    const undoButton = screen.getByRole('button', { name: 'designer.flowchart.undo.action' });
+
+    fireEvent.click(undoButton);
+
+    expect(props.undo).toHaveBeenCalledOnce();
+    expect(destroy).toHaveBeenCalledWith(messageConfig.key);
   });
 
   it('explains why locked grouping and ungrouping transactions are blocked', () => {
