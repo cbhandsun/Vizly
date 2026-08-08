@@ -498,4 +498,113 @@ describe('useMultiPage', () => {
     });
     expect(clearSelection).toHaveBeenCalledTimes(3);
   });
+
+  it('duplicates the live page after its source with isolated graph ids and data', () => {
+    let currentNodes: Node[] = [
+      {
+        ...node('parent'),
+        selected: true,
+        data: { settings: { color: 'red' } },
+      },
+      {
+        ...node('child'),
+        parentId: 'parent',
+        extent: 'parent',
+        selected: true,
+      },
+    ];
+    let currentEdges: Edge[] = [{
+      id: 'edge-1',
+      source: 'parent',
+      target: 'child',
+      selected: true,
+      data: { route: { kind: 'direct' } },
+    }];
+    const setNodes = vi.fn((nodes: Node[]) => {
+      currentNodes = nodes;
+    });
+    const setEdges = vi.fn((edges: Edge[]) => {
+      currentEdges = edges;
+    });
+    const switchScope = vi.fn();
+    const { result } = renderHook(() => useMultiPage(
+      () => currentNodes,
+      () => currentEdges,
+      setNodes,
+      setEdges,
+      { switchScope, removeScope: vi.fn() },
+    ));
+
+    let duplicateId: string | null = null;
+    act(() => {
+      duplicateId = result.current.duplicatePage('page-1', '页面 1');
+    });
+    if (!duplicateId) throw new Error('Expected a page copy to be created');
+
+    expect(result.current.pages.map(page => page.id)).toEqual(['page-1', duplicateId]);
+    expect(result.current.pages[1]?.name).toBe('页面 1 (2)');
+    expect(result.current.activePageId).toBe(duplicateId);
+    expect(switchScope).toHaveBeenLastCalledWith(duplicateId);
+
+    const originalPage = result.current.pages[0];
+    const copiedPage = result.current.pages[1];
+    if (!originalPage || !copiedPage) throw new Error('Expected source and copied pages');
+    const copiedParent = copiedPage.nodes[0];
+    const copiedChild = copiedPage.nodes[1];
+    const copiedEdge = copiedPage.edges[0];
+    if (!copiedParent || !copiedChild || !copiedEdge) throw new Error('Expected copied graph');
+
+    expect(copiedParent.id).not.toBe('parent');
+    expect(copiedChild.id).not.toBe('child');
+    expect(copiedChild.parentId).toBe(copiedParent.id);
+    expect(copiedEdge.source).toBe(copiedParent.id);
+    expect(copiedEdge.target).toBe(copiedChild.id);
+    expect(copiedParent.selected).toBe(false);
+    expect(copiedEdge.selected).toBe(false);
+    expect(copiedParent.data).not.toBe(originalPage.nodes[0]?.data);
+    expect(copiedParent.data.settings).not.toBe(originalPage.nodes[0]?.data.settings);
+  });
+
+  it('reorders pages within bounds without replacing the active canvas', () => {
+    const setNodes = vi.fn();
+    const setEdges = vi.fn();
+    const { result } = renderHook(() => useMultiPage(
+      () => [],
+      () => [],
+      setNodes,
+      setEdges,
+    ));
+
+    act(() => {
+      result.current.restorePersistedMetadata({
+        multiPage: {
+          version: 1,
+          activePageId: 'page-2',
+          pages: [
+            { id: 'page-1', name: '页面 1', nodes: [], edges: [] },
+            { id: 'page-2', name: '页面 2', nodes: [], edges: [] },
+            { id: 'page-3', name: '页面 3', nodes: [], edges: [] },
+          ],
+        },
+      });
+    });
+    setNodes.mockClear();
+    setEdges.mockClear();
+
+    let moved = false;
+    act(() => {
+      moved = result.current.movePage('page-2', 'left');
+    });
+    expect(moved).toBe(true);
+    expect(result.current.pages.map(page => page.id)).toEqual(['page-2', 'page-1', 'page-3']);
+    expect(result.current.activePageId).toBe('page-2');
+    expect(setNodes).not.toHaveBeenCalled();
+    expect(setEdges).not.toHaveBeenCalled();
+
+    act(() => {
+      expect(result.current.movePage('page-2', 'left')).toBe(false);
+      expect(result.current.movePage('missing-page', 'right')).toBe(false);
+    });
+    expect(result.current.pages.map(page => page.id)).toEqual(['page-2', 'page-1', 'page-3']);
+  });
 });

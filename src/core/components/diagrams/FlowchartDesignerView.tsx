@@ -645,6 +645,8 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                             onAddPage: multiPage.addPage,
                                             onDeletePage: multiPage.deletePage,
                                             onRenamePage: multiPage.renamePage,
+                                            onDuplicatePage: multiPage.duplicatePage,
+                                            onMovePage: multiPage.movePage,
                                             disabled: isInitialDiagramLoading,
                                         }}
                                         history={{

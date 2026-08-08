@@ -1,5 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { CloseOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
+import {
+    ArrowLeftOutlined,
+    ArrowRightOutlined,
+    CloseOutlined,
+    CopyOutlined,
+    EditOutlined,
+    PlusOutlined,
+} from '@ant-design/icons';
 import { Input, Popconfirm, theme, Tooltip } from 'antd';
 import type { InputRef } from 'antd';
 import { useTranslation } from 'react-i18next';
@@ -18,11 +25,23 @@ interface PageTabsProps {
     onAddPage: () => string | null;
     onDeletePage: (id: string) => boolean;
     onRenamePage: (id: string, name: string) => boolean;
+    onDuplicatePage?: (id: string, preferredName: string) => string | null;
+    onMovePage?: (id: string, direction: 'left' | 'right') => boolean;
     disabled?: boolean;
 }
 
 /** 底部页面 Tab 栏 — 类似 Excel 的 sheet tabs。 */
-export const PageTabs: React.FC<PageTabsProps> = React.memo(({ pages, activePageId, onSwitchPage, onAddPage, onDeletePage, onRenamePage, disabled = false }) => {
+export const PageTabs: React.FC<PageTabsProps> = React.memo(({
+    pages,
+    activePageId,
+    onSwitchPage,
+    onAddPage,
+    onDeletePage,
+    onRenamePage,
+    onDuplicatePage,
+    onMovePage,
+    disabled = false,
+}) => {
     const { token } = theme.useToken();
     const { t } = useTranslation();
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -84,6 +103,17 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({ pages, activePage
         addedPageFocusTargetRef.current = null;
         requestAnimationFrame(() => focusPageTab(targetPageId));
     }, [activePageId, focusPageTab, pages]);
+
+    useEffect(() => {
+        const editingAnotherPage = Boolean(editingId && editingId !== activePageId);
+        const confirmingAnotherPage = Boolean(confirmingPageId && confirmingPageId !== activePageId);
+        if (!editingAnotherPage && !confirmingAnotherPage) return;
+
+        setEditingId(null);
+        setEditName('');
+        setRenameError(null);
+        setConfirmingPageId(null);
+    }, [activePageId, confirmingPageId, editingId]);
 
     const handleStartRename = useCallback((page: DiagramPage) => {
         if (page.id !== activePageId) onSwitchPage(page.id);
@@ -148,6 +178,16 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({ pages, activePage
         if (newPageId) addedPageFocusTargetRef.current = newPageId;
     }, [onAddPage]);
 
+    const handleDuplicatePage = useCallback((page: DiagramPage) => {
+        if (!onDuplicatePage) return;
+        const preferredName = t('designer.pages.copyName', {
+            name: page.name,
+            defaultValue: '{{name}} 副本',
+        });
+        const newPageId = onDuplicatePage(page.id, preferredName);
+        if (newPageId) addedPageFocusTargetRef.current = newPageId;
+    }, [onDuplicatePage, t]);
+
     const handleTabKeyDown = useCallback(
         (event: React.KeyboardEvent<HTMLButtonElement>, pageId: string) => {
             if (disabled) return;
@@ -171,6 +211,7 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({ pages, activePage
     );
 
     const activePage = pages.find((page) => page.id === activePageId) ?? null;
+    const activePageIndex = activePage ? pages.findIndex(page => page.id === activePage.id) : -1;
     const isRenamingActivePage = editingId === activePage?.id;
 
     return (
@@ -260,6 +301,66 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({ pages, activePage
                         </span>
                     ) : (
                         <>
+                            {onMovePage && (
+                                <>
+                                    <Tooltip title={t('designer.pages.moveLeft', { defaultValue: '向左移动页面' })}>
+                                        <button
+                                            type="button"
+                                            aria-label={t('designer.pages.moveLeftNamed', {
+                                                name: activePage.name,
+                                                defaultValue: '向左移动页面 {{name}}',
+                                            })}
+                                            className="page-tabs__move"
+                                            disabled={disabled || activePageIndex <= 0}
+                                            onClick={() => onMovePage(activePage.id, 'left')}
+                                        >
+                                            <ArrowLeftOutlined aria-hidden style={{ fontSize: 12 }} />
+                                        </button>
+                                    </Tooltip>
+                                    <Tooltip title={t('designer.pages.moveRight', { defaultValue: '向右移动页面' })}>
+                                        <button
+                                            type="button"
+                                            aria-label={t('designer.pages.moveRightNamed', {
+                                                name: activePage.name,
+                                                defaultValue: '向右移动页面 {{name}}',
+                                            })}
+                                            className="page-tabs__move"
+                                            disabled={disabled || activePageIndex >= pages.length - 1}
+                                            onClick={() => onMovePage(activePage.id, 'right')}
+                                        >
+                                            <ArrowRightOutlined aria-hidden style={{ fontSize: 12 }} />
+                                        </button>
+                                    </Tooltip>
+                                </>
+                            )}
+
+                            {onDuplicatePage && (
+                                <Tooltip
+                                    title={pageLimitReached
+                                        ? t('designer.pages.limitReached', {
+                                              count: MAX_DIAGRAM_PAGES,
+                                              defaultValue: '最多可创建 {{count}} 个页面',
+                                          })
+                                        : t('designer.pages.duplicateAction', {
+                                              name: activePage.name,
+                                              defaultValue: '复制页面 {{name}}',
+                                          })}
+                                >
+                                    <button
+                                        type="button"
+                                        aria-label={t('designer.pages.duplicateAction', {
+                                            name: activePage.name,
+                                            defaultValue: '复制页面 {{name}}',
+                                        })}
+                                        className="page-tabs__duplicate"
+                                        disabled={disabled || pageLimitReached}
+                                        onClick={() => handleDuplicatePage(activePage)}
+                                    >
+                                        <CopyOutlined aria-hidden style={{ fontSize: 12 }} />
+                                    </button>
+                                </Tooltip>
+                            )}
+
                             <Tooltip
                                 title={t('designer.pages.renameAction', {
                                     name: activePage.name,

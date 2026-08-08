@@ -7,6 +7,7 @@ import { AnnotationLayer } from '../AnnotationLayer';
 import { PageTabs } from '../PageTabs';
 import type { HistoryPanelProps } from '../HistoryPanel';
 import type { CanvasSearchBarProps } from '../CanvasSearchBar';
+import { havePageTabsPropsChanged } from './designerCanvasFeaturesLayerMemo';
 
 const HistoryPanel = React.lazy(() => import('../HistoryPanel').then(module => ({
     default: module.HistoryPanel,
@@ -76,6 +77,8 @@ export interface DesignerCanvasFeaturesLayerProps {
         onAddPage: PageTabsProps['onAddPage'];
         onDeletePage: PageTabsProps['onDeletePage'];
         onRenamePage: PageTabsProps['onRenamePage'];
+        onDuplicatePage?: PageTabsProps['onDuplicatePage'];
+        onMovePage?: PageTabsProps['onMovePage'];
         disabled?: PageTabsProps['disabled'];
     };
 
@@ -159,6 +162,8 @@ export const DesignerCanvasFeaturesLayer = React.memo(
                 onAddPage={pages.onAddPage}
                 onDeletePage={pages.onDeletePage}
                 onRenamePage={pages.onRenamePage}
+                onDuplicatePage={pages.onDuplicatePage}
+                onMovePage={pages.onMovePage}
                 disabled={pages.disabled}
             />
             
@@ -220,8 +225,7 @@ export const DesignerCanvasFeaturesLayer = React.memo(
           prev.annotations.mode !== next.annotations.mode || 
           prev.annotations.activePageId !== next.annotations.activePageId) return false;
           
-      if (prev.pages.items !== next.pages.items || 
-          prev.pages.activePageId !== next.pages.activePageId) return false;
+      if (havePageTabsPropsChanged(prev.pages, next.pages)) return false;
 
       if (prev.history.visible !== next.history.visible) return false;
       if (prev.history.visible) {

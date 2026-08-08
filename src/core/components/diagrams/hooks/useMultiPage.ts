@@ -6,7 +6,8 @@ import {
     MAX_DIAGRAM_PAGES,
     parseMultiPageMetadata,
 } from '../multiPagePersistence';
-import { createNextPageName, isPageNameAvailable, normalizePageName } from '../multiPageNaming';
+import { duplicatePageCanvas } from '../multiPageDuplication';
+import { createNextPageName, createUniquePageName, isPageNameAvailable, normalizePageName } from '../multiPageNaming';
 
 export interface DiagramPage {
     id: string;
@@ -229,6 +230,70 @@ export const useMultiPage = (
         return true;
     }, []);
 
+    const duplicatePage = useCallback((pageId: string, preferredName: string) => {
+        const currentPages = pagesRef.current;
+        if (currentPages.length >= MAX_DIAGRAM_PAGES) return null;
+
+        const sourceIndex = currentPages.findIndex(page => page.id === pageId);
+        if (sourceIndex < 0) return null;
+
+        const duplicateName = createUniquePageName(
+            currentPages,
+            preferredName,
+            MAX_DIAGRAM_PAGE_NAME_LENGTH,
+        );
+        if (!duplicateName) return null;
+
+        const currentState = readCurrentState();
+        const sourcePage = currentPages[sourceIndex];
+        const sourceCanvas = pageId === activePageIdRef.current
+            ? currentState
+            : { nodes: sourcePage.nodes, edges: sourcePage.edges };
+        const batchId = crypto.randomUUID();
+        const duplicateId = `page-${batchId}`;
+        const duplicatedCanvas = duplicatePageCanvas(sourceCanvas.nodes, sourceCanvas.edges, batchId);
+        const duplicatedPage: DiagramPage = {
+            id: duplicateId,
+            name: duplicateName,
+            ...duplicatedCanvas,
+        };
+
+        const savedPages = currentPages.map(page => page.id === activePageIdRef.current
+            ? { ...page, nodes: currentState.nodes, edges: currentState.edges }
+            : page);
+        const nextPages = [
+            ...savedPages.slice(0, sourceIndex + 1),
+            duplicatedPage,
+            ...savedPages.slice(sourceIndex + 1),
+        ];
+
+        pageOperationVersionRef.current += 1;
+        activateHistoryScope(duplicateId);
+        clearSelection?.();
+        pagesRef.current = nextPages;
+        setPages(nextPages);
+        setNodes(duplicatedPage.nodes);
+        setEdges(duplicatedPage.edges);
+        activePageIdRef.current = duplicateId;
+        setActivePageId(duplicateId);
+        return duplicateId;
+    }, [activateHistoryScope, clearSelection, readCurrentState, setEdges, setNodes]);
+
+    const movePage = useCallback((pageId: string, direction: 'left' | 'right') => {
+        const currentPages = pagesRef.current;
+        const sourceIndex = currentPages.findIndex(page => page.id === pageId);
+        if (sourceIndex < 0) return false;
+
+        const targetIndex = sourceIndex + (direction === 'left' ? -1 : 1);
+        if (targetIndex < 0 || targetIndex >= currentPages.length) return false;
+
+        const nextPages = [...currentPages];
+        [nextPages[sourceIndex], nextPages[targetIndex]] = [nextPages[targetIndex], nextPages[sourceIndex]];
+        pagesRef.current = nextPages;
+        setPages(nextPages);
+        return true;
+    }, []);
+
     const getPersistedMetadata = useCallback(() => {
         const currentState = readCurrentState();
         return createMultiPageMetadata(
@@ -270,6 +335,8 @@ export const useMultiPage = (
         addPage,
         deletePage,
         renamePage,
+        duplicatePage,
+        movePage,
         getPersistedMetadata,
         restorePersistedMetadata,
     };

@@ -54,6 +54,8 @@
 }
 
 .page-tabs__tab,
+.page-tabs__move,
+.page-tabs__duplicate,
 .page-tabs__rename-action,
 .page-tabs__delete,
 .page-tabs__add {
@@ -92,6 +94,8 @@
 }
 
 .page-tabs__delete,
+.page-tabs__move,
+.page-tabs__duplicate,
 .page-tabs__rename-action,
 .page-tabs__add {
     display: grid;
@@ -118,6 +122,18 @@
 .page-tabs__rename-action:hover {
     color: var(--page-tab-active-color);
     background: var(--page-tab-hover-bg);
+}
+
+.page-tabs__move:hover:not(:disabled),
+.page-tabs__duplicate:hover:not(:disabled) {
+    color: var(--page-tab-active-color);
+    background: var(--page-tab-hover-bg);
+}
+
+.page-tabs__move:disabled,
+.page-tabs__duplicate:disabled {
+    cursor: not-allowed;
+    opacity: 0.38;
 }
 
 .page-tabs__rename {

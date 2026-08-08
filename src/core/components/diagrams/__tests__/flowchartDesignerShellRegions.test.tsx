@@ -119,6 +119,8 @@ const createLeftModel = (
         addPage: () => null,
         deletePage: () => false,
         renamePage: () => false,
+        duplicatePage: () => null,
+        movePage: () => false,
         getPersistedMetadata: () => null,
         restorePersistedMetadata: () => null,
     },

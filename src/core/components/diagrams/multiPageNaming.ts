@@ -31,3 +31,22 @@ export const createNextPageName = (pages: DiagramPage[]): string => {
 
     return `${DEFAULT_PAGE_NAME_PREFIX} ${suffix}`;
 };
+
+export const createUniquePageName = (
+    pages: DiagramPage[],
+    preferredName: string,
+    maxLength: number,
+): string | null => {
+    const normalizedName = normalizePageName(preferredName).slice(0, maxLength);
+    if (!normalizedName) return null;
+    if (isPageNameAvailable(pages, normalizedName)) return normalizedName;
+
+    for (let suffix = 2; suffix <= pages.length + 2; suffix += 1) {
+        const suffixText = ` (${suffix})`;
+        const baseName = normalizedName.slice(0, maxLength - suffixText.length).trimEnd();
+        const candidate = `${baseName}${suffixText}`;
+        if (isPageNameAvailable(pages, candidate)) return candidate;
+    }
+
+    return null;
+};
