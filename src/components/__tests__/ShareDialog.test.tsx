@@ -217,8 +217,22 @@ describe('ShareDialog commercial failure handling', () => {
 
     expect(await screen.findByText('请先登录后才能使用分享功能')).toBeTruthy();
     expect((screen.getByRole('button', { name: '邀请' }) as HTMLButtonElement).disabled).toBe(true);
-    expect((screen.getByPlaceholderText('输入用户的注册邮箱...') as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByRole('textbox', { name: '输入用户的注册邮箱...' }) as HTMLInputElement).disabled).toBe(true);
     expect(screen.getByRole('button', { name: '立即登录' })).toBeTruthy();
+  });
+
+  it('explains the login prerequisite before disabled public-link controls', async () => {
+    render(
+      <ShareDialog open onClose={vi.fn()} diagramId={DIAGRAM_ID} onEnsureSaved={vi.fn()} />,
+    );
+
+    fireEvent.click(await screen.findByText('公开链接'));
+
+    const activePanel = await screen.findByRole('tabpanel');
+    const loginMessage = within(activePanel).getByText('请先登录后才能使用分享功能');
+    const generateButton = within(activePanel).getByRole('button', { name: '生成分享链接' });
+    expect(loginMessage.compareDocumentPosition(generateButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect((generateButton as HTMLButtonElement).disabled).toBe(true);
   });
 
   it('keeps focus on the selected tab after switching sharing modes', async () => {

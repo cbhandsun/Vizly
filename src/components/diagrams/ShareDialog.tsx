@@ -340,6 +340,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
                     <div className="share-dialog-invite-controls">
                         <Input
                             className="share-dialog-invite-email"
+                            aria-label={t('share.inviteInput')}
                             placeholder={t('share.inviteInput')}
                             value={inviteEmail}
                             onChange={(e) => {
@@ -455,6 +456,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
             label: <span><LinkOutlined style={{ marginRight: 6 }} />{t('share.tabs.link')}</span>,
             children: (
                 <div style={{ paddingTop: 8 }}>
+                    {loginRequiredAlert}
                     <div className="share-dialog-link-controls">
                         <Select
                             value={expiration}
@@ -472,7 +474,6 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
                             {t('share.generateLink')}
                         </Button>
                     </div>
-                    {loginRequiredAlert}
 
                     {/* 链接复制成功高亮提示 */}
                     {shareLinkResult && (
