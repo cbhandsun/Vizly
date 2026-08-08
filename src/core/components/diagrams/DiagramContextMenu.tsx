@@ -49,6 +49,7 @@ export interface ContextMenuProps {
   selectedNodes: Node[];
   selectedEdges: Edge[];
   nodes?: Node[];  // All nodes for lock state lookup
+  edges?: Edge[];  // All edges for target state lookup
   extraItems?: MenuProps['items'];
 }
 
@@ -75,11 +76,13 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
   selectedNodes,
   selectedEdges,
   nodes,
+  edges,
   extraItems,
 }) => {
   const { t } = useTranslation();
   const menuRootRef = useRef<HTMLDivElement>(null);
   const allNodes = nodes || selectedNodes;
+  const allEdges = edges || selectedEdges;
   const targetNode = targetId ? allNodes.find(node => node.id === targetId) : undefined;
   const nodeActionTargets = type === 'edge' || type === 'pane'
     ? []
@@ -215,7 +218,7 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
 
       // Edge-specific actions
       if (type === 'edge') {
-        const targetEdge = selectedEdges.find(e => e.id === targetId);
+        const targetEdge = allEdges.find(e => e.id === targetId);
         const hasWaypoints = Array.isArray(targetEdge?.data?.waypoints) && targetEdge.data.waypoints.length > 0;
         const isEditable = targetEdge?.type === 'editable';
 

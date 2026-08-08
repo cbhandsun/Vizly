@@ -12,6 +12,7 @@ interface ContextMenuLayerProps {
 }
 
 const EMPTY_NODES: Node[] = [];
+const EMPTY_EDGES: Edge[] = [];
 
 export const ContextMenuLayer: React.FC<ContextMenuLayerProps> = ({ onAction, activePlugin, pluginCtx }) => {
   const contextMenu = useDiagramStore((state) => state.contextMenu);
@@ -21,6 +22,7 @@ export const ContextMenuLayer: React.FC<ContextMenuLayerProps> = ({ onAction, ac
   
   // ⭐ 性能优化：当菜单未打开时，切断对完整 nodes 数组的订阅，防止拖拽节点时引发该组件以 60FPS 重绘
   const nodes = useDiagramStore((state) => contextMenu ? state.nodes : EMPTY_NODES);
+  const edges = useDiagramStore((state) => contextMenu ? state.edges : EMPTY_EDGES);
   const extraItems = React.useMemo(() => {
     if (!contextMenu || !activePlugin?.contributeContextMenu || !pluginCtx) return [];
     
@@ -44,6 +46,7 @@ export const ContextMenuLayer: React.FC<ContextMenuLayerProps> = ({ onAction, ac
       selectedNodes={selectedNodes}
       selectedEdges={selectedEdges}
       nodes={nodes}
+      edges={edges}
       extraItems={extraItems}
     />
   );

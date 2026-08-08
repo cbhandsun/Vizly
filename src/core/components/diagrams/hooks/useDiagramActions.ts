@@ -12,6 +12,11 @@ import {
     type EdgeMutationResult,
 } from '../edgeContextMutations';
 import { reorderNodesWithinParentScopes } from './nodeLayerOrdering';
+import {
+    EDITABLE_EDGE_TARGET_ZOOM,
+    getEditableEdgeFocusCenter,
+    shouldFocusEditableEdge,
+} from '../edgeEditingViewport';
 
 type AlignmentType = 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom';
 type DistributionType = 'horizontal' | 'vertical';
@@ -57,10 +62,15 @@ interface UseDiagramActionsProps {
     selectedNodes: Node[];
     selectedEdges: Edge[];
     takeSnapshot: (nodes: Node[], edges: Edge[], label?: string) => void;
-    reactFlowInstance: ReactFlowInstance | null;
+    reactFlowInstance: DiagramReactFlowActions | null;
     pluginCtx?: PluginContext;
     activePlugin?: DiagramTypePlugin | null;
 }
+
+export type DiagramReactFlowActions = Pick<
+    ReactFlowInstance,
+    'fitView' | 'getViewport' | 'getInternalNode' | 'setCenter'
+>;
 
 export const useDiagramActions = ({
     nodes,
@@ -277,9 +287,36 @@ export const useDiagramActions = ({
         commitEdgeMutation(targetId, resetDiagramEdgeWaypoints)
     ), [commitEdgeMutation]);
 
-    const handleConvertToEditable = useCallback((targetId?: string) => (
-        commitEdgeMutation(targetId, convertDiagramEdgeToEditable)
-    ), [commitEdgeMutation]);
+    const handleConvertToEditable = useCallback((targetId?: string) => {
+        const currentEdges = edgesRef?.current ?? edges;
+        const targetEdge = currentEdges.find(edge => edge.id === targetId);
+        const changed = commitEdgeMutation(targetId, convertDiagramEdgeToEditable);
+        if (!changed || !targetEdge || !reactFlowInstance) return changed;
+
+        const viewport = reactFlowInstance.getViewport();
+        if (!shouldFocusEditableEdge(viewport.zoom)) return changed;
+
+        const center = getEditableEdgeFocusCenter(
+            reactFlowInstance.getInternalNode(targetEdge.source),
+            reactFlowInstance.getInternalNode(targetEdge.target),
+        );
+        if (center) {
+            const focusEdge = () => {
+                void reactFlowInstance.setCenter(center.x, center.y, {
+                    zoom: EDITABLE_EDGE_TARGET_ZOOM,
+                    duration: 250,
+                });
+            };
+            // The context-menu close is part of the same React event. Focus on the
+            // next frame so its selection cleanup cannot cancel the viewport move.
+            if (typeof window.requestAnimationFrame === 'function') {
+                window.requestAnimationFrame(focusEdge);
+            } else {
+                focusEdge();
+            }
+        }
+        return changed;
+    }, [commitEdgeMutation, edges, edgesRef, reactFlowInstance]);
 
     const handleStopEditing = useCallback((targetId?: string) => (
         commitEdgeMutation(targetId, stopEditingDiagramEdge)

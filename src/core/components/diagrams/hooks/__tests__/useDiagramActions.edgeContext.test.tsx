@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 
 import { act, renderHook } from '@testing-library/react';
-import type { Edge, Node } from '@xyflow/react';
+import type { Edge, InternalNode, Node } from '@xyflow/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { useDiagramActions } from '../useDiagramActions';
+import { useDiagramActions, type DiagramReactFlowActions } from '../useDiagramActions';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -20,7 +20,7 @@ const edge: Edge = {
   data: { waypoints: [{ x: 10, y: 20 }] },
 };
 
-const setup = (initialEdges: Edge[]) => {
+const setup = (initialEdges: Edge[], reactFlowInstance: DiagramReactFlowActions | null = null) => {
   const nodesRef = { current: [node] };
   const edgesRef = { current: initialEdges };
   const setEdges = vi.fn();
@@ -35,9 +35,41 @@ const setup = (initialEdges: Edge[]) => {
     selectedNodes: [],
     selectedEdges: [],
     takeSnapshot,
-    reactFlowInstance: null,
+    reactFlowInstance,
   }));
   return { ...hook, edgesRef, setEdges, takeSnapshot };
+};
+
+const createReactFlowInstance = (zoom: number) => {
+  const makeInternalNode = (id: string, x: number, y: number): InternalNode => {
+    const userNode: Node = {
+      id,
+      position: { x, y },
+      data: {},
+      measured: { width: 100, height: 40 },
+    };
+    return {
+      ...userNode,
+      measured: { width: 100, height: 40 },
+      internals: {
+        positionAbsolute: { x, y },
+        userNode,
+        z: 0,
+        handleBounds: undefined,
+        bounds: undefined,
+      },
+    };
+  };
+  const source = makeInternalNode('source', 100, 200);
+  const target = makeInternalNode('target', 300, 400);
+  const setCenter = vi.fn();
+  const instance = {
+    getViewport: () => ({ x: 0, y: 0, zoom }),
+    getInternalNode: (id: string) => id === 'source' ? source : id === 'target' ? target : undefined,
+    setCenter,
+    fitView: vi.fn(),
+  } satisfies DiagramReactFlowActions;
+  return { instance, setCenter };
 };
 
 describe('useDiagramActions edge context transactions', () => {
@@ -81,5 +113,29 @@ describe('useDiagramActions edge context transactions', () => {
       data: { waypoints: [] },
     });
     expect(takeSnapshot).toHaveBeenCalledOnce();
+  });
+
+  it('raises an overview canvas to a precise editing zoom', () => {
+    const { instance, setCenter } = createReactFlowInstance(0.32);
+    const { result } = setup([edge], instance);
+    const requestAnimationFrame = vi.spyOn(window, 'requestAnimationFrame')
+      .mockImplementation(callback => {
+        callback(0);
+        return 1;
+      });
+
+    act(() => expect(result.current.onContextMenuAction('convertToEditable', 'edge-1')).toBe(true));
+
+    expect(setCenter).toHaveBeenCalledWith(250, 320, { zoom: 0.8, duration: 250 });
+    requestAnimationFrame.mockRestore();
+  });
+
+  it('preserves an already readable viewport when entering path editing', () => {
+    const { instance, setCenter } = createReactFlowInstance(0.8);
+    const { result } = setup([edge], instance);
+
+    act(() => expect(result.current.onContextMenuAction('convertToEditable', 'edge-1')).toBe(true));
+
+    expect(setCenter).not.toHaveBeenCalled();
   });
 });

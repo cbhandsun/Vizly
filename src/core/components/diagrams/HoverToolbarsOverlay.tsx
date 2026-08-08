@@ -1,10 +1,15 @@
-import React, { useMemo } from 'react';
+import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Node, useInternalNode, useViewport, type Edge, type NodeTypes } from '@xyflow/react';
 import { useDiagramStore } from '../../store/useDiagramStore';
 import { FloatingContextToolbar, type ToolbarFeature } from './FloatingContextToolbar';
 import { ContextualEdgeToolbar } from './ContextualEdgeToolbar';
 import { NodeDataUpdate, EdgeDataUpdate } from '../../types/diagram-updates';
-import { getEdgeToolbarScreenPosition } from './edgeToolbarPosition';
+import {
+    getClampedEdgeToolbarPosition,
+    getEdgeToolbarScreenPosition,
+    type ToolbarBounds,
+    type ToolbarSize,
+} from './edgeToolbarPosition';
 import type { DiagramActionTarget } from './hooks/useDiagramActions';
 import { shouldShowNodeHoverToolbar } from './hoverToolbarVisibility';
 
@@ -193,18 +198,76 @@ const IsolatedEdgeToolbar: React.FC<{ edge: Edge; onUpdateEdge: (id: string, upd
         return getEdgeToolbarScreenPosition(sourceNode, targetNode, viewport);
     }, [sourceNode, targetNode, viewport]);
 
+    const wrapperRef = useRef<HTMLDivElement>(null);
+    const [layoutMetrics, setLayoutMetrics] = useState<{
+        toolbar: ToolbarSize;
+        bounds: ToolbarBounds;
+    } | null>(null);
+
+    useLayoutEffect(() => {
+        const wrapper = wrapperRef.current;
+        const parent = wrapper?.parentElement;
+        if (!wrapper || !parent) return;
+
+        const measure = () => {
+            const toolbarRect = wrapper.getBoundingClientRect();
+            const parentRect = parent.getBoundingClientRect();
+            const next = {
+                toolbar: {
+                    width: Math.round(toolbarRect.width * 10) / 10,
+                    height: Math.round(toolbarRect.height * 10) / 10,
+                },
+                bounds: {
+                    width: Math.round(parentRect.width * 10) / 10,
+                    height: Math.round(parentRect.height * 10) / 10,
+                },
+            };
+            setLayoutMetrics(current => (
+                current
+                && current.toolbar.width === next.toolbar.width
+                && current.toolbar.height === next.toolbar.height
+                && current.bounds.width === next.bounds.width
+                && current.bounds.height === next.bounds.height
+                    ? current
+                    : next
+            ));
+        };
+
+        measure();
+        const observer = typeof ResizeObserver === 'undefined'
+            ? null
+            : new ResizeObserver(measure);
+        observer?.observe(wrapper);
+        observer?.observe(parent);
+        window.addEventListener('resize', measure);
+        return () => {
+            observer?.disconnect();
+            window.removeEventListener('resize', measure);
+        };
+    }, []);
+
+    const clampedPosition = useMemo(() => (
+        position && layoutMetrics
+            ? getClampedEdgeToolbarPosition(position, layoutMetrics.bounds, layoutMetrics.toolbar)
+            : null
+    ), [layoutMetrics, position]);
+
     if (!position) return null;
 
     return (
-        <div style={{
+        <div ref={wrapperRef} style={{
             position: 'absolute',
             zIndex: 1000,
-            left: position.x,
-            top: position.y,
-            transform: 'translate(-50%, -100%)',
-            paddingBottom: '16px', // give some visual clearance
-            pointerEvents: 'none' // wrapper isn't clickable
-        }} className="contextual-edge-toolbar-wrapper">
+            left: clampedPosition?.x ?? position.x,
+            top: clampedPosition?.y ?? position.y,
+            width: 'max-content',
+            maxWidth: 'calc(100% - 32px)',
+            visibility: clampedPosition ? 'visible' : 'hidden',
+            pointerEvents: 'none',
+        }}
+        className="contextual-edge-toolbar-wrapper"
+        data-placement={clampedPosition?.placement}
+        >
             <ContextualEdgeToolbar
                 edge={edge}
                 onUpdateEdge={onUpdateEdge}

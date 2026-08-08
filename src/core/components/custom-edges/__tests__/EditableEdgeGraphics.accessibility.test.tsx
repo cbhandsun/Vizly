@@ -86,4 +86,17 @@ describe('EditableEdgeGraphics accessibility', () => {
     expect(screen.getByRole('textbox', { name: 'designer.edgeEditor.labelInput' }).getAttribute('placeholder'))
       .toBe('designer.edgeEditor.labelPlaceholder');
   });
+
+  it('progressively discloses secondary controls at overview zoom', () => {
+    const props = { ...createProps(), viewportZoom: 0.32 };
+    render(<svg><EditableEdgeGraphics {...props} /></svg>);
+
+    const addWaypoint = screen.getByRole('button', { name: 'designer.edgeEditor.addWaypoint 1' });
+    const deleteWaypoint = screen.getByRole('button', { name: 'designer.edgeEditor.deleteWaypoint 1' });
+
+    expect(addWaypoint.getAttribute('class')).toContain('editable-edge-secondary-control');
+    expect(addWaypoint.parentElement?.getAttribute('class')).toContain('editable-edge-control-cluster--compact');
+    expect(deleteWaypoint.getAttribute('class')).toContain('editable-edge-secondary-control');
+    expect(deleteWaypoint.parentElement?.getAttribute('class')).toContain('editable-edge-control-cluster--compact');
+  });
 });

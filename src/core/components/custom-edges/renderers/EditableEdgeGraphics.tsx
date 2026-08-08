@@ -2,6 +2,8 @@ import React from 'react';
 import { BaseEdge, EdgeLabelRenderer } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import type { Segment } from '../../../utils/orthogonalPath';
+import { isCompactEditableEdgeZoom } from '../editableEdgeControlDensity';
+import './EditableEdgeGraphics.css';
 
 interface BendPoint {
     x: number;
@@ -90,6 +92,10 @@ const EditableEdgeGraphicsComponent: React.FC<EditableEdgeGraphicsProps> = ({
     onLabelChangeSubmit
 }) => {
     const { t } = useTranslation();
+    const compactControls = isCompactEditableEdgeZoom(viewportZoom);
+    const controlClusterClassName = compactControls
+        ? 'editable-edge-control-cluster editable-edge-control-cluster--compact'
+        : 'editable-edge-control-cluster';
     const activateOnKeyboard = (event: React.KeyboardEvent, action: () => void) => {
         if (event.key !== 'Enter' && event.key !== ' ') return;
         event.preventDefault();
@@ -147,7 +153,7 @@ const EditableEdgeGraphicsComponent: React.FC<EditableEdgeGraphicsProps> = ({
                     <g
                         key={`${id}-bend-${index}`}
                         transform={`translate(${bp.x}, ${bp.y})`}
-                        style={{ outline: 'none' }}
+                        className={controlClusterClassName}
                     >
                         {/* 圆形拖拽点 */}
                         <circle
@@ -172,6 +178,7 @@ const EditableEdgeGraphicsComponent: React.FC<EditableEdgeGraphicsProps> = ({
                         {bp.isWaypoint && (
                             <g
                                 transform={`translate(${12 * zScale}, ${-12 * zScale})`}
+                                className="editable-edge-secondary-control"
                                 role="button"
                                 tabIndex={0}
                                 aria-label={t('designer.edgeEditor.deleteWaypoint', { index: (bp.waypointIndex ?? index) + 1 })}
@@ -203,7 +210,7 @@ const EditableEdgeGraphicsComponent: React.FC<EditableEdgeGraphicsProps> = ({
                     <g
                         key={`${id}-seg-${index}`}
                         transform={`translate(${seg.midPoint.x}, ${seg.midPoint.y})`}
-                        style={{ outline: 'none' }}
+                        className={controlClusterClassName}
                     >
                         {/* 拖拽长条 */}
                         <rect
@@ -233,6 +240,7 @@ const EditableEdgeGraphicsComponent: React.FC<EditableEdgeGraphicsProps> = ({
                         {/* ⊕ 添加拐点按钮 */}
                         <g
                             transform={`translate(${seg.isHorizontal ? 0 : -16 * zScale}, ${seg.isHorizontal ? -16 * zScale : 0})`}
+                            className="editable-edge-secondary-control"
                             role="button"
                             tabIndex={0}
                             aria-label={t('designer.edgeEditor.addWaypoint', { index: index + 1 })}

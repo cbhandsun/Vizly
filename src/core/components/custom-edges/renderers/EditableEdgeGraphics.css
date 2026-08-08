@@ -1,0 +1,25 @@
+.editable-edge-control-cluster {
+    outline: none;
+}
+
+.editable-edge-secondary-control {
+    opacity: 1;
+    transition: opacity 120ms ease;
+}
+
+.editable-edge-control-cluster--compact .editable-edge-secondary-control {
+    opacity: 0;
+    pointer-events: none !important;
+}
+
+.editable-edge-control-cluster--compact:hover .editable-edge-secondary-control,
+.editable-edge-control-cluster--compact:focus-within .editable-edge-secondary-control {
+    opacity: 1;
+    pointer-events: all !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .editable-edge-secondary-control {
+        transition: none;
+    }
+}
