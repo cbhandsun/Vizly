@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { useState } from 'react';
 
 import { useFlowchartToolModeShortcuts } from '../useFlowchartToolModeShortcuts';
+import { useKeyboardShortcuts } from '../../useKeyboardShortcuts';
 
 const useHarness = (
     editingEnabled = true,
@@ -34,14 +35,44 @@ const useHarness = (
 };
 
 describe('useFlowchartToolModeShortcuts', () => {
-    it('toggles drawing with P and exits the active tool with Escape', () => {
+    it('toggles drawing with P and returns to pointer mode with V', () => {
         const { result } = renderHook(() => useHarness());
 
         act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', bubbles: true })));
         expect(result.current.isDrawingMode).toBe(true);
 
-        act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+        act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'v', bubbles: true })));
         expect(result.current.isDrawingMode).toBe(false);
+    });
+
+    it('leaves Escape available to the canonical canvas exit shortcut', () => {
+        const onExit = vi.fn();
+        const { result } = renderHook(() => {
+            const tools = useHarness();
+            useKeyboardShortcuts({
+                onDelete: vi.fn(),
+                onDuplicate: vi.fn(),
+                onUndo: vi.fn(),
+                onRedo: vi.fn(),
+                onSelectAll: vi.fn(),
+                onCopy: vi.fn(),
+                onPaste: vi.fn(),
+                onGroup: vi.fn(),
+                onUngroup: vi.fn(),
+                onEscapeEdit: () => {
+                    onExit();
+                    tools.activatePointer();
+                },
+            });
+            return tools;
+        });
+
+        act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'm', bubbles: true })));
+        expect(result.current.isMarqueeActive).toBe(true);
+        act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+
+        expect(onExit).toHaveBeenCalledOnce();
+        expect(result.current.isMarqueeActive).toBe(false);
     });
 
     it('keeps drawing, marquee, and comment modes mutually exclusive', () => {

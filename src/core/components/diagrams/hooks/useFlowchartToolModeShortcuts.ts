@@ -83,11 +83,6 @@ export const useFlowchartToolModeShortcuts = ({
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
             if (!editingEnabled || isEditableTarget(event.target)) return;
-            if (event.key === 'Escape' && (isDrawingMode || isMarqueeActive || isCommentMode)) {
-                event.preventDefault();
-                activatePointer();
-                return;
-            }
             if (event.ctrlKey || event.metaKey || event.altKey) return;
 
             const key = event.key.toLowerCase();

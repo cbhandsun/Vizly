@@ -46,6 +46,7 @@ import { useDiagramOperationScope } from './hooks/useDiagramOperationScope';
 import { useFlowchartImportNotifications } from './hooks/useFlowchartImportNotifications';
 import { useHistoryFeedbackActions } from './historyActionFeedback';
 import { useFlowchartNodeFocus } from './hooks/useFlowchartNodeFocus';
+import { useFlowchartCanvasExit } from './hooks/useFlowchartCanvasExit';
 
 export const useFlowchartDesignerController = ({
     id,
@@ -360,6 +361,13 @@ export const useFlowchartDesignerController = ({
         setIsDrawingMode, setIsMarqueeActive, setIsCommentMode: setStoredCommentMode,
         activeLayerId, nodesRef, edgesRef, reactFlowInstance, setNodes, takeSnapshot, t,
     });
+    const { clearCanvasSelection, exitCanvasInteraction } = useFlowchartCanvasExit({
+        setNodes,
+        setEdges,
+        clearScopedSelection: clearSelection,
+        activatePointer,
+        closeQuickAdd: closeMenu,
+    });
     
     // 2.5 Linter Layer (Phase 8 integration)
     useTopologyLinter(nodesWithGhost, finalEdgesWithGhost, { enabled: !isReadonly });
@@ -442,18 +450,20 @@ export const useFlowchartDesignerController = ({
         setCommandPaletteVisible: handleCommandPaletteVisibility, setShortcutHelpVisible,
         setCanvasSearchVisible, setCanvasSearchReplaceVisible,
         copyStyle, pasteStyle, hasCopiedStyle, saveAsTemplate,
-        toggleGroupCollapse
+        toggleGroupCollapse,
+        onEscapeEdit: exitCanvasInteraction,
     });
     const handlePaneClick = useCallback((_event?: React.MouseEvent) => {
         // 先关闭可能存在的 Context Menu
         contextMenuPaneClick();
+        clearCanvasSelection();
 
         if (isCommentMode) {
             // [GAP-02] 由 AnnotationLayer 的 handleCanvasClick 负责展示编辑器并添加评论
             // 这里不再直接 addComment，以避免创建空评论。
             return;
         }
-    }, [isCommentMode, contextMenuPaneClick]);
+    }, [clearCanvasSelection, isCommentMode, contextMenuPaneClick]);
 
     // Features
     const { autoRoutingEnabled, setAutoRoutingEnabled, isLayoutStable, handleStrategyLayout, lastDomainStrategy, lastDomainDirection, lastNodeLayout } = useAutoRouting({

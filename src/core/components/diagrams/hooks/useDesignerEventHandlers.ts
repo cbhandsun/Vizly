@@ -60,6 +60,7 @@ export interface UseDesignerEventHandlersProps {
     saveAsTemplate: (node: Node, label: string) => void;
     /** 折叠/展开容器组 */
     toggleGroupCollapse?: (groupId: string) => void;
+    onEscapeEdit?: () => void;
 }
 
 export function useDesignerEventHandlers({
@@ -76,7 +77,7 @@ export function useDesignerEventHandlers({
     setCommandPaletteVisible, setShortcutHelpVisible,
     setCanvasSearchVisible, setCanvasSearchReplaceVisible,
     copyStyle, pasteStyle, hasCopiedStyle, saveAsTemplate,
-    toggleGroupCollapse
+    toggleGroupCollapse, onEscapeEdit,
 }: UseDesignerEventHandlersProps) {
 
     const FLOWCHART_CLIPBOARD_KEY = 'flowchart-clipboard';
@@ -196,6 +197,7 @@ export function useDesignerEventHandlers({
                 setNodes((nds: Node[]) => nds.map(n => n.id === nodeId ? { ...n, data: { ...n.data, isEditing: true } } : n));
             }
         },
+        onEscapeEdit,
         onOpenCommandPalette: () => setCommandPaletteVisible(true),
         onShowShortcuts: () => setShortcutHelpVisible(true),
         pluginShortcuts: pluginCtx

@@ -57,4 +57,21 @@ describe('useKeyboardShortcuts modal isolation', () => {
 
     expect(onOpenCommandPalette).toHaveBeenCalledTimes(1);
   });
+
+  it('routes Escape to the configured canvas exit action', () => {
+    const onEscapeEdit = vi.fn();
+    renderHook(() => useKeyboardShortcuts({
+      ...createProps(vi.fn()),
+      onEscapeEdit,
+    }));
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', {
+        key: 'Escape',
+        bubbles: true,
+      }));
+    });
+
+    expect(onEscapeEdit).toHaveBeenCalledOnce();
+  });
 });
