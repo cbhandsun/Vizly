@@ -19,6 +19,40 @@ export interface FlowchartPasteBatch {
     edges: Edge[];
 }
 
+export const MIN_FLOWCHART_PASTE_STEP = 32;
+export const MAX_FLOWCHART_PASTE_STEP = 72;
+export const MAX_FLOWCHART_PASTE_SEQUENCE = 100;
+
+const normalizePasteDimension = (value: unknown): number | null => (
+    typeof value === 'number' && Number.isFinite(value) && value > 0
+        ? Math.min(value, 10_000)
+        : null
+);
+
+export const resolveFlowchartPasteOffset = (
+    nodes: readonly Node[],
+    sequence: number,
+): number => {
+    const dimensions = nodes.flatMap(node => [
+        normalizePasteDimension(node.measured?.width),
+        normalizePasteDimension(node.measured?.height),
+        normalizePasteDimension(node.width),
+        normalizePasteDimension(node.height),
+        normalizePasteDimension(node.style?.width),
+        normalizePasteDimension(node.style?.height),
+    ]).filter((value): value is number => value !== null);
+    const largestDimension = dimensions.length > 0 ? Math.max(...dimensions) : 0;
+    const step = Math.min(
+        MAX_FLOWCHART_PASTE_STEP,
+        Math.max(MIN_FLOWCHART_PASTE_STEP, Math.round(largestDimension * 0.16)),
+    );
+    const normalizedSequence = Number.isFinite(sequence)
+        ? Math.min(MAX_FLOWCHART_PASTE_SEQUENCE, Math.max(1, Math.trunc(sequence)))
+        : 1;
+
+    return step * normalizedSequence;
+};
+
 export const createClipboardTextSignature = (text: string): string => {
     let hash = 0x811c9dc5;
     for (let index = 0; index < text.length; index += 1) {

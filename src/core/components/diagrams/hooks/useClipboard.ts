@@ -19,6 +19,7 @@ import {
     advanceClipboardPasteCursor,
     buildFlowchartPasteBatch,
     createClipboardTextSignature,
+    resolveFlowchartPasteOffset,
     type ClipboardPasteCursor,
 } from '../../../utils/flowchartClipboardPaste';
 
@@ -29,15 +30,18 @@ interface UseClipboardProps {
     selectedEdges: Edge[];
     setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
     setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
-    takeSnapshot: (nodes: Node[], edges: Edge[]) => void;
+    takeSnapshot: (nodes: Node[], edges: Edge[], label?: string) => void;
     getOperationScope: () => string;
+    getPasteHistoryLabel?: (summary: ClipboardPasteSummary) => string;
     clipboardKey?: string;
 }
 
 export type ClipboardPasteResult = 'pasted' | 'empty' | 'unsupported' | 'scope-changed';
 export type ClipboardCutResult = 'cut' | 'empty' | 'locked' | 'failed' | 'scope-changed';
-
-const PASTE_OFFSET = 20;
+export interface ClipboardPasteSummary {
+    nodes: number;
+    edges: number;
+}
 
 /**
  * 剪贴板操作 Hook
@@ -54,6 +58,7 @@ export const useClipboard = ({
     setEdges,
     takeSnapshot,
     getOperationScope,
+    getPasteHistoryLabel,
     clipboardKey = 'flowchart-clipboard',
 }: UseClipboardProps) => {
     const pasteCursorRef = useRef<ClipboardPasteCursor | null>(null);
@@ -194,10 +199,19 @@ export const useClipboard = ({
         const pasteBatch = buildFlowchartPasteBatch({
             clipboardData,
             batchId,
-            offset: PASTE_OFFSET * pasteCursor.sequence,
+            offset: resolveFlowchartPasteOffset(clipboardData.nodes, pasteCursor.sequence),
         });
 
-        takeSnapshot(nodesRef.current, edgesRef.current);
+        const pasteSummary = {
+            nodes: pasteBatch.nodes.length,
+            edges: pasteBatch.edges.length,
+        };
+        const historyLabel = getPasteHistoryLabel?.(pasteSummary);
+        if (historyLabel) {
+            takeSnapshot(nodesRef.current, edgesRef.current, historyLabel);
+        } else {
+            takeSnapshot(nodesRef.current, edgesRef.current);
+        }
         pasteCursorRef.current = pasteCursor;
 
         setNodes(nds => [
@@ -209,7 +223,7 @@ export const useClipboard = ({
             ...pasteBatch.edges,
         ]);
         return 'pasted';
-    }, [clipboardKey, edgesRef, getOperationScope, nodesRef, parseClipboardText, setEdges, setNodes, takeSnapshot]);
+    }, [clipboardKey, edgesRef, getOperationScope, getPasteHistoryLabel, nodesRef, parseClipboardText, setEdges, setNodes, takeSnapshot]);
 
     const handleCut = useCallback(async (): Promise<ClipboardCutResult> => {
         // 连线没有可独立粘贴的载荷；与右键菜单一致，禁止仅剪切连线后不可恢复地删除。

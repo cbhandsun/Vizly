@@ -8,7 +8,12 @@ import { MobileBottomDock } from '../MobileBottomDock';
 
 vi.mock('react-i18next', () => ({
     useTranslation: () => ({
-        t: (_key: string, fallback: string) => fallback,
+        t: (_key: string, fallback: string, params?: Record<string, number>) => (
+            Object.entries(params ?? {}).reduce(
+                (result, [key, value]) => result.replace(`{{${key}}}`, String(value)),
+                fallback,
+            )
+        ),
     }),
 }));
 
@@ -38,15 +43,18 @@ describe('MobileBottomDock', () => {
                 canUndo={false}
                 canRedo={false}
                 selectedCount={2}
+                selectedNodesCount={1}
+                selectedEdgesCount={1}
                 activeTab="property"
             />,
         );
 
         fireEvent.click(screen.getByRole('button', { name: '添加组件' }));
         expect(onAddClick).toHaveBeenCalledTimes(1);
-        const propertyButton = screen.getByRole('button', { name: '属性（已选择 {{count}} 项）' });
+        const propertyButton = screen.getByRole('button', { name: '属性—已选择：节点 1 个，连线 1 条' });
         expect(propertyButton.getAttribute('aria-haspopup')).toBe('dialog');
         expect(propertyButton.getAttribute('aria-expanded')).toBe('true');
+        expect(screen.getByRole('status').textContent).toBe('属性—已选择：节点 1 个，连线 1 条');
         const layerButton = screen.getByRole('button', { name: '图层' });
         expect(layerButton.getAttribute('aria-haspopup')).toBe('dialog');
         fireEvent.click(layerButton);

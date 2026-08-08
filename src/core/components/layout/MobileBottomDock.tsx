@@ -19,6 +19,8 @@ interface MobileBottomDockProps {
     canRedo?: boolean;
     editingDisabled?: boolean;
     selectedCount: number;
+    selectedNodesCount?: number;
+    selectedEdgesCount?: number;
     activeTab: 'property' | 'ai' | null;
 }
 
@@ -38,11 +40,20 @@ export const MobileBottomDock: React.FC<MobileBottomDockProps> = ({
     canRedo,
     editingDisabled = false,
     selectedCount,
+    selectedNodesCount,
+    selectedEdgesCount,
     activeTab
 }) => {
     const { t } = useTranslation();
-    const propertyLabel = selectedCount > 0
-        ? t('designer.mobileDock.propertiesSelected', '属性（已选择 {{count}} 项）', { count: selectedCount })
+    const hasDetailedSelection = selectedNodesCount !== undefined && selectedEdgesCount !== undefined;
+    const propertyLabel = selectedCount > 0 && hasDetailedSelection
+        ? t(
+            'designer.mobileDock.propertiesSelectionSummary',
+            '属性—已选择：节点 {{nodes}} 个，连线 {{edges}} 条',
+            { nodes: selectedNodesCount, edges: selectedEdgesCount },
+        )
+        : selectedCount > 0
+            ? t('designer.mobileDock.propertiesSelected', '属性（已选择 {{count}} 项）', { count: selectedCount })
         : t('designer.mobileDock.properties', '属性');
 
     return (
@@ -75,6 +86,26 @@ export const MobileBottomDock: React.FC<MobileBottomDockProps> = ({
                         </Badge>
                         <span className="dock-label">{t('designer.mobileDock.properties', '属性')}</span>
                     </button>
+                    {selectedCount > 0 && hasDetailedSelection && (
+                        <span
+                            role="status"
+                            aria-live="polite"
+                            aria-atomic="true"
+                            style={{
+                                position: 'absolute',
+                                width: 1,
+                                height: 1,
+                                padding: 0,
+                                margin: -1,
+                                overflow: 'hidden',
+                                clip: 'rect(0, 0, 0, 0)',
+                                whiteSpace: 'nowrap',
+                                border: 0,
+                            }}
+                        >
+                            {propertyLabel}
+                        </span>
+                    )}
 
                     {/* Layers */}
                     <button

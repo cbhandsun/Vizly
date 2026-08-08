@@ -213,6 +213,7 @@
             "add": "Add component",
             "properties": "Properties",
             "propertiesSelected": "Properties ({{count}} selected)",
+            "propertiesSelectionSummary": "Properties — Selection: Nodes {{nodes}}, connectors {{edges}}",
             "layers": "Layers",
             "ai": "AI assistant",
             "aiShort": "AI",
@@ -931,7 +932,8 @@
             "beforeDelete_other": "Before deleting {{count}} items",
             "beforeDuplicate": "Before duplicating {{count}} nodes",
             "beforeDuplicate_one": "Before duplicating {{count}} node",
-            "beforeDuplicate_other": "Before duplicating {{count}} nodes"
+            "beforeDuplicate_other": "Before duplicating {{count}} nodes",
+            "beforePaste": "Before paste — Nodes {{nodes}}, connectors {{edges}}"
         },
         "versionHistoryPanel": {
             "title": "Version history",

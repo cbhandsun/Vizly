@@ -212,6 +212,7 @@
             "add": "添加组件",
             "properties": "属性",
             "propertiesSelected": "属性（已选择 {{count}} 项）",
+            "propertiesSelectionSummary": "属性—已选择：节点 {{nodes}} 个，连线 {{edges}} 条",
             "layers": "图层",
             "ai": "AI 助手",
             "aiShort": "AI",
@@ -932,7 +933,8 @@
             "redoStatus": "已重做上一步",
             "restoredStatus": "已恢复到“{{label}}”，可使用重做返回恢复前状态",
             "beforeDelete": "删除 {{count}} 项前",
-            "beforeDuplicate": "复制 {{count}} 个节点前"
+            "beforeDuplicate": "复制 {{count}} 个节点前",
+            "beforePaste": "粘贴前—节点 {{nodes}} 个，连线 {{edges}} 条"
         },
         "versionHistoryPanel": {
             "title": "版本历史",

@@ -79,6 +79,9 @@ describe('useClipboard', () => {
     const setNodes = vi.fn();
     const setEdges = vi.fn();
     const takeSnapshot = vi.fn();
+    const getPasteHistoryLabel = vi.fn(({ nodes, edges }: { nodes: number; edges: number }) => (
+      `Before paste — Nodes ${nodes}, connectors ${edges}`
+    ));
     const readText = vi.fn().mockRejectedValue(new Error('api_key=clipboard-read-secret'));
     Object.assign(navigator, { clipboard: { writeText: vi.fn(), readText } });
 
@@ -97,6 +100,7 @@ describe('useClipboard', () => {
         setEdges,
         takeSnapshot,
         getOperationScope,
+        getPasteHistoryLabel,
       })
     );
 
@@ -107,7 +111,12 @@ describe('useClipboard', () => {
 
     expect(pasteResult).toBe('pasted');
     expect(loggingState.logClipboardReadFailure).toHaveBeenCalled();
-    expect(takeSnapshot).toHaveBeenCalledWith([], []);
+    expect(getPasteHistoryLabel).toHaveBeenCalledWith({ nodes: 1, edges: 0 });
+    expect(takeSnapshot).toHaveBeenCalledWith(
+      [],
+      [],
+      'Before paste — Nodes 1, connectors 0',
+    );
     expect(setNodes).toHaveBeenCalledTimes(1);
     expect(setEdges).toHaveBeenCalledTimes(1);
   });
@@ -142,8 +151,8 @@ describe('useClipboard', () => {
 
     expect(currentNodes).toHaveLength(2);
     expect(currentNodes.map(item => item.position)).toEqual([
-      { x: 30, y: 40 },
-      { x: 50, y: 60 },
+      { x: 42, y: 52 },
+      { x: 74, y: 84 },
     ]);
   });
 

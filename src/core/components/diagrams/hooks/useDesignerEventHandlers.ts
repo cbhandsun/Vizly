@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Node, Edge, type ReactFlowInstance } from '@xyflow/react';
 import type { MessageInstance } from 'antd/es/message/interface';
 import type { NotificationInstance } from 'antd/es/notification/interface';
 import { useDesignerContextMenu } from './useDesignerContextMenu';
-import { useClipboard } from './useClipboard';
+import { useClipboard, type ClipboardPasteSummary } from './useClipboard';
 import { useToastActions } from './useToastActions';
 import { useLayerKeyboardShortcuts } from '../../../hooks/useLayerKeyboardShortcuts';
 import { useKeyboardShortcuts } from '../useKeyboardShortcuts';
@@ -80,6 +81,8 @@ export function useDesignerEventHandlers({
     toggleGroupCollapse, onEscapeEdit,
 }: UseDesignerEventHandlersProps) {
 
+    const { t } = useTranslation();
+
     const FLOWCHART_CLIPBOARD_KEY = 'flowchart-clipboard';
     
     const { onNodeContextMenu, onEdgeContextMenu, onPaneContextMenu, onPaneClick } = useDesignerContextMenu({
@@ -105,9 +108,15 @@ export function useDesignerEventHandlers({
         activePlugin,
     });
 
+    const getPasteHistoryLabel = useCallback((summary: ClipboardPasteSummary) => t(
+        'designer.historyPanel.beforePaste',
+        { nodes: summary.nodes, edges: summary.edges },
+    ), [t]);
+
     const { handleCopy, handlePaste, handleCut } = useClipboard({
         nodesRef, edgesRef, selectedNodes, selectedEdges, setNodes, setEdges, takeSnapshot,
         getOperationScope,
+        getPasteHistoryLabel,
         clipboardKey: FLOWCHART_CLIPBOARD_KEY,
     });
 

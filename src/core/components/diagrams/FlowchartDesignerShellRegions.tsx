@@ -357,6 +357,8 @@ export function FlowchartDesignerOverlaysRegion({ model }: { model: FlowchartDes
                 <MobileBottomDock
                     activeTab={mobilePropertyDrawerVisible ? activeRightTab : null}
                     selectedCount={isReadonly ? 0 : selectedNodes.length + selectedEdges.length}
+                    selectedNodesCount={isReadonly ? 0 : selectedNodes.length}
+                    selectedEdgesCount={isReadonly ? 0 : selectedEdges.length}
                     editingDisabled={isReadonly}
                     onAddClick={() => {
                         setAiChatVisible(false);

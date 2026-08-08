@@ -5,6 +5,8 @@ import {
     advanceClipboardPasteCursor,
     buildFlowchartPasteBatch,
     createClipboardTextSignature,
+    MAX_FLOWCHART_PASTE_SEQUENCE,
+    resolveFlowchartPasteOffset,
 } from '../flowchartClipboardPaste';
 
 const node = (id: string, position = { x: 10, y: 20 }): Node => ({
@@ -32,6 +34,22 @@ describe('flowchartClipboardPaste', () => {
     it('creates stable signatures without retaining clipboard text', () => {
         expect(createClipboardTextSignature('diagram A')).toBe(createClipboardTextSignature('diagram A'));
         expect(createClipboardTextSignature('diagram A')).not.toBe(createClipboardTextSignature('diagram B'));
+    });
+
+    it('uses a visible adaptive offset for small and large pasted nodes', () => {
+        expect(resolveFlowchartPasteOffset([node('small')], 1)).toBe(32);
+        expect(resolveFlowchartPasteOffset([{
+            ...node('large'),
+            measured: { width: 600, height: 180 },
+        }], 1)).toBe(72);
+    });
+
+    it('bounds invalid and extreme paste sequences', () => {
+        expect(resolveFlowchartPasteOffset([node('a')], Number.NaN)).toBe(32);
+        expect(resolveFlowchartPasteOffset([node('a')], 0)).toBe(32);
+        expect(resolveFlowchartPasteOffset([node('a')], Number.POSITIVE_INFINITY)).toBe(32);
+        expect(resolveFlowchartPasteOffset([node('a')], 10_000))
+            .toBe(32 * MAX_FLOWCHART_PASTE_SEQUENCE);
     });
 
     it('pastes an internal subgraph with the requested cascade offset', () => {
