@@ -9,12 +9,20 @@ interface ContextMenuLayerProps {
   onAction: (action: string, targetId?: string) => void;
   activePlugin?: DiagramTypePlugin | null;
   pluginCtx?: PluginContext;
+  canUndo: boolean;
+  canRedo: boolean;
 }
 
 const EMPTY_NODES: Node[] = [];
 const EMPTY_EDGES: Edge[] = [];
 
-export const ContextMenuLayer: React.FC<ContextMenuLayerProps> = ({ onAction, activePlugin, pluginCtx }) => {
+export const ContextMenuLayer: React.FC<ContextMenuLayerProps> = ({
+  onAction,
+  activePlugin,
+  pluginCtx,
+  canUndo,
+  canRedo,
+}) => {
   const contextMenu = useDiagramStore((state) => state.contextMenu);
   const setContextMenu = useDiagramStore((state) => state.setContextMenu);
   const selectedNodes = useDiagramStore((state) => state.selectedNodes);
@@ -48,6 +56,8 @@ export const ContextMenuLayer: React.FC<ContextMenuLayerProps> = ({ onAction, ac
       nodes={nodes}
       edges={edges}
       extraItems={extraItems}
+      canUndo={canUndo}
+      canRedo={canRedo}
     />
   );
 };

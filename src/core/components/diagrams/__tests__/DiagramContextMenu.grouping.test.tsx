@@ -67,6 +67,8 @@ const renderMenu = (options: { type: 'node' | 'multi-node'; target: Node; select
       selectedNodes={options.selectedNodes}
       selectedEdges={[]}
       nodes={[options.target, ...options.selectedNodes.filter(item => item.id !== options.target.id)]}
+      canUndo={false}
+      canRedo={false}
     />,
   );
   return onAction;

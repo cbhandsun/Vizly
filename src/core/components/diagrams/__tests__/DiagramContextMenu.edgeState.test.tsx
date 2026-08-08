@@ -65,6 +65,8 @@ describe('DiagramContextMenu edge target state', () => {
         selectedNodes={[]}
         selectedEdges={[]}
         edges={[editableEdge]}
+        canUndo={false}
+        canRedo={false}
       />,
     );
 
@@ -86,6 +88,8 @@ describe('DiagramContextMenu edge target state', () => {
         selectedNodes={[]}
         selectedEdges={[]}
         edges={[editableEdge]}
+        canUndo={false}
+        canRedo={false}
       />,
     );
 

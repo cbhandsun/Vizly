@@ -66,6 +66,8 @@ describe('DiagramContextMenu localization', () => {
         selectedNodes={[...selectedNodes]}
         selectedEdges={[]}
         nodes={[...selectedNodes]}
+        canUndo={false}
+        canRedo={false}
       />,
     );
 

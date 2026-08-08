@@ -51,6 +51,8 @@ export interface ContextMenuProps {
   nodes?: Node[];  // All nodes for lock state lookup
   edges?: Edge[];  // All edges for target state lookup
   extraItems?: MenuProps['items'];
+  canUndo: boolean;
+  canRedo: boolean;
 }
 
 import './DiagramContextMenu.css';
@@ -78,6 +80,8 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
   nodes,
   edges,
   extraItems,
+  canUndo,
+  canRedo,
 }) => {
   const { t } = useTranslation();
   const menuRootRef = useRef<HTMLDivElement>(null);
@@ -122,11 +126,15 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
   const getMenuItems = (): MenuProps['items'] => {
     const items: MenuProps['items'] = [];
     const canPaste = (() => {
+      const canReadSystemClipboard = typeof window !== 'undefined'
+        && window.isSecureContext
+        && typeof navigator !== 'undefined'
+        && typeof navigator.clipboard?.readText === 'function';
       try {
-        return !!localStorage.getItem('flowchart-clipboard');
+        return canReadSystemClipboard || !!localStorage.getItem('flowchart-clipboard');
       } catch (error) {
         logDiagramContextMenuFailure('checkClipboardAvailability', error);
-        return false;
+        return canReadSystemClipboard;
       }
     })();
 
@@ -340,8 +348,8 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
       items.push({ type: 'divider' });
 
       items.push(
-        { key: 'undo', icon: <UndoOutlined />, label: t('designer.contextMenu.undo') },
-        { key: 'redo', icon: <RedoOutlined />, label: t('designer.contextMenu.redo') }
+        { key: 'undo', icon: <UndoOutlined />, label: t('designer.contextMenu.undo'), disabled: !canUndo },
+        { key: 'redo', icon: <RedoOutlined />, label: t('designer.contextMenu.redo'), disabled: !canRedo }
       );
 
       items.push({ type: 'divider' });

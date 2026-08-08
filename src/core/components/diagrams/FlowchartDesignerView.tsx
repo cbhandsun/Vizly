@@ -355,7 +355,13 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                         </div>
                     )}
                     <div ref={reactFlowWrapper} style={{ position: 'relative', height: '100%' }}>
-                        {editingEnabled && <ContextMenuLayer onAction={handleContextMenuAction} activePlugin={activePlugin} pluginCtx={pluginCtx ?? undefined} />}
+                        {editingEnabled && <ContextMenuLayer
+                            onAction={handleContextMenuAction}
+                            activePlugin={activePlugin}
+                            pluginCtx={pluginCtx ?? undefined}
+                            canUndo={canUndo}
+                            canRedo={canRedo}
+                        />}
 
                         <div hidden={!showEditingChrome}>
                             <DesignerHeaderLayer
