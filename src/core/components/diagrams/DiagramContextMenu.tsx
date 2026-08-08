@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Menu, MenuProps } from 'antd';
+import { useTranslation } from 'react-i18next';
 import {
   DeleteOutlined,
   CopyOutlined,
@@ -38,6 +39,7 @@ import {
 export interface ContextMenuProps {
   top: number;
   left: number;
+  submenuPlacement?: DiagramContextSubmenuPlacement;
   right?: number;
   bottom?: number;
   type: 'node' | 'edge' | 'pane' | 'selection' | 'multi-node';
@@ -52,10 +54,20 @@ export interface ContextMenuProps {
 
 import './DiagramContextMenu.css';
 import { hasMutationLockedNode, isNodeMutationLocked } from './nodeLockPolicy';
+import type { DiagramContextSubmenuPlacement } from './diagramContextMenuPlacement';
+
+const MULTI_SELECTION_ACTIONS = new Set([
+  'duplicate',
+  'lock',
+  'unlock',
+  'bringToFront',
+  'sendToBack',
+]);
 
 export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
   top,
   left,
+  submenuPlacement = 'right',
   type,
   targetId,
   onClose,
@@ -65,6 +77,7 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
   nodes,
   extraItems,
 }) => {
+  const { t } = useTranslation();
   const menuRootRef = useRef<HTMLDivElement>(null);
   const allNodes = nodes || selectedNodes;
   const targetNode = targetId ? allNodes.find(node => node.id === targetId) : undefined;
@@ -74,6 +87,15 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
       ? (selectedNodes.some(node => node.id === targetNode.id) ? selectedNodes : [targetNode])
       : selectedNodes;
   const hasLockedActionTarget = hasMutationLockedNode(nodeActionTargets);
+  const allActionTargetsLocked = nodeActionTargets.length > 0
+    && nodeActionTargets.every(isNodeMutationLocked);
+  const submenuPlacements: NonNullable<MenuProps['builtinPlacements']> = {
+    rightTop: {
+      points: submenuPlacement === 'left' ? ['tr', 'tl'] : ['tl', 'tr'],
+      offset: submenuPlacement === 'left' ? [-4, 0] : [4, 0],
+      overflow: { adjustY: 1 },
+    },
+  };
 
   useEffect(() => {
     const previouslyFocused = document.activeElement instanceof HTMLElement
@@ -87,7 +109,10 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
   }, []);
 
   const handleMenuClick = (info: { key: string }) => {
-    onAction(info.key, targetId);
+    const actionTargetId = type === 'multi-node' && MULTI_SELECTION_ACTIONS.has(info.key)
+      ? undefined
+      : targetId;
+    onAction(info.key, actionTargetId);
     onClose();
   };
 
@@ -108,31 +133,33 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
         {
           key: 'cut',
           icon: <ScissorOutlined />,
-          label: '剪切 (Cut)',
+          label: t('designer.contextMenu.cut'),
           disabled: type === 'edge' || hasLockedActionTarget
         },
         {
           key: 'copy',
           icon: <CopyOutlined />,
-          label: '复制 (Copy)',
+          label: t('designer.contextMenu.copy'),
           disabled: type === 'edge' || hasLockedActionTarget
         },
         {
           key: 'paste',
           icon: <SnippetsOutlined />,
-          label: '粘贴 (Paste)',
+          label: t('designer.contextMenu.paste'),
           disabled: !canPaste
         },
         {
           key: 'duplicate',
           icon: <CopyOutlined />,
-          label: '创建副本 (Duplicate)',
+          label: type === 'multi-node'
+            ? t('designer.contextMenu.duplicateSelection')
+            : t('designer.contextMenu.duplicate'),
           disabled: type === 'edge'
         },
         {
           key: 'delete',
           icon: <DeleteOutlined />,
-          label: '删除 (Delete)',
+          label: t('designer.contextMenu.delete'),
           danger: true,
           disabled: hasLockedActionTarget,
         }
@@ -142,11 +169,19 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
 
       // Lock/Unlock - dynamic based on target node state
       if (type === 'node' || type === 'multi-node') {
-        const isLocked = targetNode ? isNodeMutationLocked(targetNode) : false;
+        const isLocked = type === 'multi-node'
+          ? allActionTargetsLocked
+          : targetNode ? isNodeMutationLocked(targetNode) : false;
         items.push({
           key: isLocked ? 'unlock' : 'lock',
           icon: isLocked ? <UnlockOutlined /> : <LockOutlined />,
-          label: isLocked ? '解锁 (Unlock)' : '锁定 (Lock)',
+          label: type === 'multi-node'
+            ? isLocked
+              ? t('designer.contextMenu.unlockSelection')
+              : t('designer.contextMenu.lockSelection')
+            : isLocked
+              ? t('designer.contextMenu.unlock')
+              : t('designer.contextMenu.lock'),
         });
 
         // Container auto-layout
@@ -156,20 +191,22 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
           items.push({
             key: 'autoLayoutContainer',
             icon: <AppstoreOutlined />,
-            label: '自动布局子节点 (Auto Layout)',
+            label: t('designer.contextMenu.autoLayoutContainer'),
             disabled: isLocked,
           });
           items.push({
             key: 'toggleCollapse',
             icon: isCollapsed ? <ExpandOutlined /> : <GroupOutlined />,
-            label: isCollapsed ? '展开组 (Expand Group)' : '折叠组 (Collapse Group)',
+            label: isCollapsed
+              ? t('designer.contextMenu.expandGroup')
+              : t('designer.contextMenu.collapseGroup'),
             disabled: isLocked,
           });
           if (targetNode.type === 'titleGroup' || targetNode.type === 'subGroup') {
             items.push({
               key: 'ungroup',
               icon: <GroupOutlined rotate={180} />,
-              label: '取消组合 (Ungroup)',
+              label: t('designer.contextMenu.ungroup'),
               disabled: isLocked,
             });
           }
@@ -186,12 +223,12 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
           {
             key: 'reverseEdge',
             icon: <SwapOutlined />,
-            label: '反转方向 (Reverse Direction)',
+            label: t('designer.contextMenu.reverseDirection'),
           },
           {
             key: 'resetWaypoints',
             icon: <UndoOutlined />,
-            label: '重置路径 (Reset Path)',
+            label: t('designer.contextMenu.resetPath'),
             disabled: !hasWaypoints,
           }
         );
@@ -200,13 +237,13 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
           items.push({
             key: 'convertToEditable',
             icon: <EditOutlined />,
-            label: '转为可编辑 (Make Editable)',
+            label: t('designer.contextMenu.makeEditable'),
           });
         } else {
           items.push({
             key: 'stopEditing',
             icon: <CheckOutlined />,
-            label: '退出编辑状态 (Stop Editing)',
+            label: t('designer.contextMenu.stopEditing'),
           });
         }
       }
@@ -218,13 +255,17 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
         {
           key: 'bringToFront',
           icon: <VerticalAlignTopOutlined />,
-          label: '置于顶层 (Bring to Front)',
+          label: type === 'multi-node'
+            ? t('designer.contextMenu.bringSelectionToFront')
+            : t('designer.contextMenu.bringToFront'),
           disabled: hasLockedActionTarget,
         },
         {
           key: 'sendToBack',
           icon: <VerticalAlignBottomOutlined />,
-          label: '置于底层 (Send to Back)',
+          label: type === 'multi-node'
+            ? t('designer.contextMenu.sendSelectionToBack')
+            : t('designer.contextMenu.sendToBack'),
           disabled: hasLockedActionTarget,
         }
       );
@@ -237,20 +278,21 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
       items.push({
         key: 'align-submenu',
         icon: <MdAlignHorizontalCenter />,
-        label: '对齐 (Align)',
+        label: t('designer.contextMenu.align'),
+        popupClassName: 'diagram-context-menu-popup',
         disabled: hasLockedActionTarget,
         children: [
-          { key: 'align:left', icon: <MdAlignHorizontalLeft />, label: '左对齐' },
-          { key: 'align:center', icon: <MdAlignHorizontalCenter />, label: '水平居中' },
-          { key: 'align:right', icon: <MdAlignHorizontalRight />, label: '右对齐' },
+          { key: 'align:left', icon: <MdAlignHorizontalLeft />, label: t('designer.contextMenu.alignLeft') },
+          { key: 'align:center', icon: <MdAlignHorizontalCenter />, label: t('designer.contextMenu.alignCenter') },
+          { key: 'align:right', icon: <MdAlignHorizontalRight />, label: t('designer.contextMenu.alignRight') },
           { type: 'divider' as const },
-          { key: 'align:top', icon: <MdAlignVerticalTop />, label: '顶部对齐' },
-          { key: 'align:middle', icon: <MdAlignVerticalCenter />, label: '垂直居中' },
-          { key: 'align:bottom', icon: <MdAlignVerticalBottom />, label: '底部对齐' },
+          { key: 'align:top', icon: <MdAlignVerticalTop />, label: t('designer.contextMenu.alignTop') },
+          { key: 'align:middle', icon: <MdAlignVerticalCenter />, label: t('designer.contextMenu.alignMiddle') },
+          { key: 'align:bottom', icon: <MdAlignVerticalBottom />, label: t('designer.contextMenu.alignBottom') },
           ...(selectedNodes.length > 2 ? [
             { type: 'divider' as const },
-            { key: 'distribute:horizontal', icon: <MdHorizontalDistribute />, label: '水平均匀分布' },
-            { key: 'distribute:vertical', icon: <MdVerticalDistribute />, label: '垂直均匀分布' },
+            { key: 'distribute:horizontal', icon: <MdHorizontalDistribute />, label: t('designer.contextMenu.distributeHorizontal') },
+            { key: 'distribute:vertical', icon: <MdVerticalDistribute />, label: t('designer.contextMenu.distributeVertical') },
           ] : []),
         ]
       });
@@ -259,12 +301,13 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
       items.push({
         key: 'match-submenu',
         icon: <FaRulerCombined />,
-        label: '统一尺寸 (Match Size)',
+        label: t('designer.contextMenu.matchSize'),
+        popupClassName: 'diagram-context-menu-popup',
         disabled: hasLockedActionTarget,
         children: [
-          { key: 'matchWidth', icon: <ColumnWidthOutlined />, label: '统一宽度' },
-          { key: 'matchHeight', icon: <ColumnHeightOutlined />, label: '统一高度' },
-          { key: 'matchSize', icon: <ExpandOutlined />, label: '统一大小' },
+          { key: 'matchWidth', icon: <ColumnWidthOutlined />, label: t('designer.contextMenu.matchWidth') },
+          { key: 'matchHeight', icon: <ColumnHeightOutlined />, label: t('designer.contextMenu.matchHeight') },
+          { key: 'matchSize', icon: <ExpandOutlined />, label: t('designer.contextMenu.matchBoth') },
         ]
       });
 
@@ -272,7 +315,7 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
       items.push({
         key: 'group',
         icon: <GroupOutlined />,
-        label: '成组 (Group)',
+        label: t('designer.contextMenu.group'),
         disabled: hasLockedActionTarget,
       });
     }
@@ -282,39 +325,40 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
       items.push({
         key: 'paste',
         icon: <SnippetsOutlined />,
-        label: '粘贴 (Paste)',
+        label: t('designer.contextMenu.paste'),
         disabled: !canPaste
       });
 
       items.push({
         key: 'selectAll',
-        label: '全选 (Select All)'
+        label: t('designer.contextMenu.selectAll')
       });
 
       items.push({ type: 'divider' });
 
       items.push(
-        { key: 'undo', icon: <UndoOutlined />, label: '撤销 (Undo)' },
-        { key: 'redo', icon: <RedoOutlined />, label: '重做 (Redo)' }
+        { key: 'undo', icon: <UndoOutlined />, label: t('designer.contextMenu.undo') },
+        { key: 'redo', icon: <RedoOutlined />, label: t('designer.contextMenu.redo') }
       );
 
       items.push({ type: 'divider' });
 
       items.push(
-        { key: 'fitView', icon: <ExpandOutlined />, label: '适应屏幕 (Fit View)' },
+        { key: 'fitView', icon: <ExpandOutlined />, label: t('designer.contextMenu.fitView') },
         {
           key: 'add-node-submenu',
           icon: <AppstoreOutlined />,
-          label: '添加节点 (Add Node)',
+          label: t('designer.contextMenu.addNode'),
+          popupClassName: 'diagram-context-menu-popup',
           children: [
-            { key: 'context:add:flowchart:rect', icon: <EditOutlined />, label: '过程 (Process)' },
-            { key: 'context:add:flowchart:database', icon: <ColumnWidthOutlined />, label: '数据库 (Database)' },
-            { key: 'context:add:flowchart:diamond', icon: <CheckOutlined />, label: '判定 (Decision)' },
-            { key: 'context:add:flowchart:step', icon: <AppstoreOutlined />, label: '步骤 (Step)' },
+            { key: 'context:add:flowchart:rect', icon: <EditOutlined />, label: t('designer.contextMenu.process') },
+            { key: 'context:add:flowchart:database', icon: <ColumnWidthOutlined />, label: t('designer.contextMenu.database') },
+            { key: 'context:add:flowchart:diamond', icon: <CheckOutlined />, label: t('designer.contextMenu.decision') },
+            { key: 'context:add:flowchart:step', icon: <AppstoreOutlined />, label: t('designer.contextMenu.step') },
           ]
         },
-        { key: 'zoomIn', icon: <ZoomInOutlined />, label: '放大 (Zoom In)' },
-        { key: 'zoomOut', icon: <ZoomOutOutlined />, label: '缩小 (Zoom Out)' }
+        { key: 'zoomIn', icon: <ZoomInOutlined />, label: t('designer.contextMenu.zoomIn') },
+        { key: 'zoomOut', icon: <ZoomOutOutlined />, label: t('designer.contextMenu.zoomOut') }
       );
     }
 
@@ -347,6 +391,7 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
       <Menu
         mode="vertical"
         selectable={false}
+        builtinPlacements={submenuPlacements}
         onClick={handleMenuClick}
         items={getMenuItems()}
         style={{ border: 'none' }}

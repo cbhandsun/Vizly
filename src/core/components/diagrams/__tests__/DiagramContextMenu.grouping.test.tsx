@@ -32,6 +32,20 @@ vi.mock('antd', () => ({
   ),
 }));
 
+const translations: Record<string, string> = {
+  'designer.contextMenu.group': 'Group',
+  'designer.contextMenu.ungroup': 'Ungroup',
+  'designer.contextMenu.duplicateSelection': 'Duplicate selection',
+  'designer.contextMenu.lockSelection': 'Lock selection',
+  'designer.contextMenu.bringSelectionToFront': 'Bring selection to front',
+};
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string) => translations[key] ?? key,
+  }),
+}));
+
 const node = (id: string, overrides: Partial<Node> = {}): Node => ({
   id,
   position: { x: 0, y: 0 },
@@ -63,7 +77,7 @@ describe('DiagramContextMenu grouping actions', () => {
     const second = node('second');
     const onAction = renderMenu({ type: 'multi-node', target: first, selectedNodes: [first, second] });
 
-    fireEvent.click(screen.getByRole('button', { name: /成组/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Group' }));
 
     expect(onAction).toHaveBeenCalledWith('group', first.id);
   });
@@ -72,8 +86,22 @@ describe('DiagramContextMenu grouping actions', () => {
     const group = node('group', { type: 'titleGroup' });
     const onAction = renderMenu({ type: 'node', target: group, selectedNodes: [group] });
 
-    fireEvent.click(screen.getByRole('button', { name: /取消组合/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ungroup' }));
 
     expect(onAction).toHaveBeenCalledWith('ungroup', group.id);
+  });
+
+  it.each([
+    ['Duplicate selection', 'duplicate'],
+    ['Lock selection', 'lock'],
+    ['Bring selection to front', 'bringToFront'],
+  ])('dispatches %s against the full multi-node selection', (label, action) => {
+    const first = node('first');
+    const second = node('second');
+    const onAction = renderMenu({ type: 'multi-node', target: first, selectedNodes: [first, second] });
+
+    fireEvent.click(screen.getByRole('button', { name: label }));
+
+    expect(onAction).toHaveBeenCalledWith(action, undefined);
   });
 });

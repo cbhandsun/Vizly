@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { Node, Edge } from '@xyflow/react';
-import { ContextMenuProps } from '../DiagramContextMenu';
+import type { ContextMenuProps } from '../DiagramContextMenu';
+import { resolveDiagramContextMenuPosition } from '../diagramContextMenuPlacement';
 import { useDiagramStore } from '../../../store/useDiagramStore';
 
 interface UseDesignerContextMenuOptions {
@@ -22,17 +23,15 @@ export function useDesignerContextMenu({
         const el = reactFlowWrapper.current;
         if (!el) return;
         const rect = el.getBoundingClientRect();
-        const menuWidth = 220;
-        const menuHeight = 280;
-        const padding = 8;
-        const rawLeft = args.clientX - rect.left;
-        const rawTop = args.clientY - rect.top;
-        const left = Math.max(padding, Math.min(rawLeft, rect.width - menuWidth - padding));
-        const top = Math.max(padding, Math.min(rawTop, rect.height - menuHeight - padding));
+        const position = resolveDiagramContextMenuPosition({
+            clientX: args.clientX,
+            clientY: args.clientY,
+            bounds: rect,
+            type: args.type,
+        });
 
         setContextMenu({
-            top,
-            left,
+            ...position,
             type: args.type,
             targetId: args.targetId,
         });

@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { Node, Edge, NodeChange, EdgeChange, applyNodeChanges, applyEdgeChanges } from '@xyflow/react';
 
-import { ContextMenuProps } from '../components/diagrams/DiagramContextMenu';
+import type { ContextMenuProps } from '../components/diagrams/DiagramContextMenu';
+import type { DiagramContextSubmenuPlacement } from '../components/diagrams/diagramContextMenuPlacement';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value && typeof value === 'object' && !Array.isArray(value));
@@ -9,6 +10,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 export interface ContextMenuState {
     top: number;
     left: number;
+    submenuPlacement: DiagramContextSubmenuPlacement;
     type: ContextMenuProps['type'];
     targetId?: string;
 }

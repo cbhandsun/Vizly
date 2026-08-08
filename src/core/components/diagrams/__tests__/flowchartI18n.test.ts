@@ -76,6 +76,19 @@ describe('flowchart interaction copy', () => {
             expect(read(zh, ['designer', 'toolbar', key])).toBeTypeOf('string');
             expect(read(en, ['designer', 'toolbar', key])).toBeTypeOf('string');
         }
+        for (const key of [
+            'cut', 'copy', 'paste', 'duplicate', 'duplicateSelection', 'delete',
+            'lock', 'unlock', 'lockSelection', 'unlockSelection', 'bringToFront',
+            'bringSelectionToFront', 'sendToBack', 'sendSelectionToBack', 'align',
+            'alignLeft', 'alignCenter', 'alignRight', 'alignTop', 'alignMiddle',
+            'alignBottom', 'distributeHorizontal', 'distributeVertical', 'matchSize',
+            'matchWidth', 'matchHeight', 'matchBoth', 'group', 'selectAll', 'undo',
+            'redo', 'fitView', 'addNode', 'process', 'database', 'decision', 'step',
+            'zoomIn', 'zoomOut',
+        ]) {
+            expect(read(zh, ['designer', 'contextMenu', key])).toBeTypeOf('string');
+            expect(read(en, ['designer', 'contextMenu', key])).toBeTypeOf('string');
+        }
         for (const key of ['nodeAriaLabel', 'nodeSelectedState', 'nodeLockedState', 'doubleClickToEdit', 'quickAddOrConnect', 'quickAddDirection']) {
             expect(read(zh, ['designer', 'flowchart', key])).toBeTypeOf('string');
             expect(read(en, ['designer', 'flowchart', key])).toBeTypeOf('string');
