@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { Node, Edge } from '@xyflow/react';
 import { fromMermaid } from '../../../utils/mermaidConverter';
 import {
@@ -15,6 +15,12 @@ import {
     logClipboardWriteFailure,
 } from './clipboardLogging';
 import { hasMutationLockedNode } from '../nodeLockPolicy';
+import {
+    advanceClipboardPasteCursor,
+    buildFlowchartPasteBatch,
+    createClipboardTextSignature,
+    type ClipboardPasteCursor,
+} from '../../../utils/flowchartClipboardPaste';
 
 interface UseClipboardProps {
     nodesRef: React.RefObject<Node[]>;
@@ -49,6 +55,7 @@ export const useClipboard = ({
     getOperationScope,
     clipboardKey = 'flowchart-clipboard',
 }: UseClipboardProps) => {
+    const pasteCursorRef = useRef<ClipboardPasteCursor | null>(null);
 
     const handleCopy = useCallback(() => {
         if (selectedNodes.length === 0) return;
@@ -62,6 +69,8 @@ export const useClipboard = ({
             logClipboardWriteFailure(error);
             return;
         }
+
+        pasteCursorRef.current = null;
 
         try {
             localStorage.setItem(clipboardKey, serializedClipboard);
@@ -107,10 +116,12 @@ export const useClipboard = ({
 
         // 1. 首先尝试系统剪贴板（跨应用粘贴）
         let clipboardData: ClipboardData | null = null;
+        let clipboardText: string | null = null;
 
         if (navigator.clipboard?.readText && window.isSecureContext) {
             try {
                 const text = await navigator.clipboard.readText();
+                clipboardText = text;
                 clipboardData = parseClipboardText(text);
                 if (operationScope !== getOperationScope()) return 'scope-changed';
 
@@ -129,7 +140,10 @@ export const useClipboard = ({
         if (!clipboardData) {
             try {
                 const saved = localStorage.getItem(clipboardKey);
-                if (saved) clipboardData = parseClipboardText(saved);
+                if (saved) {
+                    clipboardText = saved;
+                    clipboardData = parseClipboardText(saved);
+                }
             } catch (error) {
                 logClipboardStorageReadFailure(error);
             }
@@ -138,40 +152,31 @@ export const useClipboard = ({
         // 系统剪贴板读取可能等待权限或跨进程响应。期间页面或图表若已切换，
         // 旧请求不得把结果提交到新的操作上下文。
         if (operationScope !== getOperationScope()) return 'scope-changed';
-        if (!clipboardData || clipboardData.nodes.length === 0) return 'empty';
+        if (!clipboardData || clipboardData.nodes.length === 0 || clipboardText === null) return 'empty';
 
-        takeSnapshot(nodesRef.current, edgesRef.current);
-
-        // 生成新 ID
-        const idMap = new Map<string, string>();
-        clipboardData.nodes.forEach(node => {
-            idMap.set(node.id, `${node.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+        const signature = createClipboardTextSignature(clipboardText);
+        const pasteCursor = advanceClipboardPasteCursor(
+            pasteCursorRef.current,
+            signature,
+            operationScope,
+        );
+        const batchId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const pasteBatch = buildFlowchartPasteBatch({
+            clipboardData,
+            batchId,
+            offset: PASTE_OFFSET * pasteCursor.sequence,
         });
 
-        const newNodes = clipboardData.nodes.map(node => ({
-            ...node,
-            id: idMap.get(node.id)!,
-            position: { x: node.position.x + PASTE_OFFSET, y: node.position.y + PASTE_OFFSET },
-            selected: true,
-            data: { ...node.data },
-        }));
-
-        const newEdges = clipboardData.edges.map(edge => ({
-            ...edge,
-            id: `${edge.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-            source: idMap.get(edge.source) || edge.source,
-            target: idMap.get(edge.target) || edge.target,
-            selected: true,
-            data: edge.data ? { ...edge.data } : undefined,
-        }));
+        takeSnapshot(nodesRef.current, edgesRef.current);
+        pasteCursorRef.current = pasteCursor;
 
         setNodes(nds => [
             ...nds.map(n => ({ ...n, selected: false })),
-            ...newNodes,
+            ...pasteBatch.nodes,
         ]);
         setEdges(eds => [
             ...eds.map(e => ({ ...e, selected: false })),
-            ...newEdges,
+            ...pasteBatch.edges,
         ]);
         return 'pasted';
     }, [clipboardKey, edgesRef, getOperationScope, nodesRef, parseClipboardText, setEdges, setNodes, takeSnapshot]);

@@ -3,6 +3,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Edge, Node } from '@xyflow/react';
+import type { SetStateAction } from 'react';
 import { useClipboard } from '../useClipboard';
 
 const loggingState = vi.hoisted(() => ({
@@ -109,6 +110,41 @@ describe('useClipboard', () => {
     expect(takeSnapshot).toHaveBeenCalledWith([], []);
     expect(setNodes).toHaveBeenCalledTimes(1);
     expect(setEdges).toHaveBeenCalledTimes(1);
+  });
+
+  it('cascades repeated pastes of the same clipboard payload', async () => {
+    let currentNodes: Node[] = [];
+    const setNodes = vi.fn((update: SetStateAction<Node[]>) => {
+      currentNodes = typeof update === 'function' ? update(currentNodes) : update;
+    });
+    const setEdges = vi.fn();
+    const takeSnapshot = vi.fn();
+    const clipboardText = JSON.stringify({ nodes: selectedNodes, edges: [] });
+    Object.assign(navigator, {
+      clipboard: { writeText: vi.fn(), readText: vi.fn().mockResolvedValue(clipboardText) },
+    });
+
+    const { result } = renderHook(() => useClipboard({
+      nodesRef: { current: [] },
+      edgesRef: { current: [] },
+      selectedNodes: [],
+      selectedEdges: [],
+      setNodes,
+      setEdges,
+      takeSnapshot,
+      getOperationScope,
+    }));
+
+    await act(async () => {
+      expect(await result.current.handlePaste()).toBe('pasted');
+      expect(await result.current.handlePaste()).toBe('pasted');
+    });
+
+    expect(currentNodes).toHaveLength(2);
+    expect(currentNodes.map(item => item.position)).toEqual([
+      { x: 30, y: 40 },
+      { x: 50, y: 60 },
+    ]);
   });
 
   it('does not replace unsupported system clipboard text with stale local content', async () => {
