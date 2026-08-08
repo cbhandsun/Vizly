@@ -6,6 +6,7 @@ import { createRoot } from 'react-dom/client';
 import './main/configureCoreRuntimes';
 import './main/configureAuthRuntime';
 import { initializeApplicationRuntime } from './main/bootstrapApplication';
+import { installVitePreloadErrorRecovery } from './main/preloadErrorRecovery';
 import App from './App';
 import './index.css'; // Tailwind CSS
 import './main.css'; // 保留您项目全局的基础CSS
@@ -13,6 +14,7 @@ import './main.css'; // 保留您项目全局的基础CSS
 // Initialize i18n
 import './i18n';
 
+installVitePreloadErrorRecovery();
 initializeApplicationRuntime();
 
 /**
