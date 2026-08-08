@@ -118,6 +118,45 @@ describe('useVersionHistory', () => {
         await waitFor(() => expect(result.current.previewVersion).toBeNull());
     });
 
+    it('ignores a preview payload that finishes after preview was cancelled', async () => {
+        let resolveVersion: ((version: ReturnType<typeof makeVersion>) => void) | undefined;
+        storageMocks.loadVersion.mockImplementation(() => new Promise((resolve) => {
+            resolveVersion = resolve;
+        }));
+        const setNodes = vi.fn();
+        const setEdges = vi.fn();
+        const { result } = renderHook(() => useVersionHistory('diagram-1'));
+
+        await waitFor(() => expect(storageMocks.listVersions).toHaveBeenCalledWith('diagram-1'));
+
+        let previewPromise: Promise<boolean> | undefined;
+        act(() => {
+            previewPromise = result.current.enterPreview(
+                'version-1',
+                setNodes,
+                setEdges,
+                originalNodes,
+                originalEdges,
+            );
+        });
+        await waitFor(() => expect(storageMocks.loadVersion).toHaveBeenCalledWith('diagram-1', 'version-1'));
+
+        act(() => {
+            expect(result.current.exitPreview()).toBeNull();
+        });
+
+        let entered = true;
+        await act(async () => {
+            resolveVersion?.(makeVersion());
+            entered = await previewPromise!;
+        });
+
+        expect(entered).toBe(false);
+        expect(setNodes).not.toHaveBeenCalled();
+        expect(setEdges).not.toHaveBeenCalled();
+        expect(result.current.previewVersion).toBeNull();
+    });
+
     it('does not restore the preview base after confirming a version restore', async () => {
         const setNodes = vi.fn();
         const setEdges = vi.fn();

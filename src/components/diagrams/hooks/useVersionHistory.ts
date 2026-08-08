@@ -28,6 +28,7 @@ export function useVersionHistory(diagramId: string) {
     const [loading, setLoading] = useState(false);
     const [previewVersion, setPreviewVersion] = useState<DiagramVersion | null>(null);
     const previewBaseRef = useRef<{ nodes: Node[]; edges: Edge[] } | null>(null);
+    const previewRequestIdRef = useRef(0);
 
     const loadVersions = useCallback(async () => {
         if (!diagramId) return;
@@ -88,7 +89,9 @@ export function useVersionHistory(diagramId: string) {
         currentNodes: Node[],
         currentEdges: Edge[]
     ) => {
+        const requestId = ++previewRequestIdRef.current;
         const fullVersion = await loadVersionData(versionId);
+        if (requestId !== previewRequestIdRef.current) return false;
         if (!fullVersion || !fullVersion.snapshotData) {
             appMessage.error(t('designer.versionHistoryPanel.previewMissing'));
             return false;
@@ -108,6 +111,7 @@ export function useVersionHistory(diagramId: string) {
     }, [loadVersionData, t]);
 
     const exitPreview = useCallback(() => {
+        previewRequestIdRef.current += 1;
         const previewBase = previewBaseRef.current;
         if (previewBase) {
             previewBaseRef.current = null;
