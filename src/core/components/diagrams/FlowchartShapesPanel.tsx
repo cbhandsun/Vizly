@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import {  Tooltip, Typography, Input } from 'antd';
+import { Button, Input, Tooltip, Typography } from 'antd';
 import { SearchOutlined } from '@ant-design/icons';
 import { 
      FaBox, FaLayerGroup, FaThLarge, FaImage, FaServer, 
@@ -14,6 +14,7 @@ import { AccessibleInputClearIcon } from './AccessibleInputClearIcon';
 
 const { Text } = Typography;
 type NodeConfig = Record<string, unknown>;
+const COMPONENT_SEARCH_MAX_LENGTH = 100;
 const isRecord = (value: unknown): value is Record<string, unknown> =>
     Boolean(value && typeof value === 'object' && !Array.isArray(value));
 
@@ -339,6 +340,7 @@ export const FlowchartShapesPanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) 
                     placeholder={t('designer.sidebar.searchComponents')}
                     aria-label={t('designer.sidebar.searchComponents')}
                     data-icon-rail-search-focus="true"
+                    maxLength={COMPONENT_SEARCH_MAX_LENGTH}
                     size="small"
                     allowClear={{ clearIcon: <AccessibleInputClearIcon label={t('designer.sidebar.clearSearch')} /> }}
                     value={search}
@@ -358,8 +360,25 @@ export const FlowchartShapesPanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) 
             <div style={{ marginTop: 4 }}>
                 {filteredItems ? (
                     filteredItems.length === 0 ? (
-                        <div style={{ color: '#bfbfbf', textAlign: 'center', padding: 16, fontSize: 12 }}>
-                            无匹配组件
+                        <div
+                            role="status"
+                            aria-live="polite"
+                            aria-atomic="true"
+                            style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                gap: 10,
+                                color: '#667085',
+                                textAlign: 'center',
+                                padding: '28px 16px',
+                                fontSize: 12,
+                            }}
+                        >
+                            <span>{t('designer.sidebar.noComponentsFound', { query: search.trim() })}</span>
+                            <Button size="small" onClick={() => setSearch('')}>
+                                {t('designer.sidebar.showAllComponents')}
+                            </Button>
                         </div>
                     ) : (
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6 }}>
