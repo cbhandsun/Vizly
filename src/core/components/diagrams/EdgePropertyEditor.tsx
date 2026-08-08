@@ -17,6 +17,11 @@ import {
 } from '@ant-design/icons';
 import type { Color } from 'antd/es/color-picker';
 import type { CollapseProps } from 'antd';
+import {
+    coerceFlowchartReplaceText,
+    FLOWCHART_REPLACE_TEXT_MAX_LENGTH,
+} from './flowchartSearchReplace';
+import { coerceEdgePropertyStrokeWidth } from './edgePropertyBoundary';
 
 const { Text } = Typography;
 
@@ -67,7 +72,10 @@ export function useEdgePropertyItems(params: UseEdgePropertyItemsParams): Collap
     const commonEdgeRadius = getCommonValue(selectedEdges, (e) => e.data?.borderRadius as number | undefined);
     const commonEdgeColor = getCommonValue(selectedEdges, (e) => e.style?.stroke);
     const commonEdgeColorText = typeof commonEdgeColor === 'string' ? commonEdgeColor : selectLabel;
-    const commonEdgeWidth = getCommonValue(selectedEdges, (e) => e.style?.strokeWidth);
+    const commonEdgeWidth = getCommonValue(
+        selectedEdges,
+        (e) => coerceEdgePropertyStrokeWidth(e.style?.strokeWidth),
+    );
     const getDashStyle = (style: React.CSSProperties | undefined): string => {
         const d = style?.strokeDasharray;
         if (!d || d === 'none') return 'solid';
@@ -90,9 +98,14 @@ export function useEdgePropertyItems(params: UseEdgePropertyItemsParams): Collap
                 <Form.Item label={t('propertyPanel.label')}>
                     <Input value={localEdgeLabel}
                         aria-label={t('propertyPanel.label')}
-                        onChange={e => { setLocalEdgeLabel(e.target.value); debouncedUpdateEdgeLabel(e.target.value); }}
+                        onChange={e => {
+                            const nextLabel = coerceFlowchartReplaceText(e.target.value);
+                            setLocalEdgeLabel(nextLabel);
+                            debouncedUpdateEdgeLabel(nextLabel);
+                        }}
                         onBlur={() => { debouncedUpdateEdgeLabel.cancel?.(); updateEdges({ label: localEdgeLabel, data: { label: localEdgeLabel } }); }}
                         onFocus={armSnapshot}
+                        maxLength={FLOWCHART_REPLACE_TEXT_MAX_LENGTH}
                         placeholder={edgeCount > 1 && commonEdgeLabel === undefined ? mixedLabel : selectLabel}
                         allowClear disabled={disabled} />
                 </Form.Item>

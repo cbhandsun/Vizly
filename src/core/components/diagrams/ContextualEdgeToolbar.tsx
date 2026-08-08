@@ -6,6 +6,7 @@ import {
     coerceFlowchartReplaceText,
     FLOWCHART_REPLACE_TEXT_MAX_LENGTH,
 } from './flowchartSearchReplace';
+import { coerceEdgePropertyStrokeWidth } from './edgePropertyBoundary';
 import {
     LineOutlined,
     DashOutlined,
@@ -52,7 +53,7 @@ export const ContextualEdgeToolbar: React.FC<ContextualEdgeToolbarProps> = ({ ed
     const currentDash = getDashStyle(edge.style);
     const isDashed = currentDash !== 'solid';
     const isOrthogonal = edge.type === 'smart';
-    const currentWidth = (edge.style?.strokeWidth as number) || 2;
+    const currentWidth = coerceEdgePropertyStrokeWidth(edge.style?.strokeWidth);
 
     // 标签编辑状态
     const [isEditingLabel, setIsEditingLabel] = useState(false);

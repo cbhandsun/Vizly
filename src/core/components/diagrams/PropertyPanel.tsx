@@ -17,6 +17,10 @@ import { useEdgePropertyItems } from './EdgePropertyEditor';
 import { ThemeSwitcherPanel } from '../ui/ThemeSwitcherPanel';
 import { IconExplorer } from '../shared/IconExplorer';
 import { normalizeNodeDescriptionForEditing } from './nodeDescriptionText';
+import {
+    coerceFlowchartReplaceText,
+    getFlowchartEdgeVisibleLabel,
+} from './flowchartSearchReplace';
 import './PropertyPanel.css';
 
 const { Text } = Typography;
@@ -89,13 +93,13 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
     const commonNodeLabel = getCommonValue(selectedNodes, (n) => getNodeData(n)?.label);
     const commonNodeDesc = getCommonValue(selectedNodes, (n) => getNodeData(n)?.description);
     const commonDomain = getCommonValue(selectedNodes, (n) => getNodeData(n)?.domain);
-    const commonEdgeLabel = getCommonValue(selectedEdges, (e) => e.data?.label || e.label);
+    const commonEdgeLabel = getCommonValue(selectedEdges, getFlowchartEdgeVisibleLabel);
 
     const externalFieldValues = {
         label: commonNodeLabel ?? '',
         description: normalizeNodeDescriptionForEditing(commonNodeDesc),
         domain: commonDomain ?? '',
-        edgeLabel: typeof commonEdgeLabel === 'string' ? commonEdgeLabel : '',
+        edgeLabel: coerceFlowchartReplaceText(commonEdgeLabel),
     };
 
     // --- 本地状态 ---

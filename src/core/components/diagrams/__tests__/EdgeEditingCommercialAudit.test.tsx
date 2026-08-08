@@ -111,6 +111,52 @@ describe('edge editing commercial audit regressions', () => {
         }
     });
 
+    it('shows the effective default width for a single edge instead of a mixed state', () => {
+        const edgeWithoutExplicitWidth = {
+            ...createEdge(),
+            style: { stroke: '#3b82f6' },
+        };
+        render(
+            <PropertyPanel
+                selectedNodes={[]}
+                selectedEdges={[edgeWithoutExplicitWidth]}
+                onUpdateNodes={vi.fn()}
+                onUpdateEdges={vi.fn()}
+                docked
+            />,
+        );
+
+        const widthInput = screen.getByRole('spinbutton', { name: 'propertyPanel.lineWidth' }) as HTMLInputElement;
+        expect(widthInput.value).toBe('2');
+        expect(widthInput.getAttribute('placeholder')).not.toBe('propertyPanel.mixed');
+    });
+
+    it('bounds and sanitizes labels edited through the full property panel', () => {
+        const onUpdateEdges = vi.fn();
+        render(
+            <PropertyPanel
+                selectedNodes={[]}
+                selectedEdges={[{ ...createEdge(), label: `unsafe\u0000${'x'.repeat(1_200)}` }]}
+                onUpdateNodes={vi.fn()}
+                onUpdateEdges={onUpdateEdges}
+                docked
+            />,
+        );
+
+        const labelInput = screen.getByRole('textbox', { name: 'propertyPanel.label' }) as HTMLInputElement;
+        expect(labelInput.maxLength).toBe(1_000);
+        expect(labelInput.value).toBe(`unsafe${'x'.repeat(994)}`);
+
+        fireEvent.change(labelInput, { target: { value: `next\u0000${'y'.repeat(1_200)}` } });
+        expect(labelInput.value).toBe(`next${'y'.repeat(996)}`);
+        fireEvent.blur(labelInput);
+
+        expect(onUpdateEdges).toHaveBeenLastCalledWith(
+            ['edge-1'],
+            { label: `next${'y'.repeat(996)}`, data: { label: `next${'y'.repeat(996)}` } },
+        );
+    });
+
     it('enforces 44px contextual controls for narrow or coarse-pointer environments', () => {
         const css = readFileSync(
             'src/core/components/shared/FloatingToolbar/FloatingToolbar.css',
