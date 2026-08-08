@@ -4,6 +4,41 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('react-i18next', () => ({
+    useTranslation: () => ({
+        i18n: { language: 'en', resolvedLanguage: 'en' },
+        t: (key: string, params?: Record<string, string>) => {
+            const messages: Record<string, string> = {
+                'designer.versionHistoryPanel.title': 'Version history',
+                'designer.versionHistoryPanel.close': 'Close version history',
+                'designer.versionHistoryPanel.createTitle': 'Create snapshot',
+                'designer.versionHistoryPanel.messageLabel': 'Snapshot note (optional)',
+                'designer.versionHistoryPanel.messagePlaceholder': 'Snapshot note (optional), for example: Added order module',
+                'designer.versionHistoryPanel.save': 'Save snapshot',
+                'designer.versionHistoryPanel.defaultMessage': 'Manually saved snapshot',
+                'designer.versionHistoryPanel.messageHint': 'If left blank, the note will be “{{defaultMessage}}”.',
+                'designer.versionHistoryPanel.previewing': 'Previewing: {{message}}',
+                'designer.versionHistoryPanel.previewReadonly': 'Preview is read-only. Exit preview to edit or create a snapshot.',
+                'designer.versionHistoryPanel.exitPreview': 'Exit preview',
+                'designer.versionHistoryPanel.empty': 'No version snapshots yet',
+                'designer.versionHistoryPanel.preview': 'Preview',
+                'designer.versionHistoryPanel.previewVersion': 'Preview version: {{message}}',
+                'designer.versionHistoryPanel.exitPreviewVersion': 'Exit preview: {{message}}',
+                'designer.versionHistoryPanel.restoreTitle': 'Restore version',
+                'designer.versionHistoryPanel.restoreDescription': 'The current canvas will be backed up first. If the backup fails, restore will be cancelled. Restore this version?',
+                'designer.versionHistoryPanel.restore': 'Restore',
+                'designer.versionHistoryPanel.cancel': 'Cancel',
+                'designer.versionHistoryPanel.restoreTooltip': 'Restore this version',
+                'designer.versionHistoryPanel.restoreVersion': 'Restore version: {{message}}',
+                'designer.versionHistoryPanel.unnamed': 'Unnamed snapshot',
+                'designer.versionHistoryPanel.latest': 'Latest',
+                'designer.versionHistoryPanel.createdBy': 'Created by {{author}}',
+            };
+            return (messages[key] ?? key).replace(/\{\{(\w+)\}\}/g, (_match, name: string) => params?.[name] ?? '');
+        },
+    }),
+}));
+
 beforeAll(() => {
     Object.defineProperty(globalThis, 'ResizeObserver', {
         configurable: true,
@@ -82,25 +117,25 @@ describe('VersionHistoryPanel commercial preview safeguards', () => {
         vi.restoreAllMocks();
     });
 
-    it('uses a concise localized title and keeps snapshot creation available normally', () => {
+    it('uses the active English locale and keeps snapshot creation available normally', () => {
         render(<VersionHistoryPanel diagramId="diagram-1" isOpen onClose={vi.fn()} />);
 
-        expect(screen.getByText('版本历史')).toBeTruthy();
-        expect(screen.queryByText('版本历史 (Version History)')).toBeNull();
-        expect((screen.getByLabelText('版本备注（选填）') as HTMLInputElement).disabled).toBe(false);
-        expect((screen.getByRole('button', { name: /保存/ }) as HTMLButtonElement).disabled).toBe(false);
+        expect(screen.getByText('Version history')).toBeTruthy();
+        expect(screen.queryByText(/版本/u)).toBeNull();
+        expect((screen.getByLabelText('Snapshot note (optional)') as HTMLInputElement).disabled).toBe(false);
+        expect((screen.getByRole('button', { name: /Save snapshot/ }) as HTMLButtonElement).disabled).toBe(false);
     });
 
     it('makes version preview read-only and prevents saving a new snapshot', () => {
-        historyMocks.previewVersion = { id: 'version-1', message: '发布候选版本' };
+        historyMocks.previewVersion = { id: 'version-1', message: 'Release candidate' };
         render(<VersionHistoryPanel diagramId="diagram-1" isOpen onClose={vi.fn()} />);
 
-        const input = screen.getByLabelText('版本备注（选填）') as HTMLInputElement;
-        const saveButton = screen.getByRole('button', { name: /保存/ }) as HTMLButtonElement;
+        const input = screen.getByLabelText('Snapshot note (optional)') as HTMLInputElement;
+        const saveButton = screen.getByRole('button', { name: /Save snapshot/ }) as HTMLButtonElement;
 
         expect(input.disabled).toBe(true);
         expect(saveButton.disabled).toBe(true);
-        expect(screen.getByRole('status').textContent).toContain('预览为只读模式');
+        expect(screen.getByRole('status').textContent).toContain('Preview is read-only');
 
         const interactionShield = document.querySelector('.ant-drawer-mask');
         expect(interactionShield).toBeTruthy();
@@ -117,13 +152,13 @@ describe('VersionHistoryPanel commercial preview safeguards', () => {
             diagramId: 'diagram-1',
             snapshotData: null,
             createdAt: 1,
-            message: '发布候选版本',
+            message: 'Release candidate',
         }];
         render(<VersionHistoryPanel diagramId="diagram-1" isOpen onClose={vi.fn()} />);
 
-        fireEvent.click(screen.getByLabelText('恢复版本：发布候选版本'));
+        fireEvent.click(screen.getByLabelText('Restore version: Release candidate'));
 
-        expect(await screen.findByText('恢复前会自动备份当前画布；若备份失败，将取消恢复。确定恢复此版本吗？')).toBeTruthy();
+        expect(await screen.findByText('The current canvas will be backed up first. If the backup fails, restore will be cancelled. Restore this version?')).toBeTruthy();
     });
 
     it('returns focus to document actions after the drawer closes', () => {
@@ -135,12 +170,12 @@ describe('VersionHistoryPanel commercial preview safeguards', () => {
 
         const trigger = document.createElement('button');
         trigger.setAttribute('data-version-history-focus-return', '');
-        trigger.textContent = '文档操作';
+        trigger.textContent = 'Document actions';
         document.body.appendChild(trigger);
 
         const onClose = vi.fn();
         render(<VersionHistoryPanel diagramId="diagram-1" isOpen onClose={onClose} />);
-        const closeButton = screen.getByRole('button', { name: 'Close' });
+        const closeButton = screen.getByRole('button', { name: 'Close version history' });
         closeButton.focus();
 
         fireEvent.click(closeButton);
@@ -148,6 +183,35 @@ describe('VersionHistoryPanel commercial preview safeguards', () => {
         expect(document.activeElement).not.toBe(trigger);
 
         restoreFocus?.(0);
+        expect(document.activeElement).toBe(trigger);
+        trigger.remove();
+    });
+
+    it('returns focus to document actions after a successful restore closes the drawer', async () => {
+        const pendingFrames: FrameRequestCallback[] = [];
+        vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+            pendingFrames.push(callback);
+            return pendingFrames.length;
+        });
+        historyMocks.versions = [{
+            id: 'version-1',
+            diagramId: 'diagram-1',
+            snapshotData: null,
+            createdAt: 1,
+            message: 'Release candidate',
+        }];
+        const trigger = document.createElement('button');
+        trigger.setAttribute('data-version-history-focus-return', '');
+        trigger.textContent = 'Document actions';
+        document.body.appendChild(trigger);
+        const onClose = vi.fn();
+
+        render(<VersionHistoryPanel diagramId="diagram-1" isOpen onClose={onClose} />);
+        fireEvent.click(screen.getByLabelText('Restore version: Release candidate'));
+        fireEvent.click(await screen.findByRole('button', { name: 'Restore' }));
+
+        await vi.waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+        while (pendingFrames.length > 0) pendingFrames.shift()?.(0);
         expect(document.activeElement).toBe(trigger);
         trigger.remove();
     });

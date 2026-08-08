@@ -227,13 +227,13 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
         }] : []),
         ...(onShowHistory ? [{
             key: 'operation-history',
-            label: t('designer.toolbar.operationHistory', '操作历史'),
+            label: t('designer.toolbar.operationHistory'),
             icon: <FaHistory />,
             onClick: onShowHistory,
         }] : []),
         ...(onOpenVersionHistory ? [{
             key: 'version-history',
-            label: t('designer.toolbar.versionHistory', '版本快照'),
+            label: t('designer.toolbar.versionHistory'),
             icon: <FaHistory />,
             onClick: onOpenVersionHistory,
         }] : []),

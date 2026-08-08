@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Drawer, Button, Input, List, Typography, Space, Tooltip, Badge, Popconfirm } from 'antd';
 import { PlusOutlined, UndoOutlined, EyeOutlined } from '@ant-design/icons';
 import { Clock } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useVersionHistory } from '../hooks/useVersionHistory';
 import { useReactFlow } from '@xyflow/react';
 import {
@@ -25,6 +26,7 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
     isOpen,
     onClose
 }) => {
+    const { t, i18n } = useTranslation();
     const { setNodes, setEdges, getNodes, getEdges } = useReactFlow();
     const {
         versions,
@@ -62,7 +64,10 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
         if (isSaving || previewVersion) return;
         setIsSaving(true);
         try {
-            const saved = await saveVersion(normalizeVersionMessage(commitMessage));
+            const saved = await saveVersion(normalizeVersionMessage(
+                commitMessage,
+                t('designer.versionHistoryPanel.defaultMessage'),
+            ));
             if (saved) setCommitMessage('');
         } finally {
             setIsSaving(false);
@@ -74,7 +79,7 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
         setRestoringVersionId(versionId);
         try {
             const success = await restoreVersion(versionId, setNodes, setEdges);
-            if (success) onClose();
+            if (success) handleClose();
         } finally {
             setRestoringVersionId(null);
         }
@@ -100,7 +105,8 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
 
     return (
         <Drawer
-            title="版本历史"
+            title={t('designer.versionHistoryPanel.title')}
+            closable={{ 'aria-label': t('designer.versionHistoryPanel.close') }}
             placement="right"
             onClose={handleClose}
             open={isOpen}
@@ -118,14 +124,16 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
         >
             {/* Create Snapshot Area */}
             <div style={{ padding: '20px', background: '#fafafa', borderBottom: '1px solid #f0f0f0' }}>
-                <Title level={5} style={{ marginTop: 0, fontSize: 14 }}>创建新快照</Title>
+                <Title level={5} style={{ marginTop: 0, fontSize: 14 }}>
+                    {t('designer.versionHistoryPanel.createTitle')}
+                </Title>
                 <div className="version-history-create-row">
                     <Input 
-                        aria-label="版本备注（选填）"
+                        aria-label={t('designer.versionHistoryPanel.messageLabel')}
                         aria-describedby={previewVersion
                             ? 'version-history-message-hint version-history-preview-notice'
                             : 'version-history-message-hint'}
-                        placeholder="版本备注（选填，例如：添加了订单模块）"
+                        placeholder={t('designer.versionHistoryPanel.messagePlaceholder')}
                         value={commitMessage}
                         onChange={e => setCommitMessage(e.target.value)}
                         onPressEnter={handleSave}
@@ -140,7 +148,7 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
                         loading={isSaving}
                         disabled={Boolean(previewVersion)}
                     >
-                        保存
+                        {t('designer.versionHistoryPanel.save')}
                     </Button>
                 </div>
                 <Text
@@ -148,7 +156,9 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
                     type="secondary"
                     className="version-history-message-hint"
                 >
-                    留空时将使用“手动保存的版本快照”
+                    {t('designer.versionHistoryPanel.messageHint', {
+                        defaultMessage: t('designer.versionHistoryPanel.defaultMessage'),
+                    })}
                 </Text>
             </div>
 
@@ -169,10 +179,12 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
                     <Space orientation="vertical" size={0}>
                         <Space>
                             <EyeOutlined style={{ color: '#1677ff' }} />
-                            <Text strong style={{ color: '#1677ff', fontSize: 13 }}>正在预览：{previewVersion.message}</Text>
+                            <Text strong style={{ color: '#1677ff', fontSize: 13 }}>
+                                {t('designer.versionHistoryPanel.previewing', { message: previewVersion.message })}
+                            </Text>
                         </Space>
                         <Text style={{ color: '#1677ff', fontSize: 12 }}>
-                            预览为只读模式；退出预览后才能继续编辑或创建新快照
+                            {t('designer.versionHistoryPanel.previewReadonly')}
                         </Text>
                     </Space>
                     <Button
@@ -184,7 +196,7 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
                                 setEdges(previewBase.edges);
                             }
                         }}
-                    >退出预览</Button>
+                    >{t('designer.versionHistoryPanel.exitPreview')}</Button>
                 </div>
             )}
 
@@ -193,7 +205,7 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
                 loading={loading}
                 itemLayout="horizontal"
                 dataSource={versions}
-                locale={{ emptyText: '暂无版本快照' }}
+                locale={{ emptyText: t('designer.versionHistoryPanel.empty') }}
                 style={{ flex: 1, overflowY: 'auto' }}
                 renderItem={(item, index) => {
                     const isLatest = index === 0;
@@ -206,25 +218,31 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
                                     key="preview"
                                     className="version-history-action"
                                     type={isPreviewing ? 'primary' : 'default'}
-                                    aria-label={isPreviewing ? `退出预览：${item.message}` : `预览版本：${item.message}`}
+                                    aria-label={isPreviewing
+                                        ? t('designer.versionHistoryPanel.exitPreviewVersion', { message: item.message })
+                                        : t('designer.versionHistoryPanel.previewVersion', { message: item.message })}
                                     icon={<EyeOutlined />}
                                     loading={previewingVersionId === item.id}
                                     onClick={() => void handlePreview(item.id)}
                                 >
-                                    {isPreviewing ? '退出预览' : '预览'}
+                                    {isPreviewing
+                                        ? t('designer.versionHistoryPanel.exitPreview')
+                                        : t('designer.versionHistoryPanel.preview')}
                                 </Button>,
                                 <Popconfirm
                                     key="restore"
-                                    title="恢复版本"
-                                    description="恢复前会自动备份当前画布；若备份失败，将取消恢复。确定恢复此版本吗？"
+                                    title={t('designer.versionHistoryPanel.restoreTitle')}
+                                    description={t('designer.versionHistoryPanel.restoreDescription')}
                                     onConfirm={() => void handleRestore(item.id)}
-                                    okText="恢复"
-                                    cancelText="取消"
+                                    okText={t('designer.versionHistoryPanel.restore')}
+                                    cancelText={t('designer.versionHistoryPanel.cancel')}
                                 >
-                                    <Tooltip title="恢复此版本">
+                                    <Tooltip title={t('designer.versionHistoryPanel.restoreTooltip')}>
                                         <Button
                                             className="version-history-action"
-                                            aria-label={`恢复版本：${item.message}`}
+                                            aria-label={t('designer.versionHistoryPanel.restoreVersion', {
+                                                message: item.message,
+                                            })}
                                             type="text"
                                             icon={<UndoOutlined />}
                                             loading={restoringVersionId === item.id}
@@ -254,18 +272,27 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
                                 }
                                 title={
                                     <Space>
-                                        <Text strong>{item.message || '未命名快照'}</Text>
-                                        {isLatest && <Badge count="最新" style={{ backgroundColor: '#52c41a' }} />}
+                                        <Text strong>{item.message || t('designer.versionHistoryPanel.unnamed')}</Text>
+                                        {isLatest && (
+                                            <Badge
+                                                count={t('designer.versionHistoryPanel.latest')}
+                                                style={{ backgroundColor: '#52c41a' }}
+                                            />
+                                        )}
                                     </Space>
                                 }
                                 description={
                                     <Space orientation="vertical" size={0}>
                                         <Text type="secondary" style={{ fontSize: 12 }}>
-                                            {new Date(item.createdAt).toLocaleString()}
+                                            {new Date(item.createdAt).toLocaleString(
+                                                i18n.resolvedLanguage || i18n.language,
+                                            )}
                                         </Text>
                                         {item.authorId && item.authorId !== 'anonymous' && (
                                             <Text type="secondary" style={{ fontSize: 11 }}>
-                                                由 {item.authorId} 创建
+                                                {t('designer.versionHistoryPanel.createdBy', {
+                                                    author: item.authorId,
+                                                })}
                                             </Text>
                                         )}
                                     </Space>

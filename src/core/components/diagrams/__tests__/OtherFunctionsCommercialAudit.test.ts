@@ -24,7 +24,7 @@ describe('other-function commercial interaction safeguards', () => {
         const css = readSource('../ui/AdvancedExportModal.css');
 
         expect(source).toContain('rootClassName={`${COMMERCIAL_VIEWPORT_MODAL_CLASS} advanced-export-modal`}');
-        expect(source).toContain("'aria-label': t('common.close')");
+        expect(source).toContain("'aria-label': t('advancedExport.closeDialog')");
         expect(source).toContain('aria-label={t(\'advancedExport.formatLabel\')}');
         expect(source).toContain('aria-label={t(\'advancedExport.dpiLabel\')}');
         expect(css).toMatch(/\.advanced-export-modal \.ant-modal-close,[\s\S]*?min-height: var\(--commercial-touch-target, 44px\)/);
@@ -84,7 +84,7 @@ describe('other-function commercial interaction safeguards', () => {
 
         expect(panelSource).toContain('rootClassName="keyboard-shortcut-panel"');
         expect(panelSource).toContain('<FaKeyboard aria-hidden="true" />');
-        expect(modalSource).toContain('getContainer={() => document.body}');
+        expect(modalSource).toContain('getContainer={getContainer ?? (() => document.body)}');
         expect(flowchartModalSource).toContain('getContainer={() => document.body}');
         expect(panelCss).toMatch(/\.keyboard-shortcut-panel \.ant-modal-close[\s\S]*?width: var\(--commercial-touch-target, 44px\)[\s\S]*?height: var\(--commercial-touch-target, 44px\)/);
         expect(modalCss).toMatch(/\.commercial-shortcuts-modal \.ant-modal-close[\s\S]*?width: var\(--commercial-touch-target, 44px\)[\s\S]*?height: var\(--commercial-touch-target, 44px\)/);
@@ -152,11 +152,12 @@ describe('other-function commercial interaction safeguards', () => {
     it('explains that version snapshot notes are optional and supplies the default outcome', () => {
         const source = readSource('../../../../components/diagrams/ui/VersionHistoryPanel.tsx');
 
-        expect(source).toContain('aria-label="版本备注（选填）"');
+        expect(source).toContain("aria-label={t('designer.versionHistoryPanel.messageLabel')}");
         expect(source).toContain('aria-describedby={previewVersion');
-        expect(source).toContain('留空时将使用“手动保存的版本快照”');
+        expect(source).toContain("t('designer.versionHistoryPanel.messageHint'");
         expect(source).toContain('if (isSaving || previewVersion) return;');
-        expect(source).toContain('退出预览后才能继续编辑或创建新快照');
+        expect(source).toContain("t('designer.versionHistoryPanel.previewReadonly')");
+        expect(source).not.toMatch(/[\u3400-\u9fff]/u);
     });
 
     it('opens find and replace through explicit state instead of delayed DOM coupling', () => {

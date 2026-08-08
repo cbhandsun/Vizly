@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import type { Edge, Node } from '@xyflow/react';
+import { useTranslation } from 'react-i18next';
 import { DiagramVersion } from '@/services/storage/types';
 import { appMessage } from '@/core/utils/antdStaticBridge';
 import { getFlowDataBridge } from '@/core/utils/flowDataBridge';
@@ -13,8 +14,6 @@ import {
 } from './diagramStorageLogging';
 
 const loadUnifiedStorage = async () => (await import('@/services/UnifiedStorageService')).unifiedStorage;
-const RESTORE_BACKUP_MESSAGE = '恢复前自动备份';
-
 const readBridgeCanvasSnapshot = (bridge: ReturnType<typeof getFlowDataBridge>) => {
     if (!bridge) return null;
     const candidate = typeof bridge.getCanvasSnapshot === 'function'
@@ -24,6 +23,7 @@ const readBridgeCanvasSnapshot = (bridge: ReturnType<typeof getFlowDataBridge>) 
 };
 
 export function useVersionHistory(diagramId: string) {
+    const { t } = useTranslation();
     const [versions, setVersions] = useState<DiagramVersion[]>([]);
     const [loading, setLoading] = useState(false);
     const [previewVersion, setPreviewVersion] = useState<DiagramVersion | null>(null);
@@ -38,11 +38,11 @@ export function useVersionHistory(diagramId: string) {
             setVersions(data);
         } catch (error) {
             logVersionHistoryLoadFailure(error);
-            appMessage.error("加载历史版本失败");
+            appMessage.error(t('designer.versionHistoryPanel.loadFailed'));
         } finally {
             setLoading(false);
         }
-    }, [diagramId]);
+    }, [diagramId, t]);
 
     const saveVersion = useCallback(async (commitMessage: string): Promise<boolean> => {
         if (!diagramId) return false;
@@ -52,7 +52,7 @@ export function useVersionHistory(diagramId: string) {
             const bridge = getFlowDataBridge(diagramId);
             const snapshot = readBridgeCanvasSnapshot(bridge);
             if (!snapshot) {
-                appMessage.error('无法提取当前图表数据');
+                appMessage.error(t('designer.versionHistoryPanel.canvasUnavailable'));
                 return false;
             }
 
@@ -60,15 +60,15 @@ export function useVersionHistory(diagramId: string) {
             
             // Add new version to list without refetching all
             setVersions(prev => [newVersion, ...prev]);
-            appMessage.success("已保存快照");
+            appMessage.success(t('designer.versionHistoryPanel.saveSuccess'));
             return true;
             
         } catch (error) {
             logVersionHistorySaveFailure(error);
-            appMessage.error("保存版本失败");
+            appMessage.error(t('designer.versionHistoryPanel.saveFailed'));
             return false;
         }
-    }, [diagramId]);
+    }, [diagramId, t]);
 
     const loadVersionData = useCallback(async (versionId: string) => {
         try {
@@ -76,10 +76,10 @@ export function useVersionHistory(diagramId: string) {
             return await unifiedStorage.loadVersion(diagramId, versionId);
         } catch (e) {
             logVersionHistoryPayloadLoadFailure(e);
-            appMessage.error("加载快照详细数据失败");
+            appMessage.error(t('designer.versionHistoryPanel.payloadLoadFailed'));
             return null;
         }
-    }, [diagramId]);
+    }, [diagramId, t]);
 
     const enterPreview = useCallback(async (
         versionId: string,
@@ -90,13 +90,13 @@ export function useVersionHistory(diagramId: string) {
     ) => {
         const fullVersion = await loadVersionData(versionId);
         if (!fullVersion || !fullVersion.snapshotData) {
-            appMessage.error("无法预览：快照数据缺失");
+            appMessage.error(t('designer.versionHistoryPanel.previewMissing'));
             return false;
         }
 
         const snapshot = coerceClipboardData(fullVersion.snapshotData);
         if (!snapshot) {
-            appMessage.error("无法预览：快照结构无效");
+            appMessage.error(t('designer.versionHistoryPanel.previewInvalid'));
             return false;
         }
 
@@ -105,7 +105,7 @@ export function useVersionHistory(diagramId: string) {
         setEdges(snapshot.edges);
         setPreviewVersion(fullVersion);
         return true;
-    }, [loadVersionData]);
+    }, [loadVersionData, t]);
 
     const exitPreview = useCallback(() => {
         const previewBase = previewBaseRef.current;
@@ -128,19 +128,19 @@ export function useVersionHistory(diagramId: string) {
             : await loadVersionData(versionId);
 
         if (!fullVersion || !fullVersion.snapshotData) {
-            appMessage.error("无法恢复：快照数据缺失");
+            appMessage.error(t('designer.versionHistoryPanel.restoreMissing'));
             return false;
         }
 
         const snapshot = coerceClipboardData(fullVersion.snapshotData);
         if (!snapshot) {
-            appMessage.error("无法恢复：快照结构无效");
+            appMessage.error(t('designer.versionHistoryPanel.restoreInvalid'));
             return false;
         }
 
         const bridge = getFlowDataBridge(diagramId);
         if (!bridge) {
-            appMessage.error('无法提取当前图表数据');
+            appMessage.error(t('designer.versionHistoryPanel.canvasUnavailable'));
             return false;
         }
 
@@ -148,7 +148,7 @@ export function useVersionHistory(diagramId: string) {
             ? coerceClipboardData(previewBaseRef.current)
             : readBridgeCanvasSnapshot(bridge);
         if (!backupSnapshot) {
-            appMessage.error('未能创建恢复前备份，已取消恢复');
+            appMessage.error(t('designer.versionHistoryPanel.backupFailed'));
             return false;
         }
 
@@ -157,12 +157,12 @@ export function useVersionHistory(diagramId: string) {
             const backupVersion = await unifiedStorage.saveVersion(
                 diagramId,
                 backupSnapshot,
-                RESTORE_BACKUP_MESSAGE,
+                t('designer.versionHistoryPanel.backupMessage'),
             );
             setVersions(prev => [backupVersion, ...prev]);
         } catch (e) {
             logVersionHistoryRestoreFailure(e);
-            appMessage.error('未能创建恢复前备份，已取消恢复');
+            appMessage.error(t('designer.versionHistoryPanel.backupFailed'));
             return false;
         }
 
@@ -174,18 +174,18 @@ export function useVersionHistory(diagramId: string) {
                 setEdges(snapshot.edges);
             }
 
-            appMessage.success(
-                `已恢复至快照：${fullVersion.message || fullVersion.id.substring(0, 8)}；恢复前内容已自动备份`,
-            );
+            appMessage.success(t('designer.versionHistoryPanel.restoreSuccess', {
+                message: fullVersion.message || fullVersion.id.substring(0, 8),
+            }));
             previewBaseRef.current = null;
             setPreviewVersion(null);
             return true;
         } catch (e) {
             logVersionHistoryRestoreFailure(e);
-            appMessage.error('恢复出错；恢复前内容已安全备份');
+            appMessage.error(t('designer.versionHistoryPanel.restoreFailed'));
         }
         return false;
-    }, [diagramId, previewVersion, loadVersionData]);
+    }, [diagramId, previewVersion, loadVersionData, t]);
 
     // Initial load
     useEffect(() => {

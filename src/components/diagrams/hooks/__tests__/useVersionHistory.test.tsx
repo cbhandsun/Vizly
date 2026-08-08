@@ -2,6 +2,25 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import type { Edge, Node } from '@xyflow/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('react-i18next', () => {
+    const t = (key: string, params?: { message?: string }) => ({
+            'designer.versionHistoryPanel.loadFailed': 'Failed to load version history',
+            'designer.versionHistoryPanel.canvasUnavailable': 'The current diagram data could not be read',
+            'designer.versionHistoryPanel.saveSuccess': 'Snapshot saved',
+            'designer.versionHistoryPanel.saveFailed': 'Failed to save snapshot',
+            'designer.versionHistoryPanel.payloadLoadFailed': 'Failed to load snapshot details',
+            'designer.versionHistoryPanel.previewMissing': 'Cannot preview: snapshot data is missing',
+            'designer.versionHistoryPanel.previewInvalid': 'Cannot preview: snapshot data is invalid',
+            'designer.versionHistoryPanel.restoreMissing': 'Cannot restore: snapshot data is missing',
+            'designer.versionHistoryPanel.restoreInvalid': 'Cannot restore: snapshot data is invalid',
+            'designer.versionHistoryPanel.backupMessage': 'Automatic backup before restore',
+            'designer.versionHistoryPanel.backupFailed': 'Restore cancelled because the safety backup could not be created',
+            'designer.versionHistoryPanel.restoreSuccess': `Restored to snapshot: ${params?.message ?? ''}. The previous canvas was backed up automatically.`,
+            'designer.versionHistoryPanel.restoreFailed': 'Restore failed. The previous canvas remains safely backed up.',
+        }[key] ?? key);
+    return { useTranslation: () => ({ t }) };
+});
+
 const storageMocks = vi.hoisted(() => ({
     listVersions: vi.fn(),
     loadVersion: vi.fn(),
@@ -60,7 +79,7 @@ const makeBackupVersion = () => ({
         edges: originalEdges,
     },
     createdAt: 2,
-    message: '恢复前自动备份',
+    message: 'Automatic backup before restore',
 });
 
 describe('useVersionHistory', () => {
@@ -132,7 +151,7 @@ describe('useVersionHistory', () => {
         expect(storageMocks.saveVersion).toHaveBeenCalledWith(
             'diagram-1',
             { nodes: originalNodes, edges: originalEdges },
-            '恢复前自动备份',
+            'Automatic backup before restore',
         );
         expect(bridge.replaceCanvasSnapshot).toHaveBeenCalledWith({ nodes: previewNodes, edges: previewEdges });
         expect(bridge.nodes).toEqual(previewNodes);
@@ -182,7 +201,7 @@ describe('useVersionHistory', () => {
 
         expect(saved).toBe(false);
         expect(storageMocks.saveVersion).not.toHaveBeenCalled();
-        expect(messageMocks.error).toHaveBeenCalledWith('无法提取当前图表数据');
+        expect(messageMocks.error).toHaveBeenCalledWith('The current diagram data could not be read');
     });
 
     it('cancels restore and preserves the preview when the safety backup fails', async () => {
@@ -213,11 +232,11 @@ describe('useVersionHistory', () => {
         expect(storageMocks.saveVersion).toHaveBeenCalledWith(
             'diagram-1',
             { nodes: originalNodes, edges: originalEdges },
-            '恢复前自动备份',
+            'Automatic backup before restore',
         );
         expect(bridge.replaceCanvasSnapshot).not.toHaveBeenCalled();
         expect(result.current.previewVersion?.id).toBe('version-1');
-        expect(messageMocks.error).toHaveBeenCalledWith('未能创建恢复前备份，已取消恢复');
+        expect(messageMocks.error).toHaveBeenCalledWith('Restore cancelled because the safety backup could not be created');
     });
 
     it('returns failure when persistence rejects', async () => {
@@ -233,7 +252,7 @@ describe('useVersionHistory', () => {
         });
 
         expect(saved).toBe(false);
-        expect(messageMocks.error).toHaveBeenCalledWith('保存版本失败');
+        expect(messageMocks.error).toHaveBeenCalledWith('Failed to save snapshot');
         expect(result.current.versions).toEqual([]);
     });
 });

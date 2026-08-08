@@ -14,11 +14,14 @@ const removeUnsafeControlCharacters = (value: string): string => Array.from(valu
     })
     .join('');
 
-export const normalizeVersionMessage = (value: unknown): string => {
-    if (typeof value !== 'string') return DEFAULT_VERSION_MESSAGE;
+export const normalizeVersionMessage = (
+    value: unknown,
+    defaultMessage = DEFAULT_VERSION_MESSAGE,
+): string => {
+    if (typeof value !== 'string') return defaultMessage;
     const normalized = removeUnsafeControlCharacters(value)
         .replace(/\s+/g, ' ')
         .trim()
         .slice(0, VERSION_MESSAGE_MAX_LENGTH);
-    return normalized || DEFAULT_VERSION_MESSAGE;
+    return normalized || defaultMessage;
 };

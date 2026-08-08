@@ -14,6 +14,8 @@ describe('normalizeVersionMessage', () => {
     it('uses the default for empty and non-string input', () => {
         expect(normalizeVersionMessage('   ')).toBe(DEFAULT_VERSION_MESSAGE);
         expect(normalizeVersionMessage(null)).toBe(DEFAULT_VERSION_MESSAGE);
+        expect(normalizeVersionMessage('   ', 'Manually saved snapshot')).toBe('Manually saved snapshot');
+        expect(normalizeVersionMessage(undefined, 'Manually saved snapshot')).toBe('Manually saved snapshot');
     });
 
     it('bounds exceptionally long input', () => {
