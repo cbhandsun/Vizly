@@ -18,6 +18,8 @@ import {
     type FlowchartCanvasReplaceResult,
     type FlowchartCanvasSearchMatch,
 } from './flowchartSearchReplace';
+import { getCanvasSearchMatchAnnouncementLabel } from './canvasSearchAccessibility';
+import { CanvasSearchConfirmationDescription } from './CanvasSearchConfirmationDescription';
 
 export interface CanvasSearchBarProps {
     visible: boolean;
@@ -142,6 +144,17 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
         : 0;
     const currentMatch = matches[boundedCurrentIndex] ?? null;
     const currentMatchKey = currentMatch ? buildFlowchartCanvasSearchMatchKey(currentMatch) : null;
+    const currentMatchLabel = currentMatch
+        ? getCanvasSearchMatchAnnouncementLabel(currentMatch, nodes, edges)
+        : '';
+    const resultAnnouncement = currentMatch
+        ? t('designer.canvasSearch.currentResultAnnouncement', {
+              current: boundedCurrentIndex + 1,
+              total: matches.length,
+              type: t(`designer.canvasSearch.resultTypes.${currentMatch.kind}`),
+              label: currentMatchLabel,
+          })
+        : t('designer.canvasSearch.noResultsAnnouncement');
     const nodeMatchIds = useMemo(() => new Set(
         matches.filter(match => match.kind === 'node').map(match => match.id),
     ), [matches]);
@@ -506,7 +519,7 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
                     />
                     {/* 结果计数 */}
                     {query && (
-                        <span role="status" aria-label={t('designer.canvasSearch.resultPosition')} aria-live="polite" aria-atomic="true" style={{
+                            <span role="status" aria-label={resultAnnouncement} aria-live="polite" aria-atomic="true" style={{
                             fontSize: 11,
                             color: matches.length > 0 ? token.colorTextSecondary : '#ef4444',
                             whiteSpace: 'nowrap',
@@ -580,7 +593,14 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
                             value={replaceText}
                             onChange={e => handleReplaceTextChange(e.target.value)}
                             maxLength={FLOWCHART_REPLACE_TEXT_MAX_LENGTH}
-                            onKeyDown={e => { if (e.key === 'Enter') handleReplaceCurrent(); }}
+                            onKeyDown={e => {
+                                if (e.key === 'Escape') {
+                                    e.preventDefault();
+                                    closeSearch();
+                                    return;
+                                }
+                                if (e.key === 'Enter') handleReplaceCurrent();
+                            }}
                             aria-label={t('designer.canvasSearch.replaceInputLabel')}
                             placeholder={t('designer.canvasSearch.replacePlaceholder')}
                             style={{
@@ -606,7 +626,13 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
                             title={t('designer.canvasSearch.replaceConfirmTitle', {
                                 matches: formatMatchCounts(allReplacePlan.changedMatches),
                             })}
-                            description={t('designer.canvasSearch.replaceConfirmDescription')}
+                            description={<CanvasSearchConfirmationDescription
+                                description={t('designer.canvasSearch.replaceConfirmDescription')}
+                                mapping={t('designer.canvasSearch.replaceConfirmMapping', {
+                                    query,
+                                    replacement: replaceText || t('designer.canvasSearch.emptyReplacement'),
+                                })}
+                            />}
                             okText={t('designer.canvasSearch.replaceConfirm')}
                             cancelText={t('common.cancel')}
                             onConfirm={handleReplaceAll}

@@ -1046,6 +1046,12 @@
             "searchInputLabel": "Search canvas content",
             "searchPlaceholder": "Search nodes or connector labels...",
             "resultPosition": "Search result position",
+            "currentResultAnnouncement": "Result {{current}} of {{total}}: {{type}}, {{label}}",
+            "noResultsAnnouncement": "No canvas search results",
+            "resultTypes": {
+                "node": "node text",
+                "edge": "connector label"
+            },
             "noResults": "No results",
             "clearSearch": "Clear search",
             "previousResult": "Previous search result",
@@ -1064,6 +1070,8 @@
             "replaceAllAction": "All ({{count}})",
             "replaceConfirmTitle": "Replace {{matches}}?",
             "replaceConfirmDescription": "You can undo this operation. Locked nodes and connectors will not be changed.",
+            "replaceConfirmMapping": "Find “{{query}}” → replace with “{{replacement}}”",
+            "emptyReplacement": "(empty text)",
             "replaceConfirm": "Confirm replacement",
             "replaceStatus": "Replacement status",
             "counts": {

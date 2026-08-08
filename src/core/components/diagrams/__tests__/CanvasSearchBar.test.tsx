@@ -78,7 +78,9 @@ describe('CanvasSearchBar', () => {
         fireEvent.change(screen.getByRole('textbox', { name: '搜索画布内容' }), {
             target: { value: 'Circle' },
         });
-        expect(screen.getByRole('status', { name: '搜索结果位置' }).textContent).toBe('1/1');
+        expect(screen.getByRole('status', {
+            name: '第 1 项，共 1 项：节点文本，Circle',
+        }).textContent).toBe('1/1');
         expect(Array.from(document.querySelectorAll('style')).some(style =>
             style.textContent?.includes('@media (prefers-reduced-motion: reduce)'),
         )).toBe(true);
@@ -130,6 +132,9 @@ describe('CanvasSearchBar', () => {
         expect(screen.getByRole('button', { name: 'Replace current match' })).toBeTruthy();
         expect(screen.getByRole('button', { name: 'Replace all, 1 node text' })).toBeTruthy();
         expect(screen.getByRole('button', { name: 'Close canvas search' })).toBeTruthy();
+        expect(screen.getByRole('status', {
+            name: 'Result 1 of 1: node text, Circle',
+        })).toBeTruthy();
     });
 
     it('keeps the mobile search below the second toolbar row with touch-sized actions', () => {
@@ -216,6 +221,28 @@ describe('CanvasSearchBar', () => {
         expect(screen.queryByRole('search', { name: '画布内容查找与替换' })).toBeNull();
     });
 
+    it('closes the complete search surface when Escape is pressed in the replacement input', () => {
+        const onClose = vi.fn();
+        render(
+            <CanvasSearchBar
+                visible
+                replaceVisible
+                onClose={onClose}
+                nodes={[{
+                    id: 'node-1',
+                    position: { x: 10, y: 20 },
+                    data: { label: 'Circle' },
+                }]}
+                onReplaceMatch={vi.fn()}
+                onReplaceAll={vi.fn()}
+            />,
+        );
+
+        fireEvent.keyDown(screen.getByRole('textbox', { name: '替换为' }), { key: 'Escape' });
+
+        expect(onClose).toHaveBeenCalledOnce();
+    });
+
     it('opens replace mode from controlled shortcut state without a delayed DOM click', () => {
         const onReplaceVisibleChange = vi.fn();
         render(
@@ -275,6 +302,7 @@ describe('CanvasSearchBar', () => {
 
         expect(onReplaceAll).not.toHaveBeenCalled();
         expect(screen.getByText('替换 1 个节点文本？')).toBeTruthy();
+        expect(screen.getByText('查找“circle” → 替换为“Square”')).toBeTruthy();
         expect(readFileSync('src/core/components/diagrams/CanvasSearchBar.tsx', 'utf8'))
             .toMatch(/placement="bottomRight"\s+autoAdjustOverflow=\{false\}\s+zIndex=\{2600\}\s+getPopupContainer=\{\(\) => document\.body\}/);
         fireEvent.click(screen.getByRole('button', { name: '确认替换' }));
@@ -313,7 +341,9 @@ describe('CanvasSearchBar', () => {
             target: { value: '运输费用' },
         });
 
-        expect(screen.getByRole('status', { name: '搜索结果位置' }).textContent).toBe('1/1');
+        expect(screen.getByRole('status', {
+            name: '第 1 项，共 1 项：连线标签，运输费用',
+        }).textContent).toBe('1/1');
         await waitFor(() => expect(setCenterMock).toHaveBeenLastCalledWith(
             210,
             30,
