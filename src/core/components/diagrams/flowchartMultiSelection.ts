@@ -1,4 +1,4 @@
-import type { Node, NodeSelectionChange } from '@xyflow/react';
+import type { Edge, EdgeSelectionChange, Node, NodeSelectionChange } from '@xyflow/react';
 
 const MAX_NODE_ID_LENGTH = 1_024;
 
@@ -21,6 +21,30 @@ export const buildShiftMultiSelectionChanges = (
             selected: node.id === clickedNodeId
                 ? !clickedNode.selected
                 : node.selected === true,
+        });
+    }
+    return changes;
+};
+
+export const buildShiftEdgeMultiSelectionChanges = (
+    edges: readonly Edge[],
+    clickedEdgeId: string,
+): EdgeSelectionChange[] => {
+    if (!clickedEdgeId || clickedEdgeId.length > MAX_NODE_ID_LENGTH) return [];
+    const clickedEdge = edges.find(edge => edge.id === clickedEdgeId);
+    if (!clickedEdge) return [];
+
+    const changes: EdgeSelectionChange[] = [];
+    const seenIds = new Set<string>();
+    for (const edge of edges) {
+        if (!edge.id || edge.id.length > MAX_NODE_ID_LENGTH || seenIds.has(edge.id)) continue;
+        seenIds.add(edge.id);
+        changes.push({
+            id: edge.id,
+            type: 'select',
+            selected: edge.id === clickedEdgeId
+                ? !clickedEdge.selected
+                : edge.selected === true,
         });
     }
     return changes;

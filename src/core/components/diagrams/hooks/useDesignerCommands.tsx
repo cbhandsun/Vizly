@@ -6,6 +6,7 @@ import { useCommandRegistry } from './useCommandRegistry';
 import { type CommandItem } from '../../../types/plugin';
 import { PluginContext, DiagramTypePlugin } from '../../../types/plugin';
 import { hasMutationLockedNode } from '../nodeLockPolicy';
+import { hasMutationLockedEdge } from '../edgeMutationPolicy';
 
 interface UseDesignerCommandsProps {
     // View
@@ -112,7 +113,8 @@ export function useDesignerCommands(props: UseDesignerCommandsProps) {
     const { t } = useTranslation();
     const isMac = /Mac|iPhone|iPad|iPod/i.test(navigator.userAgent);
     const mod = isMac ? '⌘' : 'Ctrl';
-    const hasLockedSelection = hasMutationLockedNode(selectedNodes ?? []);
+    const hasLockedSelection = hasMutationLockedNode(selectedNodes ?? [])
+        || hasMutationLockedEdge(selectedEdges ?? []);
 
     const [commandPaletteVisible, setCommandPaletteVisible] = useState(false);
     const { registerCommands, commands } = useCommandRegistry();

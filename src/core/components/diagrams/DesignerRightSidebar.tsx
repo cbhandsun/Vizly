@@ -25,6 +25,7 @@ import {
     trapDialogTab,
 } from './dialogFocus';
 import { hasMutationLockedNode } from './nodeLockPolicy';
+import { hasMutationLockedEdge } from './edgeMutationPolicy';
 
 const PropertyPanel = React.lazy(() => import('./PropertyPanel'));
 const COMMERCIAL_TOUCH_TARGET = 'var(--commercial-touch-target, 44px)';
@@ -87,7 +88,12 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
     const { t } = useTranslation();
     const { token } = theme.useToken();
     const hasSelection = selectedNodes.length > 0 || selectedEdges.length > 0;
-    const hasLockedSelection = hasMutationLockedNode(selectedNodes);
+    const hasLockedNodeSelection = hasMutationLockedNode(selectedNodes);
+    const hasLockedEdgeSelection = hasMutationLockedEdge(selectedEdges);
+    const hasLockedSelection = hasLockedNodeSelection || hasLockedEdgeSelection;
+    const lockedSelectionReason = hasLockedEdgeSelection
+        ? '连接器已锁定，请先解锁后再编辑'
+        : '节点已锁定，请先解锁后再编辑';
     const previousAiChatVisibleRef = React.useRef(aiChatVisible);
     const previousHasSelectionRef = React.useRef(false);
     const sidebarRef = React.useRef<HTMLDivElement>(null);
@@ -550,7 +556,7 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
                                                 onUpdateEdges={updateEdgesBatch}
                                                 onBeforeUpdate={onBeforeUpdate}
                                                 disabled={isDraggingNode || hasLockedSelection}
-                                                disabledReason={hasLockedSelection ? '节点已锁定，请先解锁后再编辑' : undefined}
+                                                disabledReason={hasLockedSelection ? lockedSelectionReason : undefined}
                                                 docked={true}
                                             />
                                         </React.Suspense>

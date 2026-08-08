@@ -57,6 +57,7 @@ export interface ContextMenuProps {
 
 import './DiagramContextMenu.css';
 import { hasMutationLockedNode, isNodeMutationLocked } from './nodeLockPolicy';
+import { isEdgeMutationLocked, isEdgeUserLocked } from './edgeMutationPolicy';
 import type { DiagramContextSubmenuPlacement } from './diagramContextMenuPlacement';
 
 const MULTI_SELECTION_ACTIONS = new Set([
@@ -88,6 +89,7 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
   const allNodes = nodes || selectedNodes;
   const allEdges = edges || selectedEdges;
   const targetNode = targetId ? allNodes.find(node => node.id === targetId) : undefined;
+  const targetEdge = targetId ? allEdges.find(edge => edge.id === targetId) : undefined;
   const nodeActionTargets = type === 'edge' || type === 'pane'
     ? []
     : targetNode
@@ -96,6 +98,9 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
   const hasLockedActionTarget = hasMutationLockedNode(nodeActionTargets);
   const allActionTargetsLocked = nodeActionTargets.length > 0
     && nodeActionTargets.every(isNodeMutationLocked);
+  const hasLockedEdgeActionTarget = type === 'edge' && targetEdge
+    ? isEdgeMutationLocked(targetEdge)
+    : false;
   const submenuPlacements: NonNullable<MenuProps['builtinPlacements']> = {
     rightTop: {
       points: submenuPlacement === 'left' ? ['tr', 'tl'] : ['tl', 'tr'],
@@ -172,7 +177,7 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
           icon: <DeleteOutlined />,
           label: t('designer.contextMenu.delete'),
           danger: true,
-          disabled: hasLockedActionTarget,
+          disabled: hasLockedActionTarget || hasLockedEdgeActionTarget,
         }
       );
 
@@ -224,9 +229,18 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
         }
       }
 
+      if (type === 'edge' && targetEdge) {
+        const isUserLocked = isEdgeUserLocked(targetEdge);
+        items.push({
+          key: isUserLocked ? 'unlock' : 'lock',
+          icon: isUserLocked ? <UnlockOutlined /> : <LockOutlined />,
+          label: t(isUserLocked ? 'designer.contextMenu.unlock' : 'designer.contextMenu.lock'),
+          disabled: hasLockedEdgeActionTarget && !isUserLocked,
+        });
+      }
+
       // Edge-specific actions
       if (type === 'edge') {
-        const targetEdge = allEdges.find(e => e.id === targetId);
         const hasWaypoints = Array.isArray(targetEdge?.data?.waypoints) && targetEdge.data.waypoints.length > 0;
         const isEditable = targetEdge?.type === 'editable';
 
@@ -235,12 +249,13 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
             key: 'reverseEdge',
             icon: <SwapOutlined />,
             label: t('designer.contextMenu.reverseDirection'),
+            disabled: hasLockedEdgeActionTarget,
           },
           {
             key: 'resetWaypoints',
             icon: <UndoOutlined />,
             label: t('designer.contextMenu.resetPath'),
-            disabled: !hasWaypoints,
+            disabled: !hasWaypoints || hasLockedEdgeActionTarget,
           }
         );
 
@@ -249,12 +264,14 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
             key: 'convertToEditable',
             icon: <EditOutlined />,
             label: t('designer.contextMenu.makeEditable'),
+            disabled: hasLockedEdgeActionTarget,
           });
         } else {
           items.push({
             key: 'stopEditing',
             icon: <CheckOutlined />,
             label: t('designer.contextMenu.stopEditing'),
+            disabled: hasLockedEdgeActionTarget,
           });
         }
       }

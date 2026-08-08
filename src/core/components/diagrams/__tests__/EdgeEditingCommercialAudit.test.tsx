@@ -42,7 +42,7 @@ const createEdge = (): Edge => ({
 
 describe('edge editing commercial audit regressions', () => {
     it('gives the contextual label editor a stable accessible name', () => {
-        render(<ContextualEdgeToolbar edge={createEdge()} onUpdateEdge={vi.fn()} />);
+        render(<ContextualEdgeToolbar edge={createEdge()} onUpdateEdge={vi.fn()} onToggleLock={vi.fn()} />);
 
         fireEvent.click(screen.getByRole('button', { name: 'edgeToolbar.addLabel' }));
 
@@ -53,7 +53,7 @@ describe('edge editing commercial audit regressions', () => {
 
     it('returns focus to the label trigger after confirming or cancelling', async () => {
         const onUpdateEdge = vi.fn();
-        render(<ContextualEdgeToolbar edge={{ ...createEdge(), label: 'Original' }} onUpdateEdge={onUpdateEdge} />);
+        render(<ContextualEdgeToolbar edge={{ ...createEdge(), label: 'Original' }} onUpdateEdge={onUpdateEdge} onToggleLock={vi.fn()} />);
         const getTrigger = () => screen.getByRole('button', { name: 'edgeToolbar.currentLabel' });
 
         fireEvent.click(getTrigger());
@@ -75,7 +75,7 @@ describe('edge editing commercial audit regressions', () => {
 
     it('bounds direct label input and emits an explicit clear update', () => {
         const onUpdateEdge = vi.fn();
-        render(<ContextualEdgeToolbar edge={{ ...createEdge(), label: 'Original' }} onUpdateEdge={onUpdateEdge} />);
+        render(<ContextualEdgeToolbar edge={{ ...createEdge(), label: 'Original' }} onUpdateEdge={onUpdateEdge} onToggleLock={vi.fn()} />);
         fireEvent.click(screen.getByRole('button', { name: 'edgeToolbar.currentLabel' }));
         const input = screen.getByRole('textbox', { name: 'edgeToolbar.labelInput' });
 
@@ -85,6 +85,28 @@ describe('edge editing commercial audit regressions', () => {
         fireEvent.click(screen.getByRole('button', { name: 'edgeToolbar.confirm' }));
 
         expect(onUpdateEdge).toHaveBeenCalledWith('edge-1', { label: undefined });
+    });
+
+    it('exposes connector locking and disables mutation controls while locked', () => {
+        const onToggleLock = vi.fn();
+        render(
+            <ContextualEdgeToolbar
+                edge={{
+                    ...createEdge(),
+                    data: { locked: true },
+                    deletable: false,
+                    reconnectable: false,
+                }}
+                onUpdateEdge={vi.fn()}
+                onToggleLock={onToggleLock}
+            />,
+        );
+
+        expect(screen.getByRole('button', { name: 'edgeToolbar.switchColor' }).getAttribute('aria-disabled')).toBe('true');
+        const unlock = screen.getByRole('button', { name: 'designer.contextMenu.unlock' });
+        expect(unlock.getAttribute('aria-disabled')).toBe('false');
+        fireEvent.click(unlock);
+        expect(onToggleLock).toHaveBeenCalledWith('edge-1', false);
     });
 
     it('gives every edge property control a field-specific accessible name', () => {

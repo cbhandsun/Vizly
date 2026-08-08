@@ -182,6 +182,7 @@ export const HoverToolbarsOverlay: React.FC<HoverToolbarsOverlayProps> = ({
                     <IsolatedEdgeToolbar
                         edge={selectedEdges[0]}
                         onUpdateEdge={(id, updates) => updateEdgesBatch([id], updates as EdgeDataUpdate)}
+                        onToggleLock={(id, locked) => handleLock([id], locked)}
                     />
                 )}
         </>
@@ -189,7 +190,11 @@ export const HoverToolbarsOverlay: React.FC<HoverToolbarsOverlayProps> = ({
 };
 
 // 封装独立组件，将 useViewport () 的 60FPS 重绘隔离到尽可能小的 DOM 树中
-const IsolatedEdgeToolbar: React.FC<{ edge: Edge; onUpdateEdge: (id: string, updates: EdgeDataUpdate) => void }> = ({ edge, onUpdateEdge }) => {
+const IsolatedEdgeToolbar: React.FC<{
+    edge: Edge;
+    onUpdateEdge: (id: string, updates: EdgeDataUpdate) => void;
+    onToggleLock: (id: string, locked: boolean) => void;
+}> = ({ edge, onUpdateEdge, onToggleLock }) => {
     const sourceNode = useInternalNode(edge.source);
     const targetNode = useInternalNode(edge.target);
     const viewport = useViewport();
@@ -271,6 +276,7 @@ const IsolatedEdgeToolbar: React.FC<{ edge: Edge; onUpdateEdge: (id: string, upd
             <ContextualEdgeToolbar
                 edge={edge}
                 onUpdateEdge={onUpdateEdge}
+                onToggleLock={onToggleLock}
             />
         </div>
     );

@@ -1,6 +1,9 @@
-import type { Node } from '@xyflow/react';
+import type { Edge, Node } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
-import { buildShiftMultiSelectionChanges } from '../flowchartMultiSelection';
+import {
+    buildShiftEdgeMultiSelectionChanges,
+    buildShiftMultiSelectionChanges,
+} from '../flowchartMultiSelection';
 
 const nodes = [
     { id: 'a', position: { x: 0, y: 0 }, data: {}, selected: true },
@@ -32,5 +35,29 @@ describe('buildShiftMultiSelectionChanges', () => {
         expect(buildShiftMultiSelectionChanges([nodes[0], nodes[0]], 'a')).toEqual([
             { id: 'a', type: 'select', selected: false },
         ]);
+    });
+});
+
+describe('buildShiftEdgeMultiSelectionChanges', () => {
+    const edges = [
+        { id: 'edge-a', source: 'a', target: 'b', selected: true },
+        { id: 'edge-b', source: 'b', target: 'c', selected: false },
+    ] satisfies Edge[];
+
+    it('adds an edge while preserving the existing connector selection', () => {
+        expect(buildShiftEdgeMultiSelectionChanges(edges, 'edge-b')).toEqual([
+            { id: 'edge-a', type: 'select', selected: true },
+            { id: 'edge-b', type: 'select', selected: true },
+        ]);
+    });
+
+    it('toggles selected edges and rejects invalid target ids', () => {
+        expect(buildShiftEdgeMultiSelectionChanges(edges, 'edge-a')).toEqual([
+            { id: 'edge-a', type: 'select', selected: false },
+            { id: 'edge-b', type: 'select', selected: false },
+        ]);
+        expect(buildShiftEdgeMultiSelectionChanges(edges, '')).toEqual([]);
+        expect(buildShiftEdgeMultiSelectionChanges(edges, 'missing')).toEqual([]);
+        expect(buildShiftEdgeMultiSelectionChanges(edges, 'x'.repeat(1_025))).toEqual([]);
     });
 });

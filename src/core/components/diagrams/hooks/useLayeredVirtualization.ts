@@ -5,6 +5,7 @@ import {
     reconcileLayeredNodePresentation,
     type LayeredNodePresentationCache,
 } from './layeredNodePresentation';
+import { isEdgeMutationLocked } from '../edgeMutationPolicy';
 
 export interface UseLayeredVirtualizationProps {
     nodes: Node[];
@@ -91,6 +92,9 @@ export function useLayeredVirtualization({
             if ('id' in change) {
                 const edge = edgeMap.get(change.id);
                 if (edge) {
+                    if (change.type !== 'select' && isEdgeMutationLocked(edge)) {
+                        return false;
+                    }
                     const layerId = String(edge.data?.layer || 'layer-0');
                     const layer = getLayer(layerId);
                     if (layer && layer.locked) {

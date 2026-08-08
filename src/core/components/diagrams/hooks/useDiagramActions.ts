@@ -5,6 +5,10 @@ import { PluginContext, DiagramTypePlugin } from '../../../types/plugin';
 import { useDiagramStore } from '../../../store/useDiagramStore';
 import { hasMutationLockedNode, resolveTargetNodes } from '../nodeLockPolicy';
 import {
+    applyEdgeLockState,
+    hasMutationLockedEdge,
+} from '../edgeMutationPolicy';
+import {
     convertDiagramEdgeToEditable,
     resetDiagramEdgeWaypoints,
     reverseDiagramEdge,
@@ -141,8 +145,15 @@ export const useDiagramActions = ({
                 mindMapNodes.forEach(rn => getDescendants(rn.id));
             }
 
-            // Cascading operations are all-or-nothing: a protected descendant also blocks deletion.
+            // Cascading operations are all-or-nothing: protected descendants and
+            // protected connectors that would disappear with a node block deletion.
             if (hasMutationLockedNode(resolveTargetNodes(currentNodes, nodeIdsToDelete))) return;
+            const affectedEdges = currentEdges.filter(edge => (
+                edgeIdsToDelete.has(edge.id)
+                || nodeIdsToDelete.has(edge.source)
+                || nodeIdsToDelete.has(edge.target)
+            ));
+            if (hasMutationLockedEdge(affectedEdges)) return;
 
             // 拦截器：允许插件否决删除操作
             if (activePlugin && pluginCtx) {
@@ -238,22 +249,37 @@ export const useDiagramActions = ({
     }, [nodes, edges, nodesRef, edgesRef, selectedNodes, setNodes, takeSnapshot]);
 
     const handleLock = useCallback((target?: DiagramActionTarget, locked: boolean = true) => {
-        const targetIds = target ? toTargetIds(target) : new Set(selectedNodes.map(node => node.id));
+        const targetIds = target
+            ? toTargetIds(target)
+            : new Set([
+                ...selectedNodes.map(node => node.id),
+                ...selectedEdges.map(edge => edge.id),
+            ]);
         if (targetIds.size === 0) return;
         const currentNodes = nodesRef?.current ?? nodes;
         const currentEdges = edgesRef?.current ?? edges;
-        const result = applyNodeLockState(currentNodes, targetIds, locked);
-        if (!result.changed) return;
+        const nodeResult = applyNodeLockState(currentNodes, targetIds, locked);
+        const edgeResult = applyEdgeLockState(currentEdges, targetIds, locked);
+        if (!nodeResult.changed && !edgeResult.changed) return;
 
         takeSnapshot(currentNodes, currentEdges);
-        if (nodesRef) nodesRef.current = result.nodes;
-        setNodes(result.nodes);
+        if (nodeResult.changed) {
+            if (nodesRef) nodesRef.current = nodeResult.nodes;
+            setNodes(nodeResult.nodes);
+        }
+        if (edgeResult.changed) {
+            if (edgesRef) edgesRef.current = edgeResult.edges;
+            setEdges(edgeResult.edges);
+        }
 
-        const nodeById = new Map(result.nodes.map(node => [node.id, node]));
+        const nodeById = new Map(nodeResult.nodes.map(node => [node.id, node]));
+        const edgeById = new Map(edgeResult.edges.map(edge => [edge.id, edge]));
         const updateSelection = (items: Node[]) => items.map(node => nodeById.get(node.id) ?? node);
+        const updateEdgeSelection = (items: Edge[]) => items.map(edge => edgeById.get(edge.id) ?? edge);
         const diagramStore = useDiagramStore.getState();
         diagramStore.setSelectedNodes(updateSelection(diagramStore.selectedNodes));
-    }, [nodes, edges, nodesRef, edgesRef, selectedNodes, setNodes, takeSnapshot]);
+        diagramStore.setSelectedEdges(updateEdgeSelection(diagramStore.selectedEdges));
+    }, [nodes, edges, nodesRef, edgesRef, selectedNodes, selectedEdges, setNodes, setEdges, takeSnapshot]);
 
     const handleSelectAll = useCallback(() => {
         setNodes(nds => nds.map(n => ({ ...n, selected: true })));

@@ -17,8 +17,11 @@ import {
     SwapOutlined,
     EditOutlined,
     CheckOutlined,
-    CloseOutlined
+    CloseOutlined,
+    LockOutlined,
+    UnlockOutlined,
 } from '@ant-design/icons';
+import { isEdgeMutationLocked, isEdgeUserLocked } from './edgeMutationPolicy';
 import {
     ToolbarContainer,
     ToolbarButton,
@@ -28,6 +31,7 @@ import {
 interface ContextualEdgeToolbarProps {
     edge: Edge;
     onUpdateEdge: (edgeId: string, updates: EdgeDataUpdate) => void;
+    onToggleLock: (edgeId: string, locked: boolean) => void;
 }
 
 // 箭头样式循环列表
@@ -38,7 +42,7 @@ const ARROW_STYLES = [
     { markerEnd: 'dot', markerStart: undefined },
 ] as const;
 
-export const ContextualEdgeToolbar: React.FC<ContextualEdgeToolbarProps> = ({ edge, onUpdateEdge }) => {
+export const ContextualEdgeToolbar: React.FC<ContextualEdgeToolbarProps> = ({ edge, onUpdateEdge, onToggleLock }) => {
     const { t } = useTranslation();
     // 根据边的数据解析当前状态
     const isAnimated = !!edge.animated;
@@ -54,6 +58,9 @@ export const ContextualEdgeToolbar: React.FC<ContextualEdgeToolbarProps> = ({ ed
     const isDashed = currentDash !== 'solid';
     const isOrthogonal = edge.type === 'smart';
     const currentWidth = coerceEdgePropertyStrokeWidth(edge.style?.strokeWidth);
+    const isLocked = isEdgeMutationLocked(edge);
+    const isUserLocked = isEdgeUserLocked(edge);
+    const canToggleLock = isUserLocked || !isLocked;
 
     // 标签编辑状态
     const [isEditingLabel, setIsEditingLabel] = useState(false);
@@ -177,6 +184,7 @@ export const ContextualEdgeToolbar: React.FC<ContextualEdgeToolbarProps> = ({ ed
                 label={t(isOrthogonal ? 'edgeToolbar.switchToCurve' : 'edgeToolbar.switchToOrthogonal')}
                 onClick={toggleRouting}
                 active={isOrthogonal}
+                disabled={isLocked}
 
             />
 
@@ -190,6 +198,7 @@ export const ContextualEdgeToolbar: React.FC<ContextualEdgeToolbarProps> = ({ ed
                 })}
                 onClick={toggleDashed}
                 active={isDashed}
+                disabled={isLocked}
 
             />
 
@@ -207,6 +216,7 @@ export const ContextualEdgeToolbar: React.FC<ContextualEdgeToolbarProps> = ({ ed
                 }
                 label={t('edgeToolbar.lineWidth', { width: currentWidth })}
                 onClick={cycleWidth}
+                disabled={isLocked}
             />
 
             {/* 流动动画 */}
@@ -215,6 +225,7 @@ export const ContextualEdgeToolbar: React.FC<ContextualEdgeToolbarProps> = ({ ed
                 label={t(isAnimated ? 'edgeToolbar.stopAnimation' : 'edgeToolbar.startAnimation')}
                 onClick={toggleAnimation}
                 active={isAnimated}
+                disabled={isLocked}
 
             />
 
@@ -225,6 +236,7 @@ export const ContextualEdgeToolbar: React.FC<ContextualEdgeToolbarProps> = ({ ed
                 icon={<SwapOutlined />}
                 label={t('edgeToolbar.switchArrowStyle')}
                 onClick={cycleArrow}
+                disabled={isLocked}
             />
 
             {/* 颜色 */}
@@ -232,6 +244,7 @@ export const ContextualEdgeToolbar: React.FC<ContextualEdgeToolbarProps> = ({ ed
                 icon={<FormatPainterOutlined />}
                 label={t('edgeToolbar.switchColor')}
                 onClick={toggleColor}
+                disabled={isLocked}
 
             />
 
@@ -253,7 +266,7 @@ export const ContextualEdgeToolbar: React.FC<ContextualEdgeToolbarProps> = ({ ed
                         maxLength={FLOWCHART_REPLACE_TEXT_MAX_LENGTH}
                         className="contextual-edge-toolbar-label-input"
                     />
-                    <ToolbarButton icon={<CheckOutlined />} label={t('edgeToolbar.confirm')} onClick={confirmLabel} />
+                    <ToolbarButton icon={<CheckOutlined />} label={t('edgeToolbar.confirm')} onClick={confirmLabel} disabled={isLocked} />
                     <ToolbarButton icon={<CloseOutlined />} label={t('edgeToolbar.cancel')} onClick={cancelLabel} danger />
                 </div>
             ) : (
@@ -265,9 +278,20 @@ export const ContextualEdgeToolbar: React.FC<ContextualEdgeToolbarProps> = ({ ed
                         : t('edgeToolbar.addLabel')}
                     onClick={() => setIsEditingLabel(true)}
                     active={!!edge.label}
+                    disabled={isLocked}
 
                 />
             )}
+
+            <ToolbarDivider />
+
+            <ToolbarButton
+                icon={isUserLocked ? <UnlockOutlined /> : <LockOutlined />}
+                label={t(isUserLocked ? 'designer.contextMenu.unlock' : 'designer.contextMenu.lock')}
+                onClick={() => onToggleLock(edge.id, !isUserLocked)}
+                active={isLocked}
+                disabled={!canToggleLock}
+            />
         </ToolbarContainer>
     );
 };

@@ -21,6 +21,7 @@ import type { CommentThread } from '../../../store/useDiagramStore';
 import type { HistorySnapshotOptions } from '../../../hooks/useDiagramHistory';
 import { normalizeCommentPageId } from '../commentPageScope';
 import { parseAnnotationContent } from '../annotationContent';
+import { canReconnectEdge } from '../edgeMutationPolicy';
 
 export interface UseDesignerInteractionsProps {
     nodes: Node[];
@@ -200,6 +201,7 @@ export function useDesignerInteractions({
     }, [nodes, edges]);
 
     const handleReconnect = useCallback((oldEdge: Edge, newConnection: Connection) => {
+        if (!canReconnectEdge(oldEdge)) return;
         takeSnapshot(reconnectNodesRef.current, reconnectEdgesRef.current);
         setEdges((eds) => reconnectEdge(oldEdge, newConnection, eds));
     }, [setEdges, takeSnapshot]);

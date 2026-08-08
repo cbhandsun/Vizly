@@ -351,6 +351,71 @@ describe('FlowchartCanvasShell', () => {
     ]);
   });
 
+  it('reconciles Shift multi-selection for connectors without clearing selected edges', () => {
+    const onEdgesChange = vi.fn();
+    const onEdgeClick = vi.fn();
+    const noop = vi.fn();
+    let scheduledSelection: FrameRequestCallback | undefined;
+    vi.stubGlobal('requestAnimationFrame', vi.fn((callback: FrameRequestCallback) => {
+      scheduledSelection = callback;
+      return 1;
+    }));
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    const edges = [
+      { id: 'edge-a', source: 'A', target: 'B', selected: true },
+      { id: 'edge-b', source: 'B', target: 'C', selected: false },
+    ] satisfies Edge[];
+    render(
+      <FlowchartCanvasShell
+        nodes={[]}
+        displayEdges={edges}
+        nodeTypes={{}}
+        onInit={noop}
+        onNodesChange={noop}
+        onEdgesChange={onEdgesChange}
+        onConnect={noop}
+        onConnectStart={noop}
+        onConnectEnd={noop}
+        autoRoutingEnabled
+        enableSmartEdges
+        showMinimap={false}
+        showGrid
+        gridVariant={'dots' as never}
+        onNodeDrag={noop}
+        onNodeDragStart={noop}
+        onSelectionChange={noop}
+        onPaneClick={noop}
+        onPaneDoubleClick={noop}
+        onEdgeClick={onEdgeClick}
+        selectionMode={'partial' as never}
+        onNodeContextMenu={noop}
+        onEdgeContextMenu={noop}
+        onPaneContextMenu={noop}
+        isSpacePressed={false}
+        isConnecting={false}
+        connectPreview={null}
+        connectionMode={'loose' as never}
+        isDragging={false}
+      />,
+    );
+
+    const props = baseReactFlowProps.mock.calls.at(-1)?.[0];
+    act(() => {
+      (props.onEdgeClick as (event: React.MouseEvent, edge: Edge) => void)(
+        { shiftKey: true } as React.MouseEvent,
+        edges[1],
+      );
+    });
+
+    expect(onEdgeClick).toHaveBeenCalledOnce();
+    expect(onEdgesChange).not.toHaveBeenCalled();
+    act(() => scheduledSelection?.(16));
+    expect(onEdgesChange).toHaveBeenCalledWith([
+      { id: 'edge-a', type: 'select', selected: true },
+      { id: 'edge-b', type: 'select', selected: true },
+    ]);
+  });
+
   it('applies smart-guide snapping inside the canvas without an upstream position write', () => {
     let scheduledFrame: FrameRequestCallback | null = null;
     vi.stubGlobal('requestAnimationFrame', vi.fn((callback: FrameRequestCallback) => {

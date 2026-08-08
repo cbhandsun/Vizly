@@ -8,7 +8,10 @@ import {
     type SmartNodeDragHandler,
 } from './hooks/useFlowchartDragBuffer';
 import { addFlowchartAccessibilityLabels } from './flowchartCanvasAccessibility';
-import { buildShiftMultiSelectionChanges } from './flowchartMultiSelection';
+import {
+    buildShiftEdgeMultiSelectionChanges,
+    buildShiftMultiSelectionChanges,
+} from './flowchartMultiSelection';
 import { getFlowchartMarqueeEdges } from './flowchartMarqueeInteraction';
 
 export interface FlowchartCanvasShellProps {
@@ -174,6 +177,22 @@ export const FlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> = React.m
         }
         onNodeClick?.(event, node);
     }, [canvasNodes, editingEnabled, handleNodesChange, onNodeClick]);
+    const handleCanvasEdgeClick = useCallback((event: React.MouseEvent, edge: Edge) => {
+        if (!editingEnabled) return;
+        if (event.shiftKey) {
+            const selectionChanges = buildShiftEdgeMultiSelectionChanges(displayEdges, edge.id);
+            if (selectionChanges.length > 0) {
+                if (shiftSelectionFrameRef.current !== null) {
+                    cancelAnimationFrame(shiftSelectionFrameRef.current);
+                }
+                shiftSelectionFrameRef.current = requestAnimationFrame(() => {
+                    shiftSelectionFrameRef.current = null;
+                    onEdgesChange(selectionChanges);
+                });
+            }
+        }
+        onEdgeClick?.(event, edge);
+    }, [displayEdges, editingEnabled, onEdgeClick, onEdgesChange]);
     return (
         <BaseReactFlow
             onInit={onInit}
@@ -203,7 +222,7 @@ export const FlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> = React.m
             onSelectionChange={editingEnabled ? onSelectionChange : undefined}
             onViewportChange={onViewportChange}
             onNodeClick={handleCanvasNodeClick}
-            onEdgeClick={onEdgeClick}
+            onEdgeClick={handleCanvasEdgeClick}
             onEdgeDoubleClick={editingEnabled ? onEdgeDoubleClick : undefined}
             onPaneClick={onPaneClick}
             onPaneDoubleClick={editingEnabled ? onPaneDoubleClick : undefined}

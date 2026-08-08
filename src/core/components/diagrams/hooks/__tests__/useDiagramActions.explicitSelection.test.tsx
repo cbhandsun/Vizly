@@ -81,6 +81,80 @@ describe('useDiagramActions explicit selection targets', () => {
         expect(setEdges).not.toHaveBeenCalled();
     });
 
+    it('blocks direct and cascading deletion when a locked connector would be removed', async () => {
+        const initialNodes = [node('node-1'), node('node-2')];
+        const lockedEdge: Edge = {
+            id: 'edge-locked',
+            source: 'node-1',
+            target: 'node-2',
+            data: { locked: true },
+            deletable: false,
+            reconnectable: false,
+        };
+        const setNodes = vi.fn();
+        const setEdges = vi.fn();
+        const takeSnapshot = vi.fn();
+        const { result } = renderHook(() => useDiagramActions({
+            nodes: [],
+            edges: [],
+            nodesRef: { current: initialNodes },
+            edgesRef: { current: [lockedEdge] },
+            setNodes,
+            setEdges,
+            selectedNodes: [],
+            selectedEdges: [lockedEdge],
+            takeSnapshot,
+            reactFlowInstance: null,
+        }));
+
+        await act(async () => result.current.handleDelete(['edge-locked']));
+        await act(async () => result.current.handleDelete(['node-1']));
+
+        expect(takeSnapshot).not.toHaveBeenCalled();
+        expect(setNodes).not.toHaveBeenCalled();
+        expect(setEdges).not.toHaveBeenCalled();
+    });
+
+    it('locks and unlocks an explicit connector in one history step per change', () => {
+        const initialEdge: Edge = { id: 'edge-1', source: 'node-1', target: 'node-2', selected: true };
+        const edgesRef = { current: [initialEdge] };
+        let currentEdges = [initialEdge];
+        const setEdges = vi.fn((update: SetStateAction<Edge[]>) => {
+            currentEdges = typeof update === 'function' ? update(currentEdges) : update;
+        });
+        const takeSnapshot = vi.fn();
+        const { result } = renderHook(() => useDiagramActions({
+            nodes: [],
+            edges: [],
+            nodesRef: { current: [] },
+            edgesRef,
+            setNodes: vi.fn(),
+            setEdges,
+            selectedNodes: [],
+            selectedEdges: [initialEdge],
+            takeSnapshot,
+            reactFlowInstance: null,
+        }));
+
+        act(() => result.current.handleLock(['edge-1'], true));
+        expect(currentEdges[0]).toMatchObject({
+            deletable: false,
+            reconnectable: false,
+            data: { locked: true },
+        });
+
+        act(() => result.current.handleLock(['edge-1'], false));
+        expect(currentEdges[0]).toMatchObject({
+            deletable: true,
+            reconnectable: true,
+            data: { locked: false },
+        });
+        expect(takeSnapshot).toHaveBeenCalledTimes(2);
+
+        act(() => result.current.handleLock(['edge-1'], false));
+        expect(takeSnapshot).toHaveBeenCalledTimes(2);
+    });
+
     it('blocks cascading deletion when a protected descendant would be removed', async () => {
         const root = { ...node('root', true), type: 'mindmap' };
         const lockedChild = { ...node('child'), draggable: false, data: { label: 'child', locked: true } };

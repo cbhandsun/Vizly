@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { fireEvent, render, screen } from '@testing-library/react';
-import type { Node } from '@xyflow/react';
+import type { Edge, Node } from '@xyflow/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { DiagramContextMenu } from '../DiagramContextMenu';
@@ -39,6 +39,9 @@ const translations: Record<string, string> = {
   'designer.contextMenu.duplicateSelection': 'Duplicate selection',
   'designer.contextMenu.lockSelection': 'Lock selection',
   'designer.contextMenu.bringSelectionToFront': 'Bring selection to front',
+  'designer.contextMenu.delete': 'Delete',
+  'designer.contextMenu.unlock': 'Unlock',
+  'designer.contextMenu.reverseDirection': 'Reverse direction',
 };
 
 vi.mock('react-i18next', () => ({
@@ -116,5 +119,37 @@ describe('DiagramContextMenu grouping actions', () => {
     fireEvent.click(screen.getByRole('button', { name: label }));
 
     expect(onAction).toHaveBeenCalledWith(action, undefined);
+  });
+
+  it('offers unlock while disabling destructive actions for a locked connector', () => {
+    const lockedEdge: Edge = {
+      id: 'edge-locked',
+      source: 'source',
+      target: 'target',
+      data: { locked: true },
+      deletable: false,
+      reconnectable: false,
+    };
+    const onAction = vi.fn();
+    render(
+      <DiagramContextMenu
+        top={0}
+        left={0}
+        type="edge"
+        targetId={lockedEdge.id}
+        onClose={vi.fn()}
+        onAction={onAction}
+        selectedNodes={[]}
+        selectedEdges={[lockedEdge]}
+        edges={[lockedEdge]}
+        canUndo={false}
+        canRedo={false}
+      />,
+    );
+
+    expect((screen.getByRole('button', { name: 'Delete' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: 'Reverse direction' }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Unlock' }));
+    expect(onAction).toHaveBeenCalledWith('unlock', lockedEdge.id);
   });
 });
