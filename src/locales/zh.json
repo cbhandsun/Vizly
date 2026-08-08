@@ -2321,6 +2321,21 @@
         }
     },
     "plugins": {
+        "timeline": {
+            "title": "专业项目时间线",
+            "description": "在专业时间线上规划里程碑、阶段、依赖关系和交付进度。",
+            "toolbar": {
+                "addEvent": "添加事件",
+                "addPhase": "添加阶段",
+                "addMilestone": "添加里程碑",
+                "created": "已添加{{item}}"
+            },
+            "labels": {
+                "event": "新事件",
+                "phase": "新阶段",
+                "milestone": "新里程碑"
+            }
+        },
         "sequence": {
             "title": "UML 时序图",
             "addActor": "添加参与者",

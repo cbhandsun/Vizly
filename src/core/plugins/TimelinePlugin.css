@@ -1,0 +1,19 @@
+.timeline-plugin-toolbar {
+  align-items: center;
+  border-left: 1px solid var(--vizly-border-color, #e8e8e8);
+  display: flex;
+  gap: 2px;
+  margin-left: 8px;
+  padding: 0 4px;
+}
+
+.timeline-plugin-toolbar .timeline-plugin-toolbar__action.ant-btn {
+  align-items: center;
+  display: inline-flex;
+  height: var(--commercial-touch-target, 44px);
+  justify-content: center;
+  min-height: var(--commercial-touch-target, 44px);
+  min-width: var(--commercial-touch-target, 44px);
+  padding: 0;
+  width: var(--commercial-touch-target, 44px);
+}

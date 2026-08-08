@@ -7,11 +7,16 @@ import {
 } from '../types/plugin';
 
 import { FlagOutlined, CheckCircleFilled, SyncOutlined, MinusCircleOutlined } from '@ant-design/icons';
-import { Button } from 'antd';
+import { Button, Tooltip } from 'antd';
 import ProTimelineCanvas from '../components/diagrams/timeline-pro/ProTimelineCanvas';
 import { ProTimelinePropertyPanel } from '../components/diagrams/timeline-pro/ProTimelinePropertyPanel';
 import { Calendar, Clock } from 'lucide-react';
-import { addDaysToDateOnly, parseDateOnlyTime, todayDateOnly } from '../utils/dateOnly';
+import { parseDateOnlyTime, todayDateOnly } from '../utils/dateOnly';
+import { useTranslation } from 'react-i18next';
+import i18n from '@/i18n';
+import { appMessage } from '@/core/utils/antdStaticBridge';
+import { buildTimelineAppendPlan, type TimelineAppendType } from './timelineToolbarActions';
+import './TimelinePlugin.css';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value && typeof value === 'object' && !Array.isArray(value));
@@ -31,9 +36,13 @@ const migrateTimelineNode = (value: unknown): unknown => {
 
 export class TimelinePlugin implements DiagramTypePlugin {
   id = 'timeline-diagram';
-  name = '项目级时间线图 (Pro)';
+  get name() {
+    return i18n.t('plugins.timeline.title');
+  }
   version = '1.1.0';
-  description = 'Pro 级甘特图与时间线引擎，支持阶段推演、依赖联动与原子级随动演练，是项目管理与路线图规划的神兵利器。';
+  get description() {
+    return i18n.t('plugins.timeline.description');
+  }
   author = 'Vizly Core';
   category: 'Core' | 'Productivity' | 'Integration' | 'Beta' = 'Productivity';
   tags = ['Gantt', 'Project', 'Timeline'];
@@ -239,93 +248,46 @@ const TimelinePalette: React.FC = () => {
         </div>
     );
 };
-// ====== 智能控制栏 ======
-// ====== 智能控制栏 (精简版) ======
-import { Tooltip, Divider } from 'antd';
-import { FullscreenOutlined, AimOutlined } from '@ant-design/icons';
-
 const TimelineSmartActionBar: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
+    const { t } = useTranslation();
     if (!ctx) return null;
-    const { nodes = [], setNodes, setEdges } = ctx;
+    const { setNodes, setEdges } = ctx;
 
-    const handleAppendNode = (type: 'event' | 'phase' | 'milestone') => {
-        const timelineNodes = nodes.filter(n => ['phase', 'event', 'milestone'].includes(n.data.type as string) || n.type === 'timelineNode');
-        
-        let prevNodeId: string | null = null;
-        let newNodeDate = todayDateOnly();
-        
-        if (timelineNodes.length > 0) {
-            const latestNode = timelineNodes.reduce((prev, current) => {
-                const prevD = parseDateOnlyTime(prev.data.endDate || prev.data.date) ?? Number.NEGATIVE_INFINITY;
-                const currD = parseDateOnlyTime(current.data.endDate || current.data.date) ?? Number.NEGATIVE_INFINITY;
-                return prevD > currD ? prev : current;
-            });
-            prevNodeId = latestNode.id;
-            newNodeDate = addDaysToDateOnly(latestNode.data.endDate || latestNode.data.date, 2);
+    const handleAppendNode = (type: TimelineAppendType) => {
+        const token = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const plan = buildTimelineAppendPlan({
+            nodes: ctx.getNodes(),
+            type,
+            nodeId: `tl-node-${token}`,
+            edgeId: `te-${token}`,
+            label: t(`plugins.timeline.labels.${type}`),
+            fallbackDate: todayDateOnly(),
+        });
+
+        ctx.takeSnapshot();
+        setNodes(nodes => [
+            ...nodes.map(node => ({ ...node, selected: false })),
+            plan.node,
+        ]);
+        const appendedEdge = plan.edge;
+        if (appendedEdge) {
+            setEdges(edges => [...edges, appendedEdge]);
         }
-
-        const newNodeId = `tl-node-${Date.now()}`;
-        const defaultLabel = type === 'event' ? '新事件' : type === 'phase' ? '新阶段' : '新里程碑';
-        
-        const newNode: Node = {
-            id: newNodeId,
-            type: 'timelineNode',
-            position: { x: 0, y: 0 },
-            data: { 
-                type, 
-                label: defaultLabel, 
-                status: 'pending', 
-                date: newNodeDate,
-                ...(type === 'phase' ? {
-                    progress: 0,
-                    endDate: addDaysToDateOnly(newNodeDate, 14)
-                } : {})
-            }
-        };
-
-        setNodes(nds => [...nds, newNode]);
-
-        if (prevNodeId) {
-            const newEdge: Edge = {
-                id: `te-${Date.now()}`,
-                source: prevNodeId,
-                target: newNodeId,
-                type: 'smoothstep',
-                style: { stroke: '#d9d9d9', strokeWidth: 2 }
-            };
-            setEdges(eds => [...eds, newEdge]);
-        }
-    };
-
-    const handleFocusToday = () => {
-        window.dispatchEvent(new CustomEvent('timeline:focusToday'));
-    };
-
-    const handleFitView = () => {
-        window.dispatchEvent(new CustomEvent('timeline:fitAll'));
+        appMessage.success(t('plugins.timeline.toolbar.created', {
+            item: t(`plugins.timeline.labels.${type}`),
+        }));
     };
 
     return (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '0 8px', borderLeft: '1px solid #e8e8e8', marginLeft: 8 }}>
-            {/* 追加操作 */}
-            <Tooltip title="追加事件">
-                <Button size="small" type="text" icon={<Clock size={14} color="#1890ff" strokeWidth={2} />} onClick={() => handleAppendNode('event')} />
+        <div className="timeline-plugin-toolbar">
+            <Tooltip title={t('plugins.timeline.toolbar.addEvent')}>
+                <Button className="timeline-plugin-toolbar__action" type="text" aria-label={t('plugins.timeline.toolbar.addEvent')} icon={<Clock aria-hidden="true" size={16} color="#1890ff" strokeWidth={2} />} onClick={() => handleAppendNode('event')} />
             </Tooltip>
-            <Tooltip title="追加阶段">
-                <Button size="small" type="text" icon={<Calendar size={14} color="#52c41a" strokeWidth={2} />} onClick={() => handleAppendNode('phase')} />
+            <Tooltip title={t('plugins.timeline.toolbar.addPhase')}>
+                <Button className="timeline-plugin-toolbar__action" type="text" aria-label={t('plugins.timeline.toolbar.addPhase')} icon={<Calendar aria-hidden="true" size={16} color="#52c41a" strokeWidth={2} />} onClick={() => handleAppendNode('phase')} />
             </Tooltip>
-            <Tooltip title="追加里程碑">
-                <Button size="small" type="text" icon={<FlagOutlined style={{ color: '#cf1322' }} />} onClick={() => handleAppendNode('milestone')} />
-            </Tooltip>
-
-            <Divider orientation="vertical" style={{ height: 16, margin: '0 2px' }} />
-
-            {/* 视图操作 */}
-            <Tooltip title="今天居中">
-                <Button size="small" type="text" icon={<AimOutlined />} onClick={handleFocusToday} />
-            </Tooltip>
-            <Tooltip title="适应全部">
-                <Button size="small" type="text" icon={<FullscreenOutlined />} onClick={handleFitView} />
+            <Tooltip title={t('plugins.timeline.toolbar.addMilestone')}>
+                <Button className="timeline-plugin-toolbar__action" type="text" aria-label={t('plugins.timeline.toolbar.addMilestone')} icon={<FlagOutlined aria-hidden="true" style={{ color: '#cf1322' }} />} onClick={() => handleAppendNode('milestone')} />
             </Tooltip>
         </div>
     );

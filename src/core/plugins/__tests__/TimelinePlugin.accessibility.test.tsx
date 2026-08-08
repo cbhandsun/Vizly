@@ -1,0 +1,120 @@
+// @vitest-environment jsdom
+
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import React from 'react';
+import { fireEvent, render, screen } from '@testing-library/react';
+import type { Edge, Node } from '@xyflow/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import type { PluginContext } from '../../types/plugin';
+import { TimelinePlugin } from '../TimelinePlugin';
+
+const messageMocks = vi.hoisted(() => ({
+    success: vi.fn(),
+}));
+
+vi.mock('@/core/utils/antdStaticBridge', () => ({ appMessage: messageMocks }));
+
+const translations: Record<string, string> = {
+    'plugins.timeline.title': 'Project Timeline Pro',
+    'plugins.timeline.description': 'Timeline description',
+    'plugins.timeline.toolbar.addEvent': 'Add event',
+    'plugins.timeline.toolbar.addPhase': 'Add phase',
+    'plugins.timeline.toolbar.addMilestone': 'Add milestone',
+    'plugins.timeline.toolbar.created': '{{item}} added',
+    'plugins.timeline.labels.event': 'New event',
+    'plugins.timeline.labels.phase': 'New phase',
+    'plugins.timeline.labels.milestone': 'New milestone',
+};
+
+vi.mock('react-i18next', () => ({
+    useTranslation: () => ({
+        t: (key: string, values?: Record<string, string>) => {
+            const template = translations[key] ?? key;
+            return Object.entries(values ?? {}).reduce(
+                (result, [name, value]) => result.replace(`{{${name}}}`, value),
+                template,
+            );
+        },
+    }),
+}));
+
+vi.mock('@/i18n', () => ({
+    default: { t: (key: string) => translations[key] ?? key },
+}));
+
+const sourceNode: Node = {
+    id: 'source',
+    type: 'timelineNode',
+    position: { x: 0, y: 0 },
+    selected: true,
+    data: { type: 'event', label: 'Existing', date: '2026-08-01' },
+};
+
+const createContext = (nodes: Node[] = [sourceNode], edges: Edge[] = []): PluginContext => ({
+    nodes,
+    edges,
+    getNodes: vi.fn(() => nodes),
+    getEdges: vi.fn(() => edges),
+    setNodes: vi.fn(),
+    setEdges: vi.fn(),
+    takeSnapshot: vi.fn(),
+    updateNodesBatch: vi.fn(),
+    updateEdgesBatch: vi.fn(),
+    addNode: vi.fn(),
+});
+
+describe('TimelinePlugin toolbar accessibility and history', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it('exposes only the three unique, named creation actions', () => {
+        const context = createContext();
+        render(<>{new TimelinePlugin().contributeToolbar(context)}</>);
+
+        expect(screen.getByRole('button', { name: 'Add event' })).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Add phase' })).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Add milestone' })).toBeTruthy();
+        expect(screen.queryByRole('button', { name: '今天居中' })).toBeNull();
+        expect(screen.queryByRole('button', { name: '适应全部' })).toBeNull();
+    });
+
+    it('snapshots, localizes, selects, and confirms an appended event', () => {
+        const context = createContext();
+        render(<>{new TimelinePlugin().contributeToolbar(context)}</>);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Add event' }));
+
+        expect(context.takeSnapshot).toHaveBeenCalledTimes(1);
+        const updateNodes = vi.mocked(context.setNodes).mock.calls[0]?.[0];
+        expect(typeof updateNodes).toBe('function');
+        if (typeof updateNodes === 'function') {
+            const updatedNodes = updateNodes([sourceNode]);
+            expect(updatedNodes).toHaveLength(2);
+            expect(updatedNodes[0]?.selected).toBe(false);
+            expect(updatedNodes[1]).toMatchObject({
+                type: 'timelineNode',
+                selected: true,
+                data: { type: 'event', label: 'New event' },
+            });
+        }
+
+        const updateEdges = vi.mocked(context.setEdges).mock.calls[0]?.[0];
+        expect(typeof updateEdges).toBe('function');
+        if (typeof updateEdges === 'function') {
+            expect(updateEdges([])[0]).toMatchObject({
+                source: 'source',
+                type: 'smoothstep',
+            });
+        }
+        expect(messageMocks.success).toHaveBeenCalledWith('New event added');
+    });
+
+    it('keeps each toolbar action at the commercial touch target', () => {
+        const css = readFileSync(resolve('src/core/plugins/TimelinePlugin.css'), 'utf8');
+        expect(css).toMatch(/\.timeline-plugin-toolbar__action\.ant-btn[\s\S]*?min-height: var\(--commercial-touch-target, 44px\)/);
+        expect(css).toMatch(/\.timeline-plugin-toolbar__action\.ant-btn[\s\S]*?min-width: var\(--commercial-touch-target, 44px\)/);
+    });
+});

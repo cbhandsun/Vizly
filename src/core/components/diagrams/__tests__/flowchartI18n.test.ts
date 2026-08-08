@@ -118,6 +118,18 @@ describe('flowchart interaction copy', () => {
             expect(read(zh, ['designer', 'architecture', 'toolbar', key])).toBeTypeOf('string');
             expect(read(en, ['designer', 'architecture', 'toolbar', key])).toBeTypeOf('string');
         }
+        for (const key of ['title', 'description']) {
+            expect(read(zh, ['plugins', 'timeline', key])).toBeTypeOf('string');
+            expect(read(en, ['plugins', 'timeline', key])).toBeTypeOf('string');
+        }
+        for (const key of ['addEvent', 'addPhase', 'addMilestone', 'created']) {
+            expect(read(zh, ['plugins', 'timeline', 'toolbar', key])).toBeTypeOf('string');
+            expect(read(en, ['plugins', 'timeline', 'toolbar', key])).toBeTypeOf('string');
+        }
+        for (const key of ['event', 'phase', 'milestone']) {
+            expect(read(zh, ['plugins', 'timeline', 'labels', key])).toBeTypeOf('string');
+            expect(read(en, ['plugins', 'timeline', 'labels', key])).toBeTypeOf('string');
+        }
         for (const [section, keys] of Object.entries({
             empty: ['title', 'description'],
             checking: ['title', 'description'],

@@ -2211,6 +2211,21 @@
         }
     },
     "plugins": {
+        "timeline": {
+            "title": "Project Timeline Pro",
+            "description": "Plan milestones, phases, dependencies, and delivery progress on a professional timeline.",
+            "toolbar": {
+                "addEvent": "Add event",
+                "addPhase": "Add phase",
+                "addMilestone": "Add milestone",
+                "created": "{{item}} added"
+            },
+            "labels": {
+                "event": "New event",
+                "phase": "New phase",
+                "milestone": "New milestone"
+            }
+        },
         "sequence": {
             "title": "UML Sequence Diagram",
             "addActor": "Add Participant",
