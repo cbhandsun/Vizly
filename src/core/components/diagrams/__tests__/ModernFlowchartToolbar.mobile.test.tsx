@@ -163,7 +163,11 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
             />,
         );
 
-        fireEvent.click(await screen.findByRole('button', { name: /更多操作|moreActions/i }));
+        const activeMarqueeTrigger = await screen.findByRole('button', {
+            name: /(?:更多操作|moreActions).*退出框选/i,
+        });
+        expect(activeMarqueeTrigger.className).toContain('bg-[#e8f0fe]');
+        fireEvent.click(activeMarqueeTrigger);
         const activeMarqueeItem = await screen.findByRole('menuitemradio', { name: /退出框选/ });
         expect(activeMarqueeItem.getAttribute('aria-checked')).toBe('true');
         expect(activeMarqueeItem.className).toContain('ant-dropdown-menu-item-selected');
@@ -199,7 +203,11 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
             />,
         );
 
-        fireEvent.click(await screen.findByRole('button', { name: /更多操作|moreActions/i }));
+        const activeDrawingTrigger = await screen.findByRole('button', {
+            name: /(?:更多操作|moreActions).*退出自由画笔/i,
+        });
+        expect(activeDrawingTrigger.className).toContain('bg-[#e8f0fe]');
+        fireEvent.click(activeDrawingTrigger);
         const activeDrawingItem = await screen.findByRole('menuitemradio', { name: /退出自由画笔/ });
         expect(activeDrawingItem.getAttribute('aria-checked')).toBe('true');
         expect(activeDrawingItem.className).toContain('ant-dropdown-menu-item-selected');

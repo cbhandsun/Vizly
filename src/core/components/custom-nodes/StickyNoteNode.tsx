@@ -2,6 +2,7 @@ import React, { memo, useRef, useEffect } from 'react';
 import { NodeProps, Node } from '@xyflow/react';
 import { useNodeUpdate } from '../diagrams/useNodeUpdate';
 import { useDiagramStylePreset_v2 } from '../../hooks/useDiagramStylePreset_v2';
+import { useTranslation } from 'react-i18next';
 import './StickyNoteNode.css';
 import type { NodeDataUpdate } from '../../types/diagram-updates';
 import type { ToolbarFeature } from '../diagrams/FloatingContextToolbar';
@@ -23,11 +24,18 @@ const colorMap = {
     purple: '#e2afff',
 };
 
+export const MAX_STICKY_NOTE_LENGTH = 4000;
+
 const StickyNoteNode: React.FC<NodeProps<Node<StickyNoteData, 'sticky-note'>>> = ({ data, selected, id }) => {
     const preset = useDiagramStylePreset_v2();
     const isSketch = preset.name === 'sketch';
     const onUpdateNodeData = useNodeUpdate();
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const { t } = useTranslation();
+    const stickyNoteLabel = t('designer.toolbar.stickyNote', '便签');
+    const safeLabel = typeof data.label === 'string'
+        ? data.label.slice(0, MAX_STICKY_NOTE_LENGTH)
+        : '';
 
     // Auto-focus when node starts out in isEditing mode
     useEffect(() => {
@@ -40,7 +48,7 @@ const StickyNoteNode: React.FC<NodeProps<Node<StickyNoteData, 'sticky-note'>>> =
 
     const handleLabelChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         if (data.locked) return;
-        const newLabel = e.target.value;
+        const newLabel = e.target.value.slice(0, MAX_STICKY_NOTE_LENGTH);
         if (onUpdateNodeData) {
             onUpdateNodeData([id], { data: { ...data, label: newLabel } });
         }
@@ -90,6 +98,8 @@ const StickyNoteNode: React.FC<NodeProps<Node<StickyNoteData, 'sticky-note'>>> =
     return (
         <div 
             className={`sticky-note-node ${selected ? 'selected' : ''} ${isSketch ? 'sketch-mode' : ''} ${data.isEditing ? 'editing' : ''}`}
+            role="group"
+            aria-label={safeLabel ? `${stickyNoteLabel}: ${safeLabel}` : stickyNoteLabel}
             style={{
                 backgroundColor: bgColor,
                 transform: rotation,
@@ -104,11 +114,13 @@ const StickyNoteNode: React.FC<NodeProps<Node<StickyNoteData, 'sticky-note'>>> =
                     <textarea
                         ref={textareaRef}
                         className="sticky-note-textarea"
-                        value={data.label || ''}
+                        value={safeLabel}
                         onChange={handleLabelChange}
                         onBlur={stopEditing}
                         onKeyDown={handleKeyDown}
-                        placeholder="Type a note..."
+                        aria-label={stickyNoteLabel}
+                        maxLength={MAX_STICKY_NOTE_LENGTH}
+                        placeholder={stickyNoteLabel}
                         style={{
                             fontFamily: isSketch ? '"Comic Sans MS", "Chalkboard SE", sans-serif' : 'inherit',
                         }}
@@ -120,7 +132,7 @@ const StickyNoteNode: React.FC<NodeProps<Node<StickyNoteData, 'sticky-note'>>> =
                             fontFamily: isSketch ? '"Comic Sans MS", "Chalkboard SE", sans-serif' : 'inherit',
                         }}
                     >
-                        {data.label || 'Double click to edit'}
+                        {safeLabel || stickyNoteLabel}
                     </div>
                 )}
             </div>
@@ -133,6 +145,7 @@ const StickyNoteToolbarExtension: React.FC<{
     node: Node<StickyNoteData>;
     updateNodesBatch: (ids: string[], data: NodeDataUpdate) => void;
 }> = ({ node, updateNodesBatch }) => {
+    const { t } = useTranslation();
     const handleColorChange = (color: keyof typeof colorMap) => {
         updateNodesBatch([node.id], { data: { ...node.data, noteColor: color } });
     };
@@ -142,9 +155,12 @@ const StickyNoteToolbarExtension: React.FC<{
             {Object.keys(colorMap).map((color) => (
                 <button
                     key={color}
+                    type="button"
                     className={`color-blob ${node.data?.noteColor === color ? 'active' : (color === 'yellow' && (!node.data || !node.data.noteColor) ? 'active' : '')}`}
                     style={{ backgroundColor: colorMap[color as keyof typeof colorMap] }}
                     onClick={() => handleColorChange(color as keyof typeof colorMap)}
+                    aria-label={`${t('designer.toolbar.stickyNote', '便签')}: ${color}`}
+                    aria-pressed={node.data?.noteColor === color || (color === 'yellow' && (!node.data || !node.data.noteColor))}
                     title={color}
                 />
             ))}

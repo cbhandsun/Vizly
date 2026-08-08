@@ -344,6 +344,17 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
     ]);
 
     const selectedToolModeKey = resolveActiveToolModeKey(isMarqueeActive, isDrawingMode);
+    const mobileMoreHasActiveTool = isMarqueeActive || isDrawingMode;
+    const mobileMoreLabel = isMarqueeActive
+        ? `${t('designer.toolbar.moreActions')} · ${t('toolbar.marqueeExit', '退出框选 (Esc)')}`
+        : isDrawingMode
+            ? `${t('designer.toolbar.moreActions')} · ${t('toolbar.drawingModeExit', '退出自由画笔 (Esc)')}`
+            : t('designer.toolbar.moreActions');
+    const mobileMoreIcon = isMarqueeActive
+        ? <FaObjectGroup className="text-[14px]" />
+        : isDrawingMode
+            ? <FaPen className="text-[13px]" />
+            : <FaEllipsisH className="text-[13px]" />;
 
     const moreMenu = useMemo(() => ({
         items: moreMenuItems,
@@ -585,11 +596,11 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                         ref={moreDropdown.triggerRef}
                         data-flowchart-import-focus-return={onImportClick ? 'true' : undefined}
                         data-flowchart-search-focus-return={onShowCanvasSearch ? 'true' : undefined}
-                        ariaLabel={t('designer.toolbar.moreActions')}
+                        ariaLabel={mobileMoreLabel}
                         open={moreDropdown.open}
                         onTriggerKeyDown={moreDropdown.handleTriggerKeyDown}
-                        icon={<FaEllipsisH className="text-[13px]" />}
-                        className={tbtn}
+                        icon={mobileMoreIcon}
+                        className={mobileMoreHasActiveTool ? tbtnActive : tbtn}
                         style={mobileToolbarButtonStyle}
                     />
                 </Dropdown>
