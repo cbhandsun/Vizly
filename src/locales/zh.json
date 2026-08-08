@@ -2334,6 +2334,61 @@
                 "event": "新事件",
                 "phase": "新阶段",
                 "milestone": "新里程碑"
+            },
+            "propertyPanel": {
+                "title": "时间线任务属性",
+                "empty": "请选择时间线任务进行编辑",
+                "sections": {
+                    "basic": "基础信息",
+                    "schedule": "排期与进度"
+                },
+                "fields": {
+                    "name": "任务名称",
+                    "type": "任务类型",
+                    "status": "状态",
+                    "assignee": "负责人",
+                    "priority": "优先级",
+                    "startDate": "起始日期",
+                    "endDate": "结束日期",
+                    "progress": "当前进度 {{value}}%",
+                    "progressLabel": "任务进度"
+                },
+                "types": {
+                    "phase": "阶段",
+                    "milestone": "里程碑",
+                    "event": "事件"
+                },
+                "statuses": {
+                    "pending": "待开始",
+                    "active": "进行中",
+                    "done": "已完成"
+                },
+                "priorities": {
+                    "high": "高",
+                    "medium": "中",
+                    "low": "低"
+                },
+                "placeholders": {
+                    "assignee": "请输入负责人姓名",
+                    "priority": "请选择优先级"
+                },
+                "baseline": {
+                    "title": "项目基线排期",
+                    "date": "基线日期",
+                    "deviation": "排期偏差",
+                    "delayed": "延迟 {{count}} 个工作日",
+                    "early": "提前 {{count}} 个工作日",
+                    "aligned": "对齐无偏差"
+                },
+                "validation": {
+                    "invalid": "请输入 YYYY-MM-DD 格式的有效日期。",
+                    "end-before-start": "结束日期不能早于起始日期。"
+                },
+                "deleteTask": "删除任务",
+                "deleteConfirmTitle": "删除该任务？",
+                "deleteConfirmDescription": "这也会删除其所有子任务和相关连线；可使用撤销恢复。",
+                "deleteConfirm": "删除任务",
+                "deleteSuccess": "已删除 {{count}} 个任务，可使用撤销恢复。"
             }
         },
         "sequence": {

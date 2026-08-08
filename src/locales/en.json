@@ -2224,6 +2224,61 @@
                 "event": "New event",
                 "phase": "New phase",
                 "milestone": "New milestone"
+            },
+            "propertyPanel": {
+                "title": "Timeline task properties",
+                "empty": "Select a timeline task to edit",
+                "sections": {
+                    "basic": "Basic information",
+                    "schedule": "Schedule and progress"
+                },
+                "fields": {
+                    "name": "Task name",
+                    "type": "Task type",
+                    "status": "Status",
+                    "assignee": "Assignee",
+                    "priority": "Priority",
+                    "startDate": "Start date",
+                    "endDate": "End date",
+                    "progress": "Current progress {{value}}%",
+                    "progressLabel": "Task progress"
+                },
+                "types": {
+                    "phase": "Phase",
+                    "milestone": "Milestone",
+                    "event": "Event"
+                },
+                "statuses": {
+                    "pending": "Not started",
+                    "active": "In progress",
+                    "done": "Completed"
+                },
+                "priorities": {
+                    "high": "High",
+                    "medium": "Medium",
+                    "low": "Low"
+                },
+                "placeholders": {
+                    "assignee": "Enter an assignee",
+                    "priority": "Select a priority"
+                },
+                "baseline": {
+                    "title": "Project baseline",
+                    "date": "Baseline dates",
+                    "deviation": "Schedule variance",
+                    "delayed": "{{count}} workdays late",
+                    "early": "{{count}} workdays early",
+                    "aligned": "On baseline"
+                },
+                "validation": {
+                    "invalid": "Enter a valid date in YYYY-MM-DD format.",
+                    "end-before-start": "The end date cannot be earlier than the start date."
+                },
+                "deleteTask": "Delete task",
+                "deleteConfirmTitle": "Delete this task?",
+                "deleteConfirmDescription": "This also removes its subtasks and related connectors. You can undo this action.",
+                "deleteConfirm": "Delete task",
+                "deleteSuccess": "Deleted {{count}} task(s). Use Undo to restore them."
             }
         },
         "sequence": {

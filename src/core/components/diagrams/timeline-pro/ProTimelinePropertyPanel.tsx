@@ -1,12 +1,19 @@
-import React, { useCallback } from 'react';
-import { Node, Edge } from '@xyflow/react';
+import React, { useCallback, useEffect, useRef } from 'react';
+import type { Edge, Node } from '@xyflow/react';
 import { Collapse, Typography, Empty, Input, DatePicker, Slider, Select, Divider, Button, Popconfirm } from 'antd';
 import { SettingOutlined, DeleteOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
+import { useTranslation } from 'react-i18next';
 import { PluginContext } from '../../../types/plugin';
 import { useTheme } from '../../../themes/useCoreTheme';
 import { appMessage } from '../../../utils/antdStaticBridge';
 import { getWorkDaysSigned } from '../../../hooks/useProTimelineEngine';
+import {
+    buildTimelineDateUpdate,
+    buildTimelineDeletionPlan,
+    readTimelineDate,
+    type TimelineDateField,
+} from './timelinePropertyActions';
 
 const { Text } = Typography;
 
@@ -19,7 +26,9 @@ export interface ProTimelinePropertyPanelProps {
 export const ProTimelinePropertyPanel: React.FC<ProTimelinePropertyPanelProps> = ({
     ctx, selectedNodes
 }) => {
+    const { t } = useTranslation();
     const [theme] = useTheme();
+    const continuousEditRef = useRef<string | null>(null);
     const isDark = theme?.mode === 'dark';
     const labelColor = isDark ? 'rgba(255,255,255,0.45)' : '#8c8c8c';
     const borderColor = isDark ? '#303030' : '#f0f0f0';
@@ -29,11 +38,23 @@ export const ProTimelinePropertyPanel: React.FC<ProTimelinePropertyPanelProps> =
     const nodeData = freshNode ? freshNode.data : null;
     const isGanttTask = nodeData && ['phase', 'milestone', 'summary', 'event'].includes(nodeData.type as string);
 
-    const updateNodeData = useCallback((key: string, value: unknown) => {
+    useEffect(() => {
+        continuousEditRef.current = null;
+    }, [activeNodeId]);
+
+    const updateNodeData = useCallback((key: string, value: unknown, continuous = false) => {
         if (!selectedNodes || !selectedNodes[0]) return;
         const nodeId = selectedNodes[0].id;
         const setNodes = ctx?.setNodes;
         if (!setNodes) return;
+        const currentNode = ctx.getNodes().find(node => node.id === nodeId);
+        if (!currentNode || Object.is(currentNode.data?.[key], value)) return;
+
+        const editToken = `${nodeId}:${key}`;
+        if (!continuous || continuousEditRef.current !== editToken) {
+            ctx.takeSnapshot();
+            if (continuous) continuousEditRef.current = editToken;
+        }
         setNodes((nds: Node[]) => nds.map((n: Node) => {
             if (n.id === nodeId) {
                 return { ...n, data: { ...n.data, [key]: value } };
@@ -42,37 +63,46 @@ export const ProTimelinePropertyPanel: React.FC<ProTimelinePropertyPanelProps> =
         }));
     }, [selectedNodes, ctx]);
 
+    const finishContinuousEdit = useCallback((key: string) => {
+        if (!activeNodeId) return;
+        if (continuousEditRef.current === `${activeNodeId}:${key}`) {
+            continuousEditRef.current = null;
+        }
+    }, [activeNodeId]);
+
+    const handleDateChange = useCallback((field: TimelineDateField, value: unknown) => {
+        if (!nodeData) return;
+        const candidate = dayjs.isDayjs(value) && value.isValid()
+            ? value.format('YYYY-MM-DD')
+            : null;
+        const result = buildTimelineDateUpdate(nodeData, field, candidate);
+        if (!result.ok) {
+            appMessage.warning(t(`plugins.timeline.propertyPanel.validation.${result.reason}`));
+            return;
+        }
+        updateNodeData(field, result.updates[field]);
+    }, [nodeData, t, updateNodeData]);
+
     const handleDelete = useCallback(() => {
         if (!activeNodeId || !ctx) return;
         
-        // 1. 递归收集要删除的节点ID及其后代ID
         const currentNodes = ctx.getNodes();
-        const toDeleteIds = new Set<string>();
-        toDeleteIds.add(activeNodeId);
+        const currentEdges = ctx.getEdges();
+        const plan = buildTimelineDeletionPlan(currentNodes, currentEdges, activeNodeId);
+        if (plan.deletedNodeIds.size === 0) return;
 
-        const collectDescendants = (parentId: string) => {
-            currentNodes.forEach(n => {
-                if (n.data?.parentId === parentId) {
-                    if (!toDeleteIds.has(n.id)) {
-                        toDeleteIds.add(n.id);
-                        collectDescendants(n.id);
-                    }
-                }
-            });
-        };
-        collectDescendants(activeNodeId);
-
-        // 2. 更新 nodes 和 edges 状态
-        ctx.setNodes((ns: Node[]) => ns.filter(n => !toDeleteIds.has(n.id)));
-        ctx.setEdges((eds: Edge[]) => eds.filter(e => !toDeleteIds.has(e.source) && !toDeleteIds.has(e.target)));
-        
-        appMessage.success('任务及子任务删除成功！');
-    }, [activeNodeId, ctx]);
+        ctx.takeSnapshot();
+        ctx.setNodes(plan.nodes);
+        ctx.setEdges(plan.edges);
+        appMessage.success(t('plugins.timeline.propertyPanel.deleteSuccess', {
+            count: plan.deletedNodeIds.size,
+        }));
+    }, [activeNodeId, ctx, t]);
 
     if (!ctx || !selectedNodes) {
         return (
             <div style={{ padding: 24, textAlign: 'center' }}>
-                <Empty description="请选择甘特图任务进行编辑" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+                <Empty description={t('plugins.timeline.propertyPanel.empty')} image={Empty.PRESENTED_IMAGE_SIMPLE} />
             </div>
         );
     }
@@ -80,76 +110,96 @@ export const ProTimelinePropertyPanel: React.FC<ProTimelinePropertyPanelProps> =
     if (!isGanttTask) {
         return (
             <div style={{ padding: 24, textAlign: 'center' }}>
-                <Empty description="请选择甘特图任务进行编辑" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+                <Empty description={t('plugins.timeline.propertyPanel.empty')} image={Empty.PRESENTED_IMAGE_SIMPLE} />
             </div>
         );
     }
 
-    const startDayjs = nodeData?.date ? dayjs(nodeData.date as string) : null;
-    const endDayjs = nodeData?.endDate ? dayjs(nodeData.endDate as string) : null;
+    const normalizedStartDate = readTimelineDate(nodeData?.date);
+    const normalizedEndDate = readTimelineDate(nodeData?.endDate);
+    const startDayjs = normalizedStartDate ? dayjs(normalizedStartDate) : null;
+    const endDayjs = normalizedEndDate ? dayjs(normalizedEndDate) : null;
+    const baselineStartDate = readTimelineDate(nodeData?.baselineStartDate);
+    const baselineEndDate = readTimelineDate(nodeData?.baselineEndDate) ?? baselineStartDate;
+    const baselineDiff = baselineStartDate && normalizedStartDate
+        ? getWorkDaysSigned(baselineStartDate, normalizedStartDate)
+        : null;
 
     const items = [
         {
             key: 'basic',
-            label: '基础信息',
+            label: t('plugins.timeline.propertyPanel.sections.basic'),
             children: (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                     <div>
-                        <div style={{ fontSize: 12, color: labelColor, marginBottom: 4 }}>任务名称</div>
+                        <label htmlFor="timeline-task-name" style={{ display: 'block', fontSize: 12, color: labelColor, marginBottom: 4 }}>
+                            {t('plugins.timeline.propertyPanel.fields.name')}
+                        </label>
                         <Input 
+                            id="timeline-task-name"
                             value={nodeData?.label as string || ''} 
-                            onChange={e => updateNodeData('label', e.target.value)} 
+                            onChange={e => updateNodeData('label', e.target.value, true)}
+                            onBlur={() => finishContinuousEdit('label')}
+                            onPressEnter={event => event.currentTarget.blur()}
                         />
                     </div>
                     <div>
-                        <div style={{ fontSize: 12, color: labelColor, marginBottom: 4 }}>任务类型</div>
+                        <div style={{ fontSize: 12, color: labelColor, marginBottom: 4 }}>{t('plugins.timeline.propertyPanel.fields.type')}</div>
                         <Select
+                            aria-label={t('plugins.timeline.propertyPanel.fields.type')}
                             value={nodeData?.type as string || 'phase'}
                             style={{ width: '100%' }}
                             onChange={val => updateNodeData('type', val)}
-                            disabled={nodeData?.type === 'summary'} // 不允许随便把汇总条改掉
+                            disabled={nodeData?.type === 'summary'}
                             options={[
-                                { value: 'phase', label: '阶段 (Phase)' },
-                                { value: 'milestone', label: '里程碑 (Milestone)' },
-                                { value: 'event', label: '事件 (Event)' }
+                                { value: 'phase', label: t('plugins.timeline.propertyPanel.types.phase') },
+                                { value: 'milestone', label: t('plugins.timeline.propertyPanel.types.milestone') },
+                                { value: 'event', label: t('plugins.timeline.propertyPanel.types.event') }
                             ]}
                         />
                     </div>
                     {nodeData?.type !== 'summary' && (
                         <div>
-                            <div style={{ fontSize: 12, color: labelColor, marginBottom: 4 }}>状态</div>
+                            <div style={{ fontSize: 12, color: labelColor, marginBottom: 4 }}>{t('plugins.timeline.propertyPanel.fields.status')}</div>
                             <Select
+                                aria-label={t('plugins.timeline.propertyPanel.fields.status')}
                                 value={nodeData?.status as string || 'pending'}
                                 style={{ width: '100%' }}
                                 onChange={val => updateNodeData('status', val)}
                                 options={[
-                                    { value: 'pending', label: '待开始' },
-                                    { value: 'active', label: '进行中' },
-                                    { value: 'done', label: '已完成' },
+                                    { value: 'pending', label: t('plugins.timeline.propertyPanel.statuses.pending') },
+                                    { value: 'active', label: t('plugins.timeline.propertyPanel.statuses.active') },
+                                    { value: 'done', label: t('plugins.timeline.propertyPanel.statuses.done') },
                                 ]}
                             />
                         </div>
                     )}
                     <div>
-                        <div style={{ fontSize: 12, color: labelColor, marginBottom: 4 }}>负责人</div>
+                        <label htmlFor="timeline-task-assignee" style={{ display: 'block', fontSize: 12, color: labelColor, marginBottom: 4 }}>
+                            {t('plugins.timeline.propertyPanel.fields.assignee')}
+                        </label>
                         <Input 
+                            id="timeline-task-assignee"
                             value={nodeData?.assignee as string || ''} 
-                            onChange={e => updateNodeData('assignee', e.target.value)} 
-                            placeholder="请输入负责人姓名"
+                            onChange={e => updateNodeData('assignee', e.target.value, true)}
+                            onBlur={() => finishContinuousEdit('assignee')}
+                            onPressEnter={event => event.currentTarget.blur()}
+                            placeholder={t('plugins.timeline.propertyPanel.placeholders.assignee')}
                         />
                     </div>
                     <div>
-                        <div style={{ fontSize: 12, color: labelColor, marginBottom: 4 }}>优先级</div>
+                        <div style={{ fontSize: 12, color: labelColor, marginBottom: 4 }}>{t('plugins.timeline.propertyPanel.fields.priority')}</div>
                         <Select
+                            aria-label={t('plugins.timeline.propertyPanel.fields.priority')}
                             value={nodeData?.priority as string || undefined}
                             style={{ width: '100%' }}
                             onChange={val => updateNodeData('priority', val || undefined)}
                             allowClear
-                            placeholder="请选择优先级"
+                            placeholder={t('plugins.timeline.propertyPanel.placeholders.priority')}
                             options={[
-                                { value: 'high', label: '高' },
-                                { value: 'medium', label: '中' },
-                                { value: 'low', label: '低' }
+                                { value: 'high', label: t('plugins.timeline.propertyPanel.priorities.high') },
+                                { value: 'medium', label: t('plugins.timeline.propertyPanel.priorities.medium') },
+                                { value: 'low', label: t('plugins.timeline.propertyPanel.priorities.low') }
                             ]}
                         />
                     </div>
@@ -158,28 +208,30 @@ export const ProTimelinePropertyPanel: React.FC<ProTimelinePropertyPanelProps> =
         },
         {
             key: 'schedule',
-            label: '排期与进度',
+            label: t('plugins.timeline.propertyPanel.sections.schedule'),
             children: (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                     <div>
-                        <div style={{ fontSize: 12, color: labelColor, marginBottom: 4 }}>起始日期</div>
+                        <div style={{ fontSize: 12, color: labelColor, marginBottom: 4 }}>{t('plugins.timeline.propertyPanel.fields.startDate')}</div>
                         <DatePicker 
+                            aria-label={t('plugins.timeline.propertyPanel.fields.startDate')}
                             disabled={nodeData?.type === 'summary'}
                             value={startDayjs}
                             format="YYYY-MM-DD"
-                            onChange={val => updateNodeData('date', val ? val.format('YYYY-MM-DD') : undefined)}
+                            onChange={val => handleDateChange('date', val)}
                             style={{ width: '100%' }}
                             allowClear={false}
                         />
                     </div>
                     {nodeData?.type !== 'milestone' && (
                         <div>
-                            <div style={{ fontSize: 12, color: labelColor, marginBottom: 4 }}>结束日期</div>
+                            <div style={{ fontSize: 12, color: labelColor, marginBottom: 4 }}>{t('plugins.timeline.propertyPanel.fields.endDate')}</div>
                             <DatePicker 
+                                aria-label={t('plugins.timeline.propertyPanel.fields.endDate')}
                                 disabled={nodeData?.type === 'summary'}
                                 value={endDayjs}
                                 format="YYYY-MM-DD"
-                                onChange={val => updateNodeData('endDate', val ? val.format('YYYY-MM-DD') : undefined)}
+                                onChange={val => handleDateChange('endDate', val)}
                                 style={{ width: '100%' }}
                                 allowClear={false}
                             />
@@ -187,20 +239,24 @@ export const ProTimelinePropertyPanel: React.FC<ProTimelinePropertyPanelProps> =
                     )}
                     {nodeData?.type !== 'milestone' && nodeData?.type !== 'event' && (
                         <div>
-                            <div style={{ fontSize: 12, color: labelColor, marginBottom: 4 }}>当前进度 {(nodeData?.progress as number) || 0}%</div>
+                            <div style={{ fontSize: 12, color: labelColor, marginBottom: 4 }}>
+                                {t('plugins.timeline.propertyPanel.fields.progress', { value: (nodeData?.progress as number) || 0 })}
+                            </div>
                             <Slider 
+                                ariaLabelForHandle={t('plugins.timeline.propertyPanel.fields.progressLabel')}
                                 disabled={nodeData?.type === 'summary'}
                                 min={0} max={100} 
                                 value={(nodeData?.progress as number) || 0} 
-                                onChange={val => updateNodeData('progress', val)} 
+                                onChange={val => updateNodeData('progress', val, true)}
+                                onChangeComplete={() => finishContinuousEdit('progress')}
                             />
                         </div>
                     )}
-                    {Boolean(nodeData?.baselineStartDate) && (
+                    {baselineStartDate && baselineEndDate && baselineDiff !== null && (
                         <>
                             <Divider style={{ margin: '12px 0' }} />
                             <div>
-                                <div style={{ fontSize: 12, color: labelColor, marginBottom: 6 }}>项目基线排期</div>
+                                <div style={{ fontSize: 12, color: labelColor, marginBottom: 6 }}>{t('plugins.timeline.propertyPanel.baseline.title')}</div>
                                 <div style={{ 
                                     padding: '8px 12px', 
                                     background: isDark ? 'rgba(255, 255, 255, 0.03)' : '#fafafa', 
@@ -211,15 +267,15 @@ export const ProTimelinePropertyPanel: React.FC<ProTimelinePropertyPanelProps> =
                                     gap: 6
                                 }}>
                                     <div style={{ fontSize: 12, display: 'flex', justifyContent: 'space-between' }}>
-                                        <span style={{ color: labelColor }}>基线日期:</span>
+                                        <span style={{ color: labelColor }}>{t('plugins.timeline.propertyPanel.baseline.date')}:</span>
                                         <span style={{ fontWeight: 500, color: isDark ? '#fff' : '#000' }}>
-                                            {nodeData.baselineStartDate as string} ~ {nodeData.baselineEndDate as string || nodeData.baselineStartDate as string}
+                                            {baselineStartDate} ~ {baselineEndDate}
                                         </span>
                                     </div>
                                     <div style={{ fontSize: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <span style={{ color: labelColor }}>排期偏差:</span>
+                                        <span style={{ color: labelColor }}>{t('plugins.timeline.propertyPanel.baseline.deviation')}:</span>
                                         {(() => {
-                                            const diff = getWorkDaysSigned(nodeData.baselineStartDate as string, nodeData.date as string);
+                                            const diff = baselineDiff;
                                             if (diff > 0) {
                                                 return (
                                                     <span style={{ 
@@ -230,7 +286,7 @@ export const ProTimelinePropertyPanel: React.FC<ProTimelinePropertyPanelProps> =
                                                         fontSize: 11,
                                                         fontWeight: 600
                                                     }}>
-                                                        延迟 {diff} 工作日
+                                                        {t('plugins.timeline.propertyPanel.baseline.delayed', { count: diff })}
                                                     </span>
                                                 );
                                             }
@@ -244,7 +300,7 @@ export const ProTimelinePropertyPanel: React.FC<ProTimelinePropertyPanelProps> =
                                                         fontSize: 11,
                                                         fontWeight: 600
                                                     }}>
-                                                        提前 {-diff} 工作日
+                                                        {t('plugins.timeline.propertyPanel.baseline.early', { count: -diff })}
                                                     </span>
                                                 );
                                             }
@@ -256,7 +312,7 @@ export const ProTimelinePropertyPanel: React.FC<ProTimelinePropertyPanelProps> =
                                                     borderRadius: 4,
                                                     fontSize: 11
                                                 }}>
-                                                    对齐无偏差
+                                                    {t('plugins.timeline.propertyPanel.baseline.aligned')}
                                                 </span>
                                             );
                                         })()}
@@ -274,7 +330,7 @@ export const ProTimelinePropertyPanel: React.FC<ProTimelinePropertyPanelProps> =
         <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
             <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 8, borderBottom: `1px solid ${borderColor}` }}>
                 <SettingOutlined />
-                <Text strong>面板属性</Text>
+                <Text strong>{t('plugins.timeline.propertyPanel.title')}</Text>
             </div>
             <div style={{ flex: 1, overflow: 'auto' }}>
                 <Collapse 
@@ -283,24 +339,24 @@ export const ProTimelinePropertyPanel: React.FC<ProTimelinePropertyPanelProps> =
                     items={items}
                 />
             </div>
-            {/* 底部删除按钮区 */}
             <div style={{ padding: '16px', borderTop: `1px solid ${borderColor}`, display: 'flex', justifyContent: 'center' }}>
                 <Popconfirm
-                    title="确定要删除该任务吗？"
-                    description="删除该任务将会级联删除其所有子任务以及相关连线，此操作不可逆。"
+                    title={t('plugins.timeline.propertyPanel.deleteConfirmTitle')}
+                    description={t('plugins.timeline.propertyPanel.deleteConfirmDescription')}
                     onConfirm={handleDelete}
-                    okText="确定删除"
-                    cancelText="取消"
+                    okText={t('plugins.timeline.propertyPanel.deleteConfirm')}
+                    cancelText={t('common.cancel')}
                     okButtonProps={{ danger: true }}
                 >
                     <Button 
+                        aria-label={t('plugins.timeline.propertyPanel.deleteTask')}
                         type="primary" 
                         danger 
                         ghost 
                         icon={<DeleteOutlined />}
                         style={{ width: '100%', borderRadius: 8 }}
                     >
-                        删除该任务
+                        {t('plugins.timeline.propertyPanel.deleteTask')}
                     </Button>
                 </Popconfirm>
             </div>

@@ -130,6 +130,33 @@ describe('flowchart interaction copy', () => {
             expect(read(zh, ['plugins', 'timeline', 'labels', key])).toBeTypeOf('string');
             expect(read(en, ['plugins', 'timeline', 'labels', key])).toBeTypeOf('string');
         }
+        for (const key of [
+            'title',
+            'empty',
+            'deleteTask',
+            'deleteConfirmTitle',
+            'deleteConfirmDescription',
+            'deleteConfirm',
+            'deleteSuccess',
+        ]) {
+            expect(read(zh, ['plugins', 'timeline', 'propertyPanel', key])).toBeTypeOf('string');
+            expect(read(en, ['plugins', 'timeline', 'propertyPanel', key])).toBeTypeOf('string');
+        }
+        for (const [section, keys] of Object.entries({
+            sections: ['basic', 'schedule'],
+            fields: ['name', 'type', 'status', 'assignee', 'priority', 'startDate', 'endDate', 'progress', 'progressLabel'],
+            types: ['phase', 'milestone', 'event'],
+            statuses: ['pending', 'active', 'done'],
+            priorities: ['high', 'medium', 'low'],
+            placeholders: ['assignee', 'priority'],
+            baseline: ['title', 'date', 'deviation', 'delayed', 'early', 'aligned'],
+            validation: ['invalid', 'end-before-start'],
+        })) {
+            for (const key of keys) {
+                expect(read(zh, ['plugins', 'timeline', 'propertyPanel', section, key])).toBeTypeOf('string');
+                expect(read(en, ['plugins', 'timeline', 'propertyPanel', section, key])).toBeTypeOf('string');
+            }
+        }
         for (const [section, keys] of Object.entries({
             empty: ['title', 'description'],
             checking: ['title', 'description'],
