@@ -29,6 +29,43 @@ describe('flowchartClipboard', () => {
         ])).toEqual({ nodes: [], edges: [] });
     });
 
+    it('detaches a copied child from an unselected parent using its absolute position', () => {
+        const parent = { id: 'parent', position: { x: 100, y: 200 }, data: {} };
+        const child = {
+            id: 'child',
+            parentId: 'parent',
+            extent: 'parent' as const,
+            expandParent: true,
+            position: { x: 15, y: 25 },
+            data: {},
+        };
+
+        const result = buildFlowchartClipboardData([child], [], [parent, child]);
+
+        expect(result.nodes[0]).toMatchObject({
+            id: 'child',
+            position: { x: 115, y: 225 },
+        });
+        expect(result.nodes[0]).not.toHaveProperty('parentId');
+        expect(result.nodes[0]).not.toHaveProperty('extent');
+        expect(result.nodes[0]).not.toHaveProperty('expandParent');
+    });
+
+    it('preserves relative hierarchy when both parent and child are copied', () => {
+        const parent = { id: 'parent', position: { x: 100, y: 200 }, data: {} };
+        const child = {
+            id: 'child',
+            parentId: 'parent',
+            extent: 'parent' as const,
+            position: { x: 15, y: 25 },
+            data: {},
+        };
+
+        const result = buildFlowchartClipboardData([parent, child], [], [parent, child]);
+
+        expect(result.nodes[1]).toBe(child);
+    });
+
     it('accepts valid clipboard data and normalizes missing node data', () => {
         const result = coerceClipboardData({
             nodes: [{ id: 'a', position: { x: 1, y: 2 } }],

@@ -60,7 +60,11 @@ export const useClipboard = ({
     const handleCopy = useCallback(() => {
         if (selectedNodes.length === 0) return;
 
-        const clipboardData: ClipboardData = buildFlowchartClipboardData(selectedNodes, edgesRef.current);
+        const clipboardData: ClipboardData = buildFlowchartClipboardData(
+            selectedNodes,
+            edgesRef.current,
+            nodesRef.current,
+        );
         let serializedClipboard: string;
 
         try {
@@ -85,7 +89,7 @@ export const useClipboard = ({
                     logClipboardSystemWriteFailure(error);
                 });
         }
-    }, [clipboardKey, edgesRef, selectedNodes]);
+    }, [clipboardKey, edgesRef, nodesRef, selectedNodes]);
 
     /**
      * 尝试解析文本为 ClipboardData

@@ -73,6 +73,25 @@ describe('flowchartClipboardPaste', () => {
         });
     });
 
+    it('detaches nodes whose original parent is not part of the pasted batch', () => {
+        const child = {
+            ...node('child', { x: 115, y: 225 }),
+            parentId: 'outside-parent',
+            extent: 'parent' as const,
+            expandParent: true,
+        };
+        const result = buildFlowchartPasteBatch({
+            clipboardData: { nodes: [child], edges: [] },
+            batchId: 'batch',
+            offset: 20,
+        });
+
+        expect(result.nodes[0]).toMatchObject({ position: { x: 135, y: 245 } });
+        expect(result.nodes[0]).not.toHaveProperty('parentId');
+        expect(result.nodes[0]).not.toHaveProperty('extent');
+        expect(result.nodes[0]).not.toHaveProperty('expandParent');
+    });
+
     it('drops dangling edges instead of reconnecting them to the original graph', () => {
         const result = buildFlowchartPasteBatch({
             clipboardData: {

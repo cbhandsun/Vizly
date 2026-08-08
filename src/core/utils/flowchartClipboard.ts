@@ -15,13 +15,46 @@ export interface ClipboardCoerceOptions {
 export const buildFlowchartClipboardData = (
     selectedNodes: Node[],
     allEdges: Edge[],
+    allNodes: Node[] = selectedNodes,
 ): ClipboardData => {
     const selectedNodeIds = new Set(selectedNodes.map(node => node.id));
+    const allNodesById = new Map(allNodes.map(node => [node.id, node]));
     const edges = allEdges.filter(edge => (
         selectedNodeIds.has(edge.source) && selectedNodeIds.has(edge.target)
     ));
 
-    return { nodes: selectedNodes, edges };
+    const resolveAbsolutePosition = (node: Node, visited = new Set<string>()): Node['position'] => {
+        if (!node.parentId || visited.has(node.id)) return { ...node.position };
+
+        const parent = allNodesById.get(node.parentId);
+        if (!parent) return { ...node.position };
+
+        const nextVisited = new Set(visited).add(node.id);
+        const parentPosition = resolveAbsolutePosition(parent, nextVisited);
+        return {
+            x: parentPosition.x + node.position.x,
+            y: parentPosition.y + node.position.y,
+        };
+    };
+
+    const requiresDetachedCopy = selectedNodes.some(node => (
+        node.parentId !== undefined && !selectedNodeIds.has(node.parentId)
+    ));
+    const nodes = requiresDetachedCopy ? selectedNodes.map(node => {
+        if (!node.parentId || selectedNodeIds.has(node.parentId)) return node;
+
+        const detachedNode: Node = {
+            ...node,
+            position: resolveAbsolutePosition(node),
+        };
+        delete detachedNode.parentId;
+        delete detachedNode.extent;
+        delete detachedNode.expandParent;
+        Reflect.deleteProperty(detachedNode, 'parentNode');
+        return detachedNode;
+    }) : selectedNodes;
+
+    return { nodes, edges };
 };
 
 const DEFAULT_MAX_NODES = 1000;

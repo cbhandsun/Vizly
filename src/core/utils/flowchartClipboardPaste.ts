@@ -59,16 +59,25 @@ export const buildFlowchartPasteBatch = ({
         const pastedParentId = node.parentId ? getPastedNodeId(node.parentId) : null;
         const remainsInsidePastedParent = pastedParentId !== null;
 
-        return {
+        const pastedNode: Node = {
             ...node,
             id: pastedId,
-            parentId: pastedParentId ?? node.parentId,
+            parentId: pastedParentId ?? undefined,
             position: remainsInsidePastedParent
                 ? { ...node.position }
                 : { x: node.position.x + offset, y: node.position.y + offset },
             selected: true,
             data: { ...node.data },
         };
+
+        Reflect.deleteProperty(pastedNode, 'parentNode');
+        if (!remainsInsidePastedParent) {
+            delete pastedNode.parentId;
+            delete pastedNode.extent;
+            delete pastedNode.expandParent;
+        }
+
+        return pastedNode;
     });
 
     const edges = clipboardData.edges.flatMap((edge, index) => {
