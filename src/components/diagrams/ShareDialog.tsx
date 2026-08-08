@@ -47,28 +47,34 @@ function getExpiresAt(option: ExpirationOption): Date | null {
 }
 
 /** 相对时间格式化 */
-function formatRelativeTime(dateStr: string): string {
-    const diff = Date.now() - new Date(dateStr).getTime();
+function formatRelativeTime(dateStr: string, locale: string): string {
+    const timestamp = Date.parse(dateStr);
+    if (!Number.isFinite(timestamp)) return '';
+
+    const diff = Math.max(0, Date.now() - timestamp);
     const minutes = Math.floor(diff / 60000);
-    if (minutes < 1) return '刚刚';
-    if (minutes < 60) return `${minutes} 分钟前`;
+    const formatter = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
+    if (minutes < 1) return formatter.format(0, 'minute');
+    if (minutes < 60) return formatter.format(-minutes, 'minute');
     const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours} 小时前`;
+    if (hours < 24) return formatter.format(-hours, 'hour');
     const days = Math.floor(hours / 24);
-    if (days < 30) return `${days} 天前`;
-    return new Date(dateStr).toLocaleDateString();
+    if (days < 30) return formatter.format(-days, 'day');
+    return new Intl.DateTimeFormat(locale).format(new Date(timestamp));
 }
 
 const isValidUuid = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
 const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onEnsureSaved }) => {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const { token } = theme.useToken();
     const { user } = useAuth();
     const [activeTab, setActiveTab] = useState('invite');
     const [authModalOpen, setAuthModalOpen] = useState(false);
     const [authModalMounted, setAuthModalMounted] = useState(false);
     const loginActionRef = useRef<HTMLButtonElement>(null);
+    const tabsRootRef = useRef<HTMLDivElement>(null);
+    const shouldRestoreTabFocusRef = useRef(false);
 
     // Link Share State
     const [expiration, setExpiration] = useState<ExpirationOption>('never');
@@ -111,8 +117,17 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
     }, [open, user]);
 
     useEffect(() => {
-        if (!open) setAuthModalOpen(false);
-    }, [open]);
+        if (!open || !shouldRestoreTabFocusRef.current) return;
+        shouldRestoreTabFocusRef.current = false;
+        tabsRootRef.current
+            ?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')
+            ?.focus();
+    }, [activeTab, open]);
+
+    const handleTabChange = useCallback((key: string) => {
+        shouldRestoreTabFocusRef.current = true;
+        setActiveTab(key);
+    }, []);
 
     // 云端 UUID（保存后获得，用于替代本地 diagramId）
     const [cloudDiagramId, setCloudDiagramId] = useState<string | null>(null);
@@ -223,7 +238,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
             setShares(prev => prev.filter(s => s.id !== shareId));
         } catch (error) {
             logShareDialogMutationFailure('revokeShare', error);
-            appMessage.error('Failed to revoke');
+            appMessage.error(t('share.revokeFailed'));
         }
     }, [t]);
 
@@ -272,7 +287,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
             setCollaborators(prev => prev.filter(c => c.user_id !== targetUserId));
         } catch (error) {
             logShareDialogMutationFailure('removeCollaborator', error);
-            appMessage.error('Failed to remove collaborator');
+            appMessage.error(t('share.removeFailed'));
         }
     }, [effectiveId, t]);
 
@@ -387,7 +402,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
                             styles={{ image: { height: 48 } }}
                             description={
                                 <Text type="secondary" style={{ fontSize: 13 }}>
-                                    输入邮箱邀请协作者查看此图表
+                                    {t('share.collaboratorsEmpty')}
                                 </Text>
                             }
                         />
@@ -404,10 +419,10 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
                                             !isSelf && (
                                                 <Popconfirm
                                                     key="remove"
-                                                    title="确认移除此协作者？"
+                                                    title={t('share.removeConfirm')}
                                                     onConfirm={() => handleRemoveCollab(item.user_id)}
-                                                    okText="移除"
-                                                    cancelText="取消"
+                                                    okText={t('share.remove')}
+                                                    cancelText={t('common.cancel')}
                                                 >
                                                     <Button size="small" type="text" danger icon={<FaTrash style={{ fontSize: 11 }} />}>
                                                         {t('share.remove')}
@@ -465,7 +480,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
                             type={shareLinkResult.copied ? 'success' : 'warning'}
                             showIcon
                             icon={shareLinkResult.copied ? <CheckCircleFilled /> : undefined}
-                            title={shareLinkResult.copied ? '链接已复制到剪贴板' : '链接已生成，请手动复制'}
+                            title={shareLinkResult.copied ? t('share.copied') : t('share.copyUnavailable')}
                             description={
                                 <Text copyable={{ text: shareLinkResult.url }} style={{ fontSize: 12, wordBreak: 'break-all' }}>
                                     {shareLinkResult.url}
@@ -487,7 +502,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
                         />
                     )}
 
-                    <Text type="secondary" strong style={{ display: 'block', marginBottom: 12 }}>分享链接历史</Text>
+                    <Text type="secondary" strong style={{ display: 'block', marginBottom: 12 }}>{t('share.linkHistory')}</Text>
                     {loadingLink ? (
                         <div style={{ textAlign: 'center', padding: 24 }}><Spin /></div>
                     ) : sharesLoadFailed ? (
@@ -505,7 +520,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
                             styles={{ image: { height: 48 } }}
                             description={
                                 <Text type="secondary" style={{ fontSize: 13 }}>
-                                    生成公开链接，任何拥有链接的人都可查看
+                                    {t('share.linkEmpty')}
                                 </Text>
                             }
                         />
@@ -523,7 +538,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
                                             <Tooltip title={t('share.copyLink')} key="copy">
                                                 <Button aria-label={t('share.copyLink')} type="text" size="small" icon={<FaCopy />} onClick={() => handleCopy(item.share_token)} />
                                             </Tooltip>,
-                                            <Popconfirm key="revoke" title={t('share.revokeConfirm')} onConfirm={() => handleRevokeShare(item.id)} okText={t('share.revokeShare')}>
+                                            <Popconfirm key="revoke" title={t('share.revokeConfirm')} onConfirm={() => handleRevokeShare(item.id)} okText={t('share.revokeShare')} cancelText={t('common.cancel')}>
                                                 <Tooltip title={t('share.revokeShare')}><Button aria-label={t('share.revokeShare')} type="text" size="small" danger icon={<FaTrash />} /></Tooltip>
                                             </Popconfirm>,
                                         ]}
@@ -545,14 +560,16 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
                                             description={
                                                 <Space size={8}>
                                                     <Text type="secondary" style={{ fontSize: 11 }}>
-                                                        {formatRelativeTime(item.created_at)}
+                                                        {formatRelativeTime(item.created_at, i18n.resolvedLanguage || i18n.language)}
                                                     </Text>
                                                     {item.expires_at ? (
                                                         <Tag
                                                             color={isExpired ? 'red' : 'blue'}
                                                             style={{ fontSize: 11 }}
                                                         >
-                                                            {isExpired ? '已过期' : `${t('share.expiresAt')}: ${new Date(item.expires_at).toLocaleDateString()}`}
+                                                            {isExpired
+                                                                ? t('share.expired')
+                                                                : `${t('share.expiresAt')}: ${new Date(item.expires_at).toLocaleDateString(i18n.resolvedLanguage || i18n.language)}`}
                                                         </Tag>
                                                     ) : <Tag color="green" style={{ fontSize: 11 }}>{t('share.never')}</Tag>}
                                                 </Space>
@@ -573,7 +590,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
             <Modal
                 open={open}
                 onCancel={onClose}
-                closable={{ 'aria-label': t('common.close') }}
+                closable={{ 'aria-label': t('share.closeDialog') }}
                 getContainer={getViewportOverlayContainer}
                 rootClassName={`${COMMERCIAL_VIEWPORT_MODAL_CLASS} share-dialog-viewport-modal`}
                 zIndex={COMMERCIAL_VIEWPORT_MODAL_Z_INDEX}
@@ -586,18 +603,20 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
                 footer={
                     <Text type="secondary" className="share-dialog-footer-note">
                         <LockOutlined aria-hidden="true" style={{ marginRight: 6 }} />
-                        分享的图表可随时撤销访问权限
+                        {t('share.footerNote')}
                     </Text>
                 }
                 width={600}
                 styles={{ body: { padding: '0 var(--glass-padding-md, 24px) var(--glass-padding-md, 24px)' } }}
             >
-                <Tabs defaultActiveKey="invite" activeKey={activeTab} onChange={setActiveTab} items={items} />
+                <div ref={tabsRootRef}>
+                    <Tabs defaultActiveKey="invite" activeKey={activeTab} onChange={handleTabChange} items={items} />
+                </div>
             </Modal>
             {authModalMounted ? (
                 <React.Suspense fallback={null}>
                     <AuthModal
-                        open={authModalOpen}
+                        open={authModalOpen && open}
                         onCancel={closeAuthModal}
                         onAuthenticated={closeAuthModal}
                         onAfterClose={handleAuthModalAfterClose}

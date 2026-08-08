@@ -24,6 +24,10 @@ const authMocks = vi.hoisted(() => ({
   user: null as { id: string } | null,
 }));
 
+const languageMocks = vi.hoisted(() => ({
+  current: 'zh',
+}));
+
 const serviceMocks = vi.hoisted(() => ({
   addCollaborator: vi.fn(),
   buildShareUrl: vi.fn(),
@@ -99,6 +103,8 @@ vi.mock('@/components/auth/AuthModal', async () => {
 
 const translations: Record<string, string> = {
   'share.title': '分享图表',
+  'share.closeDialog': '关闭分享图表',
+  'share.footerNote': '分享的图表可随时撤销访问权限',
   'share.tabs.invite': '定向邀请',
   'share.tabs.link': '公开链接',
   'share.inviteInput': '输入用户的注册邮箱...',
@@ -112,6 +118,7 @@ const translations: Record<string, string> = {
   'share.roleLabel': '协作者权限',
   'share.roleEditorComingSoon': '编辑（即将支持）',
   'share.collaborators': '协作者',
+  'share.collaboratorsEmpty': '输入邮箱邀请协作者查看此图表',
   'share.loginRequired': '请先登录后才能使用分享功能',
   'share.loginRequiredHint': '登录后将返回当前分享流程，不会丢失图表。',
   'share.loginAction': '立即登录',
@@ -120,23 +127,55 @@ const translations: Record<string, string> = {
   'share.7days': '7 天',
   'share.30days': '30 天',
   'share.generateLink': '生成分享链接',
-  'share.copied': '已复制',
+  'share.copied': '链接已复制到剪贴板',
+  'share.copyUnavailable': '链接已生成，请手动复制',
+  'share.copyFailed': '复制失败，请手动选择链接',
   'share.collaboratorsLoadFailed': '无法加载协作者',
   'share.linksLoadFailed': '无法加载分享链接',
+  'share.linkHistory': '分享链接历史',
+  'share.linkEmpty': '生成公开链接，任何拥有链接的人都可查看',
   'share.loadRetryHint': '连接恢复后可直接重试，不会影响当前图表。',
   'share.generateFailed': '无法生成分享链接',
   'share.generateRetryHint': '请确认图表已保存到云端并稍后重试。',
   'share.inviteFailedSafe': '邀请未发送',
   'share.inviteRetryHint': '请确认对方已注册，或稍后重试。',
+  'share.remove': '移除',
+  'share.removeConfirm': '确认移除此协作者？',
+  'share.removeFailed': '无法移除协作者，请稍后重试。',
+  'share.revokeFailed': '无法撤销分享链接，请稍后重试。',
+  'share.expired': '已过期',
   'common.close': '关闭',
+  'common.cancel': '取消',
   'common.retry': '重试',
+};
+
+const englishTranslations: Record<string, string> = {
+  'share.title': 'Share Diagram',
+  'share.closeDialog': 'Close Share Diagram',
+  'share.footerNote': 'Access to shared diagrams can be revoked at any time',
+  'share.tabs.invite': 'Invite People',
+  'share.tabs.link': 'Public Link',
+  'share.inviteInput': 'Add registered email...',
+  'share.roleViewer': 'Viewer',
+  'share.inviteBtn': 'Invite',
+  'share.inviteHint': 'Invite a registered user and choose view-only or edit access.',
+  'share.collaborators': 'Collaborators',
+  'share.collaboratorsEmpty': 'Invite collaborators by email to view this diagram',
+  'share.loginRequired': 'Please sign in to use sharing',
+  'share.loginRequiredHint': 'After signing in, you will return to this sharing flow without losing the diagram.',
+  'share.loginAction': 'Sign in now',
 };
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, fallback?: string | Record<string, unknown>) => (
-      typeof fallback === 'string' ? fallback : translations[key] || key
-    ),
+    t: (key: string, fallback?: string | Record<string, unknown>) => {
+      const dictionary = languageMocks.current === 'en' ? englishTranslations : translations;
+      return typeof fallback === 'string' ? fallback : dictionary[key] || key;
+    },
+    i18n: {
+      language: languageMocks.current,
+      resolvedLanguage: languageMocks.current,
+    },
   }),
 }));
 
@@ -158,6 +197,7 @@ const shareRecord = {
 describe('ShareDialog commercial failure handling', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    languageMocks.current = 'zh';
     authMocks.user = null;
     serviceMocks.listSharesForDiagram.mockResolvedValue([]);
     serviceMocks.listCollaborators.mockResolvedValue([]);
@@ -179,6 +219,35 @@ describe('ShareDialog commercial failure handling', () => {
     expect((screen.getByRole('button', { name: '邀请' }) as HTMLButtonElement).disabled).toBe(true);
     expect((screen.getByPlaceholderText('输入用户的注册邮箱...') as HTMLInputElement).disabled).toBe(true);
     expect(screen.getByRole('button', { name: '立即登录' })).toBeTruthy();
+  });
+
+  it('keeps focus on the selected tab after switching sharing modes', async () => {
+    render(
+      <ShareDialog open onClose={vi.fn()} diagramId={DIAGRAM_ID} onEnsureSaved={vi.fn()} />,
+    );
+
+    const publicLinkLabel = await screen.findByText('公开链接');
+    const publicLinkTab = publicLinkLabel.closest('[role="tab"]') as HTMLElement | null;
+    expect(publicLinkTab).toBeTruthy();
+    if (!publicLinkTab) return;
+    publicLinkTab.focus();
+    fireEvent.click(publicLinkTab);
+
+    await waitFor(() => {
+      expect(document.activeElement?.getAttribute('aria-controls')).toContain('panel-link');
+    });
+  });
+
+  it('renders the unauthenticated sharing flow without mixed-language copy', async () => {
+    languageMocks.current = 'en';
+    const { container } = render(
+      <ShareDialog open onClose={vi.fn()} diagramId={DIAGRAM_ID} onEnsureSaved={vi.fn()} />,
+    );
+
+    expect(await screen.findByText('Invite collaborators by email to view this diagram')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Close Share Diagram' })).toBeTruthy();
+    expect(screen.getByText('Access to shared diagrams can be revoked at any time')).toBeTruthy();
+    expect(container.textContent).not.toMatch(/\p{Script=Han}/u);
   });
 
   it('opens authentication directly and preserves the sharing dialog underneath', async () => {
