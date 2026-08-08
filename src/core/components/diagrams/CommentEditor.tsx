@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Input, Button, List, Typography, Flex, Space, theme, Divider, Avatar } from 'antd';
 import { FaCheck, FaTrash, FaPaperPlane } from 'react-icons/fa';
+import { useTranslation } from 'react-i18next';
 import { useDiagramStore, Comment } from '../../store/useDiagramStore';
 import { formatRelativeTime } from '../../utils/formatRelativeTime';
 
@@ -12,6 +13,7 @@ interface CommentEditorProps {
 }
 
 export const CommentEditor: React.FC<CommentEditorProps> = ({ comment, onClose }) => {
+    const { t } = useTranslation();
     const { token } = theme.useToken();
     const updateComment = useDiagramStore(state => state.updateComment);
     const removeComment = useDiagramStore(state => state.removeComment);
@@ -64,6 +66,7 @@ export const CommentEditor: React.FC<CommentEditorProps> = ({ comment, onClose }
                             <Button 
                                 type="text" 
                                 size="small" 
+                                aria-label={comment.isResolved ? t('comment.markUnresolved') : t('comment.markResolved')}
                                 icon={<FaCheck style={{ color: comment.isResolved ? token.colorSuccess : token.colorTextQuaternary }} />} 
                                 onClick={toggleResolve}
                             />
@@ -71,6 +74,7 @@ export const CommentEditor: React.FC<CommentEditorProps> = ({ comment, onClose }
                                 type="text" 
                                 size="small" 
                                 danger 
+                                aria-label={t('comment.delete')}
                                 icon={<FaTrash style={{ fontSize: 11 }} />} 
                                 onClick={handleDelete}
                             />
@@ -110,7 +114,8 @@ export const CommentEditor: React.FC<CommentEditorProps> = ({ comment, onClose }
                 {/* Reply Input */}
                 <div style={{ marginTop: 4 }}>
                     <Input.TextArea
-                        placeholder="回复评论..."
+                        placeholder={t('comment.replyPlaceholder')}
+                        aria-label={t('comment.replyLabel')}
                         value={replyText}
                         onChange={(e) => setReplyText(e.target.value)}
                         autoSize={{ minRows: 1, maxRows: 4 }}
@@ -130,7 +135,7 @@ export const CommentEditor: React.FC<CommentEditorProps> = ({ comment, onClose }
                             onClick={handleAddReply}
                             disabled={!replyText.trim()}
                         >
-                            发送
+                            {t('comment.sendReply')}
                         </Button>
                     </Flex>
                 </div>

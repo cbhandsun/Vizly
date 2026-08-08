@@ -30,10 +30,3 @@ export const parseAnnotationContent = (value: unknown): AnnotationContentResult 
     }
     return { ok: true, value: normalized };
 };
-
-export const getAnnotationContentErrorMessage = (error: AnnotationContentError | null): string | null => {
-    if (error === 'required') return '请输入批注内容';
-    if (error === 'too_long') return `批注内容不能超过 ${MAX_ANNOTATION_CONTENT_LENGTH} 个字符`;
-    if (error === 'save_failed') return '批注保存失败，请重试';
-    return null;
-};

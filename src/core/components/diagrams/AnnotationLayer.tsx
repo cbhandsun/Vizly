@@ -2,11 +2,12 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { theme, Input, Button, Tooltip, Popconfirm } from 'antd';
 import { CheckOutlined, DeleteOutlined, CloseOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import type { CommentThread as Annotation } from '../../store/useDiagramStore';
 import { useDiagramStore } from '../../store/useDiagramStore';
 import { resolveAnnotationEditorPosition, type AnnotationEditorPoint } from './annotationEditorPosition';
 import {
-    getAnnotationContentErrorMessage,
     MAX_ANNOTATION_CONTENT_LENGTH,
     parseAnnotationContent,
     type AnnotationContentError,
@@ -14,23 +15,40 @@ import {
 
 const { TextArea } = Input;
 
-const ANNOTATION_COLOR_LABELS: Readonly<Record<string, string>> = {
-    '#facc15': '黄色',
-    '#f87171': '红色',
-    '#60a5fa': '蓝色',
-    '#34d399': '绿色',
-    '#c084fc': '紫色',
-    '#fb923c': '橙色',
+const ANNOTATION_COLOR_KEYS: Readonly<Record<string, string>> = {
+    '#facc15': 'yellow',
+    '#f87171': 'red',
+    '#60a5fa': 'blue',
+    '#34d399': 'green',
+    '#c084fc': 'purple',
+    '#fb923c': 'orange',
 };
 
-const getAnnotationColorLabel = (color: string): string =>
-    ANNOTATION_COLOR_LABELS[color.toLowerCase()] ?? `自定义颜色 ${color}`;
+const getAnnotationColorLabel = (t: TFunction, color: string): string => {
+    const colorKey = ANNOTATION_COLOR_KEYS[color.toLowerCase()];
+    return colorKey
+        ? t(`comment.colors.${colorKey}`)
+        : t('comment.colors.custom', { color });
+};
+
+const getLocalizedAnnotationError = (
+    t: TFunction,
+    error: AnnotationContentError | null,
+): string | null => {
+    if (error === 'required') return t('comment.validation.required');
+    if (error === 'too_long') {
+        return t('comment.validation.tooLong', { maxLength: MAX_ANNOTATION_CONTENT_LENGTH });
+    }
+    if (error === 'save_failed') return t('comment.validation.saveFailed');
+    return null;
+};
 
 const AnnotationColorPicker: React.FC<{
     colors: string[];
     currentColor: string;
     onChange: (color: string) => void;
 }> = ({ colors, currentColor, onChange }) => {
+    const { t } = useTranslation();
     const buttonRefs = useRef(new Map<string, HTMLButtonElement>());
     const selectedIndex = colors.indexOf(currentColor);
     const rovingIndex = selectedIndex >= 0 ? selectedIndex : 0;
@@ -62,11 +80,11 @@ const AnnotationColorPicker: React.FC<{
     return (
         <div
             role="radiogroup"
-            aria-label="批注颜色"
+            aria-label={t('comment.colorGroup')}
             style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}
         >
             {colors.map((color, index) => {
-                const label = getAnnotationColorLabel(color);
+                const label = getAnnotationColorLabel(t, color);
                 return (
                     <button
                         type="button"
@@ -77,7 +95,7 @@ const AnnotationColorPicker: React.FC<{
                             else buttonRefs.current.delete(color);
                         }}
                         tabIndex={index === rovingIndex ? 0 : -1}
-                        aria-label={`批注颜色：${label}`}
+                        aria-label={t('comment.colorOption', { color: label })}
                         aria-checked={color === currentColor}
                         title={label}
                         onClick={() => selectAndFocus(color)}
@@ -122,6 +140,7 @@ export const AnnotationLayer: React.FC<AnnotationLayerProps> = ({
     annotations, annotationMode, onAdd, onUpdate, onDelete, onToggleResolved, colors, activePageId,
 }) => {
     const { token } = theme.useToken();
+    const { t } = useTranslation();
     const globalActiveId = useDiagramStore(state => state.activeCommentId);
     const [activeId, setActiveId] = useState<string | null>(null);
     const [activeEditorPoint, setActiveEditorPoint] = useState<AnnotationEditorPoint | null>(null);
@@ -136,6 +155,8 @@ export const AnnotationLayer: React.FC<AnnotationLayerProps> = ({
     const [viewportSize, setViewportSize] = useState(readViewportSize);
     const pinButtonRefs = useRef(new Map<string, HTMLButtonElement>());
     const previousActivePageIdRef = useRef(activePageId);
+    const newSubmitLockedRef = useRef(false);
+    const editSubmitLockedRef = useRef(false);
 
     const focusPin = useCallback((annotationId: string) => {
         requestAnimationFrame(() => pinButtonRefs.current.get(annotationId)?.focus());
@@ -157,19 +178,22 @@ export const AnnotationLayer: React.FC<AnnotationLayerProps> = ({
         const y = e.clientY - rect.top;
         setViewportSize(readViewportSize());
         setPendingPos({ canvasX: x, canvasY: y, clientX: e.clientX, clientY: e.clientY });
+        newSubmitLockedRef.current = false;
         setEditText('');
         setEditError(null);
     }, [annotationMode]);
 
     // 提交新批注
     const handleSubmitNew = useCallback(() => {
-        if (!pendingPos) return;
+        if (!pendingPos || newSubmitLockedRef.current) return;
         const parsedContent = parseAnnotationContent(editText);
         if (!parsedContent.ok) {
             setEditError(parsedContent.error);
             return;
         }
+        newSubmitLockedRef.current = true;
         if (onAdd(pendingPos.canvasX, pendingPos.canvasY, parsedContent.value) === false) {
+            newSubmitLockedRef.current = false;
             setEditError('save_failed');
             return;
         }
@@ -180,13 +204,15 @@ export const AnnotationLayer: React.FC<AnnotationLayerProps> = ({
 
     // 保存编辑
     const handleSaveEdit = useCallback(() => {
-        if (!activeId) return;
+        if (!activeId || editSubmitLockedRef.current) return;
         const parsedContent = parseAnnotationContent(editText);
         if (!parsedContent.ok) {
             setEditError(parsedContent.error);
             return;
         }
+        editSubmitLockedRef.current = true;
         if (onUpdate(activeId, { content: parsedContent.value }) === false) {
+            editSubmitLockedRef.current = false;
             setEditError('save_failed');
             return;
         }
@@ -203,6 +229,8 @@ export const AnnotationLayer: React.FC<AnnotationLayerProps> = ({
     }, []);
 
     const closeEditors = useCallback(() => {
+        newSubmitLockedRef.current = false;
+        editSubmitLockedRef.current = false;
         setActiveId(null);
         setActiveEditorPoint(null);
         setPendingPos(null);
@@ -272,6 +300,7 @@ export const AnnotationLayer: React.FC<AnnotationLayerProps> = ({
             onOpen={(point) => {
                 setViewportSize(readViewportSize());
                 setActiveId(ann.id);
+                editSubmitLockedRef.current = false;
                 setActiveEditorPoint(point);
                 setEditText(ann.content);
                 setPendingPos(null);
@@ -303,7 +332,7 @@ export const AnnotationLayer: React.FC<AnnotationLayerProps> = ({
         <div
             data-testid="pending-annotation-editor"
             role="dialog"
-            aria-label="新建批注"
+            aria-label={t('comment.newDialog')}
             style={{
                 position: 'fixed',
                 left: editorPosition.x,
@@ -373,15 +402,16 @@ const AnnotationPin: React.FC<{
     token: ReturnType<typeof theme.useToken>['token'];
     pinButtonRef: (element: HTMLButtonElement | null) => void;
 }> = ({ annotation, isActive, isHighlighted, editText, editError, editorPosition, onEditTextChange, onOpen, onSave, onClose, onDelete, onToggleResolved, onChangeColor, colors, token, pinButtonRef }) => {
+    const { t } = useTranslation();
     const { x, y, color, content: text, isResolved: resolved } = annotation;
-    const errorMessage = getAnnotationContentErrorMessage(editError);
+    const errorMessage = getLocalizedAnnotationError(t, editError);
     const contentIsValid = parseAnnotationContent(editText).ok;
 
     const editor = isActive && editorPosition && createPortal(
         <div
             data-testid="active-annotation-editor"
             role="dialog"
-            aria-label="编辑批注"
+            aria-label={t('comment.editDialog')}
             style={{
                 position: 'fixed',
                 left: editorPosition.x,
@@ -414,7 +444,7 @@ const AnnotationPin: React.FC<{
                     />
                     <Button
                         type="text"
-                        aria-label="关闭批注编辑器"
+                        aria-label={t('comment.closeEditor')}
                         icon={<CloseOutlined style={{ fontSize: 10, color: '#fff' }} />}
                         onClick={onClose}
                         style={{ width: 44, height: 44, minWidth: 44 }}
@@ -426,8 +456,8 @@ const AnnotationPin: React.FC<{
                         value={editText}
                         onChange={e => onEditTextChange(e.target.value)}
                         autoSize={{ minRows: 2, maxRows: 6 }}
-                        placeholder="输入批注内容..."
-                        aria-label="批注内容"
+                        placeholder={t('comment.contentPlaceholder')}
+                        aria-label={t('comment.contentLabel')}
                         aria-invalid={Boolean(errorMessage)}
                         aria-describedby={errorMessage ? 'annotation-edit-content-error' : undefined}
                         maxLength={MAX_ANNOTATION_CONTENT_LENGTH}
@@ -445,9 +475,9 @@ const AnnotationPin: React.FC<{
                     ) : null}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div style={{ display: 'flex', gap: 4 }}>
-                            <Tooltip title={resolved ? '标记未解决' : '标记已解决'}>
+                            <Tooltip title={resolved ? t('comment.markUnresolved') : t('comment.markResolved')}>
                                 <Button
-                                    aria-label={resolved ? '标记批注为未解决' : '标记批注为已解决'}
+                                    aria-label={resolved ? t('comment.markUnresolved') : t('comment.markResolved')}
                                     type={resolved ? 'primary' : 'default'}
                                     icon={<CheckOutlined style={{ fontSize: 11 }} />}
                                     onClick={onToggleResolved}
@@ -455,14 +485,14 @@ const AnnotationPin: React.FC<{
                                 />
                             </Tooltip>
                             <Popconfirm
-                                title="删除此批注？"
-                                description="删除后无法恢复。"
+                                title={t('comment.deleteConfirmTitle')}
+                                description={t('comment.deleteConfirmDescription')}
                                 onConfirm={onDelete}
-                                okText="删除"
-                                cancelText="取消"
+                                okText={t('common.delete', 'Delete')}
+                                cancelText={t('common.cancel', 'Cancel')}
                             >
                                 <Button
-                                    aria-label="删除批注"
+                                    aria-label={t('comment.delete')}
                                     danger
                                     icon={<DeleteOutlined style={{ fontSize: 11 }} />}
                                     style={{ width: 44, height: 44, minWidth: 44 }}
@@ -470,13 +500,13 @@ const AnnotationPin: React.FC<{
                             </Popconfirm>
                         </div>
                         <Button type="primary" onClick={onSave} disabled={!contentIsValid} style={{ minWidth: 64, minHeight: 44 }}>
-                            保存
+                            {t('common.save', 'Save')}
                         </Button>
                     </div>
                 </div>
 
                 <div style={{ fontSize: 10, color: token.colorTextQuaternary, padding: '0 8px 4px', textAlign: 'right' }}>
-                    Ctrl+Enter 保存 · Esc 关闭
+                    {t('comment.keyboardHint')}
                 </div>
             </div>
         </div>,
@@ -501,7 +531,7 @@ const AnnotationPin: React.FC<{
                     <button
                         type="button"
                         ref={pinButtonRef}
-                        aria-label={`查看批注：${text || '空批注'}`}
+                        aria-label={t('comment.view', { content: text || t('comment.emptyContent') })}
                         onClick={event => onOpen({ x: event.clientX, y: event.clientY })}
                         style={{
                             width: 44,
@@ -555,7 +585,8 @@ const AnnotationEditor: React.FC<{
     token: ReturnType<typeof theme.useToken>['token'];
     autoFocus?: boolean;
 }> = ({ text, error, onChange, onSubmit, onCancel, token, autoFocus }) => {
-    const errorMessage = getAnnotationContentErrorMessage(error);
+    const { t } = useTranslation();
+    const errorMessage = getLocalizedAnnotationError(t, error);
     const contentIsValid = parseAnnotationContent(text).ok;
     return (
     <div style={{
@@ -571,8 +602,8 @@ const AnnotationEditor: React.FC<{
             value={text}
             onChange={e => onChange(e.target.value)}
             autoSize={{ minRows: 2, maxRows: 4 }}
-            placeholder="输入批注内容..."
-            aria-label="新批注内容"
+            placeholder={t('comment.contentPlaceholder')}
+            aria-label={t('comment.newContentLabel')}
             aria-invalid={Boolean(errorMessage)}
             aria-describedby={errorMessage ? 'annotation-new-content-error' : undefined}
             maxLength={MAX_ANNOTATION_CONTENT_LENGTH}
@@ -595,8 +626,8 @@ const AnnotationEditor: React.FC<{
             </div>
         ) : null}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 4 }}>
-            <Button onClick={onCancel} style={{ minWidth: 64, minHeight: 44 }}>取消</Button>
-            <Button type="primary" onClick={onSubmit} disabled={!contentIsValid} style={{ minWidth: 64, minHeight: 44 }}>添加</Button>
+            <Button onClick={onCancel} style={{ minWidth: 64, minHeight: 44 }}>{t('common.cancel', 'Cancel')}</Button>
+            <Button type="primary" onClick={onSubmit} disabled={!contentIsValid} style={{ minWidth: 64, minHeight: 44 }}>{t('common.add', 'Add')}</Button>
         </div>
     </div>
     );

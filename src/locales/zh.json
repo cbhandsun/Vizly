@@ -2383,7 +2383,38 @@
         "clearFilters": "清除筛选",
         "addFirstHint": "进入评论模式后，点击画布上的位置即可添加反馈。",
         "addFirst": "添加第一条评论",
-        "modeActive": "评论模式已开启"
+        "modeActive": "评论模式已开启",
+        "focus": "定位评论",
+        "view": "查看评论：{{content}}",
+        "emptyContent": "空评论",
+        "newDialog": "新建评论",
+        "editDialog": "编辑评论",
+        "closeEditor": "关闭评论编辑器",
+        "contentLabel": "评论内容",
+        "newContentLabel": "新评论内容",
+        "contentPlaceholder": "输入评论内容...",
+        "colorGroup": "评论颜色",
+        "colorOption": "评论颜色：{{color}}",
+        "colors": {
+            "yellow": "黄色",
+            "red": "红色",
+            "blue": "蓝色",
+            "green": "绿色",
+            "purple": "紫色",
+            "orange": "橙色",
+            "custom": "自定义颜色 {{color}}"
+        },
+        "deleteConfirmTitle": "删除这条评论？",
+        "deleteConfirmDescription": "删除后无法恢复。",
+        "keyboardHint": "Ctrl+Enter 保存 · Esc 关闭",
+        "replyPlaceholder": "回复这条评论...",
+        "replyLabel": "回复内容",
+        "sendReply": "发送",
+        "validation": {
+            "required": "请输入评论内容",
+            "tooLong": "评论内容不能超过 {{maxLength}} 个字符",
+            "saveFailed": "评论保存失败，请重试"
+        }
     },
     "advancedExport": {
         "title": "高级图表导出",

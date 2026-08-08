@@ -2505,7 +2505,38 @@
         "clearFilters": "Clear filters",
         "addFirstHint": "Enter comment mode, then click anywhere on the canvas to add feedback.",
         "addFirst": "Add the first comment",
-        "modeActive": "Comment mode is active"
+        "modeActive": "Comment mode is active",
+        "focus": "Focus comment",
+        "view": "View comment: {{content}}",
+        "emptyContent": "Empty comment",
+        "newDialog": "Add comment",
+        "editDialog": "Edit comment",
+        "closeEditor": "Close comment editor",
+        "contentLabel": "Comment content",
+        "newContentLabel": "New comment content",
+        "contentPlaceholder": "Enter comment content...",
+        "colorGroup": "Comment color",
+        "colorOption": "Comment color: {{color}}",
+        "colors": {
+            "yellow": "Yellow",
+            "red": "Red",
+            "blue": "Blue",
+            "green": "Green",
+            "purple": "Purple",
+            "orange": "Orange",
+            "custom": "Custom color {{color}}"
+        },
+        "deleteConfirmTitle": "Delete this comment?",
+        "deleteConfirmDescription": "This action cannot be undone.",
+        "keyboardHint": "Ctrl+Enter to save · Esc to close",
+        "replyPlaceholder": "Reply to this comment...",
+        "replyLabel": "Reply content",
+        "sendReply": "Send",
+        "validation": {
+            "required": "Enter comment content",
+            "tooLong": "Comment content cannot exceed {{maxLength}} characters",
+            "saveFailed": "The comment could not be saved. Try again."
+        }
     },
     "advancedExport": {
         "title": "Advanced Diagram Export",
