@@ -717,6 +717,46 @@
                 "desktopDescription": "Choose an architecture component, then connect systems to show their dependencies.",
                 "mobileDescription": "Add a client, service, data store, or business system to begin.",
                 "primaryAction": "Choose your first architecture component"
+            },
+            "validation": {
+                "empty": {
+                    "title": "Nothing to validate yet",
+                    "description": "Add at least one architecture component to start validation."
+                },
+                "checking": {
+                    "title": "Checking architecture",
+                    "description": "Reviewing components and connections for topology risks."
+                },
+                "compliant": {
+                    "title": "No issues found",
+                    "description": "Checked {{nodeCount}} component(s) and {{edgeCount}} connection(s)."
+                },
+                "summary": {
+                    "error": "{{count}} error(s)",
+                    "warning": "{{count}} warning(s)",
+                    "info": "{{count}} suggestion(s)"
+                },
+                "severity": {
+                    "error": "Error",
+                    "warning": "Warning",
+                    "info": "Suggestion"
+                },
+                "inspectIssue": "Inspect {{ruleId}}: {{message}}",
+                "rules": {
+                    "sec001": "Client applications must not connect directly to databases.",
+                    "sec002": "Client applications must not connect directly to object storage.",
+                    "sec003": "Client applications must not connect directly to the cache layer.",
+                    "sec004": "Client applications must not connect directly to the internal message bus.",
+                    "sec005": "Route client requests through a gateway instead of calling a microservice directly.",
+                    "flow001": "Databases should not initiate requests back to a gateway.",
+                    "flow002": "Databases should not initiate requests back to a client.",
+                    "flow003": "Storage services should not initiate requests back to a client.",
+                    "flow004": "Cache services should not normally push data directly to a gateway.",
+                    "rel002": "A direct gateway-to-cache dependency increases coupling; route through a service layer.",
+                    "net001": "Place cloud resources inside a network container such as a VPC or subnet.",
+                    "net002": "Internal resources must not bypass subnet controls to connect directly to the public internet.",
+                    "iso001": "This component is isolated and is not connected to the architecture."
+                }
             }
         },
         "flowchart": {

@@ -5,6 +5,7 @@ export interface LintRule {
     id: string;
     severity: 'error' | 'warning' | 'info';
     message: string;
+    messageKey?: string;
     /** 匹配条件：source 类型 → target 类型 */
     sourceTypes: string[];
     targetTypes: string[];
@@ -14,6 +15,7 @@ export interface LintViolation {
     ruleId: string;
     severity: 'error' | 'warning' | 'info';
     message: string;
+    messageKey?: string;
     edgeId: string;
     sourceId: string;
     targetId: string;
@@ -25,38 +27,38 @@ export interface TopologyLinterOptions {
 }
 
 // ====== 默认规则集（对标 AWS Well-Architected 基础安全/可靠性要求） ======
-const DEFAULT_RULES: LintRule[] = [
+export const DEFAULT_TOPOLOGY_LINT_RULES: LintRule[] = [
     // 安全层
-    { id: 'SEC-001', severity: 'error',   message: '安全违规: 终端不可绕过网关直连数据库',
+    { id: 'SEC-001', severity: 'error',   message: 'Client applications must not connect directly to databases.', messageKey: 'designer.architecture.validation.rules.sec001',
       sourceTypes: ['frontend'], targetTypes: ['database'] },
-    { id: 'SEC-002', severity: 'error',   message: '安全违规: 终端不可绕过网关直连对象存储',
+    { id: 'SEC-002', severity: 'error',   message: 'Client applications must not connect directly to object storage.', messageKey: 'designer.architecture.validation.rules.sec002',
       sourceTypes: ['frontend'], targetTypes: ['storage'] },
-    { id: 'SEC-003', severity: 'error',   message: '安全违规: 终端不可绕过网关直连缓存层',
+    { id: 'SEC-003', severity: 'error',   message: 'Client applications must not connect directly to the cache layer.', messageKey: 'designer.architecture.validation.rules.sec003',
       sourceTypes: ['frontend'], targetTypes: ['cache'] },
-    { id: 'SEC-004', severity: 'error',   message: '安全违规: 终端不可直连内部消息总线',
+    { id: 'SEC-004', severity: 'error',   message: 'Client applications must not connect directly to the internal message bus.', messageKey: 'designer.architecture.validation.rules.sec004',
       sourceTypes: ['frontend'], targetTypes: ['messageQueue'] },
-    { id: 'SEC-005', severity: 'warning', message: '建议: 终端不应直接调用微服务，应经过网关路由',
+    { id: 'SEC-005', severity: 'warning', message: 'Route client requests through a gateway instead of calling a microservice directly.', messageKey: 'designer.architecture.validation.rules.sec005',
       sourceTypes: ['frontend'], targetTypes: ['microservice'] },
 
     // 数据流方向
-    { id: 'FLOW-001', severity: 'error',  message: '数据流异常: 数据库不应向网关反向发起请求',
+    { id: 'FLOW-001', severity: 'error',  message: 'Databases should not initiate requests back to a gateway.', messageKey: 'designer.architecture.validation.rules.flow001',
       sourceTypes: ['database'], targetTypes: ['gateway'] },
-    { id: 'FLOW-002', severity: 'error',  message: '数据流异常: 数据库不应向终端反向发起请求',
+    { id: 'FLOW-002', severity: 'error',  message: 'Databases should not initiate requests back to a client.', messageKey: 'designer.architecture.validation.rules.flow002',
       sourceTypes: ['database'], targetTypes: ['frontend'] },
-    { id: 'FLOW-003', severity: 'error',  message: '数据流异常: 存储层不应向终端反向发起请求',
+    { id: 'FLOW-003', severity: 'error',  message: 'Storage services should not initiate requests back to a client.', messageKey: 'designer.architecture.validation.rules.flow003',
       sourceTypes: ['storage'], targetTypes: ['frontend'] },
-    { id: 'FLOW-004', severity: 'warning',message: '建议: 缓存层通常不主动向网关推送数据',
+    { id: 'FLOW-004', severity: 'warning',message: 'Cache services should not normally push data directly to a gateway.', messageKey: 'designer.architecture.validation.rules.flow004',
       sourceTypes: ['cache'], targetTypes: ['gateway'] },
 
-    { id: 'REL-002', severity: 'info',    message: '提示: 网关直连缓存会导致耦合，建议经过服务层',
+    { id: 'REL-002', severity: 'info',    message: 'A direct gateway-to-cache dependency increases coupling; route through a service layer.', messageKey: 'designer.architecture.validation.rules.rel002',
       sourceTypes: ['gateway'], targetTypes: ['cache'] },
 
     // ====== 网络拓扑规则 (NEW in 2.0) ======
-    { id: 'NET-001', severity: 'warning', message: '建议: 云资源节点应放置在容器（如 VPC/子网）内',
+    { id: 'NET-001', severity: 'warning', message: 'Place cloud resources inside a network container such as a VPC or subnet.', messageKey: 'designer.architecture.validation.rules.net001',
       sourceTypes: ['networkNode'], targetTypes: [] }, // 特殊处理：检查父容器
-    { id: 'NET-002', severity: 'error',   message: '安全违规: 内部资源不应绕过子网限制直连外部公网',
+    { id: 'NET-002', severity: 'error',   message: 'Internal resources must not bypass subnet controls to connect directly to the public internet.', messageKey: 'designer.architecture.validation.rules.net002',
       sourceTypes: ['networkNode'], targetTypes: ['public'] },
-    { id: 'ISO-001', severity: 'info',    message: '提示: 该节点目前为孤立状态，未连接到任何组件',
+    { id: 'ISO-001', severity: 'info',    message: 'This component is isolated and is not connected to the architecture.', messageKey: 'designer.architecture.validation.rules.iso001',
       sourceTypes: ['architectureNode', 'networkNode'], targetTypes: [] },
 ];
 
@@ -66,20 +68,125 @@ const SEVERITY_EDGE_STYLE: Record<string, { stroke: string; strokeWidth: number;
     info:    { stroke: '#1890ff', strokeWidth: 2, strokeDasharray: '2 4' },
 };
 
-/**
- * 架构拓扑验证引擎 (Topology Linter)
- * - 12 条默认规则，覆盖 AWS Well-Architected 的安全/可靠性/数据流基础要求
- * - 支持 customRules 扩展
- * - 返回 lintedNodes / lintedEdges（可直接传入 ReactFlow）+ violations 列表
- */
+export interface TopologyLintResult {
+    lintedNodes: Node[];
+    lintedEdges: Edge[];
+    violations: LintViolation[];
+}
+
+const createViolation = (
+    rule: LintRule,
+    ids: Pick<LintViolation, 'edgeId' | 'sourceId' | 'targetId'>,
+): LintViolation => ({
+    ruleId: rule.id,
+    severity: rule.severity,
+    message: rule.message,
+    messageKey: rule.messageKey,
+    ...ids,
+});
+
+/** Pure topology validation so node-only diagrams and edge rules share one testable boundary. */
+export const lintTopology = (
+    nodes: Node[],
+    edges: Edge[],
+    rules: LintRule[] = DEFAULT_TOPOLOGY_LINT_RULES,
+    enabled = true,
+): TopologyLintResult => {
+    if (!enabled || nodes.length === 0) {
+        return { lintedNodes: nodes, lintedEdges: edges, violations: [] };
+    }
+
+    const violations: LintViolation[] = [];
+    const nextNodes = nodes.map(node => ({
+        ...node,
+        data: { ...node.data, linterErrors: [] as string[] },
+    }));
+    const nextEdges = edges.map(edge => ({ ...edge }));
+    const nodeMap = new Map(nextNodes.map(node => [node.id, node]));
+
+    nextNodes.forEach(node => {
+        const isArchitectureNode = node.type === 'architectureNode';
+        const isNetworkNode = node.type === 'networkNode';
+        if (!isArchitectureNode && !isNetworkNode) return;
+
+        const nodeErrors = node.data.linterErrors as string[];
+        if (isNetworkNode && !node.parentId) {
+            const rule = rules.find(candidate => candidate.id === 'NET-001');
+            if (rule) {
+                nodeErrors.push(`[${rule.id}] ${rule.message}`);
+                violations.push(createViolation(rule, {
+                    edgeId: '',
+                    sourceId: node.id,
+                    targetId: '',
+                }));
+            }
+        }
+
+        const isConnected = edges.some(edge => edge.source === node.id || edge.target === node.id);
+        if (!isConnected) {
+            const rule = rules.find(candidate => candidate.id === 'ISO-001');
+            if (rule) {
+                nodeErrors.push(`[${rule.id}] ${rule.message}`);
+                violations.push(createViolation(rule, {
+                    edgeId: '',
+                    sourceId: node.id,
+                    targetId: '',
+                }));
+            }
+        }
+    });
+
+    nextEdges.forEach(edge => {
+        const sourceNode = nodeMap.get(edge.source);
+        const targetNode = nodeMap.get(edge.target);
+        if (!sourceNode || !targetNode) return;
+
+        const isLintableNode = (type: string | undefined) => (
+            type === 'architectureNode' || type === 'networkNode'
+        );
+        if (!isLintableNode(sourceNode.type) || !isLintableNode(targetNode.type)) return;
+
+        const sourceData = sourceNode.data as Record<string, unknown>;
+        const targetData = targetNode.data as Record<string, unknown>;
+        const sourceType = typeof sourceData.type === 'string' ? sourceData.type : sourceNode.type ?? '';
+        const targetType = typeof targetData.type === 'string' ? targetData.type : targetNode.type ?? '';
+
+        const rule = rules.find(candidate => (
+            candidate.targetTypes.length > 0
+            && candidate.sourceTypes.includes(sourceType)
+            && candidate.targetTypes.includes(targetType)
+        ));
+        if (!rule) return;
+
+        violations.push(createViolation(rule, {
+            edgeId: edge.id,
+            sourceId: edge.source,
+            targetId: edge.target,
+        }));
+
+        if (rule.severity === 'error' || rule.severity === 'warning') {
+            edge.animated = true;
+            edge.style = { ...edge.style, ...SEVERITY_EDGE_STYLE[rule.severity] };
+            edge.zIndex = 9999;
+        }
+
+        const targetErrors = targetNode.data.linterErrors as string[];
+        targetErrors.push(`[${rule.id}] ${rule.message}`);
+    });
+
+    return { lintedNodes: nextNodes, lintedEdges: nextEdges, violations };
+};
+
+/** Debounced React adapter for the pure topology validation boundary. */
 export function useTopologyLinter(nodes: Node[], edges: Edge[], options: TopologyLinterOptions = {}) {
     const { enabled = true, customRules = [] } = options;
-    const allRules = useMemo(() => [...DEFAULT_RULES, ...customRules], [customRules]);
-
+    const allRules = useMemo(
+        () => [...DEFAULT_TOPOLOGY_LINT_RULES, ...customRules],
+        [customRules],
+    );
     const [debouncedNodes, setDebouncedNodes] = useState(nodes);
     const [debouncedEdges, setDebouncedEdges] = useState(edges);
 
-    // Debounce updates to prevent heavy topology linting from blocking React Flow renders during node drags
     useEffect(() => {
         const handler = setTimeout(() => {
             setDebouncedNodes(nodes);
@@ -88,114 +195,13 @@ export function useTopologyLinter(nodes: Node[], edges: Edge[], options: Topolog
         return () => clearTimeout(handler);
     }, [nodes, edges]);
 
-    return useMemo(() => {
-        if (!enabled || debouncedNodes.length === 0 || debouncedEdges.length === 0) {
-            return { lintedNodes: debouncedNodes, lintedEdges: debouncedEdges, violations: [] as LintViolation[] };
-        }
+    const result = useMemo(
+        () => lintTopology(debouncedNodes, debouncedEdges, allRules, enabled),
+        [allRules, debouncedEdges, debouncedNodes, enabled],
+    );
 
-        const violations: LintViolation[] = [];
-
-        // 浅复制
-        const nextNodes = debouncedNodes.map(n => ({
-            ...n,
-            data: { ...n.data, linterErrors: [] as string[] }
-        }));
-        const nextEdges = debouncedEdges.map(e => ({ ...e }));
-        const nodeMap = new Map(nextNodes.map(n => [n.id, n]));
-
-        // 1. 节点级校验 (孤立节点、容器合规)
-        nextNodes.forEach(node => {
-            const isArch = node.type === 'architectureNode';
-            const isNet = node.type === 'networkNode';
-            if (!isArch && !isNet) return;
-
-            const errs = node.data.linterErrors as string[];
-            
-            // NET-001: 检查网络节点是否在容器内
-            if (isNet && !node.parentId) {
-                const rule = allRules.find(r => r.id === 'NET-001');
-                if (rule) {
-                    const msg = `[${rule.id}] ${rule.message}`;
-                    if (!errs.includes(msg)) errs.push(msg);
-                    violations.push({
-                        ruleId: rule.id,
-                        severity: rule.severity,
-                        message: rule.message,
-                        edgeId: '',
-                        sourceId: node.id,
-                        targetId: '',
-                    });
-                }
-            }
-
-            // ISO-001: 检查孤立节点
-            const isConnected = debouncedEdges.some(e => e.source === node.id || e.target === node.id);
-            if (!isConnected) {
-                const rule = allRules.find(r => r.id === 'ISO-001');
-                if (rule) {
-                    const msg = `[${rule.id}] ${rule.message}`;
-                    if (!errs.includes(msg)) errs.push(msg);
-                    violations.push({
-                        ruleId: rule.id,
-                        severity: rule.severity,
-                        message: rule.message,
-                        edgeId: '',
-                        sourceId: node.id,
-                        targetId: '',
-                    });
-                }
-            }
-        });
-
-        // 2. 边级校验 (拓扑流向)
-        nextEdges.forEach(edge => {
-            const sourceNode = nodeMap.get(edge.source);
-            const targetNode = nodeMap.get(edge.target);
-            if (!sourceNode || !targetNode) return;
-
-            // 检查 architectureNode 或 networkNode
-            const sType = sourceNode.type;
-            const tType = targetNode.type;
-            const isValidType = (t: string | undefined) => t === 'architectureNode' || t === 'networkNode';
-            if (!isValidType(sType) || !isValidType(tType)) return;
-
-            const sourceData = sourceNode.data as Record<string, unknown>;
-            const targetData = targetNode.data as Record<string, unknown>;
-            const stypeAttr = typeof sourceData.type === 'string' ? sourceData.type : '';
-            const ttypeAttr = typeof targetData.type === 'string' ? targetData.type : '';
-
-            for (const rule of allRules) {
-                // 如果 rule.targetTypes 为空，说明是节点级规则，跳过
-                if (rule.targetTypes.length === 0) continue;
-
-                if (rule.sourceTypes.includes(stypeAttr || sType) && rule.targetTypes.includes(ttypeAttr || tType)) {
-                    violations.push({
-                        ruleId: rule.id,
-                        severity: rule.severity,
-                        message: rule.message,
-                        edgeId: edge.id,
-                        sourceId: edge.source,
-                        targetId: edge.target,
-                    });
-
-                    // 视觉标记：边
-                    const sevStyle = SEVERITY_EDGE_STYLE[rule.severity];
-                    if (rule.severity === 'error' || rule.severity === 'warning') {
-                        edge.animated = true;
-                        edge.style = { ...edge.style, ...sevStyle };
-                        edge.zIndex = 9999;
-                    }
-
-                    // 视觉标记：节点
-                    const targetErrs = targetNode.data.linterErrors as string[];
-                    const msg = `[${rule.id}] ${rule.message}`;
-                    if (!targetErrs.includes(msg)) targetErrs.push(msg);
-
-                    break; 
-                }
-            }
-        });
-
-        return { lintedNodes: nextNodes, lintedEdges: nextEdges, violations };
-    }, [debouncedNodes, debouncedEdges, enabled, allRules]);
+    return {
+        ...result,
+        isPending: debouncedNodes !== nodes || debouncedEdges !== edges,
+    };
 }

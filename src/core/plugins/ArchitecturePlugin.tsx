@@ -15,7 +15,7 @@ import {
     ApiOutlined, SwapOutlined, HddOutlined, CloudServerOutlined, LaptopOutlined,
     SearchOutlined, SafetyCertificateOutlined,
     CheckCircleOutlined, WarningOutlined, CloseCircleOutlined, InfoCircleOutlined,
-    ApartmentOutlined, NodeIndexOutlined, PartitionOutlined
+    ApartmentOutlined, NodeIndexOutlined, PartitionOutlined, LoadingOutlined
 } from '@ant-design/icons';
 import { useTopologyLinter } from '../hooks/useTopologyLinter';
 import { useDiagramStore } from '../store/useDiagramStore';
@@ -111,7 +111,7 @@ export class ArchitecturePlugin implements DiagramTypePlugin {
         id: 'arch-linter',
         title: '合规校验',
         icon: <SafetyCertificateOutlined />,
-        content: <LinterPanel />
+        content: <LinterPanel ctx={ctx} />
       }
     ];
   }
@@ -314,9 +314,9 @@ const ArchitecturePalette: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
 
 // ====== 合规校验面板 ======
 const SEVERITY_CONFIG = {
-    error:   { color: '#f5222d', icon: <CloseCircleOutlined />,  label: '错误' },
-    warning: { color: '#faad14', icon: <WarningOutlined />,      label: '警告' },
-    info:    { color: '#1890ff', icon: <InfoCircleOutlined />,    label: '提示' },
+    error: { color: '#f5222d', icon: <CloseCircleOutlined />, labelKey: 'designer.architecture.validation.severity.error' },
+    warning: { color: '#faad14', icon: <WarningOutlined />, labelKey: 'designer.architecture.validation.severity.warning' },
+    info: { color: '#1890ff', icon: <InfoCircleOutlined />, labelKey: 'designer.architecture.validation.severity.info' },
 };
 
 // ====== 架构图专属工具栏 ======
@@ -376,66 +376,125 @@ const ArchitectureToolbar: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
     );
 };
 
-const LinterPanel: React.FC = () => {
-    // 订阅 Store 来做高频率更新（如果面板需要实时反映节点移动后的校验结果）
-    const nodes = useDiagramStore(s => s.nodes);
-    const edges = useDiagramStore(s => s.edges);
-    const { violations } = useTopologyLinter(nodes, edges);
+const LinterPanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
+    const { t } = useTranslation();
+    const nodes = useDiagramStore(state => state.nodes);
+    const edges = useDiagramStore(state => state.edges);
+    const { violations, isPending } = useTopologyLinter(nodes, edges);
 
-    const errorCount = violations.filter(v => v.severity === 'error').length;
-    const warnCount = violations.filter(v => v.severity === 'warning').length;
-    const infoCount = violations.filter(v => v.severity === 'info').length;
+    const errorCount = violations.filter(violation => violation.severity === 'error').length;
+    const warnCount = violations.filter(violation => violation.severity === 'warning').length;
+    const infoCount = violations.filter(violation => violation.severity === 'info').length;
+
+    if (nodes.length === 0) {
+        return (
+            <div role="status" aria-live="polite" style={{ padding: 16, textAlign: 'center' }}>
+                <InfoCircleOutlined aria-hidden="true" style={{ fontSize: 32, color: '#667085', marginBottom: 8 }} />
+                <div style={{ fontSize: 13, color: '#344054', fontWeight: 600 }}>
+                    {t('designer.architecture.validation.empty.title')}
+                </div>
+                <div style={{ fontSize: 12, color: '#667085', marginTop: 4 }}>
+                    {t('designer.architecture.validation.empty.description')}
+                </div>
+            </div>
+        );
+    }
+
+    if (isPending) {
+        return (
+            <div role="status" aria-live="polite" style={{ padding: 16, textAlign: 'center' }}>
+                <LoadingOutlined aria-hidden="true" spin style={{ fontSize: 32, color: '#1677ff', marginBottom: 8 }} />
+                <div style={{ fontSize: 13, color: '#344054', fontWeight: 600 }}>
+                    {t('designer.architecture.validation.checking.title')}
+                </div>
+                <div style={{ fontSize: 12, color: '#667085', marginTop: 4 }}>
+                    {t('designer.architecture.validation.checking.description')}
+                </div>
+            </div>
+        );
+    }
 
     if (violations.length === 0) {
         return (
-            <div style={{ padding: 16, textAlign: 'center' }}>
-                <CheckCircleOutlined style={{ fontSize: 32, color: '#52c41a', marginBottom: 8 }} />
-                <div style={{ fontSize: 13, color: '#52c41a', fontWeight: 600 }}>架构合规</div>
-                <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 4 }}>当前拓扑未检出违规连线</div>
+            <div role="status" aria-live="polite" style={{ padding: 16, textAlign: 'center' }}>
+                <CheckCircleOutlined aria-hidden="true" style={{ fontSize: 32, color: '#389e0d', marginBottom: 8 }} />
+                <div style={{ fontSize: 13, color: '#237804', fontWeight: 600 }}>
+                    {t('designer.architecture.validation.compliant.title')}
+                </div>
+                <div style={{ fontSize: 12, color: '#667085', marginTop: 4 }}>
+                    {t('designer.architecture.validation.compliant.description', {
+                        nodeCount: nodes.length,
+                        edgeCount: edges.length,
+                    })}
+                </div>
             </div>
         );
     }
 
     return (
         <div style={{ padding: '8px 10px' }}>
-            {/* 统计条 */}
-            <div style={{ display: 'flex', gap: 12, marginBottom: 10, padding: '6px 8px', background: '#fafafa', borderRadius: 6, fontSize: 12 }}>
-                {errorCount > 0 && <span style={{ color: '#f5222d' }}><CloseCircleOutlined /> {errorCount} 错误</span>}
-                {warnCount > 0 && <span style={{ color: '#faad14' }}><WarningOutlined /> {warnCount} 警告</span>}
-                {infoCount > 0 && <span style={{ color: '#1890ff' }}><InfoCircleOutlined /> {infoCount} 提示</span>}
+            <div
+                role="status"
+                aria-live="polite"
+                aria-atomic="true"
+                style={{ display: 'flex', gap: 12, marginBottom: 10, padding: '6px 8px', background: '#fafafa', borderRadius: 6, fontSize: 12 }}
+            >
+                {errorCount > 0 && <span style={{ color: '#cf1322' }}><CloseCircleOutlined aria-hidden="true" /> {t('designer.architecture.validation.summary.error', { count: errorCount })}</span>}
+                {warnCount > 0 && <span style={{ color: '#ad6800' }}><WarningOutlined aria-hidden="true" /> {t('designer.architecture.validation.summary.warning', { count: warnCount })}</span>}
+                {infoCount > 0 && <span style={{ color: '#0958d9' }}><InfoCircleOutlined aria-hidden="true" /> {t('designer.architecture.validation.summary.info', { count: infoCount })}</span>}
             </div>
-            {/* 违规列表 */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {violations.map((v, i) => {
-                    const sev = SEVERITY_CONFIG[v.severity];
+            <ul style={{ display: 'flex', flexDirection: 'column', gap: 6, listStyle: 'none', margin: 0, padding: 0 }}>
+                {violations.map(violation => {
+                    const severity = SEVERITY_CONFIG[violation.severity];
+                    const message = violation.messageKey
+                        ? t(violation.messageKey, { defaultValue: violation.message })
+                        : violation.message;
+                    const focusNodeId = violation.targetId || violation.sourceId;
                     return (
-                        <div 
-                            key={i} 
-                            style={{
-                                padding: '6px 8px', borderRadius: 6,
-                                border: `1px solid ${sev.color}30`,
-                                background: `${sev.color}08`,
-                                fontSize: 12, lineHeight: 1.5,
-                                cursor: 'pointer',
-                                transition: 'all 0.2s',
-                            }}
-                            onClick={() => {
-                                window.dispatchEvent(new CustomEvent('editor:focus-entity', {
-                                    detail: { edgeId: v.edgeId, nodeId: v.targetId }
-                                }));
-                            }}
-                            onMouseEnter={(e) => { e.currentTarget.style.background = `${sev.color}15`; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.background = `${sev.color}08`; }}
-                        >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
-                                <span style={{ color: sev.color }}>{sev.icon}</span>
-                                <strong style={{ color: sev.color, fontSize: 11 }}>{v.ruleId}</strong>
-                            </div>
-                            <div style={{ color: '#595959' }}>{v.message}</div>
-                        </div>
+                        <li key={`${violation.ruleId}:${violation.edgeId || violation.sourceId}:${violation.targetId}`}>
+                            <button
+                                type="button"
+                                aria-label={t('designer.architecture.validation.inspectIssue', {
+                                    ruleId: violation.ruleId,
+                                    message,
+                                })}
+                                style={{
+                                    width: '100%', textAlign: 'left', font: 'inherit',
+                                    padding: '6px 8px', borderRadius: 6,
+                                    border: `1px solid ${severity.color}30`,
+                                    background: `${severity.color}08`,
+                                    fontSize: 12, lineHeight: 1.5,
+                                    cursor: 'pointer', transition: 'all 0.2s',
+                                }}
+                                onClick={() => {
+                                    ctx.setNodes(currentNodes => currentNodes.map(node => ({
+                                        ...node,
+                                        selected: !violation.edgeId && node.id === focusNodeId,
+                                    })));
+                                    ctx.setEdges(currentEdges => currentEdges.map(edge => ({
+                                        ...edge,
+                                        selected: Boolean(violation.edgeId) && edge.id === violation.edgeId,
+                                    })));
+                                    window.dispatchEvent(new CustomEvent('editor:focus-entity', {
+                                        detail: violation.edgeId
+                                            ? { edgeId: violation.edgeId }
+                                            : { nodeId: focusNodeId },
+                                    }));
+                                }}
+                                onMouseEnter={(event) => { event.currentTarget.style.background = `${severity.color}15`; }}
+                                onMouseLeave={(event) => { event.currentTarget.style.background = `${severity.color}08`; }}
+                            >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
+                                    <span style={{ color: severity.color }} aria-hidden="true">{severity.icon}</span>
+                                    <strong style={{ color: severity.color, fontSize: 11 }}>{violation.ruleId}</strong>
+                                    <span style={{ color: '#667085', fontSize: 11 }}>{t(severity.labelKey)}</span>
+                                </div>
+                                <div style={{ color: '#344054' }}>{message}</div>
+                            </button>
+                        </li>
                     );
                 })}
-            </div>
+            </ul>
         </div>
     );
 };

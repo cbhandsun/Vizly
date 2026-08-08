@@ -114,6 +114,26 @@ describe('flowchart interaction copy', () => {
             expect(read(zh, ['designer', 'architecture', 'components', key])).toBeTypeOf('string');
             expect(read(en, ['designer', 'architecture', 'components', key])).toBeTypeOf('string');
         }
+        for (const [section, keys] of Object.entries({
+            empty: ['title', 'description'],
+            checking: ['title', 'description'],
+            compliant: ['title', 'description'],
+            summary: ['error', 'warning', 'info'],
+            severity: ['error', 'warning', 'info'],
+        })) {
+            for (const key of keys) {
+                expect(read(zh, ['designer', 'architecture', 'validation', section, key])).toBeTypeOf('string');
+                expect(read(en, ['designer', 'architecture', 'validation', section, key])).toBeTypeOf('string');
+            }
+        }
+        for (const key of ['sec001', 'sec002', 'sec003', 'sec004', 'sec005', 'flow001', 'flow002', 'flow003', 'flow004', 'rel002', 'net001', 'net002', 'iso001']) {
+            expect(read(zh, ['designer', 'architecture', 'validation', 'rules', key])).toBeTypeOf('string');
+            expect(read(en, ['designer', 'architecture', 'validation', 'rules', key])).toBeTypeOf('string');
+        }
+        for (const key of ['inspectIssue']) {
+            expect(read(zh, ['designer', 'architecture', 'validation', key])).toBeTypeOf('string');
+            expect(read(en, ['designer', 'architecture', 'validation', key])).toBeTypeOf('string');
+        }
         for (const key of ['process', 'startEnd', 'decision']) {
             expect(read(zh, ['designer', 'flowchart', 'quickCloneLabels', key])).toBeTypeOf('string');
             expect(read(en, ['designer', 'flowchart', 'quickCloneLabels', key])).toBeTypeOf('string');
