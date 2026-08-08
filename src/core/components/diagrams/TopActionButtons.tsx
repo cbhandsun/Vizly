@@ -14,6 +14,7 @@ import type { DiagramExportFormat } from '../../types/diagram-components';
 import { DOCUMENT_MENU_OVERLAY_CLASS } from './documentMenuKeyboard';
 import { DropdownMenuTriggerButton } from './DropdownMenuTriggerButton';
 import { useKeyboardAccessibleDropdown } from './hooks/useKeyboardAccessibleDropdown';
+import { focusAdvancedExportTrigger } from './advancedExportFocus';
 
 const SAVE_MENU_OVERLAY_CLASS = 'vizly-save-actions-menu';
 
@@ -151,6 +152,13 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
         restoreDocumentMenuFocus();
     }, [restoreDocumentMenuFocus, setPluginManagerVisible]);
 
+    const closeAdvancedExport = useCallback(() => {
+        setExportModalVisible(false);
+        window.requestAnimationFrame(() => {
+            focusAdvancedExportTrigger();
+        });
+    }, [setExportModalVisible]);
+
     // [Fix] Modals must render regardless of portal vs fallback path.
     // Extract them here so both branches can render the portal content + these modals.
     const modals = (
@@ -159,7 +167,7 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
                 <React.Suspense fallback={null}>
                     <AdvancedExportModal
                         visible
-                        onClose={() => setExportModalVisible(false)}
+                        onClose={closeAdvancedExport}
                         diagramId={diagramId}
                         diagramTitle={diagramTitle}
                         getReactFlowSnapshot={getReactFlowSnapshot}

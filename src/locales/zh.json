@@ -2175,6 +2175,7 @@
     },
     "advancedExport": {
         "title": "高级图表导出",
+        "closeDialog": "关闭高级图表导出",
         "formatLabel": "选择导出格式",
         "dpiLabel": "图片清晰度 (DPI)",
         "dpi1x": "1x - 标准清晰度",
@@ -2198,6 +2199,7 @@
         "sceneBasedHint": "PNG/SVG 将基于当前画布数据生成，确保导出结果稳定可用。",
         "legacyExportHint": "当前格式将使用标准导出引擎生成。",
         "svgPreviewAlt": "SVG 导出预览",
+        "previewCounts": "{{nodes}} 个节点 / {{edges}} 条连线",
         "svgPreviewUnavailable": "暂时无法生成 SVG 预览"
     },
     "collaboration": {

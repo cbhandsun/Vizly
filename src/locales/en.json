@@ -2297,6 +2297,7 @@
     },
     "advancedExport": {
         "title": "Advanced Diagram Export",
+        "closeDialog": "Close Advanced Diagram Export",
         "formatLabel": "Select Export Format",
         "dpiLabel": "Image Resolution (DPI)",
         "dpi1x": "1x - Standard",
@@ -2320,6 +2321,7 @@
         "sceneBasedHint": "PNG/SVG exports are rendered from the current canvas data for a reliable result.",
         "legacyExportHint": "The selected format uses the standard export engine.",
         "svgPreviewAlt": "SVG export preview",
+        "previewCounts": "{{nodes}} nodes / {{edges}} edges",
         "svgPreviewUnavailable": "SVG preview is temporarily unavailable"
     },
     "collaboration": {

@@ -19,6 +19,7 @@ vi.mock('react-i18next', () => ({
     t: (key: string, fallback?: string | Record<string, unknown>) => {
       const translations: Record<string, string> = {
         'advancedExport.title': '高级图表导出',
+        'advancedExport.closeDialog': '关闭高级图表导出',
         'advancedExport.formatLabel': '选择导出格式',
         'advancedExport.dpiLabel': '图片清晰度 (DPI)',
         'advancedExport.dpi1x': '1x - 标准清晰度',
@@ -32,11 +33,17 @@ vi.mock('react-i18next', () => ({
         'advancedExport.downloadPngFallback': '下载 PNG',
         'advancedExport.exportRecoveryTitle': '导出未完成',
         'advancedExport.exportRecoveryDescription': '请检查画布内容，或降低图片清晰度后重试。',
+        'advancedExport.previewCounts': '{{nodes}} 个节点 / {{edges}} 条连线',
         'advancedExport.cancel': '取消',
         'advancedExport.confirm': '确认导出',
         'common.close': '关闭',
       };
-      return translations[key] ?? (typeof fallback === 'string' ? fallback : key);
+      const template = translations[key] ?? (typeof fallback === 'string' ? fallback : key);
+      if (!fallback || typeof fallback === 'string') return template;
+      return Object.entries(fallback).reduce(
+        (result, [name, value]) => result.replaceAll(`{{${name}}}`, String(value)),
+        template,
+      );
     },
   }),
 }));
@@ -137,7 +144,7 @@ describe('AdvancedExportModal SVG preview', () => {
     expect(decodeURIComponent(image?.getAttribute('src') ?? '')).toContain('safe edge');
     expect(decodeURIComponent(image?.getAttribute('src') ?? '')).not.toContain('<script>');
     expect(decodeURIComponent(image?.getAttribute('src') ?? '')).not.toContain('onerror');
-    expect(preview.textContent).toContain('2 nodes / 1 edges');
+    expect(preview.textContent).toContain('2 个节点 / 1 条连线');
   });
 
   it('shows a safe empty state when preview generation fails', async () => {
@@ -257,7 +264,7 @@ describe('AdvancedExportModal commercial controls', () => {
     expect(screen.getByRole('checkbox', { name: '包含底色背景' })).toBeTruthy();
     expect(screen.getByRole('checkbox', { name: '注入元数据' })).toBeTruthy();
     expect(screen.getByRole('button', { name: '复制 PNG 到剪贴板' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: '关闭' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: '关闭高级图表导出' })).toBeTruthy();
   });
 
   it('removes image-only controls when JSON is selected', () => {

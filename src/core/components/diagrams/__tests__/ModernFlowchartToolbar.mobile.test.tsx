@@ -88,12 +88,14 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
                 showRuler={false}
                 toggleRuler={vi.fn()}
                 onImportClick={onImportClick}
+                onExport={vi.fn()}
             />,
         );
 
         const moreButton = await screen.findByRole('button', { name: /更多操作|moreActions/i });
         expect(moreButton.hasAttribute('disabled')).toBe(false);
         expect(moreButton.getAttribute('data-flowchart-import-focus-return')).toBe('true');
+        expect(moreButton.getAttribute('data-advanced-export-focus-return')).toBe('true');
     });
 
     it('exposes the active selection tool as a selected radio item in the mobile more menu', async () => {

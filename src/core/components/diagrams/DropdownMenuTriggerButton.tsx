@@ -9,6 +9,7 @@ interface DropdownMenuTriggerButtonProps extends Omit<
     className: string;
     'data-flowchart-import-focus-return'?: 'true';
     'data-flowchart-search-focus-return'?: 'true';
+    'data-advanced-export-focus-return'?: 'true';
     icon: React.ReactNode;
     menuId?: string;
     open: boolean;
@@ -25,6 +26,7 @@ export const DropdownMenuTriggerButton = React.forwardRef<
             ref={ref}
             data-flowchart-import-focus-return={triggerProps['data-flowchart-import-focus-return']}
             data-flowchart-search-focus-return={triggerProps['data-flowchart-search-focus-return']}
+            data-advanced-export-focus-return={triggerProps['data-advanced-export-focus-return']}
             type="text"
             aria-label={ariaLabel}
             aria-haspopup="menu"

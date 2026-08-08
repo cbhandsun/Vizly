@@ -155,7 +155,10 @@ export const SvgExportPreview: React.FC<{
             }}
           >
             <span>{svgPreview.width} x {svgPreview.height}</span>
-            <span>{svgPreview.nodeCount} nodes / {svgPreview.edgeCount} edges</span>
+            <span>{t('advancedExport.previewCounts', {
+              nodes: svgPreview.nodeCount,
+              edges: svgPreview.edgeCount,
+            })}</span>
             <span>{Math.ceil(svgPreview.byteLength / 1024)} KB</span>
           </div>
         </div>
@@ -303,7 +306,7 @@ export const AdvancedExportModal: React.FC<AdvancedExportModalProps> = ({
       open={visible}
       onCancel={onClose}
       closable={{
-        'aria-label': t('common.close'),
+        'aria-label': t('advancedExport.closeDialog'),
         disabled: operationInProgress,
       }}
       keyboard={!operationInProgress}

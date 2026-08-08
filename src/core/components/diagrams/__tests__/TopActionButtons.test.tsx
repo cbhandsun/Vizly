@@ -45,6 +45,12 @@ vi.mock('../ui/CollaborationAvatars', () => ({
     CollaborationAvatars: () => null,
 }));
 
+vi.mock('../ui/AdvancedExportModal', () => ({
+    AdvancedExportModal: ({ onClose }: { onClose: () => void }) => (
+        <button type="button" aria-label="关闭高级图表导出" onClick={onClose} />
+    ),
+}));
+
 import { TopActionButtons } from '../TopActionButtons';
 
 describe('TopActionButtons document menu', () => {
@@ -336,6 +342,41 @@ describe('TopActionButtons document menu', () => {
         expect(document.activeElement).not.toBe(trigger);
         restoreFocus?.(0);
 
+        await waitFor(() => expect(document.activeElement).toBe(trigger));
+    });
+
+    it('returns focus to the advanced-export launcher after the modal closes', async () => {
+        let restoreFocus: FrameRequestCallback | undefined;
+        vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+            restoreFocus = callback;
+            return 1;
+        });
+
+        const ControlledTopActions = () => {
+            const [exportModalVisible, setExportModalVisible] = React.useState(true);
+            return (
+                <TopActionButtons
+                    disablePortal
+                    exportModalVisible={exportModalVisible}
+                    setExportModalVisible={setExportModalVisible}
+                />
+            );
+        };
+
+        render(
+            <>
+                <button type="button" data-advanced-export-focus-return="true">更多操作</button>
+                <ControlledTopActions />
+            </>,
+        );
+
+        const trigger = screen.getByRole('button', { name: '更多操作' });
+        const closeButton = await screen.findByRole('button', { name: '关闭高级图表导出' });
+        closeButton.focus();
+        fireEvent.click(closeButton);
+        expect(document.activeElement).not.toBe(trigger);
+
+        restoreFocus?.(0);
         await waitFor(() => expect(document.activeElement).toBe(trigger));
     });
 });
