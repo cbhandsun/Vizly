@@ -66,6 +66,7 @@ describe('useFlowchartImportNotifications', () => {
     const notificationApi = makeNotificationApi();
     const fileInputRef = createRef<HTMLInputElement>();
     const fileInput = document.createElement('input');
+    document.body.appendChild(fileInput);
     fileInputRef.current = fileInput;
     const clickSpy = vi.spyOn(fileInput, 'click').mockImplementation(() => undefined);
     const { result } = renderHook(() => useFlowchartImportNotifications({

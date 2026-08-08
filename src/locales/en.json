@@ -706,6 +706,8 @@
                 "confirmTitle": "Import will replace this page",
                 "confirmContent": "The current page's {{nodes}} nodes and {{edges}} edges will be replaced by the imported file. Other pages and comments are unaffected, and Undo can restore this page after import.",
                 "confirmOk": "Continue to file picker",
+                "dropTitle": "Drop to import file",
+                "dropDescription": "Supports JSON and Mermaid. You will confirm before the current page is replaced.",
                 "editingRequired": "Files cannot be imported in read-only or presentation mode"
             },
             "mermaidCopied": "Mermaid code copied to clipboard",

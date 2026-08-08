@@ -18,8 +18,6 @@ export const buildFlowchartImportConfirm = ({
     onConfirm: () => void;
     onClosed?: () => void;
 }) => {
-    let shouldRestoreFocus = true;
-
     return {
         title,
         content,
@@ -28,11 +26,10 @@ export const buildFlowchartImportConfirm = ({
         okButtonProps: { danger: true },
         autoFocusButton: 'cancel' as const,
         onOk: () => {
-            shouldRestoreFocus = false;
             onConfirm();
         },
         afterClose: () => {
-            if (shouldRestoreFocus) onClosed?.();
+            onClosed?.();
         },
     };
 };

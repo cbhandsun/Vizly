@@ -41,7 +41,7 @@ describe('flowchart import request', () => {
         config.onOk();
         config.afterClose();
         expect(onConfirm).toHaveBeenCalledTimes(1);
-        expect(onClosed).toHaveBeenCalledTimes(1);
+        expect(onClosed).toHaveBeenCalledTimes(2);
     });
 
     it('opens the picker immediately for an empty editable page', () => {
@@ -99,7 +99,7 @@ describe('flowchart import request', () => {
         confirmation?.onOk();
         confirmation?.afterClose();
         expect(openFilePicker).toHaveBeenCalledTimes(1);
-        expect(onConfirmationClosed).toHaveBeenCalledTimes(1);
+        expect(onConfirmationClosed).toHaveBeenCalledTimes(2);
     });
 
     it('blocks import requests when editing is unavailable', () => {

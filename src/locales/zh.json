@@ -821,6 +821,8 @@
                 "confirmTitle": "导入将替换当前页面",
                 "confirmContent": "当前页面的 {{nodes}} 个节点和 {{edges}} 条连线将被导入文件替换。其他页面与评论不会受影响，可在导入后使用撤销恢复。",
                 "confirmOk": "继续选择文件",
+                "dropTitle": "松开以导入文件",
+                "dropDescription": "支持 JSON 与 Mermaid；替换当前页面前会再次确认。",
                 "editingRequired": "只读或演示模式下不能导入文件"
             },
             "mermaidCopied": "已复制 Mermaid 代码到剪贴板",

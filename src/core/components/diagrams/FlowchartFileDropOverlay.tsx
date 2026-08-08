@@ -1,7 +1,8 @@
 import { FaFileImport } from 'react-icons/fa';
-import type { TFunction } from 'i18next';
 
-export function FlowchartFileDropOverlay({ t }: { t: TFunction }) {
+type FileDropTranslator = (key: string, defaultValue: string) => string;
+
+export function FlowchartFileDropOverlay({ t }: { t: FileDropTranslator }) {
     return (
         <div className="flowchart-file-drop-overlay" role="status" aria-live="polite">
             <div className="flowchart-file-drop-card">

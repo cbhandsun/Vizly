@@ -2,6 +2,7 @@ import React, { useCallback, type RefObject } from 'react';
 import { Button } from 'antd';
 import type { NotificationInstance } from 'antd/es/notification/interface';
 
+import { openFlowchartImportFilePicker } from '../flowchartImportFilePicker';
 import type { FlowchartImportResult } from '../flowchartImportHandler';
 
 const IMPORT_NOTIFICATION_KEY = 'flowchart-file-import-status';
@@ -47,7 +48,7 @@ export const useFlowchartImportNotifications = ({
             btn: React.createElement(Button, {
                 onClick: () => {
                     notificationApi.destroy(IMPORT_NOTIFICATION_KEY);
-                    fileInputRef.current?.click();
+                    openFlowchartImportFilePicker(fileInputRef.current);
                 },
             }, t('designer.flowchart.import.retry')),
         });

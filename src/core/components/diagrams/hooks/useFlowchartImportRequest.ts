@@ -4,6 +4,7 @@ import type { MessageInstance } from 'antd/es/message/interface';
 import type { Edge, Node } from '@xyflow/react';
 
 import { appModal } from '@/core/utils/antdStaticBridge';
+import { openFlowchartImportFilePicker } from '../flowchartImportFilePicker';
 import { focusFlowchartImportTrigger } from '../flowchartImportFocus';
 import { requestFlowchartImport } from '../flowchartImportRequest';
 
@@ -32,7 +33,9 @@ export const useFlowchartImportRequest = ({
 }) => useCallback((options?: FlowchartImportRequestOptions) => {
     const currentNodes = nodesRef.current ?? [];
     const currentEdges = edgesRef.current ?? [];
-    const startImport = options?.startImport ?? (() => fileInputRef.current?.click());
+    const startImport = options?.startImport ?? (() => {
+        openFlowchartImportFilePicker(fileInputRef.current);
+    });
     requestFlowchartImport({
         editingEnabled,
         importInProgress: importInFlightRef.current,
