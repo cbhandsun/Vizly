@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import type { Node, Edge } from '@xyflow/react';
 import { Input, Button, Tooltip, Divider } from 'antd';
+import { useTranslation } from 'react-i18next';
 import {
   DiagramTypePlugin,
   PluginContext,
@@ -18,6 +19,7 @@ import {
 } from '@ant-design/icons';
 import { useTopologyLinter } from '../hooks/useTopologyLinter';
 import { useDiagramStore } from '../store/useDiagramStore';
+import { AccessibleInputClearIcon } from '../components/diagrams/AccessibleInputClearIcon';
 
 const isRecord = (value: unknown): value is Record<string, unknown> => (
   Boolean(value) && typeof value === 'object' && !Array.isArray(value)
@@ -116,35 +118,46 @@ export class ArchitecturePlugin implements DiagramTypePlugin {
 }
 
 // ====== 组件定义 ======
-interface CompDef { type: ArchitectureNodeType | string; typeName?: string; label: string; color: string; icon: React.ReactNode; keywords: string }
+interface CompDef {
+    type: ArchitectureNodeType | string;
+    typeName?: string;
+    labelKey: string;
+    color: string;
+    icon: React.ReactNode;
+    keywords: string;
+}
+
+const ARCHITECTURE_SEARCH_MAX_LENGTH = 100;
 
 const ALL_COMPONENTS: CompDef[] = [
-    { type: 'frontend',      label: '终端 Client',   color: '#a0d911', icon: <LaptopOutlined />,       keywords: '前端 浏览器 app web client' },
-    { type: 'gateway',       label: '网关 Gateway',  color: '#722ed1', icon: <GatewayOutlined />,      keywords: '网关 api gateway nginx kong 入口' },
-    { type: 'microservice',  label: '微服务 Service', color: '#13c2c2', icon: <ApiOutlined />,          keywords: '微服务 service api 接口 grpc' },
-    { type: 'messageQueue',  label: '消息队列 MQ',    color: '#eb2f96', icon: <SwapOutlined />,         keywords: '消息 队列 kafka rabbitmq rocketmq mq 事件' },
-    { type: 'cache',         label: '缓存 Cache',    color: '#f5222d', icon: <HddOutlined />,          keywords: '缓存 redis memcached cache' },
-    { type: 'storage',       label: '存储 Storage',  color: '#fa8c16', icon: <CloudServerOutlined />,  keywords: '存储 s3 oss minio 对象 文件' },
-    { type: 'database',      label: '数据库 DB',     color: '#1890ff', icon: <DatabaseOutlined />,     keywords: '数据库 mysql postgres mongodb rds db' },
-    { type: 'system',        label: '业务域 System', color: '#2f54eb', icon: <AppstoreOutlined />,     keywords: '业务 系统 域 domain 应用' },
-    { type: 'component',     label: '组件 Component', color: '#52c41a', icon: <BuildOutlined />,       keywords: '组件 模块 component module lib' },
+    { type: 'frontend',      labelKey: 'designer.architecture.components.frontend',     color: '#a0d911', icon: <LaptopOutlined />,       keywords: '前端 浏览器 app web client' },
+    { type: 'gateway',       labelKey: 'designer.architecture.components.gateway',      color: '#722ed1', icon: <GatewayOutlined />,      keywords: '网关 api gateway nginx kong 入口' },
+    { type: 'microservice',  labelKey: 'designer.architecture.components.microservice', color: '#13c2c2', icon: <ApiOutlined />,          keywords: '微服务 service api 接口 grpc' },
+    { type: 'messageQueue',  labelKey: 'designer.architecture.components.messageQueue', color: '#eb2f96', icon: <SwapOutlined />,         keywords: '消息 队列 kafka rabbitmq rocketmq mq 事件' },
+    { type: 'cache',         labelKey: 'designer.architecture.components.cache',        color: '#f5222d', icon: <HddOutlined />,          keywords: '缓存 redis memcached cache' },
+    { type: 'storage',       labelKey: 'designer.architecture.components.storage',      color: '#fa8c16', icon: <CloudServerOutlined />,  keywords: '存储 s3 oss minio 对象 文件' },
+    { type: 'database',      labelKey: 'designer.architecture.components.database',     color: '#1890ff', icon: <DatabaseOutlined />,     keywords: '数据库 mysql postgres mongodb rds db' },
+    { type: 'system',        labelKey: 'designer.architecture.components.system',       color: '#2f54eb', icon: <AppstoreOutlined />,     keywords: '业务 系统 域 domain 应用' },
+    { type: 'component',     labelKey: 'designer.architecture.components.component',    color: '#52c41a', icon: <BuildOutlined />,        keywords: '组件 模块 component module lib' },
 ];
 
-const CATEGORIES: Array<{ key: string; title: string; types: string[] }> = [
-    { key: 'network',  title: '🌐 网络与接入层',   types: ['frontend', 'gateway'] },
-    { key: 'compute',  title: '⚙ 计算与服务层',    types: ['microservice', 'component'] },
-    { key: 'data',     title: '🗄 数据与存储层',    types: ['database', 'cache', 'storage', 'messageQueue'] },
-    { key: 'business', title: '📦 业务域',          types: ['system'] },
+const CATEGORIES: Array<{ key: string; titleKey: string; types: string[] }> = [
+    { key: 'network',  titleKey: 'designer.architecture.categories.network',  types: ['frontend', 'gateway'] },
+    { key: 'compute',  titleKey: 'designer.architecture.categories.compute',  types: ['microservice', 'component'] },
+    { key: 'data',     titleKey: 'designer.architecture.categories.data',     types: ['database', 'cache', 'storage', 'messageQueue'] },
+    { key: 'business', titleKey: 'designer.architecture.categories.business', types: ['system'] },
 ];
 
 // ====== 侧边栏面板 ======
 const ArchitecturePalette: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
+    const { t } = useTranslation();
     const [search, setSearch] = useState('');
 
     const onDragStart = (event: React.DragEvent, def: CompDef) => {
+        const label = t(def.labelKey);
         event.dataTransfer.setData('application/reactflow', JSON.stringify({
             typeName: def.typeName || 'architectureNode',
-            label: def.label.split(' ')[0],
+            label,
             config: def.typeName ? {} : { type: def.type, themeColor: def.color }
         }));
         event.dataTransfer.effectAllowed = 'move';
@@ -152,97 +165,83 @@ const ArchitecturePalette: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
 
     const filtered = useMemo(() => {
         if (!search.trim()) return null; // null = 按分类显示
-        const q = search.toLowerCase();
+        const q = search.trim().toLowerCase();
         return ALL_COMPONENTS.filter(c =>
-            c.label.toLowerCase().includes(q) || c.keywords.includes(q)
+            t(c.labelKey).toLowerCase().includes(q) || c.keywords.includes(q)
         );
-    }, [search]);
+    }, [search, t]);
 
-    const renderItem = (def: CompDef) => (
-        <div
-            key={def.type}
-            draggable
-            onDragStart={(e) => onDragStart(e, def)}
-            onClick={() => {
-                ctx.addNode(def.typeName || 'architectureNode', { 
-                    label: def.label.split(' ')[0],
-                    ...(def.typeName ? {} : { type: def.type, themeColor: def.color })
-                });
-            }}
-            style={{
-                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                padding: '12px 8px', cursor: 'grab', 
-                border: '1px solid rgba(255, 255, 255, 0.4)',
-                borderRadius: 12, 
-                background: 'rgba(255, 255, 255, 0.6)', 
-                backdropFilter: 'blur(8px)',
-                WebkitBackdropFilter: 'blur(8px)',
-                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                gap: 6, minHeight: 70,
-                boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
-            }}
-            onMouseEnter={(e) => { 
-                e.currentTarget.style.borderColor = `${def.color}40`; 
-                e.currentTarget.style.boxShadow = `0 4px 12px ${def.color}20`; 
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.9)';
-                e.currentTarget.style.transform = 'translateY(-1px)';
-            }}
-            onMouseLeave={(e) => { 
-                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.4)'; 
-                e.currentTarget.style.boxShadow = '0 2px 6px rgba(0,0,0,0.02)'; 
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.6)';
-                e.currentTarget.style.transform = 'none';
-            }}
-        >
-            <span style={{ color: def.color, fontSize: 24, lineHeight: 1, filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' }}>{def.icon}</span>
-            <span style={{ fontSize: 11, color: '#454d5d', textAlign: 'center', lineHeight: 1.2, fontWeight: 500 }}>{def.label}</span>
-        </div>
-    );
-
-    // 搜索模式：平铺网格
-    if (filtered) {
+    const renderItem = (def: CompDef) => {
+        const label = t(def.labelKey);
         return (
-            <div style={{ padding: '8px 10px' }}>
-                <Input
-                    prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
-                    placeholder="搜索组件..."
-                    size="small"
-                    allowClear
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                    style={{ marginBottom: 10 }}
-                />
-                {filtered.length === 0 ? (
-                    <div style={{ color: '#bfbfbf', textAlign: 'center', padding: 16, fontSize: 12 }}>无匹配组件</div>
-                ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6 }}>
-                        {filtered.map(renderItem)}
-                    </div>
-                )}
-            </div>
+            <button
+                type="button"
+                key={def.type}
+                draggable
+                onDragStart={(e) => onDragStart(e, def)}
+                onClick={() => {
+                    ctx.addNode(def.typeName || 'architectureNode', {
+                        label,
+                        ...(def.typeName ? {} : { type: def.type, themeColor: def.color })
+                    });
+                }}
+                aria-label={t('designer.architecture.addComponent', { component: label })}
+                style={{
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    width: '100%', padding: '12px 8px', cursor: 'grab', font: 'inherit',
+                    border: '1px solid rgba(255, 255, 255, 0.4)',
+                    borderRadius: 12,
+                    background: 'rgba(255, 255, 255, 0.6)',
+                    backdropFilter: 'blur(8px)',
+                    WebkitBackdropFilter: 'blur(8px)',
+                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                    gap: 6, minHeight: 70,
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
+                }}
+                onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = `${def.color}40`;
+                    e.currentTarget.style.boxShadow = `0 4px 12px ${def.color}20`;
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.9)';
+                    e.currentTarget.style.transform = 'translateY(-1px)';
+                }}
+                onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.4)';
+                    e.currentTarget.style.boxShadow = '0 2px 6px rgba(0,0,0,0.02)';
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.6)';
+                    e.currentTarget.style.transform = 'none';
+                }}
+            >
+                <span style={{ color: def.color, fontSize: 24, lineHeight: 1, filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' }}>{def.icon}</span>
+                <span style={{ fontSize: 11, color: '#454d5d', textAlign: 'center', lineHeight: 1.2, fontWeight: 500 }}>{label}</span>
+            </button>
         );
-    }
+    };
 
     // 自定义折叠分类组件
     const CategoryGroup = ({ cat }: { cat: typeof CATEGORIES[0] }) => {
         const [expanded, setExpanded] = useState(true);
+        const contentId = `architecture-category-${cat.key}`;
         return (
             <div style={{ marginBottom: 16 }}>
-                <div 
+                <button
+                    type="button"
                     onClick={() => setExpanded(!expanded)}
+                    aria-expanded={expanded}
+                    aria-controls={contentId}
                     style={{ 
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between', 
-                        padding: '6px 4px', cursor: 'pointer', userSelect: 'none',
+                        width: '100%', padding: '6px 4px', cursor: 'pointer', userSelect: 'none',
+                        background: 'transparent', border: 0, font: 'inherit',
                         color: '@text-color-secondary', fontWeight: 600, fontSize: 12, marginBottom: 8 
                     }}
                 >
-                    <span style={{ color: '#595959' }}>{cat.title}</span>
+                    <span style={{ color: '#595959' }}>{t(cat.titleKey)}</span>
                     <span style={{ 
                         fontSize: 10, color: '#bfbfbf', transition: 'transform 0.2s', 
                         transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)' 
-                    }}>▶</span>
-                </div>
-                <div style={{ 
+                    }} aria-hidden="true">›</span>
+                </button>
+                <div id={contentId} style={{
                     display: expanded ? 'grid' : 'none', 
                     gridTemplateColumns: 'repeat(2, 1fr)', 
                     gap: 8 
@@ -266,9 +265,11 @@ const ArchitecturePalette: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
             }}>
                 <Input
                     prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
-                    placeholder="搜索组件..."
+                    placeholder={t('designer.sidebar.searchComponents')}
+                    aria-label={t('designer.sidebar.searchComponents')}
+                    maxLength={ARCHITECTURE_SEARCH_MAX_LENGTH}
                     size="small"
-                    allowClear
+                    allowClear={{ clearIcon: <AccessibleInputClearIcon label={t('designer.sidebar.clearSearch')} /> }}
                     value={search}
                     onChange={e => setSearch(e.target.value)}
                     style={{ 
@@ -280,9 +281,32 @@ const ArchitecturePalette: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
             </div>
             
             <div style={{ marginTop: 4 }}>
-                {CATEGORIES.map(cat => (
-                    <CategoryGroup key={cat.key} cat={cat} />
-                ))}
+                {filtered ? (
+                    filtered.length === 0 ? (
+                        <div
+                            role="status"
+                            aria-live="polite"
+                            aria-atomic="true"
+                            style={{
+                                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
+                                color: '#667085', textAlign: 'center', padding: '28px 16px', fontSize: 12,
+                            }}
+                        >
+                            <span>{t('designer.sidebar.noComponentsFound', { query: search.trim() })}</span>
+                            <Button size="small" onClick={() => setSearch('')}>
+                                {t('designer.sidebar.showAllComponents')}
+                            </Button>
+                        </div>
+                    ) : (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6 }}>
+                            {filtered.map(renderItem)}
+                        </div>
+                    )
+                ) : (
+                    CATEGORIES.map(cat => (
+                        <CategoryGroup key={cat.key} cat={cat} />
+                    ))
+                )}
             </div>
         </div>
     );

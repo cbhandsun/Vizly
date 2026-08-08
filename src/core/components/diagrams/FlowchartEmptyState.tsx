@@ -9,22 +9,26 @@ const { Text, Title } = Typography;
 
 export const FlowchartEmptyState: React.FC<{
   visible: boolean;
+  pluginId?: string;
   onOpenShapePicker?: () => void;
-}> = ({ visible, onOpenShapePicker }) => {
+}> = ({ visible, pluginId, onOpenShapePicker }) => {
   const { t } = useTranslation();
+  const copyKey = pluginId === 'architecture-diagram'
+    ? 'designer.architecture.emptyState'
+    : 'designer.flowchart.emptyState';
   
   if (!visible) return null;
 
   return (
     <div className="flowchart-empty-state">
       <Title level={4} className="flowchart-empty-title">
-        {t('designer.flowchart.emptyState.title')}
+        {t(`${copyKey}.title`)}
       </Title>
       <Text type="secondary" className="flowchart-empty-description flowchart-empty-description-desktop">
-        {t('designer.flowchart.emptyState.desktopDescription')}
+        {t(`${copyKey}.desktopDescription`)}
       </Text>
       <Text type="secondary" className="flowchart-empty-description flowchart-empty-description-mobile">
-        {t('designer.flowchart.emptyState.mobileDescription')}
+        {t(`${copyKey}.mobileDescription`)}
       </Text>
 
       {onOpenShapePicker && (
@@ -34,7 +38,7 @@ export const FlowchartEmptyState: React.FC<{
           icon={<FaPlus aria-hidden="true" />}
           onClick={onOpenShapePicker}
         >
-          {t('designer.flowchart.emptyState.primaryAction')}
+          {t(`${copyKey}.primaryAction`)}
         </Button>
       )}
 

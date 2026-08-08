@@ -27,4 +27,20 @@ describe('FlowchartEmptyState', () => {
   it('renders nothing when the empty state is not visible', () => {
     expect(renderToStaticMarkup(<FlowchartEmptyState visible={false} />)).toBe('');
   });
+
+  it('uses architecture-specific onboarding copy for architecture diagrams', () => {
+    const html = renderToStaticMarkup(
+      <FlowchartEmptyState
+        visible
+        pluginId="architecture-diagram"
+        onOpenShapePicker={() => undefined}
+      />,
+    );
+
+    expect(html).toContain('designer.architecture.emptyState.title');
+    expect(html).toContain('designer.architecture.emptyState.desktopDescription');
+    expect(html).toContain('designer.architecture.emptyState.mobileDescription');
+    expect(html).toContain('designer.architecture.emptyState.primaryAction');
+    expect(html).not.toContain('designer.flowchart.emptyState.title');
+  });
 });

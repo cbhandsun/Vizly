@@ -143,6 +143,8 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
     const getPluginPanelTitle = useCallback((panel: { id: string; title: string }) => {
         if (panel.id === 'shapes') return t('designer.sidebar.basic');
         if (panel.id === 'icons') return t('designer.sidebar.iconLibrary');
+        if (panel.id === 'arch-components') return t('designer.sidebar.architectureComponents');
+        if (panel.id === 'arch-linter') return t('designer.sidebar.architectureLinter');
         return panel.title;
     }, [t]);
 

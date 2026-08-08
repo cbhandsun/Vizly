@@ -103,6 +103,16 @@ describe('flowchart interaction copy', () => {
         for (const key of ['title', 'desktopDescription', 'mobileDescription', 'primaryAction']) {
             expect(read(zh, ['designer', 'flowchart', 'emptyState', key])).toBeTypeOf('string');
             expect(read(en, ['designer', 'flowchart', 'emptyState', key])).toBeTypeOf('string');
+            expect(read(zh, ['designer', 'architecture', 'emptyState', key])).toBeTypeOf('string');
+            expect(read(en, ['designer', 'architecture', 'emptyState', key])).toBeTypeOf('string');
+        }
+        for (const key of ['network', 'compute', 'data', 'business']) {
+            expect(read(zh, ['designer', 'architecture', 'categories', key])).toBeTypeOf('string');
+            expect(read(en, ['designer', 'architecture', 'categories', key])).toBeTypeOf('string');
+        }
+        for (const key of ['frontend', 'gateway', 'microservice', 'messageQueue', 'cache', 'storage', 'database', 'system', 'component']) {
+            expect(read(zh, ['designer', 'architecture', 'components', key])).toBeTypeOf('string');
+            expect(read(en, ['designer', 'architecture', 'components', key])).toBeTypeOf('string');
         }
         for (const key of ['process', 'startEnd', 'decision']) {
             expect(read(zh, ['designer', 'flowchart', 'quickCloneLabels', key])).toBeTypeOf('string');

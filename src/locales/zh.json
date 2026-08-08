@@ -704,6 +704,32 @@
             "deleteDescription": "将永久删除此页面中的 {{nodeCount}} 个节点和 {{edgeCount}} 条连线，且无法撤销。",
             "deleteAction": "删除"
         },
+        "architecture": {
+            "addComponent": "添加{{component}}组件",
+            "categories": {
+                "network": "网络与接入",
+                "compute": "计算与服务",
+                "data": "数据与存储",
+                "business": "业务域"
+            },
+            "components": {
+                "frontend": "终端",
+                "gateway": "网关",
+                "microservice": "微服务",
+                "messageQueue": "消息队列",
+                "cache": "缓存",
+                "storage": "存储",
+                "database": "数据库",
+                "system": "业务系统",
+                "component": "组件"
+            },
+            "emptyState": {
+                "title": "绘制你的第一个系统",
+                "desktopDescription": "先选择一个架构组件，再连接各系统以呈现依赖关系。",
+                "mobileDescription": "添加终端、服务、数据存储或业务系统即可开始。",
+                "primaryAction": "选择第一个架构组件"
+            }
+        },
         "flowchart": {
             "emptyState": {
                 "title": "创建你的第一个流程",
@@ -1108,6 +1134,8 @@
         "sidebar": {
             "basic": "基础形状",
             "components": "组件",
+            "architectureComponents": "架构组件库",
+            "architectureLinter": "架构校验",
             "search": "搜索...",
             "searchComponents": "搜索组件...",
             "clearSearch": "清除搜索",

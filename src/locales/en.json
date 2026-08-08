@@ -693,6 +693,32 @@
             "deleteDescription": "This permanently deletes {{nodeCount}} node(s) and {{edgeCount}} connection(s) from this page and cannot be undone.",
             "deleteAction": "Delete"
         },
+        "architecture": {
+            "addComponent": "Add {{component}} component",
+            "categories": {
+                "network": "Network & access",
+                "compute": "Compute & services",
+                "data": "Data & storage",
+                "business": "Business domains"
+            },
+            "components": {
+                "frontend": "Client",
+                "gateway": "Gateway",
+                "microservice": "Microservice",
+                "messageQueue": "Message queue",
+                "cache": "Cache",
+                "storage": "Storage",
+                "database": "Database",
+                "system": "Business system",
+                "component": "Component"
+            },
+            "emptyState": {
+                "title": "Map your first system",
+                "desktopDescription": "Choose an architecture component, then connect systems to show their dependencies.",
+                "mobileDescription": "Add a client, service, data store, or business system to begin.",
+                "primaryAction": "Choose your first architecture component"
+            }
+        },
         "flowchart": {
             "emptyState": {
                 "title": "Build your first flow",
@@ -1107,6 +1133,8 @@
         "sidebar": {
             "basic": "Basic Shapes",
             "components": "Components",
+            "architectureComponents": "Architecture components",
+            "architectureLinter": "Architecture validation",
             "search": "Search...",
             "searchComponents": "Search components...",
             "clearSearch": "Clear search",

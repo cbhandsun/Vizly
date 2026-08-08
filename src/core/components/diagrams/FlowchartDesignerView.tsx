@@ -335,6 +335,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                     />}
                     {editingEnabled && <FlowchartEmptyState
                         visible={pluginId !== 'mindmap' && !isInitialDiagramLoading && nodes.length === 0 && !jsonEditorVisible && !isDragging && !isConnecting && !quickAddMenu?.visible}
+                        pluginId={pluginId}
                         onOpenShapePicker={() => setMobileRequestedPanel('shapes')}
                     />}
                     {isInitialDiagramLoading && (

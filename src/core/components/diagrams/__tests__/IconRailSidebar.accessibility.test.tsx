@@ -14,6 +14,8 @@ vi.mock('react-i18next', () => ({
         t: (key: string, params?: string | { count?: number }) => ({
             'designer.sidebar.basic': 'Basic Shapes',
             'designer.sidebar.iconLibrary': 'Cloud icon library',
+            'designer.sidebar.architectureComponents': 'Architecture components',
+            'designer.sidebar.architectureLinter': 'Architecture validation',
             'designer.sidebar.comments': 'Comments and feedback',
             'designer.sidebar.templatesWithCount': `Templates (${typeof params === 'object' ? params.count ?? 0 : 0})`,
         }[key] ?? (typeof params === 'string' ? params : key)),
@@ -122,6 +124,34 @@ describe('IconRailSidebar drawer accessibility', () => {
 
         fireEvent.click(screen.getByRole('button', { name: 'Basic Shapes' }));
         expect(await screen.findByRole('dialog', { name: 'Basic Shapes' })).toBeTruthy();
+    });
+
+    it('localizes architecture plugin panel titles in the rail and drawer', async () => {
+        render(
+            <IconRailSidebar
+                autoOpenShapes={false}
+                pluginPanels={[
+                    {
+                        id: 'arch-components',
+                        title: '架构组件库',
+                        icon: <span aria-hidden="true">A</span>,
+                        content: <div>Architecture palette</div>,
+                    },
+                    {
+                        id: 'arch-linter',
+                        title: '合规校验',
+                        icon: <span aria-hidden="true">V</span>,
+                        content: <div>Architecture validation panel</div>,
+                    },
+                ]}
+            />,
+        );
+
+        const trigger = screen.getByRole('button', { name: 'Architecture components' });
+        expect(screen.queryByRole('button', { name: '架构组件库' })).toBeNull();
+        fireEvent.click(trigger);
+        expect(await screen.findByRole('dialog', { name: 'Architecture components' })).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Architecture validation' })).toBeTruthy();
     });
 
     it('routes the component-search trigger directly to the drawer search field', async () => {
