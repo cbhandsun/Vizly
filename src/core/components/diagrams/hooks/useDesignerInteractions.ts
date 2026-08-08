@@ -97,7 +97,12 @@ export function useDesignerInteractions({
         isDragging, onNodesChange, onEdgesChange
     });
 
-    const { handleLabelOffsetChange, handleLabelStyleChange, handleWaypointsChange, handleEdgeLabelChange } = useDesignerEdgeCallbacks(setEdges);
+    const { handleLabelOffsetChange, handleLabelStyleChange, handleWaypointsChange, handleEdgeLabelChange } = useDesignerEdgeCallbacks({
+        setEdges,
+        nodesRef,
+        edgesRef,
+        takeSnapshot,
+    });
     const enhancedEdges = visibleEdges;
 
     const { handleGroup, handleUngroup } = useGrouping({

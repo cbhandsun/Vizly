@@ -3,6 +3,7 @@ import { EdgeProps, useViewport } from '@xyflow/react';
 import { useEdgeUpdate } from '../diagrams/useEdgeUpdate';
 import { useEditableEdgeInteractions } from './hooks/useEditableEdgeInteractions';
 import { EditableEdgeGraphics } from './renderers/EditableEdgeGraphics';
+import { resolveEditableEdgeLabel } from './editableEdgeLabel';
 
 export interface Waypoint {
     x: number;
@@ -28,11 +29,12 @@ const EditableEdge: React.FC<EdgeProps> = ({
     style = {},
     markerEnd,
     markerStart,
+    label: edgeLabel,
     data = {},
     selected = false,
 }) => {
     const waypoints = (data as EditableEdgeData)?.waypoints || [];
-    const label = (data as EditableEdgeData)?.label;
+    const label = resolveEditableEdgeLabel((data as EditableEdgeData)?.label, edgeLabel);
     const viewport = useViewport();
     const edgeCallbacks = useEdgeUpdate();
 
@@ -80,9 +82,11 @@ const EditableEdge: React.FC<EdgeProps> = ({
             onBendPointDown={interactions.handleBendPointPointerDown}
             onBendPointMove={interactions.handleBendPointPointerMove}
             onBendPointUp={interactions.handleBendPointPointerUp}
+            onBendPointKeyDown={interactions.handleBendPointKeyDown}
             onSegmentDown={interactions.handleSegmentPointerDown}
             onSegmentMove={interactions.handleSegmentPointerMove}
             onSegmentUp={interactions.handleSegmentPointerUp}
+            onSegmentKeyDown={interactions.handleSegmentKeyDown}
             onEdgeClick={interactions.handleEdgeClick}
             onDeleteWaypoint={interactions.handleDeleteWaypoint}
             onAddWaypointToSegment={interactions.handleAddWaypointToSegment}

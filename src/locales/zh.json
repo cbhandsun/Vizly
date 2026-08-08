@@ -623,6 +623,15 @@
             "zoomIn": "放大",
             "zoomOut": "缩小"
         },
+        "edgeEditor": {
+            "editLabel": "编辑连线标签：{{label}}",
+            "labelInput": "连线标签",
+            "labelPlaceholder": "输入标签...",
+            "moveBendPoint": "移动拐点 {{index}}。使用方向键，按住 Shift 可增大步长。",
+            "moveSegment": "移动线段 {{index}}。使用方向键，按住 Shift 可增大步长。",
+            "addWaypoint": "在线段 {{index}} 添加拐点",
+            "deleteWaypoint": "删除拐点 {{index}}"
+        },
         "saveStatus": {
             "local": {
                 "saving": "正在保存到本地",

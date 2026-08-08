@@ -15,14 +15,16 @@ vi.mock('react-i18next', () => ({
 const createProps = (handlePaste: () => Promise<ClipboardPasteResult>) => {
   const info = vi.fn();
   const warning = vi.fn();
+  const success = vi.fn();
   const nodesRef = { current: [] as Node[] };
   const edgesRef = { current: [] as Edge[] };
 
   return {
     info,
     warning,
+    success,
     props: {
-      messageApi: { info, warning } as unknown as MessageInstance,
+      messageApi: { info, warning, success } as unknown as MessageInstance,
       notificationApi: {} as NotificationInstance,
       handleDelete: vi.fn(),
       handleDuplicate: vi.fn(),
@@ -132,6 +134,22 @@ describe('useToastActions clipboard feedback', () => {
     act(() => result.current.handleUngroupWithToast(groupNode.id));
 
     expect(props.handleUngroup).toHaveBeenCalledWith([groupNode.id]);
+  });
+
+  it('only reports edge-operation success when state actually changed', () => {
+    const { props, success } = createProps(vi.fn().mockResolvedValue('empty'));
+    props.onContextMenuAction = vi.fn()
+      .mockReturnValueOnce(false)
+      .mockReturnValueOnce(true);
+    const { result } = renderHook(() => useToastActions(props));
+
+    act(() => {
+      result.current.onContextMenuActionWithToast('resetWaypoints', 'edge-1');
+      result.current.onContextMenuActionWithToast('reverseEdge', 'edge-1');
+    });
+
+    expect(success).toHaveBeenCalledOnce();
+    expect(success).toHaveBeenCalledWith('designer.flowchart.toast.edgeReversed');
   });
 
   it('reports an empty clipboard only after both clipboard channels fail', async () => {

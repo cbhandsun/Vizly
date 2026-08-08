@@ -28,7 +28,7 @@ interface UseToastActionsProps {
     handleGroup: () => void;
     handleUngroup: (targetNodeIds?: string[]) => void;
     // Context menu action
-    onContextMenuAction: (action: string, targetId?: string) => void;
+    onContextMenuAction: (action: string, targetId?: string) => boolean | void;
     // History
     undo: () => void;
     // State refs (avoid unstable deps)
@@ -252,23 +252,27 @@ export function useToastActions({
             return;
         }
         if (action === 'reverseEdge') {
-            onContextMenuAction(action, targetId);
-            messageApi.success(t('designer.flowchart.toast.edgeReversed'));
+            if (onContextMenuAction(action, targetId)) {
+                messageApi.success(t('designer.flowchart.toast.edgeReversed'));
+            }
             return;
         }
         if (action === 'resetWaypoints') {
-            onContextMenuAction(action, targetId);
-            messageApi.success(t('designer.flowchart.toast.waypointsReset'));
+            if (onContextMenuAction(action, targetId)) {
+                messageApi.success(t('designer.flowchart.toast.waypointsReset'));
+            }
             return;
         }
         if (action === 'convertToEditable') {
-            onContextMenuAction(action, targetId);
-            messageApi.success(t('designer.flowchart.toast.convertedToEditable', '已转为编辑状态'));
+            if (onContextMenuAction(action, targetId)) {
+                messageApi.success(t('designer.flowchart.toast.convertedToEditable', '已转为编辑状态'));
+            }
             return;
         }
         if (action === 'stopEditing') {
-            onContextMenuAction(action, targetId);
-            messageApi.success(t('designer.flowchart.toast.stoppedEditing', '已退出编辑状态'));
+            if (onContextMenuAction(action, targetId)) {
+                messageApi.success(t('designer.flowchart.toast.stoppedEditing', '已退出编辑状态'));
+            }
             return;
         }
         onContextMenuAction(action, targetId);

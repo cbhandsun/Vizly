@@ -619,6 +619,15 @@
             "zoomIn": "Zoom in",
             "zoomOut": "Zoom out"
         },
+        "edgeEditor": {
+            "editLabel": "Edit edge label: {{label}}",
+            "labelInput": "Edge label",
+            "labelPlaceholder": "Enter label...",
+            "moveBendPoint": "Move bend point {{index}}. Use arrow keys; hold Shift for larger steps.",
+            "moveSegment": "Move segment {{index}}. Use arrow keys; hold Shift for larger steps.",
+            "addWaypoint": "Add waypoint to segment {{index}}",
+            "deleteWaypoint": "Delete waypoint {{index}}"
+        },
         "saveStatus": {
             "local": {
                 "saving": "Saving locally",

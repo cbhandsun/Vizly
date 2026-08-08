@@ -10,6 +10,17 @@ import { getUiScale } from '../../shared/viewportStore';
 import type { Waypoint } from '../EditableEdge';
 type BendPoint = OrthogonalPathResult['bendPoints'][number];
 
+const keyboardDelta = (event: React.KeyboardEvent<Element>) => {
+    const step = event.shiftKey ? 10 : 1;
+    switch (event.key) {
+        case 'ArrowLeft': return { x: -step, y: 0 };
+        case 'ArrowRight': return { x: step, y: 0 };
+        case 'ArrowUp': return { x: 0, y: -step };
+        case 'ArrowDown': return { x: 0, y: step };
+        default: return null;
+    }
+};
+
 export interface UseEditableEdgeInteractionsProps {
     id: string;
     sourceX: number;
@@ -161,6 +172,22 @@ export function useEditableEdgeInteractions({
         }
     }, [draggingIndex, localWaypoints, edgeCallbacks, id]);
 
+    const handleBendPointKeyDown = useCallback((_index: number, bp: BendPoint, event: React.KeyboardEvent<Element>) => {
+        const delta = keyboardDelta(event);
+        if (!delta) return;
+        event.preventDefault();
+        event.stopPropagation();
+
+        const nextWaypoints = [...waypoints];
+        const moved = { x: bp.x + delta.x, y: bp.y + delta.y };
+        if (bp.isWaypoint && bp.waypointIndex !== undefined) {
+            nextWaypoints[bp.waypointIndex] = moved;
+        } else {
+            nextWaypoints.push(moved);
+        }
+        edgeCallbacks.onWaypointsChange(id, nextWaypoints);
+    }, [edgeCallbacks, id, waypoints]);
+
     const handleSegmentPointerDown = useCallback((index: number, seg: Segment, e: React.PointerEvent<Element>) => {
         e.preventDefault();
         e.stopPropagation();
@@ -242,6 +269,28 @@ export function useEditableEdgeInteractions({
             segmentRafIdRef.current = null;
         }
     }, [draggingSegment, localWaypoints, edgeCallbacks, id]);
+
+    const handleSegmentKeyDown = useCallback((index: number, seg: Segment, event: React.KeyboardEvent<Element>) => {
+        const delta = keyboardDelta(event);
+        if (!delta) return;
+        if ((seg.isHorizontal && delta.y === 0) || (!seg.isHorizontal && delta.x === 0)) return;
+        event.preventDefault();
+        event.stopPropagation();
+
+        const allPoints: Waypoint[] = [];
+        if (segments.length > 0) {
+            allPoints.push({ x: segments[0].start.x, y: segments[0].start.y });
+            for (const segment of segments) allPoints.push({ x: segment.end.x, y: segment.end.y });
+        }
+        const nextWaypoints = allPoints.slice(1, -1).map(point => ({ ...point }));
+        const adjacentIndexes = [index - 1, index];
+        for (const pointIndex of adjacentIndexes) {
+            if (pointIndex < 0 || pointIndex >= nextWaypoints.length) continue;
+            if (seg.isHorizontal) nextWaypoints[pointIndex].y += delta.y;
+            else nextWaypoints[pointIndex].x += delta.x;
+        }
+        edgeCallbacks.onWaypointsChange(id, nextWaypoints);
+    }, [edgeCallbacks, id, segments]);
 
     const handleEdgeClick = useCallback((e: React.MouseEvent<SVGPathElement>) => {
         e.stopPropagation();
@@ -325,7 +374,7 @@ export function useEditableEdgeInteractions({
     }, [segments, edgeCallbacks, id]);
 
 
-    const handleDeleteWaypoint = useCallback((bp: BendPoint, e: React.MouseEvent) => {
+    const handleDeleteWaypoint = useCallback((bp: BendPoint, e: React.SyntheticEvent) => {
         e.stopPropagation();
         if (bp.waypointIndex !== undefined && edgeCallbacks?.onWaypointsChange) {
             const newWaypoints = waypoints.filter((_: Waypoint, i: number) => i !== bp.waypointIndex);
@@ -333,7 +382,7 @@ export function useEditableEdgeInteractions({
         }
     }, [waypoints, edgeCallbacks, id]);
     
-    const handleAddWaypointToSegment = useCallback((index: number, seg: Segment, e: React.MouseEvent) => {
+    const handleAddWaypointToSegment = useCallback((index: number, seg: Segment, e: React.SyntheticEvent) => {
         e.stopPropagation();
         const allPoints: Waypoint[] = [];
         if (segments.length > 0) {
@@ -373,9 +422,11 @@ export function useEditableEdgeInteractions({
         handleBendPointPointerDown,
         handleBendPointPointerMove,
         handleBendPointPointerUp,
+        handleBendPointKeyDown,
         handleSegmentPointerDown,
         handleSegmentPointerMove,
         handleSegmentPointerUp,
+        handleSegmentKeyDown,
         handleEdgeClick,
         handleDeleteWaypoint,
         handleAddWaypointToSegment

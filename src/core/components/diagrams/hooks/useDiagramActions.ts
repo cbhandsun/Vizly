@@ -4,6 +4,13 @@ import { useTranslation } from 'react-i18next';
 import { PluginContext, DiagramTypePlugin } from '../../../types/plugin';
 import { useDiagramStore } from '../../../store/useDiagramStore';
 import { hasMutationLockedNode, resolveTargetNodes } from '../nodeLockPolicy';
+import {
+    convertDiagramEdgeToEditable,
+    resetDiagramEdgeWaypoints,
+    reverseDiagramEdge,
+    stopEditingDiagramEdge,
+    type EdgeMutationResult,
+} from '../edgeContextMutations';
 import { reorderNodesWithinParentScopes } from './nodeLayerOrdering';
 
 type AlignmentType = 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom';
@@ -247,75 +254,36 @@ export const useDiagramActions = ({
         reactFlowInstance?.fitView();
     }, [reactFlowInstance]);
 
-    // 反转连线方向
-    const handleReverseEdge = useCallback((targetId?: string) => {
-        if (!targetId) return;
-        takeSnapshot(nodes, edges);
-        setEdges(eds => eds.map(e => {
-            if (e.id !== targetId) return e;
-            return {
-                ...e,
-                source: e.target,
-                target: e.source,
-                sourceHandle: e.targetHandle,
-                targetHandle: e.sourceHandle,
-                data: { ...e.data, waypoints: [] }, // 反转后清除waypoints
-            };
-        }));
-    }, [nodes, edges, setEdges, takeSnapshot]);
+    const commitEdgeMutation = useCallback((
+        targetId: string | undefined,
+        mutate: (currentEdges: Edge[], id: string | undefined) => EdgeMutationResult,
+    ) => {
+        const currentNodes = nodesRef?.current ?? nodes;
+        const currentEdges = edgesRef?.current ?? edges;
+        const result = mutate(currentEdges, targetId);
+        if (!result.changed) return false;
 
-    // 重置路径（清除waypoints）
-    const handleResetWaypoints = useCallback((targetId?: string) => {
-        if (!targetId) return;
-        takeSnapshot(nodes, edges);
-        setEdges(eds => eds.map(e => {
-            if (e.id !== targetId) return e;
-            return {
-                ...e,
-                data: { ...e.data, waypoints: [] },
-            };
-        }));
-    }, [nodes, edges, setEdges, takeSnapshot]);
+        takeSnapshot(currentNodes, currentEdges);
+        if (edgesRef) edgesRef.current = result.edges;
+        setEdges(result.edges);
+        return true;
+    }, [edges, edgesRef, nodes, nodesRef, setEdges, takeSnapshot]);
 
-    // 转为可编辑边
-    const handleConvertToEditable = useCallback((targetId?: string) => {
-        if (!targetId) return;
-        takeSnapshot(nodes, edges);
-        
-        const updateFn = (e: Edge) => {
-            if (e.id !== targetId) return e;
-            return {
-                ...e,
-                type: 'editable',
-                selected: true,
-                data: { ...e.data, originalType: e.type || 'smart' },
-            };
-        };
-        
-        setEdges(eds => eds.map(updateFn));
-        reactFlowInstance?.setEdges(eds => eds.map(updateFn));
-    }, [nodes, edges, setEdges, takeSnapshot, reactFlowInstance]);
+    const handleReverseEdge = useCallback((targetId?: string) => (
+        commitEdgeMutation(targetId, reverseDiagramEdge)
+    ), [commitEdgeMutation]);
 
-    // 退出编辑边
-    const handleStopEditing = useCallback((targetId?: string) => {
-        if (!targetId) return;
-        takeSnapshot(nodes, edges);
-        
-        const updateFn = (e: Edge) => {
-            if (e.id !== targetId) return e;
-            const originalType = typeof e.data?.originalType === 'string'
-                ? e.data.originalType
-                : 'smart';
-            return {
-                ...e,
-                type: originalType,
-                selected: false,
-            };
-        };
+    const handleResetWaypoints = useCallback((targetId?: string) => (
+        commitEdgeMutation(targetId, resetDiagramEdgeWaypoints)
+    ), [commitEdgeMutation]);
 
-        setEdges(eds => eds.map(updateFn));
-        reactFlowInstance?.setEdges(eds => eds.map(updateFn));
-    }, [nodes, edges, setEdges, takeSnapshot, reactFlowInstance]);
+    const handleConvertToEditable = useCallback((targetId?: string) => (
+        commitEdgeMutation(targetId, convertDiagramEdgeToEditable)
+    ), [commitEdgeMutation]);
+
+    const handleStopEditing = useCallback((targetId?: string) => (
+        commitEdgeMutation(targetId, stopEditingDiagramEdge)
+    ), [commitEdgeMutation]);
 
     // 对齐选中节点
     const handleAlign = useCallback((type: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom') => {
@@ -467,17 +435,13 @@ export const useDiagramActions = ({
                 handleLock(targetId, false);
                 break;
             case 'reverseEdge':
-                handleReverseEdge(targetId);
-                break;
+                return handleReverseEdge(targetId);
             case 'resetWaypoints':
-                handleResetWaypoints(targetId);
-                break;
+                return handleResetWaypoints(targetId);
             case 'convertToEditable':
-                handleConvertToEditable(targetId);
-                break;
+                return handleConvertToEditable(targetId);
             case 'stopEditing':
-                handleStopEditing(targetId);
-                break;
+                return handleStopEditing(targetId);
             default:
                 if (action.startsWith('context:add:flowchart:')) {
                     const suffix = action.split(':').pop();
