@@ -99,6 +99,26 @@ describe('PropertyPanel field synchronization', () => {
         expect(screen.getByRole('spinbutton', { name: 'propertyPanel.borderWidth' })).toBeTruthy();
     });
 
+    it('exposes the validated node dimension bounds to assistive technology', () => {
+        render(
+            <PropertyPanel
+                selectedNodes={[createNode('Bounded')]}
+                selectedEdges={[]}
+                onUpdateNodes={vi.fn()}
+                onUpdateEdges={vi.fn()}
+                docked
+            />,
+        );
+
+        const width = screen.getByRole('spinbutton', { name: 'propertyPanel.width' });
+        const height = screen.getByRole('spinbutton', { name: 'propertyPanel.height' });
+
+        expect(width.getAttribute('aria-valuemin')).toBe('80');
+        expect(width.getAttribute('aria-valuemax')).toBe('800');
+        expect(height.getAttribute('aria-valuemin')).toBe('40');
+        expect(height.getAttribute('aria-valuemax')).toBe('600');
+    });
+
     it('refreshes local fields when history restores the selected node data', async () => {
         const onUpdateNodes = vi.fn();
         const onUpdateEdges = vi.fn();

@@ -37,6 +37,10 @@ import { ArrowTimelineEventsEditor } from './ArrowTimelineEventsEditor';
 import { ArchitectureNodeEditor } from './ArchitectureNodeEditor';
 import { AccessibleInputClearIcon } from './AccessibleInputClearIcon';
 import { LocalizedInputNumber } from './LocalizedInputNumber';
+import {
+    normalizeNodePropertyDimension,
+    resolveNodePropertyDimensionBounds,
+} from './nodePropertyDimensions';
 
 const { Text } = Typography;
 const { TextArea } = Input;
@@ -127,6 +131,8 @@ export function useNodePropertyItems(params: UseNodePropertyItemsParams): Collap
 
     const commonWidth = getCommonValue(selectedNodes, (n) => n.style?.width ?? n.width ?? n.measured?.width);
     const commonHeight = getCommonValue(selectedNodes, (n) => n.style?.height ?? n.height ?? n.measured?.height);
+    const widthBounds = resolveNodePropertyDimensionBounds(selectedNodes, 'width');
+    const heightBounds = resolveNodePropertyDimensionBounds(selectedNodes, 'height');
     const commonBorderRadius = getCommonValue(selectedNodes, (n) => {
         const r = n.style?.borderRadius;
         return typeof r === 'number' ? r : (typeof r === 'string' ? parseInt(r) || 10 : 10);
@@ -190,18 +196,20 @@ export function useNodePropertyItems(params: UseNodePropertyItemsParams): Collap
                 <Col span={12}>
                     <Form.Item label={t('propertyPanel.width')} htmlFor={fieldIds.width} style={{ marginBottom: 0 }}>
                         <LocalizedInputNumber id={fieldIds.width} aria-label={t('propertyPanel.width')} style={{ width: '100%' }} value={commonWidth}
+                            min={widthBounds.min} max={widthBounds.max}
                             increaseLabel={t('propertyPanel.increaseValue', { field: t('propertyPanel.width') })}
                             decreaseLabel={t('propertyPanel.decreaseValue', { field: t('propertyPanel.width') })}
-                            onChange={val => updateNodes({ style: { width: typeof val === 'number' ? val : undefined } })}
+                            onChange={val => updateNodes({ style: { width: normalizeNodePropertyDimension(val, widthBounds) } })}
                             onFocus={armSnapshot} placeholder={commonWidth === undefined ? mixedLabel : undefined} disabled={disabled} />
                     </Form.Item>
                 </Col>
                 <Col span={12}>
                     <Form.Item label={t('propertyPanel.height')} htmlFor={fieldIds.height} style={{ marginBottom: 0 }}>
                         <LocalizedInputNumber id={fieldIds.height} aria-label={t('propertyPanel.height')} style={{ width: '100%' }} value={commonHeight}
+                            min={heightBounds.min} max={heightBounds.max}
                             increaseLabel={t('propertyPanel.increaseValue', { field: t('propertyPanel.height') })}
                             decreaseLabel={t('propertyPanel.decreaseValue', { field: t('propertyPanel.height') })}
-                            onChange={val => updateNodes({ style: { height: typeof val === 'number' ? val : undefined } })}
+                            onChange={val => updateNodes({ style: { height: normalizeNodePropertyDimension(val, heightBounds) } })}
                             onFocus={armSnapshot} placeholder={commonHeight === undefined ? mixedLabel : undefined} disabled={disabled} />
                     </Form.Item>
                 </Col>
