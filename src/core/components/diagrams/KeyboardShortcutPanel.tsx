@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Input, Modal, Space, theme } from 'antd';
 import { SearchOutlined } from '@ant-design/icons';
 import { FaKeyboard } from 'react-icons/fa';
+import { useTranslation } from 'react-i18next';
 import { AccessibleInputClearIcon } from './AccessibleInputClearIcon';
 import './KeyboardShortcutPanel.css';
 
@@ -22,50 +23,50 @@ interface ShortcutGroup {
     items: ShortcutItem[];
 }
 
-const createShortcutGroups = (isMac: boolean): ShortcutGroup[] => [
+const createShortcutGroups = (isMac: boolean, t: (key: string) => string): ShortcutGroup[] => [
     {
-        title: '通用操作',
+        title: t('designer.keyboardShortcuts.groups.general'),
         items: [
-            { keys: [isMac ? '⌘' : 'Ctrl', 'Z'], label: '撤销' },
-            { keys: isMac ? ['⌘', 'Shift', 'Z'] : ['Ctrl', 'Y'], label: '重做' },
-            { keys: [isMac ? '⌘' : 'Ctrl', 'A'], label: '全选' },
-            { keys: [isMac ? '⌘' : 'Ctrl', 'C'], label: '复制' },
-            { keys: [isMac ? '⌘' : 'Ctrl', 'V'], label: '粘贴' },
-            { keys: [isMac ? '⌘' : 'Ctrl', 'X'], label: '剪切' },
-            { keys: ['Esc'], label: '取消 / 退出编辑' },
+            { keys: [isMac ? '⌘' : 'Ctrl', 'Z'], label: t('designer.flowchartShortcuts.action.undo') },
+            { keys: isMac ? ['⌘', 'Shift', 'Z'] : ['Ctrl', 'Y'], label: t('designer.flowchartShortcuts.action.redo') },
+            { keys: [isMac ? '⌘' : 'Ctrl', 'A'], label: t('designer.flowchartShortcuts.action.selectAll') },
+            { keys: [isMac ? '⌘' : 'Ctrl', 'C'], label: t('designer.flowchartShortcuts.action.copy') },
+            { keys: [isMac ? '⌘' : 'Ctrl', 'V'], label: t('designer.flowchartShortcuts.action.paste') },
+            { keys: [isMac ? '⌘' : 'Ctrl', 'X'], label: t('designer.flowchartShortcuts.action.cut') },
+            { keys: ['Esc'], label: t('designer.keyboardShortcuts.actions.cancel') },
         ]
     },
     {
-        title: '节点操作',
+        title: t('designer.keyboardShortcuts.groups.nodes'),
         items: [
-            { keys: ['Delete'], label: '删除选中' },
-            { keys: ['Backspace'], label: '删除选中' },
-            { keys: [isMac ? '⌘' : 'Ctrl', 'D'], label: '创建副本' },
-            { keys: [isMac ? '⌘' : 'Ctrl', 'G'], label: '成组' },
-            { keys: [isMac ? '⌘' : 'Ctrl', 'Shift', 'G'], label: '取消成组' },
-            { keys: ['↑ ↓ ← →'], label: '移动节点 (1px)' },
-            { keys: ['Shift', '↑ ↓ ← →'], label: '移动节点 (10px)' },
+            { keys: ['Delete'], label: t('designer.flowchartShortcuts.action.delete') },
+            { keys: ['Backspace'], label: t('designer.flowchartShortcuts.action.delete') },
+            { keys: [isMac ? '⌘' : 'Ctrl', 'D'], label: t('designer.flowchartShortcuts.action.duplicate') },
+            { keys: [isMac ? '⌘' : 'Ctrl', 'G'], label: t('designer.flowchartShortcuts.action.group') },
+            { keys: [isMac ? '⌘' : 'Ctrl', 'Shift', 'G'], label: t('designer.flowchartShortcuts.action.ungroup') },
+            { keys: ['↑ ↓ ← →'], label: t('designer.flowchartShortcuts.action.nudge') },
+            { keys: ['Shift', '↑ ↓ ← →'], label: t('designer.flowchartShortcuts.action.nudgeFast') },
         ]
     },
     {
-        title: '视图操作',
+        title: t('designer.keyboardShortcuts.groups.view'),
         items: [
-            { keys: [isMac ? '⌘' : 'Ctrl', '+'], label: '放大' },
-            { keys: [isMac ? '⌘' : 'Ctrl', '-'], label: '缩小' },
-            { keys: [isMac ? '⌘' : 'Ctrl', '0'], label: '适应屏幕' },
-            { keys: [isMac ? '⌘' : 'Ctrl', '1'], label: '实际大小' },
-            { keys: ['滚轮'], label: '缩放画布' },
+            { keys: [isMac ? '⌘' : 'Ctrl', '+'], label: t('designer.keyboardShortcuts.actions.zoomIn') },
+            { keys: [isMac ? '⌘' : 'Ctrl', '-'], label: t('designer.keyboardShortcuts.actions.zoomOut') },
+            { keys: [isMac ? '⌘' : 'Ctrl', '0'], label: t('designer.keyboardShortcuts.actions.fitView') },
+            { keys: [isMac ? '⌘' : 'Ctrl', '1'], label: t('designer.keyboardShortcuts.actions.actualSize') },
+            { keys: [t('designer.keyboardShortcuts.keys.wheel')], label: t('designer.keyboardShortcuts.actions.zoomCanvas') },
         ]
     },
     {
-        title: '高级功能',
+        title: t('designer.keyboardShortcuts.groups.advanced'),
         items: [
-            { keys: ['Ctrl', 'K'], label: '命令面板' },
-            { keys: [isMac ? '⌘' : 'Ctrl', 'F'], label: '搜索画布内容' },
-            { keys: [isMac ? '⌘' : 'Ctrl', 'H'], label: '查找并替换画布文本' },
-            { keys: ['Alt', '拖拽'], label: '拖拽复制节点' },
-            { keys: ['Shift', '点击'], label: '多选节点' },
-            { keys: ['?'], label: '显示快捷键面板' },
+            { keys: [isMac ? '⌘' : 'Ctrl', 'K'], label: t('designer.flowchartShortcuts.action.palette') },
+            { keys: [isMac ? '⌘' : 'Ctrl', 'F'], label: t('designer.flowchartShortcuts.action.canvasSearch') },
+            { keys: [isMac ? '⌘' : 'Ctrl', 'H'], label: t('designer.flowchartShortcuts.action.findReplace') },
+            { keys: ['Alt', t('designer.keyboardShortcuts.keys.drag')], label: t('designer.flowchartShortcuts.action.duplicateDrag') },
+            { keys: ['Shift', t('designer.keyboardShortcuts.keys.click')], label: t('designer.keyboardShortcuts.actions.multiSelect') },
+            { keys: ['?'], label: t('designer.keyboardShortcuts.actions.showHelp') },
         ]
     },
 ];
@@ -93,6 +94,7 @@ const KeyBadge: React.FC<{ children: string; token: ThemeToken }> = ({ children,
 
 export const KeyboardShortcutPanel: React.FC<KeyboardShortcutPanelProps> = ({ visible, onClose }) => {
     const { token } = theme.useToken();
+    const { t } = useTranslation();
     const [searchText, setSearchText] = useState('');
     const returnFocusRef = useRef<HTMLElement | null>(
         typeof document !== 'undefined'
@@ -103,7 +105,8 @@ export const KeyboardShortcutPanel: React.FC<KeyboardShortcutPanelProps> = ({ vi
     );
     const shortcutGroups = useMemo(() => createShortcutGroups(
         typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform),
-    ), []);
+        t,
+    ), [t]);
     const filteredGroups = useMemo(() => {
         const normalizedSearch = searchText.trim().toLocaleLowerCase();
         if (!normalizedSearch) return shortcutGroups;
@@ -151,7 +154,7 @@ export const KeyboardShortcutPanel: React.FC<KeyboardShortcutPanelProps> = ({ vi
 
     return (
         <Modal
-            title={<Space><FaKeyboard aria-hidden="true" />键盘快捷键</Space>}
+            title={<Space><FaKeyboard aria-hidden="true" />{t('designer.keyboardShortcuts.title')}</Space>}
             open={visible}
             onCancel={closePanel}
             footer={null}
@@ -164,11 +167,11 @@ export const KeyboardShortcutPanel: React.FC<KeyboardShortcutPanelProps> = ({ vi
             }}
         >
             <Input
-                aria-label="搜索快捷键或动作"
-                placeholder="搜索快捷键或动作..."
+                aria-label={t('designer.keyboardShortcuts.searchLabel')}
+                placeholder={t('designer.flowchartShortcuts.searchPlaceholder')}
                 prefix={<SearchOutlined aria-hidden="true" />}
                 allowClear={{
-                    clearIcon: <AccessibleInputClearIcon label="清除快捷键搜索" />,
+                    clearIcon: <AccessibleInputClearIcon label={t('designer.flowchartShortcuts.clearSearch')} />,
                 }}
                 value={searchText}
                 onChange={(event) => setSearchText(event.target.value)}
@@ -217,7 +220,7 @@ export const KeyboardShortcutPanel: React.FC<KeyboardShortcutPanelProps> = ({ vi
 
             {filteredGroups.length === 0 && (
                 <div role="status" style={{ padding: '28px 24px', textAlign: 'center', color: token.colorTextSecondary }}>
-                    未找到匹配的快捷键
+                    {t('designer.flowchartShortcuts.noResults')}
                 </div>
             )}
 
@@ -227,7 +230,9 @@ export const KeyboardShortcutPanel: React.FC<KeyboardShortcutPanelProps> = ({ vi
                 fontSize: 11,
                 color: token.colorTextQuaternary,
             }}>
-                按 <KeyBadge token={token}>?</KeyBadge> 或 <KeyBadge token={token}>Esc</KeyBadge> 关闭
+                {t('designer.keyboardShortcuts.footer.press')} <KeyBadge token={token}>?</KeyBadge>{' '}
+                {t('designer.keyboardShortcuts.footer.or')} <KeyBadge token={token}>Esc</KeyBadge>{' '}
+                {t('designer.keyboardShortcuts.footer.close')}
             </div>
         </Modal>
     );

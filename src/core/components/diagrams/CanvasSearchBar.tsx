@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { Popconfirm, theme } from 'antd';
 import { FaSearch, FaChevronUp, FaChevronDown, FaTimes, FaTimesCircle, FaExchangeAlt } from 'react-icons/fa';
 import { useReactFlow, type Edge, type Node } from '@xyflow/react';
+import { useTranslation } from 'react-i18next';
 import {
     buildPresentationEdgeIdSelector,
     buildPresentationNodeSelector,
@@ -63,6 +64,7 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
     onReplaceVisibleChange,
 }) => {
     const { token } = theme.useToken();
+    const { t } = useTranslation();
     const reactFlow = useReactFlow();
     const searchInputRef = useRef<HTMLInputElement>(null);
     const replaceInputRef = useRef<HTMLInputElement>(null);
@@ -258,21 +260,38 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
         const nodeCount = items.filter(item => item.kind === 'node').length;
         const edgeCount = items.length - nodeCount;
         return [
-            nodeCount > 0 ? `${nodeCount} 个节点文本` : '',
-            edgeCount > 0 ? `${edgeCount} 个连线标签` : '',
-        ].filter(Boolean).join('、') || '0 项内容';
-    }, []);
+            nodeCount > 0 ? t('designer.canvasSearch.counts.nodes', { count: nodeCount }) : '',
+            edgeCount > 0 ? t('designer.canvasSearch.counts.edges', { count: edgeCount }) : '',
+        ].filter(Boolean).join(t('designer.canvasSearch.counts.separator'))
+            || t('designer.canvasSearch.counts.none');
+    }, [t]);
 
     const formatReplaceResult = useCallback((result: FlowchartCanvasReplaceResult) => {
-        const parts = [`已替换 ${formatMatchCounts(result.changedMatches)}`];
+        const parts = [t('designer.canvasSearch.result.changed', {
+            matches: formatMatchCounts(result.changedMatches),
+        })];
         if (result.skippedLockedMatches.length > 0) {
-            parts.push(`跳过 ${formatMatchCounts(result.skippedLockedMatches)}（已锁定）`);
+            parts.push(t('designer.canvasSearch.result.skippedLocked', {
+                matches: formatMatchCounts(result.skippedLockedMatches),
+            }));
         }
-        if (result.skippedBlankMatches.length > 0) parts.push(`跳过 ${result.skippedBlankMatches.length} 个空文本结果`);
-        if (result.ignoredMetadataMatches.length > 0) parts.push(`忽略 ${result.ignoredMetadataMatches.length} 个仅在元数据中匹配的结果`);
-        if (result.truncatedMatches.length > 0) parts.push(`${result.truncatedMatches.length} 个文本已截断`);
-        return parts.join('；');
-    }, [formatMatchCounts]);
+        if (result.skippedBlankMatches.length > 0) {
+            parts.push(t('designer.canvasSearch.result.skippedBlank', {
+                count: result.skippedBlankMatches.length,
+            }));
+        }
+        if (result.ignoredMetadataMatches.length > 0) {
+            parts.push(t('designer.canvasSearch.result.ignoredMetadata', {
+                count: result.ignoredMetadataMatches.length,
+            }));
+        }
+        if (result.truncatedMatches.length > 0) {
+            parts.push(t('designer.canvasSearch.result.truncated', {
+                count: result.truncatedMatches.length,
+            }));
+        }
+        return parts.join(t('designer.canvasSearch.result.separator'));
+    }, [formatMatchCounts, t]);
 
     const goNext = useCallback(() => {
         if (matches.length === 0) return;
@@ -337,14 +356,23 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
         const currentKey = currentMatch ? buildFlowchartCanvasSearchMatchKey(currentMatch) : null;
         const includesCurrent = (items: readonly FlowchartCanvasSearchMatch[]) => currentKey !== null
             && items.some(item => buildFlowchartCanvasSearchMatchKey(item) === currentKey);
-        if (includesCurrent(allReplacePlan.skippedLockedMatches)) return '当前结果已锁定，不会被替换';
-        if (includesCurrent(allReplacePlan.skippedBlankMatches)) return '替换后文本不能为空';
-        if (includesCurrent(allReplacePlan.ignoredMetadataMatches)) return '当前结果仅在元数据中匹配，不会修改可见文本';
+        if (includesCurrent(allReplacePlan.skippedLockedMatches)) {
+            return t('designer.canvasSearch.preview.currentLocked');
+        }
+        if (includesCurrent(allReplacePlan.skippedBlankMatches)) {
+            return t('designer.canvasSearch.preview.blankResult');
+        }
+        if (includesCurrent(allReplacePlan.ignoredMetadataMatches)) {
+            return t('designer.canvasSearch.preview.metadataOnly');
+        }
         if (allReplacePlan.changedMatches.length > 0 && allReplacePlan.skippedLockedMatches.length > 0) {
-            return `可替换 ${formatMatchCounts(allReplacePlan.changedMatches)}，将跳过 ${formatMatchCounts(allReplacePlan.skippedLockedMatches)}`;
+            return t('designer.canvasSearch.preview.partialEligible', {
+                eligible: formatMatchCounts(allReplacePlan.changedMatches),
+                locked: formatMatchCounts(allReplacePlan.skippedLockedMatches),
+            });
         }
         return replaceStatus;
-    }, [allReplacePlan, currentMatch, formatMatchCounts, query, replaceStatus, showReplace]);
+    }, [allReplacePlan, currentMatch, formatMatchCounts, query, replaceStatus, showReplace, t]);
 
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
         if (e.key === 'Escape') {
@@ -450,7 +478,7 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
             {/* 动态搜索高亮样式 */}
             {highlightStyle && <style>{highlightStyle}</style>}
 
-            <div className="canvas-search-bar" role="search" aria-label="画布内容查找与替换" style={{
+            <div className="canvas-search-bar" role="search" aria-label={t('designer.canvasSearch.regionLabel')} style={{
                 zIndex: 1600,
                 background: token.colorBgContainer,
                 border: `1px solid ${token.colorBorderSecondary}`,
@@ -469,8 +497,8 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
                         onChange={e => handleQueryChange(e.target.value)}
                         maxLength={FLOWCHART_SEARCH_QUERY_MAX_LENGTH}
                         onKeyDown={handleKeyDown}
-                        aria-label="搜索画布内容"
-                        placeholder="搜索节点或连线标签..."
+                        aria-label={t('designer.canvasSearch.searchInputLabel')}
+                        placeholder={t('designer.canvasSearch.searchPlaceholder')}
                         style={{
                             border: 'none', outline: 'none', background: 'transparent',
                             fontSize: 13, flex: 1, minWidth: 0, color: token.colorText, fontFamily: 'inherit',
@@ -478,19 +506,21 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
                     />
                     {/* 结果计数 */}
                     {query && (
-                        <span role="status" aria-label="搜索结果位置" aria-live="polite" aria-atomic="true" style={{
+                        <span role="status" aria-label={t('designer.canvasSearch.resultPosition')} aria-live="polite" aria-atomic="true" style={{
                             fontSize: 11,
                             color: matches.length > 0 ? token.colorTextSecondary : '#ef4444',
                             whiteSpace: 'nowrap',
                             fontVariantNumeric: 'tabular-nums',
                         }}>
-                            {matches.length > 0 ? `${boundedCurrentIndex + 1}/${matches.length}` : '无结果'}
+                            {matches.length > 0
+                                ? `${boundedCurrentIndex + 1}/${matches.length}`
+                                : t('designer.canvasSearch.noResults')}
                         </span>
                     )}
                     {query && (
                         <button
                             className="canvas-search-icon-button"
-                            aria-label="清空搜索"
+                            aria-label={t('designer.canvasSearch.clearSearch')}
                             onClick={handleClearQuery}
                             style={navBtnStyle(true, token)}
                         >
@@ -498,19 +528,21 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
                         </button>
                     )}
                     {/* 上下导航 */}
-                    <button className="canvas-search-icon-button" aria-label="上一个搜索结果" onClick={goPrev} disabled={matches.length === 0} style={navBtnStyle(matches.length > 0, token)}>
+                    <button className="canvas-search-icon-button" aria-label={t('designer.canvasSearch.previousResult')} onClick={goPrev} disabled={matches.length === 0} style={navBtnStyle(matches.length > 0, token)}>
                         <FaChevronUp size={11} />
                     </button>
-                    <button className="canvas-search-icon-button" aria-label="下一个搜索结果" onClick={goNext} disabled={matches.length === 0} style={navBtnStyle(matches.length > 0, token)}>
+                    <button className="canvas-search-icon-button" aria-label={t('designer.canvasSearch.nextResult')} onClick={goNext} disabled={matches.length === 0} style={navBtnStyle(matches.length > 0, token)}>
                         <FaChevronDown size={11} />
                     </button>
                     {/* 切换替换模式 */}
                     {hasReplaceFns && (
                         <button
                             className="canvas-search-icon-button"
-                            aria-label={showReplace ? '关闭替换' : '打开查找替换'}
+                            aria-label={showReplace
+                                ? t('designer.canvasSearch.closeReplace')
+                                : t('designer.canvasSearch.openReplace')}
                             onClick={handleReplaceVisibilityChange}
-                            title="查找替换 (Ctrl+H)"
+                            title={t('designer.canvasSearch.replaceTitle')}
                             style={{
                                 ...navBtnStyle(true, token),
                                 color: showReplace ? token.colorPrimary : token.colorTextSecondary,
@@ -520,7 +552,7 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
                         </button>
                     )}
                     {/* 关闭 */}
-                    <button className="canvas-search-icon-button" aria-label="关闭画布搜索" onClick={closeSearch} style={navBtnStyle(true, token)}>
+                    <button className="canvas-search-icon-button" aria-label={t('designer.canvasSearch.closeSearch')} onClick={closeSearch} style={navBtnStyle(true, token)}>
                         <FaTimes size={11} />
                     </button>
                 </div>
@@ -531,7 +563,7 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
                         color: token.colorTextTertiary,
                         fontSize: 11,
                     }}>
-                        画布暂无可搜索内容，请先添加节点或连线
+                        {t('designer.canvasSearch.emptyCanvas')}
                     </div>
                 )}
 
@@ -549,8 +581,8 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
                             onChange={e => handleReplaceTextChange(e.target.value)}
                             maxLength={FLOWCHART_REPLACE_TEXT_MAX_LENGTH}
                             onKeyDown={e => { if (e.key === 'Enter') handleReplaceCurrent(); }}
-                            aria-label="替换为"
-                            placeholder="替换为..."
+                            aria-label={t('designer.canvasSearch.replaceInputLabel')}
+                            placeholder={t('designer.canvasSearch.replacePlaceholder')}
                             style={{
                                 border: 'none', outline: 'none', background: 'transparent',
                                 fontSize: 13, flex: 1, minWidth: 0, color: token.colorText, fontFamily: 'inherit',
@@ -558,40 +590,48 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
                         />
                         <button
                             className="canvas-search-action-button"
-                            aria-label="替换当前匹配"
+                            aria-label={t('designer.canvasSearch.replaceCurrent')}
                             onClick={handleReplaceCurrent}
                             disabled={!currentReplaceEligible}
-                            title="替换当前"
+                            title={t('designer.canvasSearch.replaceCurrent')}
                             style={actionBtnStyle(currentReplaceEligible, token)}
                         >
-                            替换
+                            {t('designer.canvasSearch.replaceAction')}
                         </button>
                         <Popconfirm
                             placement="bottomRight"
                             autoAdjustOverflow={false}
                             zIndex={2600}
                             getPopupContainer={() => document.body}
-                            title={`替换 ${formatMatchCounts(allReplacePlan.changedMatches)}？`}
-                            description="此操作可通过撤销恢复；锁定节点或连线不会被修改。"
-                            okText="确认替换"
-                            cancelText="取消"
+                            title={t('designer.canvasSearch.replaceConfirmTitle', {
+                                matches: formatMatchCounts(allReplacePlan.changedMatches),
+                            })}
+                            description={t('designer.canvasSearch.replaceConfirmDescription')}
+                            okText={t('designer.canvasSearch.replaceConfirm')}
+                            cancelText={t('common.cancel')}
                             onConfirm={handleReplaceAll}
                             disabled={allReplacePlan.changedMatches.length === 0}
                         >
                             <button
                                 className="canvas-search-action-button"
-                                aria-label={`全部替换，共 ${formatMatchCounts(allReplacePlan.changedMatches)}`}
+                                aria-label={t('designer.canvasSearch.replaceAllLabel', {
+                                    matches: formatMatchCounts(allReplacePlan.changedMatches),
+                                })}
                                 disabled={allReplacePlan.changedMatches.length === 0}
-                                title={`全部替换 (${formatMatchCounts(allReplacePlan.changedMatches)})`}
+                                title={t('designer.canvasSearch.replaceAllTitle', {
+                                    matches: formatMatchCounts(allReplacePlan.changedMatches),
+                                })}
                                 style={actionBtnStyle(allReplacePlan.changedMatches.length > 0, token)}
                             >
-                                全部({allReplacePlan.changedMatches.length})
+                                {t('designer.canvasSearch.replaceAllAction', {
+                                    count: allReplacePlan.changedMatches.length,
+                                })}
                             </button>
                         </Popconfirm>
                     </div>
                 )}
                 {replacePreviewMessage && (
-                    <div role="status" aria-label="替换操作状态" aria-live="polite" aria-atomic="true" style={{
+                    <div role="status" aria-label={t('designer.canvasSearch.replaceStatus')} aria-live="polite" aria-atomic="true" style={{
                         padding: '0 10px 8px 28px',
                         color: token.colorTextSecondary,
                         fontSize: 11,

@@ -2,6 +2,8 @@
 
 import { readFileSync } from 'node:fs';
 import React from 'react';
+import { createInstance } from 'i18next';
+import { I18nextProvider } from 'react-i18next';
 import type { Edge, Node } from '@xyflow/react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -31,6 +33,8 @@ import {
     planFlowchartCanvasTextReplacement,
     type FlowchartCanvasSearchMatch,
 } from '../flowchartSearchReplace';
+import en from '../../../../locales/en.json';
+import i18n from '../../../../i18n';
 
 beforeAll(() => {
     vi.stubGlobal('ResizeObserver', class ResizeObserver {
@@ -45,7 +49,8 @@ afterAll(() => {
 });
 
 describe('CanvasSearchBar', () => {
-    beforeEach(() => {
+    beforeEach(async () => {
+        await i18n.changeLanguage('zh');
         getInternalNodeMock.mockReset();
         setCenterMock.mockReset();
     });
@@ -88,6 +93,43 @@ describe('CanvasSearchBar', () => {
         expect(screen.getByRole('button', { name: '全部替换，共 1 个节点文本' })).toBeTruthy();
         await waitFor(() => expect(document.activeElement)
             .toBe(screen.getByRole('textbox', { name: '替换为' })));
+    });
+
+    it('localizes the complete find and replace surface in English', async () => {
+        const englishI18n = createInstance();
+        await englishI18n.init({
+            lng: 'en',
+            fallbackLng: 'en',
+            resources: { en: { translation: en } },
+        });
+
+        render(
+            <I18nextProvider i18n={englishI18n}>
+                <CanvasSearchBar
+                    visible
+                    onClose={vi.fn()}
+                    nodes={[{
+                        id: 'node-1',
+                        position: { x: 10, y: 20 },
+                        data: { label: 'Circle' },
+                    }]}
+                    onReplaceMatch={vi.fn()}
+                    onReplaceAll={vi.fn()}
+                />
+            </I18nextProvider>,
+        );
+
+        expect(screen.getByRole('search', { name: 'Find and replace canvas content' })).toBeTruthy();
+        const search = screen.getByRole('textbox', { name: 'Search canvas content' });
+        fireEvent.change(search, { target: { value: 'Circle' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Open find and replace' }));
+        fireEvent.change(screen.getByRole('textbox', { name: 'Replace with' }), {
+            target: { value: 'Shape' },
+        });
+
+        expect(screen.getByRole('button', { name: 'Replace current match' })).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Replace all, 1 node text' })).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Close canvas search' })).toBeTruthy();
     });
 
     it('keeps the mobile search below the second toolbar row with touch-sized actions', () => {

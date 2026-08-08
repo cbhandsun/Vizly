@@ -895,6 +895,87 @@
                 "pan": "Space + Drag"
             }
         },
+        "keyboardShortcuts": {
+            "title": "Keyboard Shortcuts",
+            "searchLabel": "Search shortcuts or actions",
+            "groups": {
+                "general": "General",
+                "nodes": "Node actions",
+                "view": "View actions",
+                "advanced": "Advanced"
+            },
+            "actions": {
+                "cancel": "Cancel / exit editing",
+                "zoomIn": "Zoom in",
+                "zoomOut": "Zoom out",
+                "fitView": "Fit to screen",
+                "actualSize": "Actual size",
+                "zoomCanvas": "Zoom canvas",
+                "multiSelect": "Select multiple nodes",
+                "showHelp": "Show keyboard shortcuts"
+            },
+            "keys": {
+                "wheel": "Mouse wheel",
+                "drag": "Drag",
+                "click": "Click"
+            },
+            "footer": {
+                "press": "Press",
+                "or": "or",
+                "close": "to close"
+            }
+        },
+        "canvasSearch": {
+            "regionLabel": "Find and replace canvas content",
+            "searchInputLabel": "Search canvas content",
+            "searchPlaceholder": "Search nodes or connector labels...",
+            "resultPosition": "Search result position",
+            "noResults": "No results",
+            "clearSearch": "Clear search",
+            "previousResult": "Previous search result",
+            "nextResult": "Next search result",
+            "openReplace": "Open find and replace",
+            "closeReplace": "Close replace",
+            "replaceTitle": "Find and replace (Ctrl+H)",
+            "closeSearch": "Close canvas search",
+            "emptyCanvas": "There is no searchable canvas content. Add a node or connector first.",
+            "replaceInputLabel": "Replace with",
+            "replacePlaceholder": "Replace with...",
+            "replaceCurrent": "Replace current match",
+            "replaceAction": "Replace",
+            "replaceAllLabel": "Replace all, {{matches}}",
+            "replaceAllTitle": "Replace all ({{matches}})",
+            "replaceAllAction": "All ({{count}})",
+            "replaceConfirmTitle": "Replace {{matches}}?",
+            "replaceConfirmDescription": "You can undo this operation. Locked nodes and connectors will not be changed.",
+            "replaceConfirm": "Confirm replacement",
+            "replaceStatus": "Replacement status",
+            "counts": {
+                "nodes_one": "{{count}} node text",
+                "nodes_other": "{{count}} node texts",
+                "edges_one": "{{count}} connector label",
+                "edges_other": "{{count}} connector labels",
+                "separator": ", ",
+                "none": "0 items"
+            },
+            "result": {
+                "changed": "Replaced {{matches}}",
+                "skippedLocked": "Skipped {{matches}} (locked)",
+                "skippedBlank_one": "Skipped {{count}} blank-text result",
+                "skippedBlank_other": "Skipped {{count}} blank-text results",
+                "ignoredMetadata_one": "Ignored {{count}} metadata-only result",
+                "ignoredMetadata_other": "Ignored {{count}} metadata-only results",
+                "truncated_one": "Truncated {{count}} text value",
+                "truncated_other": "Truncated {{count}} text values",
+                "separator": "; "
+            },
+            "preview": {
+                "currentLocked": "The current result is locked and will not be replaced",
+                "blankResult": "Replacement text cannot leave the result blank",
+                "metadataOnly": "The current result only matches metadata; visible text will not change",
+                "partialEligible": "Can replace {{eligible}}; will skip {{locked}}"
+            }
+        },
         "sidebar": {
             "basic": "Basic Shapes",
             "components": "Components",

@@ -896,6 +896,87 @@
                 "pan": "Space + 拖拽"
             }
         },
+        "keyboardShortcuts": {
+            "title": "键盘快捷键",
+            "searchLabel": "搜索快捷键或动作",
+            "groups": {
+                "general": "通用操作",
+                "nodes": "节点操作",
+                "view": "视图操作",
+                "advanced": "高级功能"
+            },
+            "actions": {
+                "cancel": "取消 / 退出编辑",
+                "zoomIn": "放大",
+                "zoomOut": "缩小",
+                "fitView": "适应屏幕",
+                "actualSize": "实际大小",
+                "zoomCanvas": "缩放画布",
+                "multiSelect": "多选节点",
+                "showHelp": "显示快捷键面板"
+            },
+            "keys": {
+                "wheel": "滚轮",
+                "drag": "拖拽",
+                "click": "点击"
+            },
+            "footer": {
+                "press": "按",
+                "or": "或",
+                "close": "关闭"
+            }
+        },
+        "canvasSearch": {
+            "regionLabel": "画布内容查找与替换",
+            "searchInputLabel": "搜索画布内容",
+            "searchPlaceholder": "搜索节点或连线标签...",
+            "resultPosition": "搜索结果位置",
+            "noResults": "无结果",
+            "clearSearch": "清空搜索",
+            "previousResult": "上一个搜索结果",
+            "nextResult": "下一个搜索结果",
+            "openReplace": "打开查找替换",
+            "closeReplace": "关闭替换",
+            "replaceTitle": "查找替换 (Ctrl+H)",
+            "closeSearch": "关闭画布搜索",
+            "emptyCanvas": "画布暂无可搜索内容，请先添加节点或连线",
+            "replaceInputLabel": "替换为",
+            "replacePlaceholder": "替换为...",
+            "replaceCurrent": "替换当前匹配",
+            "replaceAction": "替换",
+            "replaceAllLabel": "全部替换，共 {{matches}}",
+            "replaceAllTitle": "全部替换（{{matches}}）",
+            "replaceAllAction": "全部({{count}})",
+            "replaceConfirmTitle": "替换 {{matches}}？",
+            "replaceConfirmDescription": "此操作可通过撤销恢复；锁定节点或连线不会被修改。",
+            "replaceConfirm": "确认替换",
+            "replaceStatus": "替换操作状态",
+            "counts": {
+                "nodes_one": "{{count}} 个节点文本",
+                "nodes_other": "{{count}} 个节点文本",
+                "edges_one": "{{count}} 个连线标签",
+                "edges_other": "{{count}} 个连线标签",
+                "separator": "、",
+                "none": "0 项内容"
+            },
+            "result": {
+                "changed": "已替换 {{matches}}",
+                "skippedLocked": "跳过 {{matches}}（已锁定）",
+                "skippedBlank_one": "跳过 {{count}} 个空文本结果",
+                "skippedBlank_other": "跳过 {{count}} 个空文本结果",
+                "ignoredMetadata_one": "忽略 {{count}} 个仅在元数据中匹配的结果",
+                "ignoredMetadata_other": "忽略 {{count}} 个仅在元数据中匹配的结果",
+                "truncated_one": "{{count}} 个文本已截断",
+                "truncated_other": "{{count}} 个文本已截断",
+                "separator": "；"
+            },
+            "preview": {
+                "currentLocked": "当前结果已锁定，不会被替换",
+                "blankResult": "替换后文本不能为空",
+                "metadataOnly": "当前结果仅在元数据中匹配，不会修改可见文本",
+                "partialEligible": "可替换 {{eligible}}，将跳过 {{locked}}"
+            }
+        },
         "sidebar": {
             "basic": "基础形状",
             "components": "组件",

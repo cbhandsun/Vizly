@@ -1,8 +1,12 @@
 // @vitest-environment jsdom
 import React, { useState } from 'react';
+import { createInstance } from 'i18next';
+import { I18nextProvider } from 'react-i18next';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { KeyboardShortcutPanel } from '../KeyboardShortcutPanel';
+import en from '../../../../locales/en.json';
+import i18n from '../../../../i18n';
 
 beforeAll(() => {
     Object.defineProperty(window, 'matchMedia', {
@@ -24,6 +28,10 @@ afterEach(() => {
     document.body.innerHTML = '';
 });
 
+beforeEach(async () => {
+    await i18n.changeLanguage('zh');
+});
+
 describe('KeyboardShortcutPanel', () => {
     it('makes canvas search shortcuts discoverable through the live menu panel', () => {
         render(<KeyboardShortcutPanel visible onClose={vi.fn()} />);
@@ -38,6 +46,34 @@ describe('KeyboardShortcutPanel', () => {
 
         fireEvent.change(search, { target: { value: '不存在的动作' } });
         expect(screen.getByRole('status').textContent).toContain('未找到匹配的快捷键');
+    });
+
+    it('localizes titles, groups, actions, filtering, and empty state in English', async () => {
+        const englishI18n = createInstance();
+        await englishI18n.init({
+            lng: 'en',
+            fallbackLng: 'en',
+            resources: { en: { translation: en } },
+        });
+
+        render(
+            <I18nextProvider i18n={englishI18n}>
+                <KeyboardShortcutPanel visible onClose={vi.fn()} />
+            </I18nextProvider>,
+        );
+
+        expect(screen.getByText('Keyboard Shortcuts')).toBeTruthy();
+        expect(screen.getByText('General')).toBeTruthy();
+        expect(screen.getByText('Search canvas content')).toBeTruthy();
+        const search = screen.getByRole('textbox', { name: 'Search shortcuts or actions' });
+
+        fireEvent.change(search, { target: { value: 'canvas' } });
+        expect(screen.getByText('Search canvas content')).toBeTruthy();
+        expect(screen.getByText('Find and replace canvas text')).toBeTruthy();
+        expect(screen.queryByText('Undo')).toBeNull();
+
+        fireEvent.change(search, { target: { value: 'missing action' } });
+        expect(screen.getByText('No matching shortcuts')).toBeTruthy();
     });
 
     it('closes when the help shortcut is pressed again inside the open panel', async () => {
