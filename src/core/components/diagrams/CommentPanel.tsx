@@ -12,11 +12,13 @@ const { Text } = Typography;
 export interface CommentPanelProps {
     activePageId?: string;
     activePageName?: string;
+    onStartCommentMode?: () => void;
 }
 
 export const CommentPanel: React.FC<CommentPanelProps> = ({
     activePageId = DEFAULT_COMMENT_PAGE_ID,
     activePageName = activePageId,
+    onStartCommentMode,
 }) => {
     const { t } = useTranslation();
     const { token } = theme.useToken();
@@ -81,6 +83,10 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
     const resetCommentFilters = () => {
         setSearchTerm('');
         setFilter('all');
+    };
+    const startCommentMode = () => {
+        setIsCommentMode(true);
+        onStartCommentMode?.();
     };
 
     return (
@@ -275,7 +281,7 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
                                     <Button
                                         type="primary"
                                         icon={<FaRegCommentDots />}
-                                        onClick={() => setIsCommentMode(true)}
+                                        onClick={startCommentMode}
                                         aria-pressed={isCommentMode}
                                     >
                                         {isCommentMode ? t('comment.modeActive') : t('comment.addFirst')}

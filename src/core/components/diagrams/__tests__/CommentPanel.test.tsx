@@ -85,13 +85,15 @@ describe('CommentPanel', () => {
     });
 
     it('offers a direct path to create the first comment', () => {
-        render(<CommentPanel />);
+        const onStartCommentMode = vi.fn();
+        render(<CommentPanel onStartCommentMode={onStartCommentMode} />);
 
         const addFirst = screen.getByRole('button', { name: 'comment.addFirst' });
         expect(addFirst.getAttribute('aria-pressed')).toBe('false');
 
         fireEvent.click(addFirst);
         expect(storeState.setIsCommentMode).toHaveBeenCalledWith(true);
+        expect(onStartCommentMode).toHaveBeenCalledTimes(1);
     });
 
     it('lets users recover from filters that have no results', () => {

@@ -478,7 +478,11 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
             case 'comments':
                 return (
                     <React.Suspense fallback={null}>
-                        <CommentPanel activePageId={activePageId} activePageName={activePageName} />
+                        <CommentPanel
+                            activePageId={activePageId}
+                            activePageName={activePageName}
+                            onStartCommentMode={isMobile ? () => closeDrawer(false) : undefined}
+                        />
                     </React.Suspense>
                 );
             default:
