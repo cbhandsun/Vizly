@@ -14,6 +14,11 @@ export interface GroupingPlan {
     nodes: Node[];
 }
 
+export interface CreateUngroupingPlanOptions {
+    nodes: Node[];
+    groupIds: ReadonlySet<string>;
+}
+
 const CONTAINER_NODE_TYPES = new Set(['titleGroup', 'subGroup', 'swimlane']);
 
 const readNodeWidth = (node: Node): number => node.measured?.width ?? node.width ?? 100;
@@ -127,4 +132,64 @@ export const createGroupingPlan = ({
         groupNode,
         nodes: insertGroupBeforeChildren(reparentedNodes, groupNode),
     };
+};
+
+/**
+ * Removes one or more containers without leaving descendants attached to a
+ * container that is removed by the same transaction. Positions are promoted
+ * through every removed ancestor so the rendered canvas location is stable.
+ */
+export const createUngroupingPlan = ({
+    nodes,
+    groupIds,
+}: CreateUngroupingPlanOptions): Node[] | null => {
+    const groupsById = new Map(
+        nodes
+            .filter(node => groupIds.has(node.id) && CONTAINER_NODE_TYPES.has(node.type ?? ''))
+            .map(node => [node.id, node]),
+    );
+    if (groupsById.size === 0) return null;
+
+    return nodes.flatMap(node => {
+        if (groupsById.has(node.id)) return [];
+        if (!node.parentId || !groupsById.has(node.parentId)) return [node];
+
+        let x = node.position.x;
+        let y = node.position.y;
+        let nextParentId: string | undefined = node.parentId;
+        const visited = new Set<string>();
+
+        while (nextParentId && groupsById.has(nextParentId)) {
+            if (visited.has(nextParentId)) {
+                nextParentId = undefined;
+                break;
+            }
+            visited.add(nextParentId);
+
+            const parentGroup = groupsById.get(nextParentId);
+            if (!parentGroup) {
+                nextParentId = undefined;
+                break;
+            }
+            x += parentGroup.position.x;
+            y += parentGroup.position.y;
+            nextParentId = parentGroup.parentId;
+        }
+
+        const promotedNode: Node = {
+            ...node,
+            position: { x, y },
+        };
+        delete promotedNode.parentId;
+        delete promotedNode.extent;
+        delete promotedNode.expandParent;
+        Reflect.deleteProperty(promotedNode, 'parentNode');
+
+        if (nextParentId) {
+            promotedNode.parentId = nextParentId;
+            promotedNode.extent = 'parent';
+        }
+
+        return [promotedNode];
+    });
 };

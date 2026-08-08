@@ -212,7 +212,7 @@ describe('useClipboard', () => {
     expect(setEdges).not.toHaveBeenCalled();
   });
 
-  it('does not delete an edge-only selection because it has no pasteable payload', () => {
+  it('does not delete an edge-only selection because it has no pasteable payload', async () => {
     const edgeOnlySelection: Edge[] = [{
       id: 'edge-1',
       source: 'node-1',
@@ -238,7 +238,7 @@ describe('useClipboard', () => {
       })
     );
 
-    act(() => result.current.handleCut());
+    await expect(result.current.handleCut()).resolves.toBe('empty');
 
     expect(takeSnapshot).not.toHaveBeenCalled();
     expect(setNodes).not.toHaveBeenCalled();
@@ -247,7 +247,7 @@ describe('useClipboard', () => {
     expect(localStorage.getItem('flowchart-clipboard')).toBeNull();
   });
 
-  it('does not cut a locked node or write it to either clipboard channel', () => {
+  it('does not cut a locked node or write it to either clipboard channel', async () => {
     const lockedNodes: Node[] = [{
       ...selectedNodes[0],
       draggable: false,
@@ -272,13 +272,108 @@ describe('useClipboard', () => {
       })
     );
 
-    act(() => result.current.handleCut());
+    await expect(result.current.handleCut()).resolves.toBe('locked');
 
     expect(takeSnapshot).not.toHaveBeenCalled();
     expect(setNodes).not.toHaveBeenCalled();
     expect(setEdges).not.toHaveBeenCalled();
     expect(writeText).not.toHaveBeenCalled();
     expect(localStorage.getItem('flowchart-clipboard')).toBeNull();
+  });
+
+  it('preserves selected nodes when both clipboard channels reject a cut', async () => {
+    const setNodes = vi.fn();
+    const setEdges = vi.fn();
+    const takeSnapshot = vi.fn();
+    const writeText = vi.fn().mockRejectedValue(new Error('clipboard denied'));
+    Object.assign(navigator, { clipboard: { writeText, readText: vi.fn() } });
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('storage denied');
+    });
+
+    const { result } = renderHook(() => useClipboard({
+      nodesRef: { current: selectedNodes },
+      edgesRef: { current: [] },
+      selectedNodes,
+      selectedEdges: [],
+      setNodes,
+      setEdges,
+      takeSnapshot,
+      getOperationScope,
+    }));
+
+    await expect(result.current.handleCut()).resolves.toBe('failed');
+
+    expect(writeText).toHaveBeenCalledOnce();
+    expect(takeSnapshot).not.toHaveBeenCalled();
+    expect(setNodes).not.toHaveBeenCalled();
+    expect(setEdges).not.toHaveBeenCalled();
+  });
+
+  it('cuts after the system clipboard succeeds when local persistence is unavailable', async () => {
+    const nodesRef = { current: selectedNodes };
+    const edgesRef = { current: [] as Edge[] };
+    const setNodes = vi.fn();
+    const setEdges = vi.fn();
+    const takeSnapshot = vi.fn();
+    Object.assign(navigator, {
+      clipboard: { writeText: vi.fn().mockResolvedValue(undefined), readText: vi.fn() },
+    });
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('storage denied');
+    });
+
+    const { result } = renderHook(() => useClipboard({
+      nodesRef,
+      edgesRef,
+      selectedNodes,
+      selectedEdges: [],
+      setNodes,
+      setEdges,
+      takeSnapshot,
+      getOperationScope,
+    }));
+
+    await expect(result.current.handleCut()).resolves.toBe('cut');
+
+    expect(takeSnapshot).toHaveBeenCalledWith(selectedNodes, []);
+    expect(nodesRef.current).toEqual([]);
+    expect(setNodes).toHaveBeenCalledWith([]);
+    expect(setEdges).toHaveBeenCalledWith([]);
+  });
+
+  it('cancels a pending cut when the active page or diagram scope changes', async () => {
+    let currentScope = 'diagram-1:page-1';
+    let resolveWrite: (() => void) | undefined;
+    const writeText = vi.fn(() => new Promise<void>((resolve) => {
+      resolveWrite = resolve;
+    }));
+    Object.assign(navigator, { clipboard: { writeText, readText: vi.fn() } });
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('storage denied');
+    });
+    const setNodes = vi.fn();
+    const setEdges = vi.fn();
+    const takeSnapshot = vi.fn();
+    const { result } = renderHook(() => useClipboard({
+      nodesRef: { current: selectedNodes },
+      edgesRef: { current: [] },
+      selectedNodes,
+      selectedEdges: [],
+      setNodes,
+      setEdges,
+      takeSnapshot,
+      getOperationScope: () => currentScope,
+    }));
+
+    const cutPromise = result.current.handleCut();
+    currentScope = 'diagram-1:page-2';
+    resolveWrite?.();
+
+    await expect(cutPromise).resolves.toBe('scope-changed');
+    expect(takeSnapshot).not.toHaveBeenCalled();
+    expect(setNodes).not.toHaveBeenCalled();
+    expect(setEdges).not.toHaveBeenCalled();
   });
 
   it('cancels a pending paste when the active page or diagram scope changes', async () => {

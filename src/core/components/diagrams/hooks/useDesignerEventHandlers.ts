@@ -183,7 +183,7 @@ export function useDesignerEventHandlers({
         onSelectAll: handleSelectAll,
         onCopy: () => { if (!isDraggingRef.current) handleCopyWithToast(); },
         onPaste: () => { if (editingEnabled) void handlePasteWithToast(); },
-        onCut: () => { if (editingEnabled && !isDraggingRef.current) handleCutWithToast(); },
+        onCut: () => { if (editingEnabled && !isDraggingRef.current) void handleCutWithToast(); },
         onGroup: () => { if (editingEnabled) handleGroupWithToast(); },
         onUngroup: () => { if (editingEnabled) handleUngroupWithToast(); },
         onNudge: handleNudge,

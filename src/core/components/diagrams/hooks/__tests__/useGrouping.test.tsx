@@ -75,11 +75,25 @@ describe('useGrouping mutation boundaries', () => {
         act(() => state.result.current.handleUngroup([group.id]));
 
         expect(state.takeSnapshot).toHaveBeenCalledTimes(1);
-        const updater = state.setNodes.mock.calls[0]?.[0] as (current: Node[]) => Node[];
-        expect(updater([group, child, unrelated])).toEqual([
+        expect(state.setNodes).toHaveBeenCalledWith([
             expect.objectContaining({ id: child.id, position: { x: 120, y: 110 } }),
             unrelated,
         ]);
         expect(state.setSelectedNodes).toHaveBeenCalledWith([]);
+    });
+
+    it('ungroups nested selected containers without leaving a dangling parent', () => {
+        const outer = node('outer', { type: 'titleGroup', position: { x: 100, y: 80 } });
+        const inner = node('inner', { type: 'subGroup', parentId: outer.id, position: { x: 20, y: 30 } });
+        const child = node('child', { parentId: inner.id, position: { x: 5, y: 7 }, extent: 'parent' });
+        const state = setup([outer, inner, child], [outer, inner]);
+
+        act(() => state.result.current.handleUngroup());
+
+        expect(state.setNodes).toHaveBeenCalledWith([
+            expect.objectContaining({ id: child.id, position: { x: 125, y: 117 } }),
+        ]);
+        const promotedChild = state.setNodes.mock.calls[0]?.[0]?.[0] as Node;
+        expect(promotedChild).not.toHaveProperty('parentId');
     });
 });

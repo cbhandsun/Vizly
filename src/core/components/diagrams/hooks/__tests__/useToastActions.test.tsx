@@ -6,13 +6,16 @@ import type { Edge, Node } from '@xyflow/react';
 import type { MessageInstance } from 'antd/es/message/interface';
 import type { NotificationInstance } from 'antd/es/notification/interface';
 import { useToastActions } from '../useToastActions';
-import type { ClipboardPasteResult } from '../useClipboard';
+import type { ClipboardCutResult, ClipboardPasteResult } from '../useClipboard';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
-const createProps = (handlePaste: () => Promise<ClipboardPasteResult>) => {
+const createProps = (
+  handlePaste: () => Promise<ClipboardPasteResult>,
+  handleCut: () => Promise<ClipboardCutResult> = vi.fn().mockResolvedValue('cut'),
+) => {
   const info = vi.fn();
   const open = vi.fn();
   const destroy = vi.fn();
@@ -34,7 +37,7 @@ const createProps = (handlePaste: () => Promise<ClipboardPasteResult>) => {
       handleDuplicate: vi.fn(),
       handleCopy: vi.fn(),
       handlePaste,
-      handleCut: vi.fn(),
+      handleCut,
       handleGroup: vi.fn(),
       handleUngroup: vi.fn(),
       onContextMenuAction: vi.fn(),
@@ -206,6 +209,32 @@ describe('useToastActions clipboard feedback', () => {
 
     expect(warning).toHaveBeenCalledWith('designer.flowchart.toast.unsupportedClipboard');
     expect(info).not.toHaveBeenCalled();
+  });
+
+  it('explains that a failed cut kept the selected nodes intact', async () => {
+    const handleCut = vi.fn().mockResolvedValue('failed');
+    const { props, warning } = createProps(vi.fn().mockResolvedValue('empty'), handleCut);
+    props.selectedNodes = [{ id: 'node-1', position: { x: 0, y: 0 }, data: {} }];
+    const { result } = renderHook(() => useToastActions(props));
+
+    await act(async () => {
+      await result.current.handleCutWithToast();
+    });
+
+    expect(warning).toHaveBeenCalledWith('designer.flowchart.toast.clipboardWriteFailed');
+  });
+
+  it('explains when a pending cut is cancelled by a page or diagram change', async () => {
+    const handleCut = vi.fn().mockResolvedValue('scope-changed');
+    const { props, warning } = createProps(vi.fn().mockResolvedValue('empty'), handleCut);
+    props.selectedNodes = [{ id: 'node-1', position: { x: 0, y: 0 }, data: {} }];
+    const { result } = renderHook(() => useToastActions(props));
+
+    await act(async () => {
+      await result.current.handleCutWithToast();
+    });
+
+    expect(warning).toHaveBeenCalledWith('designer.flowchart.toast.cutScopeChanged');
   });
 
   it('explains when a pending paste is cancelled by a page or diagram change', async () => {

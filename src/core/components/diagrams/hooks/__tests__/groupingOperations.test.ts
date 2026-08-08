@@ -1,7 +1,7 @@
 import type { Edge, Node } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
 
-import { createGroupingPlan, deselectEdgesForGrouping } from '../groupingOperations';
+import { createGroupingPlan, createUngroupingPlan, deselectEdgesForGrouping } from '../groupingOperations';
 
 const node = (
     id: string,
@@ -117,5 +117,57 @@ describe('deselectEdgesForGrouping', () => {
 
         expect(deselectEdgesForGrouping(edges)).toBe(edges);
         expect(deselectEdgesForGrouping([])).toEqual([]);
+    });
+});
+
+describe('createUngroupingPlan', () => {
+    it('promotes descendants through every removed nested group', () => {
+        const outer = node('outer', 100, 80, { type: 'titleGroup' });
+        const inner = node('inner', 20, 30, { type: 'subGroup', parentId: outer.id });
+        const child = node('child', 5, 7, {
+            parentId: inner.id,
+            extent: 'parent',
+            expandParent: true,
+        });
+
+        const result = createUngroupingPlan({
+            nodes: [outer, inner, child],
+            groupIds: new Set([outer.id, inner.id]),
+        });
+
+        expect(result).toEqual([
+            expect.objectContaining({ id: child.id, position: { x: 125, y: 117 } }),
+        ]);
+        expect(result?.[0]).not.toHaveProperty('parentId');
+        expect(result?.[0]).not.toHaveProperty('extent');
+        expect(result?.[0]).not.toHaveProperty('expandParent');
+    });
+
+    it('keeps the nearest surviving ancestor when only an inner group is removed', () => {
+        const outer = node('outer', 100, 80, { type: 'titleGroup' });
+        const inner = node('inner', 20, 30, { type: 'subGroup', parentId: outer.id });
+        const child = node('child', 5, 7, { parentId: inner.id, extent: 'parent' });
+
+        const result = createUngroupingPlan({
+            nodes: [outer, inner, child],
+            groupIds: new Set([inner.id]),
+        });
+
+        expect(result).toEqual([
+            outer,
+            expect.objectContaining({
+                id: child.id,
+                parentId: outer.id,
+                extent: 'parent',
+                position: { x: 25, y: 37 },
+            }),
+        ]);
+    });
+
+    it('returns null when no requested container exists', () => {
+        expect(createUngroupingPlan({
+            nodes: [node('plain', 0, 0)],
+            groupIds: new Set(['missing']),
+        })).toBeNull();
     });
 });

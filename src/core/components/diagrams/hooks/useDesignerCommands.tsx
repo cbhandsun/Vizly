@@ -20,7 +20,7 @@ interface UseDesignerCommandsProps {
     redo: () => void;
     handleCopyWithToast: () => void;
     handlePasteWithToast: () => void;
-    handleCutWithToast: () => void;
+    handleCutWithToast: () => Promise<void>;
     handleDeleteWithToast: (targetId?: string) => void;
     handleDuplicateWithToast: (targetId?: string) => void;
     handleSelectAll: () => void;
@@ -143,7 +143,7 @@ export function useDesignerCommands(props: UseDesignerCommandsProps) {
             { id: 'edit.redo', label: t('designer.flowchart.commands.redo'), category: 'General', shortcut: isMac ? `${mod} + Shift + Z` : `${mod} + Y`, enabled: editingEnabled && canRedo, action: () => { if (editingEnabled) redo(); } },
             { id: 'edit.copy', label: t('designer.flowchart.commands.copy'), category: 'General', shortcut: `${mod} + C`, icon: <FaCopy />, action: handleCopyWithToast },
             { id: 'edit.paste', label: t('designer.flowchart.commands.paste'), category: 'General', shortcut: `${mod} + V`, enabled: editingEnabled, action: () => { if (editingEnabled) handlePasteWithToast(); } },
-            { id: 'edit.cut', label: t('designer.flowchart.commands.cut'), category: 'General', shortcut: `${mod} + X`, enabled: editingEnabled && !hasLockedSelection, action: () => { if (editingEnabled) handleCutWithToast(); } },
+            { id: 'edit.cut', label: t('designer.flowchart.commands.cut'), category: 'General', shortcut: `${mod} + X`, enabled: editingEnabled && !hasLockedSelection, action: () => { if (editingEnabled) void handleCutWithToast(); } },
             { id: 'edit.delete', label: t('designer.flowchart.commands.deleteSelected'), category: 'General', shortcut: t('designer.flowchart.commands.deleteShortcut'), icon: <FaTrash />, enabled: editingEnabled && !hasLockedSelection, action: () => { if (editingEnabled) handleDeleteWithToast(); } },
             { id: 'edit.duplicate', label: t('designer.flowchart.commands.duplicate'), category: 'General', shortcut: `${mod} + D`, enabled: editingEnabled && !hasLockedSelection, action: () => { if (editingEnabled) handleDuplicateWithToast(); } },
             { id: 'edit.selectAll', label: t('designer.flowchart.commands.selectAll'), category: 'General', shortcut: `${mod} + A`, action: handleSelectAll },

@@ -35,6 +35,7 @@ interface UseClipboardProps {
 }
 
 export type ClipboardPasteResult = 'pasted' | 'empty' | 'unsupported' | 'scope-changed';
+export type ClipboardCutResult = 'cut' | 'empty' | 'locked' | 'failed' | 'scope-changed';
 
 const PASTE_OFFSET = 20;
 
@@ -57,8 +58,8 @@ export const useClipboard = ({
 }: UseClipboardProps) => {
     const pasteCursorRef = useRef<ClipboardPasteCursor | null>(null);
 
-    const handleCopy = useCallback(() => {
-        if (selectedNodes.length === 0) return;
+    const writeSelectedNodesToClipboard = useCallback(async (): Promise<boolean> => {
+        if (selectedNodes.length === 0) return false;
 
         const clipboardData: ClipboardData = buildFlowchartClipboardData(
             selectedNodes,
@@ -71,25 +72,50 @@ export const useClipboard = ({
             serializedClipboard = JSON.stringify(clipboardData);
         } catch (error) {
             logClipboardWriteFailure(error);
-            return;
+            return false;
         }
 
-        pasteCursorRef.current = null;
+        let persistedLocally = false;
 
         try {
             localStorage.setItem(clipboardKey, serializedClipboard);
+            persistedLocally = true;
         } catch (error) {
             logClipboardWriteFailure(error);
         }
 
-        // 两个剪贴板通道相互独立：本地存储失败时仍应保留跨应用复制能力。
+        // 本地通道成功即可立即完成；系统通道继续独立写入以支持跨应用粘贴。
         if (navigator.clipboard && window.isSecureContext) {
-            void navigator.clipboard.writeText(serializedClipboard)
-                .catch((error) => {
-                    logClipboardSystemWriteFailure(error);
-                });
+            let systemWrite: Promise<void>;
+            try {
+                systemWrite = navigator.clipboard.writeText(serializedClipboard);
+            } catch (error) {
+                logClipboardSystemWriteFailure(error);
+                if (persistedLocally) pasteCursorRef.current = null;
+                return persistedLocally;
+            }
+            if (persistedLocally) {
+                pasteCursorRef.current = null;
+                void systemWrite.catch(logClipboardSystemWriteFailure);
+                return true;
+            }
+
+            try {
+                await systemWrite;
+                pasteCursorRef.current = null;
+                return true;
+            } catch (error) {
+                logClipboardSystemWriteFailure(error);
+            }
         }
+
+        if (persistedLocally) pasteCursorRef.current = null;
+        return persistedLocally;
     }, [clipboardKey, edgesRef, nodesRef, selectedNodes]);
+
+    const handleCopy = useCallback(() => {
+        void writeSelectedNodesToClipboard();
+    }, [writeSelectedNodesToClipboard]);
 
     /**
      * 尝试解析文本为 ClipboardData
@@ -185,24 +211,40 @@ export const useClipboard = ({
         return 'pasted';
     }, [clipboardKey, edgesRef, getOperationScope, nodesRef, parseClipboardText, setEdges, setNodes, takeSnapshot]);
 
-    const handleCut = useCallback(() => {
+    const handleCut = useCallback(async (): Promise<ClipboardCutResult> => {
         // 连线没有可独立粘贴的载荷；与右键菜单一致，禁止仅剪切连线后不可恢复地删除。
-        if (selectedNodes.length === 0) return;
-        if (hasMutationLockedNode(selectedNodes)) return;
+        if (selectedNodes.length === 0) return 'empty';
+        if (hasMutationLockedNode(selectedNodes)) return 'locked';
 
-        handleCopy();
-        takeSnapshot(nodesRef.current, edgesRef.current);
+        const operationScope = getOperationScope();
+        const copied = await writeSelectedNodesToClipboard();
+        if (operationScope !== getOperationScope()) return 'scope-changed';
+        if (!copied) return 'failed';
+
+        const currentNodes = nodesRef.current;
+        const currentEdges = edgesRef.current;
 
         const selectedNodeIds = new Set(selectedNodes.map(n => n.id));
         const selectedEdgeIds = new Set(selectedEdges.map(e => e.id));
+        const currentSelection = currentNodes.filter(node => selectedNodeIds.has(node.id));
+        if (currentSelection.length === 0) return 'empty';
+        if (hasMutationLockedNode(currentSelection)) return 'locked';
 
-        setNodes(nds => nds.filter(n => !selectedNodeIds.has(n.id)));
-        setEdges(eds => eds.filter(e =>
-            !selectedEdgeIds.has(e.id) &&
-            !selectedNodeIds.has(e.source) &&
-            !selectedNodeIds.has(e.target)
-        ));
-    }, [edgesRef, handleCopy, nodesRef, selectedEdges, selectedNodes, setEdges, setNodes, takeSnapshot]);
+        takeSnapshot(currentNodes, currentEdges);
+
+        const nextNodes = currentNodes.filter(node => !selectedNodeIds.has(node.id));
+        const nextEdges = currentEdges.filter(edge =>
+            !selectedEdgeIds.has(edge.id) &&
+            !selectedNodeIds.has(edge.source) &&
+            !selectedNodeIds.has(edge.target)
+        );
+
+        nodesRef.current = nextNodes;
+        edgesRef.current = nextEdges;
+        setNodes(nextNodes);
+        setEdges(nextEdges);
+        return 'cut';
+    }, [edgesRef, getOperationScope, nodesRef, selectedEdges, selectedNodes, setEdges, setNodes, takeSnapshot, writeSelectedNodesToClipboard]);
 
     return { handleCopy, handlePaste, handleCut };
 };

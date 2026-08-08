@@ -5,7 +5,7 @@ import type { Node, Edge } from '@xyflow/react';
 import type { MessageInstance } from 'antd/es/message/interface';
 import type { NotificationInstance } from 'antd/es/notification/interface';
 import type { DiagramActionTarget } from './useDiagramActions';
-import type { ClipboardPasteResult } from './useClipboard';
+import type { ClipboardCutResult, ClipboardPasteResult } from './useClipboard';
 import { hasMutationLockedNode, resolveTargetNodes } from '../nodeLockPolicy';
 
 /**
@@ -23,7 +23,7 @@ interface UseToastActionsProps {
     // Clipboard actions
     handleCopy: () => void;
     handlePaste: () => Promise<ClipboardPasteResult>;
-    handleCut: () => void;
+    handleCut: () => Promise<ClipboardCutResult>;
     // Group actions
     handleGroup: () => void;
     handleUngroup: (targetNodeIds?: string[]) => void;
@@ -123,7 +123,7 @@ export function useToastActions({
         }
     }, [handlePaste, messageApi, t]);
 
-    const handleCutWithToast = useCallback(() => {
+    const handleCutWithToast = useCallback(async () => {
         if (selectedNodes.length === 0) {
             messageApi.info(t('designer.flowchart.toast.nothingToCut'));
             return;
@@ -132,7 +132,20 @@ export function useToastActions({
             messageApi.warning(t('designer.flowchart.toast.lockedSelection', '节点已锁定，请先解锁后再操作'));
             return;
         }
-        handleCut();
+        const result = await handleCut();
+        if (result === 'failed') {
+            messageApi.warning(t(
+                'designer.flowchart.toast.clipboardWriteFailed',
+                '无法写入剪贴板，已保留所选节点，请检查浏览器权限后重试',
+            ));
+            return;
+        }
+        if (result === 'scope-changed') {
+            messageApi.warning(t(
+                'designer.flowchart.toast.cutScopeChanged',
+                '页面或图表已切换，剪切已取消，请重试',
+            ));
+        }
     }, [handleCut, messageApi, selectedNodes, t]);
 
     // --- Delete / Duplicate ---

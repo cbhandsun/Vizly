@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { Node, Edge } from '@xyflow/react';
-import { createGroupingPlan, deselectEdgesForGrouping } from './groupingOperations';
+import { createGroupingPlan, createUngroupingPlan, deselectEdgesForGrouping } from './groupingOperations';
 import { hasMutationLockedNode, resolveTargetNodes } from '../nodeLockPolicy';
 
 interface UseGroupingProps {
@@ -64,46 +64,12 @@ export const useGrouping = ({
         const affectedNodes = nodes.filter(node => groupIds.has(node.id) || (node.parentId ? groupIds.has(node.parentId) : false));
         if (hasMutationLockedNode(affectedNodes)) return;
 
+        const nextNodes = createUngroupingPlan({ nodes, groupIds });
+        if (!nextNodes) return;
+
         takeSnapshot(nodes, edges);
-
-        setNodes(nds => {
-            let nextNodes = [...nds];
-            // Process children
-            nextNodes = nextNodes.map(n => {
-                if (n.parentId && groupIds.has(n.parentId)) {
-                    const parentGroup = groupsToUngroup.find(g => g.id === n.parentId);
-                    if (parentGroup) {
-                        const newParentId = parentGroup.parentId;
-                        const newPosition = {
-                            x: n.position.x + parentGroup.position.x,
-                            y: n.position.y + parentGroup.position.y
-                        };
-
-                        const { parentId: _pid, extent: _ext, ...rest } = n;
-
-                        if (newParentId) {
-                            return {
-                                ...rest,
-                                parentId: newParentId,
-                                extent: 'parent' as const,
-                                position: newPosition
-                            };
-                        } else {
-                            return {
-                                ...rest,
-                                position: newPosition
-                            };
-                        }
-                    }
-                }
-                return n;
-            });
-
-            // Remove groups
-            const ungroupedNodes = nextNodes.filter(n => !groupIds.has(n.id));
-            if (nodesRef) nodesRef.current = ungroupedNodes;
-            return ungroupedNodes;
-        });
+        if (nodesRef) nodesRef.current = nextNodes;
+        setNodes(nextNodes);
 
         setEdges(currentEdges => {
             const nextEdges = deselectEdgesForGrouping(currentEdges);
