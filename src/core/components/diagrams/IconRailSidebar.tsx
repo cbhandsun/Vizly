@@ -31,6 +31,8 @@ import {
     type IconRailDrawerFocusTarget,
 } from './iconRailKeyboard';
 import {
+    countNavigatorSearchMatches,
+    normalizeNavigatorSearchQuery,
     resolveNavigatorNodeLabel,
     resolveNavigatorNodeTypeLabelKey,
     resolveNavigatorSearchText,
@@ -138,6 +140,7 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
     const drawerFocusTargetRef = useRef<IconRailDrawerFocusTarget>('default');
     const drawerId = React.useId();
     const drawerTitleId = React.useId();
+    const navigatorSearchStatusId = React.useId();
     const [searchTerm, setSearchTerm] = useState('');
     const panelZoom = usePanelZoom({ storageKey: 'designer.sidebar.zoom', defaultScale: 1, minScale: 0.75, maxScale: 1.35 });
     const getPluginPanelTitle = useCallback((panel: { id: string; title: string }) => {
@@ -168,7 +171,7 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
         });
 
         const expandedKeys: string[] = [];
-        const term = searchTerm.toLowerCase();
+        const term = normalizeNavigatorSearchQuery(searchTerm);
 
         const filterTree = (nodesToFilter: NavigatorNode[]): NavigatorTreeNode[] => {
             return nodesToFilter.flatMap(item => {
@@ -198,6 +201,11 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
 
         return { treeData: filterTree(roots), expandedKeys };
     }, [nodes, searchTerm, activePanel]);
+    const navigatorSearchQuery = normalizeNavigatorSearchQuery(searchTerm);
+    const navigatorSearchMatchCount = useMemo(
+        () => countNavigatorSearchMatches(navigatorTreeData),
+        [navigatorTreeData],
+    );
     const navigatorSelectedKeys = useMemo(
         () => nodes.filter(node => node.selected).map(node => node.id),
         [nodes],
@@ -382,13 +390,28 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
                         <div className="side-drawer-search">
                             <Input
                                 prefix={<FaSearch style={{ color: token.colorTextDescription }} />}
-                                placeholder={t('designer.sidebar.search')}
-                                aria-label={t('designer.sidebar.search')}
+                                placeholder={t('designer.sidebar.searchNodes')}
+                                aria-label={t('designer.sidebar.searchNodes')}
+                                aria-describedby={navigatorSearchQuery ? navigatorSearchStatusId : undefined}
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
+                                maxLength={256}
                                 allowClear={{ clearIcon: <AccessibleInputClearIcon label={t('designer.sidebar.clearSearch')} /> }}
                                 size="small"
                             />
+                            {navigatorSearchQuery ? (
+                                <Text
+                                    id={navigatorSearchStatusId}
+                                    role="status"
+                                    aria-live="polite"
+                                    className="navigator-search-status"
+                                    type="secondary"
+                                >
+                                    {t('designer.sidebar.searchResultsStatus', {
+                                        count: navigatorSearchMatchCount,
+                                    })}
+                                </Text>
+                            ) : null}
                         </div>
                         <div style={{ flex: 1, overflowY: 'auto', padding: '0 8px' }}>
                             {navigatorTreeData.length > 0 ? (

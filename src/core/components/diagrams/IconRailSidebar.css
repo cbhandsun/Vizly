@@ -170,6 +170,14 @@
     padding: 0 0 10px 0;
 }
 
+.side-drawer .navigator-search-status {
+    display: block;
+    min-height: 17px;
+    margin-top: 6px;
+    font-size: 12px;
+    line-height: 17px;
+}
+
 /* ============================================
    深色模式
    ============================================ */

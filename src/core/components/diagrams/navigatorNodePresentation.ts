@@ -1,5 +1,10 @@
 const MAX_NAVIGATOR_TEXT_LENGTH = 256;
 
+type NavigatorSearchTreeNode = {
+    isMatched: boolean;
+    children?: readonly NavigatorSearchTreeNode[];
+};
+
 type NavigatorNodeLike = {
     id: string;
     type?: string;
@@ -59,3 +64,15 @@ export const resolveNavigatorSearchText = (node: NavigatorNodeLike): string => {
         readText(node.id),
     ].filter(Boolean).join(' ').toLocaleLowerCase();
 };
+
+export const normalizeNavigatorSearchQuery = (value: string): string =>
+    value.trim().slice(0, MAX_NAVIGATOR_TEXT_LENGTH).toLocaleLowerCase();
+
+export const countNavigatorSearchMatches = (
+    nodes: readonly NavigatorSearchTreeNode[]
+): number => nodes.reduce(
+    (count, node) => count
+        + (node.isMatched ? 1 : 0)
+        + countNavigatorSearchMatches(node.children ?? []),
+    0,
+);

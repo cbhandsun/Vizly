@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+    countNavigatorSearchMatches,
+    normalizeNavigatorSearchQuery,
     resolveNavigatorNodeLabel,
     resolveNavigatorNodeTypeLabelKey,
     resolveNavigatorSearchText,
@@ -54,5 +56,24 @@ describe('navigator node presentation', () => {
         expect(resolveNavigatorNodeTypeLabelKey('stickyNote')).toBe('note');
         expect(resolveNavigatorNodeTypeLabelKey('custom')).toBe('customNode');
         expect(resolveNavigatorNodeTypeLabelKey(undefined)).toBe('customNode');
+    });
+
+    it('normalizes bounded user-entered search text', () => {
+        expect(normalizeNavigatorSearchQuery('  LoGiStIcS  ')).toBe('logistics');
+        expect(normalizeNavigatorSearchQuery('   ')).toBe('');
+        expect(normalizeNavigatorSearchQuery('X'.repeat(300))).toHaveLength(256);
+    });
+
+    it('counts only actual matches while preserving hierarchy context', () => {
+        expect(countNavigatorSearchMatches([
+            {
+                isMatched: false,
+                children: [
+                    { isMatched: true },
+                    { isMatched: false, children: [{ isMatched: true }] },
+                ],
+            },
+        ])).toBe(2);
+        expect(countNavigatorSearchMatches([])).toBe(0);
     });
 });
