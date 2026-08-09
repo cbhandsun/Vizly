@@ -276,6 +276,18 @@ describe('PageTabs', () => {
         expect(pageTabsCss).toMatch(/\.page-tabs__rename-error\s*\{[\s\S]*?bottom:\s*calc\(100% \+ 8px\);/);
         expect(pageTabsCss).toMatch(/\.page-tabs\s*\{[\s\S]*?overflow:\s*visible;/);
         expect(pageTabsCss).toMatch(/\.page-tabs__item\s*\{[\s\S]*?overflow:\s*visible;/);
+        expect(pageTabsCss).toMatch(
+            /@media \(max-width: 480px\)[\s\S]*?\.page-tabs\s*\{[\s\S]*?display:\s*grid;[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\) auto auto;/,
+        );
+        expect(pageTabsCss).toMatch(
+            /@media \(max-width: 480px\)[\s\S]*?\.page-tabs__scroller\s*\{[\s\S]*?grid-row:\s*1;[\s\S]*?grid-column:\s*1;[\s\S]*?width:\s*100%;/,
+        );
+        expect(pageTabsCss).toMatch(
+            /@media \(max-width: 480px\)[\s\S]*?\.page-tabs__actions\s*\{[\s\S]*?grid-row:\s*2;[\s\S]*?grid-column:\s*1 \/ -1;[\s\S]*?width:\s*100%;[\s\S]*?justify-content:\s*flex-end;[\s\S]*?border-left:\s*0;/,
+        );
+        expect(pageTabsCss).toMatch(
+            /@media \(max-width: 480px\)[\s\S]*?\.page-tabs__restore\s*\{[\s\S]*?grid-column:\s*2;[\s\S]*?\.page-tabs__add\s*\{[\s\S]*?grid-column:\s*3;/,
+        );
     });
 
     it('cancels inline rename with Escape and restores tab focus', async () => {
