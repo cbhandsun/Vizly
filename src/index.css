@@ -113,7 +113,8 @@
 }
 
 .commercial-viewport-modal .ant-modal-close,
-.commercial-viewport-modal .ant-modal-footer .ant-btn {
+.commercial-viewport-modal .ant-modal-footer .ant-btn,
+.commercial-viewport-modal .ant-modal-confirm-btns .ant-btn {
   min-width: 44px;
   min-height: 44px;
 }

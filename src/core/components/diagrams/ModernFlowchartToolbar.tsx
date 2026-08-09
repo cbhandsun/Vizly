@@ -20,6 +20,11 @@ import { DropdownMenuTriggerButton } from './DropdownMenuTriggerButton';
 import { buildFlowchartLayoutMenuModel } from './flowchartToolbarLayoutMenu';
 import { buildToolModeMenuItems, resolveActiveToolModeKey } from './flowchartToolbarToolModeMenu';
 import { useKeyboardAccessibleDropdown } from './hooks/useKeyboardAccessibleDropdown';
+import {
+    COMMERCIAL_VIEWPORT_MODAL_CLASS,
+    COMMERCIAL_VIEWPORT_MODAL_Z_INDEX,
+    getViewportOverlayContainer,
+} from '../ui/viewportOverlayPortal';
 
 interface FlowchartToolbarProps {
     canUndo: boolean;
@@ -219,6 +224,10 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
             content: t('designer.toolbar.clearCacheContent'),
             okText: t('designer.toolbar.clearCacheConfirm'),
             cancelText: t('common.cancel'),
+            autoFocusButton: 'cancel',
+            rootClassName: `${COMMERCIAL_VIEWPORT_MODAL_CLASS} local-editor-reset-confirm`,
+            getContainer: getViewportOverlayContainer,
+            zIndex: COMMERCIAL_VIEWPORT_MODAL_Z_INDEX,
             okButtonProps: { danger: true },
             afterClose: () => {
                 window.setTimeout(() => {

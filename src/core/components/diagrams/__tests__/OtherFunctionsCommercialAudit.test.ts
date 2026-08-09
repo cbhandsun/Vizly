@@ -112,6 +112,17 @@ describe('other-function commercial interaction safeguards', () => {
         expect(globalCss).toMatch(/\.commercial-viewport-modal \.ant-modal-close,[\s\S]*?min-height: 44px/);
     });
 
+    it('keeps destructive reset confirmation cancel-first and touch-safe', () => {
+        const source = readSource('../ModernFlowchartToolbar.tsx');
+        const globalCss = readSource('../../../../index.css');
+
+        expect(source).toContain("autoFocusButton: 'cancel'");
+        expect(source).toContain('rootClassName: `${COMMERCIAL_VIEWPORT_MODAL_CLASS} local-editor-reset-confirm`');
+        expect(source).toContain('getContainer: getViewportOverlayContainer');
+        expect(source).toContain('zIndex: COMMERCIAL_VIEWPORT_MODAL_Z_INDEX');
+        expect(globalCss).toMatch(/\.commercial-viewport-modal \.ant-modal-confirm-btns \.ant-btn[\s\S]*?min-height: 44px/);
+    });
+
     it('keeps AI panel header actions physically touch-safe under UI scaling', () => {
         const source = readSource('../../../../components/ai/AIChatViewLayout.tsx');
         const css = readSource('../../../../components/ai/AIChatPanel.css');

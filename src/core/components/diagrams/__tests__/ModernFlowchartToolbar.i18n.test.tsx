@@ -118,7 +118,7 @@ describe('ModernFlowchartToolbar localized workflows', () => {
         expect(screen.queryByText('便签 (S)')).toBeNull();
     });
 
-    it('restores focus to More Actions after the reset confirmation closes', async () => {
+    it('defaults destructive reset to cancel and restores focus to More Actions after close', async () => {
         renderToolbar();
 
         const trigger = await screen.findByRole('button', { name: 'More Actions' });
@@ -126,7 +126,18 @@ describe('ModernFlowchartToolbar localized workflows', () => {
         fireEvent.click(await screen.findByRole('menuitem', { name: 'Reset Local Editor State' }));
 
         expect(mocks.confirm).toHaveBeenCalledTimes(1);
-        const options = mocks.confirm.mock.calls[0]?.[0] as { afterClose?: () => void };
+        const options = mocks.confirm.mock.calls[0]?.[0] as {
+            afterClose?: () => void;
+            autoFocusButton?: 'ok' | 'cancel' | null;
+            getContainer?: () => HTMLElement;
+            rootClassName?: string;
+            zIndex?: number;
+        };
+        expect(options.autoFocusButton).toBe('cancel');
+        expect(options.getContainer?.()).toBe(document.body);
+        expect(options.rootClassName).toContain('commercial-viewport-modal');
+        expect(options.rootClassName).toContain('local-editor-reset-confirm');
+        expect(options.zIndex).toBe(2200);
         expect(options.afterClose).toBeTypeOf('function');
 
         vi.useFakeTimers();
