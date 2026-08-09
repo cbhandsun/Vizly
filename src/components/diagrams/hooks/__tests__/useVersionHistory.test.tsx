@@ -118,6 +118,23 @@ describe('useVersionHistory', () => {
         await waitFor(() => expect(result.current.previewVersion).toBeNull());
     });
 
+    it('exposes a persistent load error and clears it after a successful retry', async () => {
+        storageMocks.listVersions.mockRejectedValueOnce(new Error('offline'));
+        const { result } = renderHook(() => useVersionHistory('diagram-1'));
+
+        await waitFor(() => expect(result.current.loadError).toBe(true));
+        expect(result.current.versions).toEqual([]);
+        expect(messageMocks.error).toHaveBeenCalledWith('Failed to load version history');
+
+        storageMocks.listVersions.mockResolvedValueOnce([makeVersion()]);
+        await act(async () => {
+            await result.current.loadVersions();
+        });
+
+        expect(result.current.loadError).toBe(false);
+        expect(result.current.versions).toHaveLength(1);
+    });
+
     it('ignores a preview payload that finishes after preview was cancelled', async () => {
         let resolveVersion: ((version: ReturnType<typeof makeVersion>) => void) | undefined;
         storageMocks.loadVersion.mockImplementation(() => new Promise((resolve) => {

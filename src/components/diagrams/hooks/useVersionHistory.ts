@@ -26,6 +26,7 @@ export function useVersionHistory(diagramId: string) {
     const { t } = useTranslation();
     const [versions, setVersions] = useState<DiagramVersion[]>([]);
     const [loading, setLoading] = useState(false);
+    const [loadError, setLoadError] = useState(false);
     const [previewVersion, setPreviewVersion] = useState<DiagramVersion | null>(null);
     const previewBaseRef = useRef<{ nodes: Node[]; edges: Edge[] } | null>(null);
     const previewRequestIdRef = useRef(0);
@@ -33,11 +34,13 @@ export function useVersionHistory(diagramId: string) {
     const loadVersions = useCallback(async () => {
         if (!diagramId) return;
         setLoading(true);
+        setLoadError(false);
         try {
             const unifiedStorage = await loadUnifiedStorage();
             const data = await unifiedStorage.listVersions(diagramId);
             setVersions(data);
         } catch (error) {
+            setLoadError(true);
             logVersionHistoryLoadFailure(error);
             appMessage.error(t('designer.versionHistoryPanel.loadFailed'));
         } finally {
@@ -203,6 +206,7 @@ export function useVersionHistory(diagramId: string) {
     return {
         versions,
         loading,
+        loadError,
         previewVersion,
         loadVersions,
         saveVersion,

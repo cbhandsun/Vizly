@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Drawer, Button, Input, List, Typography, Space, Tooltip, Badge, Popconfirm } from 'antd';
-import { PlusOutlined, UndoOutlined, EyeOutlined } from '@ant-design/icons';
+import { Alert, Drawer, Button, Input, List, Typography, Space, Tooltip, Badge, Popconfirm } from 'antd';
+import { PlusOutlined, ReloadOutlined, UndoOutlined, EyeOutlined } from '@ant-design/icons';
 import { Clock } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useVersionHistory } from '../hooks/useVersionHistory';
@@ -31,7 +31,9 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
     const {
         versions,
         loading,
+        loadError,
         previewVersion,
+        loadVersions,
         saveVersion,
         enterPreview,
         exitPreview,
@@ -205,7 +207,28 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
                 loading={loading}
                 itemLayout="horizontal"
                 dataSource={versions}
-                locale={{ emptyText: t('designer.versionHistoryPanel.empty') }}
+                locale={{
+                    emptyText: loadError ? (
+                        <Alert
+                            className="version-history-load-error"
+                            role="alert"
+                            type="error"
+                            showIcon
+                            title={t('designer.versionHistoryPanel.loadErrorTitle')}
+                            description={t('designer.versionHistoryPanel.loadErrorDescription')}
+                            action={(
+                                <Button
+                                    icon={<ReloadOutlined />}
+                                    aria-label={t('designer.versionHistoryPanel.retry')}
+                                    loading={loading}
+                                    onClick={() => void loadVersions()}
+                                >
+                                    {t('designer.versionHistoryPanel.retry')}
+                                </Button>
+                            )}
+                        />
+                    ) : t('designer.versionHistoryPanel.empty'),
+                }}
                 style={{ flex: 1, overflowY: 'auto' }}
                 renderItem={(item, index) => {
                     const isLatest = index === 0;

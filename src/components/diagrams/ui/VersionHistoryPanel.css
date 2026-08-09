@@ -26,6 +26,15 @@
     font-size: 12px;
 }
 
+.version-history-load-error {
+    margin: 24px 20px;
+    text-align: start;
+}
+
+.version-history-load-error .ant-alert-actions .ant-btn {
+    min-height: var(--commercial-touch-target, 44px);
+}
+
 .version-history-list-item .ant-list-item-action {
     display: flex;
     gap: 4px;

@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 
 import React from 'react';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -33,6 +35,9 @@ vi.mock('react-i18next', () => ({
                 'designer.versionHistoryPanel.unnamed': 'Unnamed snapshot',
                 'designer.versionHistoryPanel.latest': 'Latest',
                 'designer.versionHistoryPanel.createdBy': 'Created by {{author}}',
+                'designer.versionHistoryPanel.loadErrorTitle': 'Version history could not be loaded',
+                'designer.versionHistoryPanel.loadErrorDescription': 'Your snapshots may still be available. Check the connection and try again.',
+                'designer.versionHistoryPanel.retry': 'Try again',
             };
             return (messages[key] ?? key).replace(/\{\{(\w+)\}\}/g, (_match, name: string) => params?.[name] ?? '');
         },
@@ -79,6 +84,8 @@ const historyMocks = vi.hoisted(() => ({
         message: string;
     }>,
     previewVersion: null as null | { id: string; message: string },
+    loadError: false,
+    loadVersions: vi.fn(async () => undefined),
     saveVersion: vi.fn(async () => true),
     enterPreview: vi.fn(async () => true),
     exitPreview: vi.fn(() => null),
@@ -93,7 +100,9 @@ vi.mock('../../hooks/useVersionHistory', () => ({
     useVersionHistory: () => ({
         versions: historyMocks.versions,
         loading: false,
+        loadError: historyMocks.loadError,
         previewVersion: historyMocks.previewVersion,
+        loadVersions: historyMocks.loadVersions,
         saveVersion: historyMocks.saveVersion,
         enterPreview: historyMocks.enterPreview,
         exitPreview: historyMocks.exitPreview,
@@ -107,6 +116,8 @@ describe('VersionHistoryPanel commercial preview safeguards', () => {
     beforeEach(() => {
         historyMocks.versions = [];
         historyMocks.previewVersion = null;
+        historyMocks.loadError = false;
+        historyMocks.loadVersions.mockClear();
         historyMocks.saveVersion.mockClear();
         historyMocks.enterPreview.mockClear();
         historyMocks.exitPreview.mockClear();
@@ -159,6 +170,20 @@ describe('VersionHistoryPanel commercial preview safeguards', () => {
         fireEvent.click(screen.getByLabelText('Restore version: Release candidate'));
 
         expect(await screen.findByText('The current canvas will be backed up first. If the backup fails, restore will be cancelled. Restore this version?')).toBeTruthy();
+    });
+
+    it('distinguishes a load failure from an empty history and offers an inline retry', () => {
+        historyMocks.loadError = true;
+        render(<VersionHistoryPanel diagramId="diagram-1" isOpen onClose={vi.fn()} />);
+
+        expect(screen.queryByText('No version snapshots yet')).toBeNull();
+        expect(screen.getByRole('alert').textContent).toContain('Version history could not be loaded');
+
+        fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+        expect(historyMocks.loadVersions).toHaveBeenCalledTimes(1);
+
+        const css = readFileSync(resolve('src/components/diagrams/ui/VersionHistoryPanel.css'), 'utf8');
+        expect(css).toMatch(/\.version-history-load-error \.ant-alert-actions \.ant-btn\s*\{[\s\S]*?min-height: var\(--commercial-touch-target, 44px\)/);
     });
 
     it('returns focus to document actions after the drawer closes', () => {
