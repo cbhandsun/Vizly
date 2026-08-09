@@ -1,6 +1,9 @@
 import type { DiagramPage } from './hooks/useMultiPage';
 
-const DEFAULT_PAGE_NAME_PREFIX = '页面';
+const createDefaultPageName = (index: number): string => `页面 ${index}`;
+const DEFAULT_PAGE_NAME_PATTERN = /^(?:Page|页面)\s+(\d+)$/iu;
+
+export type PageNameFactory = (index: number) => string;
 
 export const normalizePageName = (name: string): string => name.trim();
 
@@ -21,15 +24,26 @@ export const isPageNameAvailable = (
     ));
 };
 
-export const createNextPageName = (pages: DiagramPage[]): string => {
+export const createNextPageName = (
+    pages: DiagramPage[],
+    createPageName: PageNameFactory = createDefaultPageName,
+): string => {
     const existingNames = new Set(pages.map(page => createPageNameKey(page.name)));
+    const reservedDefaultIndexes = new Set(pages.flatMap((page) => {
+        const match = normalizePageName(page.name).match(DEFAULT_PAGE_NAME_PATTERN);
+        const index = match?.[1] ? Number.parseInt(match[1], 10) : Number.NaN;
+        return Number.isSafeInteger(index) && index > 0 ? [index] : [];
+    }));
     let suffix = 1;
 
-    while (existingNames.has(createPageNameKey(`${DEFAULT_PAGE_NAME_PREFIX} ${suffix}`))) {
+    while (
+        reservedDefaultIndexes.has(suffix)
+        || existingNames.has(createPageNameKey(createPageName(suffix)))
+    ) {
         suffix += 1;
     }
 
-    return `${DEFAULT_PAGE_NAME_PREFIX} ${suffix}`;
+    return createPageName(suffix);
 };
 
 export const createUniquePageName = (

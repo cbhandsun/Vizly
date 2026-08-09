@@ -32,8 +32,11 @@ vi.mock('react-i18next', () => ({
                 'designer.pages.renameFailed': '页面重命名失败，请重试',
                 'designer.pages.delete': '删除页面 {{name}}',
                 'designer.pages.deleteConfirm': '删除「{{name}}」？',
-                'designer.pages.deleteDescription': '将永久删除此页面中的 {{nodeCount}} 个节点和 {{edgeCount}} 条连线，且无法撤销。',
+                'designer.pages.deleteDescription': '将删除此页面中的 {{nodeCount}} 个节点和 {{edgeCount}} 条连线。关闭或重新加载图表前，可恢复最近删除的页面。',
                 'designer.pages.deleteAction': '删除',
+                'designer.pages.deleteSuccess': '已删除“{{name}}”，可使用“恢复删除的页面”找回',
+                'designer.pages.restoreAction': '恢复删除的页面',
+                'designer.pages.restoreSuccess': '已恢复删除的页面',
                 'common.cancel': '取消',
             };
             const template = translations[key] ?? key;
@@ -436,7 +439,7 @@ describe('PageTabs', () => {
         expect(deleteButton.classList.contains('page-tabs__delete')).toBe(true);
         fireEvent.click(deleteButton);
         expect(await screen.findByText('删除「页面 2」？')).toBeTruthy();
-        expect(screen.getByText('将永久删除此页面中的 1 个节点和 0 条连线，且无法撤销。')).toBeTruthy();
+        expect(screen.getByText('将删除此页面中的 1 个节点和 0 条连线。关闭或重新加载图表前，可恢复最近删除的页面。')).toBeTruthy();
         const cancelButton = screen.getByRole('button', { name: /取\s*消/ });
         const confirmButton = screen.getByRole('button', { name: /^删\s*除$/ });
         await waitFor(() => expect(document.activeElement).toBe(cancelButton));
@@ -508,6 +511,57 @@ describe('PageTabs', () => {
         await waitFor(() => expect(document.activeElement).toBe(adjacentTab));
         expect(adjacentTab.getAttribute('aria-selected')).toBe('true');
         expect(screen.queryByRole('tab', { name: '页面 3' })).toBeNull();
+    });
+
+    it('uses live canvas counts and restores the latest deleted page with focus', async () => {
+        const PageTabsHarness = () => {
+            const deletedPage = { id: 'page-2', name: '页面 2', nodes: [], edges: [] };
+            const [pages, setPages] = useState([
+                { id: 'page-1', name: '页面 1', nodes: [], edges: [] },
+                deletedPage,
+            ]);
+            const [activePageId, setActivePageId] = useState('page-2');
+            const [canRestore, setCanRestore] = useState(false);
+            return (
+                <PageTabs
+                    pages={pages}
+                    activePageId={activePageId}
+                    onSwitchPage={setActivePageId}
+                    onAddPage={vi.fn()}
+                    onDeletePage={() => {
+                        setPages((current) => current.filter((page) => page.id !== deletedPage.id));
+                        setActivePageId('page-1');
+                        setCanRestore(true);
+                        return true;
+                    }}
+                    onRestoreDeletedPage={() => {
+                        setPages((current) => [...current, deletedPage]);
+                        setActivePageId(deletedPage.id);
+                        setCanRestore(false);
+                        return deletedPage.id;
+                    }}
+                    onRenamePage={vi.fn()}
+                    canRestoreDeletedPage={canRestore}
+                    activePageNodeCount={3}
+                    activePageEdgeCount={2}
+                />
+            );
+        };
+
+        render(<PageTabsHarness />);
+        fireEvent.click(screen.getByRole('button', { name: '删除页面 页面 2' }));
+        expect(await screen.findByText('将删除此页面中的 3 个节点和 2 条连线。关闭或重新加载图表前，可恢复最近删除的页面。')).toBeTruthy();
+        fireEvent.click(screen.getByRole('button', { name: /^删\s*除$/ }));
+
+        const restoreButton = await screen.findByRole('button', { name: '恢复删除的页面' });
+        expect(screen.getByRole('status').textContent).toContain('已删除“页面 2”');
+        fireEvent.click(restoreButton);
+
+        const restoredTab = await screen.findByRole('tab', { name: '页面 2' });
+        await waitFor(() => expect(document.activeElement).toBe(restoredTab));
+        expect(restoredTab.getAttribute('aria-selected')).toBe('true');
+        expect(screen.getByRole('status').textContent).toBe('已恢复删除的页面');
+        expect(screen.queryByRole('button', { name: '恢复删除的页面' })).toBeNull();
     });
 
     it('blocks page mutations while the initial diagram is loading', () => {

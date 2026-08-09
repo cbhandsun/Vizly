@@ -76,9 +76,13 @@ export interface DesignerCanvasFeaturesLayerProps {
         onSwitchPage: PageTabsProps['onSwitchPage'];
         onAddPage: PageTabsProps['onAddPage'];
         onDeletePage: PageTabsProps['onDeletePage'];
+        onRestoreDeletedPage?: PageTabsProps['onRestoreDeletedPage'];
         onRenamePage: PageTabsProps['onRenamePage'];
         onDuplicatePage?: PageTabsProps['onDuplicatePage'];
         onMovePage?: PageTabsProps['onMovePage'];
+        canRestoreDeletedPage?: PageTabsProps['canRestoreDeletedPage'];
+        activePageNodeCount?: PageTabsProps['activePageNodeCount'];
+        activePageEdgeCount?: PageTabsProps['activePageEdgeCount'];
         disabled?: PageTabsProps['disabled'];
     };
 
@@ -161,9 +165,13 @@ export const DesignerCanvasFeaturesLayer = React.memo(
                 onSwitchPage={pages.onSwitchPage}
                 onAddPage={pages.onAddPage}
                 onDeletePage={pages.onDeletePage}
+                onRestoreDeletedPage={pages.onRestoreDeletedPage}
                 onRenamePage={pages.onRenamePage}
                 onDuplicatePage={pages.onDuplicatePage}
                 onMovePage={pages.onMovePage}
+                canRestoreDeletedPage={pages.canRestoreDeletedPage}
+                activePageNodeCount={pages.activePageNodeCount}
+                activePageEdgeCount={pages.activePageEdgeCount}
                 disabled={pages.disabled}
             />
             

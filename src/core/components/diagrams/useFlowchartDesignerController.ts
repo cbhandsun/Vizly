@@ -395,6 +395,13 @@ export const useFlowchartDesignerController = ({
         edgesRef.current = nextEdges;
         setEdges(nextEdges);
     }, [edgesRef, setEdges]);
+    const createLocalizedPageName = useCallback((index: number) => t(
+        'designer.pages.defaultName',
+        {
+            index,
+            defaultValue: '页面 {{index}}',
+        },
+    ), [t]);
     const multiPage = useMultiPage(
         () => nodesRef.current,
         () => edgesRef.current,
@@ -408,9 +415,13 @@ export const useFlowchartDesignerController = ({
             scopeId: diagramId,
             captureCurrentState: captureCurrentPageState,
         },
+        createLocalizedPageName,
     );
     const getOperationScope = useDiagramOperationScope(diagramId, multiPage.getPageOperationScope);
-    const deletePageWithComments = useCommentAwarePageDeletion(multiPage.deletePage);
+    const commentAwarePageLifecycle = useCommentAwarePageDeletion(
+        multiPage.deletePage,
+        multiPage.restoreDeletedPage,
+    );
     // 3. Event Handlers Domain Controller
     // commandPaletteVisible and shortcutHelpVisible already declared in Component root state section
 
@@ -696,7 +707,7 @@ export const useFlowchartDesignerController = ({
         isDirectSaveDisabled, isDragging, isDraggingNode, isDrawingMode, isInitialDiagramLoading, isLayoutStable, isMarqueeActive, isMobile, isReadonly,
         isSidebarHidden, isSpacePressed, isValidConnection, isVersionHistoryOpen, isYjsSynced, collaborationStatus, jsonEditorInitialContent, jsonEditorVisible, jumpTo, laserEnabled,
         lastDomainDirection, lastDomainStrategy, lastNodeLayout, layerSyncedNodes, layers, leftDrawerOpen, leftDrawerWidth, messageContextHolder,
-        mobilePropertyDrawerVisible, multiPage: { ...multiPage, deletePage: deletePageWithComments }, nodes, nodesRef, notificationContextHolder, onAiTabIntercept, onCloudSave, onConnectStart, onDirectSave,
+        mobilePropertyDrawerVisible, multiPage: { ...multiPage, ...commentAwarePageLifecycle }, nodes, nodesRef, notificationContextHolder, onAiTabIntercept, onCloudSave, onConnectStart, onDirectSave,
         onDragOver, onDrop, onEdgeContextMenu, onEdgesChangeWithLock, onNodeContextMenu, onNodeDrag, onNodeDragStop, onNodesChangeWithLock, onSmartNodeDrag,
         onExportPermissionCheck, onOpenCollaboration, onOpenSettings, onOpenShareDialog, onOpenVersionHistory, onPaneContextMenu, onPaneDoubleClick, onPaneMouseLeave, onPaneMouseMove,
         onSelectionChange, onVersionHistoryClose, onboardingDismissed, pastEntries, pasteStyle, performanceMode, pluginCtx, pluginId, pluginManagerVisible,

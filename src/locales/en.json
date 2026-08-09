@@ -676,6 +676,7 @@
         "pages": {
             "tabList": "Pages",
             "new": "New page",
+            "defaultName": "Page {{index}}",
             "limitReached": "You can create up to {{count}} pages",
             "rename": "Rename page {{name}}",
             "renameAction": "Rename page {{name}}",
@@ -690,8 +691,11 @@
             "renameFailed": "Could not rename the page. Try again.",
             "delete": "Delete page {{name}}",
             "deleteConfirm": "Delete “{{name}}”?",
-            "deleteDescription": "This permanently deletes {{nodeCount}} node(s) and {{edgeCount}} connection(s) from this page and cannot be undone.",
-            "deleteAction": "Delete"
+            "deleteDescription": "This deletes {{nodeCount}} node(s) and {{edgeCount}} connection(s) from this page. You can restore the latest deleted page before closing or reloading this diagram.",
+            "deleteAction": "Delete",
+            "deleteSuccess": "Deleted “{{name}}”. Restore deleted page is available.",
+            "restoreAction": "Restore deleted page",
+            "restoreSuccess": "Deleted page restored"
         },
         "architecture": {
             "addComponent": "Add {{component}} component",

@@ -114,10 +114,12 @@ const createLeftModel = (
     multiPage: {
         pages: [{ id: 'page-1', name: '页面 1', nodes: [], edges: [] }],
         activePageId: 'page-1',
+        canRestoreDeletedPage: false,
         getPageOperationScope: () => 'page-1:0',
         switchPage: () => undefined,
         addPage: () => null,
         deletePage: () => false,
+        restoreDeletedPage: () => null,
         renamePage: () => false,
         duplicatePage: () => null,
         movePage: () => false,

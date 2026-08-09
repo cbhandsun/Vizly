@@ -6,6 +6,7 @@ import {
     CopyOutlined,
     EditOutlined,
     PlusOutlined,
+    UndoOutlined,
 } from '@ant-design/icons';
 import { Input, Popconfirm, theme, Tooltip } from 'antd';
 import type { InputRef } from 'antd';
@@ -24,9 +25,13 @@ interface PageTabsProps {
     onSwitchPage: (id: string) => void;
     onAddPage: () => string | null;
     onDeletePage: (id: string) => boolean;
+    onRestoreDeletedPage?: () => string | null;
     onRenamePage: (id: string, name: string) => boolean;
     onDuplicatePage?: (id: string, preferredName: string) => string | null;
     onMovePage?: (id: string, direction: 'left' | 'right') => boolean;
+    canRestoreDeletedPage?: boolean;
+    activePageNodeCount?: number;
+    activePageEdgeCount?: number;
     disabled?: boolean;
 }
 
@@ -37,9 +42,13 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
     onSwitchPage,
     onAddPage,
     onDeletePage,
+    onRestoreDeletedPage,
     onRenamePage,
     onDuplicatePage,
     onMovePage,
+    canRestoreDeletedPage = false,
+    activePageNodeCount,
+    activePageEdgeCount,
     disabled = false,
 }) => {
     const { token } = theme.useToken();
@@ -48,6 +57,7 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
     const [editName, setEditName] = useState('');
     const [renameError, setRenameError] = useState<string | null>(null);
     const [confirmingPageId, setConfirmingPageId] = useState<string | null>(null);
+    const [statusMessage, setStatusMessage] = useState('');
     const inputRef = useRef<InputRef>(null);
     const renameErrorId = React.useId();
     const tabButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
@@ -198,6 +208,15 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
         const newPageId = onDuplicatePage(page.id, preferredName);
         if (newPageId) addedPageFocusTargetRef.current = newPageId;
     }, [onDuplicatePage, t]);
+
+    const handleRestoreDeletedPage = useCallback(() => {
+        const restoredPageId = onRestoreDeletedPage?.();
+        if (!restoredPageId) return;
+        addedPageFocusTargetRef.current = restoredPageId;
+        setStatusMessage(t('designer.pages.restoreSuccess', {
+            defaultValue: '已恢复删除的页面',
+        }));
+    }, [onRestoreDeletedPage, t]);
 
     const handleTabKeyDown = useCallback(
         (event: React.KeyboardEvent<HTMLButtonElement>, pageId: string) => {
@@ -399,9 +418,9 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                                         defaultValue: '删除「{{name}}」？',
                                     })}
                                     description={t('designer.pages.deleteDescription', {
-                                        nodeCount: activePage.nodes.length,
-                                        edgeCount: activePage.edges.length,
-                                        defaultValue: '将永久删除此页面中的 {{nodeCount}} 个节点和 {{edgeCount}} 条连线，且无法撤销。',
+                                        nodeCount: activePageNodeCount ?? activePage.nodes.length,
+                                        edgeCount: activePageEdgeCount ?? activePage.edges.length,
+                                        defaultValue: '将删除此页面中的 {{nodeCount}} 个节点和 {{edgeCount}} 条连线。关闭或重新加载图表前，可恢复最近删除的页面。',
                                     })}
                                     getPopupContainer={getViewportOverlayContainer}
                                     placement="top"
@@ -420,6 +439,12 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                                         cancelDeleteCancelFocus();
                                         const deleted = onDeletePage(activePage.id);
                                         restoreFocusAfterDeleteRef.current = deleted;
+                                        if (deleted) {
+                                            setStatusMessage(t('designer.pages.deleteSuccess', {
+                                                name: activePage.name,
+                                                defaultValue: '已删除“{{name}}”，可使用“恢复删除的页面”找回',
+                                            }));
+                                        }
                                         setConfirmingPageId(null);
                                     }}
                                     onCancel={() => {
@@ -463,6 +488,24 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                 <span id={renameErrorId} role="alert" className="page-tabs__rename-error">
                     {renameError}
                 </span>
+            )}
+
+            <span className="page-tabs__visually-hidden" role="status" aria-live="polite">
+                {statusMessage}
+            </span>
+
+            {onRestoreDeletedPage && canRestoreDeletedPage && (
+                <Tooltip title={t('designer.pages.restoreAction', { defaultValue: '恢复删除的页面' })}>
+                    <button
+                        type="button"
+                        aria-label={t('designer.pages.restoreAction', { defaultValue: '恢复删除的页面' })}
+                        onClick={handleRestoreDeletedPage}
+                        className="page-tabs__restore"
+                        disabled={disabled || pageLimitReached}
+                    >
+                        <UndoOutlined aria-hidden style={{ fontSize: 14 }} />
+                    </button>
+                </Tooltip>
             )}
 
             <Tooltip

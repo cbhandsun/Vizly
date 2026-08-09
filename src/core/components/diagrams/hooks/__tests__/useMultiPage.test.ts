@@ -455,6 +455,139 @@ describe('useMultiPage', () => {
     expect(new Set(result.current.pages.map(page => page.id)).size).toBe(2);
   });
 
+  it('creates localized default page names', () => {
+    const { result } = renderHook(() => useMultiPage(
+      () => [],
+      () => [],
+      vi.fn(),
+      vi.fn(),
+      undefined,
+      index => `Page ${index}`,
+    ));
+
+    act(() => {
+      result.current.addPage();
+    });
+
+    expect(result.current.pages.map(page => page.name)).toEqual(['Page 1', 'Page 2']);
+  });
+
+  it('does not reuse a default page index written in another supported locale', () => {
+    const { result } = renderHook(() => useMultiPage(
+      () => [],
+      () => [],
+      vi.fn(),
+      vi.fn(),
+      undefined,
+      index => `Page ${index}`,
+    ));
+
+    act(() => {
+      result.current.restorePersistedMetadata({
+        multiPage: {
+          version: 1,
+          activePageId: 'legacy-page',
+          pages: [{ id: 'legacy-page', name: '页面 1', nodes: [], edges: [] }],
+        },
+      });
+      result.current.addPage();
+    });
+
+    expect(result.current.pages.map(page => page.name)).toEqual(['页面 1', 'Page 2']);
+  });
+
+  it('restores the latest deleted page at its original index from the live canvas snapshot', () => {
+    let currentNodes: Node[] = [node('page-one-live')];
+    let currentEdges: Edge[] = [];
+    const setNodes = vi.fn((nodes: Node[]) => {
+      currentNodes = nodes;
+    });
+    const setEdges = vi.fn((edges: Edge[]) => {
+      currentEdges = edges;
+    });
+    const switchScope = vi.fn();
+    const removeScope = vi.fn();
+    const clearSelection = vi.fn();
+    const { result } = renderHook(() => useMultiPage(
+      () => currentNodes,
+      () => currentEdges,
+      setNodes,
+      setEdges,
+      { switchScope, removeScope, clearSelection },
+      index => `Page ${index}`,
+    ));
+
+    let pageTwoId: string | null = null;
+    act(() => {
+      pageTwoId = result.current.addPage();
+    });
+    if (!pageTwoId) throw new Error('Expected a second page');
+    const deletedPageId = pageTwoId;
+    currentNodes = [{ ...node('deleted-live-node'), selected: true }];
+    currentEdges = [{
+      id: 'deleted-live-edge',
+      source: 'deleted-live-node',
+      target: 'peer-node',
+      selected: true,
+    }];
+
+    act(() => {
+      expect(result.current.deletePage(deletedPageId)).toBe(true);
+    });
+    expect(result.current.canRestoreDeletedPage).toBe(true);
+    expect(removeScope).toHaveBeenCalledWith(deletedPageId);
+
+    currentNodes = [node('adjacent-page-latest')];
+    currentEdges = [];
+    let restoredPageId: string | null = null;
+    act(() => {
+      restoredPageId = result.current.restoreDeletedPage();
+    });
+
+    expect(restoredPageId).toBe(deletedPageId);
+    expect(result.current.pages.map(page => page.id)).toEqual(['page-1', deletedPageId]);
+    expect(result.current.pages[0]?.nodes).toEqual([node('adjacent-page-latest')]);
+    expect(result.current.pages[1]?.nodes).toEqual([
+      expect.objectContaining({ id: 'deleted-live-node', selected: false }),
+    ]);
+    expect(result.current.pages[1]?.edges).toEqual([
+      expect.objectContaining({ id: 'deleted-live-edge', selected: false }),
+    ]);
+    expect(result.current.activePageId).toBe(deletedPageId);
+    expect(result.current.canRestoreDeletedPage).toBe(false);
+    expect(switchScope).toHaveBeenLastCalledWith(deletedPageId);
+    expect(clearSelection).toHaveBeenCalled();
+    expect(result.current.restoreDeletedPage()).toBeNull();
+  });
+
+  it('invalidates transient page recovery after persisted metadata is restored', () => {
+    const { result } = renderHook(() => useMultiPage(
+      () => [],
+      () => [],
+      vi.fn(),
+      vi.fn(),
+    ));
+
+    act(() => {
+      result.current.addPage();
+      result.current.deletePage('page-1');
+    });
+    expect(result.current.canRestoreDeletedPage).toBe(true);
+
+    act(() => {
+      result.current.restorePersistedMetadata({
+        multiPage: {
+          version: 1,
+          activePageId: 'persisted-page',
+          pages: [{ id: 'persisted-page', name: 'Persisted', nodes: [], edges: [] }],
+        },
+      });
+    });
+
+    expect(result.current.canRestoreDeletedPage).toBe(false);
+    expect(result.current.restoreDeletedPage()).toBeNull();
+  });
+
   it('refuses to create pages beyond the persisted 50-page boundary', () => {
     const getCurrentNodes = vi.fn(() => []);
     const { result } = renderHook(() => useMultiPage(

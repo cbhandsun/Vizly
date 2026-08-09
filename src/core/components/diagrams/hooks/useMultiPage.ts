@@ -7,7 +7,13 @@ import {
     parseMultiPageMetadata,
 } from '../multiPagePersistence';
 import { duplicatePageCanvas } from '../multiPageDuplication';
-import { createNextPageName, createUniquePageName, isPageNameAvailable, normalizePageName } from '../multiPageNaming';
+import {
+    createNextPageName,
+    createUniquePageName,
+    isPageNameAvailable,
+    normalizePageName,
+    type PageNameFactory,
+} from '../multiPageNaming';
 
 export interface DiagramPage {
     id: string;
@@ -17,6 +23,7 @@ export interface DiagramPage {
 }
 
 const DEFAULT_PAGE_ID = 'page-1';
+const createDefaultPageName: PageNameFactory = index => `页面 ${index}`;
 
 const createPage = (id: string, name: string): DiagramPage => ({
     id,
@@ -44,6 +51,11 @@ export interface MultiPageHistoryScopes {
     captureCurrentState?: () => { nodes: Node[]; edges: Edge[] };
 }
 
+interface DeletedPageSnapshot {
+    page: DiagramPage;
+    index: number;
+}
+
 export const createMultiPageHistoryScopeKey = (scopeId: string, pageId: string): string => (
     `${encodeURIComponent(scopeId)}::${encodeURIComponent(pageId)}`
 );
@@ -60,14 +72,17 @@ export const useMultiPage = (
     setNodes: (nodes: Node[]) => void,
     setEdges: (edges: Edge[]) => void,
     historyScopes?: MultiPageHistoryScopes,
+    createPageName: PageNameFactory = createDefaultPageName,
 ) => {
     const [pages, setPages] = useState<DiagramPage[]>([
-        createPage(DEFAULT_PAGE_ID, '页面 1'),
+        createPage(DEFAULT_PAGE_ID, createPageName(1)),
     ]);
     const [activePageId, setActivePageId] = useState(DEFAULT_PAGE_ID);
+    const [canRestoreDeletedPage, setCanRestoreDeletedPage] = useState(false);
     const pagesRef = useRef(pages);
     const activePageIdRef = useRef(activePageId);
     const pageOperationVersionRef = useRef(0);
+    const deletedPageSnapshotRef = useRef<DeletedPageSnapshot | null>(null);
     const switchHistoryScope = historyScopes?.switchScope;
     const removeHistoryScope = historyScopes?.removeScope;
     const removeHistoryScopes = historyScopes?.removeScopes;
@@ -158,7 +173,7 @@ export const useMultiPage = (
         const { nodes: currentNodes, edges: currentEdges } = readCurrentState();
 
         const newId = `page-${crypto.randomUUID()}`;
-        const newName = createNextPageName(pagesRef.current);
+        const newName = createNextPageName(pagesRef.current, createPageName);
         const newPage = createPage(newId, newName);
 
         pageOperationVersionRef.current += 1;
@@ -185,7 +200,7 @@ export const useMultiPage = (
         setActivePageId(newId);
 
         return newId;
-    }, [activateHistoryScope, clearSelection, readCurrentState, setNodes, setEdges]);
+    }, [activateHistoryScope, clearSelection, createPageName, readCurrentState, setNodes, setEdges]);
 
     // 删除页面
     const deletePage = useCallback((pageId: string) => {
@@ -194,6 +209,11 @@ export const useMultiPage = (
 
         const deletedIndex = currentPages.findIndex(page => page.id === pageId);
         if (deletedIndex < 0) return false;
+        const sourcePage = currentPages[deletedIndex];
+        if (!sourcePage) return false;
+        const deletedPage = pageId === activePageIdRef.current
+            ? { ...sourcePage, ...readCurrentState() }
+            : sourcePage;
         let remainingPages = currentPages.filter(page => page.id !== pageId);
 
         // 删除当前页后优先选择右侧相邻页；删除末页时回到左侧相邻页，避免跳回首页打断上下文。
@@ -215,8 +235,51 @@ export const useMultiPage = (
         pagesRef.current = remainingPages;
         setPages(remainingPages);
         removePageHistoryScope(pageId);
+        deletedPageSnapshotRef.current = {
+            page: clearPageSelection(deletedPage),
+            index: deletedIndex,
+        };
+        setCanRestoreDeletedPage(true);
         return true;
-    }, [activateHistoryScope, clearSelection, removePageHistoryScope, setNodes, setEdges]);
+    }, [activateHistoryScope, clearSelection, readCurrentState, removePageHistoryScope, setNodes, setEdges]);
+
+    const restoreDeletedPage = useCallback(() => {
+        const snapshot = deletedPageSnapshotRef.current;
+        const currentPages = pagesRef.current;
+        if (
+            !snapshot
+            || currentPages.length >= MAX_DIAGRAM_PAGES
+            || currentPages.some(page => page.id === snapshot.page.id)
+        ) {
+            return null;
+        }
+
+        const currentActivePageId = activePageIdRef.current;
+        const currentState = readCurrentState();
+        const savedPages = currentPages.map(page => page.id === currentActivePageId
+            ? { ...page, nodes: currentState.nodes, edges: currentState.edges }
+            : page);
+        const insertionIndex = Math.min(Math.max(snapshot.index, 0), savedPages.length);
+        const restoredPage = clearPageSelection(snapshot.page);
+        const nextPages = [
+            ...savedPages.slice(0, insertionIndex),
+            restoredPage,
+            ...savedPages.slice(insertionIndex),
+        ];
+
+        pageOperationVersionRef.current += 1;
+        activateHistoryScope(restoredPage.id);
+        clearSelection?.();
+        pagesRef.current = nextPages;
+        setPages(nextPages);
+        setNodes(restoredPage.nodes);
+        setEdges(restoredPage.edges);
+        activePageIdRef.current = restoredPage.id;
+        setActivePageId(restoredPage.id);
+        deletedPageSnapshotRef.current = null;
+        setCanRestoreDeletedPage(false);
+        return restoredPage.id;
+    }, [activateHistoryScope, clearSelection, readCurrentState, setEdges, setNodes]);
 
     // 重命名页面
     const renamePage = useCallback((pageId: string, newName: string) => {
@@ -309,6 +372,8 @@ export const useMultiPage = (
     const restorePersistedMetadata = useCallback((metadata: unknown) => {
         const restored = parseMultiPageMetadata(metadata);
         if (!restored) return null;
+        deletedPageSnapshotRef.current = null;
+        setCanRestoreDeletedPage(false);
         const clearedPages = restored.pages.map(clearPageSelection);
         clearSelection?.();
         pageOperationVersionRef.current += 1;
@@ -332,10 +397,12 @@ export const useMultiPage = (
     return {
         pages,
         activePageId,
+        canRestoreDeletedPage,
         getPageOperationScope,
         switchPage,
         addPage,
         deletePage,
+        restoreDeletedPage,
         renamePage,
         duplicatePage,
         movePage,

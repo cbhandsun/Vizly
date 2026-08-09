@@ -106,6 +106,10 @@ describe('flowchart interaction copy', () => {
             expect(read(zh, ['designer', 'architecture', 'emptyState', key])).toBeTypeOf('string');
             expect(read(en, ['designer', 'architecture', 'emptyState', key])).toBeTypeOf('string');
         }
+        for (const key of ['defaultName', 'deleteDescription', 'deleteSuccess', 'restoreAction', 'restoreSuccess']) {
+            expect(read(zh, ['designer', 'pages', key])).toBeTypeOf('string');
+            expect(read(en, ['designer', 'pages', key])).toBeTypeOf('string');
+        }
         for (const key of ['network', 'compute', 'data', 'business']) {
             expect(read(zh, ['designer', 'architecture', 'categories', key])).toBeTypeOf('string');
             expect(read(en, ['designer', 'architecture', 'categories', key])).toBeTypeOf('string');

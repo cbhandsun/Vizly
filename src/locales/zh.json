@@ -687,6 +687,7 @@
         "pages": {
             "tabList": "页面",
             "new": "新建页面",
+            "defaultName": "页面 {{index}}",
             "limitReached": "最多可创建 {{count}} 个页面",
             "rename": "重命名页面 {{name}}",
             "renameAction": "重命名页面 {{name}}",
@@ -701,8 +702,11 @@
             "renameFailed": "页面重命名失败，请重试",
             "delete": "删除页面 {{name}}",
             "deleteConfirm": "删除「{{name}}」？",
-            "deleteDescription": "将永久删除此页面中的 {{nodeCount}} 个节点和 {{edgeCount}} 条连线，且无法撤销。",
-            "deleteAction": "删除"
+            "deleteDescription": "将删除此页面中的 {{nodeCount}} 个节点和 {{edgeCount}} 条连线。关闭或重新加载图表前，可恢复最近删除的页面。",
+            "deleteAction": "删除",
+            "deleteSuccess": "已删除“{{name}}”，可使用“恢复删除的页面”找回",
+            "restoreAction": "恢复删除的页面",
+            "restoreSuccess": "已恢复删除的页面"
         },
         "architecture": {
             "addComponent": "添加{{component}}组件",
