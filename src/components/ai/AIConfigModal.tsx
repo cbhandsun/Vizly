@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import Modal from 'antd/es/modal';
 import Form from 'antd/es/form';
@@ -12,7 +12,6 @@ import Divider from 'antd/es/divider';
 import Collapse from 'antd/es/collapse';
 import {
     PlusOutlined,
-    DeleteOutlined,
     RocketOutlined,
     CheckCircleFilled,
     SyncOutlined,
@@ -57,6 +56,9 @@ import {
 import { AIConfigConnectionStatusAlert } from './AIConfigConnectionStatusAlert';
 import { AIConfigProviderSidebar } from './AIConfigProviderSidebar';
 import { AIConfigModelDiscoveryModal } from './AIConfigModelDiscoveryModal';
+import { AIConfigDeletionConfirmModal } from './AIConfigDeletionConfirmModal';
+import { AIConfigModelDeleteButton, AIConfigProviderHeader } from './AIConfigDeletionTriggers';
+import { useAIConfigDeletion } from './useAIConfigDeletion';
 import { useAIConfigModalConfig } from './useAIConfigModalConfig';
 import {
     COMMERCIAL_VIEWPORT_MODAL_CLASS,
@@ -65,7 +67,7 @@ import {
 } from '@/core/components/ui/viewportOverlayPortal';
 import './AIConfigModal.css';
 
-const { Text, Title, Paragraph } = Typography;
+const { Text, Paragraph } = Typography;
 const loadStorageService = async () => (await import('@/services/SupabaseStorage')).storageService;
 
 interface AIConfigModalProps {
@@ -79,9 +81,21 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
     const { user } = useAuth();
     const [config, setConfig] = useAIConfigModalConfig(open, user?.id);
     const [selectedProviderId, setSelectedProviderId] = useState<string>('global_settings');
+    const modalCloseButtonRef = useRef<HTMLButtonElement>(null);
     const [searchText, setSearchText] = useState('');
     const [isApiKeyVisible, setIsApiKeyVisible] = useState(false);
     const [connectionStatuses, setConnectionStatuses] = useState<AIProviderConnectionStatusMap>({});
+    const {
+        pendingDeletion,
+        requestProviderDeletion,
+        requestModelDeletion,
+        cancelDeletion,
+        confirmDeletion,
+    } = useAIConfigDeletion({
+        fallbackFocusRef: modalCloseButtonRef,
+        setConfig,
+        setSelectedProviderId,
+    });
 
     // For adding new models
     const [newModelFormVisible, setNewModelFormVisible] = useState(false);
@@ -140,11 +154,13 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
 
         window.dispatchEvent(new Event('aiConfigChanged'));
         setConnectionStatuses({});
+        cancelDeletion();
         onSave();
     };
 
     const handleCancel = () => {
         setConnectionStatuses({});
+        cancelDeletion();
         onCancel();
     };
 
@@ -187,14 +203,6 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
         setSelectedProviderId(newId);
     };
 
-    const deleteProvider = (id: string) => {
-        setConfig(prev => ({
-            ...prev,
-            providers: prev.providers.filter(p => p.id !== id)
-        }));
-        if (selectedProviderId === id) setSelectedProviderId('global_settings');
-    };
-
     // --- Model Actions ---
     const addModel = (providerId: string) => {
         if (!newModelData.id) {
@@ -220,16 +228,6 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
         setNewModelFormVisible(false);
         setNewModelData({ id: '', name: '', group: '' });
         appMessage.success(t('aiConfig.modelAdded'));
-    };
-
-    const deleteModel = (providerId: string, modelId: string) => {
-        setConfig(prev => ({
-            ...prev,
-            providers: prev.providers.map(p => {
-                if (p.id !== providerId) return p;
-                return { ...p, models: p.models.filter(m => m.id !== modelId) };
-            })
-        }));
     };
 
     const toggleModel = (providerId: string, modelId: string, checked: boolean) => {
@@ -431,6 +429,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                 <div className="ai-config-modal-title">
                     <span>{t('aiConfig.title')}</span>
                     <Button
+                        ref={modalCloseButtonRef}
                         type="text"
                         className="ai-config-modal-close"
                         icon={<CloseOutlined />}
@@ -467,14 +466,11 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                 <div className="ai-config-content" style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: 'transparent', overflow: 'hidden' }}>
 
                     {/* Header */}
-                    <div style={{ padding: '24px var(--glass-padding-md, 24px)', borderBottom: '1px solid rgba(0,0,0,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Title level={4} style={{ margin: 0, fontWeight: 700, letterSpacing: '-0.02em' }}>
-                            {selectedProviderId === 'global_settings' ? t('aiConfig.globalSettings') : selectedProvider?.name}
-                        </Title>
-                        {selectedProvider && selectedProvider.id.startsWith('custom_') && (
-                            <Button danger type="text" icon={<DeleteOutlined />} onClick={() => deleteProvider(selectedProvider.id)}>{t('aiConfig.deleteProvider')}</Button>
-                        )}
-                    </div>
+                    <AIConfigProviderHeader
+                        selectedProviderId={selectedProviderId}
+                        provider={selectedProvider}
+                        onRequestDeletion={requestProviderDeletion}
+                    />
 
                     <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--glass-padding-md, 24px) var(--glass-padding-lg, 32px)' }}>
                         {selectedProviderId === 'global_settings' ? (
@@ -649,16 +645,12 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                                                                             aria-label={t('aiConfig.modelToggleLabel', { name: model.name || model.id })}
                                                                             onChange={c => toggleModel(selectedProvider.id, model.id, c)}
                                                                         />
-                                                                        {(model.isCustom || selectedProvider.id.startsWith('custom_')) && (
-                                                                            <Button
-                                                                                size="small"
-                                                                                type="text"
-                                                                                danger
-                                                                                icon={<DeleteOutlined />}
-                                                                                aria-label={t('aiConfig.deleteModelLabel', { name: model.name || model.id })}
-                                                                                onClick={() => deleteModel(selectedProvider.id, model.id)}
-                                                                            />
-                                                                        )}
+                                                                        <AIConfigModelDeleteButton
+                                                                            provider={selectedProvider}
+                                                                            model={model}
+                                                                            isActive={isGlobalActive}
+                                                                            onRequestDeletion={requestModelDeletion}
+                                                                        />
                                                                     </Space>
                                                                 </div>
                                                             );
@@ -689,6 +681,12 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                 onToggleGroup={toggleDiscoveryGroupSelection}
                 onConfirm={handleAddDiscoveredModels}
                 onCancel={() => setDiscoveryModalVisible(false)}
+            />
+            <AIConfigDeletionConfirmModal
+                pendingDeletion={pendingDeletion}
+                t={t}
+                onCancel={cancelDeletion}
+                onConfirm={confirmDeletion}
             />
         </Modal>
     );
