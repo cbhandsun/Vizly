@@ -32,6 +32,7 @@ import {
     parseLayoutPresetValue
 } from './diagramSettingsGuards';
 import { logDiagramSettingsLayoutSyncFailure } from '@/components/diagramSettingsLogging';
+import './DiagramSettingsPanel.css';
 
 interface DiagramSettingsPanelProps {
     selectedDiagram?: DiagramDefinition;
@@ -137,22 +138,22 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
     const SettingRow = ({ icon: Icon, label, children, description, disabled = false }: SettingRowProps) => (
         <div
             aria-disabled={disabled || undefined}
-            className={`group flex items-start justify-between gap-4 px-5 py-3.5 transition-all duration-300 ${disabled ? 'opacity-55' : 'hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'}`}
+            className={`diagram-settings-row group flex items-start justify-between gap-4 px-5 py-3.5 transition-all duration-300 ${disabled ? 'opacity-55' : 'hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'}`}
         >
-            <div className="flex items-start gap-4 min-w-0 flex-1">
+            <div className="diagram-settings-row__summary flex items-start gap-4 min-w-0 flex-1">
                 <div className="flex-shrink-0 mt-0 w-9 h-9 rounded-[6px] bg-black/[0.03] dark:bg-white/5 border border-black/[0.04] dark:border-white/[0.04] flex items-center justify-center group-hover:scale-105 group-hover:shadow-sm group-hover:bg-white dark:group-hover:bg-white/10 transition-all duration-300">
                     <Icon size={18} className="text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white" />
                 </div>
-                <div className="flex flex-col min-w-0 flex-1 justify-center min-h-[36px]">
+                <div className="diagram-settings-row__copy flex flex-col min-w-0 flex-1 justify-center min-h-[36px]">
                     <span className="text-[14px] font-semibold text-gray-800 dark:text-gray-100 leading-tight">{label}</span>
                     {description && (
-                        <span className="text-[12px] text-gray-500 dark:text-gray-400 leading-relaxed pr-4">
+                        <span className="diagram-settings-row__description text-[12px] text-gray-500 dark:text-gray-400 leading-relaxed pr-4">
                             {description}
                         </span>
                     )}
                 </div>
             </div>
-            <div className="flex-shrink-0 flex items-center justify-end pt-1">
+            <div className="diagram-settings-row__control flex-shrink-0 flex items-center justify-end pt-1">
                 {children}
             </div>
         </div>
@@ -167,7 +168,7 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
     return (
         <div className="flex flex-col w-full h-full bg-slate-100/80 dark:bg-black/30 overflow-hidden">
             {/* 遵循全局令牌系统的响应式滚动容器 */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar px-7 py-5">
+            <div className="diagram-settings-scroll flex-1 overflow-y-auto custom-scrollbar px-7 py-5">
                 <div className="w-full max-w-full sm:max-w-2xl lg:max-w-5xl mx-auto flex flex-col gap-1.5">
 
                 {!editingEnabled && (
@@ -210,7 +211,7 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                         </div>
                     </SettingRow>
                     
-                    <div className="h-[1px] ml-[68px] bg-black/[0.04] dark:bg-white/[0.06]" />
+                    <div className="diagram-settings-divider h-[1px] ml-[68px] bg-black/[0.04] dark:bg-white/[0.06]" />
                     
                     <SettingRow 
                         icon={Sparkles} 
@@ -257,7 +258,7 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                         </Select>
                     </SettingRow>
 
-                    <div className="h-[1px] ml-[68px] bg-black/[0.04] dark:bg-white/[0.06]" />
+                    <div className="diagram-settings-divider h-[1px] ml-[68px] bg-black/[0.04] dark:bg-white/[0.06]" />
 
                     <SettingRow 
                         icon={Layers} 
@@ -316,7 +317,7 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                         </Select>
                     </SettingRow>
 
-                    <div className="h-[1px] ml-[68px] bg-black/[0.04] dark:bg-white/[0.06]" />
+                    <div className="diagram-settings-divider h-[1px] ml-[68px] bg-black/[0.04] dark:bg-white/[0.06]" />
 
                     <SettingRow 
                         icon={Cpu} 
@@ -492,23 +493,23 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                         type="button"
                         disabled={!editingEnabled}
                         aria-describedby={!editingEnabled ? 'diagram-settings-advanced-locked' : undefined}
-                        className="w-full group relative flex items-center justify-between p-4 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 border border-black/[0.08] dark:border-white/10 rounded-[var(--glass-radius)] cursor-pointer shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition-all duration-300 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:bg-white dark:disabled:hover:bg-white/5 disabled:active:scale-100"
+                        className="diagram-settings-advanced w-full group relative flex items-center justify-between p-4 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 border border-black/[0.08] dark:border-white/10 rounded-[var(--glass-radius)] cursor-pointer shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition-all duration-300 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:bg-white dark:disabled:hover:bg-white/5 disabled:active:scale-100"
                         onClick={() => {
                             if (editingEnabled) setIsPanelOpen(true);
                         }}
                     >
-                        <div className="flex items-center gap-4">
+                        <div className="diagram-settings-advanced__content flex items-center gap-4 min-w-0">
                             <div className="w-10 h-10 rounded-[6px] bg-gradient-to-b from-gray-800 to-black hover:from-gray-700 hover:to-gray-900 dark:from-gray-200 dark:to-white flex items-center justify-center text-white dark:text-black shadow-[0_1px_2px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.1)] transition-transform duration-300">
                                 <Settings2 size={18} />
                             </div>
-                            <div className="flex flex-col text-left">
+                            <div className="diagram-settings-advanced__copy flex flex-col text-left min-w-0">
                                 <span className="text-[14px] font-semibold text-gray-800 dark:text-gray-100">{t('designer.settings.advancedConfig')}</span>
                                 <span id={!editingEnabled ? 'diagram-settings-advanced-locked' : undefined} className="text-[12px] text-gray-500 dark:text-gray-400 mt-0.5 leading-tight pr-2">
                                     {editingEnabled ? t('designer.settings.advancedConfigDesc', '精细化几何参数与避障权重调节') : editingDisabledReason}
                                 </span>
                             </div>
                         </div>
-                        <div className="w-7 h-7 rounded-[6px] bg-black/[0.03] dark:bg-white/5 flex items-center justify-center group-hover:bg-black/[0.08] dark:group-hover:bg-white/10 text-gray-500 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white transition-all">
+                        <div className="diagram-settings-advanced__chevron w-7 h-7 rounded-[6px] bg-black/[0.03] dark:bg-white/5 flex items-center justify-center group-hover:bg-black/[0.08] dark:group-hover:bg-white/10 text-gray-500 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white transition-all">
                             <ChevronRight size={16} />
                         </div>
                     </button>

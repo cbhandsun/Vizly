@@ -2,6 +2,7 @@
 
 import '@testing-library/jest-dom/vitest';
 import React from 'react';
+import { readFileSync } from 'node:fs';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -46,6 +47,16 @@ vi.mock('@/core/strategies/LayoutStrategyManager', () => ({
 import { DiagramSettingsPanel } from '../DiagramSettingsPanel';
 
 describe('DiagramSettingsPanel accessibility', () => {
+    it('keeps narrow-screen controls full-width with commercial touch heights', () => {
+        const css = readFileSync('src/components/ui/DiagramSettingsPanel.css', 'utf8');
+
+        expect(css).toContain('@media (max-width: 360px)');
+        expect(css).toContain('width: calc(100% - 48px)');
+        expect(css).toContain('min-height: var(--commercial-touch-target, 44px)');
+        expect(css).toContain('.diagram-settings-row__control .ant-select-selector');
+        expect(css).toContain('.diagram-settings-row__control button:not(.ant-switch)');
+    });
+
     it('gives each visible setting control a contextual accessible name', () => {
         render(
             <DiagramSettingsPanel
@@ -71,6 +82,31 @@ describe('DiagramSettingsPanel accessibility', () => {
         expect(screen.getByRole('combobox', { name: 'designer.settings.layoutStrategy' })).toBeTruthy();
         expect(screen.getByRole('combobox', { name: 'designer.settings.nodeLayout' })).toBeTruthy();
         expect(screen.getByRole('switch', { name: 'designer.settings.showMainFlow' })).toBeTruthy();
+    });
+
+    it('exposes the narrow-screen reflow hooks for setting summaries and controls', () => {
+        const { container } = render(
+            <DiagramSettingsPanel
+                selectedDiagramId="diagram-1"
+                edgeMode="advanced-smart"
+                onEdgeModeChange={vi.fn()}
+                layoutStrategy="DomainVerticalLayout"
+                onLayoutStrategyChange={vi.fn()}
+                nodeLayoutStrategy="VerticalLayout"
+                onNodeLayoutStrategyChange={vi.fn()}
+                elkAlgorithm="layered"
+                onElkAlgorithmChange={vi.fn()}
+                linkOrientationEnabled={false}
+                showOnlyMainFlow={false}
+                onShowOnlyMainFlowChange={vi.fn()}
+                onRefreshRequest={vi.fn()}
+            />,
+        );
+
+        expect(container.querySelectorAll('.diagram-settings-row')).toHaveLength(6);
+        expect(container.querySelectorAll('.diagram-settings-row__summary')).toHaveLength(6);
+        expect(container.querySelectorAll('.diagram-settings-row__control')).toHaveLength(6);
+        expect(container.querySelector('.diagram-settings-scroll')).toBeTruthy();
     });
 
     it('keeps view preferences available while disabling document mutations on a locked canvas', () => {

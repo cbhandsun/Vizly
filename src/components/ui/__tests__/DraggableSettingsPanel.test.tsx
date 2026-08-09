@@ -42,8 +42,28 @@ describe('DraggableSettingsPanel', () => {
         expect(panel.parentElement?.style.zIndex).toBe(String(SETTINGS_PANEL_Z_INDEX));
         expect(panel.style.width).toBe('calc(100vw - 32px)');
         expect(panel.style.maxWidth).toBe('480px');
+        expect((panel.lastElementChild as HTMLElement | null)?.style.minHeight).toBe('0px');
         expect(SETTINGS_PANEL_Z_INDEX).toBeGreaterThan(1000);
         expect(SETTINGS_PANEL_POPUP_Z_INDEX).toBeGreaterThan(SETTINGS_PANEL_Z_INDEX);
+    });
+
+    it('uses an 8px viewport inset on narrow mobile screens', () => {
+        const originalInnerWidth = window.innerWidth;
+        Object.defineProperty(window, 'innerWidth', { configurable: true, value: 320 });
+
+        try {
+            render(
+                <DraggableSettingsPanel title="图表设置" closeLabel="关闭图表设置" onClose={vi.fn()}>
+                    <div>设置内容</div>
+                </DraggableSettingsPanel>,
+            );
+
+            const panel = screen.getByRole('dialog', { name: '图表设置' });
+            expect(panel.style.width).toBe('calc(100vw - 16px)');
+            expect(panel.style.maxHeight).toBe('calc(100dvh - 16px)');
+        } finally {
+            Object.defineProperty(window, 'innerWidth', { configurable: true, value: originalInnerWidth });
+        }
     });
 
     it('provides a named close action', () => {

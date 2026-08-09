@@ -1,0 +1,90 @@
+@media (max-width: 360px) {
+    .diagram-settings-scroll {
+        padding: 12px 8px calc(20px + env(safe-area-inset-bottom));
+        scrollbar-gutter: stable;
+    }
+
+    .diagram-settings-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 8px;
+        padding: 12px;
+    }
+
+    .diagram-settings-row__summary {
+        width: 100%;
+        gap: 12px;
+    }
+
+    .diagram-settings-row__description {
+        padding-right: 0;
+    }
+
+    .diagram-settings-row__control {
+        width: calc(100% - 48px);
+        min-width: 0;
+        min-height: var(--commercial-touch-target, 44px);
+        margin-left: 48px;
+        padding-top: 0;
+        justify-content: stretch;
+    }
+
+    .diagram-settings-row__control > * {
+        width: 100%;
+        min-width: 0 !important;
+    }
+
+    .diagram-settings-row__control .ant-select {
+        width: 100% !important;
+        min-width: 0 !important;
+        min-height: var(--commercial-touch-target, 44px);
+    }
+
+    .diagram-settings-row__control .ant-select-selector {
+        min-height: var(--commercial-touch-target, 44px) !important;
+        align-items: center;
+    }
+
+    .diagram-settings-row__control .ant-select-selection-item {
+        padding-inline-end: 24px;
+        text-align: left;
+    }
+
+    .diagram-settings-row__control button:not(.ant-switch) {
+        min-height: var(--commercial-touch-target, 44px) !important;
+    }
+
+    .diagram-settings-row__control .ant-switch {
+        width: 40px;
+        min-width: 40px !important;
+        margin-left: auto;
+    }
+
+    .diagram-settings-divider {
+        margin-left: 48px;
+    }
+
+    .diagram-settings-advanced {
+        align-items: flex-start;
+        gap: 8px;
+        padding: 12px;
+    }
+
+    .diagram-settings-advanced__content {
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .diagram-settings-advanced__copy {
+        overflow-wrap: anywhere;
+    }
+
+    .diagram-settings-advanced__copy > span:last-child {
+        padding-right: 0;
+    }
+
+    .diagram-settings-advanced__chevron {
+        flex: none;
+        margin-top: 6px;
+    }
+}

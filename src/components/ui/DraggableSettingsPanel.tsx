@@ -14,12 +14,16 @@ interface DraggableSettingsPanelProps {
 
 export const SETTINGS_PANEL_Z_INDEX = 1100;
 export const SETTINGS_PANEL_POPUP_Z_INDEX = 1150;
+const getSettingsPanelViewportInset = (viewportWidth: number): number => (
+    viewportWidth <= 360 ? 8 : 16
+);
 
 export const DraggableSettingsPanel: React.FC<DraggableSettingsPanelProps> = ({ children, closeLabel, onClose, title }) => {
+    const viewportInset = useMemo(() => getSettingsPanelViewportInset(window.innerWidth), []);
     const initialPos = useMemo(() => ({
-        x: Math.max(16, (window.innerWidth - Math.min(480, window.innerWidth - 32)) / 2),
-        y: Math.max(16, Math.min(80, window.innerHeight - 160)),
-    }), []);
+        x: Math.max(viewportInset, (window.innerWidth - Math.min(480, window.innerWidth - (viewportInset * 2))) / 2),
+        y: Math.max(viewportInset, Math.min(80, window.innerHeight - 160)),
+    }), [viewportInset]);
     const titleId = useId();
     const [hasActiveNestedModal, setHasActiveNestedModal] = useState(false);
     const onCloseRef = useRef(onClose);
@@ -32,7 +36,7 @@ export const DraggableSettingsPanel: React.FC<DraggableSettingsPanelProps> = ({ 
 
     const { panelRef, handlePointerDown } = useDraggablePanel({
         initialPosition: initialPos,
-        viewportInset: 16,
+        viewportInset,
     });
 
     useEffect(() => {
@@ -104,9 +108,9 @@ export const DraggableSettingsPanel: React.FC<DraggableSettingsPanelProps> = ({ 
                 position: 'fixed',
                 top: 0,
                 left: 0,
-                width: 'calc(100vw - 32px)',
+                width: `calc(100vw - ${viewportInset * 2}px)`,
                 maxWidth: 480,
-                maxHeight: 'calc(100dvh - 32px)',
+                maxHeight: `calc(100dvh - ${viewportInset * 2}px)`,
                 display: 'flex',
                 flexDirection: 'column',
                 zIndex: 1,
@@ -149,6 +153,7 @@ export const DraggableSettingsPanel: React.FC<DraggableSettingsPanelProps> = ({ 
             >
                 <div style={{
                     flex: 1,
+                    minHeight: 0,
                     overflowY: 'auto',
                     overflowX: 'hidden'
                 }}>
