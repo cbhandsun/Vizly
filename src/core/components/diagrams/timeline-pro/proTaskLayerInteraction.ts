@@ -1,6 +1,17 @@
 export const PRO_TASK_PROGRESS_STEP = 5;
 export const PRO_TASK_FAST_STEP = 5;
 
+export const getProTaskDependencyControlLeft = (
+    type: unknown,
+    x: unknown,
+    width: unknown,
+): number => {
+    const safeX = typeof x === 'number' && Number.isFinite(x) ? x : 0;
+    const safeWidth = typeof width === 'number' && Number.isFinite(width) && width > 0 ? width : 0;
+    if (type === 'milestone') return Math.max(0, safeX - 42);
+    return safeX + Math.max(type === 'event' ? 184 : 8, safeWidth) + 4;
+};
+
 export const getProTaskLayerAccessibleName = (value: unknown): string => {
     if (typeof value !== 'string') return '未命名任务';
     const trimmed = value.trim();

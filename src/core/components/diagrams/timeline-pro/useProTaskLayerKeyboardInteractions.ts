@@ -15,6 +15,10 @@ import {
 
 interface ProTaskLayerKeyboardOptions {
     cancelDragInteraction: () => void;
+    handleTaskConnectionKeyDown?: (
+        event: React.KeyboardEvent<HTMLElement>,
+        task: ProjectedProTimelineTask,
+    ) => boolean;
     onTaskClick?: (taskId: string) => void;
     onTaskDragEnd?: (taskId: string, newStartDate: string, newEndDate: string) => void;
     onTaskUpdate?: (taskId: string, updates: Partial<ProGanttTask>) => void;
@@ -23,6 +27,7 @@ interface ProTaskLayerKeyboardOptions {
 
 export function useProTaskLayerKeyboardInteractions({
     cancelDragInteraction,
+    handleTaskConnectionKeyDown,
     onTaskClick,
     onTaskDragEnd,
     onTaskUpdate,
@@ -30,6 +35,7 @@ export function useProTaskLayerKeyboardInteractions({
 }: ProTaskLayerKeyboardOptions) {
     const handleTaskBarKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>, task: ProjectedProTimelineTask) => {
         if (event.target !== event.currentTarget) return;
+        if (handleTaskConnectionKeyDown?.(event, task)) return;
         if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault();
             onTaskClick?.(task.id);
@@ -49,7 +55,7 @@ export function useProTaskLayerKeyboardInteractions({
         if (delta === null) return;
         event.preventDefault();
         onTaskDragEnd?.(task.id, addWorkDaysSigned(task.startDate, delta), addWorkDaysSigned(task.endDate, delta));
-    }, [cancelDragInteraction, onTaskClick, onTaskDragEnd, startTaskNameEdit]);
+    }, [cancelDragInteraction, handleTaskConnectionKeyDown, onTaskClick, onTaskDragEnd, startTaskNameEdit]);
 
     const handleProgressKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>, task: ProjectedProTimelineTask) => {
         const progress = getProTaskProgressKeyboardValue(task.progress, event.key, event.shiftKey);

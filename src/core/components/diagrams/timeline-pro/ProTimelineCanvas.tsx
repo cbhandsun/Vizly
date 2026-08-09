@@ -19,6 +19,10 @@ import { appMessage } from '../../../utils/antdStaticBridge';
 import { addDaysToDateOnly, parseDateOnlyTime, todayDateOnly } from '../../../utils/dateOnly';
 import { ProTimelineChrome, ProTimelineKeyframes } from './ProTimelineChrome';
 import { projectProTimelineTasks } from './proTimelineTaskProjection';
+import {
+    validateProTimelineDependencyConnection,
+    type ProTimelineDependencyConnectionResult,
+} from './proTimelineDependencyConnection';
 import './ProTimelineCanvas.css';
 
 const ROW_HEIGHT = 42;
@@ -355,47 +359,33 @@ export default function ProTimelineCanvas() {
       }
   }, [nodes, updateNodeData, applyAutoScheduling]);
 
-    const onTaskConnect = useCallback((sourceId: string, targetId: string) => {
-        const sourceNode = nodes.find(n => n.id === sourceId);
-        const targetNode = nodes.find(n => n.id === targetId);
-        if (!sourceNode || !targetNode) return;
-
-        // 1. Time Causality Check
-        const sDateStr = sourceNode.data?.endDate || sourceNode.data?.date;
-        const tDateStr = targetNode.data?.date;
-
-        if (sDateStr && tDateStr) {
-            const sTime = parseDateOnlyTime(sDateStr);
-            const tTime = parseDateOnlyTime(tDateStr);
-            if (sTime !== null && tTime !== null && sTime > tTime) {
-                appMessage.warning('依赖校验失败：前置任务的结束时间不能晚于后置任务的开始时间！');
-                return;
-            }
+    const onTaskConnect = useCallback((sourceId: string, targetId: string): ProTimelineDependencyConnectionResult => {
+        const result = validateProTimelineDependencyConnection({
+            sourceId,
+            targetId,
+            tasks: nodes.map((node) => ({
+                id: node.id,
+                startDate: node.data?.date ?? node.data?.startDate,
+                endDate: node.data?.endDate ?? node.data?.date ?? node.data?.startDate,
+            })),
+            edges,
+        });
+        if (!result.ok) {
+            appMessage.warning(result.message);
+            return result;
         }
 
-        // 2. Prevent Cyclic Dependencies (check if path exists from target -> source)
-        const hasPath = (current: string, destination: string, visited: Set<string> = new Set()): boolean => {
-            if (current === destination) return true;
-            if (visited.has(current)) return false;
-            visited.add(current);
-            const outEdges = edges.filter(e => e.source === current);
-            return outEdges.some(e => hasPath(e.target, destination, visited));
-        };
-
-        if (hasPath(targetId, sourceId)) {
-            appMessage.warning('依赖校验失败：检测到循环依赖，无法连接！');
-            return;
-        }
-
-        setEdges(eds => {
-            if (eds.some(e => e.source === sourceId && e.target === targetId)) return eds;
-            return [...eds, {
+        window.dispatchEvent(new CustomEvent('diagram:save-snapshot'));
+        setEdges((currentEdges) => currentEdges.some((edge) => (
+            edge.source === sourceId && edge.target === targetId
+        )) ? currentEdges : [...currentEdges, {
                 id: `e-${sourceId}-${targetId}`,
                 source: sourceId,
                 target: targetId,
-                type: 'smoothstep'
-            }];
-        });
+                type: 'smoothstep',
+            }]);
+        appMessage.success('依赖关系创建成功，可使用撤销恢复。');
+        return result;
     }, [nodes, edges, setEdges]);
 
     const handleTaskDelete = useCallback((taskId: string) => {

@@ -11,7 +11,8 @@ import { Button, Tooltip } from 'antd';
 import ProTimelineCanvas from '../components/diagrams/timeline-pro/ProTimelineCanvas';
 import { ProTimelinePropertyPanel } from '../components/diagrams/timeline-pro/ProTimelinePropertyPanel';
 import { Calendar, Clock } from 'lucide-react';
-import { parseDateOnlyTime, todayDateOnly } from '../utils/dateOnly';
+import { todayDateOnly } from '../utils/dateOnly';
+import { validateProTimelineDependencyConnection } from '../components/diagrams/timeline-pro/proTimelineDependencyConnection';
 import { useTranslation } from 'react-i18next';
 import i18n from '@/i18n';
 import { appMessage } from '@/core/utils/antdStaticBridge';
@@ -132,39 +133,16 @@ export class TimelinePlugin implements DiagramTypePlugin {
       if (!source || !target || source === target) return false;
 
       const nodes = ctx.getNodes();
-      const sourceNode = nodes.find(n => n.id === source);
-      const targetNode = nodes.find(n => n.id === target);
-      if (!sourceNode || !targetNode) return false;
-
-      // Rule 1: Time Causality (Source must not occur after target)
-      // For spans (phases), use endDate as completion time, otherwise use date
-      const sDateStr = sourceNode.data?.endDate || sourceNode.data?.date;
-      const tDateStr = targetNode.data?.date;
-
-      if (sDateStr && tDateStr) {
-          const sTime = parseDateOnlyTime(sDateStr);
-          const tTime = parseDateOnlyTime(tDateStr);
-          // Reject reverse-time connections
-          if (sTime !== null && tTime !== null && sTime > tTime) {
-              return false;
-          }
-      }
-
-      // Rule 2: Prevent Cyclic Dependencies (check if path exists from target -> source)
-      const edges = ctx.getEdges();
-      const hasPath = (current: string, destination: string, visited: Set<string> = new Set()): boolean => {
-          if (current === destination) return true;
-          if (visited.has(current)) return false;
-          visited.add(current);
-          const outEdges = edges.filter(e => e.source === current);
-          return outEdges.some(e => hasPath(e.target, destination, visited));
-      };
-
-      if (hasPath(target, source)) {
-          return false;
-      }
-
-      return true;
+      return validateProTimelineDependencyConnection({
+          sourceId: source,
+          targetId: target,
+          tasks: nodes.map((node) => ({
+              id: node.id,
+              startDate: node.data?.date ?? node.data?.startDate,
+              endDate: node.data?.endDate ?? node.data?.date ?? node.data?.startDate,
+          })),
+          edges: ctx.getEdges(),
+      }).ok;
   }
 }
 

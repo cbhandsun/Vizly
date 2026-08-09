@@ -21,9 +21,11 @@ import {
 } from '../proTaskListInteraction';
 import {
     getProTaskDateKeyboardDelta,
+    getProTaskDependencyControlLeft,
     getProTaskLayerAccessibleName,
     getProTaskProgressKeyboardValue,
 } from '../proTaskLayerInteraction';
+import { validateProTimelineDependencyConnection } from '../proTimelineDependencyConnection';
 
 class ResizeObserverMock {
     observe() {}
@@ -284,11 +286,117 @@ const phaseLayerTask: ProjectedProTimelineTask = {
     },
 };
 
+const eventLayerTask: ProjectedProTimelineTask = {
+    ...phaseLayerTask,
+    id: 'event-1',
+    name: 'Design review',
+    type: 'event',
+    _computed: { ...phaseLayerTask._computed!, laneIndex: 1, x: 220 },
+};
+
+const milestoneLayerTask: ProjectedProTimelineTask = {
+    ...phaseLayerTask,
+    id: 'milestone-1',
+    name: 'Release gate',
+    type: 'milestone',
+    _computed: { ...phaseLayerTask._computed!, laneIndex: 2, x: 360, w: 12 },
+};
+
+const summaryLayerTask: ProjectedProTimelineTask = {
+    ...phaseLayerTask,
+    id: 'summary-1',
+    name: 'Program summary',
+    type: 'summary',
+    _computed: { ...phaseLayerTask._computed!, laneIndex: 3, x: 80 },
+};
+
 const renderTaskLayer = (overrides: Partial<React.ComponentProps<typeof ProTaskLayer>> = {}) => render(
     <ProTaskLayer tasks={[phaseLayerTask]} hoveredTaskId={null} {...overrides} />,
 );
 
 describe('ProTaskLayer accessibility and recovery', () => {
+    it('exposes semantic dependency actions for task types that can be connected', () => {
+        renderTaskLayer({
+            tasks: [phaseLayerTask, eventLayerTask, milestoneLayerTask, summaryLayerTask],
+            onTaskConnect: vi.fn(),
+        });
+
+        expect(screen.getByRole('button', { name: '从 Launch phase 创建依赖' })).toBeTruthy();
+        expect(screen.getByRole('button', { name: '从 Design review 创建依赖' })).toBeTruthy();
+        expect(screen.getByRole('button', { name: '从 Release gate 创建依赖' })).toBeTruthy();
+        expect(screen.queryByRole('button', { name: '从 Program summary 创建依赖' })).toBeNull();
+    });
+
+    it('creates a dependency with C, target navigation, and Enter', () => {
+        const onTaskConnect = vi.fn().mockReturnValue({ ok: true as const });
+        renderTaskLayer({ tasks: [phaseLayerTask, eventLayerTask, milestoneLayerTask], onTaskConnect });
+        const source = screen.getByRole('group', { name: 'Launch phase，时间轴任务' });
+
+        fireEvent.keyDown(source, { key: 'c' });
+        expect(source.getAttribute('data-connection-source')).toBe('true');
+        expect(screen.getByRole('group', { name: 'Design review，时间轴任务' }).getAttribute('data-connection-target')).toBe('true');
+        expect(screen.getByRole('status').textContent).toContain('使用上下方向键选择');
+
+        fireEvent.keyDown(source, { key: 'ArrowDown' });
+        expect(screen.getByRole('group', { name: 'Release gate，时间轴任务' }).getAttribute('data-connection-target')).toBe('true');
+        fireEvent.keyDown(source, { key: 'Enter' });
+
+        expect(onTaskConnect).toHaveBeenCalledWith('phase-1', 'milestone-1');
+        expect(source.getAttribute('data-connection-source')).toBeNull();
+        expect(screen.getByRole('status').textContent).toContain('已创建从 Launch phase 到 Release gate');
+    });
+
+    it('continues the keyboard workflow from the focused dependency button', () => {
+        const onTaskConnect = vi.fn().mockReturnValue({ ok: true as const });
+        renderTaskLayer({ tasks: [phaseLayerTask, eventLayerTask, milestoneLayerTask], onTaskConnect });
+        const control = screen.getByRole('button', { name: '从 Launch phase 创建依赖' });
+
+        fireEvent.click(control);
+        const activeControl = screen.getByRole('button', { name: '取消从 Launch phase 创建依赖' });
+        fireEvent.keyDown(activeControl, { key: 'End' });
+        fireEvent.keyDown(activeControl, { key: 'Enter' });
+
+        expect(onTaskConnect).toHaveBeenCalledWith('phase-1', 'milestone-1');
+        expect(screen.getByRole('status').textContent).toContain('已创建从 Launch phase 到 Release gate');
+    });
+
+    it('does not advertise dependency controls without a connection handler', () => {
+        renderTaskLayer({ tasks: [phaseLayerTask, eventLayerTask] });
+
+        expect(screen.queryByRole('button', { name: /从 Launch phase 创建依赖/ })).toBeNull();
+    });
+
+    it('cancels dependency creation without mutating edges', () => {
+        const onTaskConnect = vi.fn();
+        renderTaskLayer({ tasks: [phaseLayerTask, eventLayerTask], onTaskConnect });
+        const source = screen.getByRole('group', { name: 'Launch phase，时间轴任务' });
+
+        fireEvent.keyDown(source, { key: 'C' });
+        fireEvent.keyDown(source, { key: 'Escape' });
+
+        expect(onTaskConnect).not.toHaveBeenCalled();
+        expect(source.getAttribute('data-connection-source')).toBeNull();
+        expect(screen.getByRole('status').textContent).toContain('已取消创建依赖关系');
+    });
+
+    it('keeps connection mode recoverable after validation rejects a target', () => {
+        const onTaskConnect = vi.fn().mockReturnValue({
+            ok: false as const,
+            code: 'reverse-time' as const,
+            message: '依赖校验失败：时间顺序无效。',
+        });
+        renderTaskLayer({ tasks: [phaseLayerTask, eventLayerTask], onTaskConnect });
+        const source = screen.getByRole('group', { name: 'Launch phase，时间轴任务' });
+
+        fireEvent.keyDown(source, { key: 'c' });
+        fireEvent.keyDown(source, { key: 'Enter' });
+
+        expect(source.getAttribute('data-connection-source')).toBe('true');
+        expect(screen.getByRole('status').textContent).toContain('请选择其他任务');
+        fireEvent.keyDown(source, { key: 'Escape' });
+        expect(source.getAttribute('data-connection-source')).toBeNull();
+    });
+
     it.each(['Enter', ' '])('selects a timeline task with %j', (key) => {
         const onTaskClick = vi.fn();
         renderTaskLayer({ onTaskClick });
@@ -420,5 +528,83 @@ describe('task layer interaction boundaries', () => {
         expect(getProTaskLayerAccessibleName('  Launch  ')).toBe('Launch');
         expect(getProTaskLayerAccessibleName('  ')).toBe('未命名任务');
         expect(getProTaskLayerAccessibleName(null)).toBe('未命名任务');
+    });
+
+    it.each([
+        ['phase', 100, 80, 184],
+        ['event', 100, 12, 288],
+        ['milestone', 100, 12, 58],
+        ['milestone', 20, 12, 0],
+        ['phase', Number.NaN, Number.POSITIVE_INFINITY, 12],
+    ])('places %s dependency controls beside the rendered task', (type, x, width, expected) => {
+        expect(getProTaskDependencyControlLeft(type, x, width)).toBe(expected);
+    });
+});
+
+describe('timeline dependency validation boundaries', () => {
+    const dependencyTasks = [
+        { id: 'source', startDate: '2026-08-01', endDate: '2026-08-05' },
+        { id: 'target', startDate: '2026-08-05', endDate: '2026-08-10' },
+        { id: 'later', startDate: '2026-08-12', endDate: '2026-08-14' },
+    ];
+    const validate = (
+        sourceId: string,
+        targetId: string,
+        edges: { source?: unknown; target?: unknown }[] = [],
+        taskInputs = dependencyTasks,
+    ) => validateProTimelineDependencyConnection({ sourceId, targetId, edges, tasks: taskInputs });
+
+    it('accepts a chronological dependency, including an equal handoff date', () => {
+        expect(validate('source', 'target')).toEqual({ ok: true });
+    });
+
+    it.each([
+        ['missing', 'target', 'missing-task'],
+        ['source', 'source', 'self-dependency'],
+    ])('rejects invalid identities %s → %s', (sourceId, targetId, code) => {
+        expect(validate(sourceId, targetId)).toMatchObject({ ok: false, code });
+    });
+
+    it('rejects duplicate dependencies before mutating state', () => {
+        expect(validate('source', 'target', [{ source: 'source', target: 'target' }]))
+            .toMatchObject({ ok: false, code: 'duplicate-dependency' });
+    });
+
+    it.each([
+        [[{ id: 'source', startDate: '2026-08-01', endDate: '' }, dependencyTasks[1]], 'invalid-source-date'],
+        [[dependencyTasks[0], { id: 'target', startDate: 'not-a-date', endDate: '2026-08-10' }], 'invalid-target-date'],
+    ])('rejects invalid schedule boundaries', (taskInputs, code) => {
+        expect(validate('source', 'target', [], taskInputs)).toMatchObject({ ok: false, code });
+    });
+
+    it('rejects a dependency that travels backward in time', () => {
+        expect(validate('later', 'target')).toMatchObject({ ok: false, code: 'reverse-time' });
+    });
+
+    it('rejects direct and transitive cycles while ignoring malformed edges', () => {
+        expect(validate('source', 'later', [
+            { source: 'target', target: 'source' },
+            { source: 'later', target: 'target' },
+            { source: null, target: 'source' },
+        ])).toMatchObject({ ok: false, code: 'cyclic-dependency' });
+    });
+
+    it('handles a deep dependency graph without recursive stack growth', () => {
+        const deepTasks = Array.from({ length: 5_002 }, (_, index) => ({
+            id: `task-${index}`,
+            startDate: '2026-08-05',
+            endDate: '2026-08-05',
+        }));
+        const deepEdges = deepTasks.slice(0, -1).map((dependencyTask, index) => ({
+            source: dependencyTask.id,
+            target: deepTasks[index + 1].id,
+        }));
+
+        expect(validateProTimelineDependencyConnection({
+            sourceId: deepTasks.at(-1)!.id,
+            targetId: deepTasks[0].id,
+            tasks: deepTasks,
+            edges: deepEdges,
+        })).toMatchObject({ ok: false, code: 'cyclic-dependency' });
     });
 });

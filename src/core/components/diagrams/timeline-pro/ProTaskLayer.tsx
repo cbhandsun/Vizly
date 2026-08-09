@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { getWorkDays, ProGanttTask, useProTimelineEngine } from '../../../hooks/useProTimelineEngine';
 import { CalendarOutlined, ClockCircleOutlined, FlagFilled, CaretRightFilled } from '@ant-design/icons';
 import { useTheme } from '../../../themes/useCoreTheme';
@@ -6,9 +6,13 @@ import type { ProjectedProTimelineTask } from './proTimelineTaskProjection';
 import { clampProTaskProgress, isProTaskSelected } from './proTaskPresentationModel';
 import { ProTaskTooltip } from './ProTaskTooltip';
 import { ProTaskInlineNameEditor } from './ProTaskInlineNameEditor';
-import { getProTaskLayerAccessibleName } from './proTaskLayerInteraction';
+import { getProTaskDependencyControlLeft, getProTaskLayerAccessibleName } from './proTaskLayerInteraction';
 import { useProTaskLayerKeyboardInteractions } from './useProTaskLayerKeyboardInteractions';
 import { ProTaskAssigneeAvatar } from './ProTaskAssigneeAvatar';
+import { ProTaskDependencyControl, ProTaskDependencyFeedback } from './ProTaskDependencyControl';
+import { useProTaskDependencyKeyboard } from './useProTaskDependencyKeyboard';
+import type { ProTimelineDependencyConnectionResult } from './proTimelineDependencyConnection';
+import { useProTaskInlineEditing } from './useProTaskInlineEditing';
 
 export interface ProTaskLayerProps {
     tasks: ProjectedProTimelineTask[];
@@ -17,7 +21,10 @@ export interface ProTaskLayerProps {
     hoveredTaskId?: string | null;
     onHoverTask?: (id: string | null) => void;
     onTaskUpdate?: (taskId: string, updates: Partial<ProGanttTask>) => void;
-    onTaskConnect?: (sourceId: string, targetId: string) => void;
+    onTaskConnect?: (
+        sourceId: string,
+        targetId: string,
+    ) => ProTimelineDependencyConnectionResult | void;
     criticalPathTaskIds?: Set<string>;
     cyclicTaskIds?: Set<string>;
 }
@@ -58,28 +65,22 @@ export default function ProTaskLayer({
     const [dragDeltaW, setDragDeltaW] = useState(0);
     const [dragProgress, setDragProgress] = useState(0);
     const [tooltipState, setTooltipState] = useState<{ task: ProjectedProTimelineTask; x: number; y: number } | null>(null);
-    const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
-    const [editingText, setEditingText] = useState('');
-    const cancelledEditTaskIdRef = useRef<string | null>(null);
-
-    const commitEdit = useCallback(() => {
-        if (editingTaskId && cancelledEditTaskIdRef.current !== editingTaskId && editingText.trim()) {
-            onTaskUpdate?.(editingTaskId, { name: editingText.trim() });
-        }
-        if (cancelledEditTaskIdRef.current === editingTaskId) cancelledEditTaskIdRef.current = null;
-        setEditingTaskId(null);
-    }, [editingTaskId, editingText, onTaskUpdate]);
-
-    const startTaskNameEdit = useCallback((task: ProjectedProTimelineTask) => {
-        cancelledEditTaskIdRef.current = null;
-        setEditingTaskId(task.id);
-        setEditingText(task.name);
-    }, []);
-
-    const cancelTaskNameEdit = useCallback(() => {
-        cancelledEditTaskIdRef.current = editingTaskId;
-        setEditingTaskId(null);
-    }, [editingTaskId]);
+    const {
+        cancelTaskNameEdit,
+        commitEdit,
+        editingTaskId,
+        editingText,
+        setEditingText,
+        startTaskNameEdit,
+    } = useProTaskInlineEditing({ onTaskUpdate });
+    const {
+        connectionAnnouncement,
+        connectionState,
+        connectTasks,
+        handleTaskConnectionKeyDown,
+        isConnectableTask,
+        toggleConnection,
+    } = useProTaskDependencyKeyboard({ tasks, onTaskConnect });
 
     const snapX = useCallback((rawX: number) => Math.round(rawX / pixelsPerDay) * pixelsPerDay, [pixelsPerDay]);
 
@@ -150,14 +151,14 @@ export default function ProTaskLayer({
         } else if (dragState.mode === 'progress') {
             onTaskUpdate?.(dragState.taskId, { progress: dragProgress });
         } else if (dragState.mode === 'connect' && dragState.targetTaskId && dragState.targetTaskId !== dragState.taskId) {
-            onTaskConnect?.(dragState.taskId, dragState.targetTaskId);
+            connectTasks(dragState.taskId, dragState.targetTaskId);
         }
 
         setDragState(null);
         setDragDeltaX(0);
         setDragDeltaY(0);
         setDragDeltaW(0);
-    }, [dragState, dragDeltaX, dragDeltaW, dragProgress, snapX, xToDate, pixelsPerDay, onTaskDragEnd, onTaskUpdate, onTaskConnect]);
+    }, [connectTasks, dragState, dragDeltaX, dragDeltaW, dragProgress, snapX, xToDate, pixelsPerDay, onTaskDragEnd, onTaskUpdate]);
 
     const cancelDragInteraction = useCallback(() => {
         setDragState(null);
@@ -169,6 +170,7 @@ export default function ProTaskLayer({
 
     const { handleTaskBarKeyDown, handleProgressKeyDown, handleResizeKeyDown } = useProTaskLayerKeyboardInteractions({
         cancelDragInteraction,
+        handleTaskConnectionKeyDown,
         onTaskClick,
         onTaskDragEnd,
         onTaskUpdate,
@@ -227,13 +229,17 @@ export default function ProTaskLayer({
                 const isHovered = hoveredTaskId === task.id && !isDragging;
                 const type = task.type || 'phase';
                 const accessibleTaskName = getProTaskLayerAccessibleName(task.name);
+                const isConnectionSource = connectionState?.sourceTaskId === task.id;
+                const isConnectionTarget = connectionState?.targetTaskId === task.id;
                 const taskBarAccessibilityProps = {
-                    className: 'pro-timeline-task-bar',
+                    className: `pro-timeline-task-bar${isConnectionSource ? ' pro-timeline-task-bar--connection-source' : ''}${isConnectionTarget ? ' pro-timeline-task-bar--connection-target' : ''}`,
                     role: 'group',
                     tabIndex: 0,
                     'aria-label': `${accessibleTaskName}，时间轴任务`,
                     'aria-current': isSelected ? 'true' : undefined,
-                    'aria-keyshortcuts': 'Enter Space F2 ArrowLeft ArrowRight Shift+ArrowLeft Shift+ArrowRight',
+                    'aria-keyshortcuts': 'Enter Space F2 C ArrowLeft ArrowRight ArrowUp ArrowDown Home End Escape Shift+ArrowLeft Shift+ArrowRight',
+                    'data-connection-source': isConnectionSource ? 'true' : undefined,
+                    'data-connection-target': isConnectionTarget ? 'true' : undefined,
                     onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => handleTaskBarKeyDown(event, task),
                 } as const;
                 
@@ -564,28 +570,40 @@ export default function ProTaskLayer({
                                 />
                             )}
 
-                            {/* 连线锚点 (Hover 时显示) */}
-                            <div
-                                style={{
-                                    position: 'absolute', right: -16, top: '50%', marginTop: -6, width: 12, height: 12,
-                                    borderRadius: '50%', background: '#fff', border: `2px solid ${isCritical ? '#ff4d4f' : barColor}`,
-                                    cursor: 'crosshair', zIndex: 20,
-                                    opacity: isHovered ? 1 : 0, pointerEvents: isHovered ? 'auto' : 'none',
-                                    transition: 'opacity 0.2s', boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
-                                }}
-                                onPointerDown={(e) => { e.stopPropagation(); handleTaskPointerDown(e, task, 'connect'); }}
-                            />
                         </div>
                     );
                 })();
 
+                const connectionControlElement = isConnectableTask(task) ? (
+                    <ProTaskDependencyControl
+                        active={isConnectionSource}
+                        label={accessibleTaskName}
+                        left={getProTaskDependencyControlLeft(type, x, w)}
+                        top={y + 2}
+                        onToggle={() => toggleConnection(task.id)}
+                        onKeyDown={(event) => {
+                            handleTaskConnectionKeyDown(event, task);
+                        }}
+                        onPointerDown={(event) => {
+                            event.stopPropagation();
+                            handleTaskPointerDown(event, task, 'connect');
+                        }}
+                    />
+                ) : null;
+
                 return (
                     <React.Fragment key={task.id}>
                         {mainBarElement}
+                        {connectionControlElement}
                         {baselineBarElement}
                     </React.Fragment>
                 );
             })}
+
+            <ProTaskDependencyFeedback
+                announcement={connectionAnnouncement}
+                active={Boolean(connectionState)}
+            />
 
             {/* SVG 连线草案 */}
             {dragState && dragState.mode === 'connect' && (() => {
