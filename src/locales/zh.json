@@ -2315,6 +2315,20 @@
             "genericStandard": "通用标准架构图",
             "warehouse3d": "3D 智能仓库展示",
             "flowchartDesigner": "流程图设计器"
+        },
+        "warehouse3d": {
+            "title": "大型零售物流中心",
+            "subtitle": "交互式 3D 仿真视图",
+            "returnToWorkspace": "返回工作台",
+            "instructions": "拖拽旋转，滚轮缩放；方向键旋转，+ / - 缩放，Home 重置视角。",
+            "sceneLabel": "3D 智能仓库交互场景",
+            "controlsLabel": "3D 智能仓库场景控制",
+            "autoRotate": "自动旋转",
+            "showLabels": "显示标签",
+            "showFlow": "物流动态",
+            "resetView": "重置视角",
+            "viewReset": "视角已重置",
+            "loading": "正在加载 3D 场景…"
         }
     },
     "style": {

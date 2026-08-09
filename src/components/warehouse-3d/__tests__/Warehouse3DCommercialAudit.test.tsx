@@ -35,10 +35,13 @@ import WarehouseModel from '../WarehouseModel';
 import Warehouse3DShell from '../Warehouse3DShell';
 import Zones from '../Zones';
 import Warehouse3DPage from '../../../pages/Warehouse3DPage';
+import i18n from '../../../i18n';
 
 describe('Warehouse 3D commercial safeguards', () => {
-    beforeEach(() => {
+    beforeEach(async () => {
         vi.clearAllMocks();
+        Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1024 });
+        await i18n.changeLanguage('zh');
     });
 
     afterEach(() => {
@@ -71,9 +74,38 @@ describe('Warehouse 3D commercial safeguards', () => {
         const { container } = render(<Warehouse3DShell loading />);
 
         expect(container.firstElementChild?.getAttribute('data-smoke-ready')).toBe('warehouse-3d');
-        expect(screen.getByText('Large Retail Logistics Center')).toBeTruthy();
-        expect(screen.getByText('Interactive 3D Simulation View')).toBeTruthy();
+        expect(screen.getByText('大型零售物流中心')).toBeTruthy();
+        expect(screen.getByText('交互式 3D 仿真视图')).toBeTruthy();
+        const returnLink = screen.getByRole('link', { name: '返回工作台' });
+        expect(returnLink.getAttribute('href')).toBe('#/manage');
+        expect(returnLink.style.minHeight).toBe('44px');
         expect(screen.getByRole('status').textContent).toContain('正在加载 3D 场景');
+    });
+
+    it('anchors the controls to the viewport shell instead of a zero-height wrapper', () => {
+        const { container } = render(
+            <Warehouse3DProvider>
+                <Warehouse3DShell loading={false} controls={<ControlsOverlay />} />
+            </Warehouse3DProvider>,
+        );
+        const shell = container.firstElementChild;
+        const toolbar = screen.getByRole('toolbar', { name: '3D 智能仓库场景控制' });
+
+        expect(toolbar.parentElement).toBe(shell);
+        expect(toolbar.className).toContain('bottom-6');
+        expect(toolbar.className).toContain('z-20');
+    });
+
+    it('starts with labels hidden on narrow viewports', () => {
+        Object.defineProperty(window, 'innerWidth', { configurable: true, value: 522 });
+
+        render(
+            <Warehouse3DProvider>
+                <ControlsOverlay />
+            </Warehouse3DProvider>,
+        );
+
+        expect(screen.getByRole('button', { name: '显示标签' }).getAttribute('aria-pressed')).toBe('false');
     });
 
     it('marks the core scene ready before progressively mounting heavy details', () => {
@@ -125,6 +157,21 @@ describe('Warehouse 3D commercial safeguards', () => {
         expect(autoRotate.getAttribute('aria-pressed')).toBe('true');
         expect(labels.getAttribute('aria-pressed')).toBe('false');
         expect(flow.getAttribute('aria-pressed')).toBe('false');
+    });
+
+    it('makes reset completion visible and restores the stable action label', () => {
+        vi.useFakeTimers();
+        render(
+            <Warehouse3DProvider>
+                <ControlsOverlay />
+            </Warehouse3DProvider>,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: '重置视角' }));
+        expect(screen.getByRole('button', { name: '视角已重置' })).toBeTruthy();
+
+        act(() => vi.advanceTimersByTime(1600));
+        expect(screen.getByRole('button', { name: '重置视角' })).toBeTruthy();
     });
 
     it('offers retry and management recovery when scene rendering throws', () => {

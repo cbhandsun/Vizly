@@ -2199,6 +2199,20 @@
             "genericStandard": "Generic Standard Architecture",
             "warehouse3d": "3D Smart Warehouse Display",
             "flowchartDesigner": "Flowchart Designer"
+        },
+        "warehouse3d": {
+            "title": "Large Retail Logistics Center",
+            "subtitle": "Interactive 3D Simulation View",
+            "returnToWorkspace": "Back to workspace",
+            "instructions": "Drag to rotate and scroll to zoom. Use arrow keys to rotate, + / - to zoom, and Home to reset the view.",
+            "sceneLabel": "Interactive 3D smart warehouse scene",
+            "controlsLabel": "3D smart warehouse scene controls",
+            "autoRotate": "Auto rotate",
+            "showLabels": "Show labels",
+            "showFlow": "Logistics flow",
+            "resetView": "Reset view",
+            "viewReset": "View reset",
+            "loading": "Loading 3D scene…"
         }
     },
     "style": {
