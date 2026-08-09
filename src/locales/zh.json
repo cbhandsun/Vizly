@@ -470,6 +470,30 @@
         "canvas": {
             "initializing": "正在初始化画布…"
         },
+        "diffOverlay": {
+            "regionLabel": "差异对比结果",
+            "previousComparison": "与上一次操作对比",
+            "noChanges": "两个版本完全相同",
+            "close": "关闭",
+            "closeLabel": "关闭差异对比",
+            "summaryNode": "{{count}} 节点",
+            "summaryEdge": "{{count}} 连线",
+            "addedCount": "新增 {{count}}",
+            "removedCount": "删除 {{count}}",
+            "modifiedCount": "修改 {{count}}",
+            "addedNodesTitle": "新增节点：",
+            "removedNodesTitle": "删除节点：",
+            "modifiedNodesTitle": "修改节点：",
+            "addedEdgesTitle": "新增连线：",
+            "removedEdgesTitle": "删除连线：",
+            "modifiedEdgesTitle": "修改连线：",
+            "addedNode": "新增节点 {{index}}",
+            "unnamedNode": "未命名节点 {{index}}",
+            "addedEdge": "新增连线 {{index}}",
+            "unnamedEdge": "未命名连线 {{index}}",
+            "modifiedEdge": "连线 {{index}}",
+            "changeCount": "{{count}}项"
+        },
         "toolbar": {
             "undo": "撤销 (Ctrl+Z)",
             "redo": "重做 (Ctrl+Y)",

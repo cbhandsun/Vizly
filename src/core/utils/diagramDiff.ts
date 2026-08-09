@@ -34,6 +34,12 @@ export interface DiffResult {
   hasDiff: boolean;
 }
 
+export interface DiffSummaryFormatter {
+  node: (count: number) => string;
+  edge: (count: number) => string;
+  noChanges: string;
+}
+
 /** 运行时字段 — 这些字段在 diff 比较中应被忽略 */
 const IGNORED_NODE_KEYS = new Set([
   'measured', 'positionAbsolute', '__rel', 'selected', 'dragging',
@@ -215,13 +221,13 @@ export function diffDiagrams(
 /**
  * 生成 Diff 摘要文本
  */
-export function diffSummary(result: DiffResult): string {
+export function diffSummary(result: DiffResult, formatter: DiffSummaryFormatter): string {
   const parts: string[] = [];
-  if (result.addedNodes.length > 0) parts.push(`+${result.addedNodes.length} 节点`);
-  if (result.removedNodes.length > 0) parts.push(`-${result.removedNodes.length} 节点`);
-  if (result.modifiedNodes.length > 0) parts.push(`~${result.modifiedNodes.length} 节点`);
-  if (result.addedEdges.length > 0) parts.push(`+${result.addedEdges.length} 连线`);
-  if (result.removedEdges.length > 0) parts.push(`-${result.removedEdges.length} 连线`);
-  if (result.modifiedEdges.length > 0) parts.push(`~${result.modifiedEdges.length} 连线`);
-  return parts.length > 0 ? parts.join('  ') : '无变化';
+  if (result.addedNodes.length > 0) parts.push(`+${formatter.node(result.addedNodes.length)}`);
+  if (result.removedNodes.length > 0) parts.push(`-${formatter.node(result.removedNodes.length)}`);
+  if (result.modifiedNodes.length > 0) parts.push(`~${formatter.node(result.modifiedNodes.length)}`);
+  if (result.addedEdges.length > 0) parts.push(`+${formatter.edge(result.addedEdges.length)}`);
+  if (result.removedEdges.length > 0) parts.push(`-${formatter.edge(result.removedEdges.length)}`);
+  if (result.modifiedEdges.length > 0) parts.push(`~${formatter.edge(result.modifiedEdges.length)}`);
+  return parts.length > 0 ? parts.join('  ') : formatter.noChanges;
 }

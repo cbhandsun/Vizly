@@ -465,6 +465,33 @@
         "canvas": {
             "initializing": "Initializing canvas…"
         },
+        "diffOverlay": {
+            "regionLabel": "Diff comparison results",
+            "previousComparison": "Compared with previous action",
+            "noChanges": "These versions are identical",
+            "close": "Close",
+            "closeLabel": "Close diff comparison",
+            "summaryNode_one": "{{count}} node",
+            "summaryNode_other": "{{count}} nodes",
+            "summaryEdge_one": "{{count}} edge",
+            "summaryEdge_other": "{{count}} edges",
+            "addedCount": "Added {{count}}",
+            "removedCount": "Removed {{count}}",
+            "modifiedCount": "Modified {{count}}",
+            "addedNodesTitle": "Added nodes:",
+            "removedNodesTitle": "Removed nodes:",
+            "modifiedNodesTitle": "Modified nodes:",
+            "addedEdgesTitle": "Added edges:",
+            "removedEdgesTitle": "Removed edges:",
+            "modifiedEdgesTitle": "Modified edges:",
+            "addedNode": "Added node {{index}}",
+            "unnamedNode": "Unnamed node {{index}}",
+            "addedEdge": "Added edge {{index}}",
+            "unnamedEdge": "Unnamed edge {{index}}",
+            "modifiedEdge": "Edge {{index}}",
+            "changeCount_one": "{{count}} change",
+            "changeCount_other": "{{count}} changes"
+        },
         "toolbar": {
             "undo": "Undo (Ctrl+Z)",
             "redo": "Redo (Ctrl+Y)",

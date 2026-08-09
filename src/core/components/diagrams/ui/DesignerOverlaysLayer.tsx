@@ -182,7 +182,6 @@ export const DesignerOverlaysLayer: React.FC<DesignerOverlaysLayerProps> = ({
                     <DiffOverlay
                         diff={diff.result}
                         onClose={() => diff.setResult(null)}
-                        versionLabel="与上一次操作对比"
                     />
                 </React.Suspense>
             )}

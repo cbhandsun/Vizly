@@ -4,6 +4,12 @@ import { describe, expect, it } from 'vitest';
 import { diffDiagrams, diffSummary } from '../diagramDiff';
 import { resolveGlobalNodeOverlapsSimple } from '../overlapUtils';
 
+const englishDiffSummaryFormatter = {
+  node: (count: number) => `${count} ${count === 1 ? 'node' : 'nodes'}`,
+  edge: (count: number) => `${count} ${count === 1 ? 'edge' : 'edges'}`,
+  noChanges: 'No changes',
+};
+
 const node = (id: string, x: number, data: Record<string, unknown> = {}): Node => ({
   id,
   position: { x, y: 0 },
@@ -32,7 +38,13 @@ describe('diagram geometry tools', () => {
     expect(result.modifiedEdges[0].changes).toEqual([
       { key: 'target', oldValue: 'removed', newValue: 'added' },
     ]);
-    expect(diffSummary(result)).toContain('+1 节点');
+    expect(diffSummary(result, englishDiffSummaryFormatter)).toBe('+1 node  -1 node  ~1 node  ~1 edge');
+  });
+
+  it('formats an empty diff with the caller-provided language', () => {
+    const result = diffDiagrams({ nodes: [], edges: [] }, { nodes: [], edges: [] });
+
+    expect(diffSummary(result, englishDiffSummaryFormatter)).toBe('No changes');
   });
 
   it('uses validated node descriptions for diff labels when the canvas has no legacy label', () => {
