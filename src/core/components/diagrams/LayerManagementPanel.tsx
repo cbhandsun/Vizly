@@ -18,6 +18,7 @@ import type { LayerConfig } from './hooks/useLayerManagement';
 import { isLayerNameAvailable, normalizeLayerNameInput } from '../../utils/layerName';
 import { resolveLayerTouchTargetSize } from './layerInteractionMetrics';
 import { getUiScale } from '../shared/viewportStore';
+import './LayerManagementPanel.css';
 
 /** 预定义图层颜色 */
 const LAYER_COLORS = [
@@ -169,6 +170,7 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
     const [editName, setEditName] = useState('');
     const [editError, setEditError] = useState<string | null>(null);
     const [pendingDeleteLayer, setPendingDeleteLayer] = useState<LayerConfig | null>(null);
+    const createTriggerRef = useRef<HTMLButtonElement>(null);
     const createInputRef = useRef<InputRef>(null);
     const editInputRef = useRef<InputRef>(null);
     const skipNextEditBlurRef = useRef(false);
@@ -224,6 +226,7 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
         setIsCreating(false);
         setCreateName('');
         setCreateError(null);
+        requestAnimationFrame(() => createTriggerRef.current?.focus());
     };
 
     const handleCreate = () => {
@@ -283,14 +286,15 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
     };
 
     return (
-        <div style={{ padding: 16, background: '#fafafa', height: '100%', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="layer-management-panel" style={{ padding: 16, background: '#fafafa', height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <div className="layer-management-panel__header">
                 <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>{t('designer.layersPanel.title')}</h3>
                 {isCreating ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
-                        <Space.Compact>
+                    <div className="layer-management-panel__create">
+                        <div className="layer-management-panel__create-controls">
                             <Input
                                 ref={createInputRef}
+                                className="layer-management-panel__create-input"
                                 value={createName}
                                 autoFocus
                                 maxLength={80}
@@ -299,14 +303,18 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
                                 aria-describedby={createError ? CREATE_ERROR_ID : undefined}
                                 placeholder={t('designer.layersPanel.namePlaceholder')}
                                 status={createError ? 'error' : undefined}
-                                style={{ width: 180, minHeight: touchTargetSize }}
+                                style={{ minHeight: touchTargetSize }}
+                                data-preserve-drawer-on-escape="true"
                                 onChange={(event) => {
                                     setCreateName(event.target.value);
                                     if (createError) setCreateError(null);
                                 }}
                                 onPressEnter={handleCreate}
                                 onKeyDown={(event) => {
-                                    if (event.key === 'Escape') cancelCreate();
+                                    if (event.key !== 'Escape') return;
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    cancelCreate();
                                 }}
                             />
                             <Button
@@ -324,7 +332,7 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
                             >
                                 {t('common.cancel')}
                             </Button>
-                        </Space.Compact>
+                        </div>
                         {createError ? (
                             <div id={CREATE_ERROR_ID} role="alert" style={{ color: '#cf1322', fontSize: 12 }}>
                                 {createError}
@@ -333,6 +341,7 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
                     </div>
                 ) : (
                     <Button
+                        ref={createTriggerRef}
                         type="primary"
                         icon={<PlusOutlined />}
                         aria-label={t('designer.layersPanel.newLayer')}
@@ -455,7 +464,7 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
                                         </div>
                                     ) : null}
 
-                                    <Space size={4}>
+                                    <Space className="layer-management-panel__actions" size={4} wrap>
                                         <Tooltip title={t(layer.visible ? 'designer.layersPanel.hide' : 'designer.layersPanel.show')}>
                                             <Button
                                                 type="text"

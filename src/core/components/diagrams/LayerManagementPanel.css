@@ -1,0 +1,52 @@
+.layer-management-panel__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.layer-management-panel__create {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+}
+
+.layer-management-panel__create-controls {
+    display: flex;
+}
+
+.layer-management-panel__create-input {
+    width: 180px;
+}
+
+.layer-management-panel__actions {
+    width: 100%;
+    flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+    .layer-management-panel__header {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .layer-management-panel__create {
+        align-items: stretch;
+        width: 100%;
+    }
+
+    .layer-management-panel__create-controls {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        width: 100%;
+    }
+
+    .layer-management-panel__create-input {
+        grid-column: 1 / -1;
+        min-width: 0;
+        width: 100%;
+    }
+}

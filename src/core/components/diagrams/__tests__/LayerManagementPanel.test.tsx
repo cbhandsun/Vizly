@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { readFileSync } from 'node:fs';
 import React, { useState } from 'react';
 import { createInstance } from 'i18next';
 import { I18nextProvider } from 'react-i18next';
@@ -219,7 +220,8 @@ describe('LayerManagementPanel', () => {
             />,
         );
 
-        fireEvent.click(screen.getByRole('button', { name: '新建图层' }));
+        const createTrigger = screen.getByRole('button', { name: '新建图层' });
+        fireEvent.click(createTrigger);
         fireEvent.change(screen.getByRole('textbox', { name: '新图层名称' }), {
             target: { value: '   ' },
         });
@@ -231,9 +233,48 @@ describe('LayerManagementPanel', () => {
         expect(input.getAttribute('aria-describedby')).toBe(alert.id);
         expect(document.activeElement).toBe(input);
         expect(onCreate).not.toHaveBeenCalled();
+        expect(input.getAttribute('data-preserve-drawer-on-escape')).toBe('true');
 
-        fireEvent.click(screen.getByRole('button', { name: '取消新建图层' }));
+        fireEvent.keyDown(input, { key: 'Escape' });
         expect(screen.queryByRole('textbox', { name: '新图层名称' })).toBeNull();
+        return waitFor(() => {
+            expect(document.activeElement).toBe(screen.getByRole('button', { name: '新建图层' }));
+        });
+    });
+
+    it('uses responsive creation and wrapping action layouts on narrow screens', () => {
+        render(
+            <LayerManagementPanel
+                layers={[layer, reviewLayer]}
+                activeLayerId="layer-review"
+                onSetActive={vi.fn()}
+                onToggleVisibility={vi.fn()}
+                onToggleLock={vi.fn()}
+                onRename={vi.fn()}
+                onCreate={vi.fn()}
+                onDelete={vi.fn()}
+                onReorder={vi.fn()}
+                onSetColor={vi.fn()}
+            />,
+        );
+
+        const deleteButton = screen.getByRole('button', { name: '删除图层：评审图层' });
+        expect(deleteButton.closest('.layer-management-panel__actions')).toBeTruthy();
+
+        fireEvent.click(screen.getByRole('button', { name: '新建图层' }));
+        const input = screen.getByRole('textbox', { name: '新图层名称' });
+        expect(input.closest('.layer-management-panel__create-controls')).toBeTruthy();
+
+        const css = readFileSync('src/core/components/diagrams/LayerManagementPanel.css', 'utf8');
+        expect(css).toMatch(
+            /\.layer-management-panel__actions\s*\{[^}]*width:\s*100%;[^}]*flex-wrap:\s*wrap;/s,
+        );
+        expect(css).toMatch(
+            /@media \(max-width: 768px\)[\s\S]*?\.layer-management-panel__create-controls\s*\{[^}]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\);/,
+        );
+        expect(css).toMatch(
+            /\.layer-management-panel__create-input\s*\{[^}]*grid-column:\s*1 \/ -1;[^}]*width:\s*100%;/s,
+        );
     });
 
     it('keeps duplicate layer creation in place with an associated error', () => {
