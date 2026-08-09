@@ -1479,10 +1479,11 @@
         "native": "原生"
     },
     "aiChat": {
-        "title": "AI 架构助手",
+        "title": "AI 助手",
         "history": "历史对话",
         "historyTitle": "历史对话",
         "newConversation": "新建对话",
+        "newConversationTitle": "新建对话",
         "deleteConversation": "删除对话？",
         "deleteConversationDescription": "“{{title}}”将被永久删除，此操作无法撤销。",
         "deleteConversationLabel": "删除 {{title}}",
@@ -1503,6 +1504,7 @@
         "apply": "应用",
         "inputHint": "⌨️ Enter 发送 | Shift+Enter 换行 | Esc 关闭",
         "inputPlaceholder": "描述你想生成的架构图... 输入 / 查看命令",
+        "genericInputPlaceholder": "描述你想添加、修改或分析的内容... 输入 / 查看命令",
         "inputLabel": "向 AI 助手发送消息",
         "voiceInput": "语音输入（测试版）",
         "stopGeneration": "停止生成",
@@ -1521,6 +1523,7 @@
         "cmdClearDesc": "清空对话",
         "cmdHelpDesc": "显示帮助",
         "welcomeMsg": "你好！我是架构图 AI 助手。您可以直接告诉我架构需求，或者选择下方的示例开始：\n\n- \"画一个典型的电商微服务架构\"\n- \"生成一个带有 S3 和 Lambda 的 AWS 云架构\"\n- \"创建一个简单的 React 组件关系图\"",
+        "genericWelcomeMsg": "你好！我是你的 AI 图表助手。我可以帮助你添加内容、连接想法、优化布局或审视当前图表。可以试试：\n\n- \"添加一个评审里程碑\"\n- \"将审批连接到发布\"\n- \"把当前图表整理成更清晰的布局\"",
         "clearedMsg": "对话已清空。有什么可以帮助您的？",
         "noModel": "没有找到可用的模型，请先在设置中配置 API Key 并启用模型",
         "invalidDiagram": "无效的图表数据",
@@ -1611,7 +1614,12 @@
         },
         "help": {
             "title": "📚 可用命令",
-            "footer": "⚡ 标记的命令会直接操纵画布，无需等待 AI 响应"
+            "footer": "⚡ 标记的命令会直接操纵画布，无需等待 AI 响应",
+            "generalTitle": "图表命令",
+            "aiTitle": "AI 命令",
+            "analyzeDescription": "分析当前图表并返回结构化报告",
+            "brainstormDescription": "围绕选中节点扩展相关想法（仅思维导图）",
+            "tip": "提示：按 Alt + / 可切换面板，输入 / 可浏览命令。"
         }
     },
     "export": {

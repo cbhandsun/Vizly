@@ -16,10 +16,11 @@ export type AIChatRequestValidationResult =
     | { ok: false; reason: 'missing-model' | 'missing-api-key' | 'invalid-endpoint' };
 
 export type AIChatConfigurationState =
-    | { ready: true; providerName: string }
+    | { ready: true; providerId: string; providerName: string }
     | {
         ready: false;
         reason: 'missing-model' | AIProviderConnectionIssue;
+        providerId?: string;
         providerName?: string;
     };
 
@@ -90,12 +91,14 @@ export const getAIChatConfigurationState = (
         return {
             ready: false,
             reason: readiness.issue,
+            providerId: selection.provider.id,
             providerName: selection.provider.name,
         };
     }
 
     return {
         ready: true,
+        providerId: selection.provider.id,
         providerName: selection.provider.name,
     };
 };

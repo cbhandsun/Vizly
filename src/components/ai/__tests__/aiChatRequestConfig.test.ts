@@ -162,6 +162,7 @@ describe('aiChatRequestConfig', () => {
         expect(getAIChatConfigurationState(config)).toEqual({
             ready: false,
             reason: 'missing-api-key',
+            providerId: 'openai',
             providerName: 'OpenAI',
         });
     });

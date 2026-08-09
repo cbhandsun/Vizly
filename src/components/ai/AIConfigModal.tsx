@@ -44,7 +44,7 @@ import {
     logAIConfigRequestFailure,
 } from './aiLogging';
 import { filterAIModels, filterAIProviders, groupAIModels } from './aiConfigModelCollections';
-import { createCustomAIProvider } from './aiConfigProviderMutations';
+import { createCustomAIProvider, resolveAIConfigInitialProviderId } from './aiConfigProviderMutations';
 import { getAIProviderConnectionReadiness } from './aiProviderConnectionReadiness';
 import {
     createAIProviderConnectionFailure,
@@ -72,15 +72,18 @@ const loadStorageService = async () => (await import('@/services/SupabaseStorage
 
 interface AIConfigModalProps {
     open: boolean;
+    initialProviderId?: string;
     onCancel: () => void;
     onSave: () => void;
 }
 
-const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave }) => {
+const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, onCancel, onSave }) => {
     const { t } = useTranslation();
     const { user } = useAuth();
     const [config, setConfig] = useAIConfigModalConfig(open, user?.id);
-    const [selectedProviderId, setSelectedProviderId] = useState<string>('global_settings');
+    const [selectedProviderId, setSelectedProviderId] = useState<string>(() => (
+        resolveAIConfigInitialProviderId(initialProviderId, config.providers)
+    ));
     const modalCloseButtonRef = useRef<HTMLButtonElement>(null);
     const [searchText, setSearchText] = useState('');
     const [isApiKeyVisible, setIsApiKeyVisible] = useState(false);

@@ -34,7 +34,7 @@ export interface CanvasOperations {
 export interface AIChatPanelProps {
     open: boolean;
     onClose: () => void;
-    onOpenConfig: () => void;
+    onOpenConfig: (providerId?: string) => void;
     onApplyJson: (json: string) => void;
     onPreviewJson: (json: string) => void;
     /** 当前画布节点引用 */

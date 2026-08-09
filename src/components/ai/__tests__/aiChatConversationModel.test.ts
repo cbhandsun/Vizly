@@ -10,6 +10,11 @@ import {
     resolvePristineAIChatConversationReuse,
 } from '../aiChatConversationModel';
 import type { Conversation } from '@/services/ai/AIConversationService';
+import {
+    isConfigurationIndependentAIChatInput,
+    localizePristineAIChatConversations,
+    resolveAIChatCopyKeys,
+} from '../aiChatPresentation';
 
 const conversation = (id: string): Conversation => ({
     id,
@@ -81,5 +86,68 @@ describe('aiChatConversationModel', () => {
         expect(normalizeAIChatConversationTitle('', 'Fallback')).toBe('Fallback');
         expect(normalizeAIChatConversationTitle(null, 'Fallback')).toBe('Fallback');
         expect(normalizeAIChatConversationTitle('x'.repeat(500), 'Fallback')).toHaveLength(200);
+    });
+
+    it('uses architecture-specific copy only for architecture diagrams', () => {
+        expect(resolveAIChatCopyKeys('architecture-diagram')).toEqual({
+            inputPlaceholder: 'aiChat.inputPlaceholder',
+            welcomeMessage: 'aiChat.welcomeMsg',
+        });
+        expect(resolveAIChatCopyKeys('project-timeline')).toEqual({
+            inputPlaceholder: 'aiChat.genericInputPlaceholder',
+            welcomeMessage: 'aiChat.genericWelcomeMsg',
+        });
+        expect(resolveAIChatCopyKeys(undefined)).toEqual({
+            inputPlaceholder: 'aiChat.genericInputPlaceholder',
+            welcomeMessage: 'aiChat.genericWelcomeMsg',
+        });
+    });
+
+    it('allows only explicit configuration-independent commands through the offline gate', () => {
+        expect(isConfigurationIndependentAIChatInput('/help')).toBe(true);
+        expect(isConfigurationIndependentAIChatInput('  /CLEAR  ')).toBe(true);
+        expect(isConfigurationIndependentAIChatInput('/present now')).toBe(true);
+        expect(isConfigurationIndependentAIChatInput('/analyze')).toBe(false);
+        expect(isConfigurationIndependentAIChatInput('create a diagram')).toBe(false);
+        expect(isConfigurationIndependentAIChatInput('')).toBe(false);
+        expect(isConfigurationIndependentAIChatInput(null)).toBe(false);
+    });
+
+    it('relocalizes only pristine conversations and preserves user work', () => {
+        const pristine = {
+            ...conversation('pristine'),
+            title: '旧对话',
+            messages: [{ id: 'welcome', role: 'assistant' as const, content: '旧欢迎语' }],
+        };
+        const active = {
+            ...conversation('active'),
+            messages: [
+                { id: 'welcome', role: 'assistant' as const, content: '旧欢迎语' },
+                { id: 'user', role: 'user' as const, content: 'Keep my prompt' },
+            ],
+        };
+        const withArtifact = {
+            ...conversation('artifact'),
+            messages: [{
+                id: 'artifact-message',
+                role: 'assistant' as const,
+                content: 'Generated output',
+                hasJson: true,
+                jsonContent: '{}',
+            }],
+        };
+
+        const localized = localizePristineAIChatConversations(
+            [pristine, active, withArtifact],
+            'Current welcome',
+            'New conversation',
+        );
+
+        expect(localized[0]).toMatchObject({
+            title: 'New conversation',
+            messages: [{ content: 'Current welcome' }],
+        });
+        expect(localized[1]).toBe(active);
+        expect(localized[2]).toBe(withArtifact);
     });
 });

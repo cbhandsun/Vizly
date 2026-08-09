@@ -1363,10 +1363,11 @@
         "native": "Native"
     },
     "aiChat": {
-        "title": "AI Architect",
+        "title": "AI Assistant",
         "history": "History",
         "historyTitle": "Chat History",
         "newConversation": "New conversation",
+        "newConversationTitle": "New conversation",
         "deleteConversation": "Delete conversation?",
         "deleteConversationDescription": "“{{title}}” will be permanently deleted. This action cannot be undone.",
         "deleteConversationLabel": "Delete {{title}}",
@@ -1387,6 +1388,7 @@
         "apply": "Apply",
         "inputHint": "⌨️ Enter to send | Shift+Enter new line | Esc close",
         "inputPlaceholder": "Describe the architecture diagram... Type / for commands",
+        "genericInputPlaceholder": "Describe what you want to add, change, or analyze... Type / for commands",
         "inputLabel": "Message the AI assistant",
         "voiceInput": "Voice input (Beta)",
         "stopGeneration": "Stop generating",
@@ -1405,6 +1407,7 @@
         "cmdClearDesc": "Clear conversation",
         "cmdHelpDesc": "Show help",
         "welcomeMsg": "Hello! I'm the Architecture AI Assistant. You can tell me your architecture needs, or try one of these examples:\n\n- \"Draw a typical e-commerce microservice architecture\"\n- \"Generate an AWS cloud architecture with S3 and Lambda\"\n- \"Create a simple React component relationship diagram\"",
+        "genericWelcomeMsg": "Hello! I'm your AI diagram assistant. I can help you add content, connect ideas, improve the layout, or review the current diagram. Try one of these examples:\n\n- \"Add a review milestone\"\n- \"Connect approval to release\"\n- \"Organize this diagram into a clearer layout\"",
         "clearedMsg": "Conversation cleared. How can I help?",
         "noModel": "No models available. Please configure an API Key and enable a model in settings.",
         "invalidDiagram": "Invalid diagram data",
@@ -1495,7 +1498,12 @@
         },
         "help": {
             "title": "Command Reference",
-            "footer": "Type / for commands"
+            "footer": "Type / for commands",
+            "generalTitle": "Diagram commands",
+            "aiTitle": "AI commands",
+            "analyzeDescription": "Analyze the current diagram and return a structured report",
+            "brainstormDescription": "Expand the selected node with related ideas (mind maps only)",
+            "tip": "Tip: press Alt + / to toggle the panel, or type / to browse commands."
         }
     },
     "export": {

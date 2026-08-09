@@ -13,13 +13,19 @@ import {
     resolvePristineAIChatConversationReuse,
 } from './aiChatConversationModel';
 import { logAIChatConversationSyncFailure } from './aiLogging';
+import { localizePristineAIChatConversations } from './aiChatPresentation';
 
 interface UseAIChatConversationsOptions {
     userId?: string;
     welcomeMessage: string;
+    newConversationTitle: string;
 }
 
-export function useAIChatConversations({ userId, welcomeMessage }: UseAIChatConversationsOptions) {
+export function useAIChatConversations({
+    userId,
+    welcomeMessage,
+    newConversationTitle,
+}: UseAIChatConversationsOptions) {
     const [conversations, setConversations] = useState<Conversation[]>(() => {
         aiConversationService.setUserId(userId || null);
         return aiConversationService.getConversations();
@@ -28,11 +34,32 @@ export function useAIChatConversations({ userId, welcomeMessage }: UseAIChatConv
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editingTitle, setEditingTitle] = useState('');
 
+    const presentedConversations = useMemo(
+        () => localizePristineAIChatConversations(
+            conversations,
+            welcomeMessage,
+            newConversationTitle,
+        ),
+        [conversations, newConversationTitle, welcomeMessage],
+    );
     const activeConversation = useMemo(
-        () => conversations.find(conversation => conversation.id === activeId) || null,
-        [activeId, conversations],
+        () => presentedConversations.find(conversation => conversation.id === activeId) || null,
+        [activeId, presentedConversations],
     );
     const messages = useMemo(() => activeConversation?.messages || [], [activeConversation]);
+
+    useEffect(() => {
+        const changed = presentedConversations.filter(
+            (conversation, index) => conversation !== conversations[index],
+        );
+        if (changed.length === 0) return;
+        changed.forEach((conversation) => {
+            aiConversationService.updateConversation(conversation.id, {
+                title: conversation.title,
+                messages: conversation.messages,
+            });
+        });
+    }, [conversations, presentedConversations]);
 
     useEffect(() => {
         let cancelled = false;
@@ -60,7 +87,7 @@ export function useAIChatConversations({ userId, welcomeMessage }: UseAIChatConv
 
     const handleNewChat = useCallback(() => {
         const reusableConversation = resolvePristineAIChatConversationReuse(
-            conversations,
+            presentedConversations,
             welcomeMessage,
         );
         if (reusableConversation) {
@@ -79,9 +106,10 @@ export function useAIChatConversations({ userId, welcomeMessage }: UseAIChatConv
             content: welcomeMessage,
         };
         const conversation = aiConversationService.createConversation(welcome);
+        aiConversationService.updateConversation(conversation.id, { title: newConversationTitle });
         setConversations(aiConversationService.getConversations());
         setActiveId(conversation.id);
-    }, [conversations, welcomeMessage]);
+    }, [newConversationTitle, presentedConversations, welcomeMessage]);
 
     useEffect(() => {
         if (userId || conversations.length > 0) return;
@@ -138,7 +166,7 @@ export function useAIChatConversations({ userId, welcomeMessage }: UseAIChatConv
     }, [activeId]);
 
     return {
-        conversations,
+        conversations: presentedConversations,
         setConversations,
         activeId,
         setActiveId,

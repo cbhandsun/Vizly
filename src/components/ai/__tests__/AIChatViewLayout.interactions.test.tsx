@@ -54,7 +54,9 @@ const createProps = (overrides: Partial<LayoutProps> = {}): LayoutProps => ({
     aiConfig: { activeModelKey: 'provider:model' },
     availableModels: [{ label: 'Model', value: 'provider:model', group: 'Provider' }],
     activeModelName: 'Model',
-    configurationState: { ready: true, providerName: 'Provider' },
+    configurationState: { ready: true, providerId: 'provider', providerName: 'Provider' },
+    canSubmitWithoutConfiguration: false,
+    inputPlaceholder: 'Describe the diagram',
     handleModelChange: vi.fn(),
     onOpenConfig: vi.fn(),
     onClose: vi.fn(),
@@ -201,6 +203,44 @@ describe('AIChatViewLayout commercial interactions', () => {
         expect((sendButton as HTMLButtonElement).disabled).toBe(true);
         fireEvent.keyDown(composer, { key: 'Enter' });
         expect(handleSendMessage).not.toHaveBeenCalled();
+    });
+
+    it('allows configuration-independent help commands while the provider is not ready', () => {
+        const handleSendMessage = vi.fn(async () => undefined);
+        render(<AIChatViewLayout {...createProps({
+            configurationState: {
+                ready: false,
+                reason: 'missing-api-key',
+                providerId: 'provider',
+                providerName: 'Provider',
+            },
+            canSubmitWithoutConfiguration: true,
+            inputValue: '/help',
+            handleSendMessage,
+        })} />);
+
+        const composer = screen.getByRole('textbox', { name: 'aiChat.inputLabel' });
+        const sendButton = screen.getByRole('button', { name: 'aiChat.sendMessage' });
+
+        expect((sendButton as HTMLButtonElement).disabled).toBe(false);
+        fireEvent.keyDown(composer, { key: 'Enter' });
+        expect(handleSendMessage).toHaveBeenCalledTimes(1);
+    });
+
+    it('opens the provider responsible for the readiness warning', () => {
+        const onOpenConfig = vi.fn();
+        render(<AIChatViewLayout {...createProps({
+            configurationState: {
+                ready: false,
+                reason: 'missing-api-key',
+                providerId: 'provider',
+                providerName: 'Provider',
+            },
+            onOpenConfig,
+        })} />);
+
+        fireEvent.click(screen.getByRole('button', { name: 'aiChat.configureNow' }));
+        expect(onOpenConfig).toHaveBeenCalledWith('provider');
     });
 
     it('submits the preserved draft after configuration becomes ready', () => {

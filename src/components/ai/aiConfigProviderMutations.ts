@@ -10,6 +10,18 @@ export const createCustomAIProvider = (id: string, name: string): AIProviderConf
     models: [],
 });
 
+export const resolveAIConfigInitialProviderId = (
+    requestedProviderId: unknown,
+    providers: readonly AIProviderConfig[],
+): string => {
+    if (typeof requestedProviderId !== 'string') return 'global_settings';
+    const normalized = requestedProviderId.trim();
+    if (!normalized || normalized.length > 160) return 'global_settings';
+    return providers.some((provider) => provider.id === normalized)
+        ? normalized
+        : 'global_settings';
+};
+
 const findFallbackActiveModelKey = (providers: AIProviderConfig[]): string => {
     for (const provider of providers) {
         if (!provider.enabled) continue;

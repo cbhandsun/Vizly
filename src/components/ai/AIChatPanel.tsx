@@ -23,6 +23,10 @@ import { AIChatViewLayout, type AIChatSlashCommand } from './AIChatViewLayout';
 import { useAIChatRequestLifecycle } from './useAIChatRequestLifecycle';
 import { getAIChatConfigurationState } from './aiChatRequestConfig';
 import { shouldCloseAIChatOnKeyDown } from './aiChatEscape';
+import {
+    isConfigurationIndependentAIChatInput,
+    resolveAIChatCopyKeys,
+} from './aiChatPresentation';
 
 // --- Message Item Component (with Memo) ---
 /**
@@ -32,6 +36,8 @@ import { shouldCloseAIChatOnKeyDown } from './aiChatEscape';
 export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, onOpenConfig, onApplyJson, onPreviewJson, diagramNodesRef, diagramEdgesRef, canvasOps, pluginId, diagramId }) => {
     const { t } = useTranslation();
     const { user } = useAuth();
+    const copyKeys = resolveAIChatCopyKeys(pluginId);
+    const welcomeMessage = t(copyKeys.welcomeMessage);
 
     // --- State ---
     // [M-8] Memoize SLASH_COMMANDS: t() results are stable between renders unless locale changes.
@@ -68,13 +74,15 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
         addLocalMessage,
     } = useAIChatConversations({
         userId: user?.id,
-        welcomeMessage: t('aiChat.welcomeMsg'),
+        welcomeMessage,
+        newConversationTitle: t('aiChat.newConversationTitle'),
     });
     const [inputValue, setInputValue] = useState('');
     const [showCommands, setShowCommands] = useState(false);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Default to closed overlay
     const [filteredCommands, setFilteredCommands] = useState(SLASH_COMMANDS);
     const [isListening, setIsListening] = useState(false); // Voice UI Feedback state
+    const canSubmitWithoutConfiguration = isConfigurationIndependentAIChatInput(inputValue);
 
     const [aiConfig, setAiConfig] = useState(() => getAIConfig(user?.id));
 
@@ -279,8 +287,8 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
             const categories = {
                 general: SLASH_COMMANDS.filter(c => !['/brainstorm'].includes(c.key)),
                 ai: [
-                    { key: '/analyze', label: '/analyze', description: '深入分析当前图表架构并输出报告' },
-                    { key: '/brainstorm', label: '/brainstorm', description: '针对选中节点进行思维发散 (仅限脑图模式)' }
+                    { key: '/analyze', label: '/analyze', description: t('aiChat.help.analyzeDescription') },
+                    { key: '/brainstorm', label: '/brainstorm', description: t('aiChat.help.brainstormDescription') }
                 ]
             };
             
@@ -288,11 +296,11 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
                 `### ${title}\n` + cmds.map(c => `- **${c.label}**: ${c.description}`).join('\n');
 
             const helpMarkdown = `
-${renderCategory('🌐 通用绘图指令', categories.general)}
+${renderCategory(t('aiChat.help.generalTitle'), categories.general)}
 
-${renderCategory('🤖 AI 智能指令', categories.ai)}
+${renderCategory(t('aiChat.help.aiTitle'), categories.ai)}
 
-> **Pro Tip**: 使用 **Alt + /** 快速切换面板。输入「/」启动命令自动补全。
+> ${t('aiChat.help.tip')}
 `;
             addLocalMessage('assistant', helpMarkdown);
             return true;
@@ -588,6 +596,8 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
             availableModels={availableModels}
             activeModelName={activeModelName}
             configurationState={configurationState}
+            canSubmitWithoutConfiguration={canSubmitWithoutConfiguration}
+            inputPlaceholder={t(copyKeys.inputPlaceholder)}
             handleModelChange={handleModelChange}
             onOpenConfig={onOpenConfig}
             onClose={onClose}

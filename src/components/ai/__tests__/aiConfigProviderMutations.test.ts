@@ -5,6 +5,7 @@ import {
     createCustomAIProvider,
     removeAIModel,
     removeAIProvider,
+    resolveAIConfigInitialProviderId,
 } from '../aiConfigProviderMutations';
 
 const config: AIConfigState = {
@@ -90,5 +91,22 @@ describe('AI config deletion mutations', () => {
     it('returns the original config for unknown provider and model targets', () => {
         expect(removeAIProvider(config, 'missing-provider')).toBe(config);
         expect(removeAIModel(config, 'custom-one', 'missing-model')).toBe(config);
+    });
+});
+
+describe('resolveAIConfigInitialProviderId', () => {
+    it('accepts only an existing provider id', () => {
+        expect(resolveAIConfigInitialProviderId('custom-two', config.providers)).toBe('custom-two');
+    });
+
+    it.each([
+        undefined,
+        null,
+        '',
+        'missing-provider',
+        'x'.repeat(161),
+        42,
+    ])('falls back to global settings for invalid input: %s', (input) => {
+        expect(resolveAIConfigInitialProviderId(input, config.providers)).toBe('global_settings');
     });
 });

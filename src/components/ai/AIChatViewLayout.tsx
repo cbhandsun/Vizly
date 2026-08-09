@@ -82,8 +82,10 @@ interface AIChatViewLayoutProps {
     availableModels: AIChatModelOption[];
     activeModelName: string;
     configurationState: AIChatConfigurationState;
+    canSubmitWithoutConfiguration: boolean;
+    inputPlaceholder: string;
     handleModelChange: (value: string) => void;
-    onOpenConfig: () => void;
+    onOpenConfig: (providerId?: string) => void;
     onClose: () => void;
     onPreviewJson?: (json: string) => void;
     onApplyJson?: (json: string) => void;
@@ -130,6 +132,8 @@ export const AIChatViewLayout: React.FC<AIChatViewLayoutProps> = ({
     availableModels,
     activeModelName,
     configurationState,
+    canSubmitWithoutConfiguration,
+    inputPlaceholder,
     handleModelChange,
     onOpenConfig,
     onClose,
@@ -155,6 +159,7 @@ export const AIChatViewLayout: React.FC<AIChatViewLayoutProps> = ({
     setSaveTitle,
     saveTarget,
 }) => {
+    const canSubmit = configurationState.ready || canSubmitWithoutConfiguration;
     const historyNewConversationRef = React.useRef<HTMLButtonElement>(null);
     const renameFocusReturnIdRef = React.useRef<string | null>(null);
     const deleteTriggerRef = React.useRef<HTMLElement | null>(null);
@@ -424,7 +429,7 @@ export const AIChatViewLayout: React.FC<AIChatViewLayoutProps> = ({
                         icon={<SettingOutlined />}
                         type="text"
                         size="small"
-                        onClick={onOpenConfig}
+                        onClick={() => onOpenConfig()}
                         title={t('aiChat.settings')}
                         aria-label={t('aiChat.settings')}
                     />
@@ -450,7 +455,7 @@ export const AIChatViewLayout: React.FC<AIChatViewLayoutProps> = ({
                             })}
                         </Typography.Text>
                     </div>
-                    <Button type="link" onClick={onOpenConfig}>
+                    <Button type="link" onClick={() => onOpenConfig(configurationState.providerId)}>
                         {t('aiChat.configureNow')}
                     </Button>
                 </div>
@@ -498,12 +503,12 @@ export const AIChatViewLayout: React.FC<AIChatViewLayoutProps> = ({
                         onPressEnter={(e) => {
                             if (!e.shiftKey) {
                                 e.preventDefault();
-                                if (configurationState.ready) {
+                                if (canSubmit) {
                                     handleSendMessage();
                                 }
                             }
                         }}
-                        placeholder={t('aiChat.inputPlaceholder')}
+                        placeholder={inputPlaceholder}
                         aria-label={t('aiChat.inputLabel')}
                         autoSize={{ minRows: 1, maxRows: 6 }}
                         disabled={loading}
@@ -527,17 +532,17 @@ export const AIChatViewLayout: React.FC<AIChatViewLayoutProps> = ({
                                 shape="circle"
                                 icon={loading ? <StopOutlined /> : <SendOutlined />}
                                 onClick={loading ? handleStopGeneration : handleSendMessage}
-                                disabled={!loading && (!inputValue.trim() || !configurationState.ready)}
+                                disabled={!loading && (!inputValue.trim() || !canSubmit)}
                                 aria-label={loading
                                     ? t('aiChat.stopGeneration')
-                                    : configurationState.ready
+                                    : canSubmit
                                         ? t('aiChat.sendMessage')
                                         : `${t('aiChat.sendMessage')}: ${t(`aiChat.configReason.${configurationState.reason}`, {
                                             provider: configurationState.providerName ?? '',
                                         })}`}
                                 title={loading
                                     ? t('aiChat.stopGeneration')
-                                    : configurationState.ready
+                                    : canSubmit
                                         ? t('aiChat.sendMessage')
                                         : t('aiChat.configureBeforeSending')}
                                 className="ai-chat-send-btn"

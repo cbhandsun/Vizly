@@ -177,9 +177,13 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
 }) => {
     const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(false);
     const [hasMountedAIConfig, setHasMountedAIConfig] = useState(aiConfigVisible);
+    const [aiConfigProviderId, setAiConfigProviderId] = useState<string | undefined>();
+    const [aiConfigSession, setAiConfigSession] = useState(0);
     const settingsPanelTitle = t('designer.settings.title');
 
-    const openAIConfig = useCallback(() => {
+    const openAIConfig = useCallback((providerId?: string) => {
+        setAiConfigProviderId(providerId);
+        setAiConfigSession(session => session + 1);
         setHasMountedAIConfig(true);
         setAiConfigVisible(true);
     }, [setAiConfigVisible]);
@@ -334,7 +338,9 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
                                                 renderAIConfigModal={hasMountedAIConfig ? (
                                                     <Suspense fallback={<div />}>
                                                         <AIConfigModal
+                                                            key={aiConfigSession}
                                                             open={aiConfigVisible}
+                                                            initialProviderId={aiConfigProviderId}
                                                             onCancel={() => setAiConfigVisible(false)}
                                                             onSave={() => setAiConfigVisible(false)}
                                                         />
