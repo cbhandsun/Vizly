@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -19,6 +21,30 @@ import { ModernFlowchartToolbar } from '../ModernFlowchartToolbar';
 import { buildToolModeMenuItems } from '../flowchartToolbarToolModeMenu';
 
 describe('ModernFlowchartToolbar mobile file actions', () => {
+    it('portals the mobile menu to the viewport and gives it an opaque safe-area surface', () => {
+        const toolbarSource = readFileSync(
+            resolve(process.cwd(), 'src/core/components/diagrams/ModernFlowchartToolbar.tsx'),
+            'utf8',
+        );
+        const toolbarCss = readFileSync(
+            resolve(process.cwd(), 'src/core/components/diagrams/ModernFlowchartToolbar.css'),
+            'utf8',
+        );
+
+        expect(toolbarSource).toContain(
+            'getPopupContainer={(triggerNode) => triggerNode.ownerDocument.body}',
+        );
+        expect(toolbarCss).toMatch(
+            /body \.flowchart-mobile-more-menu\s*\{[\s\S]*?inset: 80px auto auto 8px !important;[\s\S]*?width: min\(304px, calc\(100vw - 16px\)\);[\s\S]*?max-height: calc\(100dvh - 96px\);/,
+        );
+        expect(toolbarCss).toMatch(
+            /body \.flowchart-mobile-more-menu \.ant-dropdown-menu\s*\{[\s\S]*?background-color: rgba\(255, 255, 255, 0\.98\) !important;/,
+        );
+        expect(toolbarCss).toMatch(
+            /html\[data-theme='dark'\] body \.flowchart-mobile-more-menu \.ant-dropdown-menu\s*\{[\s\S]*?background-color: rgba\(28, 28, 41, 0\.98\) !important;/,
+        );
+    });
+
     beforeEach(() => {
         globalThis.ResizeObserver = MockResizeObserver;
         Object.defineProperty(window, 'matchMedia', {

@@ -20,6 +20,7 @@ import { DropdownMenuTriggerButton } from './DropdownMenuTriggerButton';
 import { buildFlowchartLayoutMenuModel } from './flowchartToolbarLayoutMenu';
 import { buildToolModeMenuItems, resolveActiveToolModeKey } from './flowchartToolbarToolModeMenu';
 import { useKeyboardAccessibleDropdown } from './hooks/useKeyboardAccessibleDropdown';
+import './ModernFlowchartToolbar.css';
 import {
     COMMERCIAL_VIEWPORT_MODAL_CLASS,
     COMMERCIAL_VIEWPORT_MODAL_Z_INDEX,
@@ -603,6 +604,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                     placement="bottomRight"
                     trigger={['click']}
                     autoAdjustOverflow
+                    getPopupContainer={(triggerNode) => triggerNode.ownerDocument.body}
                     overlayClassName="flowchart-mobile-more-menu"
                     open={moreDropdown.open}
                     onOpenChange={moreDropdown.handleOpenChange}
