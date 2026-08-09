@@ -1280,6 +1280,8 @@
             "zoomInHint": "放大（Ctrl+滚轮也可）",
             "zoomOutHint": "缩小（Ctrl+滚轮也可）",
             "zoomLevel": "组件库缩放",
+            "resizeDrawer": "调整侧栏宽度",
+            "resizeDrawerHint": "拖拽或使用左右方向键调整宽度；按 Home 或 End 跳到最小或最大宽度。",
             "layers": "图层",
             "comments": "评论反馈",
             "templatesWithCount": "模板 ({{count}})",

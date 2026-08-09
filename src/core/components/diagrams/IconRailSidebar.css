@@ -165,6 +165,53 @@
     background: transparent;
 }
 
+.side-drawer-resize-handle {
+    position: absolute;
+    top: 64px;
+    right: 0;
+    bottom: 12px;
+    z-index: 120;
+    display: flex;
+    width: 16px;
+    align-items: center;
+    justify-content: center;
+    color: rgba(22, 119, 255, 0.72);
+    cursor: col-resize;
+    border-radius: 999px;
+    outline: none;
+    transition: background-color 160ms ease, color 160ms ease;
+}
+
+.side-drawer-resize-grip {
+    width: 3px;
+    height: 48px;
+    border-radius: 999px;
+    background: currentColor;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.72);
+    opacity: 0.72;
+    transition: height 160ms ease, opacity 160ms ease;
+}
+
+.side-drawer-resize-handle:hover,
+.side-drawer-resize-handle:focus-visible {
+    color: #1677ff;
+    background: rgba(22, 119, 255, 0.1);
+}
+
+.side-drawer-resize-handle:hover .side-drawer-resize-grip,
+.side-drawer-resize-handle:focus-visible .side-drawer-resize-grip {
+    height: 64px;
+    opacity: 1;
+}
+
+.side-drawer-resize-handle:focus-visible {
+    outline: none;
+}
+
+.side-drawer-resize-handle:focus-visible .side-drawer-resize-grip {
+    box-shadow: 0 0 0 2px #fff, 0 0 0 4px #1677ff;
+}
+
 /* Search bar inside drawer */
 .side-drawer .side-drawer-search {
     padding: 0 0 10px 0;
@@ -224,6 +271,18 @@
 
 [data-theme='dark'] .side-drawer-body::-webkit-scrollbar-thumb {
     background: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme='dark'] .side-drawer-resize-handle {
+    color: rgba(137, 180, 250, 0.8);
+}
+
+[data-theme='dark'] .side-drawer-resize-grip {
+    box-shadow: 0 0 0 1px rgba(30, 30, 46, 0.72);
+}
+
+[data-theme='dark'] .side-drawer-resize-handle:focus-visible .side-drawer-resize-grip {
+    box-shadow: 0 0 0 2px #1e1e2e, 0 0 0 4px #89b4fa;
 }
 
 /* 系统跟随暗色模式 */

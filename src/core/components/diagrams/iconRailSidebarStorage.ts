@@ -1,19 +1,21 @@
 import { logUiStorageReadFailure, logUiStorageWriteFailure } from '@/core/utils/uiStorageLogging';
 
 export const ICON_RAIL_DRAWER_WIDTH_STORAGE_KEY = 'designer.sidebar.drawerWidth';
-const MIN_DRAWER_WIDTH = 240;
-const MAX_DRAWER_WIDTH = 400;
-const DEFAULT_DRAWER_WIDTH = 280;
+export const ICON_RAIL_DRAWER_MIN_WIDTH = 240;
+export const ICON_RAIL_DRAWER_MAX_WIDTH = 400;
+export const ICON_RAIL_DRAWER_DEFAULT_WIDTH = 280;
 
 export const readIconRailDrawerWidth = (): number => {
   try {
     const value = Number(localStorage.getItem(ICON_RAIL_DRAWER_WIDTH_STORAGE_KEY));
-    return Number.isFinite(value) && value >= MIN_DRAWER_WIDTH && value <= MAX_DRAWER_WIDTH
+    return Number.isFinite(value)
+      && value >= ICON_RAIL_DRAWER_MIN_WIDTH
+      && value <= ICON_RAIL_DRAWER_MAX_WIDTH
       ? value
-      : DEFAULT_DRAWER_WIDTH;
+      : ICON_RAIL_DRAWER_DEFAULT_WIDTH;
   } catch (error) {
     logUiStorageReadFailure('IconRailSidebar.readDrawerWidth', ICON_RAIL_DRAWER_WIDTH_STORAGE_KEY, error);
-    return DEFAULT_DRAWER_WIDTH;
+    return ICON_RAIL_DRAWER_DEFAULT_WIDTH;
   }
 };
 
@@ -25,6 +27,12 @@ export const persistIconRailDrawerWidth = (drawerWidth: number): void => {
   }
 };
 
-export const clampIconRailDrawerWidth = (drawerWidth: number): number => (
-  Math.max(MIN_DRAWER_WIDTH, Math.min(MAX_DRAWER_WIDTH, drawerWidth))
-);
+export const clampIconRailDrawerWidth = (drawerWidth: number): number => {
+  const finiteWidth = Number.isFinite(drawerWidth)
+    ? drawerWidth
+    : ICON_RAIL_DRAWER_DEFAULT_WIDTH;
+  return Math.max(
+    ICON_RAIL_DRAWER_MIN_WIDTH,
+    Math.min(ICON_RAIL_DRAWER_MAX_WIDTH, finiteWidth),
+  );
+};

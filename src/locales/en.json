@@ -1282,6 +1282,8 @@
             "zoomInHint": "Zoom In (Ctrl+Wheel)",
             "zoomOutHint": "Zoom Out (Ctrl+Wheel)",
             "zoomLevel": "Component library zoom",
+            "resizeDrawer": "Resize sidebar",
+            "resizeDrawerHint": "Drag or use Left and Right Arrow keys to resize. Press Home or End for the minimum or maximum width.",
             "layers": "Layers",
             "comments": "Comments and feedback",
             "templatesWithCount": "Templates ({{count}})",

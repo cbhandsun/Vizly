@@ -15,6 +15,7 @@ import {
     persistIconRailDrawerWidth,
     readIconRailDrawerWidth,
 } from './iconRailSidebarStorage';
+import { IconRailDrawerResizeHandle } from './IconRailDrawerResizeHandle';
 import {
     resolveIconRailRequestedPanel,
     shouldAutoOpenShapesPanel,
@@ -660,19 +661,13 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
                         <div className="side-drawer-body" onWheel={activePanel === 'shapes' ? panelZoom.onWheel : undefined}>
                             {renderDrawerContent()}
                         </div>
-                        {/* Resize Handle */}
                         {!isMobile && (
-                            <div
+                            <IconRailDrawerResizeHandle
+                                currentWidth={drawerWidth}
+                                label={t('designer.sidebar.resizeDrawer')}
+                                hint={t('designer.sidebar.resizeDrawerHint')}
+                                onResize={setDrawerWidth}
                                 onMouseDown={startDrawerResize}
-                                style={{
-                                    position: 'absolute',
-                                    right: -3,
-                                    top: 0,
-                                    bottom: 0,
-                                    width: 6,
-                                    cursor: 'col-resize',
-                                    zIndex: 120,
-                                }}
                             />
                         )}
                     </div>
