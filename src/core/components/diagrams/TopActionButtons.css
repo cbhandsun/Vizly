@@ -1,0 +1,24 @@
+.vizly-document-actions-menu .ant-dropdown-menu {
+    background-color: rgba(255, 255, 255, 0.98) !important;
+    backdrop-filter: blur(28px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
+}
+
+[data-theme='dark'] .vizly-document-actions-menu .ant-dropdown-menu {
+    background-color: rgba(28, 28, 41, 0.98) !important;
+}
+
+@media (max-width: 767px) {
+    .vizly-document-actions-menu .ant-dropdown-menu {
+        width: min(288px, calc(100vw - 16px));
+        max-width: calc(100vw - 16px);
+        overscroll-behavior: contain;
+    }
+}
+
+@media (max-width: 480px) {
+    .vizly-document-actions-menu {
+        left: 8px !important;
+        right: auto !important;
+    }
+}

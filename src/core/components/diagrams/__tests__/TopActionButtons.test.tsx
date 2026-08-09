@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const breakpointState = vi.hoisted(() => ({ md: true }));
@@ -76,6 +77,26 @@ describe('TopActionButtons document menu', () => {
                 dispatchEvent: vi.fn(),
             })),
         });
+    });
+
+    it('keeps the document menu readable above dense mobile canvases', () => {
+        const css = readFileSync(
+            'src/core/components/diagrams/TopActionButtons.css',
+            'utf8',
+        );
+
+        expect(css).toMatch(
+            /\.vizly-document-actions-menu \.ant-dropdown-menu\s*\{[\s\S]*?background-color:\s*rgba\(255, 255, 255, 0\.98\) !important;/,
+        );
+        expect(css).toMatch(
+            /\[data-theme='dark'\] \.vizly-document-actions-menu \.ant-dropdown-menu\s*\{[\s\S]*?background-color:\s*rgba\(28, 28, 41, 0\.98\) !important;/,
+        );
+        expect(css).toMatch(
+            /@media \(max-width: 767px\)[\s\S]*?width:\s*min\(288px, calc\(100vw - 16px\)\);[\s\S]*?max-width:\s*calc\(100vw - 16px\);/,
+        );
+        expect(css).toMatch(
+            /@media \(max-width: 480px\)[\s\S]*?\.vizly-document-actions-menu\s*\{[\s\S]*?left:\s*8px !important;[\s\S]*?right:\s*auto !important;/,
+        );
     });
 
     it.each(['ArrowDown', 'Enter', ' '])('opens with %s, focuses the first item, and closes with Escape', async key => {

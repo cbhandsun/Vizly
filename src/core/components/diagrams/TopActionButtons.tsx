@@ -15,6 +15,7 @@ import { DOCUMENT_MENU_OVERLAY_CLASS } from './documentMenuKeyboard';
 import { DropdownMenuTriggerButton } from './DropdownMenuTriggerButton';
 import { useKeyboardAccessibleDropdown } from './hooks/useKeyboardAccessibleDropdown';
 import { focusAdvancedExportTrigger } from './advancedExportFocus';
+import './TopActionButtons.css';
 
 const SAVE_MENU_OVERLAY_CLASS = 'vizly-save-actions-menu';
 
@@ -462,6 +463,7 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
                     trigger={['click']}
                     open={documentMenuOpen}
                     onOpenChange={handleDocumentMenuOpenChange}
+                    getPopupContainer={(triggerNode) => triggerNode.ownerDocument.body}
                     classNames={{ root: DOCUMENT_MENU_OVERLAY_CLASS }}
                 >
                     <Tooltip
