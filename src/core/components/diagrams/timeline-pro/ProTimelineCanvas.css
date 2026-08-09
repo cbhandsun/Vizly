@@ -6,11 +6,24 @@
 }
 
 .pro-timeline-task-row:focus-visible,
+.pro-timeline-task-row button:focus-visible,
+.pro-timeline-task-resize-handle:focus-visible,
 .pro-timeline-chrome button:focus-visible {
     position: relative;
     z-index: 1;
     outline: 2px solid var(--ant-color-primary, #1677ff);
     outline-offset: -2px;
+}
+
+.pro-timeline-task-row button {
+    appearance: none;
+    border: 0;
+    padding: 0;
+    background: transparent;
+}
+
+.pro-timeline-task-resize-handle:focus-visible {
+    background: color-mix(in srgb, var(--ant-color-primary, #1677ff) 20%, transparent) !important;
 }
 
 @media (max-width: 768px) {

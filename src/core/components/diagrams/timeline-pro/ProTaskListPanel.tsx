@@ -1,10 +1,17 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { ProGanttTask, getWorkDays, addWorkDays, getWorkDaysSigned, useProTimelineEngine } from '../../../hooks/useProTimelineEngine';
-import { Dropdown, Select, Tooltip } from 'antd';
+import { Dropdown, Popconfirm, Select, Tooltip } from 'antd';
 import { CaretRightOutlined, CaretDownOutlined, CalendarOutlined, FlagFilled, ClockCircleOutlined, FolderOpenOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useTheme } from '../../../themes/useCoreTheme';
 import { todayDateOnly } from '../../../utils/dateOnly';
 import type { Theme } from '../../../themes/types/ThemeTypes';
+import {
+    getProTaskAccessibleName,
+    getProTaskListKeyboardWidth,
+    normalizeProTaskListWidth,
+    PRO_TASK_LIST_MAX_WIDTH,
+    PRO_TASK_LIST_MIN_WIDTH,
+} from './proTaskListInteraction';
 
 export interface ProTaskListPanelProps {
     tasks: ProGanttTask[];
@@ -40,9 +47,11 @@ export default function ProTaskListPanel({
     const [isResizing, setIsResizing] = useState(false);
     const [editingCell, setEditingCell] = useState<{ id: string, field: 'name' | 'startDate' | 'duration' | 'assignee' | 'priority' } | null>(null);
     const [editValue, setEditValue] = useState('');
+    const [focusedTaskId, setFocusedTaskId] = useState<string | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const [theme] = useTheme();
     const { showBaseline } = useProTimelineEngine();
+    const normalizedWidth = normalizeProTaskListWidth(width);
 
     const isDark = theme?.mode === 'dark';
     const panelBg = theme?.palette?.neutral?.background || (isDark ? '#141414' : '#fff');
@@ -155,10 +164,10 @@ export default function ProTaskListPanel({
         e.stopPropagation();
         setIsResizing(true);
         const startX = e.clientX;
-        const startW = width;
+        const startW = normalizedWidth;
 
         const onMove = (ev: PointerEvent) => {
-            const newW = Math.max(280, Math.min(650, startW + (ev.clientX - startX)));
+            const newW = normalizeProTaskListWidth(startW + (ev.clientX - startX));
             onWidthChange(newW);
         };
         const onUp = () => {
@@ -168,12 +177,19 @@ export default function ProTaskListPanel({
         };
         window.addEventListener('pointermove', onMove);
         window.addEventListener('pointerup', onUp);
-    }, [width, onWidthChange]);
+    }, [normalizedWidth, onWidthChange]);
+
+    const handleResizeKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+        const nextWidth = getProTaskListKeyboardWidth(normalizedWidth, event.key);
+        if (nextWidth === null) return;
+        event.preventDefault();
+        onWidthChange(nextWidth);
+    }, [normalizedWidth, onWidthChange]);
 
 
     return (
         <div className="pro-timeline-task-list" style={{
-            width, minWidth: 280, maxWidth: 650,
+            width: normalizedWidth, minWidth: PRO_TASK_LIST_MIN_WIDTH, maxWidth: PRO_TASK_LIST_MAX_WIDTH,
             borderRight: `1px solid ${borderColor}`,
             background: panelBg,
             display: 'flex', flexDirection: 'column',
@@ -214,14 +230,17 @@ export default function ProTaskListPanel({
                     const hasChildren = task._computed?.hasChildren;
                     const isExpanded = task.isExpanded !== false;
                     const isVisible = task._computed?.isVisible !== false;
+                    const accessibleTaskName = getProTaskAccessibleName(task.name);
+                    const showRowActions = isHovered || focusedTaskId === task.id;
 
                     if (!isVisible) return null; // Skip hidden rows
 
                     return (
                         <div
                             key={task.id}
-                            aria-label={`${task.name}，开始 ${task.startDate || '未设置'}，工期 ${duration ?? '未设置'} 天`}
+                            aria-label={`${accessibleTaskName}，开始 ${task.startDate || '未设置'}，工期 ${duration ?? '未设置'} 天`}
                             aria-selected={isSelected}
+                            aria-keyshortcuts="Enter Space F2 ArrowLeft ArrowRight"
                             className="pro-timeline-task-row"
                             role="option"
                             tabIndex={0}
@@ -239,29 +258,49 @@ export default function ProTaskListPanel({
                             }}
                             onMouseEnter={() => onHoverTask(task.id)}
                             onMouseLeave={() => onHoverTask(null)}
+                            onFocus={() => setFocusedTaskId(task.id)}
+                            onBlur={(event) => {
+                                if (!event.currentTarget.contains(event.relatedTarget as globalThis.Node | null)) {
+                                    setFocusedTaskId(null);
+                                }
+                            }}
                             onClick={() => onClickTask(task.id)}
                             onKeyDown={(event) => {
                                 if (event.target !== event.currentTarget) return;
                                 if (event.key === 'Enter' || event.key === ' ') {
                                     event.preventDefault();
                                     onClickTask(task.id);
+                                } else if (event.key === 'F2') {
+                                    event.preventDefault();
+                                    setEditingCell({ id: task.id, field: 'name' });
+                                    setEditValue(task.name);
+                                } else if (event.key === 'ArrowRight' && hasChildren && !isExpanded) {
+                                    event.preventDefault();
+                                    onTaskExpandToggle?.(task.id);
+                                } else if (event.key === 'ArrowLeft' && hasChildren && isExpanded) {
+                                    event.preventDefault();
+                                    onTaskExpandToggle?.(task.id);
                                 }
                             }}
                         >
                             {/* Expand/Collapse Toggle */}
                             <div style={{ width: 18, display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
                                 {hasChildren && (
-                                    <div 
+                                    <button
+                                        type="button"
+                                        aria-expanded={isExpanded}
+                                        aria-label={`${isExpanded ? '收起' : '展开'}任务 ${accessibleTaskName}`}
                                         onClick={(e) => { e.stopPropagation(); onTaskExpandToggle?.(task.id); }}
                                         style={{ 
                                             width: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                            cursor: 'pointer', color: rowTextColorSecondary, borderRadius: 4
+                                            cursor: 'pointer', color: rowTextColorSecondary, borderRadius: 4,
+                                            border: 0, padding: 0, background: 'transparent',
                                         }}
                                         onMouseEnter={e => e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)'}
                                         onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                                     >
-                                        {isExpanded ? <CaretDownOutlined style={{ fontSize: 10 }} /> : <CaretRightOutlined style={{ fontSize: 10 }} />}
-                                    </div>
+                                        {isExpanded ? <CaretDownOutlined aria-hidden style={{ fontSize: 10 }} /> : <CaretRightOutlined aria-hidden style={{ fontSize: 10 }} />}
+                                    </button>
                                 )}
                             </div>
 
@@ -285,6 +324,7 @@ export default function ProTaskListPanel({
                                     setEditingCell({ id: task.id, field: 'name' });
                                     setEditValue(task.name);
                                 }}
+                                title="双击编辑任务名称，或聚焦任务后按 F2"
                             >
                                 {cyclicTaskIds?.has(task.id) && (
                                     <Tooltip title="检测到循环依赖关系！">
@@ -294,6 +334,7 @@ export default function ProTaskListPanel({
                                 {editingCell?.id === task.id && editingCell?.field === 'name' ? (
                                     <input
                                         ref={inputRef}
+                                        aria-label={`编辑 ${accessibleTaskName} 的任务名称`}
                                         value={editValue}
                                         onChange={e => setEditValue(e.target.value)}
                                         onBlur={commitEdit}
@@ -314,13 +355,13 @@ export default function ProTaskListPanel({
                             </div>
 
                             {/* Hover Quick Add Menu & Delete Button */}
-                            {isHovered && (
+                            {showRowActions && (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
                                     <Dropdown
                                         menu={{
                                             items: [
-                                                { key: 'phase', icon: <FolderOpenOutlined />, label: '添加子阶段 (Phase)' },
-                                                { key: 'milestone', icon: <FlagFilled />, label: '添加里程碑 (Milestone)' }
+                                                { key: 'phase', icon: <FolderOpenOutlined />, label: '添加子阶段' },
+                                                { key: 'milestone', icon: <FlagFilled />, label: '添加里程碑' }
                                             ],
                                             onClick: ({ key }) => {
                                                 if (onTaskAdd && (key === 'phase' || key === 'milestone')) {
@@ -331,25 +372,38 @@ export default function ProTaskListPanel({
                                         trigger={['click']}
                                         placement="bottomRight"
                                     >
-                                        <div 
+                                        <button
+                                            type="button"
+                                            aria-haspopup="menu"
+                                            aria-label={`为 ${accessibleTaskName} 添加子项`}
                                             style={{ width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', borderRadius: 4, color: primaryColor, opacity: 0.8 }}
                                             onMouseEnter={e => e.currentTarget.style.background = isDark ? 'rgba(255, 255, 255, 0.1)' : '#e6f7ff'}
                                             onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                                             title="添加子项"
                                         >
-                                            <PlusOutlined style={{ fontSize: 12 }} />
-                                        </div>
+                                            <PlusOutlined aria-hidden style={{ fontSize: 12 }} />
+                                        </button>
                                     </Dropdown>
 
-                                    <div 
-                                        style={{ width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', borderRadius: 4, color: theme?.palette?.error?.main || '#ff4d4f', opacity: 0.8 }}
-                                        onClick={(e) => { e.stopPropagation(); onTaskDelete?.(task.id); }}
-                                        onMouseEnter={e => e.currentTarget.style.background = isDark ? 'rgba(255,77,79,0.15)' : '#fff1f0'}
-                                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                                        title="删除该任务及其所有子任务"
+                                    <Popconfirm
+                                        title={`删除“${accessibleTaskName}”？`}
+                                        description="将同时删除其所有子任务和相关依赖关系。"
+                                        okText="删除"
+                                        cancelText="取消"
+                                        okButtonProps={{ danger: true }}
+                                        onConfirm={() => onTaskDelete?.(task.id)}
                                     >
-                                        <DeleteOutlined style={{ fontSize: 12 }} />
-                                    </div>
+                                        <button
+                                            type="button"
+                                            aria-label={`删除 ${accessibleTaskName} 及其所有子任务`}
+                                            style={{ width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', borderRadius: 4, color: theme?.palette?.error?.main || '#ff4d4f', opacity: 0.8 }}
+                                            onMouseEnter={e => e.currentTarget.style.background = isDark ? 'rgba(255,77,79,0.15)' : '#fff1f0'}
+                                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                                            title="删除该任务及其所有子任务"
+                                        >
+                                            <DeleteOutlined aria-hidden style={{ fontSize: 12 }} />
+                                        </button>
+                                    </Popconfirm>
                                 </div>
                             )}
 
@@ -364,6 +418,7 @@ export default function ProTaskListPanel({
                                 {editingCell?.id === task.id && editingCell?.field === 'assignee' ? (
                                     <input
                                         ref={inputRef}
+                                        aria-label={`编辑 ${accessibleTaskName} 的负责人`}
                                         value={editValue}
                                         onChange={e => setEditValue(e.target.value)}
                                         onBlur={commitEdit}
@@ -420,6 +475,7 @@ export default function ProTaskListPanel({
                             >
                                 {editingCell?.id === task.id && editingCell?.field === 'priority' ? (
                                     <Select
+                                        aria-label={`编辑 ${accessibleTaskName} 的优先级`}
                                         size="small"
                                         value={task.priority || undefined}
                                         bordered={false}
@@ -480,6 +536,7 @@ export default function ProTaskListPanel({
                                 {editingCell?.id === task.id && editingCell?.field === 'startDate' ? (
                                     <input
                                         ref={inputRef}
+                                        aria-label={`编辑 ${accessibleTaskName} 的开始日期`}
                                         type="date"
                                         value={editValue}
                                         onChange={e => setEditValue(e.target.value)}
@@ -527,6 +584,7 @@ export default function ProTaskListPanel({
                                 {editingCell?.id === task.id && editingCell?.field === 'duration' ? (
                                     <input
                                         ref={inputRef}
+                                        aria-label={`编辑 ${accessibleTaskName} 的工期`}
                                         type="number"
                                         min={0}
                                         value={editValue}
@@ -552,6 +610,14 @@ export default function ProTaskListPanel({
             {/* 拖拽调整宽度的分隔条 */}
             <div
                 className="pro-timeline-task-resize-handle"
+                role="separator"
+                tabIndex={0}
+                aria-label="调整任务列表宽度"
+                aria-orientation="vertical"
+                aria-valuemin={PRO_TASK_LIST_MIN_WIDTH}
+                aria-valuemax={PRO_TASK_LIST_MAX_WIDTH}
+                aria-valuenow={normalizedWidth}
+                aria-keyshortcuts="ArrowLeft ArrowRight Home End"
                 style={{
                     position: 'absolute', right: -3, top: 0, bottom: 0, width: 6,
                     cursor: 'col-resize', zIndex: 10,
@@ -559,6 +625,7 @@ export default function ProTaskListPanel({
                     transition: 'background 0.15s',
                 }}
                 onPointerDown={handleResizePointerDown}
+                onKeyDown={handleResizeKeyDown}
                 onMouseEnter={(e) => { (e.target as HTMLElement).style.background = `${primaryColor}1A`; }}
                 onMouseLeave={(e) => { if (!isResizing) (e.target as HTMLElement).style.background = 'transparent'; }}
             />

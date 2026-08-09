@@ -12,6 +12,11 @@ import {
     isResourceTaskActivationKey,
     shouldCloseResourceDrawerAfterFocus,
 } from '../proResourceDrawerAccessibility';
+import {
+    getProTaskAccessibleName,
+    getProTaskListKeyboardWidth,
+    normalizeProTaskListWidth,
+} from '../proTaskListInteraction';
 
 class ResizeObserverMock {
     observe() {}
@@ -51,17 +56,18 @@ const task: ProGanttTask = {
     },
 };
 
-const renderPanel = (onClickTask = vi.fn()) => render(
+const renderPanel = (overrides: Partial<React.ComponentProps<typeof ProTaskListPanel>> = {}) => render(
     <ProTaskListPanel
         tasks={[task]}
         width={380}
         onWidthChange={vi.fn()}
         hoveredTaskId={null}
         onHoverTask={vi.fn()}
-        onClickTask={onClickTask}
+        onClickTask={vi.fn()}
         selectedTaskId={null}
         scrollTop={0}
         onScrollTopChange={vi.fn()}
+        {...overrides}
     />,
 );
 
@@ -77,7 +83,7 @@ describe('ProTaskListPanel accessibility', () => {
 
     it.each(['Enter', ' '])('selects a focused task with %j', (key) => {
         const onClickTask = vi.fn();
-        renderPanel(onClickTask);
+        renderPanel({ onClickTask });
 
         const option = screen.getByRole('option', { name: /Project launch/ });
         fireEvent.keyDown(option, { key });
@@ -87,7 +93,7 @@ describe('ProTaskListPanel accessibility', () => {
 
     it('does not select the task when a nested editor handles a key', () => {
         const onClickTask = vi.fn();
-        renderPanel(onClickTask);
+        renderPanel({ onClickTask });
 
         const option = screen.getByRole('option', { name: /Project launch/ });
         fireEvent.doubleClick(screen.getByText('Project launch'));
@@ -96,6 +102,95 @@ describe('ProTaskListPanel accessibility', () => {
 
         expect(option.isConnected).toBe(true);
         expect(onClickTask).not.toHaveBeenCalled();
+    });
+
+    it('reveals descriptive add and delete actions when a task receives keyboard focus', () => {
+        renderPanel();
+
+        const option = screen.getByRole('option', { name: /Project launch/ });
+        fireEvent.focus(option);
+
+        expect(screen.getByRole('button', { name: '为 Project launch 添加子项' })).toBeTruthy();
+        expect(screen.getByRole('button', { name: '删除 Project launch 及其所有子任务' })).toBeTruthy();
+    });
+
+    it('edits the task name with F2 and labels the editor', () => {
+        renderPanel();
+
+        fireEvent.keyDown(screen.getByRole('option', { name: /Project launch/ }), { key: 'F2' });
+
+        expect(screen.getByRole('textbox', { name: '编辑 Project launch 的任务名称' })).toBeTruthy();
+    });
+
+    it.each([
+        ['ArrowLeft', true, true],
+        ['ArrowRight', false, true],
+    ])('uses %s to change an applicable hierarchy state', (key, expanded, expectedCall) => {
+        const onTaskExpandToggle = vi.fn();
+        renderPanel({
+            tasks: [{ ...task, isExpanded: expanded, _computed: { ...task._computed!, hasChildren: true } }],
+            onTaskExpandToggle,
+        });
+
+        const option = screen.getByRole('option', { name: /Project launch/ });
+        fireEvent.keyDown(option, { key });
+
+        expect(onTaskExpandToggle).toHaveBeenCalledTimes(expectedCall ? 1 : 0);
+        expect(screen.getByRole('button', { name: `${expanded ? '收起' : '展开'}任务 Project launch` })).toBeTruthy();
+    });
+
+    it('exposes a keyboard-adjustable width separator', () => {
+        const onWidthChange = vi.fn();
+        renderPanel({ onWidthChange, width: 380 });
+
+        const separator = screen.getByRole('separator', { name: '调整任务列表宽度' });
+        expect(separator.getAttribute('aria-valuenow')).toBe('380');
+        fireEvent.keyDown(separator, { key: 'ArrowRight' });
+        expect(onWidthChange).toHaveBeenCalledWith(400);
+    });
+
+    it('requires confirmation before deleting a task', () => {
+        const onTaskDelete = vi.fn();
+        renderPanel({ onTaskDelete });
+        fireEvent.focus(screen.getByRole('option', { name: /Project launch/ }));
+
+        fireEvent.click(screen.getByRole('button', { name: '删除 Project launch 及其所有子任务' }));
+        expect(onTaskDelete).not.toHaveBeenCalled();
+        fireEvent.click(screen.getByText('删 除'));
+        expect(onTaskDelete).toHaveBeenCalledWith('launch');
+    });
+});
+
+describe('task list interaction boundaries', () => {
+    it.each([
+        [380, 380],
+        [0, 280],
+        [-1, 280],
+        [9999, 650],
+        [Number.POSITIVE_INFINITY, 380],
+        ['380', 380],
+        [undefined, 380],
+    ])('normalizes width %j', (value, expected) => {
+        expect(normalizeProTaskListWidth(value)).toBe(expected);
+    });
+
+    it.each([
+        [380, 'ArrowLeft', 360],
+        [380, 'ArrowRight', 400],
+        [280, 'ArrowLeft', 280],
+        [650, 'ArrowRight', 650],
+        [380, 'Home', 280],
+        [380, 'End', 650],
+        [380, 'Escape', null],
+        [undefined, null, null],
+    ])('steps width %j with key %j', (width, key, expected) => {
+        expect(getProTaskListKeyboardWidth(width, key)).toBe(expected);
+    });
+
+    it('sanitizes missing task names for action labels', () => {
+        expect(getProTaskAccessibleName('  Launch  ')).toBe('Launch');
+        expect(getProTaskAccessibleName('  ')).toBe('未命名任务');
+        expect(getProTaskAccessibleName(null)).toBe('未命名任务');
     });
 });
 

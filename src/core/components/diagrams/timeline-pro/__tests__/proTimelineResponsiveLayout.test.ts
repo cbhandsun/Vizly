@@ -23,6 +23,11 @@ describe('professional timeline responsive layout', () => {
         expect(css).toMatch(/\.pro-timeline-chrome\s*\{[\s\S]*?right:\s*12px !important;/);
         expect(css).toMatch(/\.pro-timeline-chrome--analysis\s*\{[\s\S]*?bottom:\s*64px !important;/);
     });
+
+    it('provides visible keyboard focus for task actions and the desktop resize separator', () => {
+        expect(css).toMatch(/\.pro-timeline-task-row button:focus-visible,[\s\S]*?\.pro-timeline-task-resize-handle:focus-visible[\s\S]*?outline:\s*2px solid/);
+        expect(css).toMatch(/\.pro-timeline-task-resize-handle:focus-visible\s*\{[\s\S]*?background:\s*color-mix\(/);
+    });
 });
 
 describe('professional resource drawer responsive layout', () => {
