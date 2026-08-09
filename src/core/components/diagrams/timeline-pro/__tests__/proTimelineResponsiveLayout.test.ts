@@ -6,6 +6,10 @@ const css = fs.readFileSync(
     path.resolve(process.cwd(), 'src/core/components/diagrams/timeline-pro/ProTimelineCanvas.css'),
     'utf8',
 );
+const resourceDrawerCss = fs.readFileSync(
+    path.resolve(process.cwd(), 'src/core/components/diagrams/timeline-pro/ProResourceDrawer.css'),
+    'utf8',
+);
 
 describe('professional timeline responsive layout', () => {
     it('reserves the mobile top toolbar and bottom editing controls', () => {
@@ -18,5 +22,16 @@ describe('professional timeline responsive layout', () => {
         expect(css).toMatch(/\.pro-timeline-task-column--secondary,[\s\S]*?\.pro-timeline-task-resize-handle\s*\{[\s\S]*?display:\s*none !important;/);
         expect(css).toMatch(/\.pro-timeline-chrome\s*\{[\s\S]*?right:\s*12px !important;/);
         expect(css).toMatch(/\.pro-timeline-chrome--analysis\s*\{[\s\S]*?bottom:\s*64px !important;/);
+    });
+});
+
+describe('professional resource drawer responsive layout', () => {
+    it('uses the full narrow viewport above the mobile editing dock', () => {
+        expect(resourceDrawerCss).toMatch(/@media \(max-width: 768px\)[\s\S]*?\.pro-resource-drawer \.ant-drawer-content-wrapper\s*\{[\s\S]*?width:\s*100vw !important;/);
+        expect(resourceDrawerCss).toMatch(/\.pro-resource-drawer__kpis\s*\{[\s\S]*?grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\);/);
+    });
+
+    it('provides a visible keyboard focus treatment for task actions', () => {
+        expect(resourceDrawerCss).toMatch(/\.pro-resource-task-action:focus-visible\s*\{[\s\S]*?outline:\s*2px solid/);
     });
 });

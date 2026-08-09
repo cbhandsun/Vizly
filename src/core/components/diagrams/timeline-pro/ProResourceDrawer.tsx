@@ -10,6 +10,12 @@ import {
 import dayjs from 'dayjs';
 import { ProGanttTask, getWorkDaysSigned, useProTimelineEngine, isWeekend } from '../../../hooks/useProTimelineEngine';
 import { useTheme } from '../../../themes/useCoreTheme';
+import {
+    getResourceTaskAccessibleLabel,
+    isResourceTaskActivationKey,
+    shouldCloseResourceDrawerAfterFocus,
+} from './proResourceDrawerAccessibility';
+import './ProResourceDrawer.css';
 
 const { Text, Title } = Typography;
 const { Panel } = Collapse;
@@ -207,10 +213,20 @@ export const ProResourceDrawer: React.FC<ProResourceDrawerProps> = ({
             const taskX = dateToX(task.startDate);
             setPan(-taskX + 120, panY); // 水平对齐到左侧 120px 处，提供舒服的视野
         }
+        if (shouldCloseResourceDrawerAfterFocus(typeof window === 'undefined' ? undefined : window.innerWidth)) {
+            onClose();
+        }
+    };
+
+    const handleTaskKeyDown = (event: React.KeyboardEvent<HTMLDivElement>, task: ProGanttTask) => {
+        if (event.target !== event.currentTarget || !isResourceTaskActivationKey(event.key)) return;
+        event.preventDefault();
+        handleFocusTask(task);
     };
 
     return (
         <Drawer
+            rootClassName="pro-resource-drawer"
             title={
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <TeamOutlined style={{ color: '#1890ff' }} />
@@ -220,17 +236,18 @@ export const ProResourceDrawer: React.FC<ProResourceDrawerProps> = ({
             placement="right"
             onClose={onClose}
             open={open}
-            width={480}
+            size="min(480px, 100vw)"
+            zIndex={1200}
             style={{
                 background: glassBg,
                 backdropFilter: 'blur(16px)',
                 boxShadow: '-6px 0 24px rgba(0, 0, 0, 0.15)',
                 borderLeft: `1px solid ${borderColor}`,
             }}
-            bodyStyle={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}
+            styles={{ body: { padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 16 } }}
         >
             {/* KPI 指标卡区块 */}
-            <div style={{ display: 'flex', gap: 12 }}>
+            <div className="pro-resource-drawer__kpis" style={{ display: 'flex', gap: 12 }}>
                 <Card size="small" style={{ flex: 1, textAlign: 'center', background: cardBg, border: `1px solid ${borderColor}` }}>
                     <Text type="secondary" style={{ fontSize: 11 }}>团队人员</Text>
                     <div style={{ fontSize: 20, fontWeight: 700, color: primaryTextColor }}>{totalStaff} <span style={{ fontSize: 12, fontWeight: 400 }}>人</span></div>
@@ -343,7 +360,12 @@ export const ProResourceDrawer: React.FC<ProResourceDrawerProps> = ({
                                                                                 return (
                                                                                     <div 
                                                                                         key={tid}
+                                                                                        aria-label={getResourceTaskAccessibleLabel(task.name)}
+                                                                                        className="pro-resource-task-action"
+                                                                                        role="button"
+                                                                                        tabIndex={0}
                                                                                         onClick={() => handleFocusTask(task)}
+                                                                                        onKeyDown={(event) => handleTaskKeyDown(event, task)}
                                                                                         onMouseEnter={(event) => {
                                                                                             event.currentTarget.style.background = focusHoverBg;
                                                                                         }}
@@ -363,7 +385,7 @@ export const ProResourceDrawer: React.FC<ProResourceDrawerProps> = ({
                                                                                         }}
                                                                                     >
                                                                                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80%' }}>• {task.name}</span>
-                                                                                        <EyeOutlined style={{ fontSize: 10 }} />
+                                                                                        <EyeOutlined aria-hidden={true} style={{ fontSize: 10 }} />
                                                                                     </div>
                                                                                 );
                                                                             })}
@@ -385,7 +407,12 @@ export const ProResourceDrawer: React.FC<ProResourceDrawerProps> = ({
                                                                 return (
                                                                     <div 
                                                                         key={task.id}
+                                                                        aria-label={getResourceTaskAccessibleLabel(task.name)}
+                                                                        className="pro-resource-task-action"
+                                                                        role="button"
+                                                                        tabIndex={0}
                                                                         onClick={() => handleFocusTask(task)}
+                                                                        onKeyDown={(event) => handleTaskKeyDown(event, task)}
                                                                         style={{
                                                                             padding: '6px 8px',
                                                                             borderRadius: 6,
@@ -402,7 +429,7 @@ export const ProResourceDrawer: React.FC<ProResourceDrawerProps> = ({
                                                                             <Text style={{ fontSize: 11, color: primaryTextColor }} ellipsis>{task.name}</Text>
                                                                             <span style={{ fontSize: 9, color: subTextColor }}>{task.startDate} ~ {task.endDate} ({duration} 工作日)</span>
                                                                         </div>
-                                                                        <EyeOutlined style={{ color: '#1890ff', fontSize: 10 }} />
+                                                                        <EyeOutlined aria-hidden={true} style={{ color: '#1890ff', fontSize: 10 }} />
                                                                     </div>
                                                                 );
                                                             })}
@@ -430,7 +457,12 @@ export const ProResourceDrawer: React.FC<ProResourceDrawerProps> = ({
                                         return (
                                             <div 
                                                 key={task.id}
+                                                aria-label={getResourceTaskAccessibleLabel(task.name)}
+                                                className="pro-resource-task-action"
+                                                role="button"
+                                                tabIndex={0}
                                                 onClick={() => handleFocusTask(task)}
+                                                onKeyDown={(event) => handleTaskKeyDown(event, task)}
                                                 style={{
                                                     padding: '8px 12px',
                                                     borderRadius: 8,
