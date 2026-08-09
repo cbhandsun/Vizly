@@ -1342,6 +1342,25 @@
     "diagramViewer": {
         "canvasNotFound": "无法连接到画布，请重试",
         "switchDiagram": "切换图表",
+        "switcher": {
+            "placeholder": "搜索图表...",
+            "builtIn": "内置图表",
+            "templateLibrary": "模板库",
+            "generalTemplates": "通用模板",
+            "s3Storage": "S3 存储",
+            "cloudDiagrams": "个人云端图表",
+            "localWorkspace": "本地工作区",
+            "current": "当前",
+            "noResults": "没有匹配的图表",
+            "noResultsHint": "请尝试其他关键词，或清除搜索条件。",
+            "clearSearch": "清除搜索",
+            "categories": {
+                "general": "通用",
+                "architecture": "企业架构",
+                "logistics": "物流运输",
+                "warehouse": "仓储管理"
+            }
+        },
         "rename": {
             "action": "重命名流程图",
             "label": "流程图名称",
@@ -2314,7 +2333,18 @@
         "title": {
             "genericStandard": "通用标准架构图",
             "warehouse3d": "3D 智能仓库展示",
-            "flowchartDesigner": "流程图设计器"
+            "flowchartDesigner": "流程图设计器",
+            "enterpriseArchitecture": "企业架构图",
+            "blankCanvas": "空白画布",
+            "demandAllocation": "仓储需求分流与库存分配策略",
+            "logisticsPlanning": "物流运输规划系统流程图",
+            "logisticsArchitecture": "物流架构图",
+            "systemsInteraction": "系统交互架构图",
+            "tmsArchitecture": "TMS 运输管理系统架构图",
+            "transportDriven": "运输驱动架构图",
+            "wmsOrderToTask": "WMS 从订单到任务流程",
+            "wmsProcess": "WMS 订单分配与作业流程",
+            "wmsEndToEnd": "WMS 全流程解决方案"
         },
         "warehouse3d": {
             "title": "大型零售物流中心",

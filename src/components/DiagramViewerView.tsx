@@ -208,16 +208,16 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
                     showThemeSelector: false,
                     showStyleSwitcher: false,
                     hideCenterIsland: resolvedPluginId === 'mindmap',
-                    leftChildren: (
-                        <>
+                    leftChildren: (switcherOpen) => (
                             <div className="flex items-center max-w-[240px]">
                                 <TemplateCascaderMenu
                                     ariaLabel={t('diagramViewer.switchDiagram', '切换图表')}
+                                    currentDiagramId={selectedDiagramId}
+                                    open={switcherOpen}
                                     style={{ width: '100%', minWidth: 160 }}
                                     onChange={handleTemplateChange}
                                 />
                             </div>
-                        </>
                     ),
                     centerChildren: null,
                     rightChildren: null

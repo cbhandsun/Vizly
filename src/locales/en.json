@@ -2198,7 +2198,18 @@
         "title": {
             "genericStandard": "Generic Standard Architecture",
             "warehouse3d": "3D Smart Warehouse Display",
-            "flowchartDesigner": "Flowchart Designer"
+            "flowchartDesigner": "Flowchart Designer",
+            "enterpriseArchitecture": "Enterprise Architecture",
+            "blankCanvas": "Blank Canvas",
+            "demandAllocation": "WMS Demand Allocation Strategy",
+            "logisticsPlanning": "Logistics Transportation Planning",
+            "logisticsArchitecture": "Logistics Architecture",
+            "systemsInteraction": "Systems Interaction Architecture",
+            "tmsArchitecture": "TMS Transportation Management Architecture",
+            "transportDriven": "Transport-Driven Architecture",
+            "wmsOrderToTask": "WMS Order-to-Task Flow",
+            "wmsProcess": "WMS Order and Operations Flow",
+            "wmsEndToEnd": "WMS End-to-End Solution"
         },
         "warehouse3d": {
             "title": "Large Retail Logistics Center",
@@ -2393,6 +2404,25 @@
     "diagramViewer": {
         "canvasNotFound": "Cannot connect to canvas, please retry",
         "switchDiagram": "Switch diagram",
+        "switcher": {
+            "placeholder": "Search diagrams...",
+            "builtIn": "Built-in diagrams",
+            "templateLibrary": "Template library",
+            "generalTemplates": "General templates",
+            "s3Storage": "S3 storage",
+            "cloudDiagrams": "Cloud diagrams",
+            "localWorkspace": "Local workspace",
+            "current": "Current",
+            "noResults": "No matching diagrams",
+            "noResultsHint": "Try another keyword or clear the search.",
+            "clearSearch": "Clear search",
+            "categories": {
+                "general": "General",
+                "architecture": "Architecture",
+                "logistics": "Logistics",
+                "warehouse": "Warehouse management"
+            }
+        },
         "rename": {
             "action": "Rename diagram",
             "label": "Diagram name",

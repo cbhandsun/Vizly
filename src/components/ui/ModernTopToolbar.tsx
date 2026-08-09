@@ -286,12 +286,16 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
                     role="dialog"
                     aria-label={diagramSwitcherLabel}
                     className="w-[360px] max-w-[calc(100vw-24px)] p-1"
-                    onKeyDown={handleDiagramSwitcherKeyDown}
+                    onKeyDownCapture={handleDiagramSwitcherKeyDown}
                   >
                     <div className="px-3 py-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 dark:border-white/5 mb-2 flex items-center justify-between">
                       <span>{t('diagramViewer.switchDiagram', '切换图表')}</span>
                     </div>
-                    <div className="max-h-[50vh] overflow-y-auto">{leftChildren}</div>
+                    <div className="max-h-[50vh] overflow-y-auto">
+                      {typeof leftChildren === 'function'
+                        ? leftChildren(isDiagramSwitcherOpen)
+                        : leftChildren}
+                    </div>
                   </div>
                 }
                 trigger="click"

@@ -1,22 +1,77 @@
 // @vitest-environment jsdom
 
+import '@testing-library/jest-dom/vitest';
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('antd/es/cascader', () => ({
-  default: ({
-    'aria-label': ariaLabel,
-    placeholder,
-  }: {
+  default: (props: {
     'aria-label'?: string;
     placeholder?: string;
-  }) => (
-    <input role="combobox" aria-label={ariaLabel} placeholder={placeholder} />
-  ),
+    options?: Array<{
+      value?: string;
+      label?: React.ReactNode;
+      disabled?: boolean;
+      children?: Array<{
+        value?: string;
+        label?: React.ReactNode;
+        disabled?: boolean;
+        children?: Array<{
+          value?: string;
+          label?: React.ReactNode;
+          disabled?: boolean;
+        }>;
+      }>;
+    }>;
+    showSearch?: {
+      searchValue?: string;
+      onSearch?: (value: string) => void;
+    };
+    notFoundContent?: React.ReactNode;
+    onChange?: (value: string[]) => void;
+  }) => {
+    const renderOptions = (
+      options: typeof props.options,
+    ): React.ReactNode => options?.map(option => (
+      <div
+        key={option.value}
+        data-testid={`option-${option.value}`}
+        data-disabled={String(Boolean(option.disabled))}
+      >
+        {option.label}
+        {option.children ? renderOptions(option.children) : null}
+      </div>
+    ));
+
+    return (
+      <div>
+        <input
+          role="combobox"
+          aria-label={props['aria-label']}
+          placeholder={props.placeholder}
+          value={props.showSearch?.searchValue ?? ''}
+          onChange={(event) => props.showSearch?.onSearch?.(event.target.value)}
+        />
+        {renderOptions(props.options)}
+        {props.notFoundContent}
+        <button
+          type="button"
+          onClick={() => props.onChange?.([
+            'built-in',
+            'category:logistics',
+            'logistics-planning-v1',
+          ])}
+        >
+          choose built-in
+        </button>
+      </div>
+    );
+  },
 }));
 
 vi.mock('@ant-design/icons', () => ({
+  AppstoreOutlined: () => <span />,
   SearchOutlined: () => <span />,
   ApartmentOutlined: () => <span />,
   CloudOutlined: () => <span />,
@@ -37,6 +92,12 @@ vi.mock('@/core/utils/customPresetStorage', () => ({
   readCustomPresetMap: () => ({}),
 }));
 
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, fallback?: string) => fallback ?? key,
+  }),
+}));
+
 import { TemplateCascaderMenu } from '../TemplateCascaderMenu';
 
 describe('TemplateCascaderMenu accessibility', () => {
@@ -44,5 +105,45 @@ describe('TemplateCascaderMenu accessibility', () => {
     render(<TemplateCascaderMenu ariaLabel="切换图表" />);
 
     expect(screen.getByRole('combobox', { name: '切换图表' })).toBeTruthy();
+  });
+
+  it('shows built-in diagrams offline and identifies the current diagram', () => {
+    render(<TemplateCascaderMenu currentDiagramId="logistics-architecture-v1" />);
+
+    expect(screen.getByRole('combobox', { name: 'Switch diagram' })).toHaveAttribute(
+      'placeholder',
+      'Search diagrams...',
+    );
+    expect(screen.getByText('Built-in diagrams')).toBeInTheDocument();
+    expect(screen.getByText('Logistics Architecture')).toBeInTheDocument();
+    expect(screen.getByText('Current')).toBeInTheDocument();
+    expect(screen.getByTestId('option-logistics-architecture-v1')).toHaveAttribute(
+      'data-disabled',
+      'true',
+    );
+  });
+
+  it('bounds and sanitizes search input and exposes a clear-search recovery action', () => {
+    render(<TemplateCascaderMenu />);
+    const input = screen.getByRole('combobox', { name: 'Switch diagram' });
+
+    fireEvent.change(input, { target: { value: `<${'x'.repeat(160)}>\u0000` } });
+    expect(input).toHaveValue('x'.repeat(120));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear search' }));
+    expect(input).toHaveValue('');
+  });
+
+  it('routes built-in selections through the standard-preset loader group', () => {
+    const onChange = vi.fn();
+    render(<TemplateCascaderMenu onChange={onChange} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'choose built-in' }));
+
+    expect(onChange).toHaveBeenCalledWith(
+      ['built-in', 'category:logistics', 'logistics-planning-v1'],
+      'logistics-planning-v1',
+      'built-in',
+    );
   });
 });

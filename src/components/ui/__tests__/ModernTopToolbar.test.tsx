@@ -113,14 +113,18 @@ vi.mock('../../auth/AuthStatus', () => ({
 
 import { ModernTopToolbar } from '../ModernTopToolbar';
 
-const renderToolbar = () => render(
+const renderToolbar = (
+  leftChildren: React.ReactNode | ((switcherOpen: boolean) => React.ReactNode) = (
+    <input aria-label="筛选图表" />
+  ),
+) => render(
   <ModernTopToolbar
     diagramId="diagram-1"
     title="Untitled flowchart"
     onRenameDiagram={async () => undefined}
     edgeMode="native"
     onEdgeModeChange={() => undefined}
-    leftChildren={<input aria-label="筛选图表" />}
+    leftChildren={leftChildren}
     centerChildren={<button type="button">center</button>}
     setIsCommandOpen={commandOpenState.setOpen}
   />,
@@ -191,11 +195,38 @@ describe('ModernTopToolbar responsive layout', () => {
     expect(await screen.findByRole('dialog', { name: '切换图表：Untitled flowchart' })).toBeTruthy();
     expect(screen.getByRole('textbox', { name: '筛选图表' })).toBeTruthy();
 
+    const diagramFilter = screen.getByRole('textbox', { name: '筛选图表' });
+    diagramFilter.focus();
+    fireEvent.keyDown(diagramFilter, { key: 'Escape' });
+    await waitFor(() => {
+      expect(diagramSwitcher.getAttribute('aria-expanded')).toBe('false');
+      expect(document.activeElement).toBe(diagramSwitcher);
+    });
+
     const commandSearch = screen.getByRole('button', { name: '打开命令搜索' });
     expect(commandSearch.getAttribute('aria-haspopup')).toBe('dialog');
     expect(commandSearch.getAttribute('aria-keyshortcuts')).toBe('Control+K');
     fireEvent.click(commandSearch);
     expect(commandOpenState.setOpen).toHaveBeenCalledWith(true);
+  });
+
+  it('opens, renders, and focuses a controlled combobox-backed diagram list with one trigger action', async () => {
+    breakpointState.md = true;
+    renderToolbar((switcherOpen) => (
+      <input
+        role="combobox"
+        aria-label="筛选图表"
+        data-open={String(switcherOpen)}
+      />
+    ));
+
+    fireEvent.click(screen.getByRole('button', { name: '切换图表：Untitled flowchart' }));
+
+    const combobox = await screen.findByRole('combobox', { name: '筛选图表' });
+    await waitFor(() => {
+      expect(document.activeElement).toBe(combobox);
+      expect(combobox.getAttribute('data-open')).toBe('true');
+    });
   });
 
   it('moves focus into system settings and restores it after Escape', async () => {

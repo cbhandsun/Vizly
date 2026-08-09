@@ -54,7 +54,7 @@ export interface TopToolbarProps {
   /**
    * 左侧插槽：用于放置图特有的控制（布局策略、主流程高亮等）
    */
-  leftChildren?: React.ReactNode;
+  leftChildren?: React.ReactNode | ((switcherOpen: boolean) => React.ReactNode);
   /**
    * 中间插槽：用于放置主要设计工具
    */
@@ -160,7 +160,7 @@ export const TopToolbar: React.FC<TopToolbarProps> = ({
             <EnhancedStyleSwitcher size="sm" />
           )}
 
-          {leftChildren}
+          {typeof leftChildren === 'function' ? leftChildren(false) : leftChildren}
         </Space>
 
         {!hideCenterIsland && centerChildren && (

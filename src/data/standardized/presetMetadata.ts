@@ -14,6 +14,96 @@ export const STANDARD_PRESET_KEYS = [
 
 export type StandardPresetKey = typeof STANDARD_PRESET_KEYS[number];
 
+export type StandardPresetCategory = 'general' | 'architecture' | 'logistics' | 'warehouse';
+
+export interface StandardPresetCatalogItem {
+  key: StandardPresetKey;
+  id: string;
+  titleKey: string;
+  fallbackTitle: string;
+  category: StandardPresetCategory;
+}
+
+export const STANDARD_PRESET_CATALOG = [
+  {
+    key: 'ArchitectureStandardData',
+    id: 'enterprise-architecture-v2',
+    titleKey: 'diagram.title.enterpriseArchitecture',
+    fallbackTitle: 'Enterprise Architecture',
+    category: 'architecture',
+  },
+  {
+    key: 'BlankCanvasStandardData',
+    id: 'blank-canvas-template',
+    titleKey: 'diagram.title.blankCanvas',
+    fallbackTitle: 'Blank Canvas',
+    category: 'general',
+  },
+  {
+    key: 'DeamndAllocation',
+    id: 'wms-demand-allocation-strategy-v2',
+    titleKey: 'diagram.title.demandAllocation',
+    fallbackTitle: 'WMS Demand Allocation Strategy',
+    category: 'warehouse',
+  },
+  {
+    key: 'LogisticsPlanningStandardData',
+    id: 'logistics-planning-v1',
+    titleKey: 'diagram.title.logisticsPlanning',
+    fallbackTitle: 'Logistics Transportation Planning',
+    category: 'logistics',
+  },
+  {
+    key: 'LogisticsStandardData',
+    id: 'logistics-architecture-v1',
+    titleKey: 'diagram.title.logisticsArchitecture',
+    fallbackTitle: 'Logistics Architecture',
+    category: 'logistics',
+  },
+  {
+    key: 'SystemsInteractionStandardData',
+    id: 'systems-interaction-v1',
+    titleKey: 'diagram.title.systemsInteraction',
+    fallbackTitle: 'Systems Interaction Architecture',
+    category: 'architecture',
+  },
+  {
+    key: 'TmsStandardData',
+    id: 'tms-architecture-v1',
+    titleKey: 'diagram.title.tmsArchitecture',
+    fallbackTitle: 'TMS Transportation Management Architecture',
+    category: 'logistics',
+  },
+  {
+    key: 'TransportDrivenStandardData',
+    id: 'transport-driven-v1',
+    titleKey: 'diagram.title.transportDriven',
+    fallbackTitle: 'Transport-Driven Architecture',
+    category: 'logistics',
+  },
+  {
+    key: 'WmsOrderToTaskFlowData',
+    id: 'wms-order-to-task-flow',
+    titleKey: 'diagram.title.wmsOrderToTask',
+    fallbackTitle: 'WMS Order-to-Task Flow',
+    category: 'warehouse',
+  },
+  {
+    key: 'WmsProcessFlowStandardData',
+    id: 'wms-process-flow-v1',
+    titleKey: 'diagram.title.wmsProcess',
+    fallbackTitle: 'WMS Order and Operations Flow',
+    category: 'warehouse',
+  },
+  {
+    key: 'WmsStandardData',
+    id: 'wms-e2e-solution',
+    titleKey: 'diagram.title.wmsEndToEnd',
+    fallbackTitle: 'WMS End-to-End Solution',
+    category: 'warehouse',
+  },
+] as const satisfies readonly StandardPresetCatalogItem[];
+
 export const PRESET_DOC_TYPES: Record<StandardPresetKey, string> = {
   ArchitectureStandardData: 'architecture',
   BlankCanvasStandardData: 'flowchart',
@@ -47,6 +137,9 @@ export const PRESET_ID_ALIASES: Record<string, StandardPresetKey> = {
 };
 
 const STANDARD_PRESET_KEY_SET = new Set<string>(STANDARD_PRESET_KEYS);
+const STANDARD_PRESET_CATALOG_BY_KEY = new Map<StandardPresetKey, StandardPresetCatalogItem>(
+  STANDARD_PRESET_CATALOG.map(item => [item.key, item]),
+);
 
 export const resolvePresetKey = (id?: string): StandardPresetKey | undefined => {
   if (!id) return undefined;
@@ -60,4 +153,11 @@ export const isStandardPresetId = (id?: string): boolean => {
 export const getStandardPresetDocTypeById = (id?: string): string | undefined => {
   const key = resolvePresetKey(id);
   return key ? PRESET_DOC_TYPES[key] : undefined;
+};
+
+export const getStandardPresetCatalogItemById = (
+  id?: string,
+): StandardPresetCatalogItem | undefined => {
+  const key = resolvePresetKey(id);
+  return key ? STANDARD_PRESET_CATALOG_BY_KEY.get(key) : undefined;
 };

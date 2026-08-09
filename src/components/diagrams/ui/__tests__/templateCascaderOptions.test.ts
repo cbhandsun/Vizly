@@ -6,6 +6,7 @@ import {
   getRootGroupFromPath,
   normalizeTemplateItem,
   normalizeTemplateMenuText,
+  normalizeTemplateSearchInput,
 } from '../templateCascaderOptions';
 
 describe('template cascader option guards', () => {
@@ -13,6 +14,9 @@ describe('template cascader option guards', () => {
     expect(normalizeTemplateMenuText(' <b>Template</b>\u0000 ')).toBe('bTemplate/b');
     expect(normalizeTemplateMenuText(undefined, 'fallback')).toBe('fallback');
     expect(normalizeTemplateMenuText('x'.repeat(160))).toHaveLength(120);
+    expect(normalizeTemplateSearchInput(' a <query>\u0000 ')).toBe(' a query ');
+    expect(normalizeTemplateSearchInput('x'.repeat(160))).toHaveLength(120);
+    expect(normalizeTemplateSearchInput(null)).toBe('');
   });
 
   it('drops templates without a usable id and normalizes title/category fallbacks', () => {
@@ -51,6 +55,7 @@ describe('template cascader option guards', () => {
     ]);
     expect(coerceCascaderPath(['system-templates', '<bad>', 42, null])).toEqual(['system-templates', 'bad']);
     expect(getRootGroupFromPath(['system-templates', 'tmpl-1'])).toBe('system-templates');
+    expect(getRootGroupFromPath(['built-in', 'category:logistics', 'logistics-architecture-v1'])).toBe('built-in');
     expect(getRootGroupFromPath(['industry-templates', 'tmpl-1'])).toBe('');
   });
 });

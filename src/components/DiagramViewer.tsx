@@ -47,6 +47,7 @@ import {
     getDiagramViewerRouteParam,
     setDiagramSearchParam,
 } from './diagramViewerLocation';
+import { resolveDiagramViewerTitle } from './diagramViewerTitle';
 import {
     seedAutoSaveAndNavigateDiagram,
     selectDiagramInViewer,
@@ -284,11 +285,12 @@ const DiagramViewer: React.FC = () => {
     // Bridge: diagram.type → plugin registry ID
     // template type 值与 plugin.id 注册名之间存在历史差异，此映射表统一桥接
     const resolvedPluginId = resolvePluginId(docType);
-    const diagramTitle = selectedDiagram?.titleKey
-        ? t(selectedDiagram.titleKey)
-        : selectedDiagram?.name
-            || (loadedDocType?.diagramId === selectedDiagramId ? loadedDocType.name : undefined)
-            || t('workspace.untitledDiagram');
+    const diagramTitle = resolveDiagramViewerTitle({
+        selectedDiagramId,
+        selectedDiagram,
+        loadedDiagram: loadedDocType,
+        translate: (key, fallback) => fallback ? t(key, fallback) : t(key),
+    });
     const canRenameDiagram = !selectedDiagram
         && loadedDocType?.diagramId === selectedDiagramId
         && Boolean(loadedDocType.name);

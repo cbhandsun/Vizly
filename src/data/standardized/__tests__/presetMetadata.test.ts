@@ -1,15 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  getStandardPresetCatalogItemById,
   getStandardPresetDocTypeById,
   isStandardPresetId,
   resolvePresetKey,
+  STANDARD_PRESET_CATALOG,
 } from '../presetMetadata';
 
 describe('presetMetadata', () => {
   it.each([
     ['enterprise-architecture-v2', 'ArchitectureStandardData', 'architecture'],
     ['blank-canvas-template', 'BlankCanvasStandardData', 'flowchart'],
+    ['wms-demand-allocation-strategy-v2', 'DeamndAllocation', 'architecture'],
     ['logistics-planning-v1', 'LogisticsPlanningStandardData', 'logistics-planning'],
     ['logistics-architecture-v1', 'LogisticsStandardData', 'logistics'],
     ['systems-interaction-v1', 'SystemsInteractionStandardData', 'systems-interaction'],
@@ -28,5 +31,30 @@ describe('presetMetadata', () => {
     expect(isStandardPresetId('custom-diagram')).toBe(false);
     expect(resolvePresetKey('custom-diagram')).toBeUndefined();
     expect(getStandardPresetDocTypeById('custom-diagram')).toBeUndefined();
+    expect(getStandardPresetCatalogItemById('custom-diagram')).toBeUndefined();
+  });
+
+  it('exposes a lightweight catalog for every standard preset and resolves aliases', () => {
+    expect(STANDARD_PRESET_CATALOG).toHaveLength(11);
+    expect(new Set(STANDARD_PRESET_CATALOG.map(item => item.key))).toEqual(
+      new Set([
+        'ArchitectureStandardData',
+        'BlankCanvasStandardData',
+        'DeamndAllocation',
+        'LogisticsPlanningStandardData',
+        'LogisticsStandardData',
+        'SystemsInteractionStandardData',
+        'TmsStandardData',
+        'TransportDrivenStandardData',
+        'WmsOrderToTaskFlowData',
+        'WmsProcessFlowStandardData',
+        'WmsStandardData',
+      ]),
+    );
+    expect(getStandardPresetCatalogItemById('supply-chain-arch')).toMatchObject({
+      key: 'LogisticsStandardData',
+      id: 'logistics-architecture-v1',
+      titleKey: 'diagram.title.logisticsArchitecture',
+    });
   });
 });

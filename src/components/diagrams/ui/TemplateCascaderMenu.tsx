@@ -1,9 +1,15 @@
 import React, { useMemo } from 'react';
 import Cascader from 'antd/es/cascader';
 import type { DefaultOptionType } from 'antd/es/cascader';
-import { SearchOutlined, ApartmentOutlined, CloudOutlined, DatabaseOutlined, FolderOpenOutlined } from '@ant-design/icons';
+import { AppstoreOutlined, SearchOutlined, ApartmentOutlined, CloudOutlined, DatabaseOutlined, FolderOpenOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import { useDiagramStorage } from '../hooks/useDiagramStorage';
 import { readCustomPresetMap } from '@/core/utils/customPresetStorage';
+import {
+  STANDARD_PRESET_CATALOG,
+  resolvePresetKey,
+  type StandardPresetCategory,
+} from '@/data/standardized/presetMetadata';
 import {
   buildCustomTemplateMenuLeafOptions,
   buildTemplateMenuLeafOptions,
@@ -11,6 +17,7 @@ import {
   coerceCascaderPath,
   getRootGroupFromPath,
   normalizeTemplateItem,
+  normalizeTemplateSearchInput,
 } from './templateCascaderOptions';
 
 export interface TemplateCascaderMenuProps {
@@ -19,36 +26,96 @@ export interface TemplateCascaderMenuProps {
   style?: React.CSSProperties;
   placeholder?: string;
   allowClear?: boolean;
+  open?: boolean;
   templatesOnly?: boolean;
   children?: React.ReactElement;
   ariaLabel?: string;
+  currentDiagramId?: string;
 }
 
 interface CascaderOption extends DefaultOptionType {
   value: string;
   label: React.ReactNode;
+  searchText?: string;
   children?: CascaderOption[];
 }
+
+const BUILT_IN_CATEGORY_ORDER: readonly StandardPresetCategory[] = [
+  'general',
+  'architecture',
+  'logistics',
+  'warehouse',
+];
+
+const BUILT_IN_CATEGORY_LABELS: Record<StandardPresetCategory, string> = {
+  general: 'diagramViewer.switcher.categories.general',
+  architecture: 'diagramViewer.switcher.categories.architecture',
+  logistics: 'diagramViewer.switcher.categories.logistics',
+  warehouse: 'diagramViewer.switcher.categories.warehouse',
+};
 
 export const TemplateCascaderMenu: React.FC<TemplateCascaderMenuProps> = ({
   value,
   onChange,
   style,
-  placeholder = "搜索或选择图表...",
+  placeholder,
   allowClear = true,
+  open,
   templatesOnly = false,
   children,
-  ariaLabel = '搜索或选择图表',
+  ariaLabel,
+  currentDiagramId,
 }) => {
+  const { t } = useTranslation();
   const { s3Diagrams, supabaseDiagrams, systemTemplates, fetchCloudList } = useDiagramStorage();
   const hasFetchedCloudListRef = React.useRef(false);
-
-  const [cascaderKey, setCascaderKey] = React.useState(0);
+  const [searchValue, setSearchValue] = React.useState('');
+  const currentPresetKey = resolvePresetKey(currentDiagramId);
+  const effectivePlaceholder = placeholder ?? t('diagramViewer.switcher.placeholder', 'Search diagrams...');
+  const effectiveAriaLabel = ariaLabel ?? t('diagramViewer.switchDiagram', 'Switch diagram');
 
   const cascaderOptions = useMemo(() => {
     const options: CascaderOption[] = [];
 
-    // --- 1. 行业模板库 (System Templates from Supabase，按 category 分组) ---
+    const builtInChildren = BUILT_IN_CATEGORY_ORDER.flatMap((category) => {
+      const categoryItems = STANDARD_PRESET_CATALOG.filter(item => item.category === category);
+      if (categoryItems.length === 0) return [];
+
+      const categoryLabel = t(BUILT_IN_CATEGORY_LABELS[category], category);
+      return [{
+        value: `category:${category}`,
+        label: categoryLabel,
+        searchText: categoryLabel,
+        children: categoryItems.map((item) => {
+          const title = t(item.titleKey, item.fallbackTitle);
+          const isCurrent = currentPresetKey === item.key;
+          return {
+            value: item.id,
+            label: (
+              <span className="inline-flex min-w-0 items-center gap-2">
+                <span className="truncate">{title}</span>
+                {isCurrent ? (
+                  <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
+                    {t('diagramViewer.switcher.current', 'Current')}
+                  </span>
+                ) : null}
+              </span>
+            ),
+            searchText: `${title} ${item.id}`,
+            disabled: isCurrent,
+          };
+        }),
+      }];
+    });
+
+    options.push({
+      value: 'built-in',
+      label: <span><AppstoreOutlined style={{ marginRight: 8, color: '#1677ff' }} />{t('diagramViewer.switcher.builtIn', 'Built-in diagrams')}</span>,
+      searchText: t('diagramViewer.switcher.builtIn', 'Built-in diagrams'),
+      children: builtInChildren,
+    });
+
+    // --- 2. 行业模板库 (System Templates from Supabase，按 category 分组) ---
     if (systemTemplates && systemTemplates.length > 0) {
       const normalizedTemplates = systemTemplates
         .map(normalizeTemplateItem)
@@ -75,7 +142,8 @@ export const TemplateCascaderMenu: React.FC<TemplateCascaderMenuProps> = ({
       if (generalTemplates.length > 0) {
         systemChildren.push({
           value: 'category:general',
-          label: '通用模版',
+          label: t('diagramViewer.switcher.generalTemplates', 'General templates'),
+          searchText: t('diagramViewer.switcher.generalTemplates', 'General templates'),
           children: generalTemplates.map(d => ({ value: d.id, label: d.title }))
         });
       }
@@ -83,31 +151,34 @@ export const TemplateCascaderMenu: React.FC<TemplateCascaderMenuProps> = ({
       if (systemChildren.length > 0) {
         options.push({
           value: 'system-templates',
-          label: <span><ApartmentOutlined style={{ marginRight: 8, color: '#eb2f96' }} />模板库</span>,
+          label: <span><ApartmentOutlined style={{ marginRight: 8, color: '#eb2f96' }} />{t('diagramViewer.switcher.templateLibrary', 'Template library')}</span>,
+          searchText: t('diagramViewer.switcher.templateLibrary', 'Template library'),
           children: systemChildren
         });
       }
     }
 
-    // --- 2. S3 存储 ---
+    // --- 3. S3 存储 ---
     if (!templatesOnly && s3Diagrams.length > 0) {
       options.push({
         value: 's3',
-        label: <span><CloudOutlined style={{ marginRight: 8, color: '#fa8c16' }} />S3 存储</span>,
+        label: <span><CloudOutlined style={{ marginRight: 8, color: '#fa8c16' }} />{t('diagramViewer.switcher.s3Storage', 'S3 storage')}</span>,
+        searchText: t('diagramViewer.switcher.s3Storage', 'S3 storage'),
         children: buildTemplateMenuLeafOptions(s3Diagrams),
       });
     }
 
-    // --- 3. 个人云端图表 ---
+    // --- 4. 个人云端图表 ---
     if (!templatesOnly && supabaseDiagrams.length > 0) {
       options.push({
         value: 'supabase',
-        label: <span><DatabaseOutlined style={{ marginRight: 8, color: '#3eaf7c' }} />个人云端图表</span>,
+        label: <span><DatabaseOutlined style={{ marginRight: 8, color: '#3eaf7c' }} />{t('diagramViewer.switcher.cloudDiagrams', 'Cloud diagrams')}</span>,
+        searchText: t('diagramViewer.switcher.cloudDiagrams', 'Cloud diagrams'),
         children: buildTemplateMenuLeafOptions(supabaseDiagrams),
       });
     }
 
-    // --- 4. 本地自定义 (Custom saved presets in localStorage) ---
+    // --- 5. 本地自定义 (Custom saved presets in localStorage) ---
     let customKeys: string[] = [];
     try {
       customKeys = Object.keys(readCustomPresetMap());
@@ -116,25 +187,26 @@ export const TemplateCascaderMenu: React.FC<TemplateCascaderMenuProps> = ({
     if (customOptions.length > 0) {
       options.push({
         value: 'local-workspace',
-        label: <span><FolderOpenOutlined style={{ marginRight: 8, color: '#8c8c8c' }} />本地工作区</span>,
+        label: <span><FolderOpenOutlined style={{ marginRight: 8, color: '#8c8c8c' }} />{t('diagramViewer.switcher.localWorkspace', 'Local workspace')}</span>,
+        searchText: t('diagramViewer.switcher.localWorkspace', 'Local workspace'),
         children: customOptions
       });
     }
 
     return options;
-  }, [s3Diagrams, supabaseDiagrams, systemTemplates, templatesOnly]);
+  }, [currentPresetKey, s3Diagrams, supabaseDiagrams, systemTemplates, t, templatesOnly]);
 
   return (
     <Cascader
-      aria-label={ariaLabel}
-      key={cascaderKey}
+      aria-label={effectiveAriaLabel}
+      open={open}
       onOpenChange={(visible) => {
         if (visible && !hasFetchedCloudListRef.current) {
           hasFetchedCloudListRef.current = true;
           void fetchCloudList();
         }
         if (!visible) {
-          setTimeout(() => setCascaderKey(k => k + 1), 300);
+          setSearchValue('');
         }
       }}
       options={cascaderOptions}
@@ -165,21 +237,55 @@ export const TemplateCascaderMenu: React.FC<TemplateCascaderMenuProps> = ({
           </span>
         );
       }}
-      placeholder={placeholder}
+      placeholder={effectivePlaceholder}
       allowClear={allowClear}
       showSearch={{
+        searchValue,
+        onSearch: (nextValue) => setSearchValue(normalizeTemplateSearchInput(nextValue)),
         filter: (inputValue, path) => {
-          const input = inputValue.toLowerCase();
+          const input = normalizeTemplateSearchInput(inputValue).trim().toLocaleLowerCase();
           return path.some(option => {
             const lbl = option.label;
-            const text = typeof lbl === 'string' ? lbl : '';
+            const text = option.searchText ?? (typeof lbl === 'string' ? lbl : '');
             const val = String(option.value || '');
-            return text.toLowerCase().indexOf(input) > -1 || val.toLowerCase().indexOf(input) > -1;
+            return text.toLocaleLowerCase().includes(input) || val.toLocaleLowerCase().includes(input);
           });
         },
       }}
+      notFoundContent={(
+        <div role="status" aria-live="polite" className="flex min-w-[280px] flex-col items-center px-5 py-6 text-center">
+          <div className="font-semibold text-text-primary">
+            {t('diagramViewer.switcher.noResults', 'No matching diagrams')}
+          </div>
+          <div className="mt-1 text-sm text-text-secondary">
+            {t('diagramViewer.switcher.noResultsHint', 'Try another keyword or clear the search.')}
+          </div>
+          {searchValue ? (
+            <button
+              type="button"
+              className="mt-4 min-h-11 rounded-lg border border-border bg-surface px-4 py-2 font-medium text-primary hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              style={{ minHeight: 'calc(var(--commercial-touch-target, 44px) + 1px)' }}
+              aria-label={t('diagramViewer.switcher.clearSearch', 'Clear search')}
+              onMouseDown={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+              }}
+              onClick={(event) => {
+                event.stopPropagation();
+                setSearchValue('');
+              }}
+            >
+              {t('diagramViewer.switcher.clearSearch', 'Clear search')}
+            </button>
+          ) : null}
+        </div>
+      )}
       expandTrigger="hover"
-      style={{ width: 320, ...style }}
+      style={{
+        width: 320,
+        minHeight: 'var(--commercial-touch-target, 44px)',
+        ...style,
+      }}
       suffixIcon={<SearchOutlined style={{ color: 'rgba(0,0,0,0.45)' }} />}
       getPopupContainer={() => document.body}
     >

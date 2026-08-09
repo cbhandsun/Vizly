@@ -9,7 +9,7 @@ export interface TemplateMenuLeafOption {
   label: string;
 }
 
-export type TemplateRootGroup = 'system-templates' | 's3' | 'supabase' | 'local-workspace';
+export type TemplateRootGroup = 'built-in' | 'system-templates' | 's3' | 'supabase' | 'local-workspace';
 
 const MAX_MENU_TEXT_LENGTH = 120;
 
@@ -25,6 +25,18 @@ export const normalizeTemplateMenuText = (value: unknown, fallback = ''): string
     })
     .join('')
     .trim()
+    .slice(0, MAX_MENU_TEXT_LENGTH);
+};
+
+export const normalizeTemplateSearchInput = (value: unknown): string => {
+  if (typeof value !== 'string') return '';
+  return value
+    .split('')
+    .filter(char => {
+      const code = char.charCodeAt(0);
+      return code > 31 && code !== 127 && char !== '<' && char !== '>';
+    })
+    .join('')
     .slice(0, MAX_MENU_TEXT_LENGTH);
 };
 
@@ -72,7 +84,7 @@ export const coerceCascaderPath = (value: unknown): string[] => {
 export const getRootGroupFromPath = (path: readonly string[]): TemplateRootGroup | '' => {
   if (path.length === 0) return '';
   const root = path[0];
-  if (root === 'system-templates' || root === 's3' || root === 'supabase' || root === 'local-workspace') {
+  if (root === 'built-in' || root === 'system-templates' || root === 's3' || root === 'supabase' || root === 'local-workspace') {
     return root;
   }
   return '';
