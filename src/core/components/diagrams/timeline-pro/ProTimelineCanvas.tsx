@@ -19,6 +19,7 @@ import { appMessage } from '../../../utils/antdStaticBridge';
 import { addDaysToDateOnly, parseDateOnlyTime, todayDateOnly } from '../../../utils/dateOnly';
 import { ProTimelineChrome, ProTimelineKeyframes } from './ProTimelineChrome';
 import { projectProTimelineTasks } from './proTimelineTaskProjection';
+import './ProTimelineCanvas.css';
 
 const ROW_HEIGHT = 42;
 const HEADER_HEIGHT = 52;
@@ -483,8 +484,7 @@ export default function ProTimelineCanvas() {
   const totalRows = Math.max(totalVisibleRows, 8);
 
   return (
-    <div style={{
-        position: 'absolute', left: 0, top: 0, width: '100%', height: '100%',
+    <div className="pro-timeline-workspace" style={{
         zIndex: 50, display: 'flex',
         fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
         userSelect: 'none',

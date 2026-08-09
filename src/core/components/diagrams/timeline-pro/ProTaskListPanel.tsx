@@ -172,7 +172,7 @@ export default function ProTaskListPanel({
 
 
     return (
-        <div style={{
+        <div className="pro-timeline-task-list" style={{
             width, minWidth: 280, maxWidth: 650,
             borderRight: `1px solid ${borderColor}`,
             background: panelBg,
@@ -189,15 +189,17 @@ export default function ProTaskListPanel({
                 letterSpacing: '0.5px', textTransform: 'uppercase',
                 flexShrink: 0,
             }}>
-                <span style={{ flex: 1, minWidth: 120 }}>任务名称</span>
-                <span style={{ width: 75, textAlign: 'left', paddingLeft: 8 }}>负责人</span>
-                <span style={{ width: 65, textAlign: 'center' }}>优先级</span>
-                <span style={{ width: 80, textAlign: 'right', paddingRight: 8 }}>开始</span>
-                <span style={{ width: 44, textAlign: 'right' }}>工期</span>
+                <span className="pro-timeline-task-column--name" style={{ flex: 1, minWidth: 120 }}>任务名称</span>
+                <span className="pro-timeline-task-column--secondary" style={{ width: 75, textAlign: 'left', paddingLeft: 8 }}>负责人</span>
+                <span className="pro-timeline-task-column--secondary" style={{ width: 65, textAlign: 'center' }}>优先级</span>
+                <span className="pro-timeline-task-column--secondary" style={{ width: 80, textAlign: 'right', paddingRight: 8 }}>开始</span>
+                <span className="pro-timeline-task-column--secondary" style={{ width: 44, textAlign: 'right' }}>工期</span>
             </div>
 
             {/* 任务行 (可滚动) */}
             <div
+                aria-label="项目任务列表"
+                role="listbox"
                 style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}
                 onScroll={(e) => onScrollTopChange((e.target as HTMLDivElement).scrollTop)}
             >
@@ -218,6 +220,11 @@ export default function ProTaskListPanel({
                     return (
                         <div
                             key={task.id}
+                            aria-label={`${task.name}，开始 ${task.startDate || '未设置'}，工期 ${duration ?? '未设置'} 天`}
+                            aria-selected={isSelected}
+                            className="pro-timeline-task-row"
+                            role="option"
+                            tabIndex={0}
                             style={{
                                 height: ROW_HEIGHT, display: 'flex', alignItems: 'center',
                                 paddingRight: 16, cursor: 'pointer',
@@ -233,6 +240,13 @@ export default function ProTaskListPanel({
                             onMouseEnter={() => onHoverTask(task.id)}
                             onMouseLeave={() => onHoverTask(null)}
                             onClick={() => onClickTask(task.id)}
+                            onKeyDown={(event) => {
+                                if (event.target !== event.currentTarget) return;
+                                if (event.key === 'Enter' || event.key === ' ') {
+                                    event.preventDefault();
+                                    onClickTask(task.id);
+                                }
+                            }}
                         >
                             {/* Expand/Collapse Toggle */}
                             <div style={{ width: 18, display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
@@ -257,7 +271,8 @@ export default function ProTaskListPanel({
                             </span>
 
                             {/* Name / Inline Editor */}
-                            <div 
+                            <div
+                                className="pro-timeline-task-column--name"
                                 style={{
                                     flex: 1, fontSize: 13, color: type === 'summary' ? summaryTextColor : rowTextColorPrimary,
                                     fontWeight: type === 'summary' || isSelected ? 600 : 400,
@@ -339,7 +354,8 @@ export default function ProTaskListPanel({
                             )}
 
                             {/* Assignee */}
-                            <div 
+                            <div
+                                className="pro-timeline-task-column--secondary"
                                 style={{
                                     width: 75, height: '100%', display: 'flex', alignItems: 'center',
                                     paddingLeft: 8, flexShrink: 0, minWidth: 0,
@@ -395,7 +411,8 @@ export default function ProTaskListPanel({
                             </div>
 
                             {/* Priority */}
-                            <div 
+                            <div
+                                className="pro-timeline-task-column--secondary"
                                 style={{
                                     width: 65, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
                                     flexShrink: 0,
@@ -442,7 +459,8 @@ export default function ProTaskListPanel({
                                 )}
                             </div>
 
-                            <div 
+                            <div
+                                className="pro-timeline-task-column--secondary"
                                 style={{
                                     width: 80, textAlign: 'right', fontSize: 11,
                                     color: hasChildren ? disabledTextColor : rowTextColorSecondary, fontVariantNumeric: 'tabular-nums',
@@ -489,7 +507,8 @@ export default function ProTaskListPanel({
                             </div>
 
                             {/* Duration */}
-                            <div 
+                            <div
+                                className="pro-timeline-task-column--secondary"
                                 style={{
                                     width: 44, textAlign: 'right', fontSize: 11,
                                     color: (duration !== null && !hasChildren) ? headerTextColor : disabledTextColor,
@@ -532,6 +551,7 @@ export default function ProTaskListPanel({
 
             {/* 拖拽调整宽度的分隔条 */}
             <div
+                className="pro-timeline-task-resize-handle"
                 style={{
                     position: 'absolute', right: -3, top: 0, bottom: 0, width: 6,
                     cursor: 'col-resize', zIndex: 10,

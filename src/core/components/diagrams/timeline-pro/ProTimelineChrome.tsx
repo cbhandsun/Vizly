@@ -45,7 +45,7 @@ export const ProTimelineChrome: React.FC<ProTimelineChromeProps> = ({
   onZoomChange,
 }) => (
   <>
-    <div style={{
+    <div className="pro-timeline-chrome pro-timeline-chrome--analysis" style={{
       position: 'absolute', bottom: 24, right: 335,
       background: glassBackground, backdropFilter: 'blur(12px) saturate(180%)',
       border: `1px solid ${borderColor}`, borderRadius: 99,
@@ -58,6 +58,7 @@ export const ProTimelineChrome: React.FC<ProTimelineChromeProps> = ({
           size="small"
           shape="circle"
           icon={<TeamOutlined />}
+          aria-label="查看团队工时与资源负载"
           onClick={onOpenResourceDrawer}
           style={{ color: showResourceDrawer ? '#1890ff' : secondaryTextColor }}
         />
@@ -65,23 +66,23 @@ export const ProTimelineChrome: React.FC<ProTimelineChromeProps> = ({
       <div style={{ width: 1, height: 16, backgroundColor: borderColor }} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
         <span style={{ color: secondaryTextColor, fontWeight: 500 }}>关键路径</span>
-        <Switch size="small" checked={showCriticalPath} onChange={onToggleCriticalPath} />
+        <Switch aria-label="显示关键路径" size="small" checked={showCriticalPath} onChange={onToggleCriticalPath} />
       </div>
       <div style={{ width: 1, height: 16, backgroundColor: borderColor }} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
         <span style={{ color: secondaryTextColor, fontWeight: 500 }}>对比基线</span>
-        <Switch size="small" checked={showBaseline} onChange={onToggleBaseline} />
+        <Switch aria-label="显示基线对比" size="small" checked={showBaseline} onChange={onToggleBaseline} />
       </div>
       <div style={{ width: 1, height: 16, backgroundColor: borderColor }} />
       <Tooltip title="锁定当前排期为基线快照">
-        <Button type="text" size="small" shape="circle" icon={<CameraOutlined />} onClick={onSaveBaseline} style={{ color: secondaryTextColor }} />
+        <Button aria-label="保存当前排期为基线" type="text" size="small" shape="circle" icon={<CameraOutlined />} onClick={onSaveBaseline} style={{ color: secondaryTextColor }} />
       </Tooltip>
       <Tooltip title="清空基线排期">
-        <Button type="text" size="small" shape="circle" icon={<DeleteOutlined />} onClick={onClearBaseline} danger />
+        <Button aria-label="清空排期基线" type="text" size="small" shape="circle" icon={<DeleteOutlined />} onClick={onClearBaseline} danger />
       </Tooltip>
     </div>
 
-    <div style={{
+    <div className="pro-timeline-chrome pro-timeline-chrome--scale" style={{
       position: 'absolute', bottom: 24, right: 24,
       background: glassBackground, backdropFilter: 'blur(12px) saturate(180%)',
       border: `1px solid ${borderColor}`, borderRadius: 99,
@@ -89,6 +90,7 @@ export const ProTimelineChrome: React.FC<ProTimelineChromeProps> = ({
       display: 'flex', alignItems: 'center', gap: 8,
     }}>
       <Segmented
+        aria-label="时间轴视图粒度"
         size="small"
         value={viewMode}
         onChange={value => onViewModeChange(coerceProTimelineViewMode(value, viewMode))}
@@ -102,21 +104,24 @@ export const ProTimelineChrome: React.FC<ProTimelineChromeProps> = ({
       />
       <div style={{ width: 1, height: 16, backgroundColor: borderColor }} />
       <Tooltip title="缩小时间轴区域">
-        <Button type="text" size="small" shape="circle" icon={<ZoomOutOutlined />} onClick={() => onZoomChange(stepProTimelineZoom(zoomLevel, -0.2))} />
+        <Button aria-label="缩小时间轴" type="text" size="small" shape="circle" icon={<ZoomOutOutlined />} onClick={() => onZoomChange(stepProTimelineZoom(zoomLevel, -0.2))} />
       </Tooltip>
       <Tooltip title="点击恢复默认 100% 比例">
-        <span
+        <button
+          type="button"
+          aria-label="恢复时间轴到 100%"
           onClick={() => onZoomChange(1)}
           style={{
             fontSize: 12, minWidth: 42, textAlign: 'center', fontFamily: 'monospace',
             cursor: 'pointer', fontWeight: 600, color: secondaryTextColor, userSelect: 'none',
+            border: 0, padding: 0, background: 'transparent',
           }}
         >
           {Math.round(zoomLevel * 100)}%
-        </span>
+        </button>
       </Tooltip>
       <Tooltip title="放大时间轴区域">
-        <Button type="text" size="small" shape="circle" icon={<ZoomInOutlined />} onClick={() => onZoomChange(stepProTimelineZoom(zoomLevel, 0.2))} />
+        <Button aria-label="放大时间轴" type="text" size="small" shape="circle" icon={<ZoomInOutlined />} onClick={() => onZoomChange(stepProTimelineZoom(zoomLevel, 0.2))} />
       </Tooltip>
     </div>
   </>
