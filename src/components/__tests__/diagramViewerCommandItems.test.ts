@@ -2,6 +2,8 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import type { TFunction } from 'i18next';
+import en from '../../locales/en.json';
+import zh from '../../locales/zh.json';
 
 import {
   createDiagramViewerCommandItems,
@@ -9,6 +11,25 @@ import {
 } from '../diagramViewerCommandItems';
 
 describe('diagramViewerCommandItems', () => {
+  it('keeps command titles localized instead of falling back to bilingual labels', () => {
+    const keys = [
+      'smartLayout',
+      'addNode',
+      'triggerAi',
+      'importMermaid',
+      'themeNext',
+      'exportPng',
+      'clearCanvas',
+    ] as const;
+
+    for (const key of keys) {
+      expect(en.designer.commandItems[key]).not.toMatch(/[\u3400-\u9fff]/u);
+      expect(zh.designer.commandItems[key]).toMatch(/[\u3400-\u9fff]/u);
+      expect(en.designer.commandItems[key]).not.toContain('/');
+      expect(zh.designer.commandItems[key]).not.toContain('/');
+    }
+  });
+
   it('detects the platform-specific modifier label', () => {
     expect(getDiagramViewerCommandModifierLabel({ platform: 'MacIntel' })).toBe('⌘');
     expect(getDiagramViewerCommandModifierLabel({ platform: 'Win32' })).toBe('Ctrl');
