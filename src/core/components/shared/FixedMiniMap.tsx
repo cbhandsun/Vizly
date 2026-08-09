@@ -132,8 +132,8 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
       pointerEvents: 'none'
     }}>
       {message === 'empty'
-        ? t('designer.toolbar.minimapEmpty', '画布暂无节点')
-        : t('designer.toolbar.minimapLoading', '正在准备缩略图…')}
+        ? t('designer.toolbar.minimapEmpty', 'No nodes on the canvas')
+        : t('designer.toolbar.minimapLoading', 'Preparing minimap…')}
     </div>
   );
 
@@ -345,14 +345,14 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
           } : undefined}
         >
           <MinimapCollapseControl
-            expandLabel={t('designer.toolbar.expandMinimap', '展开小地图')}
+            expandLabel={t('designer.toolbar.expandMinimap', 'Expand minimap')}
             isMinimized={overlay.isMinimized}
-            minimizeLabel={t('designer.toolbar.minimizeMinimap', '最小化小地图')}
+            minimizeLabel={t('designer.toolbar.minimizeMinimap', 'Minimize minimap')}
             onToggle={overlay.toggleMinimize}
           />
           {!overlay.isMinimized && (
             <>
-              <div className="minimap-drag-handle" title="拖拽移动缩略图">
+              <div className="minimap-drag-handle" title={t('designer.toolbar.dragMinimap')}>
                 <FaGripVertical className="minimap-drag-icon" />
               </div>
 

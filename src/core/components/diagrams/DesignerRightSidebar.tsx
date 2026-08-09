@@ -92,8 +92,8 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
     const hasLockedEdgeSelection = hasMutationLockedEdge(selectedEdges);
     const hasLockedSelection = hasLockedNodeSelection || hasLockedEdgeSelection;
     const lockedSelectionReason = hasLockedEdgeSelection
-        ? '连接器已锁定，请先解锁后再编辑'
-        : '节点已锁定，请先解锁后再编辑';
+        ? t('propertyPanel.lockedEdgeReason')
+        : t('propertyPanel.lockedNodeReason');
     const previousAiChatVisibleRef = React.useRef(aiChatVisible);
     const previousHasSelectionRef = React.useRef(false);
     const sidebarRef = React.useRef<HTMLDivElement>(null);
@@ -466,7 +466,7 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
 
                 {/* 折叠/展开按钮 */}
                 <Tooltip 
-                    title={isCollapsed ? '展开面板' : '收起面板'} 
+                    title={isCollapsed ? t('propertyPanel.expand') : t('propertyPanel.collapse')}
                     placement="left"
                     mouseEnterDelay={0.3}
                     styles={{ root: { pointerEvents: 'none' } }}
@@ -475,7 +475,7 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
                     <Button
                         key={mobileDialogOpen ? 'mobile-dialog-close' : 'sidebar-toggle'}
                         type="text"
-                        aria-label={isCollapsed ? '展开面板' : '收起面板'}
+                        aria-label={isCollapsed ? t('propertyPanel.expand') : t('propertyPanel.collapse')}
                         data-dialog-initial-focus={mobileDialogOpen ? 'true' : undefined}
                         autoFocus={mobileDialogOpen}
                         onClick={(e) => { e.stopPropagation(); toggle(); }}

@@ -45,14 +45,14 @@ const POPULAR_SHAPES: Array<{ shape: FlowchartShape; labelKey: string }> = [
 ];
 
 const DOMAIN_OPTIONS = [
-    { value: 'none', label: '无领域 (Default)', color: '#D5D8DC' },
-    { value: 'fe', label: '前端/交互域 (Frontend)', color: '#3498DB' },
-    { value: 'ch', label: '触点渠道域 (Channel)', color: '#E91E63' },
-    { value: 'mid', label: '业务中台域 (Middleware)', color: '#4CAF50' },
-    { value: 'backend', label: '后台服务域 (Backend)', color: '#5C6BC0' },
-    { value: 'be-scm', label: '供应链域 (SCM)', color: '#FF9800' },
-    { value: 'data', label: '数据计算域 (Data)', color: '#607D8B' },
-    { value: 'infra', label: '基础设施域 (Infra)', color: '#424242' },
+    { value: 'none', labelKey: 'none', color: '#D5D8DC' },
+    { value: 'fe', labelKey: 'frontend', color: '#3498DB' },
+    { value: 'ch', labelKey: 'channel', color: '#E91E63' },
+    { value: 'mid', labelKey: 'middleware', color: '#4CAF50' },
+    { value: 'backend', labelKey: 'backend', color: '#5C6BC0' },
+    { value: 'be-scm', labelKey: 'scm', color: '#FF9800' },
+    { value: 'data', labelKey: 'data', color: '#607D8B' },
+    { value: 'infra', labelKey: 'infrastructure', color: '#424242' },
 ];
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -124,43 +124,49 @@ const ShapePanel: React.FC<{ onChangeShape: (shape: FlowchartShape) => void }> =
     const { t } = useTranslation();
     return <div style={{ padding: 8, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4, width: 180 }}>
         {POPULAR_SHAPES.map(s => (
-            <div
+            <button
+                type="button"
                 key={s.shape}
                 onClick={() => onChangeShape(s.shape)}
+                aria-label={t(s.labelKey)}
                 style={{
                     padding: '6px 4px', cursor: 'pointer', display: 'flex', flexDirection: 'column',
                     alignItems: 'center', gap: 4, borderRadius: 4, transition: 'background 0.2s',
+                    border: 'none', background: 'transparent',
                 }}
                 title={t(s.labelKey)}
                 onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--toolbar-btn-hover-bg)'}
                 onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
             >
                 <div style={{ lineHeight: 0 }}><ShapePreview shape={s.shape} size={24} color="#64748b" /></div>
-            </div>
+            </button>
         ))}
     </div>;
 };
 
-const DomainClassPanel: React.FC<{ onChangeDomainClass: (domainClass: string) => void }> = ({ onChangeDomainClass }) => (
-    <div style={{ padding: 8, display: 'flex', flexDirection: 'column', gap: 4, width: 180 }}>
-        <div style={{ fontSize: '12px', marginBottom: 4, color: '#666' }}>业务域色带配置</div>
+const DomainClassPanel: React.FC<{ onChangeDomainClass: (domainClass: string) => void }> = ({ onChangeDomainClass }) => {
+    const { t } = useTranslation();
+    return <div style={{ padding: 8, display: 'flex', flexDirection: 'column', gap: 4, width: 180 }}>
+        <div style={{ fontSize: '12px', marginBottom: 4, color: '#666' }}>{t('designer.toolbar.domainBandSettings')}</div>
         {DOMAIN_OPTIONS.map(opt => (
-            <div
+            <button
+                type="button"
                 key={opt.value}
                 onClick={() => onChangeDomainClass(opt.value)}
+                aria-label={t(`designer.toolbar.domainOptions.${opt.labelKey}`)}
                 style={{
                     padding: '6px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8,
-                    borderRadius: 4, transition: 'background 0.2s',
+                    borderRadius: 4, transition: 'background 0.2s', border: 'none', background: 'transparent',
                 }}
                 onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--toolbar-btn-hover-bg)'}
                 onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
             >
                 <div style={{ width: 12, height: 12, borderRadius: '50%', backgroundColor: opt.color, border: '1px solid rgba(0,0,0,0.1)' }} />
-                <span style={{ fontSize: '13px' }}>{opt.label}</span>
-            </div>
+                <span style={{ fontSize: '13px' }}>{t(`designer.toolbar.domainOptions.${opt.labelKey}`)}</span>
+            </button>
         ))}
-    </div>
-);
+    </div>;
+};
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 
@@ -173,6 +179,7 @@ export const FloatingContextToolbar: React.FC<FloatingContextToolbarProps> = Rea
     overrideDefaultToolbar
 }) => {
     // ─── Hooks (must be called unconditionally) ──────────────────────────────
+    const { t } = useTranslation();
     const selectedIds = useMemo(() => selectedNodes.map(n => n.id), [selectedNodes]);
     const worldBounds = useSelectedNodeBounds(selectedIds);
     const nodesDragging = useNodesDragging();
@@ -211,7 +218,9 @@ export const FloatingContextToolbar: React.FC<FloatingContextToolbarProps> = Rea
     const allLocked = selectedNodes.every(node => node.data?.locked === true || node.draggable === false);
     const hasLockedSelection = hasMutationLockedNode(selectedNodes);
     const hasUngroupableSelection = selectedNodes.some(node => node.type === 'titleGroup' || node.type === 'subGroup');
-    const lockedActionLabel = (label: string) => hasLockedSelection ? `${label}（请先解锁）` : label;
+    const lockedActionLabel = (label: string) => hasLockedSelection
+        ? t('designer.toolbar.lockedAction', { action: label })
+        : label;
 
     const currentOpacity = selectedNodes.reduce((acc, n) => {
         const op = n.style?.opacity !== undefined ? Number(n.style.opacity) : 1;
@@ -266,16 +275,16 @@ export const FloatingContextToolbar: React.FC<FloatingContextToolbarProps> = Rea
                             }]}
                             trigger="click"
                         >
-                            <span><ToolbarColorSwatch color={currentColor} label="颜色" /></span>
+                            <span><ToolbarColorSwatch color={currentColor} label={t('designer.toolbar.color')} /></span>
                         </ColorPicker>
                     )}
 
                     {!isHide('shape') && (
-                        <ToolbarPopover icon={<FaShapes />} label={lockedActionLabel('形状')} disabled={hasLockedSelection} content={<ShapePanel onChangeShape={onChangeShape || (() => {})} />} />
+                        <ToolbarPopover icon={<FaShapes />} label={lockedActionLabel(t('designer.toolbar.shape'))} disabled={hasLockedSelection} content={<ShapePanel onChangeShape={onChangeShape || (() => {})} />} />
                     )}
 
                     {!isHide('align') && (
-                        <ToolbarPopover icon={<FaArrowsAlt />} label={lockedActionLabel('对齐')} disabled={!canAlign || hasLockedSelection}
+                        <ToolbarPopover icon={<FaArrowsAlt />} label={lockedActionLabel(t('designer.contextMenu.align'))} disabled={!canAlign || hasLockedSelection}
                             content={<AlignPanel onAlign={handleAlign} onDistribute={handleDistribute} canAlign={canAlign} canDistribute={canDistribute} />}
                         />
                     )}
@@ -285,19 +294,19 @@ export const FloatingContextToolbar: React.FC<FloatingContextToolbarProps> = Rea
                     {/* ── 操作区 ── */}
                     <ToolbarButton
                         icon={allLocked ? <FaLock /> : <FaLockOpen />}
-                        label={allLocked ? "解锁" : "锁定"}
+                        label={allLocked ? t('designer.contextMenu.unlock') : t('designer.contextMenu.lock')}
                         onClick={() => onLock(!allLocked)}
                         active={allLocked}
                     />
-                    <ToolbarButton icon={<FaCopy />} label={lockedActionLabel('复制 (Ctrl+D)')} onClick={onDuplicate} disabled={hasLockedSelection} />
-                    <ToolbarButton icon={<FaTrash />} label={lockedActionLabel('删除 (Del)')} onClick={onDelete} disabled={hasLockedSelection} danger />
+                    <ToolbarButton icon={<FaCopy />} label={lockedActionLabel(`${t('designer.contextMenu.duplicate')} (Ctrl+D)`)} onClick={onDuplicate} disabled={hasLockedSelection} />
+                    <ToolbarButton icon={<FaTrash />} label={lockedActionLabel(`${t('designer.contextMenu.delete')} (Del)`)} onClick={onDelete} disabled={hasLockedSelection} danger />
 
                     {/* ── 更多 ── */}
                     <ToolbarDivider />
-                    <ToolbarOverflow items={[
+                    <ToolbarOverflow label={t('designer.toolbar.moreActions')} items={[
                         ...(!isHide('opacity') ? [{
                             key: 'opacity', icon: <FaPercentage />,
-                            label: `透明度 ${Math.round(currentOpacity * 100)}%`,
+                            label: t('designer.toolbar.opacityWithPercent', { value: Math.round(currentOpacity * 100) }),
                             onClick: () => {
                                 const steps = [1, 0.8, 0.6, 0.4, 0.2];
                                 const idx = steps.findIndex(s => Math.abs(s - currentOpacity) < 0.05);
@@ -306,12 +315,15 @@ export const FloatingContextToolbar: React.FC<FloatingContextToolbarProps> = Rea
                             disabled: hasLockedSelection,
                         }] : []),
                         ...(!isHide('layer') ? [
-                            { key: 'bringFront', icon: <FaArrowUp />, label: '置顶', onClick: onBringToFront, disabled: hasLockedSelection },
-                            { key: 'sendBack', icon: <FaArrowDown />, label: '置底', onClick: onSendToBack, disabled: hasLockedSelection },
+                            { key: 'bringFront', icon: <FaArrowUp />, label: t('designer.contextMenu.bringToFront'), onClick: onBringToFront, disabled: hasLockedSelection },
+                            { key: 'sendBack', icon: <FaArrowDown />, label: t('designer.contextMenu.sendToBack'), onClick: onSendToBack, disabled: hasLockedSelection },
                         ] : []),
                         ...(!isHide('border') ? [{
                             key: 'border', icon: <MdLineWeight />,
-                            label: `边框 ${currentStrokeWidth}px${isDashed ? ' 虚线' : ''}`,
+                            label: t('designer.toolbar.borderWithWidth', {
+                                width: currentStrokeWidth,
+                                style: isDashed ? t('designer.toolbar.dashedSuffix') : '',
+                            }),
                             onClick: () => {
                                 const widths = [0, 1, 2, 4];
                                 const idx = widths.indexOf(currentStrokeWidth);
@@ -319,18 +331,18 @@ export const FloatingContextToolbar: React.FC<FloatingContextToolbarProps> = Rea
                             },
                             disabled: hasLockedSelection,
                         }] : []),
-                        ...(onSaveAsComponent ? [{ key: 'save', icon: <FaStar />, label: '保存为组件', onClick: onSaveAsComponent }] : []),
+                        ...(onSaveAsComponent ? [{ key: 'save', icon: <FaStar />, label: t('designer.toolbar.saveAsComponent'), onClick: onSaveAsComponent }] : []),
                         ...(onGroup && selectedNodes.length > 1 ? [{
-                            key: 'group', icon: <FaObjectGroup />, label: '组合 (Ctrl+G)', onClick: onGroup,
+                            key: 'group', icon: <FaObjectGroup />, label: `${t('designer.contextMenu.group')} (Ctrl+G)`, onClick: onGroup,
                             disabled: hasLockedSelection,
                         }] : []),
                         ...(onUngroup && hasUngroupableSelection ? [{
-                            key: 'ungroup', icon: <FaRegObjectGroup />, label: '取消组合 (Ctrl+Shift+G)', onClick: onUngroup,
+                            key: 'ungroup', icon: <FaRegObjectGroup />, label: `${t('designer.contextMenu.ungroup')} (Ctrl+Shift+G)`, onClick: onUngroup,
                             disabled: hasLockedSelection,
                         }] : []),
                         ...(onCopyStyle && onPasteStyle ? [{
                             key: 'format', icon: <FaPaintBrush />,
-                            label: hasCopiedStyle ? '粘贴样式' : '复制样式',
+                            label: hasCopiedStyle ? t('designer.toolbar.pasteStyle') : t('designer.toolbar.copyStyle'),
                             onClick: hasCopiedStyle ? onPasteStyle : onCopyStyle,
                             disabled: hasCopiedStyle && hasLockedSelection,
                         }] : []),
@@ -340,7 +352,7 @@ export const FloatingContextToolbar: React.FC<FloatingContextToolbarProps> = Rea
                     {!isHide('domain') && onChangeDomainClass && (
                         <ToolbarPopover
                             icon={<div style={{ width: 12, height: 12, borderRadius: 3, background: 'linear-gradient(135deg, #3b82f6, #ef4444)' }} />}
-                            label="业务域"
+                            label={t('designer.toolbar.domain')}
                             disabled={hasLockedSelection}
                             content={<DomainClassPanel onChangeDomainClass={onChangeDomainClass} />}
                         />
@@ -349,7 +361,7 @@ export const FloatingContextToolbar: React.FC<FloatingContextToolbarProps> = Rea
                     {/* 图层 dropdown */}
                     {!isHide('layer') && layers && layers.length > 0 && onMoveToLayer && (
                         <Dropdown disabled={hasLockedSelection} menu={{ items: layerMenuItems }} trigger={['click']}>
-                            <span><ToolbarButton icon={<FaLayerGroup />} label={lockedActionLabel('移动到图层')} disabled={hasLockedSelection} /></span>
+                            <span><ToolbarButton icon={<FaLayerGroup />} label={lockedActionLabel(t('designer.toolbar.moveToLayer'))} disabled={hasLockedSelection} /></span>
                         </Dropdown>
                     )}
 

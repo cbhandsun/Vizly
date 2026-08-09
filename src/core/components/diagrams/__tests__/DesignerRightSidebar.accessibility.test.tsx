@@ -10,6 +10,8 @@ vi.mock('react-i18next', () => ({
     useTranslation: () => ({
         t: (key: string) => ({
             'propertyPanel.title': '属性设置',
+            'propertyPanel.expand': '展开面板',
+            'propertyPanel.collapse': '收起面板',
             'aiChat.title': 'AI 架构助手',
         })[key] ?? key,
     }),

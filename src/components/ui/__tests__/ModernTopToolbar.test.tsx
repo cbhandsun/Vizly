@@ -48,6 +48,7 @@ vi.mock('react-i18next', () => ({
       'common.settings': 'Settings',
       'common.export': 'Export',
       'common.theme': 'Theme',
+      'designer.commandPalette.open': 'Open command search',
     }[key] ?? fallback ?? key),
   }),
 }));
@@ -165,7 +166,7 @@ describe('ModernTopToolbar responsive layout', () => {
     const leftIsland = container.querySelector('[data-toolbar-left-island]');
     expect(leftIsland?.className).toContain('min-w-0');
     expect(leftIsland?.className).not.toContain('shrink-0');
-    expect(screen.queryByRole('button', { name: '打开命令搜索' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Open command search' })).toBeNull();
   });
 
   it('keeps the main canvas tools inline on desktop', () => {
@@ -203,7 +204,7 @@ describe('ModernTopToolbar responsive layout', () => {
       expect(document.activeElement).toBe(diagramSwitcher);
     });
 
-    const commandSearch = screen.getByRole('button', { name: '打开命令搜索' });
+    const commandSearch = screen.getByRole('button', { name: 'Open command search' });
     expect(commandSearch.getAttribute('aria-haspopup')).toBe('dialog');
     expect(commandSearch.getAttribute('aria-keyshortcuts')).toBe('Control+K');
     fireEvent.click(commandSearch);

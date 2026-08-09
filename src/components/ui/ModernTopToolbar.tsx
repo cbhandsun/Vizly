@@ -81,7 +81,7 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
   const diagramSwitcherLabel = title
     ? `${t('diagramViewer.switchDiagram', '切换图表')}：${title}`
     : t('diagramViewer.switchDiagram', '切换图表');
-  const commandSearchLabel = t('commandPalette.open', '打开命令搜索');
+  const commandSearchLabel = t('designer.commandPalette.open', 'Open command search');
 
   const closeMoreAndRestoreFocus = useCallback(() => {
     setIsMoreOpen(false);

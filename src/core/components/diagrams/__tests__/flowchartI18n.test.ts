@@ -31,6 +31,9 @@ const readLocaleString = (relativePath: string, path: string[]) => {
 describe('flowchart interaction copy', () => {
     it('uses translations for alignment and primary shape labels', () => {
         const toolbarSource = readRelativeFile('../FloatingContextToolbar.tsx');
+        const rightSidebarSource = readRelativeFile('../DesignerRightSidebar.tsx');
+        const topToolbarSource = readRelativeFile('../../../../components/ui/ModernTopToolbar.tsx');
+        const minimapSource = readRelativeFile('../../shared/FixedMiniMap.tsx');
         const shapesSource = readRelativeFile('../FlowchartShapesPanel.tsx');
         const sidebarSource = readRelativeFile('../ModernFlowchartSidebar.tsx');
         const pluginSource = readRelativeFile('../../../plugins/FlowchartPlugin.tsx');
@@ -40,6 +43,25 @@ describe('flowchart interaction copy', () => {
         expect(toolbarSource).not.toContain('label="Align Left"');
         expect(toolbarSource).toContain("t('designer.toolbar.alignL')");
         expect(toolbarSource).toContain("labelKey: 'propertyPanel.options.shape.rectangle'");
+        for (const hardcodedLabel of [
+            'label="颜色"',
+            "lockedActionLabel('形状')",
+            'label={allLocked ? "解锁" : "锁定"}',
+            "lockedActionLabel('复制 (Ctrl+D)')",
+            "lockedActionLabel('删除 (Del)')",
+            'label="业务域"',
+        ]) {
+            expect(toolbarSource).not.toContain(hardcodedLabel);
+        }
+        expect(toolbarSource).toContain("label={t('designer.toolbar.moreActions')}");
+        expect(toolbarSource.match(/type="button"/g)?.length).toBeGreaterThanOrEqual(2);
+        expect(toolbarSource).toContain('aria-label={t(s.labelKey)}');
+        expect(toolbarSource).toContain('aria-label={t(`designer.toolbar.domainOptions.${opt.labelKey}`)}');
+        expect(rightSidebarSource).toContain("t('propertyPanel.collapse')");
+        expect(rightSidebarSource).toContain("t('propertyPanel.expand')");
+        expect(topToolbarSource).toContain("t('designer.commandPalette.open', 'Open command search')");
+        expect(minimapSource).toContain("t('designer.toolbar.minimizeMinimap', 'Minimize minimap')");
+        expect(minimapSource).toContain("t('designer.toolbar.expandMinimap', 'Expand minimap')");
         expect(shapesSource).not.toContain("label: 'Circle'");
         expect(shapesSource).toContain("t('designer.sidebar.searchComponents')");
         expect(shapesSource.match(/data-icon-rail-search-focus="true"/g)).toHaveLength(1);
@@ -71,6 +93,22 @@ describe('flowchart interaction copy', () => {
         for (const key of ['alignL', 'alignC', 'alignR', 'alignT', 'alignM', 'alignB', 'distributeH', 'distributeV']) {
             expect(read(zh, ['designer', 'toolbar', key])).toBeTypeOf('string');
             expect(read(en, ['designer', 'toolbar', key])).toBeTypeOf('string');
+        }
+        for (const key of [
+            'color', 'shape', 'lockedAction', 'opacityWithPercent', 'borderWithWidth',
+            'dashedSuffix', 'saveAsComponent', 'copyStyle', 'pasteStyle', 'moveToLayer',
+            'domainBandSettings', 'expandMinimap', 'minimizeMinimap', 'dragMinimap',
+        ]) {
+            expect(read(zh, ['designer', 'toolbar', key])).toBeTypeOf('string');
+            expect(read(en, ['designer', 'toolbar', key])).toBeTypeOf('string');
+        }
+        for (const key of ['open']) {
+            expect(read(zh, ['designer', 'commandPalette', key])).toBeTypeOf('string');
+            expect(read(en, ['designer', 'commandPalette', key])).toBeTypeOf('string');
+        }
+        for (const key of ['lockedNodeReason', 'lockedEdgeReason']) {
+            expect(read(zh, ['propertyPanel', key])).toBeTypeOf('string');
+            expect(read(en, ['propertyPanel', key])).toBeTypeOf('string');
         }
         for (const key of ['creationTools', 'pointer', 'marqueeEnter', 'marqueeExit', 'drawingMode', 'drawingModeExit', 'stickyNote', 'mindMap']) {
             expect(read(zh, ['designer', 'toolbar', key])).toBeTypeOf('string');
