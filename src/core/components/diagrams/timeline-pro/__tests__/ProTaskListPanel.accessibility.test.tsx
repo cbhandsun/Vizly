@@ -36,6 +36,7 @@ import {
     isProTimelineDependencyActivationKey,
     isProTimelineDependencyDeleteKey,
 } from '../proTimelineDependencyInteraction';
+import { requestProTimelineSnapshot } from '../proTimelineHistory';
 
 class ResizeObserverMock {
     observe() {}
@@ -48,7 +49,9 @@ vi.stubGlobal('ResizeObserver', ResizeObserverMock);
 beforeAll(() => {
     HTMLElement.prototype.setPointerCapture = vi.fn();
     HTMLElement.prototype.releasePointerCapture = vi.fn();
+    HTMLElement.prototype.hasPointerCapture = vi.fn(() => true);
 });
+
 
 vi.mock('@/core/themes/useCoreTheme', () => ({ useTheme: () => [null, vi.fn()] }));
 vi.mock('@/core/hooks/useProTimelineEngine', async (importOriginal) => {
@@ -103,6 +106,7 @@ describe('ProTaskListPanel accessibility', () => {
         renderPanel();
 
         expect(screen.getByRole('listbox', { name: '项目任务列表' })).toBeTruthy();
+        expect(screen.getByRole('listbox', { name: '项目任务列表' }).getAttribute('aria-multiselectable')).toBe('true');
         const option = screen.getByRole('option', { name: /Project launch，开始 2026-08-08/ });
         expect(option.getAttribute('tabindex')).toBe('0');
         expect(option.getAttribute('aria-selected')).toBe('false');
@@ -115,7 +119,30 @@ describe('ProTaskListPanel accessibility', () => {
         const option = screen.getByRole('option', { name: /Project launch/ });
         fireEvent.keyDown(option, { key });
 
-        expect(onClickTask).toHaveBeenCalledWith('launch');
+        expect(onClickTask).toHaveBeenCalledWith('launch', false);
+    });
+
+    it('announces and preserves additive pointer and keyboard selection', () => {
+        const onClickTask = vi.fn();
+        renderPanel({ onClickTask, selectedTaskIds: new Set(['launch']) });
+        const option = screen.getByRole('option', { name: /Project launch/ });
+
+        expect(option.getAttribute('aria-selected')).toBe('true');
+        fireEvent.click(option, { ctrlKey: true });
+        fireEvent.keyDown(option, { key: 'Enter', metaKey: true });
+
+        expect(onClickTask).toHaveBeenNthCalledWith(1, 'launch', true);
+        expect(onClickTask).toHaveBeenNthCalledWith(2, 'launch', true);
+    });
+
+    it('dispatches one recoverable snapshot request before a timeline mutation', () => {
+        const onSnapshot = vi.fn();
+        window.addEventListener('diagram:save-snapshot', onSnapshot);
+
+        requestProTimelineSnapshot(window);
+
+        expect(onSnapshot).toHaveBeenCalledTimes(1);
+        window.removeEventListener('diagram:save-snapshot', onSnapshot);
     });
 
     it('does not select the task when a nested editor handles a key', () => {
@@ -415,7 +442,19 @@ describe('ProTaskLayer accessibility and recovery', () => {
         expect(taskBar.getAttribute('tabindex')).toBe('0');
         fireEvent.keyDown(taskBar, { key });
 
-        expect(onTaskClick).toHaveBeenCalledWith('phase-1');
+        expect(onTaskClick).toHaveBeenCalledWith('phase-1', false);
+    });
+
+    it('supports additive task-bar selection by pointer and keyboard', () => {
+        const onTaskClick = vi.fn();
+        renderTaskLayer({ onTaskClick });
+        const taskBar = screen.getByRole('group', { name: 'Launch phase，时间轴任务' });
+
+        fireEvent.click(taskBar, { ctrlKey: true });
+        fireEvent.keyDown(taskBar, { key: 'Enter', metaKey: true });
+
+        expect(onTaskClick).toHaveBeenNthCalledWith(1, 'phase-1', true);
+        expect(onTaskClick).toHaveBeenNthCalledWith(2, 'phase-1', true);
     });
 
     it('opens a labeled editor with F2 and cancels without persisting', () => {

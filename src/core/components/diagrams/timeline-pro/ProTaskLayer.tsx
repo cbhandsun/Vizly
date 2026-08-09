@@ -13,10 +13,11 @@ import { ProTaskDependencyControl, ProTaskDependencyFeedback } from './ProTaskDe
 import { useProTaskDependencyKeyboard } from './useProTaskDependencyKeyboard';
 import type { ProTimelineDependencyConnectionResult } from './proTimelineDependencyConnection';
 import { useProTaskInlineEditing } from './useProTaskInlineEditing';
+import { isProTimelineAdditiveSelection } from './proTimelineViewportInteraction';
 
 export interface ProTaskLayerProps {
     tasks: ProjectedProTimelineTask[];
-    onTaskClick?: (taskId: string) => void;
+    onTaskClick?: (taskId: string, additive?: boolean) => void;
     onTaskDragEnd?: (taskId: string, newStartDate: string, newEndDate: string) => void;
     hoveredTaskId?: string | null;
     onHoverTask?: (id: string | null) => void;
@@ -237,7 +238,7 @@ export default function ProTaskLayer({
                     tabIndex: 0,
                     'aria-label': `${accessibleTaskName}，时间轴任务`,
                     'aria-current': isSelected ? 'true' : undefined,
-                    'aria-keyshortcuts': 'Enter Space F2 C ArrowLeft ArrowRight ArrowUp ArrowDown Home End Escape Shift+ArrowLeft Shift+ArrowRight',
+                    'aria-keyshortcuts': 'Enter Space Control+Enter Meta+Enter F2 C ArrowLeft ArrowRight ArrowUp ArrowDown Home End Escape Shift+ArrowLeft Shift+ArrowRight',
                     'data-connection-source': isConnectionSource ? 'true' : undefined,
                     'data-connection-target': isConnectionTarget ? 'true' : undefined,
                     onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => handleTaskBarKeyDown(event, task),
@@ -293,7 +294,13 @@ export default function ProTaskLayer({
                                     position: 'absolute', left: x, top: y + 8, width: Math.max(4, w), height: 12,
                                     pointerEvents: 'auto', cursor: 'pointer',
                                 }}
-                                onClick={(e) => { e.stopPropagation(); onTaskClick?.(task.id); }}
+                                onClick={(event) => {
+                                    event.stopPropagation();
+                                    onTaskClick?.(
+                                        task.id,
+                                        isProTimelineAdditiveSelection(event.ctrlKey, event.metaKey),
+                                    );
+                                }}
                                 onMouseEnter={(e) => handleTaskMouseEnter(e, task)}
                                 onMouseLeave={(e) => handleTaskMouseLeave(e, task)}
                                 onMouseMove={handleTaskMouseMove}
@@ -328,7 +335,13 @@ export default function ProTaskLayer({
                                     position: 'absolute', left: x - 14, top: y, width: 28, height: 28,
                                     pointerEvents: 'auto', cursor: isDragging ? 'grabbing' : 'grab',
                                 }}
-                                onClick={(e) => { e.stopPropagation(); onTaskClick?.(task.id); }}
+                                onClick={(event) => {
+                                    event.stopPropagation();
+                                    onTaskClick?.(
+                                        task.id,
+                                        isProTimelineAdditiveSelection(event.ctrlKey, event.metaKey),
+                                    );
+                                }}
                                 onPointerDown={(e) => handleTaskPointerDown(e, task, 'move')}
                                 onMouseEnter={(e) => handleTaskMouseEnter(e, task)}
                                 onMouseLeave={(e) => handleTaskMouseLeave(e, task)}
@@ -409,7 +422,13 @@ export default function ProTaskLayer({
                                         ? { animation: 'pro-timeline-cyclic-glow 2s infinite ease-in-out' }
                                         : (isCritical ? { animation: 'pro-timeline-critical-glow 2s infinite ease-in-out' } : {}))
                                 }}
-                                onClick={(e) => { e.stopPropagation(); onTaskClick?.(task.id); }}
+                                onClick={(event) => {
+                                    event.stopPropagation();
+                                    onTaskClick?.(
+                                        task.id,
+                                        isProTimelineAdditiveSelection(event.ctrlKey, event.metaKey),
+                                    );
+                                }}
                                 onPointerDown={(e) => handleTaskPointerDown(e, task, 'move')}
                                 onMouseEnter={(e) => handleTaskMouseEnter(e, task)}
                                 onMouseLeave={(e) => handleTaskMouseLeave(e, task)}
@@ -473,7 +492,13 @@ export default function ProTaskLayer({
                                     ? { animation: 'pro-timeline-cyclic-glow 2s infinite ease-in-out' }
                                     : (isCritical ? { animation: 'pro-timeline-critical-glow 2s infinite ease-in-out' } : {}))
                             }}
-                            onClick={(e) => { e.stopPropagation(); onTaskClick?.(task.id); }}
+                            onClick={(event) => {
+                                event.stopPropagation();
+                                onTaskClick?.(
+                                    task.id,
+                                    isProTimelineAdditiveSelection(event.ctrlKey, event.metaKey),
+                                );
+                            }}
                             onPointerDown={(e) => handleTaskPointerDown(e, task, 'move')}
                             onMouseEnter={(e) => handleTaskMouseEnter(e, task)}
                             onMouseLeave={(e) => handleTaskMouseLeave(e, task)}

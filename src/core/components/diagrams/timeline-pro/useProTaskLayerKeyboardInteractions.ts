@@ -12,6 +12,7 @@ import {
     getProTaskDateKeyboardDelta,
     getProTaskProgressKeyboardValue,
 } from './proTaskLayerInteraction';
+import { isProTimelineAdditiveSelection } from './proTimelineViewportInteraction';
 
 interface ProTaskLayerKeyboardOptions {
     cancelDragInteraction: () => void;
@@ -19,7 +20,7 @@ interface ProTaskLayerKeyboardOptions {
         event: React.KeyboardEvent<HTMLElement>,
         task: ProjectedProTimelineTask,
     ) => boolean;
-    onTaskClick?: (taskId: string) => void;
+    onTaskClick?: (taskId: string, additive?: boolean) => void;
     onTaskDragEnd?: (taskId: string, newStartDate: string, newEndDate: string) => void;
     onTaskUpdate?: (taskId: string, updates: Partial<ProGanttTask>) => void;
     startTaskNameEdit: (task: ProjectedProTimelineTask) => void;
@@ -38,7 +39,10 @@ export function useProTaskLayerKeyboardInteractions({
         if (handleTaskConnectionKeyDown?.(event, task)) return;
         if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault();
-            onTaskClick?.(task.id);
+            onTaskClick?.(
+                task.id,
+                isProTimelineAdditiveSelection(event.ctrlKey, event.metaKey),
+            );
             return;
         }
         if (event.key === 'F2') {

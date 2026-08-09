@@ -20,6 +20,12 @@ import { addDaysToDateOnly, parseDateOnlyTime, todayDateOnly } from '../../../ut
 import { ProTimelineChrome, ProTimelineKeyframes } from './ProTimelineChrome';
 import { projectProTimelineTasks } from './proTimelineTaskProjection';
 import { useProTimelineDependencyActions } from './useProTimelineDependencyActions';
+import { requestProTimelineSnapshot } from './proTimelineHistory';
+import {
+  getProTimelineDateX,
+  updateProTimelineTaskSelection,
+} from './proTimelineViewportInteraction';
+import { useProTimelineViewportInteractions } from './useProTimelineViewportInteractions';
 import './ProTimelineCanvas.css';
 
 const ROW_HEIGHT = 42;
@@ -32,7 +38,6 @@ export default function ProTimelineCanvas() {
     showCriticalPath, showBaseline, toggleCriticalPath, toggleBaseline
   } = useProTimelineEngine();
   const timelineRef = useRef<HTMLDivElement>(null);
-  const [isDragPan, setIsDragPan] = useState(false);
   const [panelWidth, setPanelWidth] = useState(380);
   const [hoveredTaskId, setHoveredTaskId] = useState<string | null>(null);
   const [scrollTop, setScrollTop] = useState(0);
@@ -139,41 +144,52 @@ export default function ProTimelineCanvas() {
          ...t,
          _computed: {
              ...t._computed!,
-             x: dateToX(t.startDate),
-             w: Math.max(12, dateToX(t.endDate) - dateToX(t.startDate))
+             x: getProTimelineDateX(t.startDate, pixelsPerDay),
+             w: Math.max(
+               12,
+               getProTimelineDateX(t.endDate, pixelsPerDay)
+                 - getProTimelineDateX(t.startDate, pixelsPerDay),
+             ),
          }
      }));
-  }, [tasks, dateToX]);
+  }, [tasks, pixelsPerDay]);
 
-  const selectedTaskId = useMemo(() => nodes.find(n => n.selected)?.id || null, [nodes]);
+  const selectedTaskIds = useMemo(
+    () => new Set(nodes.filter(node => node.selected).map(node => node.id)),
+    [nodes],
+  );
+  const selectedTaskId = selectedTaskIds.size === 1 ? [...selectedTaskIds][0] : null;
 
-  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
-      e.stopPropagation();
-      if (e.ctrlKey || e.metaKey) {
-          e.preventDefault();
-          const newZoom = Math.min(Math.max(0.15, zoomLevel - e.deltaY * 0.005), 5);
-          setZoom(newZoom);
-      } else {
-          setPanByDelta(-e.deltaX, -e.deltaY);
-      }
-  };
+  const clearTaskSelection = useCallback(() => {
+    setNodes(currentNodes => currentNodes.map(node => (
+      node.selected ? { ...node, selected: false } : node
+    )));
+  }, [setNodes]);
 
-  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-     if (e.target === timelineRef.current || (e.target as HTMLElement).classList.contains('pro-timeline-bg')) {
-         setIsDragPan(true);
-         e.currentTarget.setPointerCapture(e.pointerId);
-         setNodes(ns => ns.map(n => ({...n, selected: false})));
-     }
-  };
+  const onTaskClick = useCallback((taskId: string, additive = false) => {
+      setNodes(currentNodes => updateProTimelineTaskSelection(currentNodes, taskId, additive));
+  }, [setNodes]);
 
-  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-     if (isDragPan) setPanByDelta(e.movementX, e.movementY);
-  };
-
-  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-     setIsDragPan(false);
-     e.currentTarget.releasePointerCapture(e.pointerId);
-  };
+  const {
+    handleKeyDown: handleViewportKeyDown,
+    handleLostPointerCapture,
+    handlePointerCancel,
+    handlePointerDown,
+    handlePointerMove,
+    handlePointerUp,
+    handleWheel,
+    isDragPan,
+    zoomAroundViewportPoint,
+  } = useProTimelineViewportInteractions({
+    clearSelection: clearTaskSelection,
+    panX,
+    panY,
+    setPan,
+    setPanByDelta,
+    setZoom,
+    timelineRef,
+    zoomLevel,
+  });
 
   const handleDoubleClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
      if (e.target === timelineRef.current || (e.target as HTMLElement).classList.contains('pro-timeline-bg')) {
@@ -209,10 +225,6 @@ export default function ProTimelineCanvas() {
          }, 50);
      }
   }, [panX, zoomLevel, xToDate, setNodes]);
-
-  const onTaskClick = useCallback((taskId: string) => {
-      setNodes(ns => ns.map(n => ({ ...n, selected: n.id === taskId })));
-  }, [setNodes]);
 
   // 前置驱动智能级联自动避让排期核心算法
   const applyAutoScheduling = useCallback((taskId: string, targetStartDate: string, targetEndDate: string) => {
@@ -320,27 +332,21 @@ export default function ProTimelineCanvas() {
           finalEnd = addWorkDays(finalStart, duration);
       }
 
+      if (finalStart === oldStartDate && finalEnd === oldEndDate) return;
+      requestProTimelineSnapshot();
       applyAutoScheduling(taskId, finalStart, finalEnd);
+      appMessage.success('排期已更新，可使用撤销恢复。');
   }, [nodes, applyAutoScheduling]);
 
   const onTaskUpdate = useCallback((taskId: string, updates: Partial<ProGanttTask>) => {
       const rfUpdates: Record<string, unknown> = {};
-      let dateChanged = false;
-      let targetStart = '';
-      let targetEnd = '';
-      
       const node = nodes.find(n => n.id === taskId);
-      if (node) {
-          const currentStart = node.data.date as string;
-          const currentEnd = (node.data.endDate as string) || currentStart;
-          
-          targetStart = updates.startDate || currentStart;
-          targetEnd = updates.endDate || currentEnd;
-          
-          if (targetStart !== currentStart || targetEnd !== currentEnd) {
-              dateChanged = true;
-          }
-      }
+      if (!node) return;
+
+      const currentStart = node.data.date as string;
+      const currentEnd = (node.data.endDate as string) || currentStart;
+      const targetStart = updates.startDate || currentStart;
+      const targetEnd = updates.endDate || currentEnd;
 
       if ('name' in updates) rfUpdates.label = updates.name;
       if ('progress' in updates) rfUpdates.progress = updates.progress;
@@ -349,16 +355,26 @@ export default function ProTimelineCanvas() {
       if ('assignee' in updates) rfUpdates.assignee = updates.assignee;
       if ('priority' in updates) rfUpdates.priority = updates.priority;
 
-      if (Object.keys(rfUpdates).length > 0) {
+      const metadataChanged = Object.entries(rfUpdates).some(([key, value]) => node.data[key] !== value);
+      const requestedDateChange = targetStart !== currentStart || targetEnd !== currentEnd;
+      const finalStart = requestedDateChange ? adjustToWorkDay(targetStart, 'forward') : currentStart;
+      const duration = requestedDateChange ? getWorkDays(targetStart, targetEnd) : 0;
+      const finalEnd = requestedDateChange
+        ? addWorkDays(finalStart, Math.max(1, duration))
+        : currentEnd;
+      const dateChanged = finalStart !== currentStart || finalEnd !== currentEnd;
+
+      if (!metadataChanged && !dateChanged) return;
+      requestProTimelineSnapshot();
+
+      if (metadataChanged) {
           updateNodeData(taskId, rfUpdates);
       }
 
-      if (dateChanged && targetStart && targetEnd) {
-          const finalStart = adjustToWorkDay(targetStart, 'forward');
-          const duration = getWorkDays(targetStart, targetEnd);
-          const finalEnd = addWorkDays(finalStart, Math.max(1, duration));
+      if (dateChanged) {
           applyAutoScheduling(taskId, finalStart, finalEnd);
       }
+      appMessage.success('任务已更新，可使用撤销恢复。');
   }, [nodes, updateNodeData, applyAutoScheduling]);
 
     const handleTaskDelete = useCallback((taskId: string) => {
@@ -459,6 +475,7 @@ export default function ProTimelineCanvas() {
             onHoverTask={setHoveredTaskId}
             onClickTask={onTaskClick}
             selectedTaskId={selectedTaskId}
+            selectedTaskIds={selectedTaskIds}
             scrollTop={scrollTop}
             onScrollTopChange={setScrollTop}
             onTaskUpdate={onTaskUpdate}
@@ -472,15 +489,25 @@ export default function ProTimelineCanvas() {
         <div
             ref={timelineRef}
             className="pro-timeline-bg"
+            data-testid="pro-timeline-viewport"
+            role="region"
+            tabIndex={0}
+            aria-label="时间轴画布"
+            aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown + - 0"
+            aria-description="使用方向键平移，加号和减号缩放，数字 0 恢复到 100%。按住 Ctrl 或 Command 点击任务可多选。"
             style={{
                 flex: 1, position: 'relative', overflow: 'hidden',
                 background: canvasBg,
-                cursor: isDragPan ? 'grabbing' : 'default',
+                cursor: isDragPan ? 'grabbing' : 'grab',
+                touchAction: 'none',
             }}
             onWheel={handleWheel}
+            onKeyDown={handleViewportKeyDown}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerCancel}
+            onLostPointerCapture={handleLostPointerCapture}
             onDoubleClick={handleDoubleClick}
         >
             {/* 循环依赖警告 Alert 横幅 */}
@@ -531,7 +558,7 @@ export default function ProTimelineCanvas() {
                 {/* 动态高亮 (只渲染有状态的行) */}
                 {packedTasks.map((taskAtRow) => {
                     const isHovered = hoveredTaskId === taskAtRow.id;
-                    const isSelected = selectedTaskId === taskAtRow.id;
+                    const isSelected = selectedTaskIds.has(taskAtRow.id);
                     if (!isHovered && !isSelected || taskAtRow._computed?.isVisible === false) return null;
                     
                     return (
@@ -639,7 +666,7 @@ export default function ProTimelineCanvas() {
                 viewMode={viewMode}
                 onViewModeChange={setViewMode}
                 zoomLevel={zoomLevel}
-                onZoomChange={setZoom}
+                onZoomChange={zoomAroundViewportPoint}
             />
 
             {/* ===== Pro Resource Drawer ===== */}

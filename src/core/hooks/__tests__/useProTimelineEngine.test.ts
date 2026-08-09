@@ -6,6 +6,14 @@ import {
 } from '../../components/diagrams/timeline-pro/proTimelineChromeBoundary';
 import { projectProTimelineTasks } from '../../components/diagrams/timeline-pro/proTimelineTaskProjection';
 import {
+    getProTimelineDateX,
+    getProTimelineKeyboardPanDelta,
+    getProTimelineZoomedPanX,
+    isProTimelinePanClick,
+    normalizeProTimelineZoom,
+    updateProTimelineTaskSelection,
+} from '../../components/diagrams/timeline-pro/proTimelineViewportInteraction';
+import {
     addWorkDays,
     adjustToWorkDay,
     getWorkDays,
@@ -47,6 +55,46 @@ describe('useProTimelineEngine date helpers', () => {
         expect(stepProTimelineZoom(Number.NaN, 0.2)).toBe(1.2);
         expect(stepProTimelineZoom(0.2, -1)).toBe(0.15);
         expect(stepProTimelineZoom(4.9, 1)).toBe(5);
+    });
+
+    it('recomputes date geometry from the current zoom scale', () => {
+        expect(getProTimelineDateX('2026-01-11', 24)).toBe(240);
+        expect(getProTimelineDateX('2026-01-11', 48)).toBe(480);
+        expect(getProTimelineDateX('invalid', 48)).toBe(0);
+        expect(getProTimelineDateX('2026-01-11', Number.POSITIVE_INFINITY)).toBe(0);
+    });
+
+    it('anchors bounded zoom and rejects invalid viewport inputs', () => {
+        expect(normalizeProTimelineZoom(Number.NaN)).toBe(1);
+        expect(normalizeProTimelineZoom(0)).toBe(0.15);
+        expect(normalizeProTimelineZoom(99)).toBe(5);
+        expect(getProTimelineZoomedPanX(-100, 1, 1.2, 250)).toBe(-170);
+        expect(getProTimelineZoomedPanX('bad', 1, 1, 'bad')).toBe(0);
+    });
+
+    it('models keyboard panning and canceled click thresholds explicitly', () => {
+        expect(getProTimelineKeyboardPanDelta('ArrowLeft')).toEqual({ dx: 48, dy: 0 });
+        expect(getProTimelineKeyboardPanDelta('ArrowDown')).toEqual({ dx: 0, dy: -48 });
+        expect(getProTimelineKeyboardPanDelta('Enter')).toBeNull();
+        expect(isProTimelinePanClick(0, 0, 3, 0)).toBe(true);
+        expect(isProTimelinePanClick(0, 0, 5, 0)).toBe(false);
+        expect(isProTimelinePanClick(0, 0, Number.NaN, 0)).toBe(false);
+    });
+
+    it('supports additive task selection without corrupting unknown ids', () => {
+        const nodes: Node[] = [
+            { id: 'a', position: { x: 0, y: 0 }, data: {}, selected: true },
+            { id: 'b', position: { x: 0, y: 0 }, data: {}, selected: false },
+        ];
+
+        expect(updateProTimelineTaskSelection(nodes, 'b', false).map((node) => node.selected))
+            .toEqual([false, true]);
+        const additive = updateProTimelineTaskSelection(nodes, 'b', true);
+        expect(additive.map((node) => node.selected)).toEqual([true, true]);
+        expect(updateProTimelineTaskSelection(additive, 'a', true).map((node) => node.selected))
+            .toEqual([false, true]);
+        expect(updateProTimelineTaskSelection(nodes, '', true)).toEqual(nodes);
+        expect(updateProTimelineTaskSelection(nodes, 'missing', true)).toEqual(nodes);
     });
 
     it('projects external node data into validated timeline tasks', () => {

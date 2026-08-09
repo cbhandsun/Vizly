@@ -12,6 +12,7 @@ import {
     PRO_TASK_LIST_MAX_WIDTH,
     PRO_TASK_LIST_MIN_WIDTH,
 } from './proTaskListInteraction';
+import { isProTimelineAdditiveSelection } from './proTimelineViewportInteraction';
 
 export interface ProTaskListPanelProps {
     tasks: ProGanttTask[];
@@ -19,8 +20,9 @@ export interface ProTaskListPanelProps {
     onWidthChange: (w: number) => void;
     hoveredTaskId: string | null;
     onHoverTask: (id: string | null) => void;
-    onClickTask: (id: string) => void;
+    onClickTask: (id: string, additive?: boolean) => void;
     selectedTaskId: string | null;
+    selectedTaskIds?: ReadonlySet<string>;
     scrollTop: number;
     onScrollTopChange: (y: number) => void;
     onTaskExpandToggle?: (id: string) => void;
@@ -41,7 +43,7 @@ const getTypeIcons = (theme: Theme | null): Record<string, React.ReactNode> => (
 });
 
 export default function ProTaskListPanel({
-    tasks, width, onWidthChange, hoveredTaskId, onHoverTask, onClickTask, selectedTaskId, onScrollTopChange,
+    tasks, width, onWidthChange, hoveredTaskId, onHoverTask, onClickTask, selectedTaskId, selectedTaskIds, onScrollTopChange,
     onTaskExpandToggle, onTaskUpdate, onTaskAdd, onTaskDelete, cyclicTaskIds
 }: ProTaskListPanelProps) {
     const [isResizing, setIsResizing] = useState(false);
@@ -215,13 +217,14 @@ export default function ProTaskListPanel({
             {/* 任务行 (可滚动) */}
             <div
                 aria-label="项目任务列表"
+                aria-multiselectable="true"
                 role="listbox"
                 style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}
                 onScroll={(e) => onScrollTopChange((e.target as HTMLDivElement).scrollTop)}
             >
                 {tasks.map((task, idx) => {
                     const isHovered = hoveredTaskId === task.id;
-                    const isSelected = selectedTaskId === task.id;
+                    const isSelected = selectedTaskIds?.has(task.id) ?? selectedTaskId === task.id;
                     const type = task.type || 'phase';
                     const duration = getDuration(task);
                     const dateLabel = task.startDate ? task.startDate.slice(5) : '--'; // MM-DD
@@ -240,7 +243,7 @@ export default function ProTaskListPanel({
                             key={task.id}
                             aria-label={`${accessibleTaskName}，开始 ${task.startDate || '未设置'}，工期 ${duration ?? '未设置'} 天`}
                             aria-selected={isSelected}
-                            aria-keyshortcuts="Enter Space F2 ArrowLeft ArrowRight"
+                            aria-keyshortcuts="Enter Space Control+Enter Meta+Enter F2 ArrowLeft ArrowRight"
                             className="pro-timeline-task-row"
                             role="option"
                             tabIndex={0}
@@ -264,12 +267,18 @@ export default function ProTaskListPanel({
                                     setFocusedTaskId(null);
                                 }
                             }}
-                            onClick={() => onClickTask(task.id)}
+                            onClick={(event) => onClickTask(
+                                task.id,
+                                isProTimelineAdditiveSelection(event.ctrlKey, event.metaKey),
+                            )}
                             onKeyDown={(event) => {
                                 if (event.target !== event.currentTarget) return;
                                 if (event.key === 'Enter' || event.key === ' ') {
                                     event.preventDefault();
-                                    onClickTask(task.id);
+                                    onClickTask(
+                                        task.id,
+                                        isProTimelineAdditiveSelection(event.ctrlKey, event.metaKey),
+                                    );
                                 } else if (event.key === 'F2') {
                                     event.preventDefault();
                                     setEditingCell({ id: task.id, field: 'name' });

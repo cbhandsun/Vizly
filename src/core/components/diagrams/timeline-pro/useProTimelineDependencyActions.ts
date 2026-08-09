@@ -6,8 +6,7 @@ import {
     validateProTimelineDependencyUpdate,
     type ProTimelineDependencyConnectionResult,
 } from './proTimelineDependencyConnection';
-
-const saveSnapshot = () => window.dispatchEvent(new CustomEvent('diagram:save-snapshot'));
+import { requestProTimelineSnapshot } from './proTimelineHistory';
 
 export function useProTimelineDependencyActions() {
     const nodes = useNodes();
@@ -28,7 +27,7 @@ export function useProTimelineDependencyActions() {
             appMessage.warning(result.message);
             return result;
         }
-        saveSnapshot();
+        requestProTimelineSnapshot();
         setEdges((currentEdges) => currentEdges.some((edge) => (
             edge.source === sourceId && edge.target === targetId
         )) ? currentEdges : [...currentEdges, {
@@ -54,7 +53,7 @@ export function useProTimelineDependencyActions() {
             appMessage.warning(result.message);
             return result;
         }
-        saveSnapshot();
+        requestProTimelineSnapshot();
         setEdges((currentEdges) => currentEdges.filter((edge) => !(
             edge.source === sourceId && edge.target === targetId
         )));
@@ -85,7 +84,7 @@ export function useProTimelineDependencyActions() {
         ));
         if (!existingEdge) return result;
         if (sourceId === oldSourceId && targetId === oldTargetId) return result;
-        saveSnapshot();
+        requestProTimelineSnapshot();
         setEdges((currentEdges) => currentEdges.map((edge): Edge => (
             edge.id === existingEdge.id
                 ? { ...edge, source: sourceId, target: targetId }
