@@ -135,12 +135,14 @@ describe('other-function commercial interaction safeguards', () => {
         const collaborationCss = readSource('../../../../components/ui/CollaborationModal.css');
 
         expect(shareSource).toContain('share-dialog-viewport-modal');
+        expect(shareSource).toContain('width="min(600px, calc(100vw - 32px))"');
         expect(shareSource).toContain('share-dialog-invite-controls');
         expect(shareSource).toContain('share-dialog-recovery-alert');
         expect(shareSource).toContain('aria-describedby="share-dialog-email-help"');
         expect(shareCss).toMatch(/\.share-dialog-invite-controls[\s\S]*?grid-template-columns: minmax\(0, 1fr\) 124px auto/);
         expect(shareCss).toMatch(/@media \(max-width: 640px\)[\s\S]*?\.share-dialog-invite-email[\s\S]*?grid-column: 1 \/ -1/);
         expect(shareCss).toMatch(/\.share-dialog-list \.ant-list-item-action \.ant-btn[\s\S]*?min-height: var\(--commercial-touch-target, 44px\)/);
+        expect(shareCss).toMatch(/\.share-dialog-viewport-modal \.ant-tabs-tab,[\s\S]*?\.share-dialog-login-action\.ant-btn[\s\S]*?min-height: var\(--commercial-touch-target, 44px\)/);
 
         expect(collaborationSource).toContain('collaboration-viewport-modal');
         expect(collaborationSource).toContain('tryCopyShareUrl');

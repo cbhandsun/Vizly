@@ -3,6 +3,22 @@
     overflow-y: auto;
 }
 
+.share-dialog-viewport-modal .ant-tabs-tab,
+.share-dialog-login-action.ant-btn {
+    min-height: var(--commercial-touch-target, 44px);
+}
+
+.share-dialog-viewport-modal .ant-tabs-tab {
+    display: inline-flex;
+    align-items: center;
+}
+
+.share-dialog-viewport-modal .ant-tabs-tab-btn {
+    display: inline-flex;
+    min-height: var(--commercial-touch-target, 44px);
+    align-items: center;
+}
+
 .share-dialog-invite-controls {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 124px auto;

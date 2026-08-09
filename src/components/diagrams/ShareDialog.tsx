@@ -13,6 +13,10 @@ import {
 import { tryCopyShareUrl } from '@/components/shareClipboard';
 import { parseCollaboratorEmail } from '@/services/shareInvitationBoundary';
 import {
+    resolveShareDialogTabKeyboardTarget,
+    type ShareDialogTabKey,
+} from './shareDialogTabs';
+import {
     COMMERCIAL_VIEWPORT_MODAL_CLASS,
     COMMERCIAL_VIEWPORT_MODAL_Z_INDEX,
     getViewportOverlayContainer,
@@ -69,7 +73,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
     const { t, i18n } = useTranslation();
     const { token } = theme.useToken();
     const { user } = useAuth();
-    const [activeTab, setActiveTab] = useState('invite');
+    const [activeTab, setActiveTab] = useState<ShareDialogTabKey>('invite');
     const [authModalOpen, setAuthModalOpen] = useState(false);
     const [authModalMounted, setAuthModalMounted] = useState(false);
     const loginActionRef = useRef<HTMLButtonElement>(null);
@@ -125,9 +129,30 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
     }, [activeTab, open]);
 
     const handleTabChange = useCallback((key: string) => {
+        if (key !== 'invite' && key !== 'link') return;
         shouldRestoreTabFocusRef.current = true;
         setActiveTab(key);
     }, []);
+
+    const handleTabsKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+        const target = event.target;
+        if (!(target instanceof HTMLElement) || target.getAttribute('role') !== 'tab') return;
+
+        const targetTab = resolveShareDialogTabKeyboardTarget(event.key, activeTab);
+        if (!targetTab || targetTab === activeTab) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+        shouldRestoreTabFocusRef.current = true;
+        setActiveTab(targetTab);
+    }, [activeTab]);
+
+    const setTabsRoot = useCallback((node: HTMLDivElement | null) => {
+        tabsRootRef.current = node;
+        node
+            ?.querySelector<HTMLElement>('[role="tablist"]')
+            ?.setAttribute('aria-label', t('share.modeLabel'));
+    }, [t]);
 
     // 云端 UUID（保存后获得，用于替代本地 diagramId）
     const [cloudDiagramId, setCloudDiagramId] = useState<string | null>(null);
@@ -317,6 +342,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
             action={(
                 <Button
                     ref={loginActionRef}
+                    className="share-dialog-login-action"
                     type="primary"
                     icon={<LoginOutlined />}
                     aria-label={t('share.loginAction', '立即登录')}
@@ -333,7 +359,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
     const items = [
         {
             key: 'invite',
-            label: <span><TeamOutlined style={{ marginRight: 6 }} />{t('share.tabs.invite')}</span>,
+            label: <span><TeamOutlined aria-hidden="true" style={{ marginRight: 6 }} />{t('share.tabs.invite')}</span>,
             children: (
                 <div style={{ paddingTop: 8 }}>
                     {loginRequiredAlert}
@@ -453,7 +479,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
         },
         {
             key: 'link',
-            label: <span><LinkOutlined style={{ marginRight: 6 }} />{t('share.tabs.link')}</span>,
+            label: <span><LinkOutlined aria-hidden="true" style={{ marginRight: 6 }} />{t('share.tabs.link')}</span>,
             children: (
                 <div style={{ paddingTop: 8 }}>
                     {loginRequiredAlert}
@@ -607,10 +633,10 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
                         {t('share.footerNote')}
                     </Text>
                 }
-                width={600}
+                width="min(600px, calc(100vw - 32px))"
                 styles={{ body: { padding: '0 var(--glass-padding-md, 24px) var(--glass-padding-md, 24px)' } }}
             >
-                <div ref={tabsRootRef}>
+                <div ref={setTabsRoot} onKeyDownCapture={handleTabsKeyDown}>
                     <Tabs defaultActiveKey="invite" activeKey={activeTab} onChange={handleTabChange} items={items} />
                 </div>
             </Modal>

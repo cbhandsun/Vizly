@@ -1563,6 +1563,7 @@
         "viewerLabel": "Shared diagram read-only canvas",
         "fallbackTitle": "Shared diagram",
         "poweredBy": "Created with DiagramView",
+        "modeLabel": "Sharing method",
         "tabs": {
             "link": "Public Link",
             "invite": "Invite People"

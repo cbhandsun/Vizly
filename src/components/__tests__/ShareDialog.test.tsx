@@ -122,6 +122,7 @@ const translations: Record<string, string> = {
   'share.loginRequired': '请先登录后才能使用分享功能',
   'share.loginRequiredHint': '登录后将返回当前分享流程，不会丢失图表。',
   'share.loginAction': '立即登录',
+  'share.modeLabel': '分享方式',
   'share.never': '永不过期',
   'share.1day': '1 天',
   'share.7days': '7 天',
@@ -164,6 +165,7 @@ const englishTranslations: Record<string, string> = {
   'share.loginRequired': 'Please sign in to use sharing',
   'share.loginRequiredHint': 'After signing in, you will return to this sharing flow without losing the diagram.',
   'share.loginAction': 'Sign in now',
+  'share.modeLabel': 'Sharing method',
 };
 
 vi.mock('react-i18next', () => ({
@@ -249,6 +251,29 @@ describe('ShareDialog commercial failure handling', () => {
 
     await waitFor(() => {
       expect(document.activeElement?.getAttribute('aria-controls')).toContain('panel-link');
+    });
+  });
+
+  it('labels the tab list and automatically activates keyboard navigation targets', async () => {
+    render(
+      <ShareDialog open onClose={vi.fn()} diagramId={DIAGRAM_ID} onEnsureSaved={vi.fn()} />,
+    );
+
+    const tabList = await screen.findByRole('tablist', { name: '分享方式' });
+    const inviteTab = within(tabList).getByRole('tab', { name: '定向邀请' });
+    const publicLinkTab = within(tabList).getByRole('tab', { name: '公开链接' });
+    inviteTab.focus();
+
+    fireEvent.keyDown(inviteTab, { key: 'ArrowRight' });
+    await waitFor(() => {
+      expect(publicLinkTab.getAttribute('aria-selected')).toBe('true');
+      expect(document.activeElement).toBe(publicLinkTab);
+    });
+
+    fireEvent.keyDown(publicLinkTab, { key: 'Home' });
+    await waitFor(() => {
+      expect(inviteTab.getAttribute('aria-selected')).toBe('true');
+      expect(document.activeElement).toBe(inviteTab);
     });
   });
 
