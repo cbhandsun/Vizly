@@ -61,4 +61,14 @@ describe('flowchartSavePipeline', () => {
 
     expect(onDataSync).toHaveBeenCalled();
   });
+
+  it('preserves an explicit cancelled result from the save boundary', async () => {
+    await expect(runFlowchartSavePipeline({
+      activePlugin: null,
+      pluginCtx: null,
+      nodes,
+      edges,
+      saveAction: async () => 'cancelled',
+    })).resolves.toBe('cancelled');
+  });
 });

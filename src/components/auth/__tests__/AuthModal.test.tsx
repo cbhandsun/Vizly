@@ -58,6 +58,12 @@ vi.mock('react-i18next', () => ({
 }));
 
 describe('AuthModal', () => {
+    it('exposes a stable accessible name for the authentication dialog', () => {
+        render(<AuthModal open onCancel={vi.fn()} />);
+
+        expect(screen.getByRole('dialog', { name: 'auth.login' })).toBeTruthy();
+    });
+
     beforeEach(() => {
         signInWithEmailMock.mockReset();
         signInWithPasswordMock.mockReset();

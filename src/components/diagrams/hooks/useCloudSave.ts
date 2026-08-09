@@ -1,4 +1,5 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { tryAttachDiagramSnapshot } from '@/core/utils/diagramSnapshot';
 import { invalidateRemoteDiagramPreview } from '@/services/remoteDiagramPreview';
 import type { StandardDiagramData } from '@/core/models/DiagramModels';
@@ -6,6 +7,8 @@ import { appMessage } from '@/core/utils/antdStaticBridge';
 import { getFlowDataBridge } from '@/core/utils/flowDataBridge';
 import { coerceToStandardDiagramData } from '@/core/utils/coerceDiagram';
 import { logCloudSaveFailure } from './diagramStorageLogging';
+import { useAuth } from '@/context/useAuth';
+import type { DiagramSaveResult } from '@/core/types/diagram-components';
 
 const loadUnifiedStorage = async () => (await import('@/services/UnifiedStorageService')).unifiedStorage;
 
@@ -16,14 +19,48 @@ class CloudSaveBoundaryError extends Error {
     }
 }
 
+class PendingCloudSave {
+    readonly promise: Promise<DiagramSaveResult>;
+    private resolvePromise: ((result: DiagramSaveResult) => void) | null = null;
+    private rejectPromise: ((error: unknown) => void) | null = null;
+
+    constructor() {
+        this.promise = new Promise<DiagramSaveResult>((resolve, reject) => {
+            this.resolvePromise = resolve;
+            this.rejectPromise = reject;
+        });
+    }
+
+    resolve(result: DiagramSaveResult): void {
+        this.resolvePromise?.(result);
+        this.clear();
+    }
+
+    reject(error: unknown): void {
+        this.rejectPromise?.(error);
+        this.clear();
+    }
+
+    private clear(): void {
+        this.resolvePromise = null;
+        this.rejectPromise = null;
+    }
+}
+
 /**
  * 轻量云保存 Hook — 读取 __flowDataBridge 数据并上传到活动云提供商
  */
 export function useCloudSave(diagramId: string, diagramName?: string) {
+    const { t } = useTranslation();
+    const { user } = useAuth();
     const [shareDialogOpen, setShareDialogOpen] = useState(false);
+    const [cloudSaveAuthOpen, setCloudSaveAuthOpen] = useState(false);
+    const [cloudSaveAuthEnabled, setCloudSaveAuthEnabled] = useState(false);
     const shareDialogTriggerRef = useRef<HTMLElement | null>(null);
+    const cloudSaveTriggerRef = useRef<HTMLElement | null>(null);
+    const pendingCloudSaveRef = useRef<PendingCloudSave | null>(null);
 
-    const saveToCloud = useCallback(async () => {
+    const performCloudSave = useCallback(async () => {
         let hideLoading: (() => void) | undefined;
         try {
             const unifiedStorage = await loadUnifiedStorage();
@@ -106,6 +143,61 @@ export function useCloudSave(diagramId: string, diagramName?: string) {
         }
     }, [diagramId, diagramName]);
 
+    const captureCloudSaveTrigger = useCallback(() => {
+        const activeElement = document.activeElement;
+        const fallbackTrigger = document.querySelector<HTMLElement>('[data-cloud-save-focus-return="true"]');
+        cloudSaveTriggerRef.current = activeElement instanceof HTMLElement && activeElement !== document.body
+            ? activeElement
+            : fallbackTrigger;
+    }, []);
+
+    const saveToCloud = useCallback(async (): Promise<DiagramSaveResult> => {
+        captureCloudSaveTrigger();
+        const unifiedStorage = await loadUnifiedStorage();
+        if (unifiedStorage.activeProvider.id === 'supabase' && !user) {
+            if (!pendingCloudSaveRef.current) {
+                pendingCloudSaveRef.current = new PendingCloudSave();
+                appMessage.warning(t('storage.manager.needLoginForSupabase'));
+                setCloudSaveAuthEnabled(true);
+                setCloudSaveAuthOpen(true);
+            }
+            return pendingCloudSaveRef.current.promise;
+        }
+        return performCloudSave();
+    }, [captureCloudSaveTrigger, performCloudSave, t, user]);
+
+    const cancelCloudSaveAuthentication = useCallback(() => {
+        pendingCloudSaveRef.current?.resolve('cancelled');
+        pendingCloudSaveRef.current = null;
+        setCloudSaveAuthOpen(false);
+    }, []);
+
+    const completeCloudSaveAuthentication = useCallback(() => {
+        const pendingSave = pendingCloudSaveRef.current;
+        pendingCloudSaveRef.current = null;
+        setCloudSaveAuthOpen(false);
+        if (!pendingSave) return;
+
+        void performCloudSave().then(
+            () => pendingSave.resolve(undefined),
+            error => pendingSave.reject(error),
+        );
+    }, [performCloudSave]);
+
+    const restoreCloudSaveFocus = useCallback(() => {
+        const fallbackTrigger = document.querySelector<HTMLElement>('[data-cloud-save-focus-return="true"]');
+        const trigger = cloudSaveTriggerRef.current?.isConnected
+            ? cloudSaveTriggerRef.current
+            : fallbackTrigger;
+        cloudSaveTriggerRef.current = null;
+        window.requestAnimationFrame(() => trigger?.focus());
+    }, []);
+
+    useEffect(() => () => {
+        pendingCloudSaveRef.current?.resolve('cancelled');
+        pendingCloudSaveRef.current = null;
+    }, []);
+
     const openShareDialog = useCallback(() => {
         const activeElement = document.activeElement;
         const activeTrigger = activeElement instanceof HTMLElement && activeElement !== document.body
@@ -129,7 +221,8 @@ export function useCloudSave(diagramId: string, diagramName?: string) {
     /** 确保已保存再分享，返回云端 ID 或 false */
     const ensureSaved = useCallback(async (): Promise<string | false> => {
         try {
-            await saveToCloud();
+            const result = await saveToCloud();
+            if (result === 'cancelled') return false;
             const bridge = getFlowDataBridge(diagramId);
             return bridge?.metadata?.cloud?.id || false;
         } catch {
@@ -143,5 +236,10 @@ export function useCloudSave(diagramId: string, diagramName?: string) {
         openShareDialog,
         closeShareDialog,
         ensureSaved,
+        cloudSaveAuthOpen,
+        cloudSaveAuthEnabled,
+        cancelCloudSaveAuthentication,
+        completeCloudSaveAuthentication,
+        restoreCloudSaveFocus,
     };
 }

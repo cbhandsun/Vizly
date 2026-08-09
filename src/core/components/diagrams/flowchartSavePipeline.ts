@@ -1,8 +1,9 @@
 import type { Edge, Node } from '@xyflow/react';
 
 import type { DiagramTypePlugin, PluginContext } from '@/core/types/plugin';
+import type { DiagramSaveResult } from '@/core/types/diagram-components';
 
-type SaveAction = (() => Promise<void>) | undefined;
+type SaveAction = (() => Promise<DiagramSaveResult>) | undefined;
 
 export const runFlowchartSavePipeline = async ({
     activePlugin,
@@ -16,12 +17,12 @@ export const runFlowchartSavePipeline = async ({
     nodes: Node[];
     edges: Edge[];
     saveAction: SaveAction;
-}): Promise<void> => {
+}): Promise<DiagramSaveResult> => {
     if (activePlugin?.onDataSync && pluginCtx) {
         activePlugin.onDataSync(nodes, edges, false, pluginCtx);
     }
 
     if (saveAction) {
-        await saveAction();
+        return saveAction();
     }
 };

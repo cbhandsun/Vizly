@@ -145,7 +145,18 @@ const DiagramViewer: React.FC = () => {
         selectedDiagramId,
     });
 
-    const { saveToCloud, shareDialogOpen, openShareDialog, closeShareDialog, ensureSaved } = useCloudSave(selectedDiagramId);
+    const {
+        cancelCloudSaveAuthentication,
+        cloudSaveAuthOpen,
+        cloudSaveAuthEnabled,
+        closeShareDialog,
+        completeCloudSaveAuthentication,
+        ensureSaved,
+        openShareDialog,
+        restoreCloudSaveFocus,
+        saveToCloud,
+        shareDialogOpen,
+    } = useCloudSave(selectedDiagramId);
     
     // --- Phase 6: Mermaid Import Logic ---
     const handleImportMermaidNodes = useCallback(async (nodes: unknown[], edges: unknown[]): Promise<boolean> => {
@@ -663,6 +674,11 @@ const DiagramViewer: React.FC = () => {
             pushLocalChangesToYjs={pushLocalChangesToYjs}
             provider={provider ?? null}
             saveToCloud={saveToCloud}
+            cloudSaveAuthOpen={cloudSaveAuthOpen}
+            cloudSaveAuthEnabled={cloudSaveAuthEnabled}
+            cancelCloudSaveAuthentication={cancelCloudSaveAuthentication}
+            completeCloudSaveAuthentication={completeCloudSaveAuthentication}
+            restoreCloudSaveFocus={restoreCloudSaveFocus}
             handleDirectSave={handleDirectSave}
             isSettingsOpen={isSettingsOpen}
             setIsSettingsOpen={setIsSettingsOpen}

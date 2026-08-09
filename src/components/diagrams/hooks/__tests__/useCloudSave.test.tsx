@@ -8,10 +8,15 @@ const storageMocks = vi.hoisted(() => ({
     provider: { id: 'supabase', saveDiagram: vi.fn() },
 }));
 
+const authMocks = vi.hoisted(() => ({
+    user: { id: 'user-1' } as { id: string } | null,
+}));
+
 const messageMocks = vi.hoisted(() => ({
     error: vi.fn(),
     loading: vi.fn(),
     success: vi.fn(),
+    warning: vi.fn(),
     hideLoading: vi.fn(),
 }));
 
@@ -37,7 +42,16 @@ vi.mock('@/core/utils/antdStaticBridge', () => ({
         error: messageMocks.error,
         loading: messageMocks.loading,
         success: messageMocks.success,
+        warning: messageMocks.warning,
     },
+}));
+
+vi.mock('@/context/useAuth', () => ({
+    useAuth: () => ({ user: authMocks.user }),
+}));
+
+vi.mock('react-i18next', () => ({
+    useTranslation: () => ({ t: (key: string) => key }),
 }));
 
 vi.mock('@/core/utils/flowDataBridge', () => ({
@@ -89,9 +103,81 @@ describe('useCloudSave', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         storageMocks.isConfigured.mockReturnValue(true);
+        storageMocks.provider.id = 'supabase';
         storageMocks.provider.saveDiagram.mockResolvedValue(undefined);
+        authMocks.user = { id: 'user-1' };
         messageMocks.loading.mockReturnValue(messageMocks.hideLoading);
         bridgeMocks.get.mockReturnValue(createBridge());
+    });
+
+    it('opens authentication before a Supabase save and cancels without reporting a save', async () => {
+        authMocks.user = null;
+        let restoreFocus: FrameRequestCallback | undefined;
+        vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+            restoreFocus = callback;
+            return 1;
+        });
+        const trigger = document.createElement('button');
+        trigger.dataset.cloudSaveFocusReturn = 'true';
+        document.body.appendChild(trigger);
+        const menuItem = document.createElement('button');
+        document.body.appendChild(menuItem);
+        menuItem.focus();
+        const { result } = renderHook(() => useCloudSave('diagram-1', '客户流程'));
+
+        let savePromise: Promise<void | 'cancelled'> | undefined;
+        await act(async () => {
+            savePromise = result.current.saveToCloud();
+            await Promise.resolve();
+        });
+        menuItem.remove();
+
+        expect(result.current.cloudSaveAuthOpen).toBe(true);
+        expect(messageMocks.warning).toHaveBeenCalledWith('storage.manager.needLoginForSupabase');
+        expect(storageMocks.provider.saveDiagram).not.toHaveBeenCalled();
+
+        act(() => result.current.cancelCloudSaveAuthentication());
+        await expect(savePromise).resolves.toBe('cancelled');
+        act(() => result.current.restoreCloudSaveFocus());
+        act(() => restoreFocus?.(0));
+
+        expect(result.current.cloudSaveAuthOpen).toBe(false);
+        expect(document.activeElement).toBe(trigger);
+        expect(messageMocks.success).not.toHaveBeenCalled();
+        trigger.remove();
+    });
+
+    it('continues the pending Supabase save once authentication succeeds', async () => {
+        authMocks.user = null;
+        const { result } = renderHook(() => useCloudSave('diagram-1', '客户流程'));
+
+        let savePromise: Promise<void | 'cancelled'> | undefined;
+        await act(async () => {
+            savePromise = result.current.saveToCloud();
+            await Promise.resolve();
+        });
+        act(() => result.current.completeCloudSaveAuthentication());
+        await act(async () => {
+            await savePromise;
+        });
+
+        expect(storageMocks.provider.saveDiagram).toHaveBeenCalledTimes(1);
+        expect(messageMocks.success).toHaveBeenCalledWith('已保存到云端');
+        expect(result.current.cloudSaveAuthOpen).toBe(false);
+    });
+
+    it('keeps the configured S3 save path available without account authentication', async () => {
+        authMocks.user = null;
+        storageMocks.provider.id = 's3';
+        const { result } = renderHook(() => useCloudSave('diagram-1', '客户流程'));
+
+        await act(async () => {
+            await result.current.saveToCloud();
+        });
+
+        expect(storageMocks.provider.saveDiagram).toHaveBeenCalledTimes(1);
+        expect(result.current.cloudSaveAuthOpen).toBe(false);
+        expect(messageMocks.warning).not.toHaveBeenCalled();
     });
 
     it('rejects without showing a loading state when cloud storage is not configured', async () => {

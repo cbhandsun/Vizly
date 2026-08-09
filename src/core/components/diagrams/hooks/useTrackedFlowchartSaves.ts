@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState, type RefObject } from 'react';
 import type { Edge, Node } from '@xyflow/react';
 
 import type { DiagramTypePlugin, PluginContext } from '@/core/types/plugin';
+import type { DiagramSaveResult } from '@/core/types/diagram-components';
 import type { AutoSaveState } from './useAutoSave';
 import { runFlowchartSavePipeline } from '../flowchartSavePipeline';
 
@@ -40,7 +41,7 @@ interface UseTrackedFlowchartSavesOptions {
     nodesRef: RefObject<Node[]>;
     edgesRef: RefObject<Edge[]>;
     localSaveState: AutoSaveState;
-    onCloudSave?: () => Promise<void>;
+    onCloudSave?: () => Promise<DiagramSaveResult>;
     onDirectSave?: () => Promise<void>;
 }
 
@@ -57,7 +58,7 @@ export const useTrackedFlowchartSaves = ({
 
     const runTrackedSave = useCallback(async (
         target: FlowchartSaveTarget,
-        saveAction: (() => Promise<void>) | undefined,
+        saveAction: (() => Promise<DiagramSaveResult>) | undefined,
     ) => {
         const startedAt = Date.now();
         setManualStatus({
@@ -66,13 +67,17 @@ export const useTrackedFlowchartSaves = ({
             state: { saving: true, lastSaved: null, error: null },
         });
         try {
-            await runFlowchartSavePipeline({
+            const result = await runFlowchartSavePipeline({
                 activePlugin,
                 pluginCtx,
                 nodes: nodesRef.current ?? [],
                 edges: edgesRef.current ?? [],
                 saveAction,
             });
+            if (result === 'cancelled') {
+                setManualStatus(null);
+                return;
+            }
             const savedAt = Date.now();
             setManualStatus({
                 target,

@@ -6,6 +6,7 @@ import { NodeData, EdgeData, DiagramConfig } from './common';
 import { LayoutType } from './layout';
 
 export type DiagramExportFormat = 'pdf' | 'svg';
+export type DiagramSaveResult = void | 'cancelled';
 
 export type DiagramCollaborationStatus =
   | 'inactive'
@@ -107,7 +108,7 @@ export interface DiagramComponentProps {
   /** (IoC) Yjs Awareness for local cursor tracking */
   yAwareness?: DiagramCollaborationAwareness;
   /** (IoC) 触发云端保存 (Legacy) */
-  onCloudSave?: () => Promise<void>;
+  onCloudSave?: () => Promise<DiagramSaveResult>;
   /** (IoC) 触发直接覆盖保存 */
   onDirectSave?: () => Promise<void>;
   /** (IoC) 当前是否允许直接覆盖保存 */

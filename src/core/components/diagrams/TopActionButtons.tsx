@@ -393,6 +393,7 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
                 >
                     <DropdownMenuTriggerButton
                         ref={saveMenuButtonRef}
+                        data-cloud-save-focus-return="true"
                         ariaLabel={t('designer.toolbar.saveOptions')}
                         menuId={saveMenuId}
                         open={saveMenuOpen}
@@ -469,6 +470,7 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
                     >
                         <Button
                             ref={documentMenuButtonRef}
+                            data-cloud-save-focus-return={isSmallMobile ? 'true' : undefined}
                             data-presentation-focus-return
                             data-diff-focus-return
                             data-history-focus-return

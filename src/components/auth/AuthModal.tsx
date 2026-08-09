@@ -354,7 +354,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     return (
         <Modal
-            title={null}
+            title={t('auth.login')}
             open={open}
             onCancel={handleClose}
             closable={operation.busy ? false : { 'aria-label': t('common.close') }}

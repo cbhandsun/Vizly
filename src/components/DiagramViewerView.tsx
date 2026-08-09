@@ -17,6 +17,7 @@ import { DiagramLayout } from './layout/DiagramLayout';
 import { EnhancedThemeSelector } from './ui/EnhancedThemeSelector';
 import { ErrorBoundary } from './ui/ErrorBoundary';
 import { subscribeMindMapAIConfigRequest } from '@/core/components/mindmap-v2/mindMapAIConfigEvent';
+import { CloudSaveAuthRecovery } from './diagrams/CloudSaveAuthRecovery';
 
 const RoutingDebugPanel = lazy(() => import('./debug/RoutingDebugPanel').then(module => ({ default: module.RoutingDebugPanel })));
 const ShortcutsHelpModal = lazy(() => import('@/core/components/ui/ShortcutsHelpModal'));
@@ -83,6 +84,11 @@ interface DiagramViewerViewProps {
     pushLocalChangesToYjs: NonNullable<DiagramComponentProps['onSyncPush']>;
     provider: { awareness?: DiagramComponentProps['yAwareness'] } | null;
     saveToCloud: DiagramComponentProps['onCloudSave'];
+    cloudSaveAuthOpen: boolean;
+    cloudSaveAuthEnabled: boolean;
+    cancelCloudSaveAuthentication: () => void;
+    completeCloudSaveAuthentication: () => void;
+    restoreCloudSaveFocus: () => void;
     handleDirectSave: () => Promise<void>;
     isSettingsOpen: boolean;
     setIsSettingsOpen: (open: boolean) => void;
@@ -150,6 +156,11 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
     pushLocalChangesToYjs,
     provider,
     saveToCloud,
+    cloudSaveAuthOpen,
+    cloudSaveAuthEnabled,
+    cancelCloudSaveAuthentication,
+    completeCloudSaveAuthentication,
+    restoreCloudSaveFocus,
     handleDirectSave,
     isSettingsOpen,
     setIsSettingsOpen,
@@ -397,6 +408,14 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
                                     />
                                 </Suspense>
                             )}
+
+                            <CloudSaveAuthRecovery
+                                enabled={cloudSaveAuthEnabled}
+                                open={cloudSaveAuthOpen}
+                                onCancel={cancelCloudSaveAuthentication}
+                                onAuthenticated={completeCloudSaveAuthentication}
+                                onAfterClose={restoreCloudSaveFocus}
+                            />
 
                             {mermaidModalVisible && (
                                 <Suspense fallback={null}>
