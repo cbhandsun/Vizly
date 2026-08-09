@@ -1,11 +1,30 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ProGanttTask, useProTimelineEngine } from '../../../hooks/useProTimelineEngine';
 import { useTheme } from '../../../themes/useCoreTheme';
+import { ProDependencyToolbar } from './ProDependencyToolbar';
+import type { ProTimelineDependencyConnectionResult } from './proTimelineDependencyConnection';
+import {
+    getProTimelineDependencyAccessibleName,
+    getProTimelineDependencyTaskName,
+    getProTimelineDependencyViewportAnchor,
+    isProTimelineDependencyActivationKey,
+    isProTimelineDependencyDeleteKey,
+} from './proTimelineDependencyInteraction';
 
 export interface ProDependencyLayerProps {
     tasks: ProGanttTask[];
     hoveredTaskId?: string | null;
-    onDeleteDependency?: (sourceId: string, targetId: string) => void;
+    onDeleteDependency?: (
+        sourceId: string,
+        targetId: string,
+    ) => ProTimelineDependencyConnectionResult | void;
+    onUpdateDependency?: (
+        oldSourceId: string,
+        oldTargetId: string,
+        sourceId: string,
+        targetId: string,
+    ) => ProTimelineDependencyConnectionResult | void;
     criticalPathTaskIds?: Set<string>;
     cyclicTaskIds?: Set<string>;
 }
@@ -15,11 +34,34 @@ const HEADER_HEIGHT = 52;
 const BAR_HEIGHT = 28;
 const BAR_TOP_MARGIN = (ROW_HEIGHT - BAR_HEIGHT) / 2;
 
-export default function ProDependencyLayer({ tasks, hoveredTaskId, onDeleteDependency, criticalPathTaskIds, cyclicTaskIds }: ProDependencyLayerProps) {
+interface SelectedDependency {
+    sourceId: string;
+    targetId: string;
+    left: number;
+    top: number;
+}
+
+interface DependencyFeedback {
+    message: string;
+    tone: 'error' | 'success';
+}
+
+export default function ProDependencyLayer({
+    tasks,
+    hoveredTaskId,
+    onDeleteDependency,
+    onUpdateDependency,
+    criticalPathTaskIds,
+    cyclicTaskIds,
+}: ProDependencyLayerProps) {
     const { showCriticalPath } = useProTimelineEngine();
     const [theme] = useTheme();
     const [hoveredEdge, setHoveredEdge] = useState<{ sourceId: string; targetId: string } | null>(null);
+    const [selectedDependency, setSelectedDependency] = useState<SelectedDependency | null>(null);
+    const [feedback, setFeedback] = useState<DependencyFeedback | null>(null);
     const taskMap = new Map<string, { endX: number; midY: number; startX: number }>();
+    const taskNameMap = new Map(tasks.map((task) => [task.id, getProTimelineDependencyTaskName(task.name)]));
+    const canManageDependencies = Boolean(onDeleteDependency || onUpdateDependency);
     
     const isDark = theme?.mode === 'dark';
     const inactiveColor = isDark ? 'rgba(255,255,255,0.2)' : '#bfbfbf';
@@ -35,6 +77,11 @@ export default function ProDependencyLayer({ tasks, hoveredTaskId, onDeleteDepen
             midY,
         });
     });
+
+    const activeSelectedDependency = selectedDependency && tasks.some((task) => (
+        task.id === selectedDependency.targetId
+        && task.dependencies?.includes(selectedDependency.sourceId)
+    )) ? selectedDependency : null;
 
     const paths: React.ReactNode[] = [];
 
@@ -54,8 +101,6 @@ export default function ProDependencyLayer({ tasks, hoveredTaskId, onDeleteDepen
             // Smooth cubic bezier curve
             let d: string;
             const dx = x2 - x1;
-            const midX = (x1 + x2) / 2;
-            let midY = (y1 + y2) / 2;
             
             if (dx > 20) {
                 // Forward: smooth S-curve
@@ -68,16 +113,18 @@ export default function ProDependencyLayer({ tasks, hoveredTaskId, onDeleteDepen
                   + `L ${x2} ${dropY} `
                   + `C ${x2 - 15} ${dropY}, ${x2 - 15} ${y2}, ${x2} ${y2}`;
                 
-                midY = dropY;
             }
 
             const isHighlighted = hoveredTaskId === task.id || hoveredTaskId === depId;
             const isEdgeHovered = hoveredEdge?.sourceId === depId && hoveredEdge?.targetId === task.id;
+            const isSelected = selectedDependency?.sourceId === depId && selectedDependency.targetId === task.id;
             const isCriticalEdge = showCriticalPath && criticalPathTaskIds?.has(depId) && criticalPathTaskIds?.has(task.id);
             const isCyclicEdge = cyclicTaskIds?.has(depId) && cyclicTaskIds?.has(task.id);
 
             let strokeColor = inactiveColor;
-            if (isEdgeHovered) {
+            if (isSelected) {
+                strokeColor = theme?.palette?.primary?.main || '#5936d5';
+            } else if (isEdgeHovered) {
                 strokeColor = theme?.palette?.error?.main || '#ff4d4f';
             } else if (isCyclicEdge) {
                 strokeColor = '#faad14';
@@ -88,20 +135,22 @@ export default function ProDependencyLayer({ tasks, hoveredTaskId, onDeleteDepen
             }
 
             let strokeWidthVal = 1.5;
-            if (isEdgeHovered) strokeWidthVal = 2.5;
+            if (isSelected) strokeWidthVal = 3;
+            else if (isEdgeHovered) strokeWidthVal = 2.5;
             else if (isCyclicEdge || isHighlighted || isCriticalEdge) strokeWidthVal = 2;
 
             let strokeDashVal = 'none';
-            if (isHighlighted || isEdgeHovered) strokeDashVal = '6 4';
+            if (isSelected || isHighlighted || isEdgeHovered) strokeDashVal = '6 4';
             else if (isCyclicEdge) strokeDashVal = '6 4';
             else if (isCriticalEdge) strokeDashVal = '5 5';
 
             let opacityVal = isDark ? 0.8 : 0.5;
-            if (isEdgeHovered || isHighlighted) opacityVal = 1;
+            if (isSelected || isEdgeHovered || isHighlighted) opacityVal = 1;
             else if (isCyclicEdge || isCriticalEdge) opacityVal = 0.95;
 
             let markerVal = 'url(#dep-arrow)';
-            if (isEdgeHovered || isCriticalEdge) markerVal = 'url(#dep-arrow-err)';
+            if (isSelected) markerVal = 'url(#dep-arrow-selected)';
+            else if (isEdgeHovered || isCriticalEdge) markerVal = 'url(#dep-arrow-err)';
             else if (isCyclicEdge) markerVal = 'url(#dep-arrow-cyclic)';
             else if (isHighlighted) markerVal = 'url(#dep-arrow-hl)';
 
@@ -123,56 +172,82 @@ export default function ProDependencyLayer({ tasks, hoveredTaskId, onDeleteDepen
                         markerEnd={markerVal}
                         style={{ 
                             transition: 'stroke 0.15s, opacity 0.15s, stroke-width 0.15s',
-                            animation: isHighlighted || isEdgeHovered || isCriticalEdge || isCyclicEdge ? 'pro-timeline-dash-flow 1s linear infinite' : 'none',
+                            animation: isSelected || isHighlighted || isEdgeHovered || isCriticalEdge || isCyclicEdge ? 'pro-timeline-dash-flow 1s linear infinite' : 'none',
                             pointerEvents: 'visibleStroke',
                         }}
+                        aria-hidden="true"
                     />
-                    {/* 隐式宽路径 Hover 触发区 */}
+                    {/* 宽路径同时承载指针和键盘语义。 */}
                     <path 
                         d={d}
                         fill="none"
                         stroke="transparent"
-                        strokeWidth={12}
-                        style={{ pointerEvents: 'visibleStroke', cursor: 'pointer' }}
+                        strokeWidth={Math.max(16, BAR_HEIGHT / 2)}
+                        tabIndex={canManageDependencies ? 0 : undefined}
+                        role={canManageDependencies ? 'button' : undefined}
+                        aria-label={canManageDependencies ? getProTimelineDependencyAccessibleName(
+                            taskNameMap.get(depId),
+                            taskNameMap.get(task.id),
+                        ) : undefined}
+                        aria-pressed={canManageDependencies ? isSelected : undefined}
+                        aria-keyshortcuts={canManageDependencies ? 'Enter Space Delete Backspace Escape' : undefined}
+                        onFocus={(event) => {
+                            if (!canManageDependencies) return;
+                            const anchor = getProTimelineDependencyViewportAnchor(
+                                event.currentTarget.getBoundingClientRect(),
+                                window.innerWidth,
+                                window.innerHeight,
+                            );
+                            setFeedback(null);
+                            setSelectedDependency({ sourceId: depId, targetId: task.id, ...anchor });
+                        }}
+                        onClick={(event) => {
+                            if (!canManageDependencies) return;
+                            event.stopPropagation();
+                            const anchor = getProTimelineDependencyViewportAnchor(
+                                event.currentTarget.getBoundingClientRect(),
+                                window.innerWidth,
+                                window.innerHeight,
+                            );
+                            setFeedback(null);
+                            setSelectedDependency({ sourceId: depId, targetId: task.id, ...anchor });
+                        }}
+                        onKeyDown={(event) => {
+                            if (!canManageDependencies) return;
+                            if (event.key === 'Escape') {
+                                event.preventDefault();
+                                setSelectedDependency(null);
+                                return;
+                            }
+                            if (isProTimelineDependencyActivationKey(event.key)) {
+                                event.preventDefault();
+                                const anchor = getProTimelineDependencyViewportAnchor(
+                                    event.currentTarget.getBoundingClientRect(),
+                                    window.innerWidth,
+                                    window.innerHeight,
+                                );
+                                setFeedback(null);
+                                setSelectedDependency({ sourceId: depId, targetId: task.id, ...anchor });
+                                return;
+                            }
+                            if (!isProTimelineDependencyDeleteKey(event.key) || !onDeleteDependency) return;
+                            event.preventDefault();
+                            const result = onDeleteDependency(depId, task.id);
+                            if (result && !result.ok) {
+                                setFeedback({ message: result.message, tone: 'error' });
+                                return;
+                            }
+                            setSelectedDependency(null);
+                            setFeedback({ message: '依赖关系已删除，可使用撤销恢复。', tone: 'success' });
+                        }}
+                        style={{ pointerEvents: 'visibleStroke', cursor: canManageDependencies ? 'pointer' : 'default', outline: 'none' }}
                     />
-                    {/* 删除按钮 */}
-                    {isEdgeHovered && (
-                        <g 
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onDeleteDependency?.(depId, task.id);
-                            }}
-                            style={{ cursor: 'pointer' }}
-                        >
-                            <circle 
-                                cx={midX} 
-                                cy={midY} 
-                                r={8} 
-                                fill={theme?.palette?.error?.main || '#ff4d4f'} 
-                                style={{ 
-                                    transition: 'transform 0.1s', 
-                                    filter: 'drop-shadow(0px 2px 4px rgba(0,0,0,0.2))' 
-                                }}
-                            />
-                            <text 
-                                x={midX} 
-                                y={midY + 3} 
-                                textAnchor="middle" 
-                                fill="#fff" 
-                                fontSize={10} 
-                                fontWeight="bold" 
-                                style={{ userSelect: 'none', pointerEvents: 'none' }}
-                            >
-                                ×
-                            </text>
-                        </g>
-                    )}
                 </g>
             );
         });
     });
 
-    if (paths.length === 0) return null;
+    if (paths.length === 0 && !feedback) return null;
 
     return (
         <svg style={{
@@ -198,11 +273,67 @@ export default function ProDependencyLayer({ tasks, hoveredTaskId, onDeleteDepen
                 <marker id="dep-arrow-err" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
                     <path d="M 0 1 L 7 4 L 0 7 Z" fill={theme?.palette?.error?.main || '#ff4d4f'} />
                 </marker>
+                <marker id="dep-arrow-selected" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+                    <path d="M 0 1 L 7 4 L 0 7 Z" fill={theme?.palette?.primary?.main || '#5936d5'} />
+                </marker>
                 <marker id="dep-arrow-cyclic" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
                     <path d="M 0 1 L 7 4 L 0 7 Z" fill="#faad14" />
                 </marker>
             </defs>
             {paths}
+            {typeof document !== 'undefined' && createPortal(
+                <>
+                    {activeSelectedDependency && (
+                        <ProDependencyToolbar
+                            key={`${activeSelectedDependency.sourceId}-${activeSelectedDependency.targetId}`}
+                            sourceId={activeSelectedDependency.sourceId}
+                            targetId={activeSelectedDependency.targetId}
+                            tasks={tasks}
+                            left={activeSelectedDependency.left}
+                            top={activeSelectedDependency.top}
+                            onClose={() => setSelectedDependency(null)}
+                            onDelete={() => {
+                                if (!onDeleteDependency) return;
+                                const result = onDeleteDependency(
+                                    activeSelectedDependency.sourceId,
+                                    activeSelectedDependency.targetId,
+                                );
+                                if (result && !result.ok) {
+                                    setFeedback({ message: result.message, tone: 'error' });
+                                    return;
+                                }
+                                setSelectedDependency(null);
+                                setFeedback({ message: '依赖关系已删除，可使用撤销恢复。', tone: 'success' });
+                            }}
+                            onApply={(sourceId, targetId) => {
+                                if (!onUpdateDependency) return;
+                                const result = onUpdateDependency(
+                                    activeSelectedDependency.sourceId,
+                                    activeSelectedDependency.targetId,
+                                    sourceId,
+                                    targetId,
+                                );
+                                if (result && !result.ok) {
+                                    setFeedback({ message: `${result.message} 请调整后重试。`, tone: 'error' });
+                                    return;
+                                }
+                                setSelectedDependency((current) => current ? {
+                                    ...current,
+                                    sourceId,
+                                    targetId,
+                                } : null);
+                                setFeedback({ message: '依赖关系已更新，可使用撤销恢复。', tone: 'success' });
+                            }}
+                        />
+                    )}
+                    {feedback && (
+                        <div className={`pro-dependency-feedback pro-dependency-feedback--${feedback.tone}`} role="status">
+                            {feedback.message}
+                        </div>
+                    )}
+                </>,
+                document.body,
+            )}
         </svg>
     );
 }

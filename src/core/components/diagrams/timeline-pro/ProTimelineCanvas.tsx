@@ -19,10 +19,7 @@ import { appMessage } from '../../../utils/antdStaticBridge';
 import { addDaysToDateOnly, parseDateOnlyTime, todayDateOnly } from '../../../utils/dateOnly';
 import { ProTimelineChrome, ProTimelineKeyframes } from './ProTimelineChrome';
 import { projectProTimelineTasks } from './proTimelineTaskProjection';
-import {
-    validateProTimelineDependencyConnection,
-    type ProTimelineDependencyConnectionResult,
-} from './proTimelineDependencyConnection';
+import { useProTimelineDependencyActions } from './useProTimelineDependencyActions';
 import './ProTimelineCanvas.css';
 
 const ROW_HEIGHT = 42;
@@ -70,6 +67,11 @@ export default function ProTimelineCanvas() {
   const nodes = useNodes();
   const edges = useEdges();
   const { updateNodeData, setNodes, setEdges } = useReactFlow();
+  const {
+      handleDeleteDependency,
+      handleUpdateDependency,
+      onTaskConnect,
+  } = useProTimelineDependencyActions();
 
   const handleSaveBaseline = useCallback(() => {
       let count = 0;
@@ -359,35 +361,6 @@ export default function ProTimelineCanvas() {
       }
   }, [nodes, updateNodeData, applyAutoScheduling]);
 
-    const onTaskConnect = useCallback((sourceId: string, targetId: string): ProTimelineDependencyConnectionResult => {
-        const result = validateProTimelineDependencyConnection({
-            sourceId,
-            targetId,
-            tasks: nodes.map((node) => ({
-                id: node.id,
-                startDate: node.data?.date ?? node.data?.startDate,
-                endDate: node.data?.endDate ?? node.data?.date ?? node.data?.startDate,
-            })),
-            edges,
-        });
-        if (!result.ok) {
-            appMessage.warning(result.message);
-            return result;
-        }
-
-        window.dispatchEvent(new CustomEvent('diagram:save-snapshot'));
-        setEdges((currentEdges) => currentEdges.some((edge) => (
-            edge.source === sourceId && edge.target === targetId
-        )) ? currentEdges : [...currentEdges, {
-                id: `e-${sourceId}-${targetId}`,
-                source: sourceId,
-                target: targetId,
-                type: 'smoothstep',
-            }]);
-        appMessage.success('依赖关系创建成功，可使用撤销恢复。');
-        return result;
-    }, [nodes, edges, setEdges]);
-
     const handleTaskDelete = useCallback((taskId: string) => {
         // 1. 递归收集要删除的节点ID及其后代ID
         const toDeleteIds = new Set<string>();
@@ -411,11 +384,6 @@ export default function ProTimelineCanvas() {
         
         appMessage.success('任务及子任务删除成功！');
     }, [nodes, setNodes, setEdges]);
-
-    const handleDeleteDependency = useCallback((sourceId: string, targetId: string) => {
-        setEdges(eds => eds.filter(e => !(e.source === sourceId && e.target === targetId)));
-        appMessage.success('依赖关系删除成功！');
-    }, [setEdges]);
 
     const onTaskExpandToggle = useCallback((taskId: string) => {
         const node = nodes.find(n => n.id === taskId);
@@ -638,6 +606,7 @@ export default function ProTimelineCanvas() {
                    tasks={packedTasks} 
                    hoveredTaskId={hoveredTaskId} 
                    onDeleteDependency={handleDeleteDependency}
+                   onUpdateDependency={handleUpdateDependency}
                    criticalPathTaskIds={criticalPathTaskIds}
                    cyclicTaskIds={cyclicTaskIds}
                 />

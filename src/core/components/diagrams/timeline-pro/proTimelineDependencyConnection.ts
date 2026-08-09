@@ -1,6 +1,7 @@
 import { parseDateOnlyTime } from '../../../utils/dateOnly';
 
 export type ProTimelineDependencyFailureCode =
+    | 'missing-dependency'
     | 'missing-task'
     | 'self-dependency'
     | 'duplicate-dependency'
@@ -24,11 +25,16 @@ export interface ProTimelineDependencyEdgeInput {
     target?: unknown;
 }
 
-interface ValidateProTimelineDependencyOptions {
+export interface ValidateProTimelineDependencyOptions {
     sourceId: string;
     targetId: string;
     tasks: readonly ProTimelineDependencyTaskInput[];
     edges: readonly ProTimelineDependencyEdgeInput[];
+}
+
+export interface ValidateProTimelineDependencyUpdateOptions extends ValidateProTimelineDependencyOptions {
+    oldSourceId: string;
+    oldTargetId: string;
 }
 
 const failure = (
@@ -97,4 +103,24 @@ export function validateProTimelineDependencyConnection({
         return failure('cyclic-dependency', '依赖校验失败：该连接会形成循环依赖。');
     }
     return { ok: true };
+}
+
+export function validateProTimelineDependencyUpdate({
+    oldSourceId,
+    oldTargetId,
+    sourceId,
+    targetId,
+    tasks,
+    edges,
+}: ValidateProTimelineDependencyUpdateOptions): ProTimelineDependencyConnectionResult {
+    const existingIndex = edges.findIndex((edge) => (
+        edge.source === oldSourceId && edge.target === oldTargetId
+    ));
+    if (existingIndex < 0) {
+        return failure('missing-dependency', '依赖操作失败：原依赖已不存在，请重新选择。');
+    }
+    if (sourceId === oldSourceId && targetId === oldTargetId) return { ok: true };
+
+    const remainingEdges = edges.filter((_, index) => index !== existingIndex);
+    return validateProTimelineDependencyConnection({ sourceId, targetId, tasks, edges: remainingEdges });
 }

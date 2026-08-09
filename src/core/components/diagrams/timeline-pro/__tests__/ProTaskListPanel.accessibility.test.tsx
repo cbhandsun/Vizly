@@ -8,6 +8,7 @@ import type { ProGanttTask } from '../../../../hooks/useProTimelineEngine';
 import { ProResourceDrawer } from '../ProResourceDrawer';
 import ProTaskListPanel from '../ProTaskListPanel';
 import ProTaskLayer from '../ProTaskLayer';
+import ProDependencyLayer from '../ProDependencyLayer';
 import type { ProjectedProTimelineTask } from '../proTimelineTaskProjection';
 import {
     getResourceTaskAccessibleLabel,
@@ -25,7 +26,16 @@ import {
     getProTaskLayerAccessibleName,
     getProTaskProgressKeyboardValue,
 } from '../proTaskLayerInteraction';
-import { validateProTimelineDependencyConnection } from '../proTimelineDependencyConnection';
+import {
+    validateProTimelineDependencyConnection,
+    validateProTimelineDependencyUpdate,
+} from '../proTimelineDependencyConnection';
+import {
+    getProTimelineDependencyAccessibleName,
+    getProTimelineDependencyViewportAnchor,
+    isProTimelineDependencyActivationKey,
+    isProTimelineDependencyDeleteKey,
+} from '../proTimelineDependencyInteraction';
 
 class ResizeObserverMock {
     observe() {}
@@ -502,6 +512,120 @@ describe('ProTaskLayer accessibility and recovery', () => {
     });
 });
 
+const renderDependencyLayer = (
+    overrides: Partial<React.ComponentProps<typeof ProDependencyLayer>> = {},
+) => render(
+    <ProDependencyLayer
+        tasks={[
+            phaseLayerTask,
+            eventLayerTask,
+            { ...milestoneLayerTask, dependencies: ['phase-1'] },
+        ]}
+        hoveredTaskId={null}
+        onDeleteDependency={vi.fn().mockReturnValue({ ok: true as const })}
+        onUpdateDependency={vi.fn().mockReturnValue({ ok: true as const })}
+        {...overrides}
+    />,
+);
+
+describe('ProDependencyLayer management and recovery', () => {
+    it('exposes each dependency as a named keyboard action before showing destructive controls', () => {
+        renderDependencyLayer();
+
+        const dependency = screen.getByRole('button', { name: '依赖：Launch phase → Release gate' });
+        expect(dependency.getAttribute('tabindex')).toBe('0');
+        expect(dependency.getAttribute('aria-pressed')).toBe('false');
+        expect(screen.queryByRole('button', { name: '删除依赖：Launch phase → Release gate' })).toBeNull();
+
+        fireEvent.focus(dependency);
+        expect(dependency.getAttribute('aria-pressed')).toBe('true');
+        expect(screen.getByRole('group', { name: '编辑依赖：Launch phase → Release gate' })).toBeTruthy();
+    });
+
+    it('keeps legacy summary endpoints named while excluding other summaries from new choices', () => {
+        renderDependencyLayer({
+            tasks: [
+                summaryLayerTask,
+                { ...phaseLayerTask, dependencies: ['summary-1'] },
+                { ...summaryLayerTask, id: 'other-summary', name: 'Other summary' },
+            ],
+        });
+        fireEvent.focus(screen.getByRole('button', { name: '依赖：Program summary → Launch phase' }));
+
+        expect(screen.getByRole('button', { name: '删除依赖：Program summary → Launch phase' })).toBeTruthy();
+        const source = screen.getByRole('combobox', { name: '前置任务' }) as HTMLSelectElement;
+        expect(source.value).toBe('summary-1');
+        expect(Array.from(source.options).map((option) => option.value)).not.toContain('other-summary');
+    });
+
+    it('edits both dependency endpoints through validated task choices', () => {
+        const onUpdateDependency = vi.fn().mockReturnValue({ ok: true as const });
+        renderDependencyLayer({ onUpdateDependency });
+        fireEvent.click(screen.getByRole('button', { name: '依赖：Launch phase → Release gate' }));
+
+        fireEvent.change(screen.getByRole('combobox', { name: '前置任务' }), {
+            target: { value: 'event-1' },
+        });
+        fireEvent.change(screen.getByRole('combobox', { name: '后置任务' }), {
+            target: { value: 'phase-1' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: '应用更改' }));
+
+        expect(onUpdateDependency).toHaveBeenCalledWith(
+            'phase-1',
+            'milestone-1',
+            'event-1',
+            'phase-1',
+        );
+        expect(screen.getByRole('status').textContent).toContain('依赖关系已更新');
+    });
+
+    it('keeps invalid edits open with a visible recovery message', () => {
+        const onUpdateDependency = vi.fn().mockReturnValue({
+            ok: false as const,
+            code: 'cyclic-dependency' as const,
+            message: '依赖校验失败：该连接会形成循环依赖。',
+        });
+        renderDependencyLayer({ onUpdateDependency });
+        fireEvent.focus(screen.getByRole('button', { name: '依赖：Launch phase → Release gate' }));
+        fireEvent.change(screen.getByRole('combobox', { name: '后置任务' }), {
+            target: { value: 'event-1' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: '应用更改' }));
+
+        expect(screen.getByRole('group', { name: '编辑依赖：Launch phase → Release gate' })).toBeTruthy();
+        expect(screen.getByRole('status').textContent).toContain('形成循环依赖');
+        expect(screen.getByRole('status').textContent).toContain('调整后重试');
+    });
+
+    it('deletes only after selection and supports the standard Delete shortcut', () => {
+        const onDeleteDependency = vi.fn().mockReturnValue({ ok: true as const });
+        renderDependencyLayer({ onDeleteDependency });
+        const dependency = screen.getByRole('button', { name: '依赖：Launch phase → Release gate' });
+
+        fireEvent.keyDown(dependency, { key: 'Delete' });
+
+        expect(onDeleteDependency).toHaveBeenCalledWith('phase-1', 'milestone-1');
+        expect(screen.getByRole('status').textContent).toContain('可使用撤销恢复');
+    });
+
+    it('closes dependency editing with Escape without mutating data', () => {
+        const onDeleteDependency = vi.fn();
+        const onUpdateDependency = vi.fn();
+        renderDependencyLayer({ onDeleteDependency, onUpdateDependency });
+        const dependency = screen.getByRole('button', { name: '依赖：Launch phase → Release gate' });
+
+        fireEvent.focus(dependency);
+        fireEvent.keyDown(screen.getByRole('group', { name: '编辑依赖：Launch phase → Release gate' }), {
+            key: 'Escape',
+        });
+
+        expect(screen.queryByRole('group', { name: '编辑依赖：Launch phase → Release gate' })).toBeNull();
+        expect(onDeleteDependency).not.toHaveBeenCalled();
+        expect(onUpdateDependency).not.toHaveBeenCalled();
+    });
+});
+
 describe('task layer interaction boundaries', () => {
     it.each([
         ['ArrowLeft', false, -1],
@@ -538,6 +662,44 @@ describe('task layer interaction boundaries', () => {
         ['phase', Number.NaN, Number.POSITIVE_INFINITY, 12],
     ])('places %s dependency controls beside the rendered task', (type, x, width, expected) => {
         expect(getProTaskDependencyControlLeft(type, x, width)).toBe(expected);
+    });
+});
+
+describe('dependency interaction boundaries', () => {
+    it('sanitizes names used in dependency actions', () => {
+        expect(getProTimelineDependencyAccessibleName('  Source   task ', null))
+            .toBe('依赖：Source task → 未命名任务');
+    });
+
+    it.each([
+        ['Enter', true],
+        [' ', true],
+        ['Delete', false],
+        [null, false],
+    ])('classifies activation key %j', (key, expected) => {
+        expect(isProTimelineDependencyActivationKey(key)).toBe(expected);
+    });
+
+    it.each([
+        ['Delete', true],
+        ['Backspace', true],
+        ['Enter', false],
+        [undefined, false],
+    ])('classifies delete key %j', (key, expected) => {
+        expect(isProTimelineDependencyDeleteKey(key)).toBe(expected);
+    });
+
+    it('keeps the viewport toolbar inside narrow and malformed boundaries', () => {
+        expect(getProTimelineDependencyViewportAnchor(
+            { left: 560, top: 1_100, width: 20, height: 12 },
+            577,
+            1_113,
+        )).toEqual({ left: 385, top: 853 });
+        expect(getProTimelineDependencyViewportAnchor(
+            { left: Number.NaN, top: Number.NEGATIVE_INFINITY, width: -10, height: Number.NaN },
+            '577',
+            null,
+        )).toEqual({ left: 640, top: 372 });
     });
 });
 
@@ -606,5 +768,46 @@ describe('timeline dependency validation boundaries', () => {
             tasks: deepTasks,
             edges: deepEdges,
         })).toMatchObject({ ok: false, code: 'cyclic-dependency' });
+    });
+
+    it('validates dependency edits after removing only the original edge', () => {
+        expect(validateProTimelineDependencyUpdate({
+            oldSourceId: 'source',
+            oldTargetId: 'target',
+            sourceId: 'source',
+            targetId: 'later',
+            tasks: dependencyTasks,
+            edges: [
+                { source: 'source', target: 'target' },
+                { source: 'target', target: 'later' },
+            ],
+        })).toEqual({ ok: true });
+    });
+
+    it.each([
+        [
+            { oldSourceId: 'missing', oldTargetId: 'target', sourceId: 'source', targetId: 'later' },
+            [{ source: 'source', target: 'target' }],
+            'missing-dependency',
+        ],
+        [
+            { oldSourceId: 'source', oldTargetId: 'target', sourceId: 'source', targetId: 'later' },
+            [
+                { source: 'source', target: 'target' },
+                { source: 'source', target: 'later' },
+            ],
+            'duplicate-dependency',
+        ],
+        [
+            { oldSourceId: 'source', oldTargetId: 'target', sourceId: 'later', targetId: 'source' },
+            [
+                { source: 'source', target: 'target' },
+                { source: 'target', target: 'later' },
+            ],
+            'reverse-time',
+        ],
+    ])('rejects unsafe dependency edits with %s', (ids, edges, code) => {
+        expect(validateProTimelineDependencyUpdate({ ...ids, tasks: dependencyTasks, edges }))
+            .toMatchObject({ ok: false, code });
     });
 });
