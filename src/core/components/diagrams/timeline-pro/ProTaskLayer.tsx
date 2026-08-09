@@ -1,23 +1,14 @@
-import React, { useState, useCallback, useMemo } from 'react';
-import { ProGanttTask, useProTimelineEngine } from '../../../hooks/useProTimelineEngine';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
+import { getWorkDays, ProGanttTask, useProTimelineEngine } from '../../../hooks/useProTimelineEngine';
 import { CalendarOutlined, ClockCircleOutlined, FlagFilled, CaretRightFilled } from '@ant-design/icons';
 import { useTheme } from '../../../themes/useCoreTheme';
 import type { ProjectedProTimelineTask } from './proTimelineTaskProjection';
 import { clampProTaskProgress, isProTaskSelected } from './proTaskPresentationModel';
 import { ProTaskTooltip } from './ProTaskTooltip';
-
-const getAvatarColor = (name: string) => {
-    const colors = [
-        '#1890ff', '#2f54eb', '#722ed1', '#eb2f96', '#fa8c16',
-        '#faad14', '#a0d911', '#52c41a', '#13c2c2'
-    ];
-    let hash = 0;
-    for (let i = 0; i < name.length; i++) {
-        hash = name.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    const idx = Math.abs(hash) % colors.length;
-    return colors[idx];
-};
+import { ProTaskInlineNameEditor } from './ProTaskInlineNameEditor';
+import { getProTaskLayerAccessibleName } from './proTaskLayerInteraction';
+import { useProTaskLayerKeyboardInteractions } from './useProTaskLayerKeyboardInteractions';
+import { ProTaskAssigneeAvatar } from './ProTaskAssigneeAvatar';
 
 export interface ProTaskLayerProps {
     tasks: ProjectedProTimelineTask[];
@@ -69,18 +60,26 @@ export default function ProTaskLayer({
     const [tooltipState, setTooltipState] = useState<{ task: ProjectedProTimelineTask; x: number; y: number } | null>(null);
     const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
     const [editingText, setEditingText] = useState('');
+    const cancelledEditTaskIdRef = useRef<string | null>(null);
 
     const commitEdit = useCallback(() => {
-        if (editingTaskId && editingText.trim()) {
+        if (editingTaskId && cancelledEditTaskIdRef.current !== editingTaskId && editingText.trim()) {
             onTaskUpdate?.(editingTaskId, { name: editingText.trim() });
         }
+        if (cancelledEditTaskIdRef.current === editingTaskId) cancelledEditTaskIdRef.current = null;
         setEditingTaskId(null);
     }, [editingTaskId, editingText, onTaskUpdate]);
 
-    const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-        if (e.key === 'Enter') commitEdit();
-        if (e.key === 'Escape') setEditingTaskId(null);
-    }, [commitEdit]);
+    const startTaskNameEdit = useCallback((task: ProjectedProTimelineTask) => {
+        cancelledEditTaskIdRef.current = null;
+        setEditingTaskId(task.id);
+        setEditingText(task.name);
+    }, []);
+
+    const cancelTaskNameEdit = useCallback(() => {
+        cancelledEditTaskIdRef.current = editingTaskId;
+        setEditingTaskId(null);
+    }, [editingTaskId]);
 
     const snapX = useCallback((rawX: number) => Math.round(rawX / pixelsPerDay) * pixelsPerDay, [pixelsPerDay]);
 
@@ -160,6 +159,22 @@ export default function ProTaskLayer({
         setDragDeltaW(0);
     }, [dragState, dragDeltaX, dragDeltaW, dragProgress, snapX, xToDate, pixelsPerDay, onTaskDragEnd, onTaskUpdate, onTaskConnect]);
 
+    const cancelDragInteraction = useCallback(() => {
+        setDragState(null);
+        setDragDeltaX(0);
+        setDragDeltaY(0);
+        setDragDeltaW(0);
+        setTooltipState(null);
+    }, []);
+
+    const { handleTaskBarKeyDown, handleProgressKeyDown, handleResizeKeyDown } = useProTaskLayerKeyboardInteractions({
+        cancelDragInteraction,
+        onTaskClick,
+        onTaskDragEnd,
+        onTaskUpdate,
+        startTaskNameEdit,
+    });
+
     const handleTaskMouseEnter = useCallback((e: React.MouseEvent, task: ProjectedProTimelineTask) => {
         if (dragState) {
             if (dragState.mode === 'connect' && task.id !== dragState.taskId) {
@@ -191,6 +206,7 @@ export default function ProTaskLayer({
             style={{ position: 'absolute', top: 0, left: 0, width: 0, height: 0 }}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
+            onPointerCancel={cancelDragInteraction}
         >
             {tasks.map(task => {
                 if (!task._computed || !task._computed.isVisible) return null;
@@ -210,6 +226,16 @@ export default function ProTaskLayer({
                 const isSelected = isProTaskSelected(task);
                 const isHovered = hoveredTaskId === task.id && !isDragging;
                 const type = task.type || 'phase';
+                const accessibleTaskName = getProTaskLayerAccessibleName(task.name);
+                const taskBarAccessibilityProps = {
+                    className: 'pro-timeline-task-bar',
+                    role: 'group',
+                    tabIndex: 0,
+                    'aria-label': `${accessibleTaskName}，时间轴任务`,
+                    'aria-current': isSelected ? 'true' : undefined,
+                    'aria-keyshortcuts': 'Enter Space F2 ArrowLeft ArrowRight Shift+ArrowLeft Shift+ArrowRight',
+                    onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => handleTaskBarKeyDown(event, task),
+                } as const;
                 
                 // Color Mapping
                 const defaultColors = {
@@ -256,7 +282,7 @@ export default function ProTaskLayer({
                     // === Summary Bar (Roll-up bracket) ===
                     if (type === 'summary') {
                         return (
-                            <div key={task.id}
+                            <div key={task.id} {...taskBarAccessibilityProps}
                                 style={{
                                     position: 'absolute', left: x, top: y + 8, width: Math.max(4, w), height: 12,
                                     pointerEvents: 'auto', cursor: 'pointer',
@@ -291,7 +317,7 @@ export default function ProTaskLayer({
                         const isCyclic = cyclicTaskIds?.has(task.id);
                         const milestoneBorderColor = isCyclic ? '#faad14' : (isCritical ? '#ff4d4f' : barColor);
                         return (
-                            <div key={task.id}
+                            <div key={task.id} {...taskBarAccessibilityProps}
                                 style={{
                                     position: 'absolute', left: x - 14, top: y, width: 28, height: 28,
                                     pointerEvents: 'auto', cursor: isDragging ? 'grabbing' : 'grab',
@@ -334,34 +360,13 @@ export default function ProTaskLayer({
                                             flexShrink: 0
                                         }} />
                                     )}
-                                    {editingTaskId === task.id ? (
-                                        <input 
-                                            autoFocus value={editingText} onChange={e => setEditingText(e.target.value)}
-                                            onBlur={commitEdit} onKeyDown={handleKeyDown}
-                                            style={{ background: 'transparent', border: 'none', outline: 'none', color: 'inherit', fontWeight: 'inherit', fontSize: 'inherit', width: '100%', padding: 0 }}
-                                        />
-                                    ) : (
-                                        <span onDoubleClick={(e) => { e.stopPropagation(); setEditingTaskId(task.id); setEditingText(task.name); }}>{task.name}</span>
-                                    )}
-                                    {task.assignee && (
-                                        <div style={{
-                                            width: 16, height: 16, borderRadius: '50%',
-                                            backgroundColor: '#ffffff',
-                                            padding: 1,
-                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                            boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-                                            flexShrink: 0,
-                                        }} title={`负责人: ${task.assignee}`}>
-                                            <div style={{
-                                                width: '100%', height: '100%', borderRadius: '50%',
-                                                backgroundColor: getAvatarColor(task.assignee),
-                                                color: '#fff', fontSize: 8, fontWeight: 600,
-                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                            }}>
-                                                {task.assignee.trim().charAt(0).toUpperCase()}
-                                            </div>
-                                        </div>
-                                    )}
+                                    <ProTaskInlineNameEditor
+                                        accessibleTaskName={accessibleTaskName} isEditing={editingTaskId === task.id}
+                                        taskName={task.name} value={editingText} width="100%"
+                                        onStart={() => startTaskNameEdit(task)} onChange={setEditingText}
+                                        onCommit={commitEdit} onCancel={cancelTaskNameEdit}
+                                    />
+                                    {task.assignee && <ProTaskAssigneeAvatar assignee={task.assignee} />}
                                 </div>
                             </div>
                         );
@@ -371,7 +376,7 @@ export default function ProTaskLayer({
                     if (type === 'event') {
                         const isCyclic = cyclicTaskIds?.has(task.id);
                         return (
-                            <div key={task.id}
+                            <div key={task.id} {...taskBarAccessibilityProps}
                                 style={{
                                     position: 'absolute', left: x, top: y, height: BAR_HEIGHT,
                                     pointerEvents: 'auto', cursor: isDragging && dragState.mode === 'move' ? 'grabbing' : 'grab',
@@ -421,36 +426,14 @@ export default function ProTaskLayer({
                                     }} />
                                 )}
                                 <span style={{ textShadow: isDarkTheme ? '0 1px 2px rgba(0,0,0,0.8)' : '0 1px 2px #fff', pointerEvents: 'auto' }}>
-                                    {editingTaskId === task.id ? (
-                                        <input 
-                                            autoFocus value={editingText} onChange={e => setEditingText(e.target.value)}
-                                            onBlur={commitEdit} onKeyDown={handleKeyDown}
-                                            style={{ background: 'transparent', border: 'none', outline: 'none', color: 'inherit', fontWeight: 'inherit', fontSize: 'inherit', width: 120, padding: 0 }}
-                                        />
-                                    ) : (
-                                        <span onDoubleClick={(e) => { e.stopPropagation(); setEditingTaskId(task.id); setEditingText(task.name); }}>{task.name}</span>
-                                    )}
+                                    <ProTaskInlineNameEditor
+                                        accessibleTaskName={accessibleTaskName} isEditing={editingTaskId === task.id}
+                                        taskName={task.name} value={editingText} width={120}
+                                        onStart={() => startTaskNameEdit(task)} onChange={setEditingText}
+                                        onCommit={commitEdit} onCancel={cancelTaskNameEdit}
+                                    />
                                 </span>
-                                {task.assignee && (
-                                    <div style={{
-                                        width: 16, height: 16, borderRadius: '50%',
-                                        backgroundColor: '#ffffff',
-                                        padding: 1,
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                        boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-                                        flexShrink: 0,
-                                        marginLeft: 2,
-                                    }} title={`负责人: ${task.assignee}`}>
-                                        <div style={{
-                                            width: '100%', height: '100%', borderRadius: '50%',
-                                            backgroundColor: getAvatarColor(task.assignee),
-                                            color: '#fff', fontSize: 8, fontWeight: 600,
-                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                        }}>
-                                            {task.assignee.trim().charAt(0).toUpperCase()}
-                                        </div>
-                                    </div>
-                                )}
+                                {task.assignee && <ProTaskAssigneeAvatar assignee={task.assignee} withMargin />}
                             </div>
                         );
                     }
@@ -458,7 +441,7 @@ export default function ProTaskLayer({
                     // === Phase / Default bar ===
                     const isCyclic = cyclicTaskIds?.has(task.id);
                     return (
-                        <div key={task.id}
+                        <div key={task.id} {...taskBarAccessibilityProps}
                             style={{
                                 position: 'absolute', left: x, top: y, width: Math.max(8, w), height: BAR_HEIGHT,
                                 pointerEvents: 'auto', cursor: isDragging && dragState.mode === 'move' ? 'grabbing' : 'grab',
@@ -504,12 +487,22 @@ export default function ProTaskLayer({
                                 {/* 交互式进度手柄 */}
                                 {type === 'phase' && (
                                     <div
+                                        className="pro-timeline-task-progress-handle"
+                                        role="slider"
+                                        tabIndex={0}
+                                        aria-label={`调整 ${accessibleTaskName} 的进度`}
+                                        aria-valuemin={0}
+                                        aria-valuemax={100}
+                                        aria-valuenow={renderProgress}
+                                        aria-valuetext={`${renderProgress}%`}
+                                        aria-keyshortcuts="ArrowLeft ArrowRight ArrowDown ArrowUp Home End Shift+ArrowLeft Shift+ArrowRight"
                                         style={{
                                             position: 'absolute', left: `${renderProgress}%`, top: -4, bottom: -4,
                                             width: 12, marginLeft: -6, cursor: 'col-resize', zIndex: 5,
                                             display: 'flex', alignItems: 'center', justifyContent: 'center'
                                         }}
                                         onPointerDown={(e) => { e.stopPropagation(); handleTaskPointerDown(e, task, 'progress'); }}
+                                        onKeyDown={(event) => handleProgressKeyDown(event, task)}
                                     >
                                         <CaretRightFilled style={{ 
                                             color: '#fff', fontSize: 10, transform: 'rotate(90deg)',
@@ -536,44 +529,27 @@ export default function ProTaskLayer({
                                     }} />
                                 )}
                                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, pointerEvents: 'auto' }}>
-                                    {editingTaskId === task.id ? (
-                                        <input 
-                                            autoFocus value={editingText} onChange={e => setEditingText(e.target.value)}
-                                            onBlur={commitEdit} onKeyDown={handleKeyDown}
-                                            style={{ background: 'transparent', border: 'none', outline: 'none', color: 'inherit', fontWeight: 'inherit', fontSize: 'inherit', width: '100%', padding: 0 }}
-                                        />
-                                    ) : (
-                                        <span onDoubleClick={(e) => { e.stopPropagation(); setEditingTaskId(task.id); setEditingText(task.name); }}>{task.name}</span>
-                                    )}
+                                    <ProTaskInlineNameEditor
+                                        accessibleTaskName={accessibleTaskName} isEditing={editingTaskId === task.id}
+                                        taskName={task.name} value={editingText} width="100%"
+                                        onStart={() => startTaskNameEdit(task)} onChange={setEditingText}
+                                        onCommit={commitEdit} onCancel={cancelTaskNameEdit}
+                                    />
                                 </span>
                                 {renderProgress > 0 && w > 80 && (
                                     <span style={{ fontSize: 10, opacity: 0.8, fontWeight: 600 }}>{renderProgress}%</span>
                                 )}
-                                {task.assignee && (
-                                    <div style={{
-                                        width: 16, height: 16, borderRadius: '50%',
-                                        backgroundColor: '#ffffff',
-                                        padding: 1,
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                        boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-                                        flexShrink: 0,
-                                        marginLeft: 2,
-                                    }} title={`负责人: ${task.assignee}`}>
-                                        <div style={{
-                                            width: '100%', height: '100%', borderRadius: '50%',
-                                            backgroundColor: getAvatarColor(task.assignee),
-                                            color: '#fff', fontSize: 8, fontWeight: 600,
-                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                        }}>
-                                            {task.assignee.trim().charAt(0).toUpperCase()}
-                                        </div>
-                                    </div>
-                                )}
+                                {task.assignee && <ProTaskAssigneeAvatar assignee={task.assignee} withMargin />}
                             </div>
 
                             {/* 右侧拉伸手柄 */}
                             {type === 'phase' && (
                                 <div
+                                    className="pro-timeline-task-resize-handle"
+                                    role="button"
+                                    tabIndex={0}
+                                    aria-label={`调整 ${accessibleTaskName} 的工期，当前 ${Math.max(1, getWorkDays(task.startDate, task.endDate))} 个工作日`}
+                                    aria-keyshortcuts="ArrowLeft ArrowRight Shift+ArrowLeft Shift+ArrowRight"
                                     style={{
                                         position: 'absolute', right: 0, top: 0, bottom: 0, width: 8,
                                         cursor: 'ew-resize', zIndex: 3,
@@ -582,6 +558,7 @@ export default function ProTaskLayer({
                                         transition: 'background 0.15s',
                                     }}
                                     onPointerDown={(e) => { e.stopPropagation(); handleTaskPointerDown(e, task, 'resize-right'); }}
+                                    onKeyDown={(event) => handleResizeKeyDown(event, task)}
                                     onMouseEnter={(e) => { (e.target as HTMLElement).style.background = 'rgba(255,255,255,0.35)'; }}
                                     onMouseLeave={(e) => { (e.target as HTMLElement).style.background = isHovered || isSelected ? 'rgba(255,255,255,0.2)' : 'transparent'; }}
                                 />

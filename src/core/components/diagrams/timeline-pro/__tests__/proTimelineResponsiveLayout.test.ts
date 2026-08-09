@@ -10,6 +10,10 @@ const resourceDrawerCss = fs.readFileSync(
     path.resolve(process.cwd(), 'src/core/components/diagrams/timeline-pro/ProResourceDrawer.css'),
     'utf8',
 );
+const taskLayerCss = fs.readFileSync(
+    path.resolve(process.cwd(), 'src/core/components/diagrams/timeline-pro/ProTaskLayer.css'),
+    'utf8',
+);
 
 describe('professional timeline responsive layout', () => {
     it('reserves the mobile top toolbar and bottom editing controls', () => {
@@ -38,5 +42,15 @@ describe('professional resource drawer responsive layout', () => {
 
     it('provides a visible keyboard focus treatment for task actions', () => {
         expect(resourceDrawerCss).toMatch(/\.pro-resource-task-action:focus-visible\s*\{[\s\S]*?outline:\s*2px solid/);
+    });
+});
+
+describe('professional task layer interaction affordances', () => {
+    it('shows keyboard focus on task bars and their direct manipulation handles', () => {
+        expect(taskLayerCss).toMatch(/\.pro-timeline-task-bar:focus-visible,[\s\S]*?\.pro-timeline-task-progress-handle:focus-visible,[\s\S]*?\.pro-timeline-task-resize-handle:focus-visible[\s\S]*?outline:\s*2px solid/);
+    });
+
+    it('enlarges narrow progress and duration handles for coarse pointers', () => {
+        expect(taskLayerCss).toMatch(/@media \(pointer: coarse\)[\s\S]*?\.pro-timeline-task-progress-handle,[\s\S]*?\.pro-timeline-task-resize-handle[\s\S]*?min-width:\s*24px/);
     });
 });

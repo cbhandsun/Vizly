@@ -13,3 +13,22 @@
 .pro-task-tooltip {
   animation: pro-task-tooltip-fade 0.15s ease-out;
 }
+
+.pro-timeline-task-bar:focus-visible,
+.pro-timeline-task-progress-handle:focus-visible,
+.pro-timeline-task-resize-handle:focus-visible {
+  outline: 2px solid var(--ant-color-primary, #1677ff);
+  outline-offset: 3px;
+}
+
+.pro-timeline-task-progress-handle:focus-visible,
+.pro-timeline-task-resize-handle:focus-visible {
+  background: rgba(255, 255, 255, 0.35) !important;
+}
+
+@media (pointer: coarse) {
+  .pro-timeline-task-progress-handle,
+  .pro-timeline-task-resize-handle {
+    min-width: 24px;
+  }
+}
