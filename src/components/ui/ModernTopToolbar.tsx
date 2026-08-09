@@ -11,6 +11,7 @@ import type { TopToolbarProps } from './TopToolbar';
 import { getToolbarPopupContainer, isToolbarEdgeMode } from './topToolbarGuards';
 import { DiagramTitleEditor } from './DiagramTitleEditor';
 import { focusDialogEntry, trapDialogTab } from '@/core/components/diagrams/dialogFocus';
+import './ModernTopToolbar.css';
 
 export type { TopToolbarProps };
 
@@ -139,7 +140,7 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
       role="dialog"
       aria-label={moreDialogLabel}
       tabIndex={-1}
-      className="min-w-[220px] py-2 flex flex-col font-sans"
+      className="toolbar-system-actions-dialog min-w-[220px] py-2 flex flex-col font-sans"
       onKeyDown={handleMoreContentKeyDown}
     >
       {isMobile && (
@@ -191,7 +192,7 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
           onChange={(value) => {
             if (isToolbarEdgeMode(value)) onEdgeModeChange(value);
           }}
-          style={{ width: '100%', fontSize: '13px' }}
+          style={{ width: '100%', fontSize: isMobile ? '16px' : '13px' }}
           getPopupContainer={getToolbarPopupContainer}
           options={[
             { value: 'advanced-smart', label: t('header.smart') },

@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 
 import React from 'react';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -37,7 +39,13 @@ vi.mock('antd', () => ({
       {open ? content : null}
     </>
   ),
-  Select: ({ 'aria-label': ariaLabel }: { 'aria-label'?: string }) => <select aria-label={ariaLabel} />,
+  Select: ({
+    'aria-label': ariaLabel,
+    style,
+  }: {
+    'aria-label'?: string;
+    style?: React.CSSProperties;
+  }) => <select aria-label={ariaLabel} style={style} />,
   Tooltip: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
@@ -242,14 +250,16 @@ describe('ModernTopToolbar responsive layout', () => {
 
     fireEvent.click(trigger);
 
-    expect(await screen.findByRole('dialog', { name: 'System actions' })).toBeTruthy();
+    const dialog = await screen.findByRole('dialog', { name: 'System actions' });
+    expect(dialog.className).toContain('toolbar-system-actions-dialog');
     expect(screen.getByText('文件操作')).toBeTruthy();
     const exportTools = screen.getByTestId('export-tools');
     expect(exportTools.getAttribute('data-variant')).toBe('inline');
     expect(exportTools.getAttribute('data-commercial-touch-target')).toBe('true');
     expect(screen.getByTestId('theme-selector').getAttribute('data-variant')).toBe('default');
     expect(screen.getByTestId('theme-selector').getAttribute('data-borderless')).toBe('true');
-    expect(screen.getByRole('combobox', { name: '连线模式' })).toBeTruthy();
+    const edgeModeSelect = screen.getByRole('combobox', { name: '连线模式' });
+    expect(edgeModeSelect.style.fontSize).toBe('16px');
     expect(screen.getByRole('combobox', { name: '语言 / Language' })).toBeTruthy();
     expect(screen.getByRole('button', { name: '工作台' })).toBeTruthy();
     await waitFor(() => expect(document.activeElement).toBe(exportTools));
@@ -268,5 +278,20 @@ describe('ModernTopToolbar responsive layout', () => {
       expect(trigger.getAttribute('aria-expanded')).toBe('false');
       expect(document.activeElement).toBe(trigger);
     });
+  });
+
+  it('keeps mobile system-action select inputs zoom-safe and touch-sized', () => {
+    const toolbarCss = readFileSync(
+      resolve(process.cwd(), 'src/components/ui/ModernTopToolbar.css'),
+      'utf8',
+    );
+
+    expect(toolbarCss).toContain('@media (max-width: 767px)');
+    expect(toolbarCss).toMatch(
+      /\.toolbar-system-actions-dialog \.ant-select-selector\s*\{[\s\S]*?min-height:\s*var\(--commercial-touch-target, 44px\)\s*!important/,
+    );
+    expect(toolbarCss).toMatch(
+      /\.toolbar-system-actions-dialog \.ant-select-selection-search-input\s*\{[\s\S]*?font-size:\s*16px\s*!important/,
+    );
   });
 });

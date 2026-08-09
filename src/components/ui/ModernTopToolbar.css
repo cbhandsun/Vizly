@@ -1,0 +1,22 @@
+@media (max-width: 767px) {
+  .toolbar-system-actions-dialog .ant-select {
+    min-height: var(--commercial-touch-target, 44px);
+    font-size: 16px !important;
+  }
+
+  .toolbar-system-actions-dialog .ant-select-selector {
+    min-height: var(--commercial-touch-target, 44px) !important;
+    align-items: center;
+  }
+
+  .toolbar-system-actions-dialog .ant-select-selection-search-input {
+    height: calc(var(--commercial-touch-target, 44px) - 2px) !important;
+    font-size: 16px !important;
+  }
+
+  .toolbar-system-actions-dialog .ant-select-selection-item,
+  .toolbar-system-actions-dialog .ant-select-selection-placeholder {
+    font-size: 16px;
+    line-height: calc(var(--commercial-touch-target, 44px) - 2px) !important;
+  }
+}
