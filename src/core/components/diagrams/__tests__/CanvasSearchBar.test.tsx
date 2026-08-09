@@ -88,6 +88,10 @@ describe('CanvasSearchBar', () => {
         fireEvent.click(screen.getByRole('button', { name: '打开查找替换' }));
 
         expect(screen.getByRole('textbox', { name: '替换为' })).toBeTruthy();
+        expect(document.querySelector('.canvas-search-primary-row')).toBeTruthy();
+        expect(document.querySelector('.canvas-search-controls')).toBeTruthy();
+        expect(document.querySelector('.canvas-search-replace-row')).toBeTruthy();
+        expect(document.querySelector('.canvas-search-replace-actions')).toBeTruthy();
         fireEvent.change(screen.getByRole('textbox', { name: '替换为' }), {
             target: { value: 'Shape' },
         });
@@ -137,13 +141,17 @@ describe('CanvasSearchBar', () => {
         })).toBeTruthy();
     });
 
-    it('keeps the mobile search below the second toolbar row with touch-sized actions', () => {
+    it('keeps mobile search below the toolbar, clear of the icon rail, and resilient at narrow widths', () => {
         const css = readFileSync(
             'src/core/components/diagrams/FlowchartDesigner.css',
             'utf8',
         );
 
         expect(css).toMatch(/@media \(max-width: 767px\)[\s\S]*?\.canvas-search-bar[\s\S]*?top: 96px/);
+        expect(css).toMatch(/\.canvas-search-bar[\s\S]*?left: calc\(8px \+ var\(--commercial-touch-target, 44px\) \+ 8px\)/);
+        expect(css).toMatch(/\.canvas-search-primary-row,[\s\S]*?\.canvas-search-replace-row[\s\S]*?display: grid !important/);
+        expect(css).toMatch(/\.canvas-search-controls,[\s\S]*?\.canvas-search-replace-actions[\s\S]*?grid-column: 1 \/ -1[\s\S]*?flex-wrap: wrap/);
+        expect(css).toMatch(/\.canvas-search-bar[\s\S]*?overflow-y: auto !important/);
         expect(css).toMatch(/\.canvas-search-icon-button[\s\S]*?min-width: var\(--commercial-touch-target, 44px\) !important[\s\S]*?height: var\(--commercial-touch-target, 44px\) !important/);
     });
 

@@ -501,7 +501,7 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
                 overflow: 'hidden',
             }}>
                 {/* ── 搜索行 ── */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px' }}>
+                <div className="canvas-search-primary-row" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px' }}>
                     <FaSearch size={12} style={{ color: token.colorTextTertiary, flexShrink: 0 }} />
                     <input
                         ref={searchInputRef}
@@ -530,44 +530,46 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
                                 : t('designer.canvasSearch.noResults')}
                         </span>
                     )}
-                    {query && (
-                        <button
-                            className="canvas-search-icon-button"
-                            aria-label={t('designer.canvasSearch.clearSearch')}
-                            onClick={handleClearQuery}
-                            style={navBtnStyle(true, token)}
-                        >
-                            <FaTimesCircle size={11} />
+                    <div className="canvas-search-controls">
+                        {query && (
+                            <button
+                                className="canvas-search-icon-button"
+                                aria-label={t('designer.canvasSearch.clearSearch')}
+                                onClick={handleClearQuery}
+                                style={navBtnStyle(true, token)}
+                            >
+                                <FaTimesCircle size={11} />
+                            </button>
+                        )}
+                        {/* 上下导航 */}
+                        <button className="canvas-search-icon-button" aria-label={t('designer.canvasSearch.previousResult')} onClick={goPrev} disabled={matches.length === 0} style={navBtnStyle(matches.length > 0, token)}>
+                            <FaChevronUp size={11} />
                         </button>
-                    )}
-                    {/* 上下导航 */}
-                    <button className="canvas-search-icon-button" aria-label={t('designer.canvasSearch.previousResult')} onClick={goPrev} disabled={matches.length === 0} style={navBtnStyle(matches.length > 0, token)}>
-                        <FaChevronUp size={11} />
-                    </button>
-                    <button className="canvas-search-icon-button" aria-label={t('designer.canvasSearch.nextResult')} onClick={goNext} disabled={matches.length === 0} style={navBtnStyle(matches.length > 0, token)}>
-                        <FaChevronDown size={11} />
-                    </button>
-                    {/* 切换替换模式 */}
-                    {hasReplaceFns && (
-                        <button
-                            className="canvas-search-icon-button"
-                            aria-label={showReplace
-                                ? t('designer.canvasSearch.closeReplace')
-                                : t('designer.canvasSearch.openReplace')}
-                            onClick={handleReplaceVisibilityChange}
-                            title={t('designer.canvasSearch.replaceTitle')}
-                            style={{
-                                ...navBtnStyle(true, token),
-                                color: showReplace ? token.colorPrimary : token.colorTextSecondary,
-                            }}
-                        >
-                            <FaExchangeAlt size={11} />
+                        <button className="canvas-search-icon-button" aria-label={t('designer.canvasSearch.nextResult')} onClick={goNext} disabled={matches.length === 0} style={navBtnStyle(matches.length > 0, token)}>
+                            <FaChevronDown size={11} />
                         </button>
-                    )}
-                    {/* 关闭 */}
-                    <button className="canvas-search-icon-button" aria-label={t('designer.canvasSearch.closeSearch')} onClick={closeSearch} style={navBtnStyle(true, token)}>
-                        <FaTimes size={11} />
-                    </button>
+                        {/* 切换替换模式 */}
+                        {hasReplaceFns && (
+                            <button
+                                className="canvas-search-icon-button"
+                                aria-label={showReplace
+                                    ? t('designer.canvasSearch.closeReplace')
+                                    : t('designer.canvasSearch.openReplace')}
+                                onClick={handleReplaceVisibilityChange}
+                                title={t('designer.canvasSearch.replaceTitle')}
+                                style={{
+                                    ...navBtnStyle(true, token),
+                                    color: showReplace ? token.colorPrimary : token.colorTextSecondary,
+                                }}
+                            >
+                                <FaExchangeAlt size={11} />
+                            </button>
+                        )}
+                        {/* 关闭 */}
+                        <button className="canvas-search-icon-button" aria-label={t('designer.canvasSearch.closeSearch')} onClick={closeSearch} style={navBtnStyle(true, token)}>
+                            <FaTimes size={11} />
+                        </button>
+                    </div>
                 </div>
 
                 {nodes.length === 0 && edges.length === 0 && (
@@ -582,7 +584,7 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
 
                 {/* ── 替换行（可折叠）── */}
                 {showReplace && (
-                    <div style={{
+                    <div className="canvas-search-replace-row" style={{
                         display: 'flex', alignItems: 'center', gap: 6,
                         padding: '4px 10px 8px',
                         borderTop: `1px solid ${token.colorBorderSecondary}`,
@@ -608,52 +610,54 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
                                 fontSize: 13, flex: 1, minWidth: 0, color: token.colorText, fontFamily: 'inherit',
                             }}
                         />
-                        <button
-                            className="canvas-search-action-button"
-                            aria-label={t('designer.canvasSearch.replaceCurrent')}
-                            onClick={handleReplaceCurrent}
-                            disabled={!currentReplaceEligible}
-                            title={t('designer.canvasSearch.replaceCurrent')}
-                            style={actionBtnStyle(currentReplaceEligible, token)}
-                        >
-                            {t('designer.canvasSearch.replaceAction')}
-                        </button>
-                        <Popconfirm
-                            placement="bottomRight"
-                            autoAdjustOverflow={false}
-                            zIndex={2600}
-                            getPopupContainer={() => document.body}
-                            title={t('designer.canvasSearch.replaceConfirmTitle', {
-                                matches: formatMatchCounts(allReplacePlan.changedMatches),
-                            })}
-                            description={<CanvasSearchConfirmationDescription
-                                description={t('designer.canvasSearch.replaceConfirmDescription')}
-                                mapping={t('designer.canvasSearch.replaceConfirmMapping', {
-                                    query,
-                                    replacement: replaceText || t('designer.canvasSearch.emptyReplacement'),
-                                })}
-                            />}
-                            okText={t('designer.canvasSearch.replaceConfirm')}
-                            cancelText={t('common.cancel')}
-                            onConfirm={handleReplaceAll}
-                            disabled={allReplacePlan.changedMatches.length === 0}
-                        >
+                        <div className="canvas-search-replace-actions">
                             <button
                                 className="canvas-search-action-button"
-                                aria-label={t('designer.canvasSearch.replaceAllLabel', {
-                                    matches: formatMatchCounts(allReplacePlan.changedMatches),
-                                })}
-                                disabled={allReplacePlan.changedMatches.length === 0}
-                                title={t('designer.canvasSearch.replaceAllTitle', {
-                                    matches: formatMatchCounts(allReplacePlan.changedMatches),
-                                })}
-                                style={actionBtnStyle(allReplacePlan.changedMatches.length > 0, token)}
+                                aria-label={t('designer.canvasSearch.replaceCurrent')}
+                                onClick={handleReplaceCurrent}
+                                disabled={!currentReplaceEligible}
+                                title={t('designer.canvasSearch.replaceCurrent')}
+                                style={actionBtnStyle(currentReplaceEligible, token)}
                             >
-                                {t('designer.canvasSearch.replaceAllAction', {
-                                    count: allReplacePlan.changedMatches.length,
-                                })}
+                                {t('designer.canvasSearch.replaceAction')}
                             </button>
-                        </Popconfirm>
+                            <Popconfirm
+                                placement="bottomRight"
+                                autoAdjustOverflow={false}
+                                zIndex={2600}
+                                getPopupContainer={() => document.body}
+                                title={t('designer.canvasSearch.replaceConfirmTitle', {
+                                    matches: formatMatchCounts(allReplacePlan.changedMatches),
+                                })}
+                                description={<CanvasSearchConfirmationDescription
+                                    description={t('designer.canvasSearch.replaceConfirmDescription')}
+                                    mapping={t('designer.canvasSearch.replaceConfirmMapping', {
+                                        query,
+                                        replacement: replaceText || t('designer.canvasSearch.emptyReplacement'),
+                                    })}
+                                />}
+                                okText={t('designer.canvasSearch.replaceConfirm')}
+                                cancelText={t('common.cancel')}
+                                onConfirm={handleReplaceAll}
+                                disabled={allReplacePlan.changedMatches.length === 0}
+                            >
+                                <button
+                                    className="canvas-search-action-button"
+                                    aria-label={t('designer.canvasSearch.replaceAllLabel', {
+                                        matches: formatMatchCounts(allReplacePlan.changedMatches),
+                                    })}
+                                    disabled={allReplacePlan.changedMatches.length === 0}
+                                    title={t('designer.canvasSearch.replaceAllTitle', {
+                                        matches: formatMatchCounts(allReplacePlan.changedMatches),
+                                    })}
+                                    style={actionBtnStyle(allReplacePlan.changedMatches.length > 0, token)}
+                                >
+                                    {t('designer.canvasSearch.replaceAllAction', {
+                                        count: allReplacePlan.changedMatches.length,
+                                    })}
+                                </button>
+                            </Popconfirm>
+                        </div>
                     </div>
                 )}
                 {replacePreviewMessage && (

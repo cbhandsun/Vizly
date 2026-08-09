@@ -1879,15 +1879,47 @@ html[data-theme='dark'] body.performance-mode .modern-sidebar-container {
     max-width: calc(100vw - 24px);
 }
 
+.canvas-search-controls,
+.canvas-search-replace-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
 @media (max-width: 767px) {
     .canvas-search-bar {
         top: 96px;
         right: 8px;
-        left: 8px;
+        left: calc(8px + var(--commercial-touch-target, 44px) + 8px);
         width: auto;
         min-width: 0;
         max-width: none;
         max-height: calc(100dvh - 112px);
+        overflow-y: auto !important;
+    }
+
+    .canvas-search-primary-row,
+    .canvas-search-replace-row {
+        display: grid !important;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        padding-right: 8px !important;
+        padding-left: 8px !important;
+    }
+
+    .canvas-search-replace-row {
+        grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .canvas-search-controls,
+    .canvas-search-replace-actions {
+        grid-column: 1 / -1;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+        gap: 3px;
+    }
+
+    .canvas-search-replace-actions {
+        gap: 6px;
     }
 
     .canvas-search-icon-button {
