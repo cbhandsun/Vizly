@@ -141,6 +141,24 @@
     }
 }
 
+@media (max-width: 360px) {
+    .mobile-bottom-dock {
+        width: calc(100% - 8px);
+    }
+
+    .mobile-bottom-dock-actions {
+        grid-template-columns: repeat(7, minmax(var(--commercial-touch-target, 44px), 1fr));
+    }
+
+    .mobile-dock-btn.primary {
+        width: var(--commercial-touch-target, 44px);
+        height: var(--commercial-touch-target, 44px);
+        flex-basis: var(--commercial-touch-target, 44px);
+        justify-self: center;
+        border-radius: calc(var(--commercial-touch-target, 44px) / 2);
+    }
+}
+
 /* Response hide for desktop */
 @media (min-width: 769px) {
     .mobile-bottom-dock-wrapper {

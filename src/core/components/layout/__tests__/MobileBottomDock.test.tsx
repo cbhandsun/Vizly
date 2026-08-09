@@ -28,6 +28,23 @@ describe('MobileBottomDock', () => {
         expect(css).toMatch(/\.mobile-dock-btn\.mini\s*\{[\s\S]*?min-width: var\(--commercial-touch-target, 44px\);[\s\S]*?min-height: var\(--commercial-touch-target, 44px\);/);
     });
 
+    it('fits all seven dock actions inside a 320px viewport without shrinking touch targets', () => {
+        const css = readFileSync(
+            'src/core/components/layout/MobileBottomDock.css',
+            'utf8',
+        );
+
+        expect(css).toMatch(
+            /@media \(max-width: 360px\)[\s\S]*?\.mobile-bottom-dock\s*\{[\s\S]*?width:\s*calc\(100% - 8px\);/,
+        );
+        expect(css).toMatch(
+            /@media \(max-width: 360px\)[\s\S]*?\.mobile-bottom-dock-actions\s*\{[\s\S]*?grid-template-columns:\s*repeat\(7, minmax\(var\(--commercial-touch-target, 44px\), 1fr\)\);/,
+        );
+        expect(css).toMatch(
+            /@media \(max-width: 360px\)[\s\S]*?\.mobile-dock-btn\.primary\s*\{[\s\S]*?width:\s*var\(--commercial-touch-target, 44px\);[\s\S]*?height:\s*var\(--commercial-touch-target, 44px\);/,
+        );
+    });
+
     it('exposes named mobile actions and keeps disabled history controls inert', () => {
         const onAddClick = vi.fn();
         const onLayerClick = vi.fn();
