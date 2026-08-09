@@ -211,7 +211,8 @@ export function useDesignerInteractions({
 
     const { onDragOver, onDrop, onNodeDragStart, onNodeDrag, onNodeDragStop: originalOnNodeDragStop } = useDiagramDragDrop({
         nodes, edges, setNodes, setEdges, takeSnapshot, notifyHistoryChanged, reactFlowInstance, setIsDragging, snapDeltaRef, clearGuides,
-        enableAltDuplicate: false, isConnecting, activeLayerId: normalizedActiveLayerId
+        enableAltDuplicate: false, isConnecting, activeLayerId: normalizedActiveLayerId,
+        moveHistoryLabel: t('designer.historyPanel.beforeMoveNode'),
     });
 
     const [isDraggingNode, setIsDraggingNode] = useState(false);

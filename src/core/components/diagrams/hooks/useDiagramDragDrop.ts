@@ -45,6 +45,7 @@ interface UseDiagramDragDropProps {
     enableAltDuplicate?: boolean;
     isConnecting?: boolean; 
     activeLayerId?: string;
+    moveHistoryLabel: string;
 }
 
 export const useDiagramDragDrop = ({
@@ -61,6 +62,7 @@ export const useDiagramDragDrop = ({
     enableAltDuplicate = true,
     isConnecting = false, // 默认为 false
     activeLayerId = 'layer-0', // ⭐ 默认图层ID
+    moveHistoryLabel,
 }: UseDiagramDragDropProps) => {
 
     // 🚀 P2: Sync-Ref Bridge — 避免 onNodeDragStart 依赖 [nodes, edges]
@@ -299,13 +301,13 @@ export const useDiagramDragDrop = ({
         }
 
         // 🚀 P2: 使用 Ref 替代直接依赖 nodes/edges，避免回调在拖动期间重建
-        takeSnapshot(nodesRef.current, edgesRef.current, '移动节点', {
+        takeSnapshot(nodesRef.current, edgesRef.current, moveHistoryLabel, {
             notify: false,
             dedupe: false,
         });
         setIsDragging(true);
         dragTargetIdRef.current = null;
-    }, [enableAltDuplicate, isConnecting, takeSnapshot, setIsDragging, setNodes]);
+    }, [enableAltDuplicate, isConnecting, moveHistoryLabel, takeSnapshot, setIsDragging, setNodes]);
 
     const onNodeDrag = useCallback((event: MouseEvent | TouchEvent, node: Node, draggedNodes: Node[]) => {
         // ⭐ P4: 容器预览用 RAF 节流（非关键路径）

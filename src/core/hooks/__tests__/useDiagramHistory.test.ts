@@ -11,6 +11,31 @@ const node = (id: string, x: number): Node => ({
 });
 
 describe('useDiagramHistory', () => {
+    it('uses caller-provided labels for generated and restore history entries', () => {
+        const first = [node('node-1', 0)];
+        const second = [node('node-1', 100)];
+        const current = [node('node-1', 200)];
+        const labels = {
+            getDefaultOperationLabel: (count: number) => `Operation ${count}`,
+            historyRestoreLabel: 'Before history restore',
+        };
+        const { result } = renderHook(() => useDiagramHistory([], [], labels));
+
+        act(() => {
+            result.current.takeSnapshot(first, []);
+            result.current.takeSnapshot(second, []);
+        });
+        expect(result.current.pastEntries.map(entry => entry.label)).toEqual([
+            'Operation 1',
+            'Operation 2',
+        ]);
+
+        act(() => result.current.jumpTo(1, current, []));
+        act(() => result.current.redo(second, []));
+
+        expect(result.current.pastEntries.at(-1)?.label).toBe('Before history restore');
+    });
+
     it('enables undo for the first pre-operation snapshot', () => {
         const initial = [node('node-1', 0)];
         const { result } = renderHook(() => useDiagramHistory([], []));

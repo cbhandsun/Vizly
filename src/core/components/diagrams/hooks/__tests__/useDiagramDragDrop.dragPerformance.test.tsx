@@ -24,6 +24,7 @@ const createProps = () => ({
   snapDeltaRef: { current: null as { x: number; y: number } | null },
   clearGuides: vi.fn(),
   enableAltDuplicate: false,
+  moveHistoryLabel: 'Before moving node',
 });
 
 describe('useDiagramDragDrop drag performance boundary', () => {
@@ -66,7 +67,7 @@ describe('useDiagramDragDrop drag performance boundary', () => {
     expect(props.takeSnapshot).toHaveBeenCalledWith(
       [node],
       [],
-      '移动节点',
+      'Before moving node',
       { notify: false, dedupe: false },
     );
     expect(props.notifyHistoryChanged).not.toHaveBeenCalled();

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     Edge,
     NodeChange,
@@ -14,6 +15,7 @@ import { useDiagramStylePreset_v2 } from '../../../hooks/useDiagramStylePreset_v
 import { useDiagramStore } from '../../../store/useDiagramStore';
 
 export const useFlowchartState = (edgeMode: 'advanced-smart' | 'native' = 'advanced-smart') => {
+    const { t } = useTranslation();
     const nodes = useDiagramStore(state => state.nodes);
     const edges = useDiagramStore(state => state.edges);
     const setNodes = useDiagramStore(state => state.setNodes);
@@ -32,6 +34,10 @@ export const useFlowchartState = (edgeMode: 'advanced-smart' | 'native' = 'advan
     }, [nodes, edges]);
 
     // History
+    const historyLabels = useMemo(() => ({
+        getDefaultOperationLabel: (count: number) => t('designer.historyPanel.defaultOperation', { count }),
+        historyRestoreLabel: t('designer.historyPanel.historyRestore'),
+    }), [t]);
     const {
         takeSnapshot,
         notifyHistoryChanged,
@@ -45,7 +51,7 @@ export const useFlowchartState = (edgeMode: 'advanced-smart' | 'native' = 'advan
         switchScope,
         removeScope,
         removeScopes,
-    } = useDiagramHistory(nodes, edges);
+    } = useDiagramHistory(nodes, edges, historyLabels);
 
     // Presets
     const preset = useDiagramStylePreset_v2();

@@ -34,6 +34,11 @@ interface StoredHistoryEntry {
     entry: HistoryEntry;
 }
 
+export interface DiagramHistoryLabels {
+    getDefaultOperationLabel: (count: number) => string;
+    historyRestoreLabel: string;
+}
+
 interface HistoryScope {
     past: StoredHistoryEntry[];
     future: StoredHistoryEntry[];
@@ -43,6 +48,10 @@ interface HistoryScope {
 const MAX_HISTORY = 50;
 const EMPTY_HISTORY_STATE: HistoryState = { nodes: [], edges: [] };
 const DEFAULT_HISTORY_SCOPE = 'default';
+const DEFAULT_HISTORY_LABELS: DiagramHistoryLabels = {
+    getDefaultOperationLabel: count => `Operation #${count}`,
+    historyRestoreLabel: 'Before history restore',
+};
 
 const createHistoryScope = (): HistoryScope => ({
     past: [],
@@ -61,7 +70,11 @@ const cloneHistoryState = (nodes: Node[], edges: Edge[]): HistoryState => (
  * that snapshot as undoable at once keeps the first drag/add/group operation
  * reversible without requiring a second edit to "commit" the first one.
  */
-export const useDiagramHistory = (_initialNodes: Node[], _initialEdges: Edge[]) => {
+export const useDiagramHistory = (
+    _initialNodes: Node[],
+    _initialEdges: Edge[],
+    labels: DiagramHistoryLabels = DEFAULT_HISTORY_LABELS,
+) => {
     const [historyInfo, setHistoryInfo] = useState({ pastCount: 0, futureCount: 0 });
     const [pastEntries, setPastEntries] = useState<HistoryEntry[]>([]);
     const scopesRef = useRef<Map<string, HistoryScope>>(new Map([
@@ -151,13 +164,13 @@ export const useDiagramHistory = (_initialNodes: Node[], _initialEdges: Edge[]) 
                 patch,
                 changeCount: shouldBuildPatch ? patch.length : 1,
                 timestamp: Date.now(),
-                label: label || `操作 #${scope.snapshotCounter}`,
+                label: label || labels.getDefaultOperationLabel(scope.snapshotCounter),
             },
         });
         if (scope.past.length > MAX_HISTORY) scope.past.shift();
         scope.future = [];
         if (options?.notify !== false) updateInfo();
-    }, [getActiveScope, updateInfo]);
+    }, [getActiveScope, labels, updateInfo]);
 
     const undo = useCallback((currentNodes: Node[], currentEdges: Edge[]) => {
         const scope = getActiveScope();
@@ -207,7 +220,7 @@ export const useDiagramHistory = (_initialNodes: Node[], _initialEdges: Edge[]) 
                 entry: {
                     patch: compare(target.state, currentState),
                     timestamp: Date.now(),
-                    label: '跳回前状态',
+                    label: labels.historyRestoreLabel,
                 },
             },
             ...laterEntries,
@@ -215,7 +228,7 @@ export const useDiagramHistory = (_initialNodes: Node[], _initialEdges: Edge[]) 
         scope.past = scope.past.slice(0, index);
         updateInfo();
         return deepClone(target.state);
-    }, [getActiveScope, updateInfo]);
+    }, [getActiveScope, labels.historyRestoreLabel, updateInfo]);
 
     return {
         takeSnapshot,
