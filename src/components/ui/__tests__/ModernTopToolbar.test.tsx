@@ -293,5 +293,14 @@ describe('ModernTopToolbar responsive layout', () => {
     expect(toolbarCss).toMatch(
       /\.toolbar-system-actions-dialog \.ant-select-selection-search-input\s*\{[\s\S]*?font-size:\s*16px\s*!important/,
     );
+    expect(toolbarCss).toMatch(
+      /\.toolbar-system-actions-dialog \.ant-select-dropdown\s*\{[\s\S]*?background-color:\s*rgba\(255, 255, 255, 0\.98\) !important;[\s\S]*?backdrop-filter:\s*blur\(28px\) saturate\(180%\) !important;/,
+    );
+    expect(toolbarCss).toMatch(
+      /\[data-theme='dark'\] \.toolbar-system-actions-dialog \.ant-select-dropdown\s*\{[\s\S]*?background-color:\s*rgba\(28, 28, 41, 0\.98\) !important;/,
+    );
+    expect(toolbarCss).toMatch(
+      /\.toolbar-system-actions-dialog \.ant-select-item-option\s*\{[\s\S]*?min-height:\s*var\(--commercial-touch-target, 44px\) !important;[\s\S]*?padding:\s*10px 12px !important;[\s\S]*?display:\s*flex;[\s\S]*?align-items:\s*center;[\s\S]*?font-size:\s*16px !important;/,
+    );
   });
 });
