@@ -95,6 +95,12 @@ describe('TopActionButtons document menu', () => {
             /@media \(max-width: 767px\)[\s\S]*?width:\s*min\(288px, calc\(100vw - 16px\)\);[\s\S]*?max-width:\s*calc\(100vw - 16px\);/,
         );
         expect(css).toMatch(
+            /@media \(max-width: 767px\)[\s\S]*?--vizly-document-actions-top-clearance:\s*64px;[\s\S]*?--vizly-document-actions-dock-clearance:\s*calc\(88px \+ env\(safe-area-inset-bottom, 0px\)\);[\s\S]*?max-height:\s*calc\([\s\S]*?100dvh[\s\S]*?var\(--vizly-document-actions-top-clearance\)[\s\S]*?var\(--vizly-document-actions-dock-clearance\)[\s\S]*?\);/,
+        );
+        expect(css).toMatch(
+            /@media \(max-width: 767px\)[\s\S]*?overflow-y:\s*auto;[\s\S]*?overscroll-behavior:\s*contain;[\s\S]*?scroll-padding-block:\s*8px;[\s\S]*?scrollbar-gutter:\s*stable;/,
+        );
+        expect(css).toMatch(
             /@media \(max-width: 480px\)[\s\S]*?\.vizly-document-actions-menu\s*\{[\s\S]*?left:\s*8px !important;[\s\S]*?right:\s*auto !important;/,
         );
     });

@@ -10,9 +10,19 @@
 
 @media (max-width: 767px) {
     .vizly-document-actions-menu .ant-dropdown-menu {
+        --vizly-document-actions-top-clearance: 64px;
+        --vizly-document-actions-dock-clearance: calc(88px + env(safe-area-inset-bottom, 0px));
         width: min(288px, calc(100vw - 16px));
         max-width: calc(100vw - 16px);
+        max-height: calc(
+            100dvh
+            - var(--vizly-document-actions-top-clearance)
+            - var(--vizly-document-actions-dock-clearance)
+        );
+        overflow-y: auto;
         overscroll-behavior: contain;
+        scroll-padding-block: 8px;
+        scrollbar-gutter: stable;
     }
 }
 
