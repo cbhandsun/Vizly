@@ -200,6 +200,37 @@ describe('ModernTopToolbar responsive layout', () => {
     expect(bottomPortal?.parentElement?.className).toContain('bottom-[58px]');
   });
 
+  it('announces a newly entered diagram and focuses its semantic title', async () => {
+    breakpointState.md = true;
+    renderToolbar();
+
+    const heading = screen.getByRole('heading', { level: 1, name: 'Untitled flowchart' });
+    expect(heading.getAttribute('tabindex')).toBe('-1');
+    await waitFor(() => expect(document.activeElement).toBe(heading));
+  });
+
+  it('does not steal focus from an existing editor control when the diagram changes', async () => {
+    breakpointState.md = true;
+    const { rerender } = renderToolbar();
+    const commandSearch = screen.getByRole('button', { name: 'Open command search' });
+    commandSearch.focus();
+
+    rerender(
+      <ModernTopToolbar
+        diagramId="diagram-2"
+        title="Second flowchart"
+        edgeMode="native"
+        onEdgeModeChange={() => undefined}
+        setIsCommandOpen={commandOpenState.setOpen}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 1, name: 'Second flowchart' })).toBeTruthy();
+      expect(document.activeElement).toBe(commandSearch);
+    });
+  });
+
   it('exposes diagram switching and command search as keyboard-operable controls', async () => {
     breakpointState.md = true;
     renderToolbar();

@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Grid, Select, Tooltip, Popover } from 'antd';
 import { SearchOutlined, RightOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
@@ -55,6 +55,7 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
   const [isDiagramSwitcherOpen, setIsDiagramSwitcherOpen] = useState(false);
   const moreTriggerRef = useRef<HTMLButtonElement>(null);
   const moreContentRef = useRef<HTMLDivElement>(null);
+  const diagramEntryHeadingRef = useRef<HTMLHeadingElement>(null);
   const diagramSwitcherTriggerRef = useRef<HTMLButtonElement>(null);
   const diagramSwitcherContentRef = useRef<HTMLDivElement>(null);
   const morePopoverInstanceId = React.useId().replace(/[^a-zA-Z0-9_-]/g, '');
@@ -85,6 +86,16 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
     ? `${diagramSwitcherAction}：${title}`
     : diagramSwitcherAction;
   const commandSearchLabel = t('designer.commandPalette.open', 'Open command search');
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      const activeElement = document.activeElement;
+      if (activeElement !== document.body && activeElement !== document.documentElement) return;
+      diagramEntryHeadingRef.current?.focus({ preventScroll: true });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [diagramId]);
 
   const closeMoreAndRestoreFocus = useCallback(() => {
     setIsMoreOpen(false);
@@ -286,6 +297,9 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
 
           {title && (
             <div className="flex items-center min-w-0">
+              <h1 ref={diagramEntryHeadingRef} className="sr-only" tabIndex={-1}>
+                {title}
+              </h1>
               <RightOutlined className="text-[10px] text-slate-300 dark:text-slate-600 mx-1.5 flex-shrink-0" />
               <Popover
                 content={
