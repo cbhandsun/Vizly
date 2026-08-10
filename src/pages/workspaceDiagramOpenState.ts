@@ -32,3 +32,19 @@ export const finishWorkspaceDiagramOpen = (
   pendingKeys: Set<string>,
   start: WorkspaceDiagramOpenStart,
 ): boolean => start.kind === 'started' && pendingKeys.delete(start.key);
+
+export interface WorkspaceDiagramCreateLock {
+  active: boolean;
+}
+
+export const beginWorkspaceDiagramCreate = (lock: WorkspaceDiagramCreateLock): boolean => {
+  if (lock.active) return false;
+  lock.active = true;
+  return true;
+};
+
+export const finishWorkspaceDiagramCreate = (lock: WorkspaceDiagramCreateLock): boolean => {
+  if (!lock.active) return false;
+  lock.active = false;
+  return true;
+};

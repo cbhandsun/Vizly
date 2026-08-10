@@ -66,6 +66,7 @@ interface WorkspaceDiagramCollectionProps {
   viewMode: ViewMode;
   onViewModeChange: (viewMode: ViewMode) => void;
   loading: boolean;
+  isCreatingDiagram?: boolean;
   openingDiagramKeys: ReadonlySet<string>;
   onOpenDiagram: (item: UnifiedDiagramItem) => void | Promise<void>;
   onOpenDiagramInNewTab: (item: UnifiedDiagramItem) => void;
@@ -107,6 +108,7 @@ export const WorkspaceDiagramCollection = ({
   viewMode,
   onViewModeChange,
   loading,
+  isCreatingDiagram = false,
   openingDiagramKeys,
   onOpenDiagram,
   onOpenDiagramInNewTab,
@@ -322,7 +324,10 @@ export const WorkspaceDiagramCollection = ({
                                 onClearFilter={handleClearFilter}
                             />
                         ) : (
-                            <WorkspaceEmptyState onCreate={onCreateBlank} />
+                            <WorkspaceEmptyState
+                                isCreating={isCreatingDiagram}
+                                onCreate={onCreateBlank}
+                            />
                         )
                     ) : (
                         <div className={viewMode === 'grid' ? 'diagram-grid' : 'diagram-list'}>

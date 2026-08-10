@@ -61,6 +61,7 @@ vi.mock('react-i18next', () => ({
         'workspace.title': 'Workspace',
         'workspace.documentCount': '1 diagram',
         'workspace.newFlowchart': 'New flowchart',
+        'workspace.creatingDiagram': 'Creating diagram…',
         'workspace.chooseDiagramType': 'Choose a diagram type',
         'workspace.diagramTypes.mindmap': 'Mind map',
         'workspace.diagramTypes.timeline': 'Timeline',
@@ -323,6 +324,29 @@ describe('WorkspaceDiagramCollection controls', () => {
 });
 
 describe('WorkspaceCompactHeader create menu', () => {
+  it('disables every create entry and exposes progress while creation is pending', () => {
+    const onCreateTemplate = vi.fn();
+    render(
+      <WorkspaceCompactHeader
+        documentCount={1}
+        isCreating
+        onCreateTemplate={onCreateTemplate}
+      />,
+    );
+
+    const primary = screen.getByRole('button', { name: 'Creating diagram…' });
+    const secondary = screen.getByRole('button', { name: 'Choose a diagram type' });
+    expect(primary).toBeDisabled();
+    expect(primary).toHaveAttribute('aria-busy', 'true');
+    expect(secondary).toBeDisabled();
+    expect(screen.getByRole('status')).toHaveTextContent('Creating diagram…');
+
+    fireEvent.click(primary);
+    fireEvent.click(secondary);
+    expect(onCreateTemplate).not.toHaveBeenCalled();
+    expect(screen.queryByRole('menu', { name: 'Choose a diagram type' })).toBeNull();
+  });
+
   it.each(['Enter', ' ', 'ArrowDown'])(
     'opens the named diagram type menu with %j and restores focus on Escape',
     async key => {

@@ -33,7 +33,9 @@ import { useWorkspaceSearch } from './useWorkspaceSearch';
 import { focusWorkspaceTarget } from './workspaceMenuInteraction';
 import { scheduleWorkspaceRouteFocus } from './workspaceRouteFocus';
 import {
+    beginWorkspaceDiagramCreate,
     beginWorkspaceDiagramOpen,
+    finishWorkspaceDiagramCreate,
     finishWorkspaceDiagramOpen,
 } from './workspaceDiagramOpenState';
 
@@ -60,6 +62,7 @@ const WorkspaceDashboardPage: React.FC = () => {
     const [viewMode, setViewMode] = useState<ViewMode>('grid');
     const [sortKey, setSortKey] = useState<SortKey>('updated');
     const [openingDiagramKeys, setOpeningDiagramKeys] = useState<ReadonlySet<string>>(() => new Set());
+    const [isCreatingDiagram, setIsCreatingDiagram] = useState(false);
     
     const [unifiedItems, setUnifiedItems] = useState<UnifiedDiagramItem[]>([]);
     const [cloudProvider] = useState<ManageStorageProvider>(() => {
@@ -78,6 +81,7 @@ const WorkspaceDashboardPage: React.FC = () => {
     const settingsTriggerRef = useRef<HTMLButtonElement>(null);
     const authReturnFocusTargetRef = useRef<HTMLElement | null>(null);
     const openingDiagramKeysRef = useRef(new Set<string>());
+    const diagramCreateLockRef = useRef({ active: false });
 
     useEffect(() => scheduleWorkspaceRouteFocus(() => workspaceMainRef.current), []);
 
@@ -235,15 +239,25 @@ const WorkspaceDashboardPage: React.FC = () => {
 
     // Advanced Creation Router mapping to correct domains
     const handleCreateTemplate = async (templateKey: TemplateKey) => {
+        if (!beginWorkspaceDiagramCreate(diagramCreateLockRef.current)) return;
+        setIsCreatingDiagram(true);
+        let keepLockUntilNavigation = false;
         try {
             const requestedName = templateKey === 'flowchart'
                 ? t('workspace.untitledFlowchart')
                 : undefined;
             const diagramId = await workspaceDiagramActions.createDiagram(templateKey, requestedName);
-            if (diagramId) navigateToDiagram(diagramId);
+            if (diagramId) {
+                keepLockUntilNavigation = true;
+                navigateToDiagram(diagramId);
+            }
         } catch (error: unknown) {
             safeLog.error('Failed to create workspace diagram', redactSensitiveLogValue(error));
             appMessage.error('Failed to create diagram.');
+        } finally {
+            if (!keepLockUntilNavigation && finishWorkspaceDiagramCreate(diagramCreateLockRef.current)) {
+                setIsCreatingDiagram(false);
+            }
         }
     };
 
@@ -292,6 +306,7 @@ const WorkspaceDashboardPage: React.FC = () => {
                 {!searchQuery && (
                     <WorkspaceCompactHeader
                         documentCount={unifiedItems.length}
+                        isCreating={isCreatingDiagram}
                         onCreateTemplate={handleCreateTemplate}
                     />
                 )}
@@ -305,6 +320,7 @@ const WorkspaceDashboardPage: React.FC = () => {
                     viewMode={viewMode}
                     onViewModeChange={setViewMode}
                     loading={loading}
+                    isCreatingDiagram={isCreatingDiagram}
                     openingDiagramKeys={openingDiagramKeys}
                     onOpenDiagram={handleOpenDiagram}
                     onOpenDiagramInNewTab={openDiagramInNewTab}

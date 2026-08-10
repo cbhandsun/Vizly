@@ -1,8 +1,8 @@
-import { FilterX, Plus, SearchX } from 'lucide-react';
+import { FilterX, LoaderCircle, Plus, SearchX } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 type WorkspaceEmptyStateProps =
-  | { mode?: 'empty'; onCreate: () => void }
+  | { mode?: 'empty'; isCreating?: boolean; onCreate: () => void }
   | { mode: 'search'; query: string; onClearSearch: () => void }
   | { mode: 'filter'; viewLabel: string; onClearFilter: () => void };
 
@@ -44,8 +44,17 @@ export const WorkspaceEmptyState = (props: WorkspaceEmptyStateProps) => {
         {t('workspace.viewRecent')}
       </button>
     ) : (
-      <button type="button" className="create-btn-primary" onClick={props.onCreate}>
-        <Plus className="plus-icon" size={16} strokeWidth={2} /> {t('workspace.newDiagram')}
+      <button
+        type="button"
+        className="create-btn-primary"
+        onClick={props.onCreate}
+        aria-busy={props.isCreating || undefined}
+        disabled={props.isCreating}
+      >
+        {props.isCreating
+          ? <LoaderCircle className="workspace-create-spinner" size={16} strokeWidth={2} aria-hidden="true" />
+          : <Plus className="plus-icon" size={16} strokeWidth={2} aria-hidden="true" />}
+        {props.isCreating ? t('workspace.creatingDiagram') : t('workspace.newDiagram')}
       </button>
     )}
   </div>

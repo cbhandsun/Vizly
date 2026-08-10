@@ -73,6 +73,35 @@ const renderOpeningCollection = (
 );
 
 describe('WorkspaceDiagramCollection', () => {
+  it('makes the empty-workspace create action non-repeatable while creation is pending', () => {
+    const html = renderToStaticMarkup(
+      <WorkspaceDiagramCollection
+        activeView="recent"
+        onActiveViewChange={() => undefined}
+        unifiedItems={[]}
+        filteredItems={[]}
+        sortKey="updated"
+        onSortKeyChange={() => undefined}
+        viewMode="grid"
+        onViewModeChange={() => undefined}
+        loading={false}
+        isCreatingDiagram
+        openingDiagramKeys={new Set()}
+        onOpenDiagram={() => undefined}
+        onOpenDiagramInNewTab={() => undefined}
+        onContextMenu={() => undefined}
+        onDeleteDiagram={() => undefined}
+        onCreateBlank={() => undefined}
+        searchQuery=""
+        onClearSearch={() => undefined}
+      />,
+    );
+
+    expect(html).toContain('aria-busy="true"');
+    expect(html).toContain('disabled=""');
+    expect(html).toContain('workspace.creatingDiagram');
+  });
+
   it('exposes a visible, non-repeatable busy state while a diagram is opening', () => {
     const item: UnifiedDiagramItem = {
       id: 'slow-cloud-diagram',

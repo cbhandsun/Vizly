@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import type { UnifiedDiagramItem } from '../diagramManagementPage.helpers';
 import {
+  beginWorkspaceDiagramCreate,
   beginWorkspaceDiagramOpen,
+  finishWorkspaceDiagramCreate,
   finishWorkspaceDiagramOpen,
   getWorkspaceDiagramOpenKey,
 } from '../workspaceDiagramOpenState';
@@ -15,6 +17,21 @@ const createItem = (overrides: Partial<UnifiedDiagramItem> = {}): UnifiedDiagram
   role: 'owner',
   raw: { id: 'diagram-1' } as UnifiedDiagramItem['raw'],
   ...overrides,
+});
+
+describe('workspace diagram create state', () => {
+  it('synchronously rejects repeat creation until the active operation finishes', () => {
+    const lock = { active: false };
+
+    expect(beginWorkspaceDiagramCreate(lock)).toBe(true);
+    expect(lock.active).toBe(true);
+    expect(beginWorkspaceDiagramCreate(lock)).toBe(false);
+
+    expect(finishWorkspaceDiagramCreate(lock)).toBe(true);
+    expect(lock.active).toBe(false);
+    expect(finishWorkspaceDiagramCreate(lock)).toBe(false);
+    expect(beginWorkspaceDiagramCreate(lock)).toBe(true);
+  });
 });
 
 describe('workspace diagram open state', () => {

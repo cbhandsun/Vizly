@@ -379,6 +379,23 @@ html[data-theme='dark'] .create-btn-primary:hover {
   transform: scale(0.98);
 }
 
+.create-btn-primary:disabled {
+  cursor: wait;
+  opacity: 0.72;
+  transform: none;
+  box-shadow: 0 1px 3px rgba(99, 102, 241, 0.24);
+}
+
+.create-btn-primary:disabled:hover,
+.create-btn-primary:disabled:active {
+  transform: none;
+  box-shadow: 0 1px 3px rgba(99, 102, 241, 0.24);
+}
+
+.workspace-create-spinner {
+  animation: workspaceOpenSpin 0.8s linear infinite;
+}
+
 .create-btn-primary .plus-icon {
   font-size: 14px;
 }
@@ -1395,7 +1412,8 @@ html[data-theme='dark'] .diagram-context-menu {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .diagram-open-pending svg { animation: none; }
+  .diagram-open-pending svg,
+  .workspace-create-spinner { animation: none; }
 }
 
 .workspace-empty-state.is-recoverable-result {

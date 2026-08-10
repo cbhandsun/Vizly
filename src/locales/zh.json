@@ -56,6 +56,7 @@
         "documentCount": "{{count}} 个文档",
         "newDiagram": "新建图表",
         "newFlowchart": "新建流程图",
+        "creatingDiagram": "正在创建图表…",
         "untitledFlowchart": "未命名流程图",
         "untitledDiagram": "未命名图表",
         "chooseDiagramType": "选择其他图表类型",

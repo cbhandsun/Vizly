@@ -1,7 +1,7 @@
 import React from 'react';
 import Dropdown from 'antd/es/dropdown';
 import type { MenuProps } from 'antd/es/menu';
-import { BrainCircuit, ChevronDown, Clock3, Network, Plus } from 'lucide-react';
+import { BrainCircuit, ChevronDown, Clock3, LoaderCircle, Network, Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import type { TemplateKey } from './diagramManagementPage.helpers';
@@ -9,6 +9,7 @@ import { focusWorkspaceTarget } from './workspaceMenuInteraction';
 
 interface WorkspaceCompactHeaderProps {
   documentCount: number;
+  isCreating?: boolean;
   onCreateTemplate: (templateKey: TemplateKey) => void;
 }
 
@@ -20,6 +21,7 @@ const isSecondaryWorkspaceTemplate = (key: React.Key): key is TemplateKey =>
 
 export const WorkspaceCompactHeader = ({
   documentCount,
+  isCreating = false,
   onCreateTemplate,
 }: WorkspaceCompactHeaderProps) => {
   const { t } = useTranslation();
@@ -105,9 +107,13 @@ export const WorkspaceCompactHeader = ({
             type="button"
             className="create-btn-primary create-btn-main"
             onClick={() => onCreateTemplate(PRIMARY_WORKSPACE_TEMPLATE)}
+            aria-busy={isCreating || undefined}
+            disabled={isCreating}
           >
-            <Plus className="plus-icon" size={16} strokeWidth={2} />
-            {t('workspace.newFlowchart')}
+            {isCreating
+              ? <LoaderCircle className="workspace-create-spinner" size={16} strokeWidth={2} aria-hidden="true" />
+              : <Plus className="plus-icon" size={16} strokeWidth={2} aria-hidden="true" />}
+            {isCreating ? t('workspace.creatingDiagram') : t('workspace.newFlowchart')}
           </button>
           <Dropdown
             menu={{
@@ -121,6 +127,7 @@ export const WorkspaceCompactHeader = ({
             open={createMenuOpen}
             onOpenChange={handleCreateMenuOpenChange}
             placement="bottomRight"
+            disabled={isCreating}
             classNames={{ root: 'workspace-create-dropdown' }}
           >
             <button
@@ -132,11 +139,17 @@ export const WorkspaceCompactHeader = ({
               aria-expanded={createMenuOpen}
               aria-controls={WORKSPACE_CREATE_MENU_ID}
               title={t('workspace.chooseDiagramType')}
+              disabled={isCreating}
               onKeyDown={handleCreateMenuTriggerKeyDown}
             >
               <ChevronDown size={14} strokeWidth={2} />
             </button>
           </Dropdown>
+          {isCreating ? (
+            <span className="workspace-visually-hidden" role="status" aria-live="polite">
+              {t('workspace.creatingDiagram')}
+            </span>
+          ) : null}
         </div>
       </div>
     </div>

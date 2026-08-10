@@ -57,6 +57,7 @@
         "documentCount_other": "{{count}} documents",
         "newDiagram": "New diagram",
         "newFlowchart": "New flowchart",
+        "creatingDiagram": "Creating diagram…",
         "untitledFlowchart": "Untitled flowchart",
         "untitledDiagram": "Untitled diagram",
         "chooseDiagramType": "Choose another diagram type",
