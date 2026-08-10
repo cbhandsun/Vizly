@@ -5,7 +5,6 @@ import { LiveCursors } from './collaboration/LiveCursors';
 import { appMessage } from '@/core/utils/antdStaticBridge';
 import { LayoutStabilityContext } from '../../context/LayoutStabilityContext';
 import { diffDiagrams } from '../../utils/diagramDiff';
-import { dispatchDiagramControl } from '../shared/diagramControl';
 import { GestureOverlay } from '../shared/GestureOverlay';
 import { CanvasRuler, RulerCorner } from './CanvasRuler';
 import { ContextMenuLayer } from './ContextMenuLayer';
@@ -446,8 +445,8 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                 onRedo: redo,
                                 onZoomIn: () => reactFlowInstance?.zoomIn(),
                                 onZoomOut: () => reactFlowInstance?.zoomOut(),
+                                onResetZoom: () => reactFlowInstance?.zoomTo(1, { duration: 220 }),
                                 onFitView: handleFitView,
-                                onFitWidth: () => dispatchDiagramControl('top', id),
                                 autoRouting: autoRoutingEnabled,
                                 toggleAutoRouting: () => setAutoRoutingEnabled(!autoRoutingEnabled),
                                 showGrid,

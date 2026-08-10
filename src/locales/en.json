@@ -498,6 +498,7 @@
             "redo": "Redo (Ctrl+Y)",
             "zoomIn": "Zoom In",
             "zoomOut": "Zoom Out",
+            "resetZoom": "Reset zoom to 100%",
             "fitView": "Fit View",
             "autoLayout": "Auto Layout",
             "layout": "Layout",

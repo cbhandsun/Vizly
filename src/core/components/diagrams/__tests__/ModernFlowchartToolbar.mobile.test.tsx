@@ -500,6 +500,7 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
             onRedo: vi.fn(),
             onZoomIn: vi.fn(),
             onZoomOut: vi.fn(),
+            onResetZoom: vi.fn(),
             onFitView: vi.fn(),
             autoRouting: false,
             toggleAutoRouting: vi.fn(),
@@ -518,6 +519,10 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
         expect(await screen.findByRole('button', { name: /zoomIn.*32%/i })).toBeTruthy();
         expect(await screen.findByRole('button', { name: /zoomOut.*32%/i })).toBeTruthy();
         expect(await screen.findByRole('button', { name: /fitView.*32%/i })).toBeTruthy();
+        const resetZoom = await screen.findByRole('button', { name: /resetZoom.*32%/i });
+        fireEvent.click(resetZoom);
+        expect(props.onResetZoom).toHaveBeenCalledTimes(1);
+        expect(resetZoom.style.minWidth).toBe('var(--commercial-touch-target, 44px)');
 
         rerender(<ModernFlowchartToolbar {...props} zoomPercent={38} />);
 
@@ -525,6 +530,7 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
         expect(updatedStatus.textContent).toBe('38%');
         expect(updatedStatus.getAttribute('aria-live')).toBe('polite');
         expect(updatedStatus.getAttribute('aria-atomic')).toBe('true');
+        expect(await screen.findByRole('button', { name: /resetZoom.*38%/i })).toBeTruthy();
     });
 
     it('does not duplicate multi-selection actions in the mobile top toolbar', async () => {

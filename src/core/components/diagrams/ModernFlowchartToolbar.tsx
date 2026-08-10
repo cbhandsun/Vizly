@@ -34,8 +34,8 @@ interface FlowchartToolbarProps {
     onRedo: () => void;
     onZoomIn: () => void;
     onZoomOut: () => void;
+    onResetZoom?: () => void;
     onFitView: () => void;
-    onFitWidth?: () => void;
     autoRouting: boolean;
     toggleAutoRouting: () => void;
     showGrid: boolean;
@@ -111,7 +111,7 @@ const COMMERCIAL_MOBILE_TOUCH_STYLE: React.CSSProperties = {
 
 export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
     canUndo, canRedo, onUndo, onRedo,
-    onZoomIn, onZoomOut, onFitView,
+    onZoomIn, onZoomOut, onResetZoom, onFitView,
     autoRouting, toggleAutoRouting,
     showGrid, gridVariant, toggleGrid,
     onShowShortcuts,
@@ -206,6 +206,9 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
         : undefined;
     const zoomStatus = normalizedZoomPercent === undefined ? undefined : `${normalizedZoomPercent}%`;
     const zoomControlLabel = (label: string) => zoomStatus ? `${label} (${zoomStatus})` : label;
+    const zoomResetButtonStyle: React.CSSProperties = isMobile
+        ? { ...COMMERCIAL_MOBILE_TOUCH_STYLE, paddingInline: 4 }
+        : { minWidth: 38, width: 'auto', paddingInline: 4 };
 
     const gridInfo = useMemo(() => {
         if (!showGrid) return { title: t('designer.toolbar.gridOff'), icon: <FaBorderNone /> };
@@ -478,14 +481,29 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                     <Tooltip title={t('designer.toolbar.fitView')}>
                         <Button type="text" aria-label={zoomControlLabel(t('designer.toolbar.fitView'))} icon={<FaCompressArrowsAlt size={13} />} onClick={onFitView} className={tbtn} style={mobileToolbarButtonStyle} />
                     </Tooltip>
-                    {zoomStatus && (
+                    {zoomStatus && onResetZoom && (
+                        <Tooltip title={t('designer.toolbar.resetZoom')}>
+                            <Button
+                                type="text"
+                                aria-label={zoomControlLabel(t('designer.toolbar.resetZoom'))}
+                                onClick={onResetZoom}
+                                className={tbtn}
+                                style={zoomResetButtonStyle}
+                            >
+                                <span aria-hidden="true" className="tabular-nums">{zoomStatus}</span>
+                            </Button>
+                        </Tooltip>
+                    )}
+                    {zoomStatus && !onResetZoom && (
                         <span
-                            role="status"
-                            aria-live="polite"
-                            aria-atomic="true"
                             aria-label={zoomStatus}
                             className="text-[10px] sm:text-[11px] font-mono font-semibold text-slate-500 dark:text-slate-400 min-w-[30px] sm:min-w-[32px] text-center tabular-nums"
                         >
+                            {zoomStatus}
+                        </span>
+                    )}
+                    {zoomStatus && (
+                        <span role="status" aria-label={zoomStatus} aria-live="polite" aria-atomic="true" className="sr-only">
                             {zoomStatus}
                         </span>
                     )}

@@ -500,6 +500,7 @@
             "redo": "重做 (Ctrl+Y)",
             "zoomIn": "放大",
             "zoomOut": "缩小",
+            "resetZoom": "重置缩放至 100%",
             "fitView": "适应",
             "autoLayout": "自动布局",
             "layout": "布局",

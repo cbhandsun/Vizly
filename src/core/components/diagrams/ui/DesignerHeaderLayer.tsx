@@ -65,8 +65,8 @@ export interface DesignerHeaderLayerProps {
         onRedo: () => void;
         onZoomIn: () => void;
         onZoomOut: () => void;
+        onResetZoom: () => void;
         onFitView: () => void;
-        onFitWidth: () => void;
         autoRouting: boolean;
         toggleAutoRouting: () => void;
         showGrid: boolean;
@@ -207,8 +207,8 @@ export const DesignerHeaderLayer = React.memo(
                     onRedo={toolbar.onRedo}
                     onZoomIn={toolbar.onZoomIn}
                     onZoomOut={toolbar.onZoomOut}
+                    onResetZoom={toolbar.onResetZoom}
                     onFitView={toolbar.onFitView}
-                    onFitWidth={toolbar.onFitWidth}
                     autoRouting={toolbar.autoRouting}
                     toggleAutoRouting={toolbar.toggleAutoRouting}
                     showGrid={toolbar.showGrid}
