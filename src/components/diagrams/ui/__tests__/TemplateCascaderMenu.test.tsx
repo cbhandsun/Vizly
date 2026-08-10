@@ -101,6 +101,7 @@ vi.mock('react-i18next', () => ({
 }));
 
 import { TemplateCascaderMenu } from '../TemplateCascaderMenu';
+import { getTemplateCascaderPopupContainer } from '../templateCascaderPopupContainer';
 
 describe('TemplateCascaderMenu accessibility', () => {
   it('provides a stable accessible name for the diagram combobox', () => {
@@ -112,11 +113,11 @@ describe('TemplateCascaderMenu accessibility', () => {
   it('shows built-in diagrams offline and identifies the current diagram', () => {
     render(<TemplateCascaderMenu currentDiagramId="logistics-architecture-v1" />);
 
-    expect(screen.getByRole('combobox', { name: 'Switch diagram' })).toHaveAttribute(
+    expect(screen.getByRole('combobox', { name: 'Open diagrams and templates' })).toHaveAttribute(
       'placeholder',
-      'Search diagrams...',
+      'Search diagrams or templates...',
     );
-    expect(screen.getByText('Built-in diagrams')).toBeInTheDocument();
+    expect(screen.getByText('Built-in templates')).toBeInTheDocument();
     expect(screen.getByText('Logistics Architecture')).toBeInTheDocument();
     expect(screen.getByText('Current')).toBeInTheDocument();
     expect(screen.getByTestId('option-logistics-architecture-v1')).toHaveAttribute(
@@ -127,7 +128,7 @@ describe('TemplateCascaderMenu accessibility', () => {
 
   it('bounds and sanitizes search input and exposes a clear-search recovery action', () => {
     render(<TemplateCascaderMenu />);
-    const input = screen.getByRole('combobox', { name: 'Switch diagram' });
+    const input = screen.getByRole('combobox', { name: 'Open diagrams and templates' });
 
     fireEvent.change(input, { target: { value: `<${'x'.repeat(160)}>\u0000` } });
     expect(input).toHaveValue('x'.repeat(120));
@@ -161,5 +162,19 @@ describe('TemplateCascaderMenu accessibility', () => {
     expect(css).toMatch(/@media \(max-width: 640px\)[\s\S]*?\.diagram-template-cascader-popup\.ant-cascader-dropdown[\s\S]*?max-width: calc\(100vw - 16px\)/);
     expect(css).toMatch(/\.diagram-template-cascader-popup \.ant-cascader-menu \{[\s\S]*?width: calc\(\(100vw - 16px\) \/ 3\)[\s\S]*?min-width: 0/);
     expect(css).toMatch(/\.diagram-template-cascader-popup \.ant-cascader-menu-item \{[\s\S]*?min-height: var\(--commercial-touch-target, 44px\)/);
+  });
+
+  it('keeps the cascader portal inside the switcher lifecycle surface', () => {
+    const surface = document.createElement('div');
+    surface.dataset.diagramSwitcherSurface = 'true';
+    const trigger = document.createElement('input');
+    surface.appendChild(trigger);
+    document.body.appendChild(surface);
+
+    expect(getTemplateCascaderPopupContainer(trigger)).toBe(surface);
+
+    trigger.remove();
+    surface.remove();
+    expect(getTemplateCascaderPopupContainer(trigger)).toBe(document.body);
   });
 });

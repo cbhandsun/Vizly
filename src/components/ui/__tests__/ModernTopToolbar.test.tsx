@@ -57,6 +57,8 @@ vi.mock('react-i18next', () => ({
       'common.export': 'Export',
       'common.theme': 'Theme',
       'designer.commandPalette.open': 'Open command search',
+      'diagramViewer.switcher.open': 'Open diagrams and templates',
+      'diagramViewer.switcher.title': 'Diagrams & templates',
     }[key] ?? fallback ?? key),
   }),
 }));
@@ -165,7 +167,7 @@ describe('ModernTopToolbar responsive layout', () => {
     expect(screen.getByTestId('rename-title').getAttribute('data-commercial-touch-target')).toBe('true');
     expect(screen.getByTestId('auth-status').getAttribute('data-commercial-touch-target')).toBe('true');
     expect(screen.queryByRole('link')).toBeNull();
-    const diagramSwitcher = screen.getByRole('button', { name: '切换图表：Untitled flowchart' });
+    const diagramSwitcher = screen.getByRole('button', { name: 'Open diagrams and templates：Untitled flowchart' });
     expect(diagramSwitcher.className).toContain('h-[44px]');
     expect(diagramSwitcher.style.minHeight).toBe('var(--commercial-touch-target, 44px)');
     const systemActions = screen.getByRole('button', { name: 'System actions' });
@@ -202,18 +204,28 @@ describe('ModernTopToolbar responsive layout', () => {
     breakpointState.md = true;
     renderToolbar();
 
-    const diagramSwitcher = screen.getByRole('button', { name: '切换图表：Untitled flowchart' });
+    const diagramSwitcher = screen.getByRole('button', { name: 'Open diagrams and templates：Untitled flowchart' });
     expect(diagramSwitcher.getAttribute('aria-haspopup')).toBe('dialog');
     expect(diagramSwitcher.getAttribute('aria-expanded')).toBe('false');
-    expect(screen.queryByRole('dialog', { name: '切换图表：Untitled flowchart' })).toBeNull();
+    expect(screen.queryByRole('dialog', { name: 'Open diagrams and templates：Untitled flowchart' })).toBeNull();
     fireEvent.click(diagramSwitcher);
     expect(diagramSwitcher.getAttribute('aria-expanded')).toBe('true');
-    expect(await screen.findByRole('dialog', { name: '切换图表：Untitled flowchart' })).toBeTruthy();
+    const switcherDialog = await screen.findByRole('dialog', { name: 'Open diagrams and templates：Untitled flowchart' });
+    expect(switcherDialog.getAttribute('data-diagram-switcher-surface')).toBe('true');
+    expect(screen.getByText('Diagrams & templates')).toBeTruthy();
     expect(screen.getByRole('textbox', { name: '筛选图表' })).toBeTruthy();
 
     const diagramFilter = screen.getByRole('textbox', { name: '筛选图表' });
     diagramFilter.focus();
     fireEvent.keyDown(diagramFilter, { key: 'Escape' });
+    await waitFor(() => {
+      expect(diagramSwitcher.getAttribute('aria-expanded')).toBe('false');
+      expect(document.activeElement).toBe(diagramSwitcher);
+    });
+
+    fireEvent.click(diagramSwitcher);
+    expect(diagramSwitcher.getAttribute('aria-expanded')).toBe('true');
+    fireEvent.click(diagramSwitcher);
     await waitFor(() => {
       expect(diagramSwitcher.getAttribute('aria-expanded')).toBe('false');
       expect(document.activeElement).toBe(diagramSwitcher);
@@ -236,7 +248,7 @@ describe('ModernTopToolbar responsive layout', () => {
       />
     ));
 
-    fireEvent.click(screen.getByRole('button', { name: '切换图表：Untitled flowchart' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open diagrams and templates：Untitled flowchart' }));
 
     const combobox = await screen.findByRole('combobox', { name: '筛选图表' });
     await waitFor(() => {

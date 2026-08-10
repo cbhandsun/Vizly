@@ -2485,15 +2485,17 @@
         "canvasNotFound": "Cannot connect to canvas, please retry",
         "switchDiagram": "Switch diagram",
         "switcher": {
-            "placeholder": "Search diagrams...",
-            "builtIn": "Built-in diagrams",
+            "title": "Diagrams & templates",
+            "open": "Open diagrams and templates",
+            "placeholder": "Search diagrams or templates...",
+            "builtIn": "Built-in templates",
             "templateLibrary": "Template library",
             "generalTemplates": "General templates",
             "s3Storage": "S3 storage",
             "cloudDiagrams": "Cloud diagrams",
             "localWorkspace": "Local workspace",
             "current": "Current",
-            "noResults": "No matching diagrams",
+            "noResults": "No matching diagrams or templates",
             "noResultsHint": "Try another keyword or clear the search.",
             "clearSearch": "Clear search",
             "confirmTitle": "Replace the current page?",
@@ -2504,6 +2506,22 @@
                 "architecture": "Architecture",
                 "logistics": "Logistics",
                 "warehouse": "Warehouse management"
+            }
+        },
+        "mermaidImport": {
+            "title": "Import from Mermaid",
+            "close": "Close Mermaid import",
+            "cancel": "Cancel Mermaid import",
+            "submit": "Parse Mermaid and create diagram",
+            "submitLabel": "Parse and create",
+            "editorLabel": "Mermaid code editor",
+            "notice": "Basic Flowchart syntax (graph/flowchart) is supported. You can fine-tune the layout after import.",
+            "success": "Imported {{nodeCount}} nodes and {{edgeCount}} connections.",
+            "errors": {
+                "tooLarge": "Mermaid content is too large. Shorten it and try again.",
+                "parse": "Could not parse the Mermaid syntax. Check the code and try again.",
+                "noNodes": "No valid nodes were found. Add a node or connection and try again.",
+                "apply": "Import did not finish, and the current canvas was not replaced. Check the canvas and try again."
             }
         },
         "rename": {

@@ -224,7 +224,7 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
                     leftChildren: (switcherOpen) => (
                             <div className="flex items-center max-w-[240px]">
                                 <TemplateCascaderMenu
-                                    ariaLabel={t('diagramViewer.switchDiagram', '切换图表')}
+                                    ariaLabel={t('diagramViewer.switcher.open', '打开图表与模板')}
                                     currentDiagramId={selectedDiagramId}
                                     open={switcherOpen}
                                     style={{ width: '100%', minWidth: 160 }}

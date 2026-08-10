@@ -79,9 +79,11 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
     t('common.language', '语言'),
     ...(isMobile ? [t('designer.manage.title', '工作台')] : []),
   ].join('、')}`;
+  const diagramSwitcherAction = t('diagramViewer.switcher.open', '打开图表与模板');
+  const diagramSwitcherTitle = t('diagramViewer.switcher.title', '图表与模板');
   const diagramSwitcherLabel = title
-    ? `${t('diagramViewer.switchDiagram', '切换图表')}：${title}`
-    : t('diagramViewer.switchDiagram', '切换图表');
+    ? `${diagramSwitcherAction}：${title}`
+    : diagramSwitcherAction;
   const commandSearchLabel = t('designer.commandPalette.open', 'Open command search');
 
   const closeMoreAndRestoreFocus = useCallback(() => {
@@ -112,8 +114,12 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
   }, []);
 
   const handleDiagramSwitcherOpenChange = useCallback((open: boolean) => {
-    setIsDiagramSwitcherOpen(open);
-  }, []);
+    if (open) {
+      setIsDiagramSwitcherOpen(true);
+      return;
+    }
+    closeDiagramSwitcherAndRestoreFocus();
+  }, [closeDiagramSwitcherAndRestoreFocus]);
 
   const handleDiagramSwitcherAfterOpenChange = useCallback((open: boolean) => {
     if (!open) return;
@@ -288,11 +294,12 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
                     id={diagramSwitcherId}
                     role="dialog"
                     aria-label={diagramSwitcherLabel}
-                    className="w-[360px] max-w-[calc(100vw-24px)] p-1"
+                    data-diagram-switcher-surface="true"
+                    className="relative w-[360px] max-w-[calc(100vw-24px)] p-1"
                     onKeyDownCapture={handleDiagramSwitcherKeyDown}
                   >
                     <div className="px-3 py-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 dark:border-white/5 mb-2 flex items-center justify-between">
-                      <span>{t('diagramViewer.switchDiagram', '切换图表')}</span>
+                      <span>{diagramSwitcherTitle}</span>
                     </div>
                     <div className="max-h-[50vh] overflow-y-auto">
                       {typeof leftChildren === 'function'
@@ -306,8 +313,9 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
                 open={isDiagramSwitcherOpen}
                 onOpenChange={handleDiagramSwitcherOpenChange}
                 afterOpenChange={handleDiagramSwitcherAfterOpenChange}
+                destroyOnHidden
               >
-                <Tooltip title={t('diagramViewer.switchDiagram', '切换图表')} mouseEnterDelay={0.6}>
+                <Tooltip title={diagramSwitcherAction} mouseEnterDelay={0.6}>
                   <button
                     ref={diagramSwitcherTriggerRef}
                     type="button"

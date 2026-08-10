@@ -1,4 +1,4 @@
-// @vitest-environment node
+// @vitest-environment jsdom
 
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -74,6 +74,41 @@ describe('diagramViewerSwitchGuard', () => {
         expect(confirmReject).toHaveBeenCalledWith(expect.objectContaining({
             content: 'The current page contains 2 nodes.',
         }));
+    });
+
+    it('restores the toolbar trigger after a cancelled switch finishes closing', async () => {
+        type ConfirmFunction = NonNullable<
+            Parameters<typeof confirmDiagramTemplateSwitch>[0]['confirmModal']
+        >['confirm'];
+        type ConfirmOptions = Parameters<ConfirmFunction>[0];
+        let confirmOptions: ConfirmOptions | undefined;
+        const trigger = document.createElement('button');
+        trigger.setAttribute('aria-controls', 'diagram-switcher-test');
+        const surface = document.createElement('div');
+        surface.id = 'diagram-switcher-test';
+        surface.dataset.diagramSwitcherSurface = 'true';
+        const input = document.createElement('input');
+        surface.appendChild(input);
+        document.body.append(trigger, surface);
+        input.focus();
+
+        const confirm = vi.fn<ConfirmFunction>((options) => {
+            confirmOptions = options;
+            return { destroy: vi.fn(), update: vi.fn() };
+        });
+        const result = confirmDiagramTemplateSwitch({
+            nodeCount: 2,
+            confirmModal: { confirm },
+            translate,
+        });
+
+        await confirmOptions?.onCancel?.();
+        confirmOptions?.afterClose?.();
+
+        await expect(result).resolves.toBe(false);
+        expect(document.activeElement).toBe(trigger);
+        trigger.remove();
+        surface.remove();
     });
 
     it.each([-1, Number.NaN, Number.POSITIVE_INFINITY, 1.5])(

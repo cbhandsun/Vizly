@@ -19,6 +19,7 @@ import {
   normalizeTemplateItem,
   normalizeTemplateSearchInput,
 } from './templateCascaderOptions';
+import { getTemplateCascaderPopupContainer } from './templateCascaderPopupContainer';
 
 export interface TemplateCascaderMenuProps {
   value?: string[];
@@ -71,8 +72,8 @@ export const TemplateCascaderMenu: React.FC<TemplateCascaderMenuProps> = ({
   const hasFetchedCloudListRef = React.useRef(false);
   const [searchValue, setSearchValue] = React.useState('');
   const currentPresetKey = resolvePresetKey(currentDiagramId);
-  const effectivePlaceholder = placeholder ?? t('diagramViewer.switcher.placeholder', 'Search diagrams...');
-  const effectiveAriaLabel = ariaLabel ?? t('diagramViewer.switchDiagram', 'Switch diagram');
+  const effectivePlaceholder = placeholder ?? t('diagramViewer.switcher.placeholder', 'Search diagrams or templates...');
+  const effectiveAriaLabel = ariaLabel ?? t('diagramViewer.switcher.open', 'Open diagrams and templates');
 
   const cascaderOptions = useMemo(() => {
     const options: CascaderOption[] = [];
@@ -110,8 +111,8 @@ export const TemplateCascaderMenu: React.FC<TemplateCascaderMenuProps> = ({
 
     options.push({
       value: 'built-in',
-      label: <span><AppstoreOutlined style={{ marginRight: 8, color: '#1677ff' }} />{t('diagramViewer.switcher.builtIn', 'Built-in diagrams')}</span>,
-      searchText: t('diagramViewer.switcher.builtIn', 'Built-in diagrams'),
+      label: <span><AppstoreOutlined style={{ marginRight: 8, color: '#1677ff' }} />{t('diagramViewer.switcher.builtIn', 'Built-in templates')}</span>,
+      searchText: t('diagramViewer.switcher.builtIn', 'Built-in templates'),
       children: builtInChildren,
     });
 
@@ -255,7 +256,7 @@ export const TemplateCascaderMenu: React.FC<TemplateCascaderMenuProps> = ({
       notFoundContent={(
         <div role="status" aria-live="polite" className="flex min-w-[280px] flex-col items-center px-5 py-6 text-center">
           <div className="font-semibold text-text-primary">
-            {t('diagramViewer.switcher.noResults', 'No matching diagrams')}
+            {t('diagramViewer.switcher.noResults', 'No matching diagrams or templates')}
           </div>
           <div className="mt-1 text-sm text-text-secondary">
             {t('diagramViewer.switcher.noResultsHint', 'Try another keyword or clear the search.')}
@@ -288,7 +289,7 @@ export const TemplateCascaderMenu: React.FC<TemplateCascaderMenuProps> = ({
         ...style,
       }}
       suffixIcon={<SearchOutlined style={{ color: 'rgba(0,0,0,0.45)' }} />}
-      getPopupContainer={() => document.body}
+      getPopupContainer={getTemplateCascaderPopupContainer}
     >
       {children}
     </Cascader>

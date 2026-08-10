@@ -34,6 +34,24 @@ const isValidNodeCount = (nodeCount: number): boolean => (
     Number.isSafeInteger(nodeCount) && nodeCount >= 0
 );
 
+const getDiagramSwitcherFocusReturnTarget = (): HTMLElement | null => {
+    if (typeof document === 'undefined') return null;
+
+    const activeElement = document.activeElement;
+    if (!(activeElement instanceof HTMLElement)) return null;
+
+    const switcherSurface = activeElement.closest<HTMLElement>(
+        '[data-diagram-switcher-surface="true"]',
+    );
+    if (!switcherSurface?.id) {
+        return activeElement.isConnected ? activeElement : null;
+    }
+
+    return Array.from(document.querySelectorAll<HTMLElement>('[aria-controls]')).find(
+        (element) => element.getAttribute('aria-controls') === switcherSurface.id,
+    ) ?? (activeElement.isConnected ? activeElement : null);
+};
+
 export const confirmDiagramTemplateSwitch = async ({
     nodeCount,
     confirmModal = appModal,
@@ -41,6 +59,9 @@ export const confirmDiagramTemplateSwitch = async ({
 }: ConfirmSwitchOptions): Promise<boolean> => {
     if (!isValidNodeCount(nodeCount)) return false;
     if (nodeCount <= 0) return true;
+
+    const focusReturnTarget = getDiagramSwitcherFocusReturnTarget();
+    let restoreFocusAfterClose = false;
 
     return await new Promise<boolean>((resolve) => {
         confirmModal.confirm({
@@ -52,7 +73,15 @@ export const confirmDiagramTemplateSwitch = async ({
             autoFocusButton: 'cancel',
             rootClassName: COMMERCIAL_VIEWPORT_MODAL_CLASS,
             onOk: () => resolve(true),
-            onCancel: () => resolve(false),
+            onCancel: () => {
+                restoreFocusAfterClose = true;
+                resolve(false);
+            },
+            afterClose: () => {
+                if (restoreFocusAfterClose && focusReturnTarget?.isConnected) {
+                    focusReturnTarget.focus();
+                }
+            },
         });
     });
 };

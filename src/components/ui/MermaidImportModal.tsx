@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Modal, Button, Space, Alert } from 'antd';
 import type { Edge, Node } from '@xyflow/react';
+import { useTranslation } from 'react-i18next';
 import { MermaidParser } from '@/services/import/MermaidParser';
 import { appMessage } from '@/core/utils/antdStaticBridge';
 import LazyMonacoEditor from '@/core/components/lazy/LazyMonacoEditor';
@@ -28,6 +29,7 @@ const DEFAULT_MERMAID = `graph TD
     end`;
 
 export const MermaidImportModal: React.FC<MermaidImportModalProps> = ({ visible, onClose, onImport }) => {
+  const { t } = useTranslation();
   const [code, setCode] = useState(DEFAULT_MERMAID);
   const [error, setError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
@@ -50,14 +52,17 @@ export const MermaidImportModal: React.FC<MermaidImportModalProps> = ({ visible,
     } catch (error: unknown) {
       showImportError(
         error instanceof Error && error.message === 'Mermaid input is too large.'
-          ? 'Mermaid 内容过大，请缩减后重试。'
-          : '解析失败，请检查 Mermaid 语法。',
+          ? t('diagramViewer.mermaidImport.errors.tooLarge', 'Mermaid content is too large. Shorten it and try again.')
+          : t('diagramViewer.mermaidImport.errors.parse', 'Could not parse the Mermaid syntax. Check the code and try again.'),
       );
       return;
     }
 
     if (parsed.nodes.length === 0) {
-      showImportError('未能从代码中提取到有效节点，请补充节点或连线后重试。');
+      showImportError(t(
+        'diagramViewer.mermaidImport.errors.noNodes',
+        'No valid nodes were found. Add a node or connection and try again.',
+      ));
       return;
     }
 
@@ -66,13 +71,23 @@ export const MermaidImportModal: React.FC<MermaidImportModalProps> = ({ visible,
     try {
       const imported = await onImport(parsed.nodes, parsed.edges);
       if (!imported) {
-        showImportError('导入未完成，当前画布未被替换。请检查画布状态后重试。');
+        showImportError(t(
+          'diagramViewer.mermaidImport.errors.apply',
+          'Import did not finish, and the current canvas was not replaced. Check the canvas and try again.',
+        ));
         return;
       }
-      appMessage.success(`成功导入 ${parsed.nodes.length} 个节点和 ${parsed.edges.length} 条连线！`);
+      appMessage.success(t('diagramViewer.mermaidImport.success', {
+        nodeCount: parsed.nodes.length,
+        edgeCount: parsed.edges.length,
+        defaultValue: 'Imported {{nodeCount}} nodes and {{edgeCount}} connections.',
+      }));
       onClose();
     } catch (_error: unknown) {
-      showImportError('导入未完成，当前画布未被替换。请检查画布状态后重试。');
+      showImportError(t(
+        'diagramViewer.mermaidImport.errors.apply',
+        'Import did not finish, and the current canvas was not replaced. Check the canvas and try again.',
+      ));
     } finally {
       importInFlightRef.current = false;
       setImporting(false);
@@ -81,7 +96,7 @@ export const MermaidImportModal: React.FC<MermaidImportModalProps> = ({ visible,
 
   return (
     <Modal
-      title="从 Mermaid 导入"
+      title={t('diagramViewer.mermaidImport.title', 'Import from Mermaid')}
       open={visible}
       rootClassName={`${COMMERCIAL_VIEWPORT_MODAL_CLASS} mermaid-import-modal`}
       zIndex={COMMERCIAL_VIEWPORT_MODAL_Z_INDEX}
@@ -90,31 +105,34 @@ export const MermaidImportModal: React.FC<MermaidImportModalProps> = ({ visible,
       }}
       getContainer={getViewportOverlayContainer}
       closable={{
-        'aria-label': '关闭 Mermaid 导入',
+        'aria-label': t('diagramViewer.mermaidImport.close', 'Close Mermaid import'),
         disabled: importing,
       }}
       keyboard={!importing}
       mask={{ closable: !importing }}
       width={800}
       footer={[
-        <Button key="back" aria-label="取消 Mermaid 导入" disabled={importing} onClick={onClose}>
-          取消
+        <Button key="back" aria-label={t('diagramViewer.mermaidImport.cancel', 'Cancel Mermaid import')} disabled={importing} onClick={onClose}>
+          {t('common.cancel', 'Cancel')}
         </Button>,
         <Button
           key="submit"
           type="primary"
-          aria-label="解析 Mermaid 并生成"
+          aria-label={t('diagramViewer.mermaidImport.submit', 'Parse Mermaid and create diagram')}
           disabled={!code.trim()}
           loading={importing}
           onClick={handleImport}
         >
-          解析并生成
+          {t('diagramViewer.mermaidImport.submitLabel', 'Parse and create')}
         </Button>,
       ]}
     >
       <Space aria-busy={importing} orientation="vertical" style={{ width: '100%' }} size="middle">
         <Alert 
-          title="目前仅支持 Flowchart (graph/flowchart) 基础语法。导入后可手动微调布局。"
+          title={t(
+            'diagramViewer.mermaidImport.notice',
+            'Basic Flowchart syntax (graph/flowchart) is supported. You can fine-tune the layout after import.',
+          )}
           type="info" 
           showIcon 
           role="note"
@@ -126,7 +144,7 @@ export const MermaidImportModal: React.FC<MermaidImportModalProps> = ({ visible,
           <LazyMonacoEditor
             inputRef={editorRef}
             minHeight={0}
-            ariaLabel="Mermaid 基础编辑器"
+            ariaLabel={t('diagramViewer.mermaidImport.editorLabel', 'Mermaid code editor')}
             ariaInvalid={Boolean(error)}
             ariaDescribedBy={error ? 'mermaid-import-error' : undefined}
             value={code}
