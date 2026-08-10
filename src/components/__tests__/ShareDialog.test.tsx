@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import React from 'react';
+import { readFileSync } from 'node:fs';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -221,6 +222,38 @@ describe('ShareDialog commercial failure handling', () => {
     expect((screen.getByRole('button', { name: '邀请' }) as HTMLButtonElement).disabled).toBe(true);
     expect((screen.getByRole('textbox', { name: '输入用户的注册邮箱...' }) as HTMLInputElement).disabled).toBe(true);
     expect(screen.getByRole('button', { name: '立即登录' })).toBeTruthy();
+  });
+
+  it('stacks the unauthenticated explanation and login action on narrow viewports', async () => {
+    render(
+      <ShareDialog open onClose={vi.fn()} diagramId={DIAGRAM_ID} onEnsureSaved={vi.fn()} />,
+    );
+
+    const alertTitle = await screen.findByText('请先登录后才能使用分享功能');
+    expect(alertTitle.closest('.ant-alert')?.classList.contains('share-dialog-login-alert')).toBe(true);
+
+    const css = readFileSync('src/components/diagrams/ShareDialog.css', 'utf8');
+    expect(css).toContain('.share-dialog-login-alert.ant-alert-with-description');
+    expect(css).toContain('grid-template-columns: max-content minmax(0, 1fr)');
+    expect(css).toContain('.share-dialog-login-alert .ant-alert-section');
+    expect(css).toMatch(/\.share-dialog-login-alert \.ant-alert-actions\s*\{[^}]*grid-column:\s*2;[^}]*width:\s*100%;/s);
+  });
+
+  it('does not request protected share data or expose retry errors before sign-in', async () => {
+    serviceMocks.listSharesForDiagram.mockRejectedValue(new Error('authentication required'));
+    serviceMocks.listCollaborators.mockRejectedValue(new Error('authentication required'));
+
+    render(
+      <ShareDialog open onClose={vi.fn()} diagramId={DIAGRAM_ID} onEnsureSaved={vi.fn()} />,
+    );
+
+    expect(await screen.findByText('请先登录后才能使用分享功能')).toBeTruthy();
+    await waitFor(() => {
+      expect(serviceMocks.listSharesForDiagram).not.toHaveBeenCalled();
+      expect(serviceMocks.listCollaborators).not.toHaveBeenCalled();
+    });
+    expect(screen.queryByRole('button', { name: '重试' })).toBeNull();
+    expect(loggingMocks.loadFailure).not.toHaveBeenCalled();
   });
 
   it('explains the login prerequisite before disabled public-link controls', async () => {

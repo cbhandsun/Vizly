@@ -160,7 +160,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
 
     // Load Data
     const loadShares = useCallback(async () => {
-        if (!open || !effectiveId || !isValidUuid(effectiveId)) return;
+        if (!open || !user || !effectiveId || !isValidUuid(effectiveId)) return;
         const requestId = ++sharesLoadRequestRef.current;
         setLoadingLink(true);
         setSharesLoadFailed(false);
@@ -180,10 +180,10 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
             logShareDialogLoadFailure('shares', error);
             if (requestId === sharesLoadRequestRef.current) setSharesLoadFailed(true);
         } finally { setLoadingLink(false); }
-    }, [open, effectiveId]);
+    }, [open, user, effectiveId]);
 
     const loadCollaborators = useCallback(async () => {
-        if (!open || !effectiveId || !isValidUuid(effectiveId)) return;
+        if (!open || !user || !effectiveId || !isValidUuid(effectiveId)) return;
         setLoadingCollabs(true);
         setCollaboratorsLoadFailed(false);
         try {
@@ -193,7 +193,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
             logShareDialogLoadFailure('collaborators', error);
             setCollaboratorsLoadFailed(true);
         } finally { setLoadingCollabs(false); }
-    }, [open, effectiveId]);
+    }, [open, user, effectiveId]);
 
     useEffect(() => {
         if (!open) return;
@@ -202,6 +202,8 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
             if (cancelled) return;
             void loadShares();
             void loadCollaborators();
+            setSharesLoadFailed(false);
+            setCollaboratorsLoadFailed(false);
             setShareLinkResult(null);
             setLinkMutationFailed(false);
             setInviteStatus('idle');
@@ -335,6 +337,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
 
     const loginRequiredAlert = !user ? (
         <Alert
+            className="share-dialog-login-alert"
             type="warning"
             showIcon
             title={t('share.loginRequired')}
@@ -351,7 +354,6 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
                     {t('share.loginAction', '立即登录')}
                 </Button>
             )}
-            style={{ marginBottom: 16 }}
         />
     ) : null;
 
