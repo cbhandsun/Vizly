@@ -7,12 +7,28 @@ import {
 } from '../diagramViewerSwitchGuard';
 
 describe('diagramViewerSwitchGuard', () => {
+    const translations = {
+        'diagramViewer.switcher.confirmTitle': 'Replace the current page?',
+        'diagramViewer.switcher.confirmContent': 'The current page contains nodes.',
+        'diagramViewer.switcher.confirmAction': 'Replace page',
+        'common.cancel': 'Cancel',
+    } as const;
+    const translate = vi.fn((
+        key: keyof typeof translations,
+        options?: { nodeCount: number },
+    ) => (
+        key === 'diagramViewer.switcher.confirmContent'
+            ? `The current page contains ${options?.nodeCount} nodes.`
+            : translations[key]
+    ));
+
     it('skips the modal when there are no current nodes', async () => {
         const confirm = vi.fn();
 
         await expect(confirmDiagramTemplateSwitch({
             nodeCount: 0,
             confirmModal: { confirm },
+            translate,
         })).resolves.toBe(true);
 
         expect(confirm).not.toHaveBeenCalled();
@@ -35,26 +51,45 @@ describe('diagramViewerSwitchGuard', () => {
         await expect(confirmDiagramTemplateSwitch({
             nodeCount: 3,
             confirmModal: { confirm: confirmApprove },
+            translate,
         })).resolves.toBe(true);
 
         await expect(confirmDiagramTemplateSwitch({
             nodeCount: 2,
             confirmModal: { confirm: confirmReject },
+            translate,
         })).resolves.toBe(false);
 
         expect(confirmApprove).toHaveBeenCalledWith(expect.objectContaining({
-            title: '切换图表模板',
-            okText: '确定切换',
-            cancelText: '取消',
+            title: 'Replace the current page?',
+            okText: 'Replace page',
+            cancelText: 'Cancel',
             okButtonProps: { danger: true },
+            autoFocusButton: 'cancel',
+            rootClassName: 'commercial-viewport-modal',
         }));
         expect(confirmApprove).toHaveBeenCalledWith(expect.objectContaining({
-            content: expect.stringContaining('3 个节点'),
+            content: 'The current page contains 3 nodes.',
         }));
         expect(confirmReject).toHaveBeenCalledWith(expect.objectContaining({
-            content: expect.stringContaining('2 个节点'),
+            content: 'The current page contains 2 nodes.',
         }));
     });
+
+    it.each([-1, Number.NaN, Number.POSITIVE_INFINITY, 1.5])(
+        'fails closed for an invalid node count of %s',
+        async (nodeCount) => {
+            const confirm = vi.fn();
+
+            await expect(confirmDiagramTemplateSwitch({
+                nodeCount,
+                confirmModal: { confirm },
+                translate,
+            })).resolves.toBe(false);
+
+            expect(confirm).not.toHaveBeenCalled();
+        },
+    );
 
     it('checks current node count and delegates to the confirmation step', async () => {
         const getCurrentNodeCount = vi.fn().mockResolvedValue(5);
@@ -69,15 +104,34 @@ describe('diagramViewerSwitchGuard', () => {
         expect(confirmSwitch).toHaveBeenCalledWith({ nodeCount: 5 });
     });
 
-    it('continues without blocking when reading node state fails', async () => {
+    it('blocks switching when reading node state fails', async () => {
         const logFailure = vi.fn();
+        const confirmSwitch = vi.fn();
 
         await expect(ensureDiagramSwitchConfirmed({
             getCurrentNodeCount: vi.fn().mockRejectedValue(new Error('store read failed')),
-            confirmSwitch: vi.fn(),
+            confirmSwitch,
             logFailure,
-        })).resolves.toBe(true);
+        })).resolves.toBe(false);
 
         expect(logFailure).toHaveBeenCalledWith(expect.any(Error));
+        expect(confirmSwitch).not.toHaveBeenCalled();
     });
+
+    it.each([Number.NaN, Number.POSITIVE_INFINITY, -1, 0.5])(
+        'blocks switching and logs an invalid node-state count of %s',
+        async (nodeCount) => {
+            const logFailure = vi.fn();
+            const confirmSwitch = vi.fn();
+
+            await expect(ensureDiagramSwitchConfirmed({
+                getCurrentNodeCount: vi.fn().mockResolvedValue(nodeCount),
+                confirmSwitch,
+                logFailure,
+            })).resolves.toBe(false);
+
+            expect(logFailure).toHaveBeenCalledWith(expect.any(TypeError));
+            expect(confirmSwitch).not.toHaveBeenCalled();
+        },
+    );
 });

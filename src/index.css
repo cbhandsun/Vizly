@@ -118,3 +118,32 @@
   min-width: 44px;
   min-height: 44px;
 }
+
+@media (max-width: 640px) {
+  .diagram-template-cascader-popup.ant-cascader-dropdown {
+    left: 8px !important;
+    max-width: calc(100vw - 16px);
+  }
+
+  .diagram-template-cascader-popup .ant-cascader-menus {
+    max-width: calc(100vw - 16px);
+    overflow-x: hidden;
+  }
+
+  .diagram-template-cascader-popup .ant-cascader-menu {
+    width: calc((100vw - 16px) / 3);
+    min-width: 0;
+  }
+
+  .diagram-template-cascader-popup .ant-cascader-menu-item {
+    min-height: var(--commercial-touch-target, 44px);
+    padding-inline: 8px 22px;
+  }
+
+  .diagram-template-cascader-popup .ant-cascader-menu-item-content {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}

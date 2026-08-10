@@ -2,6 +2,7 @@
 
 import '@testing-library/jest-dom/vitest';
 import React from 'react';
+import { readFileSync } from 'node:fs';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -29,6 +30,7 @@ vi.mock('antd/es/cascader', () => ({
       onSearch?: (value: string) => void;
     };
     notFoundContent?: React.ReactNode;
+    popupClassName?: string;
     onChange?: (value: string[]) => void;
   }) => {
     const renderOptions = (
@@ -45,7 +47,7 @@ vi.mock('antd/es/cascader', () => ({
     ));
 
     return (
-      <div>
+      <div data-testid="cascader" data-popup-class={props.popupClassName}>
         <input
           role="combobox"
           aria-label={props['aria-label']}
@@ -145,5 +147,19 @@ describe('TemplateCascaderMenu accessibility', () => {
       'logistics-planning-v1',
       'built-in',
     );
+  });
+
+  it('keeps all three menu levels reachable and touch-safe on narrow screens', () => {
+    render(<TemplateCascaderMenu />);
+
+    expect(screen.getByTestId('cascader')).toHaveAttribute(
+      'data-popup-class',
+      'diagram-template-cascader-popup',
+    );
+
+    const css = readFileSync('src/index.css', 'utf8');
+    expect(css).toMatch(/@media \(max-width: 640px\)[\s\S]*?\.diagram-template-cascader-popup\.ant-cascader-dropdown[\s\S]*?max-width: calc\(100vw - 16px\)/);
+    expect(css).toMatch(/\.diagram-template-cascader-popup \.ant-cascader-menu \{[\s\S]*?width: calc\(\(100vw - 16px\) \/ 3\)[\s\S]*?min-width: 0/);
+    expect(css).toMatch(/\.diagram-template-cascader-popup \.ant-cascader-menu-item \{[\s\S]*?min-height: var\(--commercial-touch-target, 44px\)/);
   });
 });

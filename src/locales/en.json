@@ -2491,6 +2491,9 @@
             "noResults": "No matching diagrams",
             "noResultsHint": "Try another keyword or clear the search.",
             "clearSearch": "Clear search",
+            "confirmTitle": "Replace the current page?",
+            "confirmContent": "The current page contains {{nodeCount}} node(s). Switching templates will replace this page’s local changes. Other pages are not affected. Continue?",
+            "confirmAction": "Replace page",
             "categories": {
                 "general": "General",
                 "architecture": "Architecture",

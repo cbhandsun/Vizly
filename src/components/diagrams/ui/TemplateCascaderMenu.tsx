@@ -280,6 +280,7 @@ export const TemplateCascaderMenu: React.FC<TemplateCascaderMenuProps> = ({
           ) : null}
         </div>
       )}
+      popupClassName="diagram-template-cascader-popup"
       expandTrigger="hover"
       style={{
         width: 320,
