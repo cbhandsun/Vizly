@@ -323,7 +323,7 @@ export function useFlowchartPluginRuntime({
                 ...edge,
                 selected: false,
             })));
-            if (isMobile) setPendingFocusNodeId(selectedNodeId);
+            setPendingFocusNodeId(selectedNodeId);
             setPendingSelectedNode(null);
         });
         return () => {

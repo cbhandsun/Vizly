@@ -394,7 +394,14 @@ describe('flowchart designer architecture hooks', () => {
         expect(plugin.onDestroy).toHaveBeenCalled();
     });
 
-    it('moves mobile focus into the selected node after a plugin add closes the drawer', async () => {
+    it.each([
+        { isMobile: false, expectedMobileCallbackCount: 0, diagramId: 'diagram-desktop' },
+        { isMobile: true, expectedMobileCallbackCount: 1, diagramId: 'diagram-mobile' },
+    ])('moves $diagramId focus into the selected node after a plugin add', async ({
+        isMobile,
+        expectedMobileCallbackCount,
+        diagramId,
+    }) => {
         const plugin = makePlugin('flowchart-hook-test');
         PluginRegistry.getInstance().register(plugin);
         const animationFrames: FrameRequestCallback[] = [];
@@ -411,7 +418,7 @@ describe('flowchart designer architecture hooks', () => {
 
         const { result } = renderHook(() => useFlowchartPluginRuntime({
             pluginId: plugin.id,
-            diagramId: 'diagram-mobile',
+            diagramId,
             getNodes: () => renderedNodes,
             getEdges: () => [],
             setNodes: (update) => {
@@ -426,7 +433,7 @@ describe('flowchart designer architecture hooks', () => {
             reactFlowInstance: null,
             reactFlowWrapper: { current: null },
             activeLayerId: 'default',
-            isMobile: true,
+            isMobile,
             t: ((key: string) => key) as never,
             onMobileNodeAdded,
             notifyNodeAdded: vi.fn(),
@@ -436,7 +443,7 @@ describe('flowchart designer architecture hooks', () => {
             result.current.pluginCtx?.addNode('flowchart', { label: '数据库' });
         });
         expect(renderedNodes).toHaveLength(1);
-        expect(onMobileNodeAdded).toHaveBeenCalledOnce();
+        expect(onMobileNodeAdded).toHaveBeenCalledTimes(expectedMobileCallbackCount);
         await waitFor(() => expect(animationFrames).toHaveLength(1));
 
         act(() => animationFrames[0](0));

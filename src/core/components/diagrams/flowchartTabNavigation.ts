@@ -62,7 +62,7 @@ export const focusFlowchartEdgeById = (
 };
 
 /**
- * Hands interaction context to a newly-created node after mobile chrome closes.
+ * Hands interaction context to a newly-created node after selection settles.
  * Prefer the selected semantic tree item so assistive technology receives the
  * node's selected state; fall back to React Flow's focusable node container.
  */
