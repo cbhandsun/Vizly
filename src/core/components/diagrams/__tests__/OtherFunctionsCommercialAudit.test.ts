@@ -77,6 +77,7 @@ describe('other-function commercial interaction safeguards', () => {
 
     it('keeps the shortcut reference modal close action touch-safe', () => {
         const panelSource = readSource('../KeyboardShortcutPanel.tsx');
+        const viewerSource = readSource('../../../../components/DiagramViewerView.tsx');
         const modalSource = readSource('../../ui/ShortcutsHelpModal.tsx');
         const flowchartModalSource = readSource('../FlowchartShortcutsHelpModal.tsx');
         const panelCss = readSource('../KeyboardShortcutPanel.css');
@@ -84,6 +85,9 @@ describe('other-function commercial interaction safeguards', () => {
 
         expect(panelSource).toContain('rootClassName="keyboard-shortcut-panel"');
         expect(panelSource).toContain('<FaKeyboard aria-hidden="true" />');
+        expect(panelSource).toContain('getContainer={getContainer}');
+        expect(viewerSource).toContain("import('@/core/components/diagrams/KeyboardShortcutPanel')");
+        expect(viewerSource).not.toContain("import('@/core/components/ui/ShortcutsHelpModal')");
         expect(modalSource).toContain('getContainer={getContainer ?? (() => document.body)}');
         expect(flowchartModalSource).toContain('getContainer={() => document.body}');
         expect(panelCss).toMatch(/\.keyboard-shortcut-panel \.ant-modal-close[\s\S]*?width: var\(--commercial-touch-target, 44px\)[\s\S]*?height: var\(--commercial-touch-target, 44px\)/);

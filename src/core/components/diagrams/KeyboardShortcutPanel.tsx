@@ -9,6 +9,7 @@ import './KeyboardShortcutPanel.css';
 interface KeyboardShortcutPanelProps {
     visible: boolean;
     onClose: () => void;
+    getContainer?: () => HTMLElement;
 }
 
 type ThemeToken = ReturnType<typeof theme.useToken>['token'];
@@ -62,6 +63,11 @@ const createShortcutGroups = (isMac: boolean, t: (key: string) => string): Short
         title: t('designer.keyboardShortcuts.groups.advanced'),
         items: [
             { keys: [isMac ? '⌘' : 'Ctrl', 'K'], label: t('designer.flowchartShortcuts.action.palette') },
+            { keys: [isMac ? '⌘' : 'Ctrl', 'Shift', 'F'], label: t('designer.shortcuts.action.menuSearch') },
+            { keys: [isMac ? '⌘' : 'Ctrl', 'Shift', 'B'], label: t('designer.shortcuts.action.menuToggle') },
+            { keys: [isMac ? '⌘' : 'Ctrl', 'Shift', 'D'], label: t('designer.shortcuts.action.debugToggle') },
+            { keys: [isMac ? '⌘' : 'Ctrl', ','], label: t('designer.shortcuts.action.settings') },
+            { keys: ['Esc'], label: t('designer.shortcuts.action.exitFullscreen') },
             { keys: [isMac ? '⌘' : 'Ctrl', 'F'], label: t('designer.flowchartShortcuts.action.canvasSearch') },
             { keys: [isMac ? '⌘' : 'Ctrl', 'H'], label: t('designer.flowchartShortcuts.action.findReplace') },
             { keys: ['Alt', t('designer.keyboardShortcuts.keys.drag')], label: t('designer.flowchartShortcuts.action.duplicateDrag') },
@@ -92,7 +98,7 @@ const KeyBadge: React.FC<{ children: string; token: ThemeToken }> = ({ children,
     </span>
 );
 
-export const KeyboardShortcutPanel: React.FC<KeyboardShortcutPanelProps> = ({ visible, onClose }) => {
+export const KeyboardShortcutPanel: React.FC<KeyboardShortcutPanelProps> = ({ visible, onClose, getContainer }) => {
     const { token } = theme.useToken();
     const { t } = useTranslation();
     const [searchText, setSearchText] = useState('');
@@ -162,6 +168,7 @@ export const KeyboardShortcutPanel: React.FC<KeyboardShortcutPanelProps> = ({ vi
             centered
             afterClose={() => setSearchText('')}
             rootClassName="keyboard-shortcut-panel"
+            getContainer={getContainer}
             styles={{
                 body: { maxHeight: '60vh', overflowY: 'auto', padding: '12px 0' },
             }}

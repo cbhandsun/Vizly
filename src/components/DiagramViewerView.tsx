@@ -20,7 +20,9 @@ import { subscribeMindMapAIConfigRequest } from '@/core/components/mindmap-v2/mi
 import { CloudSaveAuthRecovery } from './diagrams/CloudSaveAuthRecovery';
 
 const RoutingDebugPanel = lazy(() => import('./debug/RoutingDebugPanel').then(module => ({ default: module.RoutingDebugPanel })));
-const ShortcutsHelpModal = lazy(() => import('@/core/components/ui/ShortcutsHelpModal'));
+const KeyboardShortcutPanel = lazy(() => import('@/core/components/diagrams/KeyboardShortcutPanel').then(module => ({
+    default: module.KeyboardShortcutPanel,
+})));
 const CollaborationModal = lazy(() => import('./ui/CollaborationModal').then(module => ({ default: module.CollaborationModal })));
 const AIConfigModal = lazy(() => import('./ai/AIConfigModal'));
 const AIChatView = lazy(() => import('./ai/AIChatPanel').then(module => ({ default: module.AIChatView })));
@@ -249,8 +251,8 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
                 />
                 {isShortcutsOpen && (
                     <Suspense fallback={null}>
-                        <ShortcutsHelpModal
-                            open={isShortcutsOpen}
+                        <KeyboardShortcutPanel
+                            visible={isShortcutsOpen}
                             onClose={() => {
                                 setIsShortcutsOpen(false);
                                 restoreCommandPaletteFocus();

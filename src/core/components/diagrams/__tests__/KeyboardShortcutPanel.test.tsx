@@ -55,6 +55,16 @@ describe('KeyboardShortcutPanel', () => {
         expect(screen.getByRole('status').textContent).toContain('未找到匹配的快捷键');
     });
 
+    it('includes the workspace shortcuts formerly exposed by the command entry', () => {
+        render(<KeyboardShortcutPanel visible onClose={vi.fn()} />);
+
+        expect(screen.getByText('聚焦左侧菜单搜索')).toBeTruthy();
+        expect(screen.getByText('展开/收起左侧菜单')).toBeTruthy();
+        expect(screen.getByText('显示/隐藏调试面板')).toBeTruthy();
+        expect(screen.getByText('打开更多设置')).toBeTruthy();
+        expect(screen.getByText('退出全屏')).toBeTruthy();
+    });
+
     it('localizes titles, groups, actions, filtering, and empty state in English', async () => {
         const englishI18n = createInstance();
         await englishI18n.init({
