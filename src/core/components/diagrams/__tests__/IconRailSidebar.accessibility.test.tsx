@@ -55,6 +55,53 @@ const pluginContext: PluginContext = {
     addNode: vi.fn(() => 'node-1'),
 };
 
+const ShapeSearchRequestHarness = () => {
+    const [requestedPanel, setRequestedPanel] = useState<MobileIconRailPanelRequest | null>(null);
+
+    return (
+        <>
+            <button type="button" onClick={() => setRequestedPanel('shapes-search')}>
+                选择第一个图形
+            </button>
+            <IconRailSidebar
+                isMobile
+                autoOpenShapes={false}
+                requestedPanel={requestedPanel}
+                onRequestedPanelHandled={() => setRequestedPanel(null)}
+                pluginPanels={[{
+                    id: 'shapes',
+                    title: '基础形状',
+                    icon: <span aria-hidden="true">S</span>,
+                    content: <FlowchartShapesPanel ctx={pluginContext} />,
+                }]}
+            />
+        </>
+    );
+};
+
+const AlreadyOpenShapeSearchRequestHarness = () => {
+    const [requestedPanel, setRequestedPanel] = useState<MobileIconRailPanelRequest | null>(null);
+
+    return (
+        <>
+            <button type="button" onClick={() => setRequestedPanel('shapes-search')}>
+                选择已打开面板中的第一个图形
+            </button>
+            <IconRailSidebar
+                autoOpenShapes
+                requestedPanel={requestedPanel}
+                onRequestedPanelHandled={() => setRequestedPanel(null)}
+                pluginPanels={[{
+                    id: 'shapes',
+                    title: '基础形状',
+                    icon: <span aria-hidden="true">S</span>,
+                    content: <FlowchartShapesPanel ctx={pluginContext} />,
+                }]}
+            />
+        </>
+    );
+};
+
 describe('IconRailSidebar drawer accessibility', () => {
     beforeEach(() => {
         vi.stubGlobal('ResizeObserver', class {
@@ -190,6 +237,43 @@ describe('IconRailSidebar drawer accessibility', () => {
         await waitFor(() => {
             expect(screen.queryByRole('dialog')).toBeNull();
             expect(document.activeElement).toBe(searchTrigger);
+        });
+    });
+
+    it('routes the first-shape request directly to search and restores its trigger after Escape', async () => {
+        render(<ShapeSearchRequestHarness />);
+        const trigger = screen.getByRole('button', { name: '选择第一个图形' });
+        trigger.focus();
+        fireEvent.click(trigger);
+
+        const searchInput = await screen.findByRole('textbox', {
+            name: 'designer.sidebar.searchComponents',
+        });
+        await waitFor(() => expect(document.activeElement).toBe(searchInput));
+
+        fireEvent.keyDown(searchInput, { key: 'Escape' });
+        await waitFor(() => {
+            expect(screen.queryByRole('dialog')).toBeNull();
+            expect(document.activeElement).toBe(trigger);
+        });
+    });
+
+    it('focuses search when the requested shapes panel is already open', async () => {
+        render(<AlreadyOpenShapeSearchRequestHarness />);
+        expect(await screen.findByRole('dialog', { name: 'Basic Shapes' })).toBeTruthy();
+        const trigger = screen.getByRole('button', { name: '选择已打开面板中的第一个图形' });
+        trigger.focus();
+        fireEvent.click(trigger);
+
+        const searchInput = screen.getByRole('textbox', {
+            name: 'designer.sidebar.searchComponents',
+        });
+        await waitFor(() => expect(document.activeElement).toBe(searchInput));
+
+        fireEvent.keyDown(searchInput, { key: 'Escape' });
+        await waitFor(() => {
+            expect(screen.queryByRole('dialog')).toBeNull();
+            expect(document.activeElement).toBe(trigger);
         });
     });
 });

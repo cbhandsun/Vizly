@@ -17,6 +17,7 @@ import {
 } from './iconRailSidebarStorage';
 import { IconRailDrawerResizeHandle } from './IconRailDrawerResizeHandle';
 import {
+    resolveIconRailRequestedFocusTarget,
     resolveIconRailRequestedPanel,
     shouldAutoOpenShapesPanel,
     type MobileIconRailPanelRequest,
@@ -299,17 +300,24 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
                 const trigger = document.activeElement;
                 if (trigger instanceof HTMLElement && trigger !== document.body) {
                     drawerReturnFocusRef.current = trigger;
-                    drawerFocusTargetRef.current = 'default';
-                    shouldFocusDrawerRef.current = true;
                 }
-                setActivePanel(resolvedPanel);
+                const focusTarget = resolveIconRailRequestedFocusTarget(requestedPanel);
+                drawerFocusTargetRef.current = focusTarget;
+                shouldFocusDrawerRef.current = true;
+                if (activePanel === resolvedPanel && drawerRef.current) {
+                    focusIconRailDrawerEntry(drawerRef.current, focusTarget);
+                    drawerFocusTargetRef.current = 'default';
+                    shouldFocusDrawerRef.current = false;
+                } else {
+                    setActivePanel(resolvedPanel);
+                }
             } else {
                 closeDrawer(false);
             }
             onRequestedPanelHandled?.();
         }, 0);
         return () => window.clearTimeout(timer);
-    }, [closeDrawer, onRequestedPanelHandled, requestedPanel]);
+    }, [activePanel, closeDrawer, onRequestedPanelHandled, requestedPanel]);
 
     useEffect(() => {
         if (!shouldAutoOpenShapesPanel({
