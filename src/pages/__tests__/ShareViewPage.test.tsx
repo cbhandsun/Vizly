@@ -45,19 +45,15 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('antd', () => ({
     Spin: () => <div data-testid="spin" />,
-    Button: ({
-        children,
-        href,
-        onClick,
-    }: {
+    Button: React.forwardRef<HTMLAnchorElement | HTMLButtonElement, {
         children?: React.ReactNode;
         href?: string;
         onClick?: () => void;
-    }) => href ? (
-        <a href={href}>{children}</a>
+    }>(({ children, href, onClick }, ref) => href ? (
+        <a ref={ref as React.Ref<HTMLAnchorElement>} href={href}>{children}</a>
     ) : (
-        <button type="button" onClick={onClick}>{children}</button>
-    ),
+        <button ref={ref as React.Ref<HTMLButtonElement>} type="button" onClick={onClick}>{children}</button>
+    )),
     Result: ({
         title,
         subTitle,
@@ -334,6 +330,25 @@ describe('ShareViewPage', () => {
         fireEvent.click(screen.getByRole('button', { name: 'common.retry' }));
 
         expect(await screen.findByText('Recovered shared flow')).toBeInTheDocument();
+        expect(getSharedDiagramMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('announces retry failures and restores focus to the retry action', async () => {
+        const token = 'retryfailuretoken';
+        getSharedDiagramMock.mockRejectedValue(new Error('Service unavailable'));
+
+        renderSharePage(`/shared?token=${token}`);
+
+        const initialRetry = await screen.findByRole('button', { name: 'common.retry' });
+        expect(screen.getByRole('alert')).toHaveTextContent('share.viewerUnavailable');
+
+        fireEvent.click(initialRetry);
+
+        expect(await screen.findByRole('heading', { name: 'share.viewerUnavailable' })).toBeInTheDocument();
+        await waitFor(() => {
+            expect(screen.getByRole('button', { name: 'common.retry' })).toHaveFocus();
+        });
+        expect(screen.getByRole('alert')).toHaveAttribute('aria-atomic', 'true');
         expect(getSharedDiagramMock).toHaveBeenCalledTimes(2);
     });
 

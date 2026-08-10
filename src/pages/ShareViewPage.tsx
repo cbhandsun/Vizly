@@ -3,7 +3,7 @@
  * 通过 URL query string 中的 token 参数加载并展示分享的图表
  */
 
-import React, { Suspense, useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { Button, Result, Spin, Tag, Typography } from 'antd';
 import { useTranslation } from 'react-i18next';
@@ -82,6 +82,7 @@ const ShareViewPage: React.FC = () => {
         || ''
     ) || '';
     const [requestRevision, setRequestRevision] = useState(0);
+    const retryButtonRef = useRef<HTMLAnchorElement | HTMLButtonElement>(null);
     const [loadResult, setLoadResult] = useState<{
         revision: number;
         token: string;
@@ -154,6 +155,11 @@ const ShareViewPage: React.FC = () => {
         return () => controller.abort();
     }, [fallbackTitle, requestRevision, shareToken]);
 
+    useEffect(() => {
+        if (state.status !== 'unavailable' || requestRevision === 0) return;
+        retryButtonRef.current?.focus();
+    }, [requestRevision, state.status]);
+
     if (state.status === 'loading') {
         return (
             <ShareViewStatePage>
@@ -178,23 +184,26 @@ const ShareViewPage: React.FC = () => {
     if (state.status === 'unavailable') {
         return (
             <ShareViewStatePage>
-                <Result
-                    status="error"
-                    title={t('share.viewerUnavailable')}
-                    subTitle={t('share.viewerUnavailableHint')}
-                    extra={[
-                        <Button
-                            key="retry"
-                            type="primary"
-                            onClick={() => setRequestRevision((current) => current + 1)}
-                        >
-                            {t('common.retry')}
-                        </Button>,
-                        <Button key="workspace" href="#/manage">
-                            {t('share.backToWorkspace')}
-                        </Button>,
-                    ]}
-                />
+                <div role="alert" aria-atomic="true">
+                    <Result
+                        status="error"
+                        title={t('share.viewerUnavailable')}
+                        subTitle={t('share.viewerUnavailableHint')}
+                        extra={[
+                            <Button
+                                key="retry"
+                                ref={retryButtonRef}
+                                type="primary"
+                                onClick={() => setRequestRevision((current) => current + 1)}
+                            >
+                                {t('common.retry')}
+                            </Button>,
+                            <Button key="workspace" href="#/manage">
+                                {t('share.backToWorkspace')}
+                            </Button>,
+                        ]}
+                    />
+                </div>
             </ShareViewStatePage>
         );
     }
