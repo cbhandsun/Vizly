@@ -11,13 +11,14 @@ import { redactSensitiveValue, S3_STORAGE_INPUT_LIMITS } from '@/services/storag
 import {
     isAbortFailure,
     isFormValidationFailure,
+    getFirstInvalidFieldName,
     S3_CONNECTION_TIMEOUT_MS,
 } from './storageConfigPageModel';
 import './StorageConfigPage.css';
 
 const { Title, Paragraph } = Typography;
 
-type ConnectionState = 'not-configured' | 'saved' | 'dirty' | 'testing' | 'verified' | 'failed';
+type ConnectionState = 'not-configured' | 'saved' | 'dirty' | 'invalid' | 'testing' | 'verified' | 'failed';
 
 const StorageConfigPage: React.FC = () => {
     const { t } = useTranslation();
@@ -28,6 +29,7 @@ const StorageConfigPage: React.FC = () => {
         storageService.getConfig() ? 'saved' : 'not-configured',
     );
     const testControllerRef = useRef<AbortController | null>(null);
+    const validationFocusFrameRef = useRef<number | null>(null);
     const mountedRef = useRef(true);
     const navigate = useNavigate();
 
@@ -40,6 +42,10 @@ const StorageConfigPage: React.FC = () => {
 
         return () => {
             mountedRef.current = false;
+            if (validationFocusFrameRef.current !== null) {
+                window.cancelAnimationFrame(validationFocusFrameRef.current);
+                validationFocusFrameRef.current = null;
+            }
             testControllerRef.current?.abort();
             testControllerRef.current = null;
         };
@@ -59,6 +65,22 @@ const StorageConfigPage: React.FC = () => {
         }
     };
 
+    const handleValidationFailure = (error: unknown) => {
+        setConnectionState('invalid');
+        const fieldName = getFirstInvalidFieldName(error);
+        if (!fieldName) return;
+
+        if (validationFocusFrameRef.current !== null) {
+            window.cancelAnimationFrame(validationFocusFrameRef.current);
+        }
+        validationFocusFrameRef.current = window.requestAnimationFrame(() => {
+            validationFocusFrameRef.current = null;
+            if (mountedRef.current) {
+                form.scrollToField(fieldName, { block: 'center', focus: true });
+            }
+        });
+    };
+
     const handleTestConnection = async () => {
         if (loading || testing) return;
 
@@ -67,7 +89,7 @@ const StorageConfigPage: React.FC = () => {
             values = await form.validateFields();
         } catch (error: unknown) {
             if (isFormValidationFailure(error)) {
-                setConnectionState('dirty');
+                handleValidationFailure(error);
                 return;
             }
             safeLog.error('S3 configuration validation failed', redactSensitiveValue(error));
@@ -149,6 +171,7 @@ const StorageConfigPage: React.FC = () => {
         'not-configured': { type: 'info', message: t('storageConfig.status.notConfigured') },
         saved: { type: 'info', message: t('storageConfig.status.saved') },
         dirty: { type: 'warning', message: t('storageConfig.status.dirty') },
+        invalid: { type: 'error', message: t('storageConfig.status.invalid') },
         testing: { type: 'info', message: t('storageConfig.status.testing') },
         verified: { type: 'success', message: t('storageConfig.status.verified') },
         failed: { type: 'error', message: t('storageConfig.status.failed') },
@@ -180,7 +203,7 @@ const StorageConfigPage: React.FC = () => {
                         className="storage-config-status"
                         type={statusCopy[connectionState].type}
                         showIcon
-                        message={statusCopy[connectionState].message}
+                        title={statusCopy[connectionState].message}
                         aria-live="polite"
                     />
                 </div>
@@ -195,6 +218,7 @@ const StorageConfigPage: React.FC = () => {
                         form={form}
                         layout="vertical"
                         onFinish={onFinish}
+                        onFinishFailed={handleValidationFailure}
                         onValuesChange={() => setConnectionState('dirty')}
                         initialValues={{ s3ForcePathStyle: true, region: 'us-east-1' }}
                     >

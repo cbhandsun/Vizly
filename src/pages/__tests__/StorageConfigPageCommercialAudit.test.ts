@@ -10,6 +10,9 @@ describe('storage configuration commercial safeguards', () => {
         expect(source).toContain('<button');
         expect(source).toContain('className="storage-config-brand"');
         expect(source).toContain('aria-live="polite"');
+        expect(source).toContain('onFinishFailed={handleValidationFailure}');
+        expect(source).toContain("form.scrollToField(fieldName, { block: 'center', focus: true })");
+        expect(source).toContain("invalid: { type: 'error'");
         expect(source).toContain('new AbortController()');
         expect(source).toContain('storageService.testConnection(values, controller.signal)');
         expect(source).toContain('disabled={testing}');

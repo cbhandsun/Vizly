@@ -2694,6 +2694,7 @@
             "notConfigured": "No storage configuration has been saved",
             "saved": "Configuration saved; test the connection before use",
             "dirty": "Configuration has unsaved or unverified changes",
+            "invalid": "Review the highlighted fields before saving or testing",
             "testing": "Testing the connection...",
             "verified": "Connection verified",
             "failed": "Connection or save failed; review the configuration"
