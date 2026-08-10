@@ -4,7 +4,10 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('react-i18next', () => ({
     useTranslation: () => ({
-        t: (key: string, fallback?: string) => typeof fallback === 'string' ? fallback : key,
+        t: (key: string, fallback?: string) => ({
+            'common.off': 'Off',
+            'common.on': 'On',
+        }[key] ?? (typeof fallback === 'string' ? fallback : key)),
     }),
 }));
 
@@ -19,7 +22,7 @@ describe('FlowchartCanvasSettingsContent', () => {
 
         render(
             <FlowchartCanvasSettingsContent
-                gridInfo={{ title: 'Grid: Lines', icon: <span>grid icon</span> }}
+                gridInfo={{ title: 'Grid: Lines', icon: <span data-testid="grid-lines-icon">grid icon</span>, stateLabel: 'Lines' }}
                 onShowShortcuts={onShowShortcuts}
                 showGrid
                 showMinimap
@@ -38,6 +41,10 @@ describe('FlowchartCanvasSettingsContent', () => {
         expect(minimap.getAttribute('aria-pressed')).toBe('true');
         expect(ruler.getAttribute('aria-pressed')).toBe('false');
         expect(grid.getAttribute('aria-pressed')).toBe('true');
+        expect(screen.getByTestId('grid-lines-icon')).toBeTruthy();
+        expect(screen.getByText('Lines')).toBeTruthy();
+        expect(screen.getByText('Off')).toBeTruthy();
+        expect(screen.getAllByText('On')).toHaveLength(1);
         for (const button of [minimap, ruler, grid, shortcuts]) {
             expect(button.style.minHeight).toBe('var(--commercial-touch-target, 44px)');
         }
@@ -50,5 +57,23 @@ describe('FlowchartCanvasSettingsContent', () => {
         expect(toggleRuler).toHaveBeenCalledTimes(1);
         expect(toggleGrid).toHaveBeenCalledTimes(1);
         expect(onShowShortcuts).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows the explicit off state and matching icon for a disabled grid', () => {
+        render(
+            <FlowchartCanvasSettingsContent
+                gridInfo={{ title: 'Grid: Off', icon: <span data-testid="grid-off-icon">off icon</span>, stateLabel: 'Off' }}
+                onShowShortcuts={vi.fn()}
+                showGrid={false}
+                showRuler={false}
+                toggleGrid={vi.fn()}
+                toggleRuler={vi.fn()}
+            />,
+        );
+
+        const grid = screen.getByRole('button', { name: 'Grid: Off' });
+        expect(grid.getAttribute('aria-pressed')).toBe('false');
+        expect(screen.getByTestId('grid-off-icon')).toBeTruthy();
+        expect(screen.getAllByText('Off').length).toBeGreaterThanOrEqual(2);
     });
 });

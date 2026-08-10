@@ -137,6 +137,51 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
         expect(screen.getByRole('button', { name: /思维导图 \(Shift\+M\)/ })).toBeTruthy();
     });
 
+    it('exposes desktop canvas helper states and the settings disclosure state', async () => {
+        Object.defineProperty(window, 'matchMedia', {
+            configurable: true,
+            value: vi.fn().mockImplementation((query: string) => ({
+                matches: query.includes('min-width: 768px'),
+                media: query,
+                onchange: null,
+                addListener: vi.fn(),
+                removeListener: vi.fn(),
+                addEventListener: vi.fn(),
+                removeEventListener: vi.fn(),
+                dispatchEvent: vi.fn(),
+            })),
+        });
+
+        render(
+            <ModernFlowchartToolbar
+                canUndo={false}
+                canRedo={false}
+                onUndo={vi.fn()}
+                onRedo={vi.fn()}
+                onZoomIn={vi.fn()}
+                onZoomOut={vi.fn()}
+                onFitView={vi.fn()}
+                autoRouting={false}
+                toggleAutoRouting={vi.fn()}
+                showGrid
+                toggleGrid={vi.fn()}
+                onShowShortcuts={vi.fn()}
+                showRuler={false}
+                toggleRuler={vi.fn()}
+                snapToGrid
+                onToggleSnap={vi.fn()}
+            />,
+        );
+
+        const snap = await screen.findByRole('button', { name: /snapOn/i });
+        expect(snap.getAttribute('aria-pressed')).toBe('true');
+
+        const settings = screen.getByRole('button', { name: '画布设置' });
+        expect(settings.getAttribute('aria-expanded')).toBe('false');
+        fireEvent.click(settings);
+        await waitFor(() => expect(settings.getAttribute('aria-expanded')).toBe('true'));
+    });
+
     it('keeps the file-actions trigger available when the desktop breakpoint is absent', async () => {
         const onImportClick = vi.fn();
 

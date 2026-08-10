@@ -1,14 +1,14 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { Button } from 'antd';
 import { useTranslation } from 'react-i18next';
-import { FaKeyboard, FaMap, FaRuler, FaTh } from 'react-icons/fa';
+import { FaKeyboard, FaMap, FaRuler } from 'react-icons/fa';
 
 const COMMERCIAL_TOUCH_ROW_STYLE: CSSProperties = {
     minHeight: 'var(--commercial-touch-target, 44px)',
 };
 
 interface FlowchartCanvasSettingsContentProps {
-    gridInfo: { title: string; icon: ReactNode };
+    gridInfo: { title: string; icon: ReactNode; stateLabel: string };
     onShowShortcuts: () => void;
     showGrid: boolean;
     showMinimap?: boolean;
@@ -29,11 +29,19 @@ export function FlowchartCanvasSettingsContent({
     toggleRuler,
 }: FlowchartCanvasSettingsContentProps) {
     const { t } = useTranslation();
+    const onLabel = t('common.on', '开启');
+    const offLabel = t('common.off', '关闭');
     const stateDot = (active: boolean) => (
         <span
             aria-hidden="true"
             className={`w-2 h-2 rounded-full ${active ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-slate-300 dark:bg-slate-700'}`}
         />
+    );
+    const stateIndicator = (active: boolean, label: string) => (
+        <span className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+            <span>{label}</span>
+            {stateDot(active)}
+        </span>
     );
 
     return (
@@ -55,7 +63,7 @@ export function FlowchartCanvasSettingsContent({
                     <span className="flex items-center gap-2 text-[13px] text-slate-600 dark:text-slate-300">
                         <FaMap className="text-[14px]" /> {t('designer.toolbar.minimap', '小地图')}
                     </span>
-                    {stateDot(Boolean(showMinimap))}
+                    {stateIndicator(Boolean(showMinimap), showMinimap ? onLabel : offLabel)}
                 </Button>
                 <Button
                     type="text"
@@ -69,7 +77,7 @@ export function FlowchartCanvasSettingsContent({
                     <span className="flex items-center gap-2 text-[13px] text-slate-600 dark:text-slate-300">
                         <FaRuler className="text-[14px]" /> {t('designer.toolbar.ruler', '标尺')}
                     </span>
-                    {stateDot(showRuler)}
+                    {stateIndicator(showRuler, showRuler ? onLabel : offLabel)}
                 </Button>
                 <Button
                     type="text"
@@ -81,9 +89,10 @@ export function FlowchartCanvasSettingsContent({
                     onClick={toggleGrid}
                 >
                     <span className="flex items-center gap-2 text-[13px] text-slate-600 dark:text-slate-300">
-                        <FaTh className="text-[14px]" /> {t('designer.toolbar.grid', '网格')}
+                        <span aria-hidden="true" className="text-[14px]">{gridInfo.icon}</span>
+                        {t('designer.toolbar.grid', '网格')}
                     </span>
-                    {stateDot(showGrid)}
+                    {stateIndicator(showGrid, gridInfo.stateLabel)}
                 </Button>
                 <div className="h-[1px] bg-slate-100 dark:bg-white/5 my-1" />
                 <Button

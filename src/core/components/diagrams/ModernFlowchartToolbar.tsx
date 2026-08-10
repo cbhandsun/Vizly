@@ -211,12 +211,32 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
         : { minWidth: 38, width: 'auto', paddingInline: 4 };
 
     const gridInfo = useMemo(() => {
-        if (!showGrid) return { title: t('designer.toolbar.gridOff'), icon: <FaBorderNone /> };
+        if (!showGrid) return {
+            title: t('designer.toolbar.gridOff'),
+            stateLabel: t('common.off'),
+            icon: <FaBorderNone />,
+        };
         switch (gridVariant) {
-            case BackgroundVariant.Dots: return { title: t('designer.toolbar.gridDots'), icon: <FaTh /> };
-            case BackgroundVariant.Lines: return { title: t('designer.toolbar.gridLines'), icon: <FaBorderAll /> };
-            case BackgroundVariant.Cross: return { title: t('designer.toolbar.gridCross'), icon: <FaTh style={{ transform: 'rotate(45deg)' }} /> };
-            default: return { title: t('designer.toolbar.showGrid'), icon: <FaTh /> };
+            case BackgroundVariant.Dots: return {
+                title: t('designer.toolbar.gridDots'),
+                stateLabel: t('designer.toolbar.gridStateDots', '点状'),
+                icon: <FaTh />,
+            };
+            case BackgroundVariant.Lines: return {
+                title: t('designer.toolbar.gridLines'),
+                stateLabel: t('designer.toolbar.gridStateLines', '线状'),
+                icon: <FaBorderAll />,
+            };
+            case BackgroundVariant.Cross: return {
+                title: t('designer.toolbar.gridCross'),
+                stateLabel: t('designer.toolbar.gridStateCross', '交叉'),
+                icon: <FaTh style={{ transform: 'rotate(45deg)' }} />,
+            };
+            default: return {
+                title: t('designer.toolbar.showGrid'),
+                stateLabel: t('common.on'),
+                icon: <FaTh />,
+            };
         }
     }, [showGrid, gridVariant, t]);
 
@@ -561,6 +581,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                             <Button
                                 type="text"
                                 aria-label={snapToGrid ? t('designer.toolbar.snapOn') : t('designer.toolbar.snapOff')}
+                                aria-pressed={Boolean(snapToGrid)}
                                 onClick={onToggleSnap}
                                 icon={<FaMagnet className="text-[13px]" />}
                                 className={snapToGrid ? tbtnActive : tbtn}
@@ -581,6 +602,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                                 ref={canvasSettingsTriggerRef}
                                 type="text"
                                 aria-label={t('designer.toolbar.canvasSettings', '画布设置')}
+                                aria-expanded={canvasSettingsOpen}
                                 icon={
                                     <div className="relative">
                                         <FaBorderAll className="text-[13px]" />
@@ -589,7 +611,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                                         )}
                                     </div>
                                 }
-                                className={tbtn}
+                                className={canvasSettingsOpen ? tbtnActive : tbtn}
                             />
                         </Tooltip>
                     </Popover>
