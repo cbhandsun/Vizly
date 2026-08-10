@@ -55,6 +55,9 @@ describe('CommandPalette commercial interaction contract', () => {
     expect(search.getAttribute('aria-expanded')).toBe('true');
     expect(search.getAttribute('aria-autocomplete')).toBe('list');
     expect(search.getAttribute('aria-controls')).toBe('command-palette-results');
+    expect(search.getAttribute('aria-keyshortcuts')).toBe(
+      'ArrowDown ArrowUp Home End Enter Control+Enter Meta+Enter Escape ?',
+    );
     expect(search.style.minHeight).toBe('var(--commercial-touch-target, 44px)');
 
     const close = screen.getByRole('button', { name: 'Close' });
@@ -173,6 +176,56 @@ describe('CommandPalette commercial interaction contract', () => {
     expect(onSelect).toHaveBeenCalledTimes(1);
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['Control', { ctrlKey: true }],
+    ['Meta', { metaKey: true }],
+  ] as const)('runs the secondary action with %s+Enter', async (_modifier, keyboardState) => {
+    const onClose = vi.fn();
+    const onSelect = vi.fn();
+    const onAltSelect = vi.fn();
+    render(
+      <CommandPalette
+        open
+        onClose={onClose}
+        items={[{
+          id: 'op:test',
+          group: 'actions',
+          title: 'Run test',
+          onSelect,
+          onAltSelect,
+        }]}
+      />,
+    );
+
+    const search = await screen.findByRole('combobox', { name: 'Search commands or diagrams' });
+    fireEvent.keyDown(search, { key: 'Enter', ...keyboardState });
+
+    expect(onAltSelect).toHaveBeenCalledTimes(1);
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('runs the shortcuts command from the declared question-mark shortcut', async () => {
+    const onClose = vi.fn();
+    const showShortcuts = vi.fn();
+    render(
+      <CommandPalette
+        open
+        onClose={onClose}
+        items={[
+          { id: 'op:test', group: 'actions', title: 'Run test', onSelect: vi.fn() },
+          { id: 'op:shortcuts', group: 'actions', title: 'Show shortcuts', onSelect: showShortcuts },
+        ]}
+      />,
+    );
+
+    const search = await screen.findByRole('combobox', { name: 'Search commands or diagrams' });
+    fireEvent.keyDown(search, { key: '?' });
+
+    expect(showShortcuts).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
 
