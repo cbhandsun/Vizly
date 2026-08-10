@@ -3,9 +3,10 @@
 import { act, renderHook } from '@testing-library/react';
 import type { Edge, Node } from '@xyflow/react';
 import type { SetStateAction } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { useDiagramActions } from '../useDiagramActions';
+import { scheduleFlowchartEmptyStateFocus } from '../../flowchartDeletionFocus';
 
 vi.mock('react-i18next', () => ({
     useTranslation: () => ({
@@ -27,7 +28,87 @@ const node = (id: string, selected = false): Node => ({
     selected,
 });
 
+afterEach(() => {
+    vi.restoreAllMocks();
+});
+
 describe('useDiagramActions explicit selection targets', () => {
+    it('retries empty-state focus for one render frame and supports cancellation', () => {
+        const animationFrames: FrameRequestCallback[] = [];
+        const cancelledFrames = new Set<number>();
+        vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => {
+            animationFrames.push(callback);
+            return animationFrames.length;
+        });
+        vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(frameId => {
+            cancelledFrames.add(frameId);
+        });
+
+        const scheduled = scheduleFlowchartEmptyStateFocus(document);
+        expect(scheduled).not.toBeNull();
+        act(() => animationFrames[0](0));
+        expect(animationFrames).toHaveLength(2);
+
+        scheduled?.cancel();
+        expect(cancelledFrames).toContain(2);
+        const action = document.createElement('button');
+        action.className = 'flowchart-empty-action';
+        document.body.append(action);
+        act(() => animationFrames[1](16));
+        expect(document.activeElement).not.toBe(action);
+        action.remove();
+    });
+
+    it('moves focus to the empty-state action after deleting the final node', async () => {
+        const animationFrames: FrameRequestCallback[] = [];
+        vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => {
+            animationFrames.push(callback);
+            return animationFrames.length;
+        });
+        const targetNode = node('node-1', true);
+        const { result } = renderHook(() => useDiagramActions({
+            nodes: [targetNode],
+            edges: [],
+            setNodes: vi.fn(),
+            setEdges: vi.fn(),
+            selectedNodes: [targetNode],
+            selectedEdges: [],
+            takeSnapshot: vi.fn(),
+            reactFlowInstance: null,
+        }));
+
+        await act(async () => result.current.handleDelete());
+        expect(animationFrames).toHaveLength(1);
+
+        const action = document.createElement('button');
+        action.className = 'flowchart-empty-action';
+        document.body.append(action);
+        act(() => animationFrames[0](0));
+
+        expect(document.activeElement).toBe(action);
+        action.remove();
+    });
+
+    it('keeps the existing focus context when deletion leaves another node', async () => {
+        const requestAnimationFrameSpy = vi.spyOn(window, 'requestAnimationFrame');
+        const targetNode = node('node-1', true);
+        const remainingNode = node('node-2');
+        const { result } = renderHook(() => useDiagramActions({
+            nodes: [targetNode, remainingNode],
+            edges: [],
+            setNodes: vi.fn(),
+            setEdges: vi.fn(),
+            selectedNodes: [targetNode],
+            selectedEdges: [],
+            takeSnapshot: vi.fn(),
+            reactFlowInstance: null,
+        }));
+
+        await act(async () => result.current.handleDelete());
+
+        expect(requestAnimationFrameSpy).not.toHaveBeenCalled();
+    });
+
     it('records a meaningful pre-operation label before duplicating nodes', () => {
         const takeSnapshot = vi.fn();
         const targetNode = node('node-1');

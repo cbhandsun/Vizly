@@ -22,6 +22,7 @@ import {
     shouldFocusEditableEdge,
 } from '../edgeEditingViewport';
 import { buildDiagramSelectionDuplicate } from '../diagramSelectionDuplication';
+import { scheduleFlowchartEmptyStateFocus } from '../flowchartDeletionFocus';
 
 type AlignmentType = 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom';
 type DistributionType = 'horizontal' | 'vertical';
@@ -181,6 +182,9 @@ export const useDiagramActions = ({
                 !nodeIdsToDelete.has(e.source) &&
                 !nodeIdsToDelete.has(e.target)
             ));
+            const removedFinalNode = nodeIdsToDelete.size > 0
+                && currentNodes.every(node => nodeIdsToDelete.has(node.id));
+            if (removedFinalNode) scheduleFlowchartEmptyStateFocus();
         }
     }, [nodes, edges, nodesRef, edgesRef, selectedNodes, selectedEdges, setNodes, setEdges, takeSnapshot, activePlugin, pluginCtx, t]);
 
