@@ -17,6 +17,11 @@ interface LanguageSwitcherProps {
     ariaLabel?: string;
 }
 
+const LANGUAGE_OPTIONS = [
+    { key: 'en', languageLabel: 'English', visualCode: 'EN' },
+    { key: 'zh', languageLabel: '简体中文', visualCode: 'ZH' },
+] as const;
+
 export const LanguageSwitcher: React.FC<LanguageSwitcherProps> = ({ variant = 'select', className, ariaLabel }) => {
     const { i18n, t } = useTranslation();
     const currentLanguage = i18n.resolvedLanguage || i18n.language;
@@ -75,13 +80,8 @@ export const LanguageSwitcher: React.FC<LanguageSwitcherProps> = ({ variant = 's
         }
     };
 
-    const options = [
-        { key: 'en', languageLabel: 'English', flag: '🇬🇧' },
-        { key: 'zh', languageLabel: '中文', flag: '🇨🇳' },
-    ];
-
     if (variant === 'icon') {
-        const currentOption = options.find(option => option.key === selectedLanguage) ?? options[0];
+        const currentOption = LANGUAGE_OPTIONS.find(option => option.key === selectedLanguage) ?? LANGUAGE_OPTIONS[0];
         const triggerLabel = `${languageLabel}: ${currentOption.languageLabel}`;
 
         return (
@@ -89,13 +89,18 @@ export const LanguageSwitcher: React.FC<LanguageSwitcherProps> = ({ variant = 's
                 menu={{
                     id: menuId,
                     'aria-label': languageLabel,
-                    items: options.map(option => ({
+                    items: LANGUAGE_OPTIONS.map(option => ({
                         key: option.key,
                         role: 'menuitemradio',
                         'aria-checked': option.key === selectedLanguage,
                         label: (
                             <div className="flex items-center gap-2">
-                                <span aria-hidden="true">{option.flag}</span>
+                                <span
+                                    aria-hidden="true"
+                                    className="inline-flex min-w-5 justify-center font-mono text-[11px] font-semibold tracking-wide text-slate-500 dark:text-slate-400"
+                                >
+                                    {option.visualCode}
+                                </span>
                                 {option.languageLabel}
                             </div>
                         ),
@@ -137,11 +142,16 @@ export const LanguageSwitcher: React.FC<LanguageSwitcherProps> = ({ variant = 's
             popupMatchSelectWidth={false}
             styles={{ popup: { root: { borderRadius: '8px', padding: '4px' } } }}
             getPopupContainer={(triggerNode) => (document.fullscreenElement as HTMLElement) || triggerNode.parentNode || document.body}
-            options={options.map(option => ({
+            options={LANGUAGE_OPTIONS.map(option => ({
                 value: option.key,
                 label: (
                     <div className="flex items-center gap-2">
-                        <span aria-hidden="true">{option.flag}</span>
+                        <span
+                            aria-hidden="true"
+                            className="inline-flex min-w-5 justify-center font-mono text-[11px] font-semibold tracking-wide text-slate-500 dark:text-slate-400"
+                        >
+                            {option.visualCode}
+                        </span>
                         {option.languageLabel}
                     </div>
                 ),

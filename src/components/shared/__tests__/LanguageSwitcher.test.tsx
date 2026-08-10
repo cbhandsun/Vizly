@@ -122,7 +122,12 @@ describe('LanguageSwitcher', () => {
 
     const trigger = screen.getByRole('button', { name: 'Language: English' });
     fireEvent.click(trigger);
-    fireEvent.click(screen.getByRole('menuitemradio', { name: '中文' }));
+    const chineseOption = screen.getByRole('menuitemradio', { name: '简体中文' });
+    expect(chineseOption.textContent).toBe('ZH简体中文');
+    expect(screen.getByRole('menuitemradio', { name: 'English' }).textContent).toBe('ENEnglish');
+    expect(document.body.textContent).not.toContain('🇬🇧');
+    expect(document.body.textContent).not.toContain('🇨🇳');
+    fireEvent.click(chineseOption);
 
     expect(languageState.changeLanguage).toHaveBeenCalledWith('zh');
     expect(languageState.set).toHaveBeenCalledWith('i18n.language', 'zh', 'user');
