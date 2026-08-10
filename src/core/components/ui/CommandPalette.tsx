@@ -7,9 +7,10 @@ import { theme } from 'antd';
 import type { InputRef } from 'antd';
 import Button from 'antd/es/button';
 import { useTranslation } from 'react-i18next';
-import { FaTimes } from 'react-icons/fa';
+import { FaEraser, FaTimes } from 'react-icons/fa';
 
 import type { CommandGroup, CommandItem } from '../../types/plugin';
+import './CommandPalette.css';
 import {
   bumpCommandUsage,
   bumpRecentCommandId,
@@ -26,6 +27,7 @@ interface CommandPaletteProps {
 
 const GROUP_WEIGHT: Record<CommandGroup, number> = { favorites: 240, recent: 200, actions: 120, diagrams: 10 };
 const GROUP_ORDER: CommandGroup[] = ['favorites', 'recent', 'actions', 'diagrams'];
+const COMMAND_PALETTE_Z_INDEX = 2200;
 
 export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, onDismiss, items, ...props }) => {
   const { t } = useTranslation();
@@ -247,9 +249,10 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, o
     queueMicrotask(() => inputRef.current?.focus());
   }, []);
 
-  const resultsStatus = flat.length === 0
+  const visibleResultCount = scored.length;
+  const resultsStatus = visibleResultCount === 0
     ? t('designer.commandPalette.noResults')
-    : t('designer.commandPalette.resultsStatus', { count: flat.length });
+    : t('designer.commandPalette.resultsStatus', { count: visibleResultCount });
 
   return (
     <Modal
@@ -260,6 +263,8 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, o
       centered
       closable={false}
       keyboard={false}
+      zIndex={COMMAND_PALETTE_Z_INDEX}
+      wrapClassName="command-palette-modal-wrap"
       focusable={{ focusTriggerAfterClose: false }}
       width={720}
       styles={{
@@ -274,11 +279,12 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, o
           whiteSpace: 'nowrap',
           border: 0,
         },
-        body: { padding: 0 },
+        body: { padding: 0, minHeight: 0 },
       }}
       {...props}
     >
       <div
+        className="command-palette-surface"
         style={{
           padding: 16,
           background: token.colorBgElevated,
@@ -287,8 +293,8 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, o
           borderRadius: 12
         }}
       >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div className="command-palette-layout" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div className="command-palette-search-row" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Input
               ref={inputRef}
               value={query}
@@ -307,16 +313,25 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, o
               placeholder={t('designer.commandPalette.placeholder', { mod: modKeyLabel })}
               size="large"
               autoComplete="off"
-              style={{ minHeight: 'var(--commercial-touch-target, 44px)' }}
+              style={{
+                minWidth: 0,
+                minHeight: 'var(--commercial-touch-target, 44px)',
+                flex: '1 1 auto',
+              }}
             />
             {query && (
               <Button
                 type="text"
+                className="command-palette-clear"
+                aria-label={t('designer.commandPalette.clearSearch')}
+                icon={<FaEraser aria-hidden="true" />}
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={clearQuery}
                 style={{ minHeight: 'var(--commercial-touch-target, 44px)' }}
               >
-                {t('designer.commandPalette.clearSearch')}
+                <span className="command-palette-clear-label">
+                  {t('designer.commandPalette.clearSearch')}
+                </span>
               </Button>
             )}
             <Button
@@ -353,11 +368,12 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, o
           <div
             ref={listViewportRef}
             id="command-palette-results"
+            className="command-palette-list"
             role="listbox"
             aria-label={t('designer.commandPalette.searchAria')}
-            style={{ maxHeight: 420, overflow: 'auto' }}
+            style={{ maxHeight: 420 }}
           >
-            {flat.length === 0 && (
+            {visibleResultCount === 0 && (
               <div style={{ padding: 16 }}>
                 <Typography.Text type="secondary">{t('designer.commandPalette.noResults')}</Typography.Text>
               </div>
@@ -419,9 +435,9 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, o
                           outline: active ? `1px solid ${token.colorPrimaryBorder}` : '1px solid transparent'
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <div className="command-palette-option-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                          <div className="command-palette-option-main" style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                            <span className="command-palette-option-title">
                               {highlight(it.title)}
                             </span>
                             {(it.meta || []).slice(0, 3).map((m) => (
@@ -430,14 +446,14 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, o
                               </Tag>
                             ))}
                           </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: '0 0 auto' }}>
+                          <div className="command-palette-option-meta" style={{ display: 'flex', alignItems: 'center', gap: 10, flex: '0 0 auto' }}>
                             {it.shortcut && (
-                              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                              <Typography.Text className="command-palette-shortcut-hint" type="secondary" style={{ fontSize: 12 }}>
                                 {it.shortcut}
                               </Typography.Text>
                             )}
                             {it.onAltSelect && (
-                              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                              <Typography.Text className="command-palette-shortcut-hint" type="secondary" style={{ fontSize: 12 }}>
                                 {t('designer.commandPalette.openInNewTabHint', { mod: modKeyLabel })}
                               </Typography.Text>
                             )}
@@ -458,8 +474,8 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, o
               </div>
             ))}
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+          <div className="command-palette-footer" style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+            <Typography.Text className="command-palette-desktop-hint" type="secondary" style={{ fontSize: 12 }}>
               {t('designer.commandPalette.footerHint', { mod: modKeyLabel })}
             </Typography.Text>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -475,7 +491,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, o
                   {t('designer.commandPalette.shortcutsHelp')}
                 </Button>
               )}
-              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              <Typography.Text className="command-palette-desktop-hint" type="secondary" style={{ fontSize: 12 }}>
                 {t('designer.commandPalette.toggleHint', { mod: modKeyLabel })}
               </Typography.Text>
             </div>

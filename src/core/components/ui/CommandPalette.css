@@ -1,0 +1,93 @@
+.command-palette-modal-wrap .ant-modal-content {
+  max-height: calc(100vh - 16px);
+  max-height: calc(100dvh - 16px);
+  padding: 0;
+  overflow: hidden;
+}
+
+.command-palette-surface {
+  box-sizing: border-box;
+  height: min(560px, calc(100vh - 16px));
+  height: min(560px, calc(100dvh - 16px));
+  max-height: calc(100vh - 16px);
+  max-height: calc(100dvh - 16px);
+  overflow: hidden;
+}
+
+.command-palette-layout {
+  height: 100%;
+  min-height: 0;
+}
+
+.command-palette-search-row,
+.command-palette-footer {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.command-palette-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.command-palette-option-row,
+.command-palette-option-main {
+  min-width: 0;
+}
+
+.command-palette-option-main {
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+}
+
+.command-palette-option-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.command-palette-option-meta {
+  max-width: 48%;
+}
+
+@media (max-width: 480px) {
+  .command-palette-surface {
+    padding: 12px !important;
+  }
+
+  .command-palette-layout {
+    gap: 8px !important;
+  }
+
+  .command-palette-clear {
+    width: var(--commercial-touch-target, 44px);
+    min-width: var(--commercial-touch-target, 44px);
+    padding-inline: 0;
+  }
+
+  .command-palette-clear-label,
+  .command-palette-desktop-hint,
+  .command-palette-shortcut-hint {
+    display: none;
+  }
+
+  .command-palette-option-title {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .command-palette-option-meta {
+    display: none !important;
+  }
+
+  .command-palette-footer {
+    justify-content: flex-end !important;
+  }
+}

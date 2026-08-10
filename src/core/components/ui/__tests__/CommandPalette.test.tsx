@@ -51,6 +51,10 @@ describe('CommandPalette commercial interaction contract', () => {
     );
 
     expect(await screen.findByRole('dialog', { name: 'Search commands or diagrams' })).toBeTruthy();
+    const dialog = screen.getByRole('dialog', { name: 'Search commands or diagrams' });
+    expect(dialog.closest('.ant-modal-wrap')?.getAttribute('style')).toContain('z-index: 2200');
+    expect(dialog.querySelector('.command-palette-surface')).toBeTruthy();
+    expect(dialog.querySelector('.command-palette-list')).toBeTruthy();
     const search = await screen.findByRole('combobox', { name: 'Search commands or diagrams' });
     expect(search.getAttribute('aria-expanded')).toBe('true');
     expect(search.getAttribute('aria-autocomplete')).toBe('list');
@@ -58,6 +62,8 @@ describe('CommandPalette commercial interaction contract', () => {
     expect(search.getAttribute('aria-keyshortcuts')).toBe(
       'ArrowDown ArrowUp Home End Enter Control+Enter Meta+Enter Escape ?',
     );
+    expect(search.style.minWidth).toBe('0px');
+    expect(search.style.flex).toBe('1 1 auto');
     expect(search.style.minHeight).toBe('var(--commercial-touch-target, 44px)');
 
     const close = screen.getByRole('button', { name: 'Close' });
@@ -107,6 +113,32 @@ describe('CommandPalette commercial interaction contract', () => {
     expect(viewAction).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps disabled matches visible without announcing a false empty result', async () => {
+    render(
+      <CommandPalette
+        open
+        onClose={vi.fn()}
+        items={[
+          {
+            id: 'op:locked',
+            group: 'actions',
+            title: 'Clear canvas',
+            description: 'Canvas locked · Unlock to edit',
+            disabled: true,
+            onSelect: vi.fn(),
+          },
+        ]}
+      />,
+    );
+
+    expect(await screen.findByRole('option', { name: /Clear canvas/ })).toBeTruthy();
+    expect(screen.getByRole('status').textContent).toBe('Matching commands or diagrams');
+    expect(screen.queryByText('No matching commands or diagrams')).toBeNull();
+    expect(
+      screen.getByRole('combobox', { name: 'Search commands or diagrams' }).getAttribute('aria-activedescendant'),
+    ).toBeNull();
+  });
+
   it('supports circular arrow navigation plus Home and End', async () => {
     render(
       <CommandPalette
@@ -147,6 +179,8 @@ describe('CommandPalette commercial interaction contract', () => {
 
     expect(screen.getByRole('status').textContent).toBe('No matching commands or diagrams');
     const clear = screen.getByRole('button', { name: 'Clear search' });
+    expect(clear.classList.contains('command-palette-clear')).toBe(true);
+    expect(clear.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
     fireEvent.click(clear);
 
     expect((search as HTMLInputElement).value).toBe('');
