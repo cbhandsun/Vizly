@@ -6,6 +6,7 @@ import { useKeyboardAccessibleDropdown } from '@/core/components/diagrams/hooks/
 
 interface WorkspaceCardActionsMenuProps {
   activeMenuKey: string | null;
+  disabled?: boolean;
   label: string;
   menuItems: MenuProps['items'];
   menuKey: string;
@@ -17,6 +18,7 @@ interface WorkspaceCardActionsMenuProps {
 
 export const WorkspaceCardActionsMenu = ({
   activeMenuKey,
+  disabled = false,
   label,
   menuItems,
   menuKey,
@@ -40,10 +42,10 @@ export const WorkspaceCardActionsMenu = ({
   });
 
   React.useEffect(() => {
-    if (open && activeMenuKey !== menuKey) {
+    if (open && (disabled || activeMenuKey !== menuKey)) {
       handleOpenChange(false, { source: 'trigger' });
     }
-  }, [activeMenuKey, handleOpenChange, menuKey, open]);
+  }, [activeMenuKey, disabled, handleOpenChange, menuKey, open]);
 
   const assignTriggerRef = React.useCallback((trigger: HTMLButtonElement | null) => {
     triggerRef.current = trigger;
@@ -54,6 +56,7 @@ export const WorkspaceCardActionsMenu = ({
     nextOpen,
     info,
   ) => {
+    if (disabled && nextOpen) return;
     handleOpenChange(nextOpen, info);
     if (!nextOpen && activeMenuKey === menuKey) onActiveMenuChange(null);
   };
@@ -69,6 +72,7 @@ export const WorkspaceCardActionsMenu = ({
       }}
       trigger={['click']}
       placement="bottomRight"
+      disabled={disabled}
       open={open}
       onOpenChange={handleDropdownOpenChange}
       classNames={{ root: overlayClassName }}
@@ -83,6 +87,7 @@ export const WorkspaceCardActionsMenu = ({
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={menuId}
+        disabled={disabled}
       >
         {triggerIcon}
       </button>

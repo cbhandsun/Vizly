@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
 import { WorkspaceDiagramCollection } from '../WorkspaceDiagramCollection';
-import type { FilterViewType, UnifiedDiagramItem } from '../diagramManagementPage.helpers';
+import type { FilterViewType, UnifiedDiagramItem, ViewMode } from '../diagramManagementPage.helpers';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -36,6 +36,7 @@ const renderCollection = (
     viewMode="grid"
     onViewModeChange={() => undefined}
     loading={false}
+    openingDiagramKeys={new Set()}
     onOpenDiagram={() => undefined}
     onOpenDiagramInNewTab={() => undefined}
     onContextMenu={() => undefined}
@@ -46,7 +47,55 @@ const renderCollection = (
   />,
 );
 
+const renderOpeningCollection = (
+  item: UnifiedDiagramItem,
+  viewMode: ViewMode = 'grid',
+): string => renderToStaticMarkup(
+  <WorkspaceDiagramCollection
+    activeView="recent"
+    onActiveViewChange={() => undefined}
+    unifiedItems={[item]}
+    filteredItems={[item]}
+    sortKey="updated"
+    onSortKeyChange={() => undefined}
+    viewMode={viewMode}
+    onViewModeChange={() => undefined}
+    loading={false}
+    openingDiagramKeys={new Set([`${item.source}:${item.id}`])}
+    onOpenDiagram={() => undefined}
+    onOpenDiagramInNewTab={() => undefined}
+    onContextMenu={() => undefined}
+    onDeleteDiagram={() => undefined}
+    onCreateBlank={() => undefined}
+    searchQuery=""
+    onClearSearch={() => undefined}
+  />,
+);
+
 describe('WorkspaceDiagramCollection', () => {
+  it('exposes a visible, non-repeatable busy state while a diagram is opening', () => {
+    const item: UnifiedDiagramItem = {
+      id: 'slow-cloud-diagram',
+      title: 'Slow cloud diagram',
+      updatedAt: 1,
+      source: 's3',
+      role: 'owner',
+      raw: { id: 'slow-cloud-diagram' } as never,
+    };
+
+    const html = renderOpeningCollection(item);
+
+    expect(html).toContain('diagram-card is-opening');
+    expect(html).toContain('aria-busy="true"');
+    expect(html.match(/disabled=""/g)).toHaveLength(2);
+    expect(html).toContain('role="status"');
+    expect(html).toContain('workspace.openingDiagram');
+
+    const listHtml = renderOpeningCollection(item, 'list');
+    expect(listHtml).toContain('diagram-list-row is-opening');
+    expect(listHtml).toContain('diagram-open-pending list');
+  });
+
   it('sanitizes template thumbnail metadata again at the render boundary', () => {
     const item: UnifiedDiagramItem = {
       id: 'template-one',

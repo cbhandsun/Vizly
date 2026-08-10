@@ -41,6 +41,8 @@
         "openInNewTab": "Open in new tab",
         "applyTemplate": "Use template",
         "applyNamedTemplate": "Use template {{title}}",
+        "openingDiagram": "Opening diagram…",
+        "applyingTemplate": "Applying template…",
         "openDiagram": "Open diagram {{title}}",
         "moreActions": "More actions for {{title}}",
         "deleteConfirmTitle": "Delete diagram?",

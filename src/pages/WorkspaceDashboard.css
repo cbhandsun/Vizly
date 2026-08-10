@@ -1348,6 +1348,56 @@ html[data-theme='dark'] .diagram-context-menu {
   outline: none;
 }
 
+.diagram-card.is-opening,
+.diagram-list-row.is-opening {
+  cursor: wait;
+}
+
+.diagram-card.is-opening .diagram-card-actions,
+.diagram-list-row.is-opening .diagram-card-actions {
+  pointer-events: none;
+  opacity: 0.45;
+}
+
+.diagram-open-pending {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #fff;
+  background: rgba(15, 23, 42, 0.62);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  font-size: 13px;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.diagram-open-pending.list {
+  inset: 4px 52px 4px auto;
+  min-width: 148px;
+  padding: 0 14px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--vz-surface-solid) 92%, transparent);
+  color: var(--vz-text-primary);
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.12);
+}
+
+.diagram-open-pending svg {
+  animation: workspaceOpenSpin 0.8s linear infinite;
+}
+
+@keyframes workspaceOpenSpin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .diagram-open-pending svg { animation: none; }
+}
+
 .workspace-empty-state.is-recoverable-result {
   border-style: solid;
   border-color: rgba(99, 102, 241, 0.16);

@@ -41,6 +41,8 @@
         "openInNewTab": "在新标签页打开",
         "applyTemplate": "使用模板",
         "applyNamedTemplate": "使用模板 {{title}}",
+        "openingDiagram": "正在打开图表…",
+        "applyingTemplate": "正在应用模板…",
         "openDiagram": "打开图表 {{title}}",
         "moreActions": "{{title}} 的更多操作",
         "deleteConfirmTitle": "删除图表？",

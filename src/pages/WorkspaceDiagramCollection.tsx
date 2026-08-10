@@ -14,6 +14,7 @@ import {
   Ellipsis,
   Laptop,
   LayoutGrid,
+  LoaderCircle,
   List,
   Share2,
   Trash2,
@@ -37,6 +38,7 @@ import { DiagramCardSkeleton } from './DiagramCardSkeleton';
 import { WorkspaceCardActionsMenu } from './WorkspaceCardActionsMenu';
 import { WorkspaceEmptyState } from './WorkspaceEmptyState';
 import { focusWorkspaceTarget } from './workspaceMenuInteraction';
+import { getWorkspaceDiagramOpenKey } from './workspaceDiagramOpenState';
 
 const RemoteDiagramCover = React.lazy(() => import('@/components/shared/RemoteDiagramCover'));
 const LocalDiagramCover = React.lazy(() => import('./LocalDiagramCover'));
@@ -64,6 +66,7 @@ interface WorkspaceDiagramCollectionProps {
   viewMode: ViewMode;
   onViewModeChange: (viewMode: ViewMode) => void;
   loading: boolean;
+  openingDiagramKeys: ReadonlySet<string>;
   onOpenDiagram: (item: UnifiedDiagramItem) => void | Promise<void>;
   onOpenDiagramInNewTab: (item: UnifiedDiagramItem) => void;
   onContextMenu: (event: React.MouseEvent, item: UnifiedDiagramItem) => void;
@@ -104,6 +107,7 @@ export const WorkspaceDiagramCollection = ({
   viewMode,
   onViewModeChange,
   loading,
+  openingDiagramKeys,
   onOpenDiagram,
   onOpenDiagramInNewTab,
   onContextMenu,
@@ -326,15 +330,32 @@ export const WorkspaceDiagramCollection = ({
                                 const diagramType = detectDiagramType(item);
                                 const nodeCount = getNodeCount(item);
                                 const cardMenuKey = getCardMenuKey(item);
+                                const openKey = getWorkspaceDiagramOpenKey(item);
+                                const isOpening = openKey ? openingDiagramKeys.has(openKey) : false;
+                                const pendingLabel = isTemplateItem(item)
+                                    ? t('workspace.applyingTemplate')
+                                    : t('workspace.openingDiagram');
 
                                 if (viewMode === 'list') {
                                     return (
-                                        <article className="diagram-list-row" key={item.id} onContextMenu={(e) => onContextMenu(e, item)}>
+                                        <article
+                                            className={`diagram-list-row${isOpening ? ' is-opening' : ''}`}
+                                            key={item.id}
+                                            onContextMenu={(e) => {
+                                                if (isOpening) {
+                                                    e.preventDefault();
+                                                    return;
+                                                }
+                                                onContextMenu(e, item);
+                                            }}
+                                        >
                                             <button
                                                 type="button"
                                                 className="diagram-list-primary-action"
                                                 onClick={() => onOpenDiagram(item)}
                                                 aria-label={t('workspace.openDiagram', { title: item.title })}
+                                                aria-busy={isOpening || undefined}
+                                                disabled={isOpening}
                                             />
                                             <div className={`list-row-icon type-${diagramType}`}>
                                                 {TYPE_ICON_MAP[diagramType] || TYPE_ICON_MAP.default}
@@ -345,9 +366,10 @@ export const WorkspaceDiagramCollection = ({
                                             {nodeCount != null && (
                                                 <span className="node-count-chip"><Boxes size={14} strokeWidth={2} /> {nodeCount}</span>
                                             )}
-                                            <div className="diagram-card-actions" style={{ position: 'relative', opacity: 1 }}>
+                                            <div className="diagram-card-actions" style={{ position: 'relative', opacity: isOpening ? 0.45 : 1 }}>
                                                 <WorkspaceCardActionsMenu
                                                     activeMenuKey={openCardMenuKey}
+                                                    disabled={isOpening}
                                                     label={t('workspace.moreActions', { title: item.title })}
                                                     menuItems={getCardMenu(item)}
                                                     menuKey={cardMenuKey}
@@ -357,13 +379,25 @@ export const WorkspaceDiagramCollection = ({
                                                     triggerIcon={<Ellipsis size={16} strokeWidth={2} />}
                                                 />
                                             </div>
+                                            {isOpening ? (
+                                                <div className="diagram-open-pending list" role="status">
+                                                    <LoaderCircle size={16} strokeWidth={2} aria-hidden="true" />
+                                                    <span>{pendingLabel}</span>
+                                                </div>
+                                            ) : null}
                                         </article>
                                     );
                                 }
 
                                 return (
-                                    <article className="diagram-card" key={item.id}
-                                        onContextMenu={(e) => onContextMenu(e, item)}
+                                    <article className={`diagram-card${isOpening ? ' is-opening' : ''}`} key={item.id}
+                                        onContextMenu={(e) => {
+                                            if (isOpening) {
+                                                e.preventDefault();
+                                                return;
+                                            }
+                                            onContextMenu(e, item);
+                                        }}
                                     >
                                         <button
                                             type="button"
@@ -372,7 +406,15 @@ export const WorkspaceDiagramCollection = ({
                                             aria-label={isTemplateItem(item)
                                                 ? t('workspace.applyNamedTemplate', { title: item.title })
                                                 : t('workspace.openDiagram', { title: item.title })}
+                                            aria-busy={isOpening || undefined}
+                                            disabled={isOpening}
                                         />
+                                        {isOpening ? (
+                                            <div className="diagram-open-pending" role="status">
+                                                <LoaderCircle size={18} strokeWidth={2} aria-hidden="true" />
+                                                <span>{pendingLabel}</span>
+                                            </div>
+                                        ) : null}
                                         {/* Source badge */}
                                         {item.source !== 'local' && (
                                             <div className={`source-badge ${item.source}`}>
@@ -388,6 +430,7 @@ export const WorkspaceDiagramCollection = ({
                                         <div className="diagram-card-actions">
                                             <WorkspaceCardActionsMenu
                                                 activeMenuKey={openCardMenuKey}
+                                                disabled={isOpening}
                                                 label={t('workspace.moreActions', { title: item.title })}
                                                 menuItems={getCardMenu(item)}
                                                 menuKey={cardMenuKey}

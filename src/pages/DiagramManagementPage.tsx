@@ -32,6 +32,10 @@ import { createWorkspaceSettingsMenu } from './workspaceSettingsMenu';
 import { useWorkspaceSearch } from './useWorkspaceSearch';
 import { focusWorkspaceTarget } from './workspaceMenuInteraction';
 import { scheduleWorkspaceRouteFocus } from './workspaceRouteFocus';
+import {
+    beginWorkspaceDiagramOpen,
+    finishWorkspaceDiagramOpen,
+} from './workspaceDiagramOpenState';
 
 const AuthModal = React.lazy(() => import('@/components/auth/AuthModal').then(module => ({
     default: module.AuthModal,
@@ -55,6 +59,7 @@ const WorkspaceDashboardPage: React.FC = () => {
     const { searchTerm, searchQuery, searchInputRef, updateSearchTerm, clearSearch } = useWorkspaceSearch();
     const [viewMode, setViewMode] = useState<ViewMode>('grid');
     const [sortKey, setSortKey] = useState<SortKey>('updated');
+    const [openingDiagramKeys, setOpeningDiagramKeys] = useState<ReadonlySet<string>>(() => new Set());
     
     const [unifiedItems, setUnifiedItems] = useState<UnifiedDiagramItem[]>([]);
     const [cloudProvider] = useState<ManageStorageProvider>(() => {
@@ -72,6 +77,7 @@ const WorkspaceDashboardPage: React.FC = () => {
     const workspaceMainRef = useRef<HTMLElement>(null);
     const settingsTriggerRef = useRef<HTMLButtonElement>(null);
     const authReturnFocusTargetRef = useRef<HTMLElement | null>(null);
+    const openingDiagramKeysRef = useRef(new Set<string>());
 
     useEffect(() => scheduleWorkspaceRouteFocus(() => workspaceMainRef.current), []);
 
@@ -157,6 +163,16 @@ const WorkspaceDashboardPage: React.FC = () => {
 
     // --- Actions ---
     const handleOpenDiagram = async (item: UnifiedDiagramItem) => {
+        const openStart = beginWorkspaceDiagramOpen(openingDiagramKeysRef.current, item);
+        if (openStart.kind === 'duplicate') return;
+        if (openStart.kind === 'started') {
+            setOpeningDiagramKeys(new Set(openingDiagramKeysRef.current));
+        }
+        const releaseOpenState = () => {
+            if (finishWorkspaceDiagramOpen(openingDiagramKeysRef.current, openStart)) {
+                setOpeningDiagramKeys(new Set(openingDiagramKeysRef.current));
+            }
+        };
         const isTemplate = item.source === 'template' || item.source === 'general_template';
         const needsLoadingMessage = item.source !== 'local' && !(item.source === 'supabase' && !user);
         const hide = needsLoadingMessage
@@ -164,6 +180,7 @@ const WorkspaceDashboardPage: React.FC = () => {
             : null;
         try {
             const result = await workspaceDiagramActions.openDiagram(item, Boolean(user));
+            releaseOpenState();
             switch (result.kind) {
                 case 'navigate':
                     navigateToDiagram(result.diagramId);
@@ -185,6 +202,7 @@ const WorkspaceDashboardPage: React.FC = () => {
             safeLog.error('Failed to open workspace diagram', redactSensitiveLogValue(error));
             appMessage.error(isTemplate ? '加载模版失败，请稍后重试。' : 'Failed to open diagram.');
         } finally {
+            releaseOpenState();
             hide?.();
         }
     };
@@ -287,6 +305,7 @@ const WorkspaceDashboardPage: React.FC = () => {
                     viewMode={viewMode}
                     onViewModeChange={setViewMode}
                     loading={loading}
+                    openingDiagramKeys={openingDiagramKeys}
                     onOpenDiagram={handleOpenDiagram}
                     onOpenDiagramInNewTab={openDiagramInNewTab}
                     onContextMenu={handleContextMenu}
