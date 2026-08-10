@@ -13,7 +13,8 @@
     animation: contextMenuPopIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     transform-origin: top left;
     
-    background-color: rgba(255, 255, 255, 0.8) !important;
+    /* Keep dense diagrams from bleeding through when backdrop blur is unavailable. */
+    background-color: #fff !important;
     backdrop-filter: blur(24px) saturate(180%) !important;
     -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
     
@@ -31,7 +32,7 @@
 
 /* Dark mode overrides if dark mode is active on html */
 html[data-theme='dark'] .diagram-context-menu {
-    background-color: rgba(30, 30, 30, 0.75) !important;
+    background-color: #1e1e1e !important;
     border-color: rgba(255, 255, 255, 0.1) !important;
     box-shadow: 
         0 8px 32px rgba(0, 0, 0, 0.4), 
@@ -90,7 +91,7 @@ html[data-theme='dark'] .diagram-context-menu .ant-menu-item-danger:hover {
 }
 
 .ant-menu-submenu-popup.diagram-context-menu-popup .ant-menu {
-    background-color: rgba(255, 255, 255, 0.8) !important;
+    background-color: #fff !important;
     backdrop-filter: blur(24px) saturate(180%) !important;
     -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
     border: 1px solid rgba(255, 255, 255, 0.6) !important;
@@ -100,7 +101,7 @@ html[data-theme='dark'] .diagram-context-menu .ant-menu-item-danger:hover {
 }
 
 html[data-theme='dark'] .ant-menu-submenu-popup.diagram-context-menu-popup .ant-menu {
-    background-color: rgba(30, 30, 30, 0.75) !important;
+    background-color: #1e1e1e !important;
     border-color: rgba(255, 255, 255, 0.1) !important;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important;
 }
