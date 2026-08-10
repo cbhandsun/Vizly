@@ -35,6 +35,40 @@ describe('diagramViewerCommandItems', () => {
     expect(getDiagramViewerCommandModifierLabel({ platform: 'Win32' })).toBe('Ctrl');
   });
 
+  it('only advertises Escape for exiting an active fullscreen session', () => {
+    const t = ((_: string, fallback: string) => fallback) as unknown as TFunction;
+    const createItems = (isFullscreen: boolean) => createDiagramViewerCommandItems({
+      t,
+      modifierLabel: 'Ctrl',
+      isFullscreen,
+      editingEnabled: true,
+      commandFavorites: [],
+      commandRecent: [],
+      commandRecentOps: [],
+      diagramDefinitions: [],
+      setIsShortcutsOpen: vi.fn(),
+      setIsSettingsOpen: vi.fn(),
+      setMermaidModalVisible: vi.fn(),
+      handleToggleFullscreen: vi.fn(),
+      handleSelectDiagram: vi.fn(),
+      openDiagramInNewTab: vi.fn(),
+      navigate: vi.fn(),
+      triggerEditorCommand: vi.fn(),
+      triggerAiButton: vi.fn(),
+      triggerThemeButton: vi.fn(),
+      clearFavorites: vi.fn(),
+    });
+
+    expect(createItems(false).find(item => item.id === 'op:toggleFullscreen')).toMatchObject({
+      title: '进入全屏 / Fullscreen',
+      shortcut: undefined,
+    });
+    expect(createItems(true).find(item => item.id === 'op:toggleFullscreen')).toMatchObject({
+      title: '退出全屏 / Exit Fullscreen',
+      shortcut: 'Esc',
+    });
+  });
+
   it('builds action items and prioritizes recent/favorite diagrams', () => {
     const setIsShortcutsOpen = vi.fn();
     const setIsSettingsOpen = vi.fn();

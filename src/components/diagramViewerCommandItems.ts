@@ -95,7 +95,7 @@ export const createDiagramViewerCommandItems = ({
         ? t('designer.commandItems.exitFullscreen', '退出全屏 / Exit Fullscreen')
         : t('designer.commandItems.enterFullscreen', '进入全屏 / Fullscreen'),
       keywords: ['全屏', 'fullscreen'],
-      shortcut: 'Esc',
+      shortcut: isFullscreen ? 'Esc' : undefined,
       onSelect: () => handleToggleFullscreen(),
     },
     editingUnavailable({
