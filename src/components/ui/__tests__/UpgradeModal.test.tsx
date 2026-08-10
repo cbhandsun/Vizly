@@ -53,7 +53,9 @@ vi.mock('@/core/utils/antdStaticBridge', () => ({
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string) => key,
+    t: (key: string) => key === 'upgrade.featureContext'
+      ? 'Upgrade to Pro to unlock'
+      : key,
   }),
 }));
 
@@ -94,6 +96,13 @@ describe('UpgradeModal', () => {
     expect(layout.querySelector('.ant-modal-root')).toBeNull();
     expect(modalRoot?.className).toContain('upgrade-viewport-modal');
     layout.remove();
+  });
+
+  it('separates the localized upgrade prefix from the feature name', () => {
+    render(<UpgradeModal />);
+
+    const context = document.querySelector('.upgrade-modal__feature-context');
+    expect(context?.textContent).toBe('Upgrade to Pro to unlock PDF export');
   });
 
   it('keeps login recovery explicit and distinguishes successful authentication', async () => {

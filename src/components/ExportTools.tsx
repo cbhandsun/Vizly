@@ -42,6 +42,13 @@ const MARKDOWN_EXPORT_MAX_EDGES = 2000;
 const EXPORT_MENU_OVERLAY_CLASS = 'vizly-export-actions-menu';
 const EXPORT_MENU_ID = 'diagram-export-actions-menu';
 
+const renderExportMenuLabel = (label: string, premiumLocked: boolean): React.ReactNode => (
+  <span className="export-menu-label">
+    <span>{label}</span>
+    {premiumLocked ? <>{' '}<span className="export-menu-pro-badge">PRO</span></> : null}
+  </span>
+);
+
 interface ExportToolsProps {
   diagramId: string;
   diagramName: string;
@@ -93,6 +100,8 @@ const ExportTools: React.FC<ExportToolsProps> = ({
   const [cloudManagerOpen, setCloudManagerOpen] = useState(false);
   const [exportableNodeCount, setExportableNodeCount] = useState(0);
   const exportInFlightRef = useRef(false);
+  const canExportPdf = hasFeature('export-pdf');
+  const canExportSvg = hasFeature('export-hd-svg');
   const readExportableNodeCount = useCallback(() => resolveExportableNodeCount(
     reactFlowInstance.getNodes().length,
     getFlowDataBridgeNodes(diagramId).length,
@@ -205,15 +214,15 @@ const ExportTools: React.FC<ExportToolsProps> = ({
 
   const handleExportPNG = () => wrapExport('png', exportToPNG);
   const handleExportPDF = () => {
-    if (!hasFeature('export-pdf')) {
-      showUpgradeModal('超高清 PDF 导出');
+    if (!canExportPdf) {
+      showUpgradeModal(t('diagramViewer.export.pdf'));
       return;
     }
     wrapExport('pdf', exportToPDF);
   };
   const handleExportSVG = () => {
-    if (!hasFeature('export-hd-svg')) {
-      showUpgradeModal('超高清矢量 SVG 导出');
+    if (!canExportSvg) {
+      showUpgradeModal(t('diagramViewer.export.svg'));
       return;
     }
     wrapExport('svg', exportToSVG);
@@ -402,14 +411,14 @@ ${mermaid}
     },
     {
       key: 'pdf',
-      label: t('export.pdf'),
+      label: renderExportMenuLabel(t('export.pdf'), !canExportPdf),
       icon: <FaFilePdf />,
       onClick: handleExportPDF,
       disabled: exportMenuAvailability.fileExportDisabled
     },
     {
       key: 'svg',
-      label: t('export.svg'),
+      label: renderExportMenuLabel(t('export.svg'), !canExportSvg),
       icon: <FaFileCode />,
       onClick: handleExportSVG,
       disabled: exportMenuAvailability.fileExportDisabled
@@ -548,7 +557,7 @@ ${mermaid}
         <Dropdown
           menu={{
             id: EXPORT_MENU_ID,
-            'aria-label': t('export.menuLabel', '导出操作'),
+            'aria-label': t('export.options'),
             items,
             onKeyDown: handleExportMenuKeyDown,
           }}

@@ -1,16 +1,20 @@
 // @vitest-environment jsdom
 
 import React from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { exportToPNG, appMessageMocks } = vi.hoisted(() => ({
+const { exportToPNG, appMessageMocks, subscriptionMocks } = vi.hoisted(() => ({
   exportToPNG: vi.fn<() => Promise<void>>(async () => undefined),
   appMessageMocks: {
     error: vi.fn(),
     loading: vi.fn(() => vi.fn()),
     success: vi.fn(),
+  },
+  subscriptionMocks: {
+    hasFeature: vi.fn<(feature: string) => boolean>(() => true),
+    showUpgradeModal: vi.fn(),
   },
 }));
 
@@ -49,6 +53,9 @@ vi.mock('react-i18next', () => ({
       'export.fileGroup': '文件导出',
       'export.fileGroupEmpty': '文件导出（暂无可导出节点）',
       'export.cloudGroup': '云端与分享',
+      'export.options': '导出选项',
+      'diagramViewer.export.pdf': '多页无缝 PDF 导出',
+      'diagramViewer.export.svg': '超高清矢量 SVG',
     }[key] ?? key),
   }),
 }));
@@ -59,8 +66,8 @@ vi.mock('@/context/useAuth', () => ({
 
 vi.mock('@/context/useSubscription', () => ({
   useSubscription: () => ({
-    hasFeature: () => true,
-    showUpgradeModal: vi.fn(),
+    hasFeature: subscriptionMocks.hasFeature,
+    showUpgradeModal: subscriptionMocks.showUpgradeModal,
   }),
 }));
 
@@ -82,6 +89,9 @@ describe('ExportTools keyboard menu', () => {
     exportToPNG.mockResolvedValue(undefined);
     appMessageMocks.error.mockClear();
     appMessageMocks.success.mockClear();
+    subscriptionMocks.hasFeature.mockReset();
+    subscriptionMocks.hasFeature.mockReturnValue(true);
+    subscriptionMocks.showUpgradeModal.mockReset();
     vi.stubGlobal('ResizeObserver', class {
       observe() {}
       unobserve() {}
@@ -140,7 +150,7 @@ describe('ExportTools keyboard menu', () => {
     expect(firstItem.getAttribute('aria-disabled')).not.toBe('true');
     expect(trigger.getAttribute('aria-expanded')).toBe('true');
     expect(trigger.getAttribute('aria-controls')).toBe('diagram-export-actions-menu');
-    const menu = screen.getByRole('menu', { name: '导出操作' });
+    const menu = screen.getByRole('menu', { name: '导出选项' });
     expect(menu.id).toBe('diagram-export-actions-menu');
 
     fireEvent.keyDown(menu, { key: 'Escape' });
@@ -171,6 +181,29 @@ describe('ExportTools keyboard menu', () => {
       expect(trigger.getAttribute('aria-expanded')).toBe('false');
       expect(document.activeElement).toBe(trigger);
     });
+  });
+
+  it('marks locked premium formats before selection and uses localized upgrade context', async () => {
+    subscriptionMocks.hasFeature.mockImplementation(feature => (
+      feature !== 'export-pdf' && feature !== 'export-hd-svg'
+    ));
+
+    render(
+      <ExportTools
+        diagramId="diagram-1"
+        diagramName="Diagram"
+        showControls={false}
+        variant="compact"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '导出' }));
+    const menu = await screen.findByRole('menu', { name: '导出选项' });
+    expect(within(menu).getByRole('menuitem', { name: 'PDF 文档 PRO' })).toBeTruthy();
+    expect(within(menu).getByRole('menuitem', { name: 'SVG 矢量图 PRO' })).toBeTruthy();
+
+    fireEvent.click(within(menu).getByRole('menuitem', { name: 'PDF 文档 PRO' }));
+    expect(subscriptionMocks.showUpgradeModal).toHaveBeenCalledWith('多页无缝 PDF 导出');
   });
 
   it('announces an active export as a polite busy status', async () => {

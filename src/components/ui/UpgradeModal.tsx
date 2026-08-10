@@ -119,6 +119,8 @@ export const UpgradeModal: React.FC = () => {
       )}
     />
   ) : null;
+  const featureContextPrefix = t('upgrade.featureContext');
+  const featureContextSeparator = /[\s:：]$/u.test(featureContextPrefix) ? '' : ' ';
 
   return (
     <>
@@ -138,7 +140,7 @@ export const UpgradeModal: React.FC = () => {
           <CrownOutlined className="upgrade-modal__crown" aria-hidden="true" />
           {upgradeFeatureContext && (
             <Text type="secondary" className="upgrade-modal__feature-context">
-              {t('upgrade.featureContext')}<Text strong>{upgradeFeatureContext}</Text>
+              {featureContextPrefix}{featureContextSeparator}<Text strong>{upgradeFeatureContext}</Text>
             </Text>
           )}
         </div>
