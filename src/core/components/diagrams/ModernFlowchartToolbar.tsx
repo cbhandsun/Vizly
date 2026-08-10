@@ -433,10 +433,10 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
             
             <div className="flex items-center gap-1">
                 <Tooltip title={t('designer.toolbar.stickyNote', '便签 (S)')}>
-                    <Button type="text" onClick={onAddStickyNote} icon={<FaStickyNote className="text-[14px] text-amber-500" />} className="w-9 h-9 p-0 border-none hover:bg-slate-200 dark:hover:bg-white/5" />
+                    <Button type="text" aria-label={t('designer.toolbar.stickyNote', '便签 (S)')} onClick={onAddStickyNote} icon={<FaStickyNote className="text-[14px] text-amber-500" />} className="w-9 h-9 p-0 border-none hover:bg-slate-200 dark:hover:bg-white/5" />
                 </Tooltip>
                 <Tooltip title={t('designer.toolbar.mindMap', '思维导图 (Shift+M)')}>
-                    <Button type="text" onClick={onAddMindMap} icon={<FaSitemap className="text-[14px] text-sky-500" />} className="w-9 h-9 p-0 border-none hover:bg-slate-200 dark:hover:bg-white/5" />
+                    <Button type="text" aria-label={t('designer.toolbar.mindMap', '思维导图 (Shift+M)')} onClick={onAddMindMap} icon={<FaSitemap className="text-[14px] text-sky-500" />} className="w-9 h-9 p-0 border-none hover:bg-slate-200 dark:hover:bg-white/5" />
                 </Tooltip>
             </div>
         </div>

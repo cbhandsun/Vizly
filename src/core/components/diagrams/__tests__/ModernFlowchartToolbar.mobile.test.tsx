@@ -94,6 +94,49 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
         expect(checkedItems[0]).toMatchObject({ key: 'marquee' });
     });
 
+    it('gives persistent desktop creation actions accessible names', async () => {
+        Object.defineProperty(window, 'matchMedia', {
+            configurable: true,
+            value: vi.fn().mockImplementation((query: string) => ({
+                matches: query.includes('min-width: 768px'),
+                media: query,
+                onchange: null,
+                addListener: vi.fn(),
+                removeListener: vi.fn(),
+                addEventListener: vi.fn(),
+                removeEventListener: vi.fn(),
+                dispatchEvent: vi.fn(),
+            })),
+        });
+
+        render(
+            <ModernFlowchartToolbar
+                canUndo={false}
+                canRedo={false}
+                onUndo={vi.fn()}
+                onRedo={vi.fn()}
+                onZoomIn={vi.fn()}
+                onZoomOut={vi.fn()}
+                onFitView={vi.fn()}
+                autoRouting={false}
+                toggleAutoRouting={vi.fn()}
+                showGrid
+                toggleGrid={vi.fn()}
+                onShowShortcuts={vi.fn()}
+                showRuler={false}
+                toggleRuler={vi.fn()}
+                onActivatePointer={vi.fn()}
+                toggleSelectionMode={vi.fn()}
+                onToggleDrawingMode={vi.fn()}
+                onAddStickyNote={vi.fn()}
+                onAddMindMap={vi.fn()}
+            />,
+        );
+
+        expect(await screen.findByRole('button', { name: /便签 \(S\)/ })).toBeTruthy();
+        expect(screen.getByRole('button', { name: /思维导图 \(Shift\+M\)/ })).toBeTruthy();
+    });
+
     it('keeps the file-actions trigger available when the desktop breakpoint is absent', async () => {
         const onImportClick = vi.fn();
 

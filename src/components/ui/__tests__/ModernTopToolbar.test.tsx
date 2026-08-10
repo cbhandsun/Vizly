@@ -177,6 +177,7 @@ describe('ModernTopToolbar responsive layout', () => {
     expect(leftIsland?.className).toContain('min-w-0');
     expect(leftIsland?.className).not.toContain('shrink-0');
     expect(screen.queryByRole('button', { name: 'Open command search' })).toBeNull();
+    expect(container.querySelector('#vizly-plugin-bottom-island-portal')).toBeNull();
   });
 
   it('keeps the main canvas tools inline on desktop', () => {
@@ -191,6 +192,10 @@ describe('ModernTopToolbar responsive layout', () => {
     expect(screen.getByTestId('theme-selector').getAttribute('data-variant')).toBe('icon');
     expect(screen.getByTestId('auth-status').getAttribute('data-commercial-touch-target')).toBe('false');
     expect(screen.getByRole('link')).toBeTruthy();
+    const bottomPortal = container.querySelector('#vizly-plugin-bottom-island-portal');
+    expect(bottomPortal).toBeTruthy();
+    expect(bottomPortal?.parentElement?.getAttribute('data-designer-bottom-toolbar')).toBe('true');
+    expect(bottomPortal?.parentElement?.className).toContain('bottom-[58px]');
   });
 
   it('exposes diagram switching and command search as keyboard-operable controls', async () => {
