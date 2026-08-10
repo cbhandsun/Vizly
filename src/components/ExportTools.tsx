@@ -24,6 +24,7 @@ import {
 import { resolveExportPopupContainer } from './exportPopupContainer';
 import { resolveExportableNodeCount, resolveExportMenuAvailability } from './exportMenuAvailability';
 import { useKeyboardAccessibleDropdown } from '@/core/components/diagrams/hooks/useKeyboardAccessibleDropdown';
+import './ExportTools.css';
 
 const ShareDialog = React.lazy(() => import('@/components/diagrams/ShareDialog'));
 const CloudStorageManagerModal = React.lazy(() => import('@/components/storage/CloudStorageManagerModal').then(async (m) => {

@@ -1,0 +1,28 @@
+.vizly-export-actions-menu .ant-dropdown-menu {
+    background-color: rgba(255, 255, 255, 0.98) !important;
+    backdrop-filter: blur(28px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
+}
+
+[data-theme='dark'] .vizly-export-actions-menu .ant-dropdown-menu {
+    background-color: rgba(28, 28, 41, 0.98) !important;
+}
+
+@media (max-width: 767px) {
+    .vizly-export-actions-menu .ant-dropdown-menu {
+        --vizly-export-actions-top-clearance: 160px;
+        --vizly-export-actions-dock-clearance: calc(88px + env(safe-area-inset-bottom, 0px));
+        max-height: min(
+            424px,
+            calc(
+                100dvh
+                - var(--vizly-export-actions-top-clearance)
+                - var(--vizly-export-actions-dock-clearance)
+            )
+        );
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        scroll-padding-block: 8px;
+        scrollbar-gutter: stable;
+    }
+}

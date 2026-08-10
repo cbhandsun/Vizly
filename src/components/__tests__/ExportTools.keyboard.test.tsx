@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { exportToPNG, appMessageMocks } = vi.hoisted(() => ({
@@ -99,6 +100,23 @@ describe('ExportTools keyboard menu', () => {
         dispatchEvent: vi.fn(),
       })),
     });
+  });
+
+  it('keeps the export menu visually isolated and clear of the mobile dock', () => {
+    const css = readFileSync('src/components/ExportTools.css', 'utf8');
+
+    expect(css).toMatch(
+      /\.vizly-export-actions-menu \.ant-dropdown-menu\s*\{[\s\S]*?background-color:\s*rgba\(255, 255, 255, 0\.98\) !important;/,
+    );
+    expect(css).toMatch(
+      /\[data-theme='dark'\] \.vizly-export-actions-menu \.ant-dropdown-menu\s*\{[\s\S]*?background-color:\s*rgba\(28, 28, 41, 0\.98\) !important;/,
+    );
+    expect(css).toMatch(
+      /@media \(max-width: 767px\)[\s\S]*?--vizly-export-actions-top-clearance:\s*160px;[\s\S]*?--vizly-export-actions-dock-clearance:\s*calc\(88px \+ env\(safe-area-inset-bottom, 0px\)\);[\s\S]*?max-height:\s*min\([\s\S]*?424px,[\s\S]*?100dvh[\s\S]*?var\(--vizly-export-actions-top-clearance\)[\s\S]*?var\(--vizly-export-actions-dock-clearance\)[\s\S]*?\);/,
+    );
+    expect(css).toMatch(
+      /@media \(max-width: 767px\)[\s\S]*?overflow-y:\s*auto;[\s\S]*?overscroll-behavior:\s*contain;[\s\S]*?scroll-padding-block:\s*8px;[\s\S]*?scrollbar-gutter:\s*stable;/,
+    );
   });
 
   it.each(['ArrowDown', 'Enter', ' '])('opens with %s, refreshes availability, and restores focus with Escape', async key => {
