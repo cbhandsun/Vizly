@@ -218,6 +218,10 @@ html[data-theme='dark'] .workspace-icon-btn:hover {
   scroll-behavior: smooth;
 }
 
+.workspace-main:focus {
+  outline: none;
+}
+
 .workspace-main-inner {
   max-width: 1360px;
   margin: 0 auto;

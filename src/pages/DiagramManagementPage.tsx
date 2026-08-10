@@ -31,6 +31,7 @@ import { createWorkspaceDiagramActions } from './diagramManagementActions';
 import { createWorkspaceSettingsMenu } from './workspaceSettingsMenu';
 import { useWorkspaceSearch } from './useWorkspaceSearch';
 import { focusWorkspaceTarget } from './workspaceMenuInteraction';
+import { scheduleWorkspaceRouteFocus } from './workspaceRouteFocus';
 
 const AuthModal = React.lazy(() => import('@/components/auth/AuthModal').then(module => ({
     default: module.AuthModal,
@@ -71,6 +72,8 @@ const WorkspaceDashboardPage: React.FC = () => {
     const workspaceMainRef = useRef<HTMLElement>(null);
     const settingsTriggerRef = useRef<HTMLButtonElement>(null);
     const authReturnFocusTargetRef = useRef<HTMLElement | null>(null);
+
+    useEffect(() => scheduleWorkspaceRouteFocus(() => workspaceMainRef.current), []);
 
     const openAuthModal = useCallback(() => {
         authReturnFocusTargetRef.current = typeof document !== 'undefined'
