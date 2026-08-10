@@ -19,6 +19,7 @@ import { FlowchartCanvasSettingsContent } from './FlowchartCanvasSettingsContent
 import { DropdownMenuTriggerButton } from './DropdownMenuTriggerButton';
 import { buildFlowchartLayoutMenuModel } from './flowchartToolbarLayoutMenu';
 import { buildToolModeMenuItems, resolveActiveToolModeKey } from './flowchartToolbarToolModeMenu';
+import { getFlowchartZoomControlState } from './flowchartZoomControlState';
 import { useKeyboardAccessibleDropdown } from './hooks/useKeyboardAccessibleDropdown';
 import './ModernFlowchartToolbar.css';
 import {
@@ -201,9 +202,8 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
     const layoutTriggerLabel = layoutMenuModel.statusText
         ? `${layoutBaseLabel}：${layoutMenuModel.statusText}`
         : layoutBaseLabel;
-    const normalizedZoomPercent = typeof zoomPercent === 'number' && Number.isFinite(zoomPercent)
-        ? Math.max(0, Math.round(zoomPercent))
-        : undefined;
+    const zoomControlState = getFlowchartZoomControlState(zoomPercent);
+    const normalizedZoomPercent = zoomControlState.percent;
     const zoomStatus = normalizedZoomPercent === undefined ? undefined : `${normalizedZoomPercent}%`;
     const zoomControlLabel = (label: string) => zoomStatus ? `${label} (${zoomStatus})` : label;
     const zoomResetButtonStyle: React.CSSProperties = isMobile
@@ -473,10 +473,10 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
             {!hideZoomControls && (
                 <>
                     <Tooltip title={t('designer.toolbar.zoomIn')}>
-                        <Button type="text" aria-label={zoomControlLabel(t('designer.toolbar.zoomIn'))} icon={<FaSearchPlus size={13} />} onClick={onZoomIn} className={tbtn} style={mobileToolbarButtonStyle} />
+                        <Button type="text" aria-label={zoomControlLabel(t('designer.toolbar.zoomIn'))} icon={<FaSearchPlus size={13} />} onClick={onZoomIn} disabled={zoomControlState.zoomInDisabled} className={zoomControlState.zoomInDisabled ? tbtnDisabled : tbtn} style={mobileToolbarButtonStyle} />
                     </Tooltip>
                     <Tooltip title={t('designer.toolbar.zoomOut')}>
-                        <Button type="text" aria-label={zoomControlLabel(t('designer.toolbar.zoomOut'))} icon={<FaSearchMinus size={13} />} onClick={onZoomOut} className={tbtn} style={mobileToolbarButtonStyle} />
+                        <Button type="text" aria-label={zoomControlLabel(t('designer.toolbar.zoomOut'))} icon={<FaSearchMinus size={13} />} onClick={onZoomOut} disabled={zoomControlState.zoomOutDisabled} className={zoomControlState.zoomOutDisabled ? tbtnDisabled : tbtn} style={mobileToolbarButtonStyle} />
                     </Tooltip>
                     <Tooltip title={t('designer.toolbar.fitView')}>
                         <Button type="text" aria-label={zoomControlLabel(t('designer.toolbar.fitView'))} icon={<FaCompressArrowsAlt size={13} />} onClick={onFitView} className={tbtn} style={mobileToolbarButtonStyle} />
@@ -487,7 +487,8 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                                 type="text"
                                 aria-label={zoomControlLabel(t('designer.toolbar.resetZoom'))}
                                 onClick={onResetZoom}
-                                className={tbtn}
+                                disabled={zoomControlState.resetDisabled}
+                                className={zoomControlState.resetDisabled ? tbtnDisabled : tbtn}
                                 style={zoomResetButtonStyle}
                             >
                                 <span aria-hidden="true" className="tabular-nums">{zoomStatus}</span>

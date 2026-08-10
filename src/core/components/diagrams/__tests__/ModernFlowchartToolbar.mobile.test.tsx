@@ -531,6 +531,17 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
         expect(updatedStatus.getAttribute('aria-live')).toBe('polite');
         expect(updatedStatus.getAttribute('aria-atomic')).toBe('true');
         expect(await screen.findByRole('button', { name: /resetZoom.*38%/i })).toBeTruthy();
+
+        rerender(<ModernFlowchartToolbar {...props} zoomPercent={400} />);
+        expect((await screen.findByRole('button', { name: /zoomIn.*400%/i }) as HTMLButtonElement).disabled).toBe(true);
+        expect((await screen.findByRole('button', { name: /zoomOut.*400%/i }) as HTMLButtonElement).disabled).toBe(false);
+
+        rerender(<ModernFlowchartToolbar {...props} zoomPercent={10} />);
+        expect((await screen.findByRole('button', { name: /zoomOut.*10%/i }) as HTMLButtonElement).disabled).toBe(true);
+        expect((await screen.findByRole('button', { name: /zoomIn.*10%/i }) as HTMLButtonElement).disabled).toBe(false);
+
+        rerender(<ModernFlowchartToolbar {...props} zoomPercent={100} />);
+        expect((await screen.findByRole('button', { name: /resetZoom.*100%/i }) as HTMLButtonElement).disabled).toBe(true);
     });
 
     it('does not duplicate multi-selection actions in the mobile top toolbar', async () => {
