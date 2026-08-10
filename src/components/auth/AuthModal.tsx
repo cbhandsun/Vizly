@@ -1,6 +1,7 @@
 
 import React, { useLayoutEffect, useState } from 'react';
 import { Alert, Modal, Form, Input, Button, Tabs, Typography } from 'antd';
+import type { FormInstance, FormProps } from 'antd/es/form';
 import { UserOutlined, MailOutlined, LockOutlined, KeyOutlined } from '@ant-design/icons';
 import { useAuth } from '@/context/useAuth';
 import { useTranslation } from 'react-i18next';
@@ -27,6 +28,24 @@ type TabKey = 'password' | 'magiclink' | 'register';
 
 export const AUTH_MODAL_Z_INDEX = 1500;
 
+const AUTH_SCROLL_TO_FIRST_ERROR: Exclude<FormProps['scrollToFirstError'], boolean | undefined> = {
+    block: 'nearest',
+    focus: true,
+};
+
+const clearFormValidation = (form: FormInstance) => {
+    const invalidFields = form.getFieldsError().filter(
+        field => field.errors.length > 0 || field.warnings.length > 0,
+    );
+    if (invalidFields.length === 0) return;
+
+    form.setFields(invalidFields.map(field => ({
+        name: field.name,
+        errors: [],
+        warnings: [],
+    })));
+};
+
 export const AuthModal: React.FC<AuthModalProps> = ({
     open,
     onCancel,
@@ -43,6 +62,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     const [registerFormInstance] = Form.useForm();
     const operation = useAuthOperation(open);
     const { invalidate: invalidateOperation } = operation;
+
+    const clearActiveFormValidation = () => {
+        if (activeTab === 'password') {
+            clearFormValidation(passwordFormInstance);
+        } else if (activeTab === 'register') {
+            clearFormValidation(registerFormInstance);
+        } else if (!magicLinkSent) {
+            clearFormValidation(magicLinkFormInstance);
+        }
+    };
 
     useLayoutEffect(() => {
         if (!open) invalidateOperation();
@@ -124,6 +153,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             onFinish={onPasswordLogin}
             layout="vertical"
             autoComplete="on"
+            scrollToFirstError={AUTH_SCROLL_TO_FIRST_ERROR}
         >
             {operationError}
             <Form.Item
@@ -206,6 +236,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             onFinish={onMagicLinkLogin}
             layout="vertical"
             autoComplete="on"
+            scrollToFirstError={AUTH_SCROLL_TO_FIRST_ERROR}
         >
             {operationError}
             <div className="auth-modal__hint">
@@ -256,6 +287,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             onFinish={onRegister}
             layout="vertical"
             autoComplete="on"
+            scrollToFirstError={AUTH_SCROLL_TO_FIRST_ERROR}
         >
             {operationError}
             <Form.Item
@@ -372,6 +404,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 onChange={(k) => {
                     if (operation.busy) return;
                     operation.clearError();
+                    clearActiveFormValidation();
                     setActiveTab(k as TabKey);
                 }}
                 items={tabItems.map((item) => ({ ...item, disabled: operation.busy }))}

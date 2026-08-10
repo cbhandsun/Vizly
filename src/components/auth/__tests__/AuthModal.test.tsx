@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AUTH_MODAL_Z_INDEX, AuthModal } from '../AuthModal';
@@ -100,6 +100,55 @@ describe('AuthModal', () => {
             expect(screen.getByLabelText('auth.modal.register.confirmPlaceholder')).toBeTruthy();
         });
         expect(screen.getByRole('button', { name: 'auth.modal.backToLogin' })).toBeTruthy();
+    });
+
+    it('focuses the first invalid field after each authentication form fails validation', async () => {
+        render(<AuthModal open onCancel={vi.fn()} />);
+
+        fireEvent.click(screen.getByRole('button', { name: /auth\.modal\.loginButton$/ }));
+        await waitFor(() => {
+            expect(document.activeElement).toBe(
+                within(screen.getByRole('tabpanel')).getByLabelText('auth.modal.emailPlaceholder'),
+            );
+        });
+
+        fireEvent.click(screen.getByRole('tab', { name: 'auth.modal.tabs.magiclink' }));
+        fireEvent.click(screen.getByRole('button', { name: /auth\.modal\.sendMagicLink$/ }));
+        await waitFor(() => {
+            expect(document.activeElement).toBe(
+                within(screen.getByRole('tabpanel')).getByLabelText('auth.modal.emailPlaceholder'),
+            );
+        });
+
+        fireEvent.click(screen.getByRole('tab', { name: 'auth.modal.tabs.register' }));
+        fireEvent.click(screen.getByRole('button', { name: 'auth.modal.register.button' }));
+        await waitFor(() => {
+            expect(document.activeElement).toBe(
+                within(screen.getByRole('tabpanel')).getByLabelText('auth.modal.emailPlaceholder'),
+            );
+        });
+    });
+
+    it('clears stale validation when switching methods without discarding entered values', async () => {
+        render(<AuthModal open onCancel={vi.fn()} />);
+
+        const email = within(screen.getByRole('tabpanel')).getByLabelText('auth.modal.emailPlaceholder');
+        fireEvent.change(email, { target: { value: 'member@example.com' } });
+        fireEvent.click(screen.getByRole('button', { name: /auth\.modal\.loginButton$/ }));
+
+        await waitFor(() => {
+            expect(screen.getByText('auth.modal.password.required')).toBeTruthy();
+        });
+        fireEvent.click(screen.getByRole('tab', { name: 'auth.modal.tabs.register' }));
+        fireEvent.click(screen.getByRole('tab', { name: 'auth.modal.tabs.password' }));
+
+        const activePanel = within(screen.getByRole('tabpanel'));
+        const password = activePanel.getByLabelText('auth.modal.password.placeholder');
+        expect(password.getAttribute('aria-invalid')).not.toBe('true');
+        expect(password.getAttribute('aria-describedby')).toBeNull();
+        expect((activePanel.getByLabelText(
+            'auth.modal.emailPlaceholder',
+        ) as HTMLInputElement).value).toBe('member@example.com');
     });
 
     it('exposes a close action that calls the owner callback', () => {
