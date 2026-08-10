@@ -1773,7 +1773,8 @@
         "backToWorkspace": "返回工作台",
         "viewerLabel": "分享图表只读画布",
         "fallbackTitle": "分享图表",
-        "poweredBy": "由 DiagramView 创建",
+        "poweredBy": "由 Vizly 创建",
+        "viewOnly": "仅查看",
         "modeLabel": "分享方式",
         "tabs": {
             "link": "公开链接",

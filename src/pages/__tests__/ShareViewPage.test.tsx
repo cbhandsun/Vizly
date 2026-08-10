@@ -4,6 +4,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import ShareViewPage from '../ShareViewPage';
+import en from '../../locales/en.json';
+import zh from '../../locales/zh.json';
 
 const getSharedDiagramMock = vi.fn();
 const registerDiagramMock = vi.fn();
@@ -71,6 +73,13 @@ vi.mock('antd', () => ({
             {extra}
         </div>
     ),
+    Tag: ({
+        children,
+        className,
+    }: {
+        children?: React.ReactNode;
+        className?: string;
+    }) => <span className={className}>{children}</span>,
     Typography: {
         Text: ({
             children,
@@ -127,6 +136,7 @@ describe('ShareViewPage', () => {
         renderSharePage('/shared');
 
         expect(screen.getByRole('heading', { name: '404' })).toBeInTheDocument();
+        expect(screen.getByRole('banner')).toHaveTextContent('Vizly');
         expect(screen.getByText('share.notFound')).toBeInTheDocument();
         expect(screen.getByRole('link', { name: 'share.backToWorkspace' })).toHaveAttribute('href', '#/manage');
 
@@ -180,6 +190,8 @@ describe('ShareViewPage', () => {
         expect(await screen.findByTestId('flowchart-designer')).toHaveAttribute('data-id', LOCAL_SHARED_DIAGRAM_ID);
         expect(screen.getAllByTestId('flowchart-designer')).toHaveLength(1);
         expect(screen.getByRole('banner')).toBeInTheDocument();
+        expect(screen.getByText('share.viewOnly')).toBeInTheDocument();
+        expect(screen.getByText('share.poweredBy')).toBeInTheDocument();
         expect(screen.getByRole('main', { name: 'share.viewerLabel' })).toBeInTheDocument();
     });
 
@@ -274,6 +286,7 @@ describe('ShareViewPage', () => {
         renderSharePage(`/shared?token=${token}`);
 
         expect(await screen.findByRole('heading', { name: 'share.viewerUnavailable' })).toBeInTheDocument();
+        expect(screen.getByRole('banner')).toHaveTextContent('Vizly');
         expect(screen.getByRole('button', { name: 'common.retry' })).toBeInTheDocument();
         expect(registerDiagramMock).not.toHaveBeenCalled();
     });
@@ -344,5 +357,16 @@ describe('ShareViewPage', () => {
         const title = await screen.findByTitle('x'.repeat(240));
         expect(title).toHaveTextContent('x'.repeat(240));
         expect(title.textContent).not.toContain('secret');
+    });
+
+    it('ships public-view branding and read-only labels in both supported locales', () => {
+        expect(en.share).toMatchObject({
+            poweredBy: 'Created with Vizly',
+            viewOnly: 'View only',
+        });
+        expect(zh.share).toMatchObject({
+            poweredBy: '由 Vizly 创建',
+            viewOnly: '仅查看',
+        });
     });
 });

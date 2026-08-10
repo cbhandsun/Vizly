@@ -5,7 +5,7 @@
 
 import React, { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { Button, Result, Spin, Typography } from 'antd';
+import { Button, Result, Spin, Tag, Typography } from 'antd';
 import { useTranslation } from 'react-i18next';
 import { coerceShareToken, getQueryOrHashParamFromLocation } from '@/core/utils/inputBoundary';
 import {
@@ -16,6 +16,7 @@ import {
 import './ShareViewPage.css';
 
 const { Text } = Typography;
+const PRODUCT_NAME = 'Vizly';
 
 const SharedDiagramCanvas = React.lazy(async () => {
     const [{ ReactFlowProvider }, { default: FlowchartDesigner }] = await Promise.all([
@@ -56,6 +57,15 @@ const LoadingState = ({ label, compact = false }: { label: string; compact?: boo
     >
         <Spin size="large" />
         <Text type="secondary">{label}</Text>
+    </div>
+);
+
+const ShareViewStatePage = ({ children }: { children: React.ReactNode }) => (
+    <div className="share-view-state-page">
+        <header className="share-view-state-header">
+            <Text className="share-view-product-name" strong>{PRODUCT_NAME}</Text>
+        </header>
+        <main className="share-view-state-content">{children}</main>
     </div>
 );
 
@@ -146,28 +156,28 @@ const ShareViewPage: React.FC = () => {
 
     if (state.status === 'loading') {
         return (
-            <main className="share-view-state-page">
+            <ShareViewStatePage>
                 <LoadingState label={t('share.loadingShared')} />
-            </main>
+            </ShareViewStatePage>
         );
     }
 
     if (state.status === 'not-found') {
         return (
-            <main className="share-view-state-page">
+            <ShareViewStatePage>
                 <Result
                     status="404"
                     title="404"
                     subTitle={t('share.notFound')}
                     extra={<Button href="#/manage">{t('share.backToWorkspace')}</Button>}
                 />
-            </main>
+            </ShareViewStatePage>
         );
     }
 
     if (state.status === 'unavailable') {
         return (
-            <main className="share-view-state-page">
+            <ShareViewStatePage>
                 <Result
                     status="error"
                     title={t('share.viewerUnavailable')}
@@ -185,7 +195,7 @@ const ShareViewPage: React.FC = () => {
                         </Button>,
                     ]}
                 />
-            </main>
+            </ShareViewStatePage>
         );
     }
 
@@ -195,9 +205,12 @@ const ShareViewPage: React.FC = () => {
                 <Text className="share-view-title" strong title={state.title}>
                     {state.title}
                 </Text>
-                <Text className="share-view-brand" type="secondary">
-                    {t('share.poweredBy')}
-                </Text>
+                <div className="share-view-meta">
+                    <Tag className="share-view-readonly-tag">{t('share.viewOnly')}</Tag>
+                    <Text className="share-view-brand" type="secondary">
+                        {t('share.poweredBy')}
+                    </Text>
+                </div>
             </header>
 
             <main className="share-view-canvas" aria-label={t('share.viewerLabel')}>

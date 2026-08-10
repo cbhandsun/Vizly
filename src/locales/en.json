@@ -1638,7 +1638,8 @@
         "backToWorkspace": "Back to workspace",
         "viewerLabel": "Shared diagram read-only canvas",
         "fallbackTitle": "Shared diagram",
-        "poweredBy": "Created with DiagramView",
+        "poweredBy": "Created with Vizly",
+        "viewOnly": "View only",
         "modeLabel": "Sharing method",
         "tabs": {
             "link": "Public Link",

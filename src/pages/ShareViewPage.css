@@ -13,7 +13,6 @@
     overflow: hidden;
 }
 
-.share-view-state-page,
 .share-view-loading {
     display: flex;
     align-items: center;
@@ -21,6 +20,32 @@
 }
 
 .share-view-state-page {
+    display: flex;
+    flex-direction: column;
+}
+
+.share-view-state-header {
+    min-height: 56px;
+    display: flex;
+    align-items: center;
+    padding: 0 24px;
+    border-bottom: 1px solid var(--ant-color-border-secondary);
+    background: var(--ant-color-bg-container);
+    flex: none;
+}
+
+.share-view-product-name {
+    color: var(--ant-color-text-heading);
+    font-size: 18px;
+    letter-spacing: -0.02em;
+}
+
+.share-view-state-content {
+    min-height: 0;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     padding: 24px;
 }
 
@@ -61,11 +86,30 @@
 }
 
 .share-view-title {
+    flex: 1;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: 16px;
+}
+
+.share-view-meta {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: none;
+}
+
+.share-view-readonly-tag {
+    min-height: 28px;
+    display: inline-flex;
+    align-items: center;
+    margin-inline-end: 0;
+    border-color: var(--ant-color-border);
+    background: var(--ant-color-fill-tertiary);
+    color: var(--ant-color-text-secondary);
 }
 
 .share-view-brand {
@@ -82,8 +126,14 @@
 }
 
 @media (max-width: 480px) {
-    .share-view-state-page {
+    .share-view-state-header,
+    .share-view-state-content {
         padding: 16px;
+    }
+
+    .share-view-state-header {
+        min-height: 56px;
+        padding-block: 0;
     }
 
     .share-view-state-page .ant-result {
@@ -104,12 +154,17 @@
 
     .share-view-header {
         min-height: 56px;
-        gap: 12px;
+        gap: 10px;
         padding-inline: 16px;
     }
 
+    .share-view-meta {
+        gap: 8px;
+        max-width: 58%;
+    }
+
     .share-view-brand {
-        max-width: 34%;
+        min-width: 0;
         overflow: hidden;
         text-overflow: ellipsis;
     }
