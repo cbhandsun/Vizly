@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Input, Spin, Empty, Tooltip, Typography } from 'antd';
+import { Button, Input, Spin, Empty, Tooltip, Typography } from 'antd';
 import { SearchOutlined, CloudDownloadOutlined, FireOutlined } from '@ant-design/icons';
 import { Icon } from '@iconify/react';
 import { useTranslation } from 'react-i18next';
@@ -38,6 +38,8 @@ export const IconExplorer: React.FC<IconExplorerProps> = ({ ctx }) => {
     const [results, setResults] = useState<string[]>([]);
     const [loading, setLoading] = useState(false);
     const [debouncedQuery, setDebouncedQuery] = useState('');
+    const [searchError, setSearchError] = useState(false);
+    const [retrySequence, setRetrySequence] = useState(0);
 
     // Debounce search query
     useEffect(() => {
@@ -53,6 +55,7 @@ export const IconExplorer: React.FC<IconExplorerProps> = ({ ctx }) => {
         const controller = new AbortController();
         const fetchIcons = async () => {
             setLoading(true);
+            setSearchError(false);
             try {
                 const data = await searchIconifyIcons(
                     { query: debouncedQuery, limit: 100 },
@@ -62,6 +65,8 @@ export const IconExplorer: React.FC<IconExplorerProps> = ({ ctx }) => {
             } catch (error) {
                 if (controller.signal.aborted) return;
                 logDiagramIconExplorerFetchFailure(error);
+                setResults([]);
+                setSearchError(true);
                 appMessage.error(t('designer.iconExplorer.searchFailed'));
             } finally {
                 if (!controller.signal.aborted) setLoading(false);
@@ -72,10 +77,11 @@ export const IconExplorer: React.FC<IconExplorerProps> = ({ ctx }) => {
             if (!controller.signal.aborted) void fetchIcons();
         });
         return () => controller.abort();
-    }, [debouncedQuery, t]);
+    }, [debouncedQuery, retrySequence, t]);
 
     const visibleResults = debouncedQuery.trim() ? results : [];
     const visibleLoading = Boolean(debouncedQuery.trim()) && loading;
+    const visibleError = Boolean(debouncedQuery.trim()) && searchError;
 
     const onDragStart = (event: React.DragEvent, iconName: string) => {
         if (!isSafeIconifyIconName(iconName)) {
@@ -112,11 +118,28 @@ export const IconExplorer: React.FC<IconExplorerProps> = ({ ctx }) => {
                     prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
                     placeholder={t('designer.iconExplorer.searchPlaceholder')}
                     aria-label={t('designer.iconExplorer.searchLabel')}
-                    allowClear={{ clearIcon: <AccessibleInputClearIcon label={t('designer.iconExplorer.clearSearch')} /> }}
-                    size="small"
+                    allowClear={{
+                        clearIcon: (
+                            <span
+                                style={{
+                                    width: 'var(--commercial-touch-target, 44px)',
+                                    height: 'var(--commercial-touch-target, 44px)',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                }}
+                            >
+                                <AccessibleInputClearIcon label={t('designer.iconExplorer.clearSearch')} />
+                            </span>
+                        ),
+                    }}
                     value={query}
                     onChange={e => setQuery(e.target.value)}
-                    style={{ borderRadius: 8, background: 'rgba(255,255,255,0.6)' }}
+                    style={{
+                        minHeight: 'var(--commercial-touch-target, 44px)',
+                        borderRadius: 8,
+                        background: 'rgba(255,255,255,0.6)',
+                    }}
                 />
             </div>
 
@@ -137,6 +160,7 @@ export const IconExplorer: React.FC<IconExplorerProps> = ({ ctx }) => {
                                     onClick={() => handlePresetClick(item.prefix)}
                                     aria-label={t('designer.iconExplorer.searchCollection', { collection: title })}
                                     style={{
+                                        minHeight: 'var(--commercial-touch-target, 44px)',
                                         padding: '10px 8px',
                                         background: 'rgba(255,255,255,0.5)',
                                         border: '1px solid rgba(0,0,0,0.05)',
@@ -159,7 +183,7 @@ export const IconExplorer: React.FC<IconExplorerProps> = ({ ctx }) => {
                                     }}
                                 >
                                     <Icon icon={item.icon} style={{ fontSize: 24 }} />
-                                    <Text style={{ fontSize: 10, fontWeight: 500 }}>{title}</Text>
+                                    <Text style={{ fontSize: 12, fontWeight: 500 }}>{title}</Text>
                                 </button>
                                 );
                             })}
@@ -168,53 +192,92 @@ export const IconExplorer: React.FC<IconExplorerProps> = ({ ctx }) => {
                 )}
 
                 {visibleLoading ? (
-                    <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}>
+                    <div role="status" aria-live="polite" style={{ display: 'flex', justifyContent: 'center', padding: 40 }}>
                         <Spin size="small" tip={t('designer.iconExplorer.searching')} />
                     </div>
-                ) : visibleResults.length > 0 ? (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
-                        {visibleResults.map(iconName => (
-                            <Tooltip key={iconName} title={iconName} placement="right">
-                                <button
-                                    type="button"
-                                    draggable
-                                    onDragStart={(e) => onDragStart(e, iconName)}
-                                    onClick={() => ctx.addNode('iconNode', createIconNodeData(iconName))}
-                                    aria-label={t('designer.iconExplorer.addIcon', { icon: iconName })}
-                                    style={{
-                                        aspectRatio: '1',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        background: 'rgba(255,255,255,0.7)',
-                                        border: '1px solid rgba(0,0,0,0.05)',
-                                        borderRadius: 8,
-                                        cursor: 'grab',
-                                        padding: 8,
-                                        transition: 'all 0.2s'
-                                    }}
-                                    onMouseEnter={e => {
-                                        e.currentTarget.style.background = '#fff';
-                                        e.currentTarget.style.borderColor = '#1890ff';
-                                    }}
-                                    onMouseLeave={e => {
-                                        e.currentTarget.style.background = 'rgba(255,255,255,0.7)';
-                                        e.currentTarget.style.borderColor = 'rgba(0,0,0,0.05)';
-                                    }}
-                                >
-                                    <Icon icon={iconName} style={{ fontSize: 28, width: '100%', height: '100%' }} />
-                                </button>
-                            </Tooltip>
-                        ))}
+                ) : visibleError ? (
+                    <div
+                        role="alert"
+                        style={{
+                            padding: '12px 8px',
+                            textAlign: 'center',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: 8,
+                        }}
+                    >
+                        <CloudDownloadOutlined aria-hidden="true" style={{ fontSize: 24, color: '#ff4d4f' }} />
+                        <Text style={{ maxWidth: 260, fontSize: 13, lineHeight: 1.4 }}>
+                            {t('designer.iconExplorer.searchFailed')}
+                        </Text>
+                        <Button
+                            type="primary"
+                            aria-label={t('common.retry')}
+                            onClick={() => setRetrySequence(sequence => sequence + 1)}
+                            style={{ minHeight: 'var(--commercial-touch-target, 44px)' }}
+                        >
+                            {t('common.retry')}
+                        </Button>
                     </div>
+                ) : visibleResults.length > 0 ? (
+                    <>
+                        <Text
+                            role="status"
+                            aria-live="polite"
+                            type="secondary"
+                            style={{ display: 'block', fontSize: 12, marginBottom: 8 }}
+                        >
+                            {t('designer.iconExplorer.resultsStatus', { count: visibleResults.length })}
+                        </Text>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(44px, 1fr))', gap: 10 }}>
+                            {visibleResults.map(iconName => (
+                                <Tooltip key={iconName} title={iconName} placement="right">
+                                    <button
+                                        type="button"
+                                        draggable
+                                        onDragStart={(e) => onDragStart(e, iconName)}
+                                        onClick={() => ctx.addNode('iconNode', createIconNodeData(iconName))}
+                                        aria-label={t('designer.iconExplorer.addIcon', { icon: iconName })}
+                                        style={{
+                                            aspectRatio: '1',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            background: 'rgba(255,255,255,0.7)',
+                                            border: '1px solid rgba(0,0,0,0.05)',
+                                            borderRadius: 8,
+                                            cursor: 'grab',
+                                            minWidth: 'var(--commercial-touch-target, 44px)',
+                                            minHeight: 'var(--commercial-touch-target, 44px)',
+                                            padding: 8,
+                                            transition: 'all 0.2s'
+                                        }}
+                                        onMouseEnter={e => {
+                                            e.currentTarget.style.background = '#fff';
+                                            e.currentTarget.style.borderColor = '#1890ff';
+                                        }}
+                                        onMouseLeave={e => {
+                                            e.currentTarget.style.background = 'rgba(255,255,255,0.7)';
+                                            e.currentTarget.style.borderColor = 'rgba(0,0,0,0.05)';
+                                        }}
+                                    >
+                                        <Icon icon={iconName} style={{ fontSize: 28, width: '100%', height: '100%' }} />
+                                    </button>
+                                </Tooltip>
+                            ))}
+                        </div>
+                    </>
                 ) : query && !visibleLoading ? (
-                    <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('designer.iconExplorer.noResults')} />
+                    <div role="status" aria-live="polite">
+                        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('designer.iconExplorer.noResults')} />
+                    </div>
                 ) : null}
             </div>
 
             {/* Footer / Tip */}
             <div style={{ padding: '8px 12px', background: 'rgba(0,0,0,0.02)', borderTop: '1px solid rgba(0,0,0,0.05)' }}>
-                <Text type="secondary" style={{ fontSize: 10 }}>
+                <Text type="secondary" style={{ fontSize: 12 }}>
                     <CloudDownloadOutlined style={{ marginRight: 4 }} />
                     {t('designer.iconExplorer.addOrDragHint')}
                 </Text>

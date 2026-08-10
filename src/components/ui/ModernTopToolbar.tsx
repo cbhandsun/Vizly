@@ -249,6 +249,7 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
 
   return (
     <div
+      data-designer-top-toolbar="true"
       className={`fixed top-3 left-3 right-3 z-[1000] flex justify-between pointer-events-none ${
         isMobile ? 'items-start h-auto gap-2' : 'items-center h-[40px] gap-3'
       }`}
@@ -363,7 +364,7 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
         isMobile
           ? 'absolute top-[48px] left-0 right-0 flex items-center justify-center min-w-0'
           : 'flex-1 flex items-center justify-center min-w-0'
-      }>
+      } data-designer-top-toolbar-center="true">
         <div className={`flex items-center gap-2 max-w-full ${
           isMobile ? 'w-full justify-center overflow-x-auto px-1' : ''
         }`}>

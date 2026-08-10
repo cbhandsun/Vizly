@@ -43,6 +43,8 @@ interface QuickCloneViewportInput {
     viewportY: number;
     zoom: number;
     margin?: number;
+    visibleTop?: number;
+    visibleBottom?: number;
 }
 
 export interface QuickCloneViewportAdjustment {
@@ -163,6 +165,8 @@ export const calculateQuickCloneViewportAdjustment = (
         input.viewportY,
         input.zoom,
         input.margin ?? 80,
+        input.visibleTop ?? 0,
+        input.visibleBottom ?? input.containerHeight,
     ];
 
     if (
@@ -179,6 +183,13 @@ export const calculateQuickCloneViewportAdjustment = (
     const visibleLeft = clamp(input.visibleLeft, 0, input.containerWidth);
     const visibleRight = clamp(input.visibleRight, visibleLeft, input.containerWidth);
     if (visibleRight <= visibleLeft) return null;
+    const visibleTop = clamp(input.visibleTop ?? 0, 0, input.containerHeight);
+    const visibleBottom = clamp(
+        input.visibleBottom ?? input.containerHeight,
+        visibleTop,
+        input.containerHeight,
+    );
+    if (visibleBottom <= visibleTop) return null;
 
     const horizontalMargin = clamp(
         Math.max(0, input.margin ?? 80),
@@ -188,7 +199,7 @@ export const calculateQuickCloneViewportAdjustment = (
     const verticalMargin = clamp(
         Math.max(0, input.margin ?? 80),
         0,
-        input.containerHeight / 2,
+        (visibleBottom - visibleTop) / 2,
     );
 
     const screenLeft = input.nodeX * input.zoom + input.viewportX;
@@ -200,8 +211,8 @@ export const calculateQuickCloneViewportAdjustment = (
         || screenRight > visibleRight - horizontalMargin
     );
     const verticalOutOfView = (
-        screenTop < verticalMargin
-        || screenBottom > input.containerHeight - verticalMargin
+        screenTop < visibleTop + verticalMargin
+        || screenBottom > visibleBottom - verticalMargin
     );
 
     if (!horizontalOutOfView && !verticalOutOfView) return null;
@@ -209,7 +220,7 @@ export const calculateQuickCloneViewportAdjustment = (
     const screenCenterX = (screenLeft + screenRight) / 2;
     const screenCenterY = (screenTop + screenBottom) / 2;
     const targetCenterX = (visibleLeft + visibleRight) / 2;
-    const targetCenterY = input.containerHeight / 2;
+    const targetCenterY = (visibleTop + visibleBottom) / 2;
 
     return {
         x: horizontalOutOfView

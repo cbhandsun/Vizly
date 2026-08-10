@@ -25,6 +25,7 @@ import {
     calculateQuickCloneViewportAdjustment,
 } from '../../custom-nodes/flowchartQuickClone';
 import { focusAddedFlowchartNodeById } from '../flowchartTabNavigation';
+import { calculateCanvasVisibleVerticalBounds } from '../canvasVisibleBounds';
 
 interface UseFlowchartPluginRuntimeOptions {
     pluginId: string;
@@ -95,6 +96,14 @@ export function useFlowchartPluginRuntime({
             const drawerRect = drawer?.getBoundingClientRect();
             const sidebar = document.querySelector<HTMLElement>('.designer-right-sidebar');
             const sidebarRect = sidebar?.getBoundingClientRect();
+            const topOverlayRects = Array.from(
+                document.querySelectorAll<HTMLElement>(
+                    '[data-designer-top-toolbar], [data-designer-top-toolbar-center]',
+                ),
+            ).map(element => element.getBoundingClientRect());
+            const bottomOverlayRects = Array.from(
+                document.querySelectorAll<HTMLElement>('.page-tabs, .mobile-bottom-dock-wrapper'),
+            ).map(element => element.getBoundingClientRect());
             const visibleLeft = calculateCanvasVisibleLeft({
                 containerLeft: containerRect.left,
                 containerRight: containerRect.right,
@@ -126,6 +135,15 @@ export function useFlowchartPluginRuntime({
                 ),
             });
             const viewport = reactFlowInstance.getViewport();
+            const { visibleTop, visibleBottom } = calculateCanvasVisibleVerticalBounds({
+                containerTop: containerRect.top,
+                containerBottom: containerRect.bottom,
+                containerLeft: containerRect.left,
+                containerRight: containerRect.right,
+                containerHeight: containerRect.height,
+                topOverlays: topOverlayRects,
+                bottomOverlays: bottomOverlayRects,
+            });
             const adjustment = calculateQuickCloneViewportAdjustment({
                 containerWidth: containerRect.width,
                 containerHeight: containerRect.height,
@@ -138,6 +156,8 @@ export function useFlowchartPluginRuntime({
                 viewportX: viewport.x,
                 viewportY: viewport.y,
                 zoom: viewport.zoom,
+                visibleTop,
+                visibleBottom,
             });
             if (adjustment) {
                 void reactFlowInstance.setViewport(adjustment, { duration: 260 });

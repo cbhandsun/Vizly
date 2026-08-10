@@ -155,6 +155,8 @@ describe('ModernTopToolbar responsive layout', () => {
     const centerPortal = container.querySelector('#vizly-plugin-center-island-portal');
     const centerSection = centerPortal?.parentElement?.parentElement?.parentElement;
 
+    expect(container.querySelector('[data-designer-top-toolbar="true"]')).toBeTruthy();
+    expect(centerSection?.getAttribute('data-designer-top-toolbar-center')).toBe('true');
     expect(centerSection?.className).toContain('absolute');
     expect(centerSection?.className).toContain('top-[48px]');
     expect(screen.queryByTestId('export-tools')).toBeNull();

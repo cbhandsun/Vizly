@@ -1334,6 +1334,7 @@
             "searchFailed": "Couldn't search icons. Check your connection and try again.",
             "searching": "Searching...",
             "addIcon": "Add icon {{icon}}",
+            "resultsStatus": "{{count}} matching icons",
             "noResults": "No matching icons",
             "addOrDragHint": "Click to add, or drag to place it on the canvas",
             "collections": {

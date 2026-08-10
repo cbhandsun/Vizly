@@ -1332,6 +1332,7 @@
             "searchFailed": "搜索图标失败，请检查网络连接后重试",
             "searching": "检索中...",
             "addIcon": "添加图标 {{icon}}",
+            "resultsStatus": "找到 {{count}} 个匹配图标",
             "noResults": "未找到匹配图标",
             "addOrDragHint": "点击添加，或拖拽到画布指定位置",
             "collections": {
