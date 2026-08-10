@@ -82,6 +82,7 @@ const ShareViewPage: React.FC = () => {
         || ''
     ) || '';
     const [requestRevision, setRequestRevision] = useState(0);
+    const notFoundHeadingRef = useRef<HTMLHeadingElement>(null);
     const retryButtonRef = useRef<HTMLAnchorElement | HTMLButtonElement>(null);
     const [loadResult, setLoadResult] = useState<{
         revision: number;
@@ -156,6 +157,11 @@ const ShareViewPage: React.FC = () => {
     }, [fallbackTitle, requestRevision, shareToken]);
 
     useEffect(() => {
+        if (state.status !== 'not-found') return;
+        notFoundHeadingRef.current?.focus();
+    }, [shareToken, state.status]);
+
+    useEffect(() => {
         if (state.status !== 'unavailable' || requestRevision === 0) return;
         retryButtonRef.current?.focus();
     }, [requestRevision, state.status]);
@@ -173,7 +179,15 @@ const ShareViewPage: React.FC = () => {
             <ShareViewStatePage>
                 <Result
                     status="404"
-                    title="404"
+                    title={(
+                        <h1
+                            ref={notFoundHeadingRef}
+                            className="share-view-result-title"
+                            tabIndex={-1}
+                        >
+                            404
+                        </h1>
+                    )}
                     subTitle={t('share.notFound')}
                     extra={<Button href="#/manage">{t('share.backToWorkspace')}</Button>}
                 />
@@ -187,7 +201,11 @@ const ShareViewPage: React.FC = () => {
                 <div role="alert" aria-atomic="true">
                     <Result
                         status="error"
-                        title={t('share.viewerUnavailable')}
+                        title={(
+                            <h1 className="share-view-result-title">
+                                {t('share.viewerUnavailable')}
+                            </h1>
+                        )}
                         subTitle={t('share.viewerUnavailableHint')}
                         extra={[
                             <Button

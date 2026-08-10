@@ -64,7 +64,7 @@ vi.mock('antd', () => ({
         extra?: React.ReactNode;
     }) => (
         <div>
-            <h1>{title}</h1>
+            {title}
             {subTitle && <p>{subTitle}</p>}
             {extra}
         </div>
@@ -135,6 +135,9 @@ describe('ShareViewPage', () => {
         expect(screen.getByRole('banner')).toHaveTextContent('Vizly');
         expect(screen.getByText('share.notFound')).toBeInTheDocument();
         expect(screen.getByRole('link', { name: 'share.backToWorkspace' })).toHaveAttribute('href', '#/manage');
+        await waitFor(() => {
+            expect(screen.getByRole('heading', { name: '404' })).toHaveFocus();
+        });
 
         await waitFor(() => {
             expect(getSharedDiagramMock).not.toHaveBeenCalled();

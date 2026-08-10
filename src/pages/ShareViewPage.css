@@ -53,6 +53,19 @@
     max-width: 680px;
 }
 
+.share-view-result-title {
+    display: inline-block;
+    margin: 0;
+    color: inherit;
+    font: inherit;
+}
+
+.share-view-result-title:focus-visible {
+    border-radius: 4px;
+    outline: 3px solid var(--ant-color-primary-border);
+    outline-offset: 6px;
+}
+
 .share-view-state-page .ant-result-extra .ant-btn,
 .share-view-state-page .ant-result-extra a.ant-btn {
     min-height: 44px;
