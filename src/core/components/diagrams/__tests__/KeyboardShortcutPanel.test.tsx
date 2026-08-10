@@ -33,6 +33,13 @@ beforeEach(async () => {
 });
 
 describe('KeyboardShortcutPanel', () => {
+    it('focuses the shortcut search when the panel opens', async () => {
+        render(<KeyboardShortcutPanel visible onClose={vi.fn()} />);
+
+        const search = screen.getByRole('textbox', { name: '搜索快捷键或动作' });
+        await waitFor(() => expect(document.activeElement).toBe(search));
+    });
+
     it('makes canvas search shortcuts discoverable through the live menu panel', () => {
         render(<KeyboardShortcutPanel visible onClose={vi.fn()} />);
 

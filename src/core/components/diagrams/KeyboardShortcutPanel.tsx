@@ -167,6 +167,7 @@ export const KeyboardShortcutPanel: React.FC<KeyboardShortcutPanelProps> = ({ vi
             }}
         >
             <Input
+                autoFocus
                 aria-label={t('designer.keyboardShortcuts.searchLabel')}
                 placeholder={t('designer.flowchartShortcuts.searchPlaceholder')}
                 prefix={<SearchOutlined aria-hidden="true" />}
