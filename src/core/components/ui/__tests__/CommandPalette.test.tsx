@@ -50,6 +50,7 @@ describe('CommandPalette commercial interaction contract', () => {
       />,
     );
 
+    expect(await screen.findByRole('dialog', { name: 'Search commands or diagrams' })).toBeTruthy();
     const search = await screen.findByRole('combobox', { name: 'Search commands or diagrams' });
     expect(search.getAttribute('aria-expanded')).toBe('true');
     expect(search.getAttribute('aria-autocomplete')).toBe('list');

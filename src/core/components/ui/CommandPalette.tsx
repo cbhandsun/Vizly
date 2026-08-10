@@ -254,14 +254,28 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, o
   return (
     <Modal
       open={open}
+      title={t('designer.commandPalette.searchAria')}
       onCancel={dismiss}
       footer={null}
       centered
       closable={false}
       keyboard={false}
-      focusTriggerAfterClose={false}
+      focusable={{ focusTriggerAfterClose: false }}
       width={720}
-      styles={{ body: { padding: 0 } }}
+      styles={{
+        header: {
+          position: 'absolute',
+          width: 1,
+          height: 1,
+          padding: 0,
+          margin: -1,
+          overflow: 'hidden',
+          clip: 'rect(0, 0, 0, 0)',
+          whiteSpace: 'nowrap',
+          border: 0,
+        },
+        body: { padding: 0 },
+      }}
       {...props}
     >
       <div
