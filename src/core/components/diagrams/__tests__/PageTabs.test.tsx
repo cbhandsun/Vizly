@@ -18,18 +18,23 @@ vi.mock('react-i18next', () => ({
                 'designer.pages.tabList': '页面',
                 'designer.pages.actions': '{{name}} 页面操作',
                 'designer.pages.new': '新建页面',
+                'designer.pages.createSuccess': '已新建页面',
                 'designer.pages.limitReached': '最多可创建 {{count}} 个页面',
                 'designer.pages.rename': '重命名页面 {{name}}',
                 'designer.pages.renameAction': '重命名页面 {{name}}',
                 'designer.pages.duplicateAction': '复制页面 {{name}}',
+                'designer.pages.duplicateSuccess': '已复制页面“{{name}}”',
                 'designer.pages.copyName': '{{name}} 副本',
                 'designer.pages.moveLeft': '向左移动页面',
                 'designer.pages.moveLeftNamed': '向左移动页面 {{name}}',
+                'designer.pages.moveLeftSuccess': '已将页面“{{name}}”向左移动',
                 'designer.pages.moveRight': '向右移动页面',
                 'designer.pages.moveRightNamed': '向右移动页面 {{name}}',
+                'designer.pages.moveRightSuccess': '已将页面“{{name}}”向右移动',
                 'designer.pages.nameRequired': '页面名称不能为空',
                 'designer.pages.duplicateName': '页面名称不能重复',
                 'designer.pages.renameFailed': '页面重命名失败，请重试',
+                'designer.pages.renameSuccess': '页面已重命名为“{{name}}”',
                 'designer.pages.delete': '删除页面 {{name}}',
                 'designer.pages.deleteConfirm': '删除「{{name}}」？',
                 'designer.pages.deleteDescription': '将删除此页面中的 {{nodeCount}} 个节点和 {{edgeCount}} 条连线。关闭或重新加载图表前，可恢复最近删除的页面。',
@@ -214,6 +219,7 @@ describe('PageTabs', () => {
         const createdPageTab = await screen.findByRole('tab', { name: '页面 2' });
         await waitFor(() => expect(document.activeElement).toBe(createdPageTab));
         expect(createdPageTab.getAttribute('aria-selected')).toBe('true');
+        expect(screen.getByRole('status').textContent).toBe('已新建页面');
     });
 
     it('offers an explicit rename action for the active page', () => {
@@ -256,6 +262,7 @@ describe('PageTabs', () => {
         const visibleError = await screen.findByRole('alert');
         expect(visibleError.textContent).toBe('页面名称不能重复');
         expect(visibleError.classList.contains('page-tabs__rename-error')).toBe(true);
+        expect(visibleError.parentElement?.classList.contains('page-tabs__rename-anchor')).toBe(true);
         expect(document.querySelector('.page-tabs__scroller')?.contains(visibleError)).toBe(false);
         expect(input.getAttribute('aria-invalid')).toBe('true');
         expect(input.getAttribute('maxlength')).toBe('80');
@@ -340,6 +347,7 @@ describe('PageTabs', () => {
         const renamedTab = await screen.findByRole('tab', { name: '总览' });
         await waitFor(() => expect(document.activeElement).toBe(renamedTab));
         expect(renamedTab.getAttribute('aria-selected')).toBe('true');
+        expect(screen.getByRole('status').textContent).toBe('页面已重命名为“总览”');
     });
 
     it('clears an invalid rename when the user switches to another page', async () => {
@@ -401,10 +409,36 @@ describe('PageTabs', () => {
         expect(moveRight.hasAttribute('disabled')).toBe(false);
 
         fireEvent.click(screen.getByRole('button', { name: '复制页面 页面 1' }));
+        expect(screen.getByRole('status').textContent).toBe('已复制页面“页面 1”');
         fireEvent.click(moveRight);
 
         expect(onDuplicatePage).toHaveBeenCalledWith('page-1', '页面 1 副本');
         expect(onMovePage).toHaveBeenCalledWith('page-1', 'right');
+        expect(screen.getByRole('status').textContent).toBe('已将页面“页面 1”向右移动');
+    });
+
+    it('does not announce page mutations that fail', () => {
+        render(
+            <PageTabs
+                pages={[
+                    { id: 'page-1', name: '页面 1', nodes: [], edges: [] },
+                    { id: 'page-2', name: '页面 2', nodes: [], edges: [] },
+                ]}
+                activePageId="page-1"
+                onSwitchPage={vi.fn()}
+                onAddPage={vi.fn(() => null)}
+                onDeletePage={vi.fn()}
+                onRenamePage={vi.fn()}
+                onDuplicatePage={vi.fn(() => null)}
+                onMovePage={vi.fn(() => false)}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: '新建页面' }));
+        fireEvent.click(screen.getByRole('button', { name: '复制页面 页面 1' }));
+        fireEvent.click(screen.getByRole('button', { name: '向右移动页面 页面 1' }));
+
+        expect(screen.getByRole('status').textContent).toBe('');
     });
 
     it('disables page creation at the 50-page limit', () => {

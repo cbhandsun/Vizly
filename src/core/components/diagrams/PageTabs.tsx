@@ -178,6 +178,10 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
         const renamedPageId = editingId;
         setRenameError(null);
         setEditingId(null);
+        setStatusMessage(t('designer.pages.renameSuccess', {
+            name: normalizedName,
+            defaultValue: '页面已重命名为“{{name}}”',
+        }));
         requestAnimationFrame(() => focusPageTab(renamedPageId));
     }, [editingId, editName, focusPageTab, onRenamePage, pages, t]);
 
@@ -196,8 +200,12 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
 
     const handleAddPage = useCallback(() => {
         const newPageId = onAddPage();
-        if (newPageId) addedPageFocusTargetRef.current = newPageId;
-    }, [onAddPage]);
+        if (!newPageId) return;
+        addedPageFocusTargetRef.current = newPageId;
+        setStatusMessage(t('designer.pages.createSuccess', {
+            defaultValue: '已新建页面',
+        }));
+    }, [onAddPage, t]);
 
     const handleDuplicatePage = useCallback((page: DiagramPage) => {
         if (!onDuplicatePage) return;
@@ -206,8 +214,27 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
             defaultValue: '{{name}} 副本',
         });
         const newPageId = onDuplicatePage(page.id, preferredName);
-        if (newPageId) addedPageFocusTargetRef.current = newPageId;
+        if (!newPageId) return;
+        addedPageFocusTargetRef.current = newPageId;
+        setStatusMessage(t('designer.pages.duplicateSuccess', {
+            name: page.name,
+            defaultValue: '已复制页面“{{name}}”',
+        }));
     }, [onDuplicatePage, t]);
+
+    const handleMovePage = useCallback((page: DiagramPage, direction: 'left' | 'right') => {
+        if (!onMovePage?.(page.id, direction)) return;
+        const statusKey = direction === 'left'
+            ? 'designer.pages.moveLeftSuccess'
+            : 'designer.pages.moveRightSuccess';
+        const defaultValue = direction === 'left'
+            ? '已将页面“{{name}}”向左移动'
+            : '已将页面“{{name}}”向右移动';
+        setStatusMessage(t(statusKey, {
+            name: page.name,
+            defaultValue,
+        }));
+    }, [onMovePage, t]);
 
     const handleRestoreDeletedPage = useCallback(() => {
         const restoredPageId = onRestoreDeletedPage?.();
@@ -328,6 +355,11 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                                 onKeyDown={handleRenameKeyDown}
                                 className="page-tabs__rename"
                             />
+                            {renameError && (
+                                <span id={renameErrorId} role="alert" className="page-tabs__rename-error">
+                                    {renameError}
+                                </span>
+                            )}
                         </span>
                     ) : (
                         <>
@@ -342,7 +374,7 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                                             })}
                                             className="page-tabs__move"
                                             disabled={disabled || activePageIndex <= 0}
-                                            onClick={() => onMovePage(activePage.id, 'left')}
+                                            onClick={() => handleMovePage(activePage, 'left')}
                                         >
                                             <ArrowLeftOutlined aria-hidden style={{ fontSize: 12 }} />
                                         </button>
@@ -356,7 +388,7 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                                             })}
                                             className="page-tabs__move"
                                             disabled={disabled || activePageIndex >= pages.length - 1}
-                                            onClick={() => onMovePage(activePage.id, 'right')}
+                                            onClick={() => handleMovePage(activePage, 'right')}
                                         >
                                             <ArrowRightOutlined aria-hidden style={{ fontSize: 12 }} />
                                         </button>
@@ -482,12 +514,6 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                         </>
                     )}
                 </div>
-            )}
-
-            {renameError && (
-                <span id={renameErrorId} role="alert" className="page-tabs__rename-error">
-                    {renameError}
-                </span>
             )}
 
             <span className="page-tabs__visually-hidden" role="status" aria-live="polite">

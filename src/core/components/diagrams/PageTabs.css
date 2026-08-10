@@ -173,7 +173,7 @@
 
 .page-tabs__rename-error {
     position: absolute;
-    right: calc(var(--commercial-touch-target, 44px) + 10px);
+    right: 0;
     bottom: calc(100% + 8px);
     z-index: 2;
     width: max-content;
@@ -192,14 +192,14 @@
 .page-tabs__rename-error::after {
     position: absolute;
     top: 100%;
-    left: 50%;
+    right: 48px;
     width: 8px;
     height: 8px;
     background: rgba(15, 23, 42, 0.96);
     border-right: 1px solid color-mix(in srgb, var(--page-tab-error-color) 60%, transparent);
     border-bottom: 1px solid color-mix(in srgb, var(--page-tab-error-color) 60%, transparent);
     content: '';
-    transform: translate(-50%, -50%) rotate(45deg);
+    transform: translate(50%, -50%) rotate(45deg);
 }
 
 @media (max-width: 768px) {
