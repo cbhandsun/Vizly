@@ -6,7 +6,7 @@ import {
     FaSitemap, FaObjectGroup, FaRuler,
     FaEllipsisH, FaTrashAlt,
     FaMagnet, FaPen, FaStickyNote, FaMousePointer,
-    FaFolderOpen, FaFileExport, FaMap, FaSearch,
+    FaFolderOpen, FaFileExport, FaHistory, FaMap, FaSearch,
 } from 'react-icons/fa';
 import { BackgroundVariant } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
@@ -159,6 +159,12 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
     const [bottomPortalTarget, setBottomPortalTarget] = useState<HTMLElement | null>(null);
     const [canvasSettingsOpen, setCanvasSettingsOpen] = useState(false);
     const canvasSettingsTriggerRef = useRef<HTMLButtonElement>(null);
+    const hasHistoryEntries = typeof historyCount === 'number'
+        && Number.isSafeInteger(historyCount)
+        && historyCount > 0;
+    const historyButtonLabel = hasHistoryEntries
+        ? t('designer.toolbar.historyWithCount', { count: historyCount })
+        : t('designer.toolbar.historyPanel');
     const layoutDropdown = useKeyboardAccessibleDropdown({
         overlayClassName: 'flowchart-layout-menu',
     });
@@ -478,8 +484,14 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                         <Button type="text" aria-label={t('designer.toolbar.undo')} icon={<FaUndo size={13} />} onClick={onUndo} disabled={!canUndo} className={canUndo ? tbtn : tbtnDisabled} />
                     </Tooltip>
                     {onShowHistory && screens.md && (
-                        <Tooltip title={historyCount ? t('designer.toolbar.historyWithCount', { count: historyCount }) : t('designer.toolbar.historyPanel')}>
-                            <Button type="text" size="small" aria-label={t('designer.toolbar.historyPanel')} onClick={onShowHistory} className="w-4 h-8 p-0 border-none text-[8px] text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 bg-transparent flex items-center justify-center">▾</Button>
+                        <Tooltip title={historyButtonLabel}>
+                            <Button
+                                type="text"
+                                aria-label={historyButtonLabel}
+                                icon={<FaHistory size={13} />}
+                                onClick={onShowHistory}
+                                className={tbtn}
+                            />
                         </Tooltip>
                     )}
                     <Tooltip title={t('designer.toolbar.redo')}>

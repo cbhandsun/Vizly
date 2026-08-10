@@ -6,7 +6,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('react-i18next', () => ({
     useTranslation: () => ({
-        t: (key: string, fallback?: string) => typeof fallback === 'string' ? fallback : key,
+        t: (key: string, fallback?: string | { count?: number }) => {
+            if (key === 'designer.toolbar.historyWithCount' && typeof fallback === 'object') {
+                return `历史记录 (${fallback.count ?? 0})`;
+            }
+            return typeof fallback === 'string' ? fallback : key;
+        },
     }),
 }));
 
@@ -16,6 +21,22 @@ class MockResizeObserver implements ResizeObserver {
     unobserve(target: Element): void { void target; }
     disconnect(): void { return; }
 }
+
+const useDesktopBreakpoint = () => {
+    Object.defineProperty(window, 'matchMedia', {
+        configurable: true,
+        value: vi.fn().mockImplementation((query: string) => ({
+            matches: query.includes('min-width: 768px'),
+            media: query,
+            onchange: null,
+            addListener: vi.fn(),
+            removeListener: vi.fn(),
+            addEventListener: vi.fn(),
+            removeEventListener: vi.fn(),
+            dispatchEvent: vi.fn(),
+        })),
+    });
+};
 
 import { ModernFlowchartToolbar } from '../ModernFlowchartToolbar';
 import { buildToolModeMenuItems } from '../flowchartToolbarToolModeMenu';
@@ -95,19 +116,7 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
     });
 
     it('gives persistent desktop creation actions accessible names', async () => {
-        Object.defineProperty(window, 'matchMedia', {
-            configurable: true,
-            value: vi.fn().mockImplementation((query: string) => ({
-                matches: query.includes('min-width: 768px'),
-                media: query,
-                onchange: null,
-                addListener: vi.fn(),
-                removeListener: vi.fn(),
-                addEventListener: vi.fn(),
-                removeEventListener: vi.fn(),
-                dispatchEvent: vi.fn(),
-            })),
-        });
+        useDesktopBreakpoint();
 
         render(
             <ModernFlowchartToolbar
@@ -138,19 +147,7 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
     });
 
     it('exposes desktop canvas helper states and the settings disclosure state', async () => {
-        Object.defineProperty(window, 'matchMedia', {
-            configurable: true,
-            value: vi.fn().mockImplementation((query: string) => ({
-                matches: query.includes('min-width: 768px'),
-                media: query,
-                onchange: null,
-                addListener: vi.fn(),
-                removeListener: vi.fn(),
-                addEventListener: vi.fn(),
-                removeEventListener: vi.fn(),
-                dispatchEvent: vi.fn(),
-            })),
-        });
+        useDesktopBreakpoint();
 
         render(
             <ModernFlowchartToolbar
@@ -180,6 +177,75 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
         expect(settings.getAttribute('aria-expanded')).toBe('false');
         fireEvent.click(settings);
         await waitFor(() => expect(settings.getAttribute('aria-expanded')).toBe('true'));
+    });
+
+    it('gives the desktop history action a full target and announces its entry count', async () => {
+        useDesktopBreakpoint();
+        const onShowHistory = vi.fn();
+
+        render(
+            <ModernFlowchartToolbar
+                canUndo
+                canRedo
+                onUndo={vi.fn()}
+                onRedo={vi.fn()}
+                onZoomIn={vi.fn()}
+                onZoomOut={vi.fn()}
+                onFitView={vi.fn()}
+                autoRouting={false}
+                toggleAutoRouting={vi.fn()}
+                showGrid
+                toggleGrid={vi.fn()}
+                onShowShortcuts={vi.fn()}
+                showRuler={false}
+                toggleRuler={vi.fn()}
+                onShowHistory={onShowHistory}
+                historyCount={3}
+            />,
+        );
+
+        const history = await screen.findByRole('button', { name: '历史记录 (3)' });
+        expect(history.className).toContain('w-8');
+        expect(history.className).toContain('h-8');
+        expect(history.textContent).not.toContain('▾');
+        fireEvent.click(history);
+        expect(onShowHistory).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+        undefined,
+        0,
+        -1,
+        1.5,
+        Number.NaN,
+        Number.POSITIVE_INFINITY,
+        Number.MAX_SAFE_INTEGER + 1,
+    ])('does not announce an invalid history count: %s', async (historyCount) => {
+        useDesktopBreakpoint();
+
+        render(
+            <ModernFlowchartToolbar
+                canUndo={false}
+                canRedo={false}
+                onUndo={vi.fn()}
+                onRedo={vi.fn()}
+                onZoomIn={vi.fn()}
+                onZoomOut={vi.fn()}
+                onFitView={vi.fn()}
+                autoRouting={false}
+                toggleAutoRouting={vi.fn()}
+                showGrid
+                toggleGrid={vi.fn()}
+                onShowShortcuts={vi.fn()}
+                showRuler={false}
+                toggleRuler={vi.fn()}
+                onShowHistory={vi.fn()}
+                historyCount={historyCount}
+            />,
+        );
+
+        expect(await screen.findByRole('button', { name: 'designer.toolbar.historyPanel' })).toBeTruthy();
+        expect(screen.queryByRole('button', { name: /历史记录 \(/ })).toBeNull();
     });
 
     it('keeps the file-actions trigger available when the desktop breakpoint is absent', async () => {
