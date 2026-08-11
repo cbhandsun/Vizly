@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { Node, Edge, ReactFlowInstance } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import { PluginContext, DiagramTypePlugin } from '../../../types/plugin';
@@ -22,7 +22,11 @@ import {
     shouldFocusEditableEdge,
 } from '../edgeEditingViewport';
 import { buildDiagramSelectionDuplicate } from '../diagramSelectionDuplication';
-import { scheduleFlowchartEmptyStateFocus } from '../flowchartDeletionFocus';
+import {
+    resolveFlowchartDeletionFocusNodeId,
+    scheduleFlowchartDeletionNodeFocus,
+    scheduleFlowchartEmptyStateFocus,
+} from '../flowchartDeletionFocus';
 
 type AlignmentType = 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom';
 type DistributionType = 'horizontal' | 'vertical';
@@ -93,6 +97,9 @@ export const useDiagramActions = ({
     activePlugin
 }: UseDiagramActionsProps) => {
     const { t } = useTranslation();
+    const deletionFocusRequestRef = useRef<{ cancel: () => void } | null>(null);
+
+    useEffect(() => () => deletionFocusRequestRef.current?.cancel(), []);
 
     const handleDelete = useCallback(async (target?: DiagramActionTarget) => {
         // Determine what to delete
@@ -173,18 +180,35 @@ export const useDiagramActions = ({
 
             if (nodeIdsToDelete.size === 0 && edgeIdsToDelete.size === 0) return;
 
+            const survivorFocusNodeId = resolveFlowchartDeletionFocusNodeId(
+                currentNodes,
+                nodeIdsToDelete,
+                typeof document === 'undefined' ? null : document.activeElement,
+            );
+
             takeSnapshot(currentNodes, currentEdges, t('designer.historyPanel.beforeDelete', {
                 count: nodeIdsToDelete.size + edgeIdsToDelete.size,
             }));
-            setNodes(nds => nds.filter(n => !nodeIdsToDelete.has(n.id)));
-            setEdges(eds => eds.filter(e =>
-                !edgeIdsToDelete.has(e.id) &&
-                !nodeIdsToDelete.has(e.source) &&
-                !nodeIdsToDelete.has(e.target)
-            ));
+            setNodes(nds => nds
+                .filter(n => !nodeIdsToDelete.has(n.id))
+                .map(n => survivorFocusNodeId
+                    ? { ...n, selected: n.id === survivorFocusNodeId }
+                    : n));
+            setEdges(eds => eds
+                .filter(e =>
+                    !edgeIdsToDelete.has(e.id) &&
+                    !nodeIdsToDelete.has(e.source) &&
+                    !nodeIdsToDelete.has(e.target)
+                )
+                .map(e => survivorFocusNodeId ? { ...e, selected: false } : e));
             const removedFinalNode = nodeIdsToDelete.size > 0
                 && currentNodes.every(node => nodeIdsToDelete.has(node.id));
-            if (removedFinalNode) scheduleFlowchartEmptyStateFocus();
+            deletionFocusRequestRef.current?.cancel();
+            if (removedFinalNode) {
+                deletionFocusRequestRef.current = scheduleFlowchartEmptyStateFocus();
+            } else if (survivorFocusNodeId) {
+                deletionFocusRequestRef.current = scheduleFlowchartDeletionNodeFocus(survivorFocusNodeId);
+            }
         }
     }, [nodes, edges, nodesRef, edgesRef, selectedNodes, selectedEdges, setNodes, setEdges, takeSnapshot, activePlugin, pluginCtx, t]);
 

@@ -89,14 +89,30 @@ describe('useDiagramActions explicit selection targets', () => {
         action.remove();
     });
 
-    it('keeps the existing focus context when deletion leaves another node', async () => {
-        const requestAnimationFrameSpy = vi.spyOn(window, 'requestAnimationFrame');
+    it('selects and focuses the surviving node when deletion removes the focused node', async () => {
+        const animationFrames: FrameRequestCallback[] = [];
+        vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => {
+            animationFrames.push(callback);
+            return animationFrames.length;
+        });
         const targetNode = node('node-1', true);
-        const remainingNode = node('node-2');
+        const remainingNode = { ...node('node-2'), position: { x: 80, y: 20 } };
+        let currentNodes = [targetNode, remainingNode];
+        const setNodes = vi.fn((update: SetStateAction<Node[]>) => {
+            currentNodes = typeof update === 'function' ? update(currentNodes) : update;
+        });
+        document.body.innerHTML = `
+            <div class="react-flow__node" data-id="node-1">
+                <div id="deleted-node" role="treeitem" aria-selected="true" tabindex="0"></div>
+            </div>
+        `;
+        const deletedNode = document.querySelector<HTMLElement>('#deleted-node');
+        if (!deletedNode) throw new Error('test fixture missing');
+        deletedNode.focus();
         const { result } = renderHook(() => useDiagramActions({
             nodes: [targetNode, remainingNode],
             edges: [],
-            setNodes: vi.fn(),
+            setNodes,
             setEdges: vi.fn(),
             selectedNodes: [targetNode],
             selectedEdges: [],
@@ -106,7 +122,15 @@ describe('useDiagramActions explicit selection targets', () => {
 
         await act(async () => result.current.handleDelete());
 
-        expect(requestAnimationFrameSpy).not.toHaveBeenCalled();
+        expect(currentNodes).toEqual([{ ...remainingNode, selected: true }]);
+        expect(animationFrames).toHaveLength(1);
+        document.body.innerHTML = `
+            <div class="react-flow__node" data-id="node-2" tabindex="0">
+                <div id="surviving-node" role="treeitem" aria-selected="true" tabindex="0"></div>
+            </div>
+        `;
+        act(() => animationFrames.shift()?.(0));
+        expect(document.activeElement?.id).toBe('surviving-node');
     });
 
     it('records a meaningful pre-operation label before duplicating nodes', () => {
