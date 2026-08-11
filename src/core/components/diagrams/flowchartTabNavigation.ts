@@ -44,6 +44,23 @@ export const focusFlowchartNodeById = (
 };
 
 /**
+ * Restores keyboard context to the canvas after a transient canvas surface
+ * closes. React Flow's application root is programmatically focusable only
+ * after it receives tabindex=-1. The negative value keeps it out of the normal
+ * tab order while allowing focus to remain stable in real browsers.
+ */
+export const focusFlowchartCanvas = (root: ParentNode): boolean => {
+    const canvas = root.querySelector<HTMLElement>('.react-flow[role="application"], .react-flow');
+    if (!canvas) return false;
+
+    if (!canvas.hasAttribute('tabindex')) {
+        canvas.setAttribute('tabindex', '-1');
+    }
+    canvas.focus({ preventScroll: true });
+    return canvas.ownerDocument.activeElement === canvas;
+};
+
+/**
  * Keeps pointer selection and keyboard context on the same edge. React Flow
  * selects SVG edges on click but browsers do not focus the SVG group by
  * default, so focus must be handed over explicitly after selection settles.

@@ -213,6 +213,45 @@
     },
     "designer": {
         "title": "Diagram View",
+        "quickConnect": {
+            "title": "Quick connect shape picker",
+            "searchLabel": "Search shapes to connect",
+            "searchPlaceholder": "Search shapes, for example: Database",
+            "optionsLabel": "Shapes available to connect",
+            "noResults": "No matching shapes",
+            "centralTopic": "Central Topic",
+            "groups": {
+                "basic": "Basic",
+                "document": "Documents",
+                "geometry": "Geometry",
+                "advanced": "Advanced",
+                "mindMap": "Mind map"
+            },
+            "shapes": {
+                "process": "Process",
+                "startEnd": "Start/End",
+                "decision": "Decision",
+                "inputOutput": "Input/Output",
+                "database": "Database",
+                "subProcess": "Sub-process",
+                "document": "Document",
+                "multiDocument": "Multi-document",
+                "note": "Note",
+                "ellipse": "Ellipse",
+                "circle": "Circle",
+                "triangle": "Triangle",
+                "hexagon": "Hexagon",
+                "trapezoid": "Trapezoid",
+                "star": "Star",
+                "cloud": "Cloud",
+                "manualInput": "Manual input",
+                "delay": "Delay",
+                "display": "Display",
+                "offPage": "Off-page connector",
+                "storage": "Internal storage",
+                "mindMap": "Mind map"
+            }
+        },
         "mobileDock": {
             "add": "Add component",
             "properties": "Properties",

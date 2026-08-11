@@ -2,6 +2,7 @@
 
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+    focusFlowchartCanvas,
     focusAddedFlowchartNodeById,
     focusFlowchartEdgeById,
     focusFlowchartNodeById,
@@ -70,6 +71,17 @@ describe('flowchartTabNavigation', () => {
         expect(focusFlowchartNodeById(document, '')).toBe(false);
         expect(focusFlowchartNodeById(document, 'x'.repeat(1_025))).toBe(false);
         expect(focusFlowchartNodeById(document, 'missing')).toBe(false);
+    });
+
+    it('restores canvas focus while keeping the application root out of the sequential tab order', () => {
+        document.body.innerHTML = '<div class="react-flow" role="application"></div>';
+        const canvas = document.querySelector<HTMLElement>('.react-flow');
+        if (!canvas) throw new Error('test fixture missing');
+
+        expect(focusFlowchartCanvas(document)).toBe(true);
+        expect(document.activeElement).toBe(canvas);
+        expect(canvas.getAttribute('tabindex')).toBe('-1');
+        expect(focusFlowchartCanvas(document.createDocumentFragment())).toBe(false);
     });
 
     it('hands added-node focus to the selected semantic target with a safe container fallback', () => {
