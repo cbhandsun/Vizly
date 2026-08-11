@@ -6,8 +6,18 @@ export interface HistoryFeedbackPort {
         type: 'success';
         content: string;
         duration: number;
+        pauseOnHover: false;
+        style: {
+            marginTop: number;
+            pointerEvents: 'none';
+        };
     }) => void;
 }
+
+const HISTORY_FEEDBACK_STYLE = {
+    marginTop: 80,
+    pointerEvents: 'none',
+} as const;
 
 export const runHistoryActionWithFeedback = (
     action: () => boolean,
@@ -22,6 +32,8 @@ export const runHistoryActionWithFeedback = (
         type: 'success',
         content,
         duration: 2,
+        pauseOnHover: false,
+        style: HISTORY_FEEDBACK_STYLE,
     });
     return true;
 };

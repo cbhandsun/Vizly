@@ -51,6 +51,11 @@ describe('history action feedback', () => {
             type: 'success',
             content: '已撤销上一步，可使用重做恢复',
             duration: 2,
+            pauseOnHover: false,
+            style: {
+                marginTop: 80,
+                pointerEvents: 'none',
+            },
         }]);
     });
 
