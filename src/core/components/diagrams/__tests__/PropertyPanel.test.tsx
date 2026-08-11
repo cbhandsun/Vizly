@@ -5,6 +5,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { Node } from '@xyflow/react';
 import { describe, expect, it, vi } from 'vitest';
 
+import { bindDialogEscapeClose } from '../dialogFocus';
 import PropertyPanel from '../PropertyPanel';
 
 vi.mock('react-i18next', () => ({
@@ -210,6 +211,43 @@ describe('PropertyPanel field synchronization', () => {
                 name: 'propertyPanel.mainColor: propertyPanel.colorPicker.alpha',
             })).toBeTruthy();
         });
+    });
+
+    it('lets the color popup own Escape and restores focus to its trigger', async () => {
+        const closeParentDialog = vi.fn();
+        render(
+            <div role="dialog" aria-label="Mobile properties">
+                <PropertyPanel
+                    selectedNodes={[createNode('Popup escape')]}
+                    selectedEdges={[]}
+                    onUpdateNodes={vi.fn()}
+                    onUpdateEdges={vi.fn()}
+                    docked
+                />
+            </div>,
+        );
+
+        const parentDialog = screen.getByRole('dialog', { name: 'Mobile properties' });
+        const unbindEscape = bindDialogEscapeClose(window, closeParentDialog, parentDialog);
+        fireEvent.click(screen.getByText('propertyPanel.colors'));
+        const trigger = screen.getByRole('button', { name: 'propertyPanel.mainColor' });
+        fireEvent.click(trigger);
+
+        const popup = await screen.findByRole('group', {
+            name: 'propertyPanel.mainColor: propertyPanel.colorPicker.editor',
+        });
+        expect(popup.getAttribute('data-preserve-dialog-on-escape')).toBe('true');
+        const valueInput = screen.getByRole('textbox', {
+            name: 'propertyPanel.mainColor: propertyPanel.colorPicker.value',
+        });
+        valueInput.focus();
+        fireEvent.keyDown(valueInput, { key: 'Escape' });
+
+        await waitFor(() => {
+            expect(document.activeElement).toBe(trigger);
+        });
+        expect(closeParentDialog).not.toHaveBeenCalled();
+        unbindEscape();
     });
 
     it('keeps property color buttons at the commercial touch-target size', () => {
