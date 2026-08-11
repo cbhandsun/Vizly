@@ -14,6 +14,7 @@ import {
     getFirstInvalidFieldName,
     S3_CONNECTION_TIMEOUT_MS,
 } from './storageConfigPageModel';
+import { StorageSecretInput } from './StorageSecretInput';
 import './StorageConfigPage.css';
 
 const { Title, Paragraph } = Typography;
@@ -275,10 +276,13 @@ const StorageConfigPage: React.FC = () => {
                             label={t('storageConfig.form.accessKeyLabel')}
                             rules={[{ required: true, message: t('storageConfig.form.accessKeyRequired') }]}
                         >
-                            <Input.Password
+                            <StorageSecretInput
                                 placeholder={t('storageConfig.form.accessKeyPlaceholder')}
                                 maxLength={S3_STORAGE_INPUT_LIMITS.accessKeyId}
                                 autoComplete="off"
+                                visibilityLabel={t('storageConfig.form.accessKeyVisibilityLabel')}
+                                revealTitle={t('storageConfig.form.revealSecretValue')}
+                                concealTitle={t('storageConfig.form.concealSecretValue')}
                             />
                         </Form.Item>
 
@@ -293,10 +297,13 @@ const StorageConfigPage: React.FC = () => {
                                 },
                             }]}
                         >
-                            <Input.Password
+                            <StorageSecretInput
                                 placeholder={t('storageConfig.form.secretKeyPlaceholder')}
                                 maxLength={S3_STORAGE_INPUT_LIMITS.secretAccessKey}
                                 autoComplete="new-password"
+                                visibilityLabel={t('storageConfig.form.secretKeyVisibilityLabel')}
+                                revealTitle={t('storageConfig.form.revealSecretValue')}
+                                concealTitle={t('storageConfig.form.concealSecretValue')}
                             />
                         </Form.Item>
 
