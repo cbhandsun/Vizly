@@ -27,6 +27,8 @@ describe('storage configuration commercial safeguards', () => {
         expect(source).toContain('storageService.testConnection(values, controller.signal)');
         expect(source).toContain('disabled={testing}');
         expect(source).toContain('disabled={loading}');
+        expect(source).toContain('<SaveOutlined aria-hidden="true" />');
+        expect(source).toContain('<ApiOutlined aria-hidden="true" />');
         expect(source).not.toContain('<div className="workspace-header-brand"');
     });
 

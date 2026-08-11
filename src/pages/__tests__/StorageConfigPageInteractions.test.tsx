@@ -98,8 +98,8 @@ describe('StorageConfigPage validation recovery', () => {
     });
 
     it.each([
-        { action: 'save', accessibleName: 'save storageConfig.form.saveBtn' },
-        { action: 'test', accessibleName: 'api storageConfig.form.testBtn' },
+        { action: 'save', accessibleName: 'storageConfig.form.saveBtn' },
+        { action: 'test', accessibleName: 'storageConfig.form.testBtn' },
     ])('focuses the first invalid field and exposes persistent recovery for $action', async ({ accessibleName }) => {
         render(<StorageConfigPage />);
 
@@ -111,5 +111,21 @@ describe('StorageConfigPage validation recovery', () => {
         expect(screen.getByText('storageConfig.status.invalid')).toBeInTheDocument();
         expect(storageMocks.saveConfig).not.toHaveBeenCalled();
         expect(storageMocks.testConnection).not.toHaveBeenCalled();
+    });
+
+    it('keeps decorative action icons out of localized accessible names', () => {
+        render(<StorageConfigPage />);
+
+        const saveButton = screen.getByRole('button', {
+            name: 'storageConfig.form.saveBtn',
+        });
+        const testButton = screen.getByRole('button', {
+            name: 'storageConfig.form.testBtn',
+        });
+
+        expect(saveButton.querySelector('.anticon')).toHaveAttribute('aria-hidden', 'true');
+        expect(testButton.querySelector('.anticon')).toHaveAttribute('aria-hidden', 'true');
+        expect(screen.queryByRole('button', { name: 'save storageConfig.form.saveBtn' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'api storageConfig.form.testBtn' })).not.toBeInTheDocument();
     });
 });

@@ -321,14 +321,14 @@ const StorageConfigPage: React.FC = () => {
                                 <Button
                                     type="primary"
                                     htmlType="submit"
-                                    icon={<SaveOutlined />}
+                                    icon={<SaveOutlined aria-hidden="true" />}
                                     loading={loading}
                                     disabled={testing}
                                 >
                                     {t('storageConfig.form.saveBtn')}
                                 </Button>
                                 <Button
-                                    icon={<ApiOutlined />}
+                                    icon={<ApiOutlined aria-hidden="true" />}
                                     onClick={() => void handleTestConnection()}
                                     loading={testing}
                                     disabled={loading}
