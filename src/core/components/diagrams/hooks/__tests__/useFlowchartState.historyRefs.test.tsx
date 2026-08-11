@@ -97,6 +97,70 @@ describe('useFlowchartState history ref boundaries', () => {
         expect(useDiagramStore.getState().nodes).toEqual(restored);
     });
 
+    it('keeps focus aligned with selection across undo and redo of a created node', () => {
+        const source = { ...node('source', 0), selected: true };
+        const current = [
+            { ...source, selected: false },
+            { ...node('new-node', 160), selected: true },
+        ];
+        useDiagramStore.setState({ nodes: current, edges: [] });
+        const frames: FrameRequestCallback[] = [];
+        vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => {
+            frames.push(callback);
+            return frames.length;
+        });
+        const { result } = renderHook(() => useFlowchartState());
+
+        act(() => {
+            result.current.diagramHistory.takeSnapshot([source], [], '快速添加前');
+            result.current.setNodes(current);
+        });
+        document.body.innerHTML = `
+            <div class="react-flow__node" data-id="source" tabindex="0">
+                <div role="treeitem" aria-selected="false" tabindex="0"></div>
+            </div>
+            <div class="react-flow__node" data-id="new-node" tabindex="0">
+                <div id="focused-new-node" role="treeitem" aria-selected="true" tabindex="0"></div>
+            </div>
+        `;
+        const focusedNewNode = document.querySelector<HTMLElement>('#focused-new-node');
+        if (!focusedNewNode) throw new Error('test fixture missing');
+        focusedNewNode.focus();
+
+        act(() => {
+            expect(result.current.diagramHistory.undo()).toBe(true);
+        });
+        document.body.innerHTML = `
+            <div class="react-flow__node" data-id="source" tabindex="0">
+                <div id="restored-source" role="treeitem" aria-selected="true" tabindex="0"></div>
+            </div>
+        `;
+        act(() => {
+            frames.shift()?.(0);
+        });
+
+        expect(document.activeElement?.id).toBe('restored-source');
+        expect(useDiagramStore.getState().nodes).toEqual([source]);
+
+        act(() => {
+            expect(result.current.diagramHistory.redo()).toBe(true);
+        });
+        document.body.innerHTML = `
+            <div class="react-flow__node" data-id="source" tabindex="0">
+                <div role="treeitem" aria-selected="false" tabindex="0"></div>
+            </div>
+            <div class="react-flow__node" data-id="new-node" tabindex="0">
+                <div id="redone-new-node" role="treeitem" aria-selected="true" tabindex="0"></div>
+            </div>
+        `;
+        act(() => {
+            frames.shift()?.(16);
+        });
+
+        expect(document.activeElement?.id).toBe('redone-new-node');
+        expect(useDiagramStore.getState().nodes).toEqual(current);
+    });
+
     it('restores focus to the empty action when redo removes the focused final node', () => {
         const restored = [{ ...node('node-1', 0), selected: true }];
         useDiagramStore.setState({ nodes: restored, edges: [] });

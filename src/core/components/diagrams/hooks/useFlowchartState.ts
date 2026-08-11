@@ -14,6 +14,7 @@ import { useDiagramHistory } from '../../../hooks/useDiagramHistory';
 import { useDiagramStylePreset_v2 } from '../../../hooks/useDiagramStylePreset_v2';
 import { useDiagramStore } from '../../../store/useDiagramStore';
 import {
+    resolveHistoryNodeFocusAfterChange,
     resolveUndoRestoredNodeFocusId,
     scheduleUndoRestoredNodeFocus,
     shouldFocusEmptyStateAfterRedo,
@@ -207,11 +208,12 @@ export const useFlowchartState = (edgeMode: 'advanced-smart' | 'native' = 'advan
         const currentNodes = nodesRef.current;
         const prevState = undo(currentNodes, edgesRef.current); // 🚀 ref
         if (!prevState) return false;
+        const activeElement = typeof document === 'undefined' ? null : document.activeElement;
         const restoredFocusNodeId = resolveUndoRestoredNodeFocusId(
             currentNodes,
             prevState.nodes,
-            typeof document === 'undefined' ? null : document.activeElement,
-        );
+            activeElement,
+        ) ?? resolveHistoryNodeFocusAfterChange(currentNodes, prevState.nodes, activeElement);
         commitHistoryState(prevState);
         if (restoredFocusNodeId) {
             historyFocusRequestRef.current = scheduleUndoRestoredNodeFocus(restoredFocusNodeId);
@@ -225,13 +227,21 @@ export const useFlowchartState = (edgeMode: 'advanced-smart' | 'native' = 'advan
         const currentNodes = nodesRef.current;
         const nextState = redo(currentNodes, edgesRef.current); // 🚀 ref
         if (!nextState) return false;
+        const activeElement = typeof document === 'undefined' ? null : document.activeElement;
+        const replacementFocusNodeId = resolveHistoryNodeFocusAfterChange(
+            currentNodes,
+            nextState.nodes,
+            activeElement,
+        );
         const shouldFocusEmptyState = shouldFocusEmptyStateAfterRedo(
             currentNodes,
             nextState.nodes,
-            typeof document === 'undefined' ? null : document.activeElement,
+            activeElement,
         );
         commitHistoryState(nextState);
-        if (shouldFocusEmptyState) {
+        if (replacementFocusNodeId) {
+            historyFocusRequestRef.current = scheduleUndoRestoredNodeFocus(replacementFocusNodeId);
+        } else if (shouldFocusEmptyState) {
             historyFocusRequestRef.current = scheduleFlowchartEmptyStateFocus();
         }
         return true;

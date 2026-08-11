@@ -4,6 +4,7 @@ import type { Node } from '@xyflow/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+    resolveHistoryNodeFocusAfterChange,
     resolveUndoRestoredNodeFocusId,
     scheduleUndoRestoredNodeFocus,
     shouldFocusEmptyStateAfterRedo,
@@ -20,6 +21,86 @@ describe('flowchartHistoryFocus', () => {
     afterEach(() => {
         document.body.innerHTML = '';
         vi.restoreAllMocks();
+    });
+
+    it('targets the selected survivor when history removes the focused node', () => {
+        document.body.innerHTML = `
+            <div class="react-flow__node" data-id="source">
+                <div role="treeitem"></div>
+            </div>
+            <div class="react-flow__node" data-id="new-node">
+                <div id="focused-new-node" role="treeitem" tabindex="0"></div>
+            </div>
+        `;
+        const focused = document.querySelector<HTMLElement>('#focused-new-node');
+        if (!focused) throw new Error('test fixture missing');
+
+        expect(resolveHistoryNodeFocusAfterChange(
+            [node('source'), node('new-node')],
+            [node('source', true)],
+            focused,
+        )).toBe('source');
+    });
+
+    it('moves focus to a different selected node when history changes semantic selection', () => {
+        document.body.innerHTML = `
+            <div class="react-flow__node" data-id="source">
+                <div id="source-node" role="treeitem" tabindex="0"></div>
+            </div>
+        `;
+        const source = document.querySelector<HTMLElement>('#source-node');
+        if (!source) throw new Error('test fixture missing');
+
+        expect(resolveHistoryNodeFocusAfterChange(
+            [node('source', true)],
+            [node('source'), node('redone-node', true)],
+            source,
+        )).toBe('redone-node');
+    });
+
+    it('does not steal focus when selection stays aligned or focus originated outside the canvas', () => {
+        document.body.innerHTML = `
+            <button id="toolbar">Undo</button>
+            <div class="react-flow__node" data-id="source">
+                <div id="source-node" role="treeitem" tabindex="0"></div>
+            </div>
+        `;
+        const source = document.querySelector<HTMLElement>('#source-node');
+        const toolbar = document.querySelector<HTMLElement>('#toolbar');
+        if (!source || !toolbar) throw new Error('test fixture missing');
+
+        expect(resolveHistoryNodeFocusAfterChange(
+            [node('source')],
+            [node('source')],
+            source,
+        )).toBeNull();
+        expect(resolveHistoryNodeFocusAfterChange(
+            [node('source')],
+            [],
+            toolbar,
+        )).toBeNull();
+    });
+
+    it('rejects stale and oversized focused node ids', () => {
+        const oversizedId = 'x'.repeat(1_025);
+        document.body.innerHTML = `
+            <div class="react-flow__node" data-id="stale"><div id="stale" tabindex="0"></div></div>
+            <div class="react-flow__node" data-id="${oversizedId}"><div id="oversized" tabindex="0"></div></div>
+        `;
+        const stale = document.querySelector<HTMLElement>('#stale');
+        const oversized = document.querySelector<HTMLElement>('#oversized');
+        if (!stale || !oversized) throw new Error('test fixture missing');
+
+        expect(resolveHistoryNodeFocusAfterChange(
+            [node('source')],
+            [node('', true), node('fallback')],
+            stale,
+        )).toBeNull();
+        expect(resolveHistoryNodeFocusAfterChange(
+            [node(oversizedId)],
+            [node('fallback')],
+            oversized,
+        )).toBeNull();
     });
 
     it('targets the selected restored node when undo replaces the focused empty state', () => {
