@@ -139,7 +139,13 @@ describe('flowchart interaction copy', () => {
             expect(read(zh, ['designer', 'edgeEditor', key])).toBeTypeOf('string');
             expect(read(en, ['designer', 'edgeEditor', key])).toBeTypeOf('string');
         }
-        for (const key of ['nodeAriaLabel', 'nodeSelectedState', 'nodeLockedState', 'doubleClickToEdit', 'quickAddOrConnect', 'quickAddDirection']) {
+        for (const key of [
+            'nodeAriaLabel', 'nodeSelectedState', 'nodeLockedState', 'nodeEditHintState',
+            'doubleClickToEdit', 'inlineEditorLabel', 'inlineEditorToolbar',
+            'inlineEditorBold', 'inlineEditorBoldShortcut', 'inlineEditorItalic',
+            'inlineEditorItalicShortcut', 'inlineEditorUnderline', 'inlineEditorUnderlineShortcut',
+            'inlineEditorLarger', 'inlineEditorSmaller', 'quickAddOrConnect', 'quickAddDirection',
+        ]) {
             expect(read(zh, ['designer', 'flowchart', key])).toBeTypeOf('string');
             expect(read(en, ['designer', 'flowchart', key])).toBeTypeOf('string');
         }

@@ -9,6 +9,7 @@ import { FaChevronUp, FaChevronRight, FaChevronDown, FaChevronLeft } from 'react
 import { useTranslation } from 'react-i18next';
 import { sanitizeInlineHtml } from '../../utils/sanitizeHtml';
 import { useDiagramEditingAllowed } from '../diagrams/DiagramEditingContext';
+import { shouldStartFlowchartNodeKeyboardEditing } from './flowchartNodeKeyboardEditing';
 import './FlowchartNode.css';
 
 export type FlowchartNodeProps = NodeProps<Node<FlowchartNodeData>>;
@@ -61,9 +62,29 @@ const FlowchartNode = ({ data, selected, id }: FlowchartNodeProps) => {
                 label: data.label || id,
                 selectedState: selected ? t('designer.flowchart.nodeSelectedState') : '',
                 lockedState: data.locked ? t('designer.flowchart.nodeLockedState') : '',
+                editHintState: editingAllowed && !data.locked && !data.isEditing
+                    ? t('designer.flowchart.nodeEditHintState')
+                    : '',
             })}
             aria-selected={selected}
+            aria-keyshortcuts={editingAllowed && !data.locked && !data.isEditing ? 'Enter F2' : undefined}
             tabIndex={0}
+            onKeyDown={(event) => {
+                if (!shouldStartFlowchartNodeKeyboardEditing({
+                    key: event.key,
+                    editingAllowed,
+                    locked: Boolean(data.locked),
+                    isEditing: Boolean(data.isEditing),
+                    targetIsNode: event.target === event.currentTarget,
+                    altKey: event.altKey,
+                    ctrlKey: event.ctrlKey,
+                    metaKey: event.metaKey,
+                    shiftKey: event.shiftKey,
+                })) return;
+                event.preventDefault();
+                event.stopPropagation();
+                handleUpdateData({ isEditing: true });
+            }}
         >
 
             <NodeResizer
@@ -137,6 +158,7 @@ const FlowchartNode = ({ data, selected, id }: FlowchartNodeProps) => {
                                     alignItems: 'center'
                                 }}
                                 className="flowchart-node-editable-container"
+                                ariaLabel={t('designer.flowchart.inlineEditorLabel')}
                                 autoFocus
                             />
                         );

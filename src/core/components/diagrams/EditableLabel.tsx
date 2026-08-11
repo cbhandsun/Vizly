@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { sanitizeInlineHtml } from '../../utils/sanitizeHtml';
 
 interface EditableLabelProps {
@@ -9,10 +10,12 @@ interface EditableLabelProps {
     isEditing?: boolean;
     autoFocus?: boolean;
     onEditingChange?: (isEditing: boolean) => void;
+    ariaLabel?: string;
 }
 
 // Mini formatting toolbar for rich text
 const FormatToolbar: React.FC<{ onFormat: (cmd: string, val?: string) => void }> = ({ onFormat }) => {
+    const { t } = useTranslation();
     const btnStyle: React.CSSProperties = {
         background: 'rgba(255,255,255,0.95)',
         border: '1px solid #d9d9d9',
@@ -27,6 +30,8 @@ const FormatToolbar: React.FC<{ onFormat: (cmd: string, val?: string) => void }>
 
     return (
         <div
+            role="toolbar"
+            aria-label={t('designer.flowchart.inlineEditorToolbar')}
             style={{
                 display: 'flex',
                 gap: 2,
@@ -44,38 +49,48 @@ const FormatToolbar: React.FC<{ onFormat: (cmd: string, val?: string) => void }>
             onMouseDown={(e) => e.preventDefault()} // prevent blur
         >
             <button
+                type="button"
                 style={{ ...btnStyle, fontWeight: 'bold' }}
                 onClick={() => onFormat('bold')}
-                title="Bold (Ctrl+B)"
+                aria-label={t('designer.flowchart.inlineEditorBold')}
+                title={t('designer.flowchart.inlineEditorBoldShortcut')}
             >
                 B
             </button>
             <button
+                type="button"
                 style={{ ...btnStyle, fontStyle: 'italic' }}
                 onClick={() => onFormat('italic')}
-                title="Italic (Ctrl+I)"
+                aria-label={t('designer.flowchart.inlineEditorItalic')}
+                title={t('designer.flowchart.inlineEditorItalicShortcut')}
             >
                 I
             </button>
             <button
+                type="button"
                 style={{ ...btnStyle, textDecoration: 'underline' }}
                 onClick={() => onFormat('underline')}
-                title="Underline (Ctrl+U)"
+                aria-label={t('designer.flowchart.inlineEditorUnderline')}
+                title={t('designer.flowchart.inlineEditorUnderlineShortcut')}
             >
                 U
             </button>
-            <div style={{ width: 1, background: '#d9d9d9', margin: '2px 2px' }} />
+            <div aria-hidden="true" style={{ width: 1, background: '#d9d9d9', margin: '2px 2px' }} />
             <button
+                type="button"
                 style={btnStyle}
                 onClick={() => onFormat('fontSize', '4')}
-                title="Larger"
+                aria-label={t('designer.flowchart.inlineEditorLarger')}
+                title={t('designer.flowchart.inlineEditorLarger')}
             >
                 A↑
             </button>
             <button
+                type="button"
                 style={{ ...btnStyle, fontSize: 10 }}
                 onClick={() => onFormat('fontSize', '2')}
-                title="Smaller"
+                aria-label={t('designer.flowchart.inlineEditorSmaller')}
+                title={t('designer.flowchart.inlineEditorSmaller')}
             >
                 A↓
             </button>
@@ -91,11 +106,14 @@ export const EditableLabel: React.FC<EditableLabelProps> = React.memo(({
     className,
     isEditing: controlledIsEditing,
     autoFocus = true,
-    onEditingChange
+    onEditingChange,
+    ariaLabel,
 }) => {
+    const { t } = useTranslation();
     const [isEditing, setIsEditing] = useState(false);
     const editRef = useRef<HTMLDivElement>(null);
     const originalValueRef = useRef(value);
+    const skipNextBlurRef = useRef(false);
 
     const handleDoubleClick = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -104,32 +122,59 @@ export const EditableLabel: React.FC<EditableLabelProps> = React.memo(({
         originalValueRef.current = value;
     };
 
-    const handleBlur = useCallback(() => {
+    const commitCurrentValue = useCallback(() => {
+        if (!editRef.current) return;
+        const html = sanitizeInlineHtml(editRef.current.innerHTML);
+        // Normalize: if content is just plain text (no tags), store as plain text
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = html;
+        const hasFormatting = tempDiv.querySelector('b, i, u, strong, em, font, span[style]');
+        const finalValue = hasFormatting ? html : (tempDiv.textContent || '');
+        if (finalValue !== value) {
+            onChange(finalValue);
+        }
+    }, [onChange, value]);
+
+    const closeEditor = useCallback(() => {
         setIsEditing(false);
         onEditingChange?.(false);
-        if (editRef.current) {
-            const html = sanitizeInlineHtml(editRef.current.innerHTML);
-            // Normalize: if content is just plain text (no tags), store as plain text
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = html;
-            const hasFormatting = tempDiv.querySelector('b, i, u, strong, em, font, span[style]');
-            const finalValue = hasFormatting ? html : (tempDiv.textContent || '');
-            if (finalValue !== value) {
-                onChange(finalValue);
+    }, [onEditingChange]);
+
+    const restoreNodeFocus = useCallback((focusTarget: HTMLElement | null) => {
+        window.setTimeout(() => {
+            skipNextBlurRef.current = false;
+            if (focusTarget?.isConnected) {
+                focusTarget.focus({ preventScroll: true });
             }
+        }, 0);
+    }, []);
+
+    const handleBlur = useCallback(() => {
+        if (skipNextBlurRef.current) {
+            skipNextBlurRef.current = false;
+            return;
         }
-    }, [value, onChange, onEditingChange]);
+        commitCurrentValue();
+        closeEditor();
+    }, [closeEditor, commitCurrentValue]);
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
-            handleBlur();
+            const focusTarget = editRef.current?.closest<HTMLElement>('[role="treeitem"], .react-flow__node') ?? null;
+            skipNextBlurRef.current = true;
+            commitCurrentValue();
+            closeEditor();
+            restoreNodeFocus(focusTarget);
         } else if (e.key === 'Escape') {
+            e.preventDefault();
+            const focusTarget = editRef.current?.closest<HTMLElement>('[role="treeitem"], .react-flow__node') ?? null;
             if (editRef.current) {
                 editRef.current.innerHTML = sanitizeInlineHtml(originalValueRef.current);
             }
-            setIsEditing(false);
-            onEditingChange?.(false);
+            skipNextBlurRef.current = true;
+            closeEditor();
+            restoreNodeFocus(focusTarget);
         }
         // Stop propagation to prevent node shortcuts
         e.stopPropagation();
@@ -144,7 +189,8 @@ export const EditableLabel: React.FC<EditableLabelProps> = React.memo(({
     useEffect(() => {
         if ((isEditing || controlledIsEditing) && autoFocus && editRef.current) {
             const el = editRef.current;
-            setTimeout(() => {
+            const focusTimer = window.setTimeout(() => {
+                if (!el.isConnected) return;
                 el.focus();
                 // Select all content
                 const range = document.createRange();
@@ -153,7 +199,9 @@ export const EditableLabel: React.FC<EditableLabelProps> = React.memo(({
                 sel?.removeAllRanges();
                 sel?.addRange(range);
             }, 50);
+            return () => window.clearTimeout(focusTimer);
         }
+        return undefined;
     }, [isEditing, controlledIsEditing, autoFocus]);
 
     if (isEditing || controlledIsEditing) {
@@ -163,6 +211,10 @@ export const EditableLabel: React.FC<EditableLabelProps> = React.memo(({
                 <div
                     ref={editRef}
                     contentEditable
+                    role="textbox"
+                    aria-label={ariaLabel || t('designer.flowchart.inlineEditorLabel')}
+                    aria-multiline="true"
+                    aria-keyshortcuts="Enter Shift+Enter Escape Control+B Control+I Control+U"
                     suppressContentEditableWarning
                     dangerouslySetInnerHTML={{ __html: sanitizeInlineHtml(value) }}
                     onBlur={handleBlur}
