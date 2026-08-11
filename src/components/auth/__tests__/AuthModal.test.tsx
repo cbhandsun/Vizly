@@ -64,6 +64,16 @@ describe('AuthModal', () => {
         expect(screen.getByRole('dialog', { name: 'auth.login' })).toBeTruthy();
     });
 
+    it('focuses the email field when the authentication task opens', async () => {
+        render(<AuthModal open onCancel={vi.fn()} />);
+
+        await waitFor(() => {
+            expect(document.activeElement).toBe(
+                within(screen.getByRole('tabpanel')).getByLabelText('auth.modal.emailPlaceholder'),
+            );
+        });
+    });
+
     beforeEach(() => {
         signInWithEmailMock.mockReset();
         signInWithPasswordMock.mockReset();

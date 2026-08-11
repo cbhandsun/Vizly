@@ -1,6 +1,6 @@
 
-import React, { useLayoutEffect, useState } from 'react';
-import { Alert, Modal, Form, Input, Button, Tabs, Typography } from 'antd';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Alert, Modal, Form, Input, Button, Tabs, Typography, type InputRef } from 'antd';
 import type { FormInstance, FormProps } from 'antd/es/form';
 import { UserOutlined, MailOutlined, LockOutlined, KeyOutlined } from '@ant-design/icons';
 import { useAuth } from '@/context/useAuth';
@@ -60,6 +60,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     const [passwordFormInstance] = Form.useForm();
     const [magicLinkFormInstance] = Form.useForm();
     const [registerFormInstance] = Form.useForm();
+    const passwordEmailInputRef = useRef<InputRef>(null);
     const operation = useAuthOperation(open);
     const { invalidate: invalidateOperation } = operation;
 
@@ -76,6 +77,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     useLayoutEffect(() => {
         if (!open) invalidateOperation();
     }, [invalidateOperation, open]);
+
+    useEffect(() => {
+        if (!open) return;
+        const focusTimer = window.setTimeout(() => passwordEmailInputRef.current?.focus(), 0);
+        return () => window.clearTimeout(focusTimer);
+    }, [open]);
 
     const handleClose = () => {
         if (operation.busy) return;
@@ -166,6 +173,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 ]}
             >
                 <Input
+                    ref={passwordEmailInputRef}
                     prefix={<MailOutlined className="auth-modal__field-icon" />}
                     placeholder={t('auth.modal.emailPlaceholder')}
                     size="large"
