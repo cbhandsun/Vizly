@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
     resolveUndoRestoredNodeFocusId,
     scheduleUndoRestoredNodeFocus,
+    shouldFocusEmptyStateAfterRedo,
 } from '../flowchartHistoryFocus';
 
 const node = (id: string, selected = false): Node => ({
@@ -44,6 +45,24 @@ describe('flowchartHistoryFocus', () => {
         expect(resolveUndoRestoredNodeFocusId([], [node('node-1')], toolbarAction)).toBeNull();
         expect(resolveUndoRestoredNodeFocusId([], [node('')], emptyAction)).toBeNull();
         expect(resolveUndoRestoredNodeFocusId([], [node('node-1')], null)).toBeNull();
+    });
+
+    it('targets the empty state only when redo removes the focused canvas node', () => {
+        document.body.innerHTML = `
+            <div class="react-flow__node" data-id="node-1">
+                <div id="selected-node" role="treeitem" tabindex="0"></div>
+            </div>
+            <button id="toolbar-redo">Redo</button>
+        `;
+        const selectedNode = document.querySelector<HTMLElement>('#selected-node');
+        const toolbarRedo = document.querySelector<HTMLButtonElement>('#toolbar-redo');
+        if (!selectedNode || !toolbarRedo) throw new Error('test fixture missing');
+
+        expect(shouldFocusEmptyStateAfterRedo([node('node-1')], [], selectedNode)).toBe(true);
+        expect(shouldFocusEmptyStateAfterRedo([], [], selectedNode)).toBe(false);
+        expect(shouldFocusEmptyStateAfterRedo([node('node-1')], [node('node-1')], selectedNode)).toBe(false);
+        expect(shouldFocusEmptyStateAfterRedo([node('node-1')], [], toolbarRedo)).toBe(false);
+        expect(shouldFocusEmptyStateAfterRedo([node('node-1')], [], null)).toBe(false);
     });
 
     it('waits for the restored semantic node target and then focuses it', () => {

@@ -21,6 +21,16 @@ export const resolveUndoRestoredNodeFocusId = (
     return restoredNode.id.trim() ? restoredNode.id : null;
 };
 
+export const shouldFocusEmptyStateAfterRedo = (
+    currentNodes: readonly Node[],
+    redoneNodes: readonly Node[],
+    activeElement: Element | null,
+): boolean => (
+    currentNodes.length > 0
+    && redoneNodes.length === 0
+    && Boolean(activeElement?.closest('.react-flow__node'))
+);
+
 export const scheduleUndoRestoredNodeFocus = (
     nodeId: string,
     root?: ParentNode,

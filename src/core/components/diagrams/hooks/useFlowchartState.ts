@@ -16,7 +16,9 @@ import { useDiagramStore } from '../../../store/useDiagramStore';
 import {
     resolveUndoRestoredNodeFocusId,
     scheduleUndoRestoredNodeFocus,
+    shouldFocusEmptyStateAfterRedo,
 } from '../flowchartHistoryFocus';
+import { scheduleFlowchartEmptyStateFocus } from '../flowchartDeletionFocus';
 
 export const useFlowchartState = (edgeMode: 'advanced-smart' | 'native' = 'advanced-smart') => {
     const { t } = useTranslation();
@@ -220,9 +222,18 @@ export const useFlowchartState = (edgeMode: 'advanced-smart' | 'native' = 'advan
     const handleRedo = useCallback(() => {
         historyFocusRequestRef.current?.cancel();
         historyFocusRequestRef.current = null;
-        const nextState = redo(nodesRef.current, edgesRef.current); // 🚀 ref
+        const currentNodes = nodesRef.current;
+        const nextState = redo(currentNodes, edgesRef.current); // 🚀 ref
         if (!nextState) return false;
+        const shouldFocusEmptyState = shouldFocusEmptyStateAfterRedo(
+            currentNodes,
+            nextState.nodes,
+            typeof document === 'undefined' ? null : document.activeElement,
+        );
         commitHistoryState(nextState);
+        if (shouldFocusEmptyState) {
+            historyFocusRequestRef.current = scheduleFlowchartEmptyStateFocus();
+        }
         return true;
     }, [commitHistoryState, redo]);
 

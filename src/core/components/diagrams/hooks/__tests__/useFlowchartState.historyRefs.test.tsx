@@ -96,4 +96,49 @@ describe('useFlowchartState history ref boundaries', () => {
         expect(document.activeElement?.id).toBe('restored-node');
         expect(useDiagramStore.getState().nodes).toEqual(restored);
     });
+
+    it('restores focus to the empty action when redo removes the focused final node', () => {
+        const restored = [{ ...node('node-1', 0), selected: true }];
+        useDiagramStore.setState({ nodes: restored, edges: [] });
+        const frames: FrameRequestCallback[] = [];
+        vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => {
+            frames.push(callback);
+            return frames.length;
+        });
+        const { result } = renderHook(() => useFlowchartState());
+
+        act(() => {
+            result.current.diagramHistory.takeSnapshot(restored, [], '删除节点前');
+            result.current.setNodes([]);
+        });
+        document.body.innerHTML = '<button class="flowchart-empty-action">Choose a shape</button>';
+        const firstEmptyAction = document.querySelector<HTMLButtonElement>('.flowchart-empty-action');
+        if (!firstEmptyAction) throw new Error('test fixture missing');
+        firstEmptyAction.focus();
+        act(() => {
+            expect(result.current.diagramHistory.undo()).toBe(true);
+        });
+        document.body.innerHTML = `
+            <div class="react-flow__node" data-id="node-1" tabindex="0">
+                <div id="restored-node" role="treeitem" aria-selected="true" tabindex="0"></div>
+            </div>
+        `;
+        act(() => {
+            frames.shift()?.(0);
+        });
+        const restoredNode = document.querySelector<HTMLElement>('#restored-node');
+        if (!restoredNode) throw new Error('test fixture missing');
+        restoredNode.focus();
+
+        act(() => {
+            expect(result.current.diagramHistory.redo()).toBe(true);
+        });
+        document.body.innerHTML = '<button id="empty-after-redo" class="flowchart-empty-action">Choose a shape</button>';
+        act(() => {
+            frames.shift()?.(16);
+        });
+
+        expect(document.activeElement?.id).toBe('empty-after-redo');
+        expect(useDiagramStore.getState().nodes).toEqual([]);
+    });
 });
