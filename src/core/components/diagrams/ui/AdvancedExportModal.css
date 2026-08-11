@@ -49,13 +49,37 @@
 
 @media (max-width: 480px) {
   .advanced-export-modal .ant-modal {
-    margin: 8px auto;
+    top: max(8px, env(safe-area-inset-top));
+    margin: 0 auto;
     padding-bottom: 0;
   }
 
+  .advanced-export-modal .ant-modal,
   .advanced-export-modal .ant-modal-content {
     max-height: calc(100dvh - 16px);
-    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .advanced-export-modal .ant-modal-container {
+    max-height: inherit;
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .advanced-export-modal .ant-modal-header,
+  .advanced-export-modal .ant-modal-footer {
+    flex: 0 0 auto;
+  }
+
+  .advanced-export-modal .ant-modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
   .advanced-export-modal .ant-modal-body,
@@ -81,6 +105,8 @@
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
+    margin-top: 0;
+    background: var(--ant-color-bg-elevated, #fff);
   }
 
   .advanced-export-modal .ant-modal-footer .ant-btn {

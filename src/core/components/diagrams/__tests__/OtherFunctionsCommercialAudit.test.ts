@@ -31,6 +31,11 @@ describe('other-function commercial interaction safeguards', () => {
         expect(css).toContain('.advanced-export-modal .advanced-export-dpi-select,');
         expect(css).toMatch(/\.advanced-export-format-group\.ant-radio-group[\s\S]*?grid-template-columns: repeat\(5, minmax\(0, 1fr\)\)/);
         expect(css).toMatch(/@media \(max-width: 480px\)[\s\S]*?grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/);
+        expect(css).toMatch(/@media \(max-width: 480px\)[\s\S]*?\.advanced-export-modal \.ant-modal[\s\S]*?top: max\(8px, env\(safe-area-inset-top\)\)/);
+        expect(css).toMatch(/\.advanced-export-modal \.ant-modal-content[\s\S]*?display: flex[\s\S]*?overflow: hidden/);
+        expect(css).toMatch(/\.advanced-export-modal \.ant-modal-container[\s\S]*?max-height: inherit[\s\S]*?overflow: hidden/);
+        expect(css).toMatch(/\.advanced-export-modal \.ant-modal-body[\s\S]*?flex: 1 1 auto[\s\S]*?min-height: 0[\s\S]*?overflow-y: auto/);
+        expect(css).toMatch(/\.advanced-export-modal \.ant-modal-footer[\s\S]*?background: var\(--ant-color-bg-elevated, #fff\)/);
         expect(css).toMatch(/\.advanced-export-modal \.ant-modal-footer \.advanced-export-copy-button[\s\S]*?grid-column: 1 \/ -1/);
     });
 
