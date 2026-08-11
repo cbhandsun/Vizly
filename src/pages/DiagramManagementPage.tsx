@@ -30,7 +30,7 @@ import { createWorkspaceDeleteConfirmation } from './workspaceDeleteConfirmation
 import { createWorkspaceDiagramActions } from './diagramManagementActions';
 import { createWorkspaceSettingsMenu } from './workspaceSettingsMenu';
 import { useWorkspaceSearch } from './useWorkspaceSearch';
-import { focusWorkspaceTarget } from './workspaceMenuInteraction';
+import { focusFirstWorkspaceResult, focusWorkspaceTarget } from './workspaceMenuInteraction';
 import { scheduleWorkspaceRouteFocus } from './workspaceRouteFocus';
 import {
     beginWorkspaceDiagramCreate,
@@ -63,6 +63,7 @@ const WorkspaceDashboardPage: React.FC = () => {
     const [sortKey, setSortKey] = useState<SortKey>('updated');
     const [openingDiagramKeys, setOpeningDiagramKeys] = useState<ReadonlySet<string>>(() => new Set());
     const [isCreatingDiagram, setIsCreatingDiagram] = useState(false);
+    const workspaceResultsRef = useRef<HTMLDivElement>(null);
     
     const [unifiedItems, setUnifiedItems] = useState<UnifiedDiagramItem[]>([]);
     const [cloudProvider] = useState<ManageStorageProvider>(() => {
@@ -289,6 +290,7 @@ const WorkspaceDashboardPage: React.FC = () => {
                 searchInputRef={searchInputRef}
                 searchResultCount={filteredItems.length}
                 onClearSearch={clearSearch}
+                onNavigateToResults={() => focusFirstWorkspaceResult(workspaceResultsRef.current)}
                 onNavigateHome={() => navigate('/manage')}
                 settingsMenu={settingsMenu}
                 settingsTriggerRef={settingsTriggerRef}
@@ -329,6 +331,7 @@ const WorkspaceDashboardPage: React.FC = () => {
                     onCreateBlank={() => handleCreateTemplate('blank')}
                     searchQuery={searchQuery}
                     onClearSearch={clearSearch}
+                    resultsRef={workspaceResultsRef}
                 />
             </main>
 

@@ -59,3 +59,13 @@ export const focusWorkspaceTarget = (
   if (fallback === preferred) return false;
   return focusConnectedTarget(fallback);
 };
+
+export const focusFirstWorkspaceResult = (
+  resultsContainer: HTMLElement | null | undefined,
+): boolean => {
+  if (!resultsContainer?.isConnected) return false;
+  const firstAvailableResult = resultsContainer.querySelector<HTMLElement>(
+    '.diagram-card-primary-action:not(:disabled), .diagram-list-primary-action:not(:disabled)',
+  );
+  return focusWorkspaceTarget(firstAvailableResult);
+};

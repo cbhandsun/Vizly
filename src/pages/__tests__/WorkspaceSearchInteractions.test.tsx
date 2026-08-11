@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { WorkspaceGlobalHeader } from '../WorkspaceGlobalHeader';
 import { useWorkspaceSearch } from '../useWorkspaceSearch';
+import { focusFirstWorkspaceResult } from '../workspaceMenuInteraction';
 
 vi.mock('antd/es/avatar', () => ({
   default: ({ icon }: { icon?: ReactNode }) => <span>{icon}</span>,
@@ -41,16 +42,28 @@ vi.mock('react-i18next', () => ({
 const SearchHarness = ({ resultCount = 0 }: { resultCount?: number }) => {
   const search = useWorkspaceSearch();
   return (
-    <WorkspaceGlobalHeader
-      searchTerm={search.searchTerm}
-      onSearchTermChange={search.updateSearchTerm}
-      searchInputRef={search.searchInputRef}
-      searchResultCount={resultCount}
-      onClearSearch={search.clearSearch}
-      onNavigateHome={() => undefined}
-      settingsMenu={[]}
-      isAuthenticated={false}
-    />
+    <>
+      <WorkspaceGlobalHeader
+        searchTerm={search.searchTerm}
+        onSearchTermChange={search.updateSearchTerm}
+        searchInputRef={search.searchInputRef}
+        searchResultCount={resultCount}
+        onClearSearch={search.clearSearch}
+        onNavigateToResults={() => focusFirstWorkspaceResult(
+          document.getElementById('workspace-diagram-results'),
+        )}
+        onNavigateHome={() => undefined}
+        settingsMenu={[]}
+        isAuthenticated={false}
+      />
+      <div id="workspace-diagram-results">
+        {resultCount > 0 ? (
+          <button type="button" className="diagram-card-primary-action">
+            Open first result
+          </button>
+        ) : null}
+      </div>
+    </>
   );
 };
 
@@ -64,10 +77,33 @@ describe('workspace search interactions', () => {
     expect(input).toHaveAttribute('maxlength', '120');
     expect(input).toHaveAttribute('aria-controls', 'workspace-diagram-results');
     expect(input).toHaveAttribute('aria-describedby', 'workspace-search-status');
+    expect(input).toHaveAttribute('aria-keyshortcuts', 'ArrowDown Escape');
 
     fireEvent.change(input, { target: { value: 'roadmap' } });
     expect(screen.getByRole('status')).toHaveTextContent('2 matching diagrams');
     expect(screen.getByRole('button', { name: 'Clear search' })).toBeVisible();
+  });
+
+  it('moves directly from an active search to the first available result with ArrowDown', () => {
+    render(<SearchHarness resultCount={2} />);
+    const input = screen.getByRole('searchbox', { name: 'Search workspace' });
+    fireEvent.change(input, { target: { value: 'roadmap' } });
+    input.focus();
+
+    expect(fireEvent.keyDown(input, { key: 'ArrowDown' })).toBe(false);
+    expect(screen.getByRole('button', { name: 'Open first result' })).toHaveFocus();
+    expect(input).toHaveValue('roadmap');
+  });
+
+  it('keeps ArrowDown inert when the active search has no available result', () => {
+    render(<SearchHarness resultCount={0} />);
+    const input = screen.getByRole('searchbox', { name: 'Search workspace' });
+    fireEvent.change(input, { target: { value: 'missing' } });
+    input.focus();
+
+    expect(fireEvent.keyDown(input, { key: 'ArrowDown' })).toBe(true);
+    expect(input).toHaveFocus();
+    expect(input).toHaveValue('missing');
   });
 
   it('clears with Escape and retains focus in the search field', async () => {

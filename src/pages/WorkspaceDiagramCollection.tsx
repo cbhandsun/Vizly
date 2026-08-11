@@ -79,6 +79,7 @@ interface WorkspaceDiagramCollectionProps {
   onCreateBlank: () => void;
   searchQuery: string;
   onClearSearch: () => void;
+  resultsRef?: React.Ref<HTMLDivElement>;
 }
 
 const formatTimeAgo = (
@@ -117,6 +118,7 @@ export const WorkspaceDiagramCollection = ({
   onCreateBlank,
   searchQuery,
   onClearSearch,
+  resultsRef,
 }: WorkspaceDiagramCollectionProps) => {
   const { t, i18n } = useTranslation();
   const locale = i18n.resolvedLanguage || i18n.language || 'en';
@@ -218,7 +220,7 @@ export const WorkspaceDiagramCollection = ({
   };
 
   return (
-                <div id="workspace-diagram-results" className="workspace-main-inner">
+                <div ref={resultsRef} id="workspace-diagram-results" className="workspace-main-inner">
                     {/* Filter Tabs with Counts */}
                     <div className="workspace-matrix-header">
                         <div className="workspace-filter-tabs" role="group" aria-label={t('workspace.filterBy')}>

@@ -19,6 +19,7 @@ interface WorkspaceGlobalHeaderProps {
   searchInputRef: RefObject<HTMLInputElement | null>;
   searchResultCount: number;
   onClearSearch: () => void;
+  onNavigateToResults?: () => boolean;
   onNavigateHome: () => void;
   settingsMenu: MenuProps['items'];
   settingsTriggerRef?: RefObject<HTMLButtonElement | null>;
@@ -32,6 +33,7 @@ export const WorkspaceGlobalHeader = ({
   searchInputRef,
   searchResultCount,
   onClearSearch,
+  onNavigateToResults,
   onNavigateHome,
   settingsMenu,
   settingsTriggerRef: externalSettingsTriggerRef,
@@ -123,6 +125,7 @@ export const WorkspaceGlobalHeader = ({
           aria-label={t('workspace.search')}
           aria-controls="workspace-diagram-results"
           aria-describedby="workspace-search-status"
+          aria-keyshortcuts="ArrowDown Escape"
           placeholder={t('workspace.searchPlaceholder')}
           value={searchTerm}
           maxLength={MAX_WORKSPACE_SEARCH_LENGTH}
@@ -130,6 +133,15 @@ export const WorkspaceGlobalHeader = ({
           spellCheck={false}
           onChange={event => onSearchTermChange(event.target.value)}
           onKeyDown={event => {
+            if (
+              event.key === 'ArrowDown'
+              && search.isActive
+              && search.resultCount > 0
+              && onNavigateToResults?.()
+            ) {
+              event.preventDefault();
+              return;
+            }
             if (event.key === 'Escape' && search.value.length > 0) {
               event.preventDefault();
               onClearSearch();
