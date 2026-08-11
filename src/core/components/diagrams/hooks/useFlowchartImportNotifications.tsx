@@ -35,6 +35,15 @@ export const useFlowchartImportNotifications = ({
         }
 
         const scopeChanged = status === 'scope-changed';
+        const retryButton = scopeChanged
+            ? undefined
+            : React.createElement(Button, {
+                onClick: () => {
+                    notificationApi.destroy(IMPORT_NOTIFICATION_KEY);
+                    openFlowchartImportFilePicker(fileInputRef.current);
+                },
+            }, t('designer.flowchart.import.retry'));
+
         notificationApi.open({
             key: IMPORT_NOTIFICATION_KEY,
             type: scopeChanged ? 'warning' : 'error',
@@ -45,12 +54,7 @@ export const useFlowchartImportNotifications = ({
                 ? t('designer.flowchart.import.scopeChanged')
                 : (detail || t('designer.flowchart.import.failedDescription')),
             duration: scopeChanged ? 8 : 0,
-            btn: React.createElement(Button, {
-                onClick: () => {
-                    notificationApi.destroy(IMPORT_NOTIFICATION_KEY);
-                    openFlowchartImportFilePicker(fileInputRef.current);
-                },
-            }, t('designer.flowchart.import.retry')),
+            btn: retryButton,
         });
     }, [fileInputRef, notificationApi, t]);
 

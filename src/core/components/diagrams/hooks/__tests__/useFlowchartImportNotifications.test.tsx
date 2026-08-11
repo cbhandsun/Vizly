@@ -48,6 +48,7 @@ describe('useFlowchartImportNotifications', () => {
       duration: 8,
       message: 'designer.flowchart.import.cancelledTitle',
       description: 'designer.flowchart.import.scopeChanged',
+      btn: undefined,
     }));
 
     act(() => result.current.handleImportFinished({
@@ -60,6 +61,7 @@ describe('useFlowchartImportNotifications', () => {
       message: 'designer.flowchart.import.failedTitle',
       description: 'The selected file is empty.',
     }));
+    expect(notificationApi.open.mock.calls.at(-1)?.[0].btn).toBeTruthy();
   });
 
   it('keeps a generic fallback and exposes a retry action', () => {
