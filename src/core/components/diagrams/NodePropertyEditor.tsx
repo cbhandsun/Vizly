@@ -41,6 +41,10 @@ import {
     normalizeNodePropertyDimension,
     resolveNodePropertyDimensionBounds,
 } from './nodePropertyDimensions';
+import {
+    AccessiblePropertyColorPicker,
+    type NodeColorField,
+} from './AccessiblePropertyColorPicker';
 
 const { Text } = Typography;
 const { TextArea } = Input;
@@ -52,7 +56,7 @@ export interface UseNodePropertyItemsParams {
     disabled: boolean;
     mixedLabel: string;
     selectLabel: string;
-    onColorChange: (color: Color, field: string) => void;
+    onColorChange: (color: Color, field: NodeColorField) => void;
     localLabel: string;
     setLocalLabel: (v: string) => void;
     localDesc: string;
@@ -388,9 +392,9 @@ export function useNodePropertyItems(params: UseNodePropertyItemsParams): Collap
             label: <Space><BgColorsOutlined />{t('propertyPanel.colors')}</Space>,
             children: (
                 <Row gutter={[8, 8]}>
-                    <Col span={24}><div className="color-row"><Text style={{ fontSize: 12 }}>{t('propertyPanel.mainColor')}</Text><ColorPicker value={commonNodeMainColor ?? undefined} onChange={c => onColorChange(c, 'main')} showText disabled={disabled} /></div></Col>
-                    <Col span={24}><div className="color-row"><Text style={{ fontSize: 12 }}>{t('propertyPanel.backgroundColor')}</Text><ColorPicker value={commonNodeBgColor ?? undefined} onChange={c => onColorChange(c, 'background')} showText disabled={disabled} /></div></Col>
-                    <Col span={24}><div className="color-row"><Text style={{ fontSize: 12 }}>{t('propertyPanel.textColor')}</Text><ColorPicker value={commonNodeTextColor ?? undefined} onChange={c => onColorChange(c, 'text')} showText disabled={disabled} /></div></Col>
+                    <Col span={24}><div className="color-row"><Text style={{ fontSize: 12 }}>{t('propertyPanel.mainColor')}</Text><AccessiblePropertyColorPicker label={t('propertyPanel.mainColor')} value={commonNodeMainColor} fallbackValue="#2196F3" field="main" disabled={disabled} onColorChange={onColorChange} /></div></Col>
+                    <Col span={24}><div className="color-row"><Text style={{ fontSize: 12 }}>{t('propertyPanel.backgroundColor')}</Text><AccessiblePropertyColorPicker label={t('propertyPanel.backgroundColor')} value={commonNodeBgColor} fallbackValue="transparent" fallbackLabel={t('propertyPanel.transparent')} field="background" disabled={disabled} onColorChange={onColorChange} /></div></Col>
+                    <Col span={24}><div className="color-row"><Text style={{ fontSize: 12 }}>{t('propertyPanel.textColor')}</Text><AccessiblePropertyColorPicker label={t('propertyPanel.textColor')} value={commonNodeTextColor} fallbackValue="#FFFFFF" field="text" disabled={disabled} onColorChange={onColorChange} /></div></Col>
                 </Row>
             ),
         });
@@ -404,7 +408,7 @@ export function useNodePropertyItems(params: UseNodePropertyItemsParams): Collap
             children: (
                 <div className="color-row">
                     <Text style={{ fontSize: 12 }}>{t('propertyPanel.themeColor')}</Text>
-                    <ColorPicker value={commonThemeColor ?? undefined} onChange={c => onColorChange(c, 'themeColor')} showText disabled={disabled} />
+                    <AccessiblePropertyColorPicker label={t('propertyPanel.themeColor')} value={commonThemeColor} fallbackValue="#2196F3" field="themeColor" disabled={disabled} onColorChange={onColorChange} />
                 </div>
             ),
         });

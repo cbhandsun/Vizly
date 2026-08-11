@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { readFileSync } from 'node:fs';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { Node } from '@xyflow/react';
 import { describe, expect, it, vi } from 'vitest';
@@ -97,6 +98,39 @@ describe('PropertyPanel field synchronization', () => {
         expect(screen.getByRole('radio', { name: 'propertyPanel.alignCenter' })).toBeTruthy();
         expect(screen.getByRole('radio', { name: 'propertyPanel.alignRight' })).toBeTruthy();
         expect(screen.getByRole('spinbutton', { name: 'propertyPanel.borderWidth' })).toBeTruthy();
+    });
+
+    it('exposes node color pickers as named keyboard buttons', () => {
+        render(
+            <PropertyPanel
+                selectedNodes={[createNode('Colors')]}
+                selectedEdges={[]}
+                onUpdateNodes={vi.fn()}
+                onUpdateEdges={vi.fn()}
+                docked
+            />,
+        );
+
+        fireEvent.click(screen.getByText('propertyPanel.colors'));
+
+        for (const accessibleName of [
+            'propertyPanel.mainColor',
+            'propertyPanel.backgroundColor',
+            'propertyPanel.textColor',
+        ]) {
+            const trigger = screen.getByRole('button', { name: accessibleName });
+            expect(trigger.classList.contains('property-color-picker-trigger')).toBe(true);
+            expect(trigger.getAttribute('type')).toBe('button');
+        }
+        expect(screen.getByRole('button', { name: 'propertyPanel.backgroundColor' }).textContent)
+            .toContain('propertyPanel.transparent');
+    });
+
+    it('keeps property color buttons at the commercial touch-target size', () => {
+        const css = readFileSync('src/core/components/diagrams/PropertyPanel.css', 'utf8');
+
+        expect(css).toMatch(/\.property-color-picker-trigger\s*\{[\s\S]*?min-height:\s*var\(--commercial-touch-target, 44px\)/);
+        expect(css).toMatch(/\.property-color-picker-trigger:focus-visible\s*\{[\s\S]*?outline:\s*2px solid/);
     });
 
     it('exposes the validated node dimension bounds to assistive technology', () => {

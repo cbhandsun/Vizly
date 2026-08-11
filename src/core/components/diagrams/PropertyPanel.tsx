@@ -13,6 +13,7 @@ import {
 } from '@ant-design/icons';
 import type { Color } from 'antd/es/color-picker';
 import { useNodePropertyItems } from './NodePropertyEditor';
+import type { NodeColorField } from './AccessiblePropertyColorPicker';
 import { useEdgePropertyItems } from './EdgePropertyEditor';
 import { ThemeSwitcherPanel } from '../ui/ThemeSwitcherPanel';
 import { IconExplorer } from '../shared/IconExplorer';
@@ -146,7 +147,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
     });
     const _commonEdgeColor = getCommonValue(selectedEdges, (e) => e.style?.stroke);
 
-    const handleNodeColorChange = useCallback((color: Color, field: string) => {
+    const handleNodeColorChange = useCallback((color: Color, field: NodeColorField) => {
         armSnapshot();
         const hex = color.toHexString();
         if (field === 'themeColor') updateNodes({ themeColor: hex });

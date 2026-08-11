@@ -126,7 +126,7 @@
     border-bottom: none;
 }
 
-.edge-color-picker-trigger {
+.property-color-picker-trigger {
     display: inline-flex;
     align-items: center;
     gap: 8px;
@@ -141,17 +141,17 @@
     cursor: pointer;
 }
 
-.edge-color-picker-trigger:focus-visible {
+.property-color-picker-trigger:focus-visible {
     outline: 2px solid var(--designer-primary, #1a73e8);
     outline-offset: 2px;
 }
 
-.edge-color-picker-trigger:disabled {
+.property-color-picker-trigger:disabled {
     cursor: not-allowed;
     opacity: 0.5;
 }
 
-.edge-color-picker-swatch {
+.property-color-picker-swatch {
     width: 20px;
     height: 20px;
     border: 1px solid rgba(0, 0, 0, 0.2);

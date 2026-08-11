@@ -1909,6 +1909,7 @@
         "mainColor": "主色调",
         "backgroundColor": "背景色",
         "textColor": "文本色",
+        "transparent": "透明",
         "styling": "风格设置",
         "connection": "连接设置",
         "lineStyle": "线条风格",

@@ -182,12 +182,12 @@ export function useEdgePropertyItems(params: UseEdgePropertyItemsParams): Collap
                             onChange={c => onColorChange(c, 'stroke')} disabled={disabled}>
                             <button
                                 type="button"
-                                className="edge-color-picker-trigger"
+                                className="property-color-picker-trigger"
                                 aria-label={t('propertyPanel.strokeColor')}
                                 disabled={disabled}
                             >
                                 <span
-                                    className="edge-color-picker-swatch"
+                                    className="property-color-picker-swatch"
                                     style={{ backgroundColor: typeof commonEdgeColor === 'string' ? commonEdgeColor : 'transparent' }}
                                     aria-hidden="true"
                                 />

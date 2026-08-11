@@ -1796,6 +1796,7 @@
         "mainColor": "Main Color",
         "backgroundColor": "Background Color",
         "textColor": "Text Color",
+        "transparent": "Transparent",
         "selectOption": "Select...",
         "options": {
             "domainClass": {
