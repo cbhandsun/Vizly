@@ -26,8 +26,8 @@ import {
     resolveFlowchartEdgeDeletionFocusTarget,
     resolveFlowchartDeletionFocusNodeId,
     scheduleFlowchartDeletionEdgeFocus,
-    scheduleFlowchartDeletionNodeFocus,
     scheduleFlowchartEmptyStateFocus,
+    scheduleFlowchartSelectedNodeFocus,
 } from '../flowchartDeletionFocus';
 
 type AlignmentType = 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom';
@@ -99,9 +99,9 @@ export const useDiagramActions = ({
     activePlugin
 }: UseDiagramActionsProps) => {
     const { t } = useTranslation();
-    const deletionFocusRequestRef = useRef<{ cancel: () => void } | null>(null);
+    const actionFocusRequestRef = useRef<{ cancel: () => void } | null>(null);
 
-    useEffect(() => () => deletionFocusRequestRef.current?.cancel(), []);
+    useEffect(() => () => actionFocusRequestRef.current?.cancel(), []);
 
     const handleDelete = useCallback(async (target?: DiagramActionTarget) => {
         // Determine what to delete
@@ -223,13 +223,13 @@ export const useDiagramActions = ({
                     : e));
             const removedFinalNode = nodeIdsToDelete.size > 0
                 && currentNodes.every(node => nodeIdsToDelete.has(node.id));
-            deletionFocusRequestRef.current?.cancel();
+            actionFocusRequestRef.current?.cancel();
             if (removedFinalNode) {
-                deletionFocusRequestRef.current = scheduleFlowchartEmptyStateFocus();
+                actionFocusRequestRef.current = scheduleFlowchartEmptyStateFocus();
             } else if (survivorFocusTarget?.kind === 'node') {
-                deletionFocusRequestRef.current = scheduleFlowchartDeletionNodeFocus(survivorFocusTarget.id);
+                actionFocusRequestRef.current = scheduleFlowchartSelectedNodeFocus(survivorFocusTarget.id);
             } else if (survivorFocusTarget?.kind === 'edge') {
-                deletionFocusRequestRef.current = scheduleFlowchartDeletionEdgeFocus(survivorFocusTarget.id);
+                actionFocusRequestRef.current = scheduleFlowchartDeletionEdgeFocus(survivorFocusTarget.id);
             }
         }
     }, [nodes, edges, nodesRef, edgesRef, selectedNodes, selectedEdges, setNodes, setEdges, takeSnapshot, activePlugin, pluginCtx, t]);
@@ -264,6 +264,11 @@ export const useDiagramActions = ({
 
         setNodes(nds => [...nds.map(n => ({ ...n, selected: false })), ...duplicate.nodes]);
         setEdges(eds => [...eds.map(edge => ({ ...edge, selected: false })), ...duplicate.edges]);
+
+        actionFocusRequestRef.current?.cancel();
+        actionFocusRequestRef.current = duplicate.nodes[0]
+            ? scheduleFlowchartSelectedNodeFocus(duplicate.nodes[0].id)
+            : null;
     }, [nodes, edges, nodesRef, edgesRef, selectedNodes, setEdges, setNodes, takeSnapshot, t]);
 
     const handleBringToFront = useCallback((target?: DiagramActionTarget) => {

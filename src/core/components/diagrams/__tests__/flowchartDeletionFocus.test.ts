@@ -9,6 +9,7 @@ import {
     resolveFlowchartDeletionFocusNodeId,
     scheduleFlowchartDeletionEdgeFocus,
     scheduleFlowchartDeletionNodeFocus,
+    scheduleFlowchartSelectedNodeFocus,
 } from '../flowchartDeletionFocus';
 
 const node = (id: string, x: number, y = 0): Node => ({
@@ -183,6 +184,7 @@ describe('flowchart deletion focus', () => {
         expect(cancelled).toContain(3);
         expect(scheduleFlowchartDeletionNodeFocus('', document)).toBeNull();
         expect(scheduleFlowchartDeletionNodeFocus('x'.repeat(1_025), document)).toBeNull();
+        expect(scheduleFlowchartSelectedNodeFocus('', document)).toBeNull();
     });
 
     it('waits for a surviving edge before restoring relationship focus', () => {

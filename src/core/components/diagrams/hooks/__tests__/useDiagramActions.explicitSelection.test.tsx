@@ -287,6 +287,43 @@ describe('useDiagramActions explicit selection targets', () => {
         );
     });
 
+    it('selects and focuses the newly created duplicate', () => {
+        const animationFrames: FrameRequestCallback[] = [];
+        vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => {
+            animationFrames.push(callback);
+            return animationFrames.length;
+        });
+        const original = node('node-1', true);
+        let currentNodes = [original];
+        const setNodes = vi.fn((update: SetStateAction<Node[]>) => {
+            currentNodes = typeof update === 'function' ? update(currentNodes) : update;
+        });
+        const { result } = renderHook(() => useDiagramActions({
+            nodes: [original],
+            edges: [],
+            setNodes,
+            setEdges: vi.fn(),
+            selectedNodes: [original],
+            selectedEdges: [],
+            takeSnapshot: vi.fn(),
+            reactFlowInstance: null,
+        }));
+
+        act(() => result.current.handleDuplicate());
+
+        expect(currentNodes).toHaveLength(2);
+        expect(currentNodes[0].selected).toBe(false);
+        expect(currentNodes[1].selected).toBe(true);
+        const duplicateId = currentNodes[1].id;
+        document.body.innerHTML = `
+            <div class="react-flow__node selected" data-id="${duplicateId}">
+                <div id="duplicate-node" role="treeitem" aria-selected="true" tabindex="0"></div>
+            </div>
+        `;
+        act(() => animationFrames.shift()?.(0));
+        expect(document.activeElement?.id).toBe('duplicate-node');
+    });
+
     it.each(['delete', 'duplicate'] as const)('blocks %s when an explicit target is locked', async actionName => {
         const lockedNode = { ...node('node-1', true), draggable: false, data: { label: 'node-1', locked: true } };
         const setNodes = vi.fn();
@@ -453,6 +490,11 @@ describe('useDiagramActions explicit selection targets', () => {
     });
 
     it('duplicates internal edges and leaves outbound edges attached only to the original graph', () => {
+        const animationFrames: FrameRequestCallback[] = [];
+        vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => {
+            animationFrames.push(callback);
+            return animationFrames.length;
+        });
         const initialNodes = [node('node-1', true), node('node-2', true), node('outside')];
         const initialEdges: Edge[] = [
             { id: 'inside', source: 'node-1', target: 'node-2', selected: true },
@@ -490,6 +532,15 @@ describe('useDiagramActions explicit selection targets', () => {
             target: currentNodes[4].id,
             selected: true,
         });
+        expect(currentNodes.slice(3).every(item => item.selected === true)).toBe(true);
+        const primaryDuplicateId = currentNodes[3].id;
+        document.body.innerHTML = `
+            <div class="react-flow__node selected" data-id="${primaryDuplicateId}">
+                <div id="primary-duplicate" role="treeitem" aria-selected="true" tabindex="0"></div>
+            </div>
+        `;
+        act(() => animationFrames.shift()?.(0));
+        expect(document.activeElement?.id).toBe('primary-duplicate');
     });
 
     it('deletes exactly the explicit toolbar targets', async () => {

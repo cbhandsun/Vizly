@@ -193,7 +193,7 @@ export const scheduleFlowchartEmptyStateFocus = (
     };
 };
 
-export const scheduleFlowchartDeletionNodeFocus = (
+export const scheduleFlowchartSelectedNodeFocus = (
     nodeId: string,
     root?: ParentNode,
 ): { cancel: () => void } | null => {
@@ -228,6 +228,8 @@ export const scheduleFlowchartDeletionNodeFocus = (
         },
     };
 };
+
+export const scheduleFlowchartDeletionNodeFocus = scheduleFlowchartSelectedNodeFocus;
 
 export const scheduleFlowchartDeletionEdgeFocus = (
     edgeId: string,
