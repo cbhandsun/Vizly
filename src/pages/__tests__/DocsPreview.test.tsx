@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import i18n from '../../i18n';
@@ -29,9 +30,17 @@ describe('DocsPreview', () => {
         expect(screen.getByRole('button', { name: /分享与只读查看/ })).toBeTruthy();
         expect(screen.queryByRole('button', { name: /快速开始/ })).toBeNull();
 
+        fireEvent.click(screen.getByRole('button', { name: '清除搜索：搜索帮助主题' }));
+        expect(search).toHaveFocus();
+        expect(search).toHaveValue('');
+        expect(screen.getByRole('status')).toHaveTextContent('找到 6 个帮助主题');
+
         fireEvent.change(search, { target: { value: '不存在的内容' } });
         expect(screen.getByRole('heading', { name: '没有匹配的帮助主题' })).toBeTruthy();
         fireEvent.click(screen.getByRole('button', { name: '清除搜索' }));
+        expect(search).toHaveFocus();
+        expect(search).toHaveValue('');
+        expect(screen.getByRole('status')).toHaveTextContent('找到 6 个帮助主题');
         expect(screen.getByRole('heading', { name: '快速开始', level: 2 })).toBeTruthy();
     });
 

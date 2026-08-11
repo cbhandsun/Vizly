@@ -37,6 +37,7 @@ const DocsPreview = () => {
     const copy = getDocsPreviewCopy(locale);
     const [query, setQuery] = useState('');
     const [selectedTopicId, setSelectedTopicId] = useState(copy.topics[0]?.id ?? '');
+    const searchInputRef = useRef<HTMLInputElement>(null);
     const articleHeadingRef = useRef<HTMLHeadingElement>(null);
     const filteredTopics = useMemo(
         () => filterDocsPreviewTopics(copy.topics, query),
@@ -52,6 +53,7 @@ const DocsPreview = () => {
     const clearSearch = () => {
         setQuery('');
         setSelectedTopicId(copy.topics[0]?.id ?? '');
+        searchInputRef.current?.focus({ preventScroll: true });
     };
 
     return (
@@ -81,6 +83,7 @@ const DocsPreview = () => {
                             maxLength={DOCS_SEARCH_MAX_LENGTH}
                             onChange={(event) => setQuery(sanitizeDocsSearchQuery(event.target.value))}
                             placeholder={copy.searchPlaceholder}
+                            ref={searchInputRef}
                             type="search"
                             value={query}
                         />
