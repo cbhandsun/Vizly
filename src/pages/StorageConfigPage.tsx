@@ -15,6 +15,7 @@ import {
     S3_CONNECTION_TIMEOUT_MS,
 } from './storageConfigPageModel';
 import { StorageSecretInput } from './StorageSecretInput';
+import { useUnsavedNavigationGuard } from './useUnsavedNavigationGuard';
 import './StorageConfigPage.css';
 
 const { Title, Paragraph } = Typography;
@@ -36,6 +37,16 @@ const StorageConfigPage: React.FC = () => {
     const validationFocusFrameRef = useRef<number | null>(null);
     const mountedRef = useRef(true);
     const navigate = useNavigate();
+
+    useUnsavedNavigationGuard({
+        when: hasUnsavedChanges,
+        copy: {
+            title: t('storageConfig.leaveConfirm.title'),
+            content: t('storageConfig.leaveConfirm.content'),
+            confirm: t('storageConfig.leaveConfirm.confirm'),
+            keepEditing: t('storageConfig.leaveConfirm.keepEditing'),
+        },
+    });
 
     useEffect(() => {
         mountedRef.current = true;
@@ -199,33 +210,7 @@ const StorageConfigPage: React.FC = () => {
         }
     };
 
-    const handleReturnToWorkspace = (event: React.MouseEvent<HTMLButtonElement>) => {
-        if (!hasUnsavedChanges) {
-            navigate('/manage');
-            return;
-        }
-
-        const trigger = event.currentTarget;
-        let shouldRestoreFocus = true;
-        let hasNavigated = false;
-        appModal.confirm({
-            title: t('storageConfig.leaveConfirm.title'),
-            content: t('storageConfig.leaveConfirm.content'),
-            okText: t('storageConfig.leaveConfirm.confirm'),
-            cancelText: t('storageConfig.leaveConfirm.keepEditing'),
-            autoFocusButton: 'cancel',
-            okButtonProps: { danger: true },
-            onOk: () => {
-                if (hasNavigated) return;
-                hasNavigated = true;
-                shouldRestoreFocus = false;
-                navigate('/manage');
-            },
-            afterClose: () => {
-                if (shouldRestoreFocus && trigger.isConnected) trigger.focus();
-            },
-        });
-    };
+    const handleReturnToWorkspace = () => navigate('/manage');
 
     const statusCopy: Record<ConnectionState, { type: 'info' | 'success' | 'warning' | 'error'; message: string }> = {
         'not-configured': { type: 'info', message: t('storageConfig.status.notConfigured') },

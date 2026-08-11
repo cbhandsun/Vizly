@@ -1,5 +1,4 @@
 import React from 'react';
-import { HashRouter } from 'react-router';
 import { AuthProvider } from '@/context/AuthContext';
 import { SubscriptionProvider } from '@/context/SubscriptionContext';
 
@@ -13,13 +12,11 @@ interface AppProvidersProps {
  */
 export const AppProviders: React.FC<AppProvidersProps> = ({ children }) => {
   return (
-    <HashRouter>
-      <AuthProvider>
-        <SubscriptionProvider>
-          {children}
-        </SubscriptionProvider>
-      </AuthProvider>
-    </HashRouter>
+    <AuthProvider>
+      <SubscriptionProvider>
+        {children}
+      </SubscriptionProvider>
+    </AuthProvider>
   );
 };
 

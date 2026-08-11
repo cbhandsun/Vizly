@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 
 import '@testing-library/jest-dom/vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { createMemoryRouter, RouterProvider } from 'react-router';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const storageMocks = vi.hoisted(() => ({
     getConfig: vi.fn(() => null),
@@ -15,14 +16,6 @@ const bridgeMocks = vi.hoisted(() => ({
     messageSuccess: vi.fn(),
     modalConfirm: vi.fn(),
     modalError: vi.fn(),
-}));
-
-const routerMocks = vi.hoisted(() => ({
-    navigate: vi.fn(),
-}));
-
-vi.mock('react-router', () => ({
-    useNavigate: () => routerMocks.navigate,
 }));
 
 vi.mock('react-i18next', () => ({
@@ -63,6 +56,25 @@ vi.stubGlobal('matchMedia', vi.fn().mockImplementation((query: string) => ({
 
 import StorageConfigPage from '../StorageConfigPage';
 
+const renderStorageConfig = (initialEntries = ['/storage-config']) => {
+    const router = createMemoryRouter([
+        { path: '/storage-config', element: <StorageConfigPage /> },
+        { path: '/manage', element: <div>workspace destination</div> },
+    ], {
+        initialEntries,
+        initialIndex: initialEntries.length - 1,
+    });
+
+    return { router, ...render(<RouterProvider router={router} />) };
+};
+
+beforeEach(() => {
+    bridgeMocks.modalConfirm.mockReturnValue({
+        destroy: vi.fn(),
+        update: vi.fn(),
+    });
+});
+
 afterEach(() => {
     cleanup();
     storageMocks.getConfig.mockReturnValue(null);
@@ -72,7 +84,6 @@ afterEach(() => {
     bridgeMocks.messageSuccess.mockReset();
     bridgeMocks.modalConfirm.mockReset();
     bridgeMocks.modalError.mockReset();
-    routerMocks.navigate.mockReset();
 });
 
 interface LeaveConfirmOptions {
@@ -83,12 +94,13 @@ interface LeaveConfirmOptions {
     autoFocusButton: 'cancel' | 'ok' | null;
     okButtonProps?: { danger?: boolean };
     onOk?: () => void;
+    onCancel?: () => void;
     afterClose?: () => void;
 }
 
 describe('StorageConfigPage validation recovery', () => {
     it('keeps essential field guidance visible and programmatically associated', () => {
-        render(<StorageConfigPage />);
+        renderStorageConfig();
 
         const endpoint = screen.getByPlaceholderText('https://...');
         const endpointGuidance = screen.getByText('storageConfig.form.endpointTooltip');
@@ -105,7 +117,7 @@ describe('StorageConfigPage validation recovery', () => {
     });
 
     it('announces route entry through the page heading without stealing later focus', async () => {
-        const { unmount } = render(<StorageConfigPage />);
+        const { unmount } = renderStorageConfig();
 
         const pageTitle = screen.getByRole('heading', {
             level: 1,
@@ -115,7 +127,7 @@ describe('StorageConfigPage validation recovery', () => {
         expect(pageTitle).toHaveAttribute('tabindex', '-1');
 
         unmount();
-        render(<StorageConfigPage />);
+        renderStorageConfig();
         const returnButton = screen.getAllByRole('button', {
             name: 'storageConfig.returnToWorkspace',
         })[0];
@@ -128,7 +140,7 @@ describe('StorageConfigPage validation recovery', () => {
         { action: 'save', accessibleName: 'storageConfig.form.saveBtn' },
         { action: 'test', accessibleName: 'storageConfig.form.testBtn' },
     ])('focuses the first invalid field and exposes persistent recovery for $action', async ({ accessibleName }) => {
-        render(<StorageConfigPage />);
+        renderStorageConfig();
 
         fireEvent.click(screen.getByRole('button', { name: accessibleName }));
 
@@ -141,7 +153,7 @@ describe('StorageConfigPage validation recovery', () => {
     });
 
     it('keeps decorative action icons out of localized accessible names', () => {
-        render(<StorageConfigPage />);
+        renderStorageConfig();
 
         const saveButton = screen.getByRole('button', {
             name: 'storageConfig.form.saveBtn',
@@ -158,7 +170,7 @@ describe('StorageConfigPage validation recovery', () => {
 
     it('localizes the connection-failure recovery action and keeps entered values available for retry', async () => {
         storageMocks.testConnection.mockRejectedValueOnce(new TypeError('Failed to fetch'));
-        render(<StorageConfigPage />);
+        renderStorageConfig();
 
         const endpoint = screen.getByPlaceholderText('https://...');
         const bucket = screen.getByPlaceholderText('my-diagrams-bucket');
@@ -183,26 +195,35 @@ describe('StorageConfigPage validation recovery', () => {
         expect(storageMocks.saveConfig).not.toHaveBeenCalled();
     });
 
-    it('leaves immediately from either return control when the form is unchanged', () => {
-        render(<StorageConfigPage />);
+    it('leaves immediately from either return control when the form is unchanged', async () => {
+        renderStorageConfig();
 
-        const returnButtons = screen.getAllByRole('button', {
+        let returnButtons = screen.getAllByRole('button', {
             name: 'storageConfig.returnToWorkspace',
         });
         expect(returnButtons).toHaveLength(2);
-        const [brandButton, returnButton] = returnButtons;
-        if (!brandButton || !returnButton) throw new Error('Expected both storage configuration return controls');
+        const brandButton = returnButtons[0];
+        if (!brandButton) throw new Error('Expected the storage configuration brand control');
 
         fireEvent.click(brandButton);
-        fireEvent.click(returnButton);
+        expect(await screen.findByText('workspace destination')).toBeInTheDocument();
+        expect(bridgeMocks.modalConfirm).not.toHaveBeenCalled();
 
-        expect(routerMocks.navigate).toHaveBeenNthCalledWith(1, '/manage');
-        expect(routerMocks.navigate).toHaveBeenNthCalledWith(2, '/manage');
+        cleanup();
+        renderStorageConfig();
+        returnButtons = screen.getAllByRole('button', {
+            name: 'storageConfig.returnToWorkspace',
+        });
+        const returnButton = returnButtons[1];
+        if (!returnButton) throw new Error('Expected the storage configuration return button');
+
+        fireEvent.click(returnButton);
+        expect(await screen.findByText('workspace destination')).toBeInTheDocument();
         expect(bridgeMocks.modalConfirm).not.toHaveBeenCalled();
     });
 
-    it('guards both return controls, preserves input on cancel, and navigates only once on confirmation', () => {
-        render(<StorageConfigPage />);
+    it('guards both return controls, preserves input on cancel, and navigates only once on confirmation', async () => {
+        renderStorageConfig();
 
         const endpoint = screen.getByPlaceholderText('https://...');
         fireEvent.change(endpoint, { target: { value: 'https://unsaved.example.invalid' } });
@@ -214,8 +235,7 @@ describe('StorageConfigPage validation recovery', () => {
 
         brandButton.focus();
         fireEvent.click(brandButton);
-        expect(routerMocks.navigate).not.toHaveBeenCalled();
-        expect(bridgeMocks.modalConfirm).toHaveBeenCalledTimes(1);
+        await waitFor(() => expect(bridgeMocks.modalConfirm).toHaveBeenCalledTimes(1));
         const cancelOptions = bridgeMocks.modalConfirm.mock.calls[0]?.[0] as LeaveConfirmOptions;
         expect(cancelOptions).toEqual(expect.objectContaining({
             title: 'storageConfig.leaveConfirm.title',
@@ -225,8 +245,10 @@ describe('StorageConfigPage validation recovery', () => {
             autoFocusButton: 'cancel',
             okButtonProps: { danger: true },
         }));
+        expect(cancelOptions.onCancel).toBeTypeOf('function');
         expect(cancelOptions.afterClose).toBeTypeOf('function');
-        cancelOptions.afterClose?.();
+        act(() => cancelOptions.onCancel?.());
+        act(() => cancelOptions.afterClose?.());
         expect(endpoint).toHaveValue('https://unsaved.example.invalid');
         expect(document.activeElement).toBe(brandButton);
 
@@ -234,20 +256,55 @@ describe('StorageConfigPage validation recovery', () => {
         returnButton.focus();
         confirmTriggerFocus.mockClear();
         fireEvent.click(returnButton);
-        expect(bridgeMocks.modalConfirm).toHaveBeenCalledTimes(2);
+        await waitFor(() => expect(bridgeMocks.modalConfirm).toHaveBeenCalledTimes(2));
         const confirmOptions = bridgeMocks.modalConfirm.mock.calls[1]?.[0] as LeaveConfirmOptions;
         expect(confirmOptions.onOk).toBeTypeOf('function');
-        confirmOptions.onOk?.();
-        confirmOptions.onOk?.();
-        confirmOptions.afterClose?.();
+        act(() => {
+            confirmOptions.onOk?.();
+            confirmOptions.onOk?.();
+        });
+        act(() => confirmOptions.afterClose?.());
 
-        expect(routerMocks.navigate).toHaveBeenCalledTimes(1);
-        expect(routerMocks.navigate).toHaveBeenCalledWith('/manage');
+        expect(await screen.findByText('workspace destination')).toBeInTheDocument();
         expect(confirmTriggerFocus).not.toHaveBeenCalled();
     });
 
+    it('guards browser history navigation, preserves dirty input on cancel, and proceeds once', async () => {
+        const { router } = renderStorageConfig(['/manage', '/storage-config']);
+
+        const endpoint = screen.getByPlaceholderText('https://...');
+        fireEvent.change(endpoint, { target: { value: 'https://history-loss.example.invalid' } });
+        endpoint.focus();
+
+        await act(async () => {
+            await router.navigate(-1);
+        });
+        await waitFor(() => expect(bridgeMocks.modalConfirm).toHaveBeenCalledTimes(1));
+        expect(router.state.location.pathname).toBe('/storage-config');
+
+        const cancelOptions = bridgeMocks.modalConfirm.mock.calls[0]?.[0] as LeaveConfirmOptions;
+        act(() => cancelOptions.onCancel?.());
+        act(() => cancelOptions.afterClose?.());
+        expect(router.state.location.pathname).toBe('/storage-config');
+        expect(endpoint).toHaveValue('https://history-loss.example.invalid');
+        expect(document.activeElement).toBe(endpoint);
+
+        await act(async () => {
+            await router.navigate(-1);
+        });
+        await waitFor(() => expect(bridgeMocks.modalConfirm).toHaveBeenCalledTimes(2));
+        const confirmOptions = bridgeMocks.modalConfirm.mock.calls[1]?.[0] as LeaveConfirmOptions;
+        act(() => {
+            confirmOptions.onOk?.();
+            confirmOptions.onOk?.();
+        });
+
+        expect(await screen.findByText('workspace destination')).toBeInTheDocument();
+        expect(router.state.location.pathname).toBe('/manage');
+    });
+
     it('protects browser unload only while changes remain unsaved', async () => {
-        render(<StorageConfigPage />);
+        renderStorageConfig();
 
         const cleanEvent = new Event('beforeunload', { cancelable: true });
         expect(window.dispatchEvent(cleanEvent)).toBe(true);
@@ -275,5 +332,13 @@ describe('StorageConfigPage validation recovery', () => {
         const savedEvent = new Event('beforeunload', { cancelable: true });
         expect(window.dispatchEvent(savedEvent)).toBe(true);
         expect(savedEvent.defaultPrevented).toBe(false);
+
+        const returnButton = screen.getAllByRole('button', {
+            name: 'storageConfig.returnToWorkspace',
+        })[1];
+        if (!returnButton) throw new Error('Expected the storage configuration return button');
+        fireEvent.click(returnButton);
+        expect(await screen.findByText('workspace destination')).toBeInTheDocument();
+        expect(bridgeMocks.modalConfirm).not.toHaveBeenCalled();
     });
 });

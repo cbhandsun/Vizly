@@ -1,6 +1,6 @@
 import React from 'react';
 import { ErrorBoundary } from '@/core/components/shared/ErrorBoundary';
-import { AppProviders, AppRoutes } from '@/app/index';
+import { AppRouter } from '@/app/index';
 import { logAppBoundaryError } from '@/core/utils/errorBoundaryLogging';
 
 /**
@@ -20,9 +20,7 @@ const App: React.FC = () => {
       }}
     >
       <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-50 dark:bg-slate-900 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] dark:bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:16px_16px] transition-colors duration-300">
-        <AppProviders>
-            <AppRoutes />
-          </AppProviders>
+        <AppRouter />
       </div>
     </ErrorBoundary>
   );
