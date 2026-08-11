@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { Node, Edge } from '@xyflow/react';
 import { fromMermaid } from '../../../utils/mermaidConverter';
 import {
@@ -22,6 +22,11 @@ import {
     resolveFlowchartPasteOffset,
     type ClipboardPasteCursor,
 } from '../../../utils/flowchartClipboardPaste';
+import {
+    resolveFlowchartCutFocusNodeId,
+    scheduleFlowchartDeletionNodeFocus,
+    scheduleFlowchartEmptyStateFocus,
+} from '../flowchartDeletionFocus';
 
 interface UseClipboardProps {
     nodesRef: React.RefObject<Node[]>;
@@ -62,6 +67,12 @@ export const useClipboard = ({
     clipboardKey = 'flowchart-clipboard',
 }: UseClipboardProps) => {
     const pasteCursorRef = useRef<ClipboardPasteCursor | null>(null);
+    const cutFocusRequestRef = useRef<{ cancel: () => void } | null>(null);
+
+    useEffect(() => () => {
+        cutFocusRequestRef.current?.cancel();
+        cutFocusRequestRef.current = null;
+    }, []);
 
     const writeSelectedNodesToClipboard = useCallback(async (targetNodeIds?: string[]): Promise<boolean> => {
         const targetIds = targetNodeIds ? new Set(targetNodeIds) : null;
@@ -248,19 +259,37 @@ export const useClipboard = ({
         if (currentSelection.length === 0) return 'empty';
         if (hasMutationLockedNode(currentSelection)) return 'locked';
 
+        const currentSelectedNodeIds = new Set(currentSelection.map(node => node.id));
+        const cutFocusNodeId = resolveFlowchartCutFocusNodeId(
+            currentNodes,
+            currentSelectedNodeIds,
+        );
+
         takeSnapshot(currentNodes, currentEdges);
 
-        const nextNodes = currentNodes.filter(node => !selectedNodeIds.has(node.id));
+        const nextNodes = currentNodes
+            .filter(node => !currentSelectedNodeIds.has(node.id))
+            .map(node => ({
+                ...node,
+                selected: cutFocusNodeId === node.id,
+            }));
         const nextEdges = currentEdges.filter(edge =>
             !selectedEdgeIds.has(edge.id) &&
-            !selectedNodeIds.has(edge.source) &&
-            !selectedNodeIds.has(edge.target)
-        );
+            !currentSelectedNodeIds.has(edge.source) &&
+            !currentSelectedNodeIds.has(edge.target)
+        ).map(edge => ({ ...edge, selected: false }));
 
         nodesRef.current = nextNodes;
         edgesRef.current = nextEdges;
         setNodes(nextNodes);
         setEdges(nextEdges);
+
+        cutFocusRequestRef.current?.cancel();
+        cutFocusRequestRef.current = cutFocusNodeId
+            ? scheduleFlowchartDeletionNodeFocus(cutFocusNodeId)
+            : nextNodes.length === 0
+                ? scheduleFlowchartEmptyStateFocus()
+                : null;
         return 'cut';
     }, [edgesRef, getOperationScope, nodesRef, selectedEdges, selectedNodes, setEdges, setNodes, takeSnapshot, writeSelectedNodesToClipboard]);
 

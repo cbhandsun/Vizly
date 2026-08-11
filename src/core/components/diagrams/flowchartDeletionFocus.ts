@@ -15,6 +15,39 @@ const hasFinitePosition = (node: Node): boolean => (
     Number.isFinite(node.position?.x) && Number.isFinite(node.position?.y)
 );
 
+const resolveNearestSurvivorNodeId = (
+    currentNodes: readonly Node[],
+    nodeIdsToDelete: ReadonlySet<string>,
+    anchorNodeIds: ReadonlySet<string>,
+): string | null => {
+    const anchors = currentNodes.filter(node => (
+        anchorNodeIds.has(node.id) && isValidFocusNodeId(node.id)
+    ));
+    const survivors = currentNodes.filter(node => (
+        !nodeIdsToDelete.has(node.id) && isValidFocusNodeId(node.id)
+    ));
+    if (anchors.length === 0 || survivors.length === 0) return null;
+
+    const positionedAnchors = anchors.filter(hasFinitePosition);
+    if (positionedAnchors.length === 0) return survivors[0]?.id ?? null;
+
+    let nearest = survivors[0];
+    let nearestDistance = Number.POSITIVE_INFINITY;
+    for (const candidate of survivors) {
+        if (!hasFinitePosition(candidate)) continue;
+        for (const anchor of positionedAnchors) {
+            const dx = candidate.position.x - anchor.position.x;
+            const dy = candidate.position.y - anchor.position.y;
+            const distance = (dx * dx) + (dy * dy);
+            if (distance < nearestDistance) {
+                nearest = candidate;
+                nearestDistance = distance;
+            }
+        }
+    }
+    return nearest?.id ?? null;
+};
+
 export const resolveFlowchartDeletionFocusNodeId = (
     currentNodes: readonly Node[],
     nodeIdsToDelete: ReadonlySet<string>,
@@ -26,27 +59,26 @@ export const resolveFlowchartDeletionFocusNodeId = (
         return null;
     }
 
-    const anchor = currentNodes.find(node => node.id === focusedNodeId);
-    const survivors = currentNodes.filter(node => (
-        !nodeIdsToDelete.has(node.id) && isValidFocusNodeId(node.id)
-    ));
-    if (!anchor || survivors.length === 0) return null;
-    if (!hasFinitePosition(anchor)) return survivors[0]?.id ?? null;
-
-    let nearest = survivors[0];
-    let nearestDistance = Number.POSITIVE_INFINITY;
-    for (const candidate of survivors) {
-        if (!hasFinitePosition(candidate)) continue;
-        const dx = candidate.position.x - anchor.position.x;
-        const dy = candidate.position.y - anchor.position.y;
-        const distance = (dx * dx) + (dy * dy);
-        if (distance < nearestDistance) {
-            nearest = candidate;
-            nearestDistance = distance;
-        }
-    }
-    return nearest?.id ?? null;
+    return resolveNearestSurvivorNodeId(
+        currentNodes,
+        nodeIdsToDelete,
+        new Set([focusedNodeId]),
+    );
 };
+
+/**
+ * A cut can be triggered from a transient menu whose focus has already left
+ * the canvas. Use the current cut selection as the spatial anchor so the
+ * nearest surviving node can take over both selection and keyboard context.
+ */
+export const resolveFlowchartCutFocusNodeId = (
+    currentNodes: readonly Node[],
+    nodeIdsToCut: ReadonlySet<string>,
+): string | null => resolveNearestSurvivorNodeId(
+    currentNodes,
+    nodeIdsToCut,
+    nodeIdsToCut,
+);
 
 export const focusFlowchartEmptyStateAction = (
     root: ParentNode,

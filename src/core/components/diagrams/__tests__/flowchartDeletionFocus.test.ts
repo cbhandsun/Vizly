@@ -4,6 +4,7 @@ import type { Node } from '@xyflow/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+    resolveFlowchartCutFocusNodeId,
     resolveFlowchartDeletionFocusNodeId,
     scheduleFlowchartDeletionNodeFocus,
 } from '../flowchartDeletionFocus';
@@ -78,6 +79,35 @@ describe('flowchart deletion focus', () => {
             [node(oversizedId, 0), node('safe', 10)],
             new Set([oversizedId]),
             oversizedFocus,
+        )).toBeNull();
+    });
+
+    it('uses every cut node as a spatial anchor when focus is inside a transient menu', () => {
+        expect(resolveFlowchartCutFocusNodeId(
+            [
+                node('left-survivor', -100),
+                node('first-cut', 0),
+                node('second-cut', 400),
+                node('right-survivor', 430),
+            ],
+            new Set(['first-cut', 'second-cut']),
+        )).toBe('right-survivor');
+    });
+
+    it('keeps cut focus resolution deterministic for invalid ids, geometry, and empty survivors', () => {
+        const invalidCut = { ...node('cut', 0), position: { x: Number.NaN, y: 0 } };
+
+        expect(resolveFlowchartCutFocusNodeId(
+            [invalidCut, node('first', 300), node('second', 10)],
+            new Set(['cut']),
+        )).toBe('first');
+        expect(resolveFlowchartCutFocusNodeId(
+            [node('cut', 0)],
+            new Set(['cut']),
+        )).toBeNull();
+        expect(resolveFlowchartCutFocusNodeId(
+            [node('safe', 0), node('x'.repeat(1_025), 10)],
+            new Set(['x'.repeat(1_025)]),
         )).toBeNull();
     });
 

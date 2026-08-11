@@ -379,6 +379,77 @@ describe('useClipboard', () => {
     expect(setEdges).toHaveBeenCalledWith([]);
   });
 
+  it('selects and focuses the nearest survivor after cutting a selected node', async () => {
+    const survivor: Node = {
+      id: 'survivor',
+      position: { x: 25, y: 20 },
+      data: { label: 'Survivor' },
+      selected: false,
+    };
+    const nodesRef = { current: [...selectedNodes, survivor] };
+    const edgesRef = { current: [] as Edge[] };
+    const setNodes = vi.fn();
+    const setEdges = vi.fn();
+    const frames: FrameRequestCallback[] = [];
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => {
+      frames.push(callback);
+      return frames.length;
+    });
+    Object.assign(navigator, {
+      clipboard: { writeText: vi.fn().mockResolvedValue(undefined), readText: vi.fn() },
+    });
+
+    const { result } = renderHook(() => useClipboard({
+      nodesRef,
+      edgesRef,
+      selectedNodes,
+      selectedEdges: [],
+      setNodes,
+      setEdges,
+      takeSnapshot: vi.fn(),
+      getOperationScope,
+    }));
+
+    await expect(result.current.handleCut()).resolves.toBe('cut');
+    expect(nodesRef.current).toEqual([{ ...survivor, selected: true }]);
+
+    document.body.innerHTML = `
+      <div class="react-flow__node selected" data-id="survivor">
+        <div id="survivor-focus" role="treeitem" aria-selected="true" tabindex="0"></div>
+      </div>
+    `;
+    frames.shift()?.(0);
+    expect(document.activeElement?.id).toBe('survivor-focus');
+  });
+
+  it('focuses the empty-state primary action after cutting the final node', async () => {
+    const nodesRef = { current: selectedNodes };
+    const frames: FrameRequestCallback[] = [];
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => {
+      frames.push(callback);
+      return frames.length;
+    });
+    Object.assign(navigator, {
+      clipboard: { writeText: vi.fn().mockResolvedValue(undefined), readText: vi.fn() },
+    });
+
+    const { result } = renderHook(() => useClipboard({
+      nodesRef,
+      edgesRef: { current: [] },
+      selectedNodes,
+      selectedEdges: [],
+      setNodes: vi.fn(),
+      setEdges: vi.fn(),
+      takeSnapshot: vi.fn(),
+      getOperationScope,
+    }));
+
+    await expect(result.current.handleCut()).resolves.toBe('cut');
+    document.body.innerHTML = '<button class="flowchart-empty-action">Choose first shape</button>';
+    frames.shift()?.(0);
+    expect(document.activeElement).toBe(document.querySelector('.flowchart-empty-action'));
+  });
+
   it('cancels a pending cut when the active page or diagram scope changes', async () => {
     let currentScope = 'diagram-1:page-1';
     let resolveWrite: (() => void) | undefined;
