@@ -156,6 +156,7 @@ const StorageConfigPage: React.FC = () => {
             const isNetworkFailure = safeError.message === 'Failed to fetch' || safeError.name === 'TypeError';
             appModal.error({
                 title: t('storageConfig.testFail.title'),
+                okText: t('common.ok'),
                 width: 600,
                 content: (
                     <div className="storage-config-error-content">

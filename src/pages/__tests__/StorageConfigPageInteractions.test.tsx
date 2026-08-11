@@ -10,6 +10,12 @@ const storageMocks = vi.hoisted(() => ({
     testConnection: vi.fn(),
 }));
 
+const bridgeMocks = vi.hoisted(() => ({
+    messageError: vi.fn(),
+    messageSuccess: vi.fn(),
+    modalError: vi.fn(),
+}));
+
 vi.mock('react-router', () => ({
     useNavigate: () => vi.fn(),
 }));
@@ -21,8 +27,8 @@ vi.mock('react-i18next', () => ({
 }));
 
 vi.mock('@/core/utils/antdStaticBridge', () => ({
-    appMessage: { error: vi.fn(), success: vi.fn() },
-    appModal: { error: vi.fn() },
+    appMessage: { error: bridgeMocks.messageError, success: bridgeMocks.messageSuccess },
+    appModal: { error: bridgeMocks.modalError },
 }));
 
 vi.mock('@/services/StorageService', () => ({
@@ -57,6 +63,9 @@ afterEach(() => {
     storageMocks.getConfig.mockReturnValue(null);
     storageMocks.saveConfig.mockReset();
     storageMocks.testConnection.mockReset();
+    bridgeMocks.messageError.mockReset();
+    bridgeMocks.messageSuccess.mockReset();
+    bridgeMocks.modalError.mockReset();
 });
 
 describe('StorageConfigPage validation recovery', () => {
@@ -127,5 +136,32 @@ describe('StorageConfigPage validation recovery', () => {
         expect(testButton.querySelector('.anticon')).toHaveAttribute('aria-hidden', 'true');
         expect(screen.queryByRole('button', { name: 'save storageConfig.form.saveBtn' })).not.toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'api storageConfig.form.testBtn' })).not.toBeInTheDocument();
+    });
+
+    it('localizes the connection-failure recovery action and keeps entered values available for retry', async () => {
+        storageMocks.testConnection.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+        render(<StorageConfigPage />);
+
+        const endpoint = screen.getByPlaceholderText('https://...');
+        const bucket = screen.getByPlaceholderText('my-diagrams-bucket');
+        const accessKey = screen.getByPlaceholderText('storageConfig.form.accessKeyPlaceholder');
+        const secretKey = screen.getByPlaceholderText('storageConfig.form.secretKeyPlaceholder');
+        fireEvent.change(endpoint, { target: { value: 'http://127.0.0.1:9' } });
+        fireEvent.change(bucket, { target: { value: 'vizly-audit-bucket' } });
+        fireEvent.change(accessKey, { target: { value: 'AUDIT_ACCESS_KEY' } });
+        fireEvent.change(secretKey, { target: { value: 'AUDIT_SECRET_KEY' } });
+
+        fireEvent.click(screen.getByRole('button', { name: 'storageConfig.form.testBtn' }));
+
+        await waitFor(() => expect(bridgeMocks.modalError).toHaveBeenCalledTimes(1));
+        expect(bridgeMocks.modalError).toHaveBeenCalledWith(expect.objectContaining({
+            title: 'storageConfig.testFail.title',
+            okText: 'common.ok',
+        }));
+        expect(endpoint).toHaveValue('http://127.0.0.1:9');
+        expect(bucket).toHaveValue('vizly-audit-bucket');
+        expect(accessKey).toHaveValue('AUDIT_ACCESS_KEY');
+        expect(secretKey).toHaveValue('AUDIT_SECRET_KEY');
+        expect(storageMocks.saveConfig).not.toHaveBeenCalled();
     });
 });

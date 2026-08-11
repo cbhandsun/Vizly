@@ -25,6 +25,7 @@ describe('storage configuration commercial safeguards', () => {
         expect(source).toContain("invalid: { type: 'error'");
         expect(source).toContain('new AbortController()');
         expect(source).toContain('storageService.testConnection(values, controller.signal)');
+        expect(source).toContain("okText: t('common.ok')");
         expect(source).toContain('disabled={testing}');
         expect(source).toContain('disabled={loading}');
         expect(source).toContain('<SaveOutlined aria-hidden="true" />');
