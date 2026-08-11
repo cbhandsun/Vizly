@@ -197,6 +197,15 @@ const shareRecord = {
   created_at: '2026-08-01T00:00:00.000Z',
 };
 
+const createCollaborator = (diagramId: string, userId: string, email: string) => ({
+  diagram_id: diagramId,
+  user_id: userId,
+  role: 'viewer' as const,
+  added_by: USER_ID,
+  created_at: '2026-08-01T00:00:00.000Z',
+  email,
+});
+
 describe('ShareDialog commercial failure handling', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -389,6 +398,33 @@ describe('ShareDialog commercial failure handling', () => {
     });
   });
 
+  it('reloads collaborators with the saved cloud id after inviting from a local diagram', async () => {
+    authMocks.user = { id: USER_ID };
+    serviceMocks.addCollaborator.mockResolvedValue({ success: true, user_id: USER_ID });
+    render(
+      <ShareDialog
+        open
+        onClose={vi.fn()}
+        diagramId="local-unsaved-diagram"
+        onEnsureSaved={vi.fn(async () => DIAGRAM_ID)}
+      />,
+    );
+
+    fireEvent.change(await screen.findByPlaceholderText('输入用户的注册邮箱...'), {
+      target: { value: 'viewer@example.com' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '邀请' }));
+
+    await waitFor(() => {
+      expect(serviceMocks.addCollaborator).toHaveBeenCalledWith(
+        DIAGRAM_ID,
+        'viewer@example.com',
+        'viewer',
+      );
+      expect(serviceMocks.listCollaborators).toHaveBeenCalledWith(DIAGRAM_ID);
+    });
+  });
+
   it('shows a retry action instead of treating collaborator load failure as an empty list', async () => {
     authMocks.user = { id: USER_ID };
     serviceMocks.listCollaborators.mockRejectedValueOnce(new Error('network unavailable'));
@@ -402,6 +438,51 @@ describe('ShareDialog commercial failure handling', () => {
 
     await waitFor(() => expect(serviceMocks.listCollaborators).toHaveBeenCalledTimes(2));
     expect(loggingMocks.loadFailure).toHaveBeenCalledWith('collaborators', expect.any(Error));
+  });
+
+  it('clears protected collaboration data when the active account signs out', async () => {
+    authMocks.user = { id: USER_ID };
+    serviceMocks.listCollaborators.mockResolvedValue([
+      createCollaborator(DIAGRAM_ID, '44444444-4444-4444-8444-444444444444', 'private@example.com'),
+    ]);
+    const { rerender } = render(
+      <ShareDialog open onClose={vi.fn()} diagramId={DIAGRAM_ID} onEnsureSaved={vi.fn()} />,
+    );
+
+    expect(await screen.findByText('private@example.com')).toBeTruthy();
+    authMocks.user = null;
+    rerender(<ShareDialog open onClose={vi.fn()} diagramId={DIAGRAM_ID} onEnsureSaved={vi.fn()} />);
+
+    expect(await screen.findByText('请先登录后才能使用分享功能')).toBeTruthy();
+    await waitFor(() => expect(screen.queryByText('private@example.com')).toBeNull());
+  });
+
+  it('ignores stale collaborator responses after switching diagrams', async () => {
+    authMocks.user = { id: USER_ID };
+    const nextDiagramId = '55555555-5555-4555-8555-555555555555';
+    let resolveFirst: ((records: ReturnType<typeof createCollaborator>[]) => void) | undefined;
+    let resolveSecond: ((records: ReturnType<typeof createCollaborator>[]) => void) | undefined;
+    serviceMocks.listCollaborators
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; }))
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveSecond = resolve; }));
+    const { rerender } = render(
+      <ShareDialog open onClose={vi.fn()} diagramId={DIAGRAM_ID} onEnsureSaved={vi.fn()} />,
+    );
+
+    await waitFor(() => expect(serviceMocks.listCollaborators).toHaveBeenCalledWith(DIAGRAM_ID));
+    rerender(<ShareDialog open onClose={vi.fn()} diagramId={nextDiagramId} onEnsureSaved={vi.fn()} />);
+    await waitFor(() => expect(serviceMocks.listCollaborators).toHaveBeenCalledWith(nextDiagramId));
+
+    resolveSecond?.([
+      createCollaborator(nextDiagramId, '66666666-6666-4666-8666-666666666666', 'current@example.com'),
+    ]);
+    expect(await screen.findByText('current@example.com')).toBeTruthy();
+
+    resolveFirst?.([
+      createCollaborator(DIAGRAM_ID, '77777777-7777-4777-8777-777777777777', 'stale@example.com'),
+    ]);
+    await waitFor(() => expect(screen.queryByText('stale@example.com')).toBeNull());
+    expect(screen.getByText('current@example.com')).toBeTruthy();
   });
 
   it('keeps a created link visible when clipboard permission is denied', async () => {

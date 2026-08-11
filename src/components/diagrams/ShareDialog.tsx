@@ -82,7 +82,10 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
 
     // Link Share State
     const [expiration, setExpiration] = useState<ExpirationOption>('never');
-    const [shares, setShares] = useState<ShareRecord[]>([]);
+    const [sharesData, setSharesData] = useState<{
+        scopeKey: string | null;
+        records: ShareRecord[];
+    }>({ scopeKey: null, records: [] });
     const [loadingLink, setLoadingLink] = useState(false);
     const [creatingLink, setCreatingLink] = useState(false);
     const [shareLinkResult, setShareLinkResult] = useState<{ url: string; copied: boolean } | null>(null);
@@ -92,7 +95,10 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
     const pendingCreatedSharesRef = useRef<ShareRecord[]>([]);
 
     // Collaboration State
-    const [collaborators, setCollaborators] = useState<CollaboratorRecord[]>([]);
+    const [collaboratorsData, setCollaboratorsData] = useState<{
+        scopeKey: string | null;
+        records: CollaboratorRecord[];
+    }>({ scopeKey: null, records: [] });
     const [loadingCollabs, setLoadingCollabs] = useState(false);
     const [inviteEmail, setInviteEmail] = useState('');
     const [inviteEmailTouched, setInviteEmailTouched] = useState(false);
@@ -100,6 +106,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
     const [inviting, setInviting] = useState(false);
     const [inviteStatus, setInviteStatus] = useState<'idle' | 'success' | 'error'>('idle');
     const [collaboratorsLoadFailed, setCollaboratorsLoadFailed] = useState(false);
+    const collaboratorsLoadRequestRef = useRef(0);
 
     const parsedInviteEmail = useMemo(
         () => parseCollaboratorEmail(inviteEmail),
@@ -155,13 +162,26 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
     }, [t]);
 
     // 云端 UUID（保存后获得，用于替代本地 diagramId）
-    const [cloudDiagramId, setCloudDiagramId] = useState<string | null>(null);
-    const effectiveId = cloudDiagramId || diagramId;
+    const [cloudDiagramScope, setCloudDiagramScope] = useState<{
+        sourceDiagramId: string;
+        cloudDiagramId: string;
+    } | null>(null);
+    const effectiveId = cloudDiagramScope?.sourceDiagramId === diagramId
+        ? cloudDiagramScope.cloudDiagramId
+        : diagramId;
+    const dataScopeKey = `${diagramId}:${user?.id ?? 'guest'}`;
+    const sharesAreCurrent = sharesData.scopeKey === dataScopeKey;
+    const collaboratorsAreCurrent = collaboratorsData.scopeKey === dataScopeKey;
+    const currentShares = sharesAreCurrent ? sharesData.records : [];
+    const currentCollaborators = collaboratorsAreCurrent ? collaboratorsData.records : [];
 
     // Load Data
     const loadShares = useCallback(async () => {
-        if (!open || !user || !effectiveId || !isValidUuid(effectiveId)) return;
         const requestId = ++sharesLoadRequestRef.current;
+        if (!open || !user || !effectiveId || !isValidUuid(effectiveId)) return;
+        setSharesData(previous => previous.scopeKey === dataScopeKey
+            ? previous
+            : { scopeKey: dataScopeKey, records: [] });
         setLoadingLink(true);
         setSharesLoadFailed(false);
         try {
@@ -174,26 +194,37 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
                 pendingCreatedSharesRef.current = pendingCreatedSharesRef.current.filter(
                     share => share.diagram_id !== effectiveId || !listedIds.has(share.id),
                 );
-                setShares([...pendingForDiagram, ...list]);
+                setSharesData({ scopeKey: dataScopeKey, records: [...pendingForDiagram, ...list] });
             }
         } catch (error) {
             logShareDialogLoadFailure('shares', error);
             if (requestId === sharesLoadRequestRef.current) setSharesLoadFailed(true);
-        } finally { setLoadingLink(false); }
-    }, [open, user, effectiveId]);
+        } finally {
+            if (requestId === sharesLoadRequestRef.current) setLoadingLink(false);
+        }
+    }, [dataScopeKey, effectiveId, open, user]);
 
-    const loadCollaborators = useCallback(async () => {
-        if (!open || !user || !effectiveId || !isValidUuid(effectiveId)) return;
+    const loadCollaborators = useCallback(async (diagramIdOverride?: string) => {
+        const requestId = ++collaboratorsLoadRequestRef.current;
+        const targetDiagramId = diagramIdOverride || effectiveId;
+        if (!open || !user || !targetDiagramId || !isValidUuid(targetDiagramId)) return;
+        setCollaboratorsData(previous => previous.scopeKey === dataScopeKey
+            ? previous
+            : { scopeKey: dataScopeKey, records: [] });
         setLoadingCollabs(true);
         setCollaboratorsLoadFailed(false);
         try {
-            const list = await shareService.listCollaborators(effectiveId);
-            setCollaborators(list);
+            const list = await shareService.listCollaborators(targetDiagramId);
+            if (requestId === collaboratorsLoadRequestRef.current) {
+                setCollaboratorsData({ scopeKey: dataScopeKey, records: list });
+            }
         } catch (error) {
             logShareDialogLoadFailure('collaborators', error);
-            setCollaboratorsLoadFailed(true);
-        } finally { setLoadingCollabs(false); }
-    }, [open, user, effectiveId]);
+            if (requestId === collaboratorsLoadRequestRef.current) setCollaboratorsLoadFailed(true);
+        } finally {
+            if (requestId === collaboratorsLoadRequestRef.current) setLoadingCollabs(false);
+        }
+    }, [dataScopeKey, effectiveId, open, user]);
 
     useEffect(() => {
         if (!open) return;
@@ -223,14 +254,17 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
                 setLinkMutationFailed(true);
                 return;
             }
-            setCloudDiagramId(savedId);
+            setCloudDiagramScope({ sourceDiagramId: diagramId, cloudDiagramId: savedId });
             const record = await shareService.createShareLink({ diagramId: savedId, userId: user.id, expiresAt: getExpiresAt(expiration) });
             const url = shareService.buildShareUrl(record.share_token);
             // A cloud-ID transition can start a list request while creation is in flight.
             // Invalidate that older response before preserving the newly created record.
             sharesLoadRequestRef.current += 1;
             pendingCreatedSharesRef.current = [record, ...pendingCreatedSharesRef.current];
-            setShares(prev => [record, ...prev]);
+            setSharesData(previous => ({
+                scopeKey: dataScopeKey,
+                records: [record, ...(previous.scopeKey === dataScopeKey ? previous.records : [])],
+            }));
             const copied = await tryCopyShareUrl(url);
             setShareLinkResult({ url, copied });
             if (copied) {
@@ -245,7 +279,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
         } finally {
             setCreatingLink(false);
         }
-    }, [user, expiration, onEnsureSaved, t]);
+    }, [dataScopeKey, diagramId, user, expiration, onEnsureSaved, t]);
 
     const handleCopy = useCallback(async (shareToken: string) => {
         const url = shareService.buildShareUrl(shareToken);
@@ -262,7 +296,10 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
             await shareService.revokeShare(shareId);
             appMessage.success(t('share.revoked'));
             pendingCreatedSharesRef.current = pendingCreatedSharesRef.current.filter(share => share.id !== shareId);
-            setShares(prev => prev.filter(s => s.id !== shareId));
+            setSharesData(previous => ({
+                ...previous,
+                records: previous.records.filter(share => share.id !== shareId),
+            }));
         } catch (error) {
             logShareDialogMutationFailure('revokeShare', error);
             appMessage.error(t('share.revokeFailed'));
@@ -285,14 +322,14 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
                 setInviteStatus('error');
                 return;
             }
-            setCloudDiagramId(savedId);
+            setCloudDiagramScope({ sourceDiagramId: diagramId, cloudDiagramId: savedId });
             const res = await shareService.addCollaborator(savedId, targetEmail.email, inviteRole);
             if (res.success) {
                 appMessage.success(t('share.inviteSuccess'));
                 setInviteEmail('');
                 setInviteEmailTouched(false);
                 setInviteStatus('success');
-                await loadCollaborators();
+                await loadCollaborators(savedId);
             } else {
                 logShareDialogMutationFailure('addCollaborator', new Error('Collaborator invite was rejected'));
                 setInviteStatus('error');
@@ -305,13 +342,16 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
         } finally {
             setInviting(false);
         }
-    }, [user, inviteEmail, inviteRole, onEnsureSaved, loadCollaborators, t]);
+    }, [diagramId, user, inviteEmail, inviteRole, onEnsureSaved, loadCollaborators, t]);
 
     const handleRemoveCollab = useCallback(async (targetUserId: string) => {
         try {
             await shareService.removeCollaborator(effectiveId, targetUserId);
             appMessage.success(t('share.removeSuccess'));
-            setCollaborators(prev => prev.filter(c => c.user_id !== targetUserId));
+            setCollaboratorsData(previous => ({
+                ...previous,
+                records: previous.records.filter(collaborator => collaborator.user_id !== targetUserId),
+            }));
         } catch (error) {
             logShareDialogMutationFailure('removeCollaborator', error);
             appMessage.error(t('share.removeFailed'));
@@ -414,9 +454,9 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
                     )}
 
                     <Text type="secondary" strong style={{ display: 'block', marginBottom: 12 }}>{t('share.collaborators')}</Text>
-                    {loadingCollabs ? (
+                    {collaboratorsAreCurrent && loadingCollabs ? (
                         <div style={{ textAlign: 'center', padding: 24 }}><Spin /></div>
-                    ) : collaboratorsLoadFailed ? (
+                    ) : collaboratorsAreCurrent && collaboratorsLoadFailed ? (
                         <Alert
                             className="share-dialog-recovery-alert"
                             type="error"
@@ -425,7 +465,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
                             description={t('share.loadRetryHint')}
                             action={<Button aria-label={t('common.retry')} onClick={() => void loadCollaborators()}>{t('common.retry')}</Button>}
                         />
-                    ) : collaborators.length === 0 ? (
+                    ) : currentCollaborators.length === 0 ? (
                         <Empty
                             image={Empty.PRESENTED_IMAGE_SIMPLE}
                             styles={{ image: { height: 48 } }}
@@ -439,7 +479,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
                         <List
                             className="share-dialog-list"
                             size="small"
-                            dataSource={collaborators}
+                            dataSource={currentCollaborators}
                             renderItem={item => {
                                 const isSelf = item.user_id === user?.id;
                                 return (
@@ -532,9 +572,9 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
                     )}
 
                     <Text type="secondary" strong style={{ display: 'block', marginBottom: 12 }}>{t('share.linkHistory')}</Text>
-                    {loadingLink ? (
+                    {sharesAreCurrent && loadingLink ? (
                         <div style={{ textAlign: 'center', padding: 24 }}><Spin /></div>
-                    ) : sharesLoadFailed ? (
+                    ) : sharesAreCurrent && sharesLoadFailed ? (
                         <Alert
                             className="share-dialog-recovery-alert"
                             type="error"
@@ -543,7 +583,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
                             description={t('share.loadRetryHint')}
                             action={<Button aria-label={t('common.retry')} onClick={() => void loadShares()}>{t('common.retry')}</Button>}
                         />
-                    ) : shares.length === 0 ? (
+                    ) : currentShares.length === 0 ? (
                         <Empty
                             image={Empty.PRESENTED_IMAGE_SIMPLE}
                             styles={{ image: { height: 48 } }}
@@ -557,7 +597,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
                         <List
                             className="share-dialog-list"
                             size="small"
-                            dataSource={shares}
+                            dataSource={currentShares}
                             renderItem={item => {
                                 const url = shareService.buildShareUrl(item.share_token);
                                 const isExpired = item.expires_at && new Date(item.expires_at) < new Date();
