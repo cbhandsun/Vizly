@@ -29,6 +29,7 @@ const node = (id: string, selected = false): Node => ({
 });
 
 afterEach(() => {
+    document.body.innerHTML = '';
     vi.restoreAllMocks();
 });
 
@@ -131,6 +132,136 @@ describe('useDiagramActions explicit selection targets', () => {
         `;
         act(() => animationFrames.shift()?.(0));
         expect(document.activeElement?.id).toBe('surviving-node');
+    });
+
+    it('selects and focuses the target endpoint after deleting the final focused edge', async () => {
+        const animationFrames: FrameRequestCallback[] = [];
+        vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => {
+            animationFrames.push(callback);
+            return animationFrames.length;
+        });
+        const initialNodes = [node('source'), node('target')];
+        const deletedEdge: Edge = {
+            id: 'edge-a',
+            source: 'source',
+            target: 'target',
+            selected: true,
+        };
+        let currentNodes = initialNodes;
+        let currentEdges = [deletedEdge];
+        const setNodes = vi.fn((update: SetStateAction<Node[]>) => {
+            currentNodes = typeof update === 'function' ? update(currentNodes) : update;
+        });
+        const setEdges = vi.fn((update: SetStateAction<Edge[]>) => {
+            currentEdges = typeof update === 'function' ? update(currentEdges) : update;
+        });
+        document.body.innerHTML = '<svg><g id="deleted-edge" class="react-flow__edge selected" data-id="edge-a" tabindex="0"></g></svg>';
+        document.querySelector<HTMLElement>('#deleted-edge')?.focus();
+
+        const { result } = renderHook(() => useDiagramActions({
+            nodes: initialNodes,
+            edges: [deletedEdge],
+            setNodes,
+            setEdges,
+            selectedNodes: [],
+            selectedEdges: [deletedEdge],
+            takeSnapshot: vi.fn(),
+            reactFlowInstance: null,
+        }));
+
+        await act(async () => result.current.handleDelete());
+
+        expect(currentEdges).toEqual([]);
+        expect(currentNodes).toEqual([
+            { ...initialNodes[0], selected: false },
+            { ...initialNodes[1], selected: true },
+        ]);
+        document.body.innerHTML = `
+            <div class="react-flow__node selected" data-id="target">
+                <div id="target-node" role="treeitem" aria-selected="true" tabindex="0"></div>
+            </div>
+        `;
+        act(() => animationFrames.shift()?.(0));
+        expect(document.activeElement?.id).toBe('target-node');
+    });
+
+    it('selects and focuses an adjacent surviving edge after deleting a focused edge', async () => {
+        const animationFrames: FrameRequestCallback[] = [];
+        vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => {
+            animationFrames.push(callback);
+            return animationFrames.length;
+        });
+        const initialNodes = [node('a'), node('b'), node('c')];
+        const deletedEdge: Edge = { id: 'edge-a', source: 'a', target: 'b', selected: true };
+        const survivingEdge: Edge = { id: 'edge-b', source: 'b', target: 'c', selected: false };
+        let currentNodes = initialNodes;
+        let currentEdges = [deletedEdge, survivingEdge];
+        const setNodes = vi.fn((update: SetStateAction<Node[]>) => {
+            currentNodes = typeof update === 'function' ? update(currentNodes) : update;
+        });
+        const setEdges = vi.fn((update: SetStateAction<Edge[]>) => {
+            currentEdges = typeof update === 'function' ? update(currentEdges) : update;
+        });
+        document.body.innerHTML = '<svg><g id="deleted-edge" class="react-flow__edge selected" data-id="edge-a" tabindex="0"></g></svg>';
+        document.querySelector<HTMLElement>('#deleted-edge')?.focus();
+
+        const { result } = renderHook(() => useDiagramActions({
+            nodes: initialNodes,
+            edges: [deletedEdge, survivingEdge],
+            setNodes,
+            setEdges,
+            selectedNodes: [],
+            selectedEdges: [deletedEdge],
+            takeSnapshot: vi.fn(),
+            reactFlowInstance: null,
+        }));
+
+        await act(async () => result.current.handleDelete());
+
+        expect(currentNodes.every(item => item.selected === false)).toBe(true);
+        expect(currentEdges).toEqual([{ ...survivingEdge, selected: true }]);
+        document.body.innerHTML = '<svg><g id="surviving-edge" class="react-flow__edge selected" data-id="edge-b" tabindex="0"></g></svg>';
+        act(() => animationFrames.shift()?.(0));
+        expect(document.activeElement?.id).toBe('surviving-edge');
+    });
+
+    it('uses the explicit toolbar edge target when focus is outside the canvas', async () => {
+        const animationFrames: FrameRequestCallback[] = [];
+        vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => {
+            animationFrames.push(callback);
+            return animationFrames.length;
+        });
+        const initialNodes = [node('source'), node('target')];
+        const deletedEdge: Edge = { id: 'edge-a', source: 'source', target: 'target' };
+        let currentNodes = initialNodes;
+        const setNodes = vi.fn((update: SetStateAction<Node[]>) => {
+            currentNodes = typeof update === 'function' ? update(currentNodes) : update;
+        });
+        const toolbar = document.createElement('button');
+        document.body.append(toolbar);
+        toolbar.focus();
+
+        const { result } = renderHook(() => useDiagramActions({
+            nodes: initialNodes,
+            edges: [deletedEdge],
+            setNodes,
+            setEdges: vi.fn(),
+            selectedNodes: [],
+            selectedEdges: [],
+            takeSnapshot: vi.fn(),
+            reactFlowInstance: null,
+        }));
+
+        await act(async () => result.current.handleDelete(['edge-a']));
+
+        expect(currentNodes[1]).toMatchObject({ id: 'target', selected: true });
+        document.body.innerHTML = `
+            <div class="react-flow__node selected" data-id="target">
+                <div id="explicit-target" role="treeitem" aria-selected="true" tabindex="0"></div>
+            </div>
+        `;
+        act(() => animationFrames.shift()?.(0));
+        expect(document.activeElement?.id).toBe('explicit-target');
     });
 
     it('records a meaningful pre-operation label before duplicating nodes', () => {

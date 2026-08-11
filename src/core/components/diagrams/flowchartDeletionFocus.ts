@@ -1,6 +1,9 @@
-import type { Node } from '@xyflow/react';
+import type { Edge, Node } from '@xyflow/react';
 
-import { focusAddedFlowchartNodeById } from './flowchartTabNavigation';
+import {
+    focusAddedFlowchartNodeById,
+    focusFlowchartEdgeById,
+} from './flowchartTabNavigation';
 
 const EMPTY_STATE_ACTION_SELECTOR = '.flowchart-empty-action';
 const MAX_FOCUS_NODE_ID_LENGTH = 1_024;
@@ -80,6 +83,70 @@ export const resolveFlowchartCutFocusNodeId = (
     nodeIdsToCut,
 );
 
+export type FlowchartEdgeDeletionFocusTarget = {
+    kind: 'edge' | 'node';
+    id: string;
+};
+
+const getAdjacentEdgeRank = (anchor: Edge, candidate: Edge): number => {
+    if (candidate.source === anchor.target) return 0;
+    if (candidate.target === anchor.source) return 1;
+    if (
+        candidate.source === anchor.source
+        || candidate.source === anchor.target
+        || candidate.target === anchor.source
+        || candidate.target === anchor.target
+    ) return 2;
+    return Number.POSITIVE_INFINITY;
+};
+
+/**
+ * Preserve relationship-editing context after an edge disappears. Continue
+ * along an adjacent surviving edge when possible; otherwise hand focus to the
+ * deleted edge's target node, then its source node.
+ */
+export const resolveFlowchartEdgeDeletionFocusTarget = (
+    currentNodes: readonly Node[],
+    currentEdges: readonly Edge[],
+    edgeIdsToDelete: ReadonlySet<string>,
+    activeElement: Element | null,
+    preferredEdgeId?: string,
+): FlowchartEdgeDeletionFocusTarget | null => {
+    const focusedEdgeId = activeElement
+        ?.closest<Element>('.react-flow__edge[data-id]')
+        ?.getAttribute('data-id');
+    const anchorEdgeId = isValidFocusNodeId(focusedEdgeId) && edgeIdsToDelete.has(focusedEdgeId)
+        ? focusedEdgeId
+        : isValidFocusNodeId(preferredEdgeId) && edgeIdsToDelete.has(preferredEdgeId)
+            ? preferredEdgeId
+            : null;
+    if (!anchorEdgeId) return null;
+
+    const anchor = currentEdges.find(edge => edge.id === anchorEdgeId);
+    if (!anchor || !isValidFocusNodeId(anchor.source) || !isValidFocusNodeId(anchor.target)) {
+        return null;
+    }
+
+    let adjacentEdge: Edge | null = null;
+    let adjacentRank = Number.POSITIVE_INFINITY;
+    for (const candidate of currentEdges) {
+        if (edgeIdsToDelete.has(candidate.id) || !isValidFocusNodeId(candidate.id)) continue;
+        const rank = getAdjacentEdgeRank(anchor, candidate);
+        if (rank < adjacentRank) {
+            adjacentEdge = candidate;
+            adjacentRank = rank;
+        }
+    }
+    if (adjacentEdge) return { kind: 'edge', id: adjacentEdge.id };
+
+    const survivingNodeIds = new Set(
+        currentNodes.filter(node => isValidFocusNodeId(node.id)).map(node => node.id),
+    );
+    if (survivingNodeIds.has(anchor.target)) return { kind: 'node', id: anchor.target };
+    if (survivingNodeIds.has(anchor.source)) return { kind: 'node', id: anchor.source };
+    return null;
+};
+
 export const focusFlowchartEmptyStateAction = (
     root: ParentNode,
 ): boolean => {
@@ -149,6 +216,42 @@ export const scheduleFlowchartDeletionNodeFocus = (
         frameId = window.requestAnimationFrame(() => {
             if (!active) return;
             focusAddedFlowchartNodeById(resolvedRoot, nodeId);
+            active = false;
+        });
+    };
+    frameId = window.requestAnimationFrame(focus);
+    return {
+        cancel: () => {
+            if (!active) return;
+            active = false;
+            window.cancelAnimationFrame(frameId);
+        },
+    };
+};
+
+export const scheduleFlowchartDeletionEdgeFocus = (
+    edgeId: string,
+    root?: ParentNode,
+): { cancel: () => void } | null => {
+    if (
+        !isValidFocusNodeId(edgeId)
+        || typeof window === 'undefined'
+        || (!root && typeof document === 'undefined')
+    ) {
+        return null;
+    }
+    const resolvedRoot = root ?? document;
+    let active = true;
+    let frameId = 0;
+    const focus = () => {
+        if (!active) return;
+        if (focusFlowchartEdgeById(resolvedRoot, edgeId)) {
+            active = false;
+            return;
+        }
+        frameId = window.requestAnimationFrame(() => {
+            if (!active) return;
+            focusFlowchartEdgeById(resolvedRoot, edgeId);
             active = false;
         });
     };

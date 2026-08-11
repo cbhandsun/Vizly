@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
 
-import type { Node } from '@xyflow/react';
+import type { Edge, Node } from '@xyflow/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
     resolveFlowchartCutFocusNodeId,
+    resolveFlowchartEdgeDeletionFocusTarget,
     resolveFlowchartDeletionFocusNodeId,
+    scheduleFlowchartDeletionEdgeFocus,
     scheduleFlowchartDeletionNodeFocus,
 } from '../flowchartDeletionFocus';
 
@@ -25,6 +27,8 @@ const renderFocusedNode = (nodeId: string): HTMLElement => {
     if (!focused) throw new Error('test fixture missing');
     return focused;
 };
+
+const edge = (id: string, source: string, target: string): Edge => ({ id, source, target });
 
 describe('flowchart deletion focus', () => {
     afterEach(() => {
@@ -111,6 +115,46 @@ describe('flowchart deletion focus', () => {
         )).toBeNull();
     });
 
+    it('continues to an adjacent edge after deleting the focused relationship', () => {
+        document.body.innerHTML = '<svg><g class="react-flow__edge" data-id="edge-a" tabindex="0"></g></svg>';
+        const focusedEdge = document.querySelector<Element>('[data-id="edge-a"]');
+        if (!focusedEdge) throw new Error('test fixture missing');
+
+        expect(resolveFlowchartEdgeDeletionFocusTarget(
+            [node('a', 0), node('b', 100), node('c', 200)],
+            [edge('unrelated', 'x', 'y'), edge('edge-a', 'a', 'b'), edge('edge-b', 'b', 'c')],
+            new Set(['edge-a']),
+            focusedEdge,
+        )).toEqual({ kind: 'edge', id: 'edge-b' });
+    });
+
+    it('falls back to the target endpoint and rejects unrelated or unsafe edge anchors', () => {
+        const nodes = [node('source', 0), node('target', 100)];
+        const edges = [edge('edge-a', 'source', 'target')];
+        const toolbar = document.createElement('button');
+
+        expect(resolveFlowchartEdgeDeletionFocusTarget(
+            nodes,
+            edges,
+            new Set(['edge-a']),
+            toolbar,
+            'edge-a',
+        )).toEqual({ kind: 'node', id: 'target' });
+        expect(resolveFlowchartEdgeDeletionFocusTarget(
+            nodes,
+            edges,
+            new Set(['edge-a']),
+            toolbar,
+        )).toBeNull();
+        expect(resolveFlowchartEdgeDeletionFocusTarget(
+            nodes,
+            [edge('edge-a', 'source', 'x'.repeat(1_025))],
+            new Set(['edge-a']),
+            toolbar,
+            'edge-a',
+        )).toBeNull();
+    });
+
     it('waits for the selected semantic survivor and supports cancellation', () => {
         const frames: FrameRequestCallback[] = [];
         const cancelled = new Set<number>();
@@ -139,5 +183,21 @@ describe('flowchart deletion focus', () => {
         expect(cancelled).toContain(3);
         expect(scheduleFlowchartDeletionNodeFocus('', document)).toBeNull();
         expect(scheduleFlowchartDeletionNodeFocus('x'.repeat(1_025), document)).toBeNull();
+    });
+
+    it('waits for a surviving edge before restoring relationship focus', () => {
+        const frames: FrameRequestCallback[] = [];
+        vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => {
+            frames.push(callback);
+            return frames.length;
+        });
+
+        expect(scheduleFlowchartDeletionEdgeFocus('edge-b', document)).not.toBeNull();
+        frames.shift()?.(0);
+        document.body.innerHTML = '<svg><g id="edge-b" class="react-flow__edge selected" data-id="edge-b" tabindex="0"></g></svg>';
+        frames.shift()?.(16);
+        expect(document.activeElement?.id).toBe('edge-b');
+        expect(scheduleFlowchartDeletionEdgeFocus('', document)).toBeNull();
+        expect(scheduleFlowchartDeletionEdgeFocus('x'.repeat(1_025), document)).toBeNull();
     });
 });

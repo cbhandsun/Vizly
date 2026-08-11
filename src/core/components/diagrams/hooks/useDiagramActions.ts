@@ -23,7 +23,9 @@ import {
 } from '../edgeEditingViewport';
 import { buildDiagramSelectionDuplicate } from '../diagramSelectionDuplication';
 import {
+    resolveFlowchartEdgeDeletionFocusTarget,
     resolveFlowchartDeletionFocusNodeId,
+    scheduleFlowchartDeletionEdgeFocus,
     scheduleFlowchartDeletionNodeFocus,
     scheduleFlowchartEmptyStateFocus,
 } from '../flowchartDeletionFocus';
@@ -185,14 +187,30 @@ export const useDiagramActions = ({
                 nodeIdsToDelete,
                 typeof document === 'undefined' ? null : document.activeElement,
             );
+            const preferredDeletedEdgeId = typeof target === 'string' && edgeIdsToDelete.has(target)
+                ? target
+                : selectedEdges.find(edge => edgeIdsToDelete.has(edge.id))?.id
+                    ?? (target ? currentEdges.find(edge => edgeIdsToDelete.has(edge.id))?.id : undefined);
+            const edgeDeletionFocusTarget = nodeIdsToDelete.size === 0
+                ? resolveFlowchartEdgeDeletionFocusTarget(
+                    currentNodes,
+                    currentEdges,
+                    edgeIdsToDelete,
+                    typeof document === 'undefined' ? null : document.activeElement,
+                    preferredDeletedEdgeId,
+                )
+                : null;
+            const survivorFocusTarget = survivorFocusNodeId
+                ? { kind: 'node' as const, id: survivorFocusNodeId }
+                : edgeDeletionFocusTarget;
 
             takeSnapshot(currentNodes, currentEdges, t('designer.historyPanel.beforeDelete', {
                 count: nodeIdsToDelete.size + edgeIdsToDelete.size,
             }));
             setNodes(nds => nds
                 .filter(n => !nodeIdsToDelete.has(n.id))
-                .map(n => survivorFocusNodeId
-                    ? { ...n, selected: n.id === survivorFocusNodeId }
+                .map(n => survivorFocusTarget
+                    ? { ...n, selected: survivorFocusTarget.kind === 'node' && n.id === survivorFocusTarget.id }
                     : n));
             setEdges(eds => eds
                 .filter(e =>
@@ -200,14 +218,18 @@ export const useDiagramActions = ({
                     !nodeIdsToDelete.has(e.source) &&
                     !nodeIdsToDelete.has(e.target)
                 )
-                .map(e => survivorFocusNodeId ? { ...e, selected: false } : e));
+                .map(e => survivorFocusTarget
+                    ? { ...e, selected: survivorFocusTarget.kind === 'edge' && e.id === survivorFocusTarget.id }
+                    : e));
             const removedFinalNode = nodeIdsToDelete.size > 0
                 && currentNodes.every(node => nodeIdsToDelete.has(node.id));
             deletionFocusRequestRef.current?.cancel();
             if (removedFinalNode) {
                 deletionFocusRequestRef.current = scheduleFlowchartEmptyStateFocus();
-            } else if (survivorFocusNodeId) {
-                deletionFocusRequestRef.current = scheduleFlowchartDeletionNodeFocus(survivorFocusNodeId);
+            } else if (survivorFocusTarget?.kind === 'node') {
+                deletionFocusRequestRef.current = scheduleFlowchartDeletionNodeFocus(survivorFocusTarget.id);
+            } else if (survivorFocusTarget?.kind === 'edge') {
+                deletionFocusRequestRef.current = scheduleFlowchartDeletionEdgeFocus(survivorFocusTarget.id);
             }
         }
     }, [nodes, edges, nodesRef, edgesRef, selectedNodes, selectedEdges, setNodes, setEdges, takeSnapshot, activePlugin, pluginCtx, t]);
