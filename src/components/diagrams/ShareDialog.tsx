@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, Button, Select, Space, Typography, Tooltip, List, Tag, Popconfirm, Spin, theme, Tabs, Input, Avatar, Empty, Alert } from 'antd';
 import { FaCopy, FaLink, FaTrash, FaUserPlus } from 'react-icons/fa';
-import { LinkOutlined, TeamOutlined, UserOutlined, CheckCircleFilled, SafetyOutlined, LockOutlined, LoginOutlined } from '@ant-design/icons';
+import { LinkOutlined, TeamOutlined, UserOutlined, CheckCircleFilled, SafetyOutlined, LockOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { shareService, ShareRecord, CollaboratorRecord } from '@/services/ShareService';
 import { useAuth } from '@/context/useAuth';
@@ -21,6 +21,7 @@ import {
     COMMERCIAL_VIEWPORT_MODAL_Z_INDEX,
     getViewportOverlayContainer,
 } from '@/core/components/ui/viewportOverlayPortal';
+import { ShareDialogLoginAlert } from './ShareDialogLoginAlert';
 import './ShareDialog.css';
 
 const AuthModal = React.lazy(() => import('@/components/auth/AuthModal').then(module => ({
@@ -125,6 +126,17 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
     const handleAuthModalAfterClose = useCallback(() => {
         setAuthModalMounted(false);
         if (open && !user) loginActionRef.current?.focus();
+    }, [open, user]);
+
+    const handleDialogAfterOpenChange = useCallback((nextOpen: boolean) => {
+        if (!nextOpen || user) return;
+        loginActionRef.current?.focus();
+    }, [user]);
+
+    useEffect(() => {
+        if (!open || user) return;
+        const focusTimer = window.setTimeout(() => loginActionRef.current?.focus(), 0);
+        return () => window.clearTimeout(focusTimer);
     }, [open, user]);
 
     useEffect(() => {
@@ -376,24 +388,9 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
         : null;
 
     const loginRequiredAlert = !user ? (
-        <Alert
-            className="share-dialog-login-alert"
-            type="warning"
-            showIcon
-            title={t('share.loginRequired')}
-            description={t('share.loginRequiredHint', '登录后将返回当前分享流程，不会丢失图表。')}
-            action={(
-                <Button
-                    ref={loginActionRef}
-                    className="share-dialog-login-action"
-                    type="primary"
-                    icon={<LoginOutlined />}
-                    aria-label={t('share.loginAction', '立即登录')}
-                    onClick={openAuthModal}
-                >
-                    {t('share.loginAction', '立即登录')}
-                </Button>
-            )}
+        <ShareDialogLoginAlert
+            ref={loginActionRef}
+            onAction={openAuthModal}
         />
     ) : null;
 
@@ -659,6 +656,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
             <Modal
                 open={open}
                 onCancel={onClose}
+                afterOpenChange={handleDialogAfterOpenChange}
                 closable={{ 'aria-label': t('share.closeDialog') }}
                 getContainer={getViewportOverlayContainer}
                 rootClassName={`${COMMERCIAL_VIEWPORT_MODAL_CLASS} share-dialog-viewport-modal`}

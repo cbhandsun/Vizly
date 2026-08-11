@@ -233,6 +233,26 @@ describe('ShareDialog commercial failure handling', () => {
     expect(screen.getByRole('button', { name: '立即登录' })).toBeTruthy();
   });
 
+  it('focuses the login action whenever an unauthenticated sharing dialog opens', async () => {
+    const onClose = vi.fn();
+    const onEnsureSaved = vi.fn();
+    const { rerender } = render(
+      <ShareDialog open onClose={onClose} diagramId={DIAGRAM_ID} onEnsureSaved={onEnsureSaved} />,
+    );
+
+    const loginAction = await screen.findByRole('button', { name: '立即登录' });
+    await waitFor(() => expect(document.activeElement).toBe(loginAction));
+
+    rerender(
+      <ShareDialog open={false} onClose={onClose} diagramId={DIAGRAM_ID} onEnsureSaved={onEnsureSaved} />,
+    );
+    rerender(
+      <ShareDialog open onClose={onClose} diagramId={DIAGRAM_ID} onEnsureSaved={onEnsureSaved} />,
+    );
+
+    await waitFor(() => expect(document.activeElement).toBe(loginAction));
+  });
+
   it('stacks the unauthenticated explanation and login action on narrow viewports', async () => {
     render(
       <ShareDialog open onClose={vi.fn()} diagramId={DIAGRAM_ID} onEnsureSaved={vi.fn()} />,
