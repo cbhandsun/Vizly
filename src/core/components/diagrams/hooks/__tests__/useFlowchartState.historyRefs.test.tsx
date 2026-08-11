@@ -2,7 +2,7 @@
 
 import { act, renderHook } from '@testing-library/react';
 import type { Node } from '@xyflow/react';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useDiagramStore } from '../../../../store/useDiagramStore';
 import { useFlowchartState } from '../useFlowchartState';
@@ -16,6 +16,11 @@ const node = (id: string, x: number): Node => ({
 describe('useFlowchartState history ref boundaries', () => {
     beforeEach(() => {
         useDiagramStore.setState({ nodes: [], edges: [] });
+    });
+
+    afterEach(() => {
+        document.body.innerHTML = '';
+        vi.restoreAllMocks();
     });
 
     it('updates live refs atomically across immediate undo and redo', () => {
@@ -55,5 +60,40 @@ describe('useFlowchartState history ref boundaries', () => {
         });
 
         expect(useDiagramStore.getState().nodes).toEqual(first);
+    });
+
+    it('restores focus to the selected node when undo replaces the focused empty state', () => {
+        const restored = [{ ...node('node-1', 0), selected: true }];
+        useDiagramStore.setState({ nodes: restored, edges: [] });
+        const frames: FrameRequestCallback[] = [];
+        vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => {
+            frames.push(callback);
+            return frames.length;
+        });
+        const { result } = renderHook(() => useFlowchartState());
+
+        act(() => {
+            result.current.diagramHistory.takeSnapshot(restored, [], '删除节点前');
+            result.current.setNodes([]);
+        });
+        document.body.innerHTML = '<button class="flowchart-empty-action">Choose a shape</button>';
+        const emptyAction = document.querySelector<HTMLButtonElement>('.flowchart-empty-action');
+        if (!emptyAction) throw new Error('test fixture missing');
+        emptyAction.focus();
+
+        act(() => {
+            expect(result.current.diagramHistory.undo()).toBe(true);
+        });
+        document.body.innerHTML = `
+            <div class="react-flow__node" data-id="node-1" tabindex="0">
+                <div id="restored-node" role="treeitem" aria-selected="true" tabindex="0"></div>
+            </div>
+        `;
+        act(() => {
+            frames.shift()?.(0);
+        });
+
+        expect(document.activeElement?.id).toBe('restored-node');
+        expect(useDiagramStore.getState().nodes).toEqual(restored);
     });
 });

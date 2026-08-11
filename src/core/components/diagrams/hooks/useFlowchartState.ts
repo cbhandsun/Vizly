@@ -13,6 +13,10 @@ import {
 import { useDiagramHistory } from '../../../hooks/useDiagramHistory';
 import { useDiagramStylePreset_v2 } from '../../../hooks/useDiagramStylePreset_v2';
 import { useDiagramStore } from '../../../store/useDiagramStore';
+import {
+    resolveUndoRestoredNodeFocusId,
+    scheduleUndoRestoredNodeFocus,
+} from '../flowchartHistoryFocus';
 
 export const useFlowchartState = (edgeMode: 'advanced-smart' | 'native' = 'advanced-smart') => {
     const { t } = useTranslation();
@@ -27,11 +31,16 @@ export const useFlowchartState = (edgeMode: 'advanced-smart' | 'native' = 'advan
     // 🚀 Ref 模式：避免回调捕获旧值
     const nodesRef = useRef(nodes);
     const edgesRef = useRef(edges);
+    const historyFocusRequestRef = useRef<{ cancel: () => void } | null>(null);
 
     useEffect(() => {
         nodesRef.current = nodes;
         edgesRef.current = edges;
     }, [nodes, edges]);
+
+    useEffect(() => () => {
+        historyFocusRequestRef.current?.cancel();
+    }, []);
 
     // History
     const historyLabels = useMemo(() => ({
@@ -191,13 +200,26 @@ export const useFlowchartState = (edgeMode: 'advanced-smart' | 'native' = 'advan
     }, [setEdges, setNodes]);
 
     const handleUndo = useCallback(() => {
-        const prevState = undo(nodesRef.current, edgesRef.current); // 🚀 ref
+        historyFocusRequestRef.current?.cancel();
+        historyFocusRequestRef.current = null;
+        const currentNodes = nodesRef.current;
+        const prevState = undo(currentNodes, edgesRef.current); // 🚀 ref
         if (!prevState) return false;
+        const restoredFocusNodeId = resolveUndoRestoredNodeFocusId(
+            currentNodes,
+            prevState.nodes,
+            typeof document === 'undefined' ? null : document.activeElement,
+        );
         commitHistoryState(prevState);
+        if (restoredFocusNodeId) {
+            historyFocusRequestRef.current = scheduleUndoRestoredNodeFocus(restoredFocusNodeId);
+        }
         return true;
     }, [commitHistoryState, undo]);
 
     const handleRedo = useCallback(() => {
+        historyFocusRequestRef.current?.cancel();
+        historyFocusRequestRef.current = null;
         const nextState = redo(nodesRef.current, edgesRef.current); // 🚀 ref
         if (!nextState) return false;
         commitHistoryState(nextState);
