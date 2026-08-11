@@ -126,6 +126,92 @@ describe('PropertyPanel field synchronization', () => {
             .toContain('propertyPanel.transparent');
     });
 
+    it('shows an explicit mixed state instead of a false fallback color', () => {
+        const blueNode = {
+            ...createNode('Blue'),
+            id: 'blue-node',
+            data: { ...createNode('Blue').data, theme: { main: '#2196F3' } },
+        };
+        const blackNode = {
+            ...createNode('Black'),
+            id: 'black-node',
+            data: { ...createNode('Black').data, theme: { main: '#000000' } },
+        };
+
+        render(
+            <PropertyPanel
+                selectedNodes={[blueNode, blackNode]}
+                selectedEdges={[]}
+                onUpdateNodes={vi.fn()}
+                onUpdateEdges={vi.fn()}
+                docked
+            />,
+        );
+
+        fireEvent.click(screen.getByText('propertyPanel.colors'));
+
+        const trigger = screen.getByRole('button', {
+            name: 'propertyPanel.mainColor: propertyPanel.mixed',
+        });
+        expect(trigger.textContent).toContain('propertyPanel.mixed');
+        expect(trigger.getAttribute('data-mixed')).toBe('true');
+        expect(trigger.textContent).not.toContain('#2196F3');
+    });
+
+    it('keeps a shared undefined color on the normal fallback path', () => {
+        const firstNode = { ...createNode('First'), id: 'first-node' };
+        const secondNode = { ...createNode('Second'), id: 'second-node' };
+
+        render(
+            <PropertyPanel
+                selectedNodes={[firstNode, secondNode]}
+                selectedEdges={[]}
+                onUpdateNodes={vi.fn()}
+                onUpdateEdges={vi.fn()}
+                docked
+            />,
+        );
+
+        fireEvent.click(screen.getByText('propertyPanel.colors'));
+
+        const trigger = screen.getByRole('button', { name: 'propertyPanel.mainColor' });
+        expect(trigger.textContent).toContain('#2196F3');
+        expect(trigger.hasAttribute('data-mixed')).toBe(false);
+    });
+
+    it('labels the keyboard-editable controls inside the color popup', async () => {
+        render(
+            <PropertyPanel
+                selectedNodes={[createNode('Popup labels')]}
+                selectedEdges={[]}
+                onUpdateNodes={vi.fn()}
+                onUpdateEdges={vi.fn()}
+                docked
+            />,
+        );
+
+        fireEvent.click(screen.getByText('propertyPanel.colors'));
+        fireEvent.click(screen.getByRole('button', { name: 'propertyPanel.mainColor' }));
+
+        await waitFor(() => {
+            expect(screen.getByRole('group', {
+                name: 'propertyPanel.mainColor: propertyPanel.colorPicker.editor',
+            })).toBeTruthy();
+            expect(screen.getByRole('slider', {
+                name: 'propertyPanel.mainColor: propertyPanel.colorPicker.hue',
+            })).toBeTruthy();
+            expect(screen.getByRole('combobox', {
+                name: 'propertyPanel.mainColor: propertyPanel.colorPicker.format',
+            })).toBeTruthy();
+            expect(screen.getByRole('textbox', {
+                name: 'propertyPanel.mainColor: propertyPanel.colorPicker.value',
+            })).toBeTruthy();
+            expect(screen.getByRole('spinbutton', {
+                name: 'propertyPanel.mainColor: propertyPanel.colorPicker.alpha',
+            })).toBeTruthy();
+        });
+    });
+
     it('keeps property color buttons at the commercial touch-target size', () => {
         const css = readFileSync('src/core/components/diagrams/PropertyPanel.css', 'utf8');
 

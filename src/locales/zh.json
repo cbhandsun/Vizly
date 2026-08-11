@@ -1910,6 +1910,13 @@
         "backgroundColor": "背景色",
         "textColor": "文本色",
         "transparent": "透明",
+        "colorPicker": {
+            "editor": "颜色编辑器",
+            "hue": "色相",
+            "alpha": "透明度",
+            "format": "颜色格式",
+            "value": "颜色值"
+        },
         "styling": "风格设置",
         "connection": "连接设置",
         "lineStyle": "线条风格",

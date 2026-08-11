@@ -45,6 +45,7 @@ import {
     AccessiblePropertyColorPicker,
     type NodeColorField,
 } from './AccessiblePropertyColorPicker';
+import { resolveCommonPropertyValue } from './commonPropertyValue';
 
 const { Text } = Typography;
 const { TextArea } = Input;
@@ -118,11 +119,15 @@ export function useNodePropertyItems(params: UseNodePropertyItemsParams): Collap
     const commonDomainClass = getCommonValue(selectedNodes, (n) => getNodeData(n)?.domainClass);
     const commonSequence = getCommonValue(selectedNodes, (n) => getNodeData(n)?.sequence);
     const commonShape = getCommonValue(selectedNodes, (n) => getNodeData(n)?.shape);
-    const commonThemeColor = getCommonValue(selectedNodes, (n) => getNodeData(n)?.themeColor);
+    const commonThemeColorState = resolveCommonPropertyValue(selectedNodes, (n) => getNodeData(n)?.themeColor);
     const commonNodeIcon = getCommonValue(selectedNodes, (n) => getNodeData(n)?.icon);
-    const commonNodeMainColor = getCommonValue(selectedNodes, (n) => getNodeData(n)?.theme?.main);
-    const commonNodeBgColor = getCommonValue(selectedNodes, (n) => getNodeData(n)?.theme?.background);
-    const commonNodeTextColor = getCommonValue(selectedNodes, (n) => getNodeData(n)?.theme?.text);
+    const commonNodeMainColorState = resolveCommonPropertyValue(selectedNodes, (n) => getNodeData(n)?.theme?.main);
+    const commonNodeBgColorState = resolveCommonPropertyValue(selectedNodes, (n) => getNodeData(n)?.theme?.background);
+    const commonNodeTextColorState = resolveCommonPropertyValue(selectedNodes, (n) => getNodeData(n)?.theme?.text);
+    const commonThemeColor = commonThemeColorState.kind === 'common' ? commonThemeColorState.value : undefined;
+    const commonNodeMainColor = commonNodeMainColorState.kind === 'common' ? commonNodeMainColorState.value : undefined;
+    const commonNodeBgColor = commonNodeBgColorState.kind === 'common' ? commonNodeBgColorState.value : undefined;
+    const commonNodeTextColor = commonNodeTextColorState.kind === 'common' ? commonNodeTextColorState.value : undefined;
     const commonNodeLabel = getCommonValue(selectedNodes, (n) => getNodeData(n)?.label);
     const commonNodeDesc = getCommonValue(selectedNodes, (n) => getNodeData(n)?.description);
     
@@ -148,6 +153,13 @@ export function useNodePropertyItems(params: UseNodePropertyItemsParams): Collap
     });
     const isDashed = (style: React.CSSProperties | undefined) => style?.strokeDasharray === '5 5' || style?.strokeDasharray === '4,4';
     const commonNodeBorderStyle = getCommonValue(selectedNodes, (n) => (isDashed(n.style) ? 'dashed' : 'solid'));
+    const colorPickerPanelLabels = {
+        editor: t('propertyPanel.colorPicker.editor'),
+        hue: t('propertyPanel.colorPicker.hue'),
+        alpha: t('propertyPanel.colorPicker.alpha'),
+        format: t('propertyPanel.colorPicker.format'),
+        value: t('propertyPanel.colorPicker.value'),
+    };
 
     const updateDimension = (
         axis: 'width' | 'height',
@@ -392,9 +404,9 @@ export function useNodePropertyItems(params: UseNodePropertyItemsParams): Collap
             label: <Space><BgColorsOutlined />{t('propertyPanel.colors')}</Space>,
             children: (
                 <Row gutter={[8, 8]}>
-                    <Col span={24}><div className="color-row"><Text style={{ fontSize: 12 }}>{t('propertyPanel.mainColor')}</Text><AccessiblePropertyColorPicker label={t('propertyPanel.mainColor')} value={commonNodeMainColor} fallbackValue="#2196F3" field="main" disabled={disabled} onColorChange={onColorChange} /></div></Col>
-                    <Col span={24}><div className="color-row"><Text style={{ fontSize: 12 }}>{t('propertyPanel.backgroundColor')}</Text><AccessiblePropertyColorPicker label={t('propertyPanel.backgroundColor')} value={commonNodeBgColor} fallbackValue="transparent" fallbackLabel={t('propertyPanel.transparent')} field="background" disabled={disabled} onColorChange={onColorChange} /></div></Col>
-                    <Col span={24}><div className="color-row"><Text style={{ fontSize: 12 }}>{t('propertyPanel.textColor')}</Text><AccessiblePropertyColorPicker label={t('propertyPanel.textColor')} value={commonNodeTextColor} fallbackValue="#FFFFFF" field="text" disabled={disabled} onColorChange={onColorChange} /></div></Col>
+                    <Col span={24}><div className="color-row"><Text style={{ fontSize: 12 }}>{t('propertyPanel.mainColor')}</Text><AccessiblePropertyColorPicker label={t('propertyPanel.mainColor')} value={commonNodeMainColor} fallbackValue="#2196F3" mixed={commonNodeMainColorState.kind === 'mixed'} mixedLabel={mixedLabel} panelLabels={colorPickerPanelLabels} field="main" disabled={disabled} onColorChange={onColorChange} /></div></Col>
+                    <Col span={24}><div className="color-row"><Text style={{ fontSize: 12 }}>{t('propertyPanel.backgroundColor')}</Text><AccessiblePropertyColorPicker label={t('propertyPanel.backgroundColor')} value={commonNodeBgColor} fallbackValue="transparent" fallbackLabel={t('propertyPanel.transparent')} mixed={commonNodeBgColorState.kind === 'mixed'} mixedLabel={mixedLabel} panelLabels={colorPickerPanelLabels} field="background" disabled={disabled} onColorChange={onColorChange} /></div></Col>
+                    <Col span={24}><div className="color-row"><Text style={{ fontSize: 12 }}>{t('propertyPanel.textColor')}</Text><AccessiblePropertyColorPicker label={t('propertyPanel.textColor')} value={commonNodeTextColor} fallbackValue="#FFFFFF" mixed={commonNodeTextColorState.kind === 'mixed'} mixedLabel={mixedLabel} panelLabels={colorPickerPanelLabels} field="text" disabled={disabled} onColorChange={onColorChange} /></div></Col>
                 </Row>
             ),
         });
@@ -408,7 +420,7 @@ export function useNodePropertyItems(params: UseNodePropertyItemsParams): Collap
             children: (
                 <div className="color-row">
                     <Text style={{ fontSize: 12 }}>{t('propertyPanel.themeColor')}</Text>
-                    <AccessiblePropertyColorPicker label={t('propertyPanel.themeColor')} value={commonThemeColor} fallbackValue="#2196F3" field="themeColor" disabled={disabled} onColorChange={onColorChange} />
+                    <AccessiblePropertyColorPicker label={t('propertyPanel.themeColor')} value={commonThemeColor} fallbackValue="#2196F3" mixed={commonThemeColorState.kind === 'mixed'} mixedLabel={mixedLabel} panelLabels={colorPickerPanelLabels} field="themeColor" disabled={disabled} onColorChange={onColorChange} />
                 </div>
             ),
         });

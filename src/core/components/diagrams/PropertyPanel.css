@@ -151,6 +151,14 @@
     opacity: 0.5;
 }
 
+.property-color-picker-trigger.mixed {
+    border-style: dashed;
+}
+
+.property-color-picker-trigger.mixed .property-color-picker-swatch {
+    border-style: dashed;
+}
+
 .property-color-picker-swatch {
     width: 20px;
     height: 20px;

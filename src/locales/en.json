@@ -1797,6 +1797,13 @@
         "backgroundColor": "Background Color",
         "textColor": "Text Color",
         "transparent": "Transparent",
+        "colorPicker": {
+            "editor": "Color editor",
+            "hue": "Hue",
+            "alpha": "Opacity",
+            "format": "Color format",
+            "value": "Color value"
+        },
         "selectOption": "Select...",
         "options": {
             "domainClass": {
