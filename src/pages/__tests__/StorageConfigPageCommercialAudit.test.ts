@@ -15,6 +15,10 @@ describe('storage configuration commercial safeguards', () => {
         expect(source).toContain('<StorageSecretInput');
         expect(source).toContain("t('storageConfig.form.accessKeyVisibilityLabel')");
         expect(source).toContain("t('storageConfig.form.secretKeyVisibilityLabel')");
+        expect(source).toContain("extra={t('storageConfig.form.endpointTooltip')}");
+        expect(source).toContain("extra={t('storageConfig.form.forcePathStyleTooltip')}");
+        expect(source).not.toContain("tooltip={t('storageConfig.form.endpointTooltip')}");
+        expect(source).not.toContain("tooltip={t('storageConfig.form.forcePathStyleTooltip')}");
         expect(source).toContain('aria-live="polite"');
         expect(source).toContain('onFinishFailed={handleValidationFailure}');
         expect(source).toContain("form.scrollToField(fieldName, { block: 'center', focus: true })");

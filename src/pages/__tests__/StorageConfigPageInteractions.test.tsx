@@ -60,6 +60,23 @@ afterEach(() => {
 });
 
 describe('StorageConfigPage validation recovery', () => {
+    it('keeps essential field guidance visible and programmatically associated', () => {
+        render(<StorageConfigPage />);
+
+        const endpoint = screen.getByPlaceholderText('https://...');
+        const endpointGuidance = screen.getByText('storageConfig.form.endpointTooltip');
+        expect(endpoint).toHaveAttribute('aria-describedby', 'endpoint_extra');
+        expect(endpointGuidance).toHaveAttribute('id', 'endpoint_extra');
+
+        const pathStyle = screen.getByRole('switch', {
+            name: 'storageConfig.form.forcePathStyleLabel',
+        });
+        const pathStyleGuidance = screen.getByText('storageConfig.form.forcePathStyleTooltip');
+        expect(pathStyle).toHaveAttribute('aria-describedby', 's3ForcePathStyle_extra');
+        expect(pathStyleGuidance).toHaveAttribute('id', 's3ForcePathStyle_extra');
+        expect(document.querySelector('.ant-form-item-tooltip')).not.toBeInTheDocument();
+    });
+
     it('announces route entry through the page heading without stealing later focus', async () => {
         const { unmount } = render(<StorageConfigPage />);
 

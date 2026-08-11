@@ -249,7 +249,7 @@ const StorageConfigPage: React.FC = () => {
                         <Form.Item
                             name="endpoint"
                             label={t('storageConfig.form.endpointLabel')}
-                            tooltip={t('storageConfig.form.endpointTooltip')}
+                            extra={t('storageConfig.form.endpointTooltip')}
                             rules={[{ required: true, message: t('storageConfig.form.endpointRequired') }]}
                         >
                             <Input placeholder="https://..." maxLength={S3_STORAGE_INPUT_LIMITS.endpoint} autoComplete="off" />
@@ -311,7 +311,7 @@ const StorageConfigPage: React.FC = () => {
                             name="s3ForcePathStyle"
                             label={t('storageConfig.form.forcePathStyleLabel')}
                             valuePropName="checked"
-                            tooltip={t('storageConfig.form.forcePathStyleTooltip')}
+                            extra={t('storageConfig.form.forcePathStyleTooltip')}
                         >
                             <Switch aria-label={t('storageConfig.form.forcePathStyleLabel')} />
                         </Form.Item>
