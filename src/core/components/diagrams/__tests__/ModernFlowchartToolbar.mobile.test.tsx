@@ -175,8 +175,47 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
 
         const settings = screen.getByRole('button', { name: '画布设置' });
         expect(settings.getAttribute('aria-expanded')).toBe('false');
+        expect(settings.getAttribute('aria-haspopup')).toBe('dialog');
         fireEvent.click(settings);
         await waitFor(() => expect(settings.getAttribute('aria-expanded')).toBe('true'));
+        const settingsDialog = await screen.findByRole('dialog', { name: '画布设置' });
+        expect(settings.getAttribute('aria-controls')).toBe(settingsDialog.id);
+        await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'designer.toolbar.showRuler' })));
+    });
+
+    it('opens canvas settings from the keyboard and restores focus after Escape', async () => {
+        useDesktopBreakpoint();
+
+        render(
+            <ModernFlowchartToolbar
+                canUndo={false}
+                canRedo={false}
+                onUndo={vi.fn()}
+                onRedo={vi.fn()}
+                onZoomIn={vi.fn()}
+                onZoomOut={vi.fn()}
+                onFitView={vi.fn()}
+                autoRouting
+                toggleAutoRouting={vi.fn()}
+                showGrid
+                toggleGrid={vi.fn()}
+                onShowShortcuts={vi.fn()}
+                showRuler={false}
+                toggleRuler={vi.fn()}
+                showMinimap={false}
+                toggleMinimap={vi.fn()}
+            />,
+        );
+
+        const settings = await screen.findByRole('button', { name: '画布设置' });
+        fireEvent.keyDown(settings, { key: 'Enter' });
+        const minimap = await screen.findByRole('button', { name: '显示小地图' });
+        await waitFor(() => expect(document.activeElement).toBe(minimap));
+
+        fireEvent.keyDown(minimap, { key: 'Escape' });
+
+        await waitFor(() => expect(settings.getAttribute('aria-expanded')).toBe('false'));
+        await waitFor(() => expect(document.activeElement).toBe(settings));
     });
 
     it('gives the desktop history action a full target and announces its entry count', async () => {

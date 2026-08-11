@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react';
+import React, { useMemo, useCallback, useRef, memo, useId } from 'react';
 import { createPortal } from 'react-dom';
 import {
     FaSearchPlus, FaSearchMinus, FaCompressArrowsAlt,
     FaMagic, FaTh, FaKeyboard, FaBorderAll, FaBorderNone,
     FaSitemap, FaObjectGroup, FaRuler,
     FaEllipsisH, FaTrashAlt,
-    FaMagnet, FaPen, FaStickyNote, FaMousePointer,
+    FaMagnet, FaPen,
     FaFolderOpen, FaFileExport, FaMap, FaSearch,
 } from 'react-icons/fa';
 import { BackgroundVariant } from '@xyflow/react';
@@ -17,12 +17,15 @@ import { coerceDiagramId, getQueryOrHashParamFromLocation } from '../../utils/in
 import { FlowchartAlignmentTools } from './FlowchartAlignmentTools';
 import { FlowchartCanvasSettingsContent } from './FlowchartCanvasSettingsContent';
 import { FlowchartHistoryToolbarControls } from './FlowchartHistoryToolbarControls';
+import { FlowchartCreationTools } from './FlowchartCreationTools';
 import { resolveFlowchartToolbarHistoryCount } from './flowchartToolbarHistoryPresentation';
 import { DropdownMenuTriggerButton } from './DropdownMenuTriggerButton';
 import { buildFlowchartLayoutMenuModel } from './flowchartToolbarLayoutMenu';
 import { buildToolModeMenuItems, resolveActiveToolModeKey } from './flowchartToolbarToolModeMenu';
 import { getFlowchartZoomControlState } from './flowchartZoomControlState';
 import { useKeyboardAccessibleDropdown } from './hooks/useKeyboardAccessibleDropdown';
+import { useKeyboardAccessiblePopover } from './hooks/useKeyboardAccessiblePopover';
+import { useFlowchartToolbarPortalTargets } from './hooks/useFlowchartToolbarPortalTargets';
 import './ModernFlowchartToolbar.css';
 import {
     COMMERCIAL_VIEWPORT_MODAL_CLASS,
@@ -156,11 +159,23 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
     const onLabel = t('common.on');
     const offLabel = t('common.off');
 
-    const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
-    const [contextPortalTarget, setContextPortalTarget] = useState<HTMLElement | null>(null);
-    const [bottomPortalTarget, setBottomPortalTarget] = useState<HTMLElement | null>(null);
-    const [canvasSettingsOpen, setCanvasSettingsOpen] = useState(false);
-    const canvasSettingsTriggerRef = useRef<HTMLButtonElement>(null);
+    const {
+        bottom: bottomPortalTarget,
+        center: portalTarget,
+        context: contextPortalTarget,
+    } = useFlowchartToolbarPortalTargets(isMobile);
+    const canvasSettingsContentRef = useRef<HTMLDivElement>(null);
+    const canvasSettingsContentId = useId();
+    const {
+        closeAndRestoreFocus: closeCanvasSettingsAndRestoreFocus,
+        handleContentKeyDown: handleCanvasSettingsContentKeyDown,
+        handleOpenChange: handleCanvasSettingsOpenChange,
+        handleTriggerKeyDown: handleCanvasSettingsTriggerKeyDown,
+        open: canvasSettingsOpen,
+        triggerRef: canvasSettingsTriggerRef,
+    } = useKeyboardAccessiblePopover({
+        contentRef: canvasSettingsContentRef,
+    });
     const safeHistoryCount = resolveFlowchartToolbarHistoryCount(historyCount);
     const historyButtonLabel = safeHistoryCount === null ? t('designer.toolbar.historyPanel') : t('designer.toolbar.historyWithCount', { count: safeHistoryCount });
     const layoutDropdown = useKeyboardAccessibleDropdown({
@@ -172,27 +187,14 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
     const moreDropdownTriggerRef = moreDropdown.triggerRef;
     const handleMoreDropdownOpenChange = moreDropdown.handleOpenChange;
     const handleShowShortcutsFromCanvasSettings = useCallback(() => {
-        setCanvasSettingsOpen(false);
-        canvasSettingsTriggerRef.current?.focus();
+        closeCanvasSettingsAndRestoreFocus();
         onShowShortcuts();
-    }, [onShowShortcuts]);
+    }, [closeCanvasSettingsAndRestoreFocus, onShowShortcuts]);
     const handleShowShortcutsFromMoreMenu = useCallback(() => {
         handleMoreDropdownOpenChange(false, { source: 'menu' });
         moreDropdownTriggerRef.current?.focus();
         onShowShortcuts();
     }, [handleMoreDropdownOpenChange, moreDropdownTriggerRef, onShowShortcuts]);
-
-    useEffect(() => {
-        const timer = window.setTimeout(() => {
-            const target = document.getElementById('vizly-plugin-center-island-portal');
-            if (target) setPortalTarget(target);
-            const contextTarget = document.getElementById('vizly-plugin-context-toolbar-portal');
-            if (contextTarget) setContextPortalTarget(contextTarget);
-            const bottomTarget = document.getElementById('vizly-plugin-bottom-island-portal');
-            if (bottomTarget) setBottomPortalTarget(bottomTarget);
-        }, 0);
-        return () => window.clearTimeout(timer);
-    }, []);
 
     const layoutMenuModel = useMemo(() => buildFlowchartLayoutMenuModel({
         lastDomainDirection,
@@ -406,63 +408,23 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
     }), [moreMenuItems, moreDropdown.handleMenuKeyDown, selectedToolModeKey]);
 
     const CanvasSettingsContent = (
-        <FlowchartCanvasSettingsContent
-            gridInfo={gridInfo}
-            onShowShortcuts={handleShowShortcutsFromCanvasSettings}
-            showGrid={showGrid}
-            showMinimap={showMinimap}
-            showRuler={showRuler}
-            toggleGrid={toggleGrid}
-            toggleMinimap={toggleMinimap}
-            toggleRuler={toggleRuler}
-        />
-    );
-
-    const CreationTools = (
-        <div className="flex items-center gap-1.5 p-1">
-            <div className="flex items-center gap-1">
-                <Tooltip title={t('designer.toolbar.pointer', '普通选择器 (V)')}>
-                    <Button 
-                        type="text" 
-                        onClick={onActivatePointer} 
-                        aria-label={t('designer.toolbar.pointer', '普通选择器 (V)')}
-                        aria-pressed={!isDrawingMode && !isMarqueeActive}
-                        icon={<FaMousePointer className={`text-[12px] ${(!isDrawingMode && !isMarqueeActive) ? 'text-indigo-500' : 'text-slate-500'}`} />} 
-                        className={`w-9 h-9 p-0 border-none transition-all ${(!isDrawingMode && !isMarqueeActive) ? 'bg-white dark:bg-slate-800 shadow-sm text-indigo-500' : 'hover:bg-slate-200 dark:hover:bg-white/5'}`} 
-                    />
-                </Tooltip>
-                <Tooltip title={isMarqueeActive ? t('designer.toolbar.marqueeExit', '退出框选 (Esc)') : t('designer.toolbar.marqueeEnter', '框选模式 (M)')}>
-                    <Button 
-                        type="text" 
-                        onClick={toggleSelectionMode} 
-                        aria-label={isMarqueeActive ? t('designer.toolbar.marqueeExit', '退出框选 (Esc)') : t('designer.toolbar.marqueeEnter', '框选模式 (M)')}
-                        aria-pressed={isMarqueeActive}
-                        icon={<FaObjectGroup className={`text-[14px] ${isMarqueeActive ? 'text-indigo-500' : 'text-slate-500'}`} />} 
-                        className={`w-9 h-9 p-0 border-none transition-all ${isMarqueeActive ? 'bg-white dark:bg-slate-800 shadow-sm text-indigo-500' : 'hover:bg-slate-200 dark:hover:bg-white/5'}`} 
-                    />
-                </Tooltip>
-                <Tooltip title={isDrawingMode ? t('designer.toolbar.drawingModeExit', '退出自由画笔 (Esc)') : t('designer.toolbar.drawingMode', '自由画笔 (P)')}>
-                    <Button 
-                        type="text" 
-                        onClick={onToggleDrawingMode} 
-                        aria-label={isDrawingMode ? t('designer.toolbar.drawingModeExit', '退出自由画笔 (Esc)') : t('designer.toolbar.drawingMode', '自由画笔 (P)')}
-                        aria-pressed={isDrawingMode}
-                        icon={<FaPen className={`text-[13px] ${isDrawingMode ? 'text-indigo-500' : 'text-slate-500'}`} />} 
-                        className={`w-9 h-9 p-0 border-none transition-all ${isDrawingMode ? 'bg-white dark:bg-slate-800 shadow-sm text-indigo-500' : 'hover:bg-slate-200 dark:hover:bg-white/5'}`} 
-                    />
-                </Tooltip>
-            </div>
-            
-            <div className="w-[1px] h-4 bg-slate-200 dark:bg-white/10 mx-1" />
-            
-            <div className="flex items-center gap-1">
-                <Tooltip title={t('designer.toolbar.stickyNote', '便签 (S)')}>
-                    <Button type="text" aria-label={t('designer.toolbar.stickyNote', '便签 (S)')} onClick={onAddStickyNote} icon={<FaStickyNote className="text-[14px] text-amber-500" />} className="w-9 h-9 p-0 border-none hover:bg-slate-200 dark:hover:bg-white/5" />
-                </Tooltip>
-                <Tooltip title={t('designer.toolbar.mindMap', '思维导图 (Shift+M)')}>
-                    <Button type="text" aria-label={t('designer.toolbar.mindMap', '思维导图 (Shift+M)')} onClick={onAddMindMap} icon={<FaSitemap className="text-[14px] text-sky-500" />} className="w-9 h-9 p-0 border-none hover:bg-slate-200 dark:hover:bg-white/5" />
-                </Tooltip>
-            </div>
+        <div
+            ref={canvasSettingsContentRef}
+            id={canvasSettingsContentId}
+            role="dialog"
+            aria-label={t('designer.toolbar.canvasSettings', '画布设置')}
+            onKeyDown={handleCanvasSettingsContentKeyDown}
+        >
+            <FlowchartCanvasSettingsContent
+                gridInfo={gridInfo}
+                onShowShortcuts={handleShowShortcutsFromCanvasSettings}
+                showGrid={showGrid}
+                showMinimap={showMinimap}
+                showRuler={showRuler}
+                toggleGrid={toggleGrid}
+                toggleMinimap={toggleMinimap}
+                toggleRuler={toggleRuler}
+            />
         </div>
     );
 
@@ -598,7 +560,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                         trigger="click"
                         placement="bottomRight"
                         open={canvasSettingsOpen}
-                        onOpenChange={setCanvasSettingsOpen}
+                        onOpenChange={handleCanvasSettingsOpenChange}
                         destroyOnHidden
                     >
                         <Tooltip title={t('designer.toolbar.canvasSettings', '画布设置')}>
@@ -607,6 +569,9 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                                 type="text"
                                 aria-label={t('designer.toolbar.canvasSettings', '画布设置')}
                                 aria-expanded={canvasSettingsOpen}
+                                aria-haspopup="dialog"
+                                aria-controls={canvasSettingsOpen ? canvasSettingsContentId : undefined}
+                                onKeyDown={handleCanvasSettingsTriggerKeyDown}
                                 icon={
                                     <div className="relative">
                                         <FaBorderAll className="text-[13px]" />
@@ -691,7 +656,18 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                 />,
                 contextPortalTarget,
             )}
-            {bottomPortalTarget && createPortal(CreationTools, bottomPortalTarget)}
+            {bottomPortalTarget && createPortal(
+                <FlowchartCreationTools
+                    isDrawingMode={isDrawingMode}
+                    isMarqueeActive={isMarqueeActive}
+                    onActivatePointer={onActivatePointer}
+                    onAddMindMap={onAddMindMap}
+                    onAddStickyNote={onAddStickyNote}
+                    onToggleDrawingMode={onToggleDrawingMode}
+                    toggleSelectionMode={toggleSelectionMode}
+                />,
+                bottomPortalTarget,
+            )}
         </>
     );
 });
