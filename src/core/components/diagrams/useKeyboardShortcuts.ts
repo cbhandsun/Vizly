@@ -1,6 +1,32 @@
 import { useEffect } from 'react';
 import { hasVisibleModalDialog } from '../ui/modalDialogState';
 
+const INTERACTIVE_SHORTCUT_TARGET_SELECTOR = [
+    'button',
+    'a[href]',
+    'summary',
+    '[role="button"]',
+    '[role="checkbox"]',
+    '[role="link"]',
+    '[role="menuitem"]',
+    '[role="option"]',
+    '[role="radio"]',
+    '[role="slider"]',
+    '[role="spinbutton"]',
+    '[role="switch"]',
+    '[role="tab"]',
+].join(',');
+
+export const shouldIgnoreCanvasShortcutForTarget = (
+    target: EventTarget | null,
+    hasGlobalModifier: boolean,
+): boolean => {
+    if (hasGlobalModifier || typeof Element === 'undefined' || !(target instanceof Element)) {
+        return false;
+    }
+    return Boolean(target.closest(INTERACTIVE_SHORTCUT_TARGET_SELECTOR));
+};
+
 interface UseKeyboardShortcutsProps {
     onDelete: () => void;
     onDuplicate: () => void;
@@ -62,6 +88,9 @@ export const useKeyboardShortcuts = ({
                 return;
             }
 
+            const isCtrlOrCmd = event.ctrlKey || event.metaKey;
+            if (shouldIgnoreCanvasShortcutForTarget(target, isCtrlOrCmd)) return;
+
             // 1. 先触发业务插件拦截
             if (pluginShortcuts && pluginCtx) {
                 for (const shortcut of pluginShortcuts) {
@@ -72,8 +101,6 @@ export const useKeyboardShortcuts = ({
                     }
                 }
             }
-
-            const isCtrlOrCmd = event.ctrlKey || event.metaKey;
 
             // Ctrl/Cmd + = : Zoom In (also catches + on many keyboards)
             if (isCtrlOrCmd && (event.key === '=' || event.key === '+') && onZoomIn) {

@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react';
 import { createPortal } from 'react-dom';
 import {
-    FaUndo, FaRedo, FaSearchPlus, FaSearchMinus, FaCompressArrowsAlt,
+    FaSearchPlus, FaSearchMinus, FaCompressArrowsAlt,
     FaMagic, FaTh, FaKeyboard, FaBorderAll, FaBorderNone,
     FaSitemap, FaObjectGroup, FaRuler,
     FaEllipsisH, FaTrashAlt,
     FaMagnet, FaPen, FaStickyNote, FaMousePointer,
-    FaFolderOpen, FaFileExport, FaHistory, FaMap, FaSearch,
+    FaFolderOpen, FaFileExport, FaMap, FaSearch,
 } from 'react-icons/fa';
 import { BackgroundVariant } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
@@ -16,6 +16,8 @@ import { clearFlowchartCache } from '../../utils/clearFlowchartCache';
 import { coerceDiagramId, getQueryOrHashParamFromLocation } from '../../utils/inputBoundary';
 import { FlowchartAlignmentTools } from './FlowchartAlignmentTools';
 import { FlowchartCanvasSettingsContent } from './FlowchartCanvasSettingsContent';
+import { FlowchartHistoryToolbarControls } from './FlowchartHistoryToolbarControls';
+import { resolveFlowchartToolbarHistoryCount } from './flowchartToolbarHistoryPresentation';
 import { DropdownMenuTriggerButton } from './DropdownMenuTriggerButton';
 import { buildFlowchartLayoutMenuModel } from './flowchartToolbarLayoutMenu';
 import { buildToolModeMenuItems, resolveActiveToolModeKey } from './flowchartToolbarToolModeMenu';
@@ -159,12 +161,8 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
     const [bottomPortalTarget, setBottomPortalTarget] = useState<HTMLElement | null>(null);
     const [canvasSettingsOpen, setCanvasSettingsOpen] = useState(false);
     const canvasSettingsTriggerRef = useRef<HTMLButtonElement>(null);
-    const hasHistoryEntries = typeof historyCount === 'number'
-        && Number.isSafeInteger(historyCount)
-        && historyCount > 0;
-    const historyButtonLabel = hasHistoryEntries
-        ? t('designer.toolbar.historyWithCount', { count: historyCount })
-        : t('designer.toolbar.historyPanel');
+    const safeHistoryCount = resolveFlowchartToolbarHistoryCount(historyCount);
+    const historyButtonLabel = safeHistoryCount === null ? t('designer.toolbar.historyPanel') : t('designer.toolbar.historyWithCount', { count: safeHistoryCount });
     const layoutDropdown = useKeyboardAccessibleDropdown({
         overlayClassName: 'flowchart-layout-menu',
     });
@@ -479,26 +477,20 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
         <div className="flex items-center gap-0.5">
             {/* ── Undo / Redo ── */}
             {!isMobile && !hideUndoRedoControls && (
-                <>
-                    <Tooltip title={t('designer.toolbar.undo')}>
-                        <Button type="text" aria-label={t('designer.toolbar.undo')} icon={<FaUndo size={13} />} onClick={onUndo} disabled={!canUndo} className={canUndo ? tbtn : tbtnDisabled} />
-                    </Tooltip>
-                    {onShowHistory && screens.md && (
-                        <Tooltip title={historyButtonLabel}>
-                            <Button
-                                type="text"
-                                aria-label={historyButtonLabel}
-                                icon={<FaHistory size={13} />}
-                                onClick={onShowHistory}
-                                className={tbtn}
-                            />
-                        </Tooltip>
-                    )}
-                    <Tooltip title={t('designer.toolbar.redo')}>
-                        <Button type="text" aria-label={t('designer.toolbar.redo')} icon={<FaRedo size={13} />} onClick={onRedo} disabled={!canRedo} className={canRedo ? tbtn : tbtnDisabled} />
-                    </Tooltip>
-                    <div className={dividerCls} />
-                </>
+                <FlowchartHistoryToolbarControls
+                    canUndo={canUndo}
+                    canRedo={canRedo}
+                    onUndo={onUndo}
+                    onRedo={onRedo}
+                    onShowHistory={onShowHistory}
+                    undoLabel={t('designer.toolbar.undo')}
+                    redoLabel={t('designer.toolbar.redo')}
+                    historyLabel={historyButtonLabel}
+                    buttonClassName={tbtn}
+                    disabledButtonClassName={tbtnDisabled}
+                    dividerClassName={dividerCls}
+                    showHistory={Boolean(screens.md)}
+                />
             )}
 
             {/* ── Zoom ── */}
