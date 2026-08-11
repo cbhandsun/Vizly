@@ -44,11 +44,26 @@ describe('DocsPreview', () => {
         expect(screen.getByRole('heading', { name: '快速开始', level: 2 })).toBeTruthy();
     });
 
-    it('switches the article from the topic navigation', () => {
+    it('switches the article without moving pointer focus into the content', () => {
         render(<DocsPreview />);
+        const storageTopic = screen.getByRole('button', { name: /存储与同步/ });
 
-        fireEvent.click(screen.getByRole('button', { name: /存储与同步/ }));
-        expect(screen.getByRole('heading', { name: '存储与同步', level: 2 })).toBeTruthy();
-        expect(screen.getByRole('button', { name: /存储与同步/ }).getAttribute('aria-current')).toBe('page');
+        storageTopic.focus();
+        fireEvent.click(storageTopic, { detail: 1 });
+
+        expect(storageTopic).toHaveFocus();
+        expect(screen.getByRole('heading', { name: '存储与同步', level: 2 })).not.toHaveFocus();
+        expect(storageTopic).toHaveAttribute('aria-current', 'page');
+    });
+
+    it('moves keyboard activation focus to the updated article heading', () => {
+        render(<DocsPreview />);
+        const keyboardTopic = screen.getByRole('button', { name: /键盘与无障碍操作/ });
+
+        keyboardTopic.focus();
+        fireEvent.click(keyboardTopic, { detail: 0 });
+
+        expect(screen.getByRole('heading', { name: '键盘与无障碍操作', level: 2 })).toHaveFocus();
+        expect(keyboardTopic).toHaveAttribute('aria-current', 'page');
     });
 });

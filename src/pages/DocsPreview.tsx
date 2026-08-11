@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
     ApartmentOutlined,
     ArrowLeftOutlined,
@@ -37,6 +37,7 @@ const DocsPreview = () => {
     const copy = getDocsPreviewCopy(locale);
     const [query, setQuery] = useState('');
     const [selectedTopicId, setSelectedTopicId] = useState(copy.topics[0]?.id ?? '');
+    const [articleFocusRequest, setArticleFocusRequest] = useState(0);
     const searchInputRef = useRef<HTMLInputElement>(null);
     const articleHeadingRef = useRef<HTMLHeadingElement>(null);
     const filteredTopics = useMemo(
@@ -45,9 +46,16 @@ const DocsPreview = () => {
     );
     const activeTopic = resolveVisibleDocsTopic(filteredTopics, selectedTopicId);
 
-    const selectTopic = (topicId: string) => {
+    useLayoutEffect(() => {
+        if (articleFocusRequest === 0) return;
+        articleHeadingRef.current?.focus({ preventScroll: true });
+    }, [articleFocusRequest]);
+
+    const selectTopic = (topicId: string, focusArticle: boolean) => {
         setSelectedTopicId(topicId);
-        articleHeadingRef.current?.focus();
+        if (focusArticle) {
+            setArticleFocusRequest((request) => request + 1);
+        }
     };
 
     const clearSearch = () => {
@@ -116,7 +124,7 @@ const DocsPreview = () => {
                                     aria-current={isActive ? 'page' : undefined}
                                     className={`docs-page__topic${isActive ? ' docs-page__topic--active' : ''}`}
                                     key={topic.id}
-                                    onClick={() => selectTopic(topic.id)}
+                                    onClick={(event) => selectTopic(topic.id, event.detail === 0)}
                                     type="button"
                                 >
                                     <TopicIcon aria-hidden="true" />
