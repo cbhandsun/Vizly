@@ -29,6 +29,8 @@ const StorageConfigPage: React.FC = () => {
         storageService.getConfig() ? 'saved' : 'not-configured',
     );
     const testControllerRef = useRef<AbortController | null>(null);
+    const pageTitleRef = useRef<HTMLHeadingElement>(null);
+    const entryFocusFrameRef = useRef<number | null>(null);
     const validationFocusFrameRef = useRef<number | null>(null);
     const mountedRef = useRef(true);
     const navigate = useNavigate();
@@ -39,9 +41,23 @@ const StorageConfigPage: React.FC = () => {
         if (config) {
             form.setFieldsValue({ ...config, secretAccessKey: '' });
         }
+        entryFocusFrameRef.current = window.requestAnimationFrame(() => {
+            entryFocusFrameRef.current = null;
+            const activeElement = document.activeElement;
+            if (
+                mountedRef.current
+                && (!activeElement || activeElement === document.body)
+            ) {
+                pageTitleRef.current?.focus({ preventScroll: true });
+            }
+        });
 
         return () => {
             mountedRef.current = false;
+            if (entryFocusFrameRef.current !== null) {
+                window.cancelAnimationFrame(entryFocusFrameRef.current);
+                entryFocusFrameRef.current = null;
+            }
             if (validationFocusFrameRef.current !== null) {
                 window.cancelAnimationFrame(validationFocusFrameRef.current);
                 validationFocusFrameRef.current = null;
@@ -197,7 +213,14 @@ const StorageConfigPage: React.FC = () => {
 
             <main className="storage-config-main" data-smoke-ready="storage-config">
                 <div className="storage-config-intro">
-                    <Title level={2}><CloudServerOutlined /> {t('storageConfig.pageTitle')}</Title>
+                    <Title
+                        ref={pageTitleRef}
+                        className="storage-config-page-title"
+                        level={1}
+                        tabIndex={-1}
+                    >
+                        <CloudServerOutlined /> {t('storageConfig.pageTitle')}
+                    </Title>
                     <Paragraph type="secondary">{t('storageConfig.pageDescription')}</Paragraph>
                     <Alert
                         className="storage-config-status"

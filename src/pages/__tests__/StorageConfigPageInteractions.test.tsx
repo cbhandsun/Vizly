@@ -60,6 +60,26 @@ afterEach(() => {
 });
 
 describe('StorageConfigPage validation recovery', () => {
+    it('announces route entry through the page heading without stealing later focus', async () => {
+        const { unmount } = render(<StorageConfigPage />);
+
+        const pageTitle = screen.getByRole('heading', {
+            level: 1,
+            name: 'cloud-server storageConfig.pageTitle',
+        });
+        await waitFor(() => expect(document.activeElement).toBe(pageTitle));
+        expect(pageTitle).toHaveAttribute('tabindex', '-1');
+
+        unmount();
+        render(<StorageConfigPage />);
+        const returnButton = screen.getAllByRole('button', {
+            name: 'storageConfig.returnToWorkspace',
+        })[0];
+        returnButton.focus();
+
+        await waitFor(() => expect(document.activeElement).toBe(returnButton));
+    });
+
     it.each([
         { action: 'save', accessibleName: 'save storageConfig.form.saveBtn' },
         { action: 'test', accessibleName: 'api storageConfig.form.testBtn' },

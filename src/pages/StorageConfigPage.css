@@ -97,6 +97,10 @@
     margin-bottom: 0;
 }
 
+.storage-config-page-title:focus {
+    outline: none;
+}
+
 .storage-config-status {
     margin-top: 20px;
 }
