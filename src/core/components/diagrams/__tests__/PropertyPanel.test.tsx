@@ -119,6 +119,59 @@ describe('PropertyPanel field synchronization', () => {
         expect(height.getAttribute('aria-valuemax')).toBe('600');
     });
 
+    it('does not create a phantom history entry for focus or a no-op bounded dimension', () => {
+        const onBeforeUpdate = vi.fn();
+        const onUpdateNodes = vi.fn();
+        const node = {
+            ...createNode('Bounded'),
+            style: { width: 80, height: 54 },
+        };
+
+        render(
+            <PropertyPanel
+                selectedNodes={[node]}
+                selectedEdges={[]}
+                onUpdateNodes={onUpdateNodes}
+                onUpdateEdges={vi.fn()}
+                onBeforeUpdate={onBeforeUpdate}
+                docked
+            />,
+        );
+
+        const width = screen.getByRole('spinbutton', { name: 'propertyPanel.width' });
+        fireEvent.focus(width);
+        fireEvent.change(width, { target: { value: '-999' } });
+
+        expect(onBeforeUpdate).not.toHaveBeenCalled();
+        expect(onUpdateNodes).not.toHaveBeenCalled();
+    });
+
+    it('takes one snapshot before applying the first effective dimension change', () => {
+        const onBeforeUpdate = vi.fn();
+        const onUpdateNodes = vi.fn();
+        const node = {
+            ...createNode('Resizable'),
+            style: { width: 80, height: 54 },
+        };
+
+        render(
+            <PropertyPanel
+                selectedNodes={[node]}
+                selectedEdges={[]}
+                onUpdateNodes={onUpdateNodes}
+                onUpdateEdges={vi.fn()}
+                onBeforeUpdate={onBeforeUpdate}
+                docked
+            />,
+        );
+
+        const width = screen.getByRole('spinbutton', { name: 'propertyPanel.width' });
+        fireEvent.change(width, { target: { value: '120' } });
+
+        expect(onBeforeUpdate).toHaveBeenCalledTimes(1);
+        expect(onUpdateNodes).toHaveBeenCalledWith(['node-1'], { style: { width: 120 } });
+    });
+
     it('refreshes local fields when history restores the selected node data', async () => {
         const onUpdateNodes = vi.fn();
         const onUpdateEdges = vi.fn();

@@ -145,6 +145,23 @@ export function useNodePropertyItems(params: UseNodePropertyItemsParams): Collap
     const isDashed = (style: React.CSSProperties | undefined) => style?.strokeDasharray === '5 5' || style?.strokeDasharray === '4,4';
     const commonNodeBorderStyle = getCommonValue(selectedNodes, (n) => (isDashed(n.style) ? 'dashed' : 'solid'));
 
+    const updateDimension = (
+        axis: 'width' | 'height',
+        value: unknown,
+        bounds: typeof widthBounds,
+        currentValue: unknown,
+    ) => {
+        const normalizedValue = normalizeNodePropertyDimension(value, bounds);
+        if (normalizedValue === undefined || normalizedValue === currentValue) return;
+
+        armSnapshot();
+        updateNodes({
+            style: axis === 'width'
+                ? { width: normalizedValue }
+                : { height: normalizedValue },
+        });
+    };
+
     const isAllNodes = selectedNodes.every(n => n.type !== 'titleGroup' && n.type !== 'subGroup' && n.type !== 'timelineNode' && n.type !== 'mindmap' && n.type !== 'architectureNode');
     const isAllGroups = selectedNodes.every(n => n.type === 'titleGroup' || n.type === 'subGroup');
     const isAllTimelineNodes = selectedNodes.every(n => n.type === 'timelineNode');
@@ -199,8 +216,8 @@ export function useNodePropertyItems(params: UseNodePropertyItemsParams): Collap
                             min={widthBounds.min} max={widthBounds.max}
                             increaseLabel={t('propertyPanel.increaseValue', { field: t('propertyPanel.width') })}
                             decreaseLabel={t('propertyPanel.decreaseValue', { field: t('propertyPanel.width') })}
-                            onChange={val => updateNodes({ style: { width: normalizeNodePropertyDimension(val, widthBounds) } })}
-                            onFocus={armSnapshot} placeholder={commonWidth === undefined ? mixedLabel : undefined} disabled={disabled} />
+                            onChange={val => updateDimension('width', val, widthBounds, commonWidth)}
+                            placeholder={commonWidth === undefined ? mixedLabel : undefined} disabled={disabled} />
                     </Form.Item>
                 </Col>
                 <Col span={12}>
@@ -209,8 +226,8 @@ export function useNodePropertyItems(params: UseNodePropertyItemsParams): Collap
                             min={heightBounds.min} max={heightBounds.max}
                             increaseLabel={t('propertyPanel.increaseValue', { field: t('propertyPanel.height') })}
                             decreaseLabel={t('propertyPanel.decreaseValue', { field: t('propertyPanel.height') })}
-                            onChange={val => updateNodes({ style: { height: normalizeNodePropertyDimension(val, heightBounds) } })}
-                            onFocus={armSnapshot} placeholder={commonHeight === undefined ? mixedLabel : undefined} disabled={disabled} />
+                            onChange={val => updateDimension('height', val, heightBounds, commonHeight)}
+                            placeholder={commonHeight === undefined ? mixedLabel : undefined} disabled={disabled} />
                     </Form.Item>
                 </Col>
             </Row>

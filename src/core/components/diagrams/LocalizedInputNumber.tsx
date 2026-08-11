@@ -22,9 +22,12 @@ export type LocalizedInputNumberProps = Omit<
 export const LocalizedInputNumber: React.FC<LocalizedInputNumberProps> = ({
     increaseLabel,
     decreaseLabel,
+    onBlur,
+    onPressEnter,
     ...inputProps
 }) => {
     const rootRef = React.useRef<HTMLSpanElement>(null);
+    const [inputRevision, resetDraft] = React.useReducer((revision: number) => revision + 1, 0);
 
     React.useEffect(() => {
         const root = rootRef.current;
@@ -38,10 +41,26 @@ export const LocalizedInputNumber: React.FC<LocalizedInputNumberProps> = ({
             ?.setAttribute('aria-label', decreaseLabel);
     }, [decreaseLabel, increaseLabel]);
 
+    const handleBlur = React.useCallback((event: React.FocusEvent<HTMLInputElement>) => {
+        onBlur?.(event);
+        // rc-input-number keeps the user's raw draft when a controlled parent
+        // normalizes it back to the same value. Remount after commit so the
+        // visible field reflects the authoritative controlled value.
+        resetDraft();
+    }, [onBlur]);
+
+    const handlePressEnter = React.useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
+        onPressEnter?.(event);
+        event.currentTarget.blur();
+    }, [onPressEnter]);
+
     return (
         <span ref={rootRef} style={{ display: 'inline-block', width: '100%' }}>
             <InputNumber
+                key={inputRevision}
                 {...inputProps}
+                onBlur={handleBlur}
+                onPressEnter={handlePressEnter}
                 controls={LOCALIZED_NUMBER_CONTROLS}
             />
         </span>
