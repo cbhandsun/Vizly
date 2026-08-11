@@ -89,7 +89,11 @@ export const useKeyboardShortcuts = ({
             }
 
             const isCtrlOrCmd = event.ctrlKey || event.metaKey;
-            if (shouldIgnoreCanvasShortcutForTarget(target, isCtrlOrCmd)) return;
+            const activeTarget = typeof document === 'undefined' ? null : document.activeElement;
+            if (
+                shouldIgnoreCanvasShortcutForTarget(target, isCtrlOrCmd)
+                || shouldIgnoreCanvasShortcutForTarget(activeTarget, isCtrlOrCmd)
+            ) return;
 
             // 1. 先触发业务插件拦截
             if (pluginShortcuts && pluginCtx) {

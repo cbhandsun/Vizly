@@ -131,4 +131,80 @@ describe('useFlowchartToolModeShortcuts', () => {
         expect(result.current.isCommentMode).toBe(false);
         input.remove();
     });
+
+    it('does not activate canvas tools from focused buttons or menu items', () => {
+        const addStickyNote = vi.fn();
+        const addMindMap = vi.fn();
+        const button = document.createElement('button');
+        const icon = document.createElement('span');
+        button.append(icon);
+        const menuItem = document.createElement('div');
+        menuItem.setAttribute('role', 'menuitem');
+        document.body.append(button, menuItem);
+        const { result } = renderHook(() => useHarness(true, addStickyNote, addMindMap));
+
+        act(() => icon.dispatchEvent(new KeyboardEvent('keydown', {
+            key: 's',
+            bubbles: true,
+            cancelable: true,
+        })));
+        act(() => menuItem.dispatchEvent(new KeyboardEvent('keydown', {
+            key: 'm',
+            bubbles: true,
+            cancelable: true,
+        })));
+        act(() => button.dispatchEvent(new KeyboardEvent('keydown', {
+            key: 'M',
+            shiftKey: true,
+            bubbles: true,
+            cancelable: true,
+        })));
+
+        expect(addStickyNote).not.toHaveBeenCalled();
+        expect(addMindMap).not.toHaveBeenCalled();
+        expect(result.current.isMarqueeActive).toBe(false);
+        expect(result.current.isDrawingMode).toBe(false);
+
+        button.remove();
+        menuItem.remove();
+    });
+
+    it('uses the focused control when a browser reports the key event at window level', () => {
+        const addStickyNote = vi.fn();
+        const button = document.createElement('button');
+        document.body.append(button);
+        button.focus();
+        renderHook(() => useHarness(true, addStickyNote));
+
+        act(() => window.dispatchEvent(new KeyboardEvent('keydown', {
+            key: 's',
+            bubbles: true,
+            cancelable: true,
+        })));
+
+        expect(document.activeElement).toBe(button);
+        expect(addStickyNote).not.toHaveBeenCalled();
+        button.remove();
+    });
+
+    it('still activates tool shortcuts from a non-interactive canvas target', () => {
+        const addStickyNote = vi.fn();
+        const canvas = document.createElement('div');
+        document.body.append(canvas);
+        const { result } = renderHook(() => useHarness(true, addStickyNote));
+
+        act(() => canvas.dispatchEvent(new KeyboardEvent('keydown', {
+            key: 'm',
+            bubbles: true,
+            cancelable: true,
+        })));
+        expect(result.current.isMarqueeActive).toBe(true);
+
+        act(() => canvas.dispatchEvent(new KeyboardEvent('keydown', {
+            key: 's',
+            bubbles: true,
+            cancelable: true,
+        })));
+        expect(addStickyNote).toHaveBeenCalledOnce();
+    });
 });

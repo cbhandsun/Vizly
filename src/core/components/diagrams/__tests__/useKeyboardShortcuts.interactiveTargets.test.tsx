@@ -61,6 +61,23 @@ describe('useKeyboardShortcuts interactive target isolation', () => {
         expect(props.onEscapeEdit).not.toHaveBeenCalled();
     });
 
+    it('uses the focused control when a browser reports the key event at window level', () => {
+        const props = createProps();
+        const button = document.createElement('button');
+        document.body.append(button);
+        button.focus();
+        renderHook(() => useKeyboardShortcuts(props));
+
+        act(() => window.dispatchEvent(new KeyboardEvent('keydown', {
+            key: 'Enter',
+            bubbles: true,
+            cancelable: true,
+        })));
+
+        expect(document.activeElement).toBe(button);
+        expect(props.onEnterEdit).not.toHaveBeenCalled();
+    });
+
     it('keeps explicit global accelerators available from toolbar controls', () => {
         const props = createProps();
         const button = document.createElement('button');

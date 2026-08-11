@@ -1,5 +1,7 @@
 import { useCallback, useEffect, type Dispatch, type SetStateAction } from 'react';
 
+import { shouldIgnoreCanvasShortcutForTarget } from '../useKeyboardShortcuts';
+
 interface FlowchartToolModeShortcutsOptions {
     editingEnabled: boolean;
     isDrawingMode: boolean;
@@ -84,6 +86,11 @@ export const useFlowchartToolModeShortcuts = ({
         const handleKeyDown = (event: KeyboardEvent) => {
             if (!editingEnabled || isEditableTarget(event.target)) return;
             if (event.ctrlKey || event.metaKey || event.altKey) return;
+            const activeTarget = typeof document === 'undefined' ? null : document.activeElement;
+            if (
+                shouldIgnoreCanvasShortcutForTarget(event.target, false)
+                || shouldIgnoreCanvasShortcutForTarget(activeTarget, false)
+            ) return;
 
             const key = event.key.toLowerCase();
             if (event.shiftKey) {
