@@ -90,6 +90,11 @@ describe('flowchart interaction copy', () => {
             source,
         );
 
+        for (const key of ['add', 'save', 'cancel']) {
+            expect(read(zh, ['common', key])).toBeTypeOf('string');
+            expect(read(en, ['common', key])).toBeTypeOf('string');
+        }
+
         for (const key of ['alignL', 'alignC', 'alignR', 'alignT', 'alignM', 'alignB', 'distributeH', 'distributeV']) {
             expect(read(zh, ['designer', 'toolbar', key])).toBeTypeOf('string');
             expect(read(en, ['designer', 'toolbar', key])).toBeTypeOf('string');

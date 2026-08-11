@@ -419,6 +419,36 @@ describe('AnnotationLayer accessibility', () => {
         expect(screen.getByTestId('pending-annotation-editor')).toBeTruthy();
     });
 
+    it('uses the first Escape to cancel the editor without exiting comment mode', () => {
+        const windowKeydown = vi.fn();
+        window.addEventListener('keydown', windowKeydown);
+        const { container } = render(
+            <AnnotationLayer
+                annotations={[]}
+                annotationMode
+                onAdd={vi.fn()}
+                onUpdate={vi.fn()}
+                onDelete={vi.fn()}
+                onToggleResolved={vi.fn()}
+                colors={['#facc15']}
+            />,
+        );
+        const layer = container.firstElementChild as HTMLElement;
+        vi.spyOn(layer, 'getBoundingClientRect').mockReturnValue({
+            x: 0, y: 0, left: 0, top: 0, right: 406, bottom: 844, width: 406, height: 844,
+            toJSON: () => ({}),
+        });
+
+        fireEvent.click(layer, { clientX: 100, clientY: 200 });
+        const input = screen.getByRole('textbox', { name: '新批注内容' });
+        fireEvent.keyDown(input, { key: 'Escape', bubbles: true });
+
+        expect(screen.queryByTestId('pending-annotation-editor')).toBeNull();
+        expect(container.firstElementChild).toBe(layer);
+        expect(windowKeydown).not.toHaveBeenCalled();
+        window.removeEventListener('keydown', windowKeydown);
+    });
+
     it('renders the complete editor flow in the active language', () => {
         translationState.language = 'en';
         render(

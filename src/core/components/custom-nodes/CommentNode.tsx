@@ -1,6 +1,7 @@
 import React, { memo } from 'react';
 import { Handle, Position, NodeProps } from '@xyflow/react';
 import { Popover, Avatar, Badge, theme } from 'antd';
+import { useTranslation } from 'react-i18next';
 import { useDiagramStore } from '../../store/useDiagramStore';
 import { CommentEditor } from '../diagrams/CommentEditor';
 import './CommentNode.css';
@@ -14,6 +15,7 @@ import './CommentNode.css';
  */
 const CommentNode = ({ id, selected }: NodeProps) => {
     const { token } = theme.useToken();
+    const { t } = useTranslation();
     // [Perf] Targeted selector: only re-renders when *this* comment changes,
     // not when other comments are added/updated/deleted.
     const comment = useDiagramStore(state => state.comments.find(c => c.id === id));
@@ -37,7 +39,24 @@ const CommentNode = ({ id, selected }: NodeProps) => {
                 placement="rightTop"
                 overlayStyle={{ zIndex: 10000 }}
             >
-                <div onClick={(e) => e.stopPropagation()}>
+                <button
+                    type="button"
+                    aria-label={t('comment.view', { content: comment.content || t('comment.emptyContent') })}
+                    aria-haspopup="dialog"
+                    aria-expanded={open}
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                        width: 44,
+                        height: 44,
+                        border: 0,
+                        padding: 0,
+                        background: 'transparent',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                    }}
+                >
                     <Badge count={replyCount} size="small" offset={[-2, 2]}>
                         <Avatar 
                             size={32} 
@@ -56,7 +75,7 @@ const CommentNode = ({ id, selected }: NodeProps) => {
                             {initials}
                         </Avatar>
                     </Badge>
-                </div>
+                </button>
             </Popover>
 
             <Handle type="source" position={Position.Bottom} style={{ visibility: 'hidden' }} />

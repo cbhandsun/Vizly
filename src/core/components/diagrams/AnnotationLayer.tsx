@@ -243,16 +243,20 @@ export const AnnotationLayer: React.FC<AnnotationLayerProps> = ({
         if (annotationId) focusPin(annotationId);
     }, [activeId, closeEditors, focusPin]);
 
-    // ESC 关闭
+    // ESC closes the current editor before the canvas-level shortcut exits
+    // comment mode. This keeps keyboard cancellation consistent with the
+    // visible Cancel action and prevents one keypress from dismissing two
+    // interaction layers at once.
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') {
-                closeActiveEditor();
-            }
+            if (e.key !== 'Escape' || (!pendingPos && !activeId)) return;
+            e.preventDefault();
+            e.stopPropagation();
+            closeActiveEditor();
         };
         document.addEventListener('keydown', handleKeyDown);
         return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [closeActiveEditor]);
+    }, [activeId, closeActiveEditor, pendingPos]);
 
     // 页面切换时重置编辑状态
     useEffect(() => {

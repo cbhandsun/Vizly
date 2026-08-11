@@ -266,30 +266,33 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
                         )}
                     />
                 ) : (
-                    <div style={{ padding: '64px 32px' }}>
-                        <Empty
-                            image={Empty.PRESENTED_IMAGE_SIMPLE}
-                            description={hasComments ? t('comment.emptyFiltered') : t('comment.emptyAll')}
-                        >
-                            {hasComments ? (
+                    hasComments ? (
+                        <div style={{ padding: 'clamp(16px, 6vh, 48px) 24px 24px' }}>
+                            <Empty
+                                image={Empty.PRESENTED_IMAGE_SIMPLE}
+                                styles={{ image: { height: 36, marginBottom: 8 } }}
+                                description={t('comment.emptyFiltered')}
+                            >
                                 <Button onClick={resetCommentFilters}>
                                     {t('comment.clearFilters')}
                                 </Button>
-                            ) : (
-                                <Flex vertical align="center" gap={12}>
-                                    <Text type="secondary">{t('comment.addFirstHint')}</Text>
-                                    <Button
-                                        type="primary"
-                                        icon={<FaRegCommentDots />}
-                                        onClick={startCommentMode}
-                                        aria-pressed={isCommentMode}
-                                    >
-                                        {isCommentMode ? t('comment.modeActive') : t('comment.addFirst')}
-                                    </Button>
-                                </Flex>
-                            )}
-                        </Empty>
-                    </div>
+                            </Empty>
+                        </div>
+                    ) : (
+                        <Flex vertical align="center" gap={8} style={{ padding: '16px 24px 24px', textAlign: 'center' }}>
+                            <Text strong>{t('comment.emptyAll')}</Text>
+                            <Button
+                                type="primary"
+                                icon={<FaRegCommentDots />}
+                                onClick={startCommentMode}
+                                aria-pressed={isCommentMode}
+                                style={{ minHeight: 'var(--commercial-touch-target, 44px)' }}
+                            >
+                                {isCommentMode ? t('comment.modeActive') : t('comment.addFirst')}
+                            </Button>
+                            <Text type="secondary" style={{ fontSize: 12 }}>{t('comment.addFirstHint')}</Text>
+                        </Flex>
+                    )
                 )}
             </div>
         </Flex>

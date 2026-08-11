@@ -90,6 +90,7 @@ describe('CommentPanel', () => {
 
         const addFirst = screen.getByRole('button', { name: 'comment.addFirst' });
         expect(addFirst.getAttribute('aria-pressed')).toBe('false');
+        expect(addFirst.style.minHeight).toBe('var(--commercial-touch-target, 44px)');
 
         fireEvent.click(addFirst);
         expect(storeState.setIsCommentMode).toHaveBeenCalledWith(true);

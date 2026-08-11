@@ -2,6 +2,7 @@
     "common": {
         "language": "Language",
         "search": "Search",
+        "add": "Add",
         "save": "Save",
         "cancel": "Cancel",
         "retry": "Retry",
