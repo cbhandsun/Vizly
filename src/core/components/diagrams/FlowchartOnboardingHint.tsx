@@ -6,6 +6,7 @@ import Space from 'antd/es/space';
 import { useTranslation } from 'react-i18next';
 
 const { Text } = Typography;
+const COMMAND_PALETTE_FOCUS_RETURN_SELECTOR = '[data-command-palette-focus-return]';
 
 export const FlowchartOnboardingHint: React.FC<{
   visible: boolean;
@@ -14,6 +15,17 @@ export const FlowchartOnboardingHint: React.FC<{
   onDismiss: () => void;
 }> = ({ visible, mod, onOpenCommandPalette, onDismiss }) => {
   const { t } = useTranslation();
+
+  const handleDismiss = (event: React.MouseEvent<HTMLButtonElement>) => {
+    onDismiss();
+    if (event.detail !== 0) return;
+
+    window.requestAnimationFrame(() => {
+      document
+        .querySelector<HTMLElement>(COMMAND_PALETTE_FOCUS_RETURN_SELECTOR)
+        ?.focus({ preventScroll: true });
+    });
+  };
 
   const steps = useMemo(() => {
     return [
@@ -65,7 +77,7 @@ export const FlowchartOnboardingHint: React.FC<{
             <Button size="small" onClick={onOpenCommandPalette}>
               {t('designer.flowchart.onboarding.openPalette', { mod })}
             </Button>
-            <Button size="small" type="text" onClick={onDismiss}>
+            <Button size="small" type="text" onClick={handleDismiss}>
               {t('designer.flowchart.onboarding.dismiss')}
             </Button>
           </Space>
