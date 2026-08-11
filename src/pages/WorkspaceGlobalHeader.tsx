@@ -53,8 +53,10 @@ export const WorkspaceGlobalHeader = ({
       : t('workspace.searchResultsStatus', { count: search.resultCount })
     : '';
   const isDarkTheme = theme?.mode === 'dark';
+  const darkThemeLabel = t('designer.menu.theme.dark');
   const nextThemeLabel = t(isDarkTheme ? 'designer.menu.theme.light' : 'designer.menu.theme.dark');
-  const themeActionLabel = `${t('workspace.toggleTheme')}: ${nextThemeLabel}`;
+  const themeToggleLabel = `${t('workspace.toggleTheme')}: ${darkThemeLabel}`;
+  const themeActionTitle = `${t('workspace.toggleTheme')}: ${nextThemeLabel}`;
 
   const handleSettingsMenuOpenChange = (open: boolean) => {
     setSettingsMenuOpen(open);
@@ -176,9 +178,9 @@ export const WorkspaceGlobalHeader = ({
         type="button"
         className="workspace-icon-btn"
         onClick={() => void setTheme(isDarkTheme ? 'light' : 'dark')}
-        aria-label={themeActionLabel}
+        aria-label={themeToggleLabel}
         aria-pressed={isDarkTheme}
-        title={themeActionLabel}
+        title={themeActionTitle}
       >
         <Palette size={16} strokeWidth={2} />
       </button>

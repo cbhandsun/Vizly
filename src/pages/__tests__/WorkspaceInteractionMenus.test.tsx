@@ -432,15 +432,18 @@ describe('WorkspaceGlobalHeader preferences', () => {
     const switchToDark = screen.getByRole('button', { name: 'Toggle theme: Dark' });
 
     expect(switchToDark).toHaveAttribute('aria-pressed', 'false');
+    expect(switchToDark).toHaveAttribute('title', 'Toggle theme: Dark');
     fireEvent.click(switchToDark);
     expect(themeMock.setTheme).toHaveBeenCalledWith('dark');
 
     unmount();
     themeMock.current = { mode: 'dark' };
     renderWorkspaceGlobalHeader();
-    const switchToLight = screen.getByRole('button', { name: 'Toggle theme: Light' });
-    expect(switchToLight).toHaveAttribute('aria-pressed', 'true');
-    fireEvent.click(switchToLight);
+    const enabledDarkTheme = screen.getByRole('button', { name: 'Toggle theme: Dark' });
+    expect(enabledDarkTheme).toHaveAttribute('aria-pressed', 'true');
+    expect(enabledDarkTheme).toHaveAttribute('title', 'Toggle theme: Light');
+    expect(screen.queryByRole('button', { name: 'Toggle theme: Light' })).not.toBeInTheDocument();
+    fireEvent.click(enabledDarkTheme);
     expect(themeMock.setTheme).toHaveBeenCalledWith('light');
   });
 });
