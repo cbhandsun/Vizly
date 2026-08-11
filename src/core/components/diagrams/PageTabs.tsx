@@ -60,9 +60,13 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
     const [statusMessage, setStatusMessage] = useState('');
     const inputRef = useRef<InputRef>(null);
     const renameErrorId = React.useId();
+    const deleteDialogId = React.useId();
+    const deleteDialogTitleId = React.useId();
+    const deleteDialogDescriptionId = React.useId();
     const tabButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
     const deleteButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
     const deleteCancelFocusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const deleteFocusReturnPageIdRef = useRef<string | null>(null);
     const restoreFocusAfterDeleteRef = useRef(false);
     const addedPageFocusTargetRef = useRef<string | null>(null);
     const pageLimitReached = pages.length >= MAX_DIAGRAM_PAGES;
@@ -108,6 +112,40 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
             getViewportOverlayContainer().querySelector<HTMLButtonElement>('[data-page-tabs-delete-cancel="true"]')?.focus({ preventScroll: true });
         }, 0);
     }, [cancelDeleteCancelFocus]);
+
+    const applyDeleteDialogSemantics = useCallback(() => {
+        const dialog = document.getElementById(deleteDialogId);
+        dialog?.setAttribute('role', 'alertdialog');
+        dialog?.setAttribute('aria-labelledby', deleteDialogTitleId);
+        dialog?.setAttribute('aria-describedby', deleteDialogDescriptionId);
+    }, [deleteDialogDescriptionId, deleteDialogId, deleteDialogTitleId]);
+
+    const handleDeleteDialogAfterOpenChange = useCallback((open: boolean) => {
+        if (open) {
+            applyDeleteDialogSemantics();
+            return;
+        }
+
+        const pageId = deleteFocusReturnPageIdRef.current;
+        deleteFocusReturnPageIdRef.current = null;
+        if (pageId) focusDeleteButton(pageId);
+    }, [applyDeleteDialogSemantics, focusDeleteButton]);
+
+    const handleDeleteDialogKeyDown = useCallback((event: React.KeyboardEvent<HTMLElement>) => {
+        if (event.key !== 'Escape' || !confirmingPageId) return;
+        event.preventDefault();
+        event.stopPropagation();
+        cancelDeleteCancelFocus();
+        deleteFocusReturnPageIdRef.current = confirmingPageId;
+        setConfirmingPageId(null);
+        requestAnimationFrame(() => focusDeleteButton(confirmingPageId));
+    }, [cancelDeleteCancelFocus, confirmingPageId, focusDeleteButton]);
+
+    useEffect(() => {
+        if (!confirmingPageId) return;
+        const frame = requestAnimationFrame(applyDeleteDialogSemantics);
+        return () => cancelAnimationFrame(frame);
+    }, [applyDeleteDialogSemantics, confirmingPageId]);
 
     useEffect(() => cancelDeleteCancelFocus, [cancelDeleteCancelFocus]);
 
@@ -445,15 +483,24 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
 
                             {pages.length > 1 && (
                                 <Popconfirm
-                                    title={t('designer.pages.deleteConfirm', {
-                                        name: activePage.name,
-                                        defaultValue: '删除「{{name}}」？',
-                                    })}
-                                    description={t('designer.pages.deleteDescription', {
-                                        nodeCount: activePageNodeCount ?? activePage.nodes.length,
-                                        edgeCount: activePageEdgeCount ?? activePage.edges.length,
-                                        defaultValue: '将删除此页面中的 {{nodeCount}} 个节点和 {{edgeCount}} 条连线。关闭或重新加载图表前，可恢复最近删除的页面。',
-                                    })}
+                                    id={deleteDialogId}
+                                    title={(
+                                        <span id={deleteDialogTitleId}>
+                                            {t('designer.pages.deleteConfirm', {
+                                                name: activePage.name,
+                                                defaultValue: '删除「{{name}}」？',
+                                            })}
+                                        </span>
+                                    )}
+                                    description={(
+                                        <span id={deleteDialogDescriptionId}>
+                                            {t('designer.pages.deleteDescription', {
+                                                nodeCount: activePageNodeCount ?? activePage.nodes.length,
+                                                edgeCount: activePageEdgeCount ?? activePage.edges.length,
+                                                defaultValue: '将删除此页面中的 {{nodeCount}} 个节点和 {{edgeCount}} 条连线。关闭或重新加载图表前，可恢复最近删除的页面。',
+                                            })}
+                                        </span>
+                                    )}
                                     getPopupContainer={getViewportOverlayContainer}
                                     placement="top"
                                     autoAdjustOverflow
@@ -464,9 +511,13 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                                         if (open) focusDeleteCancelButton();
                                         else {
                                             cancelDeleteCancelFocus();
-                                            requestAnimationFrame(() => focusDeleteButton(activePage.id));
+                                            if (!restoreFocusAfterDeleteRef.current) {
+                                                deleteFocusReturnPageIdRef.current = activePage.id;
+                                                requestAnimationFrame(() => focusDeleteButton(activePage.id));
+                                            }
                                         }
                                     }}
+                                    afterOpenChange={handleDeleteDialogAfterOpenChange}
                                     onConfirm={() => {
                                         cancelDeleteCancelFocus();
                                         const deleted = onDeletePage(activePage.id);
@@ -481,6 +532,7 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                                     }}
                                     onCancel={() => {
                                         cancelDeleteCancelFocus();
+                                        deleteFocusReturnPageIdRef.current = activePage.id;
                                         setConfirmingPageId(null);
                                         requestAnimationFrame(() => focusDeleteButton(activePage.id));
                                     }}
@@ -490,8 +542,12 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                                     cancelText={t('common.cancel', { defaultValue: '取消' })}
                                     cancelButtonProps={{
                                         'data-page-tabs-delete-cancel': 'true',
+                                        onKeyDown: handleDeleteDialogKeyDown,
                                     }}
-                                    okButtonProps={{ danger: true }}
+                                    okButtonProps={{
+                                        danger: true,
+                                        onKeyDown: handleDeleteDialogKeyDown,
+                                    }}
                                     destroyOnHidden
                                 >
                                     <button
@@ -504,6 +560,9 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                                             name: activePage.name,
                                             defaultValue: '删除页面 {{name}}',
                                         })}
+                                        aria-controls={confirmingPageId === activePage.id ? deleteDialogId : undefined}
+                                        aria-expanded={confirmingPageId === activePage.id}
+                                        aria-haspopup="dialog"
                                         className="page-tabs__delete"
                                         disabled={disabled}
                                     >

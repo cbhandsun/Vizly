@@ -486,6 +486,14 @@ describe('PageTabs', () => {
         fireEvent.click(deleteButton);
         expect(await screen.findByText('删除「页面 2」？')).toBeTruthy();
         expect(screen.getByText('将删除此页面中的 1 个节点和 0 条连线。关闭或重新加载图表前，可恢复最近删除的页面。')).toBeTruthy();
+        const dialog = await screen.findByRole('alertdialog');
+        expect(dialog.getAttribute('aria-labelledby')).toBeTruthy();
+        expect(dialog.getAttribute('aria-describedby')).toBeTruthy();
+        expect(document.getElementById(dialog.getAttribute('aria-labelledby') ?? '')?.textContent).toBe('删除「页面 2」？');
+        expect(document.getElementById(dialog.getAttribute('aria-describedby') ?? '')?.textContent).toContain('将删除此页面中的 1 个节点和 0 条连线');
+        expect(deleteButton.getAttribute('aria-haspopup')).toBe('dialog');
+        expect(deleteButton.getAttribute('aria-expanded')).toBe('true');
+        expect(deleteButton.getAttribute('aria-controls')).toBe(dialog.id);
         const cancelButton = screen.getByRole('button', { name: /取\s*消/ });
         const confirmButton = screen.getByRole('button', { name: /^删\s*除$/ });
         await waitFor(() => expect(document.activeElement).toBe(cancelButton));
@@ -495,6 +503,35 @@ describe('PageTabs', () => {
         await waitFor(() => expect(deleteButton.getAttribute('aria-describedby')).toBeNull());
         await waitFor(() => expect(document.activeElement).toBe(deleteButton));
         expect(onSwitchPage).not.toHaveBeenCalled();
+        expect(onDeletePage).not.toHaveBeenCalled();
+    });
+
+    it('closes deletion confirmation with Escape and restores trigger focus after motion', async () => {
+        const onDeletePage = vi.fn();
+        render(
+            <PageTabs
+                pages={[
+                    { id: 'page-1', name: '页面 1', nodes: [], edges: [] },
+                    { id: 'page-2', name: '页面 2', nodes: [], edges: [] },
+                ]}
+                activePageId="page-2"
+                onSwitchPage={vi.fn()}
+                onAddPage={vi.fn()}
+                onDeletePage={onDeletePage}
+                onRenamePage={vi.fn()}
+            />,
+        );
+
+        const deleteButton = screen.getByRole('button', { name: '删除页面 页面 2' });
+        fireEvent.click(deleteButton);
+        const cancelButton = screen.getByRole('button', { name: /取\s*消/ });
+        await waitFor(() => expect(document.activeElement).toBe(cancelButton));
+
+        fireEvent.keyDown(cancelButton, { key: 'Escape' });
+
+        await waitFor(() => expect(deleteButton.getAttribute('aria-expanded')).toBe('false'));
+        await waitFor(() => expect(document.activeElement).toBe(deleteButton));
+        expect(deleteButton.getAttribute('aria-controls')).toBeNull();
         expect(onDeletePage).not.toHaveBeenCalled();
     });
 
