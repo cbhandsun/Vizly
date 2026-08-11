@@ -2699,6 +2699,12 @@
         "saveFail": "Save failed",
         "validationFail": "The current configuration could not be validated. Review the inputs and retry.",
         "testTimeout": "The connection test timed out. Check the network and endpoint, then retry.",
+        "leaveConfirm": {
+            "title": "Discard unsaved storage configuration?",
+            "content": "Leaving will discard unsaved changes to the endpoint, bucket, and access credentials.",
+            "confirm": "Discard and leave",
+            "keepEditing": "Keep editing"
+        },
         "status": {
             "notConfigured": "No storage configuration has been saved",
             "saved": "Configuration saved; test the connection before use",

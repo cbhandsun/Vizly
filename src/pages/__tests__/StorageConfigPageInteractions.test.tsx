@@ -13,11 +13,16 @@ const storageMocks = vi.hoisted(() => ({
 const bridgeMocks = vi.hoisted(() => ({
     messageError: vi.fn(),
     messageSuccess: vi.fn(),
+    modalConfirm: vi.fn(),
     modalError: vi.fn(),
 }));
 
+const routerMocks = vi.hoisted(() => ({
+    navigate: vi.fn(),
+}));
+
 vi.mock('react-router', () => ({
-    useNavigate: () => vi.fn(),
+    useNavigate: () => routerMocks.navigate,
 }));
 
 vi.mock('react-i18next', () => ({
@@ -28,7 +33,7 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('@/core/utils/antdStaticBridge', () => ({
     appMessage: { error: bridgeMocks.messageError, success: bridgeMocks.messageSuccess },
-    appModal: { error: bridgeMocks.modalError },
+    appModal: { confirm: bridgeMocks.modalConfirm, error: bridgeMocks.modalError },
 }));
 
 vi.mock('@/services/StorageService', () => ({
@@ -65,8 +70,21 @@ afterEach(() => {
     storageMocks.testConnection.mockReset();
     bridgeMocks.messageError.mockReset();
     bridgeMocks.messageSuccess.mockReset();
+    bridgeMocks.modalConfirm.mockReset();
     bridgeMocks.modalError.mockReset();
+    routerMocks.navigate.mockReset();
 });
+
+interface LeaveConfirmOptions {
+    title: string;
+    content: string;
+    okText: string;
+    cancelText: string;
+    autoFocusButton: 'cancel' | 'ok' | null;
+    okButtonProps?: { danger?: boolean };
+    onOk?: () => void;
+    afterClose?: () => void;
+}
 
 describe('StorageConfigPage validation recovery', () => {
     it('keeps essential field guidance visible and programmatically associated', () => {
@@ -163,5 +181,99 @@ describe('StorageConfigPage validation recovery', () => {
         expect(accessKey).toHaveValue('AUDIT_ACCESS_KEY');
         expect(secretKey).toHaveValue('AUDIT_SECRET_KEY');
         expect(storageMocks.saveConfig).not.toHaveBeenCalled();
+    });
+
+    it('leaves immediately from either return control when the form is unchanged', () => {
+        render(<StorageConfigPage />);
+
+        const returnButtons = screen.getAllByRole('button', {
+            name: 'storageConfig.returnToWorkspace',
+        });
+        expect(returnButtons).toHaveLength(2);
+        const [brandButton, returnButton] = returnButtons;
+        if (!brandButton || !returnButton) throw new Error('Expected both storage configuration return controls');
+
+        fireEvent.click(brandButton);
+        fireEvent.click(returnButton);
+
+        expect(routerMocks.navigate).toHaveBeenNthCalledWith(1, '/manage');
+        expect(routerMocks.navigate).toHaveBeenNthCalledWith(2, '/manage');
+        expect(bridgeMocks.modalConfirm).not.toHaveBeenCalled();
+    });
+
+    it('guards both return controls, preserves input on cancel, and navigates only once on confirmation', () => {
+        render(<StorageConfigPage />);
+
+        const endpoint = screen.getByPlaceholderText('https://...');
+        fireEvent.change(endpoint, { target: { value: 'https://unsaved.example.invalid' } });
+        const returnButtons = screen.getAllByRole('button', {
+            name: 'storageConfig.returnToWorkspace',
+        });
+        const [brandButton, returnButton] = returnButtons;
+        if (!brandButton || !returnButton) throw new Error('Expected both storage configuration return controls');
+
+        brandButton.focus();
+        fireEvent.click(brandButton);
+        expect(routerMocks.navigate).not.toHaveBeenCalled();
+        expect(bridgeMocks.modalConfirm).toHaveBeenCalledTimes(1);
+        const cancelOptions = bridgeMocks.modalConfirm.mock.calls[0]?.[0] as LeaveConfirmOptions;
+        expect(cancelOptions).toEqual(expect.objectContaining({
+            title: 'storageConfig.leaveConfirm.title',
+            content: 'storageConfig.leaveConfirm.content',
+            okText: 'storageConfig.leaveConfirm.confirm',
+            cancelText: 'storageConfig.leaveConfirm.keepEditing',
+            autoFocusButton: 'cancel',
+            okButtonProps: { danger: true },
+        }));
+        expect(cancelOptions.afterClose).toBeTypeOf('function');
+        cancelOptions.afterClose?.();
+        expect(endpoint).toHaveValue('https://unsaved.example.invalid');
+        expect(document.activeElement).toBe(brandButton);
+
+        const confirmTriggerFocus = vi.spyOn(returnButton, 'focus');
+        returnButton.focus();
+        confirmTriggerFocus.mockClear();
+        fireEvent.click(returnButton);
+        expect(bridgeMocks.modalConfirm).toHaveBeenCalledTimes(2);
+        const confirmOptions = bridgeMocks.modalConfirm.mock.calls[1]?.[0] as LeaveConfirmOptions;
+        expect(confirmOptions.onOk).toBeTypeOf('function');
+        confirmOptions.onOk?.();
+        confirmOptions.onOk?.();
+        confirmOptions.afterClose?.();
+
+        expect(routerMocks.navigate).toHaveBeenCalledTimes(1);
+        expect(routerMocks.navigate).toHaveBeenCalledWith('/manage');
+        expect(confirmTriggerFocus).not.toHaveBeenCalled();
+    });
+
+    it('protects browser unload only while changes remain unsaved', async () => {
+        render(<StorageConfigPage />);
+
+        const cleanEvent = new Event('beforeunload', { cancelable: true });
+        expect(window.dispatchEvent(cleanEvent)).toBe(true);
+        expect(cleanEvent.defaultPrevented).toBe(false);
+
+        fireEvent.change(screen.getByPlaceholderText('https://...'), {
+            target: { value: 'https://unsaved.example.invalid' },
+        });
+        const dirtyEvent = new Event('beforeunload', { cancelable: true });
+        expect(window.dispatchEvent(dirtyEvent)).toBe(false);
+        expect(dirtyEvent.defaultPrevented).toBe(true);
+
+        fireEvent.change(screen.getByPlaceholderText('my-diagrams-bucket'), {
+            target: { value: 'vizly-audit-bucket' },
+        });
+        fireEvent.change(screen.getByPlaceholderText('storageConfig.form.accessKeyPlaceholder'), {
+            target: { value: 'AUDIT_ACCESS_KEY' },
+        });
+        fireEvent.change(screen.getByPlaceholderText('storageConfig.form.secretKeyPlaceholder'), {
+            target: { value: 'AUDIT_SECRET_KEY' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'storageConfig.form.saveBtn' }));
+        await waitFor(() => expect(storageMocks.saveConfig).toHaveBeenCalledTimes(1));
+
+        const savedEvent = new Event('beforeunload', { cancelable: true });
+        expect(window.dispatchEvent(savedEvent)).toBe(true);
+        expect(savedEvent.defaultPrevented).toBe(false);
     });
 });

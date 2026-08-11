@@ -26,6 +26,7 @@ const StorageConfigPage: React.FC = () => {
     const [form] = Form.useForm<StorageConfig>();
     const [loading, setLoading] = useState(false);
     const [testing, setTesting] = useState(false);
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
     const [connectionState, setConnectionState] = useState<ConnectionState>(
         storageService.getConfig() ? 'saved' : 'not-configured',
     );
@@ -68,10 +69,23 @@ const StorageConfigPage: React.FC = () => {
         };
     }, [form]);
 
+    useEffect(() => {
+        if (!hasUnsavedChanges) return;
+
+        const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+            event.preventDefault();
+            event.returnValue = '';
+        };
+        window.addEventListener('beforeunload', handleBeforeUnload);
+
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    }, [hasUnsavedChanges]);
+
     const onFinish = (values: StorageConfig) => {
         setLoading(true);
         try {
             storageService.saveConfig(values);
+            setHasUnsavedChanges(false);
             setConnectionState('saved');
             appMessage.success(t('storageConfig.saveSuccess'));
         } catch {
@@ -185,6 +199,34 @@ const StorageConfigPage: React.FC = () => {
         }
     };
 
+    const handleReturnToWorkspace = (event: React.MouseEvent<HTMLButtonElement>) => {
+        if (!hasUnsavedChanges) {
+            navigate('/manage');
+            return;
+        }
+
+        const trigger = event.currentTarget;
+        let shouldRestoreFocus = true;
+        let hasNavigated = false;
+        appModal.confirm({
+            title: t('storageConfig.leaveConfirm.title'),
+            content: t('storageConfig.leaveConfirm.content'),
+            okText: t('storageConfig.leaveConfirm.confirm'),
+            cancelText: t('storageConfig.leaveConfirm.keepEditing'),
+            autoFocusButton: 'cancel',
+            okButtonProps: { danger: true },
+            onOk: () => {
+                if (hasNavigated) return;
+                hasNavigated = true;
+                shouldRestoreFocus = false;
+                navigate('/manage');
+            },
+            afterClose: () => {
+                if (shouldRestoreFocus && trigger.isConnected) trigger.focus();
+            },
+        });
+    };
+
     const statusCopy: Record<ConnectionState, { type: 'info' | 'success' | 'warning' | 'error'; message: string }> = {
         'not-configured': { type: 'info', message: t('storageConfig.status.notConfigured') },
         saved: { type: 'info', message: t('storageConfig.status.saved') },
@@ -201,14 +243,14 @@ const StorageConfigPage: React.FC = () => {
                 <button
                     type="button"
                     className="storage-config-brand"
-                    onClick={() => navigate('/manage')}
+                    onClick={handleReturnToWorkspace}
                     aria-label={t('storageConfig.returnToWorkspace')}
                 >
                     <span className="storage-config-logo" aria-hidden="true">V</span>
                     <span className="storage-config-brand-name">Vizly</span>
                 </button>
                 <span className="storage-config-header-title">{t('storageConfig.headerTitle')}</span>
-                <Button className="storage-config-return" type="text" onClick={() => navigate('/manage')}>
+                <Button className="storage-config-return" type="text" onClick={handleReturnToWorkspace}>
                     {t('storageConfig.returnToWorkspace')}
                 </Button>
             </header>
@@ -244,7 +286,10 @@ const StorageConfigPage: React.FC = () => {
                         layout="vertical"
                         onFinish={onFinish}
                         onFinishFailed={handleValidationFailure}
-                        onValuesChange={() => setConnectionState('dirty')}
+                        onValuesChange={() => {
+                            setHasUnsavedChanges(true);
+                            setConnectionState('dirty');
+                        }}
                         initialValues={{ s3ForcePathStyle: true, region: 'us-east-1' }}
                     >
                         <Form.Item
