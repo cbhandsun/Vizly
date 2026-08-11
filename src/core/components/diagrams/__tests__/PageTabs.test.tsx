@@ -417,6 +417,53 @@ describe('PageTabs', () => {
         expect(screen.getByRole('status').textContent).toBe('已将页面“页面 1”向右移动');
     });
 
+    it('keeps reorder focus available until the active page reaches a boundary', async () => {
+        const PageTabsHarness = () => {
+            const [pages, setPages] = useState([
+                { id: 'page-1', name: '页面 1', nodes: [], edges: [] },
+                { id: 'page-2', name: '页面 2', nodes: [], edges: [] },
+                { id: 'page-3', name: '页面 3', nodes: [], edges: [] },
+            ]);
+            const movePage = (id: string, direction: 'left' | 'right') => {
+                const currentIndex = pages.findIndex((page) => page.id === id);
+                const targetIndex = direction === 'left' ? currentIndex - 1 : currentIndex + 1;
+                if (currentIndex < 0 || targetIndex < 0 || targetIndex >= pages.length) return false;
+                const nextPages = [...pages];
+                [nextPages[currentIndex], nextPages[targetIndex]] = [nextPages[targetIndex], nextPages[currentIndex]];
+                setPages(nextPages);
+                return true;
+            };
+            return (
+                <PageTabs
+                    pages={pages}
+                    activePageId="page-3"
+                    onSwitchPage={vi.fn()}
+                    onAddPage={vi.fn()}
+                    onDeletePage={vi.fn()}
+                    onRenamePage={vi.fn()}
+                    onMovePage={movePage}
+                />
+            );
+        };
+
+        render(<PageTabsHarness />);
+        const moveLeft = screen.getByRole('button', { name: '向左移动页面 页面 3' });
+        moveLeft.focus();
+        fireEvent.click(moveLeft);
+
+        await waitFor(() => expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['页面 1', '页面 3', '页面 2']));
+        expect(document.activeElement).toBe(moveLeft);
+        expect(moveLeft.hasAttribute('disabled')).toBe(false);
+
+        fireEvent.click(moveLeft);
+
+        const activeTab = screen.getByRole('tab', { name: '页面 3' });
+        await waitFor(() => expect(document.activeElement).toBe(activeTab));
+        expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['页面 3', '页面 1', '页面 2']);
+        expect(screen.getByRole('button', { name: '向左移动页面 页面 3' }).hasAttribute('disabled')).toBe(true);
+        expect(screen.getByRole('status').textContent).toBe('已将页面“页面 3”向左移动');
+    });
+
     it('does not announce page mutations that fail', () => {
         render(
             <PageTabs
@@ -436,9 +483,12 @@ describe('PageTabs', () => {
 
         fireEvent.click(screen.getByRole('button', { name: '新建页面' }));
         fireEvent.click(screen.getByRole('button', { name: '复制页面 页面 1' }));
-        fireEvent.click(screen.getByRole('button', { name: '向右移动页面 页面 1' }));
+        const moveRight = screen.getByRole('button', { name: '向右移动页面 页面 1' });
+        moveRight.focus();
+        fireEvent.click(moveRight);
 
         expect(screen.getByRole('status').textContent).toBe('');
+        expect(document.activeElement).toBe(moveRight);
     });
 
     it('disables page creation at the 50-page limit', () => {

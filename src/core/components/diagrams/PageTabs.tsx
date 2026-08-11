@@ -261,6 +261,9 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
     }, [onDuplicatePage, t]);
 
     const handleMovePage = useCallback((page: DiagramPage, direction: 'left' | 'right') => {
+        const currentIndex = pages.findIndex((candidate) => candidate.id === page.id);
+        if (currentIndex < 0) return;
+        const targetIndex = direction === 'left' ? currentIndex - 1 : currentIndex + 1;
         if (!onMovePage?.(page.id, direction)) return;
         const statusKey = direction === 'left'
             ? 'designer.pages.moveLeftSuccess'
@@ -272,7 +275,11 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
             name: page.name,
             defaultValue,
         }));
-    }, [onMovePage, t]);
+        const reachesBoundary = targetIndex === 0 || targetIndex === pages.length - 1;
+        if (reachesBoundary) {
+            requestAnimationFrame(() => focusPageTab(page.id));
+        }
+    }, [focusPageTab, onMovePage, pages, t]);
 
     const handleRestoreDeletedPage = useCallback(() => {
         const restoredPageId = onRestoreDeletedPage?.();
