@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
     coerceS3StorageConfig,
+    coercePersistedS3StorageConfigDraft,
     hasPersistedS3SecretField,
     normalizeS3AccessKeyId,
     normalizeS3Endpoint,
@@ -70,6 +71,24 @@ describe('storageSecurity', () => {
             bucket: 'vizly-diagrams',
             region: 'us-east-1',
             s3ForcePathStyle: true,
+        });
+    });
+
+    it('retains a valid non-secret draft when the session secret is unavailable', () => {
+        expect(coercePersistedS3StorageConfigDraft({
+            endpoint: 'https://s3.amazonaws.com/',
+            accessKeyId: 'AKIA_TEST',
+            secretAccessKey: '',
+            bucket: 'vizly-diagrams',
+            region: 'us-east-1',
+            s3ForcePathStyle: false,
+        })).toEqual({
+            endpoint: 'https://s3.amazonaws.com',
+            accessKeyId: 'AKIA_TEST',
+            secretAccessKey: '',
+            bucket: 'vizly-diagrams',
+            region: 'us-east-1',
+            s3ForcePathStyle: false,
         });
     });
 

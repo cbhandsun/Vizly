@@ -2770,6 +2770,7 @@
         },
         "status": {
             "notConfigured": "No storage configuration has been saved",
+            "credentialsRequired": "Configuration restored; enter the Secret Key for this browser session",
             "saved": "Configuration saved; test the connection before use",
             "dirty": "Configuration has unsaved or unverified changes",
             "invalid": "Review the highlighted fields before saving or testing",

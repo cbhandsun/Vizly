@@ -96,6 +96,29 @@ describe('S3StorageProvider', () => {
         expect(s3Storage.getConfig()?.secretAccessKey).toBe('super-secret');
     });
 
+    it('retains non-secret configuration when a new browser session needs the secret again', async () => {
+        localStorage.setItem('diagram_storage_config', JSON.stringify({
+            ...config,
+            secretAccessKey: '',
+        }));
+
+        const { s3Storage } = await loadStorageService();
+
+        expect(s3Storage.isConfigured()).toBe(false);
+        expect(s3Storage.getConfig()).toBeNull();
+        expect(s3Storage.getPersistedConfigDraft()).toEqual({
+            ...config,
+            secretAccessKey: '',
+        });
+        expect(JSON.parse(localStorage.getItem('diagram_storage_config') || '{}')).toMatchObject({
+            endpoint: config.endpoint,
+            accessKeyId: config.accessKeyId,
+            bucket: config.bucket,
+            region: config.region,
+            secretAccessKey: '',
+        });
+    });
+
     it('drops oversized persisted S3 config on load', async () => {
         localStorage.setItem('diagram_storage_config', JSON.stringify({
             endpoint: 'https://s3.amazonaws.com',

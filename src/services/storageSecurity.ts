@@ -27,6 +27,8 @@ export type ValidatedS3StorageConfig = Omit<PersistedS3StorageConfig, 'secretAcc
     secretAccessKey: string;
 };
 
+export type PersistedS3StorageConfigDraft = ValidatedS3StorageConfig;
+
 export const hasPersistedS3SecretField = (rawConfig: unknown): boolean =>
     !!rawConfig
     && typeof rawConfig === 'object'
@@ -89,6 +91,20 @@ export const coerceS3StorageConfig = (
     rawConfig: unknown,
     sessionSecret = ''
 ): ValidatedS3StorageConfig | null => {
+    const draft = coercePersistedS3StorageConfigDraft(rawConfig);
+    if (!draft) return null;
+
+    const record = rawConfig as Record<string, unknown>;
+    const persistedSecret = normalizeS3SecretAccessKey(record.secretAccessKey) || '';
+    const effectiveSecret = normalizeS3SecretAccessKey(sessionSecret) || persistedSecret;
+    if (!effectiveSecret) return null;
+
+    return { ...draft, secretAccessKey: effectiveSecret };
+};
+
+export const coercePersistedS3StorageConfigDraft = (
+    rawConfig: unknown,
+): PersistedS3StorageConfigDraft | null => {
     if (!rawConfig || typeof rawConfig !== 'object' || Array.isArray(rawConfig)) {
         return null;
     }
@@ -99,17 +115,14 @@ export const coerceS3StorageConfig = (
     const accessKeyId = normalizeS3AccessKeyId(record.accessKeyId);
     const bucket = normalizeS3Bucket(record.bucket);
     const region = normalizeS3Region(record.region);
-    const persistedSecret = normalizeS3SecretAccessKey(record.secretAccessKey) || '';
-    const effectiveSecret = normalizeS3SecretAccessKey(sessionSecret) || persistedSecret;
-
-    if (!normalizedEndpoint || !accessKeyId || !bucket || !region || !effectiveSecret) {
+    if (!normalizedEndpoint || !accessKeyId || !bucket || !region) {
         return null;
     }
 
     return {
         endpoint: normalizedEndpoint,
         accessKeyId,
-        secretAccessKey: effectiveSecret,
+        secretAccessKey: '',
         bucket,
         region,
         s3ForcePathStyle: typeof record.s3ForcePathStyle === 'boolean' ? record.s3ForcePathStyle : undefined,

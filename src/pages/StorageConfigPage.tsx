@@ -25,7 +25,7 @@ import './StorageConfigPage.css';
 
 const { Title, Paragraph } = Typography;
 
-type ConnectionState = 'not-configured' | 'saved' | 'dirty' | 'invalid' | 'testing' | 'verifiedUnsaved' | 'savedVerified' | 'failed';
+type ConnectionState = 'not-configured' | 'credentialsRequired' | 'saved' | 'dirty' | 'invalid' | 'testing' | 'verifiedUnsaved' | 'savedVerified' | 'failed';
 
 const StorageConfigPage: React.FC = () => {
     const { t } = useTranslation();
@@ -33,9 +33,10 @@ const StorageConfigPage: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [testing, setTesting] = useState(false);
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-    const [connectionState, setConnectionState] = useState<ConnectionState>(
-        storageService.getConfig() ? 'saved' : 'not-configured',
-    );
+    const [connectionState, setConnectionState] = useState<ConnectionState>(() => {
+        if (storageService.getConfig()) return 'saved';
+        return storageService.getPersistedConfigDraft() ? 'credentialsRequired' : 'not-configured';
+    });
     const testControllerRef = useRef<AbortController | null>(null);
     const testedValuesRef = useRef<StorageConfig | null>(null);
     const verifiedValuesRef = useRef<StorageConfig | null>(null);
@@ -58,7 +59,7 @@ const StorageConfigPage: React.FC = () => {
 
     useEffect(() => {
         mountedRef.current = true;
-        const config = storageService.getConfig();
+        const config = storageService.getConfig() ?? storageService.getPersistedConfigDraft();
         if (config) {
             form.setFieldsValue({ ...config, secretAccessKey: '' });
         }
@@ -262,6 +263,7 @@ const StorageConfigPage: React.FC = () => {
 
     const statusCopy: Record<ConnectionState, { type: 'info' | 'success' | 'warning' | 'error'; message: string }> = {
         'not-configured': { type: 'info', message: t('storageConfig.status.notConfigured') },
+        credentialsRequired: { type: 'warning', message: t('storageConfig.status.credentialsRequired') },
         saved: { type: 'info', message: t('storageConfig.status.saved') },
         dirty: { type: 'warning', message: t('storageConfig.status.dirty') },
         invalid: { type: 'error', message: t('storageConfig.status.invalid') },

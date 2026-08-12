@@ -2,6 +2,7 @@ import { DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command, PutObjectC
 import { IStorageProvider, DiagramMetadata, SavedDiagram } from './storage/types';
 import {
     coerceS3StorageConfig,
+    coercePersistedS3StorageConfigDraft,
     hasPersistedS3SecretField,
     redactSensitiveValue,
     type ValidatedS3StorageConfig,
@@ -38,6 +39,7 @@ export class S3StorageProvider implements IStorageProvider {
     private static instance: S3StorageProvider;
     private client: S3Client | null = null;
     private config: StorageConfig | null = null;
+    private persistedConfigDraft: StorageConfig | null = null;
 
     private constructor() {
         this.loadConfig();
@@ -148,10 +150,17 @@ export class S3StorageProvider implements IStorageProvider {
                     }
                     return;
                 }
+                const persistedDraft = coercePersistedS3StorageConfigDraft(parsed);
+                if (!persistedDraft) {
+                    this.clearPersistedConfig();
+                    return;
+                }
+
+                this.persistedConfigDraft = persistedDraft;
                 const sessionSecret = this.readPersistedSessionSecret();
                 const safeConfig = coerceS3StorageConfig(parsed, sessionSecret);
                 if (!safeConfig) {
-                    this.clearPersistedConfig();
+                    this.clearCachedSessionSecret();
                     return;
                 }
 
@@ -188,11 +197,16 @@ export class S3StorageProvider implements IStorageProvider {
         }
 
         this.config = safeConfig;
+        this.persistedConfigDraft = stripSecret(safeConfig);
         this.initializeClient();
     }
 
     getConfig(): StorageConfig | null {
         return this.config;
+    }
+
+    getPersistedConfigDraft(): StorageConfig | null {
+        return this.persistedConfigDraft;
     }
 
     private initializeClient() {

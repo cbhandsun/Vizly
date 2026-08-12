@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const storageMocks = vi.hoisted(() => ({
     getConfig: vi.fn<() => MockStorageConfig | null>(() => null),
+    getPersistedConfigDraft: vi.fn<() => MockStorageConfig | null>(() => null),
     saveConfig: vi.fn(),
     testConnection: vi.fn(),
 }));
@@ -87,6 +88,7 @@ beforeEach(() => {
 afterEach(() => {
     cleanup();
     storageMocks.getConfig.mockReturnValue(null);
+    storageMocks.getPersistedConfigDraft.mockReturnValue(null);
     storageMocks.saveConfig.mockReset();
     storageMocks.testConnection.mockReset();
     bridgeMocks.messageError.mockReset();
@@ -108,6 +110,30 @@ interface LeaveConfirmOptions {
 }
 
 describe('StorageConfigPage validation recovery', () => {
+    it('restores non-secret fields and requests only the expired session secret', async () => {
+        storageMocks.getPersistedConfigDraft.mockReturnValue({
+            endpoint: 'https://storage.example.com',
+            bucket: 'vizly-audit-bucket',
+            region: 'us-east-1',
+            accessKeyId: 'AUDIT_ACCESS_KEY',
+            secretAccessKey: '',
+            s3ForcePathStyle: false,
+        });
+        renderStorageConfig();
+
+        expect(screen.getByText('storageConfig.status.credentialsRequired')).toBeInTheDocument();
+        expect(screen.getByPlaceholderText('https://...')).toHaveValue('https://storage.example.com');
+        expect(screen.getByPlaceholderText('my-diagrams-bucket')).toHaveValue('vizly-audit-bucket');
+        expect(screen.getByPlaceholderText('us-east-1')).toHaveValue('us-east-1');
+        expect(screen.getByPlaceholderText('storageConfig.form.accessKeyPlaceholder')).toHaveValue('AUDIT_ACCESS_KEY');
+        expect(screen.getByPlaceholderText('storageConfig.form.secretKeyPlaceholder')).toHaveValue('');
+        expect(screen.getByRole('switch', { name: 'storageConfig.form.forcePathStyleLabel' })).not.toBeChecked();
+
+        fireEvent.click(screen.getByRole('button', { name: 'storageConfig.form.testBtn' }));
+        await waitFor(() => expect(screen.getByText('storageConfig.form.secretKeyRequired')).toBeInTheDocument());
+        expect(storageMocks.testConnection).not.toHaveBeenCalled();
+    });
+
     it('keeps essential field guidance visible and programmatically associated', () => {
         renderStorageConfig();
 

@@ -2880,6 +2880,7 @@
         },
         "status": {
             "notConfigured": "尚未保存存储配置",
+            "credentialsRequired": "已恢复非敏感配置，请输入本次浏览器会话的 Secret Key",
             "saved": "配置已保存，建议测试连接",
             "dirty": "配置有未保存或未验证的更改",
             "invalid": "请先检查高亮字段，再保存或测试连接",
