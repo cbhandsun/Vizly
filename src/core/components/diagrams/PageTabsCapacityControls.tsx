@@ -14,6 +14,7 @@ interface PageTabsCapacityControlsProps {
     onRestoreDeletedPage?: () => void;
     pageLimitReached: boolean;
     restoreActionLabel: string;
+    restoreButtonRef?: React.Ref<HTMLButtonElement>;
 }
 
 export const PageTabsCapacityControls: React.FC<PageTabsCapacityControlsProps> = ({
@@ -26,6 +27,7 @@ export const PageTabsCapacityControls: React.FC<PageTabsCapacityControlsProps> =
     onRestoreDeletedPage,
     pageLimitReached,
     restoreActionLabel,
+    restoreButtonRef,
 }) => {
     const controlState = getPageTabsCapacityControlState(pageLimitReached, disabled);
 
@@ -34,6 +36,7 @@ export const PageTabsCapacityControls: React.FC<PageTabsCapacityControlsProps> =
             {onRestoreDeletedPage && canRestoreDeletedPage && (
                 <Tooltip title={restoreActionLabel}>
                     <button
+                        ref={restoreButtonRef}
                         type="button"
                         aria-label={restoreActionLabel}
                         onClick={onRestoreDeletedPage}
@@ -41,6 +44,7 @@ export const PageTabsCapacityControls: React.FC<PageTabsCapacityControlsProps> =
                         disabled={disabled}
                     >
                         <UndoOutlined aria-hidden style={{ fontSize: 14 }} />
+                        <span className="page-tabs__restore-label">{restoreActionLabel}</span>
                     </button>
                 </Tooltip>
             )}

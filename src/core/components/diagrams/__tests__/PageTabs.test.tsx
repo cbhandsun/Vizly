@@ -851,7 +851,10 @@ describe('PageTabs', () => {
         fireEvent.click(screen.getByRole('button', { name: /^删\s*除$/ }));
 
         const restoreButton = await screen.findByRole('button', { name: '恢复页面“页面 2”' });
-        expect(screen.getByRole('status').textContent).toContain('已删除“页面 2”');
+        const deletedStatus = screen.getByRole('status');
+        expect(deletedStatus.textContent).toContain('已删除“页面 2”');
+        expect(deletedStatus.classList.contains('page-tabs__status')).toBe(true);
+        expect(restoreButton.textContent).toContain('恢复页面“页面 2”');
         fireEvent.click(restoreButton);
 
         const restoredTab = await screen.findByRole('tab', { name: '页面 2' });
@@ -861,7 +864,7 @@ describe('PageTabs', () => {
         expect(screen.queryByRole('button', { name: '恢复页面“页面 2”' })).toBeNull();
     });
 
-    it('keeps a named recovery action available and announces a failed restore', () => {
+    it('keeps a named recovery action visible and focused after a failed restore', async () => {
         render(
             <PageTabs
                 pages={[{ id: 'page-1', name: '页面 1', nodes: [], edges: [] }]}
@@ -881,6 +884,8 @@ describe('PageTabs', () => {
 
         expect(screen.getByRole('status').textContent).toBe('无法恢复页面“采购审批”，请重试');
         expect(screen.getByRole('button', { name: '恢复页面“采购审批”' })).toBe(restoreButton);
+        expect(restoreButton.textContent).toContain('恢复页面“采购审批”');
+        await waitFor(() => expect(document.activeElement).toBe(restoreButton));
     });
 
     it('blocks page mutations while the initial diagram is loading', () => {

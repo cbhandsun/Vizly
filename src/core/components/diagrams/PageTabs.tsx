@@ -65,6 +65,7 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
     const [confirmingPageId, setConfirmingPageId] = useState<string | null>(null);
     const [statusMessage, setStatusMessage] = useState('');
     const inputRef = useRef<InputRef>(null);
+    const restoreButtonRef = useRef<HTMLButtonElement>(null);
     const renameErrorId = React.useId();
     const deleteDialogId = React.useId();
     const deleteDialogTitleId = React.useId();
@@ -307,6 +308,7 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                 name: restorableDeletedPageName ?? '',
                 defaultValue: '无法恢复页面“{{name}}”，请重试',
             }));
+            requestAnimationFrame(() => restoreButtonRef.current?.focus());
             return;
         }
         addedPageFocusTargetRef.current = restoredPageId;
@@ -645,9 +647,11 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                 </div>
             )}
 
-            <span className="page-tabs__visually-hidden" role="status" aria-live="polite">
-                {statusMessage}
-            </span>
+            {statusMessage && (
+                <span className="page-tabs__status" role="status" aria-live="polite">
+                    {statusMessage}
+                </span>
+            )}
 
             <PageTabsCapacityControls
                 addLabel={pageLimitReached
@@ -666,6 +670,7 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                 onRestoreDeletedPage={onRestoreDeletedPage ? handleRestoreDeletedPage : undefined}
                 pageLimitReached={pageLimitReached}
                 restoreActionLabel={restoreActionLabel}
+                restoreButtonRef={restoreButtonRef}
             />
         </div>
     );
