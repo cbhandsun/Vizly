@@ -322,7 +322,7 @@ describe('S3StorageProvider', () => {
         getItemSpy.mockRestore();
     });
 
-    it('keeps runtime config when session secret persistence fails', async () => {
+    it('rejects the save without changing runtime state when session secret persistence fails', async () => {
         const originalSetItem = Storage.prototype.setItem;
         const setItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, key: string, value: string) {
             if (key === 'diagram_storage_config_secret') {
@@ -333,10 +333,12 @@ describe('S3StorageProvider', () => {
         });
 
         const { s3Storage } = await loadStorageService();
-        s3Storage.saveConfig(config);
+        expect(() => s3Storage.saveConfig(config)).toThrow(
+            'Unable to save S3 configuration in browser session storage.',
+        );
 
-        expect(s3Storage.getConfig()?.secretAccessKey).toBe('super-secret');
-        expect(localStorage.getItem('diagram_storage_config')).toContain('"secretAccessKey":""');
+        expect(s3Storage.getConfig()).toBeNull();
+        expect(localStorage.getItem('diagram_storage_config')).toBeNull();
         expect(sessionStorage.getItem('diagram_storage_config_secret')).toBeNull();
         expect(safeLogState.warn).toHaveBeenCalledWith(
             '[S3StorageProvider.saveConfig] Failed to write "diagram_storage_config_secret":',
@@ -348,7 +350,7 @@ describe('S3StorageProvider', () => {
         setItemSpy.mockRestore();
     });
 
-    it('keeps runtime config when local config persistence fails', async () => {
+    it('rolls back the session secret and runtime state when local config persistence fails', async () => {
         const originalSetItem = Storage.prototype.setItem;
         const setItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, key: string, value: string) {
             if (key === 'diagram_storage_config') {
@@ -359,10 +361,12 @@ describe('S3StorageProvider', () => {
         });
 
         const { s3Storage } = await loadStorageService();
-        s3Storage.saveConfig(config);
+        expect(() => s3Storage.saveConfig(config)).toThrow(
+            'Unable to save S3 configuration in browser local storage.',
+        );
 
-        expect(s3Storage.getConfig()?.secretAccessKey).toBe('super-secret');
-        expect(sessionStorage.getItem('diagram_storage_config_secret')).toBe('super-secret');
+        expect(s3Storage.getConfig()).toBeNull();
+        expect(sessionStorage.getItem('diagram_storage_config_secret')).toBeNull();
         expect(localStorage.getItem('diagram_storage_config')).toBeNull();
         expect(safeLogState.warn).toHaveBeenCalledWith(
             '[S3StorageProvider.saveConfig] Failed to write "diagram_storage_config":',
@@ -370,6 +374,35 @@ describe('S3StorageProvider', () => {
         );
         expect(JSON.stringify(safeLogState.warn.mock.calls)).toContain('[redacted]');
         expect(JSON.stringify(safeLogState.warn.mock.calls)).not.toContain('local-write-secret');
+
+        setItemSpy.mockRestore();
+    });
+
+    it('preserves the previous persisted and runtime config when an update cannot be committed', async () => {
+        const { s3Storage } = await loadStorageService();
+        s3Storage.saveConfig(config);
+        const previousLocalConfig = localStorage.getItem('diagram_storage_config');
+
+        const originalSetItem = Storage.prototype.setItem;
+        const setItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, key: string, value: string) {
+            if (key === 'diagram_storage_config') {
+                throw new Error('quota exceeded');
+            }
+            return originalSetItem.call(this, key, value);
+        });
+
+        expect(() => s3Storage.saveConfig({
+            ...config,
+            bucket: 'replacement-bucket',
+            secretAccessKey: 'replacement-secret',
+        })).toThrow('Unable to save S3 configuration in browser local storage.');
+
+        expect(s3Storage.getConfig()).toMatchObject({
+            bucket: config.bucket,
+            secretAccessKey: config.secretAccessKey,
+        });
+        expect(localStorage.getItem('diagram_storage_config')).toBe(previousLocalConfig);
+        expect(sessionStorage.getItem('diagram_storage_config_secret')).toBe(config.secretAccessKey);
 
         setItemSpy.mockRestore();
     });

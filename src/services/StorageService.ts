@@ -74,19 +74,35 @@ export class S3StorageProvider implements IStorageProvider {
         }
     }
 
-    private persistSessionSecret(secretAccessKey: string, source: string): void {
+    private persistSessionSecret(secretAccessKey: string, source: string): boolean {
         try {
             sessionStorage.setItem(STORAGE_SECRET_SESSION_KEY, secretAccessKey);
+            return true;
         } catch (error) {
             logUiStorageWriteFailure(source, STORAGE_SECRET_SESSION_KEY, error);
+            return false;
         }
     }
 
-    private persistSanitizedConfig(config: StorageConfig, source: string): void {
+    private persistSanitizedConfig(config: StorageConfig, source: string): boolean {
         try {
             localStorage.setItem(STORAGE_CONFIG_KEY, JSON.stringify(stripSecret(config)));
+            return true;
         } catch (error) {
             logUiStorageWriteFailure(source, STORAGE_CONFIG_KEY, error);
+            return false;
+        }
+    }
+
+    private restoreSessionSecret(secretAccessKey: string, source: string): void {
+        try {
+            if (secretAccessKey) {
+                sessionStorage.setItem(STORAGE_SECRET_SESSION_KEY, secretAccessKey);
+            } else {
+                sessionStorage.removeItem(STORAGE_SECRET_SESSION_KEY);
+            }
+        } catch (error) {
+            logUiStorageWriteFailure(source, STORAGE_SECRET_SESSION_KEY, error);
         }
     }
 
@@ -163,9 +179,15 @@ export class S3StorageProvider implements IStorageProvider {
             throw new Error('S3 configuration is invalid. Endpoint must use HTTPS or local HTTP, and bucket, region, access key, and secret are required.');
         }
 
+        if (!this.persistSessionSecret(safeConfig.secretAccessKey, 'S3StorageProvider.saveConfig')) {
+            throw new Error('Unable to save S3 configuration in browser session storage.');
+        }
+        if (!this.persistSanitizedConfig(safeConfig, 'S3StorageProvider.saveConfig')) {
+            this.restoreSessionSecret(existingSecret, 'S3StorageProvider.saveConfig.rollback');
+            throw new Error('Unable to save S3 configuration in browser local storage.');
+        }
+
         this.config = safeConfig;
-        this.persistSessionSecret(safeConfig.secretAccessKey, 'S3StorageProvider.saveConfig');
-        this.persistSanitizedConfig(safeConfig, 'S3StorageProvider.saveConfig');
         this.initializeClient();
     }
 

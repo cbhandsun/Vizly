@@ -491,6 +491,36 @@ describe('StorageConfigPage validation recovery', () => {
         expect(bridgeMocks.modalConfirm).not.toHaveBeenCalled();
     });
 
+    it('keeps the form unsaved and reports failure when browser persistence rejects a save', async () => {
+        storageMocks.saveConfig.mockImplementationOnce(() => {
+            throw new Error('Unable to save S3 configuration in browser local storage.');
+        });
+        renderStorageConfig();
+
+        fireEvent.change(screen.getByPlaceholderText('https://...'), {
+            target: { value: 'https://storage.example.com' },
+        });
+        fireEvent.change(screen.getByPlaceholderText('my-diagrams-bucket'), {
+            target: { value: 'vizly-audit-bucket' },
+        });
+        fireEvent.change(screen.getByPlaceholderText('storageConfig.form.accessKeyPlaceholder'), {
+            target: { value: 'AUDIT_ACCESS_KEY' },
+        });
+        fireEvent.change(screen.getByPlaceholderText('storageConfig.form.secretKeyPlaceholder'), {
+            target: { value: 'AUDIT_SECRET_KEY' },
+        });
+
+        fireEvent.click(screen.getByRole('button', { name: 'storageConfig.form.saveBtn' }));
+        await waitFor(() => expect(storageMocks.saveConfig).toHaveBeenCalledTimes(1));
+        expect(bridgeMocks.messageSuccess).not.toHaveBeenCalledWith('storageConfig.saveSuccess');
+        expect(bridgeMocks.messageError).toHaveBeenCalledWith('storageConfig.saveFail');
+        expect(screen.getByText('storageConfig.status.failed')).toBeInTheDocument();
+
+        const unloadEvent = new Event('beforeunload', { cancelable: true });
+        expect(window.dispatchEvent(unloadEvent)).toBe(false);
+        expect(unloadEvent.defaultPrevented).toBe(true);
+    });
+
     it('leaves immediately from either return control when the form is unchanged', async () => {
         renderStorageConfig();
 
