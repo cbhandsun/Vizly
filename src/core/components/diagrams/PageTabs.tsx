@@ -31,6 +31,7 @@ interface PageTabsProps {
     onDuplicatePage?: (id: string, preferredName: string) => string | null;
     onMovePage?: (id: string, direction: 'left' | 'right') => boolean;
     canRestoreDeletedPage?: boolean;
+    restorableDeletedPageName?: string | null;
     activePageNodeCount?: number;
     activePageEdgeCount?: number;
     disabled?: boolean;
@@ -48,6 +49,7 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
     onDuplicatePage,
     onMovePage,
     canRestoreDeletedPage = false,
+    restorableDeletedPageName = null,
     activePageNodeCount,
     activePageEdgeCount,
     disabled = false,
@@ -320,12 +322,19 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
 
     const handleRestoreDeletedPage = useCallback(() => {
         const restoredPageId = onRestoreDeletedPage?.();
-        if (!restoredPageId) return;
+        if (!restoredPageId) {
+            setStatusMessage(t('designer.pages.restoreFailed', {
+                name: restorableDeletedPageName ?? '',
+                defaultValue: '无法恢复页面“{{name}}”，请重试',
+            }));
+            return;
+        }
         addedPageFocusTargetRef.current = restoredPageId;
         setStatusMessage(t('designer.pages.restoreSuccess', {
-            defaultValue: '已恢复删除的页面',
+            name: restorableDeletedPageName ?? '',
+            defaultValue: '已恢复页面“{{name}}”',
         }));
-    }, [onRestoreDeletedPage, t]);
+    }, [onRestoreDeletedPage, restorableDeletedPageName, t]);
 
     const handleTabKeyDown = useCallback(
         (event: React.KeyboardEvent<HTMLButtonElement>, pageId: string) => {
@@ -352,6 +361,12 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
     const activePage = pages.find((page) => page.id === activePageId) ?? null;
     const activePageIndex = activePage ? pages.findIndex(page => page.id === activePage.id) : -1;
     const isRenamingActivePage = editingId === activePage?.id;
+    const restoreActionLabel = restorableDeletedPageName
+        ? t('designer.pages.restoreNamedAction', {
+            name: restorableDeletedPageName,
+            defaultValue: '恢复页面“{{name}}”',
+        })
+        : t('designer.pages.restoreAction', { defaultValue: '恢复删除的页面' });
 
     return (
         <div
@@ -633,10 +648,10 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
             </span>
 
             {onRestoreDeletedPage && canRestoreDeletedPage && (
-                <Tooltip title={t('designer.pages.restoreAction', { defaultValue: '恢复删除的页面' })}>
+                <Tooltip title={restoreActionLabel}>
                     <button
                         type="button"
-                        aria-label={t('designer.pages.restoreAction', { defaultValue: '恢复删除的页面' })}
+                        aria-label={restoreActionLabel}
                         onClick={handleRestoreDeletedPage}
                         className="page-tabs__restore"
                         disabled={disabled || pageLimitReached}

@@ -41,7 +41,9 @@ vi.mock('react-i18next', () => ({
                 'designer.pages.deleteAction': '删除',
                 'designer.pages.deleteSuccess': '已删除“{{name}}”，可使用“恢复删除的页面”找回',
                 'designer.pages.restoreAction': '恢复删除的页面',
-                'designer.pages.restoreSuccess': '已恢复删除的页面',
+                'designer.pages.restoreNamedAction': '恢复页面“{{name}}”',
+                'designer.pages.restoreSuccess': '已恢复页面“{{name}}”',
+                'designer.pages.restoreFailed': '无法恢复页面“{{name}}”，请重试',
                 'common.cancel': '取消',
             };
             const template = translations[key] ?? key;
@@ -724,6 +726,7 @@ describe('PageTabs', () => {
                     }}
                     onRenamePage={vi.fn()}
                     canRestoreDeletedPage={canRestore}
+                    restorableDeletedPageName={canRestore ? deletedPage.name : null}
                     activePageNodeCount={3}
                     activePageEdgeCount={2}
                 />
@@ -735,15 +738,37 @@ describe('PageTabs', () => {
         expect(await screen.findByText('将删除此页面中的 3 个节点和 2 条连线。关闭或重新加载图表前，可恢复最近删除的页面。')).toBeTruthy();
         fireEvent.click(screen.getByRole('button', { name: /^删\s*除$/ }));
 
-        const restoreButton = await screen.findByRole('button', { name: '恢复删除的页面' });
+        const restoreButton = await screen.findByRole('button', { name: '恢复页面“页面 2”' });
         expect(screen.getByRole('status').textContent).toContain('已删除“页面 2”');
         fireEvent.click(restoreButton);
 
         const restoredTab = await screen.findByRole('tab', { name: '页面 2' });
         await waitFor(() => expect(document.activeElement).toBe(restoredTab));
         expect(restoredTab.getAttribute('aria-selected')).toBe('true');
-        expect(screen.getByRole('status').textContent).toBe('已恢复删除的页面');
-        expect(screen.queryByRole('button', { name: '恢复删除的页面' })).toBeNull();
+        expect(screen.getByRole('status').textContent).toBe('已恢复页面“页面 2”');
+        expect(screen.queryByRole('button', { name: '恢复页面“页面 2”' })).toBeNull();
+    });
+
+    it('keeps a named recovery action available and announces a failed restore', () => {
+        render(
+            <PageTabs
+                pages={[{ id: 'page-1', name: '页面 1', nodes: [], edges: [] }]}
+                activePageId="page-1"
+                onSwitchPage={vi.fn()}
+                onAddPage={vi.fn()}
+                onDeletePage={vi.fn()}
+                onRestoreDeletedPage={() => null}
+                onRenamePage={vi.fn()}
+                canRestoreDeletedPage
+                restorableDeletedPageName="采购审批"
+            />,
+        );
+
+        const restoreButton = screen.getByRole('button', { name: '恢复页面“采购审批”' });
+        fireEvent.click(restoreButton);
+
+        expect(screen.getByRole('status').textContent).toBe('无法恢复页面“采购审批”，请重试');
+        expect(screen.getByRole('button', { name: '恢复页面“采购审批”' })).toBe(restoreButton);
     });
 
     it('blocks page mutations while the initial diagram is loading', () => {

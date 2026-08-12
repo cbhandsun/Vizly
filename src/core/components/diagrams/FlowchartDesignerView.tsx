@@ -655,6 +655,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                             onDuplicatePage: multiPage.duplicatePage,
                                             onMovePage: multiPage.movePage,
                                             canRestoreDeletedPage: multiPage.canRestoreDeletedPage,
+                                            restorableDeletedPageName: multiPage.restorableDeletedPageName,
                                             activePageNodeCount: nodes.length,
                                             activePageEdgeCount: edges.length,
                                             disabled: isInitialDiagramLoading,

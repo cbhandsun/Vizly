@@ -814,7 +814,9 @@
             "deleteAction": "删除",
             "deleteSuccess": "已删除“{{name}}”，可使用“恢复删除的页面”找回",
             "restoreAction": "恢复删除的页面",
-            "restoreSuccess": "已恢复删除的页面"
+            "restoreNamedAction": "恢复页面“{{name}}”",
+            "restoreSuccess": "已恢复页面“{{name}}”",
+            "restoreFailed": "无法恢复页面“{{name}}”，请重试"
         },
         "architecture": {
             "addComponent": "添加{{component}}组件",

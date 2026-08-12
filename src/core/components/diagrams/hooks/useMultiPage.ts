@@ -79,6 +79,7 @@ export const useMultiPage = (
     ]);
     const [activePageId, setActivePageId] = useState(DEFAULT_PAGE_ID);
     const [canRestoreDeletedPage, setCanRestoreDeletedPage] = useState(false);
+    const [restorableDeletedPageName, setRestorableDeletedPageName] = useState<string | null>(null);
     const pagesRef = useRef(pages);
     const activePageIdRef = useRef(activePageId);
     const pageOperationVersionRef = useRef(0);
@@ -239,6 +240,7 @@ export const useMultiPage = (
             page: clearPageSelection(deletedPage),
             index: deletedIndex,
         };
+        setRestorableDeletedPageName(deletedPage.name);
         setCanRestoreDeletedPage(true);
         return true;
     }, [activateHistoryScope, clearSelection, readCurrentState, removePageHistoryScope, setNodes, setEdges]);
@@ -277,6 +279,7 @@ export const useMultiPage = (
         activePageIdRef.current = restoredPage.id;
         setActivePageId(restoredPage.id);
         deletedPageSnapshotRef.current = null;
+        setRestorableDeletedPageName(null);
         setCanRestoreDeletedPage(false);
         return restoredPage.id;
     }, [activateHistoryScope, clearSelection, readCurrentState, setEdges, setNodes]);
@@ -373,6 +376,7 @@ export const useMultiPage = (
         const restored = parseMultiPageMetadata(metadata);
         if (!restored) return null;
         deletedPageSnapshotRef.current = null;
+        setRestorableDeletedPageName(null);
         setCanRestoreDeletedPage(false);
         const clearedPages = restored.pages.map(clearPageSelection);
         clearSelection?.();
@@ -398,6 +402,7 @@ export const useMultiPage = (
         pages,
         activePageId,
         canRestoreDeletedPage,
+        restorableDeletedPageName,
         getPageOperationScope,
         switchPage,
         addPage,

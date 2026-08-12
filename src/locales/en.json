@@ -806,7 +806,9 @@
             "deleteAction": "Delete",
             "deleteSuccess": "Deleted “{{name}}”. Restore deleted page is available.",
             "restoreAction": "Restore deleted page",
-            "restoreSuccess": "Deleted page restored"
+            "restoreNamedAction": "Restore page “{{name}}”",
+            "restoreSuccess": "Restored page “{{name}}”",
+            "restoreFailed": "Could not restore page “{{name}}”. Try again."
         },
         "architecture": {
             "addComponent": "Add {{component}} component",

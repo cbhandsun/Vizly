@@ -535,6 +535,7 @@ describe('useMultiPage', () => {
       expect(result.current.deletePage(deletedPageId)).toBe(true);
     });
     expect(result.current.canRestoreDeletedPage).toBe(true);
+    expect(result.current.restorableDeletedPageName).toBe('Page 2');
     expect(removeScope).toHaveBeenCalledWith(deletedPageId);
 
     currentNodes = [node('adjacent-page-latest')];
@@ -555,6 +556,7 @@ describe('useMultiPage', () => {
     ]);
     expect(result.current.activePageId).toBe(deletedPageId);
     expect(result.current.canRestoreDeletedPage).toBe(false);
+    expect(result.current.restorableDeletedPageName).toBeNull();
     expect(switchScope).toHaveBeenLastCalledWith(deletedPageId);
     expect(clearSelection).toHaveBeenCalled();
     expect(result.current.restoreDeletedPage()).toBeNull();
@@ -573,6 +575,7 @@ describe('useMultiPage', () => {
       result.current.deletePage('page-1');
     });
     expect(result.current.canRestoreDeletedPage).toBe(true);
+    expect(result.current.restorableDeletedPageName).toBe('页面 1');
 
     act(() => {
       result.current.restorePersistedMetadata({
@@ -585,6 +588,7 @@ describe('useMultiPage', () => {
     });
 
     expect(result.current.canRestoreDeletedPage).toBe(false);
+    expect(result.current.restorableDeletedPageName).toBeNull();
     expect(result.current.restoreDeletedPage()).toBeNull();
   });
 
