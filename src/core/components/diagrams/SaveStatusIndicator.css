@@ -29,6 +29,7 @@
         top: 104px;
         right: 12px;
         bottom: auto;
+        transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     .designer-save-status .ant-tag {
@@ -36,5 +37,14 @@
         padding-inline: 10px;
         background: color-mix(in srgb, var(--designer-panel-bg, #fff) 92%, transparent);
         backdrop-filter: blur(10px);
+    }
+
+    /* Persistent save feedback shares the mobile overlay lane with search. */
+    .diagram-root:has(.canvas-search-bar) > .designer-save-status-anchor {
+        top: 264px !important;
+    }
+
+    .diagram-root:has(.canvas-search-replace-row) > .designer-save-status-anchor {
+        top: 376px !important;
     }
 }
