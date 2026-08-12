@@ -101,6 +101,40 @@ describe('useToastActions clipboard feedback', () => {
     expect(destroy).toHaveBeenCalledWith(messageConfig.key);
   });
 
+  it('reports successful duplication with a keyboard-accessible undo action', () => {
+    const { destroy, open, props } = createProps(vi.fn().mockResolvedValue('empty'));
+    const selectedNode = { id: 'node-1', position: { x: 0, y: 0 }, data: {} } satisfies Node;
+    props.selectedNodes = [selectedNode];
+    props.nodesRef.current = [selectedNode];
+    const { result } = renderHook(() => useToastActions(props));
+
+    act(() => result.current.handleDuplicateWithToast());
+
+    expect(props.handleDuplicate).toHaveBeenCalledOnce();
+    expect(open).toHaveBeenCalledOnce();
+    const messageConfig = open.mock.calls[0]?.[0];
+    expect(messageConfig).toMatchObject({ type: 'success', duration: 3 });
+    render(messageConfig.content);
+    const undoButton = screen.getByRole('button', { name: 'designer.flowchart.undo.action' });
+
+    fireEvent.click(undoButton);
+
+    expect(props.undo).toHaveBeenCalledOnce();
+    expect(destroy).toHaveBeenCalledWith(messageConfig.key);
+  });
+
+  it('does not claim duplication succeeded for an invalid explicit target', () => {
+    const { info, open, props } = createProps(vi.fn().mockResolvedValue('empty'));
+    props.nodesRef.current = [{ id: 'node-1', position: { x: 0, y: 0 }, data: {} }];
+    const { result } = renderHook(() => useToastActions(props));
+
+    act(() => result.current.handleDuplicateWithToast('missing-node'));
+
+    expect(props.handleDuplicate).not.toHaveBeenCalled();
+    expect(open).not.toHaveBeenCalled();
+    expect(info).toHaveBeenCalledWith('designer.flowchart.toast.nothingToDuplicate');
+  });
+
   it('explains why locked grouping and ungrouping transactions are blocked', () => {
     const { props, warning } = createProps(vi.fn().mockResolvedValue('empty'));
     const lockedNode: Node = {

@@ -197,27 +197,24 @@ export function useToastActions({
     }, [getDeleteCounts, handleDelete, messageApi, nodesRef, selectedNodes, showUndoableMessage, t]);
 
     const handleDuplicateWithToast = useCallback((target?: DiagramActionTarget) => {
-        const count = Array.isArray(target)
-            ? new Set(target).size
-            : target
-                ? 1
-                : selectedNodes.length;
-        if (count <= 0) {
-            messageApi.info(t('designer.flowchart.toast.nothingToDuplicate'));
-            return;
-        }
         const targetIds = target
             ? new Set(typeof target === 'string' ? [target] : target)
             : null;
         const targetNodes = targetIds
             ? nodesRef.current.filter(node => targetIds.has(node.id))
             : selectedNodes;
+        const count = targetNodes.length;
+        if (count === 0) {
+            messageApi.info(t('designer.flowchart.toast.nothingToDuplicate'));
+            return;
+        }
         if (hasMutationLockedNode(targetNodes)) {
             messageApi.warning(t('designer.flowchart.toast.lockedSelection', '节点已锁定，请先解锁后再操作'));
             return;
         }
         handleDuplicate(target);
-    }, [handleDuplicate, messageApi, nodesRef, selectedNodes, t]);
+        showUndoableMessage(t('designer.flowchart.toast.duplicated', { nodes: count }));
+    }, [handleDuplicate, messageApi, nodesRef, selectedNodes, showUndoableMessage, t]);
 
     // --- Group / Ungroup ---
     const handleGroupWithToast = useCallback(() => {
