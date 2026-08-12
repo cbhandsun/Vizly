@@ -20,6 +20,7 @@ import { PageTabsCapacityControls } from './PageTabsCapacityControls';
 import { getPageTabsMutationFailure } from './pageTabsMutationFeedback';
 import { usePageTabsPendingRename } from './usePageTabsPendingRename';
 import { usePageTabsMutations } from './usePageTabsMutations';
+import { usePageTabsStatusMessage } from './usePageTabsStatusMessage';
 import { getViewportOverlayContainer } from '../ui/viewportOverlayPortal';
 import './PageTabs.css';
 
@@ -63,7 +64,7 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
     const [editName, setEditName] = useState('');
     const [renameError, setRenameError] = useState<string | null>(null);
     const [confirmingPageId, setConfirmingPageId] = useState<string | null>(null);
-    const [statusMessage, setStatusMessage] = useState('');
+    const { statusMessage, statusMessageVersion, setStatusMessage } = usePageTabsStatusMessage();
     const inputRef = useRef<InputRef>(null);
     const restoreButtonRef = useRef<HTMLButtonElement>(null);
     const renameErrorId = React.useId();
@@ -265,7 +266,7 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
         if (restoreTabFocus) {
             requestAnimationFrame(() => focusPageTab(renamedPageId));
         }
-    }, [editingId, editName, focusPageTab, onRenamePage, pages, t]);
+    }, [editingId, editName, focusPageTab, onRenamePage, pages, setStatusMessage, t]);
 
     const handleRenameBlur = useCallback(() => {
         cancelRenameBlurCommit();
@@ -316,7 +317,7 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
             name: restorableDeletedPageName ?? '',
             defaultValue: '已恢复页面“{{name}}”',
         }));
-    }, [onRestoreDeletedPage, restorableDeletedPageName, t]);
+    }, [onRestoreDeletedPage, restorableDeletedPageName, setStatusMessage, t]);
 
     const handleTabKeyDown = useCallback(
         (event: React.KeyboardEvent<HTMLButtonElement>, pageId: string) => {
@@ -648,7 +649,12 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
             )}
 
             {statusMessage && (
-                <span className="page-tabs__status" role="status" aria-live="polite">
+                <span
+                    key={statusMessageVersion}
+                    className="page-tabs__status"
+                    role="status"
+                    aria-live="polite"
+                >
                     {statusMessage}
                 </span>
             )}
