@@ -35,6 +35,7 @@ import {
   focusFirstEnabledDiagramContextMenuItem,
   shouldCloseDiagramContextMenuFromKey,
 } from './diagramContextMenuKeyboard';
+import { reorderNodesWithinParentScopes } from './hooks/nodeLayerOrdering';
 
 export interface ContextMenuProps {
   top: number;
@@ -98,6 +99,11 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
   const hasLockedActionTarget = hasMutationLockedNode(nodeActionTargets);
   const allActionTargetsLocked = nodeActionTargets.length > 0
     && nodeActionTargets.every(isNodeMutationLocked);
+  const nodeActionTargetIds = new Set(nodeActionTargets.map(node => node.id));
+  const canBringToFront = !nodes
+    || reorderNodesWithinParentScopes(nodes, nodeActionTargetIds, 'front').changed;
+  const canSendToBack = !nodes
+    || reorderNodesWithinParentScopes(nodes, nodeActionTargetIds, 'back').changed;
   const hasLockedEdgeActionTarget = type === 'edge' && targetEdge
     ? isEdgeMutationLocked(targetEdge)
     : false;
@@ -286,7 +292,7 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
           label: type === 'multi-node'
             ? t('designer.contextMenu.bringSelectionToFront')
             : t('designer.contextMenu.bringToFront'),
-          disabled: hasLockedActionTarget,
+          disabled: hasLockedActionTarget || !canBringToFront,
         },
         {
           key: 'sendToBack',
@@ -294,7 +300,7 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
           label: type === 'multi-node'
             ? t('designer.contextMenu.sendSelectionToBack')
             : t('designer.contextMenu.sendToBack'),
-          disabled: hasLockedActionTarget,
+          disabled: hasLockedActionTarget || !canSendToBack,
         }
       );
     }
