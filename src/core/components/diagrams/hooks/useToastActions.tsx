@@ -291,18 +291,18 @@ export function useToastActions({
         }
         if (action === 'convertToEditable') {
             if (onContextMenuAction(action, targetId)) {
-                messageApi.success(t('designer.flowchart.toast.convertedToEditable', '已转为编辑状态'));
+                showUndoableMessage(t('designer.flowchart.toast.convertedToEditable', '已转为编辑状态'));
             }
             return;
         }
         if (action === 'stopEditing') {
             if (onContextMenuAction(action, targetId)) {
-                messageApi.success(t('designer.flowchart.toast.stoppedEditing', '已退出编辑状态'));
+                showUndoableMessage(t('designer.flowchart.toast.stoppedEditing', '已退出编辑状态'));
             }
             return;
         }
         onContextMenuAction(action, targetId);
-    }, [handleDeleteWithToast, handleDuplicateWithToast, handlePasteWithToast, handleCutWithToast, handleCopyWithToast, onContextMenuAction, messageApi, showUndoableMessage, t]);
+    }, [handleDeleteWithToast, handleDuplicateWithToast, handlePasteWithToast, handleCutWithToast, handleCopyWithToast, onContextMenuAction, showUndoableMessage, t]);
 
     return {
         showUndoableMessage,

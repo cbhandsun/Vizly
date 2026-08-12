@@ -252,6 +252,36 @@ describe('useToastActions clipboard feedback', () => {
     expect(screen.getByRole('button', { name: 'designer.flowchart.undo.action' })).toBeTruthy();
   });
 
+  it.each([
+    ['convertToEditable', 'designer.flowchart.toast.convertedToEditable'],
+    ['stopEditing', 'designer.flowchart.toast.stoppedEditing'],
+  ])('offers direct undo after %s succeeds', (action, expectedMessage) => {
+    const { open, props } = createProps(vi.fn().mockResolvedValue('empty'));
+    props.onContextMenuAction = vi.fn().mockReturnValue(true);
+    const { result } = renderHook(() => useToastActions(props));
+
+    act(() => result.current.onContextMenuActionWithToast(action, 'edge-1'));
+
+    expect(open).toHaveBeenCalledOnce();
+    const messageConfig = open.mock.calls[0]?.[0];
+    expect(messageConfig.content.props.children[0]).toBe(expectedMessage);
+    render(messageConfig.content);
+    expect(screen.getByRole('button', { name: 'designer.flowchart.undo.action' })).toBeTruthy();
+  });
+
+  it('does not report a path editing transition when the edge did not change', () => {
+    const { open, props } = createProps(vi.fn().mockResolvedValue('empty'));
+    props.onContextMenuAction = vi.fn().mockReturnValue(false);
+    const { result } = renderHook(() => useToastActions(props));
+
+    act(() => {
+      result.current.onContextMenuActionWithToast('convertToEditable', 'missing-edge');
+      result.current.onContextMenuActionWithToast('stopEditing', 'missing-edge');
+    });
+
+    expect(open).not.toHaveBeenCalled();
+  });
+
   it('reports an empty clipboard only after both clipboard channels fail', async () => {
     const handlePaste = vi.fn().mockResolvedValue('empty');
     const { info, props } = createProps(handlePaste);
