@@ -82,14 +82,24 @@ type BrowserFileReader = {
 
 export const readFlowchartImportFileText = (
     file: Blob,
-    createFileReader: () => BrowserFileReader = () => new FileReader()
+    createFileReader: () => BrowserFileReader = () => new FileReader(),
+    timeoutMs = 10_000,
 ): Promise<string> => new Promise((resolve, reject) => {
     const reader = createFileReader();
+    const timeoutId = setTimeout(reject, timeoutMs, new Error());
+
     reader.onload = (event) => {
+        clearTimeout(timeoutId);
         resolve(String(event.target?.result || ''));
     };
     reader.onerror = () => {
-        reject(new Error('Failed to read import file.'));
+        clearTimeout(timeoutId);
+        reject(new Error());
     };
-    reader.readAsText(file);
+    try {
+        reader.readAsText(file);
+    } catch (error: unknown) {
+        clearTimeout(timeoutId);
+        reject(error);
+    }
 });

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   readFlowchartImportFileText,
@@ -13,6 +13,10 @@ const messages = {
     `${filename}|${size}|${limit}`
   ),
 };
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe('flowchartImportFile', () => {
   it('validates supported extensions and size limits for flowchart imports', () => {
@@ -109,6 +113,48 @@ describe('flowchartImportFile', () => {
           );
         },
       })
-    )).rejects.toThrow('Failed to read import file.');
+    )).rejects.toBeInstanceOf(Error);
+  });
+
+  it('bounds a FileReader that never settles', async () => {
+    vi.useFakeTimers();
+    const readPromise = readFlowchartImportFileText(
+      new Blob(['ignored']),
+      () => ({
+        onload: null,
+        onerror: null,
+        readAsText: vi.fn(),
+      }),
+    );
+    const rejection = expect(readPromise).rejects.toBeInstanceOf(Error);
+
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    await rejection;
+  });
+
+  it('ignores a late FileReader completion after the timeout', async () => {
+    vi.useFakeTimers();
+    let readerOnLoad = (_event: ProgressEvent<FileReader>) => undefined;
+    const readPromise = readFlowchartImportFileText(
+      new Blob(['ignored']),
+      () => ({
+        get onload() {
+          return readerOnLoad;
+        },
+        set onload(value) {
+          readerOnLoad = event => value?.call({} as FileReader, event);
+        },
+        onerror: null,
+        readAsText: vi.fn(),
+      }),
+      1,
+    );
+    const rejection = expect(readPromise).rejects.toBeInstanceOf(Error);
+
+    await vi.advanceTimersByTimeAsync(1);
+    readerOnLoad({ target: { result: 'late content' } } as ProgressEvent<FileReader>);
+
+    await rejection;
   });
 });
