@@ -322,10 +322,14 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
             defaultValue,
         }));
         const reachesBoundary = targetIndex === 0 || targetIndex === pages.length - 1;
-        if (reachesBoundary) {
-            requestAnimationFrame(() => focusPageTab(page.id));
-        }
-    }, [focusPageTab, onMovePage, pages, t]);
+        requestAnimationFrame(() => {
+            if (reachesBoundary) {
+                focusPageTab(page.id);
+                return;
+            }
+            scrollPageItemIntoView(page.id);
+        });
+    }, [focusPageTab, onMovePage, pages, scrollPageItemIntoView, t]);
 
     const handleRestoreDeletedPage = useCallback(() => {
         const restoredPageId = onRestoreDeletedPage?.();

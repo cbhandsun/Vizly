@@ -501,16 +501,25 @@ describe('PageTabs', () => {
 
         render(<PageTabsHarness />);
         const moveLeft = screen.getByRole('button', { name: '向左移动页面 页面 3' });
+        const activeTab = screen.getByRole('tab', { name: '页面 3' });
+        const activePageItemScroll = vi.fn();
+        Object.defineProperty(activeTab.parentElement, 'scrollIntoView', {
+            configurable: true,
+            value: activePageItemScroll,
+        });
         moveLeft.focus();
         fireEvent.click(moveLeft);
 
         await waitFor(() => expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['页面 1', '页面 3', '页面 2']));
+        await waitFor(() => expect(activePageItemScroll).toHaveBeenCalledWith({
+            block: 'nearest',
+            inline: 'nearest',
+        }));
         expect(document.activeElement).toBe(moveLeft);
         expect(moveLeft.hasAttribute('disabled')).toBe(false);
 
         fireEvent.click(moveLeft);
 
-        const activeTab = screen.getByRole('tab', { name: '页面 3' });
         await waitFor(() => expect(document.activeElement).toBe(activeTab));
         expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['页面 3', '页面 1', '页面 2']);
         expect(screen.getByRole('button', { name: '向左移动页面 页面 3' }).hasAttribute('disabled')).toBe(true);
