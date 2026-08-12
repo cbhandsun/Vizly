@@ -256,6 +256,10 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
         });
     }, []);
 
+    const handleReplaceConfirmationOpenChange = useCallback((open: boolean) => {
+        if (!open) focusReplacementInput();
+    }, [focusReplacementInput]);
+
     const handleReplaceVisibilityChange = useCallback(() => {
         const nextVisible = !showReplace;
         setShowReplace(nextVisible);
@@ -644,6 +648,7 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
                                 okText={t('designer.canvasSearch.replaceConfirm')}
                                 cancelText={t('common.cancel')}
                                 onConfirm={handleReplaceAll}
+                                onOpenChange={handleReplaceConfirmationOpenChange}
                                 disabled={allReplacePlan.changedMatches.length === 0}
                             >
                                 <button

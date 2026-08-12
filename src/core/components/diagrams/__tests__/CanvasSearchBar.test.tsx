@@ -323,6 +323,71 @@ describe('CanvasSearchBar', () => {
             .toBe(screen.getByRole('textbox', { name: '替换为' })));
     });
 
+    it('restores replacement focus without mutating content when replace-all is cancelled', async () => {
+        const nodes = [{
+            id: 'node-1',
+            position: { x: 10, y: 20 },
+            data: { label: 'Circle circle' },
+        }];
+        const onReplaceAll = vi.fn((matches: FlowchartCanvasSearchMatch[], query: string, replacement: string) => (
+            planFlowchartCanvasTextReplacement(nodes, [], matches, query, replacement)
+        ));
+        render(
+            <CanvasSearchBar
+                visible
+                replaceVisible
+                onClose={vi.fn()}
+                nodes={nodes}
+                onReplaceMatch={(match, query, replacement) => (
+                    planFlowchartCanvasTextReplacement(nodes, [], [match], query, replacement)
+                )}
+                onReplaceAll={onReplaceAll}
+            />,
+        );
+
+        const searchInput = screen.getByRole('textbox', { name: '搜索画布内容' });
+        const replacementInput = screen.getByRole('textbox', { name: '替换为' });
+        fireEvent.change(searchInput, { target: { value: 'circle' } });
+        fireEvent.change(replacementInput, { target: { value: 'Square' } });
+        fireEvent.click(screen.getByRole('button', { name: '全部替换，共 1 个节点文本' }));
+        fireEvent.click(screen.getByRole('button', { name: '取 消' }));
+
+        expect(onReplaceAll).not.toHaveBeenCalled();
+        expect(searchInput).toHaveProperty('value', 'circle');
+        expect(replacementInput).toHaveProperty('value', 'Square');
+        await waitFor(() => expect(document.activeElement).toBe(replacementInput));
+    });
+
+    it('restores replacement focus when replace-all confirmation closes with Escape', async () => {
+        const nodes = [{
+            id: 'node-1',
+            position: { x: 10, y: 20 },
+            data: { label: 'Circle circle' },
+        }];
+        const onReplaceAll = vi.fn();
+        render(
+            <CanvasSearchBar
+                visible
+                replaceVisible
+                onClose={vi.fn()}
+                nodes={nodes}
+                onReplaceMatch={vi.fn()}
+                onReplaceAll={onReplaceAll}
+            />,
+        );
+
+        fireEvent.change(screen.getByRole('textbox', { name: '搜索画布内容' }), {
+            target: { value: 'circle' },
+        });
+        const replacementInput = screen.getByRole('textbox', { name: '替换为' });
+        fireEvent.change(replacementInput, { target: { value: 'Square' } });
+        fireEvent.click(screen.getByRole('button', { name: '全部替换，共 1 个节点文本' }));
+        fireEvent.keyDown(document, { key: 'Escape' });
+
+        expect(onReplaceAll).not.toHaveBeenCalled();
+        await waitFor(() => expect(document.activeElement).toBe(replacementInput));
+    });
+
     it('finds, centers, highlights, and replaces a visible edge label', async () => {
         const nodes: Node[] = [
             { id: 'source', position: { x: 0, y: 0 }, data: { label: 'Source' } },
