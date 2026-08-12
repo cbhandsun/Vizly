@@ -74,6 +74,7 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
     const renameBlurCommitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const restoreFocusAfterDeleteRef = useRef(false);
     const addedPageFocusTargetRef = useRef<string | null>(null);
+    const pendingRenameRef = useRef<{ sourcePageId: string; targetPageId: string } | null>(null);
     const pageLimitReached = pages.length >= MAX_DIAGRAM_PAGES;
 
     const cancelRenameBlurCommit = useCallback(() => {
@@ -191,6 +192,23 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
     }, [activePageId, focusPageTab, pages]);
 
     useEffect(() => {
+        const pendingRename = pendingRenameRef.current;
+        if (pendingRename) {
+            if (activePageId === pendingRename.sourcePageId) return;
+            pendingRenameRef.current = null;
+            if (activePageId !== pendingRename.targetPageId) return;
+            const pendingPage = pages.find((page) => page.id === pendingRename.targetPageId);
+            if (!pendingPage) return;
+            setConfirmingPageId(null);
+            setEditingId(pendingPage.id);
+            setEditName(pendingPage.name);
+            setRenameError(null);
+            setTimeout(() => {
+                inputRef.current?.focus();
+                inputRef.current?.select();
+            }, 50);
+            return;
+        }
         const editingAnotherPage = Boolean(editingId && editingId !== activePageId);
         const confirmingAnotherPage = Boolean(confirmingPageId && confirmingPageId !== activePageId);
         if (!editingAnotherPage && !confirmingAnotherPage) return;
@@ -199,11 +217,19 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
         setEditName('');
         setRenameError(null);
         setConfirmingPageId(null);
-    }, [activePageId, confirmingPageId, editingId]);
+    }, [activePageId, confirmingPageId, editingId, pages]);
 
     const handleStartRename = useCallback((page: DiagramPage) => {
         cancelRenameBlurCommit();
-        if (page.id !== activePageId) onSwitchPage(page.id);
+        if (page.id !== activePageId) {
+            pendingRenameRef.current = {
+                sourcePageId: activePageId,
+                targetPageId: page.id,
+            };
+            onSwitchPage(page.id);
+            return;
+        }
+        pendingRenameRef.current = null;
         setConfirmingPageId(null);
         setEditingId(page.id);
         setEditName(page.name);

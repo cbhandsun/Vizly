@@ -194,6 +194,36 @@ describe('PageTabs', () => {
         });
     });
 
+    it('opens rename after double-clicking a page that first needs activation', async () => {
+        const PageTabsHarness = () => {
+            const [activePageId, setActivePageId] = useState('page-2');
+            return (
+                <PageTabs
+                    pages={[
+                        { id: 'page-1', name: '页面 1', nodes: [], edges: [] },
+                        { id: 'page-2', name: '页面 2', nodes: [], edges: [] },
+                    ]}
+                    activePageId={activePageId}
+                    onSwitchPage={setActivePageId}
+                    onAddPage={vi.fn()}
+                    onDeletePage={vi.fn()}
+                    onRenamePage={vi.fn()}
+                />
+            );
+        };
+
+        render(<PageTabsHarness />);
+        fireEvent.doubleClick(screen.getByRole('tab', { name: '页面 1' }));
+
+        const input = await screen.findByRole('textbox', { name: '重命名页面 页面 1' }) as HTMLInputElement;
+        await waitFor(() => {
+            expect(screen.getByRole('tab', { name: '页面 1' }).getAttribute('aria-selected')).toBe('true');
+            expect(document.activeElement).toBe(input);
+            expect(input.selectionStart).toBe(0);
+            expect(input.selectionEnd).toBe(input.value.length);
+        });
+    });
+
     it('moves focus to the newly active page after creation', async () => {
         const PageTabsHarness = () => {
             const [pages, setPages] = useState([{ id: 'page-1', name: '页面 1', nodes: [], edges: [] }]);
