@@ -8,6 +8,24 @@ export interface CloudStorageManagerScope {
     revision: number;
 }
 
+interface CloudStorageManagerListAvailability {
+    tab: CloudStorageManagerTab;
+    providerId: StorageProviderType;
+    providerConfigured: boolean;
+    hasUser: boolean;
+}
+
+export const isCloudStorageManagerListAvailable = ({
+    tab,
+    providerId,
+    providerConfigured,
+    hasUser,
+}: CloudStorageManagerListAvailability): boolean => {
+    if (tab === 'shared') return hasUser;
+    if (!providerConfigured) return false;
+    return providerId !== 'supabase' || hasUser;
+};
+
 export const createCloudStorageManagerScope = (
     providerId: StorageProviderType,
     tab: CloudStorageManagerTab = 'mine',

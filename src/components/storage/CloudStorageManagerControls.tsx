@@ -11,6 +11,7 @@ interface CloudStorageManagerTitleProps {
     currentProvider: StorageProviderType;
     loading: boolean;
     operationBusy: boolean;
+    refreshDisabled: boolean;
     onProviderChange: (provider: StorageProviderType) => void;
     onRefresh: () => void;
 }
@@ -20,6 +21,7 @@ export const CloudStorageManagerTitle: React.FC<CloudStorageManagerTitleProps> =
     currentProvider,
     loading,
     operationBusy,
+    refreshDisabled,
     onProviderChange,
     onRefresh,
 }) => {
@@ -46,7 +48,7 @@ export const CloudStorageManagerTitle: React.FC<CloudStorageManagerTitleProps> =
                         icon={<ReloadOutlined />}
                         onClick={onRefresh}
                         loading={loading}
-                        disabled={operationBusy}
+                        disabled={operationBusy || refreshDisabled}
                         aria-label={t('storage.manager.refresh')}
                     />
                 </Space>
@@ -67,12 +69,12 @@ export const CloudStorageManagerSearch: React.FC<CloudStorageManagerSearchProps>
 
     return (
         <div className="cloud-storage-manager-search">
-            <Input.Search
+            <Input
+                type="search"
                 value={value}
                 placeholder={t('storage.manager.searchPlaceholder')}
                 aria-label={t('storage.manager.searchLabel')}
                 allowClear
-                onSearch={onChange}
                 onChange={event => onChange(event.target.value)}
             />
         </div>

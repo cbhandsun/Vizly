@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
     createCloudStorageManagerScope,
     invalidateCloudStorageManagerScope,
+    isCloudStorageManagerListAvailable,
     isCloudStorageManagerScopeCurrent,
     isOwnedCloudStorageItem,
     matchesCloudStorageSearch,
@@ -44,6 +45,18 @@ describe('cloudStorageManagerScope', () => {
         expect(resolveCloudStorageItemProvider('shared', 's3')).toBe('supabase');
         expect(resolveCloudStorageItemProvider('mine', 's3')).toBe('s3');
         expect(resolveCloudStorageItemProvider('mine', 'supabase')).toBe('supabase');
+    });
+
+    it.each([
+        { tab: 'mine' as const, providerId: 's3' as const, providerConfigured: true, hasUser: false, expected: true },
+        { tab: 'mine' as const, providerId: 's3' as const, providerConfigured: false, hasUser: true, expected: false },
+        { tab: 'mine' as const, providerId: 'supabase' as const, providerConfigured: true, hasUser: false, expected: false },
+        { tab: 'mine' as const, providerId: 'supabase' as const, providerConfigured: true, hasUser: true, expected: true },
+        { tab: 'shared' as const, providerId: 's3' as const, providerConfigured: true, hasUser: false, expected: false },
+        { tab: 'shared' as const, providerId: 's3' as const, providerConfigured: false, hasUser: true, expected: true },
+    ])('exposes list controls only when the active storage view can load data', (input) => {
+        const { expected, ...availability } = input;
+        expect(isCloudStorageManagerListAvailable(availability)).toBe(expected);
     });
 
     it('matches trimmed case-insensitive search against title or id', () => {

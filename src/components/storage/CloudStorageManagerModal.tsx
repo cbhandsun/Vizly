@@ -38,6 +38,7 @@ import { CloudStorageEmptyState } from './CloudStorageEmptyState';
 import {
     createCloudStorageManagerScope,
     invalidateCloudStorageManagerScope,
+    isCloudStorageManagerListAvailable,
     isOwnedCloudStorageItem,
     isCloudStorageManagerScopeCurrent,
     matchesCloudStorageSearch,
@@ -382,6 +383,12 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
 
     const filteredCloud = cloudDiagrams.filter(item => matchesCloudStorageSearch(item, searchTerm));
     const filteredShared = sharedDiagrams.filter(item => matchesCloudStorageSearch(item, searchTerm));
+    const activeListAvailable = isCloudStorageManagerListAvailable({
+        tab: activeTab,
+        providerId: currentProvider,
+        providerConfigured: unifiedStorage.getProvider(currentProvider).isConfigured(),
+        hasUser: Boolean(user),
+    });
 
     const renderMyDiagrams = () => {
         if (currentProvider === 'supabase' && !user) {
@@ -655,6 +662,7 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
                     currentProvider={currentProvider}
                     loading={loading}
                     operationBusy={storageActionBusy}
+                    refreshDisabled={!activeListAvailable}
                     onProviderChange={handleProviderChange}
                     onRefresh={() => void loadCloudDiagrams()}
                 />
@@ -669,7 +677,9 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
             maskClosable={!storageActionBusy}
             keyboard={!storageActionBusy}
         >
-            <CloudStorageManagerSearch value={searchTerm} onChange={handleSearchTermChange} />
+            {activeListAvailable && (
+                <CloudStorageManagerSearch value={searchTerm} onChange={handleSearchTermChange} />
+            )}
             <Tabs
                 activeKey={activeTab}
                 onChange={handleTabChange}

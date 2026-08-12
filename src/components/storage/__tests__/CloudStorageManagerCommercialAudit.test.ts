@@ -16,7 +16,18 @@ describe('cloud storage manager commercial safeguards', () => {
         expect(source).toContain("resetBatchSelection();");
         expect(source).toContain('hasUnfilteredItems={cloudDiagrams.length > 0}');
         expect(source).toContain('hasUnfilteredItems={sharedDiagrams.length > 0}');
+        expect(source).toContain('activeListAvailable &&');
+        expect(source).toContain('refreshDisabled={!activeListAvailable}');
         expect(source).not.toContain('appMessage.error(error.message)');
+    });
+
+    it('does not render a second unnamed search action', () => {
+        const source = readSource('../CloudStorageManagerControls.tsx');
+
+        expect(source).toContain('<Input');
+        expect(source).toContain('type="search"');
+        expect(source).not.toContain('<Input.Search');
+        expect(source).not.toContain('suffix={<SearchOutlined');
     });
 
     it('keeps modal controls touch-safe and reflows provider and batch actions', () => {
