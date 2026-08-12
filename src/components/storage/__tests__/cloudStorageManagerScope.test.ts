@@ -48,6 +48,7 @@ describe('cloudStorageManagerScope', () => {
 
     it('matches trimmed case-insensitive search against title or id', () => {
         expect(matchesCloudStorageSearch({ id: 'diagram-1', title: 'Quarterly Plan' }, ' PLAN ')).toBe(true);
+        expect(matchesCloudStorageSearch({ id: 'diagram-1', title: 'Quarterly Plan' }, 'DIAGRAM-1')).toBe(true);
         expect(matchesCloudStorageSearch({ id: 'Fallback-ID', title: '' }, 'fallback')).toBe(true);
         expect(matchesCloudStorageSearch({ id: 'diagram-1', title: 'Quarterly Plan' }, 'missing')).toBe(false);
     });

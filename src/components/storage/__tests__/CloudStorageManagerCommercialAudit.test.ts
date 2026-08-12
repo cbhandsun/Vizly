@@ -13,6 +13,9 @@ describe('cloud storage manager commercial safeguards', () => {
         expect(source).toContain('cloudLoadFailed &&');
         expect(source).toContain('sharedLoadFailed &&');
         expect(source).toContain('setSelectedIds(new Set())');
+        expect(source).toContain("resetBatchSelection();");
+        expect(source).toContain('hasUnfilteredItems={cloudDiagrams.length > 0}');
+        expect(source).toContain('hasUnfilteredItems={sharedDiagrams.length > 0}');
         expect(source).not.toContain('appMessage.error(error.message)');
     });
 

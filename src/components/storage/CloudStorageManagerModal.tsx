@@ -34,6 +34,7 @@ import {
 import type { StorageProviderType } from '@/services/UnifiedStorageService';
 import { CloudStorageManagerSearch, CloudStorageManagerTitle } from './CloudStorageManagerControls';
 import { CloudStorageRecoveryAlert } from './CloudStorageRecoveryAlert';
+import { CloudStorageEmptyState } from './CloudStorageEmptyState';
 import {
     createCloudStorageManagerScope,
     invalidateCloudStorageManagerScope,
@@ -377,10 +378,7 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
         setSelectedIds(new Set());
     };
 
-    const handleSearchTermChange = (value: string) => {
-        setSearchTerm(value);
-        setSelectedIds(new Set());
-    };
+    const handleSearchTermChange = (value: string) => { setSearchTerm(value); resetBatchSelection(); };
 
     const filteredCloud = cloudDiagrams.filter(item => matchesCloudStorageSearch(item, searchTerm));
     const filteredShared = sharedDiagrams.filter(item => matchesCloudStorageSearch(item, searchTerm));
@@ -551,7 +549,8 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
                         );})}
                         {filteredCloud.length === 0 && !loading && !cloudLoadFailed && (
                             <Col span={24}>
-                                <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('storage.manager.noCloudDiagrams')} />
+                                <CloudStorageEmptyState hasUnfilteredItems={cloudDiagrams.length > 0} searchTerm={searchTerm}
+                                    defaultDescription={t('storage.manager.noCloudDiagrams')} onClearSearch={() => handleSearchTermChange('')} />
                             </Col>
                         )}
                     </Row>
@@ -625,7 +624,8 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
                         ))}
                         {filteredShared.length === 0 && !sharedLoading && !sharedLoadFailed && (
                             <Col span={24}>
-                                <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('storage.manager.noSharedDiagrams')} />
+                                <CloudStorageEmptyState hasUnfilteredItems={sharedDiagrams.length > 0} searchTerm={searchTerm}
+                                    defaultDescription={t('storage.manager.noSharedDiagrams')} onClearSearch={() => handleSearchTermChange('')} />
                             </Col>
                         )}
                     </Row>

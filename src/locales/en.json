@@ -188,6 +188,8 @@
             "sizeKb": "{{kb}} KB",
             "noCloudDiagrams": "No cloud diagrams",
             "noSharedDiagrams": "No shared diagrams",
+            "noSearchResults": "No cloud diagrams match “{{query}}”",
+            "clearSearch": "Clear search",
             "providerNotConfigured": "{{provider}} not configured",
             "goConfig": "Configure",
             "needLoginForSupabase": "Sign in to use Supabase",

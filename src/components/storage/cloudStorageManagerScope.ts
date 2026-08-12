@@ -58,7 +58,11 @@ interface OwnableCloudStorageItem {
 export const matchesCloudStorageSearch = (
     item: SearchableCloudStorageItem,
     searchTerm: string,
-): boolean => (item.title || item.id).toLocaleLowerCase().includes(searchTerm.trim().toLocaleLowerCase());
+): boolean => {
+    const normalizedSearchTerm = searchTerm.trim().toLocaleLowerCase();
+    return item.id.toLocaleLowerCase().includes(normalizedSearchTerm)
+        || Boolean(item.title?.toLocaleLowerCase().includes(normalizedSearchTerm));
+};
 
 export const isOwnedCloudStorageItem = (
     item: OwnableCloudStorageItem,

@@ -187,6 +187,8 @@
             "sizeKb": "{{kb}} KB",
             "noCloudDiagrams": "暂无云端图表",
             "noSharedDiagrams": "暂无共享图表",
+            "noSearchResults": "没有找到与“{{query}}”匹配的云端图表",
+            "clearSearch": "清除搜索",
             "providerNotConfigured": "{{provider}} 未配置",
             "goConfig": "去配置",
             "needLoginForSupabase": "使用 Supabase 需要先登录",
