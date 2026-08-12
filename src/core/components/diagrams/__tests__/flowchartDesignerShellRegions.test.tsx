@@ -119,6 +119,7 @@ const createLeftModel = (
         getPageOperationScope: () => 'page-1:0',
         switchPage: () => undefined,
         addPage: () => null,
+        discardPage: () => false,
         deletePage: () => false,
         restoreDeletedPage: () => null,
         renamePage: () => false,

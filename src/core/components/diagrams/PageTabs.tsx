@@ -17,6 +17,7 @@ import { resolvePageTabTargetIndex } from './pageTabKeyboard';
 import { schedulePageTabsDeleteFocus } from './pageTabsDeleteFocus';
 import { runPageTabsCapacityAction } from './pageTabsLimitFeedback';
 import { PageTabsCapacityControls } from './PageTabsCapacityControls';
+import { PageTabsStatus } from './PageTabsStatus';
 import { getPageTabsMutationFailure } from './pageTabsMutationFeedback';
 import { usePageTabsPendingRename } from './usePageTabsPendingRename';
 import { usePageTabsMutations } from './usePageTabsMutations';
@@ -29,6 +30,7 @@ interface PageTabsProps {
     activePageId: string;
     onSwitchPage: (id: string) => void;
     onAddPage: () => string | null;
+    onDiscardPage?: (id: string) => boolean;
     onDeletePage: (id: string) => boolean;
     onRestoreDeletedPage?: () => string | null;
     onRenamePage: (id: string, name: string) => boolean;
@@ -47,6 +49,7 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
     activePageId,
     onSwitchPage,
     onAddPage,
+    onDiscardPage,
     onDeletePage,
     onRestoreDeletedPage,
     onRenamePage,
@@ -64,7 +67,7 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
     const [editName, setEditName] = useState('');
     const [renameError, setRenameError] = useState<string | null>(null);
     const [confirmingPageId, setConfirmingPageId] = useState<string | null>(null);
-    const { statusMessage, statusMessageVersion, setStatusMessage } = useTransientStatusMessage();
+    const { statusAction, statusMessage, statusMessageVersion, setStatusMessage } = useTransientStatusMessage();
     const inputRef = useRef<InputRef>(null);
     const restoreButtonRef = useRef<HTMLButtonElement>(null);
     const renameErrorId = React.useId();
@@ -105,6 +108,19 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
         },
         [scrollPageItemIntoView],
     );
+
+    const setUndoableStatus = useCallback((message: string, undo: () => boolean) => {
+        setStatusMessage(message, {
+            label: t('designer.pages.undoAction', { defaultValue: '撤销此操作' }),
+            onActivate: () => {
+                const succeeded = undo();
+                setStatusMessage(succeeded
+                    ? t('designer.pages.undoSuccess', { defaultValue: '已撤销页面操作' })
+                    : t('designer.pages.undoFailed', { defaultValue: '无法撤销页面操作，请重试' }));
+                requestAnimationFrame(() => focusPageTab(activePageId));
+            },
+        });
+    }, [activePageId, focusPageTab, setStatusMessage, t]);
 
     useEffect(() => {
         const frame = requestAnimationFrame(() => scrollPageItemIntoView(activePageId));
@@ -259,14 +275,17 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
         const renamedPageId = editingId;
         setRenameError(null);
         setEditingId(null);
-        setStatusMessage(t('designer.pages.renameSuccess', {
+        const previousName = pages.find((page) => page.id === renamedPageId)?.name;
+        const successMessage = t('designer.pages.renameSuccess', {
             name: normalizedName,
             defaultValue: '页面已重命名为“{{name}}”',
-        }));
+        });
+        if (previousName) setUndoableStatus(successMessage, () => onRenamePage(renamedPageId, previousName));
+        else setStatusMessage(successMessage);
         if (restoreTabFocus) {
             requestAnimationFrame(() => focusPageTab(renamedPageId));
         }
-    }, [editingId, editName, focusPageTab, onRenamePage, pages, setStatusMessage, t]);
+    }, [editingId, editName, focusPageTab, onRenamePage, pages, setStatusMessage, setUndoableStatus, t]);
 
     const handleRenameBlur = useCallback(() => {
         cancelRenameBlurCommit();
@@ -294,11 +313,13 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
         addedPageFocusTargetRef,
         focusPageTab,
         onAddPage,
+        onDiscardPage: onDiscardPage ?? onDeletePage,
         onDuplicatePage,
         onMovePage,
         pages,
         scrollPageItemIntoView,
         setStatusMessage,
+        setUndoableStatus,
         t,
     });
 
@@ -313,11 +334,11 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
             return;
         }
         addedPageFocusTargetRef.current = restoredPageId;
-        setStatusMessage(t('designer.pages.restoreSuccess', {
+        setUndoableStatus(t('designer.pages.restoreSuccess', {
             name: restorableDeletedPageName ?? '',
             defaultValue: '已恢复页面“{{name}}”',
-        }));
-    }, [onRestoreDeletedPage, restorableDeletedPageName, setStatusMessage, t]);
+        }), () => onDeletePage(restoredPageId));
+    }, [onDeletePage, onRestoreDeletedPage, restorableDeletedPageName, setStatusMessage, setUndoableStatus, t]);
 
     const handleTabKeyDown = useCallback(
         (event: React.KeyboardEvent<HTMLButtonElement>, pageId: string) => {
@@ -648,16 +669,7 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                 </div>
             )}
 
-            {statusMessage && (
-                <span
-                    key={statusMessageVersion}
-                    className="page-tabs__status"
-                    role="status"
-                    aria-live="polite"
-                >
-                    {statusMessage}
-                </span>
-            )}
+            <PageTabsStatus action={statusAction} message={statusMessage} version={statusMessageVersion} />
 
             <PageTabsCapacityControls
                 addLabel={pageLimitReached

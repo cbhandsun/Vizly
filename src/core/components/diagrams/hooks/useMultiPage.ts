@@ -245,6 +245,31 @@ export const useMultiPage = (
         return true;
     }, [activateHistoryScope, clearSelection, readCurrentState, removePageHistoryScope, setNodes, setEdges]);
 
+    const discardPage = useCallback((pageId: string) => {
+        const currentPages = pagesRef.current;
+        if (currentPages.length <= 1) return false;
+        const discardedIndex = currentPages.findIndex(page => page.id === pageId);
+        if (discardedIndex < 0) return false;
+
+        const remainingPages = currentPages.filter(page => page.id !== pageId);
+        if (pageId === activePageIdRef.current) {
+            const adjacentPage = currentPages[discardedIndex + 1] ?? currentPages[discardedIndex - 1];
+            if (!adjacentPage) return false;
+            const clearedAdjacentPage = clearPageSelection(adjacentPage);
+            pageOperationVersionRef.current += 1;
+            activateHistoryScope(clearedAdjacentPage.id);
+            clearSelection?.();
+            setNodes(clearedAdjacentPage.nodes);
+            setEdges(clearedAdjacentPage.edges);
+            activePageIdRef.current = clearedAdjacentPage.id;
+            setActivePageId(clearedAdjacentPage.id);
+        }
+        pagesRef.current = remainingPages;
+        setPages(remainingPages);
+        removePageHistoryScope(pageId);
+        return true;
+    }, [activateHistoryScope, clearSelection, removePageHistoryScope, setEdges, setNodes]);
+
     const restoreDeletedPage = useCallback(() => {
         const snapshot = deletedPageSnapshotRef.current;
         const currentPages = pagesRef.current;
@@ -406,6 +431,7 @@ export const useMultiPage = (
         getPageOperationScope,
         switchPage,
         addPage,
+        discardPage,
         deletePage,
         restoreDeletedPage,
         renamePage,

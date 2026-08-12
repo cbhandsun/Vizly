@@ -562,6 +562,40 @@ describe('useMultiPage', () => {
     expect(result.current.restoreDeletedPage()).toBeNull();
   });
 
+  it('discards a newly created page without overwriting the latest deleted-page recovery', () => {
+    const { result } = renderHook(() => useMultiPage(
+      () => [],
+      () => [],
+      vi.fn(),
+      vi.fn(),
+    ));
+
+    let deletedPageId = '';
+    act(() => {
+      deletedPageId = result.current.addPage() ?? '';
+      expect(result.current.deletePage(deletedPageId)).toBe(true);
+    });
+    expect(result.current.canRestoreDeletedPage).toBe(true);
+
+    let temporaryPageId = '';
+    act(() => {
+      temporaryPageId = result.current.addPage() ?? '';
+    });
+    act(() => {
+      expect(result.current.discardPage(temporaryPageId)).toBe(true);
+    });
+
+    expect(result.current.canRestoreDeletedPage).toBe(true);
+    expect(result.current.restorableDeletedPageName).toBe('页面 2');
+    let restoredPageId: string | null = null;
+    act(() => {
+      restoredPageId = result.current.restoreDeletedPage();
+    });
+    expect(restoredPageId).toBe(deletedPageId);
+    expect(result.current.pages.map((page) => page.id)).toContain(deletedPageId);
+    expect(result.current.pages.map((page) => page.id)).not.toContain(temporaryPageId);
+  });
+
   it('invalidates transient page recovery after persisted metadata is restored', () => {
     const { result } = renderHook(() => useMultiPage(
       () => [],

@@ -184,6 +184,23 @@
     box-shadow: 0 8px 24px rgba(15, 23, 42, 0.14);
 }
 
+.page-tabs__status-action {
+    min-height: 32px;
+    margin: -4px -5px -4px 8px;
+    padding: 0 8px;
+    color: var(--page-tab-active-color);
+    font: inherit;
+    font-weight: 600;
+    background: transparent;
+    border: 0;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.page-tabs__status-action:hover {
+    background: var(--page-tab-hover-bg);
+}
+
 .page-tabs__rename {
     width: 96px;
     height: 32px;

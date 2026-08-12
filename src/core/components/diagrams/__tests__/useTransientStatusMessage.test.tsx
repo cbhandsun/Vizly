@@ -65,4 +65,19 @@ describe('useTransientStatusMessage', () => {
 
         expect(vi.getTimerCount()).toBe(0);
     });
+
+    it('exposes and clears a contextual recovery action with the status', () => {
+        vi.useFakeTimers();
+        const undo = vi.fn();
+        const { result } = renderHook(() => useTransientStatusMessage());
+
+        act(() => result.current.setStatusMessage('已新建页面', { label: '撤销此操作', onActivate: undo }));
+        expect(result.current.statusAction?.label).toBe('撤销此操作');
+        act(() => result.current.statusAction?.onActivate());
+        expect(undo).toHaveBeenCalledTimes(1);
+
+        act(() => vi.advanceTimersByTime(TRANSIENT_STATUS_DURATION_MS));
+        expect(result.current.statusMessage).toBe('');
+        expect(result.current.statusAction).toBeNull();
+    });
 });

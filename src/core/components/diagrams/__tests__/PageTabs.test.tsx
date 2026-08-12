@@ -50,6 +50,9 @@ vi.mock('react-i18next', () => ({
                 'designer.pages.restoreNamedAction': '恢复页面“{{name}}”',
                 'designer.pages.restoreSuccess': '已恢复页面“{{name}}”',
                 'designer.pages.restoreFailed': '无法恢复页面“{{name}}”，请重试',
+                'designer.pages.undoAction': '撤销此操作',
+                'designer.pages.undoSuccess': '已撤销页面操作',
+                'designer.pages.undoFailed': '无法撤销页面操作，请重试',
                 'common.cancel': '取消',
             };
             const template = translations[key] ?? key;
@@ -232,6 +235,12 @@ describe('PageTabs', () => {
         const PageTabsHarness = () => {
             const [pages, setPages] = useState([{ id: 'page-1', name: '页面 1', nodes: [], edges: [] }]);
             const [activePageId, setActivePageId] = useState('page-1');
+            const deletePage = (pageId: string) => {
+                if (pageId !== 'page-2') return false;
+                setPages([{ id: 'page-1', name: '页面 1', nodes: [], edges: [] }]);
+                setActivePageId('page-1');
+                return true;
+            };
             return (
                 <PageTabs
                     pages={pages}
@@ -243,7 +252,7 @@ describe('PageTabs', () => {
                         setActivePageId(newPageId);
                         return newPageId;
                     }}
-                    onDeletePage={vi.fn()}
+                    onDeletePage={deletePage}
                     onRenamePage={vi.fn()}
                 />
             );
@@ -257,7 +266,11 @@ describe('PageTabs', () => {
         const createdPageTab = await screen.findByRole('tab', { name: '页面 2' });
         await waitFor(() => expect(document.activeElement).toBe(createdPageTab));
         expect(createdPageTab.getAttribute('aria-selected')).toBe('true');
-        expect(screen.getByRole('status').textContent).toBe('已新建页面');
+        expect(screen.getByRole('status').textContent).toContain('已新建页面');
+        fireEvent.click(screen.getByRole('button', { name: '撤销此操作' }));
+        expect(screen.queryByRole('tab', { name: '页面 2' })).toBeNull();
+        expect(screen.getByRole('status').textContent).toBe('已撤销页面操作');
+        await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('tab', { name: '页面 1' })));
     });
 
     it('offers an explicit rename action for the active page', () => {
@@ -385,7 +398,10 @@ describe('PageTabs', () => {
         const renamedTab = await screen.findByRole('tab', { name: '总览' });
         await waitFor(() => expect(document.activeElement).toBe(renamedTab));
         expect(renamedTab.getAttribute('aria-selected')).toBe('true');
-        expect(screen.getByRole('status').textContent).toBe('页面已重命名为“总览”');
+        expect(screen.getByRole('status').textContent).toContain('页面已重命名为“总览”');
+        fireEvent.click(screen.getByRole('button', { name: '撤销此操作' }));
+        expect(await screen.findByRole('tab', { name: '页面 1' })).toBeTruthy();
+        expect(screen.getByRole('status').textContent).toBe('已撤销页面操作');
     });
 
     it('preserves the first page action click while committing a rename on blur', async () => {
@@ -496,12 +512,12 @@ describe('PageTabs', () => {
         expect(moveRight.hasAttribute('disabled')).toBe(false);
 
         fireEvent.click(screen.getByRole('button', { name: '复制页面 页面 1' }));
-        expect(screen.getByRole('status').textContent).toBe('已复制页面“页面 1”');
+        expect(screen.getByRole('status').textContent).toContain('已复制页面“页面 1”');
         fireEvent.click(moveRight);
 
         expect(onDuplicatePage).toHaveBeenCalledWith('page-1', '页面 1 副本');
         expect(onMovePage).toHaveBeenCalledWith('page-1', 'right');
-        expect(screen.getByRole('status').textContent).toBe('已将页面“页面 1”向右移动');
+        expect(screen.getByRole('status').textContent).toContain('已将页面“页面 1”向右移动');
     });
 
     it('keeps reorder focus available until the active page reaches a boundary', async () => {
@@ -557,7 +573,7 @@ describe('PageTabs', () => {
         await waitFor(() => expect(document.activeElement).toBe(activeTab));
         expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['页面 3', '页面 1', '页面 2']);
         expect(screen.getByRole('button', { name: '向左移动页面 页面 3' }).hasAttribute('disabled')).toBe(true);
-        expect(screen.getByRole('status').textContent).toBe('已将页面“页面 3”向左移动');
+        expect(screen.getByRole('status').textContent).toContain('已将页面“页面 3”向左移动');
     });
 
     it('announces failed page mutations without moving focus away from the retry control', () => {
@@ -860,7 +876,7 @@ describe('PageTabs', () => {
         const restoredTab = await screen.findByRole('tab', { name: '页面 2' });
         await waitFor(() => expect(document.activeElement).toBe(restoredTab));
         expect(restoredTab.getAttribute('aria-selected')).toBe('true');
-        expect(screen.getByRole('status').textContent).toBe('已恢复页面“页面 2”');
+        expect(screen.getByRole('status').textContent).toContain('已恢复页面“页面 2”');
         expect(screen.queryByRole('button', { name: '恢复页面“页面 2”' })).toBeNull();
     });
 

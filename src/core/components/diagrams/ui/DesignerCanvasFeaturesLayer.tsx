@@ -75,6 +75,7 @@ export interface DesignerCanvasFeaturesLayerProps {
         activePageId: PageTabsProps['activePageId'];
         onSwitchPage: PageTabsProps['onSwitchPage'];
         onAddPage: PageTabsProps['onAddPage'];
+        onDiscardPage: PageTabsProps['onDiscardPage'];
         onDeletePage: PageTabsProps['onDeletePage'];
         onRestoreDeletedPage?: PageTabsProps['onRestoreDeletedPage'];
         onRenamePage: PageTabsProps['onRenamePage'];
@@ -165,6 +166,7 @@ export const DesignerCanvasFeaturesLayer = React.memo(
                 activePageId={pages.activePageId}
                 onSwitchPage={pages.onSwitchPage}
                 onAddPage={pages.onAddPage}
+                onDiscardPage={pages.onDiscardPage}
                 onDeletePage={pages.onDeletePage}
                 onRestoreDeletedPage={pages.onRestoreDeletedPage}
                 onRenamePage={pages.onRenamePage}
