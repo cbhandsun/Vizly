@@ -68,6 +68,7 @@ export function useCloudSave(diagramId: string, diagramName?: string) {
             if (!unifiedStorage.isConfigured()) {
                 throw new CloudSaveBoundaryError('云存储未配置，请先在设置中配置');
             }
+            const provider = unifiedStorage.activeProvider;
 
             // 从桥接数据中读取（FlowchartDesigner 的 useEffect 会持续更新此数据）
             const bridge = getFlowDataBridge(diagramId);
@@ -80,7 +81,8 @@ export function useCloudSave(diagramId: string, diagramName?: string) {
             const bridgeCloud = bridge.metadata?.cloud;
             const cloudProvider = bridgeCloud?.provider;
             const normalizedCloud: NonNullable<StandardDiagramData['metadata']>['cloud'] = (
-                (cloudProvider === 'supabase' || cloudProvider === 's3')
+                cloudProvider === provider.id
+                && (cloudProvider === 'supabase' || cloudProvider === 's3')
                 && typeof bridgeCloud?.id === 'string'
                 && bridgeCloud.id.length > 0
             ) ? {
@@ -105,11 +107,20 @@ export function useCloudSave(diagramId: string, diagramName?: string) {
             });
 
             const snap = await tryAttachDiagramSnapshot(diagram, diagramId);
-            const provider = unifiedStorage.activeProvider;
 
             const isValidUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(diagram.id || '');
-            const cloudId = bridge.metadata?.cloud?.id;
-            const finalId = cloudId || (isValidUuid ? diagram.id : crypto.randomUUID());
+            const hasForeignCloudIdentity = (
+                (cloudProvider === 'supabase' || cloudProvider === 's3')
+                && cloudProvider !== provider.id
+                && typeof bridgeCloud?.id === 'string'
+                && bridgeCloud.id.length > 0
+            );
+            const cloudId = normalizedCloud?.id;
+            const finalId = cloudId || (
+                hasForeignCloudIdentity || !isValidUuid
+                    ? crypto.randomUUID()
+                    : diagram.id
+            );
             const finalTitle = diagramName || diagram.metadata?.title || diagram.name;
 
             await provider.saveDiagram({

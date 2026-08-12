@@ -271,6 +271,42 @@ describe('useCloudSave', () => {
         expect(messageMocks.hideLoading).toHaveBeenCalledTimes(1);
     });
 
+    it('does not reuse a cloud identity that belongs to a different provider', async () => {
+        const bridge = createBridge();
+        bridge.id = '22222222-2222-4222-8222-222222222222';
+        bridge.metadata = {
+            title: '旧标题',
+            cloud: {
+                provider: 'supabase',
+                id: bridge.id,
+                title: 'Supabase 副本',
+            },
+        };
+        storageMocks.provider.id = 's3';
+        bridgeMocks.get.mockReturnValue(bridge);
+        const { result } = renderHook(() => useCloudSave('diagram-1', '客户流程'));
+
+        await act(async () => {
+            await result.current.saveToCloud();
+        });
+
+        const savedDiagram = storageMocks.provider.saveDiagram.mock.calls[0]?.[0];
+        expect(savedDiagram).toEqual(expect.objectContaining({
+            id: expect.stringMatching(/^[0-9a-f-]{36}$/i),
+            content: expect.objectContaining({
+                id: expect.stringMatching(/^[0-9a-f-]{36}$/i),
+                metadata: expect.objectContaining({ cloud: undefined }),
+            }),
+        }));
+        expect(savedDiagram?.id).not.toBe('22222222-2222-4222-8222-222222222222');
+        expect(savedDiagram?.content.id).toBe(savedDiagram?.id);
+        expect(bridge.metadata?.cloud).toEqual({
+            provider: 's3',
+            id: savedDiagram?.id,
+            title: '客户流程',
+        });
+    });
+
     it('returns false from ensureSaved when the underlying save rejects', async () => {
         storageMocks.provider.saveDiagram.mockRejectedValue(new Error('provider unavailable'));
         const { result } = renderHook(() => useCloudSave('diagram-1'));
