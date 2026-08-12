@@ -1,7 +1,8 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { Node, Edge } from '@xyflow/react';
 import { createGroupingPlan, createUngroupingPlan, deselectEdgesForGrouping } from './groupingOperations';
 import { hasMutationLockedNode, resolveTargetNodes } from '../nodeLockPolicy';
+import { scheduleFlowchartSelectedNodeFocus } from '../flowchartDeletionFocus';
 
 interface UseGroupingProps {
     nodes: Node[];
@@ -34,6 +35,12 @@ export const useGrouping = ({
     getGroupHistoryLabel,
     getUngroupHistoryLabel,
 }: UseGroupingProps) => {
+    const groupingFocusRequestRef = useRef<{ cancel: () => void } | null>(null);
+
+    useEffect(() => () => {
+        groupingFocusRequestRef.current?.cancel();
+        groupingFocusRequestRef.current = null;
+    }, []);
 
     const handleGroup = useCallback(() => {
         const selectedIds = new Set(selectedNodes.map(node => node.id));
@@ -56,6 +63,8 @@ export const useGrouping = ({
         setNodes(plan.nodes);
         setEdges(nextEdges);
         setSelectedNodes([plan.groupNode]);
+        groupingFocusRequestRef.current?.cancel();
+        groupingFocusRequestRef.current = scheduleFlowchartSelectedNodeFocus(plan.groupNode.id);
     }, [defaultGroupDescription, defaultGroupLabel, selectedNodes, nodes, edges, nodesRef, edgesRef, takeSnapshot, setNodes, setEdges, setSelectedNodes, getGroupHistoryLabel]);
 
     const handleUngroup = useCallback((targetNodeIds?: string[]) => {
@@ -68,8 +77,19 @@ export const useGrouping = ({
         const affectedNodes = nodes.filter(node => groupIds.has(node.id) || (node.parentId ? groupIds.has(node.parentId) : false));
         if (hasMutationLockedNode(affectedNodes)) return;
 
-        const nextNodes = createUngroupingPlan({ nodes, groupIds });
-        if (!nextNodes) return;
+        const ungroupedNodes = createUngroupingPlan({ nodes, groupIds });
+        if (!ungroupedNodes) return;
+
+        const selectedChildIds = new Set(
+            affectedNodes
+                .filter(node => !groupIds.has(node.id))
+                .map(node => node.id),
+        );
+        const nextNodes = ungroupedNodes.map(node => ({
+            ...node,
+            selected: selectedChildIds.has(node.id),
+        }));
+        const nextSelection = nextNodes.filter(node => selectedChildIds.has(node.id));
 
         const affectedChildCount = affectedNodes.filter(node => !groupIds.has(node.id)).length;
         takeSnapshot(nodes, edges, getUngroupHistoryLabel?.(groupsToUngroup.length, affectedChildCount));
@@ -81,7 +101,11 @@ export const useGrouping = ({
             if (edgesRef) edgesRef.current = nextEdges;
             return nextEdges;
         });
-        setSelectedNodes([]);
+        setSelectedNodes(nextSelection);
+        groupingFocusRequestRef.current?.cancel();
+        groupingFocusRequestRef.current = nextSelection[0]
+            ? scheduleFlowchartSelectedNodeFocus(nextSelection[0].id)
+            : null;
     }, [selectedNodes, nodes, edges, nodesRef, edgesRef, takeSnapshot, setNodes, setEdges, setSelectedNodes, getUngroupHistoryLabel]);
 
     return {

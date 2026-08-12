@@ -275,7 +275,13 @@ export const FloatingContextToolbar: React.FC<FloatingContextToolbarProps> = Rea
                             }]}
                             trigger="click"
                         >
-                            <span><ToolbarColorSwatch color={currentColor} label={t('designer.toolbar.color')} /></span>
+                            <span>
+                                <ToolbarColorSwatch
+                                    color={currentColor}
+                                    label={lockedActionLabel(t('designer.toolbar.color'))}
+                                    disabled={hasLockedSelection}
+                                />
+                            </span>
                         </ColorPicker>
                     )}
 

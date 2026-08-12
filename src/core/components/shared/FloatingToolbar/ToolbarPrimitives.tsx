@@ -106,13 +106,20 @@ export interface ToolbarColorSwatchProps {
     label: string;
     onClick?: () => void;
     placement?: 'top' | 'bottom';
+    disabled?: boolean;
 }
 
 export const ToolbarColorSwatch: React.FC<ToolbarColorSwatchProps> = ({
-    color, label, onClick, placement = 'top',
+    color, label, onClick, placement = 'top', disabled = false,
 }) => (
     <Tooltip title={label} placement={placement} mouseEnterDelay={0.5}>
-        <button className="floating-toolbar-btn" onClick={onClick} aria-label={label}>
+        <button
+            className={`floating-toolbar-btn ${disabled ? 'floating-toolbar-btn--disabled' : ''}`}
+            onClick={disabled ? undefined : onClick}
+            tabIndex={disabled ? -1 : 0}
+            aria-label={label}
+            aria-disabled={disabled}
+        >
             <div className="floating-toolbar-color-swatch">
                 <div className="floating-toolbar-color-swatch__dot" style={{ backgroundColor: color }} />
             </div>
