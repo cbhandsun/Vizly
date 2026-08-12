@@ -6,6 +6,10 @@ import type { Edge } from '@xyflow/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ContextualEdgeToolbar } from '../ContextualEdgeToolbar';
+import {
+    createContextualEdgeRoutingUpdate,
+    resolveContextualEdgeRoutingState,
+} from '../contextualEdgeToolbarState';
 import PropertyPanel from '../PropertyPanel';
 
 vi.mock('react-i18next', () => ({
@@ -41,6 +45,52 @@ const createEdge = (): Edge => ({
 });
 
 describe('edge editing commercial audit regressions', () => {
+    it('recognizes persisted and computed orthogonal routes and produces a visible curve transition', () => {
+        const persisted = resolveContextualEdgeRoutingState({ type: 'smart-orthogonal', data: {} });
+        expect(persisted).toEqual({ isOrthogonal: true, nextType: 'smart-bezier' });
+
+        const computed = resolveContextualEdgeRoutingState({
+            type: 'support',
+            data: {
+                computedPath: [
+                    { x: 0, y: 0 },
+                    { x: 0, y: 40 },
+                    { x: 80, y: 40 },
+                ],
+            },
+        });
+        expect(computed).toEqual({ isOrthogonal: true, nextType: 'smart-bezier' });
+        expect(createContextualEdgeRoutingUpdate(computed)).toEqual({
+            type: 'smart-bezier',
+            data: {
+                pathType: 'smart-bezier',
+                computedPath: undefined,
+                elkPath: undefined,
+                algorithm: undefined,
+                layoutPathLocked: false,
+                _layoutPathLocked: false,
+                waypoints: [],
+            },
+        });
+    });
+
+    it('switches a smart orthogonal edge directly to a curve and invalidates stale route geometry', () => {
+        const onUpdateEdge = vi.fn();
+        render(<ContextualEdgeToolbar edge={createEdge()} onUpdateEdge={onUpdateEdge} onToggleLock={vi.fn()} />);
+
+        fireEvent.click(screen.getByRole('button', { name: 'edgeToolbar.switchToCurve' }));
+
+        expect(onUpdateEdge).toHaveBeenCalledWith('edge-1', expect.objectContaining({
+            type: 'smart-bezier',
+            data: expect.objectContaining({
+                pathType: 'smart-bezier',
+                computedPath: undefined,
+                layoutPathLocked: false,
+                _layoutPathLocked: false,
+            }),
+        }));
+    });
+
     it('gives the contextual label editor a stable accessible name', () => {
         render(<ContextualEdgeToolbar edge={createEdge()} onUpdateEdge={vi.fn()} onToggleLock={vi.fn()} />);
 
@@ -107,6 +157,28 @@ describe('edge editing commercial audit regressions', () => {
         expect(unlock.getAttribute('aria-disabled')).toBe('false');
         fireEvent.click(unlock);
         expect(onToggleLock).toHaveBeenCalledWith('edge-1', false);
+    });
+
+    it('discards an in-progress label draft when the connector is locked', () => {
+        const onUpdateEdge = vi.fn();
+        const onToggleLock = vi.fn();
+        render(
+            <ContextualEdgeToolbar
+                edge={{ ...createEdge(), label: 'Original' }}
+                onUpdateEdge={onUpdateEdge}
+                onToggleLock={onToggleLock}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'edgeToolbar.currentLabel' }));
+        fireEvent.change(screen.getByRole('textbox', { name: 'edgeToolbar.labelInput' }), {
+            target: { value: 'Unsaved draft' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'designer.contextMenu.lock' }));
+
+        expect(screen.queryByRole('textbox', { name: 'edgeToolbar.labelInput' })).toBeNull();
+        expect(onToggleLock).toHaveBeenCalledWith('edge-1', true);
+        expect(onUpdateEdge).not.toHaveBeenCalled();
     });
 
     it('gives every edge property control a field-specific accessible name', () => {

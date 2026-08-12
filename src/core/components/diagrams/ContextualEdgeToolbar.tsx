@@ -23,6 +23,10 @@ import {
 } from '@ant-design/icons';
 import { isEdgeMutationLocked, isEdgeUserLocked } from './edgeMutationPolicy';
 import {
+    createContextualEdgeRoutingUpdate,
+    resolveContextualEdgeRoutingState,
+} from './contextualEdgeToolbarState';
+import {
     ToolbarContainer,
     ToolbarButton,
     ToolbarDivider,
@@ -56,7 +60,7 @@ export const ContextualEdgeToolbar: React.FC<ContextualEdgeToolbarProps> = ({ ed
     };
     const currentDash = getDashStyle(edge.style);
     const isDashed = currentDash !== 'solid';
-    const isOrthogonal = edge.type === 'smart';
+    const routingState = resolveContextualEdgeRoutingState(edge);
     const currentWidth = coerceEdgePropertyStrokeWidth(edge.style?.strokeWidth);
     const isLocked = isEdgeMutationLocked(edge);
     const isUserLocked = isEdgeUserLocked(edge);
@@ -109,9 +113,7 @@ export const ContextualEdgeToolbar: React.FC<ContextualEdgeToolbarProps> = ({ ed
     };
 
     const toggleRouting = () => {
-        onUpdateEdge(edge.id, {
-            type: isOrthogonal ? 'default' : 'smart'
-        });
+        onUpdateEdge(edge.id, createContextualEdgeRoutingUpdate(routingState));
     };
 
     const toggleColor = () => {
@@ -156,6 +158,7 @@ export const ContextualEdgeToolbar: React.FC<ContextualEdgeToolbarProps> = ({ ed
     };
 
     const confirmLabel = () => {
+        if (isLocked) return;
         const nextLabel = coerceFlowchartReplaceText(labelText);
         restoreLabelTriggerFocusRef.current = true;
         onUpdateEdge(edge.id, { label: nextLabel.trim() ? nextLabel : undefined });
@@ -166,6 +169,15 @@ export const ContextualEdgeToolbar: React.FC<ContextualEdgeToolbarProps> = ({ ed
         setLabelText(edge.label as string || '');
         restoreLabelTriggerFocusRef.current = true;
         setIsEditingLabel(false);
+    };
+
+    const toggleLock = () => {
+        const nextLocked = !isUserLocked;
+        if (nextLocked && isEditingLabel) {
+            setLabelText(edge.label as string || '');
+            setIsEditingLabel(false);
+        }
+        onToggleLock(edge.id, nextLocked);
     };
 
     const DASH_LABEL_KEYS: Record<string, string> = {
@@ -181,9 +193,9 @@ export const ContextualEdgeToolbar: React.FC<ContextualEdgeToolbarProps> = ({ ed
             {/* 路由模式 */}
             <ToolbarButton
                 icon={<PartitionOutlined />}
-                label={t(isOrthogonal ? 'edgeToolbar.switchToCurve' : 'edgeToolbar.switchToOrthogonal')}
+                label={t(routingState.isOrthogonal ? 'edgeToolbar.switchToCurve' : 'edgeToolbar.switchToOrthogonal')}
                 onClick={toggleRouting}
-                active={isOrthogonal}
+                active={routingState.isOrthogonal}
                 disabled={isLocked}
 
             />
@@ -264,6 +276,7 @@ export const ContextualEdgeToolbar: React.FC<ContextualEdgeToolbarProps> = ({ ed
                         aria-label={t('edgeToolbar.labelInput')}
                         placeholder={t('edgeToolbar.labelPlaceholder')}
                         maxLength={FLOWCHART_REPLACE_TEXT_MAX_LENGTH}
+                        disabled={isLocked}
                         className="contextual-edge-toolbar-label-input"
                     />
                     <ToolbarButton icon={<CheckOutlined />} label={t('edgeToolbar.confirm')} onClick={confirmLabel} disabled={isLocked} />
@@ -288,7 +301,7 @@ export const ContextualEdgeToolbar: React.FC<ContextualEdgeToolbarProps> = ({ ed
             <ToolbarButton
                 icon={isUserLocked ? <UnlockOutlined /> : <LockOutlined />}
                 label={t(isUserLocked ? 'designer.contextMenu.unlock' : 'designer.contextMenu.lock')}
-                onClick={() => onToggleLock(edge.id, !isUserLocked)}
+                onClick={toggleLock}
                 active={isLocked}
                 disabled={!canToggleLock}
             />
