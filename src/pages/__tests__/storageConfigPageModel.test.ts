@@ -4,9 +4,11 @@ import {
     isAbortFailure,
     isFormValidationFailure,
     S3_CONNECTION_TIMEOUT_MS,
+    validateStorageAccessKeyId,
     validateStorageBucket,
     validateStorageEndpoint,
     validateStorageRegion,
+    validateStorageSecretAccessKey,
 } from '../storageConfigPageModel';
 
 describe('storageConfigPageModel', () => {
@@ -42,6 +44,21 @@ describe('storageConfigPageModel', () => {
         }
         expect(validateStorageRegion('us-east-1')).toBeNull();
         expect(validateStorageRegion('minio_local.1')).toBeNull();
+    });
+
+    it('classifies credential fields while preserving valid session-secret fallback', () => {
+        for (const value of [undefined, null, '', '   ']) {
+            expect(validateStorageAccessKeyId(value)).toBe('required');
+            expect(validateStorageSecretAccessKey(value, false)).toBe('required');
+        }
+        for (const value of ['ACCESS KEY', 'ACCESS\tKEY', `ACCESS${String.fromCharCode(0)}KEY`]) {
+            expect(validateStorageAccessKeyId(value)).toBe('invalid');
+        }
+        expect(validateStorageAccessKeyId('AKIA_TEST-123')).toBeNull();
+        expect(validateStorageSecretAccessKey(' secret with spaces ', false)).toBeNull();
+        expect(validateStorageSecretAccessKey(`secret${String.fromCharCode(0)}`, false)).toBe('invalid');
+        expect(validateStorageSecretAccessKey('', true)).toBeNull();
+        expect(validateStorageSecretAccessKey('   ', true)).toBeNull();
     });
 
     it('recognizes Ant Design validation failures without accepting malformed values', () => {

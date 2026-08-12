@@ -76,6 +76,15 @@ export const normalizeS3Region = (value: unknown): string | null => {
     return region;
 };
 
+export const normalizeS3AccessKeyId = (value: unknown): string | null => {
+    const accessKeyId = getString(value, MAX_ACCESS_KEY_LENGTH);
+    if (!accessKeyId || /\s/.test(accessKeyId)) return null;
+    return accessKeyId;
+};
+
+export const normalizeS3SecretAccessKey = (value: unknown): string | null =>
+    getString(value, MAX_SECRET_LENGTH);
+
 export const coerceS3StorageConfig = (
     rawConfig: unknown,
     sessionSecret = ''
@@ -87,11 +96,11 @@ export const coerceS3StorageConfig = (
     const record = rawConfig as Record<string, unknown>;
     const endpoint = getString(record.endpoint, MAX_ENDPOINT_LENGTH);
     const normalizedEndpoint = endpoint ? normalizeS3Endpoint(endpoint) : null;
-    const accessKeyId = getString(record.accessKeyId, MAX_ACCESS_KEY_LENGTH);
+    const accessKeyId = normalizeS3AccessKeyId(record.accessKeyId);
     const bucket = normalizeS3Bucket(record.bucket);
     const region = normalizeS3Region(record.region);
-    const persistedSecret = getString(record.secretAccessKey, MAX_SECRET_LENGTH) || '';
-    const effectiveSecret = getString(sessionSecret, MAX_SECRET_LENGTH) || persistedSecret;
+    const persistedSecret = normalizeS3SecretAccessKey(record.secretAccessKey) || '';
+    const effectiveSecret = normalizeS3SecretAccessKey(sessionSecret) || persistedSecret;
 
     if (!normalizedEndpoint || !accessKeyId || !bucket || !region || !effectiveSecret) {
         return null;

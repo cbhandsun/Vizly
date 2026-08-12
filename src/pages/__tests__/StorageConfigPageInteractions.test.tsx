@@ -6,7 +6,7 @@ import { createMemoryRouter, RouterProvider } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const storageMocks = vi.hoisted(() => ({
-    getConfig: vi.fn(() => null),
+    getConfig: vi.fn<() => MockStorageConfig | null>(() => null),
     saveConfig: vi.fn(),
     testConnection: vi.fn(),
 }));
@@ -55,6 +55,15 @@ vi.stubGlobal('matchMedia', vi.fn().mockImplementation((query: string) => ({
 })));
 
 import StorageConfigPage from '../StorageConfigPage';
+
+type MockStorageConfig = {
+    endpoint: string;
+    bucket: string;
+    region: string;
+    accessKeyId: string;
+    secretAccessKey: string;
+    s3ForcePathStyle: boolean;
+};
 
 const renderStorageConfig = (initialEntries = ['/storage-config']) => {
     const router = createMemoryRouter([
@@ -200,6 +209,78 @@ describe('StorageConfigPage validation recovery', () => {
         expect(screen.getByText('storageConfig.status.invalid')).toBeInTheDocument();
         expect(storageMocks.saveConfig).not.toHaveBeenCalled();
         expect(storageMocks.testConnection).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        {
+            action: 'save',
+            accessibleName: 'storageConfig.form.saveBtn',
+            fieldPlaceholder: 'storageConfig.form.accessKeyPlaceholder',
+            invalidValue: 'AUDIT ACCESS KEY',
+            errorKey: 'storageConfig.form.accessKeyInvalid',
+        },
+        {
+            action: 'test',
+            accessibleName: 'storageConfig.form.testBtn',
+            fieldPlaceholder: 'storageConfig.form.secretKeyPlaceholder',
+            invalidValue: '   ',
+            errorKey: 'storageConfig.form.secretKeyRequired',
+        },
+    ])('rejects an invalid credential at the field boundary for $action', async ({
+        accessibleName,
+        errorKey,
+        fieldPlaceholder,
+        invalidValue,
+    }) => {
+        renderStorageConfig();
+
+        fireEvent.change(screen.getByPlaceholderText('https://...'), {
+            target: { value: 'https://storage.example.com' },
+        });
+        fireEvent.change(screen.getByPlaceholderText('my-diagrams-bucket'), {
+            target: { value: 'vizly-audit-bucket' },
+        });
+        fireEvent.change(screen.getByPlaceholderText('storageConfig.form.accessKeyPlaceholder'), {
+            target: { value: 'AUDIT_ACCESS_KEY' },
+        });
+        fireEvent.change(screen.getByPlaceholderText('storageConfig.form.secretKeyPlaceholder'), {
+            target: { value: 'AUDIT_SECRET_KEY' },
+        });
+
+        const field = screen.getByPlaceholderText(fieldPlaceholder);
+        fireEvent.change(field, { target: { value: invalidValue } });
+        fireEvent.click(screen.getByRole('button', { name: accessibleName }));
+
+        await waitFor(() => {
+            expect(document.activeElement).toBe(field);
+            expect(field).toHaveAttribute('aria-invalid', 'true');
+            expect(screen.getByText(errorKey)).toBeInTheDocument();
+        });
+        expect(screen.getByText('storageConfig.status.invalid')).toBeInTheDocument();
+        expect(storageMocks.saveConfig).not.toHaveBeenCalled();
+        expect(storageMocks.testConnection).not.toHaveBeenCalled();
+    });
+
+    it('allows an empty secret field when the current session already holds one', async () => {
+        storageMocks.getConfig.mockReturnValue({
+            endpoint: 'https://storage.example.com',
+            bucket: 'vizly-audit-bucket',
+            region: 'us-east-1',
+            accessKeyId: 'AUDIT_ACCESS_KEY',
+            secretAccessKey: 'SESSION_SECRET',
+            s3ForcePathStyle: false,
+        });
+        renderStorageConfig();
+
+        const secret = screen.getByPlaceholderText('storageConfig.form.secretKeyPlaceholder');
+        expect(secret).toHaveValue('');
+        expect(screen.getByRole('switch', {
+            name: 'storageConfig.form.forcePathStyleLabel',
+        })).not.toBeChecked();
+
+        fireEvent.click(screen.getByRole('button', { name: 'storageConfig.form.testBtn' }));
+        await waitFor(() => expect(storageMocks.testConnection).toHaveBeenCalledTimes(1));
+        expect(secret).not.toHaveAttribute('aria-invalid', 'true');
     });
 
     it.each([

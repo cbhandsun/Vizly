@@ -1,7 +1,9 @@
 import {
+    normalizeS3AccessKeyId,
     normalizeS3Bucket,
     normalizeS3Endpoint,
     normalizeS3Region,
+    normalizeS3SecretAccessKey,
 } from '@/services/storageSecurity';
 
 export const S3_CONNECTION_TIMEOUT_MS = 15_000;
@@ -27,6 +29,17 @@ export const validateStorageBucket = (value: unknown): StorageNamedFieldValidati
 
 export const validateStorageRegion = (value: unknown): StorageNamedFieldValidationError | null =>
     classifyNormalizedField(value, normalizeS3Region);
+
+export const validateStorageAccessKeyId = (value: unknown): StorageNamedFieldValidationError | null =>
+    classifyNormalizedField(value, normalizeS3AccessKeyId);
+
+export const validateStorageSecretAccessKey = (
+    value: unknown,
+    hasSessionSecret: boolean,
+): StorageNamedFieldValidationError | null => {
+    if ((typeof value !== 'string' || !value.trim()) && hasSessionSecret) return null;
+    return classifyNormalizedField(value, normalizeS3SecretAccessKey);
+};
 
 export type StorageConfigFieldName = Array<string | number>;
 

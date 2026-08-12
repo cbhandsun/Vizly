@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
     coerceS3StorageConfig,
     hasPersistedS3SecretField,
+    normalizeS3AccessKeyId,
     normalizeS3Endpoint,
     normalizeS3Bucket,
     normalizeS3Region,
+    normalizeS3SecretAccessKey,
     redactSensitiveValue,
 } from '../storageSecurity';
 
@@ -15,6 +17,15 @@ describe('storageSecurity', () => {
         expect(normalizeS3Bucket('folder/vizly')).toBeNull();
         expect(normalizeS3Region(' us-east-1 ')).toBe('us-east-1');
         expect(normalizeS3Region('us east 1')).toBeNull();
+    });
+
+    it('normalizes credentials without accepting whitespace in access-key identifiers', () => {
+        expect(normalizeS3AccessKeyId(' AKIA_TEST-123 ')).toBe('AKIA_TEST-123');
+        expect(normalizeS3AccessKeyId('AUDIT ACCESS KEY')).toBeNull();
+        expect(normalizeS3AccessKeyId('   ')).toBeNull();
+        expect(normalizeS3SecretAccessKey(' secret with spaces ')).toBe('secret with spaces');
+        expect(normalizeS3SecretAccessKey('   ')).toBeNull();
+        expect(normalizeS3SecretAccessKey(`secret${String.fromCharCode(0)}`)).toBeNull();
     });
 
     it('allows HTTPS and local HTTP S3 endpoints only', () => {

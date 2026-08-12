@@ -13,9 +13,11 @@ import {
     isFormValidationFailure,
     getFirstInvalidFieldName,
     S3_CONNECTION_TIMEOUT_MS,
+    validateStorageAccessKeyId,
     validateStorageBucket,
     validateStorageEndpoint,
     validateStorageRegion,
+    validateStorageSecretAccessKey,
 } from './storageConfigPageModel';
 import { StorageSecretInput } from './StorageSecretInput';
 import { useUnsavedNavigationGuard } from './useUnsavedNavigationGuard';
@@ -338,7 +340,17 @@ const StorageConfigPage: React.FC = () => {
                         <Form.Item
                             name="accessKeyId"
                             label={t('storageConfig.form.accessKeyLabel')}
-                            rules={[{ required: true, message: t('storageConfig.form.accessKeyRequired') }]}
+                            rules={[{
+                                validator: (_, value: unknown) => {
+                                    const error = validateStorageAccessKeyId(value);
+                                    if (!error) return Promise.resolve();
+                                    return Promise.reject(new Error(t(
+                                        error === 'required'
+                                            ? 'storageConfig.form.accessKeyRequired'
+                                            : 'storageConfig.form.accessKeyInvalid',
+                                    )));
+                                },
+                            }]}
                         >
                             <StorageSecretInput
                                 placeholder={t('storageConfig.form.accessKeyPlaceholder')}
@@ -355,9 +367,17 @@ const StorageConfigPage: React.FC = () => {
                             label={t('storageConfig.form.secretKeyLabel')}
                             extra={t('storageConfig.form.secretKeyHint')}
                             rules={[{
-                                validator: (_, value) => {
-                                    if (value || storageService.getConfig()?.secretAccessKey) return Promise.resolve();
-                                    return Promise.reject(new Error(t('storageConfig.form.secretKeyRequired')));
+                                validator: (_, value: unknown) => {
+                                    const error = validateStorageSecretAccessKey(
+                                        value,
+                                        !!storageService.getConfig()?.secretAccessKey,
+                                    );
+                                    if (!error) return Promise.resolve();
+                                    return Promise.reject(new Error(t(
+                                        error === 'required'
+                                            ? 'storageConfig.form.secretKeyRequired'
+                                            : 'storageConfig.form.secretKeyInvalid',
+                                    )));
                                 },
                             }]}
                         >
