@@ -160,6 +160,7 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
                                 className="comment-list-item"
                                 onClick={() => handleFocus(item)}
                                 onKeyDown={(event) => {
+                                    if (event.target !== event.currentTarget) return;
                                     if (event.key === 'Enter' || event.key === ' ') {
                                         event.preventDefault();
                                         handleFocus(item);

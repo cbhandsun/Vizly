@@ -22,12 +22,13 @@ const storeState = vi.hoisted(() => ({
     isCommentMode: false,
     setIsCommentMode: vi.fn(),
 }));
+const reactFlowMocks = vi.hoisted(() => ({ setCenter: vi.fn() }));
 
 vi.mock('../../../store/useDiagramStore', () => ({
     useDiagramStore: (selector: (state: typeof storeState) => unknown) => selector(storeState),
 }));
 vi.mock('@xyflow/react', () => ({
-    useReactFlow: () => ({ setCenter: vi.fn() }),
+    useReactFlow: () => ({ setCenter: reactFlowMocks.setCenter }),
 }));
 vi.mock('react-i18next', () => ({
     useTranslation: () => ({
@@ -50,6 +51,7 @@ describe('CommentPanel', () => {
         storeState.setActiveCommentId.mockReset();
         storeState.isCommentMode = false;
         storeState.setIsCommentMode.mockReset();
+        reactFlowMocks.setCenter.mockReset();
         Object.defineProperty(window, 'matchMedia', {
             configurable: true,
             value: vi.fn().mockImplementation(() => ({
@@ -134,6 +136,36 @@ describe('CommentPanel', () => {
         expect(storeState.removeComment).not.toHaveBeenCalled();
         fireEvent.click(await screen.findByRole('button', { name: /删\s*除/ }));
         expect(storeState.removeComment).toHaveBeenCalledWith('comment-1');
+    });
+
+    it('does not refocus the canvas when a keyboard user activates a comment action', () => {
+        storeState.comments = [{
+            id: 'comment-1',
+            content: '键盘操作评论',
+            authorName: '测试用户',
+            authorColor: '#3b82f6',
+            createdAt: Date.now(),
+            isResolved: false,
+            replies: [],
+            x: 10,
+            y: 20,
+        }];
+        render(<CommentPanel />);
+
+        const resolveButton = screen.getByRole('button', { name: 'comment.markResolved' });
+        fireEvent.keyDown(resolveButton, { key: 'Enter' });
+
+        expect(reactFlowMocks.setCenter).not.toHaveBeenCalled();
+        expect(storeState.setActiveCommentId).not.toHaveBeenCalled();
+
+        const row = screen.getByLabelText('comment.focus: 键盘操作评论');
+        fireEvent.keyDown(row, { key: 'Enter' });
+
+        expect(reactFlowMocks.setCenter).toHaveBeenCalledWith(26, 36, {
+            zoom: 1.5,
+            duration: 800,
+        });
+        expect(storeState.setActiveCommentId).toHaveBeenCalledWith('comment-1');
     });
 
     it('shows only comments that belong to the active page and names the scope', () => {
