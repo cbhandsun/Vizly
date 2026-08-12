@@ -192,6 +192,8 @@
             "clearSearch": "Clear search",
             "providerNotConfigured": "{{provider}} not configured",
             "goConfig": "Configure",
+            "cloudSaveConfigureHint": "Configure a cloud provider before saving. Your local diagram is unchanged.",
+            "cloudSaveUnavailable": "Cloud save could not start. Please retry.",
             "needLoginForSupabase": "Sign in to use Supabase",
             "sharedLoginRequired": "Sign in to view diagrams shared with you",
             "mineTab": "My diagrams",

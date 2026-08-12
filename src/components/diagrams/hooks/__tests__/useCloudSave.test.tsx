@@ -28,6 +28,10 @@ const loggingMocks = vi.hoisted(() => ({
     cloudSaveFailure: vi.fn(),
 }));
 
+const recoveryMocks = vi.hoisted(() => ({
+    showConfiguration: vi.fn(),
+}));
+
 vi.mock('@/services/UnifiedStorageService', () => ({
     unifiedStorage: {
         isConfigured: storageMocks.isConfigured,
@@ -72,6 +76,10 @@ vi.mock('@/services/remoteDiagramPreview', () => ({
 
 vi.mock('../diagramStorageLogging', () => ({
     logCloudSaveFailure: loggingMocks.cloudSaveFailure,
+}));
+
+vi.mock('../cloudSaveRecovery', () => ({
+    showCloudSaveConfigurationRecovery: recoveryMocks.showConfiguration,
 }));
 
 import { useCloudSave } from '../useCloudSave';
@@ -180,15 +188,34 @@ describe('useCloudSave', () => {
         expect(messageMocks.warning).not.toHaveBeenCalled();
     });
 
-    it('rejects without showing a loading state when cloud storage is not configured', async () => {
+    it('offers configuration recovery without marking the local diagram as failed', async () => {
         storageMocks.isConfigured.mockReturnValue(false);
         const { result } = renderHook(() => useCloudSave('diagram-1', '客户流程'));
 
-        await expect(result.current.saveToCloud()).rejects.toThrow('云存储未配置');
+        await expect(result.current.saveToCloud()).resolves.toBe('cancelled');
 
-        expect(messageMocks.error).toHaveBeenCalledTimes(1);
-        expect(messageMocks.error).toHaveBeenCalledWith('云存储未配置，请先在设置中配置');
+        expect(recoveryMocks.showConfiguration).toHaveBeenCalledWith({
+            title: 'storage.manager.providerNotConfigured',
+            description: 'storage.manager.cloudSaveConfigureHint',
+            actionLabel: 'storage.manager.goConfig',
+        });
+        expect(messageMocks.error).not.toHaveBeenCalled();
         expect(messageMocks.loading).not.toHaveBeenCalled();
+        expect(storageMocks.provider.saveDiagram).not.toHaveBeenCalled();
+    });
+
+    it('reports provider bootstrap failures before rethrowing them to the tracked save boundary', async () => {
+        const bootstrapError = new Error('storage bootstrap failed');
+        storageMocks.isConfigured.mockImplementation(() => {
+            throw bootstrapError;
+        });
+        const { result } = renderHook(() => useCloudSave('diagram-1', '客户流程'));
+
+        await expect(result.current.saveToCloud()).rejects.toBe(bootstrapError);
+
+        expect(loggingMocks.cloudSaveFailure).toHaveBeenCalledWith('useCloudSave.bootstrap', bootstrapError);
+        expect(messageMocks.error).toHaveBeenCalledWith('storage.manager.cloudSaveUnavailable');
+        expect(recoveryMocks.showConfiguration).not.toHaveBeenCalled();
         expect(storageMocks.provider.saveDiagram).not.toHaveBeenCalled();
     });
 

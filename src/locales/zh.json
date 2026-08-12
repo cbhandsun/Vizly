@@ -191,6 +191,8 @@
             "clearSearch": "清除搜索",
             "providerNotConfigured": "{{provider}} 未配置",
             "goConfig": "去配置",
+            "cloudSaveConfigureHint": "请先配置云存储服务再保存，本地图表不会受到影响。",
+            "cloudSaveUnavailable": "云端保存暂时无法启动，请重试。",
             "needLoginForSupabase": "使用 Supabase 需要先登录",
             "sharedLoginRequired": "登录后可查看他人共享给你的图表",
             "mineTab": "我的图表",

@@ -5,6 +5,7 @@ import type { DiagramTypePlugin, PluginContext } from '@/core/types/plugin';
 import type { DiagramSaveResult } from '@/core/types/diagram-components';
 import type { AutoSaveState } from './useAutoSave';
 import { runFlowchartSavePipeline } from '../flowchartSavePipeline';
+import { logTrackedFlowchartSaveFailure } from './flowchartSaveLogging';
 
 export type FlowchartSaveTarget = 'local' | 'cloud';
 
@@ -90,7 +91,7 @@ export const useTrackedFlowchartSaves = ({
                 updatedAt: Date.now(),
                 state: { saving: false, lastSaved: null, error: 'save-failed' },
             });
-            throw error;
+            logTrackedFlowchartSaveFailure(target, error);
         }
     }, [activePlugin, edgesRef, nodesRef, pluginCtx]);
 

@@ -7,6 +7,7 @@ import { appMessage } from '@/core/utils/antdStaticBridge';
 import { getFlowDataBridge } from '@/core/utils/flowDataBridge';
 import { coerceToStandardDiagramData } from '@/core/utils/coerceDiagram';
 import { logCloudSaveFailure } from './diagramStorageLogging';
+import { showCloudSaveConfigurationRecovery } from './cloudSaveRecovery';
 import { useAuth } from '@/context/useAuth';
 import type { DiagramSaveResult } from '@/core/types/diagram-components';
 
@@ -153,8 +154,30 @@ export function useCloudSave(diagramId: string, diagramName?: string) {
 
     const saveToCloud = useCallback(async (): Promise<DiagramSaveResult> => {
         captureCloudSaveTrigger();
-        const unifiedStorage = await loadUnifiedStorage();
-        if (unifiedStorage.activeProvider.id === 'supabase' && !user) {
+        let unifiedStorage: Awaited<ReturnType<typeof loadUnifiedStorage>>;
+        let provider: Awaited<ReturnType<typeof loadUnifiedStorage>>['activeProvider'];
+        let isProviderConfigured: boolean;
+        try {
+            unifiedStorage = await loadUnifiedStorage();
+            provider = unifiedStorage.activeProvider;
+            isProviderConfigured = unifiedStorage.isConfigured();
+        } catch (error) {
+            logCloudSaveFailure('useCloudSave.bootstrap', error);
+            appMessage.error(t('storage.manager.cloudSaveUnavailable'));
+            throw error;
+        }
+
+        if (!isProviderConfigured) {
+            const providerName = provider.id === 's3' ? 'S3' : 'Supabase';
+            showCloudSaveConfigurationRecovery({
+                title: t('storage.manager.providerNotConfigured', { provider: providerName }),
+                description: t('storage.manager.cloudSaveConfigureHint'),
+                actionLabel: t('storage.manager.goConfig'),
+            });
+            return 'cancelled';
+        }
+
+        if (provider.id === 'supabase' && !user) {
             if (!pendingCloudSaveRef.current) {
                 pendingCloudSaveRef.current = new PendingCloudSave();
                 appMessage.warning(t('storage.manager.needLoginForSupabase'));
