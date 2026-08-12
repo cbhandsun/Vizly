@@ -35,6 +35,12 @@
     justify-content: center;
 }
 
+.fixed-minimap-container [role="application"]:focus-visible {
+    outline: 3px solid var(--color-primary-500, #667eea);
+    outline-offset: -4px;
+    border-radius: 0 0 12px 12px;
+}
+
 /* Drag Handle */
 .minimap-drag-handle {
     position: absolute;

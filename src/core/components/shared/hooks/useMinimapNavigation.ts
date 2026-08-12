@@ -2,6 +2,10 @@ import { useState, useRef, useCallback } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import { computeMinimapBounds, safeNumber, lerp, easeOutCubic } from './useMinimapMath';
 import { diagramConfigManager } from '@/core/config/DiagramConfig';
+import {
+    getFixedMiniMapPanDelta,
+    parseFixedMiniMapKeyboardCommand,
+} from '../fixedMiniMapKeyboard';
 
 export function useMinimapNavigation(
     anchorRef: React.RefObject<HTMLDivElement | null>,
@@ -275,6 +279,44 @@ export function useMinimapNavigation(
         animateViewportTo({ ...viewport, zoom: 1 });
     }, [reactFlowInstance, animateViewportTo]);
 
+    const handleMiniMapKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+        if (event.nativeEvent.isComposing || event.keyCode === 229) return;
+        const command = parseFixedMiniMapKeyboardCommand(event.key);
+        if (!command) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (command === 'zoom-in') {
+            zoomIn();
+            return;
+        }
+        if (command === 'zoom-out') {
+            zoomOut();
+            return;
+        }
+        if (command === 'reset-zoom') {
+            resetZoom();
+            return;
+        }
+
+        const viewport = reactFlowInstance.getViewport();
+        const canvasSize = getCanvasPixelSize();
+        const delta = getFixedMiniMapPanDelta({
+            command,
+            canvasHeight: canvasSize.height,
+            canvasWidth: canvasSize.width,
+            largeStep: event.shiftKey,
+        });
+        if (!delta) return;
+        cancelViewportAnimation();
+        reactFlowInstance.setViewport({
+            x: safeNumber(viewport.x + delta.x, 0),
+            y: safeNumber(viewport.y + delta.y, 0),
+            zoom: safeNumber(viewport.zoom, 1),
+        });
+    }, [cancelViewportAnimation, getCanvasPixelSize, reactFlowInstance, resetZoom, zoomIn, zoomOut]);
+
     return {
         isMinimapDragging,
         cancelViewportAnimation,
@@ -282,6 +324,7 @@ export function useMinimapNavigation(
         handleMinimapMouseMove,
         handleMinimapMouseUp,
         handleMiniMapClick,
+        handleMiniMapKeyDown,
         handleMiniMapWheel,
         zoomIn,
         zoomOut,

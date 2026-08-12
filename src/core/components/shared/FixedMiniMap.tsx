@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo, useId } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
@@ -90,6 +90,7 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
   defaultSize = 'large'
 }) => {
   const { t } = useTranslation();
+  const navigationInstructionsId = useId();
   // 接入主题系统
   const [cfgState, cfgActions] = useConfigIntegration({ autoInitialize: true });
   const [currentTheme, setCurrentTheme] = useState<Theme | null>(() => cfgActions.getCurrentTheme() ?? null);
@@ -358,11 +359,17 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
 
               <div
                 ref={setMinimapRef}
+                role="application"
+                tabIndex={0}
+                aria-describedby={navigationInstructionsId}
+                aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown + - 0"
+                aria-label={t('designer.toolbar.minimapNavigation', 'Minimap navigation')}
                 style={{
                   position: 'absolute', top: '44px', left: '2px', right: '2px', bottom: '2px',
                   pointerEvents: 'auto', cursor: nav.isMinimapDragging ? 'grabbing' : 'crosshair'
                 }}
                 onClick={(e) => nav.handleMiniMapClick(e, overlay.isDragging)}
+                onKeyDown={nav.handleMiniMapKeyDown}
                 onMouseDown={nav.handleMinimapMouseDown}
               >
                 {miniMapReady && minimapElement ? (
@@ -475,6 +482,12 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
                   renderMiniMapMessage('loading')
                 )}
               </div>
+              <span id={navigationInstructionsId} className="sr-only">
+                {t(
+                  'designer.toolbar.minimapKeyboardInstructions',
+                  'Use arrow keys to pan, Shift plus arrow keys for a larger step, plus or minus to zoom, and zero to reset zoom.',
+                )}
+              </span>
             </>
           )}
         </div>
