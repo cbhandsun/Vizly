@@ -81,6 +81,8 @@ export type FlowchartDesignerOverlaysModel = Pick<FlowchartDesignerViewModel,
     | 'handleOpenSettings'
     | 'handleBeforeUpdate'
     | 'handlePresentationFocus'
+    | 'handleWrappedCloudSave'
+    | 'handleWrappedDirectSave'
     | 'id'
     | 'isMobile'
     | 'isReadonly'
@@ -302,6 +304,8 @@ export function FlowchartDesignerOverlaysRegion({ model }: { model: FlowchartDes
         handleOpenSettings,
         handleBeforeUpdate,
         handlePresentationFocus,
+        handleWrappedCloudSave,
+        handleWrappedDirectSave,
     } = model;
 
     return (
@@ -333,6 +337,9 @@ export function FlowchartDesignerOverlaysRegion({ model }: { model: FlowchartDes
                 status={{
                     saveState,
                     saveTarget,
+                    onRetrySave: saveState.error
+                        ? (saveTarget === 'cloud' ? handleWrappedCloudSave : handleWrappedDirectSave)
+                        : undefined,
                     showPerformanceDashboard: !!showPerformanceDashboard,
                     nodeCount: nodes.length,
                     edgeCount: edges.length,

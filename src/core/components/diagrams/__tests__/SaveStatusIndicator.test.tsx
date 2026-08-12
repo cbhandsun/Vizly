@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('react-i18next', () => ({
@@ -17,6 +17,19 @@ vi.mock('@ant-design/icons', () => ({
 }));
 
 vi.mock('antd', () => ({
+    Button: ({
+        children,
+        danger: _danger,
+        size: _size,
+        type: _type,
+        ...props
+    }: Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'type'> & {
+        danger?: boolean;
+        size?: string;
+        type?: string;
+    }) => (
+        <button {...props}>{children}</button>
+    ),
     Tag: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
     Tooltip: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
@@ -54,5 +67,34 @@ describe('SaveStatusIndicator accessibility', () => {
 
         expect(screen.getByRole('status').getAttribute('aria-live')).toBe('assertive');
         expect(screen.getByRole('status').textContent).toContain('designer.saveStatus.cloud.failed');
+    });
+
+    it('offers an accessible retry action for recoverable save failures', () => {
+        const onRetry = vi.fn();
+        render(
+            <SaveStatusIndicator
+                saveState={{ saving: false, lastSaved: null, error: 'save failed' }}
+                target="cloud"
+                onRetry={onRetry}
+            />,
+        );
+
+        const retryButton = screen.getByRole('button', {
+            name: 'designer.saveStatus.cloud.failed. common.retry',
+        });
+        fireEvent.click(retryButton);
+
+        expect(onRetry).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not imply a retry path when the host cannot provide one', () => {
+        render(
+            <SaveStatusIndicator
+                saveState={{ saving: false, lastSaved: null, error: 'save failed' }}
+                target="cloud"
+            />,
+        );
+
+        expect(screen.queryByRole('button')).toBeNull();
     });
 });

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Tag, Tooltip } from 'antd';
+import { Button, Tag, Tooltip } from 'antd';
 import { SyncOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import type { AutoSaveState } from './hooks/useAutoSave';
@@ -8,11 +8,13 @@ import './SaveStatusIndicator.css';
 interface SaveStatusIndicatorProps {
     saveState: AutoSaveState;
     target?: 'local' | 'cloud';
+    onRetry?: () => void | Promise<void>;
 }
 
 export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = React.memo(({
     saveState,
     target = 'local',
+    onRetry,
 }) => {
     const { t } = useTranslation();
     const { saving, lastSaved, error } = saveState;
@@ -48,11 +50,24 @@ export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = React.mem
     // 保存失败
     if (error) {
         const label = t(`designer.saveStatus.${target}.failed`);
+        const retryLabel = t('common.retry');
         return (
             <span className="designer-save-status" role="status" aria-live="assertive">
                 <Tooltip title={label}>
                     <Tag icon={<CloseCircleOutlined />} color="error">
                         {label}
+                        {onRetry && (
+                            <Button
+                                type="link"
+                                danger
+                                size="small"
+                                className="designer-save-status__retry"
+                                aria-label={`${label}. ${retryLabel}`}
+                                onClick={() => void onRetry()}
+                            >
+                                {retryLabel}
+                            </Button>
+                        )}
                     </Tag>
                 </Tooltip>
             </span>

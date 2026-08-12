@@ -60,6 +60,7 @@ export interface DesignerOverlaysLayerProps {
     status: {
         saveState: AutoSaveState;
         saveTarget: FlowchartSaveTarget;
+        onRetrySave?: () => void | Promise<void>;
         showPerformanceDashboard: boolean;
         nodeCount: number;
         edgeCount: number;
@@ -148,7 +149,11 @@ export const DesignerOverlaysLayer: React.FC<DesignerOverlaysLayerProps> = ({
 
             {/* 保存状态指示器 */}
             <div className="designer-save-status-anchor">
-                <SaveStatusIndicator saveState={status.saveState} target={status.saveTarget} />
+                <SaveStatusIndicator
+                    saveState={status.saveState}
+                    target={status.saveTarget}
+                    onRetry={status.onRetrySave}
+                />
             </div>
 
             {/* ⭐ 性能仪表盘 */}

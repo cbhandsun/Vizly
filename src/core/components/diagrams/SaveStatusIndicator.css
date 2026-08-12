@@ -24,6 +24,13 @@
     font-weight: 500;
 }
 
+.designer-save-status__retry.ant-btn {
+    min-height: 28px;
+    margin-inline-start: 6px;
+    padding-inline: 8px;
+    font-weight: 600;
+}
+
 @media (max-width: 767px) {
     .designer-save-status-anchor {
         top: 104px;
@@ -37,6 +44,11 @@
         padding-inline: 10px;
         background: color-mix(in srgb, var(--designer-panel-bg, #fff) 92%, transparent);
         backdrop-filter: blur(10px);
+    }
+
+    .designer-save-status__retry.ant-btn {
+        min-width: var(--commercial-touch-target, 44px);
+        min-height: var(--commercial-touch-target, 44px);
     }
 
     /* Persistent save feedback shares the mobile overlay lane with search. */

@@ -51,9 +51,20 @@ vi.mock('../DesignerRightSidebar', () => ({
 }));
 
 vi.mock('../ui/DesignerOverlaysLayer', () => ({
-    DesignerOverlaysLayer: (props: { status: { nodeCount: number; edgeCount: number } }) => (
+    DesignerOverlaysLayer: (props: {
+        status: {
+            nodeCount: number;
+            edgeCount: number;
+            onRetrySave?: () => void | Promise<void>;
+        };
+    }) => (
         <div data-testid="designer-overlays">
             {props.status.nodeCount}:{props.status.edgeCount}
+            {props.status.onRetrySave && (
+                <button data-testid="retry-save" onClick={() => void props.status.onRetrySave?.()}>
+                    Retry save
+                </button>
+            )}
         </div>
     ),
 }));
@@ -187,6 +198,8 @@ const createOverlaysModel = (
     handleBeforeUpdate: () => undefined,
     handleOpenSettings: () => undefined,
     handlePresentationFocus: () => undefined,
+    handleWrappedCloudSave: async () => undefined,
+    handleWrappedDirectSave: async () => undefined,
     id: 'diagram-1',
     isMobile: false,
     isReadonly: false,
@@ -229,6 +242,22 @@ const createOverlaysModel = (
 });
 
 describe('FlowchartDesigner shell regions', () => {
+    it('routes a failed cloud save back to the tracked cloud save action', () => {
+        const retryCloudSave = vi.fn(async () => undefined);
+        const retryDirectSave = vi.fn(async () => undefined);
+        render(<FlowchartDesignerOverlaysRegion model={createOverlaysModel({
+            saveState: { saving: false, lastSaved: null, error: 'save-failed' },
+            saveTarget: 'cloud',
+            handleWrappedCloudSave: retryCloudSave,
+            handleWrappedDirectSave: retryDirectSave,
+        })} />);
+
+        fireEvent.click(screen.getByTestId('retry-save'));
+
+        expect(retryCloudSave).toHaveBeenCalledTimes(1);
+        expect(retryDirectSave).not.toHaveBeenCalled();
+    });
+
     it('delegates command palette ownership to the host without opening a duplicate internal panel', () => {
         const openHostCommandPalette = vi.fn();
         const setInternalVisibility = vi.fn();
