@@ -38,6 +38,7 @@ describe('useClipboard', () => {
   });
 
   afterEach(() => {
+    document.body.innerHTML = '';
     vi.restoreAllMocks();
   });
 
@@ -149,6 +150,50 @@ describe('useClipboard', () => {
     expect(setEdges).toHaveBeenCalledTimes(1);
   });
 
+  it('focuses the newly pasted node after its selected tree item renders', async () => {
+    let currentNodes: Node[] = [];
+    const setNodes = vi.fn((update: SetStateAction<Node[]>) => {
+      currentNodes = typeof update === 'function' ? update(currentNodes) : update;
+    });
+    const frames: FrameRequestCallback[] = [];
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => {
+      frames.push(callback);
+      return frames.length;
+    });
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: vi.fn(),
+        readText: vi.fn().mockResolvedValue(JSON.stringify({ nodes: selectedNodes, edges: [] })),
+      },
+    });
+
+    const { result } = renderHook(() => useClipboard({
+      nodesRef: { current: [] },
+      edgesRef: { current: [] },
+      selectedNodes: [],
+      selectedEdges: [],
+      setNodes,
+      setEdges: vi.fn(),
+      takeSnapshot: vi.fn(),
+      getOperationScope,
+    }));
+
+    await act(async () => {
+      expect(await result.current.handlePaste()).toBe('pasted');
+    });
+
+    const pastedNode = currentNodes[0];
+    expect(pastedNode?.selected).toBe(true);
+    document.body.innerHTML = `
+      <div class="react-flow__node" data-id="${pastedNode?.id}">
+        <div id="pasted-focus" role="treeitem" aria-selected="true" tabindex="0"></div>
+      </div>
+    `;
+    frames.shift()?.(0);
+
+    expect(document.activeElement?.id).toBe('pasted-focus');
+  });
+
   it('cascades repeated pastes of the same clipboard payload', async () => {
     let currentNodes: Node[] = [];
     const setNodes = vi.fn((update: SetStateAction<Node[]>) => {
@@ -156,6 +201,12 @@ describe('useClipboard', () => {
     });
     const setEdges = vi.fn();
     const takeSnapshot = vi.fn();
+    const frames: FrameRequestCallback[] = [];
+    const cancelAnimationFrame = vi.spyOn(window, 'cancelAnimationFrame');
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => {
+      frames.push(callback);
+      return frames.length;
+    });
     const clipboardText = JSON.stringify({ nodes: selectedNodes, edges: [] });
     Object.assign(navigator, {
       clipboard: { writeText: vi.fn(), readText: vi.fn().mockResolvedValue(clipboardText) },
@@ -182,6 +233,21 @@ describe('useClipboard', () => {
       { x: 42, y: 52 },
       { x: 74, y: 84 },
     ]);
+    expect(cancelAnimationFrame).toHaveBeenCalledWith(1);
+
+    const [firstPaste, latestPaste] = currentNodes;
+    document.body.innerHTML = `
+      <div class="react-flow__node" data-id="${firstPaste?.id}">
+        <div id="first-paste" role="treeitem" aria-selected="false" tabindex="-1"></div>
+      </div>
+      <div class="react-flow__node" data-id="${latestPaste?.id}">
+        <div id="latest-paste" role="treeitem" aria-selected="true" tabindex="0"></div>
+      </div>
+    `;
+    frames[0]?.(0);
+    frames[1]?.(16);
+
+    expect(document.activeElement?.id).toBe('latest-paste');
   });
 
   it('does not replace unsupported system clipboard text with stale local content', async () => {
@@ -495,6 +561,7 @@ describe('useClipboard', () => {
     const setNodes = vi.fn();
     const setEdges = vi.fn();
     const takeSnapshot = vi.fn();
+    const requestAnimationFrame = vi.spyOn(window, 'requestAnimationFrame');
     const { result } = renderHook(() => useClipboard({
       nodesRef: { current: [] },
       edgesRef: { current: [] },
@@ -521,5 +588,6 @@ describe('useClipboard', () => {
     expect(takeSnapshot).not.toHaveBeenCalled();
     expect(setNodes).not.toHaveBeenCalled();
     expect(setEdges).not.toHaveBeenCalled();
+    expect(requestAnimationFrame).not.toHaveBeenCalled();
   });
 });

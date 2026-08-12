@@ -24,8 +24,8 @@ import {
 } from '../../../utils/flowchartClipboardPaste';
 import {
     resolveFlowchartCutFocusNodeId,
-    scheduleFlowchartDeletionNodeFocus,
     scheduleFlowchartEmptyStateFocus,
+    scheduleFlowchartSelectedNodeFocus,
 } from '../flowchartDeletionFocus';
 
 interface UseClipboardProps {
@@ -67,11 +67,11 @@ export const useClipboard = ({
     clipboardKey = 'flowchart-clipboard',
 }: UseClipboardProps) => {
     const pasteCursorRef = useRef<ClipboardPasteCursor | null>(null);
-    const cutFocusRequestRef = useRef<{ cancel: () => void } | null>(null);
+    const clipboardFocusRequestRef = useRef<{ cancel: () => void } | null>(null);
 
     useEffect(() => () => {
-        cutFocusRequestRef.current?.cancel();
-        cutFocusRequestRef.current = null;
+        clipboardFocusRequestRef.current?.cancel();
+        clipboardFocusRequestRef.current = null;
     }, []);
 
     const writeSelectedNodesToClipboard = useCallback(async (targetNodeIds?: string[]): Promise<boolean> => {
@@ -237,6 +237,10 @@ export const useClipboard = ({
             ...eds.map(e => ({ ...e, selected: false })),
             ...pasteBatch.edges,
         ]);
+        clipboardFocusRequestRef.current?.cancel();
+        clipboardFocusRequestRef.current = pasteBatch.nodes[0]
+            ? scheduleFlowchartSelectedNodeFocus(pasteBatch.nodes[0].id)
+            : null;
         return 'pasted';
     }, [clipboardKey, edgesRef, getOperationScope, getPasteHistoryLabel, nodesRef, parseClipboardText, setEdges, setNodes, takeSnapshot]);
 
@@ -284,9 +288,9 @@ export const useClipboard = ({
         setNodes(nextNodes);
         setEdges(nextEdges);
 
-        cutFocusRequestRef.current?.cancel();
-        cutFocusRequestRef.current = cutFocusNodeId
-            ? scheduleFlowchartDeletionNodeFocus(cutFocusNodeId)
+        clipboardFocusRequestRef.current?.cancel();
+        clipboardFocusRequestRef.current = cutFocusNodeId
+            ? scheduleFlowchartSelectedNodeFocus(cutFocusNodeId)
             : nextNodes.length === 0
                 ? scheduleFlowchartEmptyStateFocus()
                 : null;
