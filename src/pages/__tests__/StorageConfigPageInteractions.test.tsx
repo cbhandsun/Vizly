@@ -152,6 +152,36 @@ describe('StorageConfigPage validation recovery', () => {
         expect(storageMocks.testConnection).not.toHaveBeenCalled();
     });
 
+    it.each([
+        { action: 'save', accessibleName: 'storageConfig.form.saveBtn' },
+        { action: 'test', accessibleName: 'storageConfig.form.testBtn' },
+    ])('rejects an unsafe endpoint at the field boundary for $action', async ({ accessibleName }) => {
+        renderStorageConfig();
+
+        const endpoint = screen.getByPlaceholderText('https://...');
+        fireEvent.change(endpoint, { target: { value: 'ftp://storage.example.com' } });
+        fireEvent.change(screen.getByPlaceholderText('my-diagrams-bucket'), {
+            target: { value: 'vizly-audit-bucket' },
+        });
+        fireEvent.change(screen.getByPlaceholderText('storageConfig.form.accessKeyPlaceholder'), {
+            target: { value: 'AUDIT_ACCESS_KEY' },
+        });
+        fireEvent.change(screen.getByPlaceholderText('storageConfig.form.secretKeyPlaceholder'), {
+            target: { value: 'AUDIT_SECRET_KEY' },
+        });
+
+        fireEvent.click(screen.getByRole('button', { name: accessibleName }));
+
+        await waitFor(() => {
+            expect(document.activeElement).toBe(endpoint);
+            expect(endpoint).toHaveAttribute('aria-invalid', 'true');
+            expect(screen.getByText('storageConfig.form.endpointInvalid')).toBeInTheDocument();
+        });
+        expect(screen.getByText('storageConfig.status.invalid')).toBeInTheDocument();
+        expect(storageMocks.saveConfig).not.toHaveBeenCalled();
+        expect(storageMocks.testConnection).not.toHaveBeenCalled();
+    });
+
     it('keeps decorative action icons out of localized accessible names', () => {
         renderStorageConfig();
 

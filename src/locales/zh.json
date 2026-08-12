@@ -2904,6 +2904,7 @@
             "endpointLabel": "Endpoint API地址",
             "endpointTooltip": "请输入完整的 HTTP 或 HTTPS 服务地址",
             "endpointRequired": "请输入 Endpoint",
+            "endpointInvalid": "请输入 HTTPS 地址；仅本机服务可使用 HTTP",
             "bucketLabel": "Bucket 桶名称",
             "bucketRequired": "请输入 Bucket 名称",
             "regionLabel": "Region 区域",

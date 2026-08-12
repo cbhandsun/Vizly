@@ -1,4 +1,13 @@
+import { normalizeS3Endpoint } from '@/services/storageSecurity';
+
 export const S3_CONNECTION_TIMEOUT_MS = 15_000;
+
+export type StorageEndpointValidationError = 'required' | 'invalid';
+
+export const validateStorageEndpoint = (value: unknown): StorageEndpointValidationError | null => {
+    if (typeof value !== 'string' || !value.trim()) return 'required';
+    return normalizeS3Endpoint(value) ? null : 'invalid';
+};
 
 export type StorageConfigFieldName = Array<string | number>;
 

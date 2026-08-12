@@ -13,6 +13,7 @@ import {
     isFormValidationFailure,
     getFirstInvalidFieldName,
     S3_CONNECTION_TIMEOUT_MS,
+    validateStorageEndpoint,
 } from './storageConfigPageModel';
 import { StorageSecretInput } from './StorageSecretInput';
 import { useUnsavedNavigationGuard } from './useUnsavedNavigationGuard';
@@ -281,7 +282,17 @@ const StorageConfigPage: React.FC = () => {
                             name="endpoint"
                             label={t('storageConfig.form.endpointLabel')}
                             extra={t('storageConfig.form.endpointTooltip')}
-                            rules={[{ required: true, message: t('storageConfig.form.endpointRequired') }]}
+                            rules={[{
+                                validator: (_, value: unknown) => {
+                                    const error = validateStorageEndpoint(value);
+                                    if (!error) return Promise.resolve();
+                                    return Promise.reject(new Error(t(
+                                        error === 'required'
+                                            ? 'storageConfig.form.endpointRequired'
+                                            : 'storageConfig.form.endpointInvalid',
+                                    )));
+                                },
+                            }]}
                         >
                             <Input placeholder="https://..." maxLength={S3_STORAGE_INPUT_LIMITS.endpoint} autoComplete="off" />
                         </Form.Item>

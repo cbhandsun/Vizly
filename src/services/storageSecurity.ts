@@ -1,4 +1,4 @@
-const LOCAL_HTTP_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
+const LOCAL_HTTP_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
 const REDACTED = '[redacted]';
 export const S3_STORAGE_INPUT_LIMITS = {
     endpoint: 2_048,

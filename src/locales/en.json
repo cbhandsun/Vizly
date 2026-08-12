@@ -2794,6 +2794,7 @@
             "endpointLabel": "Endpoint URL",
             "endpointTooltip": "Enter the full HTTP or HTTPS service URL",
             "endpointRequired": "Endpoint is required",
+            "endpointInvalid": "Use HTTPS; HTTP is allowed only for local services",
             "bucketLabel": "Bucket Name",
             "bucketRequired": "Bucket is required",
             "regionLabel": "Region",

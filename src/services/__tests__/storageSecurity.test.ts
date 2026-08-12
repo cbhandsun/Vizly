@@ -12,6 +12,7 @@ describe('storageSecurity', () => {
         expect(normalizeS3Endpoint('https://s3.amazonaws.com/?X-Amz-Signature=secret#frag')).toBe('https://s3.amazonaws.com');
         expect(normalizeS3Endpoint('http://localhost:9000')).toBe('http://localhost:9000');
         expect(normalizeS3Endpoint('http://127.0.0.1:9000')).toBe('http://127.0.0.1:9000');
+        expect(normalizeS3Endpoint('http://[::1]:9000')).toBe('http://[::1]:9000');
         expect(normalizeS3Endpoint('http://169.254.169.254/latest/meta-data')).toBeNull();
         expect(normalizeS3Endpoint('//evil.example')).toBeNull();
         expect(normalizeS3Endpoint('https://user:pass@s3.amazonaws.com')).toBeNull();

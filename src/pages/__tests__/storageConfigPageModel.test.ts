@@ -4,9 +4,25 @@ import {
     isAbortFailure,
     isFormValidationFailure,
     S3_CONNECTION_TIMEOUT_MS,
+    validateStorageEndpoint,
 } from '../storageConfigPageModel';
 
 describe('storageConfigPageModel', () => {
+    it('classifies empty and unsafe storage endpoints before network operations', () => {
+        expect(validateStorageEndpoint(undefined)).toBe('required');
+        expect(validateStorageEndpoint(null)).toBe('required');
+        expect(validateStorageEndpoint('')).toBe('required');
+        expect(validateStorageEndpoint('   ')).toBe('required');
+        expect(validateStorageEndpoint('ftp://storage.example.com')).toBe('invalid');
+        expect(validateStorageEndpoint('storage.example.com')).toBe('invalid');
+        expect(validateStorageEndpoint('http://storage.example.com')).toBe('invalid');
+        expect(validateStorageEndpoint('https://user:secret@storage.example.com')).toBe('invalid');
+        expect(validateStorageEndpoint('https://storage.example.com')).toBeNull();
+        expect(validateStorageEndpoint('http://localhost:9000')).toBeNull();
+        expect(validateStorageEndpoint('http://127.0.0.1:9000')).toBeNull();
+        expect(validateStorageEndpoint('http://[::1]:9000')).toBeNull();
+    });
+
     it('recognizes Ant Design validation failures without accepting malformed values', () => {
         expect(isFormValidationFailure({ errorFields: [] })).toBe(true);
         expect(isFormValidationFailure({ errorFields: [{ name: ['endpoint'] }] })).toBe(true);
