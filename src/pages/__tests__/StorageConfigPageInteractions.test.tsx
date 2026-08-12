@@ -356,6 +356,110 @@ describe('StorageConfigPage validation recovery', () => {
         expect(storageMocks.saveConfig).not.toHaveBeenCalled();
     });
 
+    it('aborts an in-flight connection test when configuration changes and keeps the form dirty', async () => {
+        let resolveTest: (() => void) | undefined;
+        storageMocks.testConnection.mockImplementationOnce(() => new Promise<void>(resolve => {
+            resolveTest = resolve;
+        }));
+        renderStorageConfig();
+
+        fireEvent.change(screen.getByPlaceholderText('https://...'), {
+            target: { value: 'https://storage.example.com' },
+        });
+        const bucket = screen.getByPlaceholderText('my-diagrams-bucket');
+        fireEvent.change(bucket, { target: { value: 'vizly-audit-bucket' } });
+        fireEvent.change(screen.getByPlaceholderText('storageConfig.form.accessKeyPlaceholder'), {
+            target: { value: 'AUDIT_ACCESS_KEY' },
+        });
+        fireEvent.change(screen.getByPlaceholderText('storageConfig.form.secretKeyPlaceholder'), {
+            target: { value: 'AUDIT_SECRET_KEY' },
+        });
+
+        fireEvent.click(screen.getByRole('button', { name: 'storageConfig.form.testBtn' }));
+        await waitFor(() => expect(storageMocks.testConnection).toHaveBeenCalledTimes(1));
+        const signal = storageMocks.testConnection.mock.calls[0]?.[1] as AbortSignal | undefined;
+        expect(signal?.aborted).toBe(false);
+        expect(screen.getByText('storageConfig.status.testing')).toBeInTheDocument();
+
+        fireEvent.change(bucket, { target: { value: 'vizly-updated-bucket' } });
+        await waitFor(() => expect(signal?.aborted).toBe(true));
+        expect(screen.getByText('storageConfig.status.dirty')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'storageConfig.form.saveBtn' })).toBeEnabled();
+        expect(screen.getByRole('button', { name: 'storageConfig.form.testBtn' })).toBeEnabled();
+
+        await act(async () => resolveTest?.());
+        expect(screen.getByText('storageConfig.status.dirty')).toBeInTheDocument();
+        expect(bridgeMocks.messageSuccess).not.toHaveBeenCalledWith('storageConfig.testSuccess');
+    });
+
+    it('ignores an aborted stale test even after a replacement test has started', async () => {
+        let resolveFirst: (() => void) | undefined;
+        let resolveSecond: (() => void) | undefined;
+        storageMocks.testConnection
+            .mockImplementationOnce(() => new Promise<void>(resolve => { resolveFirst = resolve; }))
+            .mockImplementationOnce(() => new Promise<void>(resolve => { resolveSecond = resolve; }));
+        renderStorageConfig();
+
+        fireEvent.change(screen.getByPlaceholderText('https://...'), {
+            target: { value: 'https://storage.example.com' },
+        });
+        const bucket = screen.getByPlaceholderText('my-diagrams-bucket');
+        fireEvent.change(bucket, { target: { value: 'vizly-audit-bucket' } });
+        fireEvent.change(screen.getByPlaceholderText('storageConfig.form.accessKeyPlaceholder'), {
+            target: { value: 'AUDIT_ACCESS_KEY' },
+        });
+        fireEvent.change(screen.getByPlaceholderText('storageConfig.form.secretKeyPlaceholder'), {
+            target: { value: 'AUDIT_SECRET_KEY' },
+        });
+
+        const testButton = screen.getByRole('button', { name: 'storageConfig.form.testBtn' });
+        fireEvent.click(testButton);
+        await waitFor(() => expect(storageMocks.testConnection).toHaveBeenCalledTimes(1));
+        const firstSignal = storageMocks.testConnection.mock.calls[0]?.[1] as AbortSignal | undefined;
+        fireEvent.change(bucket, { target: { value: 'vizly-updated-bucket' } });
+        expect(firstSignal?.aborted).toBe(true);
+
+        fireEvent.click(testButton);
+        await waitFor(() => expect(storageMocks.testConnection).toHaveBeenCalledTimes(2));
+        expect(screen.getByText('storageConfig.status.testing')).toBeInTheDocument();
+        await act(async () => resolveFirst?.());
+        expect(screen.getByText('storageConfig.status.testing')).toBeInTheDocument();
+        expect(testButton).toHaveClass('ant-btn-loading');
+
+        await act(async () => resolveSecond?.());
+        await waitFor(() => expect(screen.getByText('storageConfig.status.verified')).toBeInTheDocument());
+    });
+
+    it('offers an explicit cancel action during a connection test and restores editing', async () => {
+        storageMocks.testConnection.mockImplementationOnce(() => new Promise<void>(() => {}));
+        renderStorageConfig();
+        fireEvent.change(screen.getByPlaceholderText('https://...'), {
+            target: { value: 'https://storage.example.com' },
+        });
+        fireEvent.change(screen.getByPlaceholderText('my-diagrams-bucket'), {
+            target: { value: 'vizly-audit-bucket' },
+        });
+        fireEvent.change(screen.getByPlaceholderText('storageConfig.form.accessKeyPlaceholder'), {
+            target: { value: 'AUDIT_ACCESS_KEY' },
+        });
+        fireEvent.change(screen.getByPlaceholderText('storageConfig.form.secretKeyPlaceholder'), {
+            target: { value: 'AUDIT_SECRET_KEY' },
+        });
+
+        fireEvent.click(screen.getByRole('button', { name: 'storageConfig.form.testBtn' }));
+        await waitFor(() => expect(storageMocks.testConnection).toHaveBeenCalledTimes(1));
+        const signal = storageMocks.testConnection.mock.calls[0]?.[1] as AbortSignal | undefined;
+        const cancelButton = screen.getByRole('button', { name: 'storageConfig.form.cancelTestBtn' });
+        expect(cancelButton).toBeEnabled();
+
+        fireEvent.click(cancelButton);
+        expect(signal?.aborted).toBe(true);
+        expect(screen.queryByRole('button', { name: 'storageConfig.form.cancelTestBtn' })).not.toBeInTheDocument();
+        expect(screen.getByText('storageConfig.status.dirty')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'storageConfig.form.saveBtn' })).toBeEnabled();
+        expect(screen.getByRole('button', { name: 'storageConfig.form.testBtn' })).toBeEnabled();
+    });
+
     it('leaves immediately from either return control when the form is unchanged', async () => {
         renderStorageConfig();
 

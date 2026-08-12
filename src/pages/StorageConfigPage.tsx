@@ -37,6 +37,7 @@ const StorageConfigPage: React.FC = () => {
         storageService.getConfig() ? 'saved' : 'not-configured',
     );
     const testControllerRef = useRef<AbortController | null>(null);
+    const testedValuesRef = useRef<StorageConfig | null>(null);
     const pageTitleRef = useRef<HTMLHeadingElement>(null);
     const entryFocusFrameRef = useRef<number | null>(null);
     const validationFocusFrameRef = useRef<number | null>(null);
@@ -150,6 +151,7 @@ const StorageConfigPage: React.FC = () => {
         testControllerRef.current?.abort();
         const controller = new AbortController();
         testControllerRef.current = controller;
+        testedValuesRef.current = values;
         const timeoutId = window.setTimeout(() => controller.abort(), S3_CONNECTION_TIMEOUT_MS);
         setTesting(true);
         setConnectionState('testing');
@@ -157,7 +159,9 @@ const StorageConfigPage: React.FC = () => {
         try {
             await storageService.testConnection(values, controller.signal);
             if (!mountedRef.current) return;
+            if (testedValuesRef.current !== values) return;
             if (controller.signal.aborted) {
+                if (testControllerRef.current !== controller) return;
                 setConnectionState('failed');
                 appMessage.error(t('storageConfig.testTimeout'));
                 return;
@@ -166,7 +170,9 @@ const StorageConfigPage: React.FC = () => {
             appMessage.success(t('storageConfig.testSuccess'));
         } catch (error: unknown) {
             if (!mountedRef.current) return;
+            if (testedValuesRef.current !== values) return;
             if (isAbortFailure(error)) {
+                if (testControllerRef.current !== controller) return;
                 setConnectionState('failed');
                 appMessage.error(t('storageConfig.testTimeout'));
                 return;
@@ -210,9 +216,31 @@ const StorageConfigPage: React.FC = () => {
             });
         } finally {
             window.clearTimeout(timeoutId);
-            if (testControllerRef.current === controller) testControllerRef.current = null;
-            if (mountedRef.current) setTesting(false);
+            if (testControllerRef.current === controller) {
+                testControllerRef.current = null;
+                testedValuesRef.current = null;
+                if (mountedRef.current) setTesting(false);
+            }
         }
+    };
+
+    const handleFormValuesChange = () => {
+        if (testing) {
+            testControllerRef.current?.abort();
+            testControllerRef.current = null;
+            testedValuesRef.current = null;
+            setTesting(false);
+        }
+        setHasUnsavedChanges(true);
+        setConnectionState('dirty');
+    };
+
+    const cancelConnectionTest = () => {
+        testControllerRef.current?.abort();
+        testControllerRef.current = null;
+        testedValuesRef.current = null;
+        setTesting(false);
+        setConnectionState('dirty');
     };
 
     const handleReturnToWorkspace = () => navigate('/manage');
@@ -276,10 +304,7 @@ const StorageConfigPage: React.FC = () => {
                         layout="vertical"
                         onFinish={onFinish}
                         onFinishFailed={handleValidationFailure}
-                        onValuesChange={() => {
-                            setHasUnsavedChanges(true);
-                            setConnectionState('dirty');
-                        }}
+                        onValuesChange={handleFormValuesChange}
                         initialValues={{ s3ForcePathStyle: true, region: 'us-east-1' }}
                     >
                         <Form.Item
@@ -419,6 +444,11 @@ const StorageConfigPage: React.FC = () => {
                                 >
                                     {t('storageConfig.form.testBtn')}
                                 </Button>
+                                {testing && (
+                                    <Button danger onClick={cancelConnectionTest}>
+                                        {t('storageConfig.form.cancelTestBtn')}
+                                    </Button>
+                                )}
                             </Space>
                         </Form.Item>
                     </Form>

@@ -2927,7 +2927,8 @@
             "revealSecretValue": "显示密钥",
             "concealSecretValue": "隐藏密钥",
             "saveBtn": "保存配置",
-            "testBtn": "测试连接"
+            "testBtn": "测试连接",
+            "cancelTestBtn": "取消测试"
         },
         "notes": {
             "title": "说明",

@@ -2817,7 +2817,8 @@
             "revealSecretValue": "Show secret",
             "concealSecretValue": "Hide secret",
             "saveBtn": "Save",
-            "testBtn": "Test Connection"
+            "testBtn": "Test Connection",
+            "cancelTestBtn": "Cancel test"
         },
         "notes": {
             "title": "Notes",
