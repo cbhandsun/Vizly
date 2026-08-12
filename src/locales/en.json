@@ -2794,8 +2794,8 @@
         },
         "testFail": {
             "title": "Connection Failed",
-            "corsTitle": "CORS Required",
-            "corsDesc": "Add CORS rules to your S3 bucket:",
+            "transportTitle": "Browser could not reach storage",
+            "transportDesc": "Check endpoint availability, HTTPS/TLS, proxy or firewall, and bucket CORS.",
             "corsOrigin": "AllowedOrigins",
             "corsMethods": "AllowedMethods",
             "genericTitle": "Connection Error",

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import '@testing-library/jest-dom/vitest';
+import type { ReactNode } from 'react';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -109,6 +110,12 @@ interface LeaveConfirmOptions {
     onOk?: () => void | Promise<void>;
     onCancel?: () => void;
     afterClose?: () => void;
+}
+
+interface ConnectionErrorOptions {
+    content?: ReactNode;
+    okText: string;
+    title: string;
 }
 
 describe('StorageConfigPage configuration clearing', () => {
@@ -444,6 +451,11 @@ describe('StorageConfigPage validation recovery', () => {
             title: 'storageConfig.testFail.title',
             okText: 'common.ok',
         }));
+        const errorOptions = bridgeMocks.modalError.mock.calls[0]?.[0] as ConnectionErrorOptions;
+        render(<>{errorOptions.content}</>);
+        expect(screen.getByText('storageConfig.testFail.transportTitle')).toBeInTheDocument();
+        expect(screen.getByText('storageConfig.testFail.transportDesc')).toBeInTheDocument();
+        expect(screen.queryByText('storageConfig.testFail.corsTitle')).not.toBeInTheDocument();
         expect(endpoint).toHaveValue('http://127.0.0.1:9');
         expect(bucket).toHaveValue('vizly-audit-bucket');
         expect(accessKey).toHaveValue('AUDIT_ACCESS_KEY');

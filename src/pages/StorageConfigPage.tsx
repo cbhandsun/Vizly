@@ -204,19 +204,19 @@ const StorageConfigPage: React.FC = () => {
             verifiedValuesRef.current = null;
             setConnectionState('failed');
 
-            const isNetworkFailure = safeError.message === 'Failed to fetch' || safeError.name === 'TypeError';
+            const isBrowserTransportFailure = safeError.message === 'Failed to fetch' || safeError.name === 'TypeError';
             appModal.error({
                 title: t('storageConfig.testFail.title'),
                 okText: t('common.ok'),
                 width: 600,
                 content: (
                     <div className="storage-config-error-content">
-                        {isNetworkFailure && (
+                        {isBrowserTransportFailure && (
                             <Alert
                                 type="error"
                                 showIcon
-                                title={t('storageConfig.testFail.corsTitle')}
-                                description={t('storageConfig.testFail.corsDesc')}
+                                title={t('storageConfig.testFail.transportTitle')}
+                                description={t('storageConfig.testFail.transportDesc')}
                             />
                         )}
                         <p>{t('storageConfig.testFail.genericTitle')}</p>

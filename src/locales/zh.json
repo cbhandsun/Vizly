@@ -2906,8 +2906,8 @@
         },
         "testFail": {
             "title": "连接失败",
-            "corsTitle": "检测到网络/CORS 错误",
-            "corsDesc": "从浏览器直接访问对象存储通常需要配置 跨域资源共享 (CORS)。请登录云服务商控制台（如七牛云、AWS），找到 Bucket 的 CORS 设置，并添加允许规则：",
+            "transportTitle": "浏览器无法访问存储服务",
+            "transportDesc": "请检查服务地址与可用性、HTTPS/TLS、代理或防火墙，以及 Bucket CORS 配置。",
             "corsOrigin": "Origin (来源): * 或本站地址",
             "corsMethods": "Methods (方法): GET, PUT, POST, HEAD",
             "genericTitle": "无法连接到 S3 服务，请检查以下几点：",
