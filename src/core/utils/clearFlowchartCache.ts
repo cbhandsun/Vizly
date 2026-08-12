@@ -23,6 +23,18 @@ const SESSION_UI_CACHE_KEYS = [
     'layered-config-session',
 ] as const;
 
+export interface FlowchartCacheClearFailure {
+    storageType: 'localStorage' | 'sessionStorage';
+    operation: 'enumerate' | 'remove';
+    key?: string;
+}
+
+export interface FlowchartCacheClearResult {
+    ok: boolean;
+    removedCount: number;
+    failures: FlowchartCacheClearFailure[];
+}
+
 const normalizeDiagramId = (diagramId?: string | null) => {
     const trimmed = diagramId?.trim();
     return trimmed || null;
@@ -47,22 +59,34 @@ export const getFlowchartCacheKeysToClear = (diagramId?: string | null) => {
     };
 };
 
-export const clearFlowchartCache = (diagramId?: string | null) => {
+export const clearFlowchartCache = (diagramId?: string | null): FlowchartCacheClearResult => {
     const { localStorageKeys, sessionStorageKeys } = getFlowchartCacheKeysToClear(diagramId);
+    const failures: FlowchartCacheClearFailure[] = [];
+    let removedCount = 0;
 
     for (const key of localStorageKeys) {
         try {
             localStorage.removeItem(key);
+            removedCount += 1;
         } catch (error) {
             logFlowchartCacheClearFailure('localStorage', key, error);
+            failures.push({ storageType: 'localStorage', operation: 'remove', key });
         }
     }
 
     for (const key of sessionStorageKeys) {
         try {
             sessionStorage.removeItem(key);
+            removedCount += 1;
         } catch (error) {
             logFlowchartCacheClearFailure('sessionStorage', key, error);
+            failures.push({ storageType: 'sessionStorage', operation: 'remove', key });
         }
     }
+
+    return {
+        ok: failures.length === 0,
+        removedCount,
+        failures,
+    };
 };

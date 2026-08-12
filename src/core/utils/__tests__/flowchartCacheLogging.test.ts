@@ -23,15 +23,16 @@ describe('flowchartCacheLogging', () => {
   it('redacts cache clear failures', async () => {
     const logging = await import('../flowchartCacheLogging');
 
-    logging.logFlowchartCacheClearFailure('localStorage', 'flowchart.layers', new Error('Authorization: Bearer cache-secret'));
+    logging.logFlowchartCacheClearFailure('localStorage', 'flowchart.layers.user-secret', new Error('Authorization: Bearer cache-secret'));
     logging.logFlowchartCacheClearFailure('sessionStorage', 'layered-config-session', new Error('cookie=session-secret'));
 
     const warnPayload = JSON.stringify(safeLogState.warn.mock.calls);
     const warnMessages = safeLogState.warn.mock.calls.map(call => String(call[0]));
 
-    expect(warnMessages).toContain('[clearFlowchartCache] Failed to clear localStorage key "flowchart.layers":');
-    expect(warnMessages).toContain('[clearFlowchartCache] Failed to clear sessionStorage key "layered-config-session":');
+    expect(warnMessages).toContain('[clearFlowchartCache] Failed to clear localStorage editor-ui-cache:');
+    expect(warnMessages).toContain('[clearFlowchartCache] Failed to clear sessionStorage editor-ui-cache:');
     expect(warnPayload).toContain('[redacted]');
+    expect(warnPayload).not.toContain('user-secret');
     expect(warnPayload).not.toContain('cache-secret');
     expect(warnPayload).not.toContain('session-secret');
   });

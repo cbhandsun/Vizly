@@ -620,6 +620,8 @@
             "clearCacheTitle": "Reset local editor state?",
             "clearCacheContent": "This resets the flowchart editor’s local UI state and removes the current diagram’s local autosave and custom preset. AI configuration, storage settings, and other diagrams are preserved. This cannot be undone and the page will reload immediately; save or export first if needed.",
             "clearCacheConfirm": "Reset and Reload",
+            "clearCacheDiagramUnavailable": "The current diagram could not be identified. Nothing was reset; reopen the diagram and try again.",
+            "clearCacheFailed": "The local editor state could not be fully reset. Nothing was reloaded; check browser storage access and try again.",
             "toolbarAriaLabel": "Diagram Toolbar",
             "dragHandle": "Drag Handle",
             "creationTools": "Creation Tools",

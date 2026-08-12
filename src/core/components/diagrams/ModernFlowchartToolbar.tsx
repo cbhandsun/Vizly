@@ -11,9 +11,8 @@ import {
 import { BackgroundVariant } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import { Tooltip, Button, Dropdown, MenuProps, Popover, Grid } from 'antd';
-import { appModal } from '../../utils/antdStaticBridge';
-import { clearFlowchartCache } from '../../utils/clearFlowchartCache';
-import { coerceDiagramId, getQueryOrHashParamFromLocation } from '../../utils/inputBoundary';
+import { appMessage, appModal } from '../../utils/antdStaticBridge';
+import { executeConfirmedLocalEditorReset } from '../../utils/localEditorReset';
 import { FlowchartAlignmentTools } from './FlowchartAlignmentTools';
 import { FlowchartCanvasSettingsContent } from './FlowchartCanvasSettingsContent';
 import { FlowchartHistoryToolbarControls } from './FlowchartHistoryToolbarControls';
@@ -266,20 +265,19 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                     }
                 }, 0);
             },
-            onOk: () => {
-                const diagramId = coerceDiagramId(
-                    getQueryOrHashParamFromLocation(window.location, 'diagram')
-                ) || localStorage.getItem('diagramMenu.selectedDiagramId');
-
-                clearFlowchartCache(diagramId);
-
-                if (diagramId) {
-                    try {
-                        localStorage.setItem('diagramMenu.selectedDiagramId', diagramId);
-                    } catch { void 0; }
-                }
-
-                window.location.reload();
+            onOk: (close) => {
+                executeConfirmedLocalEditorReset({
+                    close,
+                    location: window.location,
+                    onFailure: (result) => {
+                        const translationKey = result.reason === 'diagram-id-unavailable'
+                            ? 'designer.toolbar.clearCacheDiagramUnavailable'
+                            : 'designer.toolbar.clearCacheFailed';
+                        appMessage.error(t(translationKey, { count: result.failureCount }));
+                    },
+                    reload: () => window.location.reload(),
+                    storage: localStorage,
+                });
             },
         });
     }, [moreDropdownTriggerRef, t]);

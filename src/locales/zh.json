@@ -621,6 +621,8 @@
             "clearCacheTitle": "重置本地编辑状态？",
             "clearCacheContent": "将重置流程图编辑器的本地界面状态，并删除当前图表的本地自动保存与自定义预设。AI 配置、存储设置及其他图表不会受到影响。此操作无法撤销，页面将立即刷新；如需保留当前内容，请先保存或导出。",
             "clearCacheConfirm": "重置并刷新",
+            "clearCacheDiagramUnavailable": "无法识别当前图表，未执行重置。请重新打开图表后再试。",
+            "clearCacheFailed": "未能完整重置本地编辑状态，页面不会刷新。请检查浏览器存储权限后重试。",
             "toolbarAriaLabel": "图表工具栏",
             "dragHandle": "拖动手柄",
             "creationTools": "操作工具",
