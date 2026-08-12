@@ -793,6 +793,8 @@
             "createSuccess": "已新建页面",
             "defaultName": "页面 {{index}}",
             "limitReached": "最多可创建 {{count}} 个页面",
+            "createLimitReached": "无法新建页面：最多可创建 {{count}} 个页面",
+            "duplicateLimitReached": "无法复制页面 {{name}}：最多可创建 {{count}} 个页面",
             "rename": "重命名页面 {{name}}",
             "renameAction": "重命名页面 {{name}}",
             "duplicateAction": "复制页面 {{name}}",

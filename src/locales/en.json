@@ -785,6 +785,8 @@
             "createSuccess": "New page created",
             "defaultName": "Page {{index}}",
             "limitReached": "You can create up to {{count}} pages",
+            "createLimitReached": "Cannot create a page: the limit is {{count}} pages",
+            "duplicateLimitReached": "Cannot duplicate page {{name}}: the limit is {{count}} pages",
             "rename": "Rename page {{name}}",
             "renameAction": "Rename page {{name}}",
             "duplicateAction": "Duplicate page {{name}}",

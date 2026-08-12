@@ -5,8 +5,6 @@ import {
     CloseOutlined,
     CopyOutlined,
     EditOutlined,
-    PlusOutlined,
-    UndoOutlined,
 } from '@ant-design/icons';
 import { Input, Popconfirm, theme, Tooltip } from 'antd';
 import type { InputRef } from 'antd';
@@ -17,6 +15,8 @@ import { MAX_DIAGRAM_PAGE_NAME_LENGTH, MAX_DIAGRAM_PAGES } from './multiPagePers
 import { isPageNameAvailable, normalizePageName } from './multiPageNaming';
 import { resolvePageTabTargetIndex } from './pageTabKeyboard';
 import { schedulePageTabsDeleteFocus } from './pageTabsDeleteFocus';
+import { runPageTabsCapacityAction } from './pageTabsLimitFeedback';
+import { PageTabsCapacityControls } from './PageTabsCapacityControls';
 import { getViewportOverlayContainer } from '../ui/viewportOverlayPortal';
 import './PageTabs.css';
 
@@ -284,6 +284,13 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
         }));
     }, [onAddPage, t]);
 
+    const announcePageLimit = useCallback(() => {
+        setStatusMessage(t('designer.pages.limitReached', {
+            count: MAX_DIAGRAM_PAGES,
+            defaultValue: '最多可创建 {{count}} 个页面',
+        }));
+    }, [t]);
+
     const handleDuplicatePage = useCallback((page: DiagramPage) => {
         if (!onDuplicatePage) return;
         const preferredName = t('designer.pages.copyName', {
@@ -361,6 +368,10 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
     const activePage = pages.find((page) => page.id === activePageId) ?? null;
     const activePageIndex = activePage ? pages.findIndex(page => page.id === activePage.id) : -1;
     const isRenamingActivePage = editingId === activePage?.id;
+    const pageLimitMessage = t('designer.pages.limitReached', {
+        count: MAX_DIAGRAM_PAGES,
+        defaultValue: '最多可创建 {{count}} 个页面',
+    });
     const restoreActionLabel = restorableDeletedPageName
         ? t('designer.pages.restoreNamedAction', {
             name: restorableDeletedPageName,
@@ -499,10 +510,7 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                             {onDuplicatePage && (
                                 <Tooltip
                                     title={pageLimitReached
-                                        ? t('designer.pages.limitReached', {
-                                              count: MAX_DIAGRAM_PAGES,
-                                              defaultValue: '最多可创建 {{count}} 个页面',
-                                          })
+                                        ? pageLimitMessage
                                         : t('designer.pages.duplicateAction', {
                                               name: activePage.name,
                                               defaultValue: '复制页面 {{name}}',
@@ -510,13 +518,25 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                                 >
                                     <button
                                         type="button"
-                                        aria-label={t('designer.pages.duplicateAction', {
-                                            name: activePage.name,
-                                            defaultValue: '复制页面 {{name}}',
-                                        })}
+                                        aria-label={pageLimitReached
+                                            ? t('designer.pages.duplicateLimitReached', {
+                                                name: activePage.name,
+                                                count: MAX_DIAGRAM_PAGES,
+                                                defaultValue: '无法复制页面 {{name}}：最多可创建 {{count}} 个页面',
+                                            })
+                                            : t('designer.pages.duplicateAction', {
+                                                name: activePage.name,
+                                                defaultValue: '复制页面 {{name}}',
+                                            })}
                                         className="page-tabs__duplicate"
-                                        disabled={disabled || pageLimitReached}
-                                        onClick={() => handleDuplicatePage(activePage)}
+                                        aria-disabled={pageLimitReached || disabled}
+                                        disabled={disabled}
+                                        onClick={() => runPageTabsCapacityAction({
+                                            pageLimitReached,
+                                            disabled,
+                                            announceLimit: announcePageLimit,
+                                            performAction: () => handleDuplicatePage(activePage),
+                                        })}
                                     >
                                         <CopyOutlined aria-hidden style={{ fontSize: 12 }} />
                                     </button>
@@ -647,34 +667,24 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                 {statusMessage}
             </span>
 
-            {onRestoreDeletedPage && canRestoreDeletedPage && (
-                <Tooltip title={restoreActionLabel}>
-                    <button
-                        type="button"
-                        aria-label={restoreActionLabel}
-                        onClick={handleRestoreDeletedPage}
-                        className="page-tabs__restore"
-                        disabled={disabled || pageLimitReached}
-                    >
-                        <UndoOutlined aria-hidden style={{ fontSize: 14 }} />
-                    </button>
-                </Tooltip>
-            )}
-
-            <Tooltip
-                title={
-                    pageLimitReached
-                        ? t('designer.pages.limitReached', {
-                              count: MAX_DIAGRAM_PAGES,
-                              defaultValue: '最多可创建 {{count}} 个页面',
-                          })
-                        : t('designer.pages.new', { defaultValue: '新建页面' })
-                }
-            >
-                <button type="button" aria-label={t('designer.pages.new', { defaultValue: '新建页面' })} onClick={handleAddPage} className="page-tabs__add" disabled={disabled || pageLimitReached}>
-                    <PlusOutlined aria-hidden style={{ fontSize: 14 }} />
-                </button>
-            </Tooltip>
+            <PageTabsCapacityControls
+                addLabel={pageLimitReached
+                    ? t('designer.pages.createLimitReached', {
+                        count: MAX_DIAGRAM_PAGES,
+                        defaultValue: '无法新建页面：最多可创建 {{count}} 个页面',
+                    })
+                    : t('designer.pages.new', { defaultValue: '新建页面' })}
+                addTooltip={pageLimitReached
+                    ? pageLimitMessage
+                    : t('designer.pages.new', { defaultValue: '新建页面' })}
+                announceLimit={announcePageLimit}
+                canRestoreDeletedPage={canRestoreDeletedPage}
+                disabled={disabled}
+                onAddPage={handleAddPage}
+                onRestoreDeletedPage={onRestoreDeletedPage ? handleRestoreDeletedPage : undefined}
+                pageLimitReached={pageLimitReached}
+                restoreActionLabel={restoreActionLabel}
+            />
         </div>
     );
 });

@@ -20,6 +20,8 @@ vi.mock('react-i18next', () => ({
                 'designer.pages.new': '新建页面',
                 'designer.pages.createSuccess': '已新建页面',
                 'designer.pages.limitReached': '最多可创建 {{count}} 个页面',
+                'designer.pages.createLimitReached': '无法新建页面：最多可创建 {{count}} 个页面',
+                'designer.pages.duplicateLimitReached': '无法复制页面 {{name}}：最多可创建 {{count}} 个页面',
                 'designer.pages.rename': '重命名页面 {{name}}',
                 'designer.pages.renameAction': '重命名页面 {{name}}',
                 'designer.pages.duplicateAction': '复制页面 {{name}}',
@@ -552,10 +554,49 @@ describe('PageTabs', () => {
         }));
         render(<PageTabs pages={pages} activePageId="page-1" onSwitchPage={vi.fn()} onAddPage={onAddPage} onDeletePage={vi.fn()} onRenamePage={vi.fn()} />);
 
-        const add = screen.getByRole('button', { name: '新建页面' });
-        expect(add.hasAttribute('disabled')).toBe(true);
+        const add = screen.getByRole('button', { name: '无法新建页面：最多可创建 50 个页面' });
+        expect(add.hasAttribute('disabled')).toBe(false);
+        expect(add.getAttribute('aria-disabled')).toBe('true');
         fireEvent.click(add);
         expect(onAddPage).not.toHaveBeenCalled();
+        expect(screen.getByRole('status').textContent).toBe('最多可创建 50 个页面');
+    });
+
+    it('explains duplicate limits and keeps recovery available at the page boundary', () => {
+        const pages = Array.from({ length: 50 }, (_, index) => ({
+            id: `page-${index + 1}`,
+            name: `页面 ${index + 1}`,
+            nodes: [],
+            edges: [],
+        }));
+        const onRestoreDeletedPage = vi.fn(() => null);
+        render(
+            <PageTabs
+                pages={pages}
+                activePageId="page-1"
+                onSwitchPage={vi.fn()}
+                onAddPage={vi.fn()}
+                onDeletePage={vi.fn()}
+                onRestoreDeletedPage={onRestoreDeletedPage}
+                onRenamePage={vi.fn()}
+                onDuplicatePage={vi.fn()}
+                canRestoreDeletedPage
+                restorableDeletedPageName="已删除页"
+            />,
+        );
+
+        const duplicateButton = screen.getByRole('button', {
+            name: '无法复制页面 页面 1：最多可创建 50 个页面',
+        });
+        expect(duplicateButton.hasAttribute('disabled')).toBe(false);
+        expect(duplicateButton.getAttribute('aria-disabled')).toBe('true');
+        fireEvent.click(duplicateButton);
+        expect(screen.getByRole('status').textContent).toBe('最多可创建 50 个页面');
+        const restoreButton = screen.getByRole('button', { name: '恢复页面“已删除页”' });
+        expect(restoreButton.hasAttribute('disabled')).toBe(false);
+        fireEvent.click(restoreButton);
+        expect(onRestoreDeletedPage).toHaveBeenCalledOnce();
+        expect(screen.getByRole('status').textContent).toBe('无法恢复页面“已删除页”，请重试');
     });
 
     it('keeps the active page unchanged when deletion is cancelled', async () => {
