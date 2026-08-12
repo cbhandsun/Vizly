@@ -60,6 +60,7 @@ export function useCloudSave(diagramId: string, diagramName?: string) {
     const shareDialogTriggerRef = useRef<HTMLElement | null>(null);
     const cloudSaveTriggerRef = useRef<HTMLElement | null>(null);
     const pendingCloudSaveRef = useRef<PendingCloudSave | null>(null);
+    const activeCloudSaveRequestRef = useRef<Promise<DiagramSaveResult> | null>(null);
 
     const performCloudSave = useCallback(async () => {
         let hideLoading: (() => void) | undefined;
@@ -163,8 +164,7 @@ export function useCloudSave(diagramId: string, diagramName?: string) {
             : fallbackTrigger;
     }, []);
 
-    const saveToCloud = useCallback(async (): Promise<DiagramSaveResult> => {
-        captureCloudSaveTrigger();
+    const executeCloudSaveRequest = useCallback(async (): Promise<DiagramSaveResult> => {
         let unifiedStorage: Awaited<ReturnType<typeof loadUnifiedStorage>>;
         let provider: Awaited<ReturnType<typeof loadUnifiedStorage>>['activeProvider'];
         let isProviderConfigured: boolean;
@@ -198,7 +198,21 @@ export function useCloudSave(diagramId: string, diagramName?: string) {
             return pendingCloudSaveRef.current.promise;
         }
         return performCloudSave();
-    }, [captureCloudSaveTrigger, performCloudSave, t, user]);
+    }, [performCloudSave, t, user]);
+
+    const saveToCloud = useCallback((): Promise<DiagramSaveResult> => {
+        const activeRequest = activeCloudSaveRequestRef.current;
+        if (activeRequest) return activeRequest;
+
+        captureCloudSaveTrigger();
+        const request = executeCloudSaveRequest().finally(() => {
+            if (activeCloudSaveRequestRef.current === request) {
+                activeCloudSaveRequestRef.current = null;
+            }
+        });
+        activeCloudSaveRequestRef.current = request;
+        return request;
+    }, [captureCloudSaveTrigger, executeCloudSaveRequest]);
 
     const cancelCloudSaveAuthentication = useCallback(() => {
         pendingCloudSaveRef.current?.resolve('cancelled');

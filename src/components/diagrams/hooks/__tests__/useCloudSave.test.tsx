@@ -174,6 +174,90 @@ describe('useCloudSave', () => {
         expect(result.current.cloudSaveAuthOpen).toBe(false);
     });
 
+    it('coalesces repeated authentication-gated saves and preserves the original focus trigger', async () => {
+        authMocks.user = null;
+        let restoreFocus: FrameRequestCallback | undefined;
+        vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+            restoreFocus = callback;
+            return 1;
+        });
+        const originalTrigger = document.createElement('button');
+        const repeatedTrigger = document.createElement('button');
+        document.body.append(originalTrigger, repeatedTrigger);
+        originalTrigger.focus();
+        const { result } = renderHook(() => useCloudSave('diagram-1', '客户流程'));
+
+        let firstSave: Promise<void | 'cancelled'> | undefined;
+        let repeatedSave: Promise<void | 'cancelled'> | undefined;
+        await act(async () => {
+            firstSave = result.current.saveToCloud();
+            await Promise.resolve();
+            repeatedTrigger.focus();
+            repeatedSave = result.current.saveToCloud();
+            await Promise.resolve();
+        });
+
+        expect(messageMocks.warning).toHaveBeenCalledTimes(1);
+        expect(result.current.cloudSaveAuthOpen).toBe(true);
+        let saveResults: Array<void | 'cancelled'> = [];
+        await act(async () => {
+            result.current.cancelCloudSaveAuthentication();
+            saveResults = await Promise.all([firstSave, repeatedSave]);
+        });
+        expect(saveResults).toEqual(['cancelled', 'cancelled']);
+        act(() => result.current.restoreCloudSaveFocus());
+        act(() => restoreFocus?.(0));
+
+        expect(document.activeElement).toBe(originalTrigger);
+        expect(storageMocks.provider.saveDiagram).not.toHaveBeenCalled();
+        originalTrigger.remove();
+        repeatedTrigger.remove();
+    });
+
+    it('coalesces concurrent authenticated saves into one provider write', async () => {
+        let finishProviderSave: (() => void) | undefined;
+        storageMocks.provider.saveDiagram.mockReturnValue(new Promise<void>((resolve) => {
+            finishProviderSave = resolve;
+        }));
+        const { result } = renderHook(() => useCloudSave('diagram-1', '客户流程'));
+
+        let firstSave: Promise<void | 'cancelled'> | undefined;
+        let repeatedSave: Promise<void | 'cancelled'> | undefined;
+        await act(async () => {
+            firstSave = result.current.saveToCloud();
+            repeatedSave = result.current.saveToCloud();
+            await Promise.resolve();
+        });
+
+        expect(storageMocks.provider.saveDiagram).toHaveBeenCalledTimes(1);
+        finishProviderSave?.();
+        await act(async () => {
+            await Promise.all([firstSave, repeatedSave]);
+        });
+
+        expect(messageMocks.loading).toHaveBeenCalledTimes(1);
+        expect(messageMocks.success).toHaveBeenCalledTimes(1);
+        expect(messageMocks.hideLoading).toHaveBeenCalledTimes(1);
+    });
+
+    it('releases the request lock after failure so an explicit retry can save', async () => {
+        const providerError = new Error('temporary provider failure');
+        storageMocks.provider.saveDiagram
+            .mockRejectedValueOnce(providerError)
+            .mockResolvedValueOnce(undefined);
+        const { result } = renderHook(() => useCloudSave('diagram-1', '客户流程'));
+
+        await expect(result.current.saveToCloud()).rejects.toBe(providerError);
+        await act(async () => {
+            await result.current.saveToCloud();
+        });
+
+        expect(storageMocks.provider.saveDiagram).toHaveBeenCalledTimes(2);
+        expect(messageMocks.error).toHaveBeenCalledTimes(1);
+        expect(messageMocks.success).toHaveBeenCalledTimes(1);
+        expect(messageMocks.hideLoading).toHaveBeenCalledTimes(2);
+    });
+
     it('keeps the configured S3 save path available without account authentication', async () => {
         authMocks.user = null;
         storageMocks.provider.id = 's3';
