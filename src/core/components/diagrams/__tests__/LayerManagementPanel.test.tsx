@@ -63,9 +63,10 @@ describe('LayerManagementPanel', () => {
             />,
         );
 
-        const layerItem = screen.getByRole('listitem');
+        expect(screen.getByRole('listbox', { name: '图层列表' })).toBeTruthy();
+        const layerItem = screen.getByRole('option', { name: '默认图层' });
         expect(layerItem.getAttribute('tabindex')).toBe('0');
-        expect(layerItem.getAttribute('aria-current')).toBe('true');
+        expect(layerItem.getAttribute('aria-selected')).toBe('true');
 
         fireEvent.keyDown(layerItem, { key: 'Enter' });
         expect(onSetActive).toHaveBeenCalledWith('layer-0');
@@ -97,12 +98,14 @@ describe('LayerManagementPanel', () => {
             />,
         );
 
-        const rows = screen.getAllByRole('listitem');
+        const rows = screen.getAllByRole('option');
         const reviewRow = rows.find(row => row.textContent?.includes('评审图层'));
         const defaultRow = rows.find(row => row.textContent?.includes('默认图层'));
 
         expect(reviewRow?.getAttribute('tabindex')).toBe('0');
+        expect(reviewRow?.getAttribute('aria-selected')).toBe('true');
         expect(defaultRow?.getAttribute('tabindex')).toBe('-1');
+        expect(defaultRow?.getAttribute('aria-selected')).toBe('false');
         expect(screen.getByRole('button', { name: '隐藏图层：默认图层' }).getAttribute('tabindex')).toBe('-1');
 
         reviewRow?.focus();
@@ -201,6 +204,42 @@ describe('LayerManagementPanel', () => {
         expect(promptSpy).not.toHaveBeenCalled();
         expect(onCreate).toHaveBeenCalledWith('评审 图层');
         expect(screen.queryByRole('textbox', { name: '新图层名称' })).toBeNull();
+    });
+
+    it('focuses the newly active layer after creation', async () => {
+        const LayerCreateHarness = () => {
+            const [layers, setLayers] = useState([layer]);
+            const [activeLayerId, setActiveLayerId] = useState('layer-0');
+            return (
+                <LayerManagementPanel
+                    layers={layers}
+                    activeLayerId={activeLayerId}
+                    onSetActive={setActiveLayerId}
+                    onToggleVisibility={vi.fn()}
+                    onToggleLock={vi.fn()}
+                    onRename={vi.fn()}
+                    onCreate={(name) => {
+                        const created = { ...reviewLayer, name };
+                        setLayers((current) => [...current, created]);
+                        setActiveLayerId(created.id);
+                        return true;
+                    }}
+                    onDelete={vi.fn()}
+                    onReorder={vi.fn()}
+                />
+            );
+        };
+
+        render(<LayerCreateHarness />);
+        fireEvent.click(screen.getByRole('button', { name: '新建图层' }));
+        fireEvent.change(screen.getByRole('textbox', { name: '新图层名称' }), {
+            target: { value: '审视图层' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: '创建图层' }));
+
+        const createdLayer = await screen.findByRole('option', { name: '审视图层' });
+        await waitFor(() => expect(document.activeElement).toBe(createdLayer));
+        expect(createdLayer.getAttribute('aria-selected')).toBe('true');
     });
 
     it('keeps the creation form open for empty input and allows cancellation', () => {

@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Space, Input, Tooltip, Popover, Modal } from 'antd';
 import type { InputRef } from 'antd';
 import { useTranslation } from 'react-i18next';
@@ -174,6 +174,7 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
     const createInputRef = useRef<InputRef>(null);
     const editInputRef = useRef<InputRef>(null);
     const skipNextEditBlurRef = useRef(false);
+    const focusCreatedLayerRef = useRef(false);
     const layerRowRefs = useRef(new Map<string, HTMLDivElement>());
     const touchTargetSize = useMemo(
         () => resolveLayerTouchTargetSize(getUiScale()),
@@ -193,6 +194,13 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
     const focusLayerRow = useCallback((layerId: string) => {
         requestAnimationFrame(() => layerRowRefs.current.get(layerId)?.focus());
     }, []);
+
+    useEffect(() => {
+        if (!focusCreatedLayerRef.current || !activeLayerId) return;
+        if (!layers.some(layer => layer.id === activeLayerId)) return;
+        focusCreatedLayerRef.current = false;
+        focusLayerRow(activeLayerId);
+    }, [activeLayerId, focusLayerRow, layers]);
 
     const moveLayer = useCallback((layer: LayerConfig, direction: 'up' | 'down') => {
         const fromIndex = layers.findIndex(candidate => candidate.id === layer.id);
@@ -246,7 +254,10 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
             createInputRef.current?.focus();
             return;
         }
-        cancelCreate();
+        focusCreatedLayerRef.current = true;
+        setIsCreating(false);
+        setCreateName('');
+        setCreateError(null);
     };
 
     const startEdit = (layer: LayerConfig) => {
@@ -370,7 +381,7 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
                 >
                     {t('designer.layersPanel.keyboardHelp')}
                 </span>
-                <div role="list" aria-label={t('designer.layersPanel.layerList')}>
+                <div role="listbox" aria-label={t('designer.layersPanel.layerList')}>
                     {displayedLayers.map((layer, displayIndex) => {
                         const isActive = layer.id === keyboardActiveLayerId;
                         const sourceIndex = layers.findIndex(candidate => candidate.id === layer.id);
@@ -384,9 +395,10 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
                                     if (element) layerRowRefs.current.set(layer.id, element);
                                     else layerRowRefs.current.delete(layer.id);
                                 }}
-                                role="listitem"
+                                role="option"
                                 tabIndex={isActive ? 0 : -1}
-                                aria-current={isActive ? 'true' : undefined}
+                                aria-selected={isActive}
+                                aria-label={layer.name}
                                 aria-describedby="layer-list-keyboard-help"
                                 style={{
                                     background: isActive ? '#e6f7ff' : '#fff',
