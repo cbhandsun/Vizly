@@ -190,6 +190,36 @@ describe('CanvasSearchBar', () => {
         })).toBeTruthy();
     });
 
+    it('does not navigate or replace while an input method composition is being confirmed', () => {
+        const nodes: Node[] = [
+            { id: 'node-1', position: { x: 0, y: 0 }, data: { label: '判断一' } },
+            { id: 'node-2', position: { x: 200, y: 0 }, data: { label: '判断二' } },
+        ];
+        const onReplaceMatch = vi.fn();
+        render(
+            <CanvasSearchBar
+                visible
+                replaceVisible
+                onClose={vi.fn()}
+                nodes={nodes}
+                onReplaceMatch={onReplaceMatch}
+                onReplaceAll={vi.fn()}
+            />,
+        );
+
+        const searchInput = screen.getByRole('textbox', { name: '搜索画布内容' });
+        fireEvent.change(searchInput, { target: { value: '判断' } });
+        expect(screen.getByRole('status', { name: '第 1 项，共 2 项：节点文本，判断一' })).toBeTruthy();
+
+        fireEvent.keyDown(searchInput, { key: 'Enter', keyCode: 229, isComposing: true });
+        expect(screen.getByRole('status', { name: '第 1 项，共 2 项：节点文本，判断一' })).toBeTruthy();
+
+        const replacementInput = screen.getByRole('textbox', { name: '替换为' });
+        fireEvent.change(replacementInput, { target: { value: '确认' } });
+        fireEvent.keyDown(replacementInput, { key: 'Enter', keyCode: 229, isComposing: true });
+        expect(onReplaceMatch).not.toHaveBeenCalled();
+    });
+
     it('keeps mobile search below the toolbar, clear of the icon rail, and resilient at narrow widths', () => {
         const css = readFileSync(
             'src/core/components/diagrams/FlowchartDesigner.css',

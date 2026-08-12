@@ -4,10 +4,6 @@ import { FaSearch, FaChevronUp, FaChevronDown, FaTimes, FaTimesCircle, FaExchang
 import { useReactFlow, type Edge, type Node } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import {
-    buildPresentationEdgeIdSelector,
-    buildPresentationNodeSelector,
-} from '../presentation/presentationSelectorSafety';
-import {
     FLOWCHART_REPLACE_TEXT_MAX_LENGTH,
     FLOWCHART_SEARCH_QUERY_MAX_LENGTH,
     buildFlowchartCanvasSearchMatchKey,
@@ -20,6 +16,7 @@ import {
 } from './flowchartSearchReplace';
 import { getCanvasSearchMatchAnnouncementLabel } from './canvasSearchAccessibility';
 import { CanvasSearchConfirmationDescription } from './CanvasSearchConfirmationDescription';
+import { buildCanvasSearchHighlightStyle } from './canvasSearchHighlightStyle';
 import { useTransientStatusMessage } from './useTransientStatusMessage';
 
 export interface CanvasSearchBarProps {
@@ -174,12 +171,6 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
             : 'designer.canvasSearch.noResultsAnnouncement', {
               page: normalizedPageName,
           });
-    const nodeMatchIds = useMemo(() => new Set(
-        matches.filter(match => match.kind === 'node').map(match => match.id),
-    ), [matches]);
-    const edgeMatchIds = useMemo(() => new Set(
-        matches.filter(match => match.kind === 'edge').map(match => match.id),
-    ), [matches]);
     const allReplacePlan = useMemo(() => planFlowchartCanvasTextReplacement(
         nodes,
         edges,
@@ -411,6 +402,7 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
     }, [allReplacePlan, currentMatch, formatMatchCounts, query, replaceStatus, showReplace, t]);
 
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+        if (e.nativeEvent.isComposing || e.keyCode === 229) return;
         if (e.key === 'Escape') {
             closeSearch();
         } else if (e.key === 'Enter') {
@@ -419,93 +411,9 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
         }
     }, [closeSearch, goNext, goPrev]);
 
-    // --- 动态注入搜索高亮样式 ---
-    const highlightStyle = useMemo(() => {
-        if (!query.trim() || matches.length === 0) return '';
-
-        const currentNodeStyles = currentMatch?.kind === 'node'
-            ? `${buildPresentationNodeSelector(currentMatch.id)} {
-                outline: 3px solid rgba(59, 130, 246, 0.8) !important; 
-                outline-offset: 4px !important;
-                border-radius: 8px;
-                animation: search-pulse 1.5s ease-in-out infinite !important;
-                z-index: 1000 !important;
-            }`
-            : '';
-        const currentEdgeStyles = currentMatch?.kind === 'edge'
-            ? `${buildPresentationEdgeIdSelector(currentMatch.id)} .react-flow__edge-path {
-                stroke: rgba(37, 99, 235, 1) !important;
-                stroke-width: 4px !important;
-                filter: drop-shadow(0 0 5px rgba(59, 130, 246, 0.65));
-                animation: search-edge-pulse 1.5s ease-in-out infinite !important;
-            }`
-            : '';
-
-        const otherNodeSelectors = matches
-            .filter(match => match.kind === 'node' && buildFlowchartCanvasSearchMatchKey(match) !== currentMatchKey)
-            .map(match => buildPresentationNodeSelector(match.id))
-            .join(',\n');
-        const otherNodeStyles = otherNodeSelectors
-            ? `${otherNodeSelectors} {
-                outline: 2px solid rgba(59, 130, 246, 0.35) !important;
-                outline-offset: 3px !important;
-                border-radius: 8px;
-            }`
-            : '';
-        const otherEdgeSelectors = matches
-            .filter(match => match.kind === 'edge' && buildFlowchartCanvasSearchMatchKey(match) !== currentMatchKey)
-            .map(match => `${buildPresentationEdgeIdSelector(match.id)} .react-flow__edge-path`)
-            .join(',\n');
-        const otherEdgeStyles = otherEdgeSelectors
-            ? `${otherEdgeSelectors} {
-                stroke: rgba(59, 130, 246, 0.72) !important;
-                stroke-width: 3px !important;
-            }`
-            : '';
-
-        const dimNodeSelectors = nodeMatchIds.size > 0 ? nodes
-            .filter(node => !nodeMatchIds.has(node.id))
-            .map(node => buildPresentationNodeSelector(node.id))
-            .join(',\n') : '';
-        const dimNodeStyles = dimNodeSelectors
-            ? `${dimNodeSelectors} { opacity: 0.35 !important; transition: opacity 0.3s ease !important; }`
-            : '';
-        const dimEdgeSelectors = edgeMatchIds.size > 0 ? edges
-            .filter(edge => !edgeMatchIds.has(edge.id))
-            .map(edge => buildPresentationEdgeIdSelector(edge.id))
-            .join(',\n') : '';
-        const dimEdgeStyles = dimEdgeSelectors
-            ? `${dimEdgeSelectors} { opacity: 0.22 !important; transition: opacity 0.3s ease !important; }`
-            : '';
-
-        const keyframes = `@keyframes search-pulse {
-            0%, 100% { outline-color: rgba(59, 130, 246, 0.8); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
-            50% { outline-color: rgba(59, 130, 246, 1); box-shadow: 0 0 16px 4px rgba(59, 130, 246, 0.25); }
-        }
-        @keyframes search-edge-pulse {
-            0%, 100% { filter: drop-shadow(0 0 3px rgba(59, 130, 246, 0.45)); }
-            50% { filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.9)); }
-        }`;
-
-        const reducedMotionStyles = `@media (prefers-reduced-motion: reduce) {
-            .react-flow__node,
-            .react-flow__edge-path {
-                animation: none !important;
-                transition: none !important;
-            }
-        }`;
-
-        return [
-            keyframes,
-            currentNodeStyles,
-            currentEdgeStyles,
-            otherNodeStyles,
-            otherEdgeStyles,
-            dimNodeStyles,
-            dimEdgeStyles,
-            reducedMotionStyles,
-        ].filter(Boolean).join('\n');
-    }, [currentMatch, currentMatchKey, edgeMatchIds, edges, matches, nodeMatchIds, nodes, query]);
+    const highlightStyle = useMemo(() => buildCanvasSearchHighlightStyle({
+        currentMatch, currentMatchKey, edges, matches, nodes, query,
+    }), [currentMatch, currentMatchKey, edges, matches, nodes, query]);
 
     const hasReplaceFns = !!(onReplaceMatch && onReplaceAll);
 
@@ -640,6 +548,7 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
                             onChange={e => handleReplaceTextChange(e.target.value)}
                             maxLength={FLOWCHART_REPLACE_TEXT_MAX_LENGTH}
                             onKeyDown={e => {
+                                if (e.nativeEvent.isComposing || e.keyCode === 229) return;
                                 if (e.key === 'Escape') {
                                     e.preventDefault();
                                     closeSearch();
