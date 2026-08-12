@@ -16,6 +16,7 @@ import type { DiagramPage } from './hooks/useMultiPage';
 import { MAX_DIAGRAM_PAGE_NAME_LENGTH, MAX_DIAGRAM_PAGES } from './multiPagePersistence';
 import { isPageNameAvailable, normalizePageName } from './multiPageNaming';
 import { resolvePageTabTargetIndex } from './pageTabKeyboard';
+import { schedulePageTabsDeleteFocus } from './pageTabsDeleteFocus';
 import { getViewportOverlayContainer } from '../ui/viewportOverlayPortal';
 import './PageTabs.css';
 
@@ -67,6 +68,7 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
     const deleteButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
     const deleteCancelFocusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const deleteFocusReturnPageIdRef = useRef<string | null>(null);
+    const deleteFocusRequestRef = useRef<{ cancel: () => void } | null>(null);
     const restoreFocusAfterDeleteRef = useRef(false);
     const addedPageFocusTargetRef = useRef<string | null>(null);
     const pageLimitReached = pages.length >= MAX_DIAGRAM_PAGES;
@@ -98,6 +100,16 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
     const focusDeleteButton = useCallback((pageId: string) => {
         deleteButtonRefs.current.get(pageId)?.focus({ preventScroll: true });
     }, []);
+
+    const scheduleDeleteFocusRecovery = useCallback((pageId: string) => {
+        deleteFocusRequestRef.current?.cancel();
+        deleteFocusRequestRef.current = schedulePageTabsDeleteFocus({
+            dialog: document.getElementById(deleteDialogId),
+            observerRoot: getViewportOverlayContainer(),
+            resolvePrimaryTarget: () => deleteButtonRefs.current.get(pageId) ?? null,
+            resolveFallbackTarget: () => tabButtonRefs.current.get(pageId) ?? null,
+        });
+    }, [deleteDialogId]);
 
     const cancelDeleteCancelFocus = useCallback(() => {
         if (deleteCancelFocusTimerRef.current === null) return;
@@ -137,9 +149,10 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
         event.stopPropagation();
         cancelDeleteCancelFocus();
         deleteFocusReturnPageIdRef.current = confirmingPageId;
+        scheduleDeleteFocusRecovery(confirmingPageId);
         setConfirmingPageId(null);
         requestAnimationFrame(() => focusDeleteButton(confirmingPageId));
-    }, [cancelDeleteCancelFocus, confirmingPageId, focusDeleteButton]);
+    }, [cancelDeleteCancelFocus, confirmingPageId, focusDeleteButton, scheduleDeleteFocusRecovery]);
 
     useEffect(() => {
         if (!confirmingPageId) return;
@@ -147,7 +160,11 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
         return () => cancelAnimationFrame(frame);
     }, [applyDeleteDialogSemantics, confirmingPageId]);
 
-    useEffect(() => cancelDeleteCancelFocus, [cancelDeleteCancelFocus]);
+    useEffect(() => () => {
+        cancelDeleteCancelFocus();
+        deleteFocusRequestRef.current?.cancel();
+        deleteFocusRequestRef.current = null;
+    }, [cancelDeleteCancelFocus]);
 
     useEffect(() => {
         if (!restoreFocusAfterDeleteRef.current) return;
@@ -515,11 +532,16 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                                     open={confirmingPageId === activePage.id}
                                     onOpenChange={(open) => {
                                         setConfirmingPageId(open ? activePage.id : null);
-                                        if (open) focusDeleteCancelButton();
+                                        if (open) {
+                                            deleteFocusRequestRef.current?.cancel();
+                                            deleteFocusRequestRef.current = null;
+                                            focusDeleteCancelButton();
+                                        }
                                         else {
                                             cancelDeleteCancelFocus();
                                             if (!restoreFocusAfterDeleteRef.current) {
                                                 deleteFocusReturnPageIdRef.current = activePage.id;
+                                                scheduleDeleteFocusRecovery(activePage.id);
                                                 requestAnimationFrame(() => focusDeleteButton(activePage.id));
                                             }
                                         }
@@ -540,6 +562,7 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                                     onCancel={() => {
                                         cancelDeleteCancelFocus();
                                         deleteFocusReturnPageIdRef.current = activePage.id;
+                                        scheduleDeleteFocusRecovery(activePage.id);
                                         setConfirmingPageId(null);
                                         requestAnimationFrame(() => focusDeleteButton(activePage.id));
                                     }}
