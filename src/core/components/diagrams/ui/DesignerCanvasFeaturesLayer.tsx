@@ -199,6 +199,7 @@ export const DesignerCanvasFeaturesLayer = React.memo(
                         onClose={search.onClose}
                         nodes={search.nodes}
                         edges={search.edges}
+                        pageName={pages.items.find(page => page.id === pages.activePageId)?.name}
                         onHighlightNode={search.onHighlightNode}
                         onReplaceMatch={search.onReplaceMatch}
                         onReplaceAll={search.onReplaceAll}

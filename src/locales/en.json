@@ -1260,16 +1260,21 @@
         },
         "canvasSearch": {
             "regionLabel": "Find and replace canvas content",
+            "regionLabelWithScope": "Find and replace canvas content, current page only: {{page}}",
             "searchInputLabel": "Search canvas content",
             "searchPlaceholder": "Search nodes or connector labels...",
+            "scopeLabel": "Current page only: {{page}}",
             "resultPosition": "Search result position",
             "currentResultAnnouncement": "Result {{current}} of {{total}}: {{type}}, {{label}}",
+            "currentResultAnnouncementWithScope": "Current page “{{page}}”: result {{current}} of {{total}}: {{type}}, {{label}}",
             "noResultsAnnouncement": "No canvas search results",
+            "noResultsAnnouncementWithScope": "No canvas search results on the current page “{{page}}”",
             "resultTypes": {
                 "node": "node text",
                 "edge": "connector label"
             },
             "noResults": "No results",
+            "noResultsCurrentPage": "No results on this page",
             "clearSearch": "Clear search",
             "previousResult": "Previous search result",
             "nextResult": "Next search result",

@@ -105,6 +105,51 @@ describe('CanvasSearchBar', () => {
             .toBe(screen.getByRole('textbox', { name: '替换为' })));
     });
 
+    it('names the current-page scope and preserves the query when pages change', () => {
+        const { rerender } = render(
+            <CanvasSearchBar
+                visible
+                pageName="页面 4"
+                onClose={vi.fn()}
+                nodes={[{
+                    id: 'node-4',
+                    position: { x: 10, y: 20 },
+                    data: { label: '起点' },
+                }]}
+            />,
+        );
+
+        const searchInput = screen.getByRole('textbox', { name: '搜索画布内容' });
+        fireEvent.change(searchInput, { target: { value: '判断' } });
+
+        expect(screen.getByRole('search', {
+            name: '画布内容查找与替换，仅搜索当前页面：页面 4',
+        })).toBeTruthy();
+        expect(screen.getByText('仅搜索当前页面：页面 4')).toBeTruthy();
+        expect(screen.getByRole('status', {
+            name: '当前页面“页面 4”的画布搜索无结果',
+        }).textContent).toBe('当前页无结果');
+
+        rerender(
+            <CanvasSearchBar
+                visible
+                pageName="页面 1"
+                onClose={vi.fn()}
+                nodes={[{
+                    id: 'node-1',
+                    position: { x: 30, y: 40 },
+                    data: { label: '判断' },
+                }]}
+            />,
+        );
+
+        expect(screen.getByRole('textbox', { name: '搜索画布内容' })).toHaveProperty('value', '判断');
+        expect(screen.getByRole('status', {
+            name: '当前页面“页面 1”：第 1 项，共 1 项：节点文本，判断',
+        }).textContent).toBe('1/1');
+        expect(screen.getByText('仅搜索当前页面：页面 1')).toBeTruthy();
+    });
+
     it('localizes the complete find and replace surface in English', async () => {
         const englishI18n = createInstance();
         await englishI18n.init({

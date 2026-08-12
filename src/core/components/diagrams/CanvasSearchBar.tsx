@@ -27,6 +27,8 @@ export interface CanvasSearchBarProps {
     onClose: () => void;
     nodes: Node[];
     edges?: Edge[];
+    /** 当前页面名称；用于明确搜索范围，避免把当前页无结果误解为全图无结果。 */
+    pageName?: string;
     /** 外部控制高亮节点 */
     onHighlightNode?: (nodeId: string | null) => void;
     /** 替换功能：更新当前节点文本或连线标签 */
@@ -60,6 +62,7 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
     onClose,
     nodes,
     edges = [],
+    pageName,
     onHighlightNode,
     onReplaceMatch,
     onReplaceAll,
@@ -152,14 +155,25 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
     const currentMatchLabel = currentMatch
         ? getCanvasSearchMatchAnnouncementLabel(currentMatch, nodes, edges)
         : '';
+    const normalizedPageName = pageName?.trim() || '';
+    const searchScopeLabel = normalizedPageName
+        ? t('designer.canvasSearch.scopeLabel', { page: normalizedPageName })
+        : '';
     const resultAnnouncement = currentMatch
-        ? t('designer.canvasSearch.currentResultAnnouncement', {
+        ? t(normalizedPageName
+            ? 'designer.canvasSearch.currentResultAnnouncementWithScope'
+            : 'designer.canvasSearch.currentResultAnnouncement', {
               current: boundedCurrentIndex + 1,
               total: matches.length,
               type: t(`designer.canvasSearch.resultTypes.${currentMatch.kind}`),
               label: currentMatchLabel,
+              page: normalizedPageName,
           })
-        : t('designer.canvasSearch.noResultsAnnouncement');
+        : t(normalizedPageName
+            ? 'designer.canvasSearch.noResultsAnnouncementWithScope'
+            : 'designer.canvasSearch.noResultsAnnouncement', {
+              page: normalizedPageName,
+          });
     const nodeMatchIds = useMemo(() => new Set(
         matches.filter(match => match.kind === 'node').map(match => match.id),
     ), [matches]);
@@ -500,7 +514,9 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
             {/* 动态搜索高亮样式 */}
             {highlightStyle && <style>{highlightStyle}</style>}
 
-            <div className="canvas-search-bar" role="search" aria-label={t('designer.canvasSearch.regionLabel')} style={{
+            <div className="canvas-search-bar" role="search" aria-label={normalizedPageName
+                ? t('designer.canvasSearch.regionLabelWithScope', { page: normalizedPageName })
+                : t('designer.canvasSearch.regionLabel')} style={{
                 zIndex: 1600,
                 background: token.colorBgContainer,
                 border: `1px solid ${token.colorBorderSecondary}`,
@@ -536,7 +552,9 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
                         }}>
                             {matches.length > 0
                                 ? `${boundedCurrentIndex + 1}/${matches.length}`
-                                : t('designer.canvasSearch.noResults')}
+                                : t(normalizedPageName
+                                    ? 'designer.canvasSearch.noResultsCurrentPage'
+                                    : 'designer.canvasSearch.noResults')}
                         </span>
                     )}
                     <div className="canvas-search-controls">
@@ -580,6 +598,23 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
                         </button>
                     </div>
                 </div>
+
+                {searchScopeLabel && (
+                    <div
+                        className="canvas-search-scope-row"
+                        title={searchScopeLabel}
+                        style={{
+                            padding: '0 10px 7px 28px',
+                            color: token.colorTextTertiary,
+                            fontSize: 11,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                        }}
+                    >
+                        {searchScopeLabel}
+                    </div>
+                )}
 
                 {nodes.length === 0 && edges.length === 0 && (
                     <div role="status" aria-live="polite" style={{
