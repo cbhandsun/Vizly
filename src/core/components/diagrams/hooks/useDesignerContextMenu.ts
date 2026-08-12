@@ -1,12 +1,21 @@
-import { useCallback } from 'react';
+import { useCallback, type Dispatch, type SetStateAction } from 'react';
 import { Node, Edge } from '@xyflow/react';
 import type { ContextMenuProps } from '../DiagramContextMenu';
 import { resolveDiagramContextMenuPosition } from '../diagramContextMenuPlacement';
 import { useDiagramStore } from '../../../store/useDiagramStore';
+import {
+    applyContextMenuVisualSelection,
+    resolveContextMenuTargetSelection,
+} from '../contextMenuTargetSelection';
 
 interface UseDesignerContextMenuOptions {
     reactFlowWrapper: React.RefObject<HTMLDivElement | null>;
     selectedNodes: Node[];
+    selectedEdges: Edge[];
+    setNodes: Dispatch<SetStateAction<Node[]>>;
+    setEdges: Dispatch<SetStateAction<Edge[]>>;
+    setSelectedNodes: Dispatch<SetStateAction<Node[]>>;
+    setSelectedEdges: Dispatch<SetStateAction<Edge[]>>;
 }
 
 /**
@@ -16,8 +25,36 @@ interface UseDesignerContextMenuOptions {
 export function useDesignerContextMenu({
     reactFlowWrapper,
     selectedNodes,
+    selectedEdges,
+    setNodes,
+    setEdges,
+    setSelectedNodes,
+    setSelectedEdges,
 }: UseDesignerContextMenuOptions) {
     const setContextMenu = useDiagramStore(state => state.setContextMenu);
+
+    const alignContextMenuTargetSelection = useCallback((target: Node | Edge, targetType: 'node' | 'edge') => {
+        const selection = resolveContextMenuTargetSelection({
+            targetId: target.id,
+            targetType,
+            selectedNodeIds: selectedNodes.map(node => node.id),
+        });
+        const selectedNodeIds = new Set(selection.nodeIds);
+        const selectedEdgeIds = new Set(selection.edgeIds);
+
+        setNodes(currentNodes => applyContextMenuVisualSelection(currentNodes, selectedNodeIds));
+        setEdges(currentEdges => applyContextMenuVisualSelection(currentEdges, selectedEdgeIds));
+        setSelectedNodes(selection.nodeIds.map(id =>
+            id === target.id && targetType === 'node'
+                ? target as Node
+                : selectedNodes.find(node => node.id === id),
+        ).filter((node): node is Node => Boolean(node)));
+        setSelectedEdges(selection.edgeIds.map(id =>
+            id === target.id && targetType === 'edge'
+                ? target as Edge
+                : selectedEdges.find(edge => edge.id === id),
+        ).filter((edge): edge is Edge => Boolean(edge)));
+    }, [selectedEdges, selectedNodes, setEdges, setNodes, setSelectedEdges, setSelectedNodes]);
 
     const openContextMenu = useCallback((args: { clientX: number; clientY: number; type: ContextMenuProps['type']; targetId?: string }) => {
         const el = reactFlowWrapper.current;
@@ -41,6 +78,7 @@ export function useDesignerContextMenu({
         (event: React.MouseEvent, node: Node) => {
             event.preventDefault();
             event.stopPropagation();
+            alignContextMenuTargetSelection(node, 'node');
             openContextMenu({
                 clientX: event.clientX,
                 clientY: event.clientY,
@@ -48,13 +86,14 @@ export function useDesignerContextMenu({
                 targetId: node.id,
             });
         },
-        [openContextMenu, selectedNodes]
+        [alignContextMenuTargetSelection, openContextMenu, selectedNodes]
     );
 
     const onEdgeContextMenu = useCallback(
         (event: React.MouseEvent, edge: Edge) => {
             event.preventDefault();
             event.stopPropagation();
+            alignContextMenuTargetSelection(edge, 'edge');
             openContextMenu({
                 clientX: event.clientX,
                 clientY: event.clientY,
@@ -62,7 +101,7 @@ export function useDesignerContextMenu({
                 targetId: edge.id,
             });
         },
-        [openContextMenu]
+        [alignContextMenuTargetSelection, openContextMenu]
     );
 
     const onPaneContextMenu = useCallback(

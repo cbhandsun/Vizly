@@ -23,6 +23,8 @@ export interface UseDesignerEventHandlersProps {
     edges: Edge[];
     setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
     setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
+    setSelectedNodes: React.Dispatch<React.SetStateAction<Node[]>>;
+    setSelectedEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
     selectedNodes: Node[];
     selectedEdges: Edge[];
     takeSnapshot: (nodes: Node[], edges: Edge[]) => void;
@@ -65,7 +67,7 @@ export interface UseDesignerEventHandlersProps {
 }
 
 export function useDesignerEventHandlers({
-    nodes, edges, setNodes, setEdges,
+    nodes, edges, setNodes, setEdges, setSelectedNodes, setSelectedEdges,
     selectedNodes, selectedEdges,
     takeSnapshot, getOperationScope, undo, redo,
     reactFlowInstance, reactFlowWrapper,
@@ -86,7 +88,8 @@ export function useDesignerEventHandlers({
     const FLOWCHART_CLIPBOARD_KEY = 'flowchart-clipboard';
     
     const { onNodeContextMenu, onEdgeContextMenu, onPaneContextMenu, onPaneClick } = useDesignerContextMenu({
-        reactFlowWrapper, selectedNodes,
+        reactFlowWrapper, selectedNodes, selectedEdges,
+        setNodes, setEdges, setSelectedNodes, setSelectedEdges,
     });
 
     const { 

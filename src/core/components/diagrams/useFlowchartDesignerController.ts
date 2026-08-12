@@ -449,7 +449,7 @@ export const useFlowchartDesignerController = ({
         handleMatchSize,
         handleReverseEdge,
     } = useDesignerEventHandlers({
-        nodes, edges, setNodes, setEdges,
+        nodes, edges, setNodes, setEdges, setSelectedNodes, setSelectedEdges,
         selectedNodes, selectedEdges,
         takeSnapshot, getOperationScope, undo, redo,
         reactFlowInstance, reactFlowWrapper,
