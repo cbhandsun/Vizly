@@ -5,8 +5,8 @@ import React from 'react';
 import { createInstance } from 'i18next';
 import { I18nextProvider } from 'react-i18next';
 import type { Edge, Node } from '@xyflow/react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { getInternalNodeMock, setCenterMock } = vi.hoisted(() => ({
     getInternalNodeMock: vi.fn(),
@@ -46,6 +46,10 @@ beforeAll(() => {
 
 afterAll(() => {
     vi.unstubAllGlobals();
+});
+
+afterEach(() => {
+    vi.useRealTimers();
 });
 
 describe('CanvasSearchBar', () => {
@@ -376,7 +380,45 @@ describe('CanvasSearchBar', () => {
             .toBe('已替换 1 个连线标签');
     });
 
+    it('dismisses completed replacement feedback without clearing the active search', () => {
+        vi.useFakeTimers();
+        const nodes: Node[] = [{
+            id: 'node-1',
+            position: { x: 10, y: 20 },
+            data: { label: '开始' },
+        }];
+        render(
+            <CanvasSearchBar
+                visible
+                replaceVisible
+                onClose={vi.fn()}
+                nodes={nodes}
+                onReplaceMatch={(match, query, replacement) => (
+                    planFlowchartCanvasTextReplacement(nodes, [], [match], query, replacement)
+                )}
+                onReplaceAll={vi.fn()}
+            />,
+        );
+
+        const searchInput = screen.getByRole('textbox', { name: '搜索画布内容' });
+        const replacementInput = screen.getByRole('textbox', { name: '替换为' });
+        fireEvent.change(searchInput, { target: { value: '开始' } });
+        fireEvent.change(replacementInput, { target: { value: '起点' } });
+        fireEvent.click(screen.getByRole('button', { name: '替换当前匹配' }));
+
+        expect(screen.getByRole('status', { name: '替换操作状态' }).textContent)
+            .toBe('已替换 1 个节点文本');
+        act(() => vi.advanceTimersByTime(3_999));
+        expect(screen.getByRole('status', { name: '替换操作状态' })).toBeTruthy();
+
+        act(() => vi.advanceTimersByTime(1));
+        expect(screen.queryByRole('status', { name: '替换操作状态' })).toBeNull();
+        expect(searchInput).toHaveProperty('value', '开始');
+        expect(replacementInput).toHaveProperty('value', '起点');
+    });
+
     it('disables replacement and explains why a matching node is protected', () => {
+        vi.useFakeTimers();
         render(
             <CanvasSearchBar
                 visible
@@ -401,6 +443,10 @@ describe('CanvasSearchBar', () => {
 
         expect(screen.getByRole('button', { name: '替换当前匹配' })).toHaveProperty('disabled', true);
         expect(screen.getByRole('button', { name: '全部替换，共 0 项内容' })).toHaveProperty('disabled', true);
+        expect(screen.getByRole('status', { name: '替换操作状态' }).textContent)
+            .toBe('当前结果已锁定，不会被替换');
+
+        act(() => vi.advanceTimersByTime(4_000));
         expect(screen.getByRole('status', { name: '替换操作状态' }).textContent)
             .toBe('当前结果已锁定，不会被替换');
     });

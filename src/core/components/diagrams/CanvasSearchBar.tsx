@@ -20,6 +20,7 @@ import {
 } from './flowchartSearchReplace';
 import { getCanvasSearchMatchAnnouncementLabel } from './canvasSearchAccessibility';
 import { CanvasSearchConfirmationDescription } from './CanvasSearchConfirmationDescription';
+import { useTransientStatusMessage } from './useTransientStatusMessage';
 
 export interface CanvasSearchBarProps {
     visible: boolean;
@@ -79,7 +80,11 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
 
     // Phase 2：替换功能
     const [replaceText, setReplaceText] = useState('');
-    const [replaceStatus, setReplaceStatus] = useState('');
+    const {
+        statusMessage: replaceStatus,
+        statusMessageVersion: replaceStatusVersion,
+        setStatusMessage: setReplaceStatus,
+    } = useTransientStatusMessage();
     const [internalReplaceVisible, setInternalReplaceVisible] = useState(false);
     const showReplace = replaceVisible ?? internalReplaceVisible;
     const setShowReplace = useCallback((visible: boolean) => {
@@ -212,7 +217,7 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
             });
             return () => window.cancelAnimationFrame(animationFrame);
         }
-    }, [edges, nodes, query]);
+    }, [edges, nodes, query, setReplaceStatus]);
 
     const handleQueryChange = useCallback((value: string) => {
         setQuery(value);
@@ -220,7 +225,7 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
         setCurrentIndex(0);
         setReplaceStatus('');
         replaceStatusTrackingRef.current = null;
-    }, []);
+    }, [setReplaceStatus]);
 
     const handleClearQuery = useCallback(() => {
         handleQueryChange('');
@@ -241,7 +246,7 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
         setReplaceText(value);
         setReplaceStatus('');
         replaceStatusTrackingRef.current = null;
-    }, []);
+    }, [setReplaceStatus]);
 
     const focusReplacementInput = useCallback(() => {
         window.requestAnimationFrame(() => {
@@ -352,7 +357,7 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
         const nextIndex = Math.min(boundedCurrentIndex, remainingMatches.length - 1);
         setCurrentIndex(Math.max(0, nextIndex));
         focusReplacementInput();
-    }, [boundedCurrentIndex, currentMatch, currentReplaceEligible, focusReplacementInput, formatReplaceResult, matches, onReplaceMatch, query, recordReplacementResult, replaceText]);
+    }, [boundedCurrentIndex, currentMatch, currentReplaceEligible, focusReplacementInput, formatReplaceResult, matches, onReplaceMatch, query, recordReplacementResult, replaceText, setReplaceStatus]);
 
     // ── 全部替换 ──
     const handleReplaceAll = useCallback(() => {
@@ -362,7 +367,7 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
         recordReplacementResult(result);
         setCurrentIndex(0);
         focusReplacementInput();
-    }, [allReplacePlan.changedMatches.length, focusReplacementInput, formatReplaceResult, matches, onReplaceAll, query, recordReplacementResult, replaceText]);
+    }, [allReplacePlan.changedMatches.length, focusReplacementInput, formatReplaceResult, matches, onReplaceAll, query, recordReplacementResult, replaceText, setReplaceStatus]);
 
     const replacePreviewMessage = useMemo(() => {
         if (!showReplace || !query.trim() || replaceStatus) return replaceStatus;
@@ -661,7 +666,7 @@ const ActiveCanvasSearchBar: React.FC<Omit<CanvasSearchBarProps, 'visible'>> = (
                     </div>
                 )}
                 {replacePreviewMessage && (
-                    <div role="status" aria-label={t('designer.canvasSearch.replaceStatus')} aria-live="polite" aria-atomic="true" style={{
+                    <div key={replaceStatus ? `operation-${replaceStatusVersion}` : `preview-${replacePreviewMessage}`} role="status" aria-label={t('designer.canvasSearch.replaceStatus')} aria-live="polite" aria-atomic="true" style={{
                         padding: '0 10px 8px 28px',
                         color: token.colorTextSecondary,
                         fontSize: 11,
