@@ -2885,6 +2885,8 @@
             "invalid": "请先检查高亮字段，再保存或测试连接",
             "testing": "正在验证连接...",
             "verified": "连接验证成功",
+            "verifiedUnsaved": "连接验证成功，请保存当前配置后再使用",
+            "savedVerified": "配置已保存且连接验证成功",
             "failed": "连接或保存失败，请检查配置"
         },
         "testFail": {

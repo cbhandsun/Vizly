@@ -427,7 +427,54 @@ describe('StorageConfigPage validation recovery', () => {
         expect(testButton).toHaveClass('ant-btn-loading');
 
         await act(async () => resolveSecond?.());
-        await waitFor(() => expect(screen.getByText('storageConfig.status.verified')).toBeInTheDocument());
+        await waitFor(() => expect(screen.getByText('storageConfig.status.verifiedUnsaved')).toBeInTheDocument());
+    });
+
+    it('preserves successful verification when the tested configuration is saved', async () => {
+        storageMocks.testConnection.mockResolvedValueOnce(undefined);
+        renderStorageConfig();
+        fireEvent.change(screen.getByPlaceholderText('https://...'), { target: { value: 'https://storage.example.com' } });
+        fireEvent.change(screen.getByPlaceholderText('my-diagrams-bucket'), { target: { value: 'vizly-audit-bucket' } });
+        fireEvent.change(screen.getByPlaceholderText('storageConfig.form.accessKeyPlaceholder'), { target: { value: 'AUDIT_ACCESS_KEY' } });
+        fireEvent.change(screen.getByPlaceholderText('storageConfig.form.secretKeyPlaceholder'), { target: { value: 'AUDIT_SECRET_KEY' } });
+
+        fireEvent.click(screen.getByRole('button', { name: 'storageConfig.form.testBtn' }));
+        await waitFor(() => expect(screen.getByText('storageConfig.status.verifiedUnsaved')).toBeInTheDocument());
+        const verifiedUnsavedEvent = new Event('beforeunload', { cancelable: true });
+        expect(window.dispatchEvent(verifiedUnsavedEvent)).toBe(false);
+        expect(verifiedUnsavedEvent.defaultPrevented).toBe(true);
+
+        fireEvent.click(screen.getByRole('button', { name: 'storageConfig.form.saveBtn' }));
+        await waitFor(() => expect(screen.getByText('storageConfig.status.savedVerified')).toBeInTheDocument());
+        expect(storageMocks.saveConfig).toHaveBeenCalledTimes(1);
+        const savedVerifiedEvent = new Event('beforeunload', { cancelable: true });
+        expect(window.dispatchEvent(savedVerifiedEvent)).toBe(true);
+        expect(savedVerifiedEvent.defaultPrevented).toBe(false);
+    });
+
+    it('retains successful verification when persistence fails and the unchanged save is retried', async () => {
+        storageMocks.testConnection.mockResolvedValueOnce(undefined);
+        storageMocks.saveConfig.mockImplementationOnce(() => {
+            throw new Error('Unable to save S3 configuration in browser local storage.');
+        });
+        renderStorageConfig();
+        fireEvent.change(screen.getByPlaceholderText('https://...'), { target: { value: 'https://storage.example.com' } });
+        fireEvent.change(screen.getByPlaceholderText('my-diagrams-bucket'), { target: { value: 'vizly-audit-bucket' } });
+        fireEvent.change(screen.getByPlaceholderText('storageConfig.form.accessKeyPlaceholder'), { target: { value: 'AUDIT_ACCESS_KEY' } });
+        fireEvent.change(screen.getByPlaceholderText('storageConfig.form.secretKeyPlaceholder'), { target: { value: 'AUDIT_SECRET_KEY' } });
+
+        fireEvent.click(screen.getByRole('button', { name: 'storageConfig.form.testBtn' }));
+        await waitFor(() => expect(screen.getByText('storageConfig.status.verifiedUnsaved')).toBeInTheDocument());
+
+        const saveButton = screen.getByRole('button', { name: 'storageConfig.form.saveBtn' });
+        fireEvent.click(saveButton);
+        await waitFor(() => expect(screen.getByText('storageConfig.status.failed')).toBeInTheDocument());
+        expect(storageMocks.saveConfig).toHaveBeenCalledTimes(1);
+
+        fireEvent.click(saveButton);
+        await waitFor(() => expect(screen.getByText('storageConfig.status.savedVerified')).toBeInTheDocument());
+        expect(storageMocks.saveConfig).toHaveBeenCalledTimes(2);
+        expect(bridgeMocks.messageSuccess).toHaveBeenCalledWith('storageConfig.saveSuccess');
     });
 
     it('offers an explicit cancel action during a connection test and restores editing', async () => {

@@ -2775,6 +2775,8 @@
             "invalid": "Review the highlighted fields before saving or testing",
             "testing": "Testing the connection...",
             "verified": "Connection verified",
+            "verifiedUnsaved": "Connection verified; save this configuration before use",
+            "savedVerified": "Configuration saved and connection verified",
             "failed": "Connection or save failed; review the configuration"
         },
         "testFail": {

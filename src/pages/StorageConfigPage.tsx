@@ -25,7 +25,7 @@ import './StorageConfigPage.css';
 
 const { Title, Paragraph } = Typography;
 
-type ConnectionState = 'not-configured' | 'saved' | 'dirty' | 'invalid' | 'testing' | 'verified' | 'failed';
+type ConnectionState = 'not-configured' | 'saved' | 'dirty' | 'invalid' | 'testing' | 'verifiedUnsaved' | 'savedVerified' | 'failed';
 
 const StorageConfigPage: React.FC = () => {
     const { t } = useTranslation();
@@ -38,6 +38,7 @@ const StorageConfigPage: React.FC = () => {
     );
     const testControllerRef = useRef<AbortController | null>(null);
     const testedValuesRef = useRef<StorageConfig | null>(null);
+    const verifiedValuesRef = useRef<StorageConfig | null>(null);
     const connectionStateBeforeTestRef = useRef<ConnectionState | null>(null);
     const pageTitleRef = useRef<HTMLHeadingElement>(null);
     const entryFocusFrameRef = useRef<number | null>(null);
@@ -85,6 +86,7 @@ const StorageConfigPage: React.FC = () => {
             testControllerRef.current?.abort();
             testControllerRef.current = null;
             testedValuesRef.current = null;
+            verifiedValuesRef.current = null;
             connectionStateBeforeTestRef.current = null;
         };
     }, [form]);
@@ -106,7 +108,7 @@ const StorageConfigPage: React.FC = () => {
         try {
             storageService.saveConfig(values);
             setHasUnsavedChanges(false);
-            setConnectionState('saved');
+            setConnectionState(verifiedValuesRef.current ? 'savedVerified' : 'saved');
             appMessage.success(t('storageConfig.saveSuccess'));
         } catch {
             setConnectionState('failed');
@@ -166,17 +168,20 @@ const StorageConfigPage: React.FC = () => {
             if (testedValuesRef.current !== values) return;
             if (controller.signal.aborted) {
                 if (testControllerRef.current !== controller) return;
+                verifiedValuesRef.current = null;
                 setConnectionState('failed');
                 appMessage.error(t('storageConfig.testTimeout'));
                 return;
             }
-            setConnectionState('verified');
+            verifiedValuesRef.current = values;
+            setConnectionState(hasUnsavedChanges ? 'verifiedUnsaved' : 'savedVerified');
             appMessage.success(t('storageConfig.testSuccess'));
         } catch (error: unknown) {
             if (!mountedRef.current) return;
             if (testedValuesRef.current !== values) return;
             if (isAbortFailure(error)) {
                 if (testControllerRef.current !== controller) return;
+                verifiedValuesRef.current = null;
                 setConnectionState('failed');
                 appMessage.error(t('storageConfig.testTimeout'));
                 return;
@@ -191,6 +196,7 @@ const StorageConfigPage: React.FC = () => {
                     : undefined,
             });
             safeLog.error('S3 connection test failed', redactedError);
+            verifiedValuesRef.current = null;
             setConnectionState('failed');
 
             const isNetworkFailure = safeError.message === 'Failed to fetch' || safeError.name === 'TypeError';
@@ -230,6 +236,7 @@ const StorageConfigPage: React.FC = () => {
     };
 
     const handleFormValuesChange = () => {
+        verifiedValuesRef.current = null;
         if (testing) {
             testControllerRef.current?.abort();
             testControllerRef.current = null;
@@ -259,7 +266,8 @@ const StorageConfigPage: React.FC = () => {
         dirty: { type: 'warning', message: t('storageConfig.status.dirty') },
         invalid: { type: 'error', message: t('storageConfig.status.invalid') },
         testing: { type: 'info', message: t('storageConfig.status.testing') },
-        verified: { type: 'success', message: t('storageConfig.status.verified') },
+        verifiedUnsaved: { type: 'warning', message: t('storageConfig.status.verifiedUnsaved') },
+        savedVerified: { type: 'success', message: t('storageConfig.status.savedVerified') },
         failed: { type: 'error', message: t('storageConfig.status.failed') },
     };
 
