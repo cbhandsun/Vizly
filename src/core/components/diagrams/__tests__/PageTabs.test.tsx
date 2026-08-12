@@ -19,6 +19,7 @@ vi.mock('react-i18next', () => ({
                 'designer.pages.actions': '{{name}} 页面操作',
                 'designer.pages.new': '新建页面',
                 'designer.pages.createSuccess': '已新建页面',
+                'designer.pages.createFailed': '无法新建页面，请重试',
                 'designer.pages.limitReached': '最多可创建 {{count}} 个页面',
                 'designer.pages.createLimitReached': '无法新建页面：最多可创建 {{count}} 个页面',
                 'designer.pages.duplicateLimitReached': '无法复制页面 {{name}}：最多可创建 {{count}} 个页面',
@@ -26,6 +27,7 @@ vi.mock('react-i18next', () => ({
                 'designer.pages.renameAction': '重命名页面 {{name}}',
                 'designer.pages.duplicateAction': '复制页面 {{name}}',
                 'designer.pages.duplicateSuccess': '已复制页面“{{name}}”',
+                'designer.pages.duplicateFailed': '无法复制页面“{{name}}”，请重试',
                 'designer.pages.copyName': '{{name}} 副本',
                 'designer.pages.moveLeft': '向左移动页面',
                 'designer.pages.moveLeftNamed': '向左移动页面 {{name}}',
@@ -33,6 +35,7 @@ vi.mock('react-i18next', () => ({
                 'designer.pages.moveRight': '向右移动页面',
                 'designer.pages.moveRightNamed': '向右移动页面 {{name}}',
                 'designer.pages.moveRightSuccess': '已将页面“{{name}}”向右移动',
+                'designer.pages.moveFailed': '无法移动页面“{{name}}”，请重试',
                 'designer.pages.nameRequired': '页面名称不能为空',
                 'designer.pages.duplicateName': '页面名称不能重复',
                 'designer.pages.renameFailed': '页面重命名失败，请重试',
@@ -42,6 +45,7 @@ vi.mock('react-i18next', () => ({
                 'designer.pages.deleteDescription': '将删除此页面中的 {{nodeCount}} 个节点和 {{edgeCount}} 条连线。关闭或重新加载图表前，可恢复最近删除的页面。',
                 'designer.pages.deleteAction': '删除',
                 'designer.pages.deleteSuccess': '已删除“{{name}}”，可使用“恢复删除的页面”找回',
+                'designer.pages.deleteFailed': '无法删除页面“{{name}}”，请重试',
                 'designer.pages.restoreAction': '恢复删除的页面',
                 'designer.pages.restoreNamedAction': '恢复页面“{{name}}”',
                 'designer.pages.restoreSuccess': '已恢复页面“{{name}}”',
@@ -556,7 +560,7 @@ describe('PageTabs', () => {
         expect(screen.getByRole('status').textContent).toBe('已将页面“页面 3”向左移动');
     });
 
-    it('does not announce page mutations that fail', () => {
+    it('announces failed page mutations without moving focus away from the retry control', () => {
         render(
             <PageTabs
                 pages={[
@@ -574,12 +578,14 @@ describe('PageTabs', () => {
         );
 
         fireEvent.click(screen.getByRole('button', { name: '新建页面' }));
+        expect(screen.getByRole('status').textContent).toBe('无法新建页面，请重试');
         fireEvent.click(screen.getByRole('button', { name: '复制页面 页面 1' }));
+        expect(screen.getByRole('status').textContent).toBe('无法复制页面“页面 1”，请重试');
         const moveRight = screen.getByRole('button', { name: '向右移动页面 页面 1' });
         moveRight.focus();
         fireEvent.click(moveRight);
 
-        expect(screen.getByRole('status').textContent).toBe('');
+        expect(screen.getByRole('status').textContent).toBe('无法移动页面“页面 1”，请重试');
         expect(document.activeElement).toBe(moveRight);
     });
 
@@ -714,6 +720,32 @@ describe('PageTabs', () => {
         await waitFor(() => expect(document.activeElement).toBe(deleteButton));
         expect(deleteButton.getAttribute('aria-controls')).toBeNull();
         expect(onDeletePage).not.toHaveBeenCalled();
+    });
+
+    it('announces deletion failure, preserves the page, and restores trigger focus', async () => {
+        const onDeletePage = vi.fn(() => false);
+        render(
+            <PageTabs
+                pages={[
+                    { id: 'page-1', name: '页面 1', nodes: [], edges: [] },
+                    { id: 'page-2', name: '页面 2', nodes: [], edges: [] },
+                ]}
+                activePageId="page-2"
+                onSwitchPage={vi.fn()}
+                onAddPage={vi.fn()}
+                onDeletePage={onDeletePage}
+                onRenamePage={vi.fn()}
+            />,
+        );
+
+        const deleteButton = screen.getByRole('button', { name: '删除页面 页面 2' });
+        fireEvent.click(deleteButton);
+        fireEvent.click(await screen.findByRole('button', { name: /^删\s*除$/ }));
+
+        expect(onDeletePage).toHaveBeenCalledWith('page-2');
+        expect(screen.getByRole('status').textContent).toBe('无法删除页面“页面 2”，请重试');
+        expect(screen.getByRole('tab', { name: '页面 2' })).toBeTruthy();
+        await waitFor(() => expect(document.activeElement).toBe(deleteButton));
     });
 
     it('renders the destructive confirmation outside the clipped page-tab item', async () => {

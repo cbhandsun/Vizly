@@ -17,6 +17,9 @@ import { resolvePageTabTargetIndex } from './pageTabKeyboard';
 import { schedulePageTabsDeleteFocus } from './pageTabsDeleteFocus';
 import { runPageTabsCapacityAction } from './pageTabsLimitFeedback';
 import { PageTabsCapacityControls } from './PageTabsCapacityControls';
+import { getPageTabsMutationFailure } from './pageTabsMutationFeedback';
+import { usePageTabsPendingRename } from './usePageTabsPendingRename';
+import { usePageTabsMutations } from './usePageTabsMutations';
 import { getViewportOverlayContainer } from '../ui/viewportOverlayPortal';
 import './PageTabs.css';
 
@@ -74,7 +77,6 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
     const renameBlurCommitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const restoreFocusAfterDeleteRef = useRef(false);
     const addedPageFocusTargetRef = useRef<string | null>(null);
-    const pendingRenameRef = useRef<{ sourcePageId: string; targetPageId: string } | null>(null);
     const pageLimitReached = pages.length >= MAX_DIAGRAM_PAGES;
 
     const cancelRenameBlurCommit = useCallback(() => {
@@ -192,23 +194,6 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
     }, [activePageId, focusPageTab, pages]);
 
     useEffect(() => {
-        const pendingRename = pendingRenameRef.current;
-        if (pendingRename) {
-            if (activePageId === pendingRename.sourcePageId) return;
-            pendingRenameRef.current = null;
-            if (activePageId !== pendingRename.targetPageId) return;
-            const pendingPage = pages.find((page) => page.id === pendingRename.targetPageId);
-            if (!pendingPage) return;
-            setConfirmingPageId(null);
-            setEditingId(pendingPage.id);
-            setEditName(pendingPage.name);
-            setRenameError(null);
-            setTimeout(() => {
-                inputRef.current?.focus();
-                inputRef.current?.select();
-            }, 50);
-            return;
-        }
         const editingAnotherPage = Boolean(editingId && editingId !== activePageId);
         const confirmingAnotherPage = Boolean(confirmingPageId && confirmingPageId !== activePageId);
         if (!editingAnotherPage && !confirmingAnotherPage) return;
@@ -217,19 +202,9 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
         setEditName('');
         setRenameError(null);
         setConfirmingPageId(null);
-    }, [activePageId, confirmingPageId, editingId, pages]);
+    }, [activePageId, confirmingPageId, editingId]);
 
-    const handleStartRename = useCallback((page: DiagramPage) => {
-        cancelRenameBlurCommit();
-        if (page.id !== activePageId) {
-            pendingRenameRef.current = {
-                sourcePageId: activePageId,
-                targetPageId: page.id,
-            };
-            onSwitchPage(page.id);
-            return;
-        }
-        pendingRenameRef.current = null;
+    const openRename = useCallback((page: DiagramPage) => {
         setConfirmingPageId(null);
         setEditingId(page.id);
         setEditName(page.name);
@@ -238,7 +213,19 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
             inputRef.current?.focus();
             inputRef.current?.select();
         }, 50);
-    }, [activePageId, cancelRenameBlurCommit, onSwitchPage]);
+    }, []);
+
+    const requestRenameAfterSwitch = usePageTabsPendingRename({ activePageId, pages, openRename });
+
+    const handleStartRename = useCallback((page: DiagramPage) => {
+        cancelRenameBlurCommit();
+        if (page.id !== activePageId) {
+            requestRenameAfterSwitch(activePageId, page.id);
+            onSwitchPage(page.id);
+            return;
+        }
+        openRename(page);
+    }, [activePageId, cancelRenameBlurCommit, onSwitchPage, openRename, requestRenameAfterSwitch]);
 
     const handleFinishRename = useCallback((restoreTabFocus = true) => {
         if (!editingId) return;
@@ -301,61 +288,17 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
         [cancelRenameBlurCommit, editingId, focusPageTab],
     );
 
-    const handleAddPage = useCallback(() => {
-        const newPageId = onAddPage();
-        if (!newPageId) return;
-        addedPageFocusTargetRef.current = newPageId;
-        setStatusMessage(t('designer.pages.createSuccess', {
-            defaultValue: '已新建页面',
-        }));
-    }, [onAddPage, t]);
-
-    const announcePageLimit = useCallback(() => {
-        setStatusMessage(t('designer.pages.limitReached', {
-            count: MAX_DIAGRAM_PAGES,
-            defaultValue: '最多可创建 {{count}} 个页面',
-        }));
-    }, [t]);
-
-    const handleDuplicatePage = useCallback((page: DiagramPage) => {
-        if (!onDuplicatePage) return;
-        const preferredName = t('designer.pages.copyName', {
-            name: page.name,
-            defaultValue: '{{name}} 副本',
-        });
-        const newPageId = onDuplicatePage(page.id, preferredName);
-        if (!newPageId) return;
-        addedPageFocusTargetRef.current = newPageId;
-        setStatusMessage(t('designer.pages.duplicateSuccess', {
-            name: page.name,
-            defaultValue: '已复制页面“{{name}}”',
-        }));
-    }, [onDuplicatePage, t]);
-
-    const handleMovePage = useCallback((page: DiagramPage, direction: 'left' | 'right') => {
-        const currentIndex = pages.findIndex((candidate) => candidate.id === page.id);
-        if (currentIndex < 0) return;
-        const targetIndex = direction === 'left' ? currentIndex - 1 : currentIndex + 1;
-        if (!onMovePage?.(page.id, direction)) return;
-        const statusKey = direction === 'left'
-            ? 'designer.pages.moveLeftSuccess'
-            : 'designer.pages.moveRightSuccess';
-        const defaultValue = direction === 'left'
-            ? '已将页面“{{name}}”向左移动'
-            : '已将页面“{{name}}”向右移动';
-        setStatusMessage(t(statusKey, {
-            name: page.name,
-            defaultValue,
-        }));
-        const reachesBoundary = targetIndex === 0 || targetIndex === pages.length - 1;
-        requestAnimationFrame(() => {
-            if (reachesBoundary) {
-                focusPageTab(page.id);
-                return;
-            }
-            scrollPageItemIntoView(page.id);
-        });
-    }, [focusPageTab, onMovePage, pages, scrollPageItemIntoView, t]);
+    const { announcePageLimit, handleAddPage, handleDuplicatePage, handleMovePage } = usePageTabsMutations({
+        addedPageFocusTargetRef,
+        focusPageTab,
+        onAddPage,
+        onDuplicatePage,
+        onMovePage,
+        pages,
+        scrollPageItemIntoView,
+        setStatusMessage,
+        t,
+    });
 
     const handleRestoreDeletedPage = useCallback(() => {
         const restoredPageId = onRestoreDeletedPage?.();
@@ -644,6 +587,15 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                                                 name: activePage.name,
                                                 defaultValue: '已删除“{{name}}”，可使用“恢复删除的页面”找回',
                                             }));
+                                        }
+                                        else {
+                                            const failure = getPageTabsMutationFailure('delete');
+                                            setStatusMessage(t(failure.key, {
+                                                name: activePage.name,
+                                                defaultValue: failure.defaultValue,
+                                            }));
+                                            deleteFocusReturnPageIdRef.current = activePage.id;
+                                            scheduleDeleteFocusRecovery(activePage.id);
                                         }
                                         setConfirmingPageId(null);
                                     }}
