@@ -1164,6 +1164,8 @@
             "previewReadonly": "Preview is read-only. Exit preview to edit or create a snapshot.",
             "exitPreview": "Exit preview",
             "empty": "No version snapshots yet",
+            "emptyTitle": "No version snapshots yet",
+            "emptyDescription": "Save a snapshot before major changes. Restoring later creates a safety backup first.",
             "preview": "Preview",
             "previewVersion": "Preview version: {{message}}",
             "exitPreviewVersion": "Exit preview: {{message}}",
@@ -3026,6 +3028,7 @@
             "disconnected": "The live collaboration connection was lost. Restore the network or service connection before inviting teammates."
         },
         "activeCount": "{{count}} collaborator(s) active",
+        "menuItem": "Live collaboration",
         "openDetails": "Open collaboration details: {{status}}"
     },
     "services": {

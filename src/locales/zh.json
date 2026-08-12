@@ -1162,6 +1162,8 @@
             "previewReadonly": "预览为只读模式；退出预览后才能继续编辑或创建新快照。",
             "exitPreview": "退出预览",
             "empty": "暂无版本快照",
+            "emptyTitle": "暂无版本快照",
+            "emptyDescription": "建议在重大修改前保存快照；日后恢复时会先自动备份当前画布。",
             "preview": "预览",
             "previewVersion": "预览版本：{{message}}",
             "exitPreviewVersion": "退出预览：{{message}}",
@@ -2872,6 +2874,7 @@
             "disconnected": "实时协作连接已断开。请恢复网络或服务连接后再邀请成员。"
         },
         "activeCount": "{{count}} 位在协作",
+        "menuItem": "实时协作",
         "openDetails": "打开协作详情：{{status}}"
     },
     "storageConfig": {

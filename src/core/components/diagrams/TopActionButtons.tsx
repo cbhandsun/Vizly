@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import {
     FaShareAlt, FaCloudUploadAlt, FaSave, FaPlay, FaFileExport, FaCheckCircle,
     FaCode, FaHistory, FaExchangeAlt, FaCog, FaLock, FaUnlock,
-    FaMagic, FaRegComment, FaEllipsisH, FaRobot
+    FaMagic, FaRegComment, FaEllipsisH, FaRobot, FaUsers
 } from 'react-icons/fa';
 import { CollaborationAvatars } from './ui/CollaborationAvatars';
 import { ApiOutlined } from '@ant-design/icons';
@@ -37,6 +37,7 @@ interface TopActionButtonsProps {
     isDirectSaveDisabled?: boolean;
     extraActionItems?: React.ReactNode;
     onShare?: () => void;
+    onOpenCollaboration?: () => void;
     onShowHistory?: () => void;
     onOpenVersionHistory?: () => void;
     /** 右侧面板宽度偏移量，工具栏位置 = right: 20 + rightOffset */
@@ -82,7 +83,7 @@ const MOBILE_TOUCH_TARGET_STYLE: React.CSSProperties = {
 export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
     diagramId, diagramTitle, onEditJson,
     onStartPresentation, onShowDiff,
-    onSaveToCloud, onDirectSave, isDirectSaveDisabled, extraActionItems, onShare, onShowHistory, onOpenVersionHistory,
+    onSaveToCloud, onDirectSave, isDirectSaveDisabled, extraActionItems, onShare, onOpenCollaboration, onShowHistory, onOpenVersionHistory,
     rightOffset = 0,
     children,
     extraExportItems,
@@ -280,6 +281,12 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
         },
         ];
         const collaborationItems: NonNullable<MenuProps['items']> = [
+        ...(onOpenCollaboration ? [{
+            key: 'live-collaboration',
+            label: t('collaboration.menuItem'),
+            icon: <FaUsers />,
+            onClick: onOpenCollaboration,
+        }] : []),
         {
             key: 'comments',
             label: isCommentMode
@@ -330,6 +337,7 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
         isYjsSynced,
         onEditJson,
         onOpenSettings,
+        onOpenCollaboration,
         onReadonlyChange,
         onShowDiff,
         onShowHistory,

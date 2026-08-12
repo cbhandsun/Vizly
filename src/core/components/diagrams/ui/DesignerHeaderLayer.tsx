@@ -142,6 +142,7 @@ export const DesignerHeaderLayer = React.memo(
                     onDirectSave={topActions.onDirectSave}
                     isDirectSaveDisabled={topActions.isDirectSaveDisabled}
                     onShare={topActions.onShare}
+                    onOpenCollaboration={topActions.onOpenCollaboration}
                     rightOffset={topActions.rightOffset}
                     extraExportItems={topActions.extraExportItems}
                     isYjsSynced={topActions.isYjsSynced}

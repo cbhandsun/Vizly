@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, Drawer, Button, Input, List, Typography, Space, Tooltip, Badge, Popconfirm } from 'antd';
+import { Alert, Drawer, Button, Empty, Input, List, Typography, Space, Tooltip, Badge, Popconfirm } from 'antd';
 import { PlusOutlined, ReloadOutlined, UndoOutlined, EyeOutlined } from '@ant-design/icons';
 import { Clock } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -227,7 +227,19 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
                                 </Button>
                             )}
                         />
-                    ) : t('designer.versionHistoryPanel.empty'),
+                    ) : (
+                        <Empty
+                            image={Empty.PRESENTED_IMAGE_SIMPLE}
+                            description={(
+                                <Space orientation="vertical" size={4}>
+                                    <Text strong>{t('designer.versionHistoryPanel.emptyTitle')}</Text>
+                                    <Text type="secondary" className="version-history-empty-description">
+                                        {t('designer.versionHistoryPanel.emptyDescription')}
+                                    </Text>
+                                </Space>
+                            )}
+                        />
+                    ),
                 }}
                 style={{ flex: 1, overflowY: 'auto' }}
                 renderItem={(item, index) => {

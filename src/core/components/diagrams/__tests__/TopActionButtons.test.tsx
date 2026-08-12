@@ -38,6 +38,7 @@ vi.mock('react-i18next', () => ({
             'designer.toolbar.versionHistory': '版本快照',
             'designer.toolbar.fileGroup': '文件操作',
             'designer.toolbar.viewGroup': '视图控制',
+            'collaboration.menuItem': '实时协作',
             'common.settings': 'Settings',
         }[key] ?? key)),
     }),
@@ -274,6 +275,20 @@ describe('TopActionButtons document menu', () => {
         expect(await screen.findByRole('menuitem', { name: /操作历史/ })).toBeTruthy();
         fireEvent.click(screen.getByRole('menuitem', { name: /版本快照/ }));
         expect(onOpenVersionHistory).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps live collaboration discoverable from the document menu before a session starts', async () => {
+        const onOpenCollaboration = vi.fn();
+        render(
+            <TopActionButtons
+                disablePortal
+                onOpenCollaboration={onOpenCollaboration}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: '文档操作' }));
+        fireEvent.click(await screen.findByRole('menuitem', { name: /实时协作/ }));
+        expect(onOpenCollaboration).toHaveBeenCalledTimes(1);
     });
 
     it('uses the active locale for the settings menu entry', async () => {

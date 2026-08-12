@@ -22,7 +22,8 @@ vi.mock('react-i18next', () => ({
                 'designer.versionHistoryPanel.previewing': 'Previewing: {{message}}',
                 'designer.versionHistoryPanel.previewReadonly': 'Preview is read-only. Exit preview to edit or create a snapshot.',
                 'designer.versionHistoryPanel.exitPreview': 'Exit preview',
-                'designer.versionHistoryPanel.empty': 'No version snapshots yet',
+                'designer.versionHistoryPanel.emptyTitle': 'No version snapshots yet',
+                'designer.versionHistoryPanel.emptyDescription': 'Save a snapshot before major changes. Restoring later creates a safety backup first.',
                 'designer.versionHistoryPanel.preview': 'Preview',
                 'designer.versionHistoryPanel.previewVersion': 'Preview version: {{message}}',
                 'designer.versionHistoryPanel.exitPreviewVersion': 'Exit preview: {{message}}',
@@ -132,6 +133,8 @@ describe('VersionHistoryPanel commercial preview safeguards', () => {
         render(<VersionHistoryPanel diagramId="diagram-1" isOpen onClose={vi.fn()} />);
 
         expect(screen.getByText('Version history')).toBeTruthy();
+        expect(screen.getByText('No version snapshots yet')).toBeTruthy();
+        expect(screen.getByText('Save a snapshot before major changes. Restoring later creates a safety backup first.')).toBeTruthy();
         expect(screen.queryByText(/版本/u)).toBeNull();
         expect((screen.getByLabelText('Snapshot note (optional)') as HTMLInputElement).disabled).toBe(false);
         expect((screen.getByRole('button', { name: /Save snapshot/ }) as HTMLButtonElement).disabled).toBe(false);

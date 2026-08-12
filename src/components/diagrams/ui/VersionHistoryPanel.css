@@ -35,6 +35,13 @@
     min-height: var(--commercial-touch-target, 44px);
 }
 
+.version-history-empty-description {
+    display: block;
+    max-width: 300px;
+    line-height: 1.5;
+    text-align: center;
+}
+
 .version-history-list-item .ant-list-item-action {
     display: flex;
     gap: 4px;
