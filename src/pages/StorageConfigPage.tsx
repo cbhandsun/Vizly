@@ -13,7 +13,9 @@ import {
     isFormValidationFailure,
     getFirstInvalidFieldName,
     S3_CONNECTION_TIMEOUT_MS,
+    validateStorageBucket,
     validateStorageEndpoint,
+    validateStorageRegion,
 } from './storageConfigPageModel';
 import { StorageSecretInput } from './StorageSecretInput';
 import { useUnsavedNavigationGuard } from './useUnsavedNavigationGuard';
@@ -300,7 +302,17 @@ const StorageConfigPage: React.FC = () => {
                         <Form.Item
                             name="bucket"
                             label={t('storageConfig.form.bucketLabel')}
-                            rules={[{ required: true, message: t('storageConfig.form.bucketRequired') }]}
+                            rules={[{
+                                validator: (_, value: unknown) => {
+                                    const error = validateStorageBucket(value);
+                                    if (!error) return Promise.resolve();
+                                    return Promise.reject(new Error(t(
+                                        error === 'required'
+                                            ? 'storageConfig.form.bucketRequired'
+                                            : 'storageConfig.form.bucketInvalid',
+                                    )));
+                                },
+                            }]}
                         >
                             <Input placeholder="my-diagrams-bucket" maxLength={S3_STORAGE_INPUT_LIMITS.bucket} autoComplete="off" />
                         </Form.Item>
@@ -308,7 +320,17 @@ const StorageConfigPage: React.FC = () => {
                         <Form.Item
                             name="region"
                             label={t('storageConfig.form.regionLabel')}
-                            rules={[{ required: true, message: t('storageConfig.form.regionRequired') }]}
+                            rules={[{
+                                validator: (_, value: unknown) => {
+                                    const error = validateStorageRegion(value);
+                                    if (!error) return Promise.resolve();
+                                    return Promise.reject(new Error(t(
+                                        error === 'required'
+                                            ? 'storageConfig.form.regionRequired'
+                                            : 'storageConfig.form.regionInvalid',
+                                    )));
+                                },
+                            }]}
                         >
                             <Input placeholder="us-east-1" maxLength={S3_STORAGE_INPUT_LIMITS.region} autoComplete="off" />
                         </Form.Item>

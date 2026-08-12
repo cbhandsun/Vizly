@@ -4,7 +4,9 @@ import {
     isAbortFailure,
     isFormValidationFailure,
     S3_CONNECTION_TIMEOUT_MS,
+    validateStorageBucket,
     validateStorageEndpoint,
+    validateStorageRegion,
 } from '../storageConfigPageModel';
 
 describe('storageConfigPageModel', () => {
@@ -21,6 +23,25 @@ describe('storageConfigPageModel', () => {
         expect(validateStorageEndpoint('http://localhost:9000')).toBeNull();
         expect(validateStorageEndpoint('http://127.0.0.1:9000')).toBeNull();
         expect(validateStorageEndpoint('http://[::1]:9000')).toBeNull();
+    });
+
+    it('classifies empty and unsafe bucket and region values before persistence', () => {
+        for (const value of [undefined, null, '', '   ']) {
+            expect(validateStorageBucket(value)).toBe('required');
+            expect(validateStorageRegion(value)).toBe('required');
+        }
+
+        for (const value of ['../vizly', 'folder/vizly', 'folder\\vizly', '.', '..', `vizly${String.fromCharCode(0)}`]) {
+            expect(validateStorageBucket(value)).toBe('invalid');
+        }
+        expect(validateStorageBucket('vizly-diagrams')).toBeNull();
+        expect(validateStorageBucket('vizly.diagrams_2026')).toBeNull();
+
+        for (const value of ['us east 1', 'us/east/1', 'region!', `us-east-1${String.fromCharCode(0)}`]) {
+            expect(validateStorageRegion(value)).toBe('invalid');
+        }
+        expect(validateStorageRegion('us-east-1')).toBeNull();
+        expect(validateStorageRegion('minio_local.1')).toBeNull();
     });
 
     it('recognizes Ant Design validation failures without accepting malformed values', () => {

@@ -1,13 +1,32 @@
-import { normalizeS3Endpoint } from '@/services/storageSecurity';
+import {
+    normalizeS3Bucket,
+    normalizeS3Endpoint,
+    normalizeS3Region,
+} from '@/services/storageSecurity';
 
 export const S3_CONNECTION_TIMEOUT_MS = 15_000;
 
 export type StorageEndpointValidationError = 'required' | 'invalid';
+export type StorageNamedFieldValidationError = 'required' | 'invalid';
 
 export const validateStorageEndpoint = (value: unknown): StorageEndpointValidationError | null => {
     if (typeof value !== 'string' || !value.trim()) return 'required';
     return normalizeS3Endpoint(value) ? null : 'invalid';
 };
+
+const classifyNormalizedField = (
+    value: unknown,
+    normalize: (candidate: unknown) => string | null,
+): StorageNamedFieldValidationError | null => {
+    if (typeof value !== 'string' || !value.trim()) return 'required';
+    return normalize(value) ? null : 'invalid';
+};
+
+export const validateStorageBucket = (value: unknown): StorageNamedFieldValidationError | null =>
+    classifyNormalizedField(value, normalizeS3Bucket);
+
+export const validateStorageRegion = (value: unknown): StorageNamedFieldValidationError | null =>
+    classifyNormalizedField(value, normalizeS3Region);
 
 export type StorageConfigFieldName = Array<string | number>;
 

@@ -153,6 +153,56 @@ describe('StorageConfigPage validation recovery', () => {
     });
 
     it.each([
+        {
+            action: 'save',
+            accessibleName: 'storageConfig.form.saveBtn',
+            fieldPlaceholder: 'my-diagrams-bucket',
+            invalidValue: '../vizly',
+            errorKey: 'storageConfig.form.bucketInvalid',
+        },
+        {
+            action: 'test',
+            accessibleName: 'storageConfig.form.testBtn',
+            fieldPlaceholder: 'us-east-1',
+            invalidValue: 'us east 1',
+            errorKey: 'storageConfig.form.regionInvalid',
+        },
+    ])('rejects an unsafe named field at the boundary for $action', async ({
+        accessibleName,
+        errorKey,
+        fieldPlaceholder,
+        invalidValue,
+    }) => {
+        renderStorageConfig();
+
+        const endpoint = screen.getByPlaceholderText('https://...');
+        const bucket = screen.getByPlaceholderText('my-diagrams-bucket');
+        const region = screen.getByPlaceholderText('us-east-1');
+        fireEvent.change(endpoint, { target: { value: 'https://storage.example.com' } });
+        fireEvent.change(bucket, { target: { value: 'vizly-audit-bucket' } });
+        fireEvent.change(region, { target: { value: 'us-east-1' } });
+        fireEvent.change(screen.getByPlaceholderText('storageConfig.form.accessKeyPlaceholder'), {
+            target: { value: 'AUDIT_ACCESS_KEY' },
+        });
+        fireEvent.change(screen.getByPlaceholderText('storageConfig.form.secretKeyPlaceholder'), {
+            target: { value: 'AUDIT_SECRET_KEY' },
+        });
+
+        const field = screen.getByPlaceholderText(fieldPlaceholder);
+        fireEvent.change(field, { target: { value: invalidValue } });
+        fireEvent.click(screen.getByRole('button', { name: accessibleName }));
+
+        await waitFor(() => {
+            expect(document.activeElement).toBe(field);
+            expect(field).toHaveAttribute('aria-invalid', 'true');
+            expect(screen.getByText(errorKey)).toBeInTheDocument();
+        });
+        expect(screen.getByText('storageConfig.status.invalid')).toBeInTheDocument();
+        expect(storageMocks.saveConfig).not.toHaveBeenCalled();
+        expect(storageMocks.testConnection).not.toHaveBeenCalled();
+    });
+
+    it.each([
         { action: 'save', accessibleName: 'storageConfig.form.saveBtn' },
         { action: 'test', accessibleName: 'storageConfig.form.testBtn' },
     ])('rejects an unsafe endpoint at the field boundary for $action', async ({ accessibleName }) => {

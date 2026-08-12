@@ -3,10 +3,20 @@ import {
     coerceS3StorageConfig,
     hasPersistedS3SecretField,
     normalizeS3Endpoint,
+    normalizeS3Bucket,
+    normalizeS3Region,
     redactSensitiveValue,
 } from '../storageSecurity';
 
 describe('storageSecurity', () => {
+    it('normalizes bucket and region values through exported service boundaries', () => {
+        expect(normalizeS3Bucket(' vizly-diagrams ')).toBe('vizly-diagrams');
+        expect(normalizeS3Bucket('../vizly')).toBeNull();
+        expect(normalizeS3Bucket('folder/vizly')).toBeNull();
+        expect(normalizeS3Region(' us-east-1 ')).toBe('us-east-1');
+        expect(normalizeS3Region('us east 1')).toBeNull();
+    });
+
     it('allows HTTPS and local HTTP S3 endpoints only', () => {
         expect(normalizeS3Endpoint('https://s3.amazonaws.com/')).toBe('https://s3.amazonaws.com');
         expect(normalizeS3Endpoint('https://s3.amazonaws.com/?X-Amz-Signature=secret#frag')).toBe('https://s3.amazonaws.com');

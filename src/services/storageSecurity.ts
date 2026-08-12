@@ -64,13 +64,13 @@ const getString = (value: unknown, maxLength: number): string | null => {
     return trimmed;
 };
 
-const normalizeBucket = (value: unknown): string | null => {
+export const normalizeS3Bucket = (value: unknown): string | null => {
     const bucket = getString(value, MAX_BUCKET_LENGTH);
     if (!bucket || bucket.includes('/') || bucket.includes('\\') || bucket === '.' || bucket === '..') return null;
     return bucket;
 };
 
-const normalizeRegion = (value: unknown): string | null => {
+export const normalizeS3Region = (value: unknown): string | null => {
     const region = getString(value, MAX_REGION_LENGTH);
     if (!region || !/^[A-Za-z0-9_.-]+$/.test(region)) return null;
     return region;
@@ -88,8 +88,8 @@ export const coerceS3StorageConfig = (
     const endpoint = getString(record.endpoint, MAX_ENDPOINT_LENGTH);
     const normalizedEndpoint = endpoint ? normalizeS3Endpoint(endpoint) : null;
     const accessKeyId = getString(record.accessKeyId, MAX_ACCESS_KEY_LENGTH);
-    const bucket = normalizeBucket(record.bucket);
-    const region = normalizeRegion(record.region);
+    const bucket = normalizeS3Bucket(record.bucket);
+    const region = normalizeS3Region(record.region);
     const persistedSecret = getString(record.secretAccessKey, MAX_SECRET_LENGTH) || '';
     const effectiveSecret = getString(sessionSecret, MAX_SECRET_LENGTH) || persistedSecret;
 
