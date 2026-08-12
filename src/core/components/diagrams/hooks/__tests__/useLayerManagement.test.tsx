@@ -90,4 +90,96 @@ describe('useLayerManagement name boundary', () => {
         });
         expect(messageState.warning).toHaveBeenCalledWith('The default layer cannot be deleted');
     });
+
+    it('keeps the active creation target visible and unlocked', () => {
+        const { result } = renderHook(() => useLayerManagement());
+
+        act(() => {
+            result.current.toggleVisibility('layer-review');
+        });
+        expect(result.current.activeLayerId).toBe('layer-0');
+        expect(result.current.getLayer('layer-review')?.visible).toBe(false);
+
+        act(() => {
+            result.current.setActiveLayerId('layer-review');
+        });
+        expect(result.current.activeLayerId).toBe('layer-0');
+        expect(messageState.warning).toHaveBeenCalledWith('请先显示该图层再设为活动图层');
+
+        act(() => {
+            result.current.toggleVisibility('layer-review');
+        });
+        act(() => {
+            result.current.setActiveLayerId('layer-review');
+        });
+        expect(result.current.activeLayerId).toBe('layer-review');
+
+        act(() => {
+            result.current.toggleLock('layer-review');
+        });
+        expect(result.current.activeLayerId).toBe('layer-0');
+        expect(result.current.getLayer('layer-review')?.locked).toBe(true);
+
+        act(() => {
+            result.current.setActiveLayerId('layer-review');
+        });
+        expect(messageState.warning).toHaveBeenCalledWith('请先解锁该图层再设为活动图层');
+    });
+
+    it('rejects mutations that would leave no editable active layer', () => {
+        const { result } = renderHook(() => useLayerManagement());
+
+        act(() => {
+            result.current.toggleVisibility('layer-review');
+        });
+        act(() => {
+            result.current.toggleVisibility('layer-0');
+            result.current.toggleLock('layer-0');
+        });
+
+        expect(result.current.getLayer('layer-0')).toMatchObject({ visible: true, locked: false });
+        expect(result.current.activeLayerId).toBe('layer-0');
+        expect(messageState.warning).toHaveBeenCalledWith('请至少保留一个可见且未锁定的活动图层');
+    });
+
+    it('does not delete the active layer when no editable fallback remains', () => {
+        const { result } = renderHook(() => useLayerManagement());
+
+        act(() => {
+            result.current.toggleVisibility('layer-0');
+        });
+        act(() => {
+            result.current.deleteLayer('layer-review');
+        });
+
+        expect(result.current.layers.some(layer => layer.id === 'layer-review')).toBe(true);
+        expect(result.current.activeLayerId).toBe('layer-review');
+        expect(messageState.warning).toHaveBeenCalledWith('请至少保留一个可见且未锁定的活动图层');
+    });
+
+    it('repairs persisted layer state so creation always has an editable target', () => {
+        localStorage.setItem(FLOWCHART_LAYERS_STORAGE_KEY, JSON.stringify([
+            { id: 'layer-0', name: '默认', visible: false, locked: true, zIndex: 0 },
+            { id: 'layer-review', name: '评审', visible: false, locked: false, zIndex: 1 },
+        ]));
+        localStorage.setItem(FLOWCHART_ACTIVE_LAYER_STORAGE_KEY, 'layer-review');
+
+        const { result } = renderHook(() => useLayerManagement());
+
+        expect(result.current.activeLayerId).toBe('layer-0');
+        expect(result.current.getLayer('layer-0')).toMatchObject({ visible: true, locked: false });
+    });
+
+    it('moves a persisted hidden active layer to an existing editable layer', () => {
+        localStorage.setItem(FLOWCHART_LAYERS_STORAGE_KEY, JSON.stringify([
+            { id: 'layer-0', name: '默认', visible: true, locked: false, zIndex: 0 },
+            { id: 'layer-review', name: '评审', visible: false, locked: false, zIndex: 1 },
+        ]));
+        localStorage.setItem(FLOWCHART_ACTIVE_LAYER_STORAGE_KEY, 'layer-review');
+
+        const { result } = renderHook(() => useLayerManagement());
+
+        expect(result.current.activeLayerId).toBe('layer-0');
+        expect(result.current.getLayer('layer-review')?.visible).toBe(false);
+    });
 });

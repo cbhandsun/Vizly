@@ -1433,6 +1433,8 @@
             "showLayer": "显示图层：{{name}}",
             "lockLayer": "锁定图层：{{name}}",
             "unlockLayer": "解锁图层：{{name}}",
+            "layerVisibility": "图层可见性：{{name}}",
+            "layerLock": "图层锁定：{{name}}",
             "colorMarker": "颜色标记",
             "setLayerColor": "设置图层颜色：{{name}}",
             "moveUp": "上移图层",
@@ -1459,7 +1461,10 @@
                 "nameDuplicate": "图层名称不能重复",
                 "created": "已创建图层“{{name}}”",
                 "cannotDeleteDefault": "无法删除默认图层",
-                "deleted": "已删除图层“{{name}}”"
+                "deleted": "已删除图层“{{name}}”",
+                "mustKeepEditable": "请至少保留一个可见且未锁定的活动图层",
+                "cannotActivateHidden": "请先显示该图层再设为活动图层",
+                "cannotActivateLocked": "请先解锁该图层再设为活动图层"
             },
             "colors": {
                 "red": "红色",

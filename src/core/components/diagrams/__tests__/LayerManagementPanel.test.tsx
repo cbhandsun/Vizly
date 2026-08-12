@@ -71,7 +71,8 @@ describe('LayerManagementPanel', () => {
         fireEvent.keyDown(layerItem, { key: 'Enter' });
         expect(onSetActive).toHaveBeenCalledWith('layer-0');
 
-        const visibilityButton = screen.getByRole('button', { name: '隐藏图层：默认图层' });
+        const visibilityButton = screen.getByRole('button', { name: '图层可见性：默认图层' });
+        expect(visibilityButton.getAttribute('aria-pressed')).toBe('true');
         expect(Number.parseFloat(visibilityButton.style.minWidth)).toBeGreaterThanOrEqual(44);
         expect(visibilityButton.style.width).toBe(visibilityButton.style.minWidth);
         expect(visibilityButton.style.height).toBe(visibilityButton.style.minWidth);
@@ -106,7 +107,8 @@ describe('LayerManagementPanel', () => {
         expect(reviewRow?.getAttribute('aria-selected')).toBe('true');
         expect(defaultRow?.getAttribute('tabindex')).toBe('-1');
         expect(defaultRow?.getAttribute('aria-selected')).toBe('false');
-        expect(screen.getByRole('button', { name: '隐藏图层：默认图层' }).getAttribute('tabindex')).toBe('-1');
+        expect(screen.getByRole('button', { name: '图层可见性：默认图层' }).getAttribute('tabindex')).toBe('-1');
+        expect(screen.getByRole('button', { name: '图层锁定：评审图层' }).getAttribute('aria-pressed')).toBe('false');
 
         reviewRow?.focus();
         fireEvent.keyDown(reviewRow as HTMLElement, { key: 'ArrowDown' });
@@ -485,8 +487,8 @@ describe('LayerManagementPanel', () => {
         );
 
         expect(screen.getByRole('heading', { name: 'Layers' })).toBeTruthy();
-        expect(screen.getByRole('button', { name: 'Hide layer: 评审图层' })).toBeTruthy();
-        expect(screen.getByRole('button', { name: 'Lock layer: 评审图层' })).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Layer visibility: 评审图层' })).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Layer lock: 评审图层' })).toBeTruthy();
         expect(screen.getByRole('button', { name: 'Set layer color: 评审图层' })).toBeTruthy();
 
         fireEvent.click(screen.getByRole('button', { name: 'New layer' }));

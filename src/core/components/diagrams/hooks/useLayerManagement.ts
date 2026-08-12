@@ -26,16 +26,44 @@ export interface LayersState {
     activeLayerId: string | null;
 }
 
+const findEditableLayer = (layers: LayerConfig[], excludedLayerId?: string) => (
+    layers.find(layer => (
+        layer.id !== excludedLayerId
+        && layer.visible
+        && !layer.locked
+    ))
+);
+
+const ensureEditableLayer = (layers: LayerConfig[]): LayerConfig[] => {
+    if (findEditableLayer(layers)) return layers;
+    const recoveryLayerId = layers.some(layer => layer.id === DEFAULT_LAYER.id)
+        ? DEFAULT_LAYER.id
+        : layers[0]?.id;
+    return layers.map(layer => (
+        layer.id === recoveryLayerId
+            ? { ...layer, visible: true, locked: false }
+            : layer
+    ));
+};
+
+const coerceEditableActiveLayerId = (layerId: string, layers: LayerConfig[]): string => {
+    const normalizedLayerId = coerceActiveLayerId(layerId, layers);
+    const normalizedLayer = layers.find(layer => layer.id === normalizedLayerId);
+    return normalizedLayer?.visible && !normalizedLayer.locked
+        ? normalizedLayer.id
+        : findEditableLayer(layers)?.id ?? DEFAULT_LAYER.id;
+};
+
 export const useLayerManagement = () => {
     const { t } = useTranslation();
     // 从 localStorage 恢复图层配置
     const [layers, setLayers] = useState<LayerConfig[]>(() => {
-        return readLayers();
+        return ensureEditableLayer(readLayers());
     });
 
     const [activeLayerId, setActiveLayerId] = useState<string>(() => {
-        const initialLayers = readLayers();
-        return readActiveLayerId(initialLayers);
+        const initialLayers = ensureEditableLayer(readLayers());
+        return coerceEditableActiveLayerId(readActiveLayerId(initialLayers), initialLayers);
     });
 
     useEffect(() => {
@@ -43,7 +71,7 @@ export const useLayerManagement = () => {
     }, [layers]);
 
     useEffect(() => {
-        const normalizedActiveLayerId = coerceActiveLayerId(activeLayerId, layers);
+        const normalizedActiveLayerId = coerceEditableActiveLayerId(activeLayerId, layers);
         if (normalizedActiveLayerId !== activeLayerId) {
             const timer = window.setTimeout(() => {
                 setActiveLayerId(normalizedActiveLayerId);
@@ -83,24 +111,51 @@ export const useLayerManagement = () => {
         }
         const layer = layers.find(l => l.id === layerId);
         if (!layer) return;
+        const fallbackLayer = activeLayerId === layerId
+            ? findEditableLayer(layers, layerId)
+            : undefined;
+        if (activeLayerId === layerId && !fallbackLayer) {
+            appMessage.warning(t('designer.layersPanel.messages.mustKeepEditable'));
+            return;
+        }
         setLayers(prev => coerceLayers(prev.filter(l => l.id !== layerId)));
-        if (activeLayerId === layerId) {
-            setActiveLayerId(DEFAULT_LAYER.id);
+        if (fallbackLayer) {
+            setActiveLayerId(fallbackLayer.id);
         }
         appMessage.success(t('designer.layersPanel.messages.deleted', { name: layer.name }));
     }, [activeLayerId, layers, t]);
 
     const toggleVisibility = useCallback((layerId: string) => {
+        const layer = layers.find(candidate => candidate.id === layerId);
+        if (!layer) return;
+        if (layer.visible && activeLayerId === layerId) {
+            const fallbackLayer = findEditableLayer(layers, layerId);
+            if (!fallbackLayer) {
+                appMessage.warning(t('designer.layersPanel.messages.mustKeepEditable'));
+                return;
+            }
+            setActiveLayerId(fallbackLayer.id);
+        }
         setLayers(prev => coerceLayers(prev.map(l =>
             l.id === layerId ? { ...l, visible: !l.visible } : l
         )));
-    }, []);
+    }, [activeLayerId, layers, t]);
 
     const toggleLock = useCallback((layerId: string) => {
+        const layer = layers.find(candidate => candidate.id === layerId);
+        if (!layer) return;
+        if (!layer.locked && activeLayerId === layerId) {
+            const fallbackLayer = findEditableLayer(layers, layerId);
+            if (!fallbackLayer) {
+                appMessage.warning(t('designer.layersPanel.messages.mustKeepEditable'));
+                return;
+            }
+            setActiveLayerId(fallbackLayer.id);
+        }
         setLayers(prev => coerceLayers(prev.map(l =>
             l.id === layerId ? { ...l, locked: !l.locked } : l
         )));
-    }, []);
+    }, [activeLayerId, layers, t]);
 
     const renameLayer = useCallback((layerId: string, newName: string) => {
         const normalizedName = normalizeLayerNameInput(newName);
@@ -150,11 +205,21 @@ export const useLayerManagement = () => {
     }, []);
 
     const setActiveLayerIdSafe = useCallback((layerId: string) => {
+        const targetLayer = layers.find(layer => layer.id === layerId);
+        if (!targetLayer) return;
+        if (!targetLayer.visible) {
+            appMessage.warning(t('designer.layersPanel.messages.cannotActivateHidden'));
+            return;
+        }
+        if (targetLayer.locked) {
+            appMessage.warning(t('designer.layersPanel.messages.cannotActivateLocked'));
+            return;
+        }
         setActiveLayerId(prev => {
             const normalized = coerceActiveLayerId(layerId, layers);
             return normalized || prev;
         });
-    }, [layers]);
+    }, [layers, t]);
 
     return {
         layers,

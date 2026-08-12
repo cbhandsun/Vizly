@@ -482,7 +482,8 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
                                                 type="text"
                                                 tabIndex={isActive ? 0 : -1}
                                                 style={actionButtonStyle}
-                                                aria-label={t(layer.visible ? 'designer.layersPanel.hideLayer' : 'designer.layersPanel.showLayer', { name: layer.name })}
+                                                aria-label={t('designer.layersPanel.layerVisibility', { name: layer.name })}
+                                                aria-pressed={layer.visible}
                                                 icon={layer.visible ? <EyeOutlined /> : <EyeInvisibleOutlined />}
                                                 onClick={(event) => {
                                                     event.stopPropagation();
@@ -496,7 +497,8 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
                                                 type="text"
                                                 tabIndex={isActive ? 0 : -1}
                                                 style={actionButtonStyle}
-                                                aria-label={t(layer.locked ? 'designer.layersPanel.unlockLayer' : 'designer.layersPanel.lockLayer', { name: layer.name })}
+                                                aria-label={t('designer.layersPanel.layerLock', { name: layer.name })}
+                                                aria-pressed={layer.locked}
                                                 icon={layer.locked ? <LockOutlined /> : <UnlockOutlined />}
                                                 onClick={(event) => {
                                                     event.stopPropagation();

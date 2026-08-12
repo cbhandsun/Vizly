@@ -1435,6 +1435,8 @@
             "showLayer": "Show layer: {{name}}",
             "lockLayer": "Lock layer: {{name}}",
             "unlockLayer": "Unlock layer: {{name}}",
+            "layerVisibility": "Layer visibility: {{name}}",
+            "layerLock": "Layer lock: {{name}}",
             "colorMarker": "Color marker",
             "setLayerColor": "Set layer color: {{name}}",
             "moveUp": "Move layer up",
@@ -1461,7 +1463,10 @@
                 "nameDuplicate": "Layer names must be unique",
                 "created": "Created layer “{{name}}”",
                 "cannotDeleteDefault": "The default layer cannot be deleted",
-                "deleted": "Deleted layer “{{name}}”"
+                "deleted": "Deleted layer “{{name}}”",
+                "mustKeepEditable": "Keep at least one visible, unlocked active layer",
+                "cannotActivateHidden": "Show this layer before making it active",
+                "cannotActivateLocked": "Unlock this layer before making it active"
             },
             "colors": {
                 "red": "Red",
