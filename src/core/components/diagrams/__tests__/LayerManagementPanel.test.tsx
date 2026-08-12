@@ -522,6 +522,6 @@ describe('LayerManagementPanel', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Delete layer: 评审图层' }));
         expect(await screen.findByRole('dialog', { name: 'Delete layer “评审图层”?' })).toBeTruthy();
         expect(screen.getByRole('button', { name: 'Confirm delete layer' })).toBeTruthy();
-        expect(screen.getByText('This action cannot be undone.')).toBeTruthy();
+        expect(screen.getByText('Items on this layer will move to another editable layer. You can undo after deletion.')).toBeTruthy();
     });
 });

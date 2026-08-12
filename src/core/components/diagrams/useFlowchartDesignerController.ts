@@ -87,6 +87,7 @@ export const useFlowchartDesignerController = ({
     pluginId = 'flowchart',
 }: DiagramComponentProps) => {
     const { t } = useTranslation();
+    const [messageApi, messageContextHolder] = message.useMessage();
     const activeUsers = useMemo(
         () => coerceCollaborationPresenceUsers(rawActiveUsers),
         [rawActiveUsers],
@@ -174,7 +175,7 @@ export const useFlowchartDesignerController = ({
 
     const {
         layers, activeLayerId, setActiveLayerId, createLayer, deleteLayer, toggleVisibility, toggleLock, renameLayer, reorderLayers, getLayer, setLayerColor
-    } = useLayerManagement();
+    } = useLayerManagement({ nodesRef, edgesRef, setNodes, setEdges, messageApi });
 
     const { updateNodesBatch, updateEdgesBatch } = useDesignerBatchUpdates({
         nodes,
@@ -227,7 +228,6 @@ export const useFlowchartDesignerController = ({
     const fileInputRef = useRef<HTMLInputElement>(null);
     const importInFlightRef = useRef(false);
 
-    const [messageApi, messageContextHolder] = message.useMessage();
     const [notificationApi, notificationContextHolder] = notification.useNotification();
     const { undo, redo } = useHistoryFeedbackActions(
         performUndo, performRedo, messageApi,

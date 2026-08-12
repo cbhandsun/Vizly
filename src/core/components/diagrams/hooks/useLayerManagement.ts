@@ -1,4 +1,7 @@
-import { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
+import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
+import type { Edge, Node } from '@xyflow/react';
+import type { MessageInstance } from 'antd/es/message/interface';
 import { useTranslation } from 'react-i18next';
 import { appMessage } from '../../../utils/antdStaticBridge';
 import {
@@ -11,6 +14,13 @@ import {
     writeLayers,
 } from '../../../utils/layerStorage';
 import { isLayerNameAvailable, normalizeLayerNameInput } from '../../../utils/layerName';
+import {
+    createLayerDeletionContentSnapshot,
+    moveDeletedLayerEdges,
+    moveDeletedLayerNodes,
+    restoreDeletedLayerEdges,
+    restoreDeletedLayerNodes,
+} from '../layerDeletionTransaction';
 
 export interface LayerConfig {
     id: string;            // 图层 ID
@@ -24,6 +34,14 @@ export interface LayerConfig {
 export interface LayersState {
     layers: LayerConfig[];
     activeLayerId: string | null;
+}
+
+interface LayerManagementGraphBoundary {
+    nodesRef: MutableRefObject<Node[]>;
+    edgesRef: MutableRefObject<Edge[]>;
+    setNodes: Dispatch<SetStateAction<Node[]>>;
+    setEdges: Dispatch<SetStateAction<Edge[]>>;
+    messageApi?: Pick<MessageInstance, 'destroy' | 'open' | 'success' | 'warning'>;
 }
 
 const findEditableLayer = (layers: LayerConfig[], excludedLayerId?: string) => (
@@ -54,8 +72,13 @@ const coerceEditableActiveLayerId = (layerId: string, layers: LayerConfig[]): st
         : findEditableLayer(layers)?.id ?? DEFAULT_LAYER.id;
 };
 
-export const useLayerManagement = () => {
+export const useLayerManagement = (graph?: LayerManagementGraphBoundary) => {
     const { t } = useTranslation();
+    const feedbackApi = graph?.messageApi ?? appMessage;
+    const nodesRef = graph?.nodesRef;
+    const edgesRef = graph?.edgesRef;
+    const setGraphNodes = graph?.setNodes;
+    const setGraphEdges = graph?.setEdges;
     // 从 localStorage 恢复图层配置
     const [layers, setLayers] = useState<LayerConfig[]>(() => {
         return ensureEditableLayer(readLayers());
@@ -84,11 +107,11 @@ export const useLayerManagement = () => {
     const createLayer = useCallback((name: string) => {
         const normalizedName = normalizeLayerNameInput(name);
         if (!normalizedName) {
-            appMessage.warning(t('designer.layersPanel.messages.nameEmpty'));
+            feedbackApi.warning(t('designer.layersPanel.messages.nameEmpty'));
             return false;
         }
         if (!isLayerNameAvailable(layers, normalizedName)) {
-            appMessage.warning(t('designer.layersPanel.messages.nameDuplicate'));
+            feedbackApi.warning(t('designer.layersPanel.messages.nameDuplicate'));
             return false;
         }
         const newLayer: LayerConfig = {
@@ -100,30 +123,89 @@ export const useLayerManagement = () => {
         };
         setLayers(prev => coerceLayers([...prev, newLayer]));
         setActiveLayerId(newLayer.id);
-        appMessage.success(t('designer.layersPanel.messages.created', { name: normalizedName }));
+        feedbackApi.success(t('designer.layersPanel.messages.created', { name: normalizedName }));
         return true;
-    }, [layers, t]);
+    }, [feedbackApi, layers, t]);
 
-    const deleteLayer = useCallback((layerId: string) => {
+    const deleteLayer = (layerId: string): void => {
         if (layerId === DEFAULT_LAYER.id) {
-            appMessage.warning(t('designer.layersPanel.messages.cannotDeleteDefault'));
+            feedbackApi.warning(t('designer.layersPanel.messages.cannotDeleteDefault'));
             return;
         }
         const layer = layers.find(l => l.id === layerId);
         if (!layer) return;
-        const fallbackLayer = activeLayerId === layerId
-            ? findEditableLayer(layers, layerId)
-            : undefined;
-        if (activeLayerId === layerId && !fallbackLayer) {
-            appMessage.warning(t('designer.layersPanel.messages.mustKeepEditable'));
+        const activeFallback = layers.find(candidate => (
+            candidate.id === activeLayerId
+            && candidate.id !== layerId
+            && candidate.visible
+            && !candidate.locked
+        ));
+        const fallbackLayer = activeFallback ?? findEditableLayer(layers, layerId);
+        if (!fallbackLayer) {
+            feedbackApi.warning(t('designer.layersPanel.messages.mustKeepEditable'));
             return;
         }
+        const layerIndex = layers.findIndex(candidate => candidate.id === layerId);
+        const wasActive = activeLayerId === layerId;
+        const contentSnapshot = createLayerDeletionContentSnapshot(
+            nodesRef?.current ?? [],
+            edgesRef?.current ?? [],
+            layerId,
+            fallbackLayer.id,
+        );
+
         setLayers(prev => coerceLayers(prev.filter(l => l.id !== layerId)));
-        if (fallbackLayer) {
+        if (wasActive) {
             setActiveLayerId(fallbackLayer.id);
         }
-        appMessage.success(t('designer.layersPanel.messages.deleted', { name: layer.name }));
-    }, [activeLayerId, layers, t]);
+        setGraphNodes?.(prev => moveDeletedLayerNodes(prev, layerId, fallbackLayer.id));
+        setGraphEdges?.(prev => moveDeletedLayerEdges(prev, layerId, fallbackLayer.id));
+
+        const messageKey = `designer.layers.delete.${layerId}`;
+        const handleUndo = () => {
+            setLayers(prev => {
+                if (prev.some(candidate => candidate.id === layer.id)) return prev;
+                const nextLayers = [...prev];
+                nextLayers.splice(Math.min(layerIndex, nextLayers.length), 0, layer);
+                return coerceLayers(nextLayers);
+            });
+            if (wasActive) setActiveLayerId(layer.id);
+            setGraphNodes?.(prev => restoreDeletedLayerNodes(prev, contentSnapshot));
+            setGraphEdges?.(prev => restoreDeletedLayerEdges(prev, contentSnapshot));
+            feedbackApi.destroy(messageKey);
+            feedbackApi.success(t('designer.layersPanel.messages.restored', { name: layer.name }));
+        };
+        feedbackApi.open({
+            key: messageKey,
+            type: 'success',
+            duration: 8,
+            content: React.createElement(
+                'span',
+                { style: { display: 'flex', alignItems: 'center', gap: 12 } },
+                t('designer.layersPanel.messages.deletedWithContents', {
+                    name: layer.name,
+                    fallback: fallbackLayer.name,
+                    nodes: contentSnapshot.nodeIds.size,
+                    edges: contentSnapshot.edgeIds.size,
+                }),
+                React.createElement('button', {
+                    type: 'button',
+                    onClick: handleUndo,
+                    style: {
+                        appearance: 'none',
+                        border: 0,
+                        padding: 0,
+                        background: 'transparent',
+                        color: 'inherit',
+                        cursor: 'pointer',
+                        font: 'inherit',
+                        fontWeight: 600,
+                        textDecoration: 'underline',
+                    },
+                }, t('designer.layersPanel.messages.undoDelete')),
+            ),
+        });
+    };
 
     const toggleVisibility = useCallback((layerId: string) => {
         const layer = layers.find(candidate => candidate.id === layerId);
@@ -131,7 +213,7 @@ export const useLayerManagement = () => {
         if (layer.visible && activeLayerId === layerId) {
             const fallbackLayer = findEditableLayer(layers, layerId);
             if (!fallbackLayer) {
-                appMessage.warning(t('designer.layersPanel.messages.mustKeepEditable'));
+                feedbackApi.warning(t('designer.layersPanel.messages.mustKeepEditable'));
                 return;
             }
             setActiveLayerId(fallbackLayer.id);
@@ -139,7 +221,7 @@ export const useLayerManagement = () => {
         setLayers(prev => coerceLayers(prev.map(l =>
             l.id === layerId ? { ...l, visible: !l.visible } : l
         )));
-    }, [activeLayerId, layers, t]);
+    }, [activeLayerId, feedbackApi, layers, t]);
 
     const toggleLock = useCallback((layerId: string) => {
         const layer = layers.find(candidate => candidate.id === layerId);
@@ -147,7 +229,7 @@ export const useLayerManagement = () => {
         if (!layer.locked && activeLayerId === layerId) {
             const fallbackLayer = findEditableLayer(layers, layerId);
             if (!fallbackLayer) {
-                appMessage.warning(t('designer.layersPanel.messages.mustKeepEditable'));
+                feedbackApi.warning(t('designer.layersPanel.messages.mustKeepEditable'));
                 return;
             }
             setActiveLayerId(fallbackLayer.id);
@@ -155,24 +237,24 @@ export const useLayerManagement = () => {
         setLayers(prev => coerceLayers(prev.map(l =>
             l.id === layerId ? { ...l, locked: !l.locked } : l
         )));
-    }, [activeLayerId, layers, t]);
+    }, [activeLayerId, feedbackApi, layers, t]);
 
     const renameLayer = useCallback((layerId: string, newName: string) => {
         const normalizedName = normalizeLayerNameInput(newName);
         if (!normalizedName) {
-            appMessage.warning(t('designer.layersPanel.messages.nameEmpty'));
+            feedbackApi.warning(t('designer.layersPanel.messages.nameEmpty'));
             return false;
         }
         if (!layers.some(layer => layer.id === layerId)) return false;
         if (!isLayerNameAvailable(layers, normalizedName, layerId)) {
-            appMessage.warning(t('designer.layersPanel.messages.nameDuplicate'));
+            feedbackApi.warning(t('designer.layersPanel.messages.nameDuplicate'));
             return false;
         }
         setLayers(prev => coerceLayers(prev.map(l =>
             l.id === layerId ? { ...l, name: normalizedName } : l
         )));
         return true;
-    }, [layers, t]);
+    }, [feedbackApi, layers, t]);
 
     const reorderLayers = useCallback((fromIndex: number, toIndex: number) => {
         setLayers(prev => {
@@ -208,18 +290,18 @@ export const useLayerManagement = () => {
         const targetLayer = layers.find(layer => layer.id === layerId);
         if (!targetLayer) return;
         if (!targetLayer.visible) {
-            appMessage.warning(t('designer.layersPanel.messages.cannotActivateHidden'));
+            feedbackApi.warning(t('designer.layersPanel.messages.cannotActivateHidden'));
             return;
         }
         if (targetLayer.locked) {
-            appMessage.warning(t('designer.layersPanel.messages.cannotActivateLocked'));
+            feedbackApi.warning(t('designer.layersPanel.messages.cannotActivateLocked'));
             return;
         }
         setActiveLayerId(prev => {
             const normalized = coerceActiveLayerId(layerId, layers);
             return normalized || prev;
         });
-    }, [layers, t]);
+    }, [feedbackApi, layers, t]);
 
     return {
         layers,

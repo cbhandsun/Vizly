@@ -1449,7 +1449,7 @@
             "deleteFallbackTitle": "删除图层？",
             "confirmDelete": "确认删除图层",
             "cancelDelete": "取消删除图层",
-            "deleteWarning": "此操作无法撤销。",
+            "deleteWarning": "此图层中的内容将迁移到其他可编辑图层，删除后可以撤销。",
             "errors": {
                 "nameRequired": "请输入图层名称",
                 "nameDuplicate": "图层名称不能重复",
@@ -1462,6 +1462,9 @@
                 "created": "已创建图层“{{name}}”",
                 "cannotDeleteDefault": "无法删除默认图层",
                 "deleted": "已删除图层“{{name}}”",
+                "deletedWithContents": "已删除“{{name}}”，{{nodes}} 个节点和 {{edges}} 条连线已移至“{{fallback}}”",
+                "undoDelete": "撤销图层删除",
+                "restored": "已恢复图层“{{name}}”",
                 "mustKeepEditable": "请至少保留一个可见且未锁定的活动图层",
                 "cannotActivateHidden": "请先显示该图层再设为活动图层",
                 "cannotActivateLocked": "请先解锁该图层再设为活动图层"

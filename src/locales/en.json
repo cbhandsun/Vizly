@@ -1451,7 +1451,7 @@
             "deleteFallbackTitle": "Delete layer?",
             "confirmDelete": "Confirm delete layer",
             "cancelDelete": "Cancel delete layer",
-            "deleteWarning": "This action cannot be undone.",
+            "deleteWarning": "Items on this layer will move to another editable layer. You can undo after deletion.",
             "errors": {
                 "nameRequired": "Enter a layer name",
                 "nameDuplicate": "Layer names must be unique",
@@ -1464,6 +1464,9 @@
                 "created": "Created layer “{{name}}”",
                 "cannotDeleteDefault": "The default layer cannot be deleted",
                 "deleted": "Deleted layer “{{name}}”",
+                "deletedWithContents": "Deleted “{{name}}”; moved {{nodes}} node(s) and {{edges}} connector(s) to “{{fallback}}”",
+                "undoDelete": "Undo layer deletion",
+                "restored": "Restored layer “{{name}}”",
                 "mustKeepEditable": "Keep at least one visible, unlocked active layer",
                 "cannotActivateHidden": "Show this layer before making it active",
                 "cannotActivateLocked": "Unlock this layer before making it active"
