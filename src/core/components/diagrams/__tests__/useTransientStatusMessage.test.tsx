@@ -4,6 +4,7 @@ import { act, renderHook } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+    TRANSIENT_ACTION_STATUS_DURATION_MS,
     TRANSIENT_STATUS_DURATION_MS,
     useTransientStatusMessage,
 } from '../useTransientStatusMessage';
@@ -76,8 +77,31 @@ describe('useTransientStatusMessage', () => {
         act(() => result.current.statusAction?.onActivate());
         expect(undo).toHaveBeenCalledTimes(1);
 
-        act(() => vi.advanceTimersByTime(TRANSIENT_STATUS_DURATION_MS));
+        act(() => vi.advanceTimersByTime(TRANSIENT_ACTION_STATUS_DURATION_MS));
         expect(result.current.statusMessage).toBe('');
         expect(result.current.statusAction).toBeNull();
+    });
+
+    it('keeps recovery actions available longer and pauses dismissal while the user interacts', () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(0);
+        const { result } = renderHook(() => useTransientStatusMessage());
+
+        act(() => result.current.setStatusMessage('已移动页面', {
+            label: '撤销此操作',
+            onActivate: vi.fn(),
+        }));
+        act(() => vi.advanceTimersByTime(4_000));
+        act(() => result.current.pauseStatusDismissal());
+        act(() => vi.advanceTimersByTime(TRANSIENT_ACTION_STATUS_DURATION_MS));
+
+        expect(result.current.statusMessage).toBe('已移动页面');
+        expect(result.current.statusAction?.label).toBe('撤销此操作');
+
+        act(() => result.current.resumeStatusDismissal());
+        act(() => vi.advanceTimersByTime(7_999));
+        expect(result.current.statusMessage).toBe('已移动页面');
+        act(() => vi.advanceTimersByTime(1));
+        expect(result.current.statusMessage).toBe('');
     });
 });

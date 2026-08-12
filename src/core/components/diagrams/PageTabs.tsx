@@ -67,7 +67,14 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
     const [editName, setEditName] = useState('');
     const [renameError, setRenameError] = useState<string | null>(null);
     const [confirmingPageId, setConfirmingPageId] = useState<string | null>(null);
-    const { statusAction, statusMessage, statusMessageVersion, setStatusMessage } = useTransientStatusMessage();
+    const {
+        pauseStatusDismissal,
+        resumeStatusDismissal,
+        statusAction,
+        statusMessage,
+        statusMessageVersion,
+        setStatusMessage,
+    } = useTransientStatusMessage();
     const inputRef = useRef<InputRef>(null);
     const restoreButtonRef = useRef<HTMLButtonElement>(null);
     const renameErrorId = React.useId();
@@ -669,7 +676,13 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                 </div>
             )}
 
-            <PageTabsStatus action={statusAction} message={statusMessage} version={statusMessageVersion} />
+            <PageTabsStatus
+                action={statusAction}
+                message={statusMessage}
+                onInteractionEnd={resumeStatusDismissal}
+                onInteractionStart={pauseStatusDismissal}
+                version={statusMessageVersion}
+            />
 
             <PageTabsCapacityControls
                 addLabel={pageLimitReached

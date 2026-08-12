@@ -259,7 +259,7 @@
     }
 }
 
-@media (max-width: 480px) {
+@media (max-width: 640px) {
     .page-tabs {
         display: grid;
         grid-template-rows: auto auto;
