@@ -275,6 +275,11 @@ export const AdvancedExportModal: React.FC<AdvancedExportModalProps> = ({
   const exporting = activeOperation === 'export';
   const copying = activeOperation === 'clipboard';
   const capabilities = getAdvancedExportCapabilities(format);
+  const selectedFormatLabel = format.toUpperCase();
+  const closeModal = () => {
+    setFailedOperation(null);
+    onClose();
+  };
   const footer = [
     ...(capabilities.clipboard ? [(
       <Button
@@ -289,11 +294,11 @@ export const AdvancedExportModal: React.FC<AdvancedExportModalProps> = ({
         {t('advancedExport.copyClipboard')}
       </Button>
     )] : []),
-    <Button key="cancel" disabled={operationInProgress} onClick={onClose}>
+    <Button key="cancel" disabled={operationInProgress} onClick={closeModal}>
       {t('advancedExport.cancel')}
     </Button>,
     <Button key="submit" type="primary" icon={<DownloadOutlined />} disabled={copying} loading={exporting} onClick={handleExport}>
-      {t('advancedExport.confirm')}
+      {t('advancedExport.confirmFormat', { format: selectedFormatLabel })}
     </Button>,
   ];
 
@@ -304,7 +309,7 @@ export const AdvancedExportModal: React.FC<AdvancedExportModalProps> = ({
       zIndex={COMMERCIAL_VIEWPORT_MODAL_Z_INDEX}
       title={<span><DownloadOutlined /> {t('advancedExport.title')}</span>}
       open={visible}
-      onCancel={onClose}
+      onCancel={closeModal}
       closable={{
         'aria-label': t('advancedExport.closeDialog'),
         disabled: operationInProgress,
@@ -327,11 +332,11 @@ export const AdvancedExportModal: React.FC<AdvancedExportModalProps> = ({
           }}
           buttonStyle="solid"
         >
-          <Radio.Button value="png"><FileImageOutlined /> PNG</Radio.Button>
-          <Radio.Button value="jpg">JPG</Radio.Button>
-          <Radio.Button value="svg">SVG</Radio.Button>
-          <Radio.Button value="pdf"><FilePdfOutlined /> PDF</Radio.Button>
-          <Radio.Button value="json"><CodeOutlined /> JSON</Radio.Button>
+          <Radio.Button aria-label="PNG" value="png"><FileImageOutlined /> PNG</Radio.Button>
+          <Radio.Button aria-label="JPG" value="jpg">JPG</Radio.Button>
+          <Radio.Button aria-label="SVG" value="svg">SVG</Radio.Button>
+          <Radio.Button aria-label="PDF" value="pdf"><FilePdfOutlined /> PDF</Radio.Button>
+          <Radio.Button aria-label="JSON" value="json"><CodeOutlined /> JSON</Radio.Button>
         </Radio.Group>
 
         {capabilities.pixelRatio ? (

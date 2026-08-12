@@ -36,6 +36,7 @@ vi.mock('react-i18next', () => ({
         'advancedExport.previewCounts': '{{nodes}} 个节点 / {{edges}} 条连线',
         'advancedExport.cancel': '取消',
         'advancedExport.confirm': '确认导出',
+        'advancedExport.confirmFormat': '导出 {{format}}',
         'common.close': '关闭',
       };
       const template = translations[key] ?? (typeof fallback === 'string' ? fallback : key);
@@ -277,13 +278,13 @@ describe('AdvancedExportModal commercial controls', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('radio', { name: 'code JSON' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'JSON' }));
 
     expect(screen.queryByRole('combobox', { name: '图片清晰度 (DPI)' })).toBeNull();
     expect(screen.queryByRole('checkbox', { name: '包含底色背景' })).toBeNull();
     expect(screen.queryByRole('checkbox', { name: '注入元数据' })).toBeNull();
     expect(screen.queryByRole('button', { name: '复制 PNG 到剪贴板' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'download 确认导出' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'download 导出 JSON' })).toBeTruthy();
   });
 
   it('keeps only the applicable controls for SVG and PDF', () => {
@@ -295,7 +296,7 @@ describe('AdvancedExportModal commercial controls', () => {
     expect(screen.getByRole('checkbox', { name: '注入元数据' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: '复制 PNG 到剪贴板' })).toBeNull();
 
-    fireEvent.click(screen.getByRole('radio', { name: 'file-pdf PDF' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'PDF' }));
     expect(screen.getByRole('combobox', { name: '图片清晰度 (DPI)' })).toBeTruthy();
     expect(screen.queryByRole('checkbox', { name: '包含底色背景' })).toBeNull();
     expect(screen.queryByRole('checkbox', { name: '注入元数据' })).toBeNull();
@@ -315,8 +316,8 @@ describe('AdvancedExportModal commercial controls', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('radio', { name: 'file-pdf PDF' }));
-    fireEvent.click(screen.getByRole('button', { name: 'download 确认导出' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'PDF' }));
+    fireEvent.click(screen.getByRole('button', { name: 'download 导出 PDF' }));
 
     await waitFor(() => {
       expect(onExportPermissionCheck).toHaveBeenCalledWith('pdf');
@@ -339,7 +340,7 @@ describe('AdvancedExportModal commercial controls', () => {
     fireEvent.click(copyButton);
 
     expect(copyImageToClipboard).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole('button', { name: 'download 确认导出' }).hasAttribute('disabled')).toBe(true);
+    expect(screen.getByRole('button', { name: 'download 导出 PNG' }).hasAttribute('disabled')).toBe(true);
     expect(screen.getByRole('button', { name: '取 消' }).hasAttribute('disabled')).toBe(true);
 
     resolveCopy?.(true);
@@ -372,12 +373,39 @@ describe('AdvancedExportModal commercial controls', () => {
 
     render(<AdvancedExportModal visible onClose={onClose} diagramId="diagram-1" />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'download 确认导出' }));
+    fireEvent.click(screen.getByRole('button', { name: 'download 导出 PNG' }));
 
     const recovery = await screen.findByTestId('advanced-export-recovery');
     expect(recovery.textContent).toContain('导出未完成');
     expect(recovery.textContent).toContain('降低图片清晰度');
     expect(document.body.textContent).not.toContain('export-secret');
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('clears stale recovery feedback when the dialog is closed and reopened', async () => {
+    vi.mocked(runAdvancedExport).mockRejectedValue(new Error('export failed'));
+
+    const ControlledModal = () => {
+      const [visible, setVisible] = React.useState(true);
+      return (
+        <>
+          <button type="button" onClick={() => setVisible(true)}>Reopen export</button>
+          <AdvancedExportModal
+            visible={visible}
+            onClose={() => setVisible(false)}
+            diagramId="diagram-1"
+          />
+        </>
+      );
+    };
+
+    render(<ControlledModal />);
+    fireEvent.click(screen.getByRole('button', { name: 'download 导出 PNG' }));
+    expect(await screen.findByTestId('advanced-export-recovery')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: '取 消' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Reopen export' }));
+
+    expect(screen.queryByTestId('advanced-export-recovery')).toBeNull();
   });
 });
