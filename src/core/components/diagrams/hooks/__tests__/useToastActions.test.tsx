@@ -216,8 +216,8 @@ describe('useToastActions clipboard feedback', () => {
     expect(props.handleCopy).toHaveBeenCalledWith(['target']);
   });
 
-  it('only reports edge-operation success when state actually changed', () => {
-    const { props, success } = createProps(vi.fn().mockResolvedValue('empty'));
+  it('only reports successful edge mutations and makes them directly undoable', () => {
+    const { destroy, open, props, success } = createProps(vi.fn().mockResolvedValue('empty'));
     props.onContextMenuAction = vi.fn()
       .mockReturnValueOnce(false)
       .mockReturnValueOnce(true);
@@ -228,8 +228,28 @@ describe('useToastActions clipboard feedback', () => {
       result.current.onContextMenuActionWithToast('reverseEdge', 'edge-1');
     });
 
-    expect(success).toHaveBeenCalledOnce();
-    expect(success).toHaveBeenCalledWith('designer.flowchart.toast.edgeReversed');
+    expect(success).not.toHaveBeenCalled();
+    expect(open).toHaveBeenCalledOnce();
+    const messageConfig = open.mock.calls[0]?.[0];
+    render(messageConfig.content);
+
+    fireEvent.click(screen.getByRole('button', { name: 'designer.flowchart.undo.action' }));
+
+    expect(props.undo).toHaveBeenCalledOnce();
+    expect(destroy).toHaveBeenCalledWith(messageConfig.key);
+  });
+
+  it('offers direct undo after resetting edge waypoints', () => {
+    const { open, props } = createProps(vi.fn().mockResolvedValue('empty'));
+    props.onContextMenuAction = vi.fn().mockReturnValue(true);
+    const { result } = renderHook(() => useToastActions(props));
+
+    act(() => result.current.onContextMenuActionWithToast('resetWaypoints', 'edge-1'));
+
+    expect(open).toHaveBeenCalledOnce();
+    const messageConfig = open.mock.calls[0]?.[0];
+    render(messageConfig.content);
+    expect(screen.getByRole('button', { name: 'designer.flowchart.undo.action' })).toBeTruthy();
   });
 
   it('reports an empty clipboard only after both clipboard channels fail', async () => {

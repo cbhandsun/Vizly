@@ -279,13 +279,13 @@ export function useToastActions({
         }
         if (action === 'reverseEdge') {
             if (onContextMenuAction(action, targetId)) {
-                messageApi.success(t('designer.flowchart.toast.edgeReversed'));
+                showUndoableMessage(t('designer.flowchart.toast.edgeReversed'));
             }
             return;
         }
         if (action === 'resetWaypoints') {
             if (onContextMenuAction(action, targetId)) {
-                messageApi.success(t('designer.flowchart.toast.waypointsReset'));
+                showUndoableMessage(t('designer.flowchart.toast.waypointsReset'));
             }
             return;
         }
@@ -302,7 +302,7 @@ export function useToastActions({
             return;
         }
         onContextMenuAction(action, targetId);
-    }, [handleDeleteWithToast, handleDuplicateWithToast, handlePasteWithToast, handleCutWithToast, handleCopyWithToast, onContextMenuAction, messageApi, t]);
+    }, [handleDeleteWithToast, handleDuplicateWithToast, handlePasteWithToast, handleCutWithToast, handleCopyWithToast, onContextMenuAction, messageApi, showUndoableMessage, t]);
 
     return {
         showUndoableMessage,
