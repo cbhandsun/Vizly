@@ -20,7 +20,7 @@ import { PageTabsCapacityControls } from './PageTabsCapacityControls';
 import { getPageTabsMutationFailure } from './pageTabsMutationFeedback';
 import { usePageTabsPendingRename } from './usePageTabsPendingRename';
 import { usePageTabsMutations } from './usePageTabsMutations';
-import { usePageTabsStatusMessage } from './usePageTabsStatusMessage';
+import { useTransientStatusMessage } from './useTransientStatusMessage';
 import { getViewportOverlayContainer } from '../ui/viewportOverlayPortal';
 import './PageTabs.css';
 
@@ -64,7 +64,7 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
     const [editName, setEditName] = useState('');
     const [renameError, setRenameError] = useState<string | null>(null);
     const [confirmingPageId, setConfirmingPageId] = useState<string | null>(null);
-    const { statusMessage, statusMessageVersion, setStatusMessage } = usePageTabsStatusMessage();
+    const { statusMessage, statusMessageVersion, setStatusMessage } = useTransientStatusMessage();
     const inputRef = useRef<InputRef>(null);
     const restoreButtonRef = useRef<HTMLButtonElement>(null);
     const renameErrorId = React.useId();

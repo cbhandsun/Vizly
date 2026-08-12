@@ -1,19 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-export const PAGE_TABS_STATUS_DURATION_MS = 4_000;
+export const TRANSIENT_STATUS_DURATION_MS = 4_000;
 
-interface PageTabsStatusState {
+interface TransientStatusState {
     message: string;
     version: number;
 }
 
 /**
- * Keeps page-operation feedback long enough to be perceived without letting it
- * permanently consume narrow-canvas space. The version remounts the live-region
- * content so repeated identical operations are announced again.
+ * Keeps operation feedback long enough to be perceived without permanently
+ * consuming compact workspace UI. Versioning remounts identical live-region
+ * messages so repeated operations are announced again.
  */
-export const usePageTabsStatusMessage = () => {
-    const [status, setStatus] = useState<PageTabsStatusState>({ message: '', version: 0 });
+export const useTransientStatusMessage = () => {
+    const [status, setStatus] = useState<TransientStatusState>({ message: '', version: 0 });
     const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const cancelDismissTimer = useCallback(() => {
@@ -30,7 +30,7 @@ export const usePageTabsStatusMessage = () => {
         dismissTimerRef.current = setTimeout(() => {
             dismissTimerRef.current = null;
             setStatus((current) => ({ ...current, message: '' }));
-        }, PAGE_TABS_STATUS_DURATION_MS);
+        }, TRANSIENT_STATUS_DURATION_MS);
     }, [cancelDismissTimer]);
 
     useEffect(() => cancelDismissTimer, [cancelDismissTimer]);

@@ -42,7 +42,10 @@ describe('HistoryPanel', () => {
         };
     };
 
-    afterEach(() => vi.unstubAllGlobals());
+    afterEach(() => {
+        vi.useRealTimers();
+        vi.unstubAllGlobals();
+    });
 
     it('stays inside narrow viewports and exposes named physical touch targets', () => {
         render(
@@ -122,6 +125,30 @@ describe('HistoryPanel', () => {
         expect(onJumpTo).toHaveBeenCalledWith(0);
         expect(screen.getByRole('status').textContent).toContain('可使用重做返回恢复前状态');
         expect(document.activeElement).toBe(screen.getByRole('button', { name: '恢复到 复制 1 个节点前，刚才' }));
+    });
+
+    it('dismisses operation feedback without removing the available recovery action', () => {
+        vi.useFakeTimers();
+        render(
+            <HistoryPanel
+                visible
+                onClose={vi.fn()}
+                pastEntries={[]}
+                canUndo
+                canRedo
+                onUndo={vi.fn()}
+                onRedo={vi.fn()}
+                onJumpTo={vi.fn()}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: '撤销' }));
+        expect(screen.getByRole('status').textContent).toContain('可使用重做恢复');
+
+        act(() => vi.advanceTimersByTime(4_000));
+
+        expect(screen.queryByRole('status')).toBeNull();
+        expect(screen.getByRole('button', { name: '重做' }).hasAttribute('disabled')).toBe(false);
     });
 
     it('keeps focus inside the panel when a recovery removes the selected entry', () => {

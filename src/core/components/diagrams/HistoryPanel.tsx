@@ -9,6 +9,7 @@ import {
     normalizeHistoryLabel,
     resolveHistoryTime,
 } from './historyPanelPresentation';
+import { useTransientStatusMessage } from './useTransientStatusMessage';
 
 export interface HistoryPanelProps {
     visible: boolean;
@@ -48,7 +49,7 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
     const { token } = theme.useToken();
     const { t, i18n } = useTranslation();
     const panelRef = useRef<HTMLDivElement>(null);
-    const [statusMessage, setStatusMessage] = useState('');
+    const { statusMessage, statusMessageVersion, setStatusMessage } = useTransientStatusMessage();
     const [now, setNow] = useState(() => Date.now());
 
     const closePanel = useCallback(() => {
@@ -59,25 +60,25 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
                 document.querySelector<HTMLButtonElement>(HISTORY_FOCUS_RETURN_SELECTOR)?.focus({ preventScroll: true });
             });
         });
-    }, [onClose]);
+    }, [onClose, setStatusMessage]);
 
     const handleUndo = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
         onUndo();
         setStatusMessage(t('designer.historyPanel.undoStatus'));
         focusAfterHistoryUpdate(event.currentTarget);
-    }, [onUndo, t]);
+    }, [onUndo, setStatusMessage, t]);
 
     const handleRedo = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
         onRedo();
         setStatusMessage(t('designer.historyPanel.redoStatus'));
         focusAfterHistoryUpdate(event.currentTarget);
-    }, [onRedo, t]);
+    }, [onRedo, setStatusMessage, t]);
 
     const handleJumpTo = useCallback((event: React.MouseEvent<HTMLButtonElement>, index: number, label: string) => {
         onJumpTo(index);
         setStatusMessage(t('designer.historyPanel.restoredStatus', { label }));
         focusAfterHistoryUpdate(event.currentTarget);
-    }, [onJumpTo, t]);
+    }, [onJumpTo, setStatusMessage, t]);
 
     const formatTime = (timestamp: number): string => {
         const presentation = resolveHistoryTime(timestamp, now);
@@ -244,6 +245,7 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
 
             {statusMessage && (
                 <div
+                    key={statusMessageVersion}
                     role="status"
                     aria-live="polite"
                     aria-atomic="true"
