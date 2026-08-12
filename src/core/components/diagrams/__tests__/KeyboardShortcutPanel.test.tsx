@@ -148,4 +148,43 @@ describe('KeyboardShortcutPanel', () => {
         await waitFor(() => expect(screen.queryByText('键盘快捷键')).toBeNull());
         await waitFor(() => expect(document.activeElement).toBe(trigger));
     });
+
+    it('falls back to the command entry when the prior modal focus owner is not interactive', async () => {
+        const trigger = document.createElement('button');
+        trigger.type = 'button';
+        trigger.dataset.commandPaletteFocusReturn = '';
+        document.body.appendChild(trigger);
+
+        const modalHeading = document.createElement('h1');
+        modalHeading.tabIndex = -1;
+        document.body.appendChild(modalHeading);
+        modalHeading.focus();
+
+        const onClose = vi.fn();
+        render(<KeyboardShortcutPanel visible onClose={onClose} />);
+
+        fireEvent.keyDown(screen.getByRole('button', { name: 'Close' }), { key: 'Escape' });
+
+        await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+        await waitFor(() => expect(document.activeElement).toBe(trigger));
+    });
+
+    it('does not restore focus into the command palette while it is leaving the DOM', async () => {
+        const trigger = document.createElement('button');
+        trigger.type = 'button';
+        trigger.dataset.commandPaletteFocusReturn = '';
+        document.body.appendChild(trigger);
+
+        const priorDialog = document.createElement('div');
+        priorDialog.setAttribute('role', 'dialog');
+        const priorOption = document.createElement('button');
+        priorDialog.appendChild(priorOption);
+        document.body.appendChild(priorDialog);
+        priorOption.focus();
+
+        render(<KeyboardShortcutPanel visible onClose={vi.fn()} />);
+        fireEvent.keyDown(screen.getByRole('button', { name: 'Close' }), { key: 'Escape' });
+
+        await waitFor(() => expect(document.activeElement).toBe(trigger));
+    });
 });

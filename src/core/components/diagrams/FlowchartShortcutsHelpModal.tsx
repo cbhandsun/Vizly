@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import Modal from 'antd/es/modal';
 import Typography from 'antd/es/typography';
 import Table from 'antd/es/table';
@@ -6,6 +6,7 @@ import Input from 'antd/es/input';
 import { SearchOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { AccessibleInputClearIcon } from './AccessibleInputClearIcon';
+import { captureShortcutFocusOwner, scheduleShortcutFocusRestore } from './shortcutFocusReturn';
 import '../ui/ShortcutsHelpModal.css';
 
 type ShortcutRow = {
@@ -19,11 +20,19 @@ export const FlowchartShortcutsHelpModal: React.FC<{
   open: boolean;
   onClose: () => void;
   getContainer?: () => HTMLElement;
-}> = ({ open, onClose }) => {
+}> = ({ open, onClose, getContainer }) => {
   const { t } = useTranslation();
   const [searchText, setSearchText] = useState('');
+  const returnFocusRef = useRef<HTMLElement | null>(captureShortcutFocusOwner());
   const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/i.test(navigator.platform || '');
   const mod = isMac ? '⌘' : 'Ctrl';
+
+  const closeModal = useCallback(() => {
+    const returnFocus = returnFocusRef.current;
+    returnFocusRef.current = null;
+    onClose();
+    scheduleShortcutFocusRestore(returnFocus);
+  }, [onClose]);
 
   const rows = useMemo<ShortcutRow[]>(() => {
     return [
@@ -60,12 +69,13 @@ export const FlowchartShortcutsHelpModal: React.FC<{
   return (
     <Modal
       open={open}
-      onCancel={onClose}
+      onCancel={closeModal}
       footer={null}
       title={t('designer.flowchartShortcuts.title')}
       width={760}
       centered
-      getContainer={() => document.body}
+      getContainer={getContainer ?? (() => document.body)}
+      focusable={{ focusTriggerAfterClose: false }}
       rootClassName="commercial-shortcuts-modal"
     >
       <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>

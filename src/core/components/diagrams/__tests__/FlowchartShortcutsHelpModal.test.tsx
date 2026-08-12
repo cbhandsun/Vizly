@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
-import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 beforeAll(() => {
     Object.defineProperty(window, 'matchMedia', {
@@ -18,6 +18,11 @@ beforeAll(() => {
             dispatchEvent: () => false,
         }),
     });
+});
+
+afterEach(() => {
+    cleanup();
+    document.body.innerHTML = '';
 });
 
 const translations: Record<string, string> = {
@@ -58,5 +63,58 @@ describe('FlowchartShortcutsHelpModal', () => {
 
         fireEvent.change(search, { target: { value: '不存在的快捷键' } });
         expect(screen.getByText('未找到匹配的快捷键')).toBeTruthy();
+    });
+
+    it('renders inside the supplied diagram container', () => {
+        const container = document.createElement('div');
+        document.body.appendChild(container);
+
+        render(
+            <FlowchartShortcutsHelpModal
+                open
+                onClose={vi.fn()}
+                getContainer={() => container}
+            />,
+        );
+
+        expect(within(container).getByRole('dialog')).toBeTruthy();
+    });
+
+    it('returns focus to the command entry when its previous owner was removed', async () => {
+        const trigger = document.createElement('button');
+        trigger.type = 'button';
+        trigger.dataset.commandPaletteFocusReturn = '';
+        trigger.textContent = '打开命令搜索';
+        document.body.appendChild(trigger);
+
+        const transientOwner = document.createElement('input');
+        document.body.appendChild(transientOwner);
+        transientOwner.focus();
+
+        const onClose = vi.fn();
+        render(<FlowchartShortcutsHelpModal open onClose={onClose} />);
+        transientOwner.remove();
+
+        fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+
+        await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+        await waitFor(() => expect(document.activeElement).toBe(trigger));
+    });
+
+    it('does not restore focus to a non-interactive modal heading', async () => {
+        const trigger = document.createElement('button');
+        trigger.type = 'button';
+        trigger.dataset.commandPaletteFocusReturn = '';
+        document.body.appendChild(trigger);
+
+        const heading = document.createElement('h1');
+        heading.tabIndex = -1;
+        document.body.appendChild(heading);
+        heading.focus();
+
+        render(<FlowchartShortcutsHelpModal open onClose={vi.fn()} />);
+        fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+
+        await waitFor(() => expect(document.activeElement).toBe(trigger));
     });
 });

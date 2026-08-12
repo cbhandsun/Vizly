@@ -130,6 +130,7 @@ export const DesignerOverlaysLayer: React.FC<DesignerOverlaysLayerProps> = ({
                     <KeyboardShortcutPanel
                         visible={shortcuts.panelVisible}
                         onClose={() => shortcuts.setPanelVisible(false)}
+                        getContainer={() => document.getElementById(`diagram-${diagramId}`) as HTMLElement}
                     />
                 </React.Suspense>
             )}

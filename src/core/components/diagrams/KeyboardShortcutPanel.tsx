@@ -4,6 +4,7 @@ import { SearchOutlined } from '@ant-design/icons';
 import { FaKeyboard } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 import { AccessibleInputClearIcon } from './AccessibleInputClearIcon';
+import { captureShortcutFocusOwner, scheduleShortcutFocusRestore } from './shortcutFocusReturn';
 import './KeyboardShortcutPanel.css';
 
 interface KeyboardShortcutPanelProps {
@@ -102,13 +103,7 @@ export const KeyboardShortcutPanel: React.FC<KeyboardShortcutPanelProps> = ({ vi
     const { token } = theme.useToken();
     const { t } = useTranslation();
     const [searchText, setSearchText] = useState('');
-    const returnFocusRef = useRef<HTMLElement | null>(
-        typeof document !== 'undefined'
-        && document.activeElement instanceof HTMLElement
-        && document.activeElement !== document.body
-            ? document.activeElement
-            : null,
-    );
+    const returnFocusRef = useRef<HTMLElement | null>(captureShortcutFocusOwner());
     const shortcutGroups = useMemo(() => createShortcutGroups(
         typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform),
         t,
@@ -132,10 +127,7 @@ export const KeyboardShortcutPanel: React.FC<KeyboardShortcutPanelProps> = ({ vi
         const returnFocus = returnFocusRef.current;
         returnFocusRef.current = null;
         onClose();
-        if (!returnFocus) return;
-        window.setTimeout(() => {
-            if (returnFocus.isConnected) returnFocus.focus();
-        }, 0);
+        scheduleShortcutFocusRestore(returnFocus);
     }, [onClose]);
 
     useEffect(() => {
@@ -169,6 +161,7 @@ export const KeyboardShortcutPanel: React.FC<KeyboardShortcutPanelProps> = ({ vi
             afterClose={() => setSearchText('')}
             rootClassName="keyboard-shortcut-panel"
             getContainer={getContainer}
+            focusable={{ focusTriggerAfterClose: false }}
             styles={{
                 body: { maxHeight: '60vh', overflowY: 'auto', padding: '12px 0' },
             }}
