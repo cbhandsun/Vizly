@@ -957,26 +957,16 @@
                 "autoLayoutTB": "自动布局（上下）",
                 "autoLayoutLR": "自动布局（左右）"
             },
-            "group": {
-                "defaultLabel": "新分组",
-                "defaultDescription": "分组选中项"
-            },
             "toast": {
-                "nothingToCopy": "没有可复制的内容",
                 "nothingToPaste": "没有可粘贴的内容",
-                "pasteScopeChanged": "页面或图表已切换，粘贴已取消，请重试",
+                "pasteScopeChanged": "页面已变更，粘贴取消",
                 "nothingToCut": "没有可剪切的内容",
                 "nothingToDuplicate": "没有可复制的节点",
                 "needTwoNodesToGroup": "至少选择两个节点才能成组",
                 "groupSameLevel": "请在同一层级内选择节点进行成组",
                 "nothingToUngroup": "没有可解组的分组",
-                "copied": "已复制：{{nodes}} 节点，{{edges}} 连线",
-                "pasted": "已粘贴：{{nodes}} 节点，{{edges}} 连线",
-                "cut": "已剪切：{{nodes}} 节点，{{edges}} 连线",
                 "deleted": "已删除：{{nodes}} 节点，{{edges}} 连线",
                 "duplicated": "已复制副本：{{nodes}} 节点",
-                "grouped": "已成组：{{nodes}} 节点",
-                "ungrouped": "已解组：{{groups}} 分组",
                 "edgeReversed": "已反转连线方向",
                 "waypointsReset": "已重置连线路径",
                 "convertedToEditable": "已转为可编辑连线"

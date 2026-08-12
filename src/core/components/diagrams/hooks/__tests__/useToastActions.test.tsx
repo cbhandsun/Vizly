@@ -4,7 +4,6 @@ import { act, fireEvent, render, renderHook, screen } from '@testing-library/rea
 import { describe, expect, it, vi } from 'vitest';
 import type { Edge, Node } from '@xyflow/react';
 import type { MessageInstance } from 'antd/es/message/interface';
-import type { NotificationInstance } from 'antd/es/notification/interface';
 import { useToastActions } from '../useToastActions';
 import type { ClipboardCutResult, ClipboardPasteResult } from '../useClipboard';
 
@@ -32,7 +31,6 @@ const createProps = (
     success,
     props: {
       messageApi: { destroy, info, open, warning, success } as unknown as MessageInstance,
-      notificationApi: {} as NotificationInstance,
       handleDelete: vi.fn(),
       handleDuplicate: vi.fn(),
       handleCopy: vi.fn(),

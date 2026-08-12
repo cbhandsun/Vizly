@@ -1056,26 +1056,16 @@
                 "autoLayoutTB": "Auto Layout (Top-Bottom)",
                 "autoLayoutLR": "Auto Layout (Left-Right)"
             },
-            "group": {
-                "defaultLabel": "New Group",
-                "defaultDescription": "Group selected items"
-            },
             "toast": {
-                "nothingToCopy": "Nothing to copy",
                 "nothingToPaste": "Nothing to paste",
-                "pasteScopeChanged": "The page or diagram changed, so paste was cancelled. Try again.",
+                "pasteScopeChanged": "Page changed; paste cancelled.",
                 "nothingToCut": "Nothing to cut",
                 "nothingToDuplicate": "No nodes to duplicate",
                 "needTwoNodesToGroup": "Select at least two nodes to group",
                 "groupSameLevel": "Select nodes at the same level to group",
                 "nothingToUngroup": "No groups to ungroup",
-                "copied": "Copied: {{nodes}} nodes, {{edges}} edges",
-                "pasted": "Pasted: {{nodes}} nodes, {{edges}} edges",
-                "cut": "Cut: {{nodes}} nodes, {{edges}} edges",
                 "deleted": "Deleted: {{nodes}} nodes, {{edges}} edges",
                 "duplicated": "Duplicated: {{nodes}} nodes",
-                "grouped": "Grouped: {{nodes}} nodes",
-                "ungrouped": "Ungrouped: {{groups}} groups",
                 "edgeReversed": "Edge direction reversed",
                 "waypointsReset": "Edge path reset",
                 "convertedToEditable": "Converted to editable edge"

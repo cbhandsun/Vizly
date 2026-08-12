@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Node, Edge, type ReactFlowInstance } from '@xyflow/react';
 import type { MessageInstance } from 'antd/es/message/interface';
-import type { NotificationInstance } from 'antd/es/notification/interface';
 import { useDesignerContextMenu } from './useDesignerContextMenu';
 import { useClipboard, type ClipboardPasteSummary } from './useClipboard';
 import { useToastActions } from './useToastActions';
@@ -38,7 +37,6 @@ export interface UseDesignerEventHandlersProps {
     pluginCtx: PluginContext | null;
     activePlugin?: DiagramTypePlugin;
     messageApi: MessageInstance;
-    notificationApi: NotificationInstance;
     
     layers: LayerConfig[];
     setActiveLayerId: (layerId: string) => void;
@@ -72,7 +70,7 @@ export function useDesignerEventHandlers({
     takeSnapshot, getOperationScope, undo, redo,
     reactFlowInstance, reactFlowWrapper,
     isDragging, editingEnabled, pluginCtx, activePlugin,
-    messageApi, notificationApi,
+    messageApi,
     layers, setActiveLayerId, toggleVisibility,
     canAlign, canDistribute, handleAlign, handleDistribute,
     handleGroup, handleUngroup,
@@ -128,7 +126,7 @@ export function useDesignerEventHandlers({
         handleDeleteWithToast, handleDuplicateWithToast,
         handleGroupWithToast, handleUngroupWithToast, onContextMenuActionWithToast
     } = useToastActions({
-        messageApi, notificationApi, handleDelete, handleDuplicate, handleCopy, handlePaste, handleCut,
+        messageApi, handleDelete, handleDuplicate, handleCopy, handlePaste, handleCut,
         handleGroup, handleUngroup, onContextMenuAction, undo, selectedNodes, selectedEdges, nodesRef, edgesRef,
     });
 

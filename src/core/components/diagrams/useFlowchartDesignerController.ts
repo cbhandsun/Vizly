@@ -454,7 +454,7 @@ export const useFlowchartDesignerController = ({
         takeSnapshot, getOperationScope, undo, redo,
         reactFlowInstance, reactFlowWrapper,
         isDragging, editingEnabled: !isReadonly && !presentationActive, pluginCtx, activePlugin,
-        messageApi, notificationApi,
+        messageApi,
         layers, setActiveLayerId, toggleVisibility,
         canAlign, canDistribute, handleAlign, handleDistribute,
         handleGroup, handleUngroup,

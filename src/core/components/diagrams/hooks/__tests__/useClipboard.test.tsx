@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Edge, Node } from '@xyflow/react';
 import type { SetStateAction } from 'react';
 import { useClipboard } from '../useClipboard';
+import { SYSTEM_CLIPBOARD_READ_TIMEOUT_MS } from '../clipboardReadBoundary';
 
 const loggingState = vi.hoisted(() => ({
   logClipboardWriteFailure: vi.fn(),
@@ -39,6 +40,7 @@ describe('useClipboard', () => {
 
   afterEach(() => {
     document.body.innerHTML = '';
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
@@ -313,6 +315,64 @@ describe('useClipboard', () => {
     expect(takeSnapshot).not.toHaveBeenCalled();
     expect(setNodes).not.toHaveBeenCalled();
     expect(setEdges).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the internal clipboard when the system read never settles', async () => {
+    vi.useFakeTimers();
+    const setNodes = vi.fn();
+    const setEdges = vi.fn();
+    const takeSnapshot = vi.fn();
+    const readText = vi.fn(() => new Promise<string>(() => undefined));
+    Object.assign(navigator, { clipboard: { writeText: vi.fn(), readText } });
+    localStorage.setItem('flowchart-clipboard', JSON.stringify({
+      nodes: selectedNodes,
+      edges: selectedEdges,
+    }));
+
+    const { result } = renderHook(() => useClipboard({
+      nodesRef: { current: [] },
+      edgesRef: { current: [] },
+      selectedNodes: [],
+      selectedEdges: [],
+      setNodes,
+      setEdges,
+      takeSnapshot,
+      getOperationScope,
+    }));
+
+    const pastePromise = result.current.handlePaste();
+    await vi.advanceTimersByTimeAsync(SYSTEM_CLIPBOARD_READ_TIMEOUT_MS);
+
+    await expect(pastePromise).resolves.toBe('pasted');
+    expect(takeSnapshot).toHaveBeenCalledOnce();
+    expect(setNodes).toHaveBeenCalledOnce();
+    expect(setEdges).toHaveBeenCalledOnce();
+  });
+
+  it('reports an empty paste when a timed-out system read has no internal fallback', async () => {
+    vi.useFakeTimers();
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: vi.fn(),
+        readText: vi.fn(() => new Promise<string>(() => undefined)),
+      },
+    });
+
+    const { result } = renderHook(() => useClipboard({
+      nodesRef: { current: [] },
+      edgesRef: { current: [] },
+      selectedNodes: [],
+      selectedEdges: [],
+      setNodes: vi.fn(),
+      setEdges: vi.fn(),
+      takeSnapshot: vi.fn(),
+      getOperationScope,
+    }));
+
+    const pastePromise = result.current.handlePaste();
+    await vi.advanceTimersByTimeAsync(SYSTEM_CLIPBOARD_READ_TIMEOUT_MS);
+
+    await expect(pastePromise).resolves.toBe('empty');
   });
 
   it('does not delete an edge-only selection because it has no pasteable payload', async () => {

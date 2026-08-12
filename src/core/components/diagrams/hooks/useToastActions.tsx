@@ -3,7 +3,6 @@ import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Node, Edge } from '@xyflow/react';
 import type { MessageInstance } from 'antd/es/message/interface';
-import type { NotificationInstance } from 'antd/es/notification/interface';
 import type { DiagramActionTarget } from './useDiagramActions';
 import type { ClipboardCutResult, ClipboardPasteResult } from './useClipboard';
 import { hasMutationLockedNode, resolveTargetNodes } from '../nodeLockPolicy';
@@ -16,7 +15,6 @@ import { hasMutationLockedNode, resolveTargetNodes } from '../nodeLockPolicy';
 
 interface UseToastActionsProps {
     messageApi: MessageInstance;
-    notificationApi: NotificationInstance;
     // Core actions (from useDiagramActions)
     handleDelete: (target?: DiagramActionTarget) => void;
     handleDuplicate: (target?: DiagramActionTarget) => void;
@@ -40,7 +38,6 @@ interface UseToastActionsProps {
 
 export function useToastActions({
     messageApi,
-    notificationApi: _notificationApi,
     handleDelete,
     handleDuplicate,
     handleCopy,

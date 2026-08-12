@@ -14,6 +14,7 @@ import {
     logClipboardSystemWriteFailure,
     logClipboardWriteFailure,
 } from './clipboardLogging';
+import { readClipboardTextWithTimeout } from './clipboardReadBoundary';
 import { hasMutationLockedNode } from '../nodeLockPolicy';
 import {
     advanceClipboardPasteCursor,
@@ -170,17 +171,19 @@ export const useClipboard = ({
 
         if (navigator.clipboard?.readText && window.isSecureContext) {
             try {
-                const text = await navigator.clipboard.readText();
-                clipboardText = text;
-                clipboardData = parseClipboardText(text);
-                if (operationScope !== getOperationScope()) return 'scope-changed';
+                const text = await readClipboardTextWithTimeout(() => navigator.clipboard.readText());
+                if (text !== null) {
+                    clipboardText = text;
+                    clipboardData = parseClipboardText(text);
+                    if (operationScope !== getOperationScope()) return 'scope-changed';
 
-                // A successful system read is authoritative. Falling back to the
-                // persisted internal clipboard here can paste stale content that
-                // the user did not ask for when the current clipboard is empty or
-                // contains unrelated text.
-                if (!text.trim()) return 'empty';
-                if (!clipboardData || clipboardData.nodes.length === 0) return 'unsupported';
+                    // A successful system read is authoritative. Falling back to the
+                    // persisted internal clipboard here can paste stale content that
+                    // the user did not ask for when the current clipboard is empty or
+                    // contains unrelated text.
+                    if (!text.trim()) return 'empty';
+                    if (!clipboardData || clipboardData.nodes.length === 0) return 'unsupported';
+                }
             } catch (error) {
                 logClipboardReadFailure(error);
             }
