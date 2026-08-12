@@ -69,9 +69,16 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
     const deleteCancelFocusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const deleteFocusReturnPageIdRef = useRef<string | null>(null);
     const deleteFocusRequestRef = useRef<{ cancel: () => void } | null>(null);
+    const renameBlurCommitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const restoreFocusAfterDeleteRef = useRef(false);
     const addedPageFocusTargetRef = useRef<string | null>(null);
     const pageLimitReached = pages.length >= MAX_DIAGRAM_PAGES;
+
+    const cancelRenameBlurCommit = useCallback(() => {
+        if (renameBlurCommitTimerRef.current === null) return;
+        clearTimeout(renameBlurCommitTimerRef.current);
+        renameBlurCommitTimerRef.current = null;
+    }, []);
 
     const scrollPageItemIntoView = useCallback((pageId: string) => {
         const tab = tabButtonRefs.current.get(pageId);
@@ -161,10 +168,11 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
     }, [applyDeleteDialogSemantics, confirmingPageId]);
 
     useEffect(() => () => {
+        cancelRenameBlurCommit();
         cancelDeleteCancelFocus();
         deleteFocusRequestRef.current?.cancel();
         deleteFocusRequestRef.current = null;
-    }, [cancelDeleteCancelFocus]);
+    }, [cancelDeleteCancelFocus, cancelRenameBlurCommit]);
 
     useEffect(() => {
         if (!restoreFocusAfterDeleteRef.current) return;
@@ -192,6 +200,7 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
     }, [activePageId, confirmingPageId, editingId]);
 
     const handleStartRename = useCallback((page: DiagramPage) => {
+        cancelRenameBlurCommit();
         if (page.id !== activePageId) onSwitchPage(page.id);
         setConfirmingPageId(null);
         setEditingId(page.id);
@@ -201,9 +210,9 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
             inputRef.current?.focus();
             inputRef.current?.select();
         }, 50);
-    }, [activePageId, onSwitchPage]);
+    }, [activePageId, cancelRenameBlurCommit, onSwitchPage]);
 
-    const handleFinishRename = useCallback(() => {
+    const handleFinishRename = useCallback((restoreTabFocus = true) => {
         if (!editingId) return;
         const normalizedName = normalizePageName(editName);
         if (!normalizedName) {
@@ -237,20 +246,31 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
             name: normalizedName,
             defaultValue: '页面已重命名为“{{name}}”',
         }));
-        requestAnimationFrame(() => focusPageTab(renamedPageId));
+        if (restoreTabFocus) {
+            requestAnimationFrame(() => focusPageTab(renamedPageId));
+        }
     }, [editingId, editName, focusPageTab, onRenamePage, pages, t]);
+
+    const handleRenameBlur = useCallback(() => {
+        cancelRenameBlurCommit();
+        renameBlurCommitTimerRef.current = setTimeout(() => {
+            renameBlurCommitTimerRef.current = null;
+            handleFinishRename(false);
+        }, 0);
+    }, [cancelRenameBlurCommit, handleFinishRename]);
 
     const handleRenameKeyDown = useCallback(
         (event: React.KeyboardEvent<HTMLInputElement>) => {
             if (event.key !== 'Escape' || !editingId) return;
             event.preventDefault();
+            cancelRenameBlurCommit();
             const cancelledPageId = editingId;
             setEditingId(null);
             setEditName('');
             setRenameError(null);
             requestAnimationFrame(() => focusPageTab(cancelledPageId));
         },
-        [editingId, focusPageTab],
+        [cancelRenameBlurCommit, editingId, focusPageTab],
     );
 
     const handleAddPage = useCallback(() => {
@@ -412,8 +432,11 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                                     setEditName(event.target.value);
                                     setRenameError(null);
                                 }}
-                                onBlur={handleFinishRename}
-                                onPressEnter={handleFinishRename}
+                                onBlur={handleRenameBlur}
+                                onPressEnter={() => {
+                                    cancelRenameBlurCommit();
+                                    handleFinishRename();
+                                }}
                                 onKeyDown={handleRenameKeyDown}
                                 className="page-tabs__rename"
                             />

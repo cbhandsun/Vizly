@@ -239,7 +239,7 @@ describe('PageTabs', () => {
     });
 
     it('keeps duplicate page names in edit mode and exposes a visible error', async () => {
-        const onRenamePage = vi.fn(() => true);
+        const onRenamePage = vi.fn<(pageId: string, name: string) => boolean>(() => true);
         render(
             <PageTabs
                 pages={[
@@ -348,6 +348,55 @@ describe('PageTabs', () => {
         await waitFor(() => expect(document.activeElement).toBe(renamedTab));
         expect(renamedTab.getAttribute('aria-selected')).toBe('true');
         expect(screen.getByRole('status').textContent).toBe('页面已重命名为“总览”');
+    });
+
+    it('preserves the first page action click while committing a rename on blur', async () => {
+        const onRenamePage = vi.fn<(pageId: string, name: string) => boolean>(() => true);
+        const onAddPage = vi.fn(() => 'page-2');
+        const PageTabsHarness = () => {
+            const [pages, setPages] = useState([{ id: 'page-1', name: '页面 1', nodes: [], edges: [] }]);
+            const [activePageId, setActivePageId] = useState('page-1');
+            return (
+                <PageTabs
+                    pages={pages}
+                    activePageId={activePageId}
+                    onSwitchPage={setActivePageId}
+                    onAddPage={() => {
+                        const newPageId = onAddPage();
+                        setPages((current) => [...current, { id: newPageId, name: '页面 2', nodes: [], edges: [] }]);
+                        setActivePageId(newPageId);
+                        return newPageId;
+                    }}
+                    onDeletePage={vi.fn()}
+                    onRenamePage={(pageId, name) => {
+                        const renamed = onRenamePage(pageId, name);
+                        if (renamed) {
+                            setPages((current) => current.map((page) => (
+                                page.id === pageId ? { ...page, name } : page
+                            )));
+                        }
+                        return renamed;
+                    }}
+                />
+            );
+        };
+
+        render(<PageTabsHarness />);
+        fireEvent.click(screen.getByRole('button', { name: '重命名页面 页面 1' }));
+        const input = screen.getByRole('textbox', { name: '重命名页面 页面 1' });
+        fireEvent.change(input, { target: { value: '总览' } });
+
+        fireEvent.blur(input);
+        fireEvent.click(screen.getByRole('button', { name: '新建页面' }));
+
+        const createdPageTab = await screen.findByRole('tab', { name: '页面 2' });
+        await waitFor(() => {
+            expect(onRenamePage).toHaveBeenCalledOnce();
+            expect(onAddPage).toHaveBeenCalledOnce();
+            expect(screen.getByRole('tab', { name: '总览' })).toBeTruthy();
+            expect(document.activeElement).toBe(createdPageTab);
+        });
+        expect(createdPageTab.getAttribute('aria-selected')).toBe('true');
     });
 
     it('clears an invalid rename when the user switches to another page', async () => {
