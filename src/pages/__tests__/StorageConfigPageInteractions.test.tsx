@@ -460,6 +460,37 @@ describe('StorageConfigPage validation recovery', () => {
         expect(screen.getByRole('button', { name: 'storageConfig.form.testBtn' })).toBeEnabled();
     });
 
+    it('restores a clean saved status when cancelling a test without configuration changes', async () => {
+        storageMocks.getConfig.mockReturnValue({
+            endpoint: 'https://storage.example.com',
+            bucket: 'vizly-audit-bucket',
+            region: 'us-east-1',
+            accessKeyId: 'AUDIT_ACCESS_KEY',
+            secretAccessKey: 'SESSION_SECRET',
+            s3ForcePathStyle: true,
+        });
+        storageMocks.testConnection.mockImplementationOnce(() => new Promise<void>(() => {}));
+        renderStorageConfig();
+
+        fireEvent.click(screen.getByRole('button', { name: 'storageConfig.form.testBtn' }));
+        await waitFor(() => expect(storageMocks.testConnection).toHaveBeenCalledTimes(1));
+        fireEvent.click(screen.getByRole('button', { name: 'storageConfig.form.cancelTestBtn' }));
+
+        expect(screen.getByText('storageConfig.status.saved')).toBeInTheDocument();
+        expect(screen.queryByText('storageConfig.status.dirty')).not.toBeInTheDocument();
+        const unloadEvent = new Event('beforeunload', { cancelable: true });
+        expect(window.dispatchEvent(unloadEvent)).toBe(true);
+        expect(unloadEvent.defaultPrevented).toBe(false);
+
+        const returnButton = screen.getAllByRole('button', {
+            name: 'storageConfig.returnToWorkspace',
+        })[1];
+        if (!returnButton) throw new Error('Expected the storage configuration return button');
+        fireEvent.click(returnButton);
+        expect(await screen.findByText('workspace destination')).toBeInTheDocument();
+        expect(bridgeMocks.modalConfirm).not.toHaveBeenCalled();
+    });
+
     it('leaves immediately from either return control when the form is unchanged', async () => {
         renderStorageConfig();
 

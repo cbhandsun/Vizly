@@ -38,6 +38,7 @@ const StorageConfigPage: React.FC = () => {
     );
     const testControllerRef = useRef<AbortController | null>(null);
     const testedValuesRef = useRef<StorageConfig | null>(null);
+    const connectionStateBeforeTestRef = useRef<ConnectionState | null>(null);
     const pageTitleRef = useRef<HTMLHeadingElement>(null);
     const entryFocusFrameRef = useRef<number | null>(null);
     const validationFocusFrameRef = useRef<number | null>(null);
@@ -83,6 +84,8 @@ const StorageConfigPage: React.FC = () => {
             }
             testControllerRef.current?.abort();
             testControllerRef.current = null;
+            testedValuesRef.current = null;
+            connectionStateBeforeTestRef.current = null;
         };
     }, [form]);
 
@@ -152,6 +155,7 @@ const StorageConfigPage: React.FC = () => {
         const controller = new AbortController();
         testControllerRef.current = controller;
         testedValuesRef.current = values;
+        connectionStateBeforeTestRef.current = connectionState;
         const timeoutId = window.setTimeout(() => controller.abort(), S3_CONNECTION_TIMEOUT_MS);
         setTesting(true);
         setConnectionState('testing');
@@ -219,6 +223,7 @@ const StorageConfigPage: React.FC = () => {
             if (testControllerRef.current === controller) {
                 testControllerRef.current = null;
                 testedValuesRef.current = null;
+                connectionStateBeforeTestRef.current = null;
                 if (mountedRef.current) setTesting(false);
             }
         }
@@ -229,6 +234,7 @@ const StorageConfigPage: React.FC = () => {
             testControllerRef.current?.abort();
             testControllerRef.current = null;
             testedValuesRef.current = null;
+            connectionStateBeforeTestRef.current = null;
             setTesting(false);
         }
         setHasUnsavedChanges(true);
@@ -239,8 +245,10 @@ const StorageConfigPage: React.FC = () => {
         testControllerRef.current?.abort();
         testControllerRef.current = null;
         testedValuesRef.current = null;
+        const previousConnectionState = connectionStateBeforeTestRef.current;
+        connectionStateBeforeTestRef.current = null;
         setTesting(false);
-        setConnectionState('dirty');
+        setConnectionState(previousConnectionState ?? (hasUnsavedChanges ? 'dirty' : 'saved'));
     };
 
     const handleReturnToWorkspace = () => navigate('/manage');
