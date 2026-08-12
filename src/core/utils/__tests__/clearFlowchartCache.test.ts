@@ -2,6 +2,7 @@
 
 import { describe, expect, it, beforeEach } from 'vitest';
 import { clearFlowchartCache, getFlowchartCacheKeysToClear } from '../clearFlowchartCache';
+import { getLayerStorageKeys } from '../layerStorage';
 
 describe('clearFlowchartCache', () => {
     beforeEach(() => {
@@ -14,13 +15,21 @@ describe('clearFlowchartCache', () => {
 
         expect(keys.localStorageKeys).toContain('flowchart-autosave-v2-diagram-a');
         expect(keys.localStorageKeys).toContain('GenericStandardDiagram.customPresets.diagram-a');
+        expect(keys.localStorageKeys).toContain('flowchart.layers.diagram.diagram-a');
+        expect(keys.localStorageKeys).toContain('flowchart.activeLayerId.diagram.diagram-a');
         expect(keys.localStorageKeys).toContain('flowchart-clipboard');
         expect(keys.localStorageKeys).not.toContain('diagramMenu.selectedDiagramId');
     });
 
     it('clears only flowchart UI cache and current diagram cache', () => {
+        const diagramALayerKeys = getLayerStorageKeys('diagram-a');
+        const diagramBLayerKeys = getLayerStorageKeys('diagram-b');
         localStorage.setItem('flowchart-clipboard', '{"nodes":[]}');
         localStorage.setItem('flowchart.layers', '[]');
+        localStorage.setItem(diagramALayerKeys.layers, '[{"id":"layer-a"}]');
+        localStorage.setItem(diagramALayerKeys.activeLayer, 'layer-a');
+        localStorage.setItem(diagramBLayerKeys.layers, '[{"id":"layer-b"}]');
+        localStorage.setItem(diagramBLayerKeys.activeLayer, 'layer-b');
         localStorage.setItem('diagramMenu.recent', '["diagram-a"]');
         localStorage.setItem('diagramMenu.selectedDiagramId', 'diagram-a');
         localStorage.setItem('flowchart-autosave-v2-diagram-a', '{"nodes":[]}');
@@ -36,12 +45,16 @@ describe('clearFlowchartCache', () => {
 
         expect(localStorage.getItem('flowchart-clipboard')).toBeNull();
         expect(localStorage.getItem('flowchart.layers')).toBeNull();
+        expect(localStorage.getItem(diagramALayerKeys.layers)).toBeNull();
+        expect(localStorage.getItem(diagramALayerKeys.activeLayer)).toBeNull();
         expect(localStorage.getItem('diagramMenu.recent')).toBeNull();
         expect(localStorage.getItem('flowchart-autosave-v2-diagram-a')).toBeNull();
         expect(localStorage.getItem('GenericStandardDiagram.customPresets.diagram-a')).toBeNull();
         expect(sessionStorage.getItem('layered-config-session')).toBeNull();
 
         expect(localStorage.getItem('diagramMenu.selectedDiagramId')).toBe('diagram-a');
+        expect(localStorage.getItem(diagramBLayerKeys.layers)).toBe('[{"id":"layer-b"}]');
+        expect(localStorage.getItem(diagramBLayerKeys.activeLayer)).toBe('layer-b');
         expect(localStorage.getItem('flowchart-autosave-v2-diagram-b')).toBe('{"nodes":[{"id":"b"}]}');
         expect(localStorage.getItem('GenericStandardDiagram.customPresets.diagram-b')).toBe('{"preset":true}');
         expect(localStorage.getItem('DiagramView.AIConfig_user-a')).toBe('{"apiKey":"secret"}');

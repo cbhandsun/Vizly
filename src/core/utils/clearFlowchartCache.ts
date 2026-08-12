@@ -1,4 +1,5 @@
 import { logFlowchartCacheClearFailure } from './flowchartCacheLogging';
+import { getLayerStorageKeys } from './layerStorage';
 
 const LOCAL_UI_CACHE_KEYS = [
     'commandPalette.recent',
@@ -35,6 +36,9 @@ export const getFlowchartCacheKeysToClear = (diagramId?: string | null) => {
     if (normalizedDiagramId) {
         localStorageKeys.add(`flowchart-autosave-v2-${normalizedDiagramId}`);
         localStorageKeys.add(`GenericStandardDiagram.customPresets.${normalizedDiagramId}`);
+        const layerStorageKeys = getLayerStorageKeys(normalizedDiagramId);
+        localStorageKeys.add(layerStorageKeys.layers);
+        localStorageKeys.add(layerStorageKeys.activeLayer);
     }
 
     return {

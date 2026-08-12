@@ -9,6 +9,7 @@ import i18n from '../../../../../i18n';
 import {
     FLOWCHART_ACTIVE_LAYER_STORAGE_KEY,
     FLOWCHART_LAYERS_STORAGE_KEY,
+    getLayerStorageKeys,
 } from '../../../../utils/layerStorage';
 import { useLayerManagement } from '../useLayerManagement';
 
@@ -235,5 +236,48 @@ describe('useLayerManagement name boundary', () => {
 
         expect(result.current.activeLayerId).toBe('layer-0');
         expect(result.current.getLayer('layer-review')?.visible).toBe(false);
+    });
+
+    it('loads isolated layer state when the keyed designer remounts for another diagram', () => {
+        localStorage.clear();
+        const diagramAKeys = getLayerStorageKeys('diagram-a');
+        const diagramBKeys = getLayerStorageKeys('diagram-b');
+        localStorage.setItem(diagramAKeys.layers, JSON.stringify([
+            { id: 'layer-0', name: 'A base', visible: true, locked: false, zIndex: 0 },
+            { id: 'layer-a', name: 'A review', visible: true, locked: false, zIndex: 1 },
+        ]));
+        localStorage.setItem(diagramAKeys.activeLayer, 'layer-a');
+        localStorage.setItem(diagramBKeys.layers, JSON.stringify([
+            { id: 'layer-0', name: 'B base', visible: true, locked: false, zIndex: 0 },
+            { id: 'layer-b', name: 'B review', visible: true, locked: false, zIndex: 1 },
+        ]));
+        localStorage.setItem(diagramBKeys.activeLayer, 'layer-b');
+
+        const graphBoundary = {
+            nodesRef: { current: [] as Node[] },
+            edgesRef: { current: [] as Edge[] },
+            setNodes: vi.fn(),
+            setEdges: vi.fn(),
+        };
+        const diagramAHook = renderHook(() => useLayerManagement({
+            ...graphBoundary,
+            storageScope: 'diagram-a',
+        }));
+        expect(diagramAHook.result.current.layers.map(layer => layer.name))
+            .toEqual(['A base', 'A review']);
+        expect(diagramAHook.result.current.activeLayerId).toBe('layer-a');
+        diagramAHook.unmount();
+
+        const diagramBHook = renderHook(() => useLayerManagement({
+            ...graphBoundary,
+            storageScope: 'diagram-b',
+        }));
+        expect(diagramBHook.result.current.layers.map(layer => layer.name))
+            .toEqual(['B base', 'B review']);
+        expect(diagramBHook.result.current.activeLayerId).toBe('layer-b');
+        expect(JSON.parse(localStorage.getItem(diagramAKeys.layers) || '[]'))
+            .toEqual(expect.arrayContaining([expect.objectContaining({ id: 'layer-a' })]));
+        expect(JSON.parse(localStorage.getItem(diagramBKeys.layers) || '[]'))
+            .toEqual(expect.arrayContaining([expect.objectContaining({ id: 'layer-b' })]));
     });
 });

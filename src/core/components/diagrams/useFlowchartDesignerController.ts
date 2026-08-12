@@ -175,7 +175,7 @@ export const useFlowchartDesignerController = ({
 
     const {
         layers, activeLayerId, setActiveLayerId, createLayer, deleteLayer, toggleVisibility, toggleLock, renameLayer, reorderLayers, getLayer, setLayerColor
-    } = useLayerManagement({ nodesRef, edgesRef, setNodes, setEdges, messageApi });
+    } = useLayerManagement({ nodesRef, edgesRef, setNodes, setEdges, storageScope: diagramIdForExport, messageApi });
 
     const { updateNodesBatch, updateEdgesBatch } = useDesignerBatchUpdates({
         nodes,

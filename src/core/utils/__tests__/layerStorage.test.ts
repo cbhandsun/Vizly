@@ -5,6 +5,8 @@ import {
     DEFAULT_LAYER,
     FLOWCHART_ACTIVE_LAYER_STORAGE_KEY,
     FLOWCHART_LAYERS_STORAGE_KEY,
+    getLayerStorageKeys,
+    normalizeLayerStorageScope,
     readActiveLayerId,
     readLayers,
     writeActiveLayerId,
@@ -105,6 +107,73 @@ describe('layerStorage', () => {
 
         localStorage.setItem(FLOWCHART_ACTIVE_LAYER_STORAGE_KEY, 'missing');
         expect(readActiveLayerId(layers)).toBe(DEFAULT_LAYER.id);
+    });
+
+    it('isolates layer order, visibility, lock, rename, and active state by diagram', () => {
+        const diagramALayers = writeLayers([
+            { id: 'layer-a', name: 'Review A', visible: false, locked: true, zIndex: 9 },
+        ], 'diagram-a');
+        writeActiveLayerId('layer-0', diagramALayers, 'diagram-a');
+
+        const diagramBLayers = writeLayers([
+            { id: 'layer-b', name: 'Review B', visible: true, locked: false, zIndex: 7 },
+        ], 'diagram-b');
+        writeActiveLayerId('layer-b', diagramBLayers, 'diagram-b');
+
+        expect(readLayers('diagram-a')).toEqual([
+            DEFAULT_LAYER,
+            { id: 'layer-a', name: 'Review A', visible: false, locked: true, zIndex: 1 },
+        ]);
+        expect(readActiveLayerId(readLayers('diagram-a'), 'diagram-a')).toBe('layer-0');
+        expect(readLayers('diagram-b')).toEqual([
+            DEFAULT_LAYER,
+            { id: 'layer-b', name: 'Review B', visible: true, locked: false, zIndex: 1 },
+        ]);
+        expect(readActiveLayerId(readLayers('diagram-b'), 'diagram-b')).toBe('layer-b');
+    });
+
+    it('claims legacy global state once and leaves later diagrams isolated', () => {
+        localStorage.setItem(FLOWCHART_LAYERS_STORAGE_KEY, JSON.stringify([
+            DEFAULT_LAYER,
+            { id: 'layer-legacy', name: 'Legacy', visible: true, locked: false, zIndex: 1 },
+        ]));
+        localStorage.setItem(FLOWCHART_ACTIVE_LAYER_STORAGE_KEY, 'layer-legacy');
+
+        const migrated = readLayers('diagram-a');
+        expect(readActiveLayerId(migrated, 'diagram-a')).toBe('layer-legacy');
+        expect(localStorage.getItem(FLOWCHART_LAYERS_STORAGE_KEY)).toBeNull();
+        expect(localStorage.getItem(FLOWCHART_ACTIVE_LAYER_STORAGE_KEY)).toBeNull();
+        expect(readLayers('diagram-b')).toEqual([DEFAULT_LAYER]);
+    });
+
+    it('keeps legacy data usable when scoped migration cannot be persisted', () => {
+        localStorage.setItem(FLOWCHART_LAYERS_STORAGE_KEY, JSON.stringify([
+            DEFAULT_LAYER,
+            { id: 'layer-legacy', name: 'Legacy', visible: true, locked: false, zIndex: 1 },
+        ]));
+        vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+            throw new Error('quota exceeded');
+        });
+
+        expect(readLayers('diagram-a').map(layer => layer.id))
+            .toEqual(['layer-0', 'layer-legacy']);
+        expect(safeLogState.warn).toHaveBeenCalledWith(
+            '[layerStorage] Failed to write "flowchart.layers.diagram.diagram-a":',
+            expect.anything(),
+        );
+    });
+
+    it('bounds and sanitizes unsafe diagram scopes without exposing them in keys', () => {
+        const unsafeScope = ` customer/<script>/${'x'.repeat(4_096)} `;
+        const normalized = normalizeLayerStorageScope(unsafeScope);
+        const keys = getLayerStorageKeys(unsafeScope);
+
+        expect(normalized).toMatch(/^hashed-[0-9a-f]{8}$/u);
+        expect(keys.layers).toBe(`flowchart.layers.diagram.${normalized}`);
+        expect(keys.layers.length).toBeLessThan(80);
+        expect(keys.layers).not.toContain('customer');
+        expect(normalizeLayerStorageScope('   ')).toBeNull();
+        expect(normalizeLayerStorageScope({ id: 'diagram-a' })).toBeNull();
     });
 
     it('falls back when layer payload is oversized', () => {

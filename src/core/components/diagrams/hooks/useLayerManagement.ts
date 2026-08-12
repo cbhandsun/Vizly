@@ -8,6 +8,7 @@ import {
     coerceActiveLayerId,
     coerceLayers,
     DEFAULT_LAYER,
+    normalizeLayerStorageScope,
     readActiveLayerId,
     readLayers,
     writeActiveLayerId,
@@ -41,6 +42,7 @@ interface LayerManagementGraphBoundary {
     edgesRef: MutableRefObject<Edge[]>;
     setNodes: Dispatch<SetStateAction<Node[]>>;
     setEdges: Dispatch<SetStateAction<Edge[]>>;
+    storageScope?: string;
     messageApi?: Pick<MessageInstance, 'destroy' | 'open' | 'success' | 'warning'>;
 }
 
@@ -79,19 +81,22 @@ export const useLayerManagement = (graph?: LayerManagementGraphBoundary) => {
     const edgesRef = graph?.edgesRef;
     const setGraphNodes = graph?.setNodes;
     const setGraphEdges = graph?.setEdges;
+    const [storageScope] = useState(() => normalizeLayerStorageScope(graph?.storageScope));
     // 从 localStorage 恢复图层配置
     const [layers, setLayers] = useState<LayerConfig[]>(() => {
-        return ensureEditableLayer(readLayers());
+        return ensureEditableLayer(readLayers(storageScope));
     });
 
     const [activeLayerId, setActiveLayerId] = useState<string>(() => {
-        const initialLayers = ensureEditableLayer(readLayers());
-        return coerceEditableActiveLayerId(readActiveLayerId(initialLayers), initialLayers);
+        const initialLayers = ensureEditableLayer(readLayers(storageScope));
+        return coerceEditableActiveLayerId(
+            readActiveLayerId(initialLayers, storageScope),
+            initialLayers,
+        );
     });
-
     useEffect(() => {
-        writeLayers(layers);
-    }, [layers]);
+        writeLayers(layers, storageScope);
+    }, [layers, storageScope]);
 
     useEffect(() => {
         const normalizedActiveLayerId = coerceEditableActiveLayerId(activeLayerId, layers);
@@ -101,8 +106,8 @@ export const useLayerManagement = (graph?: LayerManagementGraphBoundary) => {
             }, 0);
             return () => window.clearTimeout(timer);
         }
-        writeActiveLayerId(normalizedActiveLayerId, layers);
-    }, [activeLayerId, layers]);
+        writeActiveLayerId(normalizedActiveLayerId, layers, storageScope);
+    }, [activeLayerId, layers, storageScope]);
 
     const createLayer = useCallback((name: string) => {
         const normalizedName = normalizeLayerNameInput(name);
