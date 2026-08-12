@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { Alert, Button, Card, Form, Input, Space, Switch, Typography } from 'antd';
-import { ApiOutlined, CloudServerOutlined, SaveOutlined } from '@ant-design/icons';
+import { ApiOutlined, CloudServerOutlined, DeleteOutlined, SaveOutlined } from '@ant-design/icons';
 
 import { appMessage, appModal } from '@/core/utils/antdStaticBridge';
 import { safeLog } from '@/core/utils/consoleCleanup';
@@ -33,6 +33,9 @@ const StorageConfigPage: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [testing, setTesting] = useState(false);
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+    const [hasStoredConfiguration, setHasStoredConfiguration] = useState(() => (
+        !!(storageService.getConfig() ?? storageService.getPersistedConfigDraft())
+    ));
     const [connectionState, setConnectionState] = useState<ConnectionState>(() => {
         if (storageService.getConfig()) return 'saved';
         return storageService.getPersistedConfigDraft() ? 'credentialsRequired' : 'not-configured';
@@ -109,6 +112,7 @@ const StorageConfigPage: React.FC = () => {
         try {
             storageService.saveConfig(values);
             setHasUnsavedChanges(false);
+            setHasStoredConfiguration(true);
             setConnectionState(verifiedValuesRef.current ? 'savedVerified' : 'saved');
             appMessage.success(t('storageConfig.saveSuccess'));
         } catch {
@@ -257,6 +261,32 @@ const StorageConfigPage: React.FC = () => {
         connectionStateBeforeTestRef.current = null;
         setTesting(false);
         setConnectionState(previousConnectionState ?? (hasUnsavedChanges ? 'dirty' : 'saved'));
+    };
+
+    const handleClearConfiguration = () => {
+        appModal.confirm({
+            title: t('storageConfig.clearConfirm.title'),
+            content: t('storageConfig.clearConfirm.content'),
+            okText: t('storageConfig.clearConfirm.confirm'),
+            cancelText: t('storageConfig.clearConfirm.cancel'),
+            autoFocusButton: 'cancel',
+            okButtonProps: { danger: true },
+            onOk: async () => {
+                try {
+                    storageService.clearConfig();
+                    form.resetFields();
+                    verifiedValuesRef.current = null;
+                    setHasUnsavedChanges(false);
+                    setHasStoredConfiguration(false);
+                    setConnectionState('not-configured');
+                    appMessage.success(t('storageConfig.clearSuccess'));
+                } catch {
+                    setConnectionState('failed');
+                    appMessage.error(t('storageConfig.clearFail'));
+                    throw new Error('Unable to clear the storage configuration.');
+                }
+            },
+        });
     };
 
     const handleReturnToWorkspace = () => navigate('/manage');
@@ -465,6 +495,16 @@ const StorageConfigPage: React.FC = () => {
                                 {testing && (
                                     <Button danger onClick={cancelConnectionTest}>
                                         {t('storageConfig.form.cancelTestBtn')}
+                                    </Button>
+                                )}
+                                {hasStoredConfiguration && (
+                                    <Button
+                                        danger
+                                        icon={<DeleteOutlined aria-hidden="true" />}
+                                        onClick={handleClearConfiguration}
+                                        disabled={loading || testing}
+                                    >
+                                        {t('storageConfig.form.clearBtn')}
                                     </Button>
                                 )}
                             </Space>

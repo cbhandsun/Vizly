@@ -429,4 +429,65 @@ describe('S3StorageProvider', () => {
 
         setItemSpy.mockRestore();
     });
+
+    it('clears persisted, session, and runtime S3 configuration together', async () => {
+        const { s3Storage } = await loadStorageService();
+        s3Storage.saveConfig(config);
+
+        s3Storage.clearConfig();
+
+        expect(localStorage.getItem('diagram_storage_config')).toBeNull();
+        expect(sessionStorage.getItem('diagram_storage_config_secret')).toBeNull();
+        expect(s3Storage.getConfig()).toBeNull();
+        expect(s3Storage.getPersistedConfigDraft()).toBeNull();
+        expect(s3Storage.isConfigured()).toBe(false);
+    });
+
+    it('rolls back persisted configuration and preserves runtime state when clearing the session secret fails', async () => {
+        const { s3Storage } = await loadStorageService();
+        s3Storage.saveConfig(config);
+        const previousLocalConfig = localStorage.getItem('diagram_storage_config');
+        const originalRemoveItem = Storage.prototype.removeItem;
+        const removeItemSpy = vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(function (this: Storage, key: string) {
+            if (this === sessionStorage && key === 'diagram_storage_config_secret') {
+                throw new Error('token=clear-failure-secret');
+            }
+            return originalRemoveItem.call(this, key);
+        });
+
+        expect(() => s3Storage.clearConfig()).toThrow(
+            'Unable to clear the S3 configuration from browser storage.',
+        );
+
+        expect(localStorage.getItem('diagram_storage_config')).toBe(previousLocalConfig);
+        expect(sessionStorage.getItem('diagram_storage_config_secret')).toBe(config.secretAccessKey);
+        expect(s3Storage.getConfig()).toMatchObject(config);
+        expect(s3Storage.isConfigured()).toBe(true);
+        expect(JSON.stringify(safeLogState.warn.mock.calls)).toContain('[redacted]');
+        expect(JSON.stringify(safeLogState.warn.mock.calls)).not.toContain('clear-failure-secret');
+
+        removeItemSpy.mockRestore();
+    });
+
+    it('preserves configuration when the clear preflight cannot read browser storage', async () => {
+        const { s3Storage } = await loadStorageService();
+        s3Storage.saveConfig(config);
+        const originalGetItem = Storage.prototype.getItem;
+        const getItemSpy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(function (this: Storage, key: string) {
+            if (this === sessionStorage && key === 'diagram_storage_config_secret') {
+                throw new Error('Bearer clear-read-secret');
+            }
+            return originalGetItem.call(this, key);
+        });
+
+        expect(() => s3Storage.clearConfig()).toThrow(
+            'Unable to read the current S3 configuration before clearing it.',
+        );
+        expect(s3Storage.getConfig()).toMatchObject(config);
+        expect(s3Storage.isConfigured()).toBe(true);
+        expect(JSON.stringify(safeLogState.warn.mock.calls)).toContain('[redacted]');
+        expect(JSON.stringify(safeLogState.warn.mock.calls)).not.toContain('clear-read-secret');
+
+        getItemSpy.mockRestore();
+    });
 });

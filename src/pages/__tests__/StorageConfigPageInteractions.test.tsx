@@ -9,6 +9,7 @@ const storageMocks = vi.hoisted(() => ({
     getConfig: vi.fn<() => MockStorageConfig | null>(() => null),
     getPersistedConfigDraft: vi.fn<() => MockStorageConfig | null>(() => null),
     saveConfig: vi.fn(),
+    clearConfig: vi.fn(),
     testConnection: vi.fn(),
 }));
 
@@ -90,6 +91,7 @@ afterEach(() => {
     storageMocks.getConfig.mockReturnValue(null);
     storageMocks.getPersistedConfigDraft.mockReturnValue(null);
     storageMocks.saveConfig.mockReset();
+    storageMocks.clearConfig.mockReset();
     storageMocks.testConnection.mockReset();
     bridgeMocks.messageError.mockReset();
     bridgeMocks.messageSuccess.mockReset();
@@ -104,10 +106,77 @@ interface LeaveConfirmOptions {
     cancelText: string;
     autoFocusButton: 'cancel' | 'ok' | null;
     okButtonProps?: { danger?: boolean };
-    onOk?: () => void;
+    onOk?: () => void | Promise<void>;
     onCancel?: () => void;
     afterClose?: () => void;
 }
+
+describe('StorageConfigPage configuration clearing', () => {
+    const storedConfig: MockStorageConfig = {
+        endpoint: 'https://storage.example.com',
+        bucket: 'vizly-audit-bucket',
+        region: 'us-east-1',
+        accessKeyId: 'AUDIT_ACCESS_KEY',
+        secretAccessKey: 'AUDIT_SECRET_KEY',
+        s3ForcePathStyle: true,
+    };
+
+    it('requires destructive confirmation and resets the page after a successful clear', async () => {
+        storageMocks.getConfig.mockReturnValue(storedConfig);
+        renderStorageConfig();
+
+        fireEvent.click(screen.getByRole('button', { name: 'storageConfig.form.clearBtn' }));
+        expect(bridgeMocks.modalConfirm).toHaveBeenCalledTimes(1);
+        const options = bridgeMocks.modalConfirm.mock.calls[0]?.[0] as LeaveConfirmOptions;
+        expect(options).toMatchObject({
+            title: 'storageConfig.clearConfirm.title',
+            content: 'storageConfig.clearConfirm.content',
+            okText: 'storageConfig.clearConfirm.confirm',
+            cancelText: 'storageConfig.clearConfirm.cancel',
+            autoFocusButton: 'cancel',
+            okButtonProps: { danger: true },
+        });
+
+        await act(async () => options.onOk?.());
+
+        expect(storageMocks.clearConfig).toHaveBeenCalledTimes(1);
+        expect(screen.getByText('storageConfig.status.notConfigured')).toBeInTheDocument();
+        expect(screen.getByPlaceholderText('https://...')).toHaveValue('');
+        expect(screen.queryByRole('button', { name: 'storageConfig.form.clearBtn' })).not.toBeInTheDocument();
+        expect(bridgeMocks.messageSuccess).toHaveBeenCalledWith('storageConfig.clearSuccess');
+    });
+
+    it('keeps the stored form available and reports failure when clearing cannot commit', async () => {
+        storageMocks.getConfig.mockReturnValue(storedConfig);
+        storageMocks.clearConfig.mockImplementationOnce(() => {
+            throw new Error('browser storage unavailable');
+        });
+        renderStorageConfig();
+
+        fireEvent.click(screen.getByRole('button', { name: 'storageConfig.form.clearBtn' }));
+        const options = bridgeMocks.modalConfirm.mock.calls[0]?.[0] as LeaveConfirmOptions;
+        let clearFailure: unknown;
+        await act(async () => {
+            try {
+                await options.onOk?.();
+            } catch (error) {
+                clearFailure = error;
+            }
+        });
+        expect(clearFailure).toEqual(new Error('Unable to clear the storage configuration.'));
+
+        expect(screen.getByText('storageConfig.status.failed')).toBeInTheDocument();
+        expect(screen.getByPlaceholderText('https://...')).toHaveValue(storedConfig.endpoint);
+        expect(screen.getByRole('button', { name: 'storageConfig.form.clearBtn' })).toBeInTheDocument();
+        expect(bridgeMocks.messageError).toHaveBeenCalledWith('storageConfig.clearFail');
+    });
+
+    it('does not offer clearing when no persisted configuration exists', () => {
+        renderStorageConfig();
+
+        expect(screen.queryByRole('button', { name: 'storageConfig.form.clearBtn' })).not.toBeInTheDocument();
+    });
+});
 
 describe('StorageConfigPage validation recovery', () => {
     it('restores non-secret fields and requests only the expired session secret', async () => {

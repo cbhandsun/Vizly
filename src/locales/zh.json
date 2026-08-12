@@ -2869,6 +2869,8 @@
         "pageDescription": "配置 S3 兼容的云存储服务（如 AWS S3, MinIO, 阿里云 OSS, 七牛云等），用于同步和管理架构图。",
         "saveSuccess": "配置已保存",
         "saveFail": "保存失败",
+        "clearSuccess": "存储配置和当前会话密钥已清除",
+        "clearFail": "无法清除存储配置，请重试或检查浏览器存储权限",
         "validationFail": "无法验证当前配置，请检查输入后重试。",
         "testSuccess": "连接成功！S3 配置有效。",
         "testTimeout": "连接测试超时，请检查网络和服务地址后重试。",
@@ -2877,6 +2879,12 @@
             "content": "离开后，本次对 Endpoint、Bucket 和访问凭据的未保存修改将丢失。",
             "confirm": "放弃并离开",
             "keepEditing": "继续编辑"
+        },
+        "clearConfirm": {
+            "title": "清除存储配置？",
+            "content": "这会从当前浏览器清除已保存的 Endpoint、Bucket、Access Key ID 和本次会话中的 Secret Key。未保存的编辑也会丢失。此操作不会删除对象存储中的流程图。",
+            "confirm": "清除配置",
+            "cancel": "保留配置"
         },
         "status": {
             "notConfigured": "尚未保存存储配置",
@@ -2931,7 +2939,8 @@
             "concealSecretValue": "隐藏密钥",
             "saveBtn": "保存配置",
             "testBtn": "测试连接",
-            "cancelTestBtn": "取消测试"
+            "cancelTestBtn": "取消测试",
+            "clearBtn": "清除配置"
         },
         "notes": {
             "title": "说明",

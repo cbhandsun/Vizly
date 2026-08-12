@@ -108,6 +108,23 @@ export class S3StorageProvider implements IStorageProvider {
         }
     }
 
+    private restorePersistedValue(
+        storage: Storage,
+        key: string,
+        value: string | null,
+        source: string,
+    ): void {
+        try {
+            if (value === null) {
+                storage.removeItem(key);
+            } else {
+                storage.setItem(key, value);
+            }
+        } catch (error) {
+            logUiStorageWriteFailure(source, key, error);
+        }
+    }
+
     private clearPersistedConfig(): void {
         try {
             localStorage.removeItem(STORAGE_CONFIG_KEY);
@@ -199,6 +216,45 @@ export class S3StorageProvider implements IStorageProvider {
         this.config = safeConfig;
         this.persistedConfigDraft = stripSecret(safeConfig);
         this.initializeClient();
+    }
+
+    clearConfig(): void {
+        let persistedConfig: string | null;
+        let persistedSecret: string | null;
+
+        try {
+            persistedConfig = localStorage.getItem(STORAGE_CONFIG_KEY);
+            persistedSecret = sessionStorage.getItem(STORAGE_SECRET_SESSION_KEY);
+        } catch (error) {
+            logUiStorageReadFailure('S3StorageProvider.clearConfig', STORAGE_CONFIG_KEY, error);
+            throw new Error('Unable to read the current S3 configuration before clearing it.', { cause: error });
+        }
+
+        let activeKey = STORAGE_CONFIG_KEY;
+        try {
+            localStorage.removeItem(STORAGE_CONFIG_KEY);
+            activeKey = STORAGE_SECRET_SESSION_KEY;
+            sessionStorage.removeItem(STORAGE_SECRET_SESSION_KEY);
+        } catch (error) {
+            logUiStorageWriteFailure('S3StorageProvider.clearConfig', activeKey, error);
+            this.restorePersistedValue(
+                localStorage,
+                STORAGE_CONFIG_KEY,
+                persistedConfig,
+                'S3StorageProvider.clearConfig.rollback',
+            );
+            this.restorePersistedValue(
+                sessionStorage,
+                STORAGE_SECRET_SESSION_KEY,
+                persistedSecret,
+                'S3StorageProvider.clearConfig.rollback',
+            );
+            throw new Error('Unable to clear the S3 configuration from browser storage.', { cause: error });
+        }
+
+        this.client = null;
+        this.config = null;
+        this.persistedConfigDraft = null;
     }
 
     getConfig(): StorageConfig | null {

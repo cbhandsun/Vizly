@@ -2760,6 +2760,8 @@
         "returnToWorkspace": "Return to workspace",
         "connectionSettings": "Connection settings",
         "saveFail": "Save failed",
+        "clearSuccess": "Storage configuration and session secret cleared",
+        "clearFail": "The storage configuration could not be cleared. Retry or check browser storage permissions.",
         "validationFail": "The current configuration could not be validated. Review the inputs and retry.",
         "testTimeout": "The connection test timed out. Check the network and endpoint, then retry.",
         "leaveConfirm": {
@@ -2767,6 +2769,12 @@
             "content": "Leaving will discard unsaved changes to the endpoint, bucket, and access credentials.",
             "confirm": "Discard and leave",
             "keepEditing": "Keep editing"
+        },
+        "clearConfirm": {
+            "title": "Clear storage configuration?",
+            "content": "This clears the saved endpoint, bucket, Access Key ID, and this session's Secret Key from this browser. Unsaved edits will also be discarded. Diagrams in object storage are not deleted.",
+            "confirm": "Clear configuration",
+            "cancel": "Keep configuration"
         },
         "status": {
             "notConfigured": "No storage configuration has been saved",
@@ -2821,7 +2829,8 @@
             "concealSecretValue": "Hide secret",
             "saveBtn": "Save",
             "testBtn": "Test Connection",
-            "cancelTestBtn": "Cancel test"
+            "cancelTestBtn": "Cancel test",
+            "clearBtn": "Clear configuration"
         },
         "notes": {
             "title": "Notes",
