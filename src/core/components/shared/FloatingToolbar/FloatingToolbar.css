@@ -187,12 +187,28 @@
 }
 
 /* ─── Overflow panel ─── */
+.floating-toolbar-overflow-root {
+    position: relative;
+    display: inline-flex;
+}
+
 .floating-toolbar-overflow-panel {
     display: flex;
     flex-direction: column;
     gap: 1px;
     padding: 4px;
     min-width: 160px;
+}
+
+.floating-toolbar-overflow-panel--anchored {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    z-index: 1000;
+    border: var(--ftb-border);
+    border-radius: 8px;
+    background: var(--ftb-bg);
+    box-shadow: var(--ftb-shadow);
 }
 
 .floating-toolbar-overflow-item {

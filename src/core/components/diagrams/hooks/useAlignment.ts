@@ -6,6 +6,14 @@ interface UseAlignmentProps {
     onUpdateNodes: (updates: { id: string, position: { x: number, y: number } }[]) => void;
 }
 
+const readNodeWidth = (node: Node): number => node.measured?.width || node.width || 100;
+const readNodeHeight = (node: Node): number => node.measured?.height || node.height || 50;
+
+const positionChanged = (
+    node: Node,
+    position: Readonly<{ x: number; y: number }>,
+): boolean => node.position.x !== position.x || node.position.y !== position.y;
+
 export const useAlignment = ({ selectedNodes: _selectedNodes, onUpdateNodes }: UseAlignmentProps) => {
     const selectedNodes = useMemo(() => _selectedNodes || [], [_selectedNodes]);
     const canAlign = selectedNodes.length > 1;
@@ -30,8 +38,8 @@ export const useAlignment = ({ selectedNodes: _selectedNodes, onUpdateNodes }: U
         const centerY = (minY + maxY) / 2;
 
         const updates = selectedNodes.map(n => {
-            const w = n.measured?.width || n.width || 0;
-            const h = n.measured?.height || n.height || 0;
+            const w = readNodeWidth(n);
+            const h = readNodeHeight(n);
             let newX = n.position.x;
             let newY = n.position.y;
 
@@ -47,7 +55,12 @@ export const useAlignment = ({ selectedNodes: _selectedNodes, onUpdateNodes }: U
             return { id: n.id, position: { x: newX, y: newY } };
         });
 
-        onUpdateNodes(updates);
+        if (updates.some(update => {
+            const node = selectedNodes.find(candidate => candidate.id === update.id);
+            return node ? positionChanged(node, update.position) : false;
+        })) {
+            onUpdateNodes(updates);
+        }
     }, [selectedNodes, onUpdateNodes, canAlign]);
 
     const handleDistribute = useCallback((type: 'horizontal' | 'vertical') => {
@@ -61,25 +74,31 @@ export const useAlignment = ({ selectedNodes: _selectedNodes, onUpdateNodes }: U
 
         const first = sorted[0];
         const last = sorted[sorted.length - 1];
+        const totalSize = sorted.reduce((sum, node) => (
+            sum + (type === 'horizontal' ? readNodeWidth(node) : readNodeHeight(node))
+        ), 0);
+        const start = type === 'horizontal' ? first.position.x : first.position.y;
+        const end = type === 'horizontal'
+            ? last.position.x + readNodeWidth(last)
+            : last.position.y + readNodeHeight(last);
+        const gap = (end - start - totalSize) / (sorted.length - 1);
+        let cursor = start;
 
-        const minPos = type === 'horizontal' ? first.position.x : first.position.y;
-        const maxPos = type === 'horizontal' ? last.position.x : last.position.y;
-
-        const totalSpan = maxPos - minPos;
-        const step = totalSpan / (sorted.length - 1);
-
-        const updates = sorted.map((n, index) => {
-            const newPos = minPos + step * index;
-            return {
-                id: n.id,
-                position: {
-                    x: type === 'horizontal' ? newPos : n.position.x,
-                    y: type === 'vertical' ? newPos : n.position.y
-                }
+        const updates = sorted.map((node) => {
+            const position = {
+                x: type === 'horizontal' ? cursor : node.position.x,
+                y: type === 'vertical' ? cursor : node.position.y,
             };
+            cursor += (type === 'horizontal' ? readNodeWidth(node) : readNodeHeight(node)) + gap;
+            return { id: node.id, position };
         });
 
-        onUpdateNodes(updates);
+        if (updates.some(update => {
+            const node = selectedNodes.find(candidate => candidate.id === update.id);
+            return node ? positionChanged(node, update.position) : false;
+        })) {
+            onUpdateNodes(updates);
+        }
 
     }, [selectedNodes, onUpdateNodes, canDistribute]);
 

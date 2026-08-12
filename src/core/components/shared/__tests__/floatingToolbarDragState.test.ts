@@ -1,8 +1,17 @@
-import { describe, expect, it } from 'vitest';
+import React from 'react';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 import {
     hasDraggingNode,
     resolveFloatingToolbarHorizontalPosition,
 } from '../FloatingToolbar/useFloatingPosition';
+import { ToolbarOverflow } from '../FloatingToolbar/ToolbarPrimitives';
+
+vi.stubGlobal('ResizeObserver', class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+});
 
 describe('hasDraggingNode', () => {
     it('reads live dragging state from the internal node lookup', () => {
@@ -62,5 +71,41 @@ describe('resolveFloatingToolbarHorizontalPosition', () => {
             viewportWidth: 320,
             mobileLeftInset: 60,
         })).toBe(190);
+    });
+});
+
+describe('ToolbarOverflow repeated actions', () => {
+    it('keeps the formatting palette and acted item available for repeated changes', () => {
+        const onClick = vi.fn();
+        render(React.createElement(ToolbarOverflow, {
+            label: 'More actions',
+            items: [{ key: 'opacity', icon: null, label: 'Opacity 80%', onClick }],
+        }));
+
+        const trigger = screen.getByRole('button', { name: 'More actions' });
+        fireEvent.click(trigger);
+        const opacityItem = screen.getByRole('menuitem', { name: 'Opacity 80%' });
+        opacityItem.focus();
+        fireEvent.click(opacityItem);
+
+        expect(onClick).toHaveBeenCalledTimes(1);
+        expect(opacityItem).toBe(document.activeElement);
+        expect(trigger).toBeTruthy();
+
+        fireEvent.keyDown(opacityItem, { key: 'Escape' });
+        expect(screen.queryByRole('menu', { name: 'More actions' })).toBeNull();
+        expect(document.activeElement).toBe(trigger);
+    });
+
+    it('closes when pointer interaction moves outside the palette', () => {
+        render(React.createElement(ToolbarOverflow, {
+            label: 'More actions',
+            items: [{ key: 'border', icon: null, label: 'Border 1px', onClick: vi.fn() }],
+        }));
+
+        fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+        expect(screen.getByRole('menu', { name: 'More actions' })).toBeTruthy();
+        fireEvent.pointerDown(document.body);
+        expect(screen.queryByRole('menu', { name: 'More actions' })).toBeNull();
     });
 });

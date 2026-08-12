@@ -19,6 +19,7 @@ import { ShapePreview } from './ShapePreview';
 import type { FlowchartShape } from '../../types/flowchart-node';
 import { resolveFloatingContextToolbarOffset } from './floatingContextToolbarPosition';
 import { hasMutationLockedNode } from './nodeLockPolicy';
+import { resolveFloatingToolbarStyleState } from './floatingContextToolbarState';
 import {
     ToolbarContainer,
     ToolbarButton,
@@ -222,10 +223,7 @@ export const FloatingContextToolbar: React.FC<FloatingContextToolbarProps> = Rea
         ? t('designer.toolbar.lockedAction', { action: label })
         : label;
 
-    const currentOpacity = selectedNodes.reduce((acc, n) => {
-        const op = n.style?.opacity !== undefined ? Number(n.style.opacity) : 1;
-        return acc + op;
-    }, 0) / selectedNodes.length;
+    const toolbarStyleState = resolveFloatingToolbarStyleState(selectedNodes);
 
     const selectedNodeData = selectedNodes[0]?.data;
     const selectedDataStyle = isRecord(selectedNodeData?.style) ? selectedNodeData.style : {};
@@ -236,8 +234,16 @@ export const FloatingContextToolbar: React.FC<FloatingContextToolbarProps> = Rea
           ? selectedDataTheme.main
           : '#ffffff';
 
-    const currentStrokeWidth = Number(selectedNodes[0]?.style?.strokeWidth || 1);
-    const isDashed = selectedNodes[0]?.style?.strokeDasharray === '4,4';
+    const mixedLabel = t('propertyPanel.mixed');
+    const opacityLabel = toolbarStyleState.opacityMixed
+        ? t('designer.toolbar.opacityWithPercent', { value: mixedLabel }).replace(/%\s*$/, '')
+        : t('designer.toolbar.opacityWithPercent', { value: Math.round(toolbarStyleState.opacity * 100) });
+    const borderLabel = toolbarStyleState.borderMixed
+        ? `${t('propertyPanel.borderWidth')} ${mixedLabel}`
+        : t('designer.toolbar.borderWithWidth', {
+            width: toolbarStyleState.strokeWidth,
+            style: toolbarStyleState.dashed ? t('designer.toolbar.dashedSuffix') : '',
+        });
 
     // ─── Render ──────────────────────────────────────────────────────────────
     return (
@@ -309,13 +315,19 @@ export const FloatingContextToolbar: React.FC<FloatingContextToolbarProps> = Rea
 
                     {/* ── 更多 ── */}
                     <ToolbarDivider />
-                    <ToolbarOverflow label={t('designer.toolbar.moreActions')} items={[
+                    <ToolbarOverflow
+                        label={t('designer.toolbar.moreActions')}
+                        items={[
                         ...(!isHide('opacity') ? [{
                             key: 'opacity', icon: <FaPercentage />,
-                            label: t('designer.toolbar.opacityWithPercent', { value: Math.round(currentOpacity * 100) }),
+                            label: opacityLabel,
                             onClick: () => {
                                 const steps = [1, 0.8, 0.6, 0.4, 0.2];
-                                const idx = steps.findIndex(s => Math.abs(s - currentOpacity) < 0.05);
+                                if (toolbarStyleState.opacityMixed) {
+                                    onOpacity(1);
+                                    return;
+                                }
+                                const idx = steps.findIndex(s => Math.abs(s - toolbarStyleState.opacity) < 0.05);
                                 onOpacity(steps[(idx + 1) % steps.length]);
                             },
                             disabled: hasLockedSelection,
@@ -326,13 +338,14 @@ export const FloatingContextToolbar: React.FC<FloatingContextToolbarProps> = Rea
                         ] : []),
                         ...(!isHide('border') ? [{
                             key: 'border', icon: <MdLineWeight />,
-                            label: t('designer.toolbar.borderWithWidth', {
-                                width: currentStrokeWidth,
-                                style: isDashed ? t('designer.toolbar.dashedSuffix') : '',
-                            }),
+                            label: borderLabel,
                             onClick: () => {
                                 const widths = [0, 1, 2, 4];
-                                const idx = widths.indexOf(currentStrokeWidth);
+                                if (toolbarStyleState.borderMixed) {
+                                    onUpdateStyle({ strokeWidth: 1, strokeDasharray: undefined });
+                                    return;
+                                }
+                                const idx = widths.indexOf(toolbarStyleState.strokeWidth);
                                 onUpdateStyle({ strokeWidth: widths[(idx + 1) % widths.length] });
                             },
                             disabled: hasLockedSelection,
@@ -348,11 +361,14 @@ export const FloatingContextToolbar: React.FC<FloatingContextToolbarProps> = Rea
                         }] : []),
                         ...(onCopyStyle && onPasteStyle ? [{
                             key: 'format', icon: <FaPaintBrush />,
-                            label: hasCopiedStyle ? t('designer.toolbar.pasteStyle') : t('designer.toolbar.copyStyle'),
+                            label: hasCopiedStyle
+                                ? lockedActionLabel(t('designer.toolbar.pasteStyle'))
+                                : `${t('designer.toolbar.copyStyle')}${selectedNodes.length === 1 ? '' : ` ${mixedLabel}`}`,
                             onClick: hasCopiedStyle ? onPasteStyle : onCopyStyle,
-                            disabled: hasCopiedStyle && hasLockedSelection,
+                            disabled: hasCopiedStyle ? hasLockedSelection : selectedNodes.length !== 1,
                         }] : []),
-                    ]} />
+                        ]}
+                    />
 
                     {/* 域 Popover — 仅在插件启用时显示 */}
                     {!isHide('domain') && onChangeDomainClass && (

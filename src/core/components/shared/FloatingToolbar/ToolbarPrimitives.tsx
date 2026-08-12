@@ -7,7 +7,7 @@
  *   - 所有图标使用 .floating-toolbar-btn__icon 包裹以确保 font-size 统一
  *   - 不使用 antd Button，用 <button> 维持 CSS-only 控制
  */
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Tooltip, Popover } from 'antd';
 import { MoreOutlined } from '@ant-design/icons';
 import './FloatingToolbar.css';
@@ -177,20 +177,51 @@ export const ToolbarOverflow: React.FC<ToolbarOverflowProps> = ({
     items, label = '更多操作',
 }) => {
     const [open, setOpen] = useState(false);
+    const rootRef = useRef<HTMLSpanElement>(null);
+    const triggerRef = useRef<HTMLButtonElement>(null);
 
     const handleItemClick = useCallback((item: OverflowItem) => {
         if (item.disabled) return;
         item.onClick();
-        setOpen(false);
     }, []);
+
+    useEffect(() => {
+        if (!open) return;
+        const handlePointerDown = (event: PointerEvent) => {
+            if (event.target instanceof Node && rootRef.current?.contains(event.target)) return;
+            setOpen(false);
+        };
+        document.addEventListener('pointerdown', handlePointerDown);
+        return () => document.removeEventListener('pointerdown', handlePointerDown);
+    }, [open]);
 
     if (items.length === 0) return null;
 
-    const content = (
-        <div className="floating-toolbar-overflow-panel">
+    return (
+        <span ref={rootRef} className="floating-toolbar-overflow-root">
+            <ToolbarButton
+                ref={triggerRef}
+                icon={<MoreOutlined />}
+                label={label}
+                active={open}
+                onClick={() => setOpen(current => !current)}
+            />
+            {open && <div
+                className="floating-toolbar-overflow-panel floating-toolbar-overflow-panel--anchored"
+                role="menu"
+                aria-label={label}
+                onKeyDown={(event) => {
+                    if (event.key !== 'Escape') return;
+                    event.preventDefault();
+                    setOpen(false);
+                    triggerRef.current?.focus();
+                }}
+            >
             {items.map(item => (
                 <button
                     key={item.key}
+                    type="button"
+                    role="menuitem"
                     className={`floating-toolbar-overflow-item ${item.danger ? 'floating-toolbar-overflow-item--danger' : ''}`}
                     onClick={() => handleItemClick(item)}
                     disabled={item.disabled}
@@ -200,14 +231,7 @@ export const ToolbarOverflow: React.FC<ToolbarOverflowProps> = ({
                     <span>{item.label}</span>
                 </button>
             ))}
-        </div>
-    );
-
-    return (
-        <Popover content={content} trigger="click" placement="bottom" open={open} onOpenChange={setOpen}>
-            <span>
-                <ToolbarButton icon={<MoreOutlined />} label={label} />
-            </span>
-        </Popover>
+            </div>}
+        </span>
     );
 };

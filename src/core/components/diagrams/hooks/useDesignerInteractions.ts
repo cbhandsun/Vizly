@@ -137,7 +137,13 @@ export function useDesignerInteractions({
         }
     });
 
-    const { hasCopiedStyle, copyStyle, pasteStyle } = useStylePainter(setNodes);
+    const { hasCopiedStyle, copyStyle, pasteStyle } = useStylePainter({
+        setNodes,
+        setSelectedNodes,
+        takeSnapshot,
+        nodesRef,
+        edgesRef,
+    });
 
     const { templates, groupedTemplates, saveAsTemplate, saveGroupAsTemplate, createFromTemplate, deleteTemplate, renameTemplate } = useNodeTemplates(normalizedActiveLayerId);
     
