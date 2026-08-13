@@ -67,10 +67,11 @@ import {
     logMindmapToolbarFocusModeFailure,
     logMindmapToolbarStatsUpdateFailure,
     logMindmapToolbarSummaryFailure,
+    logMindmapToolbarTreeExpansionFailure,
 } from './mindmapToolbarLogging';
 import { persistMindMapThemeKey, resolveMindMapThemeKey } from './mindmapThemeStorage';
 import { emitVizlyMindMapOperation } from './mindmapOperationBridge';
-import { setMindMapTreeExpanded } from './mindmapTreeExpansion';
+import { applyMindMapTreeExpansionTransaction } from './mindmapTreeExpansion';
 import { createMindElixirArrowModeController } from './mindElixirArrowModeController';
 import { useMindElixirImportActions } from './useMindElixirImportActions';
 import { useMindElixirExportActions } from './useMindElixirExportActions';
@@ -156,16 +157,20 @@ const MindElixirToolbar: React.FC = () => {
 
     const handleCollapseAll = useCallback(() => {
         if (!mind) return;
-        const data = mind.getData();
-        const newNodeData = setMindMapTreeExpanded(cleanAndValidateTree(data.nodeData, true), false);
-        newNodeData.expanded = true; // Keep root expanded
-        mind.refresh({ ...data, nodeData: newNodeData });
+        try {
+            applyMindMapTreeExpansionTransaction(mind, false);
+        } catch (error) {
+            logMindmapToolbarTreeExpansionFailure('collapseAll', error);
+        }
     }, [mind]);
 
     const handleExpandAll = useCallback(() => {
         if (!mind) return;
-        const data = mind.getData();
-        mind.refresh({ ...data, nodeData: setMindMapTreeExpanded(cleanAndValidateTree(data.nodeData, true), true) });
+        try {
+            applyMindMapTreeExpansionTransaction(mind, true);
+        } catch (error) {
+            logMindmapToolbarTreeExpansionFailure('expandAll', error);
+        }
     }, [mind]);
 
     const handleFitView = useCallback(() => {

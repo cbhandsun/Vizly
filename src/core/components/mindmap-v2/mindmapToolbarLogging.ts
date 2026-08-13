@@ -36,3 +36,10 @@ export const logMindmapToolbarImportFailure = (format: string, error: unknown): 
 export const logMindmapToolbarStatsUpdateFailure = (error: unknown): void => {
   safeLog.warn('[MindMapToolbar] stats update failed:', redactSensitiveLogValue(error));
 };
+
+export const logMindmapToolbarTreeExpansionFailure = (
+  action: 'collapseAll' | 'expandAll',
+  error: unknown,
+): void => {
+  safeLog.warn(`[MindMapToolbar] ${action} failed:`, redactSensitiveLogValue(error));
+};

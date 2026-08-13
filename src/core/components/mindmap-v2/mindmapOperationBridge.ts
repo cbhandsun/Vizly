@@ -5,7 +5,9 @@ type MindElixirArrow = MindElixirInstance['arrows'][number];
 export type VizlyMindMapOperation =
     | { name: 'autoArrangeMindmap'; obj: NodeObj }
     | { name: 'changeDirection'; obj: NodeObj }
+    | { name: 'collapseAllBranches'; obj: NodeObj }
     | { name: 'editArrowLabel'; obj: MindElixirArrow }
+    | { name: 'expandAllBranches'; obj: NodeObj }
     | { name: 'import'; obj: NodeObj }
     | { name: 'outline_structure_change'; obj: NodeObj };
 

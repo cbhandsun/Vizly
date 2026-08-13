@@ -49,7 +49,10 @@ const readOperationName = (operation: unknown): string => {
 };
 
 const describeOperation = (operation: unknown): string => {
-    const operationKey = OPERATION_KEYS[readOperationName(operation)] ?? 'update';
+    const name = readOperationName(operation);
+    if (name === 'collapseAllBranches') return i18n.t('plugins.mindmap.collapseAll');
+    if (name === 'expandAllBranches') return i18n.t('plugins.mindmap.expandAll');
+    const operationKey = OPERATION_KEYS[name] ?? 'update';
     return i18n.t(`plugins.mindmap.history.operations.${operationKey}`);
 };
 

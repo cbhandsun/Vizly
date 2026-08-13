@@ -18,6 +18,8 @@ describe('emitVizlyMindMapOperation', () => {
 
         emitVizlyMindMapOperation(mind, { name: 'autoArrangeMindmap', obj: node });
         emitVizlyMindMapOperation(mind, { name: 'changeDirection', obj: node });
+        emitVizlyMindMapOperation(mind, { name: 'collapseAllBranches', obj: node });
+        emitVizlyMindMapOperation(mind, { name: 'expandAllBranches', obj: node });
         emitVizlyMindMapOperation(mind, { name: 'editArrowLabel', obj: arrow });
         emitVizlyMindMapOperation(mind, { name: 'outline_structure_change', obj: node });
 
@@ -30,14 +32,22 @@ describe('emitVizlyMindMapOperation', () => {
             obj: node,
         });
         expect(fire).toHaveBeenNthCalledWith(3, 'operation', {
+            name: 'collapseAllBranches',
+            obj: node,
+        });
+        expect(fire).toHaveBeenNthCalledWith(4, 'operation', {
+            name: 'expandAllBranches',
+            obj: node,
+        });
+        expect(fire).toHaveBeenNthCalledWith(5, 'operation', {
             name: 'editArrowLabel',
             obj: arrow,
         });
-        expect(fire).toHaveBeenNthCalledWith(4, 'operation', {
+        expect(fire).toHaveBeenNthCalledWith(6, 'operation', {
             name: 'outline_structure_change',
             obj: node,
         });
-        expect(fire.mock.instances).toEqual([bus, bus, bus, bus]);
+        expect(fire.mock.instances).toEqual([bus, bus, bus, bus, bus, bus]);
     });
 
     it('refreshes runtime-supported direction values through one typed adapter', () => {
