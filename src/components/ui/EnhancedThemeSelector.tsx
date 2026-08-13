@@ -3,10 +3,11 @@
  * 支持新的主题系统功能，包括预设、自定义主题、性能优化等
  */
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useId, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { THEME_JSON_IMPORT_MAX_BYTES, getFileSizeLimitError } from '../../core/utils/fileImportGuards';
 import { theme } from 'antd';
+import Popconfirm from 'antd/es/popconfirm';
 import { FaPalette, FaDownload, FaUpload, FaPlus, FaTrash, FaCheck, FaTimes } from 'react-icons/fa';
 
 import { useConfigIntegration } from '@/core/hooks/useConfigIntegration';
@@ -29,6 +30,7 @@ import {
 } from '@/core/themes/themeLogging';
 import { renderSafeThemePreviewGradient } from '@/core/themes/themePreviewSecurity';
 import { downloadFile } from '@/core/utils/downloadUtils';
+import { ThemeChoiceButton } from './ThemeChoiceButton';
 import { ThemeSelectorDialog, type ThemeSelectorTab } from './ThemeSelectorDialog';
 
 export interface EnhancedThemeSelectorProps {
@@ -51,6 +53,14 @@ interface CustomThemeForm {
   mode: ThemeMode;
   baseTheme: string;
 }
+
+const EMPTY_CUSTOM_THEME_FORM: CustomThemeForm = {
+  id: '',
+  name: '',
+  description: '',
+  mode: 'light',
+  baseTheme: 'light',
+};
 
 type ThemePreviewItem = Partial<Theme> & {
   id?: string;
@@ -83,14 +93,13 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
   const [presets, setPresets] = useState<ThemePreset[]>([]);
   const [customThemes, setCustomThemes] = useState<Theme[]>([]);
   const [isCreatingCustom, setIsCreatingCustom] = useState(false);
-  const [customThemeForm, setCustomThemeForm] = useState<CustomThemeForm>({
-    id: '',
-    name: '',
-    description: '',
-    mode: 'light',
-    baseTheme: 'light',
-  });
+  const [customThemeForm, setCustomThemeForm] = useState<CustomThemeForm>(EMPTY_CUSTOM_THEME_FORM);
+  const [isThemeActionPending, setIsThemeActionPending] = useState(false);
+  const [importStatus, setImportStatus] = useState<'success' | 'rejected' | 'failed' | null>(null);
   const [themeCache, setThemeCache] = useState<Record<string, Theme>>({});
+  const themeActionPendingRef = useRef(false);
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const importInputId = useId();
   const closeThemeDialog = useCallback(() => setIsOpen(false), []);
   const triggerLabel = ariaLabel || t('theme.selector.title');
 
@@ -141,6 +150,9 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
 
   // 处理主题切换
   const handleThemeChange = useCallback(async (themeId: string) => {
+    if (themeActionPendingRef.current) return;
+    themeActionPendingRef.current = true;
+    setIsThemeActionPending(true);
     try {
       await setTheme(themeId);
       const themeManager = state.integration?.getThemeManager();
@@ -152,11 +164,17 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
       }
     } catch (error) {
       logThemeSelectorChangeFailure(error);
+    } finally {
+      themeActionPendingRef.current = false;
+      setIsThemeActionPending(false);
     }
   }, [setTheme, state.integration, onThemeChange]);
 
   // 应用预设
   const handleApplyPreset = useCallback(async (preset: ThemePreset) => {
+    if (themeActionPendingRef.current) return;
+    themeActionPendingRef.current = true;
+    setIsThemeActionPending(true);
     try {
       if (!state.integration) return;
 
@@ -172,6 +190,9 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
       }
     } catch (error) {
       logThemeSelectorApplyPresetFailure(error);
+    } finally {
+      themeActionPendingRef.current = false;
+      setIsThemeActionPending(false);
     }
   }, [state.integration, onThemeChange, setTheme]);
 
@@ -193,25 +214,20 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
         return;
       }
 
+      const customThemeName = customThemeForm.name.trim();
+      if (!customThemeName) return;
       const customTheme: Theme = {
         ...baseTheme,
         id: customThemeForm.id || `custom-${Date.now()}`,
-        name: customThemeForm.name,
+        name: customThemeName,
         mode: customThemeForm.mode,
-        // 添加description字段，如果为空则使用默认值
-        ...(customThemeForm.description ? { description: customThemeForm.description } : { description: '' }),
+        description: customThemeForm.description.trim(),
       };
 
       await themeManager.addCustomTheme(customTheme);
       setCustomThemes(prev => [...prev, customTheme]);
       setIsCreatingCustom(false);
-      setCustomThemeForm({
-        id: '',
-        name: '',
-        description: '',
-        mode: 'light',
-        baseTheme: 'light',
-      });
+      setCustomThemeForm(EMPTY_CUSTOM_THEME_FORM);
     } catch (error) {
       logThemeSelectorCreateCustomThemeFailure(error);
     }
@@ -223,12 +239,17 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
       if (!state.integration) return;
 
       const themeManager = state.integration.getThemeManager();
+      if (currentTheme?.id === themeId) {
+        const fallbackTheme = await themeManager.setTheme('light');
+        window.dispatchEvent(new CustomEvent('diagram-global-theme-changed', { detail: fallbackTheme.id }));
+        onThemeChange?.(fallbackTheme);
+      }
       await themeManager.removeCustomTheme(themeId);
       setCustomThemes(prev => prev.filter(theme => theme.id !== themeId));
     } catch (error) {
       logThemeSelectorDeleteCustomThemeFailure(error);
     }
-  }, [state.integration]);
+  }, [currentTheme, onThemeChange, state.integration]);
 
   // 导出主题配置
   const handleExportThemes = useCallback(async () => {
@@ -245,9 +266,11 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
   const handleImportThemes = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    setImportStatus(null);
     const sizeError = getFileSizeLimitError(file, THEME_JSON_IMPORT_MAX_BYTES, 'theme JSON');
     if (sizeError) {
       logThemeSelectorImportRejected(sizeError);
+      setImportStatus('rejected');
       event.target.value = '';
       return;
     }
@@ -269,8 +292,10 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
           setPresets(allPresets);
           setCustomThemes(allCustomThemes);
         }
+        setImportStatus('success');
       } catch (error) {
         logThemeSelectorImportFailure(error);
+        setImportStatus('failed');
       } finally {
         event.target.value = '';
       }
@@ -311,7 +336,7 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
 
   // 渲染主题列表
   const renderThemeList = () => (
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6" aria-busy={isThemeActionPending}>
       {availableThemes.map((themeId: string) => {
         const themeManager = state.integration?.getThemeManager();
         // 优先从预设加载颜色数据，确保预览卡片能显示出五彩渐变色
@@ -323,32 +348,20 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
         const themeData = themeCache[themeId] || (preset ? preset.theme : (themeManager?.getCurrentThemeId() === themeId ? themeManager?.getCurrentTheme() : null));
         
         const isActive = currentTheme?.id === themeId;
+        const themeName = preset?.name || t(`theme.selector.${themeId}`, { defaultValue: themeId });
 
         return (
-          <div
+          <ThemeChoiceButton
             key={themeId}
-            className={`group relative flex flex-col gap-3 p-4 transition-all duration-300 rounded-[var(--glass-radius)] cursor-pointer ${isActive ? 'bg-white dark:bg-[#1A1A1C]/60 border-indigo-500 dark:border-indigo-400 shadow-[0_2px_12px_rgba(99,102,241,0.15)] ring-1 ring-indigo-500/20' : 'bg-white dark:bg-white/5 border border-black/[0.06] dark:border-white/[0.08] hover:border-black/[0.1] dark:hover:border-white/[0.15] hover:shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)]'}`}
-            onClick={() => handleThemeChange(themeId)}
-            role="button"
-            aria-pressed={isActive}
-            tabIndex={0}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleThemeChange(themeId); } }}
-          >
-            <div className="w-full h-[72px] rounded-[6px] shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_1px_2px_rgba(0,0,0,0.05)] relative overflow-hidden transform transition-transform" style={{
-              background: getGradientBackground(preset || themeData || { id: themeId }),
-            }}>
-               <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/30 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 transform -translate-x-[150%] group-hover:translate-x-[150%]" style={{ transitionProperty: 'opacity, transform' }} />
-            </div>
-            <div className="flex flex-col pt-1 pointer-events-none">
-              <div className="text-[15px] font-semibold text-gray-800 dark:text-gray-100 capitalize tracking-tight">
-                {preset?.name || t(`theme.selector.${themeId}`, { defaultValue: themeId })}
-              </div>
-              <div className="text-xs text-gray-500/80 dark:text-gray-400 font-medium">
-                {preset?.category === 'built-in' ? '基础主题' : preset?.category === 'preset' ? '系统预设' : t('theme.selector.themes')}
-              </div>
-            </div>
-            {isActive && <FaCheck className="absolute top-2 right-2 text-blue-500 p-1.5 w-6 h-6 bg-white/90 dark:bg-black/70 rounded-full shadow-sm backdrop-blur-md" />}
-          </div>
+            active={isActive}
+            categoryLabel={preset?.category
+              ? t(`theme.selector.categories.${preset.category}`, { defaultValue: preset.category })
+              : t('theme.selector.themes')}
+            disabled={isThemeActionPending}
+            gradient={getGradientBackground(preset || themeData || { id: themeId })}
+            label={themeName}
+            onSelect={() => void handleThemeChange(themeId)}
+          />
         );
       })}
     </div>
@@ -369,32 +382,24 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
 
           return (
             <div key={category.id} className="flex flex-col gap-3">
-              <h4 className="text-xs font-bold tracking-wider text-gray-500 uppercase dark:text-gray-400">{category.name}</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-                {categoryPresets.map(preset => (
-                  <div
-                    key={preset.id}
-                    className="group relative flex flex-col gap-3 p-4 transition-all duration-300 rounded-[var(--glass-radius)] cursor-pointer bg-white dark:bg-white/5 border border-black/[0.06] dark:border-white/[0.08] hover:border-black/[0.1] dark:hover:border-white/[0.15] hover:shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)]"
-                    onClick={() => handleApplyPreset(preset)}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleApplyPreset(preset); } }}
-                  >
-                    <div className="w-full h-[72px] rounded-[6px] shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_1px_2px_rgba(0,0,0,0.05)] relative overflow-hidden transform transition-transform" style={{
-                      background: getGradientBackground(preset),
-                    }}>
-                       <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/30 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 transform -translate-x-[150%] group-hover:translate-x-[150%]" style={{ transitionProperty: 'opacity, transform' }} />
-                    </div>
-                    <div className="relative pt-2 flex-1 text-left z-10 flex flex-col pointer-events-none">
-                      <span className="font-semibold text-[15px] text-gray-800 dark:text-gray-100 capitalize tracking-tight">
-                        {preset?.name || preset.id}
-                      </span>
-                      <span className="text-xs font-medium text-gray-500/80 dark:text-gray-400">
-                        {preset?.category === 'built-in' ? '基础主题' : preset?.category === 'preset' ? '系统预设' : '自定义'}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+              <h4 className="text-xs font-bold tracking-wider text-gray-500 uppercase dark:text-gray-400">
+                {t(`theme.selector.categories.${category.id}`, { defaultValue: category.name })}
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6" aria-busy={isThemeActionPending}>
+                {categoryPresets.map(preset => {
+                  const isActive = currentTheme?.id === preset.id;
+                  return (
+                    <ThemeChoiceButton
+                      key={preset.id}
+                      active={isActive}
+                      categoryLabel={t(`theme.selector.categories.${preset.category}`, { defaultValue: preset.category })}
+                      disabled={isThemeActionPending}
+                      gradient={getGradientBackground(preset)}
+                      label={preset.name || preset.id}
+                      onSelect={() => void handleApplyPreset(preset)}
+                    />
+                  );
+                })}
               </div>
             </div>
           );
@@ -409,68 +414,86 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
       <div className="flex items-center justify-between pointer-events-none">
         <h4 className="text-sm font-bold tracking-wider text-gray-500 uppercase dark:text-gray-400 pointer-events-auto">{t('theme.selector.custom')}</h4>
         <button
-          className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 dark:bg-blue-500/10 dark:text-blue-400 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors pointer-events-auto shadow-sm"
+          type="button"
+          className="flex min-h-[44px] items-center gap-2 px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 dark:bg-blue-500/10 dark:text-blue-400 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors pointer-events-auto shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
           onClick={() => setIsCreatingCustom(true)}
         >
-          <FaPlus /> {t('theme.selector.create')}
+          <FaPlus aria-hidden="true" /> {t('theme.selector.create')}
         </button>
       </div>
 
       {isCreatingCustom && (
-        <div className="flex flex-col gap-3 p-4 rounded-xl bg-white/50 dark:bg-black/30 border border-blue-200/50 dark:border-blue-800/30">
-          <input
-            type="text"
-            placeholder={t('theme.selector.name')}
-            value={customThemeForm.name}
-            onChange={(e) => setCustomThemeForm(prev => ({ ...prev, name: e.target.value }))}
-            className="w-full px-3 py-2 text-sm transition-colors border rounded-md border-gray-300/50 dark:border-gray-600/50 bg-white/70 dark:bg-black/40 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
-          />
-          <input
-            type="text"
-            placeholder={t('theme.selector.desc')}
-            value={customThemeForm.description}
-            onChange={(e) => setCustomThemeForm(prev => ({ ...prev, description: e.target.value }))}
-            className="w-full px-3 py-2 text-sm transition-colors border rounded-md border-gray-300/50 dark:border-gray-600/50 bg-white/70 dark:bg-black/40 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
-          />
-          <select
-            value={customThemeForm.mode}
-            onChange={(e) => setCustomThemeForm(prev => ({ ...prev, mode: e.target.value as ThemeMode }))}
-            title={t('theme.selector.mode') || 'Mode'}
-            className="w-full px-3 py-2 text-sm transition-colors border rounded-md border-gray-300/50 dark:border-gray-600/50 bg-white/70 dark:bg-black/40 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
-          >
+        <form
+          className="flex flex-col gap-3 p-4 rounded-xl bg-white/50 dark:bg-black/30 border border-blue-200/50 dark:border-blue-800/30"
+          onSubmit={(event) => { event.preventDefault(); void handleCreateCustomTheme(); }}
+        >
+          <label className="flex flex-col gap-1 text-xs font-medium text-gray-600 dark:text-gray-300">
+            {t('theme.selector.name')}
+            <input
+              autoFocus
+              type="text"
+              required
+              maxLength={80}
+              value={customThemeForm.name}
+              onChange={(e) => setCustomThemeForm(prev => ({ ...prev, name: e.target.value }))}
+              className="w-full px-3 py-2 text-sm transition-colors border rounded-md border-gray-300/50 dark:border-gray-600/50 bg-white/70 dark:bg-black/40 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-xs font-medium text-gray-600 dark:text-gray-300">
+            {t('theme.selector.desc')}
+            <input
+              type="text"
+              maxLength={240}
+              value={customThemeForm.description}
+              onChange={(e) => setCustomThemeForm(prev => ({ ...prev, description: e.target.value }))}
+              className="w-full px-3 py-2 text-sm transition-colors border rounded-md border-gray-300/50 dark:border-gray-600/50 bg-white/70 dark:bg-black/40 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-xs font-medium text-gray-600 dark:text-gray-300">
+            {t('theme.selector.mode')}
+            <select
+              value={customThemeForm.mode}
+              onChange={(e) => setCustomThemeForm(prev => ({ ...prev, mode: e.target.value as ThemeMode }))}
+              className="w-full px-3 py-2 text-sm transition-colors border rounded-md border-gray-300/50 dark:border-gray-600/50 bg-white/70 dark:bg-black/40 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
+            >
             <option value="light">{t('theme.selector.light')}</option>
             <option value="dark">{t('theme.selector.dark')}</option>
-          </select>
-          <select
-            value={customThemeForm.baseTheme}
-            onChange={(e) => setCustomThemeForm(prev => ({ ...prev, baseTheme: e.target.value }))}
-            title={t('theme.selector.baseTheme') || 'Base Theme'}
-            className="w-full px-3 py-2 text-sm transition-colors border rounded-md border-gray-300/50 dark:border-gray-600/50 bg-white/70 dark:bg-black/40 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
-          >
-            {availableThemes.map((themeId: string) => (
-              <option key={themeId} value={themeId}>{themeId}</option>
-            ))}
-          </select>
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-xs font-medium text-gray-600 dark:text-gray-300">
+            {t('theme.selector.baseTheme')}
+            <select
+              value={customThemeForm.baseTheme}
+              onChange={(e) => setCustomThemeForm(prev => ({ ...prev, baseTheme: e.target.value }))}
+              className="w-full px-3 py-2 text-sm transition-colors border rounded-md border-gray-300/50 dark:border-gray-600/50 bg-white/70 dark:bg-black/40 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
+            >
+              {availableThemes.map((themeId: string) => (
+                <option key={themeId} value={themeId}>{themeId}</option>
+              ))}
+            </select>
+          </label>
           <div className="flex gap-2 mt-2">
             <button
-              onClick={handleCreateCustomTheme}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 shadow-sm transition-colors"
+              type="submit"
+              disabled={!customThemeForm.name.trim()}
+              className="flex min-h-[44px] flex-1 items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <FaCheck /> {t('theme.selector.actions.create')}
+              <FaCheck aria-hidden="true" /> {t('theme.selector.actions.create')}
             </button>
             <button
-              onClick={() => setIsCreatingCustom(false)}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-800 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              type="button"
+              onClick={() => { setIsCreatingCustom(false); setCustomThemeForm(EMPTY_CUSTOM_THEME_FORM); }}
+              className="flex min-h-[44px] flex-1 items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-800 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
             >
-              <FaTimes /> {t('theme.selector.actions.cancel')}
+              <FaTimes aria-hidden="true" /> {t('theme.selector.actions.cancel')}
             </button>
           </div>
-        </div>
+        </form>
       )}
 
       {customThemes.length === 0 && !isCreatingCustom && (
         <div className="text-center py-8 text-gray-400 dark:text-gray-500 text-sm">
-          暂无自定义主题
+          {t('theme.selector.emptyCustom')}
         </div>
       )}
 
@@ -484,22 +507,35 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
               <div className="text-sm font-semibold text-gray-800 dark:text-gray-100">{theme.name}</div>
               <div className="text-xs text-gray-500 dark:text-gray-400 truncate">{theme.description}</div>
             </div>
-            {/* 隐藏的悬浮按钮 */}
-            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 bg-white/90 dark:bg-black/60 p-1 rounded-lg shadow-sm backdrop-blur-sm pointer-events-auto">
+            <div className="absolute top-2 right-2 flex gap-1 bg-white/90 dark:bg-black/60 p-1 rounded-lg shadow-sm backdrop-blur-sm pointer-events-auto">
               <button
-                className="p-1.5 text-blue-500 hover:text-blue-600 hover:bg-blue-50 rounded"
-                onClick={() => handleThemeChange(theme.id)}
+                type="button"
+                aria-label={`${t('theme.selector.actions.apply')} ${theme.name}`}
+                aria-pressed={currentTheme?.id === theme.id}
+                disabled={isThemeActionPending}
+                className="flex min-h-[44px] min-w-[44px] items-center justify-center p-1.5 text-blue-500 hover:text-blue-600 hover:bg-blue-50 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-wait disabled:opacity-50"
+                onClick={() => void handleThemeChange(theme.id)}
                 title={t('theme.selector.actions.apply') || 'Apply'}
               >
-                <FaCheck />
+                <FaCheck aria-hidden="true" />
               </button>
-              <button
-                className="p-1.5 text-red-500 hover:text-red-600 hover:bg-red-50 rounded"
-                onClick={() => handleDeleteCustomTheme(theme.id)}
-                title={t('theme.selector.actions.delete') || 'Delete'}
+              <Popconfirm
+                title={t('theme.selector.deleteConfirmTitle', { name: theme.name })}
+                description={t('theme.selector.deleteConfirmDescription')}
+                okText={t('common.delete')}
+                cancelText={t('common.cancel')}
+                okButtonProps={{ danger: true }}
+                onConfirm={() => handleDeleteCustomTheme(theme.id)}
               >
-                <FaTrash />
-              </button>
+                <button
+                  type="button"
+                  aria-label={`${t('theme.selector.actions.delete')} ${theme.name}`}
+                  className="flex min-h-[44px] min-w-[44px] items-center justify-center p-1.5 text-red-500 hover:text-red-600 hover:bg-red-50 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                  title={t('theme.selector.actions.delete') || 'Delete'}
+                >
+                  <FaTrash aria-hidden="true" />
+                </button>
+              </Popconfirm>
             </div>
           </div>
         ))}
@@ -524,39 +560,40 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
           <h4 className="text-xs font-bold tracking-wider text-gray-500 uppercase dark:text-gray-400">{t('theme.selector.import')}/{t('theme.selector.export')}</h4>
           <div className="flex gap-4">
             <button
-              onClick={handleExportThemes}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white/50 border border-gray-200/50 rounded-lg hover:bg-white/80 dark:bg-black/40 dark:text-gray-200 dark:border-gray-700/50 dark:hover:bg-black/60 shadow-sm transition-colors"
+              type="button"
+              onClick={() => void handleExportThemes()}
+              className="flex min-h-[44px] items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white/50 border border-gray-200/50 rounded-lg hover:bg-white/80 dark:bg-black/40 dark:text-gray-200 dark:border-gray-700/50 dark:hover:bg-black/60 shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
             >
-              <FaDownload /> {t('theme.selector.export')}
+              <FaDownload aria-hidden="true" /> {t('theme.selector.export')}
             </button>
-            <div
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white/50 border border-gray-200/50 rounded-lg hover:bg-white/80 dark:bg-black/40 dark:text-gray-200 dark:border-gray-700/50 dark:hover:bg-black/60 shadow-sm cursor-pointer transition-colors"
-              role="button"
-              tabIndex={0}
-              onClick={(e) => {
-                const input = (e.currentTarget.nextElementSibling as HTMLInputElement);
-                if (input) input.click();
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  const input = (e.currentTarget.nextElementSibling as HTMLInputElement);
-                  if (input) input.click();
-                }
-              }}
+            <button
+              type="button"
+              aria-controls={importInputId}
+              className="flex min-h-[44px] items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white/50 border border-gray-200/50 rounded-lg hover:bg-white/80 dark:bg-black/40 dark:text-gray-200 dark:border-gray-700/50 dark:hover:bg-black/60 shadow-sm cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+              onClick={() => importInputRef.current?.click()}
             >
-              <FaUpload /> {t('theme.selector.import')}
-            </div>
+              <FaUpload aria-hidden="true" /> {t('theme.selector.import')}
+            </button>
             <input
+              ref={importInputRef}
+              id={importInputId}
               type="file"
               accept=".json"
               onChange={handleImportThemes}
-              style={{ display: 'none' }}
+              className="sr-only"
               tabIndex={-1}
               aria-label={t('theme.selector.import')}
               title={t('theme.selector.import')}
             />
           </div>
+          {importStatus && (
+            <p
+              role={importStatus === 'success' ? 'status' : 'alert'}
+              className={`text-sm ${importStatus === 'success' ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}
+            >
+              {t(`theme.selector.importStatus.${importStatus}`)}
+            </p>
+          )}
         </div>
       )}
     </div>
@@ -564,7 +601,7 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
 
   if (!state.isReady) {
     return (
-      <div className={`p-2 rounded w-8 h-8 flex animate-pulse bg-black/5 dark:bg-white/5 ${className}`} style={style} />
+      <div role="status" aria-label={t('theme.selector.loading')} className={`p-2 rounded w-8 h-8 flex animate-pulse bg-black/5 dark:bg-white/5 ${className}`} style={style} />
     );
   }
 
@@ -572,22 +609,24 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
     <>
       {variant === 'icon' ? (
         <button
+            type="button"
             aria-label={triggerLabel}
             aria-expanded={isOpen}
             aria-haspopup="dialog"
-            className={className || "inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded-[6px] border-none text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] transition-colors cursor-pointer"}
+            className={className || "inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded-[6px] border-none text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"}
             onClick={() => setIsOpen(!isOpen)}
             style={style}
             title={t('theme.selector.title')}
         >
-            <FaPalette className="text-[13px]" />
+            <FaPalette aria-hidden="true" className="text-[13px]" />
         </button>
       ) : (
         <button
+            type="button"
             aria-label={triggerLabel}
             aria-expanded={isOpen}
             aria-haspopup="dialog"
-            className={`flex items-center justify-between gap-1.5 ${borderless ? 'min-h-[44px]' : 'h-8'} px-2.5 text-[13px] transition-colors rounded-[6px] ${borderless ? 'bg-transparent border-none' : 'bg-white dark:bg-[#1C1C1E] border border-[#d9d9d9] dark:border-white/15 hover:border-blue-400 dark:hover:border-blue-500 shadow-sm'} text-gray-700 dark:text-gray-200 pointer-events-auto overflow-hidden w-full ${className}`}
+            className={`flex items-center justify-between gap-1.5 ${borderless ? 'min-h-[44px]' : 'h-8'} px-2.5 text-[13px] transition-colors rounded-[6px] ${borderless ? 'bg-transparent border-none' : 'bg-white dark:bg-[#1C1C1E] border border-[#d9d9d9] dark:border-white/15 hover:border-blue-400 dark:hover:border-blue-500 shadow-sm'} text-gray-700 dark:text-gray-200 pointer-events-auto overflow-hidden w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 ${className}`}
             onClick={() => setIsOpen(!isOpen)}
             style={style}
         >

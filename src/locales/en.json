@@ -1771,6 +1771,20 @@
             "performance": "Performance Metrics",
             "import": "Import",
             "export": "Export",
+            "emptyCustom": "No custom themes yet",
+            "deleteConfirmTitle": "Delete “{{name}}”?",
+            "deleteConfirmDescription": "This action cannot be undone.",
+            "categories": {
+                "built-in": "Foundation theme",
+                "preset": "System preset",
+                "community": "Community theme",
+                "custom": "Custom theme"
+            },
+            "importStatus": {
+                "success": "Theme configuration imported.",
+                "rejected": "This file is too large to import.",
+                "failed": "Import failed. Check the file format and try again."
+            },
             "actions": {
                 "create": "Create",
                 "apply": "Apply",

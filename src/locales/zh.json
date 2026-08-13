@@ -1924,6 +1924,20 @@
             "import": "导入",
             "export": "导出",
             "performance": "性能指标",
+            "emptyCustom": "暂无自定义主题",
+            "deleteConfirmTitle": "删除「{{name}}」？",
+            "deleteConfirmDescription": "删除后无法恢复。",
+            "categories": {
+                "built-in": "基础主题",
+                "preset": "系统预设",
+                "community": "社区主题",
+                "custom": "自定义主题"
+            },
+            "importStatus": {
+                "success": "主题配置已导入。",
+                "rejected": "文件过大，无法导入。",
+                "failed": "导入失败，请检查文件格式后重试。"
+            },
             "actions": {
                 "create": "创建",
                 "apply": "应用",
