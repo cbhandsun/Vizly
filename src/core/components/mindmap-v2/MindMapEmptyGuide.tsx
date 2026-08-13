@@ -8,15 +8,11 @@
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { getMindElixirInstance, subscribeMindElixir } from './mindElixirStore';
-import type { NodeObj } from 'mind-elixir';
+import { getMindElixirInstance } from './mindElixirStore';
 import { generateMindMapFromPrompt } from './mindmapAIService';
 import { cleanMindMapData, refreshMindElixirWithSanitizedData } from './mindmapTreeSanitizer';
 import { logMindmapEmptyGuideCheckFailure } from './mindmapPanelLogging';
-
-function countNodes(node: NodeObj): number {
-    return 1 + (node.children ?? []).reduce((acc, c) => acc + countNodes(c), 0);
-}
+import { bindMindMapEmptyState, readMindMapEmptyState } from './mindMapEmptyState';
 
 const TIPS = [
     { icon: '⌨️', key: 'Tab',    tip: 'Tab — 添加子节点' },
@@ -40,10 +36,7 @@ const MindMapEmptyGuide: React.FC = () => {
     // Check if map is "empty" (only root node)
     const checkEmpty = useCallback(() => {
         try {
-            const data = mind?.getData();
-            if (!data) return;
-            const n = countNodes(data.nodeData);
-            setIsEmpty(n <= 1);
+            if (mind) setIsEmpty(readMindMapEmptyState(mind));
         } catch (error) {
             logMindmapEmptyGuideCheckFailure(error);
         }
@@ -72,24 +65,12 @@ const MindMapEmptyGuide: React.FC = () => {
 
     useEffect(() => {
         if (!mind) return;
-        let cancelled = false;
-        queueMicrotask(() => {
-            if (!cancelled) checkEmpty();
+        return bindMindMapEmptyState({
+            mind,
+            onChange: setIsEmpty,
+            onFailure: logMindmapEmptyGuideCheckFailure,
         });
-        mind.bus.addListener('operation', checkEmpty);
-        return () => {
-            cancelled = true;
-            mind.bus.removeListener('operation', checkEmpty);
-        };
-    }, [mind, checkEmpty]);
-
-    // Also subscribe to mind instance changes
-    useEffect(() => {
-        const unsub = subscribeMindElixir(m => {
-            if (m) setTimeout(checkEmpty, 500);
-        });
-        return unsub;
-    }, [checkEmpty]);
+    }, [mind]);
 
     if (!isEmpty || !visible) return null;
 

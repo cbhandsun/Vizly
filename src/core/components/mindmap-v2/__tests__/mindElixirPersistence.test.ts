@@ -56,8 +56,30 @@ describe('mindElixirPersistence', () => {
       },
     }]));
 
-    expect(data.nodeData).toMatchObject({ id: 'root-2', topic: 'Imported' });
+    expect(data.nodeData).toMatchObject({ id: 'root', topic: 'Imported' });
     expect(data.direction).toBe(1);
+  });
+
+  it('sanitizes malformed descendant topics before persisted data reaches the renderer', () => {
+    const data = loadMindElixirData(context([{
+      id: '__mindmap_meta__',
+      data: {
+        mindmapV2: {
+          _version: 'mindmap-v2',
+          nodeData: {
+            id: 'legacy-root',
+            topic: 'Imported',
+            children: [{ id: 'child', topic: undefined, children: [] }],
+          },
+          direction: 2,
+        },
+      },
+    }]));
+
+    expect(data.nodeData.children?.[0]).toMatchObject({
+      id: 'child',
+      topic: '(无标题)',
+    });
   });
 
   it('replaces stale metadata with a sanitized single payload node', () => {

@@ -9,6 +9,7 @@ import { persistMindMapThemeKey, resolveMindMapThemeKey } from './mindmapThemeSt
 import { logMindmapWrapperSaveFailure } from './mindmapWrapperLogging';
 import { VIZLY_HYPER_THEME } from './theme';
 import { isMindMapV2 } from './types';
+import { cleanMindMapData } from './mindmapTreeSanitizer';
 
 const DEFAULT_DIRECTION = 2 as const;
 
@@ -43,9 +44,10 @@ export const loadMindElixirData = (ctx: PluginContext): MindElixirData => {
     const embedded = metaNode?.data?.mindmapV2;
     if (isMindMapV2(embedded)) {
       if (embedded.themeKey) persistMindMapThemeKey(embedded.themeKey);
+      const cleaned = cleanMindMapData(embedded);
       return {
-        nodeData: embedded.nodeData,
-        direction: persistedDirection ?? coerceMindElixirDirection(embedded.direction),
+        nodeData: cleaned.nodeData,
+        direction: persistedDirection ?? coerceMindElixirDirection(cleaned.direction),
         theme: embedded.theme ?? VIZLY_HYPER_THEME,
       };
     }

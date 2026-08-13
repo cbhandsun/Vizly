@@ -8,6 +8,7 @@
  */
 import React, { useCallback, useEffect, useId, useLayoutEffect, useState, useRef } from 'react';
 import { Tooltip, Popover } from 'antd';
+import type { NodeObj } from 'mind-elixir';
 import { useTranslation } from 'react-i18next';
 import { getMindElixirInstance, subscribeMindElixir } from './mindElixirStore';
 import { findNodeById } from './migrate';
