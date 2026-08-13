@@ -92,6 +92,8 @@ describe('mind elixir operation effects', () => {
         listeners[0]?.({ name: 'unknown-operation' });
         expect(recordHistory).toHaveBeenCalledTimes(2);
         expect(recordHistory).toHaveBeenLastCalledWith('Mind map updated', expect.anything());
+        listeners[0]?.({ name: 'changeDirection' });
+        expect(recordHistory).toHaveBeenLastCalledWith('Mind map updated', expect.anything());
         expect(pending.size).toBe(3);
 
         const saveTask = [...pending.entries()].find(([handle]) => handle > 2);

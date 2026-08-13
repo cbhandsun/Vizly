@@ -19,6 +19,7 @@ const OPERATION_KEYS: Readonly<Record<string, string>> = {
     setNodeTags: 'setNodeTags',
     setNodeIcons: 'setNodeIcons',
     setNodeHyperLink: 'setNodeHyperLink',
+    changeDirection: 'update',
     outline_structure_change: 'outlineChange',
     template_apply: 'templateApply',
     ai_custom_action: 'aiAction',

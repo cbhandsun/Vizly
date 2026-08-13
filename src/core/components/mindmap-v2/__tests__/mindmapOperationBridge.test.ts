@@ -5,8 +5,9 @@ import { emitVizlyMindMapOperation, refreshVizlyMindMapData } from '../mindmapOp
 
 describe('emitVizlyMindMapOperation', () => {
     it('emits application operations through the mind-elixir operation channel', () => {
-        const fire = vi.fn();
-        const mind = { bus: { fire } } as unknown as Pick<MindElixirInstance, 'bus'>;
+        const fire = vi.fn(function () {});
+        const bus = { fire };
+        const mind = { bus } as unknown as Pick<MindElixirInstance, 'bus'>;
         const node = { id: 'root', topic: 'Root' } as NodeObj;
         const arrow = {
             id: 'arrow',
@@ -16,6 +17,7 @@ describe('emitVizlyMindMapOperation', () => {
         } as unknown as MindElixirInstance['arrows'][number];
 
         emitVizlyMindMapOperation(mind, { name: 'autoArrangeMindmap', obj: node });
+        emitVizlyMindMapOperation(mind, { name: 'changeDirection', obj: node });
         emitVizlyMindMapOperation(mind, { name: 'editArrowLabel', obj: arrow });
         emitVizlyMindMapOperation(mind, { name: 'outline_structure_change', obj: node });
 
@@ -24,13 +26,18 @@ describe('emitVizlyMindMapOperation', () => {
             obj: node,
         });
         expect(fire).toHaveBeenNthCalledWith(2, 'operation', {
+            name: 'changeDirection',
+            obj: node,
+        });
+        expect(fire).toHaveBeenNthCalledWith(3, 'operation', {
             name: 'editArrowLabel',
             obj: arrow,
         });
-        expect(fire).toHaveBeenNthCalledWith(3, 'operation', {
+        expect(fire).toHaveBeenNthCalledWith(4, 'operation', {
             name: 'outline_structure_change',
             obj: node,
         });
+        expect(fire.mock.instances).toEqual([bus, bus, bus, bus]);
     });
 
     it('refreshes runtime-supported direction values through one typed adapter', () => {

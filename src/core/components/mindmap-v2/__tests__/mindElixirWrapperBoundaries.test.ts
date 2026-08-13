@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { act, renderHook } from '@testing-library/react';
+import MindElixir, { type MindElixirInstance, type NodeObj, type Topic } from 'mind-elixir';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -13,7 +14,6 @@ import {
     parseMindMapImportText,
 } from '../useMindElixirFileDrop';
 import { createMindElixirArrowModeController } from '../mindElixirArrowModeController';
-import type { MindElixirInstance, Topic } from 'mind-elixir';
 import {
     isSupportedMindMapToolbarImport,
     parseMindMapToolbarImport,
@@ -21,6 +21,7 @@ import {
 import { printMindMap } from '../useMindElixirExportActions';
 import {
     applyMindMapDirection,
+    bindMindMapDirectionHistorySync,
     coerceMindMapBackgroundPattern,
     coerceMindMapDirectionKey,
     coerceMindMapNumberingPreference,
@@ -119,11 +120,17 @@ describe('mind elixir wrapper boundaries', () => {
         const initLeft = vi.fn();
         const initRight = vi.fn();
         const initSide = vi.fn();
+        const nodeData = { id: 'root', topic: 'Root', children: [] } as NodeObj;
+        const fire = vi.fn();
         const mind = {
             direction: 0,
             initLeft,
             initRight,
             initSide,
+            undo: vi.fn(),
+            redo: vi.fn(),
+            bus: { addListener: vi.fn(), removeListener: vi.fn(), fire },
+            getData: () => ({ nodeData }),
         } as unknown as MindElixirInstance;
         const { result } = renderHook(() => useMindElixirCanvasPreferences(mind));
 
@@ -131,16 +138,71 @@ describe('mind elixir wrapper boundaries', () => {
         expect(initLeft).toHaveBeenCalledOnce();
         expect(result.current.currentDirection).toBe('L');
         expect(localStorage.getItem('vizly_mindmap_dir')).toBe('L');
+        expect(fire).not.toHaveBeenCalledWith('operation', expect.anything());
 
+        mind.direction = MindElixir.LEFT;
         act(() => result.current.changeDirection('R'));
         expect(initRight).toHaveBeenCalledOnce();
         expect(result.current.currentDirection).toBe('R');
         expect(localStorage.getItem('vizly_mindmap_dir')).toBe('R');
+        expect(fire).toHaveBeenLastCalledWith('operation', {
+            name: 'changeDirection',
+            obj: nodeData,
+        });
 
+        mind.direction = MindElixir.RIGHT;
         act(() => result.current.changeDirection('LR'));
         expect(initSide).toHaveBeenCalledOnce();
         expect(result.current.currentDirection).toBe('LR');
         expect(localStorage.getItem('vizly_mindmap_dir')).toBe('LR');
+        expect(fire).toHaveBeenCalledTimes(2);
+    });
+
+    it('restores snapshot directions during undo and redo and restores native refresh', () => {
+        const listeners = new Map<string, () => void>();
+        const addListener = vi.fn((event: string, listener: () => void) => listeners.set(event, listener));
+        const removeListener = vi.fn();
+        const nodeData = { id: 'root', topic: 'Root', children: [] } as NodeObj;
+        const nativeRefresh = vi.fn();
+        const nativeUndo = vi.fn(function (this: MindElixirInstance) {
+            this.refresh({ nodeData, direction: MindElixir.RIGHT });
+        });
+        const nativeRedo = vi.fn(function (this: MindElixirInstance) {
+            this.refresh({ nodeData, direction: MindElixir.LEFT });
+        });
+        const mind = {
+            direction: MindElixir.LEFT,
+            isFocusMode: false,
+            refresh: nativeRefresh,
+            undo: nativeUndo,
+            redo: nativeRedo,
+            bus: { addListener, removeListener },
+        } as unknown as MindElixirInstance;
+        const onDirectionChange = vi.fn();
+
+        const cleanup = bindMindMapDirectionHistorySync(mind, onDirectionChange);
+        const wrappedRefresh = mind.refresh;
+
+        mind.undo();
+        expect(nativeUndo).toHaveBeenCalledOnce();
+        expect(nativeRefresh).toHaveBeenLastCalledWith({ nodeData, direction: MindElixir.RIGHT });
+        expect(mind.direction).toBe(MindElixir.RIGHT);
+        expect(onDirectionChange).toHaveBeenLastCalledWith('R');
+
+        mind.redo();
+        expect(nativeRedo).toHaveBeenCalledOnce();
+        expect(mind.direction).toBe(MindElixir.LEFT);
+        expect(onDirectionChange).toHaveBeenLastCalledWith('L');
+
+        mind.isFocusMode = true;
+        mind.direction = MindElixir.RIGHT;
+        listeners.get('changeDirection')?.();
+        expect(onDirectionChange).toHaveBeenCalledTimes(2);
+
+        cleanup();
+        expect(removeListener).toHaveBeenCalledWith('changeDirection', listeners.get('changeDirection'));
+        expect(mind.refresh).toBe(nativeRefresh);
+        expect(mind.refresh).not.toBe(wrappedRefresh);
     });
 
     it('uses the native side command for invalid direction input', () => {
@@ -165,8 +227,13 @@ describe('mind elixir wrapper boundaries', () => {
         root.id = 'vizly-mind-elixir-root';
         document.body.appendChild(root);
         localStorage.setItem('vizly_mindmap_numbering', 'enabled');
-        const firstMind = {} as MindElixirInstance;
-        const secondMind = {} as MindElixirInstance;
+        const createMind = () => ({
+            bus: { addListener: vi.fn(), removeListener: vi.fn() },
+            undo: vi.fn(),
+            redo: vi.fn(),
+        }) as unknown as MindElixirInstance;
+        const firstMind = createMind();
+        const secondMind = createMind();
         const hook = renderHook(
             ({ mind }: { mind: MindElixirInstance | null }) => useMindElixirCanvasPreferences(mind),
             { initialProps: { mind: firstMind as MindElixirInstance | null } },

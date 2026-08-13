@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import MindElixir from 'mind-elixir';
 import type { MindElixirInstance } from 'mind-elixir';
 
+import { emitVizlyMindMapOperation } from './mindmapOperationBridge';
+
 export type MindMapBackgroundPattern = 'none' | 'grid' | 'dots';
 export type MindMapDirectionKey = 'LR' | 'R' | 'L';
 
@@ -46,11 +48,47 @@ const writeStorage = (key: string, value: string): void => {
     }
 };
 
-const getLiveDirection = (mind: MindElixirInstance | null): MindMapDirectionKey | null => {
+export const getLiveMindMapDirection = (mind: MindElixirInstance | null): MindMapDirectionKey | null => {
     if (!mind) return null;
     if (mind.direction === MindElixir.SIDE) return 'LR';
     if (mind.direction === MindElixir.RIGHT) return 'R';
     return 'L';
+};
+
+export const bindMindMapDirectionHistorySync = (
+    mind: MindElixirInstance,
+    onDirectionChange: (direction: MindMapDirectionKey) => void,
+): (() => void) => {
+    const syncDirection = () => {
+        const direction = getLiveMindMapDirection(mind);
+        if (direction) onDirectionChange(direction);
+    };
+    const syncCommittedDirection = () => {
+        if (!mind.isFocusMode) syncDirection();
+    };
+    const originalRefresh = mind.refresh;
+    const refreshWithDirection: MindElixirInstance['refresh'] = data => {
+        const snapshotDirection = data?.direction;
+        if (snapshotDirection === MindElixir.LEFT
+            || snapshotDirection === MindElixir.RIGHT
+            || snapshotDirection === MindElixir.SIDE) {
+            // MindElixir history snapshots contain direction, but its native
+            // refresh implementation does not restore that field.
+            mind.direction = snapshotDirection;
+            originalRefresh.call(mind, data);
+            syncDirection();
+            return;
+        }
+        originalRefresh.call(mind, data);
+    };
+
+    mind.bus.addListener('changeDirection', syncCommittedDirection);
+    mind.refresh = refreshWithDirection;
+
+    return () => {
+        mind.bus.removeListener('changeDirection', syncCommittedDirection);
+        if (mind.refresh === refreshWithDirection) mind.refresh = originalRefresh;
+    };
 };
 
 export const applyMindMapDirection = (
@@ -96,15 +134,30 @@ export const useMindElixirCanvasPreferences = (mind: MindElixirInstance | null) 
         root.toggleAttribute('data-numbering', numberingEnabled);
     }, [mind, numberingEnabled]);
 
+    useEffect(() => {
+        if (!mind) return;
+        return bindMindMapDirectionHistorySync(mind, direction => {
+            setDirectionSelection({ mind, value: direction });
+            writeStorage(DIRECTION_STORAGE_KEY, direction);
+        });
+    }, [mind]);
+
     const currentDirection = directionSelection?.mind === mind
         ? directionSelection.value
-        : getLiveDirection(mind) ?? coerceMindMapDirectionKey(readStorage(DIRECTION_STORAGE_KEY));
+        : getLiveMindMapDirection(mind) ?? coerceMindMapDirectionKey(readStorage(DIRECTION_STORAGE_KEY));
 
     const changeDirection = useCallback((value: string) => {
         if (!mind) return;
+        const previousDirection = getLiveMindMapDirection(mind);
         const direction = applyMindMapDirection(mind, value);
         setDirectionSelection({ mind, value: direction });
         writeStorage(DIRECTION_STORAGE_KEY, direction);
+        if (previousDirection !== direction) {
+            emitVizlyMindMapOperation(mind, {
+                name: 'changeDirection',
+                obj: mind.getData().nodeData,
+            });
+        }
     }, [mind]);
 
     const toggleNumbering = useCallback(() => {

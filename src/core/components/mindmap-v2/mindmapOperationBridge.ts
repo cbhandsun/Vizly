@@ -4,6 +4,7 @@ type MindElixirArrow = MindElixirInstance['arrows'][number];
 
 export type VizlyMindMapOperation =
     | { name: 'autoArrangeMindmap'; obj: NodeObj }
+    | { name: 'changeDirection'; obj: NodeObj }
     | { name: 'editArrowLabel'; obj: MindElixirArrow }
     | { name: 'outline_structure_change'; obj: NodeObj };
 
@@ -11,7 +12,11 @@ export type VizlyMindMapData = Omit<MindElixirData, 'direction'> & {
     direction?: number;
 };
 
-type OperationEmitter = (event: 'operation', operation: VizlyMindMapOperation) => void;
+type OperationEmitter = (
+    this: MindElixirInstance['bus'],
+    event: 'operation',
+    operation: VizlyMindMapOperation,
+) => void;
 
 export const emitVizlyMindMapOperation = (
     mind: Pick<MindElixirInstance, 'bus'>,
@@ -20,7 +25,7 @@ export const emitVizlyMindMapOperation = (
     // mind-elixir's public operation union cannot be extended, although its
     // runtime pubsub accepts application operations. Keep that cast here.
     const emit = mind.bus.fire as unknown as OperationEmitter;
-    emit('operation', operation);
+    emit.call(mind.bus, 'operation', operation);
 };
 
 export const refreshVizlyMindMapData = (
