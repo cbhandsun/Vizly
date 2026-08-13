@@ -2786,6 +2786,90 @@
                 "noValidSuggestions": "模型未返回有效的子主题，请重试",
                 "openConfiguration": "打开 AI 设置"
             },
+            "propertyPanel": {
+                "rootNode": "根节点",
+                "nodeProperties": "节点属性",
+                "addChild": "添加子节点 (Tab)",
+                "addSibling": "添加同级节点 (Enter)",
+                "editOnCanvas": "在画布中编辑文字 (F2)",
+                "nodeText": "节点文字 · 失焦保存",
+                "nodeTextInput": "节点文字",
+                "tags": "标签",
+                "addPresetTag": "添加{{tag}}标签",
+                "customTagPlaceholder": "自定义标签 + Enter",
+                "customTagInput": "自定义标签",
+                "taskStatus": "任务状态",
+                "taskPriority": "任务优先级",
+                "taskAssignee": "任务负责人",
+                "taskAssigneePlaceholder": "输入负责人",
+                "dueDate": "截止日期",
+                "taskProgress": "任务进度",
+                "fontSize": "字体大小",
+                "textColor": "文字颜色",
+                "backgroundColor": "节点背景色",
+                "branchColor": "连线颜色",
+                "colorChoices": "颜色选项",
+                "transparent": "透明",
+                "colorValue": "将颜色设为 {{color}}",
+                "customColor": "选择自定义颜色",
+                "nodeShape": "节点形状",
+                "branchWidth": "连线宽度",
+                "branchWidthValue": "将连线宽度设为{{value}}",
+                "defaultValue": "默认",
+                "hyperlink": "超链接",
+                "note": "备注",
+                "notePlaceholder": "添加备注…",
+                "canvasTheme": "画布主题",
+                "themeChoice": "使用{{theme}}主题",
+                "currentTheme": "当前主题",
+                "availableTheme": "可选主题",
+                "themes": {
+                    "indigo": "靛蓝 Vizly Indigo",
+                    "ocean": "海洋",
+                    "emerald": "翡翠 Vizly Emerald",
+                    "rose": "玫瑰 Vizly Rose",
+                    "dark": "深色 Vizly Dark"
+                },
+                "guidance": {
+                    "selectNode": "点击节点可编辑属性",
+                    "contextMenu": "右键节点打开更多操作",
+                    "addChild": "按 Tab 键添加子节点",
+                    "zoomPan": "使用滚轮缩放，拖拽平移"
+                },
+                "presetTags": {
+                    "important": "重要",
+                    "todo": "待办",
+                    "done": "完成",
+                    "risk": "风险",
+                    "idea": "想法",
+                    "question": "问题"
+                },
+                "taskStatuses": {
+                    "todo": "待办",
+                    "doing": "进行中",
+                    "done": "已完成"
+                },
+                "taskPriorities": {
+                    "none": "无",
+                    "low": "低",
+                    "medium": "中",
+                    "high": "高"
+                },
+                "shapes": {
+                    "default": "默认",
+                    "oval": "椭圆",
+                    "rectangle": "矩形",
+                    "underline": "下划线",
+                    "diamond": "菱形"
+                },
+                "shortcuts": {
+                    "addChild": "添加子节点",
+                    "addSibling": "添加同级节点",
+                    "deleteNode": "删除节点",
+                    "edit": "编辑文字",
+                    "undo": "撤销"
+                }
+            },
             "propertyMedia": {
                 "iconsLabel": "标记",
                 "selectedIcons": "已选标记",

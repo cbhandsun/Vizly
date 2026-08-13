@@ -2633,6 +2633,90 @@
                 "noValidSuggestions": "The model returned no valid child topics. Try again",
                 "openConfiguration": "Open AI settings"
             },
+            "propertyPanel": {
+                "rootNode": "Root node",
+                "nodeProperties": "Node properties",
+                "addChild": "Add child (Tab)",
+                "addSibling": "Add sibling (Enter)",
+                "editOnCanvas": "Edit text on canvas (F2)",
+                "nodeText": "Node text · saves when focus leaves",
+                "nodeTextInput": "Node text",
+                "tags": "Tags",
+                "addPresetTag": "Add {{tag}} tag",
+                "customTagPlaceholder": "Custom tag + Enter",
+                "customTagInput": "Custom tag",
+                "taskStatus": "Task status",
+                "taskPriority": "Task priority",
+                "taskAssignee": "Assignee",
+                "taskAssigneePlaceholder": "Enter an assignee",
+                "dueDate": "Due date",
+                "taskProgress": "Task progress",
+                "fontSize": "Font size",
+                "textColor": "Text color",
+                "backgroundColor": "Node background",
+                "branchColor": "Branch color",
+                "colorChoices": "Color choices",
+                "transparent": "Transparent",
+                "colorValue": "Set color to {{color}}",
+                "customColor": "Choose a custom color",
+                "nodeShape": "Node shape",
+                "branchWidth": "Branch width",
+                "branchWidthValue": "Set branch width to {{value}}",
+                "defaultValue": "Default",
+                "hyperlink": "Link",
+                "note": "Note",
+                "notePlaceholder": "Add a note…",
+                "canvasTheme": "Canvas theme",
+                "themeChoice": "Use {{theme}} theme",
+                "currentTheme": "Current theme",
+                "availableTheme": "Available",
+                "themes": {
+                    "indigo": "Vizly Indigo",
+                    "ocean": "Ocean",
+                    "emerald": "Vizly Emerald",
+                    "rose": "Vizly Rose",
+                    "dark": "Vizly Dark"
+                },
+                "guidance": {
+                    "selectNode": "Select a node to edit its properties",
+                    "contextMenu": "Right-click a node for more actions",
+                    "addChild": "Press Tab to add a child node",
+                    "zoomPan": "Use the mouse wheel to zoom and drag to pan"
+                },
+                "presetTags": {
+                    "important": "Important",
+                    "todo": "To do",
+                    "done": "Done",
+                    "risk": "Risk",
+                    "idea": "Idea",
+                    "question": "Question"
+                },
+                "taskStatuses": {
+                    "todo": "To do",
+                    "doing": "In progress",
+                    "done": "Done"
+                },
+                "taskPriorities": {
+                    "none": "None",
+                    "low": "Low",
+                    "medium": "Medium",
+                    "high": "High"
+                },
+                "shapes": {
+                    "default": "Default",
+                    "oval": "Oval",
+                    "rectangle": "Rectangle",
+                    "underline": "Underline",
+                    "diamond": "Diamond"
+                },
+                "shortcuts": {
+                    "addChild": "Add child",
+                    "addSibling": "Add sibling",
+                    "deleteNode": "Delete node",
+                    "edit": "Edit text",
+                    "undo": "Undo"
+                }
+            },
             "propertyMedia": {
                 "iconsLabel": "Markers",
                 "selectedIcons": "Selected markers",

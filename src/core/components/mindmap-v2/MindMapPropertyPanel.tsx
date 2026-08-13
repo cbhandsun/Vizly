@@ -8,7 +8,8 @@ import {
 } from 'antd';
 import {
     FontSizeOutlined, DeleteOutlined, PlusOutlined, EditOutlined,
-    LinkOutlined, TagsOutlined,
+    ApartmentOutlined, BorderOutlined, FileTextOutlined, GatewayOutlined,
+    LinkOutlined, MinusOutlined, RadiusSettingOutlined, SelectOutlined, TagsOutlined,
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import type { NodeObj, TagObj } from 'mind-elixir';
@@ -44,9 +45,9 @@ import {
     PropertyRow as Row,
 } from './MindMapPropertyPanelControls';
 import {
-    PRESET_TAGS,
-    TASK_PRIORITY_OPTIONS,
-    TASK_STATUS_OPTIONS,
+    createMindMapPropertyPanelOptions,
+    MIND_MAP_PROPERTY_SHAPES,
+    MIND_MAP_PROPERTY_SHORTCUTS,
 } from './mindMapPropertyPanelOptions';
 import { updateMindMapNodePatchAndRestoreSelection } from './mindMapNodeMutation';
 import { useMindMapPropertySelection } from './useMindMapPropertySelection';
@@ -73,12 +74,23 @@ const tagBorderColor = (tag: TagObj): string => {
     return typeof style?.borderColor === 'string' ? style.borderColor : '#e2e8f0';
 };
 
+const PropertyShapeIcon: React.FC<{ icon: typeof MIND_MAP_PROPERTY_SHAPES[number]['icon'] }> = ({ icon }) => {
+    switch (icon) {
+        case 'oval': return <RadiusSettingOutlined />;
+        case 'rect': return <BorderOutlined />;
+        case 'underline': return <MinusOutlined />;
+        case 'diamond': return <GatewayOutlined />;
+        default: return <SelectOutlined />;
+    }
+};
+
 // ─── Node Property Panel ───────────────────────────────────────────────────────
 const NodePropertyPanel: React.FC<{
     node: NodeObj;
     onRequestDelete: (node: NodeObj) => void;
 }> = ({ node, onRequestDelete }) => {
     const { t } = useTranslation();
+    const panelOptions = createMindMapPropertyPanelOptions(t);
     const mind = getMindElixirInstance();
     const extendedNode = node as ExtendedMindMapNode;
     const [topic, setTopic] = useState(cleanMindMapTopic(node.topic, ''));
@@ -155,11 +167,11 @@ const NodePropertyPanel: React.FC<{
         return true;
     }, [applyImageUrl, imageUrl]);
 
-    const saveHyperLink = useCallback(() => {
+    const saveHyperLink = () => {
         const safeUrl = toSafeExternalUrl(hyperLink);
         setHyperLink(safeUrl ?? '');
         reshape({ hyperLink: safeUrl ?? undefined });
-    }, [hyperLink, reshape]);
+    };
 
     const handleTopicBlur = useCallback(() => {
         if (!mind || !topic.trim()) return;
@@ -192,14 +204,14 @@ const NodePropertyPanel: React.FC<{
         reshape({ tags: next });
     }, [tags, reshape]);
 
-    const handleTagInputConfirm = useCallback(() => {
+    const handleTagInputConfirm = () => {
         const t = tagInput.trim();
         if (!t) return;
         handleTagAdd({ text: t, style: { background: '#f1f5f9', color: '#475569', borderColor: '#cbd5e1' } });
         setTagInput('');
-    }, [tagInput, handleTagAdd]);
+    };
 
-    const updateTask = useCallback((patch: Partial<MindMapTaskMeta>) => {
+    const updateTask = (patch: Partial<MindMapTaskMeta>) => {
         const draft = {
             ...node,
             tags: [...(node.tags ?? [])],
@@ -212,7 +224,7 @@ const NodePropertyPanel: React.FC<{
         setTaskAssignee(next.assignee ?? '');
         setTaskProgress(next.progress ?? 0);
         reshape({ task: draft.task, tags: draft.tags });
-    }, [extendedNode, node, reshape]);
+    };
 
     const isRoot = !node.parent;
 
@@ -311,10 +323,14 @@ const NodePropertyPanel: React.FC<{
             {/* Header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
 
-                <Text strong style={{ fontSize: 13 }}>{isRoot ? '📍 根节点' : '📝 节点属性'}</Text>
+                <Text strong style={{ fontSize: 13 }}>
+                    {isRoot ? <ApartmentOutlined aria-hidden="true" /> : <FileTextOutlined aria-hidden="true" />}
+                    {' '}{t(isRoot ? 'plugins.mindmap.propertyPanel.rootNode' : 'plugins.mindmap.propertyPanel.nodeProperties')}
+                </Text>
                 <Space size={2}>
-                    <Tooltip title="添加子节点 (Tab)">
+                    <Tooltip title={t('plugins.mindmap.propertyPanel.addChild')}>
                         <Button size="small" type="text" icon={<PlusOutlined />}
+                            aria-label={t('plugins.mindmap.propertyPanel.addChild')}
                             onClick={() => {
                                 try {
                                     const el = mind?.findEle(node.id);
@@ -324,8 +340,9 @@ const NodePropertyPanel: React.FC<{
                                 }
                             }} />
                     </Tooltip>
-                    {!isRoot && <Tooltip title="添加兄弟节点 (Enter)">
+                    {!isRoot && <Tooltip title={t('plugins.mindmap.propertyPanel.addSibling')}>
                         <Button size="small" type="text" icon={<PlusOutlined rotate={90} />}
+                            aria-label={t('plugins.mindmap.propertyPanel.addSibling')}
                             onClick={() => {
                                 try {
                                     const el = mind?.findEle(node.id);
@@ -344,6 +361,7 @@ const NodePropertyPanel: React.FC<{
             </div>
 
             <Button size="small" type="dashed" icon={<EditOutlined />}
+                aria-label={t('plugins.mindmap.propertyPanel.editOnCanvas')}
                 onClick={() => {
                     try {
                         const el = mind?.findEle(node.id);
@@ -353,7 +371,7 @@ const NodePropertyPanel: React.FC<{
                     }
                 }}
                 style={{ width: '100%', marginBottom: 8 }}>
-                双击画布编辑文字 (F2)
+                {t('plugins.mindmap.propertyPanel.editOnCanvas')}
             </Button>
 
             <MindMapPropertyAISection
@@ -372,8 +390,9 @@ const NodePropertyPanel: React.FC<{
             />
 
             {/* Topic */}
-            <Row label="节点文字（失焦保存）">
+            <Row label={t('plugins.mindmap.propertyPanel.nodeText')}>
                 <TextArea value={topic} onChange={e => setTopic(e.target.value)}
+                    aria-label={t('plugins.mindmap.propertyPanel.nodeTextInput')}
                     onBlur={handleTopicBlur}
                     onPressEnter={e => { e.preventDefault(); handleTopicBlur(); }}
                     autoSize={{ minRows: 1, maxRows: 4 }} style={{ fontSize: 13 }} />
@@ -390,7 +409,7 @@ const NodePropertyPanel: React.FC<{
             />
 
             {/* Tags */}
-            <Row label="标签 Tags">
+            <Row label={t('plugins.mindmap.propertyPanel.tags')}>
                 <div style={{ marginBottom: 6, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                     {tags.map(t => (
                         <Tag key={t.text} closable onClose={() => handleTagRemove(t.text)}
@@ -400,8 +419,11 @@ const NodePropertyPanel: React.FC<{
                     ))}
                 </div>
                 <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
-                    {PRESET_TAGS.map(pt => (
+                    {panelOptions.presetTags.map(pt => (
                         <button key={pt.text} onClick={() => handleTagAdd(pt)}
+                            type="button"
+                            aria-label={t('plugins.mindmap.propertyPanel.addPresetTag', { tag: pt.text })}
+                            disabled={tags.some(tag => tag.text === pt.text)}
                             style={{ ...(pt.style as React.CSSProperties ?? {}),
                                 border: `1px solid ${tagBorderColor(pt)}`,
                                 borderRadius: 4, fontSize: 11, padding: '1px 7px',
@@ -410,7 +432,8 @@ const NodePropertyPanel: React.FC<{
                         </button>
                     ))}
                 </div>
-                <Input size="small" placeholder="输入自定义标签 + Enter"
+                <Input size="small" placeholder={t('plugins.mindmap.propertyPanel.customTagPlaceholder')}
+                    aria-label={t('plugins.mindmap.propertyPanel.customTagInput')}
                     prefix={<TagsOutlined style={{ color: '#94a3b8' }} />}
                     value={tagInput} onChange={e => setTagInput(e.target.value)}
                     onPressEnter={handleTagInputConfirm}
@@ -419,39 +442,43 @@ const NodePropertyPanel: React.FC<{
 
             <Divider style={{ margin: '10px 0' }} />
 
-            <Row label="任务状态">
+            <Row label={t('plugins.mindmap.propertyPanel.taskStatus')}>
                 <Select
+                    aria-label={t('plugins.mindmap.propertyPanel.taskStatus')}
                     size="small"
                     value={taskStatus}
-                    options={TASK_STATUS_OPTIONS}
+                    options={panelOptions.taskStatuses}
                     onChange={value => updateTask({ status: value })}
                     style={{ width: '100%' }}
                 />
             </Row>
 
-            <Row label="任务优先级">
+            <Row label={t('plugins.mindmap.propertyPanel.taskPriority')}>
                 <Select
+                    aria-label={t('plugins.mindmap.propertyPanel.taskPriority')}
                     size="small"
                     value={taskPriority}
-                    options={TASK_PRIORITY_OPTIONS}
+                    options={panelOptions.taskPriorities}
                     onChange={value => updateTask({ priority: value })}
                     style={{ width: '100%' }}
                 />
             </Row>
 
-            <Row label="任务负责人">
+            <Row label={t('plugins.mindmap.propertyPanel.taskAssignee')}>
                 <Input
+                    aria-label={t('plugins.mindmap.propertyPanel.taskAssignee')}
                     size="small"
                     value={taskAssignee}
-                    placeholder="负责人"
+                    placeholder={t('plugins.mindmap.propertyPanel.taskAssigneePlaceholder')}
                     onChange={e => setTaskAssignee(e.target.value)}
                     onBlur={() => updateTask({ assignee: taskAssignee.trim() })}
                     onPressEnter={() => updateTask({ assignee: taskAssignee.trim() })}
                 />
             </Row>
 
-            <Row label="截止日期">
+            <Row label={t('plugins.mindmap.propertyPanel.dueDate')}>
                 <Input
+                    aria-label={t('plugins.mindmap.propertyPanel.dueDate')}
                     size="small"
                     type="date"
                     value={taskDueDate}
@@ -462,8 +489,9 @@ const NodePropertyPanel: React.FC<{
                 />
             </Row>
 
-            <Row label="任务进度">
+            <Row label={t('plugins.mindmap.propertyPanel.taskProgress')}>
                 <InputNumber
+                    aria-label={t('plugins.mindmap.propertyPanel.taskProgress')}
                     min={0}
                     max={100}
                     value={taskProgress}
@@ -476,39 +504,39 @@ const NodePropertyPanel: React.FC<{
             <Divider style={{ margin: '10px 0' }} />
 
             {/* Font size */}
-            <Row label="字体大小">
+            <Row label={t('plugins.mindmap.propertyPanel.fontSize')}>
                 <InputNumber min={10} max={48} value={fontSize}
+                    aria-label={t('plugins.mindmap.propertyPanel.fontSize')}
                     onChange={v => { if (!v) return; setFontSize(v); reshape({ style: { ...node.style, fontSize: `${v}px` } }); }}
                     suffix="px" style={{ width: '100%' }} prefix={<FontSizeOutlined />} />
             </Row>
 
             {/* Text color */}
-            <Row label="文字颜色">
+            <Row label={t('plugins.mindmap.propertyPanel.textColor')}>
                 <ColorSwatch value={textColor} onChange={c => { setTextColor(c); reshape({ style: { ...node.style, color: c || undefined } }); }} withTransparent />
             </Row>
 
             {/* Background color */}
-            <Row label="节点背景色">
+            <Row label={t('plugins.mindmap.propertyPanel.backgroundColor')}>
                 <ColorSwatch value={bgColor} onChange={c => { setBgColor(c); reshape({ style: { ...node.style, background: c || undefined } }); }} withTransparent />
             </Row>
 
             {/* Branch color */}
-            <Row label="连线颜色">
+            <Row label={t('plugins.mindmap.propertyPanel.branchColor')}>
                 <ColorSwatch value={branchColor} onChange={c => { setBranchColor(c); reshape({ branchColor: c || undefined }); }} withTransparent />
             </Row>
 
             {/* Node shape */}
-            <Row label="节点形状">
+            <Row label={t('plugins.mindmap.propertyPanel.nodeShape')}>
                 <div style={{ display: 'flex', gap: 5 }}>
-                    {[
-                        { key: '',          label: '默认', preview: '▭' },
-                        { key: 'oval',      label: '椭圆', preview: '◡' },
-                        { key: 'rect',      label: '矩形', preview: '□' },
-                        { key: 'underline', label: '下划线', preview: '□̲' },
-                        { key: 'diamond',   label: '菱形', preview: '◇' },
-                    ].map(({ key, label, preview }) => (
+                    {MIND_MAP_PROPERTY_SHAPES.map(({ key, translationKey, icon }) => {
+                        const label = t(`plugins.mindmap.propertyPanel.shapes.${translationKey}`);
+                        return (
                         <button key={key || 'default'}
                             title={label}
+                            type="button"
+                            aria-label={label}
+                            aria-pressed={shapeClass === key}
                             onClick={() => {
                                 setShapeClass(key);
                                 reshape({ shapeClass: key || undefined });
@@ -518,38 +546,41 @@ const NodePropertyPanel: React.FC<{
                                 fontSize: 16, textAlign: 'center',
                                 border: shapeClass === key
                                     ? '2px solid #6366f1'
-                                    : '1px solid rgba(255,255,255,0.1)',
+                                    : '1px solid #cbd5e1',
                                 background: shapeClass === key
                                     ? 'rgba(99,102,241,0.15)'
-                                    : 'rgba(255,255,255,0.04)',
-                                color: shapeClass === key ? '#a5b4fc' : 'rgba(255,255,255,0.6)',
+                                    : '#f8fafc',
+                                color: shapeClass === key ? '#4338ca' : '#475569',
                                 transition: 'all 0.12s',
                             }}>
-                            <div style={{ fontSize: 16, lineHeight: 1 }}>{preview}</div>
-                            <div style={{ fontSize: 9, marginTop: 2, opacity: 0.7 }}>{label}</div>
+                            <div aria-hidden="true" style={{ fontSize: 16, lineHeight: 1 }}><PropertyShapeIcon icon={icon} /></div>
+                            <div style={{ fontSize: 10.5, marginTop: 3 }}>{label}</div>
                         </button>
-                    ))}
+                    );})}
                 </div>
             </Row>
 
             {/* Branch line width */}
-            <Row label="连线宽度">
+            <Row label={t('plugins.mindmap.propertyPanel.branchWidth')}>
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                     {[0, 1, 2, 4, 6].map(w => (
                         <button key={w}
-                            title={w === 0 ? '默认' : `${w}px`}
+                            type="button"
+                            title={w === 0 ? t('plugins.mindmap.propertyPanel.defaultValue') : `${w}px`}
+                            aria-label={t('plugins.mindmap.propertyPanel.branchWidthValue', { value: w === 0 ? t('plugins.mindmap.propertyPanel.defaultValue') : `${w}px` })}
+                            aria-pressed={branchWidth === w}
                             onClick={() => { setBranchWidth(w); reshape({ branchWidth: w || undefined }); }}
                             style={{
                                 flex: 1, height: 28, borderRadius: 5, cursor: 'pointer',
                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                border: branchWidth === w ? '2px solid #6366f1' : '1px solid rgba(255,255,255,0.1)',
-                                background: branchWidth === w ? 'rgba(99,102,241,0.12)' : 'rgba(255,255,255,0.04)',
+                                border: branchWidth === w ? '2px solid #6366f1' : '1px solid #cbd5e1',
+                                background: branchWidth === w ? 'rgba(99,102,241,0.12)' : '#f8fafc',
                                 transition: 'all 0.12s',
                             }}>
                             <div style={{
                                 height: w === 0 ? 1.5 : Math.min(w, 6),
                                 width: '80%',
-                                background: branchWidth === w ? '#6366f1' : 'rgba(255,255,255,0.4)',
+                                background: branchWidth === w ? '#4f46e5' : '#64748b',
                                 borderRadius: 3,
                             }} />
                         </button>
@@ -560,8 +591,9 @@ const NodePropertyPanel: React.FC<{
             <Divider style={{ margin: '10px 0' }} />
 
             {/* HyperLink */}
-            <Row label="超链接">
+            <Row label={t('plugins.mindmap.propertyPanel.hyperlink')}>
                 <Input prefix={<LinkOutlined style={{ color: '#94a3b8' }} />}
+                    aria-label={t('plugins.mindmap.propertyPanel.hyperlink')}
                     placeholder="https://..." value={hyperLink} size="small"
                     onChange={e => setHyperLink(e.target.value)}
                     onBlur={saveHyperLink}
@@ -569,8 +601,9 @@ const NodePropertyPanel: React.FC<{
             </Row>
 
             {/* Note */}
-            <Row label="备注">
-                <TextArea placeholder="添加备注..." value={note}
+            <Row label={t('plugins.mindmap.propertyPanel.note')}>
+                <TextArea placeholder={t('plugins.mindmap.propertyPanel.notePlaceholder')} value={note}
+                    aria-label={t('plugins.mindmap.propertyPanel.note')}
                     onChange={e => setNote(e.target.value)}
                     onBlur={() => {
                         const cleanNote = cleanMindMapNote(note);
@@ -585,13 +618,13 @@ const NodePropertyPanel: React.FC<{
             {/* Keyboard cheatsheet */}
             <div style={{ background: 'rgba(99,102,241,0.04)', border: '1px solid rgba(99,102,241,0.1)',
                 borderRadius: 8, padding: '8px 12px', fontSize: 11.5, color: 'rgba(0,0,0,0.5)', lineHeight: 2 }}>
-                {[['Tab','添加子节点'],['Enter','添加兄弟节点'],['Delete','删除节点'],['F2','编辑文字'],['Ctrl+Z','撤销']].map(([k,d])=>(
-                    <div key={k} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                {MIND_MAP_PROPERTY_SHORTCUTS.map(shortcut => (
+                    <div key={shortcut.key} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                         <kbd style={{ display: 'inline-block', padding: '1px 5px', background: '#f1f5f9',
                             border: '1px solid #e2e8f0', borderBottom: '2px solid #cbd5e1',
                             borderRadius: 4, fontSize: 10.5, fontFamily: 'monospace',
-                            color: '#475569', minWidth: 40, textAlign: 'center' }}>{k}</kbd>
-                        <span>{d}</span>
+                            color: '#475569', minWidth: 40, textAlign: 'center' }}>{shortcut.key}</kbd>
+                        <span>{t(`plugins.mindmap.propertyPanel.shortcuts.${shortcut.translationKey}`)}</span>
                     </div>
                 ))}
             </div>
