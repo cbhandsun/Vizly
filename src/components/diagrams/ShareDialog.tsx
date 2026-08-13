@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Modal, Button, Select, Space, Typography, Tooltip, List, Tag, Popconfirm, Spin, theme, Tabs, Input, Avatar, Empty, Alert } from 'antd';
-import { FaCopy, FaLink, FaTrash, FaUserPlus } from 'react-icons/fa';
+import { Modal, Button, Select, Space, Typography, Tooltip, List, Tag, Spin, theme, Tabs, Input, Avatar, Empty, Alert } from 'antd';
+import { FaCopy, FaLink, FaUserPlus } from 'react-icons/fa';
 import { LinkOutlined, TeamOutlined, UserOutlined, CheckCircleFilled, SafetyOutlined, LockOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { shareService, ShareRecord, CollaboratorRecord } from '@/services/ShareService';
@@ -32,6 +32,8 @@ import {
     type ShareCloudDiagramScope,
     type ShareExpirationOption,
 } from '@/components/shareDialogPresentation';
+import { useShareDialogItemMutations } from './useShareDialogItemMutations';
+import { ShareDialogDestructiveActionButton } from './ShareDialogDestructiveActionButton';
 import './ShareDialog.css';
 
 const AuthModal = React.lazy(() => import('@/components/auth/AuthModal').then(module => ({
@@ -166,6 +168,18 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
     const collaboratorsAreCurrent = collaboratorsData.scopeKey === dataScopeKey;
     const currentShares = sharesAreCurrent ? sharesData.records : [];
     const currentCollaborators = collaboratorsAreCurrent ? collaboratorsData.records : [];
+    const {
+        handleRemoveCollaborator,
+        handleRevokeShare,
+    } = useShareDialogItemMutations({
+        collaborators: setCollaboratorsData,
+        effectiveDiagramId: effectiveId,
+        open,
+        pendingCreatedSharesRef,
+        scopeKey: dataScopeKey,
+        shares: setSharesData,
+        t,
+    });
 
     // Load Data
     const loadShares = useCallback(async () => {
@@ -292,21 +306,6 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
         }
     }, [t]);
 
-    const handleRevokeShare = useCallback(async (shareId: string) => {
-        try {
-            await shareService.revokeShare(shareId);
-            appMessage.success(t('share.revoked'));
-            pendingCreatedSharesRef.current = pendingCreatedSharesRef.current.filter(share => share.id !== shareId);
-            setSharesData(previous => ({
-                ...previous,
-                records: previous.records.filter(share => share.id !== shareId),
-            }));
-        } catch (error) {
-            logShareDialogMutationFailure('revokeShare', error);
-            appMessage.error(t('share.revokeFailed'));
-        }
-    }, [t]);
-
     // ===== Invite Tab Actions =====
     const handleInvite = useCallback(async () => {
         if (!user) { appMessage.warning(t('share.loginRequired')); return; }
@@ -351,20 +350,6 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
             if (operationGateRef.current.finish(operation)) setInviting(false);
         }
     }, [diagramId, user, inviteEmail, inviteRole, onEnsureSaved, loadCollaborators, t]);
-
-    const handleRemoveCollab = useCallback(async (targetUserId: string) => {
-        try {
-            await shareService.removeCollaborator(effectiveId, targetUserId);
-            appMessage.success(t('share.removeSuccess'));
-            setCollaboratorsData(previous => ({
-                ...previous,
-                records: previous.records.filter(collaborator => collaborator.user_id !== targetUserId),
-            }));
-        } catch (error) {
-            logShareDialogMutationFailure('removeCollaborator', error);
-            appMessage.error(t('share.removeFailed'));
-        }
-    }, [effectiveId, t]);
 
     // 输入框动态边框色
     const inputBorderStyle: React.CSSProperties = inviteStatus === 'success'
@@ -479,17 +464,15 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
                                     <List.Item
                                         actions={[
                                             !isSelf && (
-                                                <Popconfirm
+                                                <ShareDialogDestructiveActionButton
                                                     key="remove"
-                                                    title={t('share.removeConfirm')}
-                                                    onConfirm={() => handleRemoveCollab(item.user_id)}
-                                                    okText={t('share.remove')}
+                                                    ariaLabel={t('share.remove')}
                                                     cancelText={t('common.cancel')}
-                                                >
-                                                    <Button size="small" type="text" danger icon={<FaTrash style={{ fontSize: 11 }} />}>
-                                                        {t('share.remove')}
-                                                    </Button>
-                                                </Popconfirm>
+                                                    confirmTitle={t('share.removeConfirm')}
+                                                    label={t('share.remove')}
+                                                    onConfirm={() => handleRemoveCollaborator(item.user_id)}
+                                                    showLabel
+                                                />
                                             )
                                         ].filter(Boolean) as React.ReactNode[]}
                                     >
@@ -600,9 +583,14 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
                                             <Tooltip title={t('share.copyLink')} key="copy">
                                                 <Button aria-label={t('share.copyLink')} type="text" size="small" icon={<FaCopy />} onClick={() => handleCopy(item.share_token)} />
                                             </Tooltip>,
-                                            <Popconfirm key="revoke" title={t('share.revokeConfirm')} onConfirm={() => handleRevokeShare(item.id)} okText={t('share.revokeShare')} cancelText={t('common.cancel')}>
-                                                <Tooltip title={t('share.revokeShare')}><Button aria-label={t('share.revokeShare')} type="text" size="small" danger icon={<FaTrash />} /></Tooltip>
-                                            </Popconfirm>,
+                                            <ShareDialogDestructiveActionButton
+                                                key="revoke"
+                                                ariaLabel={t('share.revokeShare')}
+                                                cancelText={t('common.cancel')}
+                                                confirmTitle={t('share.revokeConfirm')}
+                                                label={t('share.revokeShare')}
+                                                onConfirm={() => handleRevokeShare(item.id)}
+                                            />,
                                         ]}
                                     >
                                         <List.Item.Meta

@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { readFileSync } from 'node:fs';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.stubGlobal('ResizeObserver', class ResizeObserverStub {
@@ -144,7 +144,11 @@ const translations: Record<string, string> = {
   'share.remove': '移除',
   'share.removeConfirm': '确认移除此协作者？',
   'share.removeFailed': '无法移除协作者，请稍后重试。',
+  'share.removeSuccess': '已移除协作者',
+  'share.revokeConfirm': '确认撤销此分享链接？',
   'share.revokeFailed': '无法撤销分享链接，请稍后重试。',
+  'share.revokeShare': '撤销分享',
+  'share.revoked': '已撤销分享链接',
   'share.expired': '已过期',
   'common.close': '关闭',
   'common.cancel': '取消',
@@ -184,6 +188,7 @@ vi.mock('react-i18next', () => ({
 
 import ShareDialog from '../diagrams/ShareDialog';
 import { createShareDialogOperationGate } from '@/components/shareDialogOperationGate';
+import { createShareDialogItemMutationGate } from '@/components/shareDialogItemMutationGate';
 import {
   getShareExpiresAt,
   isCloudDiagramId,
@@ -513,6 +518,50 @@ describe('ShareDialog commercial failure handling', () => {
     expect(screen.getByText('current@example.com')).toBeTruthy();
   });
 
+  it('keeps the current collaborator list when an old removal finishes after switching diagrams', async () => {
+    authMocks.user = { id: USER_ID };
+    const targetUserId = '44444444-4444-4444-8444-444444444444';
+    const nextDiagramId = '55555555-5555-4555-8555-555555555555';
+    let finishOldRemoval: (() => void) | undefined;
+    serviceMocks.removeCollaborator.mockImplementationOnce(() => new Promise<void>((resolve) => {
+      finishOldRemoval = resolve;
+    }));
+    serviceMocks.listCollaborators
+      .mockResolvedValueOnce([
+        createCollaborator(DIAGRAM_ID, targetUserId, 'old-diagram@example.com'),
+      ])
+      .mockResolvedValueOnce([
+        createCollaborator(nextDiagramId, targetUserId, 'current-diagram@example.com'),
+      ]);
+    const onClose = vi.fn();
+    const onEnsureSaved = vi.fn(async () => savedDiagram());
+    const { rerender } = render(
+      <ShareDialog open onClose={onClose} diagramId={DIAGRAM_ID} onEnsureSaved={onEnsureSaved} />,
+    );
+
+    expect(await screen.findByText('old-diagram@example.com')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '移除' }));
+    expect(await screen.findByText('确认移除此协作者？')).toBeTruthy();
+    const confirmationButtons = document.querySelector('.ant-popconfirm-buttons') as HTMLElement | null;
+    expect(confirmationButtons).toBeTruthy();
+    if (!confirmationButtons) return;
+    fireEvent.click(within(confirmationButtons).getByRole('button', { name: /移\s*除/ }));
+    await waitFor(() => {
+      expect(serviceMocks.removeCollaborator).toHaveBeenCalledWith(DIAGRAM_ID, targetUserId);
+    });
+
+    rerender(
+      <ShareDialog open onClose={onClose} diagramId={nextDiagramId} onEnsureSaved={onEnsureSaved} />,
+    );
+    expect(await screen.findByText('current-diagram@example.com')).toBeTruthy();
+
+    await act(async () => {
+      finishOldRemoval?.();
+    });
+    expect(screen.getByText('current-diagram@example.com')).toBeTruthy();
+    expect(messageMocks.success).not.toHaveBeenCalled();
+  }, 15_000);
+
   it('keeps a created link visible when clipboard permission is denied', async () => {
     authMocks.user = { id: USER_ID };
     clipboardMocks.copy.mockResolvedValue(false);
@@ -560,6 +609,40 @@ describe('ShareDialog commercial failure handling', () => {
       expect(screen.queryByText('生成公开链接，任何拥有链接的人都可查看')).toBeNull();
     });
   });
+
+  it('coalesces repeated revoke confirmations while the first request is pending', async () => {
+    authMocks.user = { id: USER_ID };
+    let finishRevoke: (() => void) | undefined;
+    serviceMocks.listSharesForDiagram.mockResolvedValue([shareRecord]);
+    serviceMocks.revokeShare.mockImplementationOnce(() => new Promise<void>((resolve) => {
+      finishRevoke = resolve;
+    }));
+    render(
+      <ShareDialog
+        open
+        onClose={vi.fn()}
+        diagramId={DIAGRAM_ID}
+        onEnsureSaved={vi.fn(async () => savedDiagram())}
+      />,
+    );
+
+    fireEvent.click(await screen.findByText('公开链接'));
+    const revokeButton = await screen.findByRole('button', { name: '撤销分享' });
+    fireEvent.click(revokeButton);
+    expect(await screen.findByText('确认撤销此分享链接？')).toBeTruthy();
+    const confirmationButtons = document.querySelector('.ant-popconfirm-buttons') as HTMLElement | null;
+    expect(confirmationButtons).toBeTruthy();
+    if (!confirmationButtons) return;
+    const confirm = within(confirmationButtons).getByRole('button', { name: /撤\s*销\s*分\s*享/ });
+    fireEvent.click(confirm);
+    fireEvent.click(confirm);
+
+    expect(serviceMocks.revokeShare).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      finishRevoke?.();
+    });
+    await waitFor(() => expect(screen.queryByRole('button', { name: '撤销分享' })).toBeNull());
+  }, 15_000);
 
   it('shows a stable error and never renders a raw provider failure', async () => {
     authMocks.user = { id: USER_ID };
@@ -658,6 +741,20 @@ describe('ShareDialog commercial failure handling', () => {
     expect(first && gate.isCurrent(first)).toBe(false);
     expect(first && gate.finish(first)).toBe(false);
     expect(gate.begin('invite')).not.toBeNull();
+  });
+
+  it('coalesces duplicate item mutations without blocking unrelated records', () => {
+    const gate = createShareDialogItemMutationGate();
+    const revoke = gate.begin('revoke-share', 'share-a');
+    const removal = gate.begin('remove-collaborator', 'user-b');
+
+    expect(revoke).not.toBeNull();
+    expect(removal).not.toBeNull();
+    expect(gate.begin('revoke-share', 'share-a')).toBeNull();
+    expect(gate.begin('revoke-share', 'share-c')).not.toBeNull();
+    gate.invalidate();
+    expect(revoke && gate.isCurrent(revoke)).toBe(false);
+    expect(removal && gate.finish(removal)).toBe(false);
   });
 
   it('keeps share expiration and cloud identity boundaries deterministic', () => {
