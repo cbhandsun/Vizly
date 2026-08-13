@@ -209,6 +209,8 @@
             "batchDeleteSuccess": "Deleted {{success}} diagrams",
             "batchDeletePartial": "Deleted {{success}}; {{failed}} failed",
             "batchDeleteAllFailed": "All {{failed}} diagrams failed to delete",
+            "batchDeletePartialRetry": "Deleted {{success}}; {{failed}} failed and remain selected for retry",
+            "batchDeleteAllFailedRetry": "All {{failed}} diagrams failed to delete and remain selected for retry",
             "operationInProgress": "A cloud operation is in progress. Please wait.",
             "noPermission": "No delete permission",
             "collaborative": "Collaborative diagram",

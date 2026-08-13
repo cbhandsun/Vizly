@@ -208,6 +208,8 @@
             "batchDeleteSuccess": "已删除 {{success}} 个图表",
             "batchDeletePartial": "已删除 {{success}} 个，{{failed}} 个失败",
             "batchDeleteAllFailed": "{{failed}} 个图表均删除失败",
+            "batchDeletePartialRetry": "已删除 {{success}} 个；{{failed}} 个失败项已保留选中，可直接重试",
+            "batchDeleteAllFailedRetry": "{{failed}} 个图表均删除失败，失败项已保留选中，可直接重试",
             "operationInProgress": "云端操作进行中，请稍候",
             "noPermission": "无删除权限",
             "collaborative": "协作图表",

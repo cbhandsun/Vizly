@@ -18,6 +18,9 @@ describe('cloud storage manager commercial safeguards', () => {
         expect(source).toContain('hasUnfilteredItems={sharedDiagrams.length > 0}');
         expect(source).toContain('activeListAvailable &&');
         expect(source).toContain('refreshDisabled={!activeListAvailable}');
+        expect(source).toContain('setSelectedIds(new Set(result.failedIds))');
+        expect(source).toContain("t('storage.manager.batchDeletePartialRetry'");
+        expect(source).toContain("t('storage.manager.batchDeleteAllFailedRetry'");
         expect(source).not.toContain('appMessage.error(error.message)');
     });
 

@@ -35,6 +35,7 @@ import type { StorageProviderType } from '@/services/UnifiedStorageService';
 import { CloudStorageManagerSearch, CloudStorageManagerTitle } from './CloudStorageManagerControls';
 import { CloudStorageRecoveryAlert } from './CloudStorageRecoveryAlert';
 import { CloudStorageEmptyState } from './CloudStorageEmptyState';
+import { runCloudStorageBatchDelete } from './cloudStorageBatchDelete';
 import {
     createCloudStorageManagerScope,
     invalidateCloudStorageManagerScope,
@@ -346,28 +347,24 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
         const provider = unifiedStorage.getProvider(currentProvider);
         setBatchDeleting(true);
         const ids = Array.from(selectedIds);
-        let success = 0;
-        let failed = 0;
-        // 并行删除，最多 5 个并发
-        const chunks: string[][] = [];
-        for (let i = 0; i < ids.length; i += 5) chunks.push(ids.slice(i, i + 5));
-        for (const chunk of chunks) {
-            await Promise.allSettled(chunk.map(async id => {
-                try {
-                    await provider.deleteDiagram(id);
-                    success++;
-                } catch (error) {
-                    logCloudStorageManagerBatchDeleteFailure(id, error);
-                    failed++;
-                }
-            }));
+        let result;
+        try {
+            result = await runCloudStorageBatchDelete({
+                ids,
+                deleteDiagram: id => provider.deleteDiagram(id),
+                onDeleteFailure: logCloudStorageManagerBatchDeleteFailure,
+            });
+        } finally {
+            setBatchDeleting(false);
         }
-        setBatchDeleting(false);
-        setSelectedIds(new Set());
+
+        const success = result.succeededIds.length;
+        const failed = result.failedIds.length;
+        setSelectedIds(new Set(result.failedIds));
         if (success === 0 && failed > 0) {
-            appMessage.error(t('storage.manager.batchDeleteAllFailed', { failed }));
+            appMessage.error(t('storage.manager.batchDeleteAllFailedRetry', { failed }));
         } else if (failed > 0) {
-            appMessage.warning(t('storage.manager.batchDeletePartial', { success, failed }));
+            appMessage.warning(t('storage.manager.batchDeletePartialRetry', { success, failed }));
         } else {
             appMessage.success(t('storage.manager.batchDeleteSuccess', { success }));
         }
