@@ -1,0 +1,117 @@
+@keyframes mindmap-batch-bar-in {
+    from { opacity: 0; transform: translateX(-50%) translateY(12px) scale(0.95); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+
+.mindmap-batch-bar {
+    position: fixed;
+    bottom: calc(28px + env(safe-area-inset-bottom));
+    left: 50%;
+    z-index: 9100;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    max-width: calc(100vw - 24px);
+    padding: 6px 12px;
+    overflow-x: auto;
+    color: rgba(255, 255, 255, 0.85);
+    white-space: nowrap;
+    background: rgba(12, 12, 20, 0.92);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(99, 102, 241, 0.1);
+    backdrop-filter: blur(20px);
+    animation: mindmap-batch-bar-in 0.18s ease;
+}
+
+.mindmap-batch-bar__count {
+    padding: 4px 8px;
+    color: #c7d2fe;
+    font-size: 12px;
+    font-weight: 600;
+    background: rgba(99, 102, 241, 0.2);
+    border: 1px solid rgba(129, 140, 248, 0.55);
+    border-radius: 6px;
+}
+
+.mindmap-batch-bar__divider {
+    flex: 0 0 1px;
+    width: 1px;
+    height: 20px;
+    margin: 0 2px;
+    background: rgba(255, 255, 255, 0.18);
+}
+
+.mindmap-batch-bar__action,
+.mindmap-batch-color {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    touch-action: manipulation;
+}
+
+.mindmap-batch-bar__action {
+    gap: 5px;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: 500;
+    border-radius: 7px;
+}
+
+.mindmap-batch-bar__action:hover,
+.mindmap-batch-bar__action[aria-expanded='true'] {
+    background: rgba(255, 255, 255, 0.14);
+}
+
+.mindmap-batch-bar__action--danger {
+    color: #fca5a5;
+    border-color: rgba(248, 113, 113, 0.45);
+}
+
+.mindmap-batch-bar__action--danger:hover {
+    background: rgba(239, 68, 68, 0.2);
+}
+
+.mindmap-batch-bar__action:focus-visible,
+.mindmap-batch-color:focus-visible {
+    outline: 2px solid #a5b4fc;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.35);
+}
+
+.mindmap-batch-colors {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    max-width: 232px;
+    padding: 4px;
+}
+
+.mindmap-batch-color {
+    padding: 10px;
+    background: transparent;
+    border-color: transparent;
+    border-radius: 7px;
+}
+
+.mindmap-batch-color:hover {
+    background: rgba(99, 102, 241, 0.12);
+}
+
+.mindmap-batch-color > span {
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(255, 255, 255, 0.55);
+    border-radius: 5px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .mindmap-batch-bar { animation: none; }
+}

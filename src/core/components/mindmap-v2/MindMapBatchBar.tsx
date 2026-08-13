@@ -10,12 +10,15 @@
  * 设计参考：Whimsical / Figma 多选操作栏
  */
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useCallback, useEffect, useId, useState } from 'react';
 import { Popover, Tooltip, Popconfirm } from 'antd';
+import { ChevronDown, ChevronRight, Palette, Trash2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { getMindElixirInstance } from './mindElixirStore';
 import type { NodeObj, Topic } from 'mind-elixir';
 import { cleanMindMapNodePatch } from './mindmapNodePatchSecurity';
 import { logMindMapBatchActionFailure } from './mindmapBatchLogging';
+import './MindMapBatchBar.css';
 
 // ─── Quick palette for batch colour ──────────────────────────────────────────
 const BATCH_COLORS = [
@@ -39,8 +42,10 @@ const getSelectedElements = (
     .filter((element): element is Topic => Boolean(element));
 
 const MindMapBatchBar: React.FC = () => {
+    const { t } = useTranslation();
     const [batch, setBatch] = useState<BatchState>(EMPTY);
     const [colorOpen, setColorOpen] = useState(false);
+    const colorPanelId = useId();
 
     const mind = getMindElixirInstance();
 
@@ -104,54 +109,17 @@ const MindMapBatchBar: React.FC = () => {
 
     if (batch.count < 2) return null;
 
-    // ── Styles ────────────────────────────────────────────────────────────────
-    const barStyle: React.CSSProperties = {
-        position: 'fixed',
-        bottom: 28,
-        left: '50%',
-        transform: 'translateX(-50%)',
-        zIndex: 9100,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 6,
-        padding: '6px 12px',
-        background: 'rgba(12,12,20,0.92)',
-        backdropFilter: 'blur(20px)',
-        border: '1px solid rgba(99,102,241,0.3)',
-        borderRadius: 12,
-        boxShadow: '0 8px 32px rgba(0,0,0,0.6), 0 0 0 1px rgba(99,102,241,0.1)',
-        animation: 'batchBarIn 0.18s ease',
-        whiteSpace: 'nowrap',
-    };
-
-    const btnBase: React.CSSProperties = {
-        display: 'inline-flex', alignItems: 'center', gap: 4,
-        padding: '3px 10px', borderRadius: 7, cursor: 'pointer',
-        fontSize: 12, fontWeight: 500,
-        border: '1px solid rgba(255,255,255,0.1)',
-        background: 'rgba(255,255,255,0.06)',
-        color: 'rgba(255,255,255,0.85)',
-        transition: 'background 0.12s',
-    };
-
-    const DivV = () => <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.12)', margin: '0 2px' }} />;
+    const DivV = () => <span aria-hidden="true" className="mindmap-batch-bar__divider" />;
 
     return (
-        <div style={barStyle}>
-            <style>{`
-                @keyframes batchBarIn {
-                    from { opacity:0; transform:translateX(-50%) translateY(12px) scale(0.95); }
-                    to   { opacity:1; transform:translateX(-50%) translateY(0)    scale(1); }
-                }
-            `}</style>
-
+        <div
+            className="mindmap-batch-bar"
+            role="toolbar"
+            aria-label={t('designer.mindmap.batch.toolbarLabel')}
+        >
             {/* Count badge */}
-            <div style={{
-                background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(99,102,241,0.4)',
-                borderRadius: 6, padding: '2px 8px', fontSize: 12, fontWeight: 600,
-                color: '#a5b4fc',
-            }}>
-                {batch.count} 个节点已选
+            <div className="mindmap-batch-bar__count" role="status" aria-live="polite">
+                {t('designer.mindmap.batch.selectedCount', { count: batch.count })}
             </div>
 
             <DivV />
@@ -164,72 +132,74 @@ const MindMapBatchBar: React.FC = () => {
                 placement="top"
                 arrow={false}
                 content={
-                    <div style={{ display: 'flex', gap: 6, padding: '4px 2px' }}>
+                    <div
+                        id={colorPanelId}
+                        className="mindmap-batch-colors"
+                        role="group"
+                        aria-label={t('designer.mindmap.batch.colorChoices')}
+                    >
                         {BATCH_COLORS.map(c => (
-                            <div
+                            <button
+                                type="button"
                                 key={c}
+                                className="mindmap-batch-color"
+                                aria-label={t('designer.mindmap.batch.colorChoice', { color: c })}
                                 onClick={() => handleBatchColor(c)}
-                                style={{
-                                    width: 20, height: 20, borderRadius: 4, background: c,
-                                    cursor: 'pointer', border: '2px solid rgba(255,255,255,0.15)',
-                                    transition: 'transform 0.1s',
-                                }}
-                                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1.2)'; }}
-                                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1)'; }}
-                            />
+                            >
+                                <span aria-hidden="true" style={{ backgroundColor: c }} />
+                            </button>
                         ))}
                     </div>
                 }
             >
-                <Tooltip title="批量设置连线颜色">
-                    <div style={btnBase} onClick={() => setColorOpen(v => !v)}
-                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.12)'; }}
-                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)'; }}
+                <Tooltip title={t('designer.mindmap.batch.colorTooltip')}>
+                    <button
+                        type="button"
+                        className="mindmap-batch-bar__action"
+                        aria-controls={colorPanelId}
+                        aria-expanded={colorOpen}
+                        aria-haspopup="dialog"
+                        onClick={() => setColorOpen(v => !v)}
                     >
-                        🎨 颜色
-                    </div>
+                        <Palette aria-hidden="true" size={15} />
+                        {t('designer.mindmap.batch.color')}
+                    </button>
                 </Tooltip>
             </Popover>
 
             {/* Expand */}
-            <Tooltip title="批量展开">
-                <div style={btnBase} onClick={() => handleBatchExpand(true)}
-                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.12)'; }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)'; }}
-                >
-                    ▶ 展开
-                </div>
+            <Tooltip title={t('designer.mindmap.batch.expandTooltip')}>
+                <button type="button" className="mindmap-batch-bar__action" onClick={() => handleBatchExpand(true)}>
+                    <ChevronRight aria-hidden="true" size={15} />
+                    {t('designer.mindmap.batch.expand')}
+                </button>
             </Tooltip>
 
             {/* Collapse */}
-            <Tooltip title="批量折叠">
-                <div style={btnBase} onClick={() => handleBatchExpand(false)}
-                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.12)'; }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)'; }}
-                >
-                    ▼ 折叠
-                </div>
+            <Tooltip title={t('designer.mindmap.batch.collapseTooltip')}>
+                <button type="button" className="mindmap-batch-bar__action" onClick={() => handleBatchExpand(false)}>
+                    <ChevronDown aria-hidden="true" size={15} />
+                    {t('designer.mindmap.batch.collapse')}
+                </button>
             </Tooltip>
 
             <DivV />
 
             {/* Delete */}
             <Popconfirm
-                title={`确认删除这 ${batch.count} 个节点吗？`}
-                description="此操作不可撤销（除非手动 Ctrl+Z）"
+                title={t('designer.mindmap.batch.deleteTitle', { count: batch.count })}
+                description={t('designer.mindmap.batch.deleteDescription')}
                 onConfirm={handleBatchDelete}
-                okText="删除"
-                cancelText="取消"
+                okText={t('common.delete')}
+                cancelText={t('common.cancel')}
                 okButtonProps={{ danger: true }}
                 placement="top"
             >
-                <Tooltip title="批量删除选中节点">
-                    <div style={{ ...btnBase, color: '#f87171', borderColor: 'rgba(239,68,68,0.2)' }}
-                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.15)'; }}
-                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)'; }}
-                    >
-                        🗑️ 删除
-                    </div>
+                <Tooltip title={t('designer.mindmap.batch.deleteTooltip')}>
+                    <button type="button" className="mindmap-batch-bar__action mindmap-batch-bar__action--danger">
+                        <Trash2 aria-hidden="true" size={15} />
+                        {t('common.delete')}
+                    </button>
                 </Tooltip>
             </Popconfirm>
         </div>

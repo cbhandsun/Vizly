@@ -2695,6 +2695,21 @@
                 "collapse": "折叠分支",
                 "expand": "展开分支"
             },
+            "batch": {
+                "toolbarLabel": "已选节点操作",
+                "selectedCount": "已选择 {{count}} 个节点",
+                "color": "颜色",
+                "colorTooltip": "设置已选节点的分支颜色",
+                "colorChoices": "分支颜色",
+                "colorChoice": "将分支颜色设为 {{color}}",
+                "expand": "展开",
+                "expandTooltip": "展开已选节点",
+                "collapse": "折叠",
+                "collapseTooltip": "折叠已选节点",
+                "deleteTitle": "删除已选的 {{count}} 个节点？",
+                "deleteDescription": "删除后仍可通过撤销操作恢复。",
+                "deleteTooltip": "删除已选节点"
+            },
             "actionBar": {
                 "addSibling": "同级主题",
                 "addChild": "子主题",

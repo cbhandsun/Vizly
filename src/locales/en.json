@@ -2542,6 +2542,21 @@
                 "collapse": "Collapse",
                 "expand": "Expand"
             },
+            "batch": {
+                "toolbarLabel": "Selected node actions",
+                "selectedCount": "{{count}} nodes selected",
+                "color": "Color",
+                "colorTooltip": "Set branch color for selected nodes",
+                "colorChoices": "Branch colors",
+                "colorChoice": "Set branch color to {{color}}",
+                "expand": "Expand",
+                "expandTooltip": "Expand selected nodes",
+                "collapse": "Collapse",
+                "collapseTooltip": "Collapse selected nodes",
+                "deleteTitle": "Delete {{count}} selected nodes?",
+                "deleteDescription": "This can be undone with Undo after deletion.",
+                "deleteTooltip": "Delete selected nodes"
+            },
             "actionBar": {
                 "addSibling": "Add Sibling",
                 "addChild": "Add Child",
