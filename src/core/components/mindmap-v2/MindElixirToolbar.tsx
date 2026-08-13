@@ -269,7 +269,10 @@ const MindElixirToolbar: React.FC = () => {
     const [shortcutsOpen, setShortcutsOpen] = useState(false);
     const [openMenu, setOpenMenu] = useState<MindMapToolbarMenu | null>(null);
 
-    const { isFocused, toggleFocusMode } = useMindMapFocusMode(mind);
+    const { isFocused, toggleFocusMode } = useMindMapFocusMode(
+        mind,
+        logMindmapToolbarFocusModeFailure,
+    );
     const handleFocusMode = useCallback(() => {
         try {
             toggleFocusMode();
