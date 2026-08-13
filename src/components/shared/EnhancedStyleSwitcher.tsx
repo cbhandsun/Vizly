@@ -3,7 +3,7 @@
  * 采用弹出面板设计，支持分类展示、迷你预览和悬停预览功能
  */
 
-import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useId, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { FaPalette, FaCheck, FaTimes } from 'react-icons/fa';
@@ -12,6 +12,7 @@ import {
     type FlowStylePreset,
 } from '@/core/components/shared/DiagramStyleManager';
 import { useDiagramStylePreset_v2 } from '@/core/hooks/useDiagramStylePreset_v2';
+import { useModalFocusTrap } from '@/hooks/useModalFocusTrap';
 import {
     getPreviewEdgeColor,
     getSafePresetTranslationKey,
@@ -118,14 +119,20 @@ const PresetCard: React.FC<{
     onClick: () => void;
 }> = ({ preset, isActive, onClick }) => {
     const { t } = useTranslation();
+    const descriptionId = useId();
+    const presetLabel = t(getSafePresetTranslationKey(preset));
     return (
-        <div
+        <button
+            type="button"
             className={`group relative flex flex-row items-center gap-6 p-5 transition-all duration-400 rounded-2xl cursor-pointer border ${
                 isActive 
                 ? 'glass-pulse-glow bg-white/80 dark:bg-black/60 border-blue-500/50 shadow-lg' 
                 : 'bg-white/30 dark:bg-white/5 border-white/20 dark:border-white/10 hover:bg-white/50 dark:hover:bg-white/10 hover:border-blue-400/30 hover:translate-x-1 hover:shadow-xl'
-            }`}
+            } text-left min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2`}
             onClick={onClick}
+            aria-pressed={isActive}
+            aria-label={presetLabel}
+            aria-describedby={descriptionId}
         >
             {/* 左侧图例区 */}
             <div className="flex-none flex items-center justify-center w-24 h-20 rounded-xl bg-gray-50/80 dark:bg-black/30 border border-black/[0.03] dark:border-white/[0.05] overflow-hidden transition-all group-hover:scale-105">
@@ -136,18 +143,18 @@ const PresetCard: React.FC<{
             <div className="flex-1 min-w-0 flex flex-col gap-1">
                 <div className="flex items-center gap-2">
                     <span className="text-[16px] font-bold text-gray-900 dark:text-gray-100 tracking-tight truncate">
-                        {t(getSafePresetTranslationKey(preset))}
+                        {presetLabel}
                     </span>
-                    {isActive && <div className="w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center"><FaCheck className="text-white w-2 h-2" /></div>}
+                    {isActive && <span className="w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center"><FaCheck className="text-white w-2 h-2" aria-hidden="true" /></span>}
                 </div>
-                <div className="text-[13px] leading-snug text-gray-500 dark:text-gray-400 font-medium line-clamp-2 opacity-80">
+                <div id={descriptionId} className="text-[13px] leading-snug text-gray-500 dark:text-gray-400 font-medium line-clamp-2 opacity-80">
                     {preset.description}
                 </div>
             </div>
             
             {/* 激活时的背景微光 */}
-            {isActive && <div className="absolute inset-0 bg-blue-500/[0.03] rounded-2xl pointer-events-none" />}
-        </div>
+            {isActive && <span className="absolute inset-0 bg-blue-500/[0.03] rounded-2xl pointer-events-none" />}
+        </button>
     );
 };
 
@@ -164,7 +171,9 @@ export const EnhancedStyleSwitcher: React.FC<EnhancedStyleSwitcherProps> = ({
     const { t } = useTranslation();
     const currentPreset = useDiagramStylePreset_v2();
     const [isOpen, setIsOpen] = useState(false);
-    const panelRef = useRef<HTMLDivElement>(null);
+    const closeButtonRef = useRef<HTMLButtonElement>(null);
+    const dialogId = useId();
+    const dialogTitleId = useId();
     const buttonSizeClass = size === 'sm' ? 'h-8 px-2.5 text-[12px]' : 'h-10 px-3.5 text-[13px]';
 
     const categories = useMemo(() => {
@@ -175,21 +184,17 @@ export const EnhancedStyleSwitcher: React.FC<EnhancedStyleSwitcherProps> = ({
         }));
     }, []);
 
+    const handleClose = useCallback(() => setIsOpen(false), []);
+    const { containerRef: panelRef, handleKeyDown: handlePanelKeyDown } = useModalFocusTrap<HTMLDivElement>({
+        active: isOpen,
+        initialFocusRef: closeButtonRef,
+        onClose: handleClose,
+    });
+
     const handlePresetChange = useCallback((preset: FlowStylePreset) => {
         diagramStyleManager.setPreset(preset.name);
-        setIsOpen(false);
-    }, []);
-
-    useEffect(() => {
-        if (typeof document === 'undefined') return undefined;
-        const handleClickOutside = (e: MouseEvent) => {
-            if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
-                setIsOpen(false);
-            }
-        };
-        if (isOpen) document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [isOpen]);
+        handleClose();
+    }, [handleClose]);
 
     const portalTarget = typeof document === 'undefined'
         ? null
@@ -199,13 +204,17 @@ export const EnhancedStyleSwitcher: React.FC<EnhancedStyleSwitcherProps> = ({
         <>
             {/* 触发按钮 */}
             <button
-                aria-label={ariaLabel}
+                type="button"
+                aria-label={ariaLabel ?? t('style.switcher.title')}
+                aria-haspopup="dialog"
+                aria-expanded={isOpen}
+                aria-controls={dialogId}
                 className={`flex items-center justify-between gap-2.5 ${buttonSizeClass} font-semibold transition-all rounded-xl ${
                     borderless 
                     ? 'bg-transparent border-none' 
                     : 'bg-white/60 dark:bg-white/5 border border-white/40 dark:border-white/10 hover:border-blue-400/50 hover:bg-white/80 shadow-sm backdrop-blur-md'
                 } text-gray-700 dark:text-gray-200 pointer-events-auto w-full ${className}`}
-                onClick={() => setIsOpen(!isOpen)}
+                onClick={() => setIsOpen(open => !open)}
                 style={style}
             >
                 <span className="flex items-center gap-2.5 min-w-0 flex-1">
@@ -220,11 +229,22 @@ export const EnhancedStyleSwitcher: React.FC<EnhancedStyleSwitcherProps> = ({
             {/* 弹出面板 - Hyper-Glass V3 */}
             {isOpen && portalTarget &&
                 createPortal(
-                    <div className="fixed inset-0 z-[3000] flex items-center justify-center p-4 sm:p-8 bg-black/40 backdrop-blur-md animate-in fade-in duration-500" onClick={() => setIsOpen(false)}>
+                    <div
+                        className="fixed inset-0 z-[3000] flex items-center justify-center p-4 sm:p-8 bg-black/40 backdrop-blur-md animate-in fade-in duration-500"
+                        onPointerDown={(event) => {
+                            if (event.target === event.currentTarget) handleClose();
+                        }}
+                    >
                         <div
+                            id={dialogId}
                             className="relative flex flex-col w-full max-w-6xl max-h-[85vh] rounded-[24px] bg-white/75 dark:bg-[#1C1C29]/70 backdrop-blur-3xl backdrop-saturate-150 border border-white/60 dark:border-white/10 shadow-[0_40px_80px_-20px_rgba(0,0,0,0.35)] overflow-hidden animate-in zoom-in-98 duration-500 pointer-events-auto"
                             ref={panelRef}
-                            onClick={(e) => e.stopPropagation()}
+                            role="dialog"
+                            aria-modal="true"
+                            aria-labelledby={dialogTitleId}
+                            tabIndex={-1}
+                            onKeyDown={handlePanelKeyDown}
+                            onPointerDown={(event) => event.stopPropagation()}
                         >
                             {/* 面板头部 */}
                             <div className="flex-none px-10 py-6 border-b border-black/5 dark:border-white/5 flex items-center justify-between">
@@ -233,15 +253,19 @@ export const EnhancedStyleSwitcher: React.FC<EnhancedStyleSwitcherProps> = ({
                                         <FaPalette className="text-white text-lg" />
                                     </div>
                                     <div>
-                                        <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">{t('style.switcher.title')}</h2>
+                                        <h2 id={dialogTitleId} className="text-xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">{t('style.switcher.title')}</h2>
                                         <p className="text-[12px] text-gray-400 font-bold opacity-60 uppercase tracking-widest">Visual Identity Schemes</p>
                                     </div>
                                 </div>
                                 <button
-                                    className="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-gray-800 dark:hover:text-gray-100 hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-all cursor-pointer group"
-                                    onClick={() => setIsOpen(false)}
+                                    ref={closeButtonRef}
+                                    type="button"
+                                    className="min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 hover:text-gray-800 dark:hover:text-gray-100 hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-all cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                                    onClick={handleClose}
+                                    aria-label={t('common.close')}
+                                    title={t('common.close')}
                                 >
-                                    <FaTimes size={18} className="group-hover:rotate-90 transition-transform duration-300" />
+                                    <FaTimes size={18} className="group-hover:rotate-90 transition-transform duration-300" aria-hidden="true" />
                                 </button>
                             </div>
 
