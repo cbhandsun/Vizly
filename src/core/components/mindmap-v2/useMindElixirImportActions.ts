@@ -5,6 +5,7 @@ import { getFileSizeLimitError, MINDMAP_TEXT_IMPORT_MAX_BYTES } from '../../util
 import { parseDiagramJson } from '../../utils/diagramJsonImport';
 import { markdownToNodeObj, opmlToNodeObj } from './migrate';
 import { coerceMindElixirDirection } from './mindElixirDirection';
+import { applyMindMapImportTransaction } from './mindmapImportTransaction';
 import { cleanAndValidateTree, cleanMindMapData } from './mindmapTreeSanitizer';
 import {
     logMindmapToolbarImportFailure,
@@ -74,15 +75,13 @@ export const useMindElixirImportActions = (mind: MindElixirInstance | null) => {
             try {
                 const parsed = parseMindMapToolbarImport(kind, loadEvent.target?.result);
                 if (parsed.kind === 'diagram') {
-                    mind.refresh({
+                    applyMindMapImportTransaction(mind, {
                         ...parsed.data,
                         direction: coerceMindElixirDirection(parsed.data.direction),
                     });
                 } else {
-                    mind.refresh({ nodeData: parsed.nodeData });
+                    applyMindMapImportTransaction(mind, { nodeData: parsed.nodeData });
                 }
-                mind.toCenter();
-                mind.clearHistory?.();
             } catch (error) {
                 logMindmapToolbarImportFailure(kind, error);
             }

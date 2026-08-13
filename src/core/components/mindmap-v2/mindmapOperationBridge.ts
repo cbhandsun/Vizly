@@ -6,6 +6,7 @@ export type VizlyMindMapOperation =
     | { name: 'autoArrangeMindmap'; obj: NodeObj }
     | { name: 'changeDirection'; obj: NodeObj }
     | { name: 'editArrowLabel'; obj: MindElixirArrow }
+    | { name: 'import'; obj: NodeObj }
     | { name: 'outline_structure_change'; obj: NodeObj };
 
 export type VizlyMindMapData = Omit<MindElixirData, 'direction'> & {

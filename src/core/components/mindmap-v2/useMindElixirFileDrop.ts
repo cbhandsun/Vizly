@@ -3,6 +3,7 @@ import type { MindElixirInstance, NodeObj } from 'mind-elixir';
 
 import { getFileSizeLimitError, MINDMAP_TEXT_IMPORT_MAX_BYTES } from '../../utils/fileImportGuards';
 import { markdownToNodeObj, opmlToNodeObj } from './migrate';
+import { applyMindMapImportTransaction } from './mindmapImportTransaction';
 import { cleanAndValidateTree } from './mindmapTreeSanitizer';
 import {
     logMindmapWrapperDragImportFailure,
@@ -64,9 +65,7 @@ export const useMindElixirFileDrop = (
         reader.onload = event => {
             try {
                 const nodeData = parseMindMapImportText(file.name, event.target?.result);
-                mind.refresh({ nodeData });
-                mind.toCenter();
-                mind.clearHistory?.();
+                applyMindMapImportTransaction(mind, { nodeData });
             } catch (error) {
                 logMindmapWrapperDragImportFailure(error);
             }
