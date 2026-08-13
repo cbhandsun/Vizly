@@ -410,6 +410,16 @@ const MindElixirToolbar: React.FC = () => {
 
             <Divider orientation="vertical" style={{ height: 16, margin: '0 2px' }} />
 
+            {/* Keep help near the start so it remains reachable before horizontal overflow. */}
+            <MindMapToolbarIconButton
+                data-testid="mindmap-shortcuts-trigger"
+                label={t('plugins.mindmap.toolbar.shortcuts')}
+                icon={<QuestionCircleOutlined />}
+                onClick={() => setShortcutsOpen(true)}
+            />
+
+            <Divider orientation="vertical" style={{ height: 16, margin: '0 2px' }} />
+
             {/* Undo / Redo */}
             <MindMapToolbarIconButton label={t('plugins.mindmap.toolbar.undo')} icon={<UndoOutlined />} onClick={handleUndo} disabled={!mind} />
             <MindMapToolbarIconButton label={t('plugins.mindmap.toolbar.redo')} icon={<RedoOutlined />} onClick={handleRedo} disabled={!mind} />
@@ -617,14 +627,6 @@ const MindElixirToolbar: React.FC = () => {
                 onClick={handleToggleKanban}
                 pressed={isKanbanOpen}
                 style={{ color: isKanbanOpen ? '#6366f1' : undefined }}
-            />
-
-            {/* Shortcuts help */}
-            <MindMapToolbarIconButton
-                label={t('plugins.mindmap.toolbar.shortcuts')}
-                icon={<QuestionCircleOutlined />}
-                onClick={() => setShortcutsOpen(true)}
-                style={{ color: 'rgba(255,255,255,0.4)' }}
             />
 
             {/* Shortcuts Modal */}

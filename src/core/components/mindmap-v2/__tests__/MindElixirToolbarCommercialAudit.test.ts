@@ -49,6 +49,7 @@ describe('MindElixirToolbar commercial interaction contract', () => {
         expect(source).toContain('<BorderlessTableOutlined />');
         expect(source).toContain('<EllipsisOutlined />');
         expect(source).not.toContain('backgroundImage:');
+        expect(source).toMatch(/MindMapThemeSelector[\s\S]*?data-testid="mindmap-shortcuts-trigger"[\s\S]*?\/\* Undo \/ Redo \*\//);
     });
 
     it('routes visible toolbar copy through production translations', () => {

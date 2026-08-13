@@ -2633,6 +2633,49 @@
                 "noValidSuggestions": "The model returned no valid child topics. Try again",
                 "openConfiguration": "Open AI settings"
             },
+            "shortcutHelp": {
+                "title": "Mind map shortcuts and quick actions",
+                "subtitle": "Work faster with verified keyboard, mouse, and import actions. Use keyboard shortcuts while the canvas, not a text field, is focused.",
+                "or": "or",
+                "itemLabel": "{{action}}: {{shortcut}}",
+                "note": "Ctrl / ⌘ means Ctrl on Windows and Linux, or Command on macOS. Some actions require a selected node.",
+                "keys": {
+                    "mod": "Ctrl / ⌘",
+                    "space": "Space",
+                    "click": "Click",
+                    "rightClick": "Right-click",
+                    "dragFiles": "Drag .md / .opml",
+                    "arrowKeys": "Arrow keys"
+                },
+                "groups": {
+                    "nodes": "Node editing",
+                    "view": "View and navigation",
+                    "history": "History",
+                    "presentation": "Presentation mode",
+                    "quickActions": "Mouse and import"
+                },
+                "actions": {
+                    "addChild": "Add a child node",
+                    "addSiblingAfter": "Add a sibling after",
+                    "addSiblingBefore": "Add a sibling before",
+                    "insertParent": "Insert a parent node",
+                    "editNode": "Edit node text",
+                    "deleteNode": "Delete the selected node",
+                    "copyNodeText": "Copy selected node text",
+                    "search": "Search nodes",
+                    "outline": "Toggle the outline panel",
+                    "history": "Toggle history snapshots",
+                    "navigateNodes": "Move between nodes",
+                    "undo": "Undo",
+                    "redo": "Redo",
+                    "nextNode": "Move to the next presentation node",
+                    "previousNode": "Move to the previous presentation node",
+                    "exitPresentation": "Exit presentation mode",
+                    "openLink": "Open the selected node link",
+                    "contextMenu": "Open node actions",
+                    "importFiles": "Import Markdown or OPML"
+                }
+            },
             "toolbar": {
                 "label": "Mind map toolbar",
                 "undo": "Undo (Ctrl+Z)",

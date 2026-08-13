@@ -2786,6 +2786,49 @@
                 "noValidSuggestions": "模型未返回有效的子主题，请重试",
                 "openConfiguration": "打开 AI 设置"
             },
+            "shortcutHelp": {
+                "title": "思维导图快捷键与高效操作",
+                "subtitle": "集中查看已验证的键盘、鼠标和导入操作。使用键盘快捷键时，请先将焦点放在画布而不是文本输入框中。",
+                "or": "或",
+                "itemLabel": "{{action}}：{{shortcut}}",
+                "note": "Ctrl / ⌘ 表示 Windows、Linux 使用 Ctrl，macOS 使用 Command；部分操作需要先选中节点。",
+                "keys": {
+                    "mod": "Ctrl / ⌘",
+                    "space": "空格",
+                    "click": "单击",
+                    "rightClick": "右键单击",
+                    "dragFiles": "拖入 .md / .opml",
+                    "arrowKeys": "方向键"
+                },
+                "groups": {
+                    "nodes": "节点编辑",
+                    "view": "视图与导航",
+                    "history": "历史记录",
+                    "presentation": "演示模式",
+                    "quickActions": "鼠标与导入"
+                },
+                "actions": {
+                    "addChild": "添加子节点",
+                    "addSiblingAfter": "在后方添加同级节点",
+                    "addSiblingBefore": "在前方添加同级节点",
+                    "insertParent": "插入父节点",
+                    "editNode": "编辑节点文字",
+                    "deleteNode": "删除选中节点",
+                    "copyNodeText": "复制选中节点文字",
+                    "search": "搜索节点",
+                    "outline": "切换大纲面板",
+                    "history": "切换历史快照",
+                    "navigateNodes": "在节点之间移动",
+                    "undo": "撤销",
+                    "redo": "重做",
+                    "nextNode": "切换到下一个演示节点",
+                    "previousNode": "切换到上一个演示节点",
+                    "exitPresentation": "退出演示模式",
+                    "openLink": "打开选中节点的超链接",
+                    "contextMenu": "打开节点操作菜单",
+                    "importFiles": "导入 Markdown 或 OPML"
+                }
+            },
             "toolbar": {
                 "label": "思维导图工具栏",
                 "undo": "撤销 (Ctrl+Z)",

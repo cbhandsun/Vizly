@@ -1,199 +1,166 @@
-/**
- * MindMapShortcutsModal.tsx — 键盘快捷键速查面板
- *
- * 触发方式：Toolbar "?" 按钮 / 未来可加 ? 快捷键
- */
-
-import React from 'react';
+import { useMemo, type ReactNode } from 'react';
+import {
+    ApartmentOutlined,
+    CompassOutlined,
+    HistoryOutlined,
+    InfoCircleOutlined,
+    KeyOutlined,
+    PlayCircleOutlined,
+    ThunderboltOutlined,
+} from '@ant-design/icons';
 import { Modal } from 'antd';
-import { KeyOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import './MindMapShortcutsModal.css';
 
-// ─── Shortcut data ────────────────────────────────────────────────────────────
+interface ShortcutItem {
+    action: string;
+    chords: string[][];
+}
 
-const GROUPS = [
-    {
-        title: '节点操作',
-        icon: '🌿',
-        items: [
-            { keys: ['Tab'],            desc: '添加子节点' },
-            { keys: ['Enter'],          desc: '添加同级节点' },
-            { keys: ['F2'],             desc: '编辑节点文本' },
-            { keys: ['Del'],            desc: '删除选中节点' },
-            { keys: ['↑ ↓ ← →'],       desc: '导航节点' },
-            { keys: ['Ctrl', 'D'],      desc: '复制节点为同级' },
-            { keys: ['Ctrl', 'Shift', 'C'], desc: '复制节点文本到剪贴板' },
-        ],
-    },
-    {
-        title: '视图 / 画布',
-        icon: '🔭',
-        items: [
-            { keys: ['Ctrl', '+'],      desc: '放大' },
-            { keys: ['Ctrl', '-'],      desc: '缩小' },
-            { keys: ['/'],              desc: '居中视图' },
-            { keys: ['Ctrl', 'F'],      desc: '搜索节点' },
-            { keys: ['Alt', 'O'],       desc: '切换大纲视图面板' },
-            { keys: ['☰ 工具栏'],       desc: '切换大纲视图' },
-            { keys: ['⊞ 工具栏'],       desc: '切换画布背景（网格/点阵）' },
-        ],
-    },
-    {
-        title: '历史',
-        icon: '🕹️',
-        items: [
-            { keys: ['Ctrl', 'Z'],      desc: '撤销' },
-            { keys: ['Ctrl', 'Y'],      desc: '重做' },
-            { keys: ['Ctrl', 'Shift', 'Z'], desc: '重做（备选）' },
-        ],
-    },
-    {
-        title: '演示模式',
-        icon: '🎬',
-        items: [
-            { keys: ['→', 'Space'],     desc: '下一节点' },
-            { keys: ['←'],              desc: '上一节点' },
-            { keys: ['Esc'],            desc: '退出演示' },
-        ],
-    },
-    {
-        title: '高效功能',
-        icon: '⚡',
-        items: [
-            { keys: ['Ctrl', 'F'],      desc: '搜索 / 查找替换（⇌ 按钮展开替换栏）' },
-            { keys: ['# 工具栏'],        desc: '切换节点自动编号' },
-            { keys: ['Ctrl', 'Click'],  desc: '打开节点超链接' },
-            { keys: ['拖拽 .md/.opml'], desc: '快速导入文件' },
-            { keys: ['右键节点'],        desc: '上下文菜单（含形状选择）' },
-        ],
-    },
-];
-
-// ─── Key Badge ───────────────────────────────────────────────────────────────
-
-const KeyBadge: React.FC<{ label: string }> = ({ label }) => (
-    <kbd style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '2px 7px',
-        borderRadius: 6,
-        background: 'rgba(255,255,255,0.08)',
-        border: '1px solid rgba(255,255,255,0.15)',
-        borderBottomWidth: 2,
-        fontSize: 11,
-        fontFamily: 'monospace',
-        fontWeight: 600,
-        color: 'rgba(255,255,255,0.85)',
-        whiteSpace: 'nowrap',
-        lineHeight: '18px',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-    }}>
-        {label}
-    </kbd>
-);
-
-// ─── Component ────────────────────────────────────────────────────────────────
+interface ShortcutGroup {
+    id: string;
+    icon: ReactNode;
+    title: string;
+    items: ShortcutItem[];
+}
 
 interface MindMapShortcutsModalProps {
     open: boolean;
     onClose: () => void;
 }
 
-const MindMapShortcutsModal: React.FC<MindMapShortcutsModalProps> = ({ open, onClose }) => {
+const KeyBadge = ({ label }: { label: string }) => (
+    <kbd aria-hidden="true" className="mindmap-shortcuts-key">
+        {label}
+    </kbd>
+);
+
+const ShortcutKeys = ({ chords, orLabel }: { chords: string[][]; orLabel: string }) => (
+    <span aria-hidden="true" className="mindmap-shortcuts-keys">
+        {chords.map((chord, chordIndex) => (
+            <span className="mindmap-shortcuts-chord" key={chord.join('-')}>
+                {chordIndex > 0 && <span className="mindmap-shortcuts-or">{orLabel}</span>}
+                {chord.map((key, keyIndex) => (
+                    <span className="mindmap-shortcuts-key-part" key={key}>
+                        {keyIndex > 0 && <span className="mindmap-shortcuts-plus">+</span>}
+                        <KeyBadge label={key} />
+                    </span>
+                ))}
+            </span>
+        ))}
+    </span>
+);
+
+const MindMapShortcutsModal = ({ open, onClose }: MindMapShortcutsModalProps) => {
+    const { t } = useTranslation();
+    const mod = t('plugins.mindmap.shortcutHelp.keys.mod');
+    const orLabel = t('plugins.mindmap.shortcutHelp.or');
+
+    const groups = useMemo<ShortcutGroup[]>(() => [
+        {
+            id: 'nodes',
+            icon: <ApartmentOutlined />,
+            title: t('plugins.mindmap.shortcutHelp.groups.nodes'),
+            items: [
+                { chords: [['Tab']], action: t('plugins.mindmap.shortcutHelp.actions.addChild') },
+                { chords: [['Enter']], action: t('plugins.mindmap.shortcutHelp.actions.addSiblingAfter') },
+                { chords: [['Shift', 'Enter']], action: t('plugins.mindmap.shortcutHelp.actions.addSiblingBefore') },
+                { chords: [[mod, 'Enter']], action: t('plugins.mindmap.shortcutHelp.actions.insertParent') },
+                { chords: [['F2']], action: t('plugins.mindmap.shortcutHelp.actions.editNode') },
+                { chords: [['Delete'], ['Backspace']], action: t('plugins.mindmap.shortcutHelp.actions.deleteNode') },
+                { chords: [[mod, 'Shift', 'C']], action: t('plugins.mindmap.shortcutHelp.actions.copyNodeText') },
+            ],
+        },
+        {
+            id: 'view',
+            icon: <CompassOutlined />,
+            title: t('plugins.mindmap.shortcutHelp.groups.view'),
+            items: [
+                { chords: [[mod, 'F']], action: t('plugins.mindmap.shortcutHelp.actions.search') },
+                { chords: [['Alt', 'O']], action: t('plugins.mindmap.shortcutHelp.actions.outline') },
+                { chords: [['Alt', 'H']], action: t('plugins.mindmap.shortcutHelp.actions.history') },
+                { chords: [[t('plugins.mindmap.shortcutHelp.keys.arrowKeys')]], action: t('plugins.mindmap.shortcutHelp.actions.navigateNodes') },
+            ],
+        },
+        {
+            id: 'history',
+            icon: <HistoryOutlined />,
+            title: t('plugins.mindmap.shortcutHelp.groups.history'),
+            items: [
+                { chords: [[mod, 'Z']], action: t('plugins.mindmap.shortcutHelp.actions.undo') },
+                { chords: [[mod, 'Y'], [mod, 'Shift', 'Z']], action: t('plugins.mindmap.shortcutHelp.actions.redo') },
+            ],
+        },
+        {
+            id: 'presentation',
+            icon: <PlayCircleOutlined />,
+            title: t('plugins.mindmap.shortcutHelp.groups.presentation'),
+            items: [
+                { chords: [['→'], ['↓'], [t('plugins.mindmap.shortcutHelp.keys.space')], ['Enter']], action: t('plugins.mindmap.shortcutHelp.actions.nextNode') },
+                { chords: [['←'], ['↑']], action: t('plugins.mindmap.shortcutHelp.actions.previousNode') },
+                { chords: [['Esc']], action: t('plugins.mindmap.shortcutHelp.actions.exitPresentation') },
+            ],
+        },
+        {
+            id: 'quick-actions',
+            icon: <ThunderboltOutlined />,
+            title: t('plugins.mindmap.shortcutHelp.groups.quickActions'),
+            items: [
+                { chords: [[mod, t('plugins.mindmap.shortcutHelp.keys.click')]], action: t('plugins.mindmap.shortcutHelp.actions.openLink') },
+                { chords: [[t('plugins.mindmap.shortcutHelp.keys.rightClick')]], action: t('plugins.mindmap.shortcutHelp.actions.contextMenu') },
+                { chords: [[t('plugins.mindmap.shortcutHelp.keys.dragFiles')]], action: t('plugins.mindmap.shortcutHelp.actions.importFiles') },
+            ],
+        },
+    ], [mod, t]);
+
     return (
         <Modal
-            open={open}
-            onCancel={onClose}
-            footer={null}
-            width={720}
             centered
-            wrapClassName="mindmap-shortcuts-modal"
-            title={
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <KeyOutlined style={{ color: '#6366f1' }} />
-                    <span style={{ fontWeight: 700 }}>键盘快捷键</span>
-                    <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>
-                        MindMap 快速参考
-                    </span>
-                </div>
-            }
+            footer={null}
+            onCancel={onClose}
+            open={open}
+            rootClassName="mindmap-shortcuts-modal"
+            title={(
+                <span className="mindmap-shortcuts-title">
+                    <KeyOutlined aria-hidden="true" />
+                    <span>{t('plugins.mindmap.shortcutHelp.title')}</span>
+                </span>
+            )}
+            width={760}
         >
-            <div style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: 16,
-            }}>
-                {GROUPS.map(group => (
-                    <div key={group.title} style={{
-                        background: 'rgba(255,255,255,0.03)',
-                        border: '1px solid rgba(255,255,255,0.06)',
-                        borderRadius: 12,
-                        padding: '12px 14px',
-                    }}>
-                        <div style={{
-                            fontSize: 12,
-                            fontWeight: 700,
-                            color: 'rgba(255,255,255,0.5)',
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.08em',
-                            marginBottom: 10,
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 6,
-                        }}>
-                            <span>{group.icon}</span>
-                            <span>{group.title}</span>
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-                            {group.items.map((item, i) => (
-                                <div key={i} style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'space-between',
-                                    gap: 8,
-                                }}>
-                                    <span style={{
-                                        fontSize: 12,
-                                        color: 'rgba(255,255,255,0.65)',
-                                        flex: 1,
-                                    }}>
-                                        {item.desc}
-                                    </span>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
-                                        {item.keys.map((k, j) => (
-                                            <React.Fragment key={j}>
-                                                {j > 0 && (
-                                                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', margin: '0 1px' }}>
-                                                        {k === '→' || k === '←' || k === 'Space' ? '+' : '+'}
-                                                    </span>
-                                                )}
-                                                <KeyBadge label={k} />
-                                            </React.Fragment>
-                                        ))}
+            <p className="mindmap-shortcuts-subtitle" id="mindmap-shortcuts-description">
+                {t('plugins.mindmap.shortcutHelp.subtitle')}
+            </p>
+            <div aria-describedby="mindmap-shortcuts-description" className="mindmap-shortcuts-grid">
+                {groups.map(group => (
+                    <section aria-labelledby={`mindmap-shortcuts-${group.id}`} className="mindmap-shortcuts-group" key={group.id}>
+                        <h3 className="mindmap-shortcuts-group-title" id={`mindmap-shortcuts-${group.id}`}>
+                            <span aria-hidden="true" className="mindmap-shortcuts-group-icon">{group.icon}</span>
+                            {group.title}
+                        </h3>
+                        <div className="mindmap-shortcuts-list" role="list">
+                            {group.items.map(item => {
+                                const shortcut = item.chords.map(chord => chord.join('+')).join(` ${orLabel} `);
+                                return (
+                                    <div
+                                        aria-label={t('plugins.mindmap.shortcutHelp.itemLabel', { action: item.action, shortcut })}
+                                        className="mindmap-shortcuts-item"
+                                        key={`${group.id}-${item.action}`}
+                                        role="listitem"
+                                    >
+                                        <span className="mindmap-shortcuts-action">{item.action}</span>
+                                        <ShortcutKeys chords={item.chords} orLabel={orLabel} />
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
-                    </div>
+                    </section>
                 ))}
             </div>
-
-            {/* Footer */}
-            <div style={{
-                marginTop: 16,
-                padding: '10px 14px',
-                background: 'rgba(99,102,241,0.05)',
-                border: '1px solid rgba(99,102,241,0.12)',
-                borderRadius: 10,
-                fontSize: 11,
-                color: 'rgba(255,255,255,0.35)',
-                textAlign: 'center',
-            }}>
-                💡 更多快捷键请参考 mind-elixir 文档 ·
-                Ctrl+Click 节点可直接打开超链接 ·
-                拖入 .md/.opml 文件快速导入
-            </div>
+            <p className="mindmap-shortcuts-note">
+                <InfoCircleOutlined aria-hidden="true" />
+                <span>{t('plugins.mindmap.shortcutHelp.note')}</span>
+            </p>
         </Modal>
     );
 };
