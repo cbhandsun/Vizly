@@ -2786,6 +2786,31 @@
                 "noValidSuggestions": "模型未返回有效的子主题，请重试",
                 "openConfiguration": "打开 AI 设置"
             },
+            "speakerNotes": {
+                "panelLabel": "AI 演讲提词器",
+                "title": "AI 演讲提词器",
+                "currentTopic": "当前焦点主题",
+                "loading": "正在准备可选的 AI 演讲提词…",
+                "configurationRequired": "尚未配置 AI 演讲提词",
+                "configurationHint": "提词功能为可选项，演示导航不受影响；退出演示后可前往 AI 设置完成配置。",
+                "failureHint": "演示导航不受影响；可重试提词生成，或关闭本次演示的提词面板。",
+                "retry": "重新尝试",
+                "regenerate": "重新生成提词",
+                "dismiss": "关闭本次演示的提词器",
+                "copy": "复制提词",
+                "save": "保存到节点备注",
+                "copySuccess": "演讲提词已复制",
+                "copyFailed": "复制失败，请检查浏览器剪贴板权限",
+                "saveSuccess": "已保存到当前节点备注",
+                "saveFailed": "保存失败，请重试",
+                "wordCount": "演讲字数：约 {{count}} 字",
+                "tones": {
+                    "专业商务": "专业商务",
+                    "幽默风趣": "幽默风趣",
+                    "通俗易懂": "通俗易懂",
+                    "严谨理性": "严谨理性"
+                }
+            },
             "shortcutHelp": {
                 "title": "思维导图快捷键与高效操作",
                 "subtitle": "集中查看已验证的键盘、鼠标和导入操作。使用键盘快捷键时，请先将焦点放在画布而不是文本输入框中。",

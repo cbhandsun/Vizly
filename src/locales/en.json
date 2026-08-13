@@ -2633,6 +2633,31 @@
                 "noValidSuggestions": "The model returned no valid child topics. Try again",
                 "openConfiguration": "Open AI settings"
             },
+            "speakerNotes": {
+                "panelLabel": "AI speaker notes",
+                "title": "AI speaker notes",
+                "currentTopic": "Current focus topic",
+                "loading": "Preparing optional AI speaker notes…",
+                "configurationRequired": "AI speaker notes are not configured",
+                "configurationHint": "Speaker notes are optional. Presentation navigation remains available; configure AI after leaving presentation mode.",
+                "failureHint": "Presentation navigation remains available. Retry the optional speaker notes or dismiss this panel.",
+                "retry": "Retry",
+                "regenerate": "Regenerate notes",
+                "dismiss": "Dismiss speaker notes for this presentation",
+                "copy": "Copy speaker notes",
+                "save": "Save to node notes",
+                "copySuccess": "Speaker notes copied",
+                "copyFailed": "Copy failed. Check clipboard permission",
+                "saveSuccess": "Saved to the current node notes",
+                "saveFailed": "Save failed. Try again",
+                "wordCount": "About {{count}} characters",
+                "tones": {
+                    "专业商务": "Professional",
+                    "幽默风趣": "Lighthearted",
+                    "通俗易懂": "Plain language",
+                    "严谨理性": "Analytical"
+                }
+            },
             "shortcutHelp": {
                 "title": "Mind map shortcuts and quick actions",
                 "subtitle": "Work faster with verified keyboard, mouse, and import actions. Use keyboard shortcuts while the canvas, not a text field, is focused.",

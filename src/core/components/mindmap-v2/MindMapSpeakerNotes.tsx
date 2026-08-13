@@ -1,32 +1,37 @@
 import React, { useCallback, useEffect, useState, useRef } from 'react';
 import type { NodeObj } from 'mind-elixir';
+import { useTranslation } from 'react-i18next';
 import { getMindElixirInstance, getPresentationState, subscribePresentation } from './mindElixirStore';
 import { generateSpeakerNotes } from './mindmapAIService';
+import { isMindMapAIConfigurationError } from './mindMapAIErrorPresentation';
 import { mergeSpeakerNotesIntoNodeNote } from './mindmapSpeakerNotesSecurity';
 import { cleanMindMapNodePatch } from './mindmapNodePatchSecurity';
 import { logMindmapSpeakerNotesSaveFailure } from './mindmapPanelLogging';
 import { Spin, Button, Select, Tooltip, message } from 'antd';
-import { CopyOutlined, ReloadOutlined, SaveOutlined, MessageOutlined, SoundOutlined } from '@ant-design/icons';
+import { CloseOutlined, CopyOutlined, ReloadOutlined, SaveOutlined, MessageOutlined, SoundOutlined } from '@ant-design/icons';
 
-const TONE_OPTIONS = [
-    { label: '💼 专业商务', value: '专业商务' },
-    { label: '🎭 幽默风趣', value: '幽默风趣' },
-    { label: '📢 通俗易懂', value: '通俗易懂' },
-    { label: '🧐 严谨理性', value: '严谨理性' },
-];
+const TONE_VALUES = ['专业商务', '幽默风趣', '通俗易懂', '严谨理性'] as const;
 
 export const MindMapSpeakerNotes: React.FC = () => {
+    const { t } = useTranslation();
     const [isPresenting, setIsPresenting] = useState(false);
     const [currentNode, setCurrentNode] = useState<NodeObj | null>(null);
     const [notes, setNotes] = useState<string>('');
     const [loading, setLoading] = useState(false);
     const [tone, setTone] = useState('专业商务');
     const [error, setError] = useState<string | null>(null);
+    const [dismissed, setDismissed] = useState(false);
 
     // 缓存上一次请求的节点ID和语气，避免重复请求
     const lastRequestKeyRef = useRef<string>('');
     const activeRequestKeyRef = useRef<string>('');
+    const dismissedRef = useRef(false);
     const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const toneOptions = TONE_VALUES.map((value) => ({
+        value,
+        label: t(`plugins.mindmap.speakerNotes.tones.${value}`),
+    }));
 
     const fetchNotes = useCallback(async (node: NodeObj, currentTone: string) => {
         const nodeId = node.id;
@@ -45,6 +50,7 @@ export const MindMapSpeakerNotes: React.FC = () => {
             const presentation = getPresentationState();
             if (
                 activeRequestKeyRef.current !== requestKey
+                || dismissedRef.current
                 || !presentation.isPresenting
                 || presentation.presentationNode?.id !== nodeId
             ) {
@@ -62,6 +68,7 @@ export const MindMapSpeakerNotes: React.FC = () => {
             const presentation = getPresentationState();
             if (
                 activeRequestKeyRef.current === requestKey
+                && !dismissedRef.current
                 && presentation.isPresenting
                 && presentation.presentationNode?.id === nodeId
             ) {
@@ -72,6 +79,7 @@ export const MindMapSpeakerNotes: React.FC = () => {
             const presentation = getPresentationState();
             if (
                 activeRequestKeyRef.current === requestKey
+                && !dismissedRef.current
                 && presentation.isPresenting
                 && presentation.presentationNode?.id === nodeId
             ) {
@@ -87,6 +95,8 @@ export const MindMapSpeakerNotes: React.FC = () => {
             setIsPresenting(state.isPresenting);
             setCurrentNode(state.presentationNode);
             if (!state.isPresenting || !state.presentationNode) {
+                dismissedRef.current = false;
+                setDismissed(false);
                 activeRequestKeyRef.current = '';
                 lastRequestKeyRef.current = '';
                 setNotes('');
@@ -135,13 +145,24 @@ export const MindMapSpeakerNotes: React.FC = () => {
         void fetchNotes(currentNode, tone);
     };
 
+    const handleDismiss = () => {
+        dismissedRef.current = true;
+        setDismissed(true);
+        activeRequestKeyRef.current = '';
+        if (debounceTimerRef.current) {
+            clearTimeout(debounceTimerRef.current);
+            debounceTimerRef.current = null;
+        }
+        setLoading(false);
+    };
+
     const handleCopyNotes = async () => {
         if (!notes.trim()) return;
         try {
             await navigator.clipboard.writeText(notes);
-            message.success('演讲提词已复制');
+            message.success(t('plugins.mindmap.speakerNotes.copySuccess'));
         } catch {
-            message.error('复制失败，请检查浏览器剪贴板权限');
+            message.error(t('plugins.mindmap.speakerNotes.copyFailed'));
         }
     };
 
@@ -163,58 +184,122 @@ export const MindMapSpeakerNotes: React.FC = () => {
                 origin: currentNode,
             });
             setCurrentNode(changedNode);
-            message.success('已保存到当前节点备注');
+            message.success(t('plugins.mindmap.speakerNotes.saveSuccess'));
         } catch (err) {
             logMindmapSpeakerNotesSaveFailure(err);
-            message.error('保存失败，请重试');
+            message.error(t('plugins.mindmap.speakerNotes.saveFailed'));
         }
     };
 
-    if (!isPresenting || !currentNode) return null;
+    if (!isPresenting || !currentNode || dismissed) return null;
+
+    const isConfigurationError = isMindMapAIConfigurationError(error);
+    const presentedError = isConfigurationError
+        ? t('plugins.mindmap.speakerNotes.configurationRequired')
+        : error;
+    const isPending = !error && !notes.trim();
+
+    if (isPending || error) {
+        return (
+            <aside
+                style={compactContainerStyle}
+                aria-label={t('plugins.mindmap.speakerNotes.panelLabel')}
+                data-testid="mindmap-speaker-notes-compact"
+            >
+                <div style={compactHeaderStyle}>
+                    <div style={titleWrapperStyle}>
+                        <MessageOutlined style={{ color: '#818cf8', fontSize: 16 }} aria-hidden="true" />
+                        <span style={titleStyle}>{t('plugins.mindmap.speakerNotes.title')}</span>
+                    </div>
+                    <Button
+                        type="text"
+                        size="small"
+                        icon={<CloseOutlined />}
+                        onClick={handleDismiss}
+                        aria-label={t('plugins.mindmap.speakerNotes.dismiss')}
+                        style={iconButtonStyle}
+                    />
+                </div>
+                {error ? (
+                    <div style={compactErrorStyle} role="alert">
+                        <span style={errorTextStyle}>{presentedError}</span>
+                        <span style={compactHintStyle}>
+                            {t(isConfigurationError
+                                ? 'plugins.mindmap.speakerNotes.configurationHint'
+                                : 'plugins.mindmap.speakerNotes.failureHint')}
+                        </span>
+                        {!isConfigurationError && (
+                            <Button type="default" size="small" onClick={handleRetry}>
+                                {t('plugins.mindmap.speakerNotes.retry')}
+                            </Button>
+                        )}
+                    </div>
+                ) : (
+                    <div style={compactLoadingStyle} role="status" aria-live="polite">
+                        <Spin size="medium" />
+                        <span>{t('plugins.mindmap.speakerNotes.loading')}</span>
+                    </div>
+                )}
+            </aside>
+        );
+    }
 
     return (
-        <div style={containerStyle}>
+        <aside style={containerStyle} aria-label={t('plugins.mindmap.speakerNotes.panelLabel')}>
             {/* 磨砂玻璃头部 */}
             <div style={headerStyle}>
                 <div style={titleWrapperStyle}>
                     <MessageOutlined style={{ color: '#818cf8', fontSize: 16 }} />
-                    <span style={titleStyle}>AI 演讲提词器</span>
+                    <span style={titleStyle}>{t('plugins.mindmap.speakerNotes.title')}</span>
                 </div>
                 <div style={actionsStyle}>
                     <Select
                         size="small"
-                        options={TONE_OPTIONS}
+                        options={toneOptions}
                         value={tone}
                         onChange={(val) => setTone(val)}
                         dropdownStyle={dropdownStyle}
                         style={selectStyle}
                     />
-                    <Tooltip title="复制提词">
+                    <Tooltip title={t('plugins.mindmap.speakerNotes.copy')}>
                         <Button
                             type="text"
                             size="small"
                             icon={<CopyOutlined />}
                             onClick={handleCopyNotes}
                             disabled={!notes.trim() || loading}
+                            aria-label={t('plugins.mindmap.speakerNotes.copy')}
                             style={iconButtonStyle}
                         />
                     </Tooltip>
-                    <Tooltip title="保存到节点备注">
+                    <Tooltip title={t('plugins.mindmap.speakerNotes.save')}>
                         <Button
                             type="text"
                             size="small"
                             icon={<SaveOutlined />}
                             onClick={handleSaveNotes}
                             disabled={!notes.trim() || loading}
+                            aria-label={t('plugins.mindmap.speakerNotes.save')}
                             style={iconButtonStyle}
                         />
                     </Tooltip>
-                    <Tooltip title="重新生成">
+                    <Tooltip title={t('plugins.mindmap.speakerNotes.regenerate')}>
                         <Button
                             type="text"
                             size="small"
                             icon={<ReloadOutlined />}
                             onClick={handleRetry}
+                            aria-label={t('plugins.mindmap.speakerNotes.regenerate')}
+                            style={iconButtonStyle}
+                        />
+                    </Tooltip>
+                    <Tooltip title={t('plugins.mindmap.speakerNotes.dismiss')}>
+                        <Button
+                            type="text"
+                            size="small"
+                            icon={<CloseOutlined />}
+                            onClick={handleDismiss}
+                            aria-label={t('plugins.mindmap.speakerNotes.dismiss')}
                             style={iconButtonStyle}
                         />
                     </Tooltip>
@@ -224,7 +309,7 @@ export const MindMapSpeakerNotes: React.FC = () => {
             {/* 提词主体部分 */}
             <div style={contentStyle}>
                 <div style={nodeInfoStyle}>
-                    <span style={nodeLabelStyle}>当前焦点主题</span>
+                    <span style={nodeLabelStyle}>{t('plugins.mindmap.speakerNotes.currentTopic')}</span>
                     <h3 style={nodeTopicStyle}>{currentNode.topic}</h3>
                 </div>
 
@@ -232,7 +317,7 @@ export const MindMapSpeakerNotes: React.FC = () => {
                     {loading ? (
                         <div style={loadingWrapperStyle}>
                             <Spin size="default" />
-                            <span style={loadingTextStyle}>AI 正在组织演讲语言...</span>
+                            <span style={loadingTextStyle}>{t('plugins.mindmap.speakerNotes.loading')}</span>
                         </div>
                     ) : error ? (
                         <div style={errorWrapperStyle}>
@@ -243,12 +328,12 @@ export const MindMapSpeakerNotes: React.FC = () => {
                                 onClick={handleRetry}
                                 style={retryButtonStyle}
                             >
-                                重新尝试
+                                {t('plugins.mindmap.speakerNotes.retry')}
                             </Button>
                         </div>
                     ) : (
                         <div style={notesTextStyle}>
-                            {notes || '（该节点暂未生成提词，正在等待AI生成...）'}
+                            {notes}
                         </div>
                     )}
                 </div>
@@ -257,9 +342,9 @@ export const MindMapSpeakerNotes: React.FC = () => {
             {/* 底部小提示 */}
             <div style={footerStyle}>
                 <SoundOutlined style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12 }} />
-                <span>演讲字数：约 {notes.length} 字</span>
+                <span>{t('plugins.mindmap.speakerNotes.wordCount', { count: notes.length })}</span>
             </div>
-        </div>
+        </aside>
     );
 };
 
@@ -282,6 +367,55 @@ const containerStyle: React.CSSProperties = {
     overflow: 'hidden',
     animation: 'slideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
     fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+};
+
+const compactContainerStyle: React.CSSProperties = {
+    position: 'absolute',
+    top: '32px',
+    right: '32px',
+    width: '340px',
+    zIndex: 99999,
+    padding: '14px 16px',
+    background: 'rgba(15, 18, 36, 0.9)',
+    backdropFilter: 'blur(20px) saturate(180%)',
+    WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+    border: '1px solid rgba(255, 255, 255, 0.12)',
+    borderRadius: '16px',
+    boxShadow: '0 14px 36px rgba(0, 0, 0, 0.32)',
+    color: '#fff',
+    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+};
+
+const compactHeaderStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '12px',
+};
+
+const compactErrorStyle: React.CSSProperties = {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: '8px',
+    marginTop: '12px',
+    paddingTop: '12px',
+    borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+};
+
+const compactHintStyle: React.CSSProperties = {
+    color: 'rgba(255, 255, 255, 0.62)',
+    fontSize: '12px',
+    lineHeight: 1.5,
+};
+
+const compactLoadingStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    marginTop: '12px',
+    color: 'rgba(255, 255, 255, 0.68)',
+    fontSize: '12px',
 };
 
 const headerStyle: React.CSSProperties = {
