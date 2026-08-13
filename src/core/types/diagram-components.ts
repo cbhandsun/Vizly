@@ -8,6 +8,11 @@ import { LayoutType } from './layout';
 export type DiagramExportFormat = 'pdf' | 'svg';
 export type DiagramSaveResult = void | 'cancelled';
 
+export type DiagramEnsureSavedResult =
+  | { status: 'saved'; diagramId: string }
+  | { status: 'cancelled' }
+  | { status: 'failed' };
+
 export type DiagramCollaborationStatus =
   | 'inactive'
   | 'unavailable'
@@ -121,7 +126,7 @@ export interface DiagramComponentProps {
   /** (IoC) 关闭分享面板 */
   onCloseShareDialog?: () => void;
   /** (IoC) 确保内容已保存才能分享 */
-  onEnsureSaved?: () => Promise<boolean | string>;
+  onEnsureSaved?: () => Promise<DiagramEnsureSavedResult>;
   /** (IoC) 渲染 AI 会话面板 */
   renderAIChatPanel?: (controls: DiagramPanelRenderControls) => React.ReactNode;
   /** (IoC) 渲染 AI 配置弹窗 */

@@ -22,6 +22,16 @@ import {
     getViewportOverlayContainer,
 } from '@/core/components/ui/viewportOverlayPortal';
 import { ShareDialogLoginAlert } from './ShareDialogLoginAlert';
+import type { DiagramEnsureSavedResult } from '@/core/types/diagram-components';
+import { createShareDialogOperationGate } from '@/components/shareDialogOperationGate';
+import {
+    formatShareRelativeTime,
+    getShareExpiresAt,
+    isCloudDiagramId,
+    resolveShareDiagramId,
+    type ShareCloudDiagramScope,
+    type ShareExpirationOption,
+} from '@/components/shareDialogPresentation';
 import './ShareDialog.css';
 
 const AuthModal = React.lazy(() => import('@/components/auth/AuthModal').then(module => ({
@@ -34,41 +44,11 @@ interface ShareDialogProps {
     open: boolean;
     onClose: () => void;
     diagramId: string;
-    /** 确保图表已保存到云端后才能分享。返回云端 UUID 或 false。 */
-    onEnsureSaved: () => Promise<string | false>;
+    /** 确保图表已保存到云端后才能分享，并保留取消与失败语义。 */
+    onEnsureSaved: () => Promise<DiagramEnsureSavedResult>;
 }
 
-type ExpirationOption = 'never' | '1day' | '7days' | '30days';
 type InviteRole = 'viewer' | 'editor';
-
-function getExpiresAt(option: ExpirationOption): Date | null {
-    const now = new Date();
-    switch (option) {
-        case '1day': return new Date(now.getTime() + 1 * 24 * 60 * 60 * 1000);
-        case '7days': return new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-        case '30days': return new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-        default: return null;
-    }
-}
-
-/** 相对时间格式化 */
-function formatRelativeTime(dateStr: string, locale: string): string {
-    const timestamp = Date.parse(dateStr);
-    if (!Number.isFinite(timestamp)) return '';
-
-    const diff = Math.max(0, Date.now() - timestamp);
-    const minutes = Math.floor(diff / 60000);
-    const formatter = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
-    if (minutes < 1) return formatter.format(0, 'minute');
-    if (minutes < 60) return formatter.format(-minutes, 'minute');
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return formatter.format(-hours, 'hour');
-    const days = Math.floor(hours / 24);
-    if (days < 30) return formatter.format(-days, 'day');
-    return new Intl.DateTimeFormat(locale).format(new Date(timestamp));
-}
-
-const isValidUuid = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
 const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onEnsureSaved }) => {
     const { t, i18n } = useTranslation();
@@ -80,9 +60,10 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
     const loginActionRef = useRef<HTMLButtonElement>(null);
     const tabsRootRef = useRef<HTMLDivElement>(null);
     const shouldRestoreTabFocusRef = useRef(false);
+    const operationGateRef = useRef(createShareDialogOperationGate());
 
     // Link Share State
-    const [expiration, setExpiration] = useState<ExpirationOption>('never');
+    const [expiration, setExpiration] = useState<ShareExpirationOption>('never');
     const [sharesData, setSharesData] = useState<{
         scopeKey: string | null;
         records: ShareRecord[];
@@ -139,6 +120,10 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
         return () => window.clearTimeout(focusTimer);
     }, [open, user]);
 
+    useEffect(() => () => {
+        operationGateRef.current.invalidate();
+    }, [open, diagramId, user?.id]);
+
     useEffect(() => {
         if (!open || !shouldRestoreTabFocusRef.current) return;
         shouldRestoreTabFocusRef.current = false;
@@ -174,13 +159,8 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
     }, [t]);
 
     // 云端 UUID（保存后获得，用于替代本地 diagramId）
-    const [cloudDiagramScope, setCloudDiagramScope] = useState<{
-        sourceDiagramId: string;
-        cloudDiagramId: string;
-    } | null>(null);
-    const effectiveId = cloudDiagramScope?.sourceDiagramId === diagramId
-        ? cloudDiagramScope.cloudDiagramId
-        : diagramId;
+    const [cloudDiagramScope, setCloudDiagramScope] = useState<ShareCloudDiagramScope | null>(null);
+    const effectiveId = resolveShareDiagramId(diagramId, cloudDiagramScope);
     const dataScopeKey = `${diagramId}:${user?.id ?? 'guest'}`;
     const sharesAreCurrent = sharesData.scopeKey === dataScopeKey;
     const collaboratorsAreCurrent = collaboratorsData.scopeKey === dataScopeKey;
@@ -190,7 +170,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
     // Load Data
     const loadShares = useCallback(async () => {
         const requestId = ++sharesLoadRequestRef.current;
-        if (!open || !user || !effectiveId || !isValidUuid(effectiveId)) return;
+        if (!open || !user || !effectiveId || !isCloudDiagramId(effectiveId)) return;
         setSharesData(previous => previous.scopeKey === dataScopeKey
             ? previous
             : { scopeKey: dataScopeKey, records: [] });
@@ -219,7 +199,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
     const loadCollaborators = useCallback(async (diagramIdOverride?: string) => {
         const requestId = ++collaboratorsLoadRequestRef.current;
         const targetDiagramId = diagramIdOverride || effectiveId;
-        if (!open || !user || !targetDiagramId || !isValidUuid(targetDiagramId)) return;
+        if (!open || !user || !targetDiagramId || !isCloudDiagramId(targetDiagramId)) return;
         setCollaboratorsData(previous => previous.scopeKey === dataScopeKey
             ? previous
             : { scopeKey: dataScopeKey, records: [] });
@@ -251,6 +231,8 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
             setLinkMutationFailed(false);
             setInviteStatus('idle');
             setInviteEmailTouched(false);
+            setCreatingLink(false);
+            setInviting(false);
         });
         return () => { cancelled = true; };
     }, [open, loadShares, loadCollaborators]);
@@ -258,16 +240,22 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
     // ===== Link Tab Actions =====
     const handleCreateLink = useCallback(async () => {
         if (!user) { appMessage.warning(t('share.loginRequired')); return; }
+        const operation = operationGateRef.current.begin('create-link');
+        if (!operation) return;
         setCreatingLink(true);
         setLinkMutationFailed(false);
         try {
-            const savedId = await onEnsureSaved();
-            if (!savedId) {
+            const saveResult = await onEnsureSaved();
+            if (!operationGateRef.current.isCurrent(operation)) return;
+            if (saveResult.status === 'cancelled') return;
+            if (saveResult.status === 'failed') {
                 setLinkMutationFailed(true);
                 return;
             }
+            const savedId = saveResult.diagramId;
             setCloudDiagramScope({ sourceDiagramId: diagramId, cloudDiagramId: savedId });
-            const record = await shareService.createShareLink({ diagramId: savedId, userId: user.id, expiresAt: getExpiresAt(expiration) });
+            const record = await shareService.createShareLink({ diagramId: savedId, userId: user.id, expiresAt: getShareExpiresAt(expiration) });
+            if (!operationGateRef.current.isCurrent(operation)) return;
             const url = shareService.buildShareUrl(record.share_token);
             // A cloud-ID transition can start a list request while creation is in flight.
             // Invalidate that older response before preserving the newly created record.
@@ -285,11 +273,12 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
                 appMessage.warning(t('share.copyUnavailable', '链接已生成，请手动复制'));
             }
         } catch (error) {
+            if (!operationGateRef.current.isCurrent(operation)) return;
             logShareDialogMutationFailure('createShareLink', error);
             setLinkMutationFailed(true);
             appMessage.error(t('share.generateFailed', '无法生成分享链接，请稍后重试'));
         } finally {
-            setCreatingLink(false);
+            if (operationGateRef.current.finish(operation)) setCreatingLink(false);
         }
     }, [dataScopeKey, diagramId, user, expiration, onEnsureSaved, t]);
 
@@ -326,16 +315,22 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
             setInviteEmailTouched(true);
             return;
         }
+        const operation = operationGateRef.current.begin('invite');
+        if (!operation) return;
         setInviting(true);
         setInviteStatus('idle');
         try {
-            const savedId = await onEnsureSaved();
-            if (!savedId) {
+            const saveResult = await onEnsureSaved();
+            if (!operationGateRef.current.isCurrent(operation)) return;
+            if (saveResult.status === 'cancelled') return;
+            if (saveResult.status === 'failed') {
                 setInviteStatus('error');
                 return;
             }
+            const savedId = saveResult.diagramId;
             setCloudDiagramScope({ sourceDiagramId: diagramId, cloudDiagramId: savedId });
             const res = await shareService.addCollaborator(savedId, targetEmail.email, inviteRole);
+            if (!operationGateRef.current.isCurrent(operation)) return;
             if (res.success) {
                 appMessage.success(t('share.inviteSuccess'));
                 setInviteEmail('');
@@ -348,11 +343,12 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
                 appMessage.error(t('share.inviteFailedSafe', '邀请失败，请稍后重试'));
             }
         } catch (error) {
+            if (!operationGateRef.current.isCurrent(operation)) return;
             logShareDialogMutationFailure('addCollaborator', error);
             setInviteStatus('error');
             appMessage.error(t('share.inviteFailedSafe', '邀请失败，请稍后重试'));
         } finally {
-            setInviting(false);
+            if (operationGateRef.current.finish(operation)) setInviting(false);
         }
     }, [diagramId, user, inviteEmail, inviteRole, onEnsureSaved, loadCollaborators, t]);
 
@@ -427,7 +423,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
                             <Select.Option value="viewer">{t('share.roleViewer')}</Select.Option>
                             <Select.Option value="editor">{t('share.roleEditor')}</Select.Option>
                         </Select>
-                        <Button type="primary" icon={<FaUserPlus />} loading={inviting} onClick={handleInvite} disabled={!user || !parsedInviteEmail.ok}>
+                        <Button type="primary" icon={<FaUserPlus />} loading={inviting} onClick={handleInvite} disabled={!user || !parsedInviteEmail.ok || creatingLink}>
                             {t('share.inviteBtn')}
                         </Button>
                     </div>
@@ -535,7 +531,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
                             aria-label={t('share.expiration')}
                             disabled={!user}
                         />
-                        <Button type="primary" icon={<FaLink />} loading={creatingLink} onClick={handleCreateLink} disabled={!user}>
+                        <Button type="primary" icon={<FaLink />} loading={creatingLink} onClick={handleCreateLink} disabled={!user || inviting}>
                             {t('share.generateLink')}
                         </Button>
                     </div>
@@ -626,7 +622,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
                                             description={
                                                 <Space size={8}>
                                                     <Text type="secondary" style={{ fontSize: 11 }}>
-                                                        {formatRelativeTime(item.created_at, i18n.resolvedLanguage || i18n.language)}
+                                                        {formatShareRelativeTime(item.created_at, i18n.resolvedLanguage || i18n.language)}
                                                     </Text>
                                                     {item.expires_at ? (
                                                         <Tag
@@ -655,7 +651,12 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
         <>
             <Modal
                 open={open}
-                onCancel={onClose}
+                onCancel={() => {
+                    operationGateRef.current.invalidate();
+                    setCreatingLink(false);
+                    setInviting(false);
+                    onClose();
+                }}
                 afterOpenChange={handleDialogAfterOpenChange}
                 closable={{ 'aria-label': t('share.closeDialog') }}
                 getContainer={getViewportOverlayContainer}

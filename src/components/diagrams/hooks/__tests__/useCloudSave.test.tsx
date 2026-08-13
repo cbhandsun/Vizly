@@ -391,16 +391,16 @@ describe('useCloudSave', () => {
         });
     });
 
-    it('returns false from ensureSaved when the underlying save rejects', async () => {
+    it('returns a failed result from ensureSaved when the underlying save rejects', async () => {
         storageMocks.provider.saveDiagram.mockRejectedValue(new Error('provider unavailable'));
         const { result } = renderHook(() => useCloudSave('diagram-1'));
 
-        let savedId: string | false = 'unexpected';
+        let saveResult: Awaited<ReturnType<typeof result.current.ensureSaved>> | undefined;
         await act(async () => {
-            savedId = await result.current.ensureSaved();
+            saveResult = await result.current.ensureSaved();
         });
 
-        expect(savedId).toBe(false);
+        expect(saveResult).toEqual({ status: 'failed' });
         expect(messageMocks.error).toHaveBeenCalledTimes(1);
     });
 

@@ -183,6 +183,12 @@ vi.mock('react-i18next', () => ({
 }));
 
 import ShareDialog from '../diagrams/ShareDialog';
+import { createShareDialogOperationGate } from '@/components/shareDialogOperationGate';
+import {
+  getShareExpiresAt,
+  isCloudDiagramId,
+  resolveShareDiagramId,
+} from '@/components/shareDialogPresentation';
 
 const DIAGRAM_ID = '11111111-1111-4111-8111-111111111111';
 const USER_ID = '22222222-2222-4222-8222-222222222222';
@@ -205,6 +211,8 @@ const createCollaborator = (diagramId: string, userId: string, email: string) =>
   created_at: '2026-08-01T00:00:00.000Z',
   email,
 });
+
+const savedDiagram = (diagramId = DIAGRAM_ID) => ({ status: 'saved', diagramId } as const);
 
 describe('ShareDialog commercial failure handling', () => {
   beforeEach(() => {
@@ -398,7 +406,7 @@ describe('ShareDialog commercial failure handling', () => {
   it('allows an owner to invite a collaborator with editor permission', async () => {
     authMocks.user = { id: USER_ID };
     serviceMocks.addCollaborator.mockResolvedValue({ success: true, user_id: USER_ID });
-    const ensureSaved = vi.fn(async () => DIAGRAM_ID);
+    const ensureSaved = vi.fn(async () => savedDiagram());
     render(
       <ShareDialog open onClose={vi.fn()} diagramId={DIAGRAM_ID} onEnsureSaved={ensureSaved} />,
     );
@@ -426,7 +434,7 @@ describe('ShareDialog commercial failure handling', () => {
         open
         onClose={vi.fn()}
         diagramId="local-unsaved-diagram"
-        onEnsureSaved={vi.fn(async () => DIAGRAM_ID)}
+        onEnsureSaved={vi.fn(async () => savedDiagram())}
       />,
     );
 
@@ -508,7 +516,7 @@ describe('ShareDialog commercial failure handling', () => {
   it('keeps a created link visible when clipboard permission is denied', async () => {
     authMocks.user = { id: USER_ID };
     clipboardMocks.copy.mockResolvedValue(false);
-    const ensureSaved = vi.fn(async () => DIAGRAM_ID);
+    const ensureSaved = vi.fn(async () => savedDiagram());
     render(
       <ShareDialog open onClose={vi.fn()} diagramId={DIAGRAM_ID} onEnsureSaved={ensureSaved} />,
     );
@@ -534,7 +542,7 @@ describe('ShareDialog commercial failure handling', () => {
         open
         onClose={vi.fn()}
         diagramId="local-unsaved-diagram"
-        onEnsureSaved={vi.fn(async () => DIAGRAM_ID)}
+        onEnsureSaved={vi.fn(async () => savedDiagram())}
       />,
     );
 
@@ -562,7 +570,7 @@ describe('ShareDialog commercial failure handling', () => {
         open
         onClose={vi.fn()}
         diagramId={DIAGRAM_ID}
-        onEnsureSaved={vi.fn(async () => DIAGRAM_ID)}
+        onEnsureSaved={vi.fn(async () => savedDiagram())}
       />,
     );
 
@@ -574,5 +582,96 @@ describe('ShareDialog commercial failure handling', () => {
     });
     expect(loggingMocks.mutationFailure).toHaveBeenCalledWith('createShareLink', providerFailure);
     expect(document.body.textContent).not.toContain('share-provider-secret');
+  });
+
+  it('treats a cancelled prerequisite save as a neutral user decision', async () => {
+    authMocks.user = { id: USER_ID };
+    render(
+      <ShareDialog
+        open
+        onClose={vi.fn()}
+        diagramId={DIAGRAM_ID}
+        onEnsureSaved={vi.fn(async () => ({ status: 'cancelled' } as const))}
+      />,
+    );
+
+    fireEvent.click(await screen.findByText('公开链接'));
+    fireEvent.click(await screen.findByRole('button', { name: '生成分享链接' }));
+
+    await waitFor(() => {
+      expect((screen.getByRole('button', { name: '生成分享链接' }) as HTMLButtonElement).disabled).toBe(false);
+    });
+    expect(serviceMocks.createShareLink).not.toHaveBeenCalled();
+    expect(screen.queryByText('无法生成分享链接')).toBeNull();
+    expect(messageMocks.error).not.toHaveBeenCalled();
+  });
+
+  it('coalesces rapid link creation attempts before the prerequisite save resolves', async () => {
+    authMocks.user = { id: USER_ID };
+    let resolveSave: ((result: ReturnType<typeof savedDiagram>) => void) | undefined;
+    const ensureSaved = vi.fn(() => new Promise<ReturnType<typeof savedDiagram>>((resolve) => {
+      resolveSave = resolve;
+    }));
+    render(
+      <ShareDialog open onClose={vi.fn()} diagramId={DIAGRAM_ID} onEnsureSaved={ensureSaved} />,
+    );
+
+    fireEvent.click(await screen.findByText('公开链接'));
+    const generate = await screen.findByRole('button', { name: '生成分享链接' });
+    fireEvent.click(generate);
+    fireEvent.click(generate);
+
+    expect(ensureSaved).toHaveBeenCalledTimes(1);
+    resolveSave?.(savedDiagram());
+    await waitFor(() => expect(serviceMocks.createShareLink).toHaveBeenCalledTimes(1));
+  });
+
+  it('does not continue creating a link after the dialog is closed during save', async () => {
+    authMocks.user = { id: USER_ID };
+    let resolveSave: ((result: ReturnType<typeof savedDiagram>) => void) | undefined;
+    const ensureSaved = vi.fn(() => new Promise<ReturnType<typeof savedDiagram>>((resolve) => {
+      resolveSave = resolve;
+    }));
+    const onClose = vi.fn();
+    render(
+      <ShareDialog open onClose={onClose} diagramId={DIAGRAM_ID} onEnsureSaved={ensureSaved} />,
+    );
+
+    fireEvent.click(await screen.findByText('公开链接'));
+    fireEvent.click(await screen.findByRole('button', { name: '生成分享链接' }));
+    fireEvent.click(screen.getByRole('button', { name: '关闭分享图表' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    resolveSave?.(savedDiagram());
+    await waitFor(() => expect(ensureSaved).toHaveBeenCalledTimes(1));
+    expect(serviceMocks.createShareLink).not.toHaveBeenCalled();
+    expect(clipboardMocks.copy).not.toHaveBeenCalled();
+  });
+
+  it('serializes mutations and invalidates stale continuations at the dialog boundary', () => {
+    const gate = createShareDialogOperationGate();
+    const first = gate.begin('create-link');
+
+    expect(first).not.toBeNull();
+    expect(gate.begin('invite')).toBeNull();
+    gate.invalidate();
+    expect(first && gate.isCurrent(first)).toBe(false);
+    expect(first && gate.finish(first)).toBe(false);
+    expect(gate.begin('invite')).not.toBeNull();
+  });
+
+  it('keeps share expiration and cloud identity boundaries deterministic', () => {
+    const now = new Date('2026-08-12T10:00:00.000Z');
+    const scope = { sourceDiagramId: 'local-a', cloudDiagramId: 'cloud-a' };
+
+    expect(getShareExpiresAt('1day', now)?.toISOString()).toBe('2026-08-13T10:00:00.000Z');
+    expect(getShareExpiresAt('never', now)).toBeNull();
+    expect(now.toISOString()).toBe('2026-08-12T10:00:00.000Z');
+    expect(isCloudDiagramId(DIAGRAM_ID)).toBe(true);
+    expect(isCloudDiagramId('../11111111-1111-4111-8111-111111111111')).toBe(false);
+    expect(isCloudDiagramId('x'.repeat(10_000))).toBe(false);
+    expect(resolveShareDiagramId('local-a', scope)).toBe('cloud-a');
+    expect(resolveShareDiagramId('local-b', scope)).toBe('local-b');
+    expect(resolveShareDiagramId('local-a', null)).toBe('local-a');
   });
 });

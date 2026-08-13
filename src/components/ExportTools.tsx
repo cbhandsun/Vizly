@@ -16,6 +16,7 @@ import { logCloudSaveEnsureFailure, logCloudSaveFailure } from '@/components/dia
 import { downloadFile } from '@/core/utils/downloadUtils';
 import { escapeMarkdownInlineText, escapeMarkdownTableCell, escapeMermaidLabel, toMermaidNodeId } from '@/core/utils/exportTextSecurity';
 import type { StandardDiagramData } from '@/core/models/DiagramModels';
+import type { DiagramEnsureSavedResult } from '@/core/types/diagram-components';
 import {
   parseDiagramExportEventDetail,
   parseDiagramExportProgressEventDetail,
@@ -391,13 +392,15 @@ ${mermaid}
   }, [diagramId, diagramName, t, user, hasFeature, showUpgradeModal, reactFlowInstance]);
 
   // 确保图表已保存到云端（供 ShareDialog 使用），返回云端 UUID
-  const handleEnsureSaved = useCallback(async (): Promise<string | false> => {
+  const handleEnsureSaved = useCallback(async (): Promise<DiagramEnsureSavedResult> => {
     try {
       const cloudId = await handleSaveToCloud();
-      return cloudId || false;
+      return cloudId
+        ? { status: 'saved', diagramId: cloudId }
+        : { status: 'failed' };
     } catch (error) {
       logCloudSaveEnsureFailure(diagramId, error);
-      return false;
+      return { status: 'failed' };
     }
   }, [diagramId, handleSaveToCloud]);
 

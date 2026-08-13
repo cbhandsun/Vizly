@@ -9,7 +9,7 @@ import { coerceToStandardDiagramData } from '@/core/utils/coerceDiagram';
 import { logCloudSaveFailure } from './diagramStorageLogging';
 import { showCloudSaveConfigurationRecovery } from './cloudSaveRecovery';
 import { useAuth } from '@/context/useAuth';
-import type { DiagramSaveResult } from '@/core/types/diagram-components';
+import type { DiagramEnsureSavedResult, DiagramSaveResult } from '@/core/types/diagram-components';
 
 const loadUnifiedStorage = async () => (await import('@/services/UnifiedStorageService')).unifiedStorage;
 
@@ -266,15 +266,18 @@ export function useCloudSave(diagramId: string, diagramName?: string) {
         });
     }, []);
 
-    /** 确保已保存再分享，返回云端 ID 或 false */
-    const ensureSaved = useCallback(async (): Promise<string | false> => {
+    /** 确保已保存再分享，区分成功、主动取消与失败。 */
+    const ensureSaved = useCallback(async (): Promise<DiagramEnsureSavedResult> => {
         try {
             const result = await saveToCloud();
-            if (result === 'cancelled') return false;
+            if (result === 'cancelled') return { status: 'cancelled' };
             const bridge = getFlowDataBridge(diagramId);
-            return bridge?.metadata?.cloud?.id || false;
+            const savedId = bridge?.metadata?.cloud?.id;
+            return savedId
+                ? { status: 'saved', diagramId: savedId }
+                : { status: 'failed' };
         } catch {
-            return false;
+            return { status: 'failed' };
         }
     }, [saveToCloud, diagramId]);
 
