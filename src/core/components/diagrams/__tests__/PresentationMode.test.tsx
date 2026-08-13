@@ -37,6 +37,17 @@ describe('PresentationMode', () => {
         expect(onExit).toHaveBeenCalledTimes(1);
     });
 
+    it('treats repeated exit gestures as one exit transaction', () => {
+        const onExit = vi.fn();
+        render(<PresentationMode slides={slides} onFocusNodes={vi.fn()} onExit={onExit} />);
+
+        fireEvent.keyDown(window, { key: 'Escape' });
+        fireEvent.keyDown(window, { key: 'Escape', repeat: true });
+        fireEvent.click(screen.getByRole('button', { name: '退出演示' }));
+
+        expect(onExit).toHaveBeenCalledTimes(1);
+    });
+
     it('does not hijack the native Space activation of presentation buttons', () => {
         const onExit = vi.fn();
         render(<PresentationMode slides={slides} onFocusNodes={vi.fn()} onExit={onExit} />);
@@ -142,6 +153,31 @@ describe('PresentationMode', () => {
         unmount();
         expect(document.activeElement).toBe(trigger);
         trigger.remove();
+    });
+
+    it('preserves focus when the next surface takes ownership during exit', async () => {
+        const trigger = document.createElement('button');
+        trigger.dataset.presentationFocusReturn = '';
+        const handoffTarget = document.createElement('button');
+        document.body.append(trigger, handoffTarget);
+        trigger.focus();
+
+        const { unmount } = render(
+            <PresentationMode
+                slides={slides}
+                onFocusNodes={vi.fn()}
+                onExit={() => handoffTarget.focus()}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: '退出演示' }));
+        expect(document.activeElement).toBe(handoffTarget);
+        unmount();
+        await Promise.resolve();
+
+        expect(document.activeElement).toBe(handoffTarget);
+        trigger.remove();
+        handoffTarget.remove();
     });
 
     it('announces slide changes and exposes page progress semantics', () => {

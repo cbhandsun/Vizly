@@ -40,7 +40,7 @@ const PresentationMode: React.FC<PresentationModeProps> = ({ slides, onFocusNode
   const overlayRef = useRef<HTMLDivElement>(null);
   const exitButtonRef = useRef<HTMLButtonElement>(null);
   const onFocusNodesRef = useRef(onFocusNodes);
-  const emptyExitRequestedRef = useRef(false);
+  const exitRequestedRef = useRef(false);
   const totalSlides = slides.length;
   if (navigation.slides !== slides) {
     setNavigation({
@@ -76,9 +76,18 @@ const PresentationMode: React.FC<PresentationModeProps> = ({ slides, onFocusNode
     const previouslyFocused = document.activeElement instanceof HTMLElement
       ? document.activeElement
       : null;
+    const presentationOverlay = overlayRef.current;
     exitButtonRef.current?.focus();
 
     return () => {
+      const activeElement = document.activeElement;
+      const focusRemainsInPresentation = activeElement instanceof HTMLElement
+        && presentationOverlay?.contains(activeElement);
+      const focusNeedsRecovery = activeElement === document.body
+        || !(activeElement instanceof HTMLElement)
+        || !activeElement.isConnected;
+      if (!focusRemainsInPresentation && !focusNeedsRecovery) return;
+
       const persistentFocusTarget = document.querySelector<HTMLButtonElement>(
         '[data-presentation-focus-return]',
       );
@@ -89,7 +98,15 @@ const PresentationMode: React.FC<PresentationModeProps> = ({ slides, onFocusNode
           : null;
       focusTarget?.focus();
       queueMicrotask(() => {
-        if (focusTarget?.isConnected) focusTarget.focus();
+        const currentActiveElement = document.activeElement;
+        const focusStillNeedsRecovery = currentActiveElement === document.body
+          || !(currentActiveElement instanceof HTMLElement)
+          || !currentActiveElement.isConnected;
+        if (focusTarget?.isConnected && (
+          currentActiveElement === focusTarget || focusStillNeedsRecovery
+        )) {
+          focusTarget.focus();
+        }
       });
     };
   }, []);
@@ -110,17 +127,13 @@ const PresentationMode: React.FC<PresentationModeProps> = ({ slides, onFocusNode
   }, [currentIndex, setCurrentIndex]);
 
   const handleExit = useCallback(() => {
+    if (exitRequestedRef.current) return;
+    exitRequestedRef.current = true;
     onExit();
   }, [onExit]);
 
   useEffect(() => {
-    if (totalSlides > 0) {
-      emptyExitRequestedRef.current = false;
-      return;
-    }
-    if (emptyExitRequestedRef.current) return;
-    emptyExitRequestedRef.current = true;
-    handleExit();
+    if (totalSlides === 0) handleExit();
   }, [handleExit, totalSlides]);
 
   // 键盘导航
