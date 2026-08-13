@@ -21,6 +21,13 @@ const readBridgeCanvasSnapshot = (bridge: ReturnType<typeof getFlowDataBridge>) 
         : { nodes: bridge.nodes, edges: bridge.edges };
     return coerceClipboardData(candidate);
 };
+const readCurrentCanvasSnapshot = (getNodes: () => Node[], getEdges: () => Edge[]) => {
+    try {
+        return coerceClipboardData({ nodes: getNodes(), edges: getEdges() });
+    } catch {
+        return null;
+    }
+};
 
 export function useVersionHistory(diagramId: string) {
     const { t } = useTranslation();
@@ -125,8 +132,8 @@ export function useVersionHistory(diagramId: string) {
         versionId: string,
         setNodes: Dispatch<SetStateAction<Node[]>>,
         setEdges: Dispatch<SetStateAction<Edge[]>>,
-        currentNodes: Node[],
-        currentEdges: Edge[]
+        getCurrentNodes: () => Node[],
+        getCurrentEdges: () => Edge[]
     ) => {
         const requestId = ++previewRequestIdRef.current;
         const fullVersion = await loadVersionData(versionId);
@@ -142,7 +149,13 @@ export function useVersionHistory(diagramId: string) {
             return false;
         }
 
-        previewBaseRef.current ??= { diagramId, nodes: currentNodes, edges: currentEdges };
+        const currentSnapshot = readCurrentCanvasSnapshot(getCurrentNodes, getCurrentEdges);
+        if (!currentSnapshot) {
+            appMessage.error(t('designer.versionHistoryPanel.canvasUnavailable'));
+            return false;
+        }
+
+        previewBaseRef.current ??= { diagramId, ...currentSnapshot };
         setNodes(snapshot.nodes);
         setEdges(snapshot.edges);
         setPreviewVersion(fullVersion);

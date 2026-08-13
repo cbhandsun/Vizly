@@ -119,8 +119,8 @@ describe('VersionHistoryPanel commercial preview safeguards', () => {
         historyMocks.previewVersion = null;
         historyMocks.loadError = false;
         historyMocks.loadVersions.mockClear();
-        historyMocks.saveVersion.mockClear();
-        historyMocks.enterPreview.mockClear();
+        historyMocks.saveVersion.mockReset().mockResolvedValue(true);
+        historyMocks.enterPreview.mockReset().mockResolvedValue(true);
         historyMocks.exitPreview.mockClear();
         historyMocks.restoreVersion.mockReset().mockResolvedValue(true);
     });
@@ -158,6 +158,82 @@ describe('VersionHistoryPanel commercial preview safeguards', () => {
 
         fireEvent.click(saveButton);
         expect(historyMocks.saveVersion).not.toHaveBeenCalled();
+    });
+
+    it('shields the canvas while preview data loads and reads the live canvas lazily', async () => {
+        let finishPreview: ((entered: boolean) => void) | undefined;
+        historyMocks.enterPreview.mockImplementation(() => new Promise((resolve) => {
+            finishPreview = resolve;
+        }));
+        historyMocks.versions = [{
+            id: 'version-1',
+            diagramId: 'diagram-1',
+            snapshotData: null,
+            createdAt: 1,
+            message: 'Release candidate',
+        }];
+        const onClose = vi.fn();
+        render(<VersionHistoryPanel diagramId="diagram-1" isOpen onClose={onClose} />);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Preview version: Release candidate' }));
+        await waitFor(() => expect(historyMocks.enterPreview).toHaveBeenCalledTimes(1));
+
+        expect(historyMocks.enterPreview).toHaveBeenCalledWith(
+            'version-1',
+            reactFlowMocks.setNodes,
+            reactFlowMocks.setEdges,
+            reactFlowMocks.getNodes,
+            reactFlowMocks.getEdges,
+        );
+        expect(document.querySelector('.ant-drawer-mask')).toBeTruthy();
+        expect((screen.getByLabelText('Snapshot note (optional)') as HTMLInputElement).disabled).toBe(true);
+        expect((screen.getByLabelText('Restore version: Release candidate') as HTMLButtonElement).disabled).toBe(true);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Close version history' }));
+        expect(historyMocks.exitPreview).toHaveBeenCalledTimes(1);
+        expect(onClose).toHaveBeenCalledTimes(1);
+
+        await act(async () => {
+            finishPreview?.(false);
+        });
+    });
+
+    it('does not let an old diagram save completion unlock a new diagram save', async () => {
+        let finishFirstSave: ((saved: boolean) => void) | undefined;
+        let finishSecondSave: ((saved: boolean) => void) | undefined;
+        historyMocks.saveVersion
+            .mockImplementationOnce(() => new Promise((resolve) => {
+                finishFirstSave = resolve;
+            }))
+            .mockImplementationOnce(() => new Promise((resolve) => {
+                finishSecondSave = resolve;
+            }));
+        const { rerender } = render(
+            <VersionHistoryPanel diagramId="diagram-1" isOpen onClose={vi.fn()} />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: /Save snapshot/ }));
+        await waitFor(() => expect(historyMocks.saveVersion).toHaveBeenCalledTimes(1));
+
+        rerender(<VersionHistoryPanel diagramId="diagram-2" isOpen onClose={vi.fn()} />);
+        const saveButton = screen.getByRole('button', { name: /Save snapshot/ });
+        expect((saveButton as HTMLButtonElement).disabled).toBe(false);
+        fireEvent.click(saveButton);
+        await waitFor(() => expect(historyMocks.saveVersion).toHaveBeenCalledTimes(2));
+
+        await act(async () => {
+            finishFirstSave?.(false);
+        });
+        expect((screen.getByRole('button', { name: /Save snapshot/ }) as HTMLButtonElement).disabled).toBe(true);
+        fireEvent.click(screen.getByRole('button', { name: /Save snapshot/ }));
+        expect(historyMocks.saveVersion).toHaveBeenCalledTimes(2);
+
+        await act(async () => {
+            finishSecondSave?.(false);
+        });
+        await waitFor(() => {
+            expect((screen.getByRole('button', { name: /Save snapshot/ }) as HTMLButtonElement).disabled).toBe(false);
+        });
     });
 
     it('explains that restore is protected by an automatic safety backup', async () => {

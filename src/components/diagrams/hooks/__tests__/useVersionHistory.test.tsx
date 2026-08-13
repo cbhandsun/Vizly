@@ -101,7 +101,13 @@ describe('useVersionHistory', () => {
 
         let entered = false;
         await act(async () => {
-            entered = await result.current.enterPreview('version-1', setNodes, setEdges, originalNodes, originalEdges);
+            entered = await result.current.enterPreview(
+                'version-1',
+                setNodes,
+                setEdges,
+                () => originalNodes,
+                () => originalEdges,
+            );
         });
 
         expect(entered).toBe(true);
@@ -116,6 +122,76 @@ describe('useVersionHistory', () => {
 
         expect(previewBase).toEqual({ nodes: originalNodes, edges: originalEdges });
         await waitFor(() => expect(result.current.previewVersion).toBeNull());
+    });
+
+    it('captures the latest canvas immediately before an async preview is applied', async () => {
+        let resolveVersion: ((version: ReturnType<typeof makeVersion>) => void) | undefined;
+        storageMocks.loadVersion.mockImplementation(() => new Promise((resolve) => {
+            resolveVersion = resolve;
+        }));
+        const editedNodes = [{ ...originalNodes[0], position: { x: 48, y: 72 } }];
+        const editedEdges: Edge[] = [{
+            id: 'edited-edge',
+            source: 'original-node',
+            target: 'original-node',
+            label: 'Edited while loading',
+        }];
+        let currentNodes = originalNodes;
+        let currentEdges = originalEdges;
+        const setNodes = vi.fn();
+        const setEdges = vi.fn();
+        const { result } = renderHook(() => useVersionHistory('diagram-1'));
+
+        await waitFor(() => expect(storageMocks.listVersions).toHaveBeenCalledWith('diagram-1'));
+
+        let previewPromise: Promise<boolean> | undefined;
+        act(() => {
+            previewPromise = result.current.enterPreview(
+                'version-1',
+                setNodes,
+                setEdges,
+                () => currentNodes,
+                () => currentEdges,
+            );
+        });
+        await waitFor(() => expect(storageMocks.loadVersion).toHaveBeenCalledWith('diagram-1', 'version-1'));
+
+        currentNodes = editedNodes;
+        currentEdges = editedEdges;
+        await act(async () => {
+            resolveVersion?.(makeVersion());
+            expect(await previewPromise!).toBe(true);
+        });
+
+        let previewBase: { nodes: Node[]; edges: Edge[] } | null = null;
+        act(() => {
+            previewBase = result.current.exitPreview();
+        });
+        expect(previewBase).toEqual({ nodes: editedNodes, edges: editedEdges });
+    });
+
+    it('rejects preview when the live canvas cannot be read', async () => {
+        const setNodes = vi.fn();
+        const setEdges = vi.fn();
+        const { result } = renderHook(() => useVersionHistory('diagram-1'));
+
+        await waitFor(() => expect(storageMocks.listVersions).toHaveBeenCalledWith('diagram-1'));
+
+        let entered = true;
+        await act(async () => {
+            entered = await result.current.enterPreview(
+                'version-1',
+                setNodes,
+                setEdges,
+                () => { throw new Error('canvas unavailable'); },
+                () => originalEdges,
+            );
+        });
+
+        expect(entered).toBe(false);
+        expect(setNodes).not.toHaveBeenCalled();
+        expect(setEdges).not.toHaveBeenCalled();
+        expect(messageMocks.error).toHaveBeenCalledWith('The current diagram data could not be read');
     });
 
     it('exposes a persistent load error and clears it after a successful retry', async () => {
@@ -201,8 +277,8 @@ describe('useVersionHistory', () => {
                 'version-1',
                 setNodes,
                 setEdges,
-                originalNodes,
-                originalEdges,
+                () => originalNodes,
+                () => originalEdges,
             );
         });
         await waitFor(() => expect(storageMocks.loadVersion).toHaveBeenCalledWith('diagram-1', 'version-1'));
@@ -243,7 +319,13 @@ describe('useVersionHistory', () => {
         await waitFor(() => expect(storageMocks.listVersions).toHaveBeenCalledWith('diagram-1'));
 
         await act(async () => {
-            await result.current.enterPreview('version-1', setNodes, setEdges, originalNodes, originalEdges);
+            await result.current.enterPreview(
+                'version-1',
+                setNodes,
+                setEdges,
+                () => originalNodes,
+                () => originalEdges,
+            );
         });
         await waitFor(() => expect(result.current.previewVersion?.id).toBe('version-1'));
 
@@ -463,7 +545,13 @@ describe('useVersionHistory', () => {
         await waitFor(() => expect(storageMocks.listVersions).toHaveBeenCalled());
 
         await act(async () => {
-            await result.current.enterPreview('version-1', setNodes, setEdges, originalNodes, originalEdges);
+            await result.current.enterPreview(
+                'version-1',
+                setNodes,
+                setEdges,
+                () => originalNodes,
+                () => originalEdges,
+            );
         });
         await waitFor(() => expect(result.current.previewVersion?.id).toBe('version-1'));
 
