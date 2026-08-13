@@ -113,6 +113,8 @@ const MindElixirToolbar: React.FC = () => {
         applyBackgroundPattern: applyBgPattern,
         currentDirection: currentDir,
         changeDirection: handleDirectionChange,
+        numberingEnabled: isNumbering,
+        toggleNumbering: handleToggleNumbering,
     } = useMindElixirCanvasPreferences(mind);
 
     // Presentation mode — declare state first so callback closure is clean
@@ -280,19 +282,6 @@ const MindElixirToolbar: React.FC = () => {
             logMindmapToolbarFocusModeFailure(error);
         }
     }, [toggleFocusMode]);
-
-    // ── 自动节点编号 ─────────────────────────────────────────────────────────────
-    const [isNumbering, setIsNumbering] = useState(false);
-    const handleToggleNumbering = useCallback(() => {
-        const el = document.getElementById('vizly-mind-elixir-root');
-        if (!el) return;
-        setIsNumbering(v => {
-            const next = !v;
-            if (next) el.setAttribute('data-numbering', '');
-            else el.removeAttribute('data-numbering');
-            return next;
-        });
-    }, []);
 
     const exportMenuItems = [
         { key: 'svg',      label: t('plugins.mindmap.toolbar.exportSvg'),      icon: <ExportOutlined />,  onClick: handleExportSvg },

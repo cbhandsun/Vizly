@@ -23,6 +23,7 @@ import {
     applyMindMapDirection,
     coerceMindMapBackgroundPattern,
     coerceMindMapDirectionKey,
+    coerceMindMapNumberingPreference,
     useMindElixirCanvasPreferences,
 } from '../useMindElixirCanvasPreferences';
 
@@ -152,6 +153,40 @@ describe('mind elixir wrapper boundaries', () => {
 
         expect(applyMindMapDirection(mind, 'diagonal')).toBe('LR');
         expect(initSide).toHaveBeenCalledOnce();
+    });
+
+    it('validates, restores, reapplies, and persists the numbering preference', () => {
+        localStorage.clear();
+        expect(coerceMindMapNumberingPreference(null)).toBe(false);
+        expect(coerceMindMapNumberingPreference('true')).toBe(false);
+        expect(coerceMindMapNumberingPreference('enabled')).toBe(true);
+
+        const root = document.createElement('div');
+        root.id = 'vizly-mind-elixir-root';
+        document.body.appendChild(root);
+        localStorage.setItem('vizly_mindmap_numbering', 'enabled');
+        const firstMind = {} as MindElixirInstance;
+        const secondMind = {} as MindElixirInstance;
+        const hook = renderHook(
+            ({ mind }: { mind: MindElixirInstance | null }) => useMindElixirCanvasPreferences(mind),
+            { initialProps: { mind: firstMind as MindElixirInstance | null } },
+        );
+
+        expect(hook.result.current.numberingEnabled).toBe(true);
+        expect(root.hasAttribute('data-numbering')).toBe(true);
+
+        root.removeAttribute('data-numbering');
+        hook.rerender({ mind: secondMind });
+        expect(root.hasAttribute('data-numbering')).toBe(true);
+
+        act(() => hook.result.current.toggleNumbering());
+        expect(hook.result.current.numberingEnabled).toBe(false);
+        expect(root.hasAttribute('data-numbering')).toBe(false);
+        expect(localStorage.getItem('vizly_mindmap_numbering')).toBe('disabled');
+
+        hook.unmount();
+        root.remove();
+        localStorage.clear();
     });
 
     it('removes the exact arrow listener on toggle and disposal', () => {

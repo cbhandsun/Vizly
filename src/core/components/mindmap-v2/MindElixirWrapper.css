@@ -235,18 +235,21 @@ me-wrapper[data-shape="diamond"] me-tpc {
 }
 
 /* ── 自动节点编号 (data-numbering 驱动) ─────────────────────────────────── */
+#vizly-mind-elixir-root[data-numbering] me-nodes,
 #vizly-mind-elixir-root[data-numbering] me-children {
     counter-reset: me-seq;
 }
+#vizly-mind-elixir-root[data-numbering] me-main > me-wrapper,
 #vizly-mind-elixir-root[data-numbering] me-children > me-wrapper {
     counter-increment: me-seq;
 }
-#vizly-mind-elixir-root[data-numbering] me-children > me-wrapper > me-tpc::before {
-    content: counter(me-seq) ".";
+#vizly-mind-elixir-root[data-numbering] me-main > me-wrapper > me-parent > me-tpc::before,
+#vizly-mind-elixir-root[data-numbering] me-children > me-wrapper > me-parent > me-tpc::before {
+    content: counters(me-seq, ".") ".";
     font-size: 0.75em;
     font-weight: 700;
     letter-spacing: 0.02em;
-    opacity: 0.45;
+    opacity: 0.78;
     margin-right: 5px;
     font-family: 'Menlo', 'Consolas', monospace;
     color: inherit;

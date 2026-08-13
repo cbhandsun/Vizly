@@ -6,6 +6,7 @@ const source = readFileSync(resolve(process.cwd(), 'src/core/components/mindmap-
 const themeSelectorSource = readFileSync(resolve(process.cwd(), 'src/core/components/mindmap-v2/MindMapThemeSelector.tsx'), 'utf8');
 const directionSelectorSource = readFileSync(resolve(process.cwd(), 'src/core/components/mindmap-v2/MindMapDirectionSelector.tsx'), 'utf8');
 const css = readFileSync(resolve(process.cwd(), 'src/core/components/mindmap-v2/MindElixirToolbar.css'), 'utf8');
+const wrapperCss = readFileSync(resolve(process.cwd(), 'src/core/components/mindmap-v2/MindElixirWrapper.css'), 'utf8');
 const topToolbarSource = readFileSync(resolve(process.cwd(), 'src/components/ui/ModernTopToolbar.tsx'), 'utf8');
 const topActionButtonsSource = readFileSync(resolve(process.cwd(), 'src/core/components/diagrams/TopActionButtons.tsx'), 'utf8');
 const iconButtonSource = readFileSync(resolve(process.cwd(), 'src/core/components/mindmap-v2/MindMapToolbarIconButton.tsx'), 'utf8');
@@ -66,5 +67,14 @@ describe('MindElixirToolbar commercial interaction contract', () => {
         expect(directionSelectorSource).not.toContain("label: '双向展开'");
         expect(themeSelectorSource).not.toContain('aria-label="选择思维导图主题"');
         expect(source.match(/plugins\.mindmap\.toolbar\./g)?.length).toBeGreaterThanOrEqual(35);
+    });
+
+    it('numbers the current MindElixir hierarchy instead of obsolete topic markup', () => {
+        expect(wrapperCss).toContain('#vizly-mind-elixir-root[data-numbering] me-nodes');
+        expect(wrapperCss).toContain('#vizly-mind-elixir-root[data-numbering] me-main > me-wrapper');
+        expect(wrapperCss).toContain('me-children > me-wrapper > me-parent > me-tpc::before');
+        expect(wrapperCss).toContain('content: counters(me-seq, ".") ".";');
+        expect(wrapperCss).toContain('opacity: 0.78;');
+        expect(wrapperCss).not.toContain('me-children > me-wrapper > me-tpc::before');
     });
 });

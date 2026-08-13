@@ -12,6 +12,7 @@ type MindMapDirectionSelection = {
 
 const BACKGROUND_STORAGE_KEY = 'vizly_mindmap_bg';
 const DIRECTION_STORAGE_KEY = 'vizly_mindmap_dir';
+const NUMBERING_STORAGE_KEY = 'vizly_mindmap_numbering';
 const BACKGROUND_PATTERNS = new Set<MindMapBackgroundPattern>(['none', 'grid', 'dots']);
 const DIRECTION_KEYS = new Set<MindMapDirectionKey>(['LR', 'R', 'L']);
 
@@ -26,6 +27,8 @@ export const coerceMindMapDirectionKey = (value: unknown): MindMapDirectionKey =
         : typeof value === 'string' && DIRECTION_KEYS.has(value as MindMapDirectionKey)
         ? value as MindMapDirectionKey
         : 'LR';
+
+export const coerceMindMapNumberingPreference = (value: unknown): boolean => value === 'enabled';
 
 const readStorage = (key: string): string | null => {
     try {
@@ -72,6 +75,9 @@ export const useMindElixirCanvasPreferences = (mind: MindElixirInstance | null) 
         coerceMindMapBackgroundPattern(readStorage(BACKGROUND_STORAGE_KEY))
     );
     const [directionSelection, setDirectionSelection] = useState<MindMapDirectionSelection | null>(null);
+    const [numberingEnabled, setNumberingEnabled] = useState(() =>
+        coerceMindMapNumberingPreference(readStorage(NUMBERING_STORAGE_KEY))
+    );
 
     const applyBackgroundPattern = useCallback((value: MindMapBackgroundPattern) => {
         const pattern = coerceMindMapBackgroundPattern(value);
@@ -84,6 +90,12 @@ export const useMindElixirCanvasPreferences = (mind: MindElixirInstance | null) 
         document.getElementById('vizly-mind-elixir-root')?.setAttribute('data-bg', backgroundPattern);
     }, [mind, backgroundPattern]);
 
+    useEffect(() => {
+        const root = document.getElementById('vizly-mind-elixir-root');
+        if (!root) return;
+        root.toggleAttribute('data-numbering', numberingEnabled);
+    }, [mind, numberingEnabled]);
+
     const currentDirection = directionSelection?.mind === mind
         ? directionSelection.value
         : getLiveDirection(mind) ?? coerceMindMapDirectionKey(readStorage(DIRECTION_STORAGE_KEY));
@@ -95,10 +107,18 @@ export const useMindElixirCanvasPreferences = (mind: MindElixirInstance | null) 
         writeStorage(DIRECTION_STORAGE_KEY, direction);
     }, [mind]);
 
+    const toggleNumbering = useCallback(() => {
+        const next = !numberingEnabled;
+        setNumberingEnabled(next);
+        writeStorage(NUMBERING_STORAGE_KEY, next ? 'enabled' : 'disabled');
+    }, [numberingEnabled]);
+
     return {
         backgroundPattern,
         applyBackgroundPattern,
         currentDirection,
         changeDirection,
+        numberingEnabled,
+        toggleNumbering,
     };
 };
