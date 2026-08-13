@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -73,6 +73,7 @@ vi.mock('../advancedExportActions', () => ({
 
 import { runAdvancedExport } from '../advancedExportActions';
 import { copyImageToClipboard } from '../../../utils/imageExporter';
+import { appMessage } from '@/core/utils/antdStaticBridge';
 
 const installReactFlowInstance = () => {
   (window as any).reactFlowInstance = {
@@ -345,6 +346,69 @@ describe('AdvancedExportModal commercial controls', () => {
 
     resolveCopy?.(true);
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+  });
+
+  it('isolates export completion after switching to another diagram', async () => {
+    let finishFirstExport: (() => void) | undefined;
+    let finishSecondExport: (() => void) | undefined;
+    vi.mocked(runAdvancedExport)
+      .mockImplementationOnce(() => new Promise<'scene'>((resolve) => {
+        finishFirstExport = () => resolve('scene');
+      }))
+      .mockImplementationOnce(() => new Promise<'scene'>((resolve) => {
+        finishSecondExport = () => resolve('scene');
+      }));
+    const onClose = vi.fn();
+    const { rerender } = render(
+      <AdvancedExportModal visible onClose={onClose} diagramId="diagram-1" />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'download 导出 PNG' }));
+    await waitFor(() => expect(runAdvancedExport).toHaveBeenCalledTimes(1));
+
+    rerender(<AdvancedExportModal visible onClose={onClose} diagramId="diagram-2" />);
+    const currentExportButton = screen.getByRole('button', { name: 'download 导出 PNG' });
+    expect(currentExportButton.hasAttribute('disabled')).toBe(false);
+    fireEvent.click(currentExportButton);
+    await waitFor(() => expect(runAdvancedExport).toHaveBeenCalledTimes(2));
+
+    await act(async () => {
+      finishFirstExport?.();
+    });
+    expect(onClose).not.toHaveBeenCalled();
+    expect(appMessage.success).not.toHaveBeenCalled();
+    expect(screen.getByText('导出 PNG').closest('button')?.classList.contains('ant-btn-loading')).toBe(true);
+
+    await act(async () => {
+      finishSecondExport?.();
+    });
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(appMessage.success).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores clipboard failure from a previous dialog session', async () => {
+    let rejectOldCopy: (() => void) | undefined;
+    vi.mocked(copyImageToClipboard).mockImplementationOnce(() => new Promise<boolean>((_resolve, reject) => {
+      rejectOldCopy = () => reject(new Error('old clipboard failure'));
+    }));
+    const onClose = vi.fn();
+    const { rerender } = render(
+      <AdvancedExportModal visible onClose={onClose} diagramId="diagram-1" />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '复制 PNG 到剪贴板' }));
+    await waitFor(() => expect(copyImageToClipboard).toHaveBeenCalledTimes(1));
+
+    rerender(<AdvancedExportModal visible={false} onClose={onClose} diagramId="diagram-1" />);
+    rerender(<AdvancedExportModal visible onClose={onClose} diagramId="diagram-1" />);
+    await act(async () => {
+      rejectOldCopy?.();
+    });
+
+    expect(screen.queryByTestId('advanced-export-recovery')).toBeNull();
+    expect(appMessage.error).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: '复制 PNG 到剪贴板' }).hasAttribute('disabled')).toBe(false);
   });
 
   it('offers a PNG download fallback after clipboard access fails', async () => {

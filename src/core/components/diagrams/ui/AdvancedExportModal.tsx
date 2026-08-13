@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Modal, Radio, Checkbox, Select, Button, Space, Divider } from 'antd';
 import { 
   DownloadOutlined, 
@@ -44,6 +44,11 @@ interface AdvancedExportModalProps {
 
 type AdvancedExportOperation = 'export' | 'clipboard';
 type AdvancedExportFailure = AdvancedExportOperation | null;
+interface AdvancedExportOperationToken {
+  diagramId: string;
+  generation: number;
+  operation: AdvancedExportOperation;
+}
 
 export const AdvancedExportModeNotice: React.FC<{
   format: ExportOptions['format'];
@@ -199,21 +204,50 @@ export const AdvancedExportModal: React.FC<AdvancedExportModalProps> = ({
   const [pixelRatio, setPixelRatio] = useState<number>(2);
   const [includeBackground, setIncludeBackground] = useState<boolean>(true);
   const [embedMetadata, setEmbedMetadata] = useState<boolean>(true);
-  const [activeOperation, setActiveOperation] = useState<AdvancedExportOperation | null>(null);
+  const [activeOperation, setActiveOperation] = useState<AdvancedExportOperationToken | null>(null);
   const [failedOperation, setFailedOperation] = useState<AdvancedExportFailure>(null);
-  const activeOperationRef = useRef<AdvancedExportOperation | null>(null);
+  const activeOperationRef = useRef<AdvancedExportOperationToken | null>(null);
+  const contextRef = useRef({ diagramId: diagramId ?? '', generation: 0, visible });
 
-  const beginOperation = (operation: AdvancedExportOperation) => {
-    if (activeOperationRef.current !== null) return false;
-    activeOperationRef.current = operation;
-    setActiveOperation(operation);
-    setFailedOperation(null);
-    return true;
-  };
+  useLayoutEffect(() => {
+    const context = contextRef.current;
+    const nextDiagramId = diagramId ?? '';
+    if (context.diagramId === nextDiagramId && context.visible === visible) return;
 
-  const finishOperation = () => {
+    contextRef.current = {
+      diagramId: nextDiagramId,
+      generation: context.generation + 1,
+      visible,
+    };
     activeOperationRef.current = null;
     setActiveOperation(null);
+    setFailedOperation(null);
+  }, [diagramId, visible]);
+
+  const isCurrentOperation = (token: AdvancedExportOperationToken) => {
+    const context = contextRef.current;
+    return activeOperationRef.current === token
+      && context.visible
+      && context.diagramId === token.diagramId
+      && context.generation === token.generation;
+  };
+
+  const beginOperation = (operation: AdvancedExportOperation) => {
+    if (activeOperationRef.current !== null || !contextRef.current.visible) return null;
+    const token: AdvancedExportOperationToken = {
+      diagramId: contextRef.current.diagramId,
+      generation: contextRef.current.generation,
+      operation,
+    };
+    activeOperationRef.current = token;
+    setActiveOperation(token);
+    setFailedOperation(null);
+    return token;
+  };
+
+  const finishOperation = (token: AdvancedExportOperationToken) => {
+    if (activeOperationRef.current === token) activeOperationRef.current = null;
+    setActiveOperation(current => current === token ? null : current);
   };
 
   const runExport = async (requestedFormat: ExportOptions['format']) => {
@@ -225,7 +259,8 @@ export const AdvancedExportModal: React.FC<AdvancedExportModalProps> = ({
       onClose();
       return;
     }
-    if (!beginOperation('export')) return;
+    const token = beginOperation('export');
+    if (!token) return;
 
     try {
       const currentNodes = useDiagramStore.getState().nodes;
@@ -239,23 +274,27 @@ export const AdvancedExportModal: React.FC<AdvancedExportModalProps> = ({
         embedMetadata,
         getReactFlowSnapshot,
       });
+      if (!isCurrentOperation(token)) return;
       appMessage.success(t('advancedExport.successMsg', { format: requestedFormat.toUpperCase() }));
       onClose();
     } catch (_e) {
+      if (!isCurrentOperation(token)) return;
       setFailedOperation('export');
       appMessage.error(t('advancedExport.errorMsg'));
     } finally {
-      finishOperation();
+      finishOperation(token);
     }
   };
 
   const handleExport = () => runExport(format);
 
   const handleCopyClipboard = async () => {
-    if (!beginOperation('clipboard')) return;
+    const token = beginOperation('clipboard');
+    if (!token) return;
     try {
       const currentNodes = useDiagramStore.getState().nodes;
       const success = await copyImageToClipboard(currentNodes);
+      if (!isCurrentOperation(token)) return;
       if (success) {
         appMessage.success(t('advancedExport.copySuccess'));
         onClose();
@@ -264,19 +303,24 @@ export const AdvancedExportModal: React.FC<AdvancedExportModalProps> = ({
       setFailedOperation('clipboard');
       appMessage.error(t('advancedExport.copyFailed'));
     } catch (_error) {
+      if (!isCurrentOperation(token)) return;
       setFailedOperation('clipboard');
       appMessage.error(t('advancedExport.copyFailed'));
     } finally {
-      finishOperation();
+      finishOperation(token);
     }
   };
 
-  const operationInProgress = activeOperation !== null;
-  const exporting = activeOperation === 'export';
-  const copying = activeOperation === 'clipboard';
+  const currentOperation = activeOperation?.diagramId === (diagramId ?? '')
+    ? activeOperation.operation
+    : null;
+  const operationInProgress = currentOperation !== null;
+  const exporting = currentOperation === 'export';
+  const copying = currentOperation === 'clipboard';
   const capabilities = getAdvancedExportCapabilities(format);
   const selectedFormatLabel = format.toUpperCase();
   const closeModal = () => {
+    if (activeOperationRef.current !== null) return;
     setFailedOperation(null);
     onClose();
   };
