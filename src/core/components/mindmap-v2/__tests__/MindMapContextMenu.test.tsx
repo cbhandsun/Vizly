@@ -12,6 +12,7 @@ const harness = vi.hoisted(() => {
         root,
         topicElement: {},
         removeNodes: vi.fn(),
+        reshapeNode: vi.fn(),
         selectNode: vi.fn(),
     };
 });
@@ -28,7 +29,7 @@ vi.mock('../mindElixirStore', () => ({
         moveDownNode: vi.fn(),
         moveUpNode: vi.fn(),
         removeNodes: harness.removeNodes,
-        reshapeNode: vi.fn(),
+        reshapeNode: harness.reshapeNode,
         selectNode: harness.selectNode,
     }),
 }));
@@ -46,6 +47,22 @@ vi.mock('react-i18next', () => ({
                 'plugins.mindmap.actions.contextMenuLabel': 'Node actions',
                 'plugins.mindmap.actions.deleteNode': 'Delete node',
                 'plugins.mindmap.actions.expand': 'Expand',
+                'plugins.mindmap.contextMenu.addChild': 'Add child',
+                'plugins.mindmap.contextMenu.addSibling': 'Add sibling',
+                'plugins.mindmap.contextMenu.createSummary': 'Create summary bracket',
+                'plugins.mindmap.contextMenu.duplicate': 'Duplicate as sibling',
+                'plugins.mindmap.contextMenu.edit': 'Edit node',
+                'plugins.mindmap.contextMenu.moveDown': 'Move down',
+                'plugins.mindmap.contextMenu.moveUp': 'Move up',
+                'plugins.mindmap.contextMenu.nodeLabel': 'Node',
+                'plugins.mindmap.contextMenu.openLink': 'Open link',
+                'plugins.mindmap.contextMenu.shape': 'Node shape',
+                'plugins.mindmap.contextMenu.shapeOptions': 'Node shape options',
+                'plugins.mindmap.contextMenu.shapes.default': 'Default',
+                'plugins.mindmap.contextMenu.shapes.diamond': 'Diamond',
+                'plugins.mindmap.contextMenu.shapes.oval': 'Oval',
+                'plugins.mindmap.contextMenu.shapes.rectangle': 'Rectangle',
+                'plugins.mindmap.contextMenu.shapes.underline': 'Underline',
                 'plugins.mindmap.nodeDelete.confirm': 'Delete node',
                 'plugins.mindmap.nodeDelete.descriptionWithChildren': `Also deletes ${String(values?.count ?? 0)} descendants`,
                 'plugins.mindmap.nodeDelete.failed': 'Could not delete',
@@ -83,6 +100,7 @@ vi.mock('antd', () => ({
 describe('MindMapContextMenu', () => {
     beforeEach(() => {
         harness.removeNodes.mockReset();
+        harness.reshapeNode.mockReset();
         harness.selectNode.mockReset();
     });
 
@@ -135,6 +153,73 @@ describe('MindMapContextMenu', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Delete node' }));
         await waitFor(() => expect(harness.removeNodes).toHaveBeenCalledWith([harness.topicElement]));
         expect(harness.selectNode).toHaveBeenCalledWith(harness.topicElement);
+        expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('opens the localized shape submenu and keeps keyboard focus inside its radio choices', async () => {
+        const onClose = vi.fn();
+        const { rerender } = render(
+            <MindMapContextMenu
+                visible
+                x={20}
+                y={20}
+                nodeId={harness.child.id}
+                onClose={onClose}
+            />,
+        );
+
+        const trigger = screen.getByRole('menuitem', { name: 'Node shape' });
+        expect(trigger.getAttribute('aria-expanded')).toBe('false');
+        expect(trigger.querySelector('button')).toBeNull();
+
+        fireEvent.keyDown(trigger, { key: 'ArrowRight' });
+        const submenu = await screen.findByRole('menu', { name: 'Node shape options' });
+        expect(trigger.getAttribute('aria-expanded')).toBe('true');
+        const options = screen.getAllByRole('menuitemradio');
+        expect(options).toHaveLength(5);
+        expect(options[0]?.getAttribute('aria-checked')).toBe('true');
+        await waitFor(() => expect(document.activeElement).toBe(options[0]));
+
+        rerender(
+            <MindMapContextMenu
+                visible
+                x={20}
+                y={20}
+                nodeId={harness.child.id}
+                onClose={vi.fn()}
+            />,
+        );
+        await waitFor(() => expect(document.activeElement).toBe(options[0]));
+
+        fireEvent.keyDown(options[0]!, { key: 'ArrowRight' });
+        expect(document.activeElement).toBe(options[1]);
+        fireEvent.keyDown(options[1]!, { key: 'Home' });
+        expect(document.activeElement).toBe(options[0]);
+        fireEvent.keyDown(options[0]!, { key: 'ArrowLeft' });
+        expect(submenu.isConnected).toBe(false);
+        expect(document.activeElement).toBe(trigger);
+        expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it('applies a selected shape and closes the context menu', async () => {
+        const onClose = vi.fn();
+        render(
+            <MindMapContextMenu
+                visible
+                x={20}
+                y={20}
+                nodeId={harness.child.id}
+                onClose={onClose}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Node shape' }));
+        fireEvent.click(await screen.findByRole('menuitemradio', { name: 'Oval' }));
+
+        expect(harness.reshapeNode).toHaveBeenCalledWith(
+            harness.topicElement,
+            expect.objectContaining({ id: 'child', shapeClass: 'oval' }),
+        );
         expect(onClose).toHaveBeenCalledTimes(1);
     });
 });

@@ -2697,6 +2697,26 @@
                 "expand": "展开分支",
                 "contextMenuLabel": "节点操作"
             },
+            "contextMenu": {
+                "nodeLabel": "节点",
+                "edit": "编辑节点",
+                "addChild": "添加子节点",
+                "addSibling": "添加同级节点",
+                "duplicate": "复制为同级",
+                "moveUp": "向上移动",
+                "moveDown": "向下移动",
+                "createSummary": "创建汇总括号",
+                "shape": "节点形状",
+                "shapeOptions": "节点形状选项",
+                "openLink": "打开超链接",
+                "shapes": {
+                    "default": "默认",
+                    "oval": "椭圆",
+                    "rectangle": "矩形",
+                    "underline": "下划线",
+                    "diamond": "菱形"
+                }
+            },
             "batch": {
                 "toolbarLabel": "已选节点操作",
                 "selectedCount": "已选择 {{count}} 个节点",

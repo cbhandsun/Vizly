@@ -2544,6 +2544,26 @@
                 "expand": "Expand",
                 "contextMenuLabel": "Node actions"
             },
+            "contextMenu": {
+                "nodeLabel": "Node",
+                "edit": "Edit node",
+                "addChild": "Add child",
+                "addSibling": "Add sibling",
+                "duplicate": "Duplicate as sibling",
+                "moveUp": "Move up",
+                "moveDown": "Move down",
+                "createSummary": "Create summary bracket",
+                "shape": "Node shape",
+                "shapeOptions": "Node shape options",
+                "openLink": "Open link",
+                "shapes": {
+                    "default": "Default",
+                    "oval": "Oval",
+                    "rectangle": "Rectangle",
+                    "underline": "Underline",
+                    "diamond": "Diamond"
+                }
+            },
             "batch": {
                 "toolbarLabel": "Selected node actions",
                 "selectedCount": "{{count}} nodes selected",
