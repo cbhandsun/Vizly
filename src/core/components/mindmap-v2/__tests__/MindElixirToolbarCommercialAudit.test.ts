@@ -39,7 +39,7 @@ describe('MindElixirToolbar commercial interaction contract', () => {
 
     it('keeps every tool reachable by touch and keyboard without text-symbol icons', () => {
         expect(css).toMatch(/\.mind-elixir-toolbar-button[\s\S]*?min-width: var\(--commercial-touch-target, 44px\)[\s\S]*?height: var\(--commercial-touch-target, 44px\)/);
-        expect(css).toMatch(/\.mind-elixir-toolbar \{[\s\S]*?width: 100%;[\s\S]*?overflow-x: auto;/);
+        expect(css).toMatch(/\.vizly-mindmap-toolbar \{[\s\S]*?width: 100%;[\s\S]*?overflow-x: auto;/);
         expect(css).toMatch(/\.mind-elixir-toolbar-zoom-reset[\s\S]*?min-width: var\(--commercial-touch-target, 44px\)[\s\S]*?height: var\(--commercial-touch-target, 44px\)/);
         expect(source).toContain('<button');
         expect(source).not.toContain('⊞');
@@ -50,6 +50,12 @@ describe('MindElixirToolbar commercial interaction contract', () => {
         expect(source).toContain('<EllipsisOutlined />');
         expect(source).not.toContain('backgroundImage:');
         expect(source).toMatch(/MindMapThemeSelector[\s\S]*?data-testid="mindmap-shortcuts-trigger"[\s\S]*?\/\* Undo \/ Redo \*\//);
+    });
+
+    it('avoids the mind-elixir vendor toolbar class that forces absolute positioning', () => {
+        expect(source).toContain('className="vizly-mindmap-toolbar"');
+        expect(source).not.toContain('className="mind-elixir-toolbar"');
+        expect(css).not.toMatch(/(^|\n)\.mind-elixir-toolbar\s*\{/);
     });
 
     it('routes visible toolbar copy through production translations', () => {

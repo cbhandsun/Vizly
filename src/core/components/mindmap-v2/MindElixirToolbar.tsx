@@ -386,7 +386,7 @@ const MindElixirToolbar: React.FC = () => {
     return (
         <div
             aria-label={t('plugins.mindmap.toolbar.label')}
-            className="mind-elixir-toolbar"
+            className="vizly-mindmap-toolbar"
             role="toolbar"
         >
             {/* Direction selector */}
