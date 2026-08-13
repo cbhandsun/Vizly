@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Alert, Drawer, Button, Empty, Input, List, Typography, Space, Tooltip, Badge, Popconfirm } from 'antd';
 import { PlusOutlined, ReloadOutlined, UndoOutlined, EyeOutlined } from '@ant-design/icons';
 import { Clock } from 'lucide-react';
@@ -44,8 +44,11 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
     const [isSaving, setIsSaving] = useState(false);
     const [previewingVersionId, setPreviewingVersionId] = useState<string | null>(null);
     const [restoringVersionId, setRestoringVersionId] = useState<string | null>(null);
+    const mutationLockRef = useRef(false);
+    const isMutationPending = isSaving || restoringVersionId !== null;
 
     const handleClose = () => {
+        if (mutationLockRef.current) return;
         const previewBase = exitPreview();
         if (previewBase) {
             setNodes(previewBase.nodes);
@@ -63,7 +66,8 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
     };
 
     const handleSave = async () => {
-        if (isSaving || previewVersion) return;
+        if (mutationLockRef.current || previewVersion) return;
+        mutationLockRef.current = true;
         setIsSaving(true);
         try {
             const saved = await saveVersion(normalizeVersionMessage(
@@ -72,23 +76,29 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
             ));
             if (saved) setCommitMessage('');
         } finally {
+            mutationLockRef.current = false;
             setIsSaving(false);
         }
     };
 
     const handleRestore = async (versionId: string) => {
-        if (restoringVersionId) return;
+        if (mutationLockRef.current) return;
+        mutationLockRef.current = true;
         setRestoringVersionId(versionId);
         try {
             const success = await restoreVersion(versionId, setNodes, setEdges);
-            if (success) handleClose();
+            if (success) {
+                mutationLockRef.current = false;
+                handleClose();
+            }
         } finally {
+            mutationLockRef.current = false;
             setRestoringVersionId(null);
         }
     };
 
     const handlePreview = async (versionId: string) => {
-        if (previewingVersionId) return;
+        if (previewingVersionId || mutationLockRef.current) return;
         if (previewVersion?.id === versionId) {
             const previewBase = exitPreview();
             if (previewBase) {
@@ -108,7 +118,9 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
     return (
         <Drawer
             title={t('designer.versionHistoryPanel.title')}
-            closable={{ 'aria-label': t('designer.versionHistoryPanel.close') }}
+            closable={isMutationPending
+                ? false
+                : { 'aria-label': t('designer.versionHistoryPanel.close') }}
             placement="right"
             onClose={handleClose}
             open={isOpen}
@@ -123,6 +135,7 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
             }}
             mask={Boolean(previewVersion)}
             maskClosable={false}
+            keyboard={!isMutationPending}
         >
             {/* Create Snapshot Area */}
             <div style={{ padding: '20px', background: '#fafafa', borderBottom: '1px solid #f0f0f0' }}>
@@ -139,7 +152,7 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
                         value={commitMessage}
                         onChange={e => setCommitMessage(e.target.value)}
                         onPressEnter={handleSave}
-                        disabled={Boolean(previewVersion)}
+                        disabled={Boolean(previewVersion) || isMutationPending}
                         maxLength={VERSION_MESSAGE_MAX_LENGTH}
                     />
                     <Button 
@@ -148,7 +161,7 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
                         icon={<PlusOutlined />} 
                         onClick={handleSave}
                         loading={isSaving}
-                        disabled={Boolean(previewVersion)}
+                        disabled={Boolean(previewVersion) || restoringVersionId !== null}
                     >
                         {t('designer.versionHistoryPanel.save')}
                     </Button>
@@ -258,6 +271,7 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
                                         : t('designer.versionHistoryPanel.previewVersion', { message: item.message })}
                                     icon={<EyeOutlined />}
                                     loading={previewingVersionId === item.id}
+                                    disabled={isMutationPending}
                                     onClick={() => void handlePreview(item.id)}
                                 >
                                     {isPreviewing
@@ -281,6 +295,7 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
                                             type="text"
                                             icon={<UndoOutlined />}
                                             loading={restoringVersionId === item.id}
+                                            disabled={isMutationPending}
                                         />
                                     </Tooltip>
                                 </Popconfirm>

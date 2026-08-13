@@ -3,7 +3,7 @@
 import React from 'react';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('react-i18next', () => ({
@@ -122,7 +122,7 @@ describe('VersionHistoryPanel commercial preview safeguards', () => {
         historyMocks.saveVersion.mockClear();
         historyMocks.enterPreview.mockClear();
         historyMocks.exitPreview.mockClear();
-        historyMocks.restoreVersion.mockClear();
+        historyMocks.restoreVersion.mockReset().mockResolvedValue(true);
     });
 
     afterEach(() => {
@@ -242,5 +242,43 @@ describe('VersionHistoryPanel commercial preview safeguards', () => {
         while (pendingFrames.length > 0) pendingFrames.shift()?.(0);
         expect(document.activeElement).toBe(trigger);
         trigger.remove();
+    });
+
+    it('locks close, preview, save, and additional restores while a restore is pending', async () => {
+        let finishRestore: ((success: boolean) => void) | undefined;
+        historyMocks.restoreVersion.mockImplementation(() => new Promise((resolve) => {
+            finishRestore = resolve;
+        }));
+        historyMocks.versions = [{
+            id: 'version-1',
+            diagramId: 'diagram-1',
+            snapshotData: null,
+            createdAt: 1,
+            message: 'Release candidate',
+        }];
+        const onClose = vi.fn();
+        render(<VersionHistoryPanel diagramId="diagram-1" isOpen onClose={onClose} />);
+
+        fireEvent.click(screen.getByLabelText('Restore version: Release candidate'));
+        fireEvent.click(await screen.findByRole('button', { name: 'Restore' }));
+        await waitFor(() => expect(historyMocks.restoreVersion).toHaveBeenCalledTimes(1));
+
+        expect(screen.queryByRole('button', { name: 'Close version history' })).toBeNull();
+        expect((screen.getByLabelText('Snapshot note (optional)') as HTMLInputElement).disabled).toBe(true);
+        expect((screen.getByRole('button', { name: /Save snapshot/ }) as HTMLButtonElement).disabled).toBe(true);
+        expect((screen.getByRole('button', { name: 'Preview version: Release candidate' }) as HTMLButtonElement).disabled).toBe(true);
+        expect((screen.getByLabelText('Restore version: Release candidate') as HTMLButtonElement).disabled).toBe(true);
+
+        fireEvent.keyDown(document, { key: 'Escape' });
+        fireEvent.click(screen.getByRole('button', { name: /Save snapshot/ }));
+        expect(onClose).not.toHaveBeenCalled();
+        expect(historyMocks.saveVersion).not.toHaveBeenCalled();
+        expect(historyMocks.enterPreview).not.toHaveBeenCalled();
+        expect(historyMocks.restoreVersion).toHaveBeenCalledTimes(1);
+
+        await act(async () => {
+            finishRestore?.(false);
+        });
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Close version history' })).toBeTruthy());
     });
 });

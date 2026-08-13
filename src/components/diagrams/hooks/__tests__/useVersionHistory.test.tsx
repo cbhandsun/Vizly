@@ -135,6 +135,39 @@ describe('useVersionHistory', () => {
         expect(result.current.versions).toHaveLength(1);
     });
 
+    it('ignores an older version list response after the active diagram changes', async () => {
+        let resolveFirstDiagram: ((versions: ReturnType<typeof makeVersion>[]) => void) | undefined;
+        storageMocks.listVersions.mockImplementation((requestedDiagramId: string) => {
+            if (requestedDiagramId === 'diagram-1') {
+                return new Promise((resolve) => {
+                    resolveFirstDiagram = resolve;
+                });
+            }
+            return Promise.resolve([{
+                ...makeVersion(),
+                id: 'version-2',
+                diagramId: 'diagram-2',
+                message: 'Second diagram version',
+            }]);
+        });
+        const { result, rerender } = renderHook(
+            ({ activeDiagramId }) => useVersionHistory(activeDiagramId),
+            { initialProps: { activeDiagramId: 'diagram-1' } },
+        );
+
+        await waitFor(() => expect(storageMocks.listVersions).toHaveBeenCalledWith('diagram-1'));
+        rerender({ activeDiagramId: 'diagram-2' });
+        await waitFor(() => expect(result.current.versions[0]?.id).toBe('version-2'));
+
+        await act(async () => {
+            resolveFirstDiagram?.([makeVersion()]);
+            await Promise.resolve();
+        });
+
+        expect(result.current.versions).toHaveLength(1);
+        expect(result.current.versions[0]?.diagramId).toBe('diagram-2');
+    });
+
     it('ignores a preview payload that finishes after preview was cancelled', async () => {
         let resolveVersion: ((version: ReturnType<typeof makeVersion>) => void) | undefined;
         storageMocks.loadVersion.mockImplementation(() => new Promise((resolve) => {
@@ -242,6 +275,45 @@ describe('useVersionHistory', () => {
         );
         expect(bridge.getCanvasSnapshot).toHaveBeenCalledTimes(1);
         expect(result.current.versions[0]?.id).toBe('version-1');
+    });
+
+    it('allows only one persistence mutation at a time', async () => {
+        let resolveSave: ((version: ReturnType<typeof makeVersion>) => void) | undefined;
+        storageMocks.saveVersion.mockImplementation(() => new Promise((resolve) => {
+            resolveSave = resolve;
+        }));
+        const bridge = {
+            id: 'diagram-1',
+            nodes: originalNodes,
+            edges: originalEdges,
+            getCanvasSnapshot: vi.fn(() => ({ nodes: originalNodes, edges: originalEdges })),
+            replaceCanvasSnapshot: vi.fn(),
+        };
+        (window as unknown as { __flowDataBridge: Record<string, typeof bridge> }).__flowDataBridge = { 'diagram-1': bridge };
+        const { result } = renderHook(() => useVersionHistory('diagram-1'));
+        await waitFor(() => expect(storageMocks.listVersions).toHaveBeenCalled());
+
+        let savePromise: Promise<boolean> | undefined;
+        act(() => {
+            savePromise = result.current.saveVersion('Release candidate');
+        });
+        await waitFor(() => expect(storageMocks.saveVersion).toHaveBeenCalledTimes(1));
+
+        let overlappingRestore = true;
+        await act(async () => {
+            overlappingRestore = await result.current.restoreVersion('version-1', vi.fn(), vi.fn());
+        });
+
+        expect(overlappingRestore).toBe(false);
+        expect(storageMocks.loadVersion).not.toHaveBeenCalled();
+        expect(storageMocks.saveVersion).toHaveBeenCalledTimes(1);
+
+        let saved = false;
+        await act(async () => {
+            resolveSave?.(makeVersion());
+            saved = await savePromise!;
+        });
+        expect(saved).toBe(true);
     });
 
     it('rejects invalid active canvas data before persistence', async () => {

@@ -28,51 +28,75 @@ export function useVersionHistory(diagramId: string) {
     const [loading, setLoading] = useState(false);
     const [loadError, setLoadError] = useState(false);
     const [previewVersion, setPreviewVersion] = useState<DiagramVersion | null>(null);
-    const previewBaseRef = useRef<{ nodes: Node[]; edges: Edge[] } | null>(null);
+    const previewBaseRef = useRef<{ diagramId: string; nodes: Node[]; edges: Edge[] } | null>(null);
     const previewRequestIdRef = useRef(0);
+    const versionsRequestIdRef = useRef(0);
+    const mutationPromiseRef = useRef<Promise<boolean> | null>(null);
+
+    const runExclusiveMutation = useCallback((operation: () => Promise<boolean>): Promise<boolean> => {
+        if (mutationPromiseRef.current) return Promise.resolve(false);
+
+        const pendingOperation = operation();
+        mutationPromiseRef.current = pendingOperation;
+        return pendingOperation.finally(() => {
+            if (mutationPromiseRef.current === pendingOperation) {
+                mutationPromiseRef.current = null;
+            }
+        });
+    }, []);
 
     const loadVersions = useCallback(async () => {
-        if (!diagramId) return;
+        const requestId = ++versionsRequestIdRef.current;
+        if (!diagramId) {
+            setVersions([]);
+            setLoadError(false);
+            setLoading(false);
+            return;
+        }
+        setVersions([]);
         setLoading(true);
         setLoadError(false);
         try {
             const unifiedStorage = await loadUnifiedStorage();
             const data = await unifiedStorage.listVersions(diagramId);
+            if (requestId !== versionsRequestIdRef.current) return;
             setVersions(data);
         } catch (error) {
+            if (requestId !== versionsRequestIdRef.current) return;
             setLoadError(true);
             logVersionHistoryLoadFailure(error);
             appMessage.error(t('designer.versionHistoryPanel.loadFailed'));
         } finally {
-            setLoading(false);
+            if (requestId === versionsRequestIdRef.current) setLoading(false);
         }
     }, [diagramId, t]);
 
     const saveVersion = useCallback(async (commitMessage: string): Promise<boolean> => {
         if (!diagramId) return false;
 
-        try {
-            const unifiedStorage = await loadUnifiedStorage();
-            const bridge = getFlowDataBridge(diagramId);
-            const snapshot = readBridgeCanvasSnapshot(bridge);
-            if (!snapshot) {
-                appMessage.error(t('designer.versionHistoryPanel.canvasUnavailable'));
+        return runExclusiveMutation(async () => {
+            try {
+                const unifiedStorage = await loadUnifiedStorage();
+                const bridge = getFlowDataBridge(diagramId);
+                const snapshot = readBridgeCanvasSnapshot(bridge);
+                if (!snapshot) {
+                    appMessage.error(t('designer.versionHistoryPanel.canvasUnavailable'));
+                    return false;
+                }
+
+                const newVersion = await unifiedStorage.saveVersion(diagramId, snapshot, commitMessage);
+
+                // Add new version to list without refetching all
+                setVersions(prev => [newVersion, ...prev]);
+                appMessage.success(t('designer.versionHistoryPanel.saveSuccess'));
+                return true;
+            } catch (error) {
+                logVersionHistorySaveFailure(error);
+                appMessage.error(t('designer.versionHistoryPanel.saveFailed'));
                 return false;
             }
-
-            const newVersion = await unifiedStorage.saveVersion(diagramId, snapshot, commitMessage);
-            
-            // Add new version to list without refetching all
-            setVersions(prev => [newVersion, ...prev]);
-            appMessage.success(t('designer.versionHistoryPanel.saveSuccess'));
-            return true;
-            
-        } catch (error) {
-            logVersionHistorySaveFailure(error);
-            appMessage.error(t('designer.versionHistoryPanel.saveFailed'));
-            return false;
-        }
-    }, [diagramId, t]);
+        });
+    }, [diagramId, runExclusiveMutation, t]);
 
     const loadVersionData = useCallback(async (versionId: string) => {
         try {
@@ -106,32 +130,33 @@ export function useVersionHistory(diagramId: string) {
             return false;
         }
 
-        previewBaseRef.current ??= { nodes: currentNodes, edges: currentEdges };
+        previewBaseRef.current ??= { diagramId, nodes: currentNodes, edges: currentEdges };
         setNodes(snapshot.nodes);
         setEdges(snapshot.edges);
         setPreviewVersion(fullVersion);
         return true;
-    }, [loadVersionData, t]);
+    }, [diagramId, loadVersionData, t]);
 
     const exitPreview = useCallback(() => {
         previewRequestIdRef.current += 1;
         const previewBase = previewBaseRef.current;
-        if (previewBase) {
+        if (previewBase?.diagramId === diagramId) {
             previewBaseRef.current = null;
             setPreviewVersion(null);
-            return previewBase;
+            return { nodes: previewBase.nodes, edges: previewBase.edges };
         }
+        previewBaseRef.current = null;
         setPreviewVersion(null);
         return null;
-    }, []);
+    }, [diagramId]);
 
     const restoreVersion = useCallback(async (
         versionId: string,
         setNodes: Dispatch<SetStateAction<Node[]>>,
         setEdges: Dispatch<SetStateAction<Edge[]>>
-    ) => {
-        const fullVersion = previewVersion?.id === versionId 
-            ? previewVersion 
+    ) => runExclusiveMutation(async () => {
+        const fullVersion = previewVersion?.diagramId === diagramId && previewVersion.id === versionId
+            ? previewVersion
             : await loadVersionData(versionId);
 
         if (!fullVersion || !fullVersion.snapshotData) {
@@ -151,7 +176,7 @@ export function useVersionHistory(diagramId: string) {
             return false;
         }
 
-        const backupSnapshot = previewBaseRef.current
+        const backupSnapshot = previewBaseRef.current?.diagramId === diagramId
             ? coerceClipboardData(previewBaseRef.current)
             : readBridgeCanvasSnapshot(bridge);
         if (!backupSnapshot) {
@@ -192,7 +217,13 @@ export function useVersionHistory(diagramId: string) {
             appMessage.error(t('designer.versionHistoryPanel.restoreFailed'));
         }
         return false;
-    }, [diagramId, previewVersion, loadVersionData, t]);
+    }), [diagramId, previewVersion, loadVersionData, runExclusiveMutation, t]);
+
+    useEffect(() => {
+        versionsRequestIdRef.current += 1;
+        previewRequestIdRef.current += 1;
+        previewBaseRef.current = null;
+    }, [diagramId]);
 
     // Initial load
     useEffect(() => {
@@ -207,7 +238,7 @@ export function useVersionHistory(diagramId: string) {
         versions,
         loading,
         loadError,
-        previewVersion,
+        previewVersion: previewVersion?.diagramId === diagramId ? previewVersion : null,
         loadVersions,
         saveVersion,
         enterPreview,
