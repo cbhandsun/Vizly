@@ -152,6 +152,29 @@
     gap: 8px;
 }
 
+.status-action {
+    min-width: 32px;
+    min-height: 32px;
+    padding: 4px 6px;
+    border: 0;
+    border-radius: 6px;
+    color: inherit;
+    background: transparent;
+    font: inherit;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+.status-action:hover {
+    background: var(--color-slate-100, rgba(148, 163, 184, 0.16));
+}
+
+.status-action:focus-visible {
+    outline: 2px solid var(--theme-primary-main, #3b82f6);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 3px var(--theme-primary-main-alpha, rgba(59, 130, 246, 0.2));
+}
+
 .status-dot {
     width: 8px;
     height: 8px;
@@ -1660,6 +1683,11 @@ circle.custom-edge-updater {
         transform: translateX(-50%) !important;
         font-size: 11px !important;
         padding: 4px 12px !important;
+    }
+
+    .status-action {
+        min-width: 44px;
+        min-height: 44px;
     }
 
     /* Prevent text selection and long-press callouts on canvas */

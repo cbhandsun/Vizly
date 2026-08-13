@@ -780,13 +780,24 @@
             "reactFlowWarning": "You are currently viewing internal React Flow graph models (Read-Only mode). This is for debugging purposes only. To edit diagram structure, please switch to Standard Data mode."
         },
         "statusBar": {
+            "label": "Diagram status and quick actions",
+            "noNodes": "No nodes",
             "nodes": "Nodes",
             "edges": "Edges",
             "smartMesh": "Smart Mesh",
             "directLink": "Direct Link",
             "selectedSummary": "Selected: {{nodes}} nodes, {{edges}} edges",
             "smartRoutingEnabled": "Smart routing enabled",
-            "directRoutingEnabled": "Direct routing enabled"
+            "directRoutingEnabled": "Direct routing enabled",
+            "domainList": "Domains: {{domains}}",
+            "snapEnabled": "Grid snapping on",
+            "snapDisabled": "Grid snapping off",
+            "snapShortEnabled": "Grid",
+            "snapShortDisabled": "Free",
+            "annotation": "Annotations",
+            "annotationCount": "Annotations ({{count}})",
+            "annotationEnabled": "Annotation mode on. Click the canvas to add an annotation.",
+            "annotationDisabled": "Annotation mode off"
         },
         "pages": {
             "tabList": "Pages",

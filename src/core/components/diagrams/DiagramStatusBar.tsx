@@ -59,13 +59,27 @@ export const DiagramStatusBar: React.FC<DiagramStatusBarProps> = React.memo(({
 
     const shapeSummary = [
         ...shapeStats.map(([shape, count]) => `${shape}: ${count}`),
-        domainStats.size > 0 ? `─────\n域: ${[...domainStats].join(', ')}` : '',
+        domainStats.size > 0
+            ? `─────\n${t('designer.statusBar.domainList', { domains: [...domainStats].join(', ') })}`
+            : '',
     ].filter(Boolean).join('\n');
 
+    const snapLabel = snapToGrid
+        ? t('designer.statusBar.snapEnabled')
+        : t('designer.statusBar.snapDisabled');
+    const annotationLabel = annotationMode
+        ? t('designer.statusBar.annotationEnabled')
+        : t('designer.statusBar.annotationDisabled');
+
     return (
-        <div className="diagram-status-bar" style={{ pointerEvents: 'auto' }} role="status" aria-label="图表统计信息">
+        <div
+            className="diagram-status-bar"
+            style={{ pointerEvents: 'auto' }}
+            role="region"
+            aria-label={t('designer.statusBar.label')}
+        >
             {/* Stats with shape tooltip */}
-            <Tooltip title={shapeSummary || '无节点'} placement="top">
+            <Tooltip title={shapeSummary || t('designer.statusBar.noNodes')} placement="top">
                 <div className="status-item" style={{ cursor: 'help' }}>
                     <div className="status-dot" style={{ backgroundColor: '#4CAF50', boxShadow: '0 0 8px rgba(76, 175, 80, 0.4)' }}></div>
                     <span><strong>{nodes.length}</strong> {t('designer.statusBar.nodes')}</span>
@@ -95,13 +109,21 @@ export const DiagramStatusBar: React.FC<DiagramStatusBarProps> = React.memo(({
             {/* Snap to Grid */}
             {onToggleSnap && (
                 <>
-                    <Tooltip title={snapToGrid ? '网格吸附：开' : '网格吸附：关'}>
-                        <div className="status-item" style={{ cursor: 'pointer', gap: 4 }} onClick={onToggleSnap}>
-                            <FaTh size={10} style={{ color: snapToGrid ? '#1976d2' : '#999' }} />
+                    <Tooltip title={snapLabel}>
+                        <button
+                            type="button"
+                            className="status-item status-action"
+                            aria-label={snapLabel}
+                            aria-pressed={Boolean(snapToGrid)}
+                            onClick={onToggleSnap}
+                        >
+                            <FaTh aria-hidden="true" size={10} style={{ color: snapToGrid ? '#1976d2' : '#999' }} />
                             <span style={{ fontSize: 10, color: snapToGrid ? '#1976d2' : '#999' }}>
-                                {snapToGrid ? 'Grid' : 'Free'}
+                                {snapToGrid
+                                    ? t('designer.statusBar.snapShortEnabled')
+                                    : t('designer.statusBar.snapShortDisabled')}
                             </span>
-                        </div>
+                        </button>
                     </Tooltip>
                     <div className="status-separator"></div>
                 </>
@@ -130,13 +152,21 @@ export const DiagramStatusBar: React.FC<DiagramStatusBarProps> = React.memo(({
             {/* Annotation Mode */}
             {onToggleAnnotation && (
                 <>
-                    <Tooltip title={annotationMode ? '批注模式：开（点击画布添加批注）' : '批注模式：关'}>
-                        <div className="status-item" style={{ cursor: 'pointer', gap: 4 }} onClick={onToggleAnnotation}>
-                            <FaThumbtack size={10} style={{ color: annotationMode ? '#f59e0b' : '#999' }} />
+                    <Tooltip title={annotationLabel}>
+                        <button
+                            type="button"
+                            className="status-item status-action"
+                            aria-label={annotationLabel}
+                            aria-pressed={Boolean(annotationMode)}
+                            onClick={onToggleAnnotation}
+                        >
+                            <FaThumbtack aria-hidden="true" size={10} style={{ color: annotationMode ? '#f59e0b' : '#999' }} />
                             <span style={{ fontSize: 10, color: annotationMode ? '#f59e0b' : '#999', fontWeight: annotationMode ? 700 : 400 }}>
-                                {annotationCount > 0 ? `批注(${annotationCount})` : '批注'}
+                                {annotationCount > 0
+                                    ? t('designer.statusBar.annotationCount', { count: annotationCount })
+                                    : t('designer.statusBar.annotation')}
                             </span>
-                        </div>
+                        </button>
                     </Tooltip>
                     <div className="status-separator"></div>
                 </>

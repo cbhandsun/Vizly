@@ -788,13 +788,24 @@
             "reactFlowWarning": "当前处于 React Flow 内部渲染节点/边结构大纲预览（只读）。该模式仅供 Debug，不支持反向应用。如需修改架构，请切换到标准数据模式。"
         },
         "statusBar": {
+            "label": "图表状态与快捷操作",
+            "noNodes": "暂无节点",
             "nodes": "节点",
             "edges": "连线",
             "smartMesh": "智能网格",
             "directLink": "直接连接",
             "selectedSummary": "已选：{{nodes}} 节点，{{edges}} 连线",
             "smartRoutingEnabled": "智能布线已启用",
-            "directRoutingEnabled": "直接连线模式"
+            "directRoutingEnabled": "直接连线模式",
+            "domainList": "业务域：{{domains}}",
+            "snapEnabled": "网格吸附已开启",
+            "snapDisabled": "网格吸附已关闭",
+            "snapShortEnabled": "吸附",
+            "snapShortDisabled": "自由",
+            "annotation": "批注",
+            "annotationCount": "批注（{{count}}）",
+            "annotationEnabled": "批注模式已开启，点击画布即可添加批注",
+            "annotationDisabled": "批注模式已关闭"
         },
         "pages": {
             "tabList": "页面",
