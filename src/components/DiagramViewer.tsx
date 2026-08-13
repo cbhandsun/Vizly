@@ -650,7 +650,7 @@ const DiagramViewer: React.FC = () => {
             isReadonly={isReadonly}
             onReadonlyChange={setIsReadonly}
             isPresentationMode={isPresentationMode}
-            setIsPresentationMode={setIsPresentationMode}
+            onExitPresentation={exitPresentation}
             isFullscreen={isFullscreen}
             handleToggleFullscreen={handleToggleFullscreen}
             resolvedPluginId={resolvedPluginId}

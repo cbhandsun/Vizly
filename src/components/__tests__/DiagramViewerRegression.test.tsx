@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 
 type CanvasOpsOptions = {
@@ -10,6 +10,7 @@ type CanvasOpsOptions = {
     onExportPDF?: unknown;
     onExportSVG?: unknown;
     onExportGIF?: unknown;
+    onSetPresentationMode?: (active: boolean) => void;
 };
 type DiagramControlsOptions = {
     getReactFlowSnapshot: () => { nodes: unknown[]; edges: unknown[] };
@@ -24,6 +25,7 @@ const exportToSVGMock = vi.fn();
 const exportToGIFMock = vi.fn();
 const openShareDialogMock = vi.fn();
 const configValueSetterMock = vi.fn();
+const { appMessageInfoMock } = vi.hoisted(() => ({ appMessageInfoMock: vi.fn() }));
 const useDiagramControlsMock = vi.fn((
     _diagramId: string,
     _ready: boolean,
@@ -199,7 +201,7 @@ vi.mock('@/services/remoteDiagramPreview', () => ({
 
 vi.mock('@/core/utils/antdStaticBridge', () => ({
     appMessage: {
-        info: vi.fn(),
+        info: appMessageInfoMock,
         error: vi.fn(),
         loading: vi.fn(() => vi.fn()),
     },
@@ -400,5 +402,26 @@ describe('DiagramViewer regression', () => {
         fireEvent.click(screen.getByRole('button', { name: 'refresh-settings' }));
 
         expect(configValueSetterMock).not.toHaveBeenCalled();
+    });
+
+    it('exposes a localized keyboard-operable presentation exit action', () => {
+        canvasOpsMock.mockClear();
+        appMessageInfoMock.mockClear();
+        render(
+            <MemoryRouter initialEntries={['/diagram?diagram=test-diagram']}>
+                <DiagramViewer />
+            </MemoryRouter>
+        );
+
+        const options = canvasOpsMock.mock.calls[0]?.[0];
+        act(() => options?.onSetPresentationMode?.(true));
+
+        const exit = screen.getByRole('button', { name: 'diagramViewer.presentation.hint' });
+        expect(exit).toHaveAttribute('aria-keyshortcuts', 'Escape');
+        expect(exit.className).toContain('min-h-[44px]');
+        fireEvent.click(exit);
+
+        expect(screen.queryByRole('button', { name: 'diagramViewer.presentation.hint' })).toBeNull();
+        expect(appMessageInfoMock).toHaveBeenCalledWith('diagramViewer.presentation.exit');
     });
 });

@@ -12,7 +12,6 @@ import type {
 } from '@/core/types/diagram-components';
 import DiagramControlBridge from '@/core/components/shared/DiagramControlBridge';
 import { DiagramThemeProvider } from '@/core/themes/DiagramThemeProvider';
-import { appMessage } from '@/core/utils/antdStaticBridge';
 import { DiagramLayout } from './layout/DiagramLayout';
 import { EnhancedThemeSelector } from './ui/EnhancedThemeSelector';
 import { ErrorBoundary } from './ui/ErrorBoundary';
@@ -62,7 +61,7 @@ interface DiagramViewerViewProps {
     isReadonly: boolean;
     onReadonlyChange: (value: boolean) => void;
     isPresentationMode: boolean;
-    setIsPresentationMode: (value: boolean) => void;
+    onExitPresentation: () => void;
     isFullscreen: boolean;
     handleToggleFullscreen: () => void;
     resolvedPluginId?: string;
@@ -134,7 +133,7 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
     isReadonly,
     onReadonlyChange,
     isPresentationMode,
-    setIsPresentationMode,
+    onExitPresentation,
     isFullscreen,
     handleToggleFullscreen,
     resolvedPluginId,
@@ -387,15 +386,14 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
 
                                 {/* 演示模式退出提示层 */}
                                 {isPresentationMode && (
-                                    <div
-                                        className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[3000] px-6 py-2.5 bg-black/70 hover:bg-black/90 backdrop-blur-md text-white text-xs font-semibold rounded-full cursor-pointer transition-all border border-white/20 shadow-2xl animate-bounce-subtle"
-                                        onClick={() => {
-                                            setIsPresentationMode(false);
-                                            appMessage.info('演示模式已退出');
-                                        }}
+                                    <button
+                                        type="button"
+                                        className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[3000] min-h-[44px] px-6 py-2.5 bg-black/70 hover:bg-black/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black/70 backdrop-blur-md text-white text-xs font-semibold rounded-full cursor-pointer transition-all border border-white/20 shadow-2xl animate-bounce-subtle"
+                                        onClick={onExitPresentation}
+                                        aria-keyshortcuts="Escape"
                                     >
-                                        🎬 点击或按 ESC 退出演示模式
-                                    </div>
+                                        {t('diagramViewer.presentation.hint')}
+                                    </button>
                                 )}
                             </ErrorBoundary>
 
