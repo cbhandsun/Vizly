@@ -11,6 +11,7 @@ import zh from '../../../../locales/zh.json';
 import MindMapBatchBar from '../MindMapBatchBar';
 import { MindMapPropertyAISection } from '../MindMapPropertyAISection';
 import { MindMapPropertyMediaControls } from '../MindMapPropertyMediaControls';
+import { MindMapNoteEditorPanel } from '../MindMapNoteEditorPanel';
 
 const mindHarness = vi.hoisted(() => {
     const listeners = new Map<string, (...args: unknown[]) => void>();
@@ -82,6 +83,11 @@ const renderLocalized = async (language: 'en' | 'zh') => {
             <MindMapBatchBar />
             <MindMapPropertyAISection {...aiProps} />
             <MindMapPropertyMediaControls {...mediaProps} />
+            <MindMapNoteEditorPanel
+                onCancel={vi.fn()}
+                onClear={vi.fn()}
+                onSave={vi.fn()}
+            />
         </I18nextProvider>,
     );
     act(() => {
@@ -120,6 +126,9 @@ describe('mind map commercial control translations', () => {
         expect(screen.getByRole('button', { name: 'Add markers' })).toBeTruthy();
         expect(screen.getByRole('textbox', { name: 'Image URL' })).toBeTruthy();
         expect(screen.getByRole('button', { name: 'Upload an image' })).toBeTruthy();
+        expect(screen.getByRole('dialog', { name: 'Node note' })).toBeTruthy();
+        expect(screen.getByRole('textbox', { name: 'Node note' })).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Cancel' })).toBeTruthy();
     });
 
     it('resolves the Chinese batch, AI, and media controls from production resources', async () => {
@@ -130,5 +139,8 @@ describe('mind map commercial control translations', () => {
         expect(screen.getByRole('button', { name: '添加标记' })).toBeTruthy();
         expect(screen.getByRole('textbox', { name: '图片地址' })).toBeTruthy();
         expect(screen.getByRole('button', { name: '上传图片' })).toBeTruthy();
+        expect(screen.getByRole('dialog', { name: '节点备注' })).toBeTruthy();
+        expect(screen.getByRole('textbox', { name: '节点备注' })).toBeTruthy();
+        expect(screen.getByRole('button', { name: '取消' })).toBeTruthy();
     });
 });

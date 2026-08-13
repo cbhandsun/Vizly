@@ -38,6 +38,10 @@ const boundaryEditorSource = readFileSync(
     resolve(process.cwd(), 'src/core/components/mindmap-v2/MindMapBoundaryEditor.tsx'),
     'utf8',
 );
+const noteEditorSource = readFileSync(
+    resolve(process.cwd(), 'src/core/components/mindmap-v2/MindMapNoteEditorPanel.tsx'),
+    'utf8',
+);
 
 describe('MindMapFloatingBar commercial interaction contract', () => {
     it('keeps node actions named, keyboard visible, and inside narrow viewports', () => {
@@ -47,9 +51,26 @@ describe('MindMapFloatingBar commercial interaction contract', () => {
         expect(source).toContain('aria-label="AI 节点助手"');
         expect(source).toContain('aria-label="连线颜色"');
         expect(shapeControlSource).toContain('aria-label="节点形状"');
-        expect(source).toContain("aria-label={obj.note ? '编辑备注' : '添加备注'}");
+        expect(source).toContain('aria-haspopup="dialog"');
+        expect(source).toContain('aria-expanded={noteOpen}');
+        expect(source).toContain('aria-controls={noteDialogId}');
         expect(css).toMatch(/\.barContainer[\s\S]*?max-width: calc\(100vw - 16px\)[\s\S]*?overflow-x: auto/);
+        expect(css).toMatch(/\.btn[\s\S]*?width: 52px;[\s\S]*?height: 52px;/);
         expect(css).toContain('.btn:focus-visible');
+    });
+
+    it('keeps note editing localized, recoverable, single-flight, and touch sized', () => {
+        expect(source).toContain('if (!v && noteDirty) return');
+        expect(source).toContain('const targetNodeId = noteSession?.nodeId ?? obj.id');
+        expect(source).toContain('key={noteSession?.nodeId ?? obj.id}');
+        expect(source).toContain('throw error');
+        expect(noteEditorSource).toContain("pendingAction === 'save'");
+        expect(noteEditorSource).toContain('pendingRef.current');
+        expect(noteEditorSource).toContain('role="alert"');
+        expect(noteEditorSource).toContain("t('plugins.mindmap.noteEditor.cancel')");
+        expect(css).toMatch(/\.noteBtnClear[\s\S]*?min-height: 52px;/);
+        expect(css).toMatch(/\.noteBtnCancel[\s\S]*?min-height: 52px;/);
+        expect(css).toMatch(/\.noteBtnSave[\s\S]*?min-height: 52px;/);
     });
 
     it('keeps AI popover state single-sourced and provides a configuration recovery path', () => {

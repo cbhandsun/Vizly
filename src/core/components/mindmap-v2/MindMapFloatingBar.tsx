@@ -6,14 +6,20 @@
  *  - 覆盖 90% 高频操作：添加子/兄弟、颜色、折叠/展开、删除
  *  - 无需打开侧边属性面板或右键菜单
  */
-import React, { useCallback, useEffect, useLayoutEffect, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useId, useLayoutEffect, useState, useRef } from 'react';
 import { Tooltip, Popover } from 'antd';
 import type { NodeObj } from 'mind-elixir';
+import { useTranslation } from 'react-i18next';
 import { getMindElixirInstance, subscribeMindElixir } from './mindElixirStore';
 import { findNodeById } from './migrate';
 import { expandNodeWithAI, getAncestorPath, summarizeNodeWithAI, processNodeWithAICustomAction } from './mindmapAIService';
 import { cleanMindMapNodePatch } from './mindmapNodePatchSecurity';
-import { cleanMindMapData, cleanMindMapTopic, refreshMindElixirWithSanitizedData } from './mindmapTreeSanitizer';
+import {
+    cleanMindMapData,
+    cleanMindMapNote,
+    cleanMindMapTopic,
+    refreshMindElixirWithSanitizedData,
+} from './mindmapTreeSanitizer';
 import { cleanMindMapChildNode } from './mindmapBridgeSecurity';
 import { RobotOutlined } from '@ant-design/icons';
 import { logMindMapFloatingActionFailure } from './mindmapFloatingLogging';
@@ -45,6 +51,7 @@ const errorMessage = (error: unknown, fallback: string): string =>
     error instanceof Error && error.message ? error.message : fallback;
 
 const MindMapFloatingBar: React.FC = () => {
+    const { t } = useTranslation();
     // 订阅 store，确保 mind 实例异步注册后触发重渲染
     const [mind, setMind] = useState(getMindElixirInstance);
     useEffect(() => subscribeMindElixir(() => setMind(getMindElixirInstance())), []);
@@ -52,6 +59,11 @@ const MindMapFloatingBar: React.FC = () => {
     const [colorOpen, setColorOpen] = useState(false);
     const [shapeOpen, setShapeOpen] = useState(false);
     const [noteOpen, setNoteOpen] = useState(false);
+    const [noteDirty, setNoteDirty] = useState(false);
+    const [noteSession, setNoteSession] = useState<{
+        nodeId: string;
+        initialNote?: string;
+    } | null>(null);
     const [aiOpen, setAiOpen] = useState(false);
     const [boundaryOpen, setBoundaryOpen] = useState(false);
     const [aiExpanding, setAiExpanding] = useState(false);
@@ -63,10 +75,12 @@ const MindMapFloatingBar: React.FC = () => {
     const barRef = useRef<HTMLDivElement>(null);
     const colorTriggerRef = useRef<HTMLButtonElement>(null);
     const noteTriggerRef = useRef<HTMLButtonElement>(null);
+    const noteDialogId = useId();
     const [barWidth, setBarWidth] = useState(0);
 
     const closeSelectionOverlays = useCallback(() => {
-        setColorOpen(false); setShapeOpen(false); setNoteOpen(false); setAiOpen(false); setBoundaryOpen(false);
+        setColorOpen(false); setShapeOpen(false); setNoteOpen(false); setNoteDirty(false);
+        setNoteSession(null); setAiOpen(false); setBoundaryOpen(false);
     }, []);
     const {
         position: pos,
@@ -109,6 +123,8 @@ const MindMapFloatingBar: React.FC = () => {
 
     const closeNoteEditor = (restoreFocus = false) => {
         setNoteOpen(false);
+        setNoteDirty(false);
+        setNoteSession(null);
         if (restoreFocus) {
             requestAnimationFrame(() => noteTriggerRef.current?.focus());
         }
@@ -116,13 +132,20 @@ const MindMapFloatingBar: React.FC = () => {
 
     const commitNote = async (note: string | undefined, action: 'clearNote' | 'saveNote') => {
         try {
-            const tpc = getTpc();
-            if (tpc) {
-                const restored = await updateMindMapNoteAndRestoreSelection(mind, tpc, obj, note);
-                if (restored) refreshFloatingBarForNode(obj.id);
-            }
+            const targetNodeId = noteSession?.nodeId ?? obj.id;
+            const targetNode = findNodeById(mind.getData().nodeData, targetNodeId);
+            const targetTopic = mind.findEle(targetNodeId);
+            if (!targetNode || !targetTopic) throw new Error('Note target is unavailable');
+            const restored = await updateMindMapNoteAndRestoreSelection(
+                mind,
+                targetTopic,
+                targetNode,
+                note,
+            );
+            if (restored) refreshFloatingBarForNode(targetNode.id);
         } catch (error) {
             logMindMapFloatingActionFailure(action, error);
+            throw error;
         }
         closeNoteEditor(true);
     };
@@ -544,11 +567,21 @@ const MindMapFloatingBar: React.FC = () => {
             <Popover
                 open={noteOpen}
                 onOpenChange={v => {
+                    if (!v && noteDirty) return;
                     if (v) {
                         setColorOpen(false); setShapeOpen(false);
                         setBoundaryOpen(false);
+                        setNoteDirty(false);
+                        setNoteSession({
+                            nodeId: obj.id,
+                            initialNote: cleanMindMapNote(obj.note),
+                        });
                     }
                     setNoteOpen(v);
+                    if (!v) {
+                        setNoteDirty(false);
+                        setNoteSession(null);
+                    }
                 }}
                 trigger="click"
                 placement="top"
@@ -560,20 +593,32 @@ const MindMapFloatingBar: React.FC = () => {
                 }}
                 content={
                     <MindMapNoteEditorPanel
-                        initialNote={obj.note}
+                        key={noteSession?.nodeId ?? obj.id}
+                        dialogId={noteDialogId}
+                        initialNote={noteSession?.initialNote}
                         onCancel={() => closeNoteEditor(true)}
-                        onClear={() => void commitNote(undefined, 'clearNote')}
-                        onSave={note => void commitNote(note, 'saveNote')}
+                        onClear={() => commitNote(undefined, 'clearNote')}
+                        onDirtyChange={setNoteDirty}
+                        onSave={note => commitNote(note, 'saveNote')}
                     />
                 }
             >
-                <Tooltip title={obj.note ? '编辑备注' : '添加备注'}>
+                <Tooltip title={t(obj.note
+                    ? 'plugins.mindmap.noteEditor.editNote'
+                    : 'plugins.mindmap.noteEditor.addNote')}>
                     <button
                         ref={noteTriggerRef}
                         type="button"
                         className={styles.btn}
-                        aria-label={obj.note ? '编辑备注' : '添加备注'}
-                        title={obj.note ? '编辑备注' : '添加备注'}
+                        aria-label={t(obj.note
+                            ? 'plugins.mindmap.noteEditor.editNote'
+                            : 'plugins.mindmap.noteEditor.addNote')}
+                        aria-haspopup="dialog"
+                        aria-expanded={noteOpen}
+                        aria-controls={noteDialogId}
+                        title={t(obj.note
+                            ? 'plugins.mindmap.noteEditor.editNote'
+                            : 'plugins.mindmap.noteEditor.addNote')}
                         style={{ color: obj.note ? '#f59e0b' : 'rgba(255, 255, 255, 0.7)' }}
                     >
                         <span aria-hidden="true" style={{ fontSize: 13 }}>📝</span>

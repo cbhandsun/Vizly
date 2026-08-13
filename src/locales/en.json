@@ -2605,6 +2605,23 @@
                 "previewAlt": "Node image preview",
                 "removeImage": "Remove node image"
             },
+            "noteEditor": {
+                "addNote": "Add note",
+                "editNote": "Edit note",
+                "title": "Node note",
+                "markdown": "Markdown supported",
+                "textareaLabel": "Node note",
+                "placeholder": "Add a note…",
+                "shortcuts": "Esc cancel · Ctrl/Cmd+Enter save",
+                "clear": "Clear",
+                "clearing": "Clearing…",
+                "cancel": "Cancel",
+                "save": "Save",
+                "saving": "Saving…",
+                "saveLabel": "Save node note (Ctrl/Cmd+Enter)",
+                "clearFailed": "The note could not be cleared. Try again",
+                "saveFailed": "The note could not be saved. Try again"
+            },
             "actionBar": {
                 "addSibling": "Add Sibling",
                 "addChild": "Add Child",

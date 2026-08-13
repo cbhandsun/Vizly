@@ -26,8 +26,8 @@
 }
 
 .btn {
-    width: 28px;
-    height: 28px;
+    width: 52px;
+    height: 52px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -352,6 +352,16 @@
     font-size: 10px;
 }
 
+.noteError {
+    padding: 8px 10px;
+    border: 1px solid rgba(248, 113, 113, 0.42);
+    border-radius: 6px;
+    background: rgba(127, 29, 29, 0.28);
+    color: #fecaca;
+    font-size: 11px;
+    line-height: 1.45;
+}
+
 .noteActions {
     display: flex;
     gap: 6px;
@@ -360,7 +370,7 @@
 
 .noteBtnClear {
     min-width: 64px;
-    min-height: 36px;
+    min-height: 52px;
     padding: 6px 14px;
     border-radius: 5px;
     border: none;
@@ -376,9 +386,27 @@
     color: rgba(255, 255, 255, 0.8);
 }
 
+.noteBtnCancel {
+    min-width: 64px;
+    min-height: 52px;
+    padding: 6px 14px;
+    border-radius: 5px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    cursor: pointer;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.72);
+    font-size: 11px;
+    transition: all 0.15s;
+}
+
+.noteBtnCancel:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+}
+
 .noteBtnSave {
     min-width: 72px;
-    min-height: 36px;
+    min-height: 52px;
     padding: 6px 16px;
     border-radius: 5px;
     border: none;
@@ -396,18 +424,21 @@
 }
 
 .noteBtnClear:focus-visible,
+.noteBtnCancel:focus-visible,
 .noteBtnSave:focus-visible {
     outline: 2px solid #c7d2fe;
     outline-offset: 2px;
 }
 
 .noteBtnClear:disabled,
+.noteBtnCancel:disabled,
 .noteBtnSave:disabled {
     cursor: not-allowed;
     opacity: 0.45;
 }
 
 .noteBtnClear:disabled:hover,
+.noteBtnCancel:disabled:hover,
 .noteBtnSave:disabled:hover {
     background: rgba(255, 255, 255, 0.07);
     color: rgba(255, 255, 255, 0.45);

@@ -2758,6 +2758,23 @@
                 "previewAlt": "节点图片预览",
                 "removeImage": "移除节点图片"
             },
+            "noteEditor": {
+                "addNote": "添加备注",
+                "editNote": "编辑备注",
+                "title": "节点备注",
+                "markdown": "支持 Markdown",
+                "textareaLabel": "节点备注",
+                "placeholder": "输入备注…",
+                "shortcuts": "Esc 取消 · Ctrl/Cmd+Enter 保存",
+                "clear": "清除",
+                "clearing": "清除中…",
+                "cancel": "取消",
+                "save": "保存",
+                "saving": "保存中…",
+                "saveLabel": "保存节点备注 (Ctrl/Cmd+Enter)",
+                "clearFailed": "无法清除备注，请重试",
+                "saveFailed": "无法保存备注，请重试"
+            },
             "actionBar": {
                 "addSibling": "同级主题",
                 "addChild": "子主题",

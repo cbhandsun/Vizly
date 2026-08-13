@@ -1,4 +1,5 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     cleanMindMapNote,
     MINDMAP_MAX_NOTE_LENGTH,
@@ -6,37 +7,59 @@ import {
 import styles from './FloatingBar.module.css';
 
 interface MindMapNoteEditorPanelProps {
+    dialogId?: string;
     initialNote?: string;
     onCancel: () => void;
-    onClear: () => void;
-    onSave: (note: string | undefined) => void;
+    onClear: () => Promise<void> | void;
+    onDirtyChange?: (isDirty: boolean) => void;
+    onSave: (note: string | undefined) => Promise<void> | void;
 }
 
 export const MindMapNoteEditorPanel: React.FC<MindMapNoteEditorPanelProps> = ({
+    dialogId,
     initialNote,
     onCancel,
     onClear,
+    onDirtyChange,
     onSave,
 }) => {
+    const { t } = useTranslation();
     const initialValue = cleanMindMapNote(initialNote) ?? '';
     const [draft, setDraft] = useState(initialValue);
+    const [pendingAction, setPendingAction] = useState<'clear' | 'save' | null>(null);
+    const [error, setError] = useState('');
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const initialSelectionPositionRef = useRef(initialValue.length);
+    const mountedRef = useRef(true);
+    const pendingRef = useRef(false);
     const titleId = useId();
     const helpId = useId();
-    const isDirty = draft !== initialValue;
+    const errorId = useId();
+    const cleanDraft = cleanMindMapNote(draft) ?? '';
+    const isDirty = cleanDraft !== initialValue;
     const canClear = Boolean(initialValue || draft);
+    const isPending = pendingAction !== null;
 
     useEffect(() => {
         const textarea = textareaRef.current;
         if (!textarea) return;
         textarea.focus();
-        textarea.setSelectionRange(draft.length, draft.length);
+        const initialSelectionPosition = initialSelectionPositionRef.current;
+        textarea.setSelectionRange(initialSelectionPosition, initialSelectionPosition);
     }, []);
 
-    const saveDraft = () => {
-        if (!isDirty) return;
-        onSave(cleanMindMapNote(draft));
-    };
+    useEffect(() => {
+        mountedRef.current = true;
+        return () => {
+            mountedRef.current = false;
+        };
+    }, []);
+
+    useEffect(() => {
+        onDirtyChange?.(isDirty);
+    }, [isDirty, onDirtyChange]);
+
+    useEffect(() => () => onDirtyChange?.(false), [onDirtyChange]);
 
     const runAfterPointerInteraction = (action: () => void) => {
         if (typeof requestAnimationFrame === 'function') {
@@ -46,11 +69,43 @@ export const MindMapNoteEditorPanel: React.FC<MindMapNoteEditorPanelProps> = ({
         queueMicrotask(action);
     };
 
+    const runMutation = async (
+        action: 'clear' | 'save',
+        mutation: () => Promise<void> | void,
+    ) => {
+        if (pendingRef.current) return;
+        pendingRef.current = true;
+        setPendingAction(action);
+        setError('');
+        let failed = false;
+        try {
+            await mutation();
+        } catch {
+            if (!mountedRef.current) return;
+            failed = true;
+            setError(t(`plugins.mindmap.noteEditor.${action}Failed`));
+        } finally {
+            pendingRef.current = false;
+            if (mountedRef.current) {
+                setPendingAction(null);
+                if (failed) runAfterPointerInteraction(() => textareaRef.current?.focus());
+            }
+        }
+    };
+
+    const saveDraft = () => {
+        if (!isDirty || isPending) return;
+        void runMutation('save', () => onSave(cleanMindMapNote(draft)));
+    };
+
     return (
         <div
+            id={dialogId}
             className={styles.notePopover}
             role="dialog"
             aria-labelledby={titleId}
+            aria-describedby={error ? `${helpId} ${errorId}` : helpId}
+            aria-busy={isPending}
             onPointerDown={event => event.stopPropagation()}
             onPointerUp={event => event.stopPropagation()}
             onMouseDown={event => event.stopPropagation()}
@@ -61,15 +116,15 @@ export const MindMapNoteEditorPanel: React.FC<MindMapNoteEditorPanelProps> = ({
             onKeyDown={event => event.stopPropagation()}
         >
             <div className={styles.noteHeader}>
-                <strong id={titleId}>节点备注</strong>
-                <span>支持 Markdown</span>
+                <strong id={titleId}>{t('plugins.mindmap.noteEditor.title')}</strong>
+                <span>{t('plugins.mindmap.noteEditor.markdown')}</span>
             </div>
             <textarea
                 ref={textareaRef}
                 className={styles.noteTextarea}
-                aria-label="节点备注"
-                aria-describedby={helpId}
+                aria-label={t('plugins.mindmap.noteEditor.textareaLabel')}
                 value={draft}
+                disabled={isPending}
                 maxLength={MINDMAP_MAX_NOTE_LENGTH}
                 onChange={event => setDraft(event.target.value.slice(0, MINDMAP_MAX_NOTE_LENGTH))}
                 onKeyDown={event => {
@@ -83,27 +138,44 @@ export const MindMapNoteEditorPanel: React.FC<MindMapNoteEditorPanelProps> = ({
                         saveDraft();
                     }
                 }}
-                placeholder="输入备注…"
+                placeholder={t('plugins.mindmap.noteEditor.placeholder')}
                 rows={5}
             />
             <div id={helpId} className={styles.noteMeta}>
-                <span>Esc 取消 · Ctrl/Cmd+Enter 保存</span>
+                <span>{t('plugins.mindmap.noteEditor.shortcuts')}</span>
                 <span>{draft.length} / {MINDMAP_MAX_NOTE_LENGTH}</span>
             </div>
+            {error && (
+                <div id={errorId} className={styles.noteError} role="alert">
+                    {error}
+                </div>
+            )}
             <div className={styles.noteActions}>
                 <button
                     type="button"
                     className={styles.noteBtnClear}
-                    disabled={!canClear}
-                    onClick={() => runAfterPointerInteraction(onClear)}
-                >清除</button>
+                    disabled={!canClear || isPending}
+                    onClick={() => runAfterPointerInteraction(() => {
+                        void runMutation('clear', onClear);
+                    })}
+                >{pendingAction === 'clear'
+                        ? t('plugins.mindmap.noteEditor.clearing')
+                        : t('plugins.mindmap.noteEditor.clear')}</button>
+                <button
+                    type="button"
+                    className={styles.noteBtnCancel}
+                    disabled={isPending}
+                    onClick={onCancel}
+                >{t('plugins.mindmap.noteEditor.cancel')}</button>
                 <button
                     type="button"
                     className={styles.noteBtnSave}
-                    disabled={!isDirty}
-                    aria-label="保存节点备注 (Ctrl/Cmd+Enter)"
+                    disabled={!isDirty || isPending}
+                    aria-label={t('plugins.mindmap.noteEditor.saveLabel')}
                     onClick={() => runAfterPointerInteraction(saveDraft)}
-                >保存</button>
+                >{pendingAction === 'save'
+                        ? t('plugins.mindmap.noteEditor.saving')
+                        : t('plugins.mindmap.noteEditor.save')}</button>
             </div>
         </div>
     );
