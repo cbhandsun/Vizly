@@ -21,11 +21,22 @@ import {
     refreshMindElixirWithSanitizedData,
 } from './mindmapTreeSanitizer';
 import { cleanMindMapChildNode } from './mindmapBridgeSecurity';
-import { RobotOutlined } from '@ant-design/icons';
+import {
+    ApartmentOutlined,
+    CopyOutlined,
+    DeleteOutlined,
+    DownOutlined,
+    EditOutlined,
+    FileTextOutlined,
+    PlusOutlined,
+    RightOutlined,
+    RobotOutlined,
+} from '@ant-design/icons';
 import { logMindMapFloatingActionFailure } from './mindmapFloatingLogging';
 import {
     resolveMindMapFloatingBarFallbackWidth,
     resolveMindMapFloatingBarLeft,
+    resolveMindMapFloatingBarTop,
     resolveMindMapFloatingBarVisibleRight,
 } from './mindMapFloatingBarLayout';
 import { addEditableMindMapChild } from './mindMapNodeCreation';
@@ -49,6 +60,8 @@ import styles from './FloatingBar.module.css';
 
 const errorMessage = (error: unknown, fallback: string): string =>
     error instanceof Error && error.message ? error.message : fallback;
+
+const DEFAULT_FLOATING_BAR_HEIGHT = 66;
 
 const MindMapFloatingBar: React.FC = () => {
     const { t } = useTranslation();
@@ -77,6 +90,7 @@ const MindMapFloatingBar: React.FC = () => {
     const noteTriggerRef = useRef<HTMLButtonElement>(null);
     const noteDialogId = useId();
     const [barWidth, setBarWidth] = useState(0);
+    const [barHeight, setBarHeight] = useState(0);
     const [visibleRight, setVisibleRight] = useState(() => window.innerWidth);
 
     const closeSelectionOverlays = useCallback(() => {
@@ -102,7 +116,9 @@ const MindMapFloatingBar: React.FC = () => {
         const sidebar = document.querySelector<HTMLElement>('.designer-right-sidebar');
         const updateLayout = () => {
             const sidebarRect = sidebar?.getBoundingClientRect();
-            setBarWidth(bar.getBoundingClientRect().width);
+            const barRect = bar.getBoundingClientRect();
+            setBarWidth(barRect.width);
+            setBarHeight(barRect.height);
             setVisibleRight(resolveMindMapFloatingBarVisibleRight({
                 viewportWidth: window.innerWidth,
                 sidebarLeft: sidebarRect?.left,
@@ -369,7 +385,7 @@ const MindMapFloatingBar: React.FC = () => {
     const Btn: React.FC<{
         ariaExpanded?: boolean;
         danger?: boolean;
-        icon: string;
+        icon: React.ReactNode;
         onClick: () => void;
         tip: string;
     }> = ({ ariaExpanded, icon, tip, danger, onClick }) => (
@@ -421,6 +437,7 @@ const MindMapFloatingBar: React.FC = () => {
     const safeVisibleRight = Math.min(window.innerWidth, visibleRight);
     const resolvedBarWidth =
         barWidth || resolveMindMapFloatingBarFallbackWidth({ visibleRight: safeVisibleRight });
+    const resolvedBarHeight = barHeight || DEFAULT_FLOATING_BAR_HEIGHT;
 
     return (
         <>
@@ -428,14 +445,17 @@ const MindMapFloatingBar: React.FC = () => {
             ref={barRef}
             className={styles.barContainer}
             role="toolbar"
-            aria-label="节点快捷操作"
+            aria-label={t('plugins.mindmap.floatingBar.toolbarLabel')}
             style={{
                 left: resolveMindMapFloatingBarLeft({
                 anchorX: pos.x,
                 measuredWidth: resolvedBarWidth,
                 viewportWidth: safeVisibleRight,
             }),
-                top: Math.max(pos.y - 44, 8),
+                top: resolveMindMapFloatingBarTop({
+                    anchorY: pos.y,
+                    measuredHeight: resolvedBarHeight,
+                }),
                 maxWidth: Math.max(0, safeVisibleRight - 16),
             }}
             // stop clicks from deselecting the node in canvas
@@ -485,12 +505,12 @@ const MindMapFloatingBar: React.FC = () => {
                     />
                 }
             >
-                <Tooltip title="AI 节点助手">
+                <Tooltip title={t('plugins.mindmap.floatingBar.aiAssistant')}>
                     <button
                         type="button"
                         className={`${styles.btn} ${styles.btnAi}`}
-                        aria-label="AI 节点助手"
-                        title="AI 节点助手"
+                        aria-label={t('plugins.mindmap.floatingBar.aiAssistant')}
+                        title={t('plugins.mindmap.floatingBar.aiAssistant')}
                         aria-expanded={aiOpen}
                         onKeyDown={event => {
                             if (event.key !== 'Enter' && event.key !== ' ') return;
@@ -506,31 +526,31 @@ const MindMapFloatingBar: React.FC = () => {
             <Div />
 
             {/* Add child */}
-            <Btn icon="➕" tip="添加子节点 (Tab)"
+            <Btn icon={<PlusOutlined />} tip={t('plugins.mindmap.floatingBar.addChild')}
                 onClick={handleAddChild} />
 
             {/* Add sibling — not for root */}
             {!isRoot && (
-                <Btn icon="↕️" tip="添加同级节点 (Enter)"
+                <Btn icon={<ApartmentOutlined />} tip={t('plugins.mindmap.floatingBar.addSibling')}
                     onClick={() => act(() => { const tpc = getTpc(); if (tpc) mind.insertSibling('after', tpc, cleanMindMapChildNode()); })} />
             )}
 
             {/* Duplicate — not for root */}
             {!isRoot && (
-                <Btn icon="📋" tip="复制为同级 (Ctrl+D)"
+                <Btn icon={<CopyOutlined />} tip={t('plugins.mindmap.floatingBar.duplicateSibling')}
                     onClick={handleDuplicate} />
             )}
 
             <Div />
 
             {/* Edit */}
-            <Btn icon="✏️" tip="编辑文字 (F2)"
+            <Btn icon={<EditOutlined />} tip={t('plugins.mindmap.floatingBar.edit')}
                 onClick={() => act(() => { const tpc = getTpc(); if (tpc) mind.editTopic(tpc); })} />
 
             {/* Expand/Collapse — only if has children */}
             {hasChildren && (
                 <Btn
-                    icon={isExpanded ? '🔽' : '▶️'}
+                    icon={isExpanded ? <DownOutlined /> : <RightOutlined />}
                     tip={t(isExpanded
                         ? 'plugins.mindmap.actions.collapse'
                         : 'plugins.mindmap.actions.expand')}
@@ -563,13 +583,13 @@ const MindMapFloatingBar: React.FC = () => {
                     />
                 }
             >
-                <Tooltip title="连线颜色">
+                <Tooltip title={t('plugins.mindmap.floatingBar.branchColor')}>
                     <button
                         ref={colorTriggerRef}
                         type="button"
                         className={styles.btn}
-                        aria-label="连线颜色"
-                        title="连线颜色"
+                        aria-label={t('plugins.mindmap.floatingBar.branchColor')}
+                        title={t('plugins.mindmap.floatingBar.branchColor')}
                         style={{ gap: 2 }}
                         onKeyDown={event => {
                             if (event.key !== 'Enter' && event.key !== ' ') return;
@@ -662,7 +682,7 @@ const MindMapFloatingBar: React.FC = () => {
                             : 'plugins.mindmap.noteEditor.addNote')}
                         style={{ color: obj.note ? '#f59e0b' : 'rgba(255, 255, 255, 0.7)' }}
                     >
-                        <span aria-hidden="true" style={{ fontSize: 13 }}>📝</span>
+                        <span aria-hidden="true"><FileTextOutlined /></span>
                     </button>
                 </Tooltip>
             </Popover>
@@ -684,7 +704,7 @@ const MindMapFloatingBar: React.FC = () => {
             {!isRoot && (
                 <>
                     <Div />
-                    <Btn icon="🗑️" tip={t('plugins.mindmap.actions.deleteNode')} danger
+                    <Btn icon={<DeleteOutlined />} tip={t('plugins.mindmap.actions.deleteNode')} danger
                         onClick={() => requestDelete(obj)} />
                 </>
             )}

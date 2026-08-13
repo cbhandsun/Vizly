@@ -2544,6 +2544,18 @@
                 "expand": "Expand",
                 "contextMenuLabel": "Node actions"
             },
+            "floatingBar": {
+                "toolbarLabel": "Selected node actions",
+                "aiAssistant": "AI node assistant",
+                "addChild": "Add child (Tab)",
+                "addSibling": "Add sibling (Enter)",
+                "duplicateSibling": "Duplicate as sibling (Ctrl+D)",
+                "edit": "Edit text (F2)",
+                "branchColor": "Branch color",
+                "nodeShape": "Node shape",
+                "addBoundary": "Add boundary",
+                "editBoundary": "Edit boundary"
+            },
             "contextMenu": {
                 "nodeLabel": "Node",
                 "edit": "Edit node",

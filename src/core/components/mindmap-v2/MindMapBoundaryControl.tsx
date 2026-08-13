@@ -1,6 +1,7 @@
 import React, { useRef } from "react";
 import { Popover, Tooltip } from "antd";
 import { PushpinOutlined } from "@ant-design/icons";
+import { useTranslation } from "react-i18next";
 
 import {
   MindMapBoundaryEditor,
@@ -23,7 +24,11 @@ export const MindMapBoundaryControl: React.FC<MindMapBoundaryControlProps> = ({
   onRemove,
   onSave,
 }) => {
+  const { t } = useTranslation();
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const label = t(boundary
+    ? "plugins.mindmap.floatingBar.editBoundary"
+    : "plugins.mindmap.floatingBar.addBoundary");
 
   const closeAndRestoreFocus = () => {
     onOpenChange(false);
@@ -59,13 +64,13 @@ export const MindMapBoundaryControl: React.FC<MindMapBoundaryControlProps> = ({
         />
       }
     >
-      <Tooltip title={boundary ? "编辑外框分组" : "添加外框分组"}>
+      <Tooltip title={label}>
         <button
           ref={triggerRef}
           type="button"
           className={`${styles.btn} ${boundary ? styles.btnActive : ""}`}
-          aria-label={boundary ? "编辑外框分组" : "添加外框分组"}
-          title={boundary ? "编辑外框分组" : "添加外框分组"}
+          aria-label={label}
+          title={label}
           aria-expanded={open}
           onKeyDown={(event) => {
             if (event.key !== "Enter" && event.key !== " ") return;

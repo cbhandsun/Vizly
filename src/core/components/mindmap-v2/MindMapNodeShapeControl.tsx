@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
 import { Popover, Tooltip } from 'antd';
 import { GatewayOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 
 import { MindMapNodeShapePicker } from './MindMapNodeShapePicker';
 import styles from './FloatingBar.module.css';
@@ -18,7 +19,9 @@ export const MindMapNodeShapeControl: React.FC<MindMapNodeShapeControlProps> = (
     onOpenChange,
     onSelect,
 }) => {
+    const { t } = useTranslation();
     const triggerRef = useRef<HTMLButtonElement>(null);
+    const label = t('plugins.mindmap.floatingBar.nodeShape');
 
     const closeAndRestoreFocus = () => {
         onOpenChange(false);
@@ -53,13 +56,13 @@ export const MindMapNodeShapeControl: React.FC<MindMapNodeShapeControlProps> = (
                 />
             }
         >
-            <Tooltip title="节点形状">
+            <Tooltip title={label}>
                 <button
                     ref={triggerRef}
                     type="button"
                     className={styles.btn}
-                    aria-label="节点形状"
-                    title="节点形状"
+                    aria-label={label}
+                    title={label}
                     onKeyDown={event => {
                         if (event.key !== 'Enter' && event.key !== ' ') return;
                         event.preventDefault();

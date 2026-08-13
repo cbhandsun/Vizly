@@ -2697,6 +2697,18 @@
                 "expand": "展开分支",
                 "contextMenuLabel": "节点操作"
             },
+            "floatingBar": {
+                "toolbarLabel": "所选节点操作",
+                "aiAssistant": "AI 节点助手",
+                "addChild": "添加子节点 (Tab)",
+                "addSibling": "添加同级节点 (Enter)",
+                "duplicateSibling": "复制为同级 (Ctrl+D)",
+                "edit": "编辑文字 (F2)",
+                "branchColor": "分支颜色",
+                "nodeShape": "节点形状",
+                "addBoundary": "添加外框分组",
+                "editBoundary": "编辑外框分组"
+            },
             "contextMenu": {
                 "nodeLabel": "节点",
                 "edit": "编辑节点",

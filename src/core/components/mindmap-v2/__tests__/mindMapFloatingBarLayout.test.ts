@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
     resolveMindMapFloatingBarFallbackWidth,
     resolveMindMapFloatingBarLeft,
+    resolveMindMapFloatingBarTop,
     resolveMindMapFloatingBarVisibleRight,
 } from '../mindMapFloatingBarLayout';
 
@@ -21,6 +22,30 @@ describe('resolveMindMapFloatingBarFallbackWidth', () => {
             edgeInset: Number.POSITIVE_INFINITY,
             preferredWidth: -1,
             visibleRight: Number.NaN,
+        })).toBe(0);
+    });
+});
+
+describe('resolveMindMapFloatingBarTop', () => {
+    it('places the complete measured toolbar above the node anchor', () => {
+        expect(resolveMindMapFloatingBarTop({
+            anchorY: 327.5,
+            measuredHeight: 65.1,
+        })).toBeCloseTo(262.4);
+    });
+
+    it('keeps the toolbar inside the top edge of the viewport', () => {
+        expect(resolveMindMapFloatingBarTop({
+            anchorY: 48,
+            measuredHeight: 66,
+        })).toBe(8);
+    });
+
+    it('coerces invalid and extreme measurements to a safe position', () => {
+        expect(resolveMindMapFloatingBarTop({
+            anchorY: Number.NaN,
+            measuredHeight: Number.POSITIVE_INFINITY,
+            edgePadding: -1,
         })).toBe(0);
     });
 });

@@ -21,6 +21,12 @@ export interface MindMapFloatingBarFallbackWidthInput {
     visibleRight: number;
 }
 
+export interface MindMapFloatingBarTopInput {
+    anchorY: number;
+    measuredHeight: number;
+    edgePadding?: number;
+}
+
 const finiteNonNegative = (value: number): number => (
     Number.isFinite(value) ? Math.max(0, value) : 0
 );
@@ -73,4 +79,16 @@ export function resolveMindMapFloatingBarLeft({
     const maxLeft = Math.max(safePadding, safeViewportWidth - visibleWidth - safePadding);
 
     return Math.min(Math.max(idealLeft, safePadding), maxLeft);
+}
+
+export function resolveMindMapFloatingBarTop({
+    anchorY,
+    measuredHeight,
+    edgePadding = DEFAULT_EDGE_PADDING,
+}: MindMapFloatingBarTopInput): number {
+    const safePadding = finiteNonNegative(edgePadding);
+    const safeAnchorY = Number.isFinite(anchorY) ? Math.max(safePadding, anchorY) : safePadding;
+    const safeHeight = finiteNonNegative(measuredHeight);
+
+    return Math.max(safeAnchorY - safeHeight, safePadding);
 }
