@@ -189,6 +189,23 @@ describe('VersionHistoryPanel commercial preview safeguards', () => {
         expect(css).toMatch(/\.version-history-load-error \.ant-alert-actions \.ant-btn\s*\{[\s\S]*?min-height: var\(--commercial-touch-target, 44px\)/);
     });
 
+    it('keeps cached snapshots visible and shows retry guidance after refresh fails', () => {
+        historyMocks.loadError = true;
+        historyMocks.versions = [{
+            id: 'version-1',
+            diagramId: 'diagram-1',
+            snapshotData: null,
+            createdAt: 1,
+            message: 'Last usable snapshot',
+        }];
+        render(<VersionHistoryPanel diagramId="diagram-1" isOpen onClose={vi.fn()} />);
+
+        expect(screen.getByText('Last usable snapshot')).toBeTruthy();
+        expect(screen.getByRole('alert').textContent).toContain('Version history could not be loaded');
+        fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+        expect(historyMocks.loadVersions).toHaveBeenCalledTimes(1);
+    });
+
     it('returns focus to document actions after the drawer closes', () => {
         let restoreFocus: FrameRequestCallback | undefined;
         vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {

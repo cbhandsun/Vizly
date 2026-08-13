@@ -216,6 +216,26 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
             )}
 
             {/* Timeline List */}
+            {loadError && versions.length > 0 && (
+                <Alert
+                    className="version-history-load-error"
+                    role="alert"
+                    type="error"
+                    showIcon
+                    title={t('designer.versionHistoryPanel.loadErrorTitle')}
+                    description={t('designer.versionHistoryPanel.loadErrorDescription')}
+                    action={(
+                        <Button
+                            icon={<ReloadOutlined />}
+                            aria-label={t('designer.versionHistoryPanel.retry')}
+                            loading={loading}
+                            onClick={() => void loadVersions()}
+                        >
+                            {t('designer.versionHistoryPanel.retry')}
+                        </Button>
+                    )}
+                />
+            )}
             <List
                 loading={loading}
                 itemLayout="horizontal"

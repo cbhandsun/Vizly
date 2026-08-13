@@ -135,6 +135,22 @@ describe('useVersionHistory', () => {
         expect(result.current.versions).toHaveLength(1);
     });
 
+    it('keeps the last usable history visible when a refresh fails', async () => {
+        storageMocks.listVersions.mockResolvedValueOnce([makeVersion()]);
+        const { result } = renderHook(() => useVersionHistory('diagram-1'));
+
+        await waitFor(() => expect(result.current.versions).toHaveLength(1));
+        storageMocks.listVersions.mockRejectedValueOnce(new Error('refresh unavailable'));
+        await act(async () => {
+            await result.current.loadVersions();
+        });
+
+        expect(result.current.loadError).toBe(true);
+        expect(result.current.versions).toHaveLength(1);
+        expect(result.current.versions[0]?.id).toBe('version-1');
+        expect(messageMocks.error).toHaveBeenCalledWith('Failed to load version history');
+    });
+
     it('ignores an older version list response after the active diagram changes', async () => {
         let resolveFirstDiagram: ((versions: ReturnType<typeof makeVersion>[]) => void) | undefined;
         storageMocks.listVersions.mockImplementation((requestedDiagramId: string) => {
@@ -314,6 +330,106 @@ describe('useVersionHistory', () => {
             saved = await savePromise!;
         });
         expect(saved).toBe(true);
+    });
+
+    it('does not publish a stale save result after switching diagrams', async () => {
+        let resolveFirstSave: ((version: ReturnType<typeof makeVersion>) => void) | undefined;
+        storageMocks.saveVersion
+            .mockImplementationOnce(() => new Promise((resolve) => {
+                resolveFirstSave = resolve;
+            }))
+            .mockResolvedValueOnce({
+                ...makeVersion(),
+                id: 'version-2',
+                diagramId: 'diagram-2',
+                message: 'Second diagram snapshot',
+            });
+        const firstBridge = {
+            id: 'diagram-1',
+            nodes: originalNodes,
+            edges: originalEdges,
+            getCanvasSnapshot: vi.fn(() => ({ nodes: originalNodes, edges: originalEdges })),
+        };
+        const secondBridge = {
+            ...firstBridge,
+            id: 'diagram-2',
+        };
+        (window as unknown as {
+            __flowDataBridge: Record<string, typeof firstBridge>;
+        }).__flowDataBridge = {
+            'diagram-1': firstBridge,
+            'diagram-2': secondBridge,
+        };
+        const { result, rerender } = renderHook(
+            ({ activeDiagramId }) => useVersionHistory(activeDiagramId),
+            { initialProps: { activeDiagramId: 'diagram-1' } },
+        );
+        await waitFor(() => expect(storageMocks.listVersions).toHaveBeenCalledWith('diagram-1'));
+
+        let firstSave: Promise<boolean> | undefined;
+        act(() => {
+            firstSave = result.current.saveVersion('First diagram snapshot');
+        });
+        await waitFor(() => expect(storageMocks.saveVersion).toHaveBeenCalledTimes(1));
+
+        rerender({ activeDiagramId: 'diagram-2' });
+        await waitFor(() => expect(storageMocks.listVersions).toHaveBeenCalledWith('diagram-2'));
+        let secondSaved = false;
+        await act(async () => {
+            secondSaved = await result.current.saveVersion('Second diagram snapshot');
+        });
+        expect(secondSaved).toBe(true);
+
+        let firstSaved = true;
+        await act(async () => {
+            resolveFirstSave?.(makeVersion());
+            firstSaved = await firstSave!;
+        });
+
+        expect(firstSaved).toBe(false);
+        expect(result.current.versions.map(version => version.id)).toEqual(['version-2']);
+        expect(messageMocks.success).toHaveBeenCalledTimes(1);
+        expect(messageMocks.success).toHaveBeenCalledWith('Snapshot saved');
+    });
+
+    it('does not apply a restore whose safety backup finishes after switching diagrams', async () => {
+        let resolveBackup: ((version: ReturnType<typeof makeBackupVersion>) => void) | undefined;
+        storageMocks.saveVersion.mockImplementationOnce(() => new Promise((resolve) => {
+            resolveBackup = resolve;
+        }));
+        const replaceCanvasSnapshot = vi.fn();
+        const firstBridge = {
+            id: 'diagram-1',
+            nodes: originalNodes,
+            edges: originalEdges,
+            replaceCanvasSnapshot,
+        };
+        (window as unknown as {
+            __flowDataBridge: Record<string, typeof firstBridge>;
+        }).__flowDataBridge = { 'diagram-1': firstBridge };
+        const { result, rerender } = renderHook(
+            ({ activeDiagramId }) => useVersionHistory(activeDiagramId),
+            { initialProps: { activeDiagramId: 'diagram-1' } },
+        );
+        await waitFor(() => expect(storageMocks.listVersions).toHaveBeenCalledWith('diagram-1'));
+
+        let restorePromise: Promise<boolean> | undefined;
+        act(() => {
+            restorePromise = result.current.restoreVersion('version-1', vi.fn(), vi.fn());
+        });
+        await waitFor(() => expect(storageMocks.saveVersion).toHaveBeenCalledTimes(1));
+
+        rerender({ activeDiagramId: 'diagram-2' });
+        let restored = true;
+        await act(async () => {
+            resolveBackup?.(makeBackupVersion());
+            restored = await restorePromise!;
+        });
+
+        expect(restored).toBe(false);
+        expect(replaceCanvasSnapshot).not.toHaveBeenCalled();
+        expect(messageMocks.success).not.toHaveBeenCalled();
+        expect(messageMocks.error).not.toHaveBeenCalled();
     });
 
     it('rejects invalid active canvas data before persistence', async () => {
