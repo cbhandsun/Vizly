@@ -1,4 +1,5 @@
 import type { MindElixirInstance, NodeObj } from 'mind-elixir';
+import i18n from '@/i18n';
 
 import { addHistoryRecord } from './mindmapHistoryStore';
 import {
@@ -7,23 +8,23 @@ import {
     logMindmapWrapperShapeSyncFailure,
 } from './mindmapWrapperLogging';
 
-const OPERATION_NAMES: Readonly<Record<string, string>> = {
-    insertSibling: '添加兄弟节点',
-    addChild: '添加子节点',
-    removeNodes: '删除节点',
-    removeNode: '删除节点',
-    setNodeTopic: '修改节点文本',
-    moveNode: '移动节点位置',
-    setNodeNote: '修改节点备注',
-    setNodeTags: '修改节点标签',
-    setNodeIcons: '修改节点图标',
-    setNodeHyperLink: '修改节点链接',
-    outline_structure_change: '大纲拖拽排序',
-    template_apply: '套用模板',
-    ai_custom_action: 'AI 交互式指令处理',
-    clearHistory: '清空历史',
-    import: '导入数据',
-    restore_version: '恢复历史版本',
+const OPERATION_KEYS: Readonly<Record<string, string>> = {
+    insertSibling: 'insertSibling',
+    addChild: 'addChild',
+    removeNodes: 'removeNode',
+    removeNode: 'removeNode',
+    setNodeTopic: 'setNodeTopic',
+    moveNode: 'moveNode',
+    setNodeNote: 'setNodeNote',
+    setNodeTags: 'setNodeTags',
+    setNodeIcons: 'setNodeIcons',
+    setNodeHyperLink: 'setNodeHyperLink',
+    outline_structure_change: 'outlineChange',
+    template_apply: 'templateApply',
+    ai_custom_action: 'aiAction',
+    clearHistory: 'clear',
+    import: 'import',
+    restore_version: 'restore',
 };
 
 type TimerHandle = ReturnType<typeof setTimeout>;
@@ -44,6 +45,11 @@ const readOperationName = (operation: unknown): string => {
     if (typeof operation !== 'object' || operation === null || Array.isArray(operation)) return '';
     const name = (operation as { name?: unknown }).name;
     return typeof name === 'string' ? name : '';
+};
+
+const describeOperation = (operation: unknown): string => {
+    const operationKey = OPERATION_KEYS[readOperationName(operation)] ?? 'update';
+    return i18n.t(`plugins.mindmap.history.operations.${operationKey}`);
 };
 
 const readNodeShape = (node: NodeObj): string | undefined => {
@@ -75,7 +81,7 @@ export const bindMindElixirOperationEffects = ({
 
     const onOperation = (operation: unknown) => {
         scheduleSave();
-        const description = OPERATION_NAMES[readOperationName(operation)] || '更新思维导图';
+        const description = describeOperation(operation);
         try {
             dependencies.recordHistory(description, mind.getData().nodeData);
         } catch (error) {

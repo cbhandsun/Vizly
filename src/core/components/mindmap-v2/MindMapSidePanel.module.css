@@ -20,7 +20,8 @@
 }
 
 .historyPanel {
-    z-index: 810;
+    position: fixed;
+    z-index: 1000;
 }
 
 .header {

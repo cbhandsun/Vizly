@@ -29,12 +29,21 @@ describe('mind map auxiliary panel commercial audit contract', () => {
         expect(source).not.toContain('placeholder="🔍');
     });
 
-    it('uses a named, always-visible restore button for each history snapshot', () => {
+    it('uses a named, confirmed, top-layer restore action for each history snapshot', () => {
         const source = readSource('MindMapHistoryPanel.tsx');
+        const css = readSource('MindMapSidePanel.module.css');
 
         expect(source).toContain('onClick={() => setHistoryOpen(false)}');
-        expect(source).toContain('aria-label={`恢复 ${r.time} 的历史版本：${r.description}`}');
+        expect(source).toContain("aria-label={t('plugins.mindmap.history.restoreLabel'");
         expect(source).toContain('className={sidePanelStyles.historyRestoreAction}');
+        expect(source).toContain("title={t('plugins.mindmap.history.restoreConfirmTitle'");
+        expect(source).toContain('onConfirm={() => handleRestore(r)}');
+        expect(source).toContain('placement="leftTop"');
+        expect(source).toContain('autoAdjustOverflow={false}');
+        expect(source).toContain('getPopupContainer={() => document.body}');
+        expect(source).toContain('return createPortal((');
+        expect(source).toContain('), document.body);');
+        expect(css).toMatch(/\.historyPanel\s*\{[\s\S]*?position:\s*fixed;[\s\S]*?z-index:\s*1000;/);
         expect(source).not.toContain('history-restore-btn');
     });
 

@@ -1,9 +1,14 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import type { MindElixirInstance, NodeObj } from 'mind-elixir';
+import i18n from '@/i18n';
 
 import { bindMindElixirOperationEffects } from '../mindElixirOperationEffects';
 
 describe('mind elixir operation effects', () => {
+    beforeAll(async () => {
+        await i18n.changeLanguage('en');
+    });
+
     it('removes the exact listeners and cancels every pending task during cleanup', () => {
         const listeners: Array<(operation?: unknown) => void> = [];
         const addListener = vi.fn((_event: string, listener: (operation?: unknown) => void) => {
@@ -43,7 +48,7 @@ describe('mind elixir operation effects', () => {
         expect(addListener).toHaveBeenCalledTimes(3);
 
         listeners[0]?.({ name: 'addChild' });
-        expect(recordHistory).toHaveBeenCalledWith('添加子节点', nodeData);
+        expect(recordHistory).toHaveBeenCalledWith('Child node added', nodeData);
         expect(pending.size).toBe(3);
 
         cleanup();
@@ -86,7 +91,7 @@ describe('mind elixir operation effects', () => {
         listeners[0]?.({ name: 'unknown-operation' });
         listeners[0]?.({ name: 'unknown-operation' });
         expect(recordHistory).toHaveBeenCalledTimes(2);
-        expect(recordHistory).toHaveBeenLastCalledWith('更新思维导图', expect.anything());
+        expect(recordHistory).toHaveBeenLastCalledWith('Mind map updated', expect.anything());
         expect(pending.size).toBe(3);
 
         const saveTask = [...pending.entries()].find(([handle]) => handle > 2);

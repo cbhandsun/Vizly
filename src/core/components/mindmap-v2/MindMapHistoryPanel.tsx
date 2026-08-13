@@ -3,24 +3,26 @@
  * 能够查看历史版本时间线，并一键恢复至历史版本
  */
 import React, { useEffect, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 import { getMindElixirInstance } from './mindElixirStore';
 import {
     subscribeToggleHistory,
     subscribeHistoryList,
     clearHistory,
-    parseHistoryNodeData,
     setHistoryOpen,
-    HistoryRecord,
 } from './mindmapHistoryStore';
+import type { HistoryRecord } from './mindmapHistoryStore';
+import { restoreMindMapHistoryRecord } from './mindmapHistoryRestore';
 import { Popconfirm, message } from 'antd';
 import { CloseOutlined, DeleteOutlined, HistoryOutlined, RollbackOutlined } from '@ant-design/icons';
 import { logMindmapHistoryRestoreFailure } from './mindmapPanelLogging';
 import sidePanelStyles from './MindMapSidePanel.module.css';
 
 const MindMapHistoryPanel: React.FC = () => {
+    const { t } = useTranslation();
     const [open, setOpen] = useState(false);
     const [records, setRecords] = useState<HistoryRecord[]>([]);
-    const mind = getMindElixirInstance();
 
     useEffect(() => {
         const unsubToggle = subscribeToggleHistory(v => setOpen(v));
@@ -32,67 +34,59 @@ const MindMapHistoryPanel: React.FC = () => {
     }, []);
 
     const handleRestore = useCallback((record: HistoryRecord) => {
+        const mind = getMindElixirInstance();
         if (!mind) {
-            message.error('思维导图实例未准备就绪');
+            message.error(t('plugins.mindmap.history.notReady'));
             return;
         }
         try {
-            const oldNodeData = parseHistoryNodeData(record.data);
-            const currentData = mind.getData();
-            
-            // 恢复数据
-            mind.refresh({
-                ...currentData,
-                nodeData: oldNodeData
+            restoreMindMapHistoryRecord({
+                mind,
+                record,
+                backupDescription: t('plugins.mindmap.history.backupDescription'),
             });
-            mind.toCenter();
-
-            // 触发 operation，以使修改被保存，并写入新的历史快照记录中
-            mind.bus.fire('operation', { 
-                name: 'reshapeNode',
-                obj: oldNodeData,
-                origin: oldNodeData,
-            });
-
-            message.success(`已恢复至 ${record.time} 的历史版本`);
+            message.success(t('plugins.mindmap.history.restoreSuccess', { time: record.time }));
         } catch (e) {
             logMindmapHistoryRestoreFailure(e);
-            message.error('版本恢复失败，快照数据已损坏');
+            message.error(t('plugins.mindmap.history.restoreFailed'));
         }
-    }, [mind]);
+    }, [t]);
 
     const handleClear = useCallback(() => {
         clearHistory();
-        message.success('历史记录已清空');
-    }, []);
+        message.success(t('plugins.mindmap.history.clearSuccess'));
+    }, [t]);
 
-    if (!open) return null;
+    if (!open || typeof document === 'undefined') return null;
 
-    return (
+    return createPortal((
         <aside
             className={`${sidePanelStyles.panel} ${sidePanelStyles.historyPanel}`}
-            aria-label="历史版本快照"
+            aria-label={t('plugins.mindmap.history.panelLabel')}
         >
             <div className={sidePanelStyles.header}>
                 <HistoryOutlined className={sidePanelStyles.headerIcon} aria-hidden="true" />
-                <span className={sidePanelStyles.title}>历史版本快照</span>
+                <span className={sidePanelStyles.title}>{t('plugins.mindmap.history.title')}</span>
                 
                 {records.length > 0 && (
                     <Popconfirm
-                        title="确定清空历史记录吗？"
-                        description="此操作不可撤销，已生成的历史版本将被永久移除。"
+                        title={t('plugins.mindmap.history.clearConfirmTitle')}
+                        description={t('plugins.mindmap.history.clearConfirmDescription')}
                         onConfirm={handleClear}
-                        okText="清空"
-                        cancelText="取消"
+                        okText={t('plugins.mindmap.history.clearConfirmAction')}
+                        cancelText={t('plugins.mindmap.history.cancel')}
                         placement="bottomRight"
+                        autoAdjustOverflow={false}
+                        zIndex={1100}
+                        getPopupContainer={() => document.body}
                     >
                         <button
                             type="button"
                             className={`${sidePanelStyles.headerAction} ${sidePanelStyles.dangerAction}`}
-                            aria-label="清空历史记录"
+                            aria-label={t('plugins.mindmap.history.clear')}
                         >
                             <DeleteOutlined aria-hidden="true" />
-                            清空
+                            {t('plugins.mindmap.history.clearShort')}
                         </button>
                     </Popconfirm>
                 )}
@@ -101,46 +95,64 @@ const MindMapHistoryPanel: React.FC = () => {
                     type="button"
                     className={sidePanelStyles.closeButton}
                     onClick={() => setHistoryOpen(false)}
-                    aria-label="关闭历史版本快照"
-                    title="关闭历史版本快照 (Alt+H)"
+                    aria-label={t('plugins.mindmap.history.close')}
+                    title={t('plugins.mindmap.history.closeWithShortcut')}
                 >
                     <CloseOutlined aria-hidden="true" />
                 </button>
             </div>
 
             <div className={sidePanelStyles.scrollArea}>
-                <div className={sidePanelStyles.historyList} role="list" aria-label="历史版本列表">
+                <div
+                    className={sidePanelStyles.historyList}
+                    role="list"
+                    aria-label={t('plugins.mindmap.history.listLabel')}
+                >
                     {records.map(r => (
                         <div key={r.id} role="listitem">
-                            <button
-                                type="button"
-                                className={sidePanelStyles.historyItem}
-                                onClick={() => handleRestore(r)}
-                                aria-label={`恢复 ${r.time} 的历史版本：${r.description}`}
+                            <Popconfirm
+                                title={t('plugins.mindmap.history.restoreConfirmTitle', { time: r.time })}
+                                description={t('plugins.mindmap.history.restoreConfirmDescription')}
+                                onConfirm={() => handleRestore(r)}
+                                okText={t('plugins.mindmap.history.restoreConfirmAction')}
+                                cancelText={t('plugins.mindmap.history.cancel')}
+                                placement="leftTop"
+                                autoAdjustOverflow={false}
+                                zIndex={1100}
+                                getPopupContainer={() => document.body}
                             >
-                                <div className={sidePanelStyles.historyTime}>{r.time}</div>
-                                <div className={sidePanelStyles.historyDescription}>{r.description}</div>
-                                <span className={sidePanelStyles.historyRestoreAction}>
-                                    <RollbackOutlined aria-hidden="true" />
-                                    恢复此版本
-                                </span>
-                            </button>
+                                <button
+                                    type="button"
+                                    className={sidePanelStyles.historyItem}
+                                    aria-label={t('plugins.mindmap.history.restoreLabel', {
+                                        time: r.time,
+                                        description: r.description,
+                                    })}
+                                >
+                                    <div className={sidePanelStyles.historyTime}>{r.time}</div>
+                                    <div className={sidePanelStyles.historyDescription}>{r.description}</div>
+                                    <span className={sidePanelStyles.historyRestoreAction}>
+                                        <RollbackOutlined aria-hidden="true" />
+                                        {t('plugins.mindmap.history.restoreAction')}
+                                    </span>
+                                </button>
+                            </Popconfirm>
                         </div>
                     ))}
                 </div>
                 {records.length === 0 && (
                     <div className={sidePanelStyles.emptyState} role="status">
-                        暂无历史修改快照
+                        {t('plugins.mindmap.history.empty')}
                     </div>
                 )}
             </div>
 
             <div className={sidePanelStyles.footer}>
-                <span>快照数量: {records.length} / 50</span>
-                <span>Alt+H 切换</span>
+                <span>{t('plugins.mindmap.history.count', { count: records.length, limit: 50 })}</span>
+                <span>{t('plugins.mindmap.history.toggleHint')}</span>
             </div>
         </aside>
-    );
+    ), document.body);
 };
 
 export default MindMapHistoryPanel;

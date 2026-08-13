@@ -17,6 +17,7 @@ import React, {
     useCallback,
     useState,
 } from 'react';
+import i18n from '@/i18n';
 import MindElixir from 'mind-elixir';
 import type { MindElixirInstance, NodeObj, Topic } from 'mind-elixir';
 import 'mind-elixir/style.css';
@@ -159,7 +160,10 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
         registerMindElixirInstance(mind);  // expose to toolbar and other out-of-tree consumers
 
         if (diagramId) {
-            addHistoryRecord('加载思维导图', initialData.nodeData);
+            addHistoryRecord(
+                i18n.t('plugins.mindmap.history.operations.load'),
+                initialData.nodeData,
+            );
         }
 
         // ── 拦截 changeTheme 并同步彩虹色样式 ──────────────────────────
