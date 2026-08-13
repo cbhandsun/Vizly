@@ -67,6 +67,7 @@ import {
     logMindmapToolbarStatsUpdateFailure,
     logMindmapToolbarSummaryFailure,
     logMindmapToolbarTreeExpansionFailure,
+    logMindmapToolbarZoomFailure,
 } from './mindmapToolbarLogging';
 import { persistMindMapThemeKey, resolveMindMapThemeKey } from './mindmapThemeStorage';
 import { applyMindMapTreeExpansionTransaction } from './mindmapTreeExpansion';
@@ -81,6 +82,12 @@ import { useMindMapFocusMode } from './useMindMapFocusMode';
 import { getViewportPopupContainer } from '../ui/viewportOverlayPortal';
 import { appMessage } from '@/core/utils/antdStaticBridge';
 import { createMindMapSummaryForSelection } from './mindMapSummaryCreation';
+import {
+    applyMindMapZoomCommand,
+    MIND_MAP_MAX_SCALE,
+    MIND_MAP_MIN_SCALE,
+    toMindMapZoomPercent,
+} from './mindMapZoom';
 import './MindElixirToolbar.css';
 
 
@@ -230,7 +237,7 @@ const MindElixirToolbar: React.FC = () => {
     const [zoomVal, setZoomVal] = useState(100);
     useEffect(() => {
         if (!mind) return;
-        const update = () => setZoomVal(Math.round((mind.scaleVal ?? 1) * 100));
+        const update = () => setZoomVal(toMindMapZoomPercent(mind.scaleVal));
         update();
         mind.bus.addListener('operation', update);
         return () => { mind.bus.removeListener('operation', update); };
@@ -238,18 +245,35 @@ const MindElixirToolbar: React.FC = () => {
 
     const handleZoomIn = useCallback(() => {
         if (!mind) return;
-        mind.scale(Math.min((mind.scaleVal ?? 1) + 0.1, 3));
+        try {
+            setZoomVal(applyMindMapZoomCommand(mind, 'in'));
+        } catch (error) {
+            logMindmapToolbarZoomFailure(error);
+        }
     }, [mind]);
 
     const handleZoomOut = useCallback(() => {
         if (!mind) return;
-        mind.scale(Math.max((mind.scaleVal ?? 1) - 0.1, 0.2));
+        try {
+            setZoomVal(applyMindMapZoomCommand(mind, 'out'));
+        } catch (error) {
+            logMindmapToolbarZoomFailure(error);
+        }
     }, [mind]);
 
     const handleZoomReset = useCallback(() => {
         if (!mind) return;
-        mind.scale(1);
-        mind.toCenter();
+        try {
+            setZoomVal(applyMindMapZoomCommand(mind, 'reset'));
+        } catch (error) {
+            logMindmapToolbarZoomFailure(error);
+            return;
+        }
+        try {
+            mind.toCenter();
+        } catch (error) {
+            logMindmapToolbarZoomFailure(error);
+        }
     }, [mind]);
 
     // Also update zoom on wheel scroll (mind-elixir zoom doesn't emit 'operation')
@@ -259,7 +283,7 @@ const MindElixirToolbar: React.FC = () => {
         const onWheel = () => {
             clearTimeout(timer);
             timer = setTimeout(() => {
-                setZoomVal(Math.round((mind.scaleVal ?? 1) * 100));
+                setZoomVal(toMindMapZoomPercent(mind.scaleVal));
             }, 80);
         };
         const container = mind.container;
@@ -487,7 +511,7 @@ const MindElixirToolbar: React.FC = () => {
             {/* Zoom controls */}
             {mind && (
                 <div className="mind-elixir-toolbar-zoom" role="group" aria-label={t('plugins.mindmap.toolbar.zoomControls')}>
-                    <MindMapToolbarIconButton label={t('plugins.mindmap.toolbar.zoomOut')} icon={<ZoomOutOutlined />} onClick={handleZoomOut} />
+                    <MindMapToolbarIconButton label={t('plugins.mindmap.toolbar.zoomOut')} icon={<ZoomOutOutlined />} onClick={handleZoomOut} disabled={zoomVal <= MIND_MAP_MIN_SCALE * 100} />
                     <Tooltip title={t('plugins.mindmap.toolbar.zoomResetTooltip')}>
                         <button
                             aria-label={t('plugins.mindmap.toolbar.zoomResetLabel', { zoom: zoomVal })}
@@ -498,7 +522,7 @@ const MindElixirToolbar: React.FC = () => {
                             {zoomVal}%
                         </button>
                     </Tooltip>
-                    <MindMapToolbarIconButton label={t('plugins.mindmap.toolbar.zoomIn')} icon={<ZoomInOutlined />} onClick={handleZoomIn} />
+                    <MindMapToolbarIconButton label={t('plugins.mindmap.toolbar.zoomIn')} icon={<ZoomInOutlined />} onClick={handleZoomIn} disabled={zoomVal >= MIND_MAP_MAX_SCALE * 100} />
                 </div>
             )}
 

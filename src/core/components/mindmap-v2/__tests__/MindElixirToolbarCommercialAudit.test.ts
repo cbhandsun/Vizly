@@ -83,4 +83,14 @@ describe('MindElixirToolbar commercial interaction contract', () => {
         expect(source).toContain("t('plugins.mindmap.toolbar.direction.twoWay')");
         expect(source).toContain('applyMindMapAutoArrangeTransaction(mind)');
     });
+
+    it('keeps the displayed zoom synchronized with every toolbar command', () => {
+        expect(source).toContain("setZoomVal(applyMindMapZoomCommand(mind, 'in'))");
+        expect(source).toContain("setZoomVal(applyMindMapZoomCommand(mind, 'out'))");
+        expect(source).toContain("setZoomVal(applyMindMapZoomCommand(mind, 'reset'))");
+        expect(source).toContain('toMindMapZoomPercent(mind.scaleVal)');
+        expect(source).toContain('disabled={zoomVal <= MIND_MAP_MIN_SCALE * 100}');
+        expect(source).toContain('disabled={zoomVal >= MIND_MAP_MAX_SCALE * 100}');
+        expect(source).toContain('logMindmapToolbarZoomFailure(error)');
+    });
 });

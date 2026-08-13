@@ -37,6 +37,10 @@ export const logMindmapToolbarStatsUpdateFailure = (error: unknown): void => {
   safeLog.warn('[MindMapToolbar] stats update failed:', redactSensitiveLogValue(error));
 };
 
+export const logMindmapToolbarZoomFailure = (error: unknown): void => {
+  safeLog.warn('[MindMapToolbar] zoom failed:', redactSensitiveLogValue(error));
+};
+
 export const logMindmapToolbarTreeExpansionFailure = (
   action: 'collapseAll' | 'expandAll',
   error: unknown,
