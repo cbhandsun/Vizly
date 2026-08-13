@@ -8,7 +8,6 @@
  */
 import React, { useCallback, useEffect, useId, useLayoutEffect, useState, useRef } from 'react';
 import { Tooltip, Popover } from 'antd';
-import type { NodeObj } from 'mind-elixir';
 import { useTranslation } from 'react-i18next';
 import { getMindElixirInstance, subscribeMindElixir } from './mindElixirStore';
 import { findNodeById } from './migrate';
@@ -23,7 +22,11 @@ import {
 import { cleanMindMapChildNode } from './mindmapBridgeSecurity';
 import { RobotOutlined } from '@ant-design/icons';
 import { logMindMapFloatingActionFailure } from './mindmapFloatingLogging';
-import { resolveMindMapFloatingBarLeft } from './mindMapFloatingBarLayout';
+import {
+    resolveMindMapFloatingBarFallbackWidth,
+    resolveMindMapFloatingBarLeft,
+    resolveMindMapFloatingBarVisibleRight,
+} from './mindMapFloatingBarLayout';
 import { addEditableMindMapChild } from './mindMapNodeCreation';
 import { MindMapNoteEditorPanel } from './MindMapNoteEditorPanel';
 import { updateMindMapNoteAndRestoreSelection } from './mindMapNoteMutation';
@@ -39,13 +42,9 @@ import {
     restoreCurrentMindMapSelectionAfterMutation,
 } from './mindMapFloatingSelection';
 import { useMindMapFloatingSelection } from './useMindMapFloatingSelection';
+import { useMindMapNodeDeletion } from './useMindMapNodeDeletion';
+import type { MindMapFloatingBarNode } from './mindMapFloatingBarTypes';
 import styles from './FloatingBar.module.css';
-
-// ─── Position tracking ────────────────────────────────────────────────────────
-type ExtendedMindMapNode = NodeObj & {
-    shapeClass?: string;
-    boundary?: { color: string; title: string };
-};
 
 const errorMessage = (error: unknown, fallback: string): string =>
     error instanceof Error && error.message ? error.message : fallback;
@@ -77,6 +76,7 @@ const MindMapFloatingBar: React.FC = () => {
     const noteTriggerRef = useRef<HTMLButtonElement>(null);
     const noteDialogId = useId();
     const [barWidth, setBarWidth] = useState(0);
+    const [visibleRight, setVisibleRight] = useState(() => window.innerWidth);
 
     const closeSelectionOverlays = useCallback(() => {
         setColorOpen(false); setShapeOpen(false); setNoteOpen(false); setNoteDirty(false);
@@ -86,25 +86,49 @@ const MindMapFloatingBar: React.FC = () => {
         position: pos,
         refreshForNode: refreshFloatingBarForNode,
     } = useMindMapFloatingSelection(mind, closeSelectionOverlays);
+    const {
+        deleteDialog,
+        requestDelete,
+    } = useMindMapNodeDeletion({
+        mind,
+        onDeleted: closeSelectionOverlays,
+        onFailure: error => logMindMapFloatingActionFailure('removeNode', error),
+    });
     useLayoutEffect(() => {
         const bar = barRef.current;
         if (!pos || !bar) return;
 
-        const updateWidth = () => setBarWidth(bar.getBoundingClientRect().width);
-        updateWidth();
-        window.addEventListener('resize', updateWidth);
+        const sidebar = document.querySelector<HTMLElement>('.designer-right-sidebar');
+        const updateLayout = () => {
+            const sidebarRect = sidebar?.getBoundingClientRect();
+            setBarWidth(bar.getBoundingClientRect().width);
+            setVisibleRight(resolveMindMapFloatingBarVisibleRight({
+                viewportWidth: window.innerWidth,
+                sidebarLeft: sidebarRect?.left,
+                sidebarWidth: sidebarRect?.width,
+                sidebarHeight: sidebarRect?.height,
+                sidebarVisible: Boolean(
+                    sidebar
+                    && sidebarRect
+                    && getComputedStyle(sidebar).visibility !== 'hidden'
+                ),
+            }));
+        };
+        updateLayout();
+        window.addEventListener('resize', updateLayout);
         const resizeObserver = typeof ResizeObserver === 'function'
-            ? new ResizeObserver(updateWidth)
+            ? new ResizeObserver(updateLayout)
             : null;
         resizeObserver?.observe(bar);
+        if (sidebar) resizeObserver?.observe(sidebar);
 
         return () => {
-            window.removeEventListener('resize', updateWidth);
+            window.removeEventListener('resize', updateLayout);
             resizeObserver?.disconnect();
         };
     }, [pos]);
 
-    if (!pos || !mind) return null;
+    if (!pos || !mind) return deleteDialog;
 
     const getTpc = () => {
         try { return mind.findEle(pos.nodeId); } catch (error) {
@@ -119,7 +143,7 @@ const MindMapFloatingBar: React.FC = () => {
         }
     };
     const obj = getObj();
-    if (!obj) return null;
+    if (!obj) return deleteDialog;
 
     const closeNoteEditor = (restoreFocus = false) => {
         setNoteOpen(false);
@@ -204,7 +228,7 @@ const MindMapFloatingBar: React.FC = () => {
         }
     };
 
-    const extendedObj = obj as ExtendedMindMapNode;
+    const extendedObj = obj as MindMapFloatingBarNode;
 
     const isRoot = pos.nodeId === mind.getData()?.nodeData?.id;
     const hasChildren = (obj.children?.length ?? 0) > 0;
@@ -341,12 +365,19 @@ const MindMapFloatingBar: React.FC = () => {
     };
 
     // ── Button style ─────────────────────────────────────────────────────────
-    const Btn: React.FC<{ icon: string; tip: string; danger?: boolean; onClick: () => void }> = ({ icon, tip, danger, onClick }) => (
+    const Btn: React.FC<{
+        ariaExpanded?: boolean;
+        danger?: boolean;
+        icon: string;
+        onClick: () => void;
+        tip: string;
+    }> = ({ ariaExpanded, icon, tip, danger, onClick }) => (
         <Tooltip title={tip} placement="top" mouseEnterDelay={0.4}>
             <button
                 type="button"
                 className={`${styles.btn} ${danger ? styles.btnDanger : ''}`}
                 aria-label={tip}
+                aria-expanded={ariaExpanded}
                 title={tip}
                 onClick={onClick}
             >
@@ -386,9 +417,12 @@ const MindMapFloatingBar: React.FC = () => {
         })();
     };
 
-    const resolvedBarWidth = barWidth || Math.min(window.innerWidth - 16, 320);
+    const safeVisibleRight = Math.min(window.innerWidth, visibleRight);
+    const resolvedBarWidth =
+        barWidth || resolveMindMapFloatingBarFallbackWidth({ visibleRight: safeVisibleRight });
 
     return (
+        <>
         <div
             ref={barRef}
             className={styles.barContainer}
@@ -396,11 +430,12 @@ const MindMapFloatingBar: React.FC = () => {
             aria-label="节点快捷操作"
             style={{
                 left: resolveMindMapFloatingBarLeft({
-                    anchorX: pos.x,
-                    measuredWidth: resolvedBarWidth,
-                    viewportWidth: window.innerWidth,
-                }),
+                anchorX: pos.x,
+                measuredWidth: resolvedBarWidth,
+                viewportWidth: safeVisibleRight,
+            }),
                 top: Math.max(pos.y - 44, 8),
+                maxWidth: Math.max(0, safeVisibleRight - 16),
             }}
             // stop clicks from deselecting the node in canvas
             onMouseDown={e => e.stopPropagation()}
@@ -493,7 +528,12 @@ const MindMapFloatingBar: React.FC = () => {
 
             {/* Expand/Collapse — only if has children */}
             {hasChildren && (
-                <Btn icon={isExpanded ? '🔽' : '▶️'} tip={isExpanded ? '折叠' : '展开'}
+                <Btn
+                    icon={isExpanded ? '🔽' : '▶️'}
+                    tip={t(isExpanded
+                        ? 'plugins.mindmap.actions.collapse'
+                        : 'plugins.mindmap.actions.expand')}
+                    ariaExpanded={isExpanded}
                     onClick={() => act(() => { const tpc = getTpc(); if (tpc) mind.expandNode(tpc, !isExpanded); })} />
             )}
 
@@ -643,11 +683,13 @@ const MindMapFloatingBar: React.FC = () => {
             {!isRoot && (
                 <>
                     <Div />
-                    <Btn icon="🗑️" tip="删除节点 (Del)" danger
-                        onClick={() => act(() => { const tpc = getTpc(); if (tpc) mind.removeNodes([tpc]); })} />
+                    <Btn icon="🗑️" tip={t('plugins.mindmap.actions.deleteNode')} danger
+                        onClick={() => requestDelete(obj)} />
                 </>
             )}
         </div>
+        {deleteDialog}
+        </>
     );
 };
 

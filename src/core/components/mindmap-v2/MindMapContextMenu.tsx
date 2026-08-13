@@ -4,7 +4,7 @@
  *
  * v2: 修复 getObjById → findNodeById，新增形状快速选择
  */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { getMindElixirInstance } from './mindElixirStore';
 import { findNodeById } from './migrate';
 import { toSafeExternalUrl } from '../../utils/sanitizeHtml';
@@ -14,6 +14,9 @@ import type { NodeObj } from 'mind-elixir';
 import { logMindmapContextMenuFailure } from './mindmapInteractionLogging';
 import { appMessage } from '@/core/utils/antdStaticBridge';
 import { createMindMapSummaryForSelection } from './mindMapSummaryCreation';
+import { useMindMapNodeDeletion } from './useMindMapNodeDeletion';
+import { useTranslation } from 'react-i18next';
+import { resolveMindMapContextMenuPosition } from './mindMapContextMenuLayout';
 
 interface CtxPos { visible: boolean; x: number; y: number; nodeId: string | null; }
 interface Props extends CtxPos { onClose: () => void; }
@@ -24,11 +27,12 @@ const ITEM_STYLE: React.CSSProperties = {
     fontSize: 13, color: 'rgba(255,255,255,0.82)',
     transition: 'background 0.12s',
     userSelect: 'none', whiteSpace: 'nowrap',
+    border: 'none', width: '100%', background: 'transparent', textAlign: 'left',
 };
 const DIVIDER = <div style={{ height: 1, background: 'rgba(255,255,255,0.07)', margin: '4px 8px' }} />;
 
 const KBD: React.FC<{ k: string }> = ({ k }) => (
-    <kbd style={{
+    <kbd aria-hidden="true" style={{
         marginLeft: 'auto', padding: '1px 5px', borderRadius: 4,
         background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)',
         fontSize: 10, fontFamily: 'monospace', color: 'rgba(255,255,255,0.4)',
@@ -45,26 +49,60 @@ const SHAPES = [
 ];
 
 const MindMapContextMenu: React.FC<Props> = ({ visible, x, y, nodeId, onClose }) => {
+    const { t } = useTranslation();
     const mind = getMindElixirInstance();
     const ref = useRef<HTMLDivElement>(null);
     const [shapeOpen, setShapeOpen] = useState(false);
+    const {
+        deleteDialog,
+        isDeleteDialogOpen,
+        requestDelete,
+    } = useMindMapNodeDeletion({
+        mind,
+        onDeleted: onClose,
+        onFailure: error => logMindmapContextMenuFailure('removeNode', error),
+    });
+
+    const moveMenuFocus = useCallback((key: string): boolean => {
+        if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(key)) return false;
+        const items = Array.from(
+            ref.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? [],
+        );
+        if (items.length === 0 || !ref.current?.contains(document.activeElement)) return false;
+        const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement);
+        if (key === 'Home') items[0]?.focus();
+        else if (key === 'End') items[items.length - 1]?.focus();
+        else if (key === 'ArrowDown') items[(currentIndex + 1 + items.length) % items.length]?.focus();
+        else items[(currentIndex - 1 + items.length) % items.length]?.focus();
+        return true;
+    }, []);
 
     // Close on outside click or Escape
     useEffect(() => {
         if (!visible) return;
-        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+        const focusFrame = requestAnimationFrame(() => {
+            ref.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus();
+        });
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && !isDeleteDialogOpen) {
+                onClose();
+                return;
+            }
+            if (moveMenuFocus(e.key)) e.preventDefault();
+        };
         const onClick = (e: MouseEvent) => {
-            if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+            if (!isDeleteDialogOpen && ref.current && !ref.current.contains(e.target as Node)) onClose();
         };
         document.addEventListener('keydown', onKey, true);
         document.addEventListener('mousedown', onClick, true);
         return () => {
+            cancelAnimationFrame(focusFrame);
             document.removeEventListener('keydown', onKey, true);
             document.removeEventListener('mousedown', onClick, true);
         };
-    }, [visible, onClose]);
+    }, [isDeleteDialogOpen, moveMenuFocus, visible, onClose]);
 
-    if (!visible || !nodeId || !mind) return null;
+    if (!visible || !nodeId || !mind) return deleteDialog;
 
     const getTpc = () => {
         try { return mind.findEle(nodeId); } catch (error) {
@@ -86,38 +124,52 @@ const MindMapContextMenu: React.FC<Props> = ({ visible, x, y, nodeId, onClose })
     const currentShape = (obj as NodeObj & { shapeClass?: string })?.shapeClass ?? '';
     const safeHyperLink = obj?.hyperLink ? toSafeExternalUrl(String(obj.hyperLink)) : null;
 
-    // Clamp to viewport
-    const MENU_W = 230, MENU_H = 420;
-    const cx = Math.min(x, window.innerWidth - MENU_W - 8);
-    const cy = Math.min(y, window.innerHeight - MENU_H - 8);
+    const MENU_W = 230;
+    const menuPosition = resolveMindMapContextMenuPosition({
+        x,
+        y,
+        viewportWidth: window.innerWidth,
+        viewportHeight: window.innerHeight,
+        menuWidth: MENU_W,
+    });
 
     const act = (fn: () => void) => { fn(); onClose(); };
 
     const Item: React.FC<{ icon: string; label: string; kbd?: string; danger?: boolean; onClick: () => void }> =
         ({ icon, label, kbd: k, danger, onClick }) => (
-            <div
+            <button
+                type="button"
+                role="menuitem"
+                aria-label={label}
                 style={{ ...ITEM_STYLE, color: danger ? '#f87171' : ITEM_STYLE.color }}
                 onClick={onClick}
                 onMouseEnter={e => (e.currentTarget.style.background = danger ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.07)')}
                 onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
             >
-                <span style={{ fontSize: 14, width: 18, textAlign: 'center' }}>{icon}</span>
+                <span aria-hidden="true" style={{ fontSize: 14, width: 18, textAlign: 'center' }}>{icon}</span>
                 <span style={{ flex: 1 }}>{label}</span>
                 {k && <KBD k={k} />}
-            </div>
+            </button>
         );
 
     return (
+        <>
         <div
             ref={ref}
+            role="menu"
+            aria-label={t('plugins.mindmap.actions.contextMenuLabel')}
+            onClick={event => event.stopPropagation()}
+            onMouseDown={event => event.stopPropagation()}
             style={{
-                position: 'fixed', left: cx, top: cy, zIndex: 99999,
+                position: 'fixed', left: menuPosition.left, top: menuPosition.top, zIndex: 99999,
                 background: 'rgba(12,12,18,0.92)',
                 backdropFilter: 'blur(20px)',
                 border: '1px solid rgba(255,255,255,0.1)',
                 borderRadius: 12, padding: '6px 0',
                 boxShadow: '0 16px 48px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.3)',
                 minWidth: MENU_W,
+                maxHeight: 'calc(100vh - 16px)',
+                overflowY: 'auto',
                 animation: 'ctxMenuIn 0.12s ease',
             }}
         >
@@ -167,7 +219,11 @@ const MindMapContextMenu: React.FC<Props> = ({ visible, x, y, nodeId, onClose })
             )}
 
             {hasChildren && (
-                <Item icon={isExpanded ? '🔽' : '▶️'} label={isExpanded ? '折叠子节点' : '展开子节点'}
+                <Item
+                    icon={isExpanded ? '🔽' : '▶️'}
+                    label={t(isExpanded
+                        ? 'plugins.mindmap.actions.collapse'
+                        : 'plugins.mindmap.actions.expand')}
                     onClick={() => act(() => { const tpc = getTpc(); if (tpc) mind.expandNode(tpc, !isExpanded); })} />
             )}
             <Item icon="⌥" label="创建汇总括号"
@@ -243,11 +299,13 @@ const MindMapContextMenu: React.FC<Props> = ({ visible, x, y, nodeId, onClose })
             {!isRoot && (
                 <>
                     {DIVIDER}
-                    <Item icon="🗑️" label="删除节点" kbd="Del" danger
-                        onClick={() => act(() => { const tpc = getTpc(); if (tpc) mind.removeNodes([tpc]); })} />
+                    <Item icon="🗑️" label={t('plugins.mindmap.actions.deleteNode')} kbd="Del" danger
+                        onClick={() => obj && requestDelete(obj)} />
                 </>
             )}
         </div>
+        {deleteDialog}
+        </>
     );
 };
 

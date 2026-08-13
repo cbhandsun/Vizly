@@ -29,6 +29,7 @@ import { isMindMapV1, isMindMapV2 } from './types';
 import { registerMindElixirInstance, unregisterMindElixirInstance } from './mindElixirStore';
 import { MindElixirContext } from './MindElixirContext';
 import MindMapContextMenu, { type CtxPos } from './MindMapContextMenu';
+import { resolveMindMapContextNodeId } from './mindMapContextNodeId';
 import MindMapFloatingBar from './MindMapFloatingBar';
 import MindMapBatchBar from './MindMapBatchBar';
 import MindMapEmptyGuide from './MindMapEmptyGuide';
@@ -207,10 +208,11 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
             const tpc = (e.target as HTMLElement)?.closest?.('me-tpc') as HTMLElement | null;
             if (!tpc) return;
             const wrapper = tpc.closest('me-wrapper') as HTMLElement | null;
-            const nodeId = tpc.getAttribute('data-nodeid')
-                || wrapper?.getAttribute('data-nodeid')
-                || mind.currentNode?.id
-                || null;
+            const nodeId = resolveMindMapContextNodeId(mind.getData().nodeData, [
+                tpc.getAttribute('data-nodeid'),
+                wrapper?.getAttribute('data-nodeid'),
+                mind.currentNode?.id,
+            ]);
             if (!nodeId) return;
             setCtxMenu({ visible: true, x: e.clientX, y: e.clientY, nodeId });
         };

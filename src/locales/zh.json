@@ -2694,7 +2694,8 @@
                 "addSibling": "添加同级节点 (Enter)",
                 "deleteNode": "删除节点 (Del)",
                 "collapse": "折叠分支",
-                "expand": "展开分支"
+                "expand": "展开分支",
+                "contextMenuLabel": "节点操作"
             },
             "batch": {
                 "toolbarLabel": "已选节点操作",
@@ -2774,6 +2775,16 @@
                 "saveLabel": "保存节点备注 (Ctrl/Cmd+Enter)",
                 "clearFailed": "无法清除备注，请重试",
                 "saveFailed": "无法保存备注，请重试"
+            },
+            "nodeDelete": {
+                "title": "删除“{{topic}}”？",
+                "titleFallback": "删除该节点？",
+                "untitled": "未命名节点",
+                "description": "该节点将被删除，可使用撤销恢复。",
+                "descriptionWithChildren": "该节点及其 {{count}} 个后代节点将被删除，可使用撤销恢复。",
+                "confirm": "删除节点",
+                "success": "节点已删除",
+                "failed": "无法删除该节点。请确认节点仍然存在后重试。"
             },
             "actionBar": {
                 "addSibling": "同级主题",

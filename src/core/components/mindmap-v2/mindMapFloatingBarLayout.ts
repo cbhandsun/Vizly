@@ -6,9 +6,57 @@ export interface MindMapFloatingBarLayoutInput {
     viewportWidth: number;
     edgePadding?: number;
 }
+
+export interface MindMapFloatingBarVisibleRightInput {
+    sidebarHeight?: number;
+    sidebarLeft?: number;
+    sidebarVisible?: boolean;
+    sidebarWidth?: number;
+    viewportWidth: number;
+}
+
+export interface MindMapFloatingBarFallbackWidthInput {
+    edgeInset?: number;
+    preferredWidth?: number;
+    visibleRight: number;
+}
+
 const finiteNonNegative = (value: number): number => (
     Number.isFinite(value) ? Math.max(0, value) : 0
 );
+
+export function resolveMindMapFloatingBarFallbackWidth({
+    edgeInset = 16,
+    preferredWidth = 320,
+    visibleRight,
+}: MindMapFloatingBarFallbackWidthInput): number {
+    const availableWidth = Math.max(
+        0,
+        finiteNonNegative(visibleRight) - finiteNonNegative(edgeInset),
+    );
+
+    return Math.min(availableWidth, finiteNonNegative(preferredWidth));
+}
+
+export function resolveMindMapFloatingBarVisibleRight({
+    sidebarHeight,
+    sidebarLeft,
+    sidebarVisible,
+    sidebarWidth,
+    viewportWidth,
+}: MindMapFloatingBarVisibleRightInput): number {
+    const safeViewportWidth = finiteNonNegative(viewportWidth);
+    if (
+        !sidebarVisible
+        || !Number.isFinite(sidebarLeft)
+        || finiteNonNegative(sidebarWidth ?? 0) === 0
+        || finiteNonNegative(sidebarHeight ?? 0) === 0
+    ) {
+        return safeViewportWidth;
+    }
+
+    return Math.min(finiteNonNegative(sidebarLeft ?? safeViewportWidth), safeViewportWidth);
+}
 
 export function resolveMindMapFloatingBarLeft({
     anchorX,

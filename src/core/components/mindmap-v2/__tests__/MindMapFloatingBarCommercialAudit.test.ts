@@ -42,6 +42,18 @@ const noteEditorSource = readFileSync(
     resolve(process.cwd(), 'src/core/components/mindmap-v2/MindMapNoteEditorPanel.tsx'),
     'utf8',
 );
+const deleteHookSource = readFileSync(
+    resolve(process.cwd(), 'src/core/components/mindmap-v2/useMindMapNodeDeletion.tsx'),
+    'utf8',
+);
+const contextMenuSource = readFileSync(
+    resolve(process.cwd(), 'src/core/components/mindmap-v2/MindMapContextMenu.tsx'),
+    'utf8',
+);
+const propertyPanelSource = readFileSync(
+    resolve(process.cwd(), 'src/core/components/mindmap-v2/MindMapPropertyPanel.tsx'),
+    'utf8',
+);
 
 describe('MindMapFloatingBar commercial interaction contract', () => {
     it('keeps node actions named, keyboard visible, and inside narrow viewports', () => {
@@ -71,6 +83,30 @@ describe('MindMapFloatingBar commercial interaction contract', () => {
         expect(css).toMatch(/\.noteBtnClear[\s\S]*?min-height: 52px;/);
         expect(css).toMatch(/\.noteBtnCancel[\s\S]*?min-height: 52px;/);
         expect(css).toMatch(/\.noteBtnSave[\s\S]*?min-height: 52px;/);
+    });
+
+    it('routes every single-node delete through one recoverable confirmation transaction', () => {
+        expect(source).toContain('requestDelete(obj)');
+        expect(contextMenuSource).toContain('obj && requestDelete(obj)');
+        expect(propertyPanelSource).toContain('onRequestDelete(node)');
+        expect(propertyPanelSource).toContain("aria-label={t('plugins.mindmap.actions.deleteNode')}");
+        expect(source).not.toContain('mind.removeNodes([tpc])');
+        expect(contextMenuSource).not.toContain('mind.removeNodes([tpc])');
+        expect(propertyPanelSource).not.toContain('mind!.removeNodes([el])');
+        expect(deleteHookSource).toContain('currentNode.id === root.id');
+        expect(deleteHookSource).toContain('confirmLoading={pending}');
+        expect(deleteHookSource).toContain('role="alert"');
+    });
+
+    it('exposes branch state and native keyboard navigation for contextual actions', () => {
+        expect(source).toContain('aria-expanded={ariaExpanded}');
+        expect(source).toContain('ariaExpanded={isExpanded}');
+        expect(source).toContain("document.querySelector<HTMLElement>('.designer-right-sidebar')");
+        expect(source).toContain('maxWidth: Math.max(0, safeVisibleRight - 16)');
+        expect(contextMenuSource).toContain('role="menu"');
+        expect(contextMenuSource).toContain('role="menuitem"');
+        expect(contextMenuSource).toContain("'ArrowDown', 'ArrowUp', 'Home', 'End'");
+        expect(contextMenuSource).toContain("querySelector<HTMLButtonElement>('[role=\"menuitem\"]')?.focus()");
     });
 
     it('keeps AI popover state single-sourced and provides a configuration recovery path', () => {

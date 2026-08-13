@@ -2,7 +2,7 @@ import { safeLog } from '@/core/utils/consoleCleanup';
 import { redactSensitiveLogValue } from '@/core/utils/logSecurity';
 
 export const logMindmapContextMenuFailure = (
-  action: 'findTopicElement' | 'findNodeObject' | 'copyNode' | 'createSummary' | 'setShapeClass',
+  action: 'findTopicElement' | 'findNodeObject' | 'copyNode' | 'createSummary' | 'setShapeClass' | 'removeNode',
   error: unknown
 ): void => {
   safeLog.warn(`[MindMapContextMenu] ${action} failed:`, redactSensitiveLogValue(error));

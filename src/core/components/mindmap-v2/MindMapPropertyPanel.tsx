@@ -54,6 +54,7 @@ import { MindMapPropertyAISection } from './MindMapPropertyAISection';
 import { isMindMapAIConfigurationError } from './mindMapAIErrorPresentation';
 import { presentMindMapPropertyAIError } from './mindMapPropertyAIError';
 import { MindMapPropertyMediaControls } from './MindMapPropertyMediaControls';
+import { useMindMapNodeDeletion } from './useMindMapNodeDeletion';
 
 const { Text } = Typography;
 const { TextArea } = Input;
@@ -73,7 +74,10 @@ const tagBorderColor = (tag: TagObj): string => {
 };
 
 // ─── Node Property Panel ───────────────────────────────────────────────────────
-const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
+const NodePropertyPanel: React.FC<{
+    node: NodeObj;
+    onRequestDelete: (node: NodeObj) => void;
+}> = ({ node, onRequestDelete }) => {
     const { t } = useTranslation();
     const mind = getMindElixirInstance();
     const extendedNode = node as ExtendedMindMapNode;
@@ -331,16 +335,10 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
                                 }
                             }} />
                     </Tooltip>}
-                    {!isRoot && <Tooltip title="删除节点 (Delete)">
+                    {!isRoot && <Tooltip title={t('plugins.mindmap.actions.deleteNode')}>
                         <Button size="small" type="text" danger icon={<DeleteOutlined />}
-                            onClick={() => {
-                                try {
-                                    const el = mind?.findEle(node.id);
-                                    if (el) { mind!.selectNode(el); mind!.removeNodes([el]); }
-                                } catch (error) {
-                                    logMindmapPropertyQuickActionFailure('removeNode', error);
-                                }
-                            }} />
+                            aria-label={t('plugins.mindmap.actions.deleteNode')}
+                            onClick={() => onRequestDelete(node)} />
                     </Tooltip>}
                 </Space>
             </div>
@@ -612,12 +610,21 @@ const MindMapPropertyPanel: React.FC<MindMapPropertyPanelProps> = ({ activeTheme
     useEffect(() => subscribeMindElixir(() => setTick(t => t + 1)), []);
     const mind = getMindElixirInstance();
     const selectedNode = useMindMapPropertySelection(mind);
+    const { deleteDialog, requestDelete } = useMindMapNodeDeletion({
+        mind,
+        onFailure: error => logMindmapPropertyQuickActionFailure('removeNode', error),
+    });
 
     return (
         <div style={{ height: '100%', overflowY: 'auto' }}>
             {selectedNode
-                ? <NodePropertyPanel key={selectedNode.id} node={selectedNode} />
+                ? <NodePropertyPanel
+                    key={selectedNode.id}
+                    node={selectedNode}
+                    onRequestDelete={requestDelete}
+                />
                 : <CanvasPanel activeTheme={activeTheme} onThemeChange={onThemeChange} />}
+            {deleteDialog}
         </div>
     );
 };

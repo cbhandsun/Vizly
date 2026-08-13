@@ -99,6 +99,15 @@ const renderLocalized = async (language: 'en' | 'zh') => {
 };
 
 describe('mind map commercial control translations', () => {
+    it('ships localized single-node deletion and contextual action copy', () => {
+        expect(en.plugins.mindmap.nodeDelete.confirm).toBe('Delete node');
+        expect(en.plugins.mindmap.nodeDelete.failed).toContain('try again');
+        expect(en.plugins.mindmap.actions.contextMenuLabel).toBe('Node actions');
+        expect(zh.plugins.mindmap.nodeDelete.confirm).toBe('删除节点');
+        expect(zh.plugins.mindmap.nodeDelete.failed).toContain('重试');
+        expect(zh.plugins.mindmap.actions.contextMenuLabel).toBe('节点操作');
+    });
+
     beforeEach(() => {
         mindHarness.listeners.clear();
         vi.stubGlobal('ResizeObserver', class {

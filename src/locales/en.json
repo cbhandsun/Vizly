@@ -2541,7 +2541,8 @@
                 "addSibling": "Add Sibling",
                 "deleteNode": "Delete",
                 "collapse": "Collapse",
-                "expand": "Expand"
+                "expand": "Expand",
+                "contextMenuLabel": "Node actions"
             },
             "batch": {
                 "toolbarLabel": "Selected node actions",
@@ -2621,6 +2622,16 @@
                 "saveLabel": "Save node note (Ctrl/Cmd+Enter)",
                 "clearFailed": "The note could not be cleared. Try again",
                 "saveFailed": "The note could not be saved. Try again"
+            },
+            "nodeDelete": {
+                "title": "Delete “{{topic}}”?",
+                "titleFallback": "Delete this node?",
+                "untitled": "Untitled node",
+                "description": "This removes the node. You can undo this action.",
+                "descriptionWithChildren": "This also removes {{count}} descendant nodes. You can undo this action.",
+                "confirm": "Delete node",
+                "success": "Node deleted",
+                "failed": "The node could not be deleted. Check that it still exists and try again."
             },
             "actionBar": {
                 "addSibling": "Add Sibling",
