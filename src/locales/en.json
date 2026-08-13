@@ -2558,6 +2558,27 @@
                 "deleteDescription": "This can be undone with Undo after deletion.",
                 "deleteTooltip": "Delete selected nodes"
             },
+            "propertyAI": {
+                "sectionLabel": "AI node actions",
+                "suggestionsTitle": "AI child-topic suggestions",
+                "suggestionsList": "Suggested child topics",
+                "applySuggestion": "Add {{topic}} as a child topic",
+                "applying": "Adding…",
+                "expand": "Expand child topics with AI",
+                "summarize": "Summarize this node with AI",
+                "generated": "{{count}} AI suggestions generated",
+                "applied": "Added {{topic}} as a child topic",
+                "summaryUpdated": "The node title was updated",
+                "summaryUnchanged": "The current node title is already suitable",
+                "expandFailed": "Could not generate suggestions",
+                "summarizeFailed": "Could not summarize this node",
+                "applyUnavailable": "The selected node is no longer available",
+                "applyFailed": "Could not add the suggested child topic",
+                "configurationRequired": "Configure a valid AI provider and API key before continuing",
+                "modelRequired": "Select an AI model before continuing",
+                "noValidSuggestions": "The model returned no valid child topics. Try again",
+                "openConfiguration": "Open AI settings"
+            },
             "actionBar": {
                 "addSibling": "Add Sibling",
                 "addChild": "Add Child",

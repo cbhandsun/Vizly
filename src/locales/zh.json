@@ -2711,6 +2711,27 @@
                 "deleteDescription": "删除后仍可通过撤销操作恢复。",
                 "deleteTooltip": "删除已选节点"
             },
+            "propertyAI": {
+                "sectionLabel": "AI 节点操作",
+                "suggestionsTitle": "AI 子主题建议",
+                "suggestionsList": "建议的子主题",
+                "applySuggestion": "将{{topic}}添加为子主题",
+                "applying": "添加中…",
+                "expand": "AI 扩展子主题",
+                "summarize": "AI 智能归纳当前节点",
+                "generated": "已生成 {{count}} 条 AI 建议",
+                "applied": "已将{{topic}}添加为子主题",
+                "summaryUpdated": "已更新节点名称",
+                "summaryUnchanged": "当前节点名称已较为合适",
+                "expandFailed": "无法生成建议",
+                "summarizeFailed": "无法归纳当前节点",
+                "applyUnavailable": "当前选中节点已不可用",
+                "applyFailed": "无法添加建议的子主题",
+                "configurationRequired": "请先配置有效的 AI Provider 和 API Key",
+                "modelRequired": "请先选择一个 AI 模型",
+                "noValidSuggestions": "模型未返回有效的子主题，请重试",
+                "openConfiguration": "打开 AI 设置"
+            },
             "actionBar": {
                 "addSibling": "同级主题",
                 "addChild": "子主题",

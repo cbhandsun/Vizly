@@ -8,8 +8,9 @@ import {
 } from 'antd';
 import {
     FontSizeOutlined, DeleteOutlined, PlusOutlined, EditOutlined,
-    LinkOutlined, SmileOutlined, TagsOutlined, RobotOutlined,
+    LinkOutlined, SmileOutlined, TagsOutlined,
 } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import type { NodeObj, TagObj } from 'mind-elixir';
 import { getMindElixirInstance, subscribeMindElixir } from './mindElixirStore';
 import { expandNodeWithAI, getAncestorPath, summarizeNodeWithAI } from './mindmapAIService';
@@ -52,6 +53,9 @@ import {
 } from './mindMapPropertyPanelOptions';
 import { updateMindMapNodePatchAndRestoreSelection } from './mindMapNodeMutation';
 import { useMindMapPropertySelection } from './useMindMapPropertySelection';
+import { MindMapPropertyAISection } from './MindMapPropertyAISection';
+import { isMindMapAIConfigurationError } from './mindMapAIErrorPresentation';
+import { presentMindMapPropertyAIError } from './mindMapPropertyAIError';
 
 const { Text } = Typography;
 const { TextArea } = Input;
@@ -72,6 +76,7 @@ const tagBorderColor = (tag: TagObj): string => {
 
 // ─── Node Property Panel ───────────────────────────────────────────────────────
 const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
+    const { t } = useTranslation();
     const mind = getMindElixirInstance();
     const extendedNode = node as ExtendedMindMapNode;
     const [topic, setTopic] = useState(cleanMindMapTopic(node.topic, ''));
@@ -207,60 +212,90 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
     const [aiSummarizing, setAiSummarizing] = useState(false);
     const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
     const [aiError, setAiError] = useState('');
+    const [aiStatus, setAiStatus] = useState('');
+    const [aiApplyingTopic, setAiApplyingTopic] = useState<string | null>(null);
+    const [aiNeedsConfiguration, setAiNeedsConfiguration] = useState(false);
 
     const handleAIExpand = useCallback(async () => {
         if (!mind || aiExpanding) return;
         setAiExpanding(true);
         setAiSuggestions([]);
         setAiError('');
+        setAiStatus('');
+        setAiNeedsConfiguration(false);
         try {
             const data = mind.getData();
             const ancestorPath = getAncestorPath(data.nodeData, node.id);
             const mapTitle = data.nodeData.topic;
             const result = await expandNodeWithAI({ node, ancestorPath, count: 5, mapTitle });
-            if (result.error) { setAiError(result.error); }
-            else { setAiSuggestions(result.topics); }
+            if (result.error) {
+                setAiNeedsConfiguration(isMindMapAIConfigurationError(result.error));
+                setAiError(presentMindMapPropertyAIError(result.error, key => t(key)));
+            }
+            else {
+                const suggestions = [...new Set(result.topics)];
+                setAiSuggestions(suggestions);
+                setAiStatus(t('designer.mindmap.propertyAI.generated', { count: suggestions.length }));
+            }
         } catch (e: unknown) {
-            setAiError(errorMessage(e, '未知错误'));
+            setAiError(errorMessage(e, t('designer.mindmap.propertyAI.expandFailed')));
         } finally {
             setAiExpanding(false);
         }
-    }, [mind, node, aiExpanding]);
+    }, [mind, node, aiExpanding, t]);
 
     const handleAISummarize = useCallback(async () => {
         if (!mind || aiSummarizing || !node.children?.length) return;
         setAiSummarizing(true);
         setAiError('');
+        setAiStatus('');
+        setAiNeedsConfiguration(false);
         try {
             const childrenTopics = node.children.map(child => child.topic || '');
             const result = await summarizeNodeWithAI(node.topic, childrenTopics);
             if ('error' in result) {
-                setAiError(result.error);
-                setAiSuggestions(['error']);
+                setAiNeedsConfiguration(isMindMapAIConfigurationError(result.error));
+                setAiError(presentMindMapPropertyAIError(result.error, key => t(key)));
             } else if (result.topic && result.topic !== node.topic) {
                 const tpcEl = mind.findEle(node.id);
                 if (tpcEl) {
                     mind.setNodeTopic(tpcEl, cleanMindMapTopic(result.topic));
+                    setAiStatus(t('designer.mindmap.propertyAI.summaryUpdated'));
                 }
+            } else {
+                setAiStatus(t('designer.mindmap.propertyAI.summaryUnchanged'));
             }
         } catch (e: unknown) {
-            setAiError(errorMessage(e, '归纳失败'));
-            setAiSuggestions(['error']);
+            setAiError(errorMessage(e, t('designer.mindmap.propertyAI.summarizeFailed')));
         } finally {
             setAiSummarizing(false);
         }
-    }, [mind, node, aiSummarizing]);
+    }, [mind, node, aiSummarizing, t]);
 
     const handleAIApply = useCallback(async (topic: string) => {
-        if (!mind) return;
+        if (!mind || aiApplyingTopic) return;
+        setAiApplyingTopic(topic);
+        setAiError('');
+        setAiStatus('');
+        setAiNeedsConfiguration(false);
         try {
             const tpcEl = mind.findEle(node.id);
-            if (!tpcEl) return;
+            if (!tpcEl) {
+                setAiError(t('designer.mindmap.propertyAI.applyUnavailable'));
+                return;
+            }
             mind.selectNode(tpcEl);
             await mind.addChild(tpcEl, cleanMindMapChildNode({ label: topic }, mind.generateNewObj?.().id ?? `n_${Date.now()}`));
-        } catch (e) { logMindmapPropertyAiAddChildFailure(e); }
+            setAiSuggestions(current => current.filter(suggestion => suggestion !== topic));
+            setAiStatus(t('designer.mindmap.propertyAI.applied', { topic }));
+        } catch (e) {
+            logMindmapPropertyAiAddChildFailure(e);
+            setAiError(t('designer.mindmap.propertyAI.applyFailed'));
+        } finally {
+            setAiApplyingTopic(null);
+        }
 
-    }, [mind, node]);
+    }, [aiApplyingTopic, mind, node, t]);
 
     return (
         <div style={{ padding: '12px 16px' }}>
@@ -318,52 +353,20 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
                 双击画布编辑文字 (F2)
             </Button>
 
-            {/* AI Expand & AI Summarize */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
-                <Popover
-                    trigger="click"
-                    placement="left"
-                    open={aiSuggestions.length > 0 || !!aiError}
-                    onOpenChange={v => { if (!v) { setAiSuggestions([]); setAiError(''); } }}
-                    title={<span style={{ fontSize: 12 }}>🤖 AI 建议子主题（点击添加）</span>}
-                    content={
-                        <div style={{ width: 220 }}>
-                            {aiError && <div style={{ color: '#ef4444', fontSize: 12 }}>{aiError}</div>}
-                            {aiSuggestions.map(s => {
-                                if (s === 'error') return null;
-                                return (
-                                    <div key={s} onClick={() => handleAIApply(s)}
-                                        style={{ padding: '5px 8px', cursor: 'pointer', borderRadius: 6,
-                                            fontSize: 13, marginBottom: 3,
-                                            background: 'rgba(99,102,241,0.05)',
-                                            border: '1px solid rgba(99,102,241,0.12)',
-                                            transition: 'background 0.15s' }}
-                                        onMouseEnter={e => (e.currentTarget.style.background = 'rgba(99,102,241,0.15)')}
-                                        onMouseLeave={e => (e.currentTarget.style.background = 'rgba(99,102,241,0.05)')}
-                                    >
-                                        <PlusOutlined style={{ marginRight: 6, color: '#6366f1', fontSize: 10 }} />
-                                        {s}
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    }
-                >
-                    <Button size="small" type="primary" ghost icon={<RobotOutlined />}
-                        onClick={handleAIExpand} loading={aiExpanding}
-                        style={{ width: '100%' }}>
-                        AI 扩展子主题
-                    </Button>
-                </Popover>
-
-                {node.children && node.children.length > 0 && (
-                    <Button size="small" type="dashed" icon={<RobotOutlined />}
-                        onClick={handleAISummarize} loading={aiSummarizing}
-                        style={{ width: '100%' }}>
-                        AI 智能归纳节点
-                    </Button>
-                )}
-            </div>
+            <MindMapPropertyAISection
+                applyingTopic={aiApplyingTopic}
+                error={aiError}
+                expanding={aiExpanding}
+                hasChildren={Boolean(node.children?.length)}
+                needsConfiguration={aiNeedsConfiguration}
+                status={aiStatus}
+                suggestions={aiSuggestions}
+                summarizing={aiSummarizing}
+                onApplySuggestion={topic => { void handleAIApply(topic); }}
+                onDismiss={() => { setAiSuggestions([]); setAiError(''); setAiNeedsConfiguration(false); }}
+                onExpand={() => { void handleAIExpand(); }}
+                onSummarize={() => { void handleAISummarize(); }}
+            />
 
             {/* Icons 已选 + picker */}
             {icons.length > 0 && (
