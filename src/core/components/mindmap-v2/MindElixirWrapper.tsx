@@ -28,6 +28,7 @@ import { VIZLY_HYPER_THEME, VIZLY_HYPER_DARK_THEME, VIZLY_THEMES } from './theme
 import { migrateV1ToV2, findNodeById } from './migrate';
 import { isMindMapV1, isMindMapV2 } from './types';
 import { registerMindElixirInstance, unregisterMindElixirInstance } from './mindElixirStore';
+import { trackMindMapHistoryAvailability } from './mindMapHistoryAvailability';
 import { MindElixirContext } from './MindElixirContext';
 import MindMapContextMenu, { type CtxPos } from './MindMapContextMenu';
 import { restoreMindMapContextMenuFocus } from './mindMapContextMenuFocus';
@@ -147,6 +148,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
         });
 
         mind.init(initialData);
+        const stopHistoryAvailabilityTracking = trackMindMapHistoryAvailability(mind);
         const cancelInitialViewportFit = scheduleMindMapInitialViewport({
             measure: () => ({
                 width: containerRef.current?.clientWidth ?? 0,
@@ -387,6 +389,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
             mind.container?.removeEventListener('mouseout', handleNoteOut);
             document.removeEventListener('keydown', handleGlobalKeys);
             clearMindElixirPalette(themeStyle);
+            stopHistoryAvailabilityTracking();
             // mind-elixir doesn't have a formal destroy() — unmounting the div is enough
             unregisterMindElixirInstance();
             mindRef.current = null;

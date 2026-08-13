@@ -38,6 +38,15 @@ describe('MindElixirToolbar commercial interaction contract', () => {
         expect(topActionButtonsSource).toContain("minWidth: 0, maxWidth: '100%', width: '100%'");
     });
 
+    it('exposes undo and redo only when the native history lifecycle allows them', () => {
+        expect(source).toContain('useSyncExternalStore(');
+        expect(source).toContain('subscribeMindMapHistoryAvailability(mind, listener)');
+        expect(source).toContain('disabled={!mind || !historyAvailability.canUndo}');
+        expect(source).toContain('disabled={!mind || !historyAvailability.canRedo}');
+        expect(source).toContain("logMindmapToolbarHistoryFailure('undo', error)");
+        expect(source).toContain("logMindmapToolbarHistoryFailure('redo', error)");
+    });
+
     it('keeps every tool reachable by touch and keyboard without text-symbol icons', () => {
         expect(css).toMatch(/\.mind-elixir-toolbar-button[\s\S]*?min-width: var\(--commercial-touch-target, 44px\)[\s\S]*?height: var\(--commercial-touch-target, 44px\)/);
         expect(css).toMatch(/\.vizly-mindmap-toolbar \{[\s\S]*?width: 100%;[\s\S]*?overflow-x: auto;/);

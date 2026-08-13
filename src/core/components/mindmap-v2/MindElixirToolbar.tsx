@@ -14,7 +14,7 @@
  *   - Add root child
  */
 
-import React, { useCallback, useEffect, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useState, useRef, useSyncExternalStore } from 'react';
 import { Divider, Tooltip, Dropdown } from 'antd';
 import {
     MenuFoldOutlined,
@@ -64,11 +64,16 @@ import {
     logMindmapToolbarAddRootChildFailure,
     logMindmapToolbarAutoArrangeFailure,
     logMindmapToolbarFocusModeFailure,
+    logMindmapToolbarHistoryFailure,
     logMindmapToolbarStatsUpdateFailure,
     logMindmapToolbarSummaryFailure,
     logMindmapToolbarTreeExpansionFailure,
     logMindmapToolbarZoomFailure,
 } from './mindmapToolbarLogging';
+import {
+    getMindMapHistoryAvailability,
+    subscribeMindMapHistoryAvailability,
+} from './mindMapHistoryAvailability';
 import { persistMindMapThemeKey, resolveMindMapThemeKey } from './mindmapThemeStorage';
 import { applyMindMapTreeExpansionTransaction } from './mindmapTreeExpansion';
 import { createMindElixirArrowModeController } from './mindElixirArrowModeController';
@@ -200,12 +205,36 @@ const MindElixirToolbar: React.FC = () => {
     }, [mind]);
 
     const handleUndo = useCallback(() => {
-        mind?.undo();
+        if (!mind) return;
+        try {
+            mind.undo();
+        } catch (error) {
+            logMindmapToolbarHistoryFailure('undo', error);
+        }
     }, [mind]);
 
     const handleRedo = useCallback(() => {
-        mind?.redo();
+        if (!mind) return;
+        try {
+            mind.redo();
+        } catch (error) {
+            logMindmapToolbarHistoryFailure('redo', error);
+        }
     }, [mind]);
+
+    const subscribeHistoryAvailability = useCallback(
+        (listener: () => void) => subscribeMindMapHistoryAvailability(mind, listener),
+        [mind],
+    );
+    const getHistoryAvailabilitySnapshot = useCallback(
+        () => getMindMapHistoryAvailability(mind),
+        [mind],
+    );
+    const historyAvailability = useSyncExternalStore(
+        subscribeHistoryAvailability,
+        getHistoryAvailabilitySnapshot,
+        getHistoryAvailabilitySnapshot,
+    );
 
     const handleAddRootChild = useCallback(() => {
         if (!mind) return;
@@ -440,8 +469,8 @@ const MindElixirToolbar: React.FC = () => {
             <Divider orientation="vertical" style={{ height: 16, margin: '0 2px' }} />
 
             {/* Undo / Redo */}
-            <MindMapToolbarIconButton label={t('plugins.mindmap.toolbar.undo')} icon={<UndoOutlined />} onClick={handleUndo} disabled={!mind} />
-            <MindMapToolbarIconButton label={t('plugins.mindmap.toolbar.redo')} icon={<RedoOutlined />} onClick={handleRedo} disabled={!mind} />
+            <MindMapToolbarIconButton label={t('plugins.mindmap.toolbar.undo')} icon={<UndoOutlined />} onClick={handleUndo} disabled={!mind || !historyAvailability.canUndo} />
+            <MindMapToolbarIconButton label={t('plugins.mindmap.toolbar.redo')} icon={<RedoOutlined />} onClick={handleRedo} disabled={!mind || !historyAvailability.canRedo} />
 
             <Divider orientation="vertical" style={{ height: 16, margin: '0 2px' }} />
 

@@ -33,6 +33,8 @@ describe('mindmapToolbarLogging', () => {
     logging.logMindmapToolbarImportRejected('OPML', { reason: 'cookie=opml-reject-secret' });
     logging.logMindmapToolbarImportFailure('OPML', new Error('api_key=opml-secret'));
     logging.logMindmapToolbarStatsUpdateFailure(new Error('password=stats-secret'));
+    logging.logMindmapToolbarHistoryFailure('undo', new Error('token=undo-secret'));
+    logging.logMindmapToolbarHistoryFailure('redo', new Error('cookie=redo-secret'));
     logging.logMindmapToolbarTreeExpansionFailure('collapseAll', new Error('token=collapse-secret'));
     logging.logMindmapToolbarTreeExpansionFailure('expandAll', new Error('cookie=expand-secret'));
 
@@ -51,6 +53,8 @@ describe('mindmapToolbarLogging', () => {
     expect(warnPayload).toContain('[MindMapToolbar] OPML import rejected:');
     expect(errorPayload).toContain('[MindMapToolbar] OPML import failed:');
     expect(warnPayload).toContain('[MindMapToolbar] stats update failed:');
+    expect(warnPayload).toContain('[MindMapToolbar] undo failed:');
+    expect(warnPayload).toContain('[MindMapToolbar] redo failed:');
     expect(warnPayload).toContain('[MindMapToolbar] collapseAll failed:');
     expect(warnPayload).toContain('[MindMapToolbar] expandAll failed:');
     expect(errorPayload).toContain('[redacted]');
@@ -67,6 +71,8 @@ describe('mindmapToolbarLogging', () => {
     expect(warnPayload).not.toContain('opml-reject-secret');
     expect(errorPayload).not.toContain('opml-secret');
     expect(warnPayload).not.toContain('stats-secret');
+    expect(warnPayload).not.toContain('undo-secret');
+    expect(warnPayload).not.toContain('redo-secret');
     expect(warnPayload).not.toContain('collapse-secret');
     expect(warnPayload).not.toContain('expand-secret');
   });
