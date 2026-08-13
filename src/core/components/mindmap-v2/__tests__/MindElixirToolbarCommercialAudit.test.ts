@@ -77,4 +77,10 @@ describe('MindElixirToolbar commercial interaction contract', () => {
         expect(wrapperCss).toContain('opacity: 0.78;');
         expect(wrapperCss).not.toContain('me-children > me-wrapper > me-tpc::before');
     });
+
+    it('only enables branch balancing in the two-way layout where it is visible', () => {
+        expect(source).toContain("disabled={!mind || currentDir !== 'LR'}");
+        expect(source).toContain("t('plugins.mindmap.toolbar.direction.twoWay')");
+        expect(source).toContain('applyMindMapAutoArrangeTransaction(mind)');
+    });
 });

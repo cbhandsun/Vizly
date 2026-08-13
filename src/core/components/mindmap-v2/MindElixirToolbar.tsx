@@ -58,8 +58,7 @@ import { emitToggleOutline } from './mindmapOutlineStore';
 import { emitToggleHistory } from './mindmapHistoryStore';
 import MindMapShortcutsModal from './MindMapShortcutsModal';
 import MindMapTemplates from './MindMapTemplates';
-import { arrangeMindMapTree } from './mindmapAutoArrange';
-import { cleanAndValidateTree } from './mindmapTreeSanitizer';
+import { applyMindMapAutoArrangeTransaction } from './mindmapAutoArrange';
 import { cleanMindMapChildNode } from './mindmapBridgeSecurity';
 import {
     logMindmapToolbarAddRootChildFailure,
@@ -70,7 +69,6 @@ import {
     logMindmapToolbarTreeExpansionFailure,
 } from './mindmapToolbarLogging';
 import { persistMindMapThemeKey, resolveMindMapThemeKey } from './mindmapThemeStorage';
-import { emitVizlyMindMapOperation } from './mindmapOperationBridge';
 import { applyMindMapTreeExpansionTransaction } from './mindmapTreeExpansion';
 import { createMindElixirArrowModeController } from './mindElixirArrowModeController';
 import { useMindElixirImportActions } from './useMindElixirImportActions';
@@ -180,15 +178,15 @@ const MindElixirToolbar: React.FC = () => {
     const handleAutoArrange = useCallback(() => {
         if (!mind) return;
         try {
-            const data = mind.getData();
-            const nodeData = cleanAndValidateTree(arrangeMindMapTree(data.nodeData), true);
-            mind.refresh({ ...data, nodeData });
-            mind.layout();
-            setTimeout(() => mind.toCenter(), 80);
-            emitVizlyMindMapOperation(mind, {
-                name: 'autoArrangeMindmap',
-                obj: nodeData,
-            });
+            const changed = applyMindMapAutoArrangeTransaction(mind);
+            if (!changed) return;
+            setTimeout(() => {
+                try {
+                    mind.toCenter();
+                } catch (error) {
+                    logMindmapToolbarAutoArrangeFailure(error);
+                }
+            }, 80);
         } catch (e) {
             logMindmapToolbarAutoArrangeFailure(e);
         }
@@ -477,7 +475,14 @@ const MindElixirToolbar: React.FC = () => {
 
             {/* Fit to center */}
             <MindMapToolbarIconButton label={t('plugins.mindmap.fitView')} icon={<FullscreenOutlined />} onClick={handleFitView} disabled={!mind} />
-            <MindMapToolbarIconButton label={t('plugins.mindmap.toolbar.autoArrange')} icon={<DeploymentUnitOutlined />} onClick={handleAutoArrange} disabled={!mind} />
+            <MindMapToolbarIconButton
+                label={currentDir === 'LR'
+                    ? t('plugins.mindmap.toolbar.autoArrange')
+                    : `${t('plugins.mindmap.toolbar.autoArrange')} · ${t('plugins.mindmap.toolbar.direction.twoWay')}`}
+                icon={<DeploymentUnitOutlined />}
+                onClick={handleAutoArrange}
+                disabled={!mind || currentDir !== 'LR'}
+            />
 
             {/* Zoom controls */}
             {mind && (

@@ -166,6 +166,9 @@ export function cleanAndValidateTree(
             .slice(0, MINDMAP_MAX_CHILDREN_PER_NODE)
             .map((child) => cleanAndValidateTree(child, false, depth + 1, ctx)),
     };
+    if (input.direction === 0 || input.direction === 1) {
+        clean.direction = input.direction;
+    }
     if (input.note) clean.note = cleanMindMapNote(input.note);
     if (input.hyperLink) {
         const safeUrl = toSafeExternalUrl(String(input.hyperLink));

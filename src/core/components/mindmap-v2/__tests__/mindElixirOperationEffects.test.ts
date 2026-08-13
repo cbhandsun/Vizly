@@ -94,6 +94,8 @@ describe('mind elixir operation effects', () => {
         expect(recordHistory).toHaveBeenLastCalledWith('Mind map updated', expect.anything());
         listeners[0]?.({ name: 'changeDirection' });
         expect(recordHistory).toHaveBeenLastCalledWith('Mind map updated', expect.anything());
+        listeners[0]?.({ name: 'autoArrangeMindmap' });
+        expect(recordHistory).toHaveBeenLastCalledWith('Auto-arrange branches', expect.anything());
         listeners[0]?.({ name: 'collapseAllBranches' });
         expect(recordHistory).toHaveBeenLastCalledWith('Collapse All Branches', expect.anything());
         listeners[0]?.({ name: 'expandAllBranches' });

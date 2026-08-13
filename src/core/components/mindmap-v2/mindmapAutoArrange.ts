@@ -1,4 +1,7 @@
-import type { NodeObj } from 'mind-elixir';
+import type { MindElixirInstance, NodeObj } from 'mind-elixir';
+
+import { emitVizlyMindMapOperation, refreshVizlyMindMapData } from './mindmapOperationBridge';
+import { cleanAndValidateTree } from './mindmapTreeSanitizer';
 
 type Side = 0 | 1;
 
@@ -46,6 +49,50 @@ function balanceRootChildren(root: NodeObj): NodeObj {
 export function arrangeMindMapTree(root: NodeObj): NodeObj {
     const next = cloneNode(root);
     return balanceRootChildren(next);
+}
+
+export function hasMindMapAutoArrangeChange(current: NodeObj, arranged: NodeObj): boolean {
+    const currentChildren = current.children ?? [];
+    const arrangedChildren = arranged.children ?? [];
+    if (currentChildren.length !== arrangedChildren.length) return true;
+    return arrangedChildren.some((child, index) => (
+        child.id !== currentChildren[index]?.id
+        || child.direction !== currentChildren[index]?.direction
+    ));
+}
+
+/**
+ * Balance the root branches as one recoverable Mind Elixir transaction.
+ * The operation event is intentionally omitted for a deterministic no-op so
+ * repeated clicks do not consume undo history or create duplicate versions.
+ */
+export function applyMindMapAutoArrangeTransaction(mind: MindElixirInstance): boolean {
+    const previousData = mind.getData();
+    const currentRoot = cleanAndValidateTree(previousData.nodeData, true);
+    const nodeData = arrangeMindMapTree(currentRoot);
+    if (!hasMindMapAutoArrangeChange(currentRoot, nodeData)) return false;
+
+    const nextData = { ...previousData, nodeData };
+    refreshVizlyMindMapData(mind, nextData);
+    try {
+        mind.layout();
+        emitVizlyMindMapOperation(mind, {
+            name: 'autoArrangeMindmap',
+            obj: nodeData,
+        });
+    } catch (operationError) {
+        try {
+            refreshVizlyMindMapData(mind, previousData);
+        } catch (rollbackError) {
+            throw new AggregateError(
+                [operationError, rollbackError],
+                'Mind map auto arrange failed and could not restore the previous map.',
+                { cause: rollbackError },
+            );
+        }
+        throw operationError;
+    }
+    return true;
 }
 
 export function getRootSideWeights(root: NodeObj): { left: number; right: number } {
