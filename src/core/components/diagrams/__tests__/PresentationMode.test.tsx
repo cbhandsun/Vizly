@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { readFileSync } from 'node:fs';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import PresentationMode from '../../presentation/PresentationMode';
@@ -35,6 +35,50 @@ describe('PresentationMode', () => {
         expect(screen.getByText('详情')).toBeTruthy();
         fireEvent.keyDown(window, { key: 'Escape' });
         expect(onExit).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not hijack the native Space activation of presentation buttons', () => {
+        const onExit = vi.fn();
+        render(<PresentationMode slides={slides} onFocusNodes={vi.fn()} onExit={onExit} />);
+
+        const exit = screen.getByRole('button', { name: '退出演示' });
+        fireEvent.keyDown(exit, { key: ' ' });
+
+        expect(screen.getByText('概览')).toBeTruthy();
+        expect(onExit).not.toHaveBeenCalled();
+        fireEvent.click(exit);
+        expect(onExit).toHaveBeenCalledTimes(1);
+    });
+
+    it('clamps navigation when regenerated slides shrink', () => {
+        const onFocusNodes = vi.fn();
+        const { rerender } = render(
+            <PresentationMode slides={slides} onFocusNodes={onFocusNodes} onExit={vi.fn()} />,
+        );
+        fireEvent.click(screen.getByRole('button', { name: '下一页' }));
+        expect(screen.getByText('详情')).toBeTruthy();
+
+        rerender(
+            <PresentationMode slides={[slides[0]]} onFocusNodes={onFocusNodes} onExit={vi.fn()} />,
+        );
+
+        expect(screen.getByRole('dialog', { name: '演示模式' })).toBeTruthy();
+        expect(screen.getByText('概览')).toBeTruthy();
+        expect(screen.getByRole('progressbar', { name: '演示进度' }).getAttribute('aria-valuetext'))
+            .toBe('第 1 页，共 1 页');
+        expect(onFocusNodes).toHaveBeenLastCalledWith(['a']);
+    });
+
+    it('requests a recoverable exit when regenerated slides become empty', async () => {
+        const onExit = vi.fn();
+        const { rerender } = render(
+            <PresentationMode slides={slides} onFocusNodes={vi.fn()} onExit={onExit} />,
+        );
+
+        rerender(<PresentationMode slides={[]} onFocusNodes={vi.fn()} onExit={onExit} />);
+
+        await waitFor(() => expect(onExit).toHaveBeenCalledTimes(1));
+        expect(screen.queryByRole('dialog', { name: '演示模式' })).toBeNull();
     });
 
     it('focuses only when the active slide changes, not when the callback identity changes', () => {

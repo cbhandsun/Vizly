@@ -22,13 +22,51 @@ interface PresentationModeProps {
   onExit: () => void;
 }
 
+interface PresentationNavigationState {
+  index: number;
+  slides: PresentationSlide[];
+}
+
+const clampPresentationIndex = (index: number, totalSlides: number) => {
+  if (totalSlides <= 0) return 0;
+  return Math.min(Math.max(index, 0), totalSlides - 1);
+};
+
 const PresentationMode: React.FC<PresentationModeProps> = ({ slides, onFocusNodes, onExit }) => {
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [navigation, setNavigation] = useState<PresentationNavigationState>(() => ({
+    index: 0,
+    slides,
+  }));
   const overlayRef = useRef<HTMLDivElement>(null);
   const exitButtonRef = useRef<HTMLButtonElement>(null);
   const onFocusNodesRef = useRef(onFocusNodes);
+  const emptyExitRequestedRef = useRef(false);
   const totalSlides = slides.length;
+  if (navigation.slides !== slides) {
+    setNavigation({
+      index: clampPresentationIndex(navigation.index, totalSlides),
+      slides,
+    });
+  }
+  const currentIndex = navigation.slides === slides
+    ? navigation.index
+    : clampPresentationIndex(navigation.index, totalSlides);
   const currentSlide = slides[currentIndex];
+
+  const setCurrentIndex = useCallback((nextIndex: number | ((index: number) => number)) => {
+    setNavigation(current => {
+      const currentIndexForSlides = current.slides === slides
+        ? current.index
+        : clampPresentationIndex(current.index, totalSlides);
+      const resolvedIndex = typeof nextIndex === 'function'
+        ? nextIndex(currentIndexForSlides)
+        : nextIndex;
+      return {
+        index: clampPresentationIndex(resolvedIndex, totalSlides),
+        slides,
+      };
+    });
+  }, [slides, totalSlides]);
 
   useEffect(() => {
     onFocusNodesRef.current = onFocusNodes;
@@ -65,15 +103,25 @@ const PresentationMode: React.FC<PresentationModeProps> = ({ slides, onFocusNode
 
   const goNext = useCallback(() => {
     if (currentIndex < totalSlides - 1) setCurrentIndex(i => i + 1);
-  }, [currentIndex, totalSlides]);
+  }, [currentIndex, setCurrentIndex, totalSlides]);
 
   const goPrev = useCallback(() => {
     if (currentIndex > 0) setCurrentIndex(i => i - 1);
-  }, [currentIndex]);
+  }, [currentIndex, setCurrentIndex]);
 
   const handleExit = useCallback(() => {
     onExit();
   }, [onExit]);
+
+  useEffect(() => {
+    if (totalSlides > 0) {
+      emptyExitRequestedRef.current = false;
+      return;
+    }
+    if (emptyExitRequestedRef.current) return;
+    emptyExitRequestedRef.current = true;
+    handleExit();
+  }, [handleExit, totalSlides]);
 
   // 键盘导航
   useEffect(() => {
@@ -101,7 +149,10 @@ const PresentationMode: React.FC<PresentationModeProps> = ({ slides, onFocusNode
       }
 
       switch (e.key) {
-        case 'ArrowRight': case 'ArrowDown': case ' ':
+        case 'ArrowRight': case 'ArrowDown':
+          e.preventDefault(); goNext(); break;
+        case ' ':
+          if (e.target instanceof HTMLButtonElement) return;
           e.preventDefault(); goNext(); break;
         case 'ArrowLeft': case 'ArrowUp':
           e.preventDefault(); goPrev(); break;
@@ -115,7 +166,7 @@ const PresentationMode: React.FC<PresentationModeProps> = ({ slides, onFocusNode
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [goNext, goPrev, handleExit, totalSlides]);
+  }, [goNext, goPrev, handleExit, setCurrentIndex, totalSlides]);
 
   // 🎯 动态高亮：淡化非焦点 + 发光焦点（Lucidchart Spotlight 风格）
   const highlightCSS = useMemo(() => {
