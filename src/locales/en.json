@@ -2564,6 +2564,27 @@
                     "diamond": "Diamond"
                 }
             },
+            "emptyGuide": {
+                "title": "Start your mind map",
+                "descriptionBefore": "Double-click the root node or press",
+                "descriptionAfter": "to add your first branch.",
+                "promptLabel": "Topic for AI mind map generation",
+                "promptPlaceholder": "Describe a topic for AI...",
+                "generate": "Generate with AI",
+                "generating": "Generating...",
+                "generateFailed": "Generation failed. Try again.",
+                "requestFailed": "Request failed. Check your connection or AI settings.",
+                "dismiss": "Dismiss",
+                "dismissLabel": "Dismiss getting-started guide",
+                "shortcutsLabel": "Mind map keyboard shortcuts",
+                "shortcuts": {
+                    "addChild": "Add child",
+                    "addSibling": "Add sibling",
+                    "editNode": "Edit node",
+                    "search": "Search",
+                    "undo": "Undo"
+                }
+            },
             "batch": {
                 "toolbarLabel": "Selected node actions",
                 "selectedCount": "{{count}} nodes selected",

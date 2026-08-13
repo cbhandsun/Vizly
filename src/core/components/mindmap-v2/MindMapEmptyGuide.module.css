@@ -1,0 +1,202 @@
+.guide {
+    position: absolute;
+    bottom: calc(50% + 48px);
+    left: 50%;
+    z-index: 100;
+    display: flex;
+    width: min(560px, calc(100% - 48px));
+    transform: translateX(-50%);
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    color: var(--main-color, #1f2937);
+    pointer-events: none;
+    user-select: none;
+}
+
+.card {
+    position: relative;
+    display: flex;
+    width: min(360px, 100%);
+    box-sizing: border-box;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 18px 24px 16px;
+    border: 1px solid color-mix(in srgb, var(--main-color, #1f2937) 18%, transparent);
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--main-bgcolor, #ffffff) 94%, #6366f1 6%);
+    box-shadow: 0 16px 38px rgb(15 23 42 / 16%);
+    pointer-events: auto;
+    animation: empty-guide-fade-in 180ms ease-out;
+}
+
+.heroIcon {
+    color: #4f46e5;
+}
+
+.title {
+    margin: 0;
+    color: var(--main-color, #1f2937);
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1.35;
+}
+
+.description {
+    max-width: 300px;
+    margin: 0;
+    color: color-mix(in srgb, var(--main-color, #1f2937) 72%, transparent);
+    font-size: 12px;
+    line-height: 1.55;
+    text-align: center;
+}
+
+.inlineKey,
+.tip kbd {
+    border: 1px solid color-mix(in srgb, var(--main-color, #1f2937) 24%, transparent);
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--main-color, #1f2937) 8%, transparent);
+    color: var(--main-color, #1f2937);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.inlineKey {
+    padding: 1px 5px;
+}
+
+.aiControls {
+    display: grid;
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    margin-top: 4px;
+    padding-top: 12px;
+    border-top: 1px solid color-mix(in srgb, var(--main-color, #1f2937) 12%, transparent);
+}
+
+.prompt,
+.generate,
+.dismiss {
+    min-height: 40px;
+    border-radius: 8px;
+    font: inherit;
+}
+
+.prompt {
+    min-width: 0;
+    padding: 8px 10px;
+    border: 1px solid color-mix(in srgb, var(--main-color, #1f2937) 24%, transparent);
+    background: var(--main-bgcolor, #ffffff);
+    color: var(--main-color, #1f2937);
+    font-size: 12px;
+}
+
+.prompt::placeholder {
+    color: color-mix(in srgb, var(--main-color, #1f2937) 54%, transparent);
+}
+
+.generate {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 12px;
+    border: 0;
+    background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+    box-shadow: 0 4px 12px rgb(79 70 229 / 22%);
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.generate:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
+.dismiss {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    display: inline-flex;
+    min-width: 44px;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 6px 8px;
+    border: 0;
+    background: transparent;
+    color: color-mix(in srgb, var(--main-color, #1f2937) 68%, transparent);
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.prompt:focus-visible,
+.generate:focus-visible,
+.dismiss:focus-visible {
+    outline: 2px solid #4f46e5;
+    outline-offset: 2px;
+}
+
+.error {
+    grid-column: 1 / -1;
+    color: #b91c1c;
+    font-size: 11px;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+
+.tips {
+    display: flex;
+    max-width: 100%;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+}
+
+.tip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 8px;
+    border: 1px solid color-mix(in srgb, var(--main-color, #1f2937) 14%, transparent);
+    border-radius: 7px;
+    background: color-mix(in srgb, var(--main-bgcolor, #ffffff) 94%, #6366f1 6%);
+    color: color-mix(in srgb, var(--main-color, #1f2937) 72%, transparent);
+    font-size: 11px;
+    line-height: 1.4;
+}
+
+.tip kbd {
+    padding: 0 4px;
+    font-size: 10px;
+}
+
+@keyframes empty-guide-fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .card {
+        animation: none;
+    }
+}
+
+@media (max-height: 640px) {
+    .guide {
+        bottom: calc(50% + 40px);
+    }
+
+    .tips {
+        display: none;
+    }
+}

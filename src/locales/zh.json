@@ -2717,6 +2717,27 @@
                     "diamond": "菱形"
                 }
             },
+            "emptyGuide": {
+                "title": "开始创建思维导图",
+                "descriptionBefore": "双击根节点或按",
+                "descriptionAfter": "添加第一个分支。",
+                "promptLabel": "用于 AI 生成思维导图的主题",
+                "promptPlaceholder": "输入主题，让 AI 帮你建图...",
+                "generate": "使用 AI 生成",
+                "generating": "正在生成...",
+                "generateFailed": "生成失败，请重试。",
+                "requestFailed": "请求失败，请检查网络或 AI 设置。",
+                "dismiss": "关闭",
+                "dismissLabel": "关闭入门引导",
+                "shortcutsLabel": "思维导图键盘快捷键",
+                "shortcuts": {
+                    "addChild": "添加子节点",
+                    "addSibling": "添加同级节点",
+                    "editNode": "编辑节点",
+                    "search": "搜索",
+                    "undo": "撤销"
+                }
+            },
             "batch": {
                 "toolbarLabel": "已选节点操作",
                 "selectedCount": "已选择 {{count}} 个节点",
