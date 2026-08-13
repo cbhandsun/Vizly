@@ -26,7 +26,11 @@ import { WorkspaceCompactHeader } from './WorkspaceCompactHeader';
 import { WorkspaceDiagramCollection } from './WorkspaceDiagramCollection';
 import { WorkspaceGlobalHeader } from './WorkspaceGlobalHeader';
 import { WorkspaceContextMenu } from './WorkspaceContextMenu';
-import { createWorkspaceDeleteConfirmation } from './workspaceDeleteConfirmation';
+import {
+    beginWorkspaceDeleteDialog,
+    createWorkspaceDeleteConfirmation,
+    finishWorkspaceDeleteDialog,
+} from './workspaceDeleteConfirmation';
 import { createWorkspaceDiagramActions } from './diagramManagementActions';
 import { createWorkspaceSettingsMenu } from './workspaceSettingsMenu';
 import { useWorkspaceSearch } from './useWorkspaceSearch';
@@ -83,6 +87,7 @@ const WorkspaceDashboardPage: React.FC = () => {
     const authReturnFocusTargetRef = useRef<HTMLElement | null>(null);
     const openingDiagramKeysRef = useRef(new Set<string>());
     const diagramCreateLockRef = useRef({ active: false });
+    const deleteDialogLockRef = useRef({ active: false });
 
     useEffect(() => scheduleWorkspaceRouteFocus(() => workspaceMainRef.current), []);
 
@@ -220,7 +225,8 @@ const WorkspaceDashboardPage: React.FC = () => {
             : null,
     ) => {
         e.stopPropagation();
-        modal.confirm(createWorkspaceDeleteConfirmation({
+        if (!beginWorkspaceDeleteDialog(deleteDialogLockRef.current)) return;
+        const confirmation = createWorkspaceDeleteConfirmation({
             title: t('workspace.deleteConfirmTitle'),
             description: t('workspace.deleteConfirmDescription'),
             deleteLabel: t('common.delete'),
@@ -235,7 +241,20 @@ const WorkspaceDashboardPage: React.FC = () => {
                 safeLog.error('Failed to delete workspace diagram', redactSensitiveLogValue(error));
                 appMessage.error(t('workspace.deleteFailed'));
             },
-        }));
+            onRefreshFailure: (error: unknown) => {
+                safeLog.error('Workspace refresh failed after deleting a diagram', redactSensitiveLogValue(error));
+                appMessage.error(t('workspace.deleteRefreshFailed'));
+            },
+            onAfterClose: () => {
+                finishWorkspaceDeleteDialog(deleteDialogLockRef.current);
+            },
+        });
+        try {
+            modal.confirm(confirmation);
+        } catch (error) {
+            finishWorkspaceDeleteDialog(deleteDialogLockRef.current);
+            throw error;
+        }
     };
 
     // Advanced Creation Router mapping to correct domains

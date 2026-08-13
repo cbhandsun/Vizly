@@ -16,7 +16,9 @@ import type {
   ViewMode,
 } from '../diagramManagementPage.helpers';
 import {
+  beginWorkspaceDeleteDialog,
   createWorkspaceDeleteConfirmation,
+  finishWorkspaceDeleteDialog,
   type WorkspaceDeleteConfirmationOptions,
 } from '../workspaceDeleteConfirmation';
 import {
@@ -507,10 +509,21 @@ const createDeleteOptions = (
   onInvalidId: vi.fn(),
   onSuccess: vi.fn(),
   onFailure: vi.fn(),
+  onRefreshFailure: vi.fn(),
   ...overrides,
 });
 
 describe('createWorkspaceDeleteConfirmation', () => {
+  it('allows only one destructive confirmation until the active dialog closes', () => {
+    const lock = { active: false };
+
+    expect(beginWorkspaceDeleteDialog(lock)).toBe(true);
+    expect(beginWorkspaceDeleteDialog(lock)).toBe(false);
+    expect(finishWorkspaceDeleteDialog(lock)).toBe(true);
+    expect(finishWorkspaceDeleteDialog(lock)).toBe(false);
+    expect(beginWorkspaceDeleteDialog(lock)).toBe(true);
+  });
+
   it('defaults focus to Cancel and returns to the trigger when deletion is cancelled', () => {
     const trigger = document.createElement('button');
     const fallback = document.createElement('main');
@@ -552,7 +565,7 @@ describe('createWorkspaceDeleteConfirmation', () => {
     expect(document.activeElement).toBe(fallback);
   });
 
-  it('keeps the trigger path for invalid IDs and reports failed deletion safely', async () => {
+  it('keeps the trigger path for invalid IDs and keeps a failed deletion retryable', async () => {
     const trigger = document.createElement('button');
     const fallback = document.createElement('main');
     fallback.tabIndex = -1;
@@ -576,7 +589,35 @@ describe('createWorkspaceDeleteConfirmation', () => {
       deleteItem: vi.fn().mockRejectedValue(failure),
       onFailure,
     }));
-    await failureConfig.onOk?.();
+    await expect(failureConfig.onOk?.()).rejects.toBe(failure);
     expect(onFailure).toHaveBeenCalledWith(failure);
+  });
+
+  it('distinguishes a completed deletion from a subsequent refresh failure', async () => {
+    const trigger = document.createElement('button');
+    const fallback = document.createElement('main');
+    fallback.tabIndex = -1;
+    document.body.append(trigger, fallback);
+    const refreshFailure = new Error('refresh unavailable');
+    const onSuccess = vi.fn();
+    const onFailure = vi.fn();
+    const onRefreshFailure = vi.fn();
+    const config = createWorkspaceDeleteConfirmation(createDeleteOptions({
+      returnFocusTarget: trigger,
+      fallbackFocusTarget: fallback,
+      reloadItems: vi.fn().mockRejectedValue(refreshFailure),
+      onSuccess,
+      onFailure,
+      onRefreshFailure,
+    }));
+
+    await expect(config.onOk?.()).resolves.toBeUndefined();
+    trigger.remove();
+    config.afterClose?.();
+
+    expect(onSuccess).toHaveBeenCalledTimes(1);
+    expect(onFailure).not.toHaveBeenCalled();
+    expect(onRefreshFailure).toHaveBeenCalledWith(refreshFailure);
+    expect(document.activeElement).toBe(fallback);
   });
 });

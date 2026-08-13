@@ -50,6 +50,7 @@
         "deleteConfirmDescription": "Are you sure you want to permanently delete this diagram? This action cannot be undone.",
         "deleteSuccess": "Diagram deleted",
         "deleteFailed": "Failed to delete the diagram. Please try again.",
+        "deleteRefreshFailed": "The diagram was deleted, but the workspace could not refresh. Reload the page to update the list.",
         "unknownTime": "Unknown time",
         "previewLoading": "Loading preview",
         "previewUnavailable": "Preview unavailable",

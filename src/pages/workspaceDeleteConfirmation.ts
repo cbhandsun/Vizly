@@ -14,7 +14,25 @@ export interface WorkspaceDeleteConfirmationOptions {
   onInvalidId: () => void;
   onSuccess: () => void;
   onFailure: (error: unknown) => void;
+  onRefreshFailure: (error: unknown) => void;
+  onAfterClose?: () => void;
 }
+
+export interface WorkspaceDeleteDialogLock {
+  active: boolean;
+}
+
+export const beginWorkspaceDeleteDialog = (lock: WorkspaceDeleteDialogLock): boolean => {
+  if (lock.active) return false;
+  lock.active = true;
+  return true;
+};
+
+export const finishWorkspaceDeleteDialog = (lock: WorkspaceDeleteDialogLock): boolean => {
+  if (!lock.active) return false;
+  lock.active = false;
+  return true;
+};
 
 export const createWorkspaceDeleteConfirmation = (
   options: WorkspaceDeleteConfirmationOptions,
@@ -36,19 +54,28 @@ export const createWorkspaceDeleteConfirmation = (
         deletionCompleted ? null : options.returnFocusTarget,
         options.fallbackFocusTarget,
       );
+      options.onAfterClose?.();
     },
     onOk: async () => {
+      let result: 'deleted' | 'invalid-id';
       try {
-        const result = await options.deleteItem();
-        if (result === 'invalid-id') {
-          options.onInvalidId();
-          return;
-        }
-        deletionCompleted = true;
-        options.onSuccess();
-        await options.reloadItems();
+        result = await options.deleteItem();
       } catch (error: unknown) {
         options.onFailure(error);
+        throw error;
+      }
+
+      if (result === 'invalid-id') {
+        options.onInvalidId();
+        return;
+      }
+
+      deletionCompleted = true;
+      options.onSuccess();
+      try {
+        await options.reloadItems();
+      } catch (error: unknown) {
+        options.onRefreshFailure(error);
       }
     },
   };
