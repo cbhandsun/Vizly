@@ -111,6 +111,7 @@
     },
     "auth": {
         "login": "Sign in",
+        "accountMenu": "Account menu",
         "menu": {
             "myDiagrams": "My diagrams",
             "switchUser": "Switch user",

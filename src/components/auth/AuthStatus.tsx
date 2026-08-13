@@ -1,9 +1,10 @@
 
-import React, { useState } from 'react';
+import React, { useId, useRef, useState, type KeyboardEvent } from 'react';
 import { Button, Avatar, Dropdown, MenuProps, Tooltip } from 'antd';
 import { UserOutlined, LoginOutlined, LogoutOutlined, CloudOutlined, LockOutlined } from '@ant-design/icons';
 import { useAuth } from '@/context/useAuth';
 import { SetPasswordModal } from './SetPasswordModal';
+import './AuthStatus.css';
 const CloudStorageManagerModal = React.lazy(() => import('../storage/CloudStorageManagerModal').then(m => ({ default: m.CloudStorageManagerModal })));
 import { useTranslation } from 'react-i18next';
 
@@ -30,6 +31,45 @@ export const AuthStatus: React.FC<AuthStatusProps> = ({
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isCloudModalOpen, setIsCloudModalOpen] = useState(false);
     const [isSetPasswordModalOpen, setIsSetPasswordModalOpen] = useState(false);
+    const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
+    const accountMenuTriggerRef = useRef<HTMLButtonElement>(null);
+    const shouldRestoreAccountMenuFocusRef = useRef(false);
+    const accountMenuId = `auth-account-menu-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
+
+    const handleAccountMenuOpenChange = (open: boolean) => {
+        setIsAccountMenuOpen(open);
+        if (open) {
+            requestAnimationFrame(() => {
+                document.querySelector<HTMLElement>(
+                    `#${accountMenuId} [role="menuitem"]:not([aria-disabled="true"])`,
+                )?.focus();
+            });
+            return;
+        }
+
+        if (shouldRestoreAccountMenuFocusRef.current) {
+            shouldRestoreAccountMenuFocusRef.current = false;
+            queueMicrotask(() => accountMenuTriggerRef.current?.focus());
+        }
+    };
+
+    const handleAccountMenuTriggerKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+        if (event.key === 'Escape' && isAccountMenuOpen) {
+            event.preventDefault();
+            shouldRestoreAccountMenuFocusRef.current = true;
+            handleAccountMenuOpenChange(false);
+            return;
+        }
+        if (!['Enter', ' ', 'ArrowDown'].includes(event.key)) return;
+        event.preventDefault();
+        handleAccountMenuOpenChange(true);
+    };
+
+    const handleAccountMenuKeyDown = (event: KeyboardEvent<HTMLUListElement>) => {
+        if (event.key === 'Escape') {
+            shouldRestoreAccountMenuFocusRef.current = true;
+        }
+    };
 
     const handleMenuClick: MenuProps['onClick'] = ({ key }) => {
         if (key === 'logout') {
@@ -99,24 +139,29 @@ export const AuthStatus: React.FC<AuthStatusProps> = ({
             )}
         </>
     ) : (
-        <Dropdown menu={{ items: menuItems, onClick: handleMenuClick }} placement="bottomRight">
-            <div
-                role="button"
-                tabIndex={0}
-                aria-label={t('auth.accountMenu', '账户菜单')}
-                onKeyDown={(event) => {
-                    if (event.key !== 'Enter' && event.key !== ' ') return;
-                    event.preventDefault();
-                    event.currentTarget.click();
-                }}
-                style={{
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 8,
-                    ...(commercialTouchTarget ? COMMERCIAL_TOUCH_TARGET_STYLE : {}),
-                }}
+        <Dropdown
+            menu={{
+                id: accountMenuId,
+                'aria-label': t('auth.accountMenu'),
+                items: menuItems,
+                onClick: handleMenuClick,
+                onKeyDown: handleAccountMenuKeyDown,
+            }}
+            trigger={['click']}
+            placement="bottomRight"
+            open={isAccountMenuOpen}
+            onOpenChange={handleAccountMenuOpenChange}
+        >
+            <button
+                ref={accountMenuTriggerRef}
+                type="button"
+                className={`auth-account-menu-trigger${commercialTouchTarget ? ' auth-account-menu-trigger--commercial' : ''}`}
+                aria-label={t('auth.accountMenu')}
+                aria-haspopup="menu"
+                aria-expanded={isAccountMenuOpen}
+                aria-controls={accountMenuId}
+                title={t('auth.accountMenu')}
+                onKeyDown={handleAccountMenuTriggerKeyDown}
             >
                 <Avatar
                     size="small"
@@ -125,7 +170,7 @@ export const AuthStatus: React.FC<AuthStatusProps> = ({
                 >
                     {user.email?.[0].toUpperCase()}
                 </Avatar>
-            </div>
+            </button>
         </Dropdown>
     );
 

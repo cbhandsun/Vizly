@@ -110,6 +110,7 @@
     },
     "auth": {
         "login": "登录",
+        "accountMenu": "账户菜单",
         "menu": {
             "myDiagrams": "我的图表",
             "switchUser": "切换账号",
