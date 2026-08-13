@@ -7,6 +7,10 @@ import { appMessage } from '@/core/utils/antdStaticBridge';
 import { getFlowDataBridge } from '@/core/utils/flowDataBridge';
 import { coerceClipboardData } from '@/core/utils/flowchartClipboard';
 import {
+    coerceDiagramVersion,
+    parseDiagramVersionList,
+} from '@/services/versionSnapshotSecurity';
+import {
     logVersionHistoryLoadFailure,
     logVersionHistoryPayloadLoadFailure,
     logVersionHistoryRestoreFailure,
@@ -70,7 +74,9 @@ export function useVersionHistory(diagramId: string) {
             const unifiedStorage = await loadUnifiedStorage();
             const data = await unifiedStorage.listVersions(diagramId);
             if (requestId !== versionsRequestIdRef.current) return;
-            setVersionCollection({ diagramId, items: data });
+            const parsed = parseDiagramVersionList(data, diagramId);
+            if (!parsed.ok) throw new Error('Storage returned an invalid version list.');
+            setVersionCollection({ diagramId, items: parsed.value });
         } catch (error) {
             if (requestId !== versionsRequestIdRef.current) return;
             setLoadError(true);
@@ -95,7 +101,12 @@ export function useVersionHistory(diagramId: string) {
                     return false;
                 }
 
-                const newVersion = await unifiedStorage.saveVersion(diagramId, snapshot, commitMessage);
+                const newVersion = coerceDiagramVersion(
+                    await unifiedStorage.saveVersion(diagramId, snapshot, commitMessage),
+                );
+                if (!newVersion || newVersion.diagramId !== diagramId) {
+                    throw new Error('Storage returned an invalid saved version.');
+                }
                 if (currentDiagramIdRef.current !== diagramId) return false;
 
                 // Add new version to list without refetching all
@@ -119,7 +130,13 @@ export function useVersionHistory(diagramId: string) {
     const loadVersionData = useCallback(async (versionId: string) => {
         try {
             const unifiedStorage = await loadUnifiedStorage();
-            return await unifiedStorage.loadVersion(diagramId, versionId);
+            const value = await unifiedStorage.loadVersion(diagramId, versionId);
+            if (value === null) return null;
+            const version = coerceDiagramVersion(value);
+            if (!version || version.diagramId !== diagramId || version.id !== versionId) {
+                throw new Error('Storage returned an invalid version payload.');
+            }
+            return version;
         } catch (e) {
             if (currentDiagramIdRef.current !== diagramId) return null;
             logVersionHistoryPayloadLoadFailure(e);
@@ -212,11 +229,16 @@ export function useVersionHistory(diagramId: string) {
 
         try {
             const unifiedStorage = await loadUnifiedStorage();
-            const backupVersion = await unifiedStorage.saveVersion(
-                diagramId,
-                backupSnapshot,
-                t('designer.versionHistoryPanel.backupMessage'),
+            const backupVersion = coerceDiagramVersion(
+                await unifiedStorage.saveVersion(
+                    diagramId,
+                    backupSnapshot,
+                    t('designer.versionHistoryPanel.backupMessage'),
+                ),
             );
+            if (!backupVersion || backupVersion.diagramId !== diagramId) {
+                throw new Error('Storage returned an invalid backup version.');
+            }
             if (currentDiagramIdRef.current !== diagramId) return false;
             setVersionCollection(prev => ({
                 diagramId,

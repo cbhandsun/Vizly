@@ -4,6 +4,7 @@ import {
     coerceVersionMessage,
     coerceVersionSnapshotData,
     isSafeVersionId,
+    parseDiagramVersionList,
 } from '../versionSnapshotSecurity';
 
 const makeSnapshot = () => ({
@@ -28,6 +29,7 @@ describe('versionSnapshotSecurity', () => {
         expect(coerceVersionMessage('  saved  ')).toBe('saved');
         expect(coerceVersionMessage('')).toBe('版本快照');
         expect(coerceVersionMessage('x'.repeat(600))).toHaveLength(500);
+        expect(coerceVersionMessage(' release\u0000  \u202ecandidate ')).toBe('release candidate');
     });
 
     it('coerces snapshot data through clipboard guards', () => {
@@ -46,26 +48,79 @@ describe('versionSnapshotSecurity', () => {
         })).toThrow('too large');
     });
 
-    it('normalizes complete diagram version records and rejects unsafe ids', () => {
+    it('normalizes complete diagram version records and rejects unsafe metadata', () => {
         const version = coerceDiagramVersion({
             id: ' version-1 ',
             diagramId: ' diagram-1 ',
             snapshotData: makeSnapshot(),
-            createdAt: Number.NaN,
+            createdAt: 123,
             message: '  restored ',
+            authorId: ` user\u2066  ${'x'.repeat(240)} `,
         });
 
         expect(version).toMatchObject({
             id: 'version-1',
             diagramId: 'diagram-1',
             message: 'restored',
+            authorId: `user ${'x'.repeat(175)}`,
+            createdAt: 123,
         });
-        expect(typeof version?.createdAt).toBe('number');
         expect(coerceDiagramVersion({
             id: '../bad',
             diagramId: 'diagram-1',
             snapshotData: makeSnapshot(),
             createdAt: 1,
         })).toBeNull();
+        expect(coerceDiagramVersion({
+            id: 'version-1',
+            diagramId: 'diagram-1',
+            snapshotData: null,
+            createdAt: Number.NaN,
+        })).toBeNull();
+        expect(coerceDiagramVersion('not a record')).toBeNull();
+    });
+
+    it('parses a bounded, scoped, unique version list in descending time order', () => {
+        const parsed = parseDiagramVersionList([
+            {
+                id: 'version-1',
+                diagramId: 'diagram-1',
+                snapshotData: null,
+                createdAt: 1,
+                message: 'First',
+            },
+            {
+                id: 'version-2',
+                diagramId: 'diagram-1',
+                snapshotData: null,
+                createdAt: 2,
+                message: 'Second',
+            },
+        ], 'diagram-1');
+
+        expect(parsed).toEqual({
+            ok: true,
+            value: [
+                expect.objectContaining({ id: 'version-2' }),
+                expect.objectContaining({ id: 'version-1' }),
+            ],
+        });
+    });
+
+    it('rejects malformed, cross-diagram, duplicate, and oversized version lists', () => {
+        const version = {
+            id: 'version-1',
+            diagramId: 'diagram-1',
+            snapshotData: null,
+            createdAt: 1,
+        };
+
+        expect(parseDiagramVersionList('invalid', 'diagram-1').ok).toBe(false);
+        expect(parseDiagramVersionList([{ ...version, diagramId: 'diagram-2' }], 'diagram-1').ok).toBe(false);
+        expect(parseDiagramVersionList([version, version], 'diagram-1').ok).toBe(false);
+        expect(parseDiagramVersionList(
+            Array.from({ length: 501 }, (_, index) => ({ ...version, id: `version-${index}` })),
+            'diagram-1',
+        ).ok).toBe(false);
     });
 });

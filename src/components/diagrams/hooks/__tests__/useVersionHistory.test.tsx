@@ -227,6 +227,24 @@ describe('useVersionHistory', () => {
         expect(messageMocks.error).toHaveBeenCalledWith('Failed to load version history');
     });
 
+    it('keeps the last usable history when a refresh returns cross-diagram records', async () => {
+        storageMocks.listVersions.mockResolvedValueOnce([makeVersion()]);
+        const { result } = renderHook(() => useVersionHistory('diagram-1'));
+
+        await waitFor(() => expect(result.current.versions).toHaveLength(1));
+        storageMocks.listVersions.mockResolvedValueOnce([{
+            ...makeVersion(),
+            diagramId: 'diagram-2',
+        }]);
+        await act(async () => {
+            await result.current.loadVersions();
+        });
+
+        expect(result.current.loadError).toBe(true);
+        expect(result.current.versions.map(version => version.id)).toEqual(['version-1']);
+        expect(messageMocks.error).toHaveBeenCalledWith('Failed to load version history');
+    });
+
     it('ignores an older version list response after the active diagram changes', async () => {
         let resolveFirstDiagram: ((versions: ReturnType<typeof makeVersion>[]) => void) | undefined;
         storageMocks.listVersions.mockImplementation((requestedDiagramId: string) => {
@@ -528,6 +546,54 @@ describe('useVersionHistory', () => {
         expect(saved).toBe(false);
         expect(storageMocks.saveVersion).not.toHaveBeenCalled();
         expect(messageMocks.error).toHaveBeenCalledWith('The current diagram data could not be read');
+    });
+
+    it('rejects an invalid saved version response instead of publishing it', async () => {
+        storageMocks.saveVersion.mockResolvedValue({
+            ...makeVersion(),
+            diagramId: 'diagram-2',
+        });
+        const bridge = { id: 'diagram-1', nodes: originalNodes, edges: originalEdges };
+        (window as unknown as { __flowDataBridge: Record<string, typeof bridge> }).__flowDataBridge = { 'diagram-1': bridge };
+        const { result } = renderHook(() => useVersionHistory('diagram-1'));
+        await waitFor(() => expect(storageMocks.listVersions).toHaveBeenCalled());
+
+        let saved = true;
+        await act(async () => {
+            saved = await result.current.saveVersion('Invalid response');
+        });
+
+        expect(saved).toBe(false);
+        expect(result.current.versions).toEqual([]);
+        expect(messageMocks.success).not.toHaveBeenCalled();
+        expect(messageMocks.error).toHaveBeenCalledWith('Failed to save snapshot');
+    });
+
+    it('rejects a version payload whose identity does not match the request', async () => {
+        storageMocks.loadVersion.mockResolvedValue({
+            ...makeVersion(),
+            id: 'version-2',
+        });
+        const setNodes = vi.fn();
+        const setEdges = vi.fn();
+        const { result } = renderHook(() => useVersionHistory('diagram-1'));
+        await waitFor(() => expect(storageMocks.listVersions).toHaveBeenCalled());
+
+        let entered = true;
+        await act(async () => {
+            entered = await result.current.enterPreview(
+                'version-1',
+                setNodes,
+                setEdges,
+                () => originalNodes,
+                () => originalEdges,
+            );
+        });
+
+        expect(entered).toBe(false);
+        expect(setNodes).not.toHaveBeenCalled();
+        expect(setEdges).not.toHaveBeenCalled();
+        expect(messageMocks.error).toHaveBeenCalledWith('Failed to load snapshot details');
     });
 
     it('cancels restore and preserves the preview when the safety backup fails', async () => {
