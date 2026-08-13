@@ -117,13 +117,22 @@ const createHudKey = (text: string): HTMLElement => {
     return key;
 };
 
-export function showPresentationHUD(topic: string, index: number, total: number) {
+export function showPresentationHUD(
+    topic: string,
+    index: number,
+    total: number,
+    host: HTMLElement | null = document.body
+) {
     let hud = document.getElementById('me-presentation-hud');
     if (!hud) {
         hud = document.createElement('div');
         hud.id = 'me-presentation-hud';
-        document.body.appendChild(hud);
     }
+
+    // Fullscreen only renders descendants of the fullscreen element. Keep the
+    // navigation HUD inside the mind-map root so it remains visible after the
+    // browser enters presentation mode.
+    (host ?? document.body).appendChild(hud);
 
     const nav = document.createDocumentFragment();
     nav.append(createHudKey('←'), createHudKey('→'), document.createTextNode(' 导航 \u00a0 '), createHudKey('Esc'), document.createTextNode(' 退出'));
@@ -176,12 +185,17 @@ export function usePresentationMode(
 
             // find topic text
             const obj = mind.getObjById(id, nodeData);
-            showPresentationHUD(obj?.topic ?? id, idx, ids.length);
+            showPresentationHUD(
+                obj?.topic ?? id,
+                idx,
+                ids.length,
+                document.getElementById(containerId)
+            );
             onNodeFocusRef.current?.(obj ?? null);
         } catch (e) {
             logMindmapPresentationNavigateFailure(e);
         }
-    }, [mind]);
+    }, [containerId, mind]);
 
     const stop = useCallback(() => {
         if (!isActiveRef.current) return;

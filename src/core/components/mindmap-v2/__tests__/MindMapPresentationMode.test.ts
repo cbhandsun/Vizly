@@ -32,4 +32,17 @@ describe('MindMapPresentationMode HUD', () => {
         expect(hud?.querySelector('.hud-topic')?.textContent).toBe('Quarterly plan');
         expect(keys).toEqual(['←', '→', 'Esc']);
     });
+
+    it('mounts the HUD inside the presentation host so fullscreen keeps it visible', () => {
+        const presentationHost = document.createElement('div');
+        presentationHost.id = 'presentation-host';
+        document.body.appendChild(presentationHost);
+
+        showPresentationHUD('Launch plan', 0, 1, presentationHost);
+
+        const hud = document.getElementById('me-presentation-hud');
+        expect(hud?.parentElement).toBe(presentationHost);
+
+        presentationHost.remove();
+    });
 });
