@@ -29,6 +29,7 @@ import { isMindMapV1, isMindMapV2 } from './types';
 import { registerMindElixirInstance, unregisterMindElixirInstance } from './mindElixirStore';
 import { MindElixirContext } from './MindElixirContext';
 import MindMapContextMenu, { type CtxPos } from './MindMapContextMenu';
+import { restoreMindMapContextMenuFocus } from './mindMapContextMenuFocus';
 import { resolveMindMapContextNodeId } from './mindMapContextNodeId';
 import MindMapFloatingBar from './MindMapFloatingBar';
 import MindMapBatchBar from './MindMapBatchBar';
@@ -89,6 +90,7 @@ interface MindElixirWrapperProps {
 
 const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNodeSelect }) => {
     const containerRef = useRef<HTMLDivElement>(null);
+    const contextMenuTriggerRef = useRef<HTMLElement | null>(null);
     const mindRef = useRef<MindElixirInstance | null>(null);
     const [instance, setInstance] = useState<MindElixirInstance | null>(null);
     const [selectedNode, setSelectedNode] = useState<NodeObj | null>(null);
@@ -214,6 +216,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
                 mind.currentNode?.id,
             ]);
             if (!nodeId) return;
+            contextMenuTriggerRef.current = tpc;
             setCtxMenu({ visible: true, x: e.clientX, y: e.clientY, nodeId });
         };
         mind.container.addEventListener('contextmenu', handleContextMenu);
@@ -525,6 +528,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
                 <div
                     ref={containerRef}
                     id="vizly-mind-elixir-root"
+                    tabIndex={-1}
                     style={{ width: '100%', height: '100%', position: 'relative' }}
                 >
                     <MindMapSpeakerNotes />
@@ -571,6 +575,10 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
             <MindMapContextMenu
                 {...ctxMenu}
                 onClose={() => setCtxMenu(m => ({ ...m, visible: false }))}
+                onRestoreFocus={() => restoreMindMapContextMenuFocus(
+                    contextMenuTriggerRef.current,
+                    containerRef.current,
+                )}
             />
 
             {/* Floating quick action bar — appears above selected node (Whimsical-style) */}

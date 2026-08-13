@@ -114,6 +114,15 @@ describe('MindMapFloatingBar commercial interaction contract', () => {
         expect(contextMenuSource).toContain('role="menuitem"');
         expect(contextMenuSource).toContain("'ArrowDown', 'ArrowUp', 'Home', 'End'");
         expect(contextMenuSource).toContain("querySelector<HTMLButtonElement>('[role=\"menuitem\"]')?.focus()");
+        expect(contextMenuSource).toContain('role="separator"');
+        expect(contextMenuSource).toContain(':focus-visible');
+        expect(contextMenuSource).toContain('@media (prefers-reduced-motion: reduce)');
+        expect(contextMenuSource).toContain('onRestoreFocus');
+        expect(contextMenuSource).toContain('<EditOutlined />');
+        expect(contextMenuSource).toContain('<DeleteOutlined />');
+        for (const legacyIcon of ['✏️', '➕', '↕️', '📋', '⬆️', '⬇️', '🔽', '▶️', '🔷', '🗑️']) {
+            expect(contextMenuSource).not.toContain(legacyIcon);
+        }
     });
 
     it('keeps AI popover state single-sourced and provides a configuration recovery path', () => {

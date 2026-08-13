@@ -131,6 +131,7 @@ describe('MindMapContextMenu', () => {
 
     it('keeps the menu mounted while confirming and deletes only the captured target', async () => {
         const onClose = vi.fn();
+        const onRestoreFocus = vi.fn();
         const onCanvasClick = vi.fn();
         render(
             <div onClick={onCanvasClick} onMouseDown={onCanvasClick}>
@@ -140,6 +141,7 @@ describe('MindMapContextMenu', () => {
                     y={20}
                     nodeId={harness.child.id}
                     onClose={onClose}
+                    onRestoreFocus={onRestoreFocus}
                 />
             </div>,
         );
@@ -154,6 +156,7 @@ describe('MindMapContextMenu', () => {
         await waitFor(() => expect(harness.removeNodes).toHaveBeenCalledWith([harness.topicElement]));
         expect(harness.selectNode).toHaveBeenCalledWith(harness.topicElement);
         expect(onClose).toHaveBeenCalledTimes(1);
+        await waitFor(() => expect(onRestoreFocus).toHaveBeenCalledTimes(1));
     });
 
     it('opens the localized shape submenu and keeps keyboard focus inside its radio choices', async () => {
@@ -203,6 +206,7 @@ describe('MindMapContextMenu', () => {
 
     it('applies a selected shape and closes the context menu', async () => {
         const onClose = vi.fn();
+        const onRestoreFocus = vi.fn();
         render(
             <MindMapContextMenu
                 visible
@@ -210,6 +214,7 @@ describe('MindMapContextMenu', () => {
                 y={20}
                 nodeId={harness.child.id}
                 onClose={onClose}
+                onRestoreFocus={onRestoreFocus}
             />,
         );
 
@@ -221,5 +226,56 @@ describe('MindMapContextMenu', () => {
             expect.objectContaining({ id: 'child', shapeClass: 'oval' }),
         );
         expect(onClose).toHaveBeenCalledTimes(1);
+        await waitFor(() => expect(onRestoreFocus).toHaveBeenCalledTimes(1));
+    });
+
+    it('returns focus after Escape and outside-pointer dismissal', async () => {
+        const onClose = vi.fn();
+        const onRestoreFocus = vi.fn();
+        const { rerender } = render(
+            <MindMapContextMenu
+                visible
+                x={20}
+                y={20}
+                nodeId={harness.child.id}
+                onClose={onClose}
+                onRestoreFocus={onRestoreFocus}
+            />,
+        );
+
+        fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+        expect(onClose).toHaveBeenCalledTimes(1);
+        await waitFor(() => expect(onRestoreFocus).toHaveBeenCalledTimes(1));
+
+        rerender(
+            <MindMapContextMenu
+                visible
+                x={20}
+                y={20}
+                nodeId={harness.child.id}
+                onClose={onClose}
+                onRestoreFocus={onRestoreFocus}
+            />,
+        );
+        fireEvent.mouseDown(document.body);
+        expect(onClose).toHaveBeenCalledTimes(2);
+        await waitFor(() => expect(onRestoreFocus).toHaveBeenCalledTimes(2));
+    });
+
+    it('does not steal focus back when editing starts', () => {
+        const onRestoreFocus = vi.fn();
+        render(
+            <MindMapContextMenu
+                visible
+                x={20}
+                y={20}
+                nodeId={harness.child.id}
+                onClose={vi.fn()}
+                onRestoreFocus={onRestoreFocus}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Edit node' }));
+        expect(onRestoreFocus).not.toHaveBeenCalled();
     });
 });
