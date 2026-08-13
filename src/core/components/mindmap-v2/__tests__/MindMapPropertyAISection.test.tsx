@@ -12,14 +12,14 @@ import {
 vi.mock('react-i18next', () => ({
     useTranslation: () => ({
         t: (key: string, values?: { topic?: string; count?: number }) => ({
-            'designer.mindmap.propertyAI.sectionLabel': 'AI 节点操作',
-            'designer.mindmap.propertyAI.suggestionsTitle': 'AI 子主题建议',
-            'designer.mindmap.propertyAI.suggestionsList': '建议的子主题',
-            'designer.mindmap.propertyAI.applying': '添加中…',
-            'designer.mindmap.propertyAI.expand': 'AI 扩展子主题',
-            'designer.mindmap.propertyAI.summarize': 'AI 智能归纳当前节点',
-            'designer.mindmap.propertyAI.openConfiguration': '打开 AI 设置',
-            'designer.mindmap.propertyAI.applySuggestion': `将${values?.topic ?? ''}添加为子主题`,
+            'plugins.mindmap.propertyAI.sectionLabel': 'AI 节点操作',
+            'plugins.mindmap.propertyAI.suggestionsTitle': 'AI 子主题建议',
+            'plugins.mindmap.propertyAI.suggestionsList': '建议的子主题',
+            'plugins.mindmap.propertyAI.applying': '添加中…',
+            'plugins.mindmap.propertyAI.expand': 'AI 扩展子主题',
+            'plugins.mindmap.propertyAI.summarize': 'AI 智能归纳当前节点',
+            'plugins.mindmap.propertyAI.openConfiguration': '打开 AI 设置',
+            'plugins.mindmap.propertyAI.applySuggestion': `将${values?.topic ?? ''}添加为子主题`,
         }[key] ?? key),
     }),
 }));

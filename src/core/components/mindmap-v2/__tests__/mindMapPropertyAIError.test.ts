@@ -8,9 +8,9 @@ describe('presentMindMapPropertyAIError', () => {
         expect(presentMindMapPropertyAIError(
             '请先在 AI 设置中配置有效的 Provider 和 API Key',
             translate,
-        )).toBe('translated:designer.mindmap.propertyAI.configurationRequired');
+        )).toBe('translated:plugins.mindmap.propertyAI.configurationRequired');
         expect(presentMindMapPropertyAIError('请在 AI 设置中选择一个模型', translate))
-            .toBe('translated:designer.mindmap.propertyAI.modelRequired');
+            .toBe('translated:plugins.mindmap.propertyAI.modelRequired');
     });
 
     it('preserves bounded provider errors that do not have a known localization key', () => {

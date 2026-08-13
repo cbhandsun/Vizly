@@ -4,11 +4,11 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-    Input, InputNumber, Divider, Typography, Space, Button, Tooltip, Popover, Tag, Select,
+    Input, InputNumber, Divider, Typography, Space, Button, Tooltip, Tag, Select,
 } from 'antd';
 import {
     FontSizeOutlined, DeleteOutlined, PlusOutlined, EditOutlined,
-    LinkOutlined, SmileOutlined, TagsOutlined,
+    LinkOutlined, TagsOutlined,
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import type { NodeObj, TagObj } from 'mind-elixir';
@@ -22,7 +22,6 @@ import {
     type TaskStatus,
 } from './mindmapTaskModel';
 import { toSafeExternalUrl, toSafeImageUrl } from '../../utils/sanitizeHtml';
-import { getImageFileImportError, IMAGE_DATA_URL_IMPORT_MAX_BYTES } from '../../utils/fileImportGuards';
 import {
     cleanMindMapColor,
     cleanMindMapTagObjects,
@@ -35,7 +34,6 @@ import {
 import { cleanMindMapChildNode } from './mindmapBridgeSecurity';
 import {
     logMindmapPropertyAiAddChildFailure,
-    logMindmapPropertyImageUploadRejected,
     logMindmapPropertyQuickActionFailure,
     logMindmapPropertyReshapeFailure,
     logMindmapPropertySetTopicFailure,
@@ -43,7 +41,6 @@ import {
 import {
     CanvasPanel,
     ColorSwatch,
-    IconsPicker,
     PropertyRow as Row,
 } from './MindMapPropertyPanelControls';
 import {
@@ -56,6 +53,7 @@ import { useMindMapPropertySelection } from './useMindMapPropertySelection';
 import { MindMapPropertyAISection } from './MindMapPropertyAISection';
 import { isMindMapAIConfigurationError } from './mindMapAIErrorPresentation';
 import { presentMindMapPropertyAIError } from './mindMapPropertyAIError';
+import { MindMapPropertyMediaControls } from './MindMapPropertyMediaControls';
 
 const { Text } = Typography;
 const { TextArea } = Input;
@@ -140,11 +138,18 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
         } catch (e) { logMindmapPropertyReshapeFailure(e); }
     }, [mind, node]);
 
-    const saveImageUrl = useCallback(() => {
-        const safeUrl = toSafeImageUrl(imageUrl);
+    const applyImageUrl = useCallback((url: string) => {
+        const safeUrl = toSafeImageUrl(url);
         setImageUrl(safeUrl ?? '');
         reshape({ image: safeUrl ? { url: safeUrl, width: 160, height: 100, fit: 'contain' } : undefined });
-    }, [imageUrl, reshape]);
+    }, [reshape]);
+
+    const saveImageUrl = useCallback((): boolean => {
+        const safeUrl = toSafeImageUrl(imageUrl);
+        if (imageUrl.trim() && !safeUrl) return false;
+        applyImageUrl(safeUrl ?? '');
+        return true;
+    }, [applyImageUrl, imageUrl]);
 
     const saveHyperLink = useCallback(() => {
         const safeUrl = toSafeExternalUrl(hyperLink);
@@ -235,10 +240,10 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
             else {
                 const suggestions = [...new Set(result.topics)];
                 setAiSuggestions(suggestions);
-                setAiStatus(t('designer.mindmap.propertyAI.generated', { count: suggestions.length }));
+                setAiStatus(t('plugins.mindmap.propertyAI.generated', { count: suggestions.length }));
             }
         } catch (e: unknown) {
-            setAiError(errorMessage(e, t('designer.mindmap.propertyAI.expandFailed')));
+            setAiError(errorMessage(e, t('plugins.mindmap.propertyAI.expandFailed')));
         } finally {
             setAiExpanding(false);
         }
@@ -260,13 +265,13 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
                 const tpcEl = mind.findEle(node.id);
                 if (tpcEl) {
                     mind.setNodeTopic(tpcEl, cleanMindMapTopic(result.topic));
-                    setAiStatus(t('designer.mindmap.propertyAI.summaryUpdated'));
+                    setAiStatus(t('plugins.mindmap.propertyAI.summaryUpdated'));
                 }
             } else {
-                setAiStatus(t('designer.mindmap.propertyAI.summaryUnchanged'));
+                setAiStatus(t('plugins.mindmap.propertyAI.summaryUnchanged'));
             }
         } catch (e: unknown) {
-            setAiError(errorMessage(e, t('designer.mindmap.propertyAI.summarizeFailed')));
+            setAiError(errorMessage(e, t('plugins.mindmap.propertyAI.summarizeFailed')));
         } finally {
             setAiSummarizing(false);
         }
@@ -281,16 +286,16 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
         try {
             const tpcEl = mind.findEle(node.id);
             if (!tpcEl) {
-                setAiError(t('designer.mindmap.propertyAI.applyUnavailable'));
+                setAiError(t('plugins.mindmap.propertyAI.applyUnavailable'));
                 return;
             }
             mind.selectNode(tpcEl);
             await mind.addChild(tpcEl, cleanMindMapChildNode({ label: topic }, mind.generateNewObj?.().id ?? `n_${Date.now()}`));
             setAiSuggestions(current => current.filter(suggestion => suggestion !== topic));
-            setAiStatus(t('designer.mindmap.propertyAI.applied', { topic }));
+            setAiStatus(t('plugins.mindmap.propertyAI.applied', { topic }));
         } catch (e) {
             logMindmapPropertyAiAddChildFailure(e);
-            setAiError(t('designer.mindmap.propertyAI.applyFailed'));
+            setAiError(t('plugins.mindmap.propertyAI.applyFailed'));
         } finally {
             setAiApplyingTopic(null);
         }
@@ -368,20 +373,6 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
                 onSummarize={() => { void handleAISummarize(); }}
             />
 
-            {/* Icons 已选 + picker */}
-            {icons.length > 0 && (
-                <div style={{ marginBottom: 10, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                    {icons.map(ic => (
-                        <button key={ic} onClick={() => handleIconToggle(ic)}
-                            title="点击移除"
-                            style={{ fontSize: 18, cursor: 'pointer', border: '1px solid #e2e8f0',
-                                borderRadius: 6, padding: '1px 4px', background: 'rgba(99,102,241,0.08)' }}>
-                            {ic}
-                        </button>
-                    ))}
-                </div>
-            )}
-
             {/* Topic */}
             <Row label="节点文字（失焦保存）">
                 <TextArea value={topic} onChange={e => setTopic(e.target.value)}
@@ -390,16 +381,15 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
                     autoSize={{ minRows: 1, maxRows: 4 }} style={{ fontSize: 13 }} />
             </Row>
 
-            {/* Icons picker */}
-            <Row label="图标 Markers">
-                <Popover trigger="click" placement="left"
-                    content={<IconsPicker icons={icons} onToggle={handleIconToggle} />}
-                    title={<span style={{ fontSize: 12 }}>选择图标（可多选）</span>}>
-                    <Button size="small" icon={<SmileOutlined />} style={{ width: '100%' }}>
-                        {icons.length > 0 ? `已选 ${icons.length} 个图标` : '添加图标...'}
-                    </Button>
-                </Popover>
-            </Row>
+            <MindMapPropertyMediaControls
+                key={node.id}
+                icons={icons}
+                imageUrl={imageUrl}
+                onIconToggle={handleIconToggle}
+                onImageChange={applyImageUrl}
+                onImageUrlCommit={saveImageUrl}
+                onImageUrlInput={setImageUrl}
+            />
 
             {/* Tags */}
             <Row label="标签 Tags">
@@ -590,62 +580,6 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
                         reshape({ note: cleanNote });
                     }}
                     autoSize={{ minRows: 2, maxRows: 5 }} style={{ fontSize: 12 }} />
-            </Row>
-
-            {/* Image — URL input + local file upload */}
-            <Row label="节点图片">
-                <div style={{ display: 'flex', gap: 4, marginBottom: 5 }}>
-                    <Input prefix={<span style={{ fontSize: 11, color: '#94a3b8' }}>🖼️</span>}
-                        placeholder="https://... 或点击上传" value={imageUrl} size="small"
-                        style={{ flex: 1 }}
-                        onChange={e => setImageUrl(e.target.value)}
-                        onBlur={saveImageUrl}
-                        onPressEnter={saveImageUrl} />
-                    {/* Local file upload */}
-                    <label title="从本地上传图片" style={{
-                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                        width: 28, height: 24, borderRadius: 5, cursor: 'pointer', flexShrink: 0,
-                        background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)',
-                        fontSize: 13,
-                    }}>
-                        📁
-                        <input type="file" accept="image/*" style={{ display: 'none' }}
-                            onChange={e => {
-                                const file = e.target.files?.[0];
-                                if (!file) return;
-                                const importError = getImageFileImportError(file, IMAGE_DATA_URL_IMPORT_MAX_BYTES);
-                                if (importError) {
-                                    logMindmapPropertyImageUploadRejected(importError);
-                                    e.target.value = '';
-                                    return;
-                                }
-                                const reader = new FileReader();
-                                reader.onload = ev => {
-                                    const dataUrl = ev.target?.result as string;
-                                    const safeUrl = dataUrl ? toSafeImageUrl(dataUrl) : null;
-                                    if (!safeUrl) return;
-                                    setImageUrl(safeUrl);
-                                    reshape({ image: { url: safeUrl, width: 160, height: 100, fit: 'contain' } });
-                                };
-                                reader.readAsDataURL(file);
-                                e.target.value = '';
-                            }} />
-                    </label>
-                </div>
-                {toSafeImageUrl(imageUrl) && (
-                    <div style={{ marginTop: 2, borderRadius: 6, overflow: 'hidden',
-                        border: '1px solid rgba(99,102,241,0.15)', position: 'relative' }}>
-                        <img src={toSafeImageUrl(imageUrl)!} alt="预览"
-                            style={{ width: '100%', maxHeight: 100, objectFit: 'contain',
-                                display: 'block', background: '#f8fafc' }}
-                            onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                        <button onClick={() => { setImageUrl(''); reshape({ image: undefined }); }}
-                            style={{ position: 'absolute', top: 4, right: 4, width: 20, height: 20,
-                                borderRadius: '50%', background: 'rgba(0,0,0,0.5)', color: '#fff',
-                                border: 'none', cursor: 'pointer', fontSize: 11, lineHeight: '20px',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
-                    </div>
-                )}
             </Row>
 
             <Divider style={{ margin: '10px 0' }} />

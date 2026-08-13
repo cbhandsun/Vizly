@@ -98,11 +98,11 @@ describe('MindMapBatchBar commercial interactions', () => {
 
         selectBatch();
 
-        expect(screen.getByRole('toolbar', { name: 'designer.mindmap.batch.toolbarLabel' })).toBeTruthy();
-        expect(screen.getByRole('status').textContent).toContain('designer.mindmap.batch.selectedCount 2');
-        expect(screen.getByRole('button', { name: 'designer.mindmap.batch.color' }).tagName).toBe('BUTTON');
-        expect(screen.getByRole('button', { name: 'designer.mindmap.batch.expand' }).tagName).toBe('BUTTON');
-        expect(screen.getByRole('button', { name: 'designer.mindmap.batch.collapse' }).tagName).toBe('BUTTON');
+        expect(screen.getByRole('toolbar', { name: 'plugins.mindmap.batch.toolbarLabel' })).toBeTruthy();
+        expect(screen.getByRole('status').textContent).toContain('plugins.mindmap.batch.selectedCount 2');
+        expect(screen.getByRole('button', { name: 'plugins.mindmap.batch.color' }).tagName).toBe('BUTTON');
+        expect(screen.getByRole('button', { name: 'plugins.mindmap.batch.expand' }).tagName).toBe('BUTTON');
+        expect(screen.getByRole('button', { name: 'plugins.mindmap.batch.collapse' }).tagName).toBe('BUTTON');
         expect(screen.getByRole('button', { name: 'common.delete' }).tagName).toBe('BUTTON');
     });
 
@@ -110,13 +110,13 @@ describe('MindMapBatchBar commercial interactions', () => {
         render(<MindMapBatchBar />);
         selectBatch();
 
-        const trigger = screen.getByRole('button', { name: 'designer.mindmap.batch.color' });
+        const trigger = screen.getByRole('button', { name: 'plugins.mindmap.batch.color' });
         expect(trigger.getAttribute('aria-expanded')).toBe('false');
         fireEvent.click(trigger);
         expect(trigger.getAttribute('aria-expanded')).toBe('true');
 
         fireEvent.click(screen.getByRole('button', {
-            name: 'designer.mindmap.batch.colorChoice #6366f1',
+            name: 'plugins.mindmap.batch.colorChoice #6366f1',
         }));
 
         expect(mindHarness.reshapeNode).toHaveBeenCalledTimes(2);
@@ -128,8 +128,8 @@ describe('MindMapBatchBar commercial interactions', () => {
         render(<MindMapBatchBar />);
         selectBatch();
 
-        fireEvent.click(screen.getByRole('button', { name: 'designer.mindmap.batch.expand' }));
-        fireEvent.click(screen.getByRole('button', { name: 'designer.mindmap.batch.collapse' }));
+        fireEvent.click(screen.getByRole('button', { name: 'plugins.mindmap.batch.expand' }));
+        fireEvent.click(screen.getByRole('button', { name: 'plugins.mindmap.batch.collapse' }));
         expect(mindHarness.expandNode.mock.calls.map(call => call[1])).toEqual([true, true, false, false]);
 
         fireEvent.click(screen.getByTestId('confirm-batch-delete'));

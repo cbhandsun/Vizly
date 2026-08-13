@@ -42,7 +42,7 @@ export const MindMapPropertyAISection: React.FC<MindMapPropertyAISectionProps> =
     const isApplying = applyingTopic !== null;
 
     return (
-        <section className={styles.section} aria-label={t('designer.mindmap.propertyAI.sectionLabel')}>
+        <section className={styles.section} aria-label={t('plugins.mindmap.propertyAI.sectionLabel')}>
             <Popover
                 trigger="click"
                 placement="left"
@@ -51,7 +51,7 @@ export const MindMapPropertyAISection: React.FC<MindMapPropertyAISectionProps> =
                 title={(
                     <span id={titleId} className={styles.title}>
                         <RobotOutlined aria-hidden="true" />
-                        {t('designer.mindmap.propertyAI.suggestionsTitle')}
+                        {t('plugins.mindmap.propertyAI.suggestionsTitle')}
                     </span>
                 )}
                 content={(
@@ -71,13 +71,13 @@ export const MindMapPropertyAISection: React.FC<MindMapPropertyAISectionProps> =
                                         className={styles.recovery}
                                         onClick={requestMindMapAIConfig}
                                     >
-                                        {t('designer.mindmap.propertyAI.openConfiguration')}
+                                        {t('plugins.mindmap.propertyAI.openConfiguration')}
                                     </button>
                                 )}
                             </div>
                         )}
                         {suggestions.length > 0 && (
-                            <ul className={styles.list} aria-label={t('designer.mindmap.propertyAI.suggestionsList')}>
+                            <ul className={styles.list} aria-label={t('plugins.mindmap.propertyAI.suggestionsList')}>
                                 {suggestions.map(suggestion => (
                                     <li key={suggestion}>
                                         <button
@@ -85,12 +85,12 @@ export const MindMapPropertyAISection: React.FC<MindMapPropertyAISectionProps> =
                                             className={styles.suggestion}
                                             onClick={() => onApplySuggestion(suggestion)}
                                             disabled={isApplying}
-                                            aria-label={t('designer.mindmap.propertyAI.applySuggestion', { topic: suggestion })}
+                                            aria-label={t('plugins.mindmap.propertyAI.applySuggestion', { topic: suggestion })}
                                         >
                                             <PlusOutlined aria-hidden="true" />
                                             <span>{suggestion}</span>
                                             {applyingTopic === suggestion && (
-                                                <span className={styles.pending}>{t('designer.mindmap.propertyAI.applying')}</span>
+                                                <span className={styles.pending}>{t('plugins.mindmap.propertyAI.applying')}</span>
                                             )}
                                         </button>
                                     </li>
@@ -112,7 +112,7 @@ export const MindMapPropertyAISection: React.FC<MindMapPropertyAISectionProps> =
                     aria-expanded={open}
                     aria-controls={suggestionsId}
                 >
-                    {t('designer.mindmap.propertyAI.expand')}
+                    {t('plugins.mindmap.propertyAI.expand')}
                 </Button>
             </Popover>
 
@@ -125,7 +125,7 @@ export const MindMapPropertyAISection: React.FC<MindMapPropertyAISectionProps> =
                     loading={summarizing}
                     className={styles.action}
                 >
-                    {t('designer.mindmap.propertyAI.summarize')}
+                    {t('plugins.mindmap.propertyAI.summarize')}
                 </Button>
             )}
 

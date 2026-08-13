@@ -115,11 +115,11 @@ const MindMapBatchBar: React.FC = () => {
         <div
             className="mindmap-batch-bar"
             role="toolbar"
-            aria-label={t('designer.mindmap.batch.toolbarLabel')}
+            aria-label={t('plugins.mindmap.batch.toolbarLabel')}
         >
             {/* Count badge */}
             <div className="mindmap-batch-bar__count" role="status" aria-live="polite">
-                {t('designer.mindmap.batch.selectedCount', { count: batch.count })}
+                {t('plugins.mindmap.batch.selectedCount', { count: batch.count })}
             </div>
 
             <DivV />
@@ -136,14 +136,14 @@ const MindMapBatchBar: React.FC = () => {
                         id={colorPanelId}
                         className="mindmap-batch-colors"
                         role="group"
-                        aria-label={t('designer.mindmap.batch.colorChoices')}
+                        aria-label={t('plugins.mindmap.batch.colorChoices')}
                     >
                         {BATCH_COLORS.map(c => (
                             <button
                                 type="button"
                                 key={c}
                                 className="mindmap-batch-color"
-                                aria-label={t('designer.mindmap.batch.colorChoice', { color: c })}
+                                aria-label={t('plugins.mindmap.batch.colorChoice', { color: c })}
                                 onClick={() => handleBatchColor(c)}
                             >
                                 <span aria-hidden="true" style={{ backgroundColor: c }} />
@@ -152,7 +152,7 @@ const MindMapBatchBar: React.FC = () => {
                     </div>
                 }
             >
-                <Tooltip title={t('designer.mindmap.batch.colorTooltip')}>
+                <Tooltip title={t('plugins.mindmap.batch.colorTooltip')}>
                     <button
                         type="button"
                         className="mindmap-batch-bar__action"
@@ -162,24 +162,24 @@ const MindMapBatchBar: React.FC = () => {
                         onClick={() => setColorOpen(v => !v)}
                     >
                         <Palette aria-hidden="true" size={15} />
-                        {t('designer.mindmap.batch.color')}
+                        {t('plugins.mindmap.batch.color')}
                     </button>
                 </Tooltip>
             </Popover>
 
             {/* Expand */}
-            <Tooltip title={t('designer.mindmap.batch.expandTooltip')}>
+            <Tooltip title={t('plugins.mindmap.batch.expandTooltip')}>
                 <button type="button" className="mindmap-batch-bar__action" onClick={() => handleBatchExpand(true)}>
                     <ChevronRight aria-hidden="true" size={15} />
-                    {t('designer.mindmap.batch.expand')}
+                    {t('plugins.mindmap.batch.expand')}
                 </button>
             </Tooltip>
 
             {/* Collapse */}
-            <Tooltip title={t('designer.mindmap.batch.collapseTooltip')}>
+            <Tooltip title={t('plugins.mindmap.batch.collapseTooltip')}>
                 <button type="button" className="mindmap-batch-bar__action" onClick={() => handleBatchExpand(false)}>
                     <ChevronDown aria-hidden="true" size={15} />
-                    {t('designer.mindmap.batch.collapse')}
+                    {t('plugins.mindmap.batch.collapse')}
                 </button>
             </Tooltip>
 
@@ -187,15 +187,15 @@ const MindMapBatchBar: React.FC = () => {
 
             {/* Delete */}
             <Popconfirm
-                title={t('designer.mindmap.batch.deleteTitle', { count: batch.count })}
-                description={t('designer.mindmap.batch.deleteDescription')}
+                title={t('plugins.mindmap.batch.deleteTitle', { count: batch.count })}
+                description={t('plugins.mindmap.batch.deleteDescription')}
                 onConfirm={handleBatchDelete}
                 okText={t('common.delete')}
                 cancelText={t('common.cancel')}
                 okButtonProps={{ danger: true }}
                 placement="top"
             >
-                <Tooltip title={t('designer.mindmap.batch.deleteTooltip')}>
+                <Tooltip title={t('plugins.mindmap.batch.deleteTooltip')}>
                     <button type="button" className="mindmap-batch-bar__action mindmap-batch-bar__action--danger">
                         <Trash2 aria-hidden="true" size={15} />
                         {t('common.delete')}

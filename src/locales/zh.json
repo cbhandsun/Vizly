@@ -2732,6 +2732,32 @@
                 "noValidSuggestions": "模型未返回有效的子主题，请重试",
                 "openConfiguration": "打开 AI 设置"
             },
+            "propertyMedia": {
+                "iconsLabel": "标记",
+                "selectedIcons": "已选标记",
+                "removeIcon": "移除 {{icon}} 标记",
+                "addIcon": "添加 {{icon}} 标记",
+                "iconPickerTitle": "选择标记",
+                "iconGroups": {
+                    "priority": "优先级",
+                    "status": "状态",
+                    "people": "人员协作",
+                    "objects": "文件与工具"
+                },
+                "iconsSelected": "已选 {{count}} 个标记",
+                "addIcons": "添加标记",
+                "imageLabel": "图片",
+                "imageUrlLabel": "图片地址",
+                "imageUrlPlaceholder": "粘贴 HTTPS 图片地址",
+                "uploadImage": "上传图片",
+                "invalidUrl": "请输入有效的 HTTP 或 HTTPS 图片地址",
+                "emptyFile": "所选图片为空文件",
+                "invalidFile": "请选择不超过 3 MB 的 PNG、JPEG、GIF、WebP 或 AVIF 图片",
+                "readFailed": "无法读取图片，请重试",
+                "unsafeContent": "所选图片无法安全使用",
+                "previewAlt": "节点图片预览",
+                "removeImage": "移除节点图片"
+            },
             "actionBar": {
                 "addSibling": "同级主题",
                 "addChild": "子主题",

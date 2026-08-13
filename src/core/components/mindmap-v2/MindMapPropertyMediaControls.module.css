@@ -1,0 +1,135 @@
+.selectedIcons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 0 0 8px;
+    padding: 0;
+    list-style: none;
+}
+
+.selectedIcon,
+.iconChoice,
+.uploadButton,
+.removeImage {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 52px;
+    min-height: 52px;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.selectedIcon {
+    border: 1px solid #cbd5e1;
+    background: rgba(99, 102, 241, 0.08);
+    font-size: 18px;
+}
+
+.fullWidthAction {
+    width: 100%;
+    min-height: 52px;
+}
+
+.iconPicker {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 284px;
+}
+
+.iconGroupLabel {
+    margin-bottom: 4px;
+    color: #64748b;
+    font-size: 11px;
+}
+
+.iconGrid {
+    display: grid;
+    grid-template-columns: repeat(5, 52px);
+    gap: 4px;
+}
+
+.iconChoice {
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    background: rgba(248, 250, 252, 0.9);
+    font-size: 18px;
+}
+
+.selectedIcon:hover,
+.iconChoice:hover,
+.uploadButton:hover {
+    border-color: rgba(99, 102, 241, 0.65);
+    background: rgba(99, 102, 241, 0.12);
+}
+
+.iconChoice[aria-pressed='true'] {
+    border-color: #6366f1;
+    background: rgba(99, 102, 241, 0.15);
+}
+
+.imageControls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 52px;
+    gap: 6px;
+}
+
+.uploadButton {
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    background: rgba(99, 102, 241, 0.08);
+    color: #4f46e5;
+}
+
+.uploadButton:disabled {
+    cursor: wait;
+    opacity: 0.6;
+}
+
+.fileInput {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+}
+
+.error {
+    margin-top: 6px;
+    color: #b91c1c;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.preview {
+    position: relative;
+    margin-top: 8px;
+    overflow: hidden;
+    border: 1px solid rgba(99, 102, 241, 0.2);
+    border-radius: 8px;
+    background: #f8fafc;
+}
+
+.preview img {
+    display: block;
+    width: 100%;
+    max-height: 120px;
+    object-fit: contain;
+}
+
+.removeImage {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    border: 0;
+    background: rgba(15, 23, 42, 0.82);
+    color: #fff;
+}
+
+.selectedIcon:focus-visible,
+.iconChoice:focus-visible,
+.uploadButton:focus-visible,
+.removeImage:focus-visible {
+    outline: 2px solid var(--vz-brand-from, #6366f1);
+    outline-offset: 2px;
+}

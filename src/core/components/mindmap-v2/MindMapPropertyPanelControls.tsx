@@ -4,14 +4,6 @@ import { VIZLY_THEME_OPTIONS } from './theme';
 
 const { Text } = Typography;
 
-const ICON_GROUPS: Record<string, string[]> = {
-    '优先级': ['🔴', '🟠', '🟡', '🟢', '🔵'],
-    '状态': ['✅', '⬜', '🔄', '❌', '⏸️', '🚀'],
-    '标注': ['⭐', '💡', '❓', '❗', '📌', '🔒', '💬', '🎯'],
-    '情绪': ['👍', '👎', '👀', '🤔', '💪', '🙌'],
-    '数字': ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣'],
-};
-
 const QUICK_COLORS = [
     '#6366f1', '#8b5cf6', '#06b6d4', '#10b981',
     '#f59e0b', '#ef4444', '#ec4899', '#64748b', '#ffffff', '#1e293b',
@@ -49,31 +41,6 @@ export const PropertyRow: React.FC<{ label: string; children: React.ReactNode }>
     <div style={{ marginBottom: 12 }}>
         <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 4 }}>{label}</Text>
         {children}
-    </div>
-);
-
-export const IconsPicker: React.FC<{ icons: string[]; onToggle: (icon: string) => void }> = ({ icons, onToggle }) => (
-    <div style={{ width: 260 }}>
-        {Object.entries(ICON_GROUPS).map(([group, emojis]) => (
-            <div key={group} style={{ marginBottom: 8 }}>
-                <Text type="secondary" style={{ fontSize: 10, display: 'block', marginBottom: 4 }}>{group}</Text>
-                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                    {emojis.map(emoji => (
-                        <button key={emoji} onClick={() => onToggle(emoji)}
-                            title={icons.includes(emoji) ? '点击移除' : '点击添加'}
-                            style={{
-                                fontSize: 18, cursor: 'pointer', border: 'none', padding: '2px 4px',
-                                borderRadius: 6, background: icons.includes(emoji)
-                                    ? 'rgba(99,102,241,0.15)' : 'transparent',
-                                outline: icons.includes(emoji) ? '2px solid #6366f1' : 'none',
-                                transition: 'all 0.15s',
-                            }}>
-                            {emoji}
-                        </button>
-                    ))}
-                </div>
-            </div>
-        ))}
     </div>
 );
 

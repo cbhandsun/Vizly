@@ -2579,6 +2579,32 @@
                 "noValidSuggestions": "The model returned no valid child topics. Try again",
                 "openConfiguration": "Open AI settings"
             },
+            "propertyMedia": {
+                "iconsLabel": "Markers",
+                "selectedIcons": "Selected markers",
+                "removeIcon": "Remove {{icon}} marker",
+                "addIcon": "Add {{icon}} marker",
+                "iconPickerTitle": "Choose markers",
+                "iconGroups": {
+                    "priority": "Priority",
+                    "status": "Status",
+                    "people": "People",
+                    "objects": "Files and tools"
+                },
+                "iconsSelected": "{{count}} markers selected",
+                "addIcons": "Add markers",
+                "imageLabel": "Image",
+                "imageUrlLabel": "Image URL",
+                "imageUrlPlaceholder": "Paste an HTTPS image URL",
+                "uploadImage": "Upload an image",
+                "invalidUrl": "Enter a valid HTTP or HTTPS image URL",
+                "emptyFile": "The selected image is empty",
+                "invalidFile": "Choose a PNG, JPEG, GIF, WebP, or AVIF image up to 3 MB",
+                "readFailed": "The image could not be read. Try again",
+                "unsafeContent": "The selected image could not be used safely",
+                "previewAlt": "Node image preview",
+                "removeImage": "Remove node image"
+            },
             "actionBar": {
                 "addSibling": "Add Sibling",
                 "addChild": "Add Child",
