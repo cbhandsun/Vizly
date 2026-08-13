@@ -1,6 +1,7 @@
 import React, { useEffect, useId, useMemo, useRef } from 'react';
 import { BgColorsOutlined, CheckOutlined } from '@ant-design/icons';
 import { Button, Dropdown, Tooltip, theme as antdTheme } from 'antd';
+import { useTranslation } from 'react-i18next';
 
 import { getViewportPopupContainer } from '../ui/viewportOverlayPortal';
 import { VIZLY_THEME_OPTIONS, VIZLY_THEMES } from './theme';
@@ -29,6 +30,7 @@ export const MindMapThemeSelector: React.FC<MindMapThemeSelectorProps> = ({
     suppressTooltip = false,
 }) => {
     const { token } = antdTheme.useToken();
+    const { t } = useTranslation();
     const menuId = useId();
     const triggerRef = useRef<HTMLButtonElement>(null);
     const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -36,7 +38,10 @@ export const MindMapThemeSelector: React.FC<MindMapThemeSelectorProps> = ({
         () => Math.max(0, VIZLY_THEME_OPTIONS.findIndex(option => option.key === activeThemeKey)),
         [activeThemeKey],
     );
-    const activeLabel = VIZLY_THEME_OPTIONS[activeIndex]?.label ?? activeThemeKey;
+    const activeOption = VIZLY_THEME_OPTIONS[activeIndex];
+    const activeLabel = activeOption
+        ? t(`plugins.mindmap.toolbar.themeNames.${activeOption.key}`)
+        : activeThemeKey;
 
     useEffect(() => {
         if (!open) return;
@@ -56,7 +61,7 @@ export const MindMapThemeSelector: React.FC<MindMapThemeSelectorProps> = ({
     const menu = (
         <ul
             id={menuId}
-            aria-label="选择思维导图主题"
+            aria-label={t('plugins.mindmap.toolbar.chooseTheme')}
             className="mind-map-theme-menu"
             role="menu"
             style={{
@@ -96,7 +101,9 @@ export const MindMapThemeSelector: React.FC<MindMapThemeSelectorProps> = ({
                                 className="mind-map-theme-menu-swatch"
                                 style={{ background: option.theme.cssVar['--main-bgcolor'] }}
                             />
-                            <span className="mind-map-theme-menu-label">{option.label}</span>
+                            <span className="mind-map-theme-menu-label">
+                                {t(`plugins.mindmap.toolbar.themeNames.${option.key}`)}
+                            </span>
                             {selected && <CheckOutlined aria-hidden="true" className="mind-map-theme-menu-check" />}
                         </button>
                     </li>
@@ -106,7 +113,7 @@ export const MindMapThemeSelector: React.FC<MindMapThemeSelectorProps> = ({
     );
 
     return (
-        <Tooltip title={`切换主题，当前${activeLabel}`} open={open || suppressTooltip ? false : undefined}>
+        <Tooltip title={t('plugins.mindmap.toolbar.currentTheme', { theme: activeLabel })} open={open || suppressTooltip ? false : undefined}>
             <Dropdown
                 autoAdjustOverflow
                 popupRender={() => menu}
@@ -122,7 +129,7 @@ export const MindMapThemeSelector: React.FC<MindMapThemeSelectorProps> = ({
                     aria-controls={menuId}
                     aria-expanded={open}
                     aria-haspopup="menu"
-                    aria-label={`切换主题，当前${activeLabel}`}
+                    aria-label={t('plugins.mindmap.toolbar.currentTheme', { theme: activeLabel })}
                     className="mind-elixir-toolbar-button"
                     icon={<BgColorsOutlined />}
                     size="small"

@@ -1,17 +1,15 @@
 import React from 'react';
 import { Select } from 'antd';
+import { useTranslation } from 'react-i18next';
 
 import { getViewportPopupContainer } from '../ui/viewportOverlayPortal';
 import type { MindMapDirectionKey } from './useMindElixirCanvasPreferences';
 
-const DIRECTION_OPTIONS: Array<{ label: string; value: MindMapDirectionKey }> = [
-    { label: '双向展开', value: 'LR' },
-    { label: '向右展开', value: 'R' },
-    { label: '向左展开', value: 'L' },
+const DIRECTION_OPTIONS: Array<{ key: string; value: MindMapDirectionKey }> = [
+    { key: 'twoWay', value: 'LR' },
+    { key: 'right', value: 'R' },
+    { key: 'left', value: 'L' },
 ];
-
-const getMindMapDirectionLabel = (value: MindMapDirectionKey): string =>
-    DIRECTION_OPTIONS.find(option => option.value === value)?.label ?? '双向展开';
 
 interface MindMapDirectionSelectorProps {
     currentDirection: MindMapDirectionKey;
@@ -25,13 +23,22 @@ export const MindMapDirectionSelector: React.FC<MindMapDirectionSelectorProps> =
     onChange,
     onOpenChange,
     open,
-}) => (
+}) => {
+    const { t } = useTranslation();
+    const options = DIRECTION_OPTIONS.map(option => ({
+        label: t(`plugins.mindmap.toolbar.direction.${option.key}`),
+        value: option.value,
+    }));
+    const currentLabel = options.find(option => option.value === currentDirection)?.label
+        ?? t('plugins.mindmap.toolbar.direction.twoWay');
+
+    return (
     <Select
-        aria-label={`思维导图布局方向，当前${getMindMapDirectionLabel(currentDirection)}`}
+        aria-label={t('plugins.mindmap.toolbar.direction.current', { direction: currentLabel })}
         className="mind-elixir-toolbar-direction"
         getPopupContainer={getViewportPopupContainer}
         open={open}
-        options={DIRECTION_OPTIONS}
+        options={options}
         popupMatchSelectWidth={140}
         size="small"
         value={currentDirection}
@@ -40,4 +47,5 @@ export const MindMapDirectionSelector: React.FC<MindMapDirectionSelectorProps> =
         onChange={onChange}
         onOpenChange={onOpenChange}
     />
-);
+    );
+};

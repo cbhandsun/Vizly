@@ -2,8 +2,11 @@
 
 import React, { useState } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import i18next, { type i18n } from 'i18next';
+import { I18nextProvider, initReactI18next } from 'react-i18next';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 
+import zh from '../../../../locales/zh.json';
 import { MindMapDirectionSelector } from '../MindMapDirectionSelector';
 
 vi.stubGlobal('ResizeObserver', class ResizeObserverStub {
@@ -11,6 +14,20 @@ vi.stubGlobal('ResizeObserver', class ResizeObserverStub {
     observe() {}
     unobserve() {}
 });
+
+let testI18n: i18n;
+
+beforeAll(async () => {
+    testI18n = i18next.createInstance();
+    await testI18n.use(initReactI18next).init({
+        lng: 'zh',
+        resources: { zh: { translation: zh } },
+    });
+});
+
+const renderLocalized = (ui: React.ReactElement) => render(
+    <I18nextProvider i18n={testI18n}>{ui}</I18nextProvider>,
+);
 
 const DirectionSelectorHarness = () => {
     const [open, setOpen] = useState(false);
@@ -26,7 +43,7 @@ const DirectionSelectorHarness = () => {
 
 describe('MindMapDirectionSelector', () => {
     it('includes the current direction in the combobox name', () => {
-        render(
+        renderLocalized(
             <MindMapDirectionSelector
                 currentDirection="L"
                 open={false}
@@ -35,12 +52,12 @@ describe('MindMapDirectionSelector', () => {
             />,
         );
 
-        expect(screen.getByRole('combobox', { name: '思维导图布局方向，当前向左展开' })).toBeTruthy();
+        expect(screen.getByRole('combobox', { name: '思维导图布局方向：向左展开' })).toBeTruthy();
     });
 
     it('opens from the keyboard and exposes user-facing option names', async () => {
-        render(<DirectionSelectorHarness />);
-        const combo = screen.getByRole('combobox', { name: '思维导图布局方向，当前双向展开' });
+        renderLocalized(<DirectionSelectorHarness />);
+        const combo = screen.getByRole('combobox', { name: '思维导图布局方向：双向展开' });
 
         fireEvent.keyDown(combo, { key: 'Enter', keyCode: 13 });
 

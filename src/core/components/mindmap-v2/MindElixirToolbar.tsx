@@ -43,6 +43,9 @@ import {
     HistoryOutlined,
     OrderedListOutlined,
     UnorderedListOutlined,
+    BgColorsOutlined,
+    BorderlessTableOutlined,
+    EllipsisOutlined,
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import type { MindElixirInstance } from 'mind-elixir';
@@ -289,19 +292,19 @@ const MindElixirToolbar: React.FC = () => {
     }, []);
 
     const exportMenuItems = [
-        { key: 'svg',      label: '导出 SVG',      icon: <ExportOutlined />,  onClick: handleExportSvg },
-        { key: 'png',      label: '导出 PNG',      icon: <DownloadOutlined />, onClick: handleExportPng },
-        { key: 'xmind',   label: '导出 XMind',    icon: <DownloadOutlined />, onClick: handleExportXmind },
+        { key: 'svg',      label: t('plugins.mindmap.toolbar.exportSvg'),      icon: <ExportOutlined />,  onClick: handleExportSvg },
+        { key: 'png',      label: t('plugins.mindmap.toolbar.exportPng'),      icon: <DownloadOutlined />, onClick: handleExportPng },
+        { key: 'xmind',   label: t('plugins.mindmap.toolbar.exportXmind'),    icon: <DownloadOutlined />, onClick: handleExportXmind },
         { type: 'divider' as const },
-        { key: 'markdown', label: '导出 Markdown', icon: <DownloadOutlined />, onClick: handleExportMarkdown },
-        { key: 'opml',     label: '导出 OPML',     icon: <DownloadOutlined />, onClick: handleExportOpml },
-        { key: 'json',     label: '导出 JSON',     icon: <DownloadOutlined />, onClick: handleExportJson },
+        { key: 'markdown', label: t('plugins.mindmap.toolbar.exportMarkdown'), icon: <DownloadOutlined />, onClick: handleExportMarkdown },
+        { key: 'opml',     label: t('plugins.mindmap.toolbar.exportOpml'),     icon: <DownloadOutlined />, onClick: handleExportOpml },
+        { key: 'json',     label: t('plugins.mindmap.toolbar.exportJson'),     icon: <DownloadOutlined />, onClick: handleExportJson },
         { type: 'divider' as const },
-        { key: 'pitch-md', label: '导出演示稿 Markdown', icon: <PlaySquareOutlined />, onClick: handleExportPitchMarkdown },
+        { key: 'pitch-md', label: t('plugins.mindmap.toolbar.exportPitchMarkdown'), icon: <PlaySquareOutlined />, onClick: handleExportPitchMarkdown },
         { type: 'divider' as const },
-        { key: 'flowchart',label: '转为流程图格式', icon: <ShareAltOutlined />, onClick: handleExportFlowchart },
+        { key: 'flowchart',label: t('plugins.mindmap.toolbar.exportFlowchart'), icon: <ShareAltOutlined />, onClick: handleExportFlowchart },
         { type: 'divider' as const },
-        { key: 'pdf',      label: '打印 / PDF',    icon: <PrinterOutlined />,  onClick: handleExportPdf },
+        { key: 'pdf',      label: t('plugins.mindmap.toolbar.printPdf'),    icon: <PrinterOutlined />,  onClick: handleExportPdf },
     ];
 
     // ── Summary creation ─────────────────────────────────────────────────────────
@@ -382,7 +385,7 @@ const MindElixirToolbar: React.FC = () => {
 
     return (
         <div
-            aria-label="思维导图工具"
+            aria-label={t('plugins.mindmap.toolbar.label')}
             className="mind-elixir-toolbar"
             role="toolbar"
         >
@@ -408,21 +411,21 @@ const MindElixirToolbar: React.FC = () => {
             <Divider orientation="vertical" style={{ height: 16, margin: '0 2px' }} />
 
             {/* Undo / Redo */}
-            <MindMapToolbarIconButton label="撤销 (Ctrl+Z)" icon={<UndoOutlined />} onClick={handleUndo} disabled={!mind} />
-            <MindMapToolbarIconButton label="重做 (Ctrl+Y)" icon={<RedoOutlined />} onClick={handleRedo} disabled={!mind} />
+            <MindMapToolbarIconButton label={t('plugins.mindmap.toolbar.undo')} icon={<UndoOutlined />} onClick={handleUndo} disabled={!mind} />
+            <MindMapToolbarIconButton label={t('plugins.mindmap.toolbar.redo')} icon={<RedoOutlined />} onClick={handleRedo} disabled={!mind} />
 
             <Divider orientation="vertical" style={{ height: 16, margin: '0 2px' }} />
 
             {/* Add root child */}
-            <MindMapToolbarIconButton label="添加主分支 (Tab)" icon={<PlusOutlined />} onClick={handleAddRootChild} disabled={!mind} />
+            <MindMapToolbarIconButton label={t('plugins.mindmap.toolbar.addRootChild')} icon={<PlusOutlined />} onClick={handleAddRootChild} disabled={!mind} />
 
             {/* Collapse / Expand */}
-            <MindMapToolbarIconButton label={t('plugins.mindmap.collapseAll', '折叠全部')} icon={<MenuFoldOutlined />} onClick={handleCollapseAll} disabled={!mind} />
-            <MindMapToolbarIconButton label={t('plugins.mindmap.expandAll', '展开全部')} icon={<MenuUnfoldOutlined />} onClick={handleExpandAll} disabled={!mind} />
+            <MindMapToolbarIconButton label={t('plugins.mindmap.collapseAll')} icon={<MenuFoldOutlined />} onClick={handleCollapseAll} disabled={!mind} />
+            <MindMapToolbarIconButton label={t('plugins.mindmap.expandAll')} icon={<MenuUnfoldOutlined />} onClick={handleExpandAll} disabled={!mind} />
 
             {/* Presentation Mode */}
             <MindMapToolbarIconButton
-                label={isPresenting ? '退出演示模式' : '演示模式（逐节点呈现）'}
+                label={t(isPresenting ? 'plugins.mindmap.toolbar.exitPresentation' : 'plugins.mindmap.toolbar.enterPresentation')}
                 icon={<PlaySquareOutlined />}
                 onClick={handlePresentation}
                 disabled={!mind}
@@ -432,7 +435,7 @@ const MindElixirToolbar: React.FC = () => {
 
             {/* Focus Mode */}
             <MindMapToolbarIconButton
-                label={isFocused ? '退出焦点模式' : '焦点模式（聚焦选中节点）'}
+                label={t(isFocused ? 'plugins.mindmap.toolbar.exitFocus' : 'plugins.mindmap.toolbar.enterFocus')}
                 icon={<AimOutlined />}
                 onClick={handleFocusMode}
                 disabled={!mind}
@@ -441,11 +444,11 @@ const MindElixirToolbar: React.FC = () => {
             />
 
             {/* Summary node creation */}
-            <MindMapToolbarIconButton label="为选中节点创建汇总括号" icon={<BranchesOutlined />} onClick={handleCreateSummary} disabled={!mind} />
+            <MindMapToolbarIconButton label={t('plugins.mindmap.toolbar.createSummary')} icon={<BranchesOutlined />} onClick={handleCreateSummary} disabled={!mind} />
 
             {/* Arrow creation mode */}
             <MindMapToolbarIconButton
-                label={arrowMode ? '退出关联线创建模式' : '创建关联线'}
+                label={t(arrowMode ? 'plugins.mindmap.toolbar.exitArrowMode' : 'plugins.mindmap.toolbar.enterArrowMode')}
                 icon={<ShareAltOutlined />}
                 onClick={handleArrowMode}
                 disabled={!mind}
@@ -455,7 +458,7 @@ const MindElixirToolbar: React.FC = () => {
 
             {/* Auto numbering */}
             <MindMapToolbarIconButton
-                label={isNumbering ? '关闭自动编号' : '开启自动编号（每层节点自动加序号）'}
+                label={t(isNumbering ? 'plugins.mindmap.toolbar.disableNumbering' : 'plugins.mindmap.toolbar.enableNumbering')}
                 icon={<OrderedListOutlined />}
                 onClick={handleToggleNumbering}
                 disabled={!mind}
@@ -466,16 +469,16 @@ const MindElixirToolbar: React.FC = () => {
             <Divider orientation="vertical" style={{ height: 16, margin: '0 2px' }} />
 
             {/* Fit to center */}
-            <MindMapToolbarIconButton label={t('plugins.mindmap.fitView', '居中')} icon={<FullscreenOutlined />} onClick={handleFitView} disabled={!mind} />
-            <MindMapToolbarIconButton label="自动整理分支" icon={<DeploymentUnitOutlined />} onClick={handleAutoArrange} disabled={!mind} />
+            <MindMapToolbarIconButton label={t('plugins.mindmap.fitView')} icon={<FullscreenOutlined />} onClick={handleFitView} disabled={!mind} />
+            <MindMapToolbarIconButton label={t('plugins.mindmap.toolbar.autoArrange')} icon={<DeploymentUnitOutlined />} onClick={handleAutoArrange} disabled={!mind} />
 
             {/* Zoom controls */}
             {mind && (
-                <div className="mind-elixir-toolbar-zoom" role="group" aria-label="缩放控制">
-                    <MindMapToolbarIconButton label="缩小" icon={<ZoomOutOutlined />} onClick={handleZoomOut} />
-                    <Tooltip title="点击重置为 100%">
+                <div className="mind-elixir-toolbar-zoom" role="group" aria-label={t('plugins.mindmap.toolbar.zoomControls')}>
+                    <MindMapToolbarIconButton label={t('plugins.mindmap.toolbar.zoomOut')} icon={<ZoomOutOutlined />} onClick={handleZoomOut} />
+                    <Tooltip title={t('plugins.mindmap.toolbar.zoomResetTooltip')}>
                         <button
-                            aria-label={`重置缩放为 100%，当前 ${zoomVal}%`}
+                            aria-label={t('plugins.mindmap.toolbar.zoomResetLabel', { zoom: zoomVal })}
                             className={`mind-elixir-toolbar-zoom-reset${zoomVal !== 100 ? ' is-modified' : ''}`}
                             onClick={handleZoomReset}
                             type="button"
@@ -483,7 +486,7 @@ const MindElixirToolbar: React.FC = () => {
                             {zoomVal}%
                         </button>
                     </Tooltip>
-                    <MindMapToolbarIconButton label="放大" icon={<ZoomInOutlined />} onClick={handleZoomIn} />
+                    <MindMapToolbarIconButton label={t('plugins.mindmap.toolbar.zoomIn')} icon={<ZoomInOutlined />} onClick={handleZoomIn} />
                 </div>
             )}
 
@@ -496,7 +499,7 @@ const MindElixirToolbar: React.FC = () => {
                 getPopupContainer={getViewportPopupContainer}
                 trigger={['click']}
             >
-                <MindMapToolbarIconButton aria-expanded={openMenu === 'export'} aria-haspopup="menu" label="导出思维导图" icon={<ExportOutlined />} disabled={!mind} suppressTooltip={openMenu !== null} />
+                <MindMapToolbarIconButton aria-expanded={openMenu === 'export'} aria-haspopup="menu" label={t('plugins.mindmap.toolbar.exportMindMap')} icon={<ExportOutlined />} disabled={!mind} suppressTooltip={openMenu !== null} />
             </Dropdown>
 
             {/* Hidden file inputs */}
@@ -513,46 +516,46 @@ const MindElixirToolbar: React.FC = () => {
                 onOpenChange={open => setOpenMenu(open ? 'import' : null)}
                 menu={{
                     items: [
-                        { key: 'md',   label: '从 Markdown 导入', icon: <UploadOutlined />, onClick: handleImportMarkdown },
-                        { key: 'opml', label: '从 OPML 导入',     icon: <UploadOutlined />, onClick: handleImportOpml },
-                        { key: 'json', label: '从 JSON 导入',     icon: <UploadOutlined />, onClick: handleImportJson },
+                        { key: 'md',   label: t('plugins.mindmap.toolbar.importMarkdown'), icon: <UploadOutlined />, onClick: handleImportMarkdown },
+                        { key: 'opml', label: t('plugins.mindmap.toolbar.importOpml'),     icon: <UploadOutlined />, onClick: handleImportOpml },
+                        { key: 'json', label: t('plugins.mindmap.toolbar.importJson'),     icon: <UploadOutlined />, onClick: handleImportJson },
                     ]
                 }}
                 placement="bottomRight"
                 getPopupContainer={getViewportPopupContainer}
                 trigger={['click']}
             >
-                <MindMapToolbarIconButton aria-expanded={openMenu === 'import'} aria-haspopup="menu" label="导入思维导图" icon={<UploadOutlined />} disabled={!mind} suppressTooltip={openMenu !== null} />
+                <MindMapToolbarIconButton aria-expanded={openMenu === 'import'} aria-haspopup="menu" label={t('plugins.mindmap.toolbar.importMindMap')} icon={<UploadOutlined />} disabled={!mind} suppressTooltip={openMenu !== null} />
             </Dropdown>
 
             {/* Node stats badge */}
             {mind && stats.nodes > 0 && (
-                <Tooltip title={`共 ${stats.nodes} 个节点，最大深度 ${stats.depth} 层`}>
+                <Tooltip title={t('plugins.mindmap.toolbar.stats', { nodes: stats.nodes, depth: stats.depth })}>
                     <div
-                        aria-label={`共 ${stats.nodes} 个节点，最大深度 ${stats.depth} 层`}
+                        aria-label={t('plugins.mindmap.toolbar.stats', { nodes: stats.nodes, depth: stats.depth })}
                         className="mind-elixir-toolbar-stats"
                         role="status"
                     >
                         <BarChartOutlined style={{ fontSize: 11, color: '#6366f1' }} />
                         <span style={{ fontSize: 11, color: '#6366f1', fontWeight: 600 }}>
-                            {stats.nodes}节点
+                            {t('plugins.mindmap.toolbar.nodesShort', { count: stats.nodes })}
                         </span>
                         <span style={{ fontSize: 10, color: 'rgba(99,102,241,0.6)' }}>
-                            /{stats.depth}层
+                            /{t('plugins.mindmap.toolbar.depthShort', { count: stats.depth })}
                         </span>
                     </div>
                 </Tooltip>
             )}
 
             {/* Search */}
-            <MindMapToolbarIconButton label="搜索节点 (Ctrl+F)" icon={<SearchOutlined />} onClick={emitOpenSearch} disabled={!mind} />
+            <MindMapToolbarIconButton label={t('plugins.mindmap.toolbar.search')} icon={<SearchOutlined />} onClick={emitOpenSearch} disabled={!mind} />
 
             {/* Templates */}
             <MindMapTemplates />
 
             {/* Unified AI assistant */}
             <MindMapToolbarIconButton
-                label={isAIPanelOpen ? '关闭 AI 思维导图助手' : '打开 AI 思维导图助手'}
+                label={t(isAIPanelOpen ? 'plugins.mindmap.toolbar.closeAiAssistant' : 'plugins.mindmap.toolbar.openAiAssistant')}
                 icon={<RobotOutlined />}
                 onClick={handleToggleAIPanel}
                 disabled={!mind}
@@ -567,24 +570,18 @@ const MindElixirToolbar: React.FC = () => {
                 menu={{
                     items: [
                         {
-                            key: 'none', label: '纯色背景',
-                            icon: <span style={{ display:'inline-block', width:12, height:12,
-                                borderRadius:2, background:'#1e293b', border:'1px solid #475569' }} />,
+                            key: 'none', label: t('plugins.mindmap.toolbar.backgroundSolid'),
+                            icon: <BgColorsOutlined />,
                             onClick: () => applyBgPattern('none'),
                         },
                         {
-                            key: 'grid', label: '网格背景',
-                            icon: <span style={{ display:'inline-block', width:12, height:12,
-                                borderRadius:2, border:'1px solid #6366f1',
-                                backgroundImage:'repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(99,102,241,.25) 3px,rgba(99,102,241,.25) 4px),repeating-linear-gradient(90deg,transparent,transparent 3px,rgba(99,102,241,.25) 3px,rgba(99,102,241,.25) 4px)' }} />,
+                            key: 'grid', label: t('plugins.mindmap.toolbar.backgroundGrid'),
+                            icon: <BorderlessTableOutlined />,
                             onClick: () => applyBgPattern('grid'),
                         },
                         {
-                            key: 'dots', label: '点阵背景',
-                            icon: <span style={{ display:'inline-block', width:12, height:12,
-                                borderRadius:2, border:'1px solid #6366f1',
-                                backgroundImage:'radial-gradient(circle, rgba(99,102,241,.5) 1px, transparent 1px)',
-                                backgroundSize:'5px 5px' }} />,
+                            key: 'dots', label: t('plugins.mindmap.toolbar.backgroundDots'),
+                            icon: <EllipsisOutlined />,
                             onClick: () => applyBgPattern('dots'),
                         },
                     ],
@@ -598,7 +595,9 @@ const MindElixirToolbar: React.FC = () => {
                 <MindMapToolbarIconButton
                     aria-expanded={openMenu === 'background'}
                     aria-haspopup="menu"
-                    label={`画布背景，当前${bgPattern === 'grid' ? '网格' : bgPattern === 'dots' ? '点阵' : '纯色'}`}
+                    label={t('plugins.mindmap.toolbar.backgroundCurrent', {
+                        background: t(`plugins.mindmap.toolbar.backgroundNames.${bgPattern}`),
+                    })}
                     icon={<AppstoreOutlined />}
                     suppressTooltip={openMenu !== null}
                     style={{ color: bgPattern !== 'none' ? '#6366f1' : 'rgba(255,255,255,0.4)' }}
@@ -606,14 +605,14 @@ const MindElixirToolbar: React.FC = () => {
             </Dropdown>
 
             {/* Outline view toggle */}
-            <MindMapToolbarIconButton label="切换大纲视图 (Alt+O)" icon={<UnorderedListOutlined />} onClick={emitToggleOutline} />
+            <MindMapToolbarIconButton label={t('plugins.mindmap.toolbar.toggleOutline')} icon={<UnorderedListOutlined />} onClick={emitToggleOutline} />
 
             {/* History version toggle */}
-            <MindMapToolbarIconButton label="切换历史快照 (Alt+H)" icon={<HistoryOutlined />} onClick={emitToggleHistory} />
+            <MindMapToolbarIconButton label={t('plugins.mindmap.toolbar.toggleHistory')} icon={<HistoryOutlined />} onClick={emitToggleHistory} />
 
             {/* Kanban toggle */}
             <MindMapToolbarIconButton
-                label={isKanbanOpen ? '关闭 AI 敏捷任务看板' : '打开 AI 敏捷任务看板'}
+                label={t(isKanbanOpen ? 'plugins.mindmap.toolbar.closeKanban' : 'plugins.mindmap.toolbar.openKanban')}
                 icon={<ProjectOutlined />}
                 onClick={handleToggleKanban}
                 pressed={isKanbanOpen}
@@ -622,7 +621,7 @@ const MindElixirToolbar: React.FC = () => {
 
             {/* Shortcuts help */}
             <MindMapToolbarIconButton
-                label="键盘快捷键 (?)"
+                label={t('plugins.mindmap.toolbar.shortcuts')}
                 icon={<QuestionCircleOutlined />}
                 onClick={() => setShortcutsOpen(true)}
                 style={{ color: 'rgba(255,255,255,0.4)' }}

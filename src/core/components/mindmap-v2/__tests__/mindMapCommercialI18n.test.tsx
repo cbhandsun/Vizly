@@ -9,9 +9,11 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import en from '../../../../locales/en.json';
 import zh from '../../../../locales/zh.json';
 import MindMapBatchBar from '../MindMapBatchBar';
+import { MindMapDirectionSelector } from '../MindMapDirectionSelector';
 import { MindMapPropertyAISection } from '../MindMapPropertyAISection';
 import { MindMapPropertyMediaControls } from '../MindMapPropertyMediaControls';
 import { MindMapNoteEditorPanel } from '../MindMapNoteEditorPanel';
+import { MindMapThemeSelector } from '../MindMapThemeSelector';
 
 const mindHarness = vi.hoisted(() => {
     const listeners = new Map<string, (...args: unknown[]) => void>();
@@ -108,6 +110,22 @@ describe('mind map commercial control translations', () => {
         expect(zh.plugins.mindmap.actions.contextMenuLabel).toBe('节点操作');
     });
 
+    it('keeps the toolbar resource shape and interpolation tokens aligned', () => {
+        expect(Object.keys(en.plugins.mindmap.toolbar).sort()).toEqual(
+            Object.keys(zh.plugins.mindmap.toolbar).sort(),
+        );
+        expect(Object.keys(en.plugins.mindmap.toolbar.direction).sort()).toEqual(
+            Object.keys(zh.plugins.mindmap.toolbar.direction).sort(),
+        );
+        expect(Object.keys(en.plugins.mindmap.toolbar.themeNames).sort()).toEqual(
+            Object.keys(zh.plugins.mindmap.toolbar.themeNames).sort(),
+        );
+        expect(en.plugins.mindmap.toolbar.zoomResetLabel).toContain('{{zoom}}');
+        expect(zh.plugins.mindmap.toolbar.zoomResetLabel).toContain('{{zoom}}');
+        expect(en.plugins.mindmap.toolbar.stats).toContain('{{nodes}}');
+        expect(zh.plugins.mindmap.toolbar.stats).toContain('{{depth}}');
+    });
+
     beforeEach(() => {
         mindHarness.listeners.clear();
         vi.stubGlobal('ResizeObserver', class {
@@ -138,6 +156,33 @@ describe('mind map commercial control translations', () => {
         expect(screen.getByRole('dialog', { name: 'Node note' })).toBeTruthy();
         expect(screen.getByRole('textbox', { name: 'Node note' })).toBeTruthy();
         expect(screen.getByRole('button', { name: 'Cancel' })).toBeTruthy();
+    });
+
+    it('resolves English direction and theme controls without mixed-language labels', async () => {
+        await act(async () => {
+            await testI18n.changeLanguage('en');
+        });
+        render(
+            <I18nextProvider i18n={testI18n}>
+                <MindMapDirectionSelector
+                    currentDirection="L"
+                    onChange={vi.fn()}
+                    onOpenChange={vi.fn()}
+                    open={false}
+                />
+                <MindMapThemeSelector
+                    activeThemeKey="ocean"
+                    onOpenChange={vi.fn()}
+                    onThemeChange={vi.fn()}
+                    open={false}
+                />
+            </I18nextProvider>,
+        );
+
+        expect(screen.getByRole('combobox', { name: 'Mind map layout direction: Expand left' })).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Switch theme; current theme: Ocean' })).toBeTruthy();
+        expect(screen.queryByText('双向展开')).toBeNull();
+        expect(screen.queryByText('海洋')).toBeNull();
     });
 
     it('resolves the Chinese batch, AI, and media controls from production resources', async () => {

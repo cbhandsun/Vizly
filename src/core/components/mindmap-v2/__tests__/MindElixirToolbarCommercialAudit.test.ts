@@ -13,8 +13,8 @@ const iconButtonSource = readFileSync(resolve(process.cwd(), 'src/core/component
 describe('MindElixirToolbar commercial interaction contract', () => {
     it('uses one accessible toolbar button contract and semantic toolbar boundaries', () => {
         expect(source).toContain('role="toolbar"');
-        expect(source).toContain('aria-label="思维导图工具"');
-        expect(directionSelectorSource).toContain('思维导图布局方向，当前');
+        expect(source).toContain("aria-label={t('plugins.mindmap.toolbar.label')}");
+        expect(directionSelectorSource).toContain("'plugins.mindmap.toolbar.direction.current'");
         expect(directionSelectorSource).toContain('virtual={false}');
         expect(directionSelectorSource).toContain('open={open}');
         expect(source.match(/getPopupContainer=\{getViewportPopupContainer\}/g)).toHaveLength(3);
@@ -24,6 +24,8 @@ describe('MindElixirToolbar commercial interaction contract', () => {
         expect(themeSelectorSource).toContain('role="menuitemradio"');
         expect(themeSelectorSource).toContain('aria-checked={selected}');
         expect(themeSelectorSource).toContain('aria-controls={menuId}');
+        expect(themeSelectorSource).toContain("'plugins.mindmap.toolbar.chooseTheme'");
+        expect(themeSelectorSource).toContain("'plugins.mindmap.toolbar.currentTheme'");
         expect(source).toContain("aria-expanded={openMenu === 'export'}");
         expect(source).toContain("aria-expanded={openMenu === 'import'}");
         expect(source).toContain("aria-expanded={openMenu === 'background'}");
@@ -43,5 +45,19 @@ describe('MindElixirToolbar commercial interaction contract', () => {
         expect(source).not.toContain('⊞');
         expect(source).not.toContain('☰');
         expect(source).not.toContain('🕒');
+        expect(source).toContain('<BgColorsOutlined />');
+        expect(source).toContain('<BorderlessTableOutlined />');
+        expect(source).toContain('<EllipsisOutlined />');
+        expect(source).not.toContain('backgroundImage:');
+    });
+
+    it('routes visible toolbar copy through production translations', () => {
+        expect(source).not.toContain('label="撤销');
+        expect(source).not.toContain('label="重做');
+        expect(source).not.toContain('label="导出思维导图"');
+        expect(source).not.toContain("label: '纯色背景'");
+        expect(directionSelectorSource).not.toContain("label: '双向展开'");
+        expect(themeSelectorSource).not.toContain('aria-label="选择思维导图主题"');
+        expect(source.match(/plugins\.mindmap\.toolbar\./g)?.length).toBeGreaterThanOrEqual(35);
     });
 });
