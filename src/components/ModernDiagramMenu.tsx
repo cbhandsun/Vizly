@@ -271,38 +271,36 @@ const ModernDiagramMenu: React.FC<ModernDiagramMenuProps> = ({
     const isSelected = diagram.id === selectedDiagram;
     const isFav = favoriteIds.includes(String(diagram.id));
 
-    const baseClasses = "flex items-center gap-2.5 px-2.5 py-2 mx-1.5 my-0.5 rounded-xl cursor-pointer transition-all duration-200 relative border border-transparent group";
+    const baseClasses = "flex w-[calc(100%-0.75rem)] min-h-11 items-center gap-2.5 px-2.5 py-2 pr-12 mx-1.5 my-0.5 rounded-xl cursor-pointer text-left transition-all duration-200 relative border border-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1";
     const hoverClasses = "hover:bg-black/5 dark:hover:bg-white/5 text-slate-600 dark:text-slate-400";
     const selectedClasses = "bg-indigo-500/10 text-slate-900 dark:bg-indigo-500/20 dark:text-white border-indigo-500/20 dark:border-indigo-500/30 font-semibold";
     const leafClasses = size === 'sm' ? "mx-2 px-3" : "";
     const itemClass = `${baseClasses} ${isSelected ? selectedClasses : hoverClasses} ${leafClasses}`;
 
     return (
-      <div
-        key={diagram.id}
-        title={displayName}
-        onClick={() => handleSelect(diagram.id)}
-        data-diagram-id={normalizeDiagramId(diagram.id) ?? undefined}
-        className={itemClass}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSelect(diagram.id); } }}
-      >
-        {isSelected && <div className="absolute left-[-4px] top-1/2 -translate-y-1/2 w-[3px] h-[18px] rounded-sm bg-indigo-600 dark:bg-indigo-400" />}
-        <div className={`w-7 h-7 flex items-center justify-center rounded-lg transition-all ${isSelected ? 'bg-indigo-500/10 text-indigo-600 dark:bg-indigo-500/30 dark:text-indigo-400' : 'bg-transparent text-slate-500 dark:text-slate-400'}`}>
-          <IconComponent size={size === 'md' ? 16 : 14} aria-hidden="true" />
-        </div>
-        <span className={`flex-1 overflow-hidden overflow-ellipsis whitespace-nowrap mb-0 pl-1 ${isSelected ? 'font-semibold' : 'font-medium'} ${size === 'md' ? 'text-[14px]' : 'text-[13px]'}`}>{displayName}</span>
-        <span className={`ml-auto inline-flex items-center transition-opacity duration-150 group-hover:opacity-100 ${isSelected ? 'opacity-100' : 'opacity-0'}`}>
+      <div key={diagram.id} className="group relative">
+        <button
+          type="button"
+          title={displayName}
+          onClick={() => handleSelect(diagram.id)}
+          data-diagram-id={normalizeDiagramId(diagram.id) ?? undefined}
+          className={itemClass}
+          aria-current={isSelected ? 'page' : undefined}
+        >
+          {isSelected && <span className="absolute left-[-4px] top-1/2 -translate-y-1/2 w-[3px] h-[18px] rounded-sm bg-indigo-600 dark:bg-indigo-400" />}
+          <span className={`w-7 h-7 flex items-center justify-center rounded-lg transition-all ${isSelected ? 'bg-indigo-500/10 text-indigo-600 dark:bg-indigo-500/30 dark:text-indigo-400' : 'bg-transparent text-slate-500 dark:text-slate-400'}`}>
+            <IconComponent size={size === 'md' ? 16 : 14} aria-hidden="true" />
+          </span>
+          <span className={`flex-1 overflow-hidden overflow-ellipsis whitespace-nowrap mb-0 pl-1 ${isSelected ? 'font-semibold' : 'font-medium'} ${size === 'md' ? 'text-[14px]' : 'text-[13px]'}`}>{displayName}</span>
+        </button>
+        <span className={`absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100 ${isSelected ? 'opacity-100' : 'opacity-0'}`}>
           <AntButton
             type="text"
-            className="w-6 h-6 p-0 hover:bg-black/5 dark:hover:bg-white/10"
+            className="w-11 min-w-11 h-11 p-0 hover:bg-black/5 dark:hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-indigo-500"
             size="small"
             aria-label={isFav ? t('designer.menu.unfavorite') : t('designer.menu.favorite')}
             icon={isFav ? <StarFilled style={{ color: token.colorWarning, fontSize: 13 }} /> : <StarOutlined style={{ fontSize: 13 }} />}
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
+            onClick={() => {
               const diagramId = normalizeDiagramId(diagram.id);
               if (diagramId) toggleFavorite(diagramId);
             }}
