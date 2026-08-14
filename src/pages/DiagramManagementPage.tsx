@@ -41,6 +41,7 @@ import {
     beginWorkspaceDiagramOpen,
     finishWorkspaceDiagramCreate,
     finishWorkspaceDiagramOpen,
+    navigateToCreatedWorkspaceDiagram,
 } from './workspaceDiagramOpenState';
 
 const AuthModal = React.lazy(() => import('@/components/auth/AuthModal').then(module => ({
@@ -267,10 +268,7 @@ const WorkspaceDashboardPage: React.FC = () => {
                 ? t('workspace.untitledFlowchart')
                 : undefined;
             const diagramId = await workspaceDiagramActions.createDiagram(templateKey, requestedName);
-            if (diagramId) {
-                keepLockUntilNavigation = true;
-                navigateToDiagram(diagramId);
-            }
+            keepLockUntilNavigation = navigateToCreatedWorkspaceDiagram(diagramId, navigateToDiagram);
         } catch (error: unknown) {
             safeLog.error('Failed to create workspace diagram', redactSensitiveLogValue(error));
             appMessage.error('Failed to create diagram.');

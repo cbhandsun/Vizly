@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { UnifiedDiagramItem } from '../diagramManagementPage.helpers';
 import {
@@ -7,6 +7,7 @@ import {
   finishWorkspaceDiagramCreate,
   finishWorkspaceDiagramOpen,
   getWorkspaceDiagramOpenKey,
+  navigateToCreatedWorkspaceDiagram,
 } from '../workspaceDiagramOpenState';
 
 const createItem = (overrides: Partial<UnifiedDiagramItem> = {}): UnifiedDiagramItem => ({
@@ -32,6 +33,36 @@ describe('workspace diagram create state', () => {
     expect(finishWorkspaceDiagramCreate(lock)).toBe(false);
     expect(beginWorkspaceDiagramCreate(lock)).toBe(true);
   });
+
+  it('only transfers the create lock after navigation succeeds', () => {
+    const navigate = vi.fn<(diagramId: string) => void>();
+    const keepLockUntilNavigation = navigateToCreatedWorkspaceDiagram(' created-id ', navigate);
+
+    expect(keepLockUntilNavigation).toBe(true);
+    expect(navigate).toHaveBeenCalledWith('created-id');
+  });
+
+  it('keeps the create lock releasable when navigation throws', () => {
+    let keepLockUntilNavigation = false;
+
+    expect(() => {
+      keepLockUntilNavigation = navigateToCreatedWorkspaceDiagram('created-id', () => {
+        throw new Error('navigation unavailable');
+      });
+    }).toThrow('navigation unavailable');
+
+    expect(keepLockUntilNavigation).toBe(false);
+  });
+
+  it.each([null, undefined, '', '   ', '@@@'])(
+    'does not navigate to an invalid created diagram id: %j',
+    diagramId => {
+      const navigate = vi.fn<(diagramId: string) => void>();
+
+      expect(navigateToCreatedWorkspaceDiagram(diagramId, navigate)).toBe(false);
+      expect(navigate).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe('workspace diagram open state', () => {

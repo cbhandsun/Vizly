@@ -48,3 +48,13 @@ export const finishWorkspaceDiagramCreate = (lock: WorkspaceDiagramCreateLock): 
   lock.active = false;
   return true;
 };
+
+export const navigateToCreatedWorkspaceDiagram = (
+  diagramId: unknown,
+  navigate: (diagramId: string) => void,
+): boolean => {
+  const validDiagramId = coerceDiagramId(diagramId);
+  if (!validDiagramId) return false;
+  navigate(validDiagramId);
+  return true;
+};
