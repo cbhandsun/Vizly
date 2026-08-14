@@ -11,6 +11,14 @@ export interface RemoteDiagramSelection {
     content: unknown;
 }
 
+export interface DiagramViewerTemplateSelectionContext {
+    isCurrent: () => boolean;
+}
+
+export interface DiagramViewerTemplateSelectionSequence {
+    current: number;
+}
+
 export type DiagramViewerTemplateTranslationKey =
     | 'storage.manager.downloading'
     | 'storage.manager.noContent'
@@ -25,13 +33,18 @@ export interface DiagramViewerTemplateSelectionDependencies {
         content: unknown,
         fallback: { id: string; title?: string },
     ) => DiagramViewerTemplateData;
-    seedAndNavigate: (data: DiagramViewerTemplateData, id: string) => Promise<void> | void;
+    seedAndNavigate: (
+        data: DiagramViewerTemplateData,
+        id: string,
+        context: DiagramViewerTemplateSelectionContext,
+    ) => Promise<void> | void;
     clearBlankTemplate: (id: string) => void;
     selectDiagram: (id: string) => void;
     showLoading: (message: string) => () => void;
     showError: (message: string) => void;
     logFailure: (source: string, id: string, error: unknown) => void;
     translate: (key: DiagramViewerTemplateTranslationKey, values?: { message?: string }) => string;
+    isSelectionCurrent?: () => boolean;
 }
 
 const MAX_SELECTION_VALUE_LENGTH = 200;
@@ -45,6 +58,14 @@ const normalizeSelectionValue = (value: unknown): string | null => {
         return codePoint <= 31 || codePoint === 127;
     });
     return normalized && !hasControlCharacter ? normalized : null;
+};
+
+export const beginDiagramViewerTemplateSelection = (
+    sequence: DiagramViewerTemplateSelectionSequence,
+): DiagramViewerTemplateSelectionContext => {
+    sequence.current += 1;
+    const requestId = sequence.current;
+    return { isCurrent: () => sequence.current === requestId };
 };
 
 export const coerceRemoteDiagramSelection = (
@@ -81,24 +102,30 @@ export async function selectDiagramViewerTemplate(
 ): Promise<void> {
     const leafKey = normalizeSelectionValue(leafKeyInput);
     const rootGroup = normalizeSelectionValue(rootGroupInput) ?? '';
-    if (!leafKey) return;
+    const context: DiagramViewerTemplateSelectionContext = {
+        isCurrent: dependencies.isSelectionCurrent ?? (() => true),
+    };
+    if (!leafKey || !context.isCurrent()) return;
 
     if (rootGroup === 's3' || rootGroup === 'cloud' || rootGroup === 'supabase') {
         const provider = rootGroup === 's3' ? 's3' : 'supabase';
         const hideLoading = dependencies.showLoading(dependencies.translate('storage.manager.downloading'));
         try {
             const remote = await dependencies.loadRemoteDiagram(provider, leafKey);
+            if (!context.isCurrent()) return;
             if (!remote?.content) {
                 dependencies.showError(dependencies.translate('storage.manager.noContent'));
                 return;
             }
             const parsed = dependencies.parseRemoteContent(remote.content, remote);
-            await dependencies.seedAndNavigate(withRemoteMetadata(parsed, remote, provider), remote.id);
+            await dependencies.seedAndNavigate(withRemoteMetadata(parsed, remote, provider), remote.id, context);
         } catch (error) {
-            dependencies.logFailure(provider, leafKey, error);
-            dependencies.showError(dependencies.translate('diagramViewer.cloudLoad.error', {
-                message: error instanceof Error ? error.message : String(error),
-            }));
+            if (context.isCurrent()) {
+                dependencies.logFailure(provider, leafKey, error);
+                dependencies.showError(dependencies.translate('diagramViewer.cloudLoad.error', {
+                    message: error instanceof Error ? error.message : String(error),
+                }));
+            }
         } finally {
             hideLoading();
         }
@@ -109,15 +136,18 @@ export async function selectDiagramViewerTemplate(
         const hideLoading = dependencies.showLoading('正在加载云端模板...');
         try {
             const remote = await dependencies.loadSystemTemplate(leafKey);
+            if (!context.isCurrent()) return;
             if (!remote?.content) {
                 dependencies.showError(dependencies.translate('storage.manager.noContent'));
                 return;
             }
             const parsed = dependencies.parseRemoteContent(remote.content, remote);
-            await dependencies.seedAndNavigate(withRemoteMetadata(parsed, remote), remote.id);
+            await dependencies.seedAndNavigate(withRemoteMetadata(parsed, remote), remote.id, context);
         } catch (error) {
-            dependencies.logFailure('system-templates', leafKey, error);
-            dependencies.showError(`加载失败: ${error instanceof Error ? error.message : String(error)}`);
+            if (context.isCurrent()) {
+                dependencies.logFailure('system-templates', leafKey, error);
+                dependencies.showError(`加载失败: ${error instanceof Error ? error.message : String(error)}`);
+            }
         } finally {
             hideLoading();
         }
@@ -126,23 +156,25 @@ export async function selectDiagramViewerTemplate(
 
     if (rootGroup === 'local-workspace') {
         const localPreset = dependencies.getLocalPreset(leafKey);
+        if (!context.isCurrent()) return;
         if (!localPreset) {
             dependencies.showError(dependencies.translate('storage.manager.noContent'));
             return;
         }
         const localPresetId = normalizeSelectionValue(localPreset.id) ?? leafKey;
-        await dependencies.seedAndNavigate(localPreset, localPresetId);
+        await dependencies.seedAndNavigate(localPreset, localPresetId, context);
         return;
     }
 
     const preset = await dependencies.loadStandardPreset(leafKey);
+    if (!context.isCurrent()) return;
     if (preset) {
         const id = preset.id || leafKey;
         await dependencies.seedAndNavigate({
             ...preset,
             id,
             metadata: { ...preset.metadata, title: preset.name },
-        }, id);
+        }, id, context);
         return;
     }
 

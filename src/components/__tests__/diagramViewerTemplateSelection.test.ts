@@ -3,6 +3,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+    beginDiagramViewerTemplateSelection,
     coerceRemoteDiagramSelection,
     selectDiagramViewerTemplate,
     type DiagramViewerTemplateSelectionDependencies,
@@ -24,6 +25,15 @@ const createDependencies = (): DiagramViewerTemplateSelectionDependencies => ({
 });
 
 describe('selectDiagramViewerTemplate', () => {
+    it('makes only the latest selection context current', () => {
+        const sequence = { current: 0 };
+        const first = beginDiagramViewerTemplateSelection(sequence);
+        const second = beginDiagramViewerTemplateSelection(sequence);
+
+        expect(first.isCurrent()).toBe(false);
+        expect(second.isCurrent()).toBe(true);
+    });
+
     it('coerces remote records without trusting identifier and title types', () => {
         expect(coerceRemoteDiagramSelection({ content: '{}', title: 42 }, ' fallback-id ')).toEqual({
             id: 'fallback-id',
@@ -67,7 +77,7 @@ describe('selectDiagramViewerTemplate', () => {
                 title: 'Remote title',
                 cloud: { provider: 'supabase', id: 'remote-1', title: 'Remote title' },
             },
-        }), 'remote-1');
+        }), 'remote-1', expect.objectContaining({ isCurrent: expect.any(Function) }));
     });
 
     it('reports remote failures and always closes the loading indicator', async () => {
@@ -83,6 +93,45 @@ describe('selectDiagramViewerTemplate', () => {
         expect(hideLoading).toHaveBeenCalledOnce();
     });
 
+    it('does not apply a remote result after a newer selection starts', async () => {
+        let resolveRemote!: (value: { id: string; content: string }) => void;
+        const dependencies = createDependencies();
+        const sequence = { current: 0 };
+        const first = beginDiagramViewerTemplateSelection(sequence);
+        vi.mocked(dependencies.loadRemoteDiagram).mockReturnValue(new Promise((resolve) => {
+            resolveRemote = resolve;
+        }));
+        dependencies.isSelectionCurrent = first.isCurrent;
+
+        const pending = selectDiagramViewerTemplate('remote-a', 's3', dependencies);
+        beginDiagramViewerTemplateSelection(sequence);
+        resolveRemote({ id: 'remote-a', content: '{}' });
+        await pending;
+
+        expect(dependencies.parseRemoteContent).not.toHaveBeenCalled();
+        expect(dependencies.seedAndNavigate).not.toHaveBeenCalled();
+        expect(dependencies.showError).not.toHaveBeenCalled();
+    });
+
+    it('suppresses an error from a selection that became stale', async () => {
+        let rejectRemote!: (reason: Error) => void;
+        const dependencies = createDependencies();
+        const sequence = { current: 0 };
+        const first = beginDiagramViewerTemplateSelection(sequence);
+        vi.mocked(dependencies.loadRemoteDiagram).mockReturnValue(new Promise((_resolve, reject) => {
+            rejectRemote = reject;
+        }));
+        dependencies.isSelectionCurrent = first.isCurrent;
+
+        const pending = selectDiagramViewerTemplate('remote-a', 's3', dependencies);
+        beginDiagramViewerTemplateSelection(sequence);
+        rejectRemote(new Error('stale failure'));
+        await pending;
+
+        expect(dependencies.logFailure).not.toHaveBeenCalled();
+        expect(dependencies.showError).not.toHaveBeenCalled();
+    });
+
     it('opens a local preset and normalizes an invalid stored preset id', async () => {
         const localDependencies = createDependencies();
         vi.mocked(localDependencies.getLocalPreset).mockReturnValue({ id: 'bad\nid', name: 'Local' });
@@ -92,6 +141,7 @@ describe('selectDiagramViewerTemplate', () => {
         expect(localDependencies.seedAndNavigate).toHaveBeenCalledWith(
             { id: 'bad\nid', name: 'Local' },
             'menu-id',
+            expect.objectContaining({ isCurrent: expect.any(Function) }),
         );
         expect(localDependencies.showError).not.toHaveBeenCalled();
     });

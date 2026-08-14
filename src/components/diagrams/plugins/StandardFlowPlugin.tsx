@@ -8,16 +8,21 @@ import { JsonEditorModal } from '@/core/components/diagrams/JsonEditorModal';
 import { FlowchartShapesPanel } from '@/core/components/diagrams/FlowchartShapesPanel';
 import { TemplateCascaderMenu } from '../ui/TemplateCascaderMenu';
 import { parseRemoteDiagramContent } from '@/services/remoteDiagramContent';
-import { PRESET_MAP, defaultStandardData } from '@/data/standardized';
+import { PRESET_MAP } from '@/data/standardized';
 import { getCustomPreset } from '@/core/utils/customPresetStorage';
 import { appMessage } from '@/core/utils/antdStaticBridge';
 import type { StandardDiagramData } from '@/core/models/DiagramModels';
 import {
   coerceRemoteDiagramSelection,
+  beginDiagramViewerTemplateSelection,
   selectDiagramViewerTemplate,
   type DiagramViewerTemplateData,
 } from '@/components/diagramViewerTemplateSelection';
 import { logStandardFlowTemplateLoadFailure } from './standardFlowPluginLogging';
+import {
+  applyStandardFlowTemplateSelection,
+  resolveStandardFlowPreset,
+} from './standardFlowTemplateSelection';
 
 export class StandardFlowPlugin implements DiagramTypePlugin {
   id = 'standard-flow';
@@ -121,12 +126,15 @@ export class StandardFlowPlugin implements DiagramTypePlugin {
  */
 const StandardTemplateToolbar: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
   const [selectedPath, setSelectedPath] = useState<string[]>(['gallery', 'all-demos', 'SupplyChainReceivingFlow']);
+  const selectionSequenceRef = React.useRef({ current: 0 });
 
   const handlePresetChange = async (val: string[], key: string, rootGroup: string) => {
     setSelectedPath(val);
+    const selectionContext = beginDiagramViewerTemplateSelection(selectionSequenceRef.current);
     if (!key) return;
 
     await selectDiagramViewerTemplate(key, rootGroup, {
+      isSelectionCurrent: selectionContext.isCurrent,
       loadRemoteDiagram: async (providerName, id) => {
         const { unifiedStorage } = await import('@/services/UnifiedStorageService');
         const savedDiagram = await unifiedStorage.getProvider(providerName).loadDiagram(id);
@@ -144,21 +152,26 @@ const StandardTemplateToolbar: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
         return coerceRemoteDiagramSelection(data, id);
       },
       loadStandardPreset: async (id) => (
-        (PRESET_MAP[id] ?? defaultStandardData) as unknown as DiagramViewerTemplateData
+        resolveStandardFlowPreset(PRESET_MAP, id) as unknown as DiagramViewerTemplateData | null
       ),
       getLocalPreset: (id) => getCustomPreset(id) as unknown as DiagramViewerTemplateData | null,
       parseRemoteContent: (content, fallback) => parseRemoteDiagramContent(content, {
         id: fallback.id,
         title: fallback.title ?? fallback.id,
       }) as unknown as DiagramViewerTemplateData,
-      seedAndNavigate: async (data) => {
-        const { standardDataToCanvas } = await import('@/core/components/diagrams/designerUtils');
-        const { nodes, edges } = await standardDataToCanvas(data as unknown as StandardDiagramData);
-        ctx.setNodes(nodes);
-        ctx.setEdges(edges);
-        setTimeout(() => {
-          ctx.reactFlowInstance?.fitView({ duration: 800, padding: 0.35, minZoom: 0.55 });
-        }, 50);
+      seedAndNavigate: async (data, _id, context) => {
+        await applyStandardFlowTemplateSelection(data, context, {
+          convertData: async (templateData) => {
+            const { standardDataToCanvas } = await import('@/core/components/diagrams/designerUtils');
+            return standardDataToCanvas(templateData as unknown as StandardDiagramData);
+          },
+          setNodes: ctx.setNodes,
+          setEdges: ctx.setEdges,
+          scheduleFitView: (callback) => { window.setTimeout(callback, 50); },
+          fitView: () => {
+            ctx.reactFlowInstance?.fitView({ duration: 800, padding: 0.35, minZoom: 0.55 });
+          },
+        });
       },
       clearBlankTemplate: () => undefined,
       selectDiagram: () => undefined,

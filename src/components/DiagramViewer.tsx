@@ -62,9 +62,11 @@ import { parseRemoteDiagramContent } from '@/services/remoteDiagramContent';
 import { coerceToStandardDiagramData } from '@/core/utils/coerceDiagram';
 import { importMermaidGraphToBridge } from './diagramViewerMermaidImport';
 import {
+    beginDiagramViewerTemplateSelection,
     coerceRemoteDiagramSelection,
     selectDiagramViewerTemplate,
     type DiagramViewerTemplateData,
+    type DiagramViewerTemplateSelectionContext,
 } from './diagramViewerTemplateSelection';
 import { useDiagramViewerCommands } from './useDiagramViewerCommands';
 import { useDiagramViewerSaveActions } from './useDiagramViewerSaveActions';
@@ -125,6 +127,7 @@ const DiagramViewer: React.FC = () => {
     // refreshNonce: 仅用于手动刷新场景（如设置面板的 onRefreshRequest），
     // 模板切换已改为 window.location.reload() 方式，不再依赖 nonce 触发 remount。
     const [refreshNonce, setRefreshNonce] = useState(0);
+    const templateSelectionSequenceRef = useRef({ current: 0 });
 
     // =============== Phase 5: IoC 依赖注入层 =================
     const roomFromUrl = getDiagramViewerRouteParam(searchParams, browserLocation, 'room');
@@ -389,7 +392,11 @@ const DiagramViewer: React.FC = () => {
         });
     }, [setSearchParams, addRecentDiagram]);
 
-    const seedAutoSaveAndNavigate = useCallback(async (data: unknown, id: string) => {
+    const seedAutoSaveAndNavigate = useCallback(async (
+        data: unknown,
+        id: string,
+        selectionContext?: DiagramViewerTemplateSelectionContext,
+    ) => {
         await seedAutoSaveAndNavigateDiagram({
             data: coerceDiagramSeedData(data),
             id,
@@ -423,6 +430,7 @@ const DiagramViewer: React.FC = () => {
                 createPayload: createAutoSavePayload,
                 logBridgeCleanupFailure: logDiagramViewerBridgeCleanupFailure,
             }),
+            isCurrent: selectionContext?.isCurrent,
         });
     }, [saveSelectedDiagramId, selectedDiagramId]);
     const handleExportPermissionCheck = useCallback((format: DiagramExportFormat) => (
@@ -564,7 +572,9 @@ const DiagramViewer: React.FC = () => {
     }, [hasFeature, showUpgradeModal, t]);
 
     const handleTemplateChange = useCallback(async (_value: string[], leafKey: string, rootGroup: string) => {
+        const selectionContext = beginDiagramViewerTemplateSelection(templateSelectionSequenceRef.current);
         await selectDiagramViewerTemplate(leafKey, rootGroup, {
+            isSelectionCurrent: selectionContext.isCurrent,
             loadRemoteDiagram: async (providerName, id) => {
                 const { unifiedStorage } = await import('@/services/UnifiedStorageService');
                 const savedDiagram = await unifiedStorage.getProvider(providerName).loadDiagram(id);

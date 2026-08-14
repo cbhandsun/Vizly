@@ -46,19 +46,23 @@ export const seedAutoSaveAndNavigateDiagram = async <TInput, TProcessed>({
   ensureSwitchConfirmed,
   normalizeSeedData,
   finalizeNavigation,
+  isCurrent = () => true,
 }: {
   data: TInput;
   id: string;
   ensureSwitchConfirmed: () => Promise<boolean>;
   normalizeSeedData: (data: TInput) => Promise<TProcessed>;
   finalizeNavigation: (processedData: TProcessed, id: string) => void;
+  isCurrent?: () => boolean;
 }) => {
+  if (!isCurrent()) return false;
   const confirmed = await ensureSwitchConfirmed();
-  if (!confirmed) {
+  if (!confirmed || !isCurrent()) {
     return false;
   }
 
   const processedData = await normalizeSeedData(data);
+  if (!isCurrent()) return false;
   finalizeNavigation(processedData, id);
   return true;
 };

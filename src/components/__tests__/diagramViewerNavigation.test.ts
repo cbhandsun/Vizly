@@ -96,4 +96,53 @@ describe('diagramViewerNavigation', () => {
       finalizeNavigation,
     })).resolves.toBe(false);
   });
+
+  it('stops when a template selection becomes stale during confirmation', async () => {
+    let resolveConfirmation!: (confirmed: boolean) => void;
+    let current = true;
+    const ensureSwitchConfirmed = vi.fn(() => new Promise<boolean>((resolve) => {
+      resolveConfirmation = resolve;
+    }));
+    const normalizeSeedData = vi.fn(async () => ({ normalized: true }));
+    const finalizeNavigation = vi.fn();
+
+    const pending = seedAutoSaveAndNavigateDiagram({
+      data: { raw: true },
+      id: 'stale-diagram',
+      ensureSwitchConfirmed,
+      normalizeSeedData,
+      finalizeNavigation,
+      isCurrent: () => current,
+    });
+    current = false;
+    resolveConfirmation(true);
+
+    await expect(pending).resolves.toBe(false);
+    expect(normalizeSeedData).not.toHaveBeenCalled();
+    expect(finalizeNavigation).not.toHaveBeenCalled();
+  });
+
+  it('stops when a template selection becomes stale during normalization', async () => {
+    let resolveNormalization!: (value: { normalized: boolean }) => void;
+    let current = true;
+    const normalizeSeedData = vi.fn(() => new Promise<{ normalized: boolean }>((resolve) => {
+      resolveNormalization = resolve;
+    }));
+    const finalizeNavigation = vi.fn();
+
+    const pending = seedAutoSaveAndNavigateDiagram({
+      data: { raw: true },
+      id: 'stale-diagram',
+      ensureSwitchConfirmed: vi.fn(async () => true),
+      normalizeSeedData,
+      finalizeNavigation,
+      isCurrent: () => current,
+    });
+    await vi.waitFor(() => expect(normalizeSeedData).toHaveBeenCalledOnce());
+    current = false;
+    resolveNormalization({ normalized: true });
+
+    await expect(pending).resolves.toBe(false);
+    expect(finalizeNavigation).not.toHaveBeenCalled();
+  });
 });
