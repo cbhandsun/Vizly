@@ -2971,6 +2971,33 @@
                     "current": "思维导图布局方向：{{direction}}"
                 }
             },
+            "kanban": {
+                "title": "AI 敏捷任务看板",
+                "description": "自动提取叶子节点为任务，并与思维导图保持同步。",
+                "close": "关闭任务看板",
+                "copyMarkdown": "复制 Markdown 任务看板",
+                "planWithAi": "AI 智能规划",
+                "aiPlanning": "AI 正在将叶子节点整理为敏捷计划…",
+                "planningFailed": "AI 规划失败，当前任务看板未被修改。",
+                "planningSuccess": "AI 已规划并同步 {{count}} 个任务。",
+                "noEligibleTasks": "没有找到可规划的叶子节点。",
+                "copySuccess": "已复制任务看板 Markdown。",
+                "copyFailed": "无法复制任务看板，请重试。",
+                "emptyColumn": "此列暂无任务，可拖入卡片或使用卡片状态控件。",
+                "toggleDone": "将“{{task}}”标记为完成",
+                "moveTask": "状态",
+                "moveTaskLabel": "将“{{task}}”移动到其他列",
+                "statusChanged": "已将“{{task}}”移动到“{{status}}”。",
+                "rootNode": "根节点",
+                "defaultDocumentTitle": "思维导图",
+                "updatedAt": "更新时间",
+                "noTasks": "暂无任务",
+                "columns": {
+                    "todo": "待办事项",
+                    "doing": "进行中",
+                    "done": "已完成"
+                }
+            },
             "propertyPanel": {
                 "rootNode": "根节点",
                 "nodeProperties": "节点属性",

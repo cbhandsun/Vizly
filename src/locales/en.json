@@ -2818,6 +2818,33 @@
                     "current": "Mind map layout direction: {{direction}}"
                 }
             },
+            "kanban": {
+                "title": "AI agile task board",
+                "description": "Leaf nodes are collected as tasks and kept in sync with the mind map.",
+                "close": "Close task board",
+                "copyMarkdown": "Copy task board as Markdown",
+                "planWithAi": "Plan with AI",
+                "aiPlanning": "AI is organizing leaf nodes into an agile plan…",
+                "planningFailed": "AI planning failed. Your current task board was not changed.",
+                "planningSuccess": "AI planned and synchronized {{count}} tasks.",
+                "noEligibleTasks": "No eligible leaf nodes were found.",
+                "copySuccess": "Task board Markdown copied.",
+                "copyFailed": "Could not copy the task board. Try again.",
+                "emptyColumn": "No tasks in this column. Drag a card here or use its status control.",
+                "toggleDone": "Mark {{task}} as done",
+                "moveTask": "Status",
+                "moveTaskLabel": "Move {{task}} to another column",
+                "statusChanged": "Moved {{task}} to {{status}}.",
+                "rootNode": "Root node",
+                "defaultDocumentTitle": "Mind map",
+                "updatedAt": "Updated",
+                "noTasks": "No tasks",
+                "columns": {
+                    "todo": "To do",
+                    "doing": "In progress",
+                    "done": "Done"
+                }
+            },
             "propertyPanel": {
                 "rootNode": "Root node",
                 "nodeProperties": "Node properties",

@@ -438,6 +438,16 @@ const MindElixirToolbar: React.FC = () => {
                 onClick={() => setShortcutsOpen(true)}
             />
 
+            {/* Keep the task board near help so it remains reachable before horizontal overflow. */}
+            <MindMapToolbarIconButton
+                data-testid="mindmap-kanban-trigger"
+                label={t(isKanbanOpen ? 'plugins.mindmap.toolbar.closeKanban' : 'plugins.mindmap.toolbar.openKanban')}
+                icon={<ProjectOutlined />}
+                onClick={handleToggleKanban}
+                pressed={isKanbanOpen}
+                style={{ color: isKanbanOpen ? '#6366f1' : undefined }}
+            />
+
             <Divider orientation="vertical" style={{ height: 16, margin: '0 2px' }} />
 
             {/* Undo / Redo */}
@@ -638,15 +648,6 @@ const MindElixirToolbar: React.FC = () => {
             </Dropdown>
 
             <MindMapAuxiliaryPanelButtons />
-
-            {/* Kanban toggle */}
-            <MindMapToolbarIconButton
-                label={t(isKanbanOpen ? 'plugins.mindmap.toolbar.closeKanban' : 'plugins.mindmap.toolbar.openKanban')}
-                icon={<ProjectOutlined />}
-                onClick={handleToggleKanban}
-                pressed={isKanbanOpen}
-                style={{ color: isKanbanOpen ? '#6366f1' : undefined }}
-            />
 
             {/* Shortcuts Modal */}
             <MindMapShortcutsModal
