@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -24,6 +24,8 @@ vi.mock('react-i18next', () => ({
             'designer.toolbar.documentActions': '文档操作',
             'designer.toolbar.saveOptions': '保存选项',
             'designer.toolbar.saveToCloud': '保存到云端',
+            'designer.saveStatus.local.saving': '正在保存到本地',
+            'designer.saveStatus.cloud.saving': '正在保存到云端',
             'designer.toolbar.presentationMode': '演示模式',
             'designer.toolbar.pluginManager': '插件管理',
             'designer.toolbar.commentMode': '评论模式',
@@ -169,11 +171,61 @@ describe('TopActionButtons document menu', () => {
 
         fireEvent.keyDown(saveItem, { key: ' ' });
 
-        expect(onSaveToCloud).toHaveBeenCalledTimes(1);
+        await waitFor(() => expect(onSaveToCloud).toHaveBeenCalledTimes(1));
         await waitFor(() => {
             expect(trigger.getAttribute('aria-expanded')).toBe('false');
+            expect(trigger.getAttribute('aria-busy')).toBe('false');
             expect(document.activeElement).toBe(trigger);
         });
+    });
+
+    it('shows an accessible busy state and blocks duplicate save actions until completion', async () => {
+        let releaseCloudSave = () => {};
+        const cloudSavePromise = new Promise<void>((resolve) => {
+            releaseCloudSave = resolve;
+        });
+        const onSaveToCloud = vi.fn(() => cloudSavePromise);
+        const onDirectSave = vi.fn().mockResolvedValue(undefined);
+        render(
+            <React.StrictMode>
+                <TopActionButtons
+                    disablePortal
+                    onDirectSave={onDirectSave}
+                    onSaveToCloud={onSaveToCloud}
+                />
+            </React.StrictMode>,
+        );
+
+        const trigger = screen.getByRole('button', { name: '保存选项' });
+        fireEvent.click(trigger);
+        fireEvent.click(await screen.findByRole('menuitem', { name: '保存到云端' }));
+
+        await waitFor(() => expect(onSaveToCloud).toHaveBeenCalledTimes(1));
+        expect(trigger.getAttribute('aria-busy')).toBe('true');
+        expect(trigger.getAttribute('aria-label')).toBe('正在保存到云端');
+
+        fireEvent.click(trigger);
+        const pendingCloudItem = await screen.findByRole('menuitem', { name: '正在保存到云端' });
+        const blockedDirectItem = screen.getByRole('menuitem', { name: '覆盖保存' });
+        expect(pendingCloudItem.getAttribute('aria-disabled')).toBe('true');
+        expect(blockedDirectItem.getAttribute('aria-disabled')).toBe('true');
+        fireEvent.click(pendingCloudItem);
+        fireEvent.click(blockedDirectItem);
+        expect(onSaveToCloud).toHaveBeenCalledTimes(1);
+        expect(onDirectSave).not.toHaveBeenCalled();
+
+        await act(async () => {
+            releaseCloudSave();
+            await cloudSavePromise;
+        });
+        await waitFor(() => {
+            expect(trigger.getAttribute('aria-busy')).toBe('false');
+            expect(trigger.getAttribute('aria-label')).toBe('保存选项');
+        });
+
+        fireEvent.click(trigger);
+        fireEvent.click(await screen.findByRole('menuitem', { name: '覆盖保存' }));
+        await waitFor(() => expect(onDirectSave).toHaveBeenCalledTimes(1));
     });
 
     it('consolidates save into the 44px document menu on mobile', async () => {

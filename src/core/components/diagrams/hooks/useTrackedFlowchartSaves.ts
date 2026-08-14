@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, type RefObject } from 'react';
+import { useCallback, useMemo, useRef, useState, type RefObject } from 'react';
 import type { Edge, Node } from '@xyflow/react';
 
 import type { DiagramTypePlugin, PluginContext } from '@/core/types/plugin';
@@ -56,43 +56,58 @@ export const useTrackedFlowchartSaves = ({
     onDirectSave,
 }: UseTrackedFlowchartSavesOptions) => {
     const [manualStatus, setManualStatus] = useState<ManualSaveStatus | null>(null);
+    const activeSaveRef = useRef<Promise<void> | null>(null);
 
-    const runTrackedSave = useCallback(async (
+    const runTrackedSave = useCallback((
         target: FlowchartSaveTarget,
         saveAction: (() => Promise<DiagramSaveResult>) | undefined,
     ) => {
-        const startedAt = Date.now();
-        setManualStatus({
-            target,
-            updatedAt: startedAt,
-            state: { saving: true, lastSaved: null, error: null },
-        });
-        try {
-            const result = await runFlowchartSavePipeline({
-                activePlugin,
-                pluginCtx,
-                nodes: nodesRef.current ?? [],
-                edges: edgesRef.current ?? [],
-                saveAction,
-            });
-            if (result === 'cancelled') {
-                setManualStatus(null);
-                return;
-            }
-            const savedAt = Date.now();
-            setManualStatus({
-                target,
-                updatedAt: savedAt,
-                state: { saving: false, lastSaved: savedAt, error: null },
-            });
-        } catch (error) {
-            setManualStatus({
-                target,
-                updatedAt: Date.now(),
-                state: { saving: false, lastSaved: null, error: 'save-failed' },
-            });
-            logTrackedFlowchartSaveFailure(target, error);
+        if (activeSaveRef.current) {
+            return activeSaveRef.current;
         }
+
+        const saveOperation = (async () => {
+            const startedAt = Date.now();
+            setManualStatus({
+                target,
+                updatedAt: startedAt,
+                state: { saving: true, lastSaved: null, error: null },
+            });
+            try {
+                const result = await runFlowchartSavePipeline({
+                    activePlugin,
+                    pluginCtx,
+                    nodes: nodesRef.current ?? [],
+                    edges: edgesRef.current ?? [],
+                    saveAction,
+                });
+                if (result === 'cancelled') {
+                    setManualStatus(null);
+                    return;
+                }
+                const savedAt = Date.now();
+                setManualStatus({
+                    target,
+                    updatedAt: savedAt,
+                    state: { saving: false, lastSaved: savedAt, error: null },
+                });
+            } catch (error) {
+                setManualStatus({
+                    target,
+                    updatedAt: Date.now(),
+                    state: { saving: false, lastSaved: null, error: 'save-failed' },
+                });
+                logTrackedFlowchartSaveFailure(target, error);
+            }
+        })();
+
+        activeSaveRef.current = saveOperation;
+        void saveOperation.finally(() => {
+            if (activeSaveRef.current === saveOperation) {
+                activeSaveRef.current = null;
+            }
+        });
+        return saveOperation;
     }, [activePlugin, edgesRef, nodesRef, pluginCtx]);
 
     const handleCloudSave = useCallback(

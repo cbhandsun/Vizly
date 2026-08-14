@@ -8,12 +8,13 @@ import {
     FaMagic, FaRegComment, FaEllipsisH, FaRobot, FaUsers
 } from 'react-icons/fa';
 import { CollaborationAvatars } from './ui/CollaborationAvatars';
-import { ApiOutlined } from '@ant-design/icons';
+import { ApiOutlined, LoadingOutlined } from '@ant-design/icons';
 import type { ReactFlowRenderSnapshot } from '../../rendering/reactFlowScene';
 import type { DiagramExportFormat } from '../../types/diagram-components';
 import { DOCUMENT_MENU_OVERLAY_CLASS } from './documentMenuKeyboard';
 import { DropdownMenuTriggerButton } from './DropdownMenuTriggerButton';
 import { useKeyboardAccessibleDropdown } from './hooks/useKeyboardAccessibleDropdown';
+import { useExclusiveSaveActions } from './hooks/useExclusiveSaveActions';
 import { focusAdvancedExportTrigger } from './advancedExportFocus';
 import './TopActionButtons.css';
 
@@ -188,23 +189,34 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
         </>
     );
 
+    const {
+        handleCloudSave,
+        handleDirectSave,
+        pendingSaveTarget,
+    } = useExclusiveSaveActions({ onCloudSave: onSaveToCloud, onDirectSave });
+
     const saveMenu: MenuProps['items'] = useMemo(() => [
         ...(onDirectSave ? [{
             key: 'direct-save',
-            label: isDirectSaveDisabled
+            label: pendingSaveTarget === 'local'
+                ? t('designer.saveStatus.local.saving')
+                : isDirectSaveDisabled
                 ? t('designer.toolbar.directSaveDisabled')
                 : t('designer.toolbar.directSave', '覆盖保存'),
-            icon: <FaSave />,
-            disabled: isDirectSaveDisabled,
-            onClick: onDirectSave,
+            icon: pendingSaveTarget === 'local' ? <LoadingOutlined spin aria-hidden="true" /> : <FaSave />,
+            disabled: isDirectSaveDisabled || pendingSaveTarget !== null,
+            onClick: handleDirectSave,
         }] : []),
         ...(onSaveToCloud ? [{
             key: 'cloud-save',
-            label: t('designer.toolbar.saveToCloud', '保存到云端'),
-            icon: <FaCloudUploadAlt />,
-            onClick: onSaveToCloud,
+            label: pendingSaveTarget === 'cloud'
+                ? t('designer.saveStatus.cloud.saving')
+                : t('designer.toolbar.saveToCloud', '保存到云端'),
+            icon: pendingSaveTarget === 'cloud' ? <LoadingOutlined spin aria-hidden="true" /> : <FaCloudUploadAlt />,
+            disabled: pendingSaveTarget !== null,
+            onClick: handleCloudSave,
         }] : []),
-    ], [isDirectSaveDisabled, onDirectSave, onSaveToCloud, t]);
+    ], [handleCloudSave, handleDirectSave, isDirectSaveDisabled, onDirectSave, onSaveToCloud, pendingSaveTarget, t]);
 
     const documentMenu: MenuProps['items'] = useMemo(() => {
         const viewItems: NonNullable<MenuProps['items']> = [
@@ -403,11 +415,16 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
                     <DropdownMenuTriggerButton
                         ref={saveMenuButtonRef}
                         data-cloud-save-focus-return="true"
-                        ariaLabel={t('designer.toolbar.saveOptions')}
+                        ariaLabel={pendingSaveTarget
+                            ? t(`designer.saveStatus.${pendingSaveTarget}.saving`)
+                            : t('designer.toolbar.saveOptions')}
+                        busy={pendingSaveTarget !== null}
                         menuId={saveMenuId}
                         open={saveMenuOpen}
                         onTriggerKeyDown={handleSaveMenuButtonKeyDown}
-                        icon={<FaSave className="text-[13px]" />}
+                        icon={pendingSaveTarget
+                            ? <LoadingOutlined spin aria-hidden="true" className="text-[13px]" />
+                            : <FaSave className="text-[13px]" />}
                         className={tbtn}
                     />
                 </Dropdown>
@@ -491,6 +508,7 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
                             type="text"
                             aria-label={t('designer.toolbar.documentActions')}
                             aria-haspopup="menu"
+                            aria-busy={pendingSaveTarget !== null}
                             aria-expanded={documentMenuOpen}
                             aria-controls={documentMenuId}
                             onKeyDown={handleDocumentMenuButtonKeyDown}
