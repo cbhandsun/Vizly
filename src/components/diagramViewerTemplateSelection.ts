@@ -126,10 +126,13 @@ export async function selectDiagramViewerTemplate(
 
     if (rootGroup === 'local-workspace') {
         const localPreset = dependencies.getLocalPreset(leafKey);
-        if (localPreset) {
-            await dependencies.seedAndNavigate(localPreset, localPreset.id || leafKey);
+        if (!localPreset) {
+            dependencies.showError(dependencies.translate('storage.manager.noContent'));
             return;
         }
+        const localPresetId = normalizeSelectionValue(localPreset.id) ?? leafKey;
+        await dependencies.seedAndNavigate(localPreset, localPresetId);
+        return;
     }
 
     const preset = await dependencies.loadStandardPreset(leafKey);
@@ -140,6 +143,11 @@ export async function selectDiagramViewerTemplate(
             id,
             metadata: { ...preset.metadata, title: preset.name },
         }, id);
+        return;
+    }
+
+    if (rootGroup === 'built-in') {
+        dependencies.showError(dependencies.translate('storage.manager.noContent'));
         return;
     }
 

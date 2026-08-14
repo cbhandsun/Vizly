@@ -83,18 +83,36 @@ describe('selectDiagramViewerTemplate', () => {
         expect(hideLoading).toHaveBeenCalledOnce();
     });
 
-    it('prefers local presets and falls back to blank navigation', async () => {
+    it('opens a local preset and normalizes an invalid stored preset id', async () => {
         const localDependencies = createDependencies();
-        vi.mocked(localDependencies.getLocalPreset).mockReturnValue({ id: 'local-id', name: 'Local' });
+        vi.mocked(localDependencies.getLocalPreset).mockReturnValue({ id: 'bad\nid', name: 'Local' });
 
         await selectDiagramViewerTemplate('menu-id', 'local-workspace', localDependencies);
 
         expect(localDependencies.seedAndNavigate).toHaveBeenCalledWith(
-            { id: 'local-id', name: 'Local' },
-            'local-id',
+            { id: 'bad\nid', name: 'Local' },
+            'menu-id',
         );
+        expect(localDependencies.showError).not.toHaveBeenCalled();
+    });
 
+    it.each(['local-workspace', 'built-in'])(
+        'keeps the current diagram when a %s selection no longer exists',
+        async rootGroup => {
+            const dependencies = createDependencies();
+
+            await selectDiagramViewerTemplate('stale-id', rootGroup, dependencies);
+
+            expect(dependencies.showError).toHaveBeenCalledWith('storage.manager.noContent');
+            expect(dependencies.seedAndNavigate).not.toHaveBeenCalled();
+            expect(dependencies.clearBlankTemplate).not.toHaveBeenCalled();
+            expect(dependencies.selectDiagram).not.toHaveBeenCalled();
+        },
+    );
+
+    it('preserves the legacy ungrouped blank-navigation fallback', async () => {
         const blankDependencies = createDependencies();
+
         await selectDiagramViewerTemplate('blank-flow', 'templates', blankDependencies);
 
         expect(blankDependencies.clearBlankTemplate).toHaveBeenCalledWith('blank-flow');
