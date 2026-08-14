@@ -46,7 +46,7 @@
         "applyingTemplate": "正在应用模板…",
         "openDiagram": "打开图表 {{title}}",
         "moreActions": "{{title}} 的更多操作",
-        "deleteConfirmTitle": "删除图表？",
+        "deleteConfirmTitle": "删除“{{name}}”？",
         "deleteConfirmDescription": "确定要永久删除这个图表吗？此操作无法撤销。",
         "deleteSuccess": "图表已删除",
         "deleteFailed": "图表删除失败，请稍后重试。",

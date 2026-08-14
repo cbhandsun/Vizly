@@ -28,6 +28,7 @@ import { WorkspaceGlobalHeader } from './WorkspaceGlobalHeader';
 import { WorkspaceContextMenu } from './WorkspaceContextMenu';
 import {
     beginWorkspaceDeleteDialog,
+    coerceWorkspaceDeleteTargetName,
     createWorkspaceDeleteConfirmation,
     finishWorkspaceDeleteDialog,
 } from './workspaceDeleteConfirmation';
@@ -227,8 +228,12 @@ const WorkspaceDashboardPage: React.FC = () => {
     ) => {
         e.stopPropagation();
         if (!beginWorkspaceDeleteDialog(deleteDialogLockRef.current)) return;
+        const deleteTargetName = coerceWorkspaceDeleteTargetName(
+            item.title,
+            t('workspace.untitledDiagram'),
+        );
         const confirmation = createWorkspaceDeleteConfirmation({
-            title: t('workspace.deleteConfirmTitle'),
+            title: t('workspace.deleteConfirmTitle', { name: deleteTargetName }),
             description: t('workspace.deleteConfirmDescription'),
             deleteLabel: t('common.delete'),
             cancelLabel: t('common.cancel'),

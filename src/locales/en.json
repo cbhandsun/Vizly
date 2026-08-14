@@ -46,7 +46,7 @@
         "applyingTemplate": "Applying template…",
         "openDiagram": "Open diagram {{title}}",
         "moreActions": "More actions for {{title}}",
-        "deleteConfirmTitle": "Delete diagram?",
+        "deleteConfirmTitle": "Delete “{{name}}”?",
         "deleteConfirmDescription": "Are you sure you want to permanently delete this diagram? This action cannot be undone.",
         "deleteSuccess": "Diagram deleted",
         "deleteFailed": "Failed to delete the diagram. Please try again.",

@@ -17,6 +17,7 @@ import type {
 } from '../diagramManagementPage.helpers';
 import {
   beginWorkspaceDeleteDialog,
+  coerceWorkspaceDeleteTargetName,
   createWorkspaceDeleteConfirmation,
   finishWorkspaceDeleteDialog,
   type WorkspaceDeleteConfirmationOptions,
@@ -514,6 +515,18 @@ const createDeleteOptions = (
 });
 
 describe('createWorkspaceDeleteConfirmation', () => {
+  it('coerces a bounded and unambiguous target name for destructive confirmation', () => {
+    expect(coerceWorkspaceDeleteTargetName('  Logistics   Architecture  ', 'Untitled diagram'))
+      .toBe('Logistics Architecture');
+    expect(coerceWorkspaceDeleteTargetName('Invoice\u0000\n\u202Ecod.exe', 'Untitled diagram'))
+      .toBe('Invoice cod.exe');
+    expect(coerceWorkspaceDeleteTargetName('', '未命名图表')).toBe('未命名图表');
+    expect(coerceWorkspaceDeleteTargetName({ title: 'not trusted' }, 'Untitled diagram'))
+      .toBe('Untitled diagram');
+    expect(coerceWorkspaceDeleteTargetName('A'.repeat(120), 'Untitled diagram'))
+      .toBe(`${'A'.repeat(79)}…`);
+  });
+
   it('allows only one destructive confirmation until the active dialog closes', () => {
     const lock = { active: false };
 
