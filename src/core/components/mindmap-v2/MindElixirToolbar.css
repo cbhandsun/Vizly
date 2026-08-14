@@ -158,11 +158,46 @@
 }
 
 .mind-map-search-panel {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
     top: 104px;
-    right: 8px;
+    right: calc(72px + env(safe-area-inset-right, 0px));
     z-index: 10020;
-    width: min(420px, calc(100% - 16px));
+    width: min(420px, calc(100% - 88px));
     min-width: 0;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    background: rgba(12, 12, 20, 0.92);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+}
+
+me-tpc.search-match {
+    outline: 2px solid #f59e0b !important;
+    outline-offset: 2px !important;
+}
+
+me-tpc.search-match-active {
+    outline: 2.5px solid #6366f1 !important;
+    outline-offset: 2px !important;
+    background: rgba(99, 102, 241, 0.12) !important;
+}
+
+.mind-map-search-visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    border: 0;
+    white-space: nowrap;
 }
 
 .mind-map-search-row {
@@ -174,15 +209,124 @@
 }
 
 .mind-map-search-icon-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     width: var(--commercial-touch-target, 44px);
     min-width: var(--commercial-touch-target, 44px);
     height: var(--commercial-touch-target, 44px);
     padding: 0;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.7);
+    cursor: pointer;
+    line-height: 1;
+    transition: color 0.15s, background 0.15s;
 }
 
-.mind-map-search-replace-row button {
+.mind-map-search-icon-button:disabled {
+    color: rgba(255, 255, 255, 0.2);
+    cursor: not-allowed;
+}
+
+.mind-map-search-icon-button:not(:disabled):hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.mind-map-search-icon-button .anticon {
+    font-size: 11px;
+}
+
+.mind-map-search-leading-icon {
+    flex-shrink: 0;
+    color: rgba(255, 255, 255, 0.45);
+    font-size: 14px;
+}
+
+.mind-map-search-input.ant-input {
+    min-width: 0;
+    padding: 0 4px;
+    background: transparent;
+    color: #fff;
+    font-size: 13px;
+}
+
+.mind-map-search-input.ant-input::placeholder {
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.mind-map-search-result-count {
+    min-width: 40px;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 11px;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.mind-map-search-result-count.is-empty {
+    color: #f87171;
+}
+
+.mind-map-search-replace-toggle {
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.mind-map-search-replace-toggle.is-active {
+    color: #818cf8;
+}
+
+.mind-map-search-replace-toggle .anticon {
+    font-size: 13px;
+}
+
+.mind-map-search-replace-row {
+    display: grid;
+    grid-template-columns: auto minmax(72px, 1fr) auto auto auto;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.mind-map-search-replace-icon {
+    width: 14px;
+    flex-shrink: 0;
+    color: rgba(255, 255, 255, 0.3);
+    font-size: 12px;
+}
+
+.mind-map-search-replace-button {
     min-width: var(--commercial-touch-target, 44px);
     min-height: var(--commercial-touch-target, 44px);
+    padding: 2px 8px;
+    border: 0;
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.68);
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 600;
+    transition: background 0.12s;
+}
+
+.mind-map-search-replace-button.is-primary {
+    background: rgba(99, 102, 241, 0.25);
+    color: #c7d2fe;
+}
+
+.mind-map-search-replace-button:disabled {
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.25);
+    cursor: not-allowed;
+}
+
+.mind-map-search-replace-count {
+    color: #6ee7b7;
+    font-size: 10px;
+    white-space: nowrap;
 }
 
 .mind-map-search-icon-button:focus-visible,
@@ -200,4 +344,17 @@
     .mind-map-search-row > .mind-map-search-icon-button:nth-of-type(2) {
         display: none;
     }
+
+    .mind-map-search-replace-row {
+        grid-template-columns: auto minmax(72px, 1fr) auto;
+    }
+
+    .mind-map-search-replace-input {
+        grid-column: 2 / -1;
+    }
+
+    .mind-map-search-replace-count {
+        grid-column: 2 / -1;
+    }
+
 }

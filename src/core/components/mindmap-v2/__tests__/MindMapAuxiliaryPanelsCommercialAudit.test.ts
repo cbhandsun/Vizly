@@ -61,17 +61,31 @@ describe('mind map auxiliary panel commercial audit contract', () => {
     it('keeps search controls in a named safe-area panel with reliable hit targets', () => {
         const source = readSource('MindMapSearch.tsx');
         const css = readSource('MindElixirToolbar.css');
+        const plugin = readFileSync(
+            resolve(process.cwd(), 'src/core/plugins/MindMapPlugin.tsx'),
+            'utf8',
+        );
 
         expect(source).toContain('role="search"');
         expect(source).toContain('aria-label="搜索并替换思维导图节点"');
         expect(source).toContain('aria-label="搜索节点"');
         expect(source).toContain('aria-controls="me-search-replace-row"');
+        expect(source).toContain('aria-live="polite"');
+        expect(source).toContain('maxLength={MINDMAP_MAX_TOPIC_LENGTH}');
+        expect(source).toContain('appModal.confirm({');
+        expect(source).toContain('getContainer: getViewportOverlayContainer');
+        expect(source).toContain('maskClosable: false');
+        expect(source).toContain('aria-haspopup="dialog"');
+        expect(source).toContain('returnTarget.focus({ preventScroll: true })');
         expect(source).toContain('disabled={total === 0}');
+        expect(source).not.toContain('document.createElement(\'style\')');
         expect(source).not.toContain('⇌');
         expect(source).not.toContain('✓ {replaceCount}');
-        expect(css).toMatch(/\.mind-map-search-panel\s*\{[\s\S]*?top:\s*104px;[\s\S]*?z-index:\s*10020;/);
+        expect(plugin).toContain("shortcutKey === 'h'");
+        expect(plugin).toContain('replaceRequested={replaceRequested}');
+        expect(css).toMatch(/\.mind-map-search-panel\s*\{[\s\S]*?top:\s*104px;[\s\S]*?right:\s*calc\(72px \+ env\(safe-area-inset-right, 0px\)\);[\s\S]*?z-index:\s*10020;/);
         expect(css).toMatch(/\.mind-map-search-icon-button\s*\{[\s\S]*?width:\s*var\(--commercial-touch-target, 44px\);[\s\S]*?height:\s*var\(--commercial-touch-target, 44px\);/);
-        expect(css).toMatch(/\.mind-map-search-replace-row button\s*\{[\s\S]*?min-width:\s*var\(--commercial-touch-target, 44px\);[\s\S]*?min-height:\s*var\(--commercial-touch-target, 44px\);/);
+        expect(css).toMatch(/\.mind-map-search-replace-button\s*\{[\s\S]*?min-width:\s*var\(--commercial-touch-target, 44px\);[\s\S]*?min-height:\s*var\(--commercial-touch-target, 44px\);/);
     });
 
     it('keeps the AI assistant below application chrome and names its inputs', () => {

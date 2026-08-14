@@ -55,22 +55,34 @@ const MindMapCanvas: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
         || isStoredApplicationThemeDark();
 
     const [searchOpen, setSearchOpen] = useState(false);
+    const [replaceRequested, setReplaceRequested] = useState(false);
 
     // Subscribe to search event from Toolbar
     useEffect(() => {
-        return subscribeSearchOpen(() => setSearchOpen(prev => !prev));
+        return subscribeSearchOpen(() => {
+            setReplaceRequested(false);
+            setSearchOpen(prev => !prev);
+        });
     }, []);
 
-    // Ctrl+F / Cmd+F to open search;  Ctrl+D to duplicate node
+    // Ctrl+F / Cmd+F opens search; Ctrl+H / Cmd+H opens find-and-replace.
     const handleKeyDown = useCallback((e: KeyboardEvent) => {
-        const isInput = ['INPUT','TEXTAREA','SELECT'].includes((e.target as HTMLElement)?.tagName);
-        if (isInput) return;
-
-        if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        const shortcutKey = e.key.toLowerCase();
+        if ((e.ctrlKey || e.metaKey) && shortcutKey === 'f') {
             e.preventDefault(); e.stopPropagation();
-            setSearchOpen(prev => !prev);
+            setReplaceRequested(false);
+            setSearchOpen(true);
             return;
         }
+        if ((e.ctrlKey || e.metaKey) && shortcutKey === 'h') {
+            e.preventDefault(); e.stopPropagation();
+            setReplaceRequested(true);
+            setSearchOpen(true);
+            return;
+        }
+
+        const isInput = ['INPUT','TEXTAREA','SELECT'].includes((e.target as HTMLElement)?.tagName);
+        if (isInput) return;
 
         // Ctrl+D — duplicate selected node as sibling (with all children)
         if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
@@ -97,7 +109,14 @@ const MindMapCanvas: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
     return (
         <div style={{ position: 'relative', width: '100%', height: '100%' }}>
             <MindElixirWrapper ctx={ctx} isDark={isDark} />
-            <MindMapSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
+            <MindMapSearch
+                open={searchOpen}
+                replaceRequested={replaceRequested}
+                onClose={() => {
+                    setSearchOpen(false);
+                    setReplaceRequested(false);
+                }}
+            />
         </div>
     );
 };

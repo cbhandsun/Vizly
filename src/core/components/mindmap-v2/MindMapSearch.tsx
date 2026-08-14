@@ -22,6 +22,9 @@ import { getMindElixirInstance } from './mindElixirStore';
 import { findNodeById } from './migrate';
 import { cleanMindMapNodePatch } from './mindmapNodePatchSecurity';
 import { logMindmapSearchFailure } from './mindmapInteractionLogging';
+import { MINDMAP_MAX_TOPIC_LENGTH } from './mindmapTreeSanitizer';
+import { appModal } from '../../utils/antdStaticBridge';
+import { getViewportOverlayContainer } from '../ui/viewportOverlayPortal';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function collectAllNodes(root: NodeObj): NodeObj[] {
@@ -31,26 +34,6 @@ function collectAllNodes(root: NodeObj): NodeObj[] {
     return result;
 }
 
-// ─── CSS injection ────────────────────────────────────────────────────────────
-const SEARCH_STYLE_ID = 'me-search-highlight-style';
-function injectSearchCSS() {
-    if (document.getElementById(SEARCH_STYLE_ID)) return;
-    const style = document.createElement('style');
-    style.id = SEARCH_STYLE_ID;
-    style.textContent = `
-        me-tpc.search-match {
-            outline: 2px solid #f59e0b !important;
-            outline-offset: 2px !important;
-        }
-        me-tpc.search-match-active {
-            outline: 2.5px solid #6366f1 !important;
-            outline-offset: 2px !important;
-            background: rgba(99,102,241,0.12) !important;
-        }
-    `;
-    document.head.appendChild(style);
-}
-
 function clearSearchHighlights() {
     document.querySelectorAll('me-tpc.search-match, me-tpc.search-match-active').forEach(el => {
         el.classList.remove('search-match', 'search-match-active');
@@ -58,19 +41,30 @@ function clearSearchHighlights() {
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
-interface MindMapSearchProps { open: boolean; onClose: () => void; }
+interface MindMapSearchProps {
+    open: boolean;
+    onClose: () => void;
+    replaceRequested?: boolean;
+}
 type MindElixirInstance = NonNullable<ReturnType<typeof getMindElixirInstance>>;
 type ReshapeNodeTarget = Parameters<MindElixirInstance['reshapeNode']>[0];
 
-const MindMapSearch: React.FC<MindMapSearchProps> = ({ open, onClose }) => {
+const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const MindMapSearch: React.FC<MindMapSearchProps> = ({ open, onClose, replaceRequested = false }) => {
     const mind = getMindElixirInstance();
     const inputRef = useRef<InputRef>(null);
+    const replaceInputRef = useRef<InputRef>(null);
+    const replaceAllConfirmOpenRef = useRef(false);
+    const returnFocusRef = useRef<HTMLElement | null>(null);
+    const wasOpenRef = useRef(open);
 
     const [query, setQuery] = useState('');
     const [replaceText, setReplaceText] = useState('');
     const [showReplace, setShowReplace] = useState(false);
     const [matchIdx, setMatchIdx] = useState(0);
     const [replaceCount, setReplaceCount] = useState<number | null>(null);
+    const [replaceStatus, setReplaceStatus] = useState('');
 
     const matchIds = useMemo<string[]>(() => {
         if (!mind || !query.trim()) return [];
@@ -85,7 +79,6 @@ const MindMapSearch: React.FC<MindMapSearchProps> = ({ open, onClose }) => {
 
     // Sync highlights
     useEffect(() => {
-        injectSearchCSS();
         clearSearchHighlights();
         if (!mind || matchIds.length === 0) return;
         matchIds.forEach(id => {
@@ -116,6 +109,7 @@ const MindMapSearch: React.FC<MindMapSearchProps> = ({ open, onClose }) => {
         const timer = window.setTimeout(() => {
             setMatchIdx(0);
             setReplaceCount(null);
+            setReplaceStatus('');
         }, 0);
         return () => window.clearTimeout(timer);
     }, [matchIds.length, query]);
@@ -123,7 +117,19 @@ const MindMapSearch: React.FC<MindMapSearchProps> = ({ open, onClose }) => {
     useEffect(() => {
         let timer: number | undefined;
         if (open) {
-            timer = window.setTimeout(() => inputRef.current?.focus(), 80);
+            if (!wasOpenRef.current) {
+                const activeElement = document.activeElement;
+                returnFocusRef.current = activeElement instanceof HTMLElement && activeElement !== document.body
+                    ? activeElement
+                    : null;
+            }
+            timer = window.setTimeout(() => {
+                if (replaceRequested) {
+                    setShowReplace(true);
+                } else {
+                    inputRef.current?.focus();
+                }
+            }, 80);
         } else {
             clearSearchHighlights();
             timer = window.setTimeout(() => {
@@ -131,22 +137,50 @@ const MindMapSearch: React.FC<MindMapSearchProps> = ({ open, onClose }) => {
                 setReplaceText('');
                 setShowReplace(false);
                 setReplaceCount(null);
+                setReplaceStatus('');
+                const returnTarget = returnFocusRef.current;
+                returnFocusRef.current = null;
+                if (returnTarget?.isConnected) returnTarget.focus({ preventScroll: true });
             }, 0);
         }
+        wasOpenRef.current = open;
         return () => {
             if (timer !== undefined) window.clearTimeout(timer);
         };
-    }, [open]);
+    }, [open, replaceRequested]);
 
-    // Escape key
+    useEffect(() => {
+        if (!open || !showReplace || !replaceRequested) return;
+        const timer = window.setTimeout(() => replaceInputRef.current?.focus(), 0);
+        return () => window.clearTimeout(timer);
+    }, [open, replaceRequested, showReplace]);
+
+    const focusReplacement = useCallback(() => {
+        window.setTimeout(() => replaceInputRef.current?.focus(), 0);
+    }, []);
+
+    // Escape and find/replace shortcuts remain inside the active surface.
     useEffect(() => {
         if (!open) return;
         const handler = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') { e.stopPropagation(); onClose(); }
+            if (e.isComposing || e.keyCode === 229) return;
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'h') {
+                e.preventDefault();
+                e.stopPropagation();
+                setShowReplace(true);
+                focusReplacement();
+                return;
+            }
+            if (e.key === 'Escape') {
+                if (replaceAllConfirmOpenRef.current) return;
+                e.preventDefault();
+                e.stopPropagation();
+                onClose();
+            }
         };
         document.addEventListener('keydown', handler, true);
         return () => document.removeEventListener('keydown', handler, true);
-    }, [open, onClose]);
+    }, [focusReplacement, onClose, open]);
 
     const goNext = useCallback(() => {
         if (matchIds.length === 0) return;
@@ -159,6 +193,7 @@ const MindMapSearch: React.FC<MindMapSearchProps> = ({ open, onClose }) => {
     }, [matchIds.length]);
 
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+        if (e.nativeEvent.isComposing || e.keyCode === 229) return;
         if (e.key === 'Enter') { e.preventDefault(); if (e.shiftKey) goPrev(); else goNext(); }
     }, [goNext, goPrev]);
 
@@ -171,26 +206,30 @@ const MindMapSearch: React.FC<MindMapSearchProps> = ({ open, onClose }) => {
             if (!obj) return;
             const tpc = mind.findEle(id);
             if (!tpc) return;
-            const newTopic = obj.topic.replace(new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), replaceText);
+            const newTopic = obj.topic.replace(new RegExp(escapeRegExp(query), 'gi'), replaceText);
             mind.reshapeNode(tpc as ReshapeNodeTarget, { ...obj, ...cleanMindMapNodePatch({ topic: newTopic }) });
             setReplaceCount(1);
+            setReplaceStatus('已替换当前匹配项');
             // Move to next after replacing
             setTimeout(() => goNext(), 60);
         } catch (error) {
             logMindmapSearchFailure('replaceOne', error);
+            setReplaceCount(null);
+            setReplaceStatus('替换失败，请重试');
         }
     }, [mind, matchIds, matchIdx, query, replaceText, goNext]);
 
     const doReplaceAll = useCallback(() => {
         if (!mind || matchIds.length === 0 || !query.trim()) return;
         let count = 0;
-        const regex = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+        let failureCount = 0;
+        const regex = new RegExp(escapeRegExp(query), 'gi');
         for (const id of matchIds) {
             try {
                 const obj = findNodeById(mind.getData().nodeData, id);
-                if (!obj) continue;
+                if (!obj) { failureCount++; continue; }
                 const tpc = mind.findEle(id);
-                if (!tpc) continue;
+                if (!tpc) { failureCount++; continue; }
                 const newTopic = obj.topic.replace(regex, replaceText);
                 if (newTopic !== obj.topic) {
                     mind.reshapeNode(tpc as ReshapeNodeTarget, { ...obj, ...cleanMindMapNodePatch({ topic: newTopic }) });
@@ -198,31 +237,51 @@ const MindMapSearch: React.FC<MindMapSearchProps> = ({ open, onClose }) => {
                 }
             } catch (error) {
                 logMindmapSearchFailure('replaceAll', error);
+                failureCount++;
             }
         }
         setReplaceCount(count);
+        setReplaceStatus(failureCount > 0
+            ? `批量替换完成：成功 ${count} 处，失败 ${failureCount} 处`
+            : `批量替换完成：成功 ${count} 处`);
         setMatchIdx(0);
-    }, [mind, matchIds, query, replaceText]);
+        focusReplacement();
+    }, [focusReplacement, mind, matchIds, query, replaceText]);
 
     if (!open) return null;
 
     const total = matchIds.length;
     const current = total > 0 ? Math.min(matchIdx, total - 1) + 1 : 0;
+    const resultStatus = !query.trim()
+        ? '输入关键词开始搜索'
+        : total > 0
+            ? `第 ${current} 项，共 ${total} 项`
+            : '未找到匹配节点';
 
-    // ── Shared button style ───────────────────────────────────────────────────
-    const iconBtn = (disabled: boolean): React.CSSProperties => ({
-        background: 'transparent', border: 'none',
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        color: disabled ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.7)',
-        borderRadius: 6, lineHeight: 1, transition: 'color 0.15s',
-    });
+    const toggleReplace = () => {
+        const next = !showReplace;
+        setShowReplace(next);
+        if (next) focusReplacement();
+    };
 
-    const replaceBtn = (primary = false): React.CSSProperties => ({
-        padding: '2px 8px', borderRadius: 5, cursor: total === 0 ? 'not-allowed' : 'pointer',
-        fontSize: 11, fontWeight: 600, border: 'none', transition: 'background 0.12s',
-        background: total === 0 ? 'rgba(255,255,255,0.06)' : primary ? 'rgba(99,102,241,0.25)' : 'rgba(255,255,255,0.08)',
-        color: total === 0 ? 'rgba(255,255,255,0.25)' : primary ? '#a5b4fc' : 'rgba(255,255,255,0.6)',
-    });
+    const requestReplaceAll = () => {
+        replaceAllConfirmOpenRef.current = true;
+        appModal.confirm({
+            title: `替换 ${total} 个匹配节点？`,
+            content: `查找“${query}” → 替换为“${replaceText || '空文本'}”`,
+            okText: '确认替换',
+            cancelText: '取消',
+            centered: true,
+            keyboard: true,
+            maskClosable: false,
+            getContainer: getViewportOverlayContainer,
+            onOk: doReplaceAll,
+            afterClose: () => {
+                replaceAllConfirmOpenRef.current = false;
+                focusReplacement();
+            },
+        });
+    };
 
     return (
         <div
@@ -230,92 +289,90 @@ const MindMapSearch: React.FC<MindMapSearchProps> = ({ open, onClose }) => {
             className="mind-map-search-panel"
             id="me-search-panel"
             role="search"
-            style={{
-            position: 'absolute',
-            display: 'flex', flexDirection: 'column', gap: 0,
-            background: 'rgba(12,12,20,0.92)',
-            backdropFilter: 'blur(20px)',
-            border: '1px solid rgba(255,255,255,0.12)',
-            borderRadius: 12,
-            boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-            overflow: 'hidden',
-        }}>
+        >
+            <span className="mind-map-search-visually-hidden" role="status" aria-live="polite" aria-atomic="true">
+                {replaceStatus || resultStatus}
+            </span>
             {/* ── Search row ─────────────────────────────────────────────── */}
             <div className="mind-map-search-row">
-                <SearchOutlined style={{ color: 'rgba(255,255,255,0.45)', fontSize: 14, flexShrink: 0 }} />
+                <SearchOutlined className="mind-map-search-leading-icon" />
                 <Input
                     ref={inputRef}
                     aria-label="搜索节点"
+                    maxLength={MINDMAP_MAX_TOPIC_LENGTH}
                     value={query}
                     onChange={e => setQuery(e.target.value)}
                     onKeyDown={handleKeyDown}
                     placeholder="搜索节点..."
                     variant="borderless"
-                    style={{ flex: 1, color: '#fff', background: 'transparent', fontSize: 13, padding: '0 4px' }}
-                    styles={{ input: { color: '#fff' } }}
+                    className="mind-map-search-input"
                 />
                 {query.trim() && (
-                    <span style={{
-                        fontSize: 11, whiteSpace: 'nowrap', minWidth: 40, textAlign: 'center',
-                        color: total > 0 ? 'rgba(255,255,255,0.6)' : '#ef4444',
-                    }}>
+                    <span className={`mind-map-search-result-count${total === 0 ? ' is-empty' : ''}`} aria-hidden="true">
                         {total > 0 ? `${current}/${total}` : '无匹配'}
                     </span>
                 )}
-                <button aria-label="上一个搜索结果" className="mind-map-search-icon-button" disabled={total === 0} onClick={goPrev} style={iconBtn(total === 0)} title="上一个 (Shift+Enter)" type="button">
-                    <UpOutlined style={{ fontSize: 11 }} />
+                <button aria-label="上一个搜索结果" className="mind-map-search-icon-button" disabled={total === 0} onClick={goPrev} title="上一个 (Shift+Enter)" type="button">
+                    <UpOutlined />
                 </button>
-                <button aria-label="下一个搜索结果" className="mind-map-search-icon-button" disabled={total === 0} onClick={goNext} style={iconBtn(total === 0)} title="下一个 (Enter)" type="button">
-                    <DownOutlined style={{ fontSize: 11 }} />
+                <button aria-label="下一个搜索结果" className="mind-map-search-icon-button" disabled={total === 0} onClick={goNext} title="下一个 (Enter)" type="button">
+                    <DownOutlined />
                 </button>
                 {/* Toggle replace row */}
                 <button
                     aria-controls="me-search-replace-row"
                     aria-expanded={showReplace}
                     aria-label={showReplace ? '收起替换控件' : '展开替换控件'}
-                    className="mind-map-search-icon-button"
-                    onClick={() => setShowReplace(v => !v)}
+                    className={`mind-map-search-icon-button mind-map-search-replace-toggle${showReplace ? ' is-active' : ''}`}
+                    onClick={toggleReplace}
                     title={showReplace ? '关闭替换' : '展开替换 (Ctrl+H)'}
-                    style={{
-                        ...iconBtn(false),
-                        fontSize: 12, fontWeight: 700,
-                        color: showReplace ? '#6366f1' : 'rgba(255,255,255,0.4)',
-                    }}
                     type="button"
                 >
-                    <SwapOutlined style={{ fontSize: 13 }} />
+                    <SwapOutlined />
                 </button>
-                <button aria-label="关闭搜索" className="mind-map-search-icon-button" onClick={onClose} title="关闭 (Esc)" style={iconBtn(false)} type="button">
-                    <CloseOutlined style={{ fontSize: 11 }} />
+                <button aria-label="关闭搜索" className="mind-map-search-icon-button" onClick={onClose} title="关闭 (Esc)" type="button">
+                    <CloseOutlined />
                 </button>
             </div>
 
             {/* ── Replace row ────────────────────────────────────────────── */}
             {showReplace && (
-                <div id="me-search-replace-row" className="mind-map-search-replace-row" style={{
-                    display: 'flex', alignItems: 'center', gap: 6,
-                    padding: '5px 10px 8px',
-                    borderTop: '1px solid rgba(255,255,255,0.06)',
-                }}>
-                    <SwapOutlined aria-hidden="true" style={{ fontSize: 12, width: 14, color: 'rgba(255,255,255,0.3)', flexShrink: 0 }} />
+                <div id="me-search-replace-row" className="mind-map-search-replace-row">
+                    <SwapOutlined aria-hidden="true" className="mind-map-search-replace-icon" />
                     <Input
+                        ref={replaceInputRef}
                         aria-label="替换文本"
+                        maxLength={MINDMAP_MAX_TOPIC_LENGTH}
                         value={replaceText}
-                        onChange={e => { setReplaceText(e.target.value); setReplaceCount(null); }}
+                        onChange={e => {
+                            setReplaceText(e.target.value);
+                            setReplaceCount(null);
+                            setReplaceStatus('');
+                        }}
                         placeholder="替换为..."
                         variant="borderless"
-                        style={{ flex: 1, color: '#fff', background: 'transparent', fontSize: 13, padding: '0 4px' }}
-                        styles={{ input: { color: '#fff' } }}
-                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); doReplaceOne(); } }}
+                        className="mind-map-search-input mind-map-search-replace-input"
+                        onKeyDown={e => {
+                            if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+                            if (e.key === 'Enter') { e.preventDefault(); doReplaceOne(); }
+                        }}
                     />
-                    <button aria-label="替换当前匹配项" onClick={doReplaceOne} disabled={total === 0} style={replaceBtn(false)} title="替换当前 (Enter)" type="button">
+                    <button aria-label="替换当前匹配项" className="mind-map-search-replace-button" onClick={doReplaceOne} disabled={total === 0} title="替换当前 (Enter)" type="button">
                         替换
                     </button>
-                    <button aria-label="替换所有匹配项" onClick={doReplaceAll} disabled={total === 0} style={replaceBtn(true)} title="全部替换" type="button">
+                    <button
+                        aria-haspopup="dialog"
+                        aria-label={`替换所有匹配项，共 ${total} 个节点`}
+                        className="mind-map-search-replace-button is-primary"
+                        disabled={total === 0}
+                        onClick={requestReplaceAll}
+                        title="全部替换"
+                        type="button"
+                    >
                         全替
                     </button>
                     {replaceCount !== null && (
-                        <span style={{ fontSize: 10, color: '#6ee7b7', whiteSpace: 'nowrap' }}>
+                        <span className="mind-map-search-replace-count" aria-hidden="true">
                             <CheckOutlined aria-hidden="true" /> {replaceCount} 处
                         </span>
                     )}
