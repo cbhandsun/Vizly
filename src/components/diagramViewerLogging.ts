@@ -61,9 +61,9 @@ export const logDiagramViewerCommandPaletteStateFailure = (error: unknown): void
   safeLog.warn('[DiagramViewer] Failed to load command palette recent state:', redactSensitiveLogValue(error));
 };
 
-export const logDiagramViewerOpenNewTabFailure = (diagramId: string, error: unknown): void => {
+export const logDiagramViewerOpenNewTabFailure = (_diagramId: string, error: unknown): void => {
   safeLog.warn(
-    `[DiagramViewer] Failed to construct full URL for new tab of diagram "${diagramId}", using fallback URL:`,
+    '[DiagramViewer] Failed to open diagram in a new tab:',
     redactSensitiveLogValue(error)
   );
 };

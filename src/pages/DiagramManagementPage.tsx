@@ -5,6 +5,7 @@ import { coerceDiagramId, getQueryOrHashParamFromLocation, type LocationLike } f
 import { useNavigate, useSearchParams } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import type { ManageStorageProvider } from '@/components/ui/ManageTopToolbar';
+import { openDiagramViewerInNewTab } from '@/components/diagramViewerNavigation';
 import { useAuth } from '@/context/useAuth';
 import {
     coerceFilterView,
@@ -140,8 +141,17 @@ const WorkspaceDashboardPage: React.FC = () => {
             appMessage.error('Unable to open diagram: missing diagram id.');
             return;
         }
-        window.open(`/?diagram=${encodeURIComponent(diagramId)}`, '_blank', 'noopener,noreferrer');
-    }, []);
+        const opened = openDiagramViewerInNewTab({
+            id: diagramId,
+            currentHref: window.location.href,
+            openWindow: (url, target, features) => window.open(url, target, features),
+            logFailure: (_id, error) => {
+                safeLog.error('Failed to open workspace diagram in a new tab', redactSensitiveLogValue(error));
+            },
+        });
+        if (opened) appMessage.success(t('workspace.openNewTabSuccess'));
+        else appMessage.warning(t('workspace.openNewTabBlocked'));
+    }, [t]);
 
     const navigateToDiagram = useCallback((id: unknown) => {
         const diagramId = coerceDiagramId(id);

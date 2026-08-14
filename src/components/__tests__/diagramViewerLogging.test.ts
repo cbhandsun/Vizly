@@ -58,7 +58,8 @@ describe('diagramViewerLogging', () => {
     expect(warnMessages).toContain('[DiagramViewer] Failed to detect document type for diagram "diagram-3":');
     expect(warnMessages).toContain('[DiagramViewer] Switch confirmation failed, continuing without prompt:');
     expect(warnMessages).toContain('[DiagramViewer] Failed to load command palette recent state:');
-    expect(warnMessages).toContain('[DiagramViewer] Failed to construct full URL for new tab of diagram "diagram-4", using fallback URL:');
+    expect(warnMessages).toContain('[DiagramViewer] Failed to open diagram in a new tab:');
+    expect(warnPayload).not.toContain('diagram-4');
     expect(errorPayload).toContain('[redacted]');
     expect(warnPayload).toContain('[redacted]');
     expect(errorPayload).not.toContain('mermaid-secret');

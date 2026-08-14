@@ -30,33 +30,35 @@ describe('diagramViewerNavigation', () => {
   });
 
   it('opens a diagram in a new tab and falls back on invalid URLs', () => {
-    const openWindow = vi.fn();
+    const openedWindow = { opener: {} as unknown };
+    const openWindow = vi.fn(() => openedWindow);
     const logFailure = vi.fn();
 
-    openDiagramViewerInNewTab({
+    expect(openDiagramViewerInNewTab({
       id: 'alpha',
       currentHref: 'https://example.com/app?foo=bar',
       openWindow,
       logFailure,
-    });
+    })).toBe(true);
     expect(openWindow).toHaveBeenCalledWith(
-      'https://example.com/app?foo=bar&diagram=alpha',
+      'https://example.com/app?foo=bar#/?diagram=alpha',
       '_blank',
-      'noopener,noreferrer',
+      '',
     );
+    expect(openedWindow.opener).toBeNull();
 
-    openDiagramViewerInNewTab({
+    expect(openDiagramViewerInNewTab({
       id: 'beta',
       currentHref: '::::',
       openWindow,
       logFailure,
-    });
+    })).toBe(true);
     expect(logFailure).toHaveBeenCalledTimes(1);
-    expect(openWindow).toHaveBeenLastCalledWith('/?diagram=beta', '_blank', 'noopener,noreferrer');
+    expect(openWindow).toHaveBeenLastCalledWith('/#/?diagram=beta', '_blank', '');
   });
 
   it('replaces the active hash-routed diagram when opening a new tab', () => {
-    const openWindow = vi.fn();
+    const openWindow = vi.fn(() => ({ opener: {} }));
 
     openDiagramViewerInNewTab({
       id: 'target diagram',
@@ -66,10 +68,63 @@ describe('diagramViewerNavigation', () => {
     });
 
     expect(openWindow).toHaveBeenCalledWith(
-      'https://example.com/app?theme=dark#/?diagram=target%20diagram',
+      'https://example.com/app?theme=dark#/?diagram=target-diagram',
       '_blank',
-      'noopener,noreferrer',
+      '',
     );
+  });
+
+  it('reports blocked, thrown, and invalid new-tab attempts without retrying', () => {
+    const blockedWindow = vi.fn(() => null);
+    const blockedLog = vi.fn();
+    expect(openDiagramViewerInNewTab({
+      id: 'blocked-target',
+      currentHref: 'https://example.com/app#/manage',
+      openWindow: blockedWindow,
+      logFailure: blockedLog,
+    })).toBe(false);
+    expect(blockedWindow).toHaveBeenCalledTimes(1);
+    expect(blockedLog).not.toHaveBeenCalled();
+
+    const thrownError = new Error('popup policy unavailable');
+    const throwingWindow = vi.fn(() => { throw thrownError; });
+    const throwingLog = vi.fn();
+    expect(openDiagramViewerInNewTab({
+      id: 'throwing-target',
+      currentHref: 'https://example.com/app#/manage',
+      openWindow: throwingWindow,
+      logFailure: throwingLog,
+    })).toBe(false);
+    expect(throwingWindow).toHaveBeenCalledTimes(1);
+    expect(throwingLog).toHaveBeenCalledWith('throwing-target', thrownError);
+
+    const invalidWindow = vi.fn(() => ({ opener: {} }));
+    const invalidLog = vi.fn();
+    expect(openDiagramViewerInNewTab({
+      id: '   ',
+      currentHref: 'https://example.com/app#/manage',
+      openWindow: invalidWindow,
+      logFailure: invalidLog,
+    })).toBe(false);
+    expect(invalidWindow).not.toHaveBeenCalled();
+    expect(invalidLog).toHaveBeenCalledTimes(1);
+
+    const close = vi.fn();
+    const detachError = new Error('opener cannot be detached');
+    const unsafeWindow = {} as { opener: unknown; close: () => void };
+    Object.defineProperties(unsafeWindow, {
+      opener: { set: () => { throw detachError; } },
+      close: { value: close },
+    });
+    const detachLog = vi.fn();
+    expect(openDiagramViewerInNewTab({
+      id: 'unsafe-target',
+      currentHref: 'https://example.com/app#/manage',
+      openWindow: vi.fn(() => unsafeWindow),
+      logFailure: detachLog,
+    })).toBe(false);
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(detachLog).toHaveBeenCalledWith('unsafe-target', detachError);
   });
 
   it('only finalizes seed navigation after confirmation and normalization', async () => {
