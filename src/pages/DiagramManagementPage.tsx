@@ -45,6 +45,11 @@ import {
     finishWorkspaceDiagramOpen,
     navigateToCreatedWorkspaceDiagram,
 } from './workspaceDiagramOpenState';
+import {
+    readWorkspaceDisplayPreferences,
+    writeWorkspaceDisplayPreferences,
+    type WorkspaceDisplayPreferences,
+} from './workspaceDisplayPreferences';
 
 const AuthModal = React.lazy(() => import('@/components/auth/AuthModal').then(module => ({
     default: module.AuthModal,
@@ -66,8 +71,10 @@ const WorkspaceDashboardPage: React.FC = () => {
     const [activeView, setActiveView] = useState<FilterViewType>(initialView);
     const [loading, setLoading] = useState(true);
     const { searchTerm, searchQuery, searchInputRef, updateSearchTerm, clearSearch } = useWorkspaceSearch();
-    const [viewMode, setViewMode] = useState<ViewMode>('grid');
-    const [sortKey, setSortKey] = useState<SortKey>('updated');
+    const [displayPreferences, setDisplayPreferences] = useState<WorkspaceDisplayPreferences>(
+        readWorkspaceDisplayPreferences,
+    );
+    const { viewMode, sortKey } = displayPreferences;
     const [openingDiagramKeys, setOpeningDiagramKeys] = useState<ReadonlySet<string>>(() => new Set());
     const [isCreatingDiagram, setIsCreatingDiagram] = useState(false);
     const workspaceResultsRef = useRef<HTMLDivElement>(null);
@@ -91,6 +98,21 @@ const WorkspaceDashboardPage: React.FC = () => {
     const openingDiagramKeysRef = useRef(new Set<string>());
     const diagramCreateLockRef = useRef({ active: false });
     const deleteDialogLockRef = useRef({ active: false });
+
+    const commitDisplayPreferences = useCallback((next: WorkspaceDisplayPreferences) => {
+        setDisplayPreferences(next);
+        writeWorkspaceDisplayPreferences(next);
+    }, []);
+
+    const handleViewModeChange = useCallback((nextViewMode: ViewMode) => {
+        if (nextViewMode === displayPreferences.viewMode) return;
+        commitDisplayPreferences({ ...displayPreferences, viewMode: nextViewMode });
+    }, [commitDisplayPreferences, displayPreferences]);
+
+    const handleSortKeyChange = useCallback((nextSortKey: SortKey) => {
+        if (nextSortKey === displayPreferences.sortKey) return;
+        commitDisplayPreferences({ ...displayPreferences, sortKey: nextSortKey });
+    }, [commitDisplayPreferences, displayPreferences]);
 
     useEffect(() => scheduleWorkspaceRouteFocus(() => workspaceMainRef.current), []);
 
@@ -350,9 +372,9 @@ const WorkspaceDashboardPage: React.FC = () => {
                     unifiedItems={unifiedItems}
                     filteredItems={filteredItems}
                     sortKey={sortKey}
-                    onSortKeyChange={setSortKey}
+                    onSortKeyChange={handleSortKeyChange}
                     viewMode={viewMode}
-                    onViewModeChange={setViewMode}
+                    onViewModeChange={handleViewModeChange}
                     loading={loading}
                     isCreatingDiagram={isCreatingDiagram}
                     openingDiagramKeys={openingDiagramKeys}
