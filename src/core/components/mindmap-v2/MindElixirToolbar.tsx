@@ -40,9 +40,7 @@ import {
     RobotOutlined,
     DeploymentUnitOutlined,
     AppstoreOutlined,
-    HistoryOutlined,
     OrderedListOutlined,
-    UnorderedListOutlined,
     BgColorsOutlined,
     BorderlessTableOutlined,
     EllipsisOutlined,
@@ -54,8 +52,6 @@ import { countNodes, getTreeDepth } from './migrate';
 import { VIZLY_THEMES } from './theme';
 import { usePresentationMode } from './MindMapPresentationMode';
 import { emitOpenSearch } from './mindmapSearchStore';
-import { emitToggleOutline } from './mindmapOutlineStore';
-import { emitToggleHistory } from './mindmapHistoryStore';
 import MindMapShortcutsModal from './MindMapShortcutsModal';
 import MindMapTemplates from './MindMapTemplates';
 import { applyMindMapAutoArrangeTransaction } from './mindmapAutoArrange';
@@ -81,6 +77,7 @@ import { useMindElixirImportActions } from './useMindElixirImportActions';
 import { useMindElixirExportActions } from './useMindElixirExportActions';
 import { useMindElixirCanvasPreferences } from './useMindElixirCanvasPreferences';
 import MindMapToolbarIconButton from './MindMapToolbarIconButton';
+import MindMapAuxiliaryPanelButtons from './MindMapAuxiliaryPanelButtons';
 import { MindMapThemeSelector } from './MindMapThemeSelector';
 import { MindMapDirectionSelector } from './MindMapDirectionSelector';
 import { useMindMapFocusMode } from './useMindMapFocusMode';
@@ -672,11 +669,7 @@ const MindElixirToolbar: React.FC = () => {
                 />
             </Dropdown>
 
-            {/* Outline view toggle */}
-            <MindMapToolbarIconButton label={t('plugins.mindmap.toolbar.toggleOutline')} icon={<UnorderedListOutlined />} onClick={emitToggleOutline} />
-
-            {/* History version toggle */}
-            <MindMapToolbarIconButton label={t('plugins.mindmap.toolbar.toggleHistory')} icon={<HistoryOutlined />} onClick={emitToggleHistory} />
+            <MindMapAuxiliaryPanelButtons />
 
             {/* Kanban toggle */}
             <MindMapToolbarIconButton

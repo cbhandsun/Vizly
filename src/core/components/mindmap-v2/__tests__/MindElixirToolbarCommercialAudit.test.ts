@@ -10,6 +10,7 @@ const wrapperCss = readFileSync(resolve(process.cwd(), 'src/core/components/mind
 const topToolbarSource = readFileSync(resolve(process.cwd(), 'src/components/ui/ModernTopToolbar.tsx'), 'utf8');
 const topActionButtonsSource = readFileSync(resolve(process.cwd(), 'src/core/components/diagrams/TopActionButtons.tsx'), 'utf8');
 const iconButtonSource = readFileSync(resolve(process.cwd(), 'src/core/components/mindmap-v2/MindMapToolbarIconButton.tsx'), 'utf8');
+const auxiliaryPanelButtonsSource = readFileSync(resolve(process.cwd(), 'src/core/components/mindmap-v2/MindMapAuxiliaryPanelButtons.tsx'), 'utf8');
 
 describe('MindElixirToolbar commercial interaction contract', () => {
     it('uses one accessible toolbar button contract and semantic toolbar boundaries', () => {
@@ -51,6 +52,14 @@ describe('MindElixirToolbar commercial interaction contract', () => {
         expect(source).toContain("aria-keyshortcuts={arrowMode ? 'Escape' : undefined}");
         expect(source).toContain("plugins.mindmap.toolbar.exitArrowMode");
         expect(source).toContain("`${t('plugins.mindmap.toolbar.exitArrowMode')} (Esc)`");
+    });
+
+    it('keeps outline and history toggle semantics synchronized with their panels', () => {
+        expect(source).toContain('<MindMapAuxiliaryPanelButtons />');
+        expect(auxiliaryPanelButtonsSource).toContain('useSyncExternalStore(subscribeOutline, getOutlineOpen, getOutlineOpen)');
+        expect(auxiliaryPanelButtonsSource).toContain('useSyncExternalStore(subscribeToggleHistory, getHistoryOpen, getHistoryOpen)');
+        expect(auxiliaryPanelButtonsSource).toContain('pressed={isOutlineOpen}');
+        expect(auxiliaryPanelButtonsSource).toContain('pressed={isHistoryOpen}');
     });
 
     it('keeps every tool reachable by touch and keyboard without text-symbol icons', () => {
