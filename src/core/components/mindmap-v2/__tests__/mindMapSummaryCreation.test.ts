@@ -7,6 +7,7 @@ import {
     createMindMapSummaryForSelection,
     type MindMapSummaryHost,
 } from '../mindMapSummaryCreation';
+import { getMindMapSummaryAvailability } from '../mindMapSummaryAvailability';
 import { setActiveMindMapSelection } from '../mindMapSelectionStore';
 
 const createTopic = (nodeId: string): Topic => {
@@ -86,3 +87,51 @@ describe('createMindMapSummaryForSelection', () => {
     });
 });
 
+describe('getMindMapSummaryAvailability', () => {
+    it('enables summary creation only for a selected non-root node', () => {
+        const host = createHost({ rootId: 'root' });
+
+        expect(getMindMapSummaryAvailability(host, { id: 'child' })).toEqual({ enabled: true });
+        expect(getMindMapSummaryAvailability(host, { id: 'root' })).toEqual({
+            enabled: false,
+            reason: 'root-selected',
+        });
+    });
+
+    it('disables the action for missing or empty selections', () => {
+        const host = createHost();
+
+        expect(getMindMapSummaryAvailability(null, { id: 'child' })).toEqual({
+            enabled: false,
+            reason: 'no-instance',
+        });
+        expect(getMindMapSummaryAvailability(host, null)).toEqual({
+            enabled: false,
+            reason: 'no-selection',
+        });
+        expect(getMindMapSummaryAvailability(host, { id: '   ' })).toEqual({
+            enabled: false,
+            reason: 'no-selection',
+        });
+    });
+
+    it('fails closed when the root boundary is invalid or unavailable', () => {
+        const invalidRootHost = {
+            getData: () => ({ nodeData: { id: '', topic: 'Root' } } as MindElixirData),
+        };
+        const throwingHost = {
+            getData: (): MindElixirData => {
+                throw new Error('unavailable');
+            },
+        };
+
+        expect(getMindMapSummaryAvailability(invalidRootHost, { id: 'child' })).toEqual({
+            enabled: false,
+            reason: 'invalid-root',
+        });
+        expect(getMindMapSummaryAvailability(throwingHost, { id: 'child' })).toEqual({
+            enabled: false,
+            reason: 'invalid-root',
+        });
+    });
+});

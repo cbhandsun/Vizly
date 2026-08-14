@@ -11,6 +11,7 @@ const topToolbarSource = readFileSync(resolve(process.cwd(), 'src/components/ui/
 const topActionButtonsSource = readFileSync(resolve(process.cwd(), 'src/core/components/diagrams/TopActionButtons.tsx'), 'utf8');
 const iconButtonSource = readFileSync(resolve(process.cwd(), 'src/core/components/mindmap-v2/MindMapToolbarIconButton.tsx'), 'utf8');
 const auxiliaryPanelButtonsSource = readFileSync(resolve(process.cwd(), 'src/core/components/mindmap-v2/MindMapAuxiliaryPanelButtons.tsx'), 'utf8');
+const summaryButtonSource = readFileSync(resolve(process.cwd(), 'src/core/components/mindmap-v2/MindMapSummaryButton.tsx'), 'utf8');
 
 describe('MindElixirToolbar commercial interaction contract', () => {
     it('uses one accessible toolbar button contract and semantic toolbar boundaries', () => {
@@ -60,6 +61,14 @@ describe('MindElixirToolbar commercial interaction contract', () => {
         expect(auxiliaryPanelButtonsSource).toContain('useSyncExternalStore(subscribeToggleHistory, getHistoryOpen, getHistoryOpen)');
         expect(auxiliaryPanelButtonsSource).toContain('pressed={isOutlineOpen}');
         expect(auxiliaryPanelButtonsSource).toContain('pressed={isHistoryOpen}');
+    });
+
+    it('only offers summary creation for a selected non-root node', () => {
+        expect(source).toContain('<MindMapSummaryButton mind={mind} />');
+        expect(summaryButtonSource).toContain('useMindMapPropertySelection(mind)');
+        expect(summaryButtonSource).toContain('getMindMapSummaryAvailability(mind, selectedNode)');
+        expect(summaryButtonSource).toContain('disabled={!availability.enabled}');
+        expect(summaryButtonSource).toContain('createMindMapSummaryForSelection(mind, selectedNode?.id)');
     });
 
     it('keeps every tool reachable by touch and keyboard without text-symbol icons', () => {

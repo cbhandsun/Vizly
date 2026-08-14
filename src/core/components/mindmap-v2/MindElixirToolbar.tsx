@@ -29,7 +29,6 @@ import {
     PlaySquareOutlined,
     UploadOutlined,
     ShareAltOutlined,
-    BranchesOutlined,
     BarChartOutlined,
     SearchOutlined,
     ZoomInOutlined,
@@ -62,7 +61,6 @@ import {
     logMindmapToolbarFocusModeFailure,
     logMindmapToolbarHistoryFailure,
     logMindmapToolbarStatsUpdateFailure,
-    logMindmapToolbarSummaryFailure,
     logMindmapToolbarTreeExpansionFailure,
     logMindmapToolbarZoomFailure,
 } from './mindmapToolbarLogging';
@@ -78,12 +76,11 @@ import { useMindElixirExportActions } from './useMindElixirExportActions';
 import { useMindElixirCanvasPreferences } from './useMindElixirCanvasPreferences';
 import MindMapToolbarIconButton from './MindMapToolbarIconButton';
 import MindMapAuxiliaryPanelButtons from './MindMapAuxiliaryPanelButtons';
+import MindMapSummaryButton from './MindMapSummaryButton';
 import { MindMapThemeSelector } from './MindMapThemeSelector';
 import { MindMapDirectionSelector } from './MindMapDirectionSelector';
 import { useMindMapFocusMode } from './useMindMapFocusMode';
 import { getViewportPopupContainer } from '../ui/viewportOverlayPortal';
-import { appMessage } from '@/core/utils/antdStaticBridge';
-import { createMindMapSummaryForSelection } from './mindMapSummaryCreation';
 import {
     applyMindMapZoomCommand,
     MIND_MAP_MAX_SCALE,
@@ -352,19 +349,6 @@ const MindElixirToolbar: React.FC = () => {
         { key: 'pdf',      label: t('plugins.mindmap.toolbar.printPdf'),    icon: <PrinterOutlined />,  onClick: handleExportPdf },
     ];
 
-    // ── Summary creation ─────────────────────────────────────────────────────────
-    const handleCreateSummary = useCallback(() => {
-        if (!mind) return;
-        const result = createMindMapSummaryForSelection(mind);
-        if (result.ok) {
-            appMessage.success(result.message);
-            return;
-        }
-        if (result.error) logMindmapToolbarSummaryFailure(result.error);
-        if (result.code === 'create-failed') appMessage.error(result.message);
-        else appMessage.warning(result.message);
-    }, [mind]);
-
     const [arrowState, setArrowState] = useState<{ mind: MindElixirInstance | null; enabled: boolean }>({
         mind: null,
         enabled: false,
@@ -499,7 +483,7 @@ const MindElixirToolbar: React.FC = () => {
             />
 
             {/* Summary node creation */}
-            <MindMapToolbarIconButton label={t('plugins.mindmap.toolbar.createSummary')} icon={<BranchesOutlined />} onClick={handleCreateSummary} disabled={!mind} />
+            <MindMapSummaryButton mind={mind} />
 
             {/* Arrow creation mode */}
             <MindMapToolbarIconButton
