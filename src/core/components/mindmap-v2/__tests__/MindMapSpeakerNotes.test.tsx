@@ -63,6 +63,9 @@ describe('MindMapSpeakerNotes commercial presentation fallback', () => {
         expect(alert.textContent).not.toContain('Provider');
         expect(alert.textContent).toContain('Presentation navigation remains available');
         expect(screen.getByTestId('mindmap-speaker-notes-compact')).toBeTruthy();
+        expect(screen.getByTestId('mindmap-speaker-notes-compact').style.width)
+            .toBe('calc(100vw - 24px)');
+        expect(screen.getByTestId('mindmap-speaker-notes-compact').style.maxWidth).toBe('340px');
         expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
 
         fireEvent.click(screen.getByRole('button', {

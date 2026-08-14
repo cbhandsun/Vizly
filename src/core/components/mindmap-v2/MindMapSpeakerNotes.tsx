@@ -351,10 +351,11 @@ export const MindMapSpeakerNotes: React.FC = () => {
 // ─── 磨砂玻璃风格 Inline Styles ──────────────────────────────────────────────
 const containerStyle: React.CSSProperties = {
     position: 'absolute',
-    top: '32px',
-    right: '32px',
-    bottom: '96px', // 留出底部 HUD 的空间
-    width: '340px',
+    top: 'max(12px, env(safe-area-inset-top))',
+    right: 'max(12px, env(safe-area-inset-right))',
+    bottom: 'max(96px, calc(76px + env(safe-area-inset-bottom)))', // 留出底部 HUD 的空间
+    width: 'calc(100vw - 24px)',
+    maxWidth: '340px',
     zIndex: 99999, // 必须极高，在全屏模式下覆盖 Canvas 元素
     background: 'rgba(15, 18, 36, 0.72)',
     backdropFilter: 'blur(20px) saturate(180%)',
@@ -371,9 +372,10 @@ const containerStyle: React.CSSProperties = {
 
 const compactContainerStyle: React.CSSProperties = {
     position: 'absolute',
-    top: '32px',
-    right: '32px',
-    width: '340px',
+    top: 'max(12px, env(safe-area-inset-top))',
+    right: 'max(12px, env(safe-area-inset-right))',
+    width: 'calc(100vw - 24px)',
+    maxWidth: '340px',
     zIndex: 99999,
     padding: '14px 16px',
     background: 'rgba(15, 18, 36, 0.9)',
@@ -569,6 +571,12 @@ if (typeof document !== 'undefined') {
             @keyframes fadeIn {
                 from { opacity: 0; }
                 to { opacity: 1; }
+            }
+            @media (prefers-reduced-motion: reduce) {
+                #vizly-mind-elixir-root [data-testid="mindmap-speaker-notes-compact"],
+                #vizly-mind-elixir-root aside[aria-label] {
+                    animation: none !important;
+                }
             }
             /* 自定义滚动条风格 */
             #vizly-mind-elixir-root div::-webkit-scrollbar {

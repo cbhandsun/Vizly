@@ -120,6 +120,7 @@ const MindElixirToolbar: React.FC = () => {
 
     // Presentation mode — declare state first so callback closure is clean
     const [isPresenting, setIsPresenting] = useState(false);
+    const presentationTriggerRef = useRef<HTMLButtonElement>(null);
     const presentation = usePresentationMode(
         mind,
         () => {
@@ -128,7 +129,16 @@ const MindElixirToolbar: React.FC = () => {
         },
         (node) => {
             setPresentationState(true, node);
-        }
+        },
+        {
+            returnFocusTarget: () => presentationTriggerRef.current,
+            labels: {
+                toolbar: t('plugins.mindmap.shortcutHelp.groups.presentation'),
+                previous: t('plugins.mindmap.toolbar.presentationPrevious'),
+                next: t('plugins.mindmap.toolbar.presentationNext'),
+                exit: t('plugins.mindmap.toolbar.presentationExit'),
+            },
+        },
     );
 
     const handlePresentation = useCallback(() => {
@@ -464,6 +474,8 @@ const MindElixirToolbar: React.FC = () => {
 
             {/* Presentation Mode */}
             <MindMapToolbarIconButton
+                data-testid="mindmap-presentation-trigger"
+                ref={presentationTriggerRef}
                 label={t(isPresenting ? 'plugins.mindmap.toolbar.exitPresentation' : 'plugins.mindmap.toolbar.enterPresentation')}
                 icon={<PlaySquareOutlined />}
                 onClick={handlePresentation}
