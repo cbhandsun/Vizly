@@ -1,14 +1,13 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import App from 'antd/es/app';
 import type { MenuProps } from 'antd/es/menu';
-import { coerceDiagramId, getQueryOrHashParamFromLocation, type LocationLike } from '@/core/utils/inputBoundary';
+import { coerceDiagramId, type LocationLike } from '@/core/utils/inputBoundary';
 import { useNavigate, useSearchParams } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import type { ManageStorageProvider } from '@/components/ui/ManageTopToolbar';
 import { openDiagramViewerInNewTab } from '@/components/diagramViewerNavigation';
 import { useAuth } from '@/context/useAuth';
 import {
-    coerceFilterView,
     filterAndSortItems,
     loadWorkspaceItems,
     readStoredCloudProvider,
@@ -50,6 +49,10 @@ import {
     writeWorkspaceDisplayPreferences,
     type WorkspaceDisplayPreferences,
 } from './workspaceDisplayPreferences';
+import {
+    createWorkspaceFilterSearchUpdate,
+    resolveWorkspaceFilterView,
+} from './workspaceFilterRoute';
 
 const AuthModal = React.lazy(() => import('@/components/auth/AuthModal').then(module => ({
     default: module.AuthModal,
@@ -60,15 +63,14 @@ const workspaceDiagramActions = createWorkspaceDiagramActions();
 const WorkspaceDashboardPage: React.FC = () => {
     const navigate = useNavigate();
     const { t } = useTranslation();
-    const [searchParams] = useSearchParams();
+    const [searchParams, setSearchParams] = useSearchParams();
     const browserLocation = typeof window === 'undefined' ? null : window.location as LocationLike;
     const { user } = useAuth();
     const { modal } = App.useApp();
-    const initialView = coerceFilterView(searchParams.get('view') || getQueryOrHashParamFromLocation(browserLocation, 'view'));
+    const activeView = resolveWorkspaceFilterView(searchParams, browserLocation);
     
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
     const [isAuthModalMounted, setIsAuthModalMounted] = useState(false);
-    const [activeView, setActiveView] = useState<FilterViewType>(initialView);
     const [loading, setLoading] = useState(true);
     const { searchTerm, searchQuery, searchInputRef, updateSearchTerm, clearSearch } = useWorkspaceSearch();
     const [displayPreferences, setDisplayPreferences] = useState<WorkspaceDisplayPreferences>(
@@ -113,6 +115,12 @@ const WorkspaceDashboardPage: React.FC = () => {
         if (nextSortKey === displayPreferences.sortKey) return;
         commitDisplayPreferences({ ...displayPreferences, sortKey: nextSortKey });
     }, [commitDisplayPreferences, displayPreferences]);
+
+    const handleActiveViewChange = useCallback((nextView: FilterViewType) => {
+        const update = createWorkspaceFilterSearchUpdate(searchParams, nextView);
+        if (!update.changed) return;
+        setSearchParams(update.searchParams, { replace: false });
+    }, [searchParams, setSearchParams]);
 
     useEffect(() => scheduleWorkspaceRouteFocus(() => workspaceMainRef.current), []);
 
@@ -368,7 +376,7 @@ const WorkspaceDashboardPage: React.FC = () => {
                 )}
                 <WorkspaceDiagramCollection
                     activeView={activeView}
-                    onActiveViewChange={setActiveView}
+                    onActiveViewChange={handleActiveViewChange}
                     unifiedItems={unifiedItems}
                     filteredItems={filteredItems}
                     sortKey={sortKey}
