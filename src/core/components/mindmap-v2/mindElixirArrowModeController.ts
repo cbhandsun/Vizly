@@ -7,6 +7,11 @@ import { logMindmapToolbarArrowFailure } from './mindmapToolbarLogging';
 type RelationshipResult = Awaited<ReturnType<typeof analyzeNodesRelationship>>;
 type SelectNodesListener = (nodes: NodeObj[], element: Topic) => void;
 
+export interface MindElixirArrowModeKeyboardTarget {
+    addEventListener: (type: 'keydown', listener: (event: KeyboardEvent) => void) => void;
+    removeEventListener: (type: 'keydown', listener: (event: KeyboardEvent) => void) => void;
+}
+
 export interface MindElixirArrowModeDependencies {
     analyzeRelationship: (left: string, right: string) => Promise<RelationshipResult>;
     emitOperation: typeof emitVizlyMindMapOperation;
@@ -22,10 +27,12 @@ const DEFAULT_DEPENDENCIES: MindElixirArrowModeDependencies = {
 export const createMindElixirArrowModeController = ({
     mind,
     onEnabledChange,
+    keyboardTarget = typeof document === 'undefined' ? null : document,
     dependencies: overrides = {},
 }: {
     mind: MindElixirInstance;
     onEnabledChange: (enabled: boolean) => void;
+    keyboardTarget?: MindElixirArrowModeKeyboardTarget | null;
     dependencies?: Partial<MindElixirArrowModeDependencies>;
 }) => {
     const dependencies = { ...DEFAULT_DEPENDENCIES, ...overrides };
@@ -33,7 +40,14 @@ export const createMindElixirArrowModeController = ({
     let listener: SelectNodesListener | null = null;
     let enabled = false;
 
+    const handleKeyDown = (event: KeyboardEvent) => {
+        if (event.key !== 'Escape' || !enabled) return;
+        event.preventDefault();
+        disable();
+    };
+
     const disable = () => {
+        keyboardTarget?.removeEventListener('keydown', handleKeyDown);
         if (listener) {
             mind.bus.removeListener('selectNodes', listener as never);
             listener = null;
@@ -102,6 +116,7 @@ export const createMindElixirArrowModeController = ({
             void completeArrow(start, element);
         };
         mind.bus.addListener('selectNodes', listener as never);
+        keyboardTarget?.addEventListener('keydown', handleKeyDown);
     };
 
     return {

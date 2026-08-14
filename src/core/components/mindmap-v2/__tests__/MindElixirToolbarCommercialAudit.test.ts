@@ -47,6 +47,12 @@ describe('MindElixirToolbar commercial interaction contract', () => {
         expect(source).toContain("logMindmapToolbarHistoryFailure('redo', error)");
     });
 
+    it('makes relationship-line mode visibly cancellable from the keyboard', () => {
+        expect(source).toContain("aria-keyshortcuts={arrowMode ? 'Escape' : undefined}");
+        expect(source).toContain("plugins.mindmap.toolbar.exitArrowMode");
+        expect(source).toContain("`${t('plugins.mindmap.toolbar.exitArrowMode')} (Esc)`");
+    });
+
     it('keeps every tool reachable by touch and keyboard without text-symbol icons', () => {
         expect(css).toMatch(/\.mind-elixir-toolbar-button[\s\S]*?min-width: var\(--commercial-touch-target, 44px\)[\s\S]*?height: var\(--commercial-touch-target, 44px\)/);
         expect(css).toMatch(/\.vizly-mindmap-toolbar \{[\s\S]*?width: 100%;[\s\S]*?overflow-x: auto;/);

@@ -506,11 +506,14 @@ const MindElixirToolbar: React.FC = () => {
 
             {/* Arrow creation mode */}
             <MindMapToolbarIconButton
-                label={t(arrowMode ? 'plugins.mindmap.toolbar.exitArrowMode' : 'plugins.mindmap.toolbar.enterArrowMode')}
+                label={arrowMode
+                    ? `${t('plugins.mindmap.toolbar.exitArrowMode')} (Esc)`
+                    : t('plugins.mindmap.toolbar.enterArrowMode')}
                 icon={<ShareAltOutlined />}
                 onClick={handleArrowMode}
                 disabled={!mind}
                 pressed={arrowMode}
+                aria-keyshortcuts={arrowMode ? 'Escape' : undefined}
                 style={{ color: arrowMode ? '#6366f1' : undefined }}
             />
 

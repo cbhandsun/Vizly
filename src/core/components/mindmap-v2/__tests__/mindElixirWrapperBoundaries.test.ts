@@ -13,7 +13,10 @@ import {
     isSupportedMindMapImportFile,
     parseMindMapImportText,
 } from '../useMindElixirFileDrop';
-import { createMindElixirArrowModeController } from '../mindElixirArrowModeController';
+import {
+    createMindElixirArrowModeController,
+    type MindElixirArrowModeKeyboardTarget,
+} from '../mindElixirArrowModeController';
 import {
     isSupportedMindMapToolbarImport,
     parseMindMapToolbarImport,
@@ -274,6 +277,33 @@ describe('mind elixir wrapper boundaries', () => {
         const secondListener = addListener.mock.calls[1]?.[1];
         controller.dispose();
         expect(removeListener).toHaveBeenLastCalledWith('selectNodes', secondListener);
+        expect(onEnabledChange).toHaveBeenLastCalledWith(false);
+    });
+
+    it('cancels relationship-line mode with Escape and removes its selection listener', () => {
+        const addListener = vi.fn();
+        const removeListener = vi.fn();
+        const onEnabledChange = vi.fn();
+        const eventTarget = new EventTarget();
+        const keyboardTarget = eventTarget as unknown as MindElixirArrowModeKeyboardTarget;
+        const mind = { bus: { addListener, removeListener } } as unknown as MindElixirInstance;
+        const controller = createMindElixirArrowModeController({
+            mind,
+            onEnabledChange,
+            keyboardTarget,
+        });
+
+        controller.toggle();
+        const listener = addListener.mock.calls[0]?.[1];
+        const escapeEvent = new KeyboardEvent('keydown', {
+            key: 'Escape',
+            cancelable: true,
+        });
+        eventTarget.dispatchEvent(escapeEvent);
+
+        expect(escapeEvent.defaultPrevented).toBe(true);
+        expect(removeListener).toHaveBeenCalledWith('selectNodes', listener);
+        expect(controller.isEnabled()).toBe(false);
         expect(onEnabledChange).toHaveBeenLastCalledWith(false);
     });
 
