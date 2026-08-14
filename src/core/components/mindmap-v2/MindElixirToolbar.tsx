@@ -17,8 +17,6 @@
 import React, { useCallback, useEffect, useState, useRef, useSyncExternalStore } from 'react';
 import { Divider, Tooltip, Dropdown } from 'antd';
 import {
-    MenuFoldOutlined,
-    MenuUnfoldOutlined,
     FullscreenOutlined,
     UndoOutlined,
     RedoOutlined,
@@ -59,7 +57,6 @@ import {
     logMindmapToolbarAutoArrangeFailure,
     logMindmapToolbarHistoryFailure,
     logMindmapToolbarStatsUpdateFailure,
-    logMindmapToolbarTreeExpansionFailure,
     logMindmapToolbarZoomFailure,
 } from './mindmapToolbarLogging';
 import {
@@ -67,7 +64,6 @@ import {
     subscribeMindMapHistoryAvailability,
 } from './mindMapHistoryAvailability';
 import { persistMindMapThemeKey, resolveMindMapThemeKey } from './mindmapThemeStorage';
-import { applyMindMapTreeExpansionTransaction } from './mindmapTreeExpansion';
 import { createMindElixirArrowModeController } from './mindElixirArrowModeController';
 import { useMindElixirImportActions } from './useMindElixirImportActions';
 import { useMindElixirExportActions } from './useMindElixirExportActions';
@@ -76,6 +72,7 @@ import MindMapToolbarIconButton from './MindMapToolbarIconButton';
 import MindMapAuxiliaryPanelButtons from './MindMapAuxiliaryPanelButtons';
 import MindMapFocusButton from './MindMapFocusButton';
 import MindMapSummaryButton from './MindMapSummaryButton';
+import MindMapTreeExpansionButtons from './MindMapTreeExpansionButtons';
 import { MindMapThemeSelector } from './MindMapThemeSelector';
 import { MindMapDirectionSelector } from './MindMapDirectionSelector';
 import { getViewportPopupContainer } from '../ui/viewportOverlayPortal';
@@ -155,24 +152,6 @@ const MindElixirToolbar: React.FC = () => {
         mind.changeTheme(theme);
         setActiveThemeKey(key);
         persistMindMapThemeKey(key);
-    }, [mind]);
-
-    const handleCollapseAll = useCallback(() => {
-        if (!mind) return;
-        try {
-            applyMindMapTreeExpansionTransaction(mind, false);
-        } catch (error) {
-            logMindmapToolbarTreeExpansionFailure('collapseAll', error);
-        }
-    }, [mind]);
-
-    const handleExpandAll = useCallback(() => {
-        if (!mind) return;
-        try {
-            applyMindMapTreeExpansionTransaction(mind, true);
-        } catch (error) {
-            logMindmapToolbarTreeExpansionFailure('expandAll', error);
-        }
     }, [mind]);
 
     const handleFitView = useCallback(() => {
@@ -445,8 +424,7 @@ const MindElixirToolbar: React.FC = () => {
             <MindMapToolbarIconButton label={t('plugins.mindmap.toolbar.addRootChild')} icon={<PlusOutlined />} onClick={handleAddRootChild} disabled={!mind} />
 
             {/* Collapse / Expand */}
-            <MindMapToolbarIconButton label={t('plugins.mindmap.collapseAll')} icon={<MenuFoldOutlined />} onClick={handleCollapseAll} disabled={!mind} />
-            <MindMapToolbarIconButton label={t('plugins.mindmap.expandAll')} icon={<MenuUnfoldOutlined />} onClick={handleExpandAll} disabled={!mind} />
+            <MindMapTreeExpansionButtons mind={mind} />
 
             {/* Presentation Mode */}
             <MindMapToolbarIconButton

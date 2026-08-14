@@ -13,6 +13,7 @@ const iconButtonSource = readFileSync(resolve(process.cwd(), 'src/core/component
 const auxiliaryPanelButtonsSource = readFileSync(resolve(process.cwd(), 'src/core/components/mindmap-v2/MindMapAuxiliaryPanelButtons.tsx'), 'utf8');
 const focusButtonSource = readFileSync(resolve(process.cwd(), 'src/core/components/mindmap-v2/MindMapFocusButton.tsx'), 'utf8');
 const summaryButtonSource = readFileSync(resolve(process.cwd(), 'src/core/components/mindmap-v2/MindMapSummaryButton.tsx'), 'utf8');
+const treeExpansionButtonsSource = readFileSync(resolve(process.cwd(), 'src/core/components/mindmap-v2/MindMapTreeExpansionButtons.tsx'), 'utf8');
 
 describe('MindElixirToolbar commercial interaction contract', () => {
     it('uses one accessible toolbar button contract and semantic toolbar boundaries', () => {
@@ -78,6 +79,15 @@ describe('MindElixirToolbar commercial interaction contract', () => {
         expect(focusButtonSource).toContain('getMindMapFocusAvailability(mind, selectedNode)');
         expect(focusButtonSource).toContain('toggleFocusMode(selectedNode?.id)');
         expect(focusButtonSource).toContain('disabled={!isFocused && !availability.enabled}');
+    });
+
+    it('only offers tree expansion actions that can visibly change the current tree', () => {
+        expect(source).toContain('<MindMapTreeExpansionButtons mind={mind} />');
+        expect(treeExpansionButtonsSource).toContain('useMindMapTreeExpansionAvailability(mind)');
+        expect(treeExpansionButtonsSource).toContain('disabled={!availability.canCollapse}');
+        expect(treeExpansionButtonsSource).toContain('disabled={!availability.canExpand}');
+        expect(treeExpansionButtonsSource).toContain('if (!mind || !availability.canCollapse) return;');
+        expect(treeExpansionButtonsSource).toContain('if (!mind || !availability.canExpand) return;');
     });
 
     it('keeps every tool reachable by touch and keyboard without text-symbol icons', () => {
