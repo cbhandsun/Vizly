@@ -880,6 +880,38 @@ describe('PageTabs', () => {
         expect(screen.queryByRole('button', { name: '恢复页面“页面 2”' })).toBeNull();
     });
 
+    it('uses domain content metrics instead of hidden persistence node counts', async () => {
+        render(
+            <PageTabs
+                pages={[
+                    { id: 'page-1', name: '页面 1', nodes: [], edges: [] },
+                    {
+                        id: 'page-2',
+                        name: '页面 2',
+                        nodes: [{
+                            id: '__mindmap_meta__',
+                            position: { x: -9999, y: -9999 },
+                            data: {
+                                pageContentMetrics: { version: 1, nodeCount: 4, edgeCount: 0 },
+                            },
+                        }],
+                        edges: [],
+                    },
+                ]}
+                activePageId="page-2"
+                onSwitchPage={vi.fn()}
+                onAddPage={vi.fn()}
+                onDeletePage={vi.fn(() => true)}
+                onRenamePage={vi.fn()}
+                activePageNodeCount={1}
+                activePageEdgeCount={0}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: '删除页面 页面 2' }));
+        expect(await screen.findByText('将删除此页面中的 4 个节点和 0 条连线。关闭或重新加载图表前，可恢复最近删除的页面。')).toBeTruthy();
+    });
+
     it('keeps a named recovery action visible and focused after a failed restore', async () => {
         render(
             <PageTabs

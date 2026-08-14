@@ -2,8 +2,12 @@ import type { MindElixirData, MindElixirInstance, NodeObj } from 'mind-elixir';
 import type { Edge, Node } from '@xyflow/react';
 
 import type { PluginContext } from '../../types/plugin';
+import {
+  createPageContentMetrics,
+  PRESERVE_PAGE_COPY_NODE_ID,
+} from '../diagrams/pageCanvasMetadata';
 import { coerceMindElixirDirection } from './mindElixirDirection';
-import { directionStringToInt, migrateV1ToV2 } from './migrate';
+import { countNodes, directionStringToInt, migrateV1ToV2 } from './migrate';
 import { createSafeMindMapV2Payload } from './mindmapPersistenceSecurity';
 import { persistMindMapThemeKey, resolveMindMapThemeKey } from './mindmapThemeStorage';
 import { logMindmapWrapperSaveFailure } from './mindmapWrapperLogging';
@@ -12,6 +16,7 @@ import { isMindMapV2 } from './types';
 import { cleanMindMapData } from './mindmapTreeSanitizer';
 
 const DEFAULT_DIRECTION = 2 as const;
+const MINDMAP_META_NODE_ID = '__mindmap_meta__';
 
 const DEFAULT_DATA: MindElixirData = {
   nodeData: {
@@ -40,8 +45,16 @@ export const loadMindElixirData = (ctx: PluginContext): MindElixirData => {
       return { ...DEFAULT_DATA, direction: persistedDirection ?? DEFAULT_DATA.direction };
     }
 
-    const metaNode = nodes.find(node => node.id === '__mindmap_meta__');
-    const embedded = metaNode?.data?.mindmapV2;
+    const canonicalMetaNode = nodes.find(node => (
+      node.id === MINDMAP_META_NODE_ID
+      && isMindMapV2(node.data?.mindmapV2)
+    ));
+    const compatibleMetaNode = canonicalMetaNode ?? nodes.find(node => (
+      node.type === 'mindmap'
+      && node.hidden === true
+      && isMindMapV2(node.data?.mindmapV2)
+    ));
+    const embedded = compatibleMetaNode?.data?.mindmapV2;
     if (isMindMapV2(embedded)) {
       if (embedded.themeKey) persistMindMapThemeKey(embedded.themeKey);
       const cleaned = cleanMindMapData(embedded);
@@ -89,13 +102,26 @@ export const createMindElixirPersistenceNodes = (
     DEFAULT_DIRECTION,
   );
   return [
-    ...previous.filter(node => node.id !== '__mindmap_meta__'),
+    ...previous.filter(node => (
+      node.id !== MINDMAP_META_NODE_ID
+      && !(
+        node.type === 'mindmap'
+        && node.hidden === true
+        && isMindMapV2(node.data?.mindmapV2)
+      )
+    )),
     {
-      id: '__mindmap_meta__',
+      id: MINDMAP_META_NODE_ID,
       type: 'mindmap',
       position: { x: -9999, y: -9999 },
       hidden: true,
-      data: { mindmapV2: payload, depth: -1, label: '' },
+      data: {
+        mindmapV2: payload,
+        depth: -1,
+        label: '',
+        pageCopyIdPolicy: PRESERVE_PAGE_COPY_NODE_ID,
+        pageContentMetrics: createPageContentMetrics(countNodes(payload.nodeData), 0),
+      },
     },
   ];
 };

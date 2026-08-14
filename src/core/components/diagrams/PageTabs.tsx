@@ -13,6 +13,7 @@ import { useTranslation } from 'react-i18next';
 import type { DiagramPage } from './hooks/useMultiPage';
 import { MAX_DIAGRAM_PAGE_NAME_LENGTH, MAX_DIAGRAM_PAGES } from './multiPagePersistence';
 import { isPageNameAvailable, normalizePageName } from './multiPageNaming';
+import { resolvePageContentMetrics } from './pageCanvasMetadata';
 import { resolvePageTabTargetIndex } from './pageTabKeyboard';
 import { schedulePageTabsDeleteFocus } from './pageTabsDeleteFocus';
 import { runPageTabsCapacityAction } from './pageTabsLimitFeedback';
@@ -372,6 +373,14 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
     const activePage = pages.find((page) => page.id === activePageId) ?? null;
     const activePageIndex = activePage ? pages.findIndex(page => page.id === activePage.id) : -1;
     const isRenamingActivePage = editingId === activePage?.id;
+    const activePageContentMetrics = activePage
+        ? resolvePageContentMetrics(
+            activePage.nodes,
+            activePage.edges,
+            activePageNodeCount,
+            activePageEdgeCount,
+        )
+        : null;
     const pageLimitMessage = t('designer.pages.limitReached', {
         count: MAX_DIAGRAM_PAGES,
         defaultValue: '最多可创建 {{count}} 个页面',
@@ -581,8 +590,8 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                                     description={(
                                         <span id={deleteDialogDescriptionId}>
                                             {t('designer.pages.deleteDescription', {
-                                                nodeCount: activePageNodeCount ?? activePage.nodes.length,
-                                                edgeCount: activePageEdgeCount ?? activePage.edges.length,
+                                                nodeCount: activePageContentMetrics?.nodeCount ?? activePage.nodes.length,
+                                                edgeCount: activePageContentMetrics?.edgeCount ?? activePage.edges.length,
                                                 defaultValue: '将删除此页面中的 {{nodeCount}} 个节点和 {{edgeCount}} 条连线。关闭或重新加载图表前，可恢复最近删除的页面。',
                                             })}
                                         </span>

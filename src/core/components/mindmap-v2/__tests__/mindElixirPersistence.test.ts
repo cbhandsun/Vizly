@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PluginContext } from '../../../types/plugin';
 import {
   captureMindElixirPageState,
+  createMindElixirPersistenceNodes,
   loadMindElixirData,
   saveMindElixirData,
 } from '../mindElixirPersistence';
@@ -60,6 +61,43 @@ describe('mindElixirPersistence', () => {
     expect(data.direction).toBe(1);
   });
 
+  it('loads a validated legacy copy whose metadata node ID was remapped', () => {
+    const data = loadMindElixirData(context([{
+      id: 'node-page-copy-legacy-0',
+      type: 'mindmap',
+      hidden: true,
+      data: {
+        mindmapV2: {
+          _version: 'mindmap-v2',
+          nodeData: { id: 'root-2', topic: 'Copied topic', root: true, children: [] },
+          direction: 2,
+        },
+      },
+    }]));
+
+    expect(data.nodeData).toMatchObject({ id: 'root', topic: 'Copied topic' });
+  });
+
+  it('uses a valid remapped payload when a stale canonical node is also present', () => {
+    const data = loadMindElixirData(context([
+      { id: '__mindmap_meta__', type: 'mindmap', hidden: true, data: { stale: true } },
+      {
+        id: 'node-page-copy-legacy-0',
+        type: 'mindmap',
+        hidden: true,
+        data: {
+          mindmapV2: {
+            _version: 'mindmap-v2',
+            nodeData: { id: 'root-2', topic: 'Recovered copy', root: true, children: [] },
+            direction: 2,
+          },
+        },
+      },
+    ]));
+
+    expect(data.nodeData).toMatchObject({ topic: 'Recovered copy' });
+  });
+
   it('sanitizes malformed descendant topics before persisted data reaches the renderer', () => {
     const data = loadMindElixirData(context([{
       id: '__mindmap_meta__',
@@ -101,12 +139,46 @@ describe('mindElixirPersistence', () => {
     expect(next[1]).toMatchObject({
       hidden: true,
       data: {
+        pageCopyIdPolicy: 'preserve',
+        pageContentMetrics: { version: 1, nodeCount: 1, edgeCount: 0 },
         mindmapV2: {
           _version: 'mindmap-v2',
           direction: 2,
           nodeData: { id: 'root', topic: 'Saved' },
         },
       },
+    });
+  });
+
+  it('normalizes remapped metadata to one canonical persistence node', () => {
+    const next = createMindElixirPersistenceNodes([
+      { id: 'keep', position: { x: 0, y: 0 }, data: {} },
+      {
+        id: 'node-page-copy-legacy-0',
+        type: 'mindmap',
+        hidden: true,
+        position: { x: -9999, y: -9999 },
+        data: {
+          mindmapV2: {
+            _version: 'mindmap-v2',
+            nodeData: { id: 'legacy', topic: 'Legacy', root: true, children: [] },
+            direction: 2,
+          },
+        },
+      },
+    ], {
+      nodeData: {
+        id: 'root',
+        topic: 'Current',
+        children: [{ id: 'child', topic: 'Child', children: [] }],
+      },
+      direction: 2,
+    });
+
+    expect(next.map(node => node.id)).toEqual(['keep', '__mindmap_meta__']);
+    expect(next[1]?.data).toMatchObject({
+      pageCopyIdPolicy: 'preserve',
+      pageContentMetrics: { version: 1, nodeCount: 2, edgeCount: 0 },
     });
   });
 
@@ -127,6 +199,8 @@ describe('mindElixirPersistence', () => {
     expect(pageState.nodes.map(node => node.id)).toEqual(['keep', '__mindmap_meta__']);
     expect(pageState.nodes[1]).toMatchObject({
       data: {
+        pageCopyIdPolicy: 'preserve',
+        pageContentMetrics: { version: 1, nodeCount: 1, edgeCount: 0 },
         mindmapV2: {
           _version: 'mindmap-v2',
           nodeData: { id: 'root', topic: '第二页主题' },

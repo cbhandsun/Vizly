@@ -1,6 +1,8 @@
 import type { Edge, Node } from '@xyflow/react';
 import jsonpatch from 'fast-json-patch';
 
+import { shouldPreservePageCopyNodeId } from './pageCanvasMetadata';
+
 const { deepClone } = jsonpatch;
 
 export interface DuplicatedPageCanvas {
@@ -23,7 +25,12 @@ export const duplicatePageCanvas = (
     const nodeIds = new Map<string, string>();
 
     cloned.nodes.forEach((node, index) => {
-        nodeIds.set(node.id, `node-page-copy-${batchId}-${index}`);
+        nodeIds.set(
+            node.id,
+            shouldPreservePageCopyNodeId(node.data)
+                ? node.id
+                : `node-page-copy-${batchId}-${index}`,
+        );
     });
 
     const duplicatedNodes = cloned.nodes.map(node => {
