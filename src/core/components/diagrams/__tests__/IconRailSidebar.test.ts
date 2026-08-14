@@ -21,6 +21,7 @@ import {
   readIconRailDrawerWidth,
 } from '../iconRailSidebarStorage';
 import {
+  resolveIconRailRequestedFocusTarget,
   resolveIconRailRequestedPanel,
   shouldAutoOpenShapesPanel,
 } from '../iconRailSidebarState';
@@ -115,8 +116,11 @@ describe('IconRailSidebar storage helpers', () => {
 
   it('resolves explicit mobile open and close requests', () => {
     expect(resolveIconRailRequestedPanel('shapes')).toBe('shapes');
+    expect(resolveIconRailRequestedPanel('shapes-search')).toBe('shapes');
     expect(resolveIconRailRequestedPanel('layers')).toBe('layers');
     expect(resolveIconRailRequestedPanel('close')).toBeNull();
+    expect(resolveIconRailRequestedFocusTarget('shapes')).toBe('default');
+    expect(resolveIconRailRequestedFocusTarget('shapes-search')).toBe('search');
   });
 
   it('keeps the mobile drawer inside the viewport and above the bottom dock', () => {
