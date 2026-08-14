@@ -65,7 +65,7 @@ import {
 } from './mindMapHistoryAvailability';
 import { persistMindMapThemeKey, resolveMindMapThemeKey } from './mindmapThemeStorage';
 import { createMindElixirArrowModeController } from './mindElixirArrowModeController';
-import { useMindElixirImportActions } from './useMindElixirImportActions';
+import { type MindMapImportStatus, useMindElixirImportActions } from './useMindElixirImportActions';
 import { type MindMapExportStatus, useMindElixirExportActions } from './useMindElixirExportActions';
 import { useMindElixirCanvasPreferences } from './useMindElixirCanvasPreferences';
 import MindMapToolbarIconButton from './MindMapToolbarIconButton';
@@ -224,6 +224,7 @@ const MindElixirToolbar: React.FC = () => {
 
     const [openMenu, setOpenMenu] = useState<MindMapToolbarMenu | null>(null);
     const exportTriggerRef = useRef<HTMLButtonElement>(null);
+    const importTriggerRef = useRef<HTMLButtonElement>(null);
     const handleExportStatus = useCallback((status: MindMapExportStatus) => {
         const feedback = t(status.kind === 'error' ? 'export.failed' : 'export.success', {
             format: status.format,
@@ -244,6 +245,20 @@ const MindElixirToolbar: React.FC = () => {
         handleExportXmind,
         handleExportPdf,
     } = useMindElixirExportActions(mind, { onStatus: handleExportStatus });
+
+    const restoreImportTriggerFocus = useCallback(() => {
+        requestAnimationFrame(() => importTriggerRef.current?.focus({ preventScroll: true }));
+    }, []);
+    const handleImportStatus = useCallback((status: MindMapImportStatus) => {
+        appMessage[status.kind === 'error' ? 'error' : 'success'](
+            `${status.format}: ${t(status.kind === 'success' ? 'common.success' : 'theme.selector.importStatus.failed')}`,
+        );
+        restoreImportTriggerFocus();
+    }, [restoreImportTriggerFocus, t]);
+    const handleImportMenuOpenChange = useCallback((open: boolean) => {
+        setOpenMenu(open ? 'import' : null);
+        if (!open) restoreImportTriggerFocus();
+    }, [restoreImportTriggerFocus]);
 
     // ── Zoom controls ───────────────────────────────────────────────────────
     const [zoomVal, setZoomVal] = useState(100);
@@ -366,7 +381,7 @@ const MindElixirToolbar: React.FC = () => {
         handleMarkdownFileChange: handleFileChange,
         handleOpmlFileChange,
         handleJsonFileChange,
-    } = useMindElixirImportActions(mind);
+    } = useMindElixirImportActions(mind, { onStatus: handleImportStatus });
 
     // ── Stats ─────────────────────────────────────────────────────────────────
     const [stats, setStats] = useState({ nodes: 0, depth: 0 });
@@ -529,8 +544,9 @@ const MindElixirToolbar: React.FC = () => {
 
             {/* Import dropdown (MD + OPML + JSON) */}
             <Dropdown
+                autoFocus
                 open={openMenu === 'import'}
-                onOpenChange={open => setOpenMenu(open ? 'import' : null)}
+                onOpenChange={handleImportMenuOpenChange}
                 menu={{
                     items: [
                         { key: 'md',   label: t('plugins.mindmap.toolbar.importMarkdown'), icon: <UploadOutlined />, onClick: handleImportMarkdown },
@@ -542,7 +558,7 @@ const MindElixirToolbar: React.FC = () => {
                 getPopupContainer={getViewportPopupContainer}
                 trigger={['click']}
             >
-                <MindMapToolbarIconButton aria-expanded={openMenu === 'import'} aria-haspopup="menu" label={t('plugins.mindmap.toolbar.importMindMap')} icon={<UploadOutlined />} disabled={!mind} suppressTooltip={openMenu !== null} />
+                <MindMapToolbarIconButton ref={importTriggerRef} aria-expanded={openMenu === 'import'} aria-haspopup="menu" label={t('plugins.mindmap.toolbar.importMindMap')} icon={<UploadOutlined />} disabled={!mind} suppressTooltip={openMenu !== null} />
             </Dropdown>
 
             {/* Node stats badge */}

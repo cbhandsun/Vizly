@@ -14,6 +14,20 @@ import {
 
 export type MindMapImportKind = 'JSON' | 'Markdown' | 'OPML';
 
+export type MindMapImportFailureReason =
+    | 'aborted'
+    | 'invalid'
+    | 'read'
+    | 'too-large';
+
+export type MindMapImportStatus =
+    | { format: MindMapImportKind; kind: 'success' }
+    | { format: MindMapImportKind; kind: 'error'; reason: MindMapImportFailureReason };
+
+export interface MindMapImportActionOptions {
+    onStatus?: (status: MindMapImportStatus) => void;
+}
+
 const IMPORT_IDENTITIES: Record<MindMapImportKind, { fileName: RegExp; mimeTypes: ReadonlySet<string> }> = {
     JSON: { fileName: /\.json$/i, mimeTypes: new Set(['application/json', 'text/json']) },
     Markdown: { fileName: /\.(?:md|markdown|txt)$/i, mimeTypes: new Set(['text/markdown', 'text/plain']) },
@@ -44,7 +58,11 @@ export const parseMindMapToolbarImport = (
     return { kind: 'tree', nodeData: cleanAndValidateTree(parsed, true) };
 };
 
-export const useMindElixirImportActions = (mind: MindElixirInstance | null) => {
+export const useMindElixirImportActions = (
+    mind: MindElixirInstance | null,
+    options: MindMapImportActionOptions = {},
+) => {
+    const { onStatus } = options;
     const markdownInputRef = useRef<HTMLInputElement>(null);
     const opmlInputRef = useRef<HTMLInputElement>(null);
     const jsonInputRef = useRef<HTMLInputElement>(null);
@@ -60,13 +78,17 @@ export const useMindElixirImportActions = (mind: MindElixirInstance | null) => {
         const file = input.files?.[0];
         input.value = '';
         if (!file || !mind) return;
-        if (!isSupportedMindMapToolbarImport(kind, file)) {
-            logMindmapToolbarImportRejected(kind, new Error(`Unsupported ${kind} import file type.`));
+        const fail = (reason: MindMapImportFailureReason, error: unknown, rejected = false) => {
+            (rejected ? logMindmapToolbarImportRejected : logMindmapToolbarImportFailure)(kind, error);
+            onStatus?.({ format: kind, kind: 'error', reason });
+        };
+        if (!isSupportedMindMapToolbarImport(kind, file) || !Number.isFinite(file.size) || file.size <= 0) {
+            fail('invalid', new Error('Import file rejected.'), true);
             return;
         }
         const sizeError = getFileSizeLimitError(file, MINDMAP_TEXT_IMPORT_MAX_BYTES, kind);
         if (sizeError) {
-            logMindmapToolbarImportRejected(kind, sizeError);
+            fail('too-large', sizeError, true);
             return;
         }
 
@@ -82,12 +104,19 @@ export const useMindElixirImportActions = (mind: MindElixirInstance | null) => {
                 } else {
                     applyMindMapImportTransaction(mind, { nodeData: parsed.nodeData });
                 }
+                onStatus?.({ format: kind, kind: 'success' });
             } catch (error) {
-                logMindmapToolbarImportFailure(kind, error);
+                fail('invalid', error);
             }
         };
+        reader.onerror = () => {
+            fail('read', reader.error ?? new Error('Import read failed.'));
+        };
+        reader.onabort = () => {
+            fail('aborted', new Error('Import read aborted.'));
+        };
         reader.readAsText(file);
-    }, [mind]);
+    }, [mind, onStatus]);
 
     return {
         markdownInputRef,

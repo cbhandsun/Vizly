@@ -37,6 +37,11 @@ describe('MindElixirToolbar commercial interaction contract', () => {
         expect(source).toContain("requestAnimationFrame(() => exportTriggerRef.current?.focus({ preventScroll: true }))");
         expect(source).toContain("appMessage[status.kind === 'error' ? 'error' : 'success'](feedback)");
         expect(source).toContain("aria-expanded={openMenu === 'import'}");
+        expect(source).toMatch(/\/\* Import dropdown \(MD \+ OPML \+ JSON\) \*\/[\s\S]*?<Dropdown[\s\S]*?autoFocus/);
+        expect(source).toContain('ref={importTriggerRef}');
+        expect(source).toContain('onOpenChange={handleImportMenuOpenChange}');
+        expect(source).toContain('restoreImportTriggerFocus()');
+        expect(source).toContain('useMindElixirImportActions(mind, { onStatus: handleImportStatus })');
         expect(source).toContain("aria-expanded={openMenu === 'background'}");
         expect(source.match(/suppressTooltip=\{openMenu !== null\}/g)).toHaveLength(4);
         expect(iconButtonSource).toContain('open={suppressTooltip ? false : undefined}');
@@ -97,6 +102,8 @@ describe('MindElixirToolbar commercial interaction contract', () => {
     it('keeps every tool reachable by touch and keyboard without text-symbol icons', () => {
         expect(css).toMatch(/\.mind-elixir-toolbar-button[\s\S]*?min-width: var\(--commercial-touch-target, 44px\)[\s\S]*?height: var\(--commercial-touch-target, 44px\)/);
         expect(css).toMatch(/\.vizly-mindmap-toolbar \{[\s\S]*?width: 100%;[\s\S]*?overflow-x: auto;/);
+        expect(css).toContain('scrollbar-color: rgba(99, 102, 241, 0.72)');
+        expect(css).toContain('.vizly-mindmap-toolbar::-webkit-scrollbar-thumb');
         expect(css).toMatch(/\.mind-elixir-toolbar-zoom-reset[\s\S]*?min-width: var\(--commercial-touch-target, 44px\)[\s\S]*?height: var\(--commercial-touch-target, 44px\)/);
         expect(source).toContain('<button');
         expect(source).not.toContain('⊞');

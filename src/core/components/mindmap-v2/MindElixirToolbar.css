@@ -5,11 +5,27 @@
     width: 100%;
     min-width: 0;
     max-width: 100%;
-    padding: 0 8px;
+    padding: 0 8px 4px;
     overflow-x: auto;
     overscroll-behavior-inline: contain;
     border-left: 1px solid rgba(0, 0, 0, 0.08);
+    scrollbar-color: rgba(99, 102, 241, 0.72) rgba(99, 102, 241, 0.12);
+    scrollbar-gutter: stable;
     scrollbar-width: thin;
+}
+
+.vizly-mindmap-toolbar::-webkit-scrollbar {
+    height: 6px;
+}
+
+.vizly-mindmap-toolbar::-webkit-scrollbar-track {
+    border-radius: 999px;
+    background: rgba(99, 102, 241, 0.12);
+}
+
+.vizly-mindmap-toolbar::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: rgba(99, 102, 241, 0.72);
 }
 
 .mind-elixir-toolbar-button {
