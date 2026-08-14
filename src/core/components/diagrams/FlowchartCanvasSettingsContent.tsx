@@ -50,21 +50,22 @@ export function FlowchartCanvasSettingsContent({
                 {t('designer.toolbar.canvasSettings', '画布设置')}
             </div>
             <div className="flex flex-col gap-0.5">
-                <Button
-                    type="text"
-                    block
-                    aria-label={showMinimap ? t('designer.toolbar.hideMinimap', '隐藏小地图') : t('designer.toolbar.showMinimap', '显示小地图')}
-                    aria-pressed={Boolean(showMinimap)}
-                    disabled={!toggleMinimap}
-                    className="flex items-center justify-between h-9 px-2 hover:bg-slate-100 dark:hover:bg-white/5"
-                    style={COMMERCIAL_TOUCH_ROW_STYLE}
-                    onClick={toggleMinimap}
-                >
-                    <span className="flex items-center gap-2 text-[13px] text-slate-600 dark:text-slate-300">
-                        <FaMap className="text-[14px]" /> {t('designer.toolbar.minimap', '小地图')}
-                    </span>
-                    {stateIndicator(Boolean(showMinimap), showMinimap ? onLabel : offLabel)}
-                </Button>
+                {toggleMinimap && (
+                    <Button
+                        type="text"
+                        block
+                        aria-label={showMinimap ? t('designer.toolbar.hideMinimap', '隐藏小地图') : t('designer.toolbar.showMinimap', '显示小地图')}
+                        aria-pressed={Boolean(showMinimap)}
+                        className="flex items-center justify-between h-9 px-2 hover:bg-slate-100 dark:hover:bg-white/5"
+                        style={COMMERCIAL_TOUCH_ROW_STYLE}
+                        onClick={toggleMinimap}
+                    >
+                        <span className="flex items-center gap-2 text-[13px] text-slate-600 dark:text-slate-300">
+                            <FaMap className="text-[14px]" /> {t('designer.toolbar.minimap', '小地图')}
+                        </span>
+                        {stateIndicator(Boolean(showMinimap), showMinimap ? onLabel : offLabel)}
+                    </Button>
+                )}
                 <Button
                     type="text"
                     block

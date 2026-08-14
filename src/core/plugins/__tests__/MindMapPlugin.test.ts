@@ -15,6 +15,10 @@ describe('MindMapPlugin boundaries', () => {
         vi.unstubAllGlobals();
     });
 
+    it('opts out of the generic React Flow minimap for its self-rendered canvas', () => {
+        expect(new MindMapPlugin().hideMiniMap).toBe(true);
+    });
+
     it('rejects malformed AI action parameters and normalizes valid child input', async () => {
         const addChild = vi.fn();
         window.__flowDataBridge = { 'mindmap-1': { addChild } };

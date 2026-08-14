@@ -163,6 +163,7 @@ export class MindMapPlugin extends BaseDiagramPlugin implements DiagramTypePlugi
     // ── Plugin Flags ─────────────────────────────────────────────────────────
     hideDefaultSidebar = true;
     hideContextToolbar = true;
+    hideMiniMap = true;
     hideGridControls = true;
     hideLayoutControls = true;
     hideFlowFocusControls = true;

@@ -76,4 +76,21 @@ describe('FlowchartCanvasSettingsContent', () => {
         expect(screen.getByTestId('grid-off-icon')).toBeTruthy();
         expect(screen.getAllByText('Off').length).toBeGreaterThanOrEqual(2);
     });
+
+    it('omits the minimap setting when the active canvas cannot support it', () => {
+        render(
+            <FlowchartCanvasSettingsContent
+                gridInfo={{ title: 'Grid: Lines', icon: <span>grid icon</span>, stateLabel: 'Lines' }}
+                onShowShortcuts={vi.fn()}
+                showGrid
+                showMinimap
+                showRuler={false}
+                toggleGrid={vi.fn()}
+                toggleRuler={vi.fn()}
+            />,
+        );
+
+        expect(screen.queryByRole('button', { name: '隐藏小地图' })).toBeNull();
+        expect(screen.queryByText('小地图')).toBeNull();
+    });
 });

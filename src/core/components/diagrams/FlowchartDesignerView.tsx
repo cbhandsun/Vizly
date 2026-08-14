@@ -39,6 +39,7 @@ import {
 } from './FlowchartDesignerShellRegions';
 import { filterCommentsForPage } from './commentPageScope';
 import { useFlowchartFileDrop } from './hooks/useFlowchartFileDrop';
+import { supportsReactFlowMinimap } from './reactFlowMinimapCapability';
 
 export type { FlowchartDesignerViewModel } from './flowchartDesignerViewModel';
 
@@ -274,6 +275,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
         confirmOkText: t('designer.flowchart.import.confirmDropOk', '继续导入'),
         enabled: editingEnabled,
     });
+    const reactFlowMinimapSupported = supportsReactFlowMinimap(activePlugin);
 
     return (
         <UnifiedDesignerShell
@@ -463,8 +465,10 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                 lastNodeLayout,
                                 showRuler,
                                 toggleRuler: () => setShowRuler((previous: boolean) => !previous),
-                                showMinimap,
-                                toggleMinimap: () => setShowMinimap((previous: boolean) => !previous),
+                                showMinimap: reactFlowMinimapSupported ? showMinimap : undefined,
+                                toggleMinimap: reactFlowMinimapSupported
+                                    ? () => setShowMinimap((previous: boolean) => !previous)
+                                    : undefined,
                                 showAiCrown,
                                 onToggleAI: () => {
                                     if (onAiTabIntercept && !onAiTabIntercept()) return;
@@ -574,7 +578,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                     onReconnectEnd={handleReconnectEnd}
                                     autoRoutingEnabled={autoRoutingEnabled}
                                     enableSmartEdges={true}
-                                    showMinimap={showEditingChrome && showMinimap}
+                                    showMinimap={showEditingChrome && showMinimap && reactFlowMinimapSupported}
                                     showGrid={showGrid}
                                     gridVariant={gridVariant}
                                     backgroundGridColor={gridColor}
