@@ -4,26 +4,43 @@ import { findNodeById } from './migrate';
 
 interface MindMapSelectionSource {
     readonly currentNode: Topic | null;
-    readonly container: Pick<ParentNode, 'querySelector'>;
+    readonly container: Pick<ParentNode, 'contains' | 'querySelector'>;
     findEle: (nodeId: string) => Topic | null;
+}
+
+const isTopicOwnedByMindMap = (
+    mind: MindMapSelectionSource,
+    topic: Topic | null,
+): topic is Topic => Boolean(
+    topic
+    && topic.isConnected
+    && mind.container.contains(topic),
+);
+
+export function resolveMindMapTopicById(
+    mind: MindMapSelectionSource,
+    nodeId: string,
+): Topic | null {
+    try {
+        const topic = mind.findEle(nodeId);
+        return isTopicOwnedByMindMap(mind, topic) ? topic : null;
+    } catch {
+        return null;
+    }
 }
 
 export function resolveSelectedMindMapTopic(
     mind: MindMapSelectionSource,
     fallbackNodeId: string | null,
 ): Topic | null {
-    if (mind.currentNode) return mind.currentNode;
+    if (isTopicOwnedByMindMap(mind, mind.currentNode)) return mind.currentNode;
     if (fallbackNodeId) {
-        try {
-            const fallback = mind.findEle(fallbackNodeId);
-            if (fallback?.classList.contains('selected')) return fallback;
-        } catch {
-            // The refreshed topic can briefly be unavailable by id. Fall
-            // through to the instance-scoped DOM selection below.
-        }
+        const fallback = resolveMindMapTopicById(mind, fallbackNodeId);
+        if (fallback?.classList.contains('selected')) return fallback;
     }
     try {
-        return mind.container.querySelector<Topic>('me-tpc.selected');
+        const selectedTopic = mind.container.querySelector<Topic>('me-tpc.selected');
+        return isTopicOwnedByMindMap(mind, selectedTopic) ? selectedTopic : null;
     } catch {
         return null;
     }

@@ -7,7 +7,10 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { useMindMapPropertySelection } from '../useMindMapPropertySelection';
 import { setActiveMindMapSelection } from '../mindMapSelectionStore';
 
-afterEach(() => setActiveMindMapSelection(null));
+afterEach(() => {
+    setActiveMindMapSelection(null);
+    document.body.replaceChildren();
+});
 
 const createMind = () => {
     const root = {
@@ -20,6 +23,7 @@ const createMind = () => {
     topic.dataset.nodeid = 'node-1';
     topic.classList.add('selected');
     container.append(topic);
+    document.body.append(container);
     let currentTopic: Topic | null = topic;
     const mind = {
         container,

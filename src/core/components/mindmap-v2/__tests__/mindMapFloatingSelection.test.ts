@@ -2,6 +2,7 @@ import type { Topic } from 'mind-elixir';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+    resolveMindMapTopicById,
     resolveSelectedMindMapTopic,
     resolveMindMapNodeAfterSelectionSettles,
     restoreCurrentMindMapSelectionAfterMutation,
@@ -9,9 +10,14 @@ import {
 
 const topicWithSelectedState = (selected: boolean): Topic => ({
     classList: { contains: vi.fn(() => selected) },
+    isConnected: true,
 } as unknown as Topic);
 
-const selectionContainer = (topic: Topic | null = null) => ({
+const selectionContainer = (
+    topic: Topic | null = null,
+    ownedTopics: Topic[] = topic ? [topic] : [],
+) => ({
+    contains: vi.fn((candidate: Node) => ownedTopics.includes(candidate as Topic)),
     querySelector: vi.fn(() => topic),
 });
 
@@ -20,7 +26,7 @@ describe('resolveSelectedMindMapTopic', () => {
         const currentNode = topicWithSelectedState(false);
         expect(resolveSelectedMindMapTopic({
             currentNode,
-            container: selectionContainer(),
+            container: selectionContainer(null, [currentNode]),
             findEle: vi.fn(),
         }, 'fallback'))
             .toBe(currentNode);
@@ -30,7 +36,7 @@ describe('resolveSelectedMindMapTopic', () => {
         const fallback = topicWithSelectedState(true);
         expect(resolveSelectedMindMapTopic({
             currentNode: null,
-            container: selectionContainer(),
+            container: selectionContainer(null, [fallback]),
             findEle: () => fallback,
         }, 'node-1'))
             .toBe(fallback);
@@ -43,6 +49,35 @@ describe('resolveSelectedMindMapTopic', () => {
             container: selectionContainer(selectedTopic),
             findEle: () => null,
         }, null)).toBe(selectedTopic);
+    });
+
+    it('ignores a detached current topic and recovers the connected instance selection', () => {
+        const detachedCurrent = topicWithSelectedState(true);
+        Object.assign(detachedCurrent, { isConnected: false });
+        const selectedTopic = topicWithSelectedState(true);
+
+        expect(resolveSelectedMindMapTopic({
+            currentNode: detachedCurrent,
+            container: selectionContainer(selectedTopic),
+            findEle: () => { throw new Error('stale id'); },
+        }, 'stale-node')).toBe(selectedTopic);
+    });
+
+    it('treats a throwing or detached id lookup as an unavailable transient topic', () => {
+        const detachedTopic = topicWithSelectedState(true);
+        Object.assign(detachedTopic, { isConnected: false });
+        const detachedContainer = selectionContainer(detachedTopic);
+
+        expect(resolveMindMapTopicById({
+            currentNode: null,
+            container: detachedContainer,
+            findEle: () => detachedTopic,
+        }, 'detached-node')).toBeNull();
+        expect(resolveMindMapTopicById({
+            currentNode: null,
+            container: selectionContainer(),
+            findEle: () => { throw new Error('missing node'); },
+        }, 'missing-node')).toBeNull();
     });
 
     it('does not revive a deselected, missing, or failed fallback topic', () => {
@@ -94,7 +129,10 @@ describe('resolveSelectedMindMapTopic', () => {
 
         await expect(resolveMindMapNodeAfterSelectionSettles({
             currentNode: null,
-            container: { querySelector },
+            container: {
+                contains: (candidate: Node | null) => candidate === selectedTopic,
+                querySelector,
+            },
             findEle: () => null,
             getData: () => ({ nodeData: copiedNode }),
             selectNodes: vi.fn(),

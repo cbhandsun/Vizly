@@ -158,6 +158,8 @@ describe('MindMapFloatingBar commercial interaction contract', () => {
         expect(selectionHookSource).toContain('resolveSelectedMindMapTopic(activeMind, null)');
         expect(selectionHookSource).toContain('if (existingNode) onSelect([existingNode])');
         expect(selectionHookSource).toContain('resolveMindMapNodeAfterSelectionSettles');
+        expect(selectionHookSource).toContain('resolveMindMapTopicById(mind, nodeId)');
+        expect(selectionHookSource).not.toContain('const topic = mind.findEle(nodeId)');
     });
 
     it('uses a portal-safe, touch-sized branch color picker without double-toggling its trigger', () => {

@@ -4,6 +4,7 @@ import type { MindElixirInstance, NodeObj } from 'mind-elixir';
 import { findNodeById } from './migrate';
 import {
     resolveMindMapNodeAfterSelectionSettles,
+    resolveMindMapTopicById,
     resolveSelectedMindMapTopic,
 } from './mindMapFloatingSelection';
 import { logMindMapFloatingActionFailure } from './mindmapFloatingLogging';
@@ -28,7 +29,7 @@ export function useMindMapFloatingSelection(
 
     const refreshForNode = useCallback((nodeId: string): boolean => {
         if (!mind) return false;
-        const topic = mind.findEle(nodeId);
+        const topic = resolveMindMapTopicById(mind, nodeId);
         if (!topic) return false;
         const rect = topic.getBoundingClientRect();
         selectedNodeIdRef.current = nodeId;
