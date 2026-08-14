@@ -88,6 +88,7 @@ describe('MindElixirToolbar commercial interaction contract', () => {
         expect(focusButtonSource).toContain('getMindMapFocusAvailability(mind, selectedNode)');
         expect(focusButtonSource).toContain('toggleFocusMode(selectedNode?.id)');
         expect(focusButtonSource).toContain('disabled={!isFocused && !availability.enabled}');
+        expect(focusButtonSource).toContain("aria-keyshortcuts={isFocused ? 'Escape' : undefined}");
     });
 
     it('only offers tree expansion actions that can visibly change the current tree', () => {
