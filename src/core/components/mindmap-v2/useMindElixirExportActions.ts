@@ -14,6 +14,26 @@ import { logMindmapToolbarExportFailure } from './mindmapToolbarLogging';
 
 const PRINT_BODY_CLASS = 'vizly-mindmap-print';
 
+export type MindMapExportFormat =
+    | 'SVG'
+    | 'PNG'
+    | 'XMind'
+    | 'Markdown'
+    | 'OPML'
+    | 'JSON'
+    | 'Pitch markdown'
+    | 'Flowchart'
+    | 'PDF';
+
+export interface MindMapExportStatus {
+    format: MindMapExportFormat;
+    kind: 'error' | 'success';
+}
+
+export interface MindMapExportActionOptions {
+    onStatus?: (status: MindMapExportStatus) => void;
+}
+
 export interface MindMapPrintDependencies {
     documentRef: Pick<Document, 'body'>;
     windowRef: Pick<Window, 'addEventListener' | 'print' | 'removeEventListener'>;
@@ -54,28 +74,43 @@ export const printMindMap = (
     return cleanup;
 };
 
-export const useMindElixirExportActions = (mind: MindElixirInstance | null) => {
+export const useMindElixirExportActions = (
+    mind: MindElixirInstance | null,
+    options: MindMapExportActionOptions = {},
+) => {
+    const { onStatus } = options;
+    const reportSuccess = useCallback((format: MindMapExportFormat) => {
+        onStatus?.({ format, kind: 'success' });
+    }, [onStatus]);
+    const reportFailure = useCallback((format: MindMapExportFormat, error: unknown) => {
+        logMindmapToolbarExportFailure(format, error);
+        onStatus?.({ format, kind: 'error' });
+    }, [onStatus]);
+
     const handleExportSvg = useCallback(() => {
         if (!mind) return;
         try {
             downloadBlob(mind.exportSvg(), 'mindmap.svg', 'mindmap.svg');
+            reportSuccess('SVG');
         } catch (error) {
-            logMindmapToolbarExportFailure('SVG', error);
+            reportFailure('SVG', error);
         }
-    }, [mind]);
+    }, [mind, reportFailure, reportSuccess]);
 
     const handleExportPng = useCallback(async () => {
         if (!mind) return;
         try {
             const blob = await mind.exportPng();
-            if (blob) downloadBlob(blob, 'mindmap.png', 'mindmap.png');
+            if (!blob) throw new Error('PNG export returned no data.');
+            downloadBlob(blob, 'mindmap.png', 'mindmap.png');
+            reportSuccess('PNG');
         } catch (error) {
-            logMindmapToolbarExportFailure('PNG', error);
+            reportFailure('PNG', error);
         }
-    }, [mind]);
+    }, [mind, reportFailure, reportSuccess]);
 
     const exportText = useCallback((
-        format: string,
+        format: MindMapExportFormat,
         fileName: string,
         mimeType: string,
         content: (instance: MindElixirInstance) => string,
@@ -83,10 +118,11 @@ export const useMindElixirExportActions = (mind: MindElixirInstance | null) => {
         if (!mind) return;
         try {
             downloadText(fileName, content(mind), mimeType);
+            reportSuccess(format);
         } catch (error) {
-            logMindmapToolbarExportFailure(format, error);
+            reportFailure(format, error);
         }
-    }, [mind]);
+    }, [mind, reportFailure, reportSuccess]);
 
     const handleExportMarkdown = useCallback(() => exportText(
         'Markdown', 'mindmap.md', 'text/markdown', instance => nodeObjToMarkdown(instance.getData().nodeData),
@@ -111,19 +147,21 @@ export const useMindElixirExportActions = (mind: MindElixirInstance | null) => {
         try {
             const nodeData = mind.getData().nodeData;
             await exportXmind(nodeData, nodeData.topic ?? 'mindmap');
+            reportSuccess('XMind');
         } catch (error) {
-            logMindmapToolbarExportFailure('XMind', error);
+            reportFailure('XMind', error);
         }
-    }, [mind]);
+    }, [mind, reportFailure, reportSuccess]);
 
     const handleExportPdf = useCallback(() => {
         if (!mind) return;
         try {
             printMindMap();
+            reportSuccess('PDF');
         } catch (error) {
-            logMindmapToolbarExportFailure('PDF', error);
+            reportFailure('PDF', error);
         }
-    }, [mind]);
+    }, [mind, reportFailure, reportSuccess]);
 
     return {
         handleExportSvg,

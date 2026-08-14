@@ -32,6 +32,10 @@ describe('MindElixirToolbar commercial interaction contract', () => {
         expect(themeSelectorSource).toContain("'plugins.mindmap.toolbar.chooseTheme'");
         expect(themeSelectorSource).toContain("'plugins.mindmap.toolbar.currentTheme'");
         expect(source).toContain("aria-expanded={openMenu === 'export'}");
+        expect(source).toMatch(/\/\* Export dropdown \*\/[\s\S]*?<Dropdown[\s\S]*?autoFocus/);
+        expect(source).toContain('ref={exportTriggerRef}');
+        expect(source).toContain("requestAnimationFrame(() => exportTriggerRef.current?.focus({ preventScroll: true }))");
+        expect(source).toContain("appMessage[status.kind === 'error' ? 'error' : 'success'](feedback)");
         expect(source).toContain("aria-expanded={openMenu === 'import'}");
         expect(source).toContain("aria-expanded={openMenu === 'background'}");
         expect(source.match(/suppressTooltip=\{openMenu !== null\}/g)).toHaveLength(4);

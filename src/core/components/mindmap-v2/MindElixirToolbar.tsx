@@ -66,7 +66,7 @@ import {
 import { persistMindMapThemeKey, resolveMindMapThemeKey } from './mindmapThemeStorage';
 import { createMindElixirArrowModeController } from './mindElixirArrowModeController';
 import { useMindElixirImportActions } from './useMindElixirImportActions';
-import { useMindElixirExportActions } from './useMindElixirExportActions';
+import { type MindMapExportStatus, useMindElixirExportActions } from './useMindElixirExportActions';
 import { useMindElixirCanvasPreferences } from './useMindElixirCanvasPreferences';
 import MindMapToolbarIconButton from './MindMapToolbarIconButton';
 import MindMapAuxiliaryPanelButtons from './MindMapAuxiliaryPanelButtons';
@@ -75,6 +75,7 @@ import MindMapSummaryButton from './MindMapSummaryButton';
 import MindMapTreeExpansionButtons from './MindMapTreeExpansionButtons';
 import { MindMapThemeSelector } from './MindMapThemeSelector';
 import { MindMapDirectionSelector } from './MindMapDirectionSelector';
+import { appMessage } from '../../utils/antdStaticBridge';
 import { getViewportPopupContainer } from '../ui/viewportOverlayPortal';
 import {
     applyMindMapZoomCommand,
@@ -221,6 +222,17 @@ const MindElixirToolbar: React.FC = () => {
         }
     }, [mind]);
 
+    const [openMenu, setOpenMenu] = useState<MindMapToolbarMenu | null>(null);
+    const exportTriggerRef = useRef<HTMLButtonElement>(null);
+    const handleExportStatus = useCallback((status: MindMapExportStatus) => {
+        const feedback = t(status.kind === 'error' ? 'export.failed' : 'export.success', {
+            format: status.format,
+        });
+        appMessage[status.kind === 'error' ? 'error' : 'success'](feedback);
+        setOpenMenu(null);
+        requestAnimationFrame(() => exportTriggerRef.current?.focus({ preventScroll: true }));
+    }, [t]);
+
     const {
         handleExportSvg,
         handleExportPng,
@@ -231,7 +243,7 @@ const MindElixirToolbar: React.FC = () => {
         handleExportPitchMarkdown,
         handleExportXmind,
         handleExportPdf,
-    } = useMindElixirExportActions(mind);
+    } = useMindElixirExportActions(mind, { onStatus: handleExportStatus });
 
     // ── Zoom controls ───────────────────────────────────────────────────────
     const [zoomVal, setZoomVal] = useState(100);
@@ -296,7 +308,6 @@ const MindElixirToolbar: React.FC = () => {
 
     // ── Shortcuts panel ─────────────────────────────────────────────────────────
     const [shortcutsOpen, setShortcutsOpen] = useState(false);
-    const [openMenu, setOpenMenu] = useState<MindMapToolbarMenu | null>(null);
 
     const exportMenuItems = [
         { key: 'svg',      label: t('plugins.mindmap.toolbar.exportSvg'),      icon: <ExportOutlined />,  onClick: handleExportSvg },
@@ -498,6 +509,7 @@ const MindElixirToolbar: React.FC = () => {
 
             {/* Export dropdown */}
             <Dropdown
+                autoFocus
                 open={openMenu === 'export'}
                 onOpenChange={open => setOpenMenu(open ? 'export' : null)}
                 menu={{ items: exportMenuItems }}
@@ -505,9 +517,8 @@ const MindElixirToolbar: React.FC = () => {
                 getPopupContainer={getViewportPopupContainer}
                 trigger={['click']}
             >
-                <MindMapToolbarIconButton aria-expanded={openMenu === 'export'} aria-haspopup="menu" label={t('plugins.mindmap.toolbar.exportMindMap')} icon={<ExportOutlined />} disabled={!mind} suppressTooltip={openMenu !== null} />
+                <MindMapToolbarIconButton ref={exportTriggerRef} aria-expanded={openMenu === 'export'} aria-haspopup="menu" label={t('plugins.mindmap.toolbar.exportMindMap')} icon={<ExportOutlined />} disabled={!mind} suppressTooltip={openMenu !== null} />
             </Dropdown>
-
             {/* Hidden file inputs */}
             <input ref={fileInputRef} type="file" accept=".md,.markdown,.txt"
                 style={{ display: 'none' }} onChange={handleFileChange} />
