@@ -25,7 +25,6 @@ import {
     ExportOutlined,
     PlusOutlined,
     DownloadOutlined,
-    AimOutlined,
     PlaySquareOutlined,
     UploadOutlined,
     ShareAltOutlined,
@@ -58,7 +57,6 @@ import { cleanMindMapChildNode } from './mindmapBridgeSecurity';
 import {
     logMindmapToolbarAddRootChildFailure,
     logMindmapToolbarAutoArrangeFailure,
-    logMindmapToolbarFocusModeFailure,
     logMindmapToolbarHistoryFailure,
     logMindmapToolbarStatsUpdateFailure,
     logMindmapToolbarTreeExpansionFailure,
@@ -76,10 +74,10 @@ import { useMindElixirExportActions } from './useMindElixirExportActions';
 import { useMindElixirCanvasPreferences } from './useMindElixirCanvasPreferences';
 import MindMapToolbarIconButton from './MindMapToolbarIconButton';
 import MindMapAuxiliaryPanelButtons from './MindMapAuxiliaryPanelButtons';
+import MindMapFocusButton from './MindMapFocusButton';
 import MindMapSummaryButton from './MindMapSummaryButton';
 import { MindMapThemeSelector } from './MindMapThemeSelector';
 import { MindMapDirectionSelector } from './MindMapDirectionSelector';
-import { useMindMapFocusMode } from './useMindMapFocusMode';
 import { getViewportPopupContainer } from '../ui/viewportOverlayPortal';
 import {
     applyMindMapZoomCommand,
@@ -321,18 +319,6 @@ const MindElixirToolbar: React.FC = () => {
     const [shortcutsOpen, setShortcutsOpen] = useState(false);
     const [openMenu, setOpenMenu] = useState<MindMapToolbarMenu | null>(null);
 
-    const { isFocused, toggleFocusMode } = useMindMapFocusMode(
-        mind,
-        logMindmapToolbarFocusModeFailure,
-    );
-    const handleFocusMode = useCallback(() => {
-        try {
-            toggleFocusMode();
-        } catch (error) {
-            logMindmapToolbarFocusModeFailure(error);
-        }
-    }, [toggleFocusMode]);
-
     const exportMenuItems = [
         { key: 'svg',      label: t('plugins.mindmap.toolbar.exportSvg'),      icon: <ExportOutlined />,  onClick: handleExportSvg },
         { key: 'png',      label: t('plugins.mindmap.toolbar.exportPng'),      icon: <DownloadOutlined />, onClick: handleExportPng },
@@ -473,14 +459,7 @@ const MindElixirToolbar: React.FC = () => {
             />
 
             {/* Focus Mode */}
-            <MindMapToolbarIconButton
-                label={t(isFocused ? 'plugins.mindmap.toolbar.exitFocus' : 'plugins.mindmap.toolbar.enterFocus')}
-                icon={<AimOutlined />}
-                onClick={handleFocusMode}
-                disabled={!mind}
-                pressed={isFocused}
-                style={{ color: isFocused ? '#6366f1' : undefined }}
-            />
+            <MindMapFocusButton mind={mind} />
 
             {/* Summary node creation */}
             <MindMapSummaryButton mind={mind} />

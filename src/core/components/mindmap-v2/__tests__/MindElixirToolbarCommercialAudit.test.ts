@@ -11,6 +11,7 @@ const topToolbarSource = readFileSync(resolve(process.cwd(), 'src/components/ui/
 const topActionButtonsSource = readFileSync(resolve(process.cwd(), 'src/core/components/diagrams/TopActionButtons.tsx'), 'utf8');
 const iconButtonSource = readFileSync(resolve(process.cwd(), 'src/core/components/mindmap-v2/MindMapToolbarIconButton.tsx'), 'utf8');
 const auxiliaryPanelButtonsSource = readFileSync(resolve(process.cwd(), 'src/core/components/mindmap-v2/MindMapAuxiliaryPanelButtons.tsx'), 'utf8');
+const focusButtonSource = readFileSync(resolve(process.cwd(), 'src/core/components/mindmap-v2/MindMapFocusButton.tsx'), 'utf8');
 const summaryButtonSource = readFileSync(resolve(process.cwd(), 'src/core/components/mindmap-v2/MindMapSummaryButton.tsx'), 'utf8');
 
 describe('MindElixirToolbar commercial interaction contract', () => {
@@ -69,6 +70,14 @@ describe('MindElixirToolbar commercial interaction contract', () => {
         expect(summaryButtonSource).toContain('getMindMapSummaryAvailability(mind, selectedNode)');
         expect(summaryButtonSource).toContain('disabled={!availability.enabled}');
         expect(summaryButtonSource).toContain('createMindMapSummaryForSelection(mind, selectedNode?.id)');
+    });
+
+    it('only enters focus mode for a selected non-root node while keeping exit available', () => {
+        expect(source).toContain('<MindMapFocusButton mind={mind} />');
+        expect(focusButtonSource).toContain('useMindMapPropertySelection(mind)');
+        expect(focusButtonSource).toContain('getMindMapFocusAvailability(mind, selectedNode)');
+        expect(focusButtonSource).toContain('toggleFocusMode(selectedNode?.id)');
+        expect(focusButtonSource).toContain('disabled={!isFocused && !availability.enabled}');
     });
 
     it('keeps every tool reachable by touch and keyboard without text-symbol icons', () => {

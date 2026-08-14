@@ -5,7 +5,6 @@ export interface MindMapFocusInstance<TNode = Element> {
     currentNode?: TNode | null;
     findEle: (nodeId: string) => TNode | null;
     focusNode?: (node: TNode) => void;
-    getData: () => { nodeData: { id: string } };
 }
 
 export type MindMapFocusModeErrorReporter = (error: unknown) => void;
@@ -48,7 +47,7 @@ export const useMindMapFocusMode = <TNode,>(
         if (activeMind) cancelFocusedMind(activeMind);
     }, [cancelFocusedMind]);
 
-    const toggleFocusMode = useCallback(() => {
+    const toggleFocusMode = useCallback((selectedNodeId?: string | null) => {
         if (!mind) return;
 
         const activeMind = focusedMindRef.current;
@@ -58,10 +57,13 @@ export const useMindMapFocusMode = <TNode,>(
             return;
         }
 
-        if (activeMind) cancelFocusedMind(activeMind);
+        const targetNodeId = selectedNodeId?.trim();
+        if (!targetNodeId || !mind.focusNode) return;
 
-        const target = mind.currentNode ?? mind.findEle(mind.getData().nodeData.id);
-        if (!target || !mind.focusNode) return;
+        const target = mind.findEle(targetNodeId);
+        if (!target) return;
+
+        if (activeMind) cancelFocusedMind(activeMind);
 
         mind.focusNode(target);
         focusedMindRef.current = mind;

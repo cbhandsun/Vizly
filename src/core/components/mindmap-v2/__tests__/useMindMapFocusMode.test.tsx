@@ -4,18 +4,17 @@ import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { useMindMapFocusMode, type MindMapFocusInstance } from '../useMindMapFocusMode';
 
-const createMind = (selectedNode: Element | null = null) => {
-    const rootNode = document.createElement('div');
+const createMind = () => {
+    const targetNode = document.createElement('div');
     const focusNode = vi.fn();
     const cancelFocus = vi.fn();
     const mind: MindMapFocusInstance = {
         cancelFocus,
-        currentNode: selectedNode,
-        findEle: vi.fn(() => rootNode),
+        currentNode: null,
+        findEle: vi.fn((nodeId: string) => nodeId === 'child' ? targetNode : null),
         focusNode,
-        getData: () => ({ nodeData: { id: 'root' } }),
     };
-    return { cancelFocus, focusNode, mind, rootNode };
+    return { cancelFocus, focusNode, mind, targetNode };
 };
 
 describe('useMindMapFocusMode', () => {
@@ -29,25 +28,25 @@ describe('useMindMapFocusMode', () => {
         );
 
         expect(result.current.isFocused).toBe(false);
-        act(() => result.current.toggleFocusMode());
-        expect(first.focusNode).toHaveBeenCalledWith(first.rootNode);
+        act(() => result.current.toggleFocusMode('child'));
+        expect(first.focusNode).toHaveBeenCalledWith(first.targetNode);
         expect(result.current.isFocused).toBe(true);
 
         rerender({ mind: second.mind });
         expect(first.cancelFocus).toHaveBeenCalledTimes(1);
         expect(result.current.isFocused).toBe(false);
-        act(() => result.current.toggleFocusMode());
-        expect(second.focusNode).toHaveBeenCalledWith(second.rootNode);
+        act(() => result.current.toggleFocusMode('child'));
+        expect(second.focusNode).toHaveBeenCalledWith(second.targetNode);
         expect(result.current.isFocused).toBe(true);
         expect(reportError).not.toHaveBeenCalled();
     });
 
     it('cancels focus and does not claim an unavailable focus capability', () => {
-        const available = createMind(document.createElement('button'));
+        const available = createMind();
         const reportError = vi.fn();
         const { result, unmount } = renderHook(() => useMindMapFocusMode(available.mind, reportError));
 
-        act(() => result.current.toggleFocusMode());
+        act(() => result.current.toggleFocusMode('child'));
         act(() => result.current.toggleFocusMode());
         expect(available.cancelFocus).toHaveBeenCalledTimes(1);
         expect(result.current.isFocused).toBe(false);
@@ -57,7 +56,6 @@ describe('useMindMapFocusMode', () => {
         const unavailable: MindMapFocusInstance = {
             currentNode: null,
             findEle: () => null,
-            getData: () => ({ nodeData: { id: 'root' } }),
         };
         const missing = renderHook(() => useMindMapFocusMode(unavailable, reportError));
         act(() => missing.result.current.toggleFocusMode());
@@ -74,13 +72,13 @@ describe('useMindMapFocusMode', () => {
             { initialProps },
         );
 
-        act(() => unavailableHook.result.current.toggleFocusMode());
+        act(() => unavailableHook.result.current.toggleFocusMode('child'));
         unavailableHook.rerender({ mind: null });
         expect(unavailable.cancelFocus).toHaveBeenCalledTimes(1);
         expect(unavailableHook.result.current.isFocused).toBe(false);
 
         const unmountedHook = renderHook(() => useMindMapFocusMode(unmounted.mind, reportError));
-        act(() => unmountedHook.result.current.toggleFocusMode());
+        act(() => unmountedHook.result.current.toggleFocusMode('child'));
         unmountedHook.unmount();
         expect(unmounted.cancelFocus).toHaveBeenCalledTimes(1);
         expect(reportError).not.toHaveBeenCalled();
@@ -95,12 +93,28 @@ describe('useMindMapFocusMode', () => {
         });
         const { result, unmount } = renderHook(() => useMindMapFocusMode(failing.mind, reportError));
 
-        act(() => result.current.toggleFocusMode());
+        act(() => result.current.toggleFocusMode('child'));
         act(() => result.current.toggleFocusMode());
         expect(reportError).toHaveBeenCalledWith(failure);
         expect(result.current.isFocused).toBe(false);
 
         unmount();
         expect(failing.cancelFocus).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not fall back to the root when the selected node is missing or stale', () => {
+        const available = createMind();
+        const reportError = vi.fn();
+        const { result } = renderHook(() => useMindMapFocusMode(available.mind, reportError));
+
+        act(() => result.current.toggleFocusMode());
+        act(() => result.current.toggleFocusMode('   '));
+        act(() => result.current.toggleFocusMode('missing'));
+
+        expect(available.mind.findEle).toHaveBeenCalledTimes(1);
+        expect(available.mind.findEle).toHaveBeenCalledWith('missing');
+        expect(available.focusNode).not.toHaveBeenCalled();
+        expect(result.current.isFocused).toBe(false);
+        expect(reportError).not.toHaveBeenCalled();
     });
 });
