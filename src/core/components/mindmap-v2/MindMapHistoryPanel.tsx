@@ -2,7 +2,7 @@
  * MindMapHistoryPanel.tsx — 思维导图历史快照管理面板
  * 能够查看历史版本时间线，并一键恢复至历史版本
  */
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { getMindElixirInstance } from './mindElixirStore';
@@ -14,15 +14,27 @@ import {
 } from './mindmapHistoryStore';
 import type { HistoryRecord } from './mindmapHistoryStore';
 import { restoreMindMapHistoryRecord } from './mindmapHistoryRestore';
-import { Popconfirm, message } from 'antd';
+import { Popconfirm } from 'antd';
 import { CloseOutlined, DeleteOutlined, HistoryOutlined, RollbackOutlined } from '@ant-design/icons';
 import { logMindmapHistoryRestoreFailure } from './mindmapPanelLogging';
 import sidePanelStyles from './MindMapSidePanel.module.css';
+import { appMessage } from '../../utils/antdStaticBridge';
+import { getViewportPopupContainer } from '../ui/viewportOverlayPortal';
+import {
+    getMindMapHistoryConfirmCancelId,
+    useMindMapHistoryConfirmationFocus,
+} from './useMindMapHistoryConfirmationFocus';
 
 const MindMapHistoryPanel: React.FC = () => {
     const { t } = useTranslation();
     const [open, setOpen] = useState(false);
     const [records, setRecords] = useState<HistoryRecord[]>([]);
+    const clearButtonRef = useRef<HTMLButtonElement>(null);
+    const closeButtonRef = useRef<HTMLButtonElement>(null);
+    const restoreButtonRefs = useRef(new Map<string, HTMLButtonElement>());
+    const { confirmationKey, handleConfirmationOpenChange } = useMindMapHistoryConfirmationFocus(
+        closeButtonRef,
+    );
 
     useEffect(() => {
         const unsubToggle = subscribeToggleHistory(v => setOpen(v));
@@ -36,7 +48,7 @@ const MindMapHistoryPanel: React.FC = () => {
     const handleRestore = useCallback((record: HistoryRecord) => {
         const mind = getMindElixirInstance();
         if (!mind) {
-            message.error(t('plugins.mindmap.history.notReady'));
+            appMessage.error(t('plugins.mindmap.history.notReady'));
             return;
         }
         try {
@@ -45,16 +57,16 @@ const MindMapHistoryPanel: React.FC = () => {
                 record,
                 backupDescription: t('plugins.mindmap.history.backupDescription'),
             });
-            message.success(t('plugins.mindmap.history.restoreSuccess', { time: record.time }));
+            appMessage.success(t('plugins.mindmap.history.restoreSuccess', { time: record.time }));
         } catch (e) {
             logMindmapHistoryRestoreFailure(e);
-            message.error(t('plugins.mindmap.history.restoreFailed'));
+            appMessage.error(t('plugins.mindmap.history.restoreFailed'));
         }
     }, [t]);
 
     const handleClear = useCallback(() => {
         clearHistory();
-        message.success(t('plugins.mindmap.history.clearSuccess'));
+        appMessage.success(t('plugins.mindmap.history.clearSuccess'));
     }, [t]);
 
     if (!open || typeof document === 'undefined') return null;
@@ -76,11 +88,20 @@ const MindMapHistoryPanel: React.FC = () => {
                         okText={t('plugins.mindmap.history.clearConfirmAction')}
                         cancelText={t('plugins.mindmap.history.cancel')}
                         placement="bottomRight"
-                        autoAdjustOverflow={false}
+                        autoAdjustOverflow
+                        styles={{ root: { maxWidth: 'min(540px, calc(100vw - 80px))' } }}
                         zIndex={1100}
-                        getPopupContainer={() => document.body}
+                        getPopupContainer={getViewportPopupContainer}
+                        open={confirmationKey === 'clear'}
+                        onOpenChange={(nextOpen) => handleConfirmationOpenChange(
+                            'clear',
+                            nextOpen,
+                            clearButtonRef.current,
+                        )}
+                        cancelButtonProps={{ id: getMindMapHistoryConfirmCancelId('clear') }}
                     >
                         <button
+                            ref={clearButtonRef}
                             type="button"
                             className={`${sidePanelStyles.headerAction} ${sidePanelStyles.dangerAction}`}
                             aria-label={t('plugins.mindmap.history.clear')}
@@ -92,6 +113,7 @@ const MindMapHistoryPanel: React.FC = () => {
                 )}
 
                 <button
+                    ref={closeButtonRef}
                     type="button"
                     className={sidePanelStyles.closeButton}
                     onClick={() => setHistoryOpen(false)}
@@ -116,12 +138,24 @@ const MindMapHistoryPanel: React.FC = () => {
                                 onConfirm={() => handleRestore(r)}
                                 okText={t('plugins.mindmap.history.restoreConfirmAction')}
                                 cancelText={t('plugins.mindmap.history.cancel')}
-                                placement="leftTop"
-                                autoAdjustOverflow={false}
+                                placement="bottomRight"
+                                autoAdjustOverflow
+                                styles={{ root: { maxWidth: 'min(540px, calc(100vw - 80px))' } }}
                                 zIndex={1100}
-                                getPopupContainer={() => document.body}
+                                getPopupContainer={getViewportPopupContainer}
+                                open={confirmationKey === r.id}
+                                onOpenChange={(nextOpen) => handleConfirmationOpenChange(
+                                    r.id,
+                                    nextOpen,
+                                    restoreButtonRefs.current.get(r.id) ?? null,
+                                )}
+                                cancelButtonProps={{ id: getMindMapHistoryConfirmCancelId(r.id) }}
                             >
                                 <button
+                                    ref={(element) => {
+                                        if (element) restoreButtonRefs.current.set(r.id, element);
+                                        else restoreButtonRefs.current.delete(r.id);
+                                    }}
                                     type="button"
                                     className={sidePanelStyles.historyItem}
                                     aria-label={t('plugins.mindmap.history.restoreLabel', {

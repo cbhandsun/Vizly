@@ -21,6 +21,16 @@ import {
     setHistoryOpen,
 } from '../mindmapHistoryStore';
 import MindMapHistoryPanel from '../MindMapHistoryPanel';
+import { getMindMapHistoryConfirmCancelId } from '../useMindMapHistoryConfirmationFocus';
+
+const bridge = vi.hoisted(() => ({
+    error: vi.fn(),
+    success: vi.fn(),
+}));
+
+vi.mock('../../../utils/antdStaticBridge', () => ({
+    appMessage: bridge,
+}));
 
 let testI18n: i18n;
 
@@ -52,6 +62,15 @@ afterEach(() => {
 });
 
 describe('MindMapHistoryPanel commercial restore flow', () => {
+    it('creates bounded DOM ids from untrusted confirmation keys', () => {
+        expect(getMindMapHistoryConfirmCancelId('snapshot:<unsafe>'))
+            .toBe('mindmap-history-confirm-cancel-snapshot--unsafe-');
+        expect(getMindMapHistoryConfirmCancelId('')).toBe('mindmap-history-confirm-cancel-action');
+        expect(getMindMapHistoryConfirmCancelId('x'.repeat(100))).toHaveLength(
+            'mindmap-history-confirm-cancel-'.length + 64,
+        );
+    });
+
     it('portals above editor chrome and requires confirmation before restoring', async () => {
         await act(async () => {
             await testI18n.changeLanguage('en');
@@ -94,16 +113,38 @@ describe('MindMapHistoryPanel commercial restore flow', () => {
         fireEvent.click(screen.getByRole('button', {
             name: `Restore the ${snapshotTime} version: Mind map loaded`,
         }));
+        const restoreTrigger = screen.getByRole('button', {
+            name: `Restore the ${snapshotTime} version: Mind map loaded`,
+        });
         expect(refresh).not.toHaveBeenCalled();
         expect(await screen.findByText(
             'Your current canvas will be saved as a recovery snapshot before this version is applied.',
         )).toBeTruthy();
-        expect(document.querySelector('.ant-popover-placement-leftTop')).toBeTruthy();
+        expect(document.querySelector('.ant-popover-placement-bottomRight')).toBeTruthy();
+
+        const cancel = document.getElementById(
+            getMindMapHistoryConfirmCancelId(getHistoryList()[0]?.id ?? ''),
+        );
+        expect(cancel).toBeInstanceOf(HTMLButtonElement);
+        await waitFor(() => expect(document.activeElement).toBe(cancel));
+        fireEvent.click(cancel as HTMLButtonElement);
+        await waitFor(() => expect(document.activeElement).toBe(restoreTrigger));
+
+        fireEvent.click(restoreTrigger);
 
         fireEvent.click(screen.getByRole('button', { name: 'Restore version' }));
         await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
         expect(getHistoryList().some(record => (
             record.description === 'Recovery snapshot before version restore'
         ))).toBe(true);
+
+        const clearTrigger = screen.getByRole('button', { name: 'Clear version history' });
+        fireEvent.click(clearTrigger);
+        const clearCancel = document.getElementById(getMindMapHistoryConfirmCancelId('clear'));
+        expect(clearCancel).toBeInstanceOf(HTMLButtonElement);
+        await waitFor(() => expect(document.activeElement).toBe(clearCancel));
+        fireEvent.click(clearCancel as HTMLButtonElement);
+        await waitFor(() => expect(document.activeElement).toBe(clearTrigger));
+        expect(getHistoryList().length).toBeGreaterThan(0);
     });
 });
