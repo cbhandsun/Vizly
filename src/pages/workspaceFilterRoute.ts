@@ -3,6 +3,20 @@ import { coerceFilterView, type FilterViewType } from './diagramManagementPage.h
 
 const VIEW_PARAM = 'view';
 
+const WORKSPACE_FILTER_VIEWS: readonly FilterViewType[] = [
+  'recent',
+  'local',
+  'cloud',
+  'shared',
+  'templates',
+  'general_templates',
+];
+
+type WorkspaceFilterNavigationKey = 'ArrowLeft' | 'ArrowRight' | 'Home' | 'End';
+
+const isWorkspaceFilterNavigationKey = (value: unknown): value is WorkspaceFilterNavigationKey =>
+  value === 'ArrowLeft' || value === 'ArrowRight' || value === 'Home' || value === 'End';
+
 export interface WorkspaceFilterSearchUpdate {
   readonly searchParams: URLSearchParams;
   readonly changed: boolean;
@@ -31,4 +45,21 @@ export const createWorkspaceFilterSearchUpdate = (
     searchParams,
     changed: searchParams.toString() !== currentSearchParams.toString(),
   };
+};
+
+export const resolveNextWorkspaceFilterView = (
+  currentView: unknown,
+  key: unknown,
+): FilterViewType | null => {
+  if (!isWorkspaceFilterNavigationKey(key)) return null;
+
+  const currentIndex = WORKSPACE_FILTER_VIEWS.findIndex(view => view === currentView);
+  if (currentIndex < 0) return null;
+  if (key === 'Home') return WORKSPACE_FILTER_VIEWS[0];
+  if (key === 'End') return WORKSPACE_FILTER_VIEWS[WORKSPACE_FILTER_VIEWS.length - 1];
+
+  const offset = key === 'ArrowRight' ? 1 : -1;
+  const nextIndex = (currentIndex + offset + WORKSPACE_FILTER_VIEWS.length)
+    % WORKSPACE_FILTER_VIEWS.length;
+  return WORKSPACE_FILTER_VIEWS[nextIndex];
 };

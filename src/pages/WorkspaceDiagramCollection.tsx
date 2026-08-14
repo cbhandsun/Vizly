@@ -37,6 +37,7 @@ import {
 import { DiagramCardSkeleton } from './DiagramCardSkeleton';
 import { WorkspaceCardActionsMenu } from './WorkspaceCardActionsMenu';
 import { WorkspaceEmptyState } from './WorkspaceEmptyState';
+import { resolveNextWorkspaceFilterView } from './workspaceFilterRoute';
 import { focusWorkspaceTarget } from './workspaceMenuInteraction';
 import { getWorkspaceDiagramOpenKey } from './workspaceDiagramOpenState';
 
@@ -194,6 +195,24 @@ export const WorkspaceDiagramCollection = ({
     queueMicrotask(() => focusWorkspaceTarget(recentFilterRef.current));
   };
 
+  const handleFilterGroupKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    const target = event.target instanceof HTMLElement
+      ? event.target.closest<HTMLButtonElement>('[data-workspace-filter-view]')
+      : null;
+    const nextView = resolveNextWorkspaceFilterView(
+      target?.dataset.workspaceFilterView,
+      event.key,
+    );
+    if (!nextView) return;
+
+    event.preventDefault();
+    const nextButton = event.currentTarget.querySelector<HTMLButtonElement>(
+      `[data-workspace-filter-view="${nextView}"]`,
+    );
+    onActiveViewChange(nextView);
+    focusWorkspaceTarget(nextButton);
+  };
+
   const getCardMenu = (item: UnifiedDiagramItem): MenuProps['items'] => {
     if (isTemplateItem(item)) {
       return [{ key: 'apply_template', label: t('workspace.applyTemplate'), icon: <Copy size={16} strokeWidth={2} /> }];
@@ -223,28 +242,28 @@ export const WorkspaceDiagramCollection = ({
                 <div ref={resultsRef} id="workspace-diagram-results" className="workspace-main-inner">
                     {/* Filter Tabs with Counts */}
                     <div className="workspace-matrix-header">
-                        <div className="workspace-filter-tabs" role="group" aria-label={t('workspace.filterBy')}>
-                            <button ref={recentFilterRef} type="button" className={`filter-tab ${activeView === 'recent' ? 'active' : ''}`} aria-pressed={activeView === 'recent'} onClick={() => onActiveViewChange('recent')}>
+                        <div className="workspace-filter-tabs" role="group" aria-label={t('workspace.filterBy')} onKeyDown={handleFilterGroupKeyDown}>
+                            <button ref={recentFilterRef} type="button" className={`filter-tab ${activeView === 'recent' ? 'active' : ''}`} aria-pressed={activeView === 'recent'} data-workspace-filter-view="recent" tabIndex={activeView === 'recent' ? 0 : -1} onClick={() => onActiveViewChange('recent')}>
                                 <Clock size={14} strokeWidth={2} /> {t('workspace.recent')}
                                 <span className="filter-tab-count">{unifiedItems.filter(i => i.source !== 'template' && i.source !== 'general_template').length}</span>
                             </button>
-                            <button type="button" className={`filter-tab ${activeView === 'local' ? 'active' : ''}`} aria-pressed={activeView === 'local'} onClick={() => onActiveViewChange('local')}>
+                            <button type="button" className={`filter-tab ${activeView === 'local' ? 'active' : ''}`} aria-pressed={activeView === 'local'} data-workspace-filter-view="local" tabIndex={activeView === 'local' ? 0 : -1} onClick={() => onActiveViewChange('local')}>
                                 <Laptop size={14} strokeWidth={2} /> {t('workspace.local')}
                                 <span className="filter-tab-count">{localCount}</span>
                             </button>
-                            <button type="button" className={`filter-tab ${activeView === 'cloud' ? 'active' : ''}`} aria-pressed={activeView === 'cloud'} onClick={() => onActiveViewChange('cloud')}>
+                            <button type="button" className={`filter-tab ${activeView === 'cloud' ? 'active' : ''}`} aria-pressed={activeView === 'cloud'} data-workspace-filter-view="cloud" tabIndex={activeView === 'cloud' ? 0 : -1} onClick={() => onActiveViewChange('cloud')}>
                                 <Cloud size={14} strokeWidth={2} /> {t('workspace.cloud')}
                                 <span className="filter-tab-count">{cloudCount}</span>
                             </button>
-                            <button type="button" className={`filter-tab ${activeView === 'shared' ? 'active' : ''}`} aria-pressed={activeView === 'shared'} onClick={() => onActiveViewChange('shared')}>
+                            <button type="button" className={`filter-tab ${activeView === 'shared' ? 'active' : ''}`} aria-pressed={activeView === 'shared'} data-workspace-filter-view="shared" tabIndex={activeView === 'shared' ? 0 : -1} onClick={() => onActiveViewChange('shared')}>
                                 <Share2 size={14} strokeWidth={2} /> {t('workspace.shared')}
                                 <span className="filter-tab-count">{sharedCount}</span>
                             </button>
-                            <button type="button" className={`filter-tab ${activeView === 'templates' ? 'active' : ''}`} aria-pressed={activeView === 'templates'} onClick={() => onActiveViewChange('templates')}>
+                            <button type="button" className={`filter-tab ${activeView === 'templates' ? 'active' : ''}`} aria-pressed={activeView === 'templates'} data-workspace-filter-view="templates" tabIndex={activeView === 'templates' ? 0 : -1} onClick={() => onActiveViewChange('templates')}>
                                 <LayoutGrid size={14} strokeWidth={2} /> {t('workspace.industryTemplates')}
                                 <span className="filter-tab-count">{unifiedItems.filter(i => i.source === 'template').length}</span>
                             </button>
-                            <button type="button" className={`filter-tab ${activeView === 'general_templates' ? 'active' : ''}`} aria-pressed={activeView === 'general_templates'} onClick={() => onActiveViewChange('general_templates')}>
+                            <button type="button" className={`filter-tab ${activeView === 'general_templates' ? 'active' : ''}`} aria-pressed={activeView === 'general_templates'} data-workspace-filter-view="general_templates" tabIndex={activeView === 'general_templates' ? 0 : -1} onClick={() => onActiveViewChange('general_templates')}>
                                 <Blocks size={14} strokeWidth={2} /> {t('workspace.generalTemplates')}
                                 <span className="filter-tab-count">{unifiedItems.filter(i => i.source === 'general_template').length}</span>
                             </button>

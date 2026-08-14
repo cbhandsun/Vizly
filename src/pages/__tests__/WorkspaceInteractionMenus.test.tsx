@@ -233,6 +233,35 @@ describe('WorkspaceContextMenu', () => {
 });
 
 describe('WorkspaceDiagramCollection controls', () => {
+  it('uses a roving tab stop and activates adjacent filters with horizontal navigation keys', async () => {
+    render(<WorkspaceControlsHarness />);
+
+    const cloud = screen.getByRole('button', { name: /Cloud/ });
+    const shared = screen.getByRole('button', { name: /Shared/ });
+    const recent = screen.getByRole('button', { name: /Recent/ });
+    const generalTemplates = screen.getByRole('button', { name: /General templates/ });
+
+    expect(cloud).toHaveAttribute('tabindex', '0');
+    expect(shared).toHaveAttribute('tabindex', '-1');
+    cloud.focus();
+    fireEvent.keyDown(cloud, { key: 'ArrowRight' });
+    expect(shared).toHaveAttribute('aria-pressed', 'true');
+    expect(shared).toHaveAttribute('tabindex', '0');
+    expect(document.activeElement).toBe(shared);
+
+    fireEvent.keyDown(shared, { key: 'End' });
+    expect(generalTemplates).toHaveAttribute('aria-pressed', 'true');
+    expect(document.activeElement).toBe(generalTemplates);
+
+    fireEvent.keyDown(generalTemplates, { key: 'ArrowRight' });
+    expect(recent).toHaveAttribute('aria-pressed', 'true');
+    expect(document.activeElement).toBe(recent);
+
+    fireEvent.keyDown(recent, { key: 'ArrowDown' });
+    expect(recent).toHaveAttribute('aria-pressed', 'true');
+    expect(document.activeElement).toBe(recent);
+  });
+
   it('recovers an empty filtered view to Recent and restores focus to that filter', async () => {
     render(<WorkspaceControlsHarness />);
 

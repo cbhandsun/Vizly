@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   createWorkspaceFilterSearchUpdate,
+  resolveNextWorkspaceFilterView,
   resolveWorkspaceFilterView,
 } from '../workspaceFilterRoute';
 
@@ -72,5 +73,26 @@ describe('workspaceFilterRoute', () => {
       new URLSearchParams('provider=s3'),
       'recent',
     ).changed).toBe(false);
+  });
+
+  it.each([
+    ['recent', 'ArrowLeft', 'general_templates'],
+    ['general_templates', 'ArrowRight', 'recent'],
+    ['cloud', 'ArrowLeft', 'local'],
+    ['cloud', 'ArrowRight', 'shared'],
+    ['shared', 'Home', 'recent'],
+    ['local', 'End', 'general_templates'],
+  ])('resolves %s + %s to %s for horizontal keyboard navigation', (view, key, expected) => {
+    expect(resolveNextWorkspaceFilterView(view, key)).toBe(expected);
+  });
+
+  it.each([
+    ['invalid-view', 'ArrowRight'],
+    [null, 'ArrowLeft'],
+    ['recent', 'ArrowDown'],
+    ['recent', ''],
+    ['recent', '<script>'],
+  ])('ignores malformed filter navigation input %#', (view, key) => {
+    expect(resolveNextWorkspaceFilterView(view, key)).toBeNull();
   });
 });
