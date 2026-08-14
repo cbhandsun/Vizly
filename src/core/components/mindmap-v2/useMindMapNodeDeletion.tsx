@@ -108,7 +108,7 @@ export const useMindMapNodeDeletion = ({
             okButtonProps={{ danger: true }}
             confirmLoading={pending}
             closable={!pending}
-            maskClosable={!pending}
+            mask={{ closable: !pending }}
             keyboard={!pending}
             destroyOnHidden
             onCancel={close}

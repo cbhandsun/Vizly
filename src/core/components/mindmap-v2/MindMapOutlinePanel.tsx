@@ -2,7 +2,7 @@
  * MindMapOutlinePanel.tsx — 大纲视图侧面板
  * XMind / Notion 风格：所有节点按树形缩进列出，点击定位，内置搜索过滤
  */
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import type { MindElixirData, NodeObj } from 'mind-elixir';
 import {
     CloseOutlined,
@@ -21,6 +21,10 @@ import { cleanMindMapData, cleanMindMapTopic } from './mindmapTreeSanitizer';
 import { cleanMindMapChildNode } from './mindmapBridgeSecurity';
 import { emitVizlyMindMapOperation, refreshVizlyMindMapData } from './mindmapOperationBridge';
 import {
+    getMindMapOutlineNavigationTarget,
+    getMindMapOutlineRovingId,
+} from './mindMapOutlineKeyboard';
+import {
     logMindmapOutlineAddFailure,
     logMindmapOutlineDeleteFailure,
     logMindmapOutlineEditFailure,
@@ -31,6 +35,7 @@ import {
     logMindmapOutlineUpdateFailure,
 } from './mindmapPanelLogging';
 import sidePanelStyles from './MindMapSidePanel.module.css';
+import { useMindMapNodeDeletion } from './useMindMapNodeDeletion';
 
 // ─── Flatten tree → array ─────────────────────────────────────────────────────
 interface FlatNode {
@@ -89,6 +94,7 @@ const MindMapOutlinePanel: React.FC = () => {
     const [draggingId, setDraggingId] = useState<string | null>(null);
     const [dragOverId, setDragOverId] = useState<string | null>(null);
     const [dropPosition, setDropPosition] = useState<'before' | 'after' | 'inside' | null>(null);
+    const outlineItemRefs = useRef(new Map<string, HTMLDivElement>());
 
     useEffect(() => subscribeMindElixir(m => setMind(m)), []);
     useEffect(() => subscribeOutline(v => setOpen(v)), []);
@@ -102,6 +108,15 @@ const MindMapOutlinePanel: React.FC = () => {
             logMindmapOutlineRefreshFailure(error);
         }
     }, [mind]);
+
+    const handleDeleted = useCallback(() => {
+        window.setTimeout(refresh, 100);
+    }, [refresh]);
+    const { deleteDialog, requestDelete } = useMindMapNodeDeletion({
+        mind,
+        onDeleted: handleDeleted,
+        onFailure: logMindmapOutlineDeleteFailure,
+    });
 
     useEffect(() => {
         if (!mind || !open) return;
@@ -399,24 +414,21 @@ const MindMapOutlinePanel: React.FC = () => {
     const handleDeleteNode = useCallback((e: React.MouseEvent, id: string) => {
         e.stopPropagation();
         if (!mind) return;
-        const isRoot = id === mind.getData()?.nodeData?.id;
-        if (isRoot) return;
         try {
-            const tpc = mind.findEle(id);
-            if (tpc) {
-                mind.removeNodes([tpc]);
-                setTimeout(refresh, 100);
-            }
+            const node = findNodeById(mind.getData().nodeData, id);
+            if (node) requestDelete(node);
         } catch (e) {
             logMindmapOutlineDeleteFailure(e);
         }
-    }, [mind, refresh]);
+    }, [mind, requestDelete]);
 
     if (!open) return null;
 
     const filtered = query.trim()
         ? nodes.filter(n => n.topic.toLowerCase().includes(query.toLowerCase()))
         : nodes;
+    const visibleIds = filtered.map(node => node.id);
+    const rovingId = getMindMapOutlineRovingId(visibleIds, activeId);
 
     const INDENT = 12;
     const depthColor = (d: number) =>
@@ -468,9 +480,13 @@ const MindMapOutlinePanel: React.FC = () => {
                 {filtered.map(n => (
                     <div
                         key={n.id}
+                        ref={(element) => {
+                            if (element) outlineItemRefs.current.set(n.id, element);
+                            else outlineItemRefs.current.delete(n.id);
+                        }}
                         className={sidePanelStyles.outlineItem}
                         role="treeitem"
-                        tabIndex={0}
+                        tabIndex={rovingId === n.id ? 0 : -1}
                         aria-level={n.depth + 1}
                         aria-selected={activeId === n.id}
                         draggable={n.id !== 'root' && editingId !== n.id}
@@ -483,7 +499,16 @@ const MindMapOutlinePanel: React.FC = () => {
                         onDoubleClick={() => startEdit(n.id, n.topic)}
                         onKeyDown={(event) => {
                             if (event.target !== event.currentTarget) return;
-                            if (event.key === 'Enter' || event.key === ' ') {
+                            const navigationTarget = getMindMapOutlineNavigationTarget({
+                                key: event.key,
+                                currentId: n.id,
+                                visibleIds,
+                            });
+                            if (navigationTarget) {
+                                event.preventDefault();
+                                handleClick(navigationTarget);
+                                outlineItemRefs.current.get(navigationTarget)?.focus({ preventScroll: true });
+                            } else if (event.key === 'Enter' || event.key === ' ') {
                                 event.preventDefault();
                                 handleClick(n.id);
                             } else if (event.key === 'F2') {
@@ -575,6 +600,7 @@ const MindMapOutlinePanel: React.FC = () => {
                                 className={sidePanelStyles.rowAction}
                                 title="添加子节点"
                                 aria-label={`为“${n.topic}”添加子节点`}
+                                tabIndex={rovingId === n.id ? 0 : -1}
                                 onClick={(e) => handleAddChild(e, n.id)}
                             >
                                 <PlusOutlined aria-hidden="true" />
@@ -585,6 +611,7 @@ const MindMapOutlinePanel: React.FC = () => {
                                     className={`${sidePanelStyles.rowAction} ${sidePanelStyles.dangerAction}`}
                                     title="删除节点"
                                     aria-label={`删除节点“${n.topic}”`}
+                                    tabIndex={rovingId === n.id ? 0 : -1}
                                     onClick={(e) => handleDeleteNode(e, n.id)}
                                 >
                                     <DeleteOutlined aria-hidden="true" />
@@ -611,6 +638,7 @@ const MindMapOutlinePanel: React.FC = () => {
                 <span>共 {nodes.length} 个节点</span>
                 <span>Alt+O 切换</span>
             </div>
+            {deleteDialog}
         </aside>
     );
 };

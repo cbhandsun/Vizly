@@ -13,6 +13,7 @@ describe('mind map auxiliary panel commercial audit contract', () => {
 
         expect(css).toContain('@media (max-width: 767px)');
         expect(css).toMatch(/\.panel\s*\{[\s\S]*?top:\s*104px;/);
+        expect(css).toMatch(/\.panel\s*\{[\s\S]*?right:\s*calc\(72px \+ env\(safe-area-inset-right, 0px\)\);/);
         expect(css).toContain('bottom: calc(164px + env(safe-area-inset-bottom, 0px));');
         expect(css).toContain('.outlineItem:focus-visible');
         expect(css).toContain('.outlineItem:focus-within .outlineActions');
@@ -21,11 +22,18 @@ describe('mind map auxiliary panel commercial audit contract', () => {
 
     it('exposes outline operations to keyboard and assistive technology users', () => {
         const source = readSource('MindMapOutlinePanel.tsx');
+        const deletionSource = readSource('useMindMapNodeDeletion.tsx');
 
         expect(source).toContain('aria-label="搜索大纲节点"');
         expect(source).toContain('role="tree"');
         expect(source).toContain('role="treeitem"');
+        expect(source).toContain('tabIndex={rovingId === n.id ? 0 : -1}');
+        expect(source).toContain('getMindMapOutlineNavigationTarget({');
+        expect(source).toContain('requestDelete(node)');
+        expect(source).toContain('{deleteDialog}');
         expect(source).toContain('onClick={() => setOutlineOpen(false)}');
+        expect(deletionSource).toContain('mask={{ closable: !pending }}');
+        expect(deletionSource).not.toContain('maskClosable=');
         expect(source).not.toContain('placeholder="🔍');
     });
 
