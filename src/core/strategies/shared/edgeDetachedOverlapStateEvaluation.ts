@@ -29,6 +29,12 @@ export function scoreDetachedOverlapState(
   nodes: ReactFlowNode[],
 ): number {
   const segments = extractPathSegmentRefs(paths, edges);
+  const segmentsByEdgeIndex = new Map<number, PathSegmentRef[]>();
+  for (const segment of segments) {
+    const current = segmentsByEdgeIndex.get(segment.edgeIndex) ?? [];
+    current.push(segment);
+    segmentsByEdgeIndex.set(segment.edgeIndex, current);
+  }
   const obstacles = getRoutingObstacles(nodes);
   let score = 0;
 
@@ -37,7 +43,14 @@ export function scoreDetachedOverlapState(
       if (segments[i].edgeIndex === segments[j].edgeIndex) continue;
       if (strictCross(segments[i], segments[j])) score += 4500;
       const overlap = segmentOverlap(segments[i], segments[j]);
-      if (isEndpointSharedTrunkOverlap(segments[i], segments[j], edges, overlap)) continue;
+      if (isEndpointSharedTrunkOverlap(
+        segments[i],
+        segments[j],
+        edges,
+        overlap,
+        segmentsByEdgeIndex.get(segments[i].edgeIndex),
+        segmentsByEdgeIndex.get(segments[j].edgeIndex),
+      )) continue;
       const reversePair = isReversePairOverlap(segments[i], segments[j], edges);
       const oppositeDirection = segmentsRunOppositeDirections(segments[i], segments[j]);
       const unrelated = !sharesAnyEndpoint(segments[i], segments[j], edges);
@@ -85,7 +98,14 @@ const detachedPairScore = (
     for (const second of secondSegments) {
       if (strictCross(first, second)) score += 4500;
       const overlap = segmentOverlap(first, second);
-      if (isEndpointSharedTrunkOverlap(first, second, edges, overlap)) continue;
+      if (isEndpointSharedTrunkOverlap(
+        first,
+        second,
+        edges,
+        overlap,
+        firstSegments,
+        secondSegments,
+      )) continue;
       const reversePair = isReversePairOverlap(first, second, edges);
       const oppositeDirection = segmentsRunOppositeDirections(first, second);
       const unrelated = !sharesAnyEndpoint(first, second, edges);

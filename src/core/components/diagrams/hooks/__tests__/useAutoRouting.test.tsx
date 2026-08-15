@@ -119,4 +119,25 @@ describe('useAutoRouting layout preference coordination', () => {
 
         expect(result.current.isLayoutStable).toBe(true);
     });
+
+    it('ignores overlapping layout requests until the active layout completes', async () => {
+        const deferred = createDeferred();
+        mocks.handleStrategyLayout.mockReturnValueOnce(deferred.promise);
+        const { result } = renderHook(() => useAutoRouting(createOptions()));
+        let firstLayout = Promise.resolve();
+
+        act(() => {
+            firstLayout = result.current.handleStrategyLayout('domain-dagre', 'dagre', 'LR');
+        });
+        await act(async () => {
+            await result.current.handleStrategyLayout('domain-vertical', 'grid', 'TB');
+        });
+
+        expect(mocks.handleStrategyLayout).toHaveBeenCalledTimes(1);
+        expect(result.current.isLayoutStable).toBe(false);
+
+        deferred.resolve();
+        await act(async () => firstLayout);
+        expect(result.current.isLayoutStable).toBe(true);
+    });
 });

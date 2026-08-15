@@ -436,6 +436,18 @@ function repairOppositeHemisphereTargetBacktracks(
   return changed ? nextEdges : edges;
 }
 
+/**
+ * Repairs a route that leaves the source on the far hemisphere and returns to
+ * the target from the opposite far hemisphere. This is useful even for a
+ * single reverse-flow edge, so expose it independently from trunk synthesis.
+ */
+export function repairOppositeHemisphereTerminalBacktracks(
+  edges: Edge[],
+  nodes: ReactFlowNode[],
+): Edge[] {
+  return repairOppositeHemisphereTargetBacktracks(edges, { nodes });
+}
+
 export function synthesizeSharedEndpointTrunks(
   edges: Edge[],
   options: SharedTrunkSynthesisOptions = {},

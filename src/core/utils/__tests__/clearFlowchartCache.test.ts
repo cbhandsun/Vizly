@@ -1,7 +1,11 @@
 // @vitest-environment jsdom
 
-import { describe, expect, it, beforeEach } from 'vitest';
-import { clearFlowchartCache, getFlowchartCacheKeysToClear } from '../clearFlowchartCache';
+import { beforeEach, describe, expect, it } from 'vitest';
+import {
+    clearFlowchartCache,
+    getFlowchartCacheKeysToClear,
+    getFlowchartRuntimeCacheKeysToClear,
+} from '../clearFlowchartCache';
 import { getLayerStorageKeys } from '../layerStorage';
 
 describe('clearFlowchartCache', () => {
@@ -36,6 +40,26 @@ describe('clearFlowchartCache', () => {
         localStorage.setItem('flowchart-autosave-v2-diagram-b', '{"nodes":[{"id":"b"}]}');
         localStorage.setItem('GenericStandardDiagram.customPresets.diagram-a', '{"preset":true}');
         localStorage.setItem('GenericStandardDiagram.customPresets.diagram-b', '{"preset":true}');
+        localStorage.setItem(
+            'vizly:standard-preset-canvas:route-v119:diagram-a:old-hash',
+            '{"nodes":[],"edges":[]}',
+        );
+        localStorage.setItem(
+            'vizly:standard-preset-canvas:route-v132:diagram-a:new-hash',
+            '{"nodes":[],"edges":[]}',
+        );
+        localStorage.setItem(
+            'vizly:standard-preset-canvas:route-v132:diagram-b:other-hash',
+            '{"nodes":[{"id":"b"}],"edges":[]}',
+        );
+        localStorage.setItem(
+            'vizly:baseReactFlowDisplayEdges:route-v119:signature-a',
+            '{"hardClean":true}',
+        );
+        localStorage.setItem(
+            'vizly:baseReactFlowDisplayEdges:route-v132:signature-b',
+            '{"hardClean":true}',
+        );
         localStorage.setItem('DiagramView.AIConfig_user-a', '{"apiKey":"secret"}');
         localStorage.setItem('diagram_storage_config', '{"provider":"s3"}');
         sessionStorage.setItem('layered-config-session', '{"theme":"dark"}');
@@ -50,6 +74,18 @@ describe('clearFlowchartCache', () => {
         expect(localStorage.getItem('diagramMenu.recent')).toBeNull();
         expect(localStorage.getItem('flowchart-autosave-v2-diagram-a')).toBeNull();
         expect(localStorage.getItem('GenericStandardDiagram.customPresets.diagram-a')).toBeNull();
+        expect(localStorage.getItem(
+            'vizly:standard-preset-canvas:route-v119:diagram-a:old-hash'
+        )).toBeNull();
+        expect(localStorage.getItem(
+            'vizly:standard-preset-canvas:route-v132:diagram-a:new-hash'
+        )).toBeNull();
+        expect(localStorage.getItem(
+            'vizly:baseReactFlowDisplayEdges:route-v119:signature-a'
+        )).toBeNull();
+        expect(localStorage.getItem(
+            'vizly:baseReactFlowDisplayEdges:route-v132:signature-b'
+        )).toBeNull();
         expect(sessionStorage.getItem('layered-config-session')).toBeNull();
 
         expect(localStorage.getItem('diagramMenu.selectedDiagramId')).toBe('diagram-a');
@@ -57,8 +93,35 @@ describe('clearFlowchartCache', () => {
         expect(localStorage.getItem(diagramBLayerKeys.activeLayer)).toBe('layer-b');
         expect(localStorage.getItem('flowchart-autosave-v2-diagram-b')).toBe('{"nodes":[{"id":"b"}]}');
         expect(localStorage.getItem('GenericStandardDiagram.customPresets.diagram-b')).toBe('{"preset":true}');
+        expect(localStorage.getItem(
+            'vizly:standard-preset-canvas:route-v132:diagram-b:other-hash'
+        )).toBe('{"nodes":[{"id":"b"}],"edges":[]}');
         expect(localStorage.getItem('DiagramView.AIConfig_user-a')).toBe('{"apiKey":"secret"}');
         expect(localStorage.getItem('diagram_storage_config')).toBe('{"provider":"s3"}');
         expect(sessionStorage.getItem('diagram_storage_config_secret')).toBe('storage-secret');
     });
+
+    it('bounds runtime cache discovery and rejects unsafe diagram identifiers', () => {
+        localStorage.setItem(
+            'vizly:standard-preset-canvas:route-v132:diagram-a:hash',
+            '{"nodes":[],"edges":[]}',
+        );
+        localStorage.setItem(
+            'vizly:baseReactFlowDisplayEdges:route-v132:signature',
+            '{"hardClean":true}',
+        );
+
+        expect(getFlowchartRuntimeCacheKeysToClear(localStorage, 'diagram-a')).toEqual([
+            'vizly:standard-preset-canvas:route-v132:diagram-a:hash',
+            'vizly:baseReactFlowDisplayEdges:route-v132:signature',
+        ]);
+        expect(getFlowchartRuntimeCacheKeysToClear(localStorage, 'diagram-a:hash')).toEqual([
+            'vizly:baseReactFlowDisplayEdges:route-v132:signature',
+        ]);
+        expect(getFlowchartRuntimeCacheKeysToClear({
+            get length(): number { throw new Error('blocked'); },
+            key: () => null,
+        }, 'diagram-a')).toEqual([]);
+    });
+
 });

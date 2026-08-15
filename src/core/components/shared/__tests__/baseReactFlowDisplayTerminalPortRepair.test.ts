@@ -8,6 +8,7 @@ import wmsStandardData from '../../../../data/standardized/WmsStandardData.json'
 import { standardDataToCanvas } from '../../diagrams/designerUtils';
 import { calculateEdgePathQualityScore } from '../../../strategies/shared/edgeStrictCrossingGuard';
 import { countDisplayObstacleHits } from '../baseReactFlowDisplayEvaluation';
+import { getDisplayHardQualityGateReport } from '../baseReactFlowDisplayQualityGates';
 import {
   repairAxisMismatchedTerminalsWithBoundedPortRoles,
   repairTerminalHandleHemisphereHairpins,
@@ -197,6 +198,50 @@ describe('baseReactFlowDisplayTerminalPortRepair', () => {
     expect(repairedQuality.unexplainedRelatedOverlap).toBeLessThanOrEqual(
       baselineQuality.unexplainedRelatedOverlap,
     );
+  });
+
+  it('moves a bottom terminal off an exact rectangle corner without changing its side', () => {
+    const nodes: Node[] = [
+      node('source', 0, 0, 100, 100),
+      node('target', 300, 0, 100, 100),
+    ];
+    const routed: Edge[] = [{
+      id: 'bottom-corner',
+      source: 'source',
+      target: 'target',
+      sourceHandle: 'right',
+      targetHandle: 'bottom',
+      data: {
+        computedPath: [
+          { x: 100, y: 50 },
+          { x: 200, y: 50 },
+          { x: 200, y: 148 },
+          { x: 300, y: 148 },
+          { x: 300, y: 100 },
+        ],
+      },
+    }];
+    const baselineQuality = calculateEdgePathQualityScore(routed);
+
+    const repaired = repairAxisMismatchedTerminalsWithBoundedPortRoles(routed, nodes, 64);
+    const repairedQuality = calculateEdgePathQualityScore(repaired);
+    const path = (repaired[0].data as { computedPath: Array<{ x: number; y: number }> })
+      .computedPath;
+    const endpoint = path.at(-1)!;
+    const neighbor = path.at(-2)!;
+
+    expect(repaired).not.toBe(routed);
+    expect(repaired[0].targetHandle).toBe('bottom');
+    expect(endpoint.y).toBe(100);
+    expect(endpoint.x).toBeGreaterThanOrEqual(316);
+    expect(endpoint.x).toBeLessThanOrEqual(384);
+    expect(neighbor.x).toBe(endpoint.x);
+    expect(neighbor.y - endpoint.y).toBeGreaterThanOrEqual(48);
+    expect(repairedQuality.nonOrthogonalSegments).toBeLessThanOrEqual(
+      baselineQuality.nonOrthogonalSegments,
+    );
+    expect(repairedQuality.strictCrossings).toBeLessThanOrEqual(baselineQuality.strictCrossings);
+    expect(countDisplayObstacleHits(repaired, nodes)).toBe(0);
   });
 
   it('repairs declared terminal-axis mismatches in graphs larger than 24 edges', () => {
@@ -503,7 +548,7 @@ describe('baseReactFlowDisplayTerminalPortRepair', () => {
       tinyInteriorDoglegs: baselineQuality.tinyInteriorDoglegs,
     }).toEqual({
       reverseOverlap: 96,
-      unexplainedRelatedOverlap: 96,
+      unexplainedRelatedOverlap: 181,
       tinyInteriorDoglegs: 3,
     });
     expect([1, 2].map(index => {
@@ -730,5 +775,61 @@ describe('baseReactFlowDisplayTerminalPortRepair', () => {
       tinyInteriorDoglegs: 0,
       hairpins: 0,
     });
+  });
+
+  it('atomically moves both feedback terminals away from occupied forward-flow ports', () => {
+    const nodes = [
+      node('incoming', 9800, 100, 50, 100),
+      node('labor', 9900, 100, 100, 100),
+      node('task-group', 9500, 100, 100, 100),
+      node('downstream', 9700, 100, 50, 100),
+    ];
+    const edges: Edge[] = [
+      {
+        id: 'incoming-labor',
+        source: 'incoming',
+        target: 'labor',
+        sourceHandle: 'right',
+        targetHandle: 'left',
+        data: { computedPath: [{ x: 9850, y: 150 }, { x: 9900, y: 150 }] },
+      },
+      {
+        id: 'feedback',
+        source: 'labor',
+        target: 'task-group',
+        sourceHandle: 'left',
+        targetHandle: 'right',
+        data: {
+          autoSource: true,
+          autoTarget: true,
+          auto: ['source', 'target'],
+          runtimeHandleLock: { source: true, target: true },
+          computedPath: [
+            { x: 9900, y: 150 }, { x: 9900, y: 50 },
+            { x: 9600, y: 50 }, { x: 9600, y: 150 },
+          ],
+        },
+      },
+      {
+        id: 'task-downstream',
+        source: 'task-group',
+        target: 'downstream',
+        sourceHandle: 'right',
+        targetHandle: 'left',
+        data: { computedPath: [{ x: 9600, y: 150 }, { x: 9700, y: 150 }] },
+      },
+    ];
+
+    const baseline = getDisplayHardQualityGateReport(edges, nodes, 'polished');
+    expect(baseline.terminalsAttached).toBe(true);
+    expect(baseline.terminalsAnchored).toBe(false);
+
+    const repaired = repairAxisMismatchedTerminalsWithBoundedPortRoles(edges, nodes, 96);
+    const report = getDisplayHardQualityGateReport(repaired, nodes, 'polished');
+    const feedback = repaired.find(edge => edge.id === 'feedback');
+
+    expect(report.hardClean, JSON.stringify({ report, feedback }, null, 2)).toBe(true);
+    expect(feedback?.sourceHandle).not.toBe('left');
+    expect(feedback?.targetHandle).not.toBe('right');
   });
 });

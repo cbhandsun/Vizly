@@ -88,7 +88,7 @@ export const diagramDefinitions: DiagramDefinition[] = [
     tags: ['standard', 'flow', 'unified', 'plugin'],
     icon: FaSitemap,
   },
-  {
+  ...(import.meta.env.DEV ? ([{
     id: 'hello-world-unified',
     name: '🌟 统一架构：示例插件 (SDK)',
     // [Fix] 注册逻辑提升到 .then() 链中（同 standard-flow-unified）
@@ -112,8 +112,8 @@ export const diagramDefinitions: DiagramDefinition[] = [
     category: 'other',
     tags: ['sdk', 'hello-world', 'unified', 'plugin'],
     icon: FaSitemap,
-  },
-  {
+  }] satisfies DiagramDefinition[]) : []),
+  ...(import.meta.env.DEV ? ([{
     id: 'theme-color-comparison',
     name: '主题颜色对比',
     component: lazy(() => import('../pages/ThemeColorComparison')),
@@ -152,7 +152,7 @@ export const diagramDefinitions: DiagramDefinition[] = [
     category: 'debug',
     tags: ['performance', 'smart-edge', 'demo'],
     icon: FaCodeBranch,
-  },
+  }] satisfies DiagramDefinition[]) : []),
   {
     id: 'flowchart-designer',
     name: '流程图设计器',

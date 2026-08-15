@@ -37,6 +37,7 @@ describe('sanitizeLayoutEdges', () => {
 
     expect(edge.sourceHandle).toBe('bottom');
     expect(edge.targetHandle).toBe('top');
+    expect(edge.type).toBe('stablePath');
     expect(edge.data).toMatchObject({
       layoutPathLocked: true,
       _layoutPathLocked: true,

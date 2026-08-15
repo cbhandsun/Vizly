@@ -463,6 +463,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                 lastDomainStrategy,
                                 lastDomainDirection,
                                 lastNodeLayout,
+                                layoutBusy: !isLayoutStable,
                                 showRuler,
                                 toggleRuler: () => setShowRuler((previous: boolean) => !previous),
                                 showMinimap: reactFlowMinimapSupported ? showMinimap : undefined,

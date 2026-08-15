@@ -4,6 +4,8 @@ import type { CSSProperties } from 'react';
 import { StandardDiagramData, StandardNodeData, StandardEdgeData, GroupNodeData } from '../../models/DiagramModels';
 import { LayoutType, type LayoutOptions } from '../../types/layout';
 import { getThemeManager } from '../../themes';
+import { isSafeCssColor } from '../../themes/themeImportSecurity';
+import { appendBaseReactFlowEdgeSemanticClassName } from '../shared/baseReactFlowEdgePresentation';
 import { downloadFile } from '../../utils/downloadUtils';
 import { validateAndFixNodes } from '../../utils/nodeValidation';
 import { expandHandle } from '../../routing/utils/handleUtils';
@@ -52,6 +54,26 @@ const resolveGeneratedGroupLayoutOptions = (layout: StandardDiagramData['layout'
         generateSubDomainGroups: layout?.generateSubDomainGroups !== false,
         domainWhitelist: Array.isArray(layout?.domainWhitelist) ? layout.domainWhitelist : undefined,
         subDomainWhitelist: Array.isArray(layout?.subDomainWhitelist) ? layout.subDomainWhitelist : undefined,
+    };
+};
+
+const restoreCanvasEdgePresentation = (edge: StandardEdgeData, edgeId: string) => {
+    const semanticStroke = typeof edge.style?.stroke === 'string'
+        && isSafeCssColor(edge.style.stroke)
+        ? edge.style.stroke.trim()
+        : undefined;
+    return {
+        id: edgeId,
+        source: edge.source,
+        target: edge.target,
+        type: edge.type === 'main' ? 'advanced-smart-step' : (edge.type || 'advanced-smart-step'),
+        className: appendBaseReactFlowEdgeSemanticClassName(undefined, edge.type),
+        label: edge.label,
+        markerEnd: edge.markerEnd ?? {
+            type: MarkerType.ArrowClosed,
+            ...(semanticStroke ? { color: semanticStroke } : {}),
+        },
+        style: edge.style,
     };
 };
 
@@ -293,7 +315,9 @@ export const standardDataToCanvas = async (
         getThemeManager().setTheme(savedThemeId).catch((error) => {
             logDesignerUtilsThemeRestoreFailure(savedThemeId, error);
         });
-        window.dispatchEvent(new CustomEvent('diagram-global-theme-changed', { detail: savedThemeId }));
+        if (typeof window !== 'undefined' && typeof CustomEvent === 'function') {
+            window.dispatchEvent(new CustomEvent('diagram-global-theme-changed', { detail: savedThemeId }));
+        }
     }
 
     let nodes: Node[] = [];
@@ -443,6 +467,7 @@ export const standardDataToCanvas = async (
     // 3. Process Edges
     data.edges.forEach(e => {
         const edgeId = e.id || `e-${e.source}-${e.target}-${Math.random().toString(36).substring(2,9)}`;
+        const restoredPresentation = restoreCanvasEdgePresentation(e, edgeId);
         const metadata = isRecord(e.metadata) ? e.metadata : {};
         const rawSource = rawNodeById.get(e.source);
         const rawTarget = rawNodeById.get(e.target);
@@ -471,16 +496,11 @@ export const standardDataToCanvas = async (
         const inferredSubDomainHandles = isCrossSubDomainEdge && !explicitSourceHandle && !explicitTargetHandle;
         if (hasCanvasPositions) {
             // 有保存坐标：使用保存的边数据
-            const edgeType = e.type === 'main' ? 'advanced-smart-step' : (e.type || 'advanced-smart-step');
             const inferredAuto = Array.isArray(metadata.autoHandles)
                 ? metadata.autoHandles.filter((value): value is string => typeof value === 'string')
                 : ((metadata.manualHandles === true || manualHandleSides.length > 0) ? undefined : ((metadata.sourceHandle || metadata.targetHandle) ? ['source', 'target'] : undefined));
             edges.push({
-                id: edgeId,
-                source: e.source,
-                target: e.target,
-                type: edgeType,
-                label: e.label,
+                ...restoredPresentation,
                 sourceHandle,
                 targetHandle,
                 data: {
@@ -489,25 +509,17 @@ export const standardDataToCanvas = async (
                     manualHandleSides: metadata.manualHandleSides ?? (manualHandleSides.length > 0 ? manualHandleSides : undefined),
                     inferredSubDomainHandles
                 },
-                markerEnd: e.markerEnd || { type: MarkerType.ArrowClosed },
-                style: e.style
             });
         } else {
             // 无保存坐标：也使用智能连线类型
             const direction = (data.layout?.direction === 'LR' || data.layout?.direction === 'RL') ? 'LR' : 'TB';
             const srcH = sourceHandle ?? (direction === 'LR' ? 'right' : 'bottom');
             const tgtH = targetHandle ?? (direction === 'LR' ? 'left' : 'top');
-            const edgeType = e.type === 'main' ? 'advanced-smart-step' : (e.type || 'advanced-smart-step');
             edges.push({
-                id: edgeId,
-                source: e.source,
-                target: e.target,
-                type: edgeType,
-                label: e.label,
+                ...restoredPresentation,
                 sourceHandle: srcH,
                 targetHandle: tgtH,
                 data: manualHandleSides.length > 0 ? { manualHandleSides, auto: [], inferredSubDomainHandles } : undefined,
-                markerEnd: { type: MarkerType.ArrowClosed },
             });
         }
     });

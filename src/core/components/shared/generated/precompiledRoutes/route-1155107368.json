@@ -1,0 +1,1052 @@
+{
+  "schema": "vizly-precompiled-display-route-v1",
+  "routingVersion": "2026-08-13-precompiled-runtime-stability-v173",
+  "sourceHash": "source-v1:ea82c502ab6535b5c8f8367c591861e540396a41955a15c6b5f94f922264b7de",
+  "inputSignature": "1155107368",
+  "inputGeometryDigest": "geometry-v1:0583feec545f0dc8b0c0ddf2cb700544",
+  "outputRouteSignature": "route-v2:26:162:e9b975517ce9367f",
+  "hardClean": true,
+  "patches": [
+    {
+      "id": "e1",
+      "source": "start-calc",
+      "target": "init-data",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 243,
+            "y": 1541
+          },
+          {
+            "x": 243,
+            "y": 1699
+          }
+        ],
+        "sharedTrunkAware": true
+      }
+    },
+    {
+      "id": "e-check-inv",
+      "source": "init-data",
+      "target": "check-inv-sufficiency",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 243,
+            "y": 1797
+          },
+          {
+            "x": 243,
+            "y": 1955
+          }
+        ],
+        "sharedTrunkAware": true
+      }
+    },
+    {
+      "id": "e-shortage-yes",
+      "source": "check-inv-sufficiency",
+      "target": "apply-satisfaction-rate",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 243,
+            "y": 2052
+          },
+          {
+            "x": 243,
+            "y": 2212
+          }
+        ],
+        "treeRouting": {
+          "effectiveSourceHandle": "b",
+          "effectiveTargetHandle": "t",
+          "points": [
+            {
+              "x": 243,
+              "y": 2052
+            },
+            {
+              "x": 243,
+              "y": 2212
+            }
+          ]
+        },
+        "isTreeBus": true
+      }
+    },
+    {
+      "id": "e-shortage-no",
+      "source": "check-inv-sufficiency",
+      "target": "calc-theory-ratio",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 243,
+            "y": 2052
+          },
+          {
+            "x": 243,
+            "y": 2164
+          },
+          {
+            "x": 427,
+            "y": 2164
+          },
+          {
+            "x": 427,
+            "y": 2356
+          },
+          {
+            "x": 339,
+            "y": 2356
+          },
+          {
+            "x": 339,
+            "y": 2468
+          }
+        ],
+        "treeRouting": {
+          "effectiveSourceHandle": "b",
+          "effectiveTargetHandle": "t",
+          "points": [
+            {
+              "x": 243,
+              "y": 2052
+            },
+            {
+              "x": 243,
+              "y": 2164
+            },
+            {
+              "x": 427,
+              "y": 2164
+            },
+            {
+              "x": 427,
+              "y": 2356
+            },
+            {
+              "x": 339,
+              "y": 2356
+            },
+            {
+              "x": 339,
+              "y": 2468
+            }
+          ]
+        },
+        "sharedTrunkAware": true,
+        "isTreeBus": true
+      }
+    },
+    {
+      "id": "e-rate-applied",
+      "source": "apply-satisfaction-rate",
+      "target": "calc-theory-ratio",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 243,
+            "y": 2309
+          },
+          {
+            "x": 243,
+            "y": 2468
+          }
+        ],
+        "sharedTrunkAware": true
+      }
+    },
+    {
+      "id": "e3",
+      "source": "calc-theory-ratio",
+      "target": "sort-demand",
+      "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 366,
+            "y": 2516
+          },
+          {
+            "x": 498,
+            "y": 2516
+          },
+          {
+            "x": 498,
+            "y": 1492
+          },
+          {
+            "x": 639,
+            "y": 1492
+          }
+        ],
+        "sharedTrunkAware": true
+      }
+    },
+    {
+      "id": "e4",
+      "source": "sort-demand",
+      "target": "check-limit",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 802,
+            "y": 1541
+          },
+          {
+            "x": 802,
+            "y": 1613
+          },
+          {
+            "x": 741,
+            "y": 1613
+          },
+          {
+            "x": 741,
+            "y": 1699
+          }
+        ],
+        "sharedTrunkAware": true
+      }
+    },
+    {
+      "id": "e5",
+      "source": "check-limit",
+      "target": "pool-a-entry",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 741,
+            "y": 1796
+          },
+          {
+            "x": 741,
+            "y": 1956
+          }
+        ],
+        "treeRouting": {
+          "effectiveSourceHandle": "b",
+          "effectiveTargetHandle": "t",
+          "points": [
+            {
+              "x": 741,
+              "y": 1796
+            },
+            {
+              "x": 741,
+              "y": 1956
+            }
+          ]
+        },
+        "isTreeBus": true
+      }
+    },
+    {
+      "id": "e6",
+      "source": "check-limit",
+      "target": "pool-b-entry",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 741,
+            "y": 1796
+          },
+          {
+            "x": 741,
+            "y": 1908
+          },
+          {
+            "x": 584,
+            "y": 1908
+          },
+          {
+            "x": 584,
+            "y": 2140
+          },
+          {
+            "x": 676,
+            "y": 2140
+          },
+          {
+            "x": 676,
+            "y": 2212
+          }
+        ],
+        "treeRouting": {
+          "effectiveSourceHandle": "b",
+          "effectiveTargetHandle": "t",
+          "points": [
+            {
+              "x": 741,
+              "y": 1796
+            },
+            {
+              "x": 741,
+              "y": 1908
+            },
+            {
+              "x": 584,
+              "y": 1908
+            },
+            {
+              "x": 584,
+              "y": 2140
+            },
+            {
+              "x": 676,
+              "y": 2140
+            },
+            {
+              "x": 676,
+              "y": 2212
+            }
+          ]
+        },
+        "sharedTrunkAware": true,
+        "isTreeBus": true
+      }
+    },
+    {
+      "id": "e7",
+      "source": "pool-a-entry",
+      "target": "calc-real-ratio",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 837,
+            "y": 1956
+          },
+          {
+            "x": 837,
+            "y": 1884
+          },
+          {
+            "x": 984,
+            "y": 1884
+          },
+          {
+            "x": 984,
+            "y": 1612
+          },
+          {
+            "x": 1228,
+            "y": 1612
+          },
+          {
+            "x": 1228,
+            "y": 1540
+          }
+        ],
+        "treeRouting": {
+          "effectiveSourceHandle": "top",
+          "effectiveTargetHandle": "bottom",
+          "points": [
+            {
+              "x": 837,
+              "y": 1956
+            },
+            {
+              "x": 837,
+              "y": 1884
+            },
+            {
+              "x": 984,
+              "y": 1884
+            },
+            {
+              "x": 984,
+              "y": 1612
+            },
+            {
+              "x": 1228,
+              "y": 1612
+            },
+            {
+              "x": 1228,
+              "y": 1540
+            }
+          ]
+        },
+        "sharedTrunkAware": true,
+        "isTreeBus": true
+      }
+    },
+    {
+      "id": "e8",
+      "source": "pool-b-entry",
+      "target": "calc-real-ratio",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 741,
+            "y": 2212
+          },
+          {
+            "x": 741,
+            "y": 2140
+          },
+          {
+            "x": 984,
+            "y": 2140
+          },
+          {
+            "x": 984,
+            "y": 1612
+          },
+          {
+            "x": 1228,
+            "y": 1612
+          },
+          {
+            "x": 1228,
+            "y": 1540
+          }
+        ],
+        "treeRouting": {
+          "effectiveSourceHandle": "t",
+          "effectiveTargetHandle": "bottom",
+          "points": [
+            {
+              "x": 741,
+              "y": 2212
+            },
+            {
+              "x": 741,
+              "y": 2140
+            },
+            {
+              "x": 984,
+              "y": 2140
+            },
+            {
+              "x": 984,
+              "y": 1612
+            },
+            {
+              "x": 1228,
+              "y": 1612
+            },
+            {
+              "x": 1228,
+              "y": 1540
+            }
+          ]
+        },
+        "sharedTrunkAware": true,
+        "isTreeBus": true
+      }
+    },
+    {
+      "id": "e9",
+      "source": "calc-real-ratio",
+      "target": "fix-quota",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1260,
+            "y": 1541
+          },
+          {
+            "x": 1260,
+            "y": 1700
+          }
+        ]
+      }
+    },
+    {
+      "id": "e10",
+      "source": "fix-quota",
+      "target": "greedy-spec",
+      "type": "stablePath",
+      "sourceHandle": "top",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1336,
+            "y": 1700
+          },
+          {
+            "x": 1336,
+            "y": 1588
+          },
+          {
+            "x": 1372,
+            "y": 1588
+          },
+          {
+            "x": 1372,
+            "y": 1396
+          },
+          {
+            "x": 50,
+            "y": 1396
+          },
+          {
+            "x": 50,
+            "y": 2932
+          },
+          {
+            "x": 106,
+            "y": 2932
+          }
+        ],
+        "treeRouting": {
+          "effectiveSourceHandle": "top",
+          "effectiveTargetHandle": "left",
+          "points": [
+            {
+              "x": 1336,
+              "y": 1700
+            },
+            {
+              "x": 1336,
+              "y": 1588
+            },
+            {
+              "x": 1372,
+              "y": 1588
+            },
+            {
+              "x": 1372,
+              "y": 1396
+            },
+            {
+              "x": 50,
+              "y": 1396
+            },
+            {
+              "x": 50,
+              "y": 2932
+            },
+            {
+              "x": 106,
+              "y": 2932
+            }
+          ]
+        },
+        "sharedTrunkAware": true,
+        "isTreeBus": true
+      }
+    },
+    {
+      "id": "e11",
+      "source": "greedy-spec",
+      "target": "check-rem",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 216,
+            "y": 2981
+          },
+          {
+            "x": 216,
+            "y": 3140
+          }
+        ],
+        "sharedTrunkAware": true
+      }
+    },
+    {
+      "id": "e12",
+      "source": "check-rem",
+      "target": "sort-rem-round",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 217,
+            "y": 3213
+          },
+          {
+            "x": 217,
+            "y": 3373
+          }
+        ],
+        "treeRouting": {
+          "effectiveSourceHandle": "b",
+          "effectiveTargetHandle": "t",
+          "points": [
+            {
+              "x": 217,
+              "y": 3213
+            },
+            {
+              "x": 217,
+              "y": 3373
+            }
+          ]
+        },
+        "isTreeBus": true
+      }
+    },
+    {
+      "id": "e13",
+      "source": "check-rem",
+      "target": "task-direct-a",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 217,
+            "y": 3213
+          },
+          {
+            "x": 217,
+            "y": 3325
+          },
+          {
+            "x": 66,
+            "y": 3325
+          },
+          {
+            "x": 66,
+            "y": 3733
+          },
+          {
+            "x": 202,
+            "y": 3733
+          },
+          {
+            "x": 202,
+            "y": 3789
+          }
+        ],
+        "treeRouting": {
+          "effectiveSourceHandle": "bottom",
+          "effectiveTargetHandle": "top",
+          "points": [
+            {
+              "x": 217,
+              "y": 3213
+            },
+            {
+              "x": 217,
+              "y": 3325
+            },
+            {
+              "x": 66,
+              "y": 3325
+            },
+            {
+              "x": 66,
+              "y": 3733
+            },
+            {
+              "x": 202,
+              "y": 3733
+            },
+            {
+              "x": 202,
+              "y": 3789
+            }
+          ]
+        },
+        "sharedTrunkAware": true,
+        "sharedTrunkSynthesized": true,
+        "isTreeBus": true
+      }
+    },
+    {
+      "id": "e14",
+      "source": "sort-rem-round",
+      "target": "task-direct-a",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 216,
+            "y": 3470
+          },
+          {
+            "x": 216,
+            "y": 3789
+          }
+        ],
+        "sharedTrunkSynthesized": true
+      }
+    },
+    {
+      "id": "e15",
+      "source": "pool-b-entry",
+      "target": "merge-res",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 741,
+            "y": 2309
+          },
+          {
+            "x": 741,
+            "y": 2680
+          },
+          {
+            "x": 664,
+            "y": 2680
+          },
+          {
+            "x": 664,
+            "y": 2883
+          }
+        ],
+        "sharedTrunkAware": true
+      }
+    },
+    {
+      "id": "e16",
+      "source": "fix-quota",
+      "target": "merge-res",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1172,
+            "y": 1796
+          },
+          {
+            "x": 1172,
+            "y": 2828
+          },
+          {
+            "x": 676,
+            "y": 2828
+          },
+          {
+            "x": 676,
+            "y": 2884
+          }
+        ],
+        "treeRouting": {
+          "effectiveSourceHandle": "bottom",
+          "effectiveTargetHandle": "top",
+          "points": [
+            {
+              "x": 1172,
+              "y": 1796
+            },
+            {
+              "x": 1172,
+              "y": 2828
+            },
+            {
+              "x": 676,
+              "y": 2828
+            },
+            {
+              "x": 676,
+              "y": 2884
+            }
+          ]
+        },
+        "sharedTrunkAware": true,
+        "sharedTrunkSynthesized": true,
+        "isTreeBus": true
+      }
+    },
+    {
+      "id": "e17",
+      "source": "merge-res",
+      "target": "alloc-mixed",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 670,
+            "y": 2981
+          },
+          {
+            "x": 670,
+            "y": 3140
+          }
+        ]
+      }
+    },
+    {
+      "id": "e18",
+      "source": "alloc-mixed",
+      "target": "check-source",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 669,
+            "y": 3237
+          },
+          {
+            "x": 669,
+            "y": 3395
+          }
+        ]
+      }
+    },
+    {
+      "id": "e19",
+      "source": "check-source",
+      "target": "task-rep-b",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 669,
+            "y": 3469
+          },
+          {
+            "x": 669,
+            "y": 3973
+          },
+          {
+            "x": 202,
+            "y": 3973
+          },
+          {
+            "x": 202,
+            "y": 4045
+          }
+        ],
+        "treeRouting": {
+          "effectiveSourceHandle": "bottom",
+          "effectiveTargetHandle": "top",
+          "points": [
+            {
+              "x": 669,
+              "y": 3469
+            },
+            {
+              "x": 669,
+              "y": 3973
+            },
+            {
+              "x": 202,
+              "y": 3973
+            },
+            {
+              "x": 202,
+              "y": 4045
+            }
+          ]
+        },
+        "sharedTrunkAware": true,
+        "isTreeBus": true
+      }
+    },
+    {
+      "id": "e20",
+      "source": "check-source",
+      "target": "task-direct-b",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 669,
+            "y": 3469
+          },
+          {
+            "x": 669,
+            "y": 4229
+          },
+          {
+            "x": 202,
+            "y": 4229
+          },
+          {
+            "x": 202,
+            "y": 4301
+          }
+        ],
+        "treeRouting": {
+          "effectiveSourceHandle": "bottom",
+          "effectiveTargetHandle": "top",
+          "points": [
+            {
+              "x": 669,
+              "y": 3469
+            },
+            {
+              "x": 669,
+              "y": 4229
+            },
+            {
+              "x": 202,
+              "y": 4229
+            },
+            {
+              "x": 202,
+              "y": 4301
+            }
+          ]
+        },
+        "sharedTrunkAware": true,
+        "sharedTrunkSynthesized": true,
+        "isTreeBus": true
+      }
+    },
+    {
+      "id": "e21",
+      "source": "task-direct-a",
+      "target": "end-wms",
+      "type": "stablePath",
+      "sourceHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 116,
+            "y": 3837
+          },
+          {
+            "x": -12,
+            "y": 3837
+          },
+          {
+            "x": -12,
+            "y": 4445
+          },
+          {
+            "x": 202,
+            "y": 4445
+          },
+          {
+            "x": 202,
+            "y": 4557
+          }
+        ],
+        "treeRouting": {
+          "effectiveSourceHandle": "left",
+          "effectiveTargetHandle": "top",
+          "points": [
+            {
+              "x": 116,
+              "y": 3837
+            },
+            {
+              "x": -12,
+              "y": 3837
+            },
+            {
+              "x": -12,
+              "y": 4445
+            },
+            {
+              "x": 202,
+              "y": 4445
+            },
+            {
+              "x": 202,
+              "y": 4557
+            }
+          ]
+        },
+        "sharedTrunkAware": true,
+        "isTreeBus": true
+      }
+    },
+    {
+      "id": "e22",
+      "source": "task-rep-b",
+      "target": "end-wms",
+      "type": "stablePath",
+      "sourceHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 106,
+            "y": 4093
+          },
+          {
+            "x": 50,
+            "y": 4093
+          },
+          {
+            "x": 50,
+            "y": 4445
+          },
+          {
+            "x": 202,
+            "y": 4445
+          },
+          {
+            "x": 202,
+            "y": 4557
+          }
+        ],
+        "treeRouting": {
+          "effectiveSourceHandle": "left",
+          "effectiveTargetHandle": "top",
+          "points": [
+            {
+              "x": 106,
+              "y": 4093
+            },
+            {
+              "x": 50,
+              "y": 4093
+            },
+            {
+              "x": 50,
+              "y": 4445
+            },
+            {
+              "x": 202,
+              "y": 4445
+            },
+            {
+              "x": 202,
+              "y": 4557
+            }
+          ]
+        },
+        "sharedTrunkAware": true,
+        "isTreeBus": true
+      }
+    },
+    {
+      "id": "e23",
+      "source": "task-direct-b",
+      "target": "end-wms",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 202,
+            "y": 4397
+          },
+          {
+            "x": 202,
+            "y": 4557
+          }
+        ],
+        "treeRouting": {
+          "effectiveSourceHandle": "b",
+          "effectiveTargetHandle": "t",
+          "points": [
+            {
+              "x": 202,
+              "y": 4397
+            },
+            {
+              "x": 202,
+              "y": 4557
+            }
+          ]
+        },
+        "isTreeBus": true
+      }
+    }
+  ]
+}

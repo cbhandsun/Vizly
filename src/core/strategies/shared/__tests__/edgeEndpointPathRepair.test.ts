@@ -517,6 +517,38 @@ describe('repairEndpointOrthogonalPaths', () => {
     expect((repaired.data as any)?.endpointOrthogonalRepaired).toBe(true);
   });
 
+  it('keeps a repaired tangential endpoint bridge at or above the 24px commercial floor', () => {
+    const edges: Edge[] = [{
+      id: 'tangential-source',
+      source: 'source',
+      target: 'target',
+      sourceHandle: 'bottom',
+      targetHandle: 'top',
+      data: {
+        computedPath: [
+          { x: 50, y: 128 },
+          { x: 98, y: 128 },
+          { x: 98, y: 244 },
+          { x: 300, y: 244 },
+          { x: 300, y: 1000 },
+        ],
+      },
+    }];
+
+    const [repaired] = repairEndpointOrthogonalPaths(edges, [
+      node('source', 0, 0, 100, 128),
+      node('target', 250, 1000, 100, 50),
+    ]);
+    const path = ((repaired.data as any)?.computedPath ?? []) as Array<{ x: number; y: number }>;
+    const segmentLengths = path.slice(1).map((point, index) => (
+      Math.abs(point.x - path[index].x) + Math.abs(point.y - path[index].y)
+    ));
+
+    expect(path[1].x).toBe(path[0].x);
+    expect(path[1].y).toBeGreaterThan(path[0].y);
+    expect(Math.min(...segmentLengths)).toBeGreaterThanOrEqual(24);
+  });
+
   it('preserves the input array identity when endpoint paths are already valid', () => {
     const edges: Edge[] = [{
       id: 'already-valid',

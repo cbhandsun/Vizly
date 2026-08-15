@@ -3,89 +3,122 @@ import { describe, expect, it } from 'vitest';
 
 import {
   findBaseReactFlowBlockedContextEdgePromotions,
+  findBaseReactFlowStrictContextEdgePromotions,
 } from '../baseReactFlowDisplayIncrementalPromotion';
 
-const changedNode = (type = 'default'): Node => ({
-  id: 'moved',
-  type,
+const changedNode = (overrides: Partial<Node> = {}): Node => ({
+  id: 'changed',
+  type: 'custom',
   position: { x: 100, y: 100 },
-  width: 100,
-  height: 80,
+  measured: { width: 100, height: 100 },
   data: {},
+  ...overrides,
 });
 
-const routedEdge = (
-  id: string,
-  path: Array<{ x: number; y: number }>,
-  source = `${id}-source`,
-  target = `${id}-target`,
-): Edge => ({
+describe('findBaseReactFlowStrictContextEdgePromotions', () => {
+  const crossingEdges: Edge[] = [
+    {
+      id: 'mutable', source: 'a', target: 'b', data: {
+        computedPath: [{ x: 0, y: 50 }, { x: 100, y: 50 }],
+      },
+    },
+    {
+      id: 'context', source: 'c', target: 'd', data: {
+        computedPath: [{ x: 50, y: 0 }, { x: 50, y: 100 }],
+      },
+    },
+    {
+      id: 'unrelated-context', source: 'e', target: 'f', data: {
+        computedPath: [{ x: 150, y: 0 }, { x: 150, y: 100 }],
+      },
+    },
+  ];
+
+  it('promotes only context edges that strictly cross a mutable edge', () => {
+    expect(findBaseReactFlowStrictContextEdgePromotions({
+      edges: crossingEdges,
+      mutableEdgeIds: new Set(['mutable']),
+      contextEdgeIds: ['context', 'unrelated-context'],
+    })).toEqual(['context']);
+  });
+
+  it('keeps context-to-context crossings frozen without mutable evidence', () => {
+    expect(findBaseReactFlowStrictContextEdgePromotions({
+      edges: crossingEdges,
+      mutableEdgeIds: new Set<string>(),
+      contextEdgeIds: ['mutable', 'context'],
+    })).toEqual([]);
+  });
+});
+
+const contextEdge = (id: string, y: number): Edge => ({
   id,
-  source,
-  target,
-  data: { computedPath: path },
+  source: `source-${id}`,
+  target: `target-${id}`,
+  type: 'stablePath',
+  data: {
+    computedPath: [
+      { x: 0, y },
+      { x: 300, y },
+    ],
+  },
 });
 
 describe('findBaseReactFlowBlockedContextEdgePromotions', () => {
-  it('promotes only frozen context edges that intersect the changed node', () => {
-    const crossing = routedEdge('crossing', [
-      { x: 0, y: 130 },
-      { x: 250, y: 130 },
-    ]);
-    const clear = routedEdge('clear', [
-      { x: 0, y: 60 },
-      { x: 250, y: 60 },
-    ]);
-    const incident = routedEdge('incident', [
-      { x: 100, y: 100 },
-      { x: 250, y: 100 },
-    ], 'moved');
-    const outsideContext = routedEdge('outside-context', [
-      { x: 0, y: 140 },
-      { x: 250, y: 140 },
-    ]);
+  it('promotes a frozen branch before it enters the changed node commercial-clearance zone', () => {
+    const edge = contextEdge('near-branch', 242);
 
     expect(findBaseReactFlowBlockedContextEdgePromotions({
-      edges: [clear, crossing, incident, outsideContext],
+      edges: [edge],
       nodes: [changedNode()],
-      changedNodeIds: ['moved'],
-      contextEdgeIds: ['clear', 'crossing', 'incident'],
-    })).toEqual(['crossing']);
+      changedNodeIds: ['changed'],
+      contextEdgeIds: [],
+    })).toEqual([edge.id]);
   });
 
-  it('returns an empty promotion for missing geometry and container changes', () => {
-    const crossing = routedEdge('crossing', [
-      { x: 0, y: 130 },
-      { x: 250, y: 130 },
-    ]);
+  it('keeps a branch frozen at the exact commercial-clearance boundary', () => {
+    const edge = contextEdge('clear-branch', 248);
 
     expect(findBaseReactFlowBlockedContextEdgePromotions({
-      edges: [crossing],
+      edges: [edge],
       nodes: [changedNode()],
-      changedNodeIds: [],
-      contextEdgeIds: ['crossing'],
-    })).toEqual([]);
-    expect(findBaseReactFlowBlockedContextEdgePromotions({
-      edges: [crossing],
-      nodes: [changedNode('titleGroup')],
-      changedNodeIds: ['moved'],
-      contextEdgeIds: ['crossing'],
+      changedNodeIds: ['changed'],
+      contextEdgeIds: [edge.id],
     })).toEqual([]);
   });
 
-  it('rejects promotion sets that exceed the bounded transaction budget', () => {
-    const crossingEdges = Array.from({ length: 9 }, (_, index) => (
-      routedEdge(`crossing-${index}`, [
-        { x: 0, y: 120 + index },
-        { x: 250, y: 120 + index },
-      ])
+  it('ignores incident, unlisted, container, and unmeasured obstacles', () => {
+    const incident = {
+      ...contextEdge('incident', 150),
+      source: 'changed',
+    };
+    const unlisted = contextEdge('unlisted', 150);
+    const listed = contextEdge('listed', 150);
+
+    expect(findBaseReactFlowBlockedContextEdgePromotions({
+      edges: [incident, unlisted, listed],
+      nodes: [changedNode({ type: 'titleGroup' })],
+      changedNodeIds: ['changed'],
+      contextEdgeIds: [incident.id, listed.id],
+    })).toEqual([]);
+    expect(findBaseReactFlowBlockedContextEdgePromotions({
+      edges: [incident, unlisted, listed],
+      nodes: [changedNode({ measured: undefined })],
+      changedNodeIds: ['changed'],
+      contextEdgeIds: [incident.id, listed.id],
+    })).toEqual([]);
+  });
+
+  it('requests a full route when more than eight context branches need promotion', () => {
+    const edges = Array.from({ length: 9 }, (_, index) => (
+      contextEdge(`branch-${index}`, 220 + index)
     ));
 
     expect(findBaseReactFlowBlockedContextEdgePromotions({
-      edges: crossingEdges,
+      edges,
       nodes: [changedNode()],
-      changedNodeIds: ['moved'],
-      contextEdgeIds: crossingEdges.map(edge => edge.id),
+      changedNodeIds: ['changed'],
+      contextEdgeIds: edges.map(edge => edge.id),
     })).toBeNull();
   });
 });

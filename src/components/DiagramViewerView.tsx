@@ -18,7 +18,9 @@ import { ErrorBoundary } from './ui/ErrorBoundary';
 import { subscribeMindMapAIConfigRequest } from '@/core/components/mindmap-v2/mindMapAIConfigEvent';
 import { CloudSaveAuthRecovery } from './diagrams/CloudSaveAuthRecovery';
 
-const RoutingDebugPanel = lazy(() => import('./debug/RoutingDebugPanel').then(module => ({ default: module.RoutingDebugPanel })));
+const RoutingDebugPanel = import.meta.env.DEV
+    ? lazy(() => import('./debug/RoutingDebugPanel').then(module => ({ default: module.RoutingDebugPanel })))
+    : null;
 const KeyboardShortcutPanel = lazy(() => import('@/core/components/diagrams/KeyboardShortcutPanel').then(module => ({
     default: module.KeyboardShortcutPanel,
 })));
@@ -431,7 +433,7 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
                 </div>
 
                 {/* Routing Debug Panel */}
-                {showDebugPanel && (
+                {import.meta.env.DEV && showDebugPanel && RoutingDebugPanel && (
                     <RoutingDebugPanel onClose={() => setShowDebugPanel(false)} />
                 )}
             </DiagramLayout>

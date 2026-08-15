@@ -342,6 +342,7 @@ describe('baseReactFlowDisplayWorker lifecycle', () => {
     expect(resolveBaseReactFlowDisplayWorkerTimeoutMs(Number.POSITIVE_INFINITY, 'interactive')).toBe(12_000);
     expect(resolveBaseReactFlowDisplayWorkerTimeoutMs(-10, 'full')).toBe(1_000);
     expect(resolveBaseReactFlowDisplayWorkerTimeoutMs(900_000, 'full')).toBe(60_000);
+    expect(resolveBaseReactFlowDisplayWorkerTimeoutMs(120_000, 'full')).toBe(120_000);
   });
 
   it('transfers only routing-owned cache patches into validate-or-route', async () => {

@@ -1,6 +1,6 @@
 import { useCallback, useState, MutableRefObject } from 'react';
 import { Node, Edge, ReactFlowInstance } from '@xyflow/react';
-import { animateLayoutTransition } from '../../../utils/animateLayoutTransition';
+import { animateLayoutTransition, runAfterLayoutRenderFrames } from '../../../utils/animateLayoutTransition';
 import { EdgeRoutingCoordinator } from '../../../services/EdgeRoutingCoordinator';
 import { flushObstacles } from '../../custom-edges/obstacleContext';
 import { buildChildrenMap, getDescendantIds } from './useCollapsibleGroups';
@@ -287,6 +287,17 @@ export function sanitizeLayoutEdges(resultNodes: Node[], resultEdges: Edge[], di
                 stablePathQuality: e.data?.stablePathQuality,
                 _layoutEpoch: e.data?._layoutEpoch
             };
+            if (
+                computedPath
+                && (edge.data.layoutPathLocked === true || edge.data._layoutPathLocked === true)
+            ) {
+                // React Flow's built-in smoothstep renderer ignores computedPath.
+                // A domain strategy's locked path must render immediately while
+                // the display worker validates the final candidate; otherwise a
+                // rejected worker leaves every edge on invalid transition-time
+                // handle coordinates in wide LR layouts.
+                edge.type = 'stablePath';
+            }
 
             return edge;
         });
@@ -398,15 +409,10 @@ export function useLayoutStrategy({
                 // [FIX] Post-animation safety clear
                 EdgeRoutingCoordinator.getInstance().forceClearAllCaches();
                 // [FIX] Double RAF: let RF recompute positionAbsolute, then re-trigger edges
-                await new Promise<void>(resolve => {
-                    requestAnimationFrame(() => {
-                        requestAnimationFrame(() => {
-                            EdgeRoutingCoordinator.getInstance().forceClearAllCaches();
-                            setEdges(prev => prev.map(e => ({ ...e, data: { ...e.data, _layoutEpoch: Date.now() } })));
-                            flushObstacles();
-                            resolve();
-                        });
-                    });
+                await runAfterLayoutRenderFrames(() => {
+                    EdgeRoutingCoordinator.getInstance().forceClearAllCaches();
+                    setEdges(prev => prev.map(e => ({ ...e, data: { ...e.data, _layoutEpoch: Date.now() } })));
+                    flushObstacles();
                 });
             } else if (strategyName === 'force') {
                 // ── 扁平力导向布局（对齐 SVG 版：不检测域） ──
@@ -437,15 +443,10 @@ export function useLayoutStrategy({
                 // [FIX] Post-animation safety clear
                 EdgeRoutingCoordinator.getInstance().forceClearAllCaches();
                 // [FIX] Double RAF: let RF recompute positionAbsolute, then re-trigger edges
-                await new Promise<void>(resolve => {
-                    requestAnimationFrame(() => {
-                        requestAnimationFrame(() => {
-                            EdgeRoutingCoordinator.getInstance().forceClearAllCaches();
-                            setEdges(prev => prev.map(e => ({ ...e, data: { ...e.data, _layoutEpoch: Date.now() } })));
-                            flushObstacles();
-                            resolve();
-                        });
-                    });
+                await runAfterLayoutRenderFrames(() => {
+                    EdgeRoutingCoordinator.getInstance().forceClearAllCaches();
+                    setEdges(prev => prev.map(e => ({ ...e, data: { ...e.data, _layoutEpoch: Date.now() } })));
+                    flushObstacles();
                 });
             } else {
                 // ── 域感知策略布局 ──
@@ -567,17 +568,12 @@ export function useLayoutStrategy({
                     // Smart edges read `nodeLookup.internals.positionAbsolute` — if stale, centeredCoords
                     // get wrong absolute coords (e.g. sourceY=2570 instead of 200).
                     // Double RAF ensures RF's internal state is updated before we force edge re-render.
-                    await new Promise<void>(resolve => {
-                        requestAnimationFrame(() => {
-                            requestAnimationFrame(() => {
-                                EdgeRoutingCoordinator.getInstance().forceClearAllCaches();
-                                // Touch edges to force re-render with fresh positionAbsolute.
-                                const layoutEpoch = Date.now();
-                                setEdges(prev => prev.map(e => refreshDomainLayoutEdgeForRender(e, layoutEpoch)));
-                                flushObstacles();
-                                resolve();
-                            });
-                        });
+                    await runAfterLayoutRenderFrames(() => {
+                        EdgeRoutingCoordinator.getInstance().forceClearAllCaches();
+                        // Touch edges to force re-render with fresh positionAbsolute.
+                        const layoutEpoch = Date.now();
+                        setEdges(prev => prev.map(e => refreshDomainLayoutEdgeForRender(e, layoutEpoch)));
+                        flushObstacles();
                     });
                 }
             }

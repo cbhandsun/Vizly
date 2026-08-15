@@ -16,6 +16,10 @@ import {
   getDisplayNodeRect,
 } from './baseReactFlowDisplayGeometry';
 import { createDisplayObstacleHitContext } from './baseReactFlowDisplayObstacleHitCache';
+import {
+  createDisplayTerminalValidationSnapshot,
+  displayTerminalValidationDoesNotRegress,
+} from './baseReactFlowTerminalValidation';
 
 export type DisplaySoftQualityOptions = {
   maxEdges: number;
@@ -64,8 +68,9 @@ export const resolveDisplayQualityBudget = (
   edges: Edge[],
   nodes: Node[],
   isLargeGraph: boolean,
+  forceFullQuality = false,
 ): DisplayQualityBudget => {
-  if (isLargeGraph || edges.length > 80 || nodes.length > 120) {
+  if ((!forceFullQuality && isLargeGraph) || edges.length > 80 || nodes.length > 120) {
     return {
       mode: 'fast',
       soft: { maxEdges: 1, maxCandidatesPerEdge: 8, maxQualityEvaluations: 8 },
@@ -231,6 +236,46 @@ export const countDisplayObstacleHits = (edges: Edge[], nodes: Node[]): number =
   return hitContext.obstacles.size === 0
     ? 0
     : countDisplayObstacleHitsAgainst(edges, hitContext);
+};
+
+export const keepPerEdgeObstacleNonRegressingCandidates = <T extends Edge[]>(
+  baseline: T,
+  candidate: T,
+  nodes: Node[],
+): T => {
+  if (baseline.length !== candidate.length || baseline === candidate) return baseline;
+  const hitContext = createDisplayObstacleHitContext(nodes);
+  const candidateById = new Map(candidate.map(edge => [edge.id, edge] as const));
+  let changed = false;
+  const safeEdges = baseline.map((edge, index) => {
+    const candidateEdge = candidate[index]?.id === edge.id
+      ? candidate[index]
+      : candidateById.get(edge.id);
+    if (!candidateEdge || candidateEdge === edge) return edge;
+    const baselineHits = countDisplayEdgeObstacleHits(edge, hitContext);
+    const candidateHits = countDisplayEdgeObstacleHits(candidateEdge, hitContext);
+    if (candidateHits > baselineHits) return edge;
+    changed = true;
+    return candidateEdge;
+  });
+  return changed ? safeEdges as T : baseline;
+};
+
+export const changedEdgesObstacleHitsDoNotRegress = (
+  baseline: readonly Edge[],
+  candidate: readonly Edge[],
+  changedIndexes: readonly number[],
+  nodes: Node[],
+): boolean => {
+  if (baseline.length !== candidate.length) return false;
+  const hitContext = createDisplayObstacleHitContext(nodes);
+  return [...new Set(changedIndexes)].every(index => {
+    const baselineEdge = baseline[index];
+    const candidateEdge = candidate[index];
+    if (!baselineEdge || !candidateEdge || baselineEdge.id !== candidateEdge.id) return false;
+    return countDisplayEdgeObstacleHits(candidateEdge, hitContext)
+      <= countDisplayEdgeObstacleHits(baselineEdge, hitContext);
+  });
 };
 
 type CachedDisplayObstacleEvaluationContext = {
@@ -475,6 +520,12 @@ export const displayHardQualityGatesAreClean = (
   evaluateTerminals,
 ).hardClean;
 
+const candidateTerminalsDoNotRegress = (
+  baseline: Edge[],
+  candidate: Edge[],
+  snapshot: ReturnType<typeof createDisplayTerminalValidationSnapshot>,
+): boolean => displayTerminalValidationDoesNotRegress(baseline, candidate, snapshot);
+
 export const chooseFinalObstacleAwarePolishCandidate = <T extends Edge[]>(
   nodes: Node[],
   baseline: T,
@@ -486,10 +537,12 @@ export const chooseFinalObstacleAwarePolishCandidate = <T extends Edge[]>(
   const obstacleContext = createDisplayObstacleEvaluationContext(baseline, nodes);
   const baselineQuality = qualityContext.evaluate(baseline);
   const baselineObstacleHits = obstacleContext.evaluate(baseline);
+  const terminalSnapshot = createDisplayTerminalValidationSnapshot(nodes);
   let best = baseline;
   let bestObstacleHits = baselineObstacleHits;
   let bestScore = obstacleRepairScore(baselineQuality, baselineObstacleHits);
   for (const candidate of uniqueCandidates) {
+    if (!candidateTerminalsDoNotRegress(baseline, candidate, terminalSnapshot)) continue;
     const candidateQuality = evaluateDisplayQualityCandidate(qualityContext, baseline, candidate);
     const candidateObstacleHits = evaluateDisplayObstacleCandidate(obstacleContext, baseline, candidate);
     if (candidateObstacleHits > baselineObstacleHits) continue;
@@ -522,10 +575,12 @@ export const chooseFinalTerminalTransactionCandidate = <T extends Edge[]>(
   const obstacleContext = createDisplayObstacleEvaluationContext(baseline, nodes);
   const baselineQuality = qualityContext.evaluate(baseline);
   const baselineObstacleHits = obstacleContext.evaluate(baseline);
+  const terminalSnapshot = createDisplayTerminalValidationSnapshot(nodes);
   let best = baseline;
   let bestObstacleHits = baselineObstacleHits;
   let bestScore = obstacleRepairScore(baselineQuality, baselineObstacleHits);
   for (const candidate of uniqueCandidates) {
+    if (!candidateTerminalsDoNotRegress(baseline, candidate, terminalSnapshot)) continue;
     const candidateQuality = evaluateDisplayQualityCandidate(qualityContext, baseline, candidate);
     const candidateObstacleHits = evaluateDisplayObstacleCandidate(obstacleContext, baseline, candidate);
     if (candidateObstacleHits > baselineObstacleHits) continue;
@@ -561,12 +616,14 @@ export const chooseDisplayStrictPolishCandidate = <T extends Edge[]>(
   const obstacleContext = createDisplayObstacleEvaluationContext(baseline, nodes);
   const baselineQuality = qualityContext.evaluate(baseline);
   const baselineObstacleHits = obstacleContext.evaluate(baseline);
+  const terminalSnapshot = createDisplayTerminalValidationSnapshot(nodes);
   let best = baseline;
   const baselineDisplayStrictCrossings = countDisplayStrictCrossings(baseline);
   let bestDisplayStrictCrossings = baselineDisplayStrictCrossings;
   let bestObstacleHits = baselineObstacleHits;
   let bestScore = obstacleRepairScore(baselineQuality, baselineObstacleHits);
   for (const candidate of uniqueCandidates) {
+    if (!candidateTerminalsDoNotRegress(baseline, candidate, terminalSnapshot)) continue;
     const candidateQuality = evaluateDisplayQualityCandidate(qualityContext, baseline, candidate);
     const candidateObstacleHits = evaluateDisplayObstacleCandidate(obstacleContext, baseline, candidate);
     if (candidateObstacleHits > baselineObstacleHits) continue;

@@ -4,10 +4,11 @@ import { normalizeHandle } from '../../routing/utils/handleUtils';
 import { findStrictCrossings } from '../../strategies/shared/edgeDetachedOverlapRepair';
 import { buildSharedNodeTerminalSideCandidates } from './baseReactFlowSharedNodePortRoleRepair';
 import { compactOrthogonalPath } from './baseReactFlowDisplayEdgeCore';
+import { buildCrossedHorizontalMixedTerminalBridgeVariants } from './baseReactFlowDisplayMixedTerminalBridgeCandidates';
 import {
   displayTerminalSideCanSwitch,
-  resolveDisplayTerminalHandleForSide,
 } from './baseReactFlowDisplayTerminalPolicy';
+import { withDisplayPortBridge } from './baseReactFlowDisplayTerminalPortBridge';
 import {
   displayAxisOf,
   fullDisplayPortSide,
@@ -27,6 +28,7 @@ import {
 export { displayTerminalSideCanSwitch } from './baseReactFlowDisplayTerminalPolicy';
 
 const MIN_DISPLAY_ENDPOINT_STUB = 48;
+const MIN_MIXED_OUTER_PORT_STUB = 56;
 const TERMINAL_SIDE_TOLERANCE = 2;
 
 const pointOnDeclaredTerminalSide = (
@@ -155,6 +157,18 @@ export const displayTerminalRoleNeedsDeclaredAxisRepair = (
         ? Math.abs(endpoint.x - rect.x) <= 2
         : Math.abs(endpoint.x - (rect.x + rect.width)) <= 2;
   if (!onDeclaredSide) return true;
+  // A declared handle disambiguates source breakout direction. Target arrows
+  // are different: render/audit consumers can still infer the adjacent side
+  // from an exact rectangle corner and paint a misleading final approach.
+  // Keep only target terminals slightly inset from tangential extremes.
+  const tangent = side === 'top' || side === 'bottom' ? endpoint.x : endpoint.y;
+  const tangentMinimum = side === 'top' || side === 'bottom' ? rect.x : rect.y;
+  const tangentMaximum = tangentMinimum
+    + (side === 'top' || side === 'bottom' ? rect.width : rect.height);
+  if (role === 'target' && (
+    tangent <= tangentMinimum + 2
+    || tangent >= tangentMaximum - 2
+  )) return true;
   const axis = displayAxisOf(endpoint, neighbor);
   if (side === 'top') return axis !== 'v' || neighbor.y >= endpoint.y - 1;
   if (side === 'bottom') return axis !== 'v' || neighbor.y <= endpoint.y + 1;
@@ -162,45 +176,7 @@ export const displayTerminalRoleNeedsDeclaredAxisRepair = (
   return axis !== 'h' || neighbor.x <= endpoint.x + 1;
 };
 
-export const withDisplayPortBridge = (
-  edge: Edge,
-  path: DisplayPoint[],
-  sourceHandle: 'top' | 'bottom' | 'left' | 'right',
-  targetHandle: 'top' | 'bottom' | 'left' | 'right',
-): Edge => {
-  const candidate = withDisplayComputedPath(edge, path);
-  const data = (candidate.data || {}) as Record<string, unknown>;
-  const resolvedSourceHandle = resolveDisplayTerminalHandleForSide(
-    edge,
-    'source',
-    sourceHandle,
-  );
-  const resolvedTargetHandle = resolveDisplayTerminalHandleForSide(
-    edge,
-    'target',
-    targetHandle,
-  );
-  const treeRouting = data.treeRouting && typeof data.treeRouting === 'object'
-    ? data.treeRouting as Record<string, unknown>
-    : undefined;
-  return {
-    ...candidate,
-    sourceHandle: resolvedSourceHandle,
-    targetHandle: resolvedTargetHandle,
-    data: {
-      ...data,
-      treeRouting: treeRouting && Array.isArray(treeRouting.points)
-        ? {
-          ...treeRouting,
-          effectiveSourceHandle: resolvedSourceHandle,
-          effectiveTargetHandle: resolvedTargetHandle,
-          points: path,
-        }
-        : data.treeRouting,
-      terminalPortBridgeRepaired: true,
-    },
-  };
-};
+export { withDisplayPortBridge } from './baseReactFlowDisplayTerminalPortBridge';
 
 export const buildOppositeRoleSharedNodeCandidates = <T extends Edge[]>(
   edges: T,
@@ -221,7 +197,7 @@ export const buildOppositeRoleSharedNodeCandidates = <T extends Edge[]>(
     const incomingPath = getDisplayComputedPath(orientation.incomingEdge);
     if (
       orientation.incomingSegment.segmentIndex !== incomingPath.length - 2
-      || orientation.outgoingSegment.segmentIndex <= 0
+      || orientation.outgoingSegment.segmentIndex < 0
     ) continue;
     const outgoingSide = normalizeHandle(orientation.outgoingEdge.sourceHandle);
     const incomingSide = normalizeHandle(orientation.incomingEdge.targetHandle);
@@ -264,6 +240,7 @@ export const buildCrossingCompanionOuterPortVariants = <T extends Edge[]>(
   if (primary.axis === companion.axis) return [];
   const edge = edges[companion.edgeIndex];
   if (!edge) return [];
+  const companionPath = getDisplayComputedPath(edge);
   const nodeById = new Map(nodes.map(node => [node.id, node] as const));
   const sourceNode = nodeById.get(edge.source);
   const targetNode = nodeById.get(edge.target);
@@ -320,6 +297,14 @@ export const buildCrossingCompanionOuterPortVariants = <T extends Edge[]>(
         edgeIndex === companion.edgeIndex ? bridged : candidate
       )) as T);
     }
+
+    variants.push(...buildCrossedHorizontalMixedTerminalBridgeVariants({
+      edges,
+      primary,
+      companion,
+      nodes,
+      bridgeEdge: withDisplayPortBridge,
+    }));
   }
 
   if (primary.axis === 'h' && companion.axis === 'v') {
@@ -362,7 +347,91 @@ export const buildCrossingCompanionOuterPortVariants = <T extends Edge[]>(
         edgeIndex === companion.edgeIndex ? bridged : candidate
       )) as T);
     }
+
+    // A same-side outer trunk can still cut through the node at the opposite
+    // endpoint. Add mixed-side candidates that leave one endpoint laterally,
+    // dip around its node, pass just beyond the crossed horizontal span, and
+    // then rejoin the untouched remote terminal stub. This is the planar
+    // escape needed when a vertical connection is topologically trapped by a
+    // source bus and routing both endpoints to the same far side is excessive.
+    const declaredSourceSide = fullDisplayPortSide(normalizeHandle(edge.sourceHandle));
+    const declaredTargetSide = fullDisplayPortSide(normalizeHandle(edge.targetHandle));
+    if (companionPath.length >= 4 && declaredSourceSide && declaredTargetSide) {
+      const primaryMinX = Math.min(primary.a.x, primary.b.x);
+      const primaryMaxX = Math.max(primary.a.x, primary.b.x);
+      for (const role of ['source', 'target'] as const) {
+        const terminalRect = role === 'source' ? sourceRect : targetRect;
+        const oriented = role === 'source'
+          ? companionPath.map(point => ({ ...point }))
+          : [...companionPath].reverse().map(point => ({ ...point }));
+        const remoteStub = oriented[oriented.length - 2];
+        const remoteTerminal = oriented[oriented.length - 1];
+        if (!remoteStub || !remoteTerminal || !displayAxisOf(remoteStub, remoteTerminal)) continue;
+        const returnDirection = terminalRect.y + terminalRect.height / 2 >= remoteTerminal.y
+          ? 1
+          : -1;
+        const returnBoundaryY = returnDirection > 0
+          ? Math.max(...relevantRects.map(rect => rect.y + rect.height))
+          : Math.min(...relevantRects.map(rect => rect.y));
+        for (const side of ['left', 'right'] as const) {
+          if (!displayTerminalSideCanSwitch(edge, role, side)) continue;
+          const sideDirection = side === 'right' ? 1 : -1;
+          const terminal = {
+            x: side === 'right' ? terminalRect.x + terminalRect.width : terminalRect.x,
+            y: terminalRect.y + terminalRect.height / 2,
+          };
+          const sideStub = {
+            x: terminal.x + sideDirection * MIN_MIXED_OUTER_PORT_STUB,
+            y: terminal.y,
+          };
+          const localOuterX = side === 'right'
+            ? Math.max(sideStub.x, primaryMaxX + RESIDUAL_PARALLEL_LANE_GAP)
+            : Math.min(sideStub.x, primaryMinX - RESIDUAL_PARALLEL_LANE_GAP);
+          const farOuterX = side === 'right'
+            ? Math.max(
+              sideStub.x,
+              ...relevantRects.map(rect => rect.x + rect.width),
+            ) + MIN_DISPLAY_ENDPOINT_STUB
+            : Math.min(sideStub.x, ...relevantRects.map(rect => rect.x))
+              - MIN_DISPLAY_ENDPOINT_STUB;
+          const outerLanes = [...new Set([localOuterX, farOuterX])];
+          const returnLanes = [
+            returnBoundaryY + returnDirection * RESIDUAL_PARALLEL_LANE_GAP,
+            returnBoundaryY + returnDirection * MIN_DISPLAY_ENDPOINT_STUB,
+          ];
+          for (const outerX of outerLanes) {
+            for (const returnY of returnLanes) {
+              const candidateOriented = compactOrthogonalPath([
+                terminal,
+                sideStub,
+                { x: sideStub.x, y: returnY },
+                { x: outerX, y: returnY },
+                { x: outerX, y: remoteStub.y },
+                remoteStub,
+                remoteTerminal,
+              ]);
+              if (candidateOriented.length < 4) continue;
+              const candidatePath = role === 'source'
+                ? candidateOriented
+                : [...candidateOriented].reverse();
+              const sourceSide = role === 'source' ? side : declaredSourceSide;
+              const targetSide = role === 'target' ? side : declaredTargetSide;
+              const bridged = withDisplayPortBridge(
+                edge,
+                candidatePath,
+                sourceSide,
+                targetSide,
+              );
+              variants.push(edges.map((candidate, edgeIndex) => (
+                edgeIndex === companion.edgeIndex ? bridged : candidate
+              )) as T);
+            }
+          }
+        }
+      }
+    }
   }
+
   return variants;
 };
 

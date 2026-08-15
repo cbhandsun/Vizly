@@ -20,13 +20,26 @@ export type RoutingObstacleEvaluationContext = Readonly<{
   evaluate: (path: Point[]) => RoutingObstacleHitEvaluation;
 }>;
 
+export type NodeClearanceEvaluationContext = Readonly<{
+  score: (path: Point[], minimumClearance?: number) => number;
+}>;
+
 const ENDPOINT_INTERIOR_TOLERANCE = 0.51;
+export const BUSINESS_NODE_CLEARANCE = 28;
 
 const EPS = 0.5;
 const FLEXIBLE_SHARED_TRUNK_MIN = 24;
 const SEVERE_DETOUR_RATIO = 2.5;
 const SOFT_DETOUR_RATIO = 1.8;
 const EXCESSIVE_BENDS = 6;
+const CONTAINER_NODE_TYPES = new Set([
+  'titleGroup',
+  'subGroup',
+  'group',
+  'domain',
+  'subDomain',
+  'swimlane',
+]);
 
 const num = (value: unknown, fallback: number): number => (
   typeof value === 'number' && Number.isFinite(value) ? value : fallback
@@ -83,8 +96,7 @@ function nodeRect(node: ReactFlowNode): Rect | null {
 }
 
 function isContainerNode(node: ReactFlowNode): boolean {
-  return new Set(['titleGroup', 'subGroup', 'group', 'domain', 'subDomain', 'swimlane'])
-    .has(String(node.type ?? ''));
+  return CONTAINER_NODE_TYPES.has(String(node.type ?? ''));
 }
 
 function segmentIntersectsRect(segment: Segment, rect: Rect, padding = 10): boolean {
@@ -156,6 +168,26 @@ function distancePointToSegment(point: Point, segment: Segment): number {
 }
 
 function segmentToRectDistance(segment: Segment, rect: Rect): number {
+  const axis = axisOf(segment.a, segment.b);
+  if (axis) {
+    const segmentMinX = Math.min(segment.a.x, segment.b.x);
+    const segmentMaxX = Math.max(segment.a.x, segment.b.x);
+    const segmentMinY = Math.min(segment.a.y, segment.b.y);
+    const segmentMaxY = Math.max(segment.a.y, segment.b.y);
+    const deltaX = Math.max(
+      rect.x - segmentMaxX,
+      segmentMinX - (rect.x + rect.width),
+      0,
+    );
+    const deltaY = Math.max(
+      rect.y - segmentMaxY,
+      segmentMinY - (rect.y + rect.height),
+      0,
+    );
+    if (deltaX === 0) return deltaY;
+    if (deltaY === 0) return deltaX;
+    return Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+  }
   if (segmentIntersectsRect(segment, rect, 0)) return 0;
   const corners = [
     { x: rect.x, y: rect.y },
@@ -164,6 +196,36 @@ function segmentToRectDistance(segment: Segment, rect: Rect): number {
     { x: rect.x, y: rect.y + rect.height },
   ];
   return Math.min(...corners.map(corner => distancePointToSegment(corner, segment)));
+}
+
+const normalizeNodeClearance = (minimumClearance: number): number => (
+  Number.isFinite(minimumClearance)
+    ? Math.max(0, minimumClearance)
+    : BUSINESS_NODE_CLEARANCE
+);
+
+export function createNodeClearanceEvaluationContext(
+  nodes: ReactFlowNode[],
+  edge: Edge,
+): NodeClearanceEvaluationContext {
+  const nodeRects = businessRects(nodes)
+    .filter(node => node.id !== edge.source && node.id !== edge.target)
+    .map(node => node.rect);
+
+  return Object.freeze({
+    score(path: Point[], minimumClearance = BUSINESS_NODE_CLEARANCE): number {
+      if (nodeRects.length === 0) return 0;
+      const requiredClearance = normalizeNodeClearance(minimumClearance);
+      let risk = 0;
+      for (const segment of toSegments(path)) {
+        for (const rect of nodeRects) {
+          const clearance = segmentToRectDistance(segment, rect);
+          risk += Math.max(0, requiredClearance - clearance);
+        }
+      }
+      return risk;
+    },
+  });
 }
 
 function businessRects(nodes: ReactFlowNode[]): Array<{ id: string; rect: Rect }> {
@@ -270,6 +332,16 @@ function endpointStubPoint(anchor: Point, adjacent: Point | undefined, length: n
   }
   const direction = Math.sign(adjacent.y - anchor.y);
   return direction === 0 ? null : { x: anchor.x, y: anchor.y + direction * length };
+}
+
+export function scoreNodeClearanceRisk(
+  path: Point[],
+  nodes: ReactFlowNode[] | undefined,
+  edge: Edge | undefined,
+  minimumClearance = BUSINESS_NODE_CLEARANCE,
+): number {
+  if (!nodes || nodes.length === 0 || !edge) return 0;
+  return createNodeClearanceEvaluationContext(nodes, edge).score(path, minimumClearance);
 }
 
 export function pathHasNodeRoutingRisk(path: Point[], nodes: ReactFlowNode[] | undefined, edge: Edge | undefined): boolean {

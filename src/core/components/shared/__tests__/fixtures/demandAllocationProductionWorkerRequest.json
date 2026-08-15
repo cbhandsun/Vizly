@@ -1,0 +1,2778 @@
+{
+  "requestId": "3316775788:1",
+  "edges": [
+    {
+      "id": "e1",
+      "source": "start-calc",
+      "target": "init-data",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "computedPath": [
+          {
+            "x": 243,
+            "y": 1541
+          },
+          {
+            "x": 243,
+            "y": 1699
+          }
+        ],
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "beautified": true,
+        "orthogonalSanitized": true,
+        "sharedTrunkAware": true,
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        }
+      }
+    },
+    {
+      "id": "e-check-inv",
+      "source": "init-data",
+      "target": "check-inv-sufficiency",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "label": "基础数据",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "computedPath": [
+          {
+            "x": 243,
+            "y": 1797
+          },
+          {
+            "x": 243,
+            "y": 1955
+          }
+        ],
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "beautified": true,
+        "orthogonalSanitized": true,
+        "sharedTrunkAware": true,
+        "labelPosition": {
+          "x": 297,
+          "y": 1876,
+          "adjusted": true
+        },
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        }
+      }
+    },
+    {
+      "id": "e-shortage-yes",
+      "source": "check-inv-sufficiency",
+      "target": "apply-satisfaction-rate",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "label": "缺货 (Inv < Demand)",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "computedPath": [
+          {
+            "x": 243,
+            "y": 2052
+          },
+          {
+            "x": 243,
+            "y": 2212
+          }
+        ],
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "_orderIndexSource": 0,
+        "_orderTotalSource": 2,
+        "beautified": true,
+        "treeRouting": {
+          "type": "tree-out",
+          "points": [
+            {
+              "x": 243,
+              "y": 2052
+            },
+            {
+              "x": 243,
+              "y": 2212
+            }
+          ],
+          "trunkId": "trunk-out-check-inv-sufficiency-all",
+          "effectiveSourceHandle": "b",
+          "effectiveTargetHandle": "t"
+        },
+        "isTreeBus": true,
+        "orthogonalSanitized": true,
+        "crossingOptimized": true,
+        "labelPosition": {
+          "x": 297,
+          "y": 2132,
+          "adjusted": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        }
+      }
+    },
+    {
+      "id": "e-shortage-no",
+      "source": "check-inv-sufficiency",
+      "target": "calc-theory-ratio",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "label": "充足",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "computedPath": [
+          {
+            "x": 243,
+            "y": 2052
+          },
+          {
+            "x": 243,
+            "y": 2124
+          },
+          {
+            "x": 391,
+            "y": 2124
+          },
+          {
+            "x": 391,
+            "y": 2396
+          },
+          {
+            "x": 339,
+            "y": 2396
+          },
+          {
+            "x": 339,
+            "y": 2468
+          }
+        ],
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "_orderIndexSource": 1,
+        "_orderTotalSource": 2,
+        "_orderIndexTarget": 1,
+        "_orderTotalTarget": 2,
+        "layerControlPoints": [
+          {
+            "x": 243,
+            "y": 2260
+          }
+        ],
+        "isLongEdge": true,
+        "beautified": true,
+        "treeRouting": {
+          "type": "tree-out",
+          "points": [
+            {
+              "x": 243,
+              "y": 2052
+            },
+            {
+              "x": 243,
+              "y": 2124
+            },
+            {
+              "x": 391,
+              "y": 2124
+            },
+            {
+              "x": 391,
+              "y": 2396
+            },
+            {
+              "x": 339,
+              "y": 2396
+            },
+            {
+              "x": 339,
+              "y": 2468
+            }
+          ],
+          "trunkId": "trunk-out-check-inv-sufficiency-all",
+          "effectiveSourceHandle": "b",
+          "effectiveTargetHandle": "t"
+        },
+        "isTreeBus": true,
+        "orthogonalSanitized": true,
+        "hardObstacleRepaired": true,
+        "obstacleClearanceOptimized": false,
+        "sharedTrunkAware": true,
+        "crossingOptimized": true,
+        "labelPosition": {
+          "x": 297,
+          "y": 2260,
+          "adjusted": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "localDoglegRepaired": true,
+        "detachedOverlapSeparated": true,
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        }
+      }
+    },
+    {
+      "id": "e-rate-applied",
+      "source": "apply-satisfaction-rate",
+      "target": "calc-theory-ratio",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "label": "修正需求 (Q*Rate)",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "computedPath": [
+          {
+            "x": 243,
+            "y": 2309
+          },
+          {
+            "x": 243,
+            "y": 2468
+          }
+        ],
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "_orderIndexTarget": 0,
+        "_orderTotalTarget": 2,
+        "beautified": true,
+        "orthogonalSanitized": true,
+        "sharedTrunkAware": true,
+        "crossingOptimized": true,
+        "labelPosition": {
+          "x": 297,
+          "y": 2388,
+          "adjusted": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        }
+      }
+    },
+    {
+      "id": "e3",
+      "source": "calc-theory-ratio",
+      "target": "sort-demand",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "type": "advanced-smart-step",
+      "label": "Max_Ratio",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "computedPath": [
+          {
+            "x": 147,
+            "y": 2467
+          },
+          {
+            "x": 147,
+            "y": 2395
+          },
+          {
+            "x": 94,
+            "y": 2395
+          },
+          {
+            "x": 94,
+            "y": 1413
+          },
+          {
+            "x": 612,
+            "y": 1413
+          },
+          {
+            "x": 612,
+            "y": 1541
+          },
+          {
+            "x": 740,
+            "y": 1541
+          }
+        ],
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "layerControlPoints": [
+          {
+            "x": 409,
+            "y": 2175
+          },
+          {
+            "x": 575,
+            "y": 1833
+          }
+        ],
+        "isLongEdge": true,
+        "orthogonalSanitized": true,
+        "sharedTrunkAware": true,
+        "hardObstacleRepaired": true,
+        "obstacleClearanceOptimized": true,
+        "crossingOptimized": true,
+        "labelPosition": {
+          "x": 546,
+          "y": 2004,
+          "adjusted": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "localDoglegRepaired": true,
+        "detachedOverlapSeparated": true,
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        }
+      }
+    },
+    {
+      "id": "e4",
+      "source": "sort-demand",
+      "target": "check-limit",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "label": "循环处理",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "computedPath": [
+          {
+            "x": 802,
+            "y": 1541
+          },
+          {
+            "x": 802,
+            "y": 1613
+          },
+          {
+            "x": 741,
+            "y": 1613
+          },
+          {
+            "x": 741,
+            "y": 1699
+          }
+        ],
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "beautified": true,
+        "orthogonalSanitized": true,
+        "sharedTrunkAware": true,
+        "crossingOptimized": true,
+        "labelPosition": {
+          "x": 795,
+          "y": 1620,
+          "adjusted": true
+        },
+        "sameNodeInOutCrossingRepaired": true,
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "localDoglegRepaired": true,
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        }
+      }
+    },
+    {
+      "id": "e5",
+      "source": "check-limit",
+      "target": "pool-a-entry",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "label": "Yes (未满)",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "computedPath": [
+          {
+            "x": 741,
+            "y": 1796
+          },
+          {
+            "x": 741,
+            "y": 1956
+          }
+        ],
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "_orderIndexSource": 0,
+        "_orderTotalSource": 2,
+        "beautified": true,
+        "treeRouting": {
+          "type": "tree-out",
+          "points": [
+            {
+              "x": 741,
+              "y": 1796
+            },
+            {
+              "x": 741,
+              "y": 1956
+            }
+          ],
+          "trunkId": "trunk-out-check-limit-all",
+          "effectiveSourceHandle": "b",
+          "effectiveTargetHandle": "t"
+        },
+        "isTreeBus": true,
+        "orthogonalSanitized": true,
+        "crossingOptimized": true,
+        "labelPosition": {
+          "x": 795,
+          "y": 1876,
+          "adjusted": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        }
+      }
+    },
+    {
+      "id": "e6",
+      "source": "check-limit",
+      "target": "pool-b-entry",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "label": "No (溢出)",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "computedPath": [
+          {
+            "x": 741,
+            "y": 1796
+          },
+          {
+            "x": 741,
+            "y": 1932
+          },
+          {
+            "x": 620,
+            "y": 1932
+          },
+          {
+            "x": 620,
+            "y": 2140
+          },
+          {
+            "x": 645,
+            "y": 2140
+          },
+          {
+            "x": 645,
+            "y": 2212
+          }
+        ],
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "_orderIndexSource": 1,
+        "_orderTotalSource": 2,
+        "layerControlPoints": [
+          {
+            "x": 741,
+            "y": 2004
+          }
+        ],
+        "isLongEdge": true,
+        "beautified": true,
+        "treeRouting": {
+          "type": "tree-out",
+          "points": [
+            {
+              "x": 741,
+              "y": 1796
+            },
+            {
+              "x": 741,
+              "y": 1932
+            },
+            {
+              "x": 620,
+              "y": 1932
+            },
+            {
+              "x": 620,
+              "y": 2140
+            },
+            {
+              "x": 645,
+              "y": 2140
+            },
+            {
+              "x": 645,
+              "y": 2212
+            }
+          ],
+          "trunkId": "trunk-out-check-limit-all",
+          "effectiveSourceHandle": "b",
+          "effectiveTargetHandle": "t"
+        },
+        "isTreeBus": true,
+        "orthogonalSanitized": true,
+        "hardObstacleRepaired": true,
+        "obstacleClearanceOptimized": true,
+        "sharedTrunkAware": true,
+        "crossingOptimized": true,
+        "labelPosition": {
+          "x": 795,
+          "y": 2004,
+          "adjusted": true
+        },
+        "localDoglegRepaired": true,
+        "detachedOverlapSeparated": true,
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        }
+      }
+    },
+    {
+      "id": "e7",
+      "source": "pool-a-entry",
+      "target": "calc-real-ratio",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "type": "advanced-smart-step",
+      "label": "汇聚",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "computedPath": [
+          {
+            "x": 837,
+            "y": 1956
+          },
+          {
+            "x": 837,
+            "y": 1884
+          },
+          {
+            "x": 973,
+            "y": 1884
+          },
+          {
+            "x": 973,
+            "y": 1612
+          },
+          {
+            "x": 1228,
+            "y": 1612
+          },
+          {
+            "x": 1228,
+            "y": 1540
+          }
+        ],
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "_orderIndexTarget": 0,
+        "_orderTotalTarget": 2,
+        "layerControlPoints": [
+          {
+            "x": 984,
+            "y": 1748
+          }
+        ],
+        "isLongEdge": true,
+        "treeRouting": {
+          "type": "tree-in",
+          "points": [
+            {
+              "x": 837,
+              "y": 1956
+            },
+            {
+              "x": 837,
+              "y": 1884
+            },
+            {
+              "x": 973,
+              "y": 1884
+            },
+            {
+              "x": 973,
+              "y": 1612
+            },
+            {
+              "x": 1228,
+              "y": 1612
+            },
+            {
+              "x": 1228,
+              "y": 1540
+            }
+          ],
+          "trunkId": "trunk-in-calc-real-ratio-all",
+          "effectiveSourceHandle": "top",
+          "effectiveTargetHandle": "bottom"
+        },
+        "isTreeBus": true,
+        "hardObstacleRepaired": true,
+        "obstacleClearanceOptimized": true,
+        "sharedTrunkAware": true,
+        "sameNodeInOutCrossingRepaired": true,
+        "crossingOptimized": true,
+        "labelPosition": {
+          "x": 984,
+          "y": 1802,
+          "adjusted": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "detachedOverlapSeparated": true,
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        }
+      }
+    },
+    {
+      "id": "e8",
+      "source": "pool-b-entry",
+      "target": "calc-real-ratio",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "type": "advanced-smart-step",
+      "label": "汇聚",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "computedPath": [
+          {
+            "x": 741,
+            "y": 2212
+          },
+          {
+            "x": 741,
+            "y": 2140
+          },
+          {
+            "x": 985,
+            "y": 2140
+          },
+          {
+            "x": 985,
+            "y": 1612
+          },
+          {
+            "x": 1228,
+            "y": 1612
+          },
+          {
+            "x": 1228,
+            "y": 1540
+          }
+        ],
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "_orderIndexSource": 1,
+        "_orderTotalSource": 2,
+        "_orderIndexTarget": 1,
+        "_orderTotalTarget": 2,
+        "layerControlPoints": [
+          {
+            "x": 985,
+            "y": 1876
+          }
+        ],
+        "isLongEdge": true,
+        "treeRouting": {
+          "type": "tree-in",
+          "points": [
+            {
+              "x": 741,
+              "y": 2212
+            },
+            {
+              "x": 741,
+              "y": 2140
+            },
+            {
+              "x": 985,
+              "y": 2140
+            },
+            {
+              "x": 985,
+              "y": 1612
+            },
+            {
+              "x": 1228,
+              "y": 1612
+            },
+            {
+              "x": 1228,
+              "y": 1540
+            }
+          ],
+          "trunkId": "trunk-in-calc-real-ratio-all",
+          "effectiveSourceHandle": "t",
+          "effectiveTargetHandle": "bottom"
+        },
+        "isTreeBus": true,
+        "hardObstacleRepaired": true,
+        "obstacleClearanceOptimized": false,
+        "sharedTrunkAware": true,
+        "sameNodeInOutCrossingRepaired": true,
+        "crossingOptimized": true,
+        "labelPosition": {
+          "x": 1039,
+          "y": 1876,
+          "adjusted": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        }
+      }
+    },
+    {
+      "id": "e9",
+      "source": "calc-real-ratio",
+      "target": "fix-quota",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "label": "Real_Ratio",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "computedPath": [
+          {
+            "x": 1260,
+            "y": 1541
+          },
+          {
+            "x": 1260,
+            "y": 1700
+          }
+        ],
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "beautified": true,
+        "labelPosition": {
+          "x": 1282,
+          "y": 1620,
+          "adjusted": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "detachedOverlapSeparated": true,
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        }
+      }
+    },
+    {
+      "id": "e10",
+      "source": "fix-quota",
+      "target": "greedy-spec",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "label": "Quota A",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "computedPath": [
+          {
+            "x": 1228,
+            "y": 1796
+          },
+          {
+            "x": 1228,
+            "y": 2907
+          },
+          {
+            "x": 823,
+            "y": 2907
+          },
+          {
+            "x": 823,
+            "y": 2812
+          },
+          {
+            "x": 216,
+            "y": 2812
+          },
+          {
+            "x": 216,
+            "y": 2884
+          }
+        ],
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "_orderIndexSource": 0,
+        "_orderTotalSource": 2,
+        "layerControlPoints": [
+          {
+            "x": 891,
+            "y": 2143
+          },
+          {
+            "x": 553,
+            "y": 2537
+          }
+        ],
+        "isLongEdge": true,
+        "treeRouting": {
+          "type": "tree-out",
+          "points": [
+            {
+              "x": 1228,
+              "y": 1796
+            },
+            {
+              "x": 1228,
+              "y": 2907
+            },
+            {
+              "x": 823,
+              "y": 2907
+            },
+            {
+              "x": 823,
+              "y": 2812
+            },
+            {
+              "x": 216,
+              "y": 2812
+            },
+            {
+              "x": 216,
+              "y": 2884
+            }
+          ],
+          "trunkId": "trunk-out-fix-quota-all",
+          "effectiveSourceHandle": "bottom",
+          "effectiveTargetHandle": "top"
+        },
+        "isTreeBus": true,
+        "orthogonalSanitized": true,
+        "sharedTrunkAware": true,
+        "hardObstacleRepaired": true,
+        "obstacleClearanceOptimized": false,
+        "crossingOptimized": true,
+        "labelPosition": {
+          "x": 776,
+          "y": 2340,
+          "adjusted": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        }
+      }
+    },
+    {
+      "id": "e11",
+      "source": "greedy-spec",
+      "target": "check-rem",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "computedPath": [
+          {
+            "x": 216,
+            "y": 2981
+          },
+          {
+            "x": 216,
+            "y": 3140
+          }
+        ],
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "beautified": true,
+        "orthogonalSanitized": true,
+        "sharedTrunkAware": true,
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        }
+      }
+    },
+    {
+      "id": "e12",
+      "source": "check-rem",
+      "target": "sort-rem-round",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "label": "有剩余",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "computedPath": [
+          {
+            "x": 217,
+            "y": 3213
+          },
+          {
+            "x": 217,
+            "y": 3373
+          }
+        ],
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "_orderIndexSource": 0,
+        "_orderTotalSource": 2,
+        "beautified": true,
+        "treeRouting": {
+          "type": "tree-out",
+          "points": [
+            {
+              "x": 217,
+              "y": 3213
+            },
+            {
+              "x": 217,
+              "y": 3373
+            }
+          ],
+          "trunkId": "trunk-out-check-rem-all",
+          "effectiveSourceHandle": "b",
+          "effectiveTargetHandle": "t"
+        },
+        "isTreeBus": true,
+        "crossingOptimized": true,
+        "labelPosition": {
+          "x": 270,
+          "y": 3293,
+          "adjusted": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        }
+      }
+    },
+    {
+      "id": "e13",
+      "source": "check-rem",
+      "target": "task-direct-a",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "label": "耗尽",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "computedPath": [
+          {
+            "x": 217,
+            "y": 3213
+          },
+          {
+            "x": 217,
+            "y": 3268
+          },
+          {
+            "x": 102,
+            "y": 3268
+          },
+          {
+            "x": 102,
+            "y": 3717
+          },
+          {
+            "x": 215,
+            "y": 3717
+          },
+          {
+            "x": 215,
+            "y": 3789
+          }
+        ],
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "_orderIndexSource": 1,
+        "_orderTotalSource": 2,
+        "_orderIndexTarget": 0,
+        "_orderTotalTarget": 2,
+        "layerControlPoints": [
+          {
+            "x": 209,
+            "y": 3507
+          }
+        ],
+        "isLongEdge": true,
+        "beautified": true,
+        "treeRouting": {
+          "type": "tree-out",
+          "points": [
+            {
+              "x": 217,
+              "y": 3213
+            },
+            {
+              "x": 217,
+              "y": 3268
+            },
+            {
+              "x": 102,
+              "y": 3268
+            },
+            {
+              "x": 102,
+              "y": 3717
+            },
+            {
+              "x": 215,
+              "y": 3717
+            },
+            {
+              "x": 215,
+              "y": 3789
+            }
+          ],
+          "trunkId": "trunk-out-check-rem-all",
+          "effectiveSourceHandle": "b",
+          "effectiveTargetHandle": "t"
+        },
+        "isTreeBus": true,
+        "hardObstacleRepaired": true,
+        "obstacleClearanceOptimized": false,
+        "sharedTrunkAware": true,
+        "crossingOptimized": true,
+        "labelPosition": {
+          "x": 263,
+          "y": 3501,
+          "adjusted": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "sharedTrunkSynthesized": true,
+        "localDoglegRepaired": true,
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        }
+      }
+    },
+    {
+      "id": "e14",
+      "source": "sort-rem-round",
+      "target": "task-direct-a",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "label": "分配完",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "computedPath": [
+          {
+            "x": 216,
+            "y": 3470
+          },
+          {
+            "x": 216,
+            "y": 3789
+          }
+        ],
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "_orderIndexTarget": 1,
+        "_orderTotalTarget": 2,
+        "layerControlPoints": [
+          {
+            "x": 209,
+            "y": 3629
+          }
+        ],
+        "isLongEdge": true,
+        "beautified": true,
+        "crossingOptimized": true,
+        "labelPosition": {
+          "x": 209,
+          "y": 3629,
+          "adjusted": false
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "sharedTrunkSynthesized": true,
+        "localDoglegRepaired": true,
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        }
+      }
+    },
+    {
+      "id": "e15",
+      "source": "pool-b-entry",
+      "target": "merge-res",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "label": "Pool B Demand",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "computedPath": [
+          {
+            "x": 741,
+            "y": 2309
+          },
+          {
+            "x": 741,
+            "y": 2760
+          },
+          {
+            "x": 216,
+            "y": 2760
+          },
+          {
+            "x": 216,
+            "y": 2819
+          },
+          {
+            "x": 670,
+            "y": 2819
+          },
+          {
+            "x": 670,
+            "y": 2883
+          }
+        ],
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "_orderIndexSource": 0,
+        "_orderTotalSource": 2,
+        "_orderIndexTarget": 0,
+        "_orderTotalTarget": 2,
+        "layerControlPoints": [
+          {
+            "x": 705,
+            "y": 2596
+          }
+        ],
+        "isLongEdge": true,
+        "crossingOptimized": true,
+        "sharedTrunkAware": true,
+        "hardObstacleRepaired": true,
+        "obstacleClearanceOptimized": true,
+        "orthogonalSanitized": true,
+        "labelPosition": {
+          "x": 759,
+          "y": 2596,
+          "adjusted": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "localDoglegRepaired": true,
+        "detachedOverlapSeparated": true,
+        "globalWaypointRefined": true,
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        }
+      }
+    },
+    {
+      "id": "e16",
+      "source": "fix-quota",
+      "target": "merge-res",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "label": "余量传递",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "computedPath": [
+          {
+            "x": 1228,
+            "y": 1796
+          },
+          {
+            "x": 1228,
+            "y": 2800
+          },
+          {
+            "x": 688,
+            "y": 2800
+          },
+          {
+            "x": 688,
+            "y": 2812
+          },
+          {
+            "x": 670,
+            "y": 2812
+          },
+          {
+            "x": 670,
+            "y": 2884
+          }
+        ],
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "_orderIndexSource": 1,
+        "_orderTotalSource": 2,
+        "_orderIndexTarget": 1,
+        "_orderTotalTarget": 2,
+        "layerControlPoints": [
+          {
+            "x": 1042,
+            "y": 2143
+          },
+          {
+            "x": 856,
+            "y": 2537
+          }
+        ],
+        "isLongEdge": true,
+        "treeRouting": {
+          "type": "tree-out",
+          "points": [
+            {
+              "x": 1228,
+              "y": 1796
+            },
+            {
+              "x": 1228,
+              "y": 2800
+            },
+            {
+              "x": 688,
+              "y": 2800
+            },
+            {
+              "x": 688,
+              "y": 2812
+            },
+            {
+              "x": 670,
+              "y": 2812
+            },
+            {
+              "x": 670,
+              "y": 2884
+            }
+          ],
+          "trunkId": "trunk-out-fix-quota-all",
+          "effectiveSourceHandle": "bottom",
+          "effectiveTargetHandle": "top"
+        },
+        "isTreeBus": true,
+        "orthogonalSanitized": true,
+        "sharedTrunkAware": true,
+        "crossingOptimized": true,
+        "labelPosition": {
+          "x": 1003,
+          "y": 2340,
+          "adjusted": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "localDoglegRepaired": true,
+        "sharedTrunkSynthesized": true,
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        }
+      }
+    },
+    {
+      "id": "e17",
+      "source": "merge-res",
+      "target": "alloc-mixed",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "computedPath": [
+          {
+            "x": 670,
+            "y": 2981
+          },
+          {
+            "x": 670,
+            "y": 3140
+          }
+        ],
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "beautified": true,
+        "orthogonalSanitized": true,
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        }
+      }
+    },
+    {
+      "id": "e18",
+      "source": "alloc-mixed",
+      "target": "check-source",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "computedPath": [
+          {
+            "x": 669,
+            "y": 3237
+          },
+          {
+            "x": 669,
+            "y": 3395
+          }
+        ],
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "beautified": true,
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        }
+      }
+    },
+    {
+      "id": "e19",
+      "source": "check-source",
+      "target": "task-rep-b",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "label": "用到存储",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "computedPath": [
+          {
+            "x": 669,
+            "y": 3469
+          },
+          {
+            "x": 669,
+            "y": 3973
+          },
+          {
+            "x": 202,
+            "y": 3973
+          },
+          {
+            "x": 202,
+            "y": 4045
+          }
+        ],
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "_orderIndexSource": 0,
+        "_orderTotalSource": 2,
+        "layerControlPoints": [
+          {
+            "x": 435,
+            "y": 3763
+          }
+        ],
+        "isLongEdge": true,
+        "treeRouting": {
+          "type": "tree-out",
+          "points": [
+            {
+              "x": 669,
+              "y": 3469
+            },
+            {
+              "x": 669,
+              "y": 3973
+            },
+            {
+              "x": 202,
+              "y": 3973
+            },
+            {
+              "x": 202,
+              "y": 4045
+            }
+          ],
+          "trunkId": "trunk-out-check-source-all",
+          "effectiveSourceHandle": "bottom",
+          "effectiveTargetHandle": "top"
+        },
+        "isTreeBus": true,
+        "orthogonalSanitized": true,
+        "sharedTrunkAware": true,
+        "crossingOptimized": true,
+        "labelPosition": {
+          "x": 435,
+          "y": 3757,
+          "adjusted": false
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        }
+      }
+    },
+    {
+      "id": "e20",
+      "source": "check-source",
+      "target": "task-direct-b",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "label": "拣选捡漏",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "computedPath": [
+          {
+            "x": 669,
+            "y": 3469
+          },
+          {
+            "x": 669,
+            "y": 4229
+          },
+          {
+            "x": 202,
+            "y": 4229
+          },
+          {
+            "x": 202,
+            "y": 4301
+          }
+        ],
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "_orderIndexSource": 1,
+        "_orderTotalSource": 2,
+        "layerControlPoints": [
+          {
+            "x": 513,
+            "y": 3738
+          },
+          {
+            "x": 358,
+            "y": 4044
+          }
+        ],
+        "isLongEdge": true,
+        "treeRouting": {
+          "type": "tree-out",
+          "points": [
+            {
+              "x": 669,
+              "y": 3469
+            },
+            {
+              "x": 669,
+              "y": 4229
+            },
+            {
+              "x": 202,
+              "y": 4229
+            },
+            {
+              "x": 202,
+              "y": 4301
+            }
+          ],
+          "trunkId": "trunk-out-check-source-all",
+          "effectiveSourceHandle": "bottom",
+          "effectiveTargetHandle": "top"
+        },
+        "isTreeBus": true,
+        "orthogonalSanitized": true,
+        "sharedTrunkAware": true,
+        "hardObstacleRepaired": true,
+        "obstacleClearanceOptimized": false,
+        "crossingOptimized": true,
+        "detachedOverlapSeparated": true,
+        "labelPosition": {
+          "x": 436,
+          "y": 3885,
+          "adjusted": false
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "sharedTrunkSynthesized": true,
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        }
+      }
+    },
+    {
+      "id": "e21",
+      "source": "task-direct-a",
+      "target": "end-wms",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "computedPath": [
+          {
+            "x": 202,
+            "y": 3885
+          },
+          {
+            "x": 202,
+            "y": 3957
+          },
+          {
+            "x": 94,
+            "y": 3957
+          },
+          {
+            "x": 94,
+            "y": 4421
+          },
+          {
+            "x": 202,
+            "y": 4421
+          },
+          {
+            "x": 202,
+            "y": 4557
+          }
+        ],
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "_orderIndexTarget": 1,
+        "_orderTotalTarget": 3,
+        "layerControlPoints": [
+          {
+            "x": 202,
+            "y": 4221
+          }
+        ],
+        "isLongEdge": true,
+        "beautified": true,
+        "treeRouting": {
+          "type": "tree-in",
+          "points": [
+            {
+              "x": 202,
+              "y": 3885
+            },
+            {
+              "x": 202,
+              "y": 3957
+            },
+            {
+              "x": 94,
+              "y": 3957
+            },
+            {
+              "x": 94,
+              "y": 4421
+            },
+            {
+              "x": 202,
+              "y": 4421
+            },
+            {
+              "x": 202,
+              "y": 4557
+            }
+          ],
+          "trunkId": "trunk-in-end-wms-all",
+          "effectiveSourceHandle": "b",
+          "effectiveTargetHandle": "t"
+        },
+        "isTreeBus": true,
+        "orthogonalSanitized": true,
+        "hardObstacleRepaired": true,
+        "obstacleClearanceOptimized": false,
+        "sharedTrunkAware": true,
+        "crossingOptimized": true,
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "localDoglegRepaired": true,
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        }
+      }
+    },
+    {
+      "id": "e22",
+      "source": "task-rep-b",
+      "target": "end-wms",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "computedPath": [
+          {
+            "x": 202,
+            "y": 4141
+          },
+          {
+            "x": 202,
+            "y": 4213
+          },
+          {
+            "x": 94,
+            "y": 4213
+          },
+          {
+            "x": 94,
+            "y": 4421
+          },
+          {
+            "x": 202,
+            "y": 4421
+          },
+          {
+            "x": 202,
+            "y": 4557
+          }
+        ],
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "_orderIndexTarget": 0,
+        "_orderTotalTarget": 3,
+        "layerControlPoints": [
+          {
+            "x": 202,
+            "y": 4349
+          }
+        ],
+        "isLongEdge": true,
+        "beautified": true,
+        "treeRouting": {
+          "type": "tree-in",
+          "points": [
+            {
+              "x": 202,
+              "y": 4141
+            },
+            {
+              "x": 202,
+              "y": 4213
+            },
+            {
+              "x": 94,
+              "y": 4213
+            },
+            {
+              "x": 94,
+              "y": 4421
+            },
+            {
+              "x": 202,
+              "y": 4421
+            },
+            {
+              "x": 202,
+              "y": 4557
+            }
+          ],
+          "trunkId": "trunk-in-end-wms-all",
+          "effectiveSourceHandle": "b",
+          "effectiveTargetHandle": "t"
+        },
+        "isTreeBus": true,
+        "orthogonalSanitized": true,
+        "hardObstacleRepaired": true,
+        "obstacleClearanceOptimized": false,
+        "sharedTrunkAware": true,
+        "crossingOptimized": true,
+        "localDoglegRepaired": true,
+        "detachedOverlapSeparated": true,
+        "endpointLaneNudged": true,
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "globalWaypointRefined": true,
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        }
+      }
+    },
+    {
+      "id": "e23",
+      "source": "task-direct-b",
+      "target": "end-wms",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "computedPath": [
+          {
+            "x": 202,
+            "y": 4397
+          },
+          {
+            "x": 202,
+            "y": 4557
+          }
+        ],
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "_orderIndexTarget": 2,
+        "_orderTotalTarget": 3,
+        "beautified": true,
+        "treeRouting": {
+          "type": "tree-in",
+          "points": [
+            {
+              "x": 202,
+              "y": 4397
+            },
+            {
+              "x": 202,
+              "y": 4557
+            }
+          ],
+          "trunkId": "trunk-in-end-wms-all",
+          "effectiveSourceHandle": "b",
+          "effectiveTargetHandle": "t"
+        },
+        "isTreeBus": true,
+        "orthogonalSanitized": true,
+        "crossingOptimized": true,
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        }
+      }
+    }
+  ],
+  "nodes": [
+    {
+      "id": "start-calc",
+      "type": "custom",
+      "position": {
+        "x": 157,
+        "y": 1444
+      },
+      "positionAbsolute": {
+        "x": 157,
+        "y": 1444
+      },
+      "width": 172,
+      "height": 96,
+      "measured": {
+        "width": 172,
+        "height": 96
+      },
+      "style": {
+        "width": 172,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "init-data",
+      "type": "custom",
+      "position": {
+        "x": 137,
+        "y": 1700
+      },
+      "positionAbsolute": {
+        "x": 137,
+        "y": 1700
+      },
+      "width": 211,
+      "height": 96,
+      "measured": {
+        "width": 211,
+        "height": 96
+      },
+      "style": {
+        "width": 211,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "check-inv-sufficiency",
+      "type": "custom",
+      "position": {
+        "x": 141,
+        "y": 1956
+      },
+      "positionAbsolute": {
+        "x": 141,
+        "y": 1956
+      },
+      "width": 204,
+      "height": 96,
+      "measured": {
+        "width": 204,
+        "height": 96
+      },
+      "style": {
+        "width": 204,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "apply-satisfaction-rate",
+      "type": "custom",
+      "position": {
+        "x": 106,
+        "y": 2212
+      },
+      "positionAbsolute": {
+        "x": 106,
+        "y": 2212
+      },
+      "width": 273,
+      "height": 96,
+      "measured": {
+        "width": 273,
+        "height": 96
+      },
+      "style": {
+        "width": 273,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "calc-theory-ratio",
+      "type": "custom",
+      "position": {
+        "x": 120,
+        "y": 2468
+      },
+      "positionAbsolute": {
+        "x": 120,
+        "y": 2468
+      },
+      "width": 246,
+      "height": 96,
+      "measured": {
+        "width": 246,
+        "height": 96
+      },
+      "style": {
+        "width": 246,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "sort-demand",
+      "type": "custom",
+      "position": {
+        "x": 639,
+        "y": 1444
+      },
+      "positionAbsolute": {
+        "x": 639,
+        "y": 1444
+      },
+      "width": 204,
+      "height": 96,
+      "measured": {
+        "width": 204,
+        "height": 96
+      },
+      "style": {
+        "width": 204,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "check-limit",
+      "type": "custom",
+      "position": {
+        "x": 616,
+        "y": 1700
+      },
+      "positionAbsolute": {
+        "x": 616,
+        "y": 1700
+      },
+      "width": 249,
+      "height": 96,
+      "measured": {
+        "width": 249,
+        "height": 96
+      },
+      "style": {
+        "width": 249,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "pool-a-entry",
+      "type": "custom",
+      "position": {
+        "x": 632,
+        "y": 1956
+      },
+      "positionAbsolute": {
+        "x": 632,
+        "y": 1956
+      },
+      "width": 217,
+      "height": 96,
+      "measured": {
+        "width": 217,
+        "height": 96
+      },
+      "style": {
+        "width": 217,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "pool-b-entry",
+      "type": "custom",
+      "position": {
+        "x": 633,
+        "y": 2212
+      },
+      "positionAbsolute": {
+        "x": 633,
+        "y": 2212
+      },
+      "width": 216,
+      "height": 96,
+      "measured": {
+        "width": 216,
+        "height": 96
+      },
+      "style": {
+        "width": 216,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "calc-real-ratio",
+      "type": "custom",
+      "position": {
+        "x": 1132,
+        "y": 1444
+      },
+      "positionAbsolute": {
+        "x": 1132,
+        "y": 1444
+      },
+      "width": 192,
+      "height": 96,
+      "measured": {
+        "width": 192,
+        "height": 96
+      },
+      "style": {
+        "width": 192,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "fix-quota",
+      "type": "custom",
+      "position": {
+        "x": 1102,
+        "y": 1700
+      },
+      "positionAbsolute": {
+        "x": 1102,
+        "y": 1700
+      },
+      "width": 252,
+      "height": 96,
+      "measured": {
+        "width": 252,
+        "height": 96
+      },
+      "style": {
+        "width": 252,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "greedy-spec",
+      "type": "custom",
+      "position": {
+        "x": 106,
+        "y": 2884
+      },
+      "positionAbsolute": {
+        "x": 106,
+        "y": 2884
+      },
+      "width": 220,
+      "height": 96,
+      "measured": {
+        "width": 220,
+        "height": 96
+      },
+      "style": {
+        "width": 220,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "check-rem",
+      "type": "custom",
+      "position": {
+        "x": 108,
+        "y": 3140
+      },
+      "positionAbsolute": {
+        "x": 108,
+        "y": 3140
+      },
+      "width": 217,
+      "height": 73,
+      "measured": {
+        "width": 217,
+        "height": 73
+      },
+      "style": {
+        "width": 217,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "sort-rem-round",
+      "type": "custom",
+      "position": {
+        "x": 114,
+        "y": 3373
+      },
+      "positionAbsolute": {
+        "x": 114,
+        "y": 3373
+      },
+      "width": 204,
+      "height": 96,
+      "measured": {
+        "width": 204,
+        "height": 96
+      },
+      "style": {
+        "width": 204,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "merge-res",
+      "type": "custom",
+      "position": {
+        "x": 564,
+        "y": 2884
+      },
+      "positionAbsolute": {
+        "x": 564,
+        "y": 2884
+      },
+      "width": 211,
+      "height": 96,
+      "measured": {
+        "width": 211,
+        "height": 96
+      },
+      "style": {
+        "width": 211,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "alloc-mixed",
+      "type": "custom",
+      "position": {
+        "x": 567,
+        "y": 3140
+      },
+      "positionAbsolute": {
+        "x": 567,
+        "y": 3140
+      },
+      "width": 204,
+      "height": 96,
+      "measured": {
+        "width": 204,
+        "height": 96
+      },
+      "style": {
+        "width": 204,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "check-source",
+      "type": "custom",
+      "position": {
+        "x": 563,
+        "y": 3396
+      },
+      "positionAbsolute": {
+        "x": 563,
+        "y": 3396
+      },
+      "width": 212,
+      "height": 73,
+      "measured": {
+        "width": 212,
+        "height": 73
+      },
+      "style": {
+        "width": 212,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "task-direct-a",
+      "type": "custom",
+      "position": {
+        "x": 116,
+        "y": 3789
+      },
+      "positionAbsolute": {
+        "x": 116,
+        "y": 3789
+      },
+      "width": 172,
+      "height": 96,
+      "measured": {
+        "width": 172,
+        "height": 96
+      },
+      "style": {
+        "width": 172,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "task-rep-b",
+      "type": "custom",
+      "position": {
+        "x": 106,
+        "y": 4045
+      },
+      "positionAbsolute": {
+        "x": 106,
+        "y": 4045
+      },
+      "width": 191,
+      "height": 96,
+      "measured": {
+        "width": 191,
+        "height": 96
+      },
+      "style": {
+        "width": 191,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "task-direct-b",
+      "type": "custom",
+      "position": {
+        "x": 116,
+        "y": 4301
+      },
+      "positionAbsolute": {
+        "x": 116,
+        "y": 4301
+      },
+      "width": 172,
+      "height": 96,
+      "measured": {
+        "width": 172,
+        "height": 96
+      },
+      "style": {
+        "width": 172,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "end-wms",
+      "type": "custom",
+      "position": {
+        "x": 115,
+        "y": 4557
+      },
+      "positionAbsolute": {
+        "x": 115,
+        "y": 4557
+      },
+      "width": 174,
+      "height": 96,
+      "measured": {
+        "width": 174,
+        "height": 96
+      },
+      "style": {
+        "width": 174,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "titlegroup-策略计算",
+      "type": "titleGroup",
+      "position": {
+        "x": 20,
+        "y": 1312
+      },
+      "positionAbsolute": {
+        "x": 20,
+        "y": 1312
+      },
+      "width": 1421,
+      "height": 1296,
+      "measured": {
+        "width": 1421,
+        "height": 1296
+      },
+      "style": {
+        "width": 1421,
+        "height": 1296
+      },
+      "data": {}
+    },
+    {
+      "id": "titlegroup-资源分配",
+      "type": "titleGroup",
+      "position": {
+        "x": 20,
+        "y": 2752
+      },
+      "positionAbsolute": {
+        "x": 20,
+        "y": 2752
+      },
+      "width": 1421,
+      "height": 761,
+      "measured": {
+        "width": 1421,
+        "height": 761
+      },
+      "style": {
+        "width": 1421,
+        "height": 761
+      },
+      "data": {}
+    },
+    {
+      "id": "titlegroup-作业执行",
+      "type": "titleGroup",
+      "position": {
+        "x": 20,
+        "y": 3657
+      },
+      "positionAbsolute": {
+        "x": 20,
+        "y": 3657
+      },
+      "width": 1421,
+      "height": 1040,
+      "measured": {
+        "width": 1421,
+        "height": 1040
+      },
+      "style": {
+        "width": 1421,
+        "height": 1040
+      },
+      "data": {}
+    },
+    {
+      "id": "subgroup-策略计算-数据准备",
+      "type": "subGroup",
+      "position": {
+        "x": 84,
+        "y": 1384
+      },
+      "positionAbsolute": {
+        "x": 84,
+        "y": 1384
+      },
+      "width": 318,
+      "height": 1192,
+      "measured": {
+        "width": 318,
+        "height": 1192
+      },
+      "style": {
+        "width": 318,
+        "height": 1192
+      },
+      "data": {}
+    },
+    {
+      "id": "subgroup-策略计算-初分逻辑",
+      "type": "subGroup",
+      "position": {
+        "x": 594,
+        "y": 1384
+      },
+      "positionAbsolute": {
+        "x": 594,
+        "y": 1384
+      },
+      "width": 294,
+      "height": 1192,
+      "measured": {
+        "width": 294,
+        "height": 1192
+      },
+      "style": {
+        "width": 294,
+        "height": 1192
+      },
+      "data": {}
+    },
+    {
+      "id": "subgroup-策略计算-库存修正",
+      "type": "subGroup",
+      "position": {
+        "x": 1080,
+        "y": 1384
+      },
+      "positionAbsolute": {
+        "x": 1080,
+        "y": 1384
+      },
+      "width": 297,
+      "height": 1192,
+      "measured": {
+        "width": 297,
+        "height": 1192
+      },
+      "style": {
+        "width": 297,
+        "height": 1192
+      },
+      "data": {}
+    },
+    {
+      "id": "subgroup-资源分配-直拣池分配",
+      "type": "subGroup",
+      "position": {
+        "x": 84,
+        "y": 2824
+      },
+      "positionAbsolute": {
+        "x": 84,
+        "y": 2824
+      },
+      "width": 265,
+      "height": 657,
+      "measured": {
+        "width": 265,
+        "height": 657
+      },
+      "style": {
+        "width": 265,
+        "height": 657
+      },
+      "data": {}
+    },
+    {
+      "id": "subgroup-资源分配-补货池分配",
+      "type": "subGroup",
+      "position": {
+        "x": 541,
+        "y": 2824
+      },
+      "positionAbsolute": {
+        "x": 541,
+        "y": 2824
+      },
+      "width": 257,
+      "height": 657,
+      "measured": {
+        "width": 257,
+        "height": 657
+      },
+      "style": {
+        "width": 257,
+        "height": 657
+      },
+      "data": {}
+    },
+    {
+      "id": "subgroup-作业执行-作业执行",
+      "type": "subGroup",
+      "position": {
+        "x": 84,
+        "y": 3729
+      },
+      "positionAbsolute": {
+        "x": 84,
+        "y": 3729
+      },
+      "width": 236,
+      "height": 936,
+      "measured": {
+        "width": 236,
+        "height": 936
+      },
+      "style": {
+        "width": 236,
+        "height": 936
+      },
+      "data": {}
+    }
+  ],
+  "enableSmartEdges": true,
+  "smartEdgePadding": 20,
+  "isLargeGraph": false,
+  "displayEdgeEpoch": 2573065392,
+  "qualityMode": "full",
+  "operation": "route"
+}

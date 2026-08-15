@@ -169,7 +169,10 @@ describe('repairDisplayMicroArtifacts', () => {
     const quality = calculateEdgePathQualityScore(repaired);
     const carrierPath = (repaired[1].data as any).computedPath;
 
-    expect(quality.strictCrossings).toBe(0);
+    expect(
+      quality.strictCrossings,
+      JSON.stringify({ quality, carrierPath }, null, 2),
+    ).toBe(0);
     expect(quality.tinyInteriorDoglegs).toBe(0);
     expect(carrierPath[0]).toEqual({ x: 904, y: 811 });
     expect(carrierPath[carrierPath.length - 1]).toEqual({ x: 1227, y: 203 });
@@ -329,8 +332,8 @@ describe('repairDisplayMicroArtifacts', () => {
         target: 'visibility',
         data: {
           computedPath: [
-            { x: 149, y: 931 },
-            { x: 149, y: 1020 },
+            { x: 154, y: 931 },
+            { x: 154, y: 1020 },
             { x: 286, y: 1020 },
             { x: 286, y: 1450 },
             { x: 1216, y: 1450 },
@@ -360,14 +363,24 @@ describe('repairDisplayMicroArtifacts', () => {
 
     expect(quality.strictCrossings).toBe(0);
     expect(quality.unrelatedOverlap).toBe(0);
-    expect(quality.unexplainedRelatedOverlap).toBe(0);
+    expect(
+      quality.unexplainedRelatedOverlap,
+      JSON.stringify({
+        quality,
+        repairedPath,
+        paths: repaired.map(edge => ({
+          id: edge.id,
+          path: (edge.data as { computedPath?: unknown }).computedPath,
+        })),
+      }, null, 2),
+    ).toBe(0);
     expect(quality.detourPenalty).toBeLessThan(baseline.detourPenalty);
     expect(quality.totalLength).toBeLessThan(baseline.totalLength);
     expect(repairedPath).toEqual([
       { x: 916, y: 653 },
       { x: 916, y: 742 },
-      { x: 132, y: 742 },
-      { x: 132, y: 1450 },
+      { x: 148, y: 742 },
+      { x: 148, y: 1450 },
       { x: 1216, y: 1450 },
       { x: 1216, y: 1539 },
     ]);

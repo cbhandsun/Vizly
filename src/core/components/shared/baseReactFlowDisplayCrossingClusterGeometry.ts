@@ -5,12 +5,66 @@ import {
   displayStrictCrossesVertical,
   getDisplayComputedPath,
   type DisplayPoint,
+  type DisplayRect,
   type DisplaySegment,
 } from './baseReactFlowDisplayGeometry';
+import type { DisplayCrossingClusterPortSide } from './baseReactFlowDisplayCrossingClusterRanking';
 
 export type DisplayCrossingClusterStrictHit = {
   a: DisplaySegment;
   b: DisplaySegment;
+};
+
+export const displayCrossingClusterSideAxis = (
+  side: DisplayCrossingClusterPortSide,
+): 'h' | 'v' => side === 'left' || side === 'right' ? 'h' : 'v';
+
+export const displayCrossingClusterOutwardStub = (
+  anchor: DisplayPoint,
+  side: DisplayCrossingClusterPortSide,
+  clearance: number,
+): DisplayPoint => {
+  if (side === 'left') return { x: anchor.x - clearance, y: anchor.y };
+  if (side === 'right') return { x: anchor.x + clearance, y: anchor.y };
+  if (side === 'top') return { x: anchor.x, y: anchor.y - clearance };
+  return { x: anchor.x, y: anchor.y + clearance };
+};
+
+export const displayCrossingClusterPointOnSide = (
+  point: DisplayPoint,
+  rect: DisplayRect,
+  side: DisplayCrossingClusterPortSide,
+): boolean => {
+  if (side === 'left' || side === 'right') {
+    const sideX = side === 'left' ? rect.x : rect.x + rect.width;
+    return Math.abs(point.x - sideX) <= 2
+      && point.y >= rect.y - 2
+      && point.y <= rect.y + rect.height + 2;
+  }
+  const sideY = side === 'top' ? rect.y : rect.y + rect.height;
+  return Math.abs(point.y - sideY) <= 2
+    && point.x >= rect.x - 2
+    && point.x <= rect.x + rect.width + 2;
+};
+
+export const displayCrossingClusterFacingSidePair = (
+  sourceRect: DisplayRect,
+  targetRect: DisplayRect,
+): [DisplayCrossingClusterPortSide, DisplayCrossingClusterPortSide] => {
+  const sourceCenter = {
+    x: sourceRect.x + sourceRect.width / 2,
+    y: sourceRect.y + sourceRect.height / 2,
+  };
+  const targetCenter = {
+    x: targetRect.x + targetRect.width / 2,
+    y: targetRect.y + targetRect.height / 2,
+  };
+  const dx = targetCenter.x - sourceCenter.x;
+  const dy = targetCenter.y - sourceCenter.y;
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    return dx >= 0 ? ['right', 'left'] : ['left', 'right'];
+  }
+  return dy >= 0 ? ['bottom', 'top'] : ['top', 'bottom'];
 };
 
 /**

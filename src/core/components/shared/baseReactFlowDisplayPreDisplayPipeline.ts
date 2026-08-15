@@ -1,4 +1,4 @@
-import type { Edge, Node } from "@xyflow/react";
+import type { Edge } from "@xyflow/react";
 
 import { repairDetachedStrictCrossingBypasses } from "../../strategies/shared/edgeDetachedStrictCrossingRepair";
 import { repairDisplayMicroArtifacts } from "../../strategies/shared/edgeDisplayMicroCleanup";
@@ -7,6 +7,7 @@ import { repairLocalDoglegArtifacts } from "../../strategies/shared/edgeLocalDog
 import { calculateEdgePathQualityScore } from "../../strategies/shared/edgeStrictCrossingGuard";
 import { repairTerminalBoundaryStairs } from "../../strategies/shared/edgeTerminalBoundaryStairRepair";
 import { repairBoundedPortAndInternalStrictCrossings } from "./baseReactFlowDisplayBoundedStrictRepair";
+import { shouldStopAfterBoundedTerminalLaneSeed } from "./baseReactFlowDisplayBoundedSeedPolicy";
 import {
   anchorComputedDisplayEdgeEndpoints,
   withDisplayAbsolutePositions,
@@ -15,7 +16,6 @@ import {
   chooseDisplayStrictPolishCandidate,
   chooseFinalObstacleAwarePolishCandidate,
   hasHardDisplayOverlapRisk,
-  type BaseDisplayBoundedCandidateReport,
 } from "./baseReactFlowDisplayEvaluation";
 import { compactDisplayEdgePaths } from "./baseReactFlowDisplayGeometry";
 import { createBaseDisplayHardGateMemo } from "./baseReactFlowDisplayHardGateMemo";
@@ -37,10 +37,10 @@ import {
 } from "./baseReactFlowDisplayStrictTerminalRepair";
 import {
   repairAxisMismatchedTerminalsWithBoundedPortRoles,
-  repairBoundedReverseParallelOverlaps,
   repairDetachedTerminalsWithBoundedPortRoles,
   repairTerminalHandleHemisphereHairpins,
 } from "./baseReactFlowDisplayTerminalPortRepair";
+import { repairBoundedReverseParallelOverlaps } from './baseReactFlowDisplayReverseParallelOverlapClosure';
 import { repairFastDisplayHardSafety } from "./baseReactFlowFastEdgeSafety";
 import {
   createDisplayTerminalValidationSnapshot,
@@ -55,23 +55,12 @@ import {
   displayReportOnlyNeedsTerminalAnchoring,
 } from './baseReactFlowDisplayReportPolicy';
 import { readDisplayLayoutDirection } from './baseReactFlowDisplayDirection';
+import { repairBaseReactFlowResidualOverlapAxisClosure } from './baseReactFlowDisplayResidualOverlapClosure';
+import type { BaseReactFlowPreDisplayFinalEdgesArgs } from './baseReactFlowDisplayFullRouteTypes';
 
-export const createBaseReactFlowPreDisplayFinalEdges = (args: {
-  edges: Edge[];
-  nodes: Node[];
-  enableSmartEdges: boolean;
-  smartEdgePadding: number;
-  isLargeGraph: boolean;
-  displayEdgeEpoch: number;
-  /**
-   * Interactive result prepared from the same input graph. Worker callers can
-   * provide it to avoid repeating the interactive routing pass; direct callers
-   * keep the existing behavior when it is omitted.
-   */
-  preparedInteractiveEdges?: Edge[];
-  skipFullRouteFallback?: boolean;
-  onBoundedCandidate?: (report: BaseDisplayBoundedCandidateReport) => void;
-}): Edge[] => {
+export const createBaseReactFlowPreDisplayFinalEdges = (
+  args: BaseReactFlowPreDisplayFinalEdgesArgs,
+): Edge[] => {
   const nodeById = new Map(args.nodes.map((node) => [node.id, node]));
   const repairNodes = withDisplayAbsolutePositions(args.nodes, nodeById);
   const terminalValidationSnapshot =
@@ -168,6 +157,14 @@ export const createBaseReactFlowPreDisplayFinalEdges = (args: {
     "terminal-lane",
   );
   if (terminalLaneReport.hardClean) {
+    args.onBoundedCandidate?.(terminalLaneReport);
+    return terminalLaneRepaired;
+  }
+  if (shouldStopAfterBoundedTerminalLaneSeed({
+    skipFullRouteFallback: args.skipFullRouteFallback,
+    edgeCount: args.edges.length,
+    nodeCount: repairNodes.length,
+  })) {
     args.onBoundedCandidate?.(terminalLaneReport);
     return terminalLaneRepaired;
   }
@@ -692,6 +689,11 @@ export const createBaseReactFlowPreDisplayFinalEdges = (args: {
       }
     }
   }
-  args.onBoundedCandidate?.(fallbackReport);
-  return fallback;
+  const residualOverlapClosure = repairBaseReactFlowResidualOverlapAxisClosure(
+    fallback,
+    repairNodes,
+    fallbackReport,
+  );
+  args.onBoundedCandidate?.(residualOverlapClosure.report);
+  return residualOverlapClosure.edges;
 };

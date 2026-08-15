@@ -48,6 +48,11 @@ import {
   createDisplayObstacleHitContext,
   type DisplayObstacleHitContext,
 } from './baseReactFlowDisplayObstacleHitCache';
+import {
+  createDisplayTerminalValidationSnapshot,
+  displayEdgeTerminalValidationDoesNotRegress,
+  displayTerminalValidationDoesNotRegress,
+} from './baseReactFlowTerminalValidation';
 
 const DISPLAY_RESIDUAL_OVERLAP_REPAIR_OPTIONS = {
   maxIterations: 2,
@@ -63,6 +68,7 @@ const repairRemainingObstacleHitsWithOuterLanes = <T extends Edge[]>(
   hitContext: DisplayObstacleHitContext,
 ): T => {
   let current = edges;
+  const terminalSnapshot = createDisplayTerminalValidationSnapshot(nodes);
   for (let pass = 0; pass < 2; pass += 1) {
     const entries = current
       .map((edge, edgeIndex) => {
@@ -89,10 +95,18 @@ const repairRemainingObstacleHitsWithOuterLanes = <T extends Edge[]>(
       const baselineStrictCrossings = baselineQuality.strictCrossings;
       const baselinePathHits = hitContext.countUnrelated(entry.path, edge);
       const includeOuterRingCandidates = current.length <= 20 && nodes.length <= 40 && baselinePathHits >= 1;
-      const rawCandidates = [
-        ...buildWholePathOuterLaneCandidates(entry.path, nodes, edge, includeOuterRingCandidates)
-          .map(candidate => ({ path: candidate, priority: 0 })),
-      ]
+      const rawCandidates = buildWholePathOuterLaneCandidates(
+        entry.path,
+        nodes,
+        edge,
+        includeOuterRingCandidates,
+      )
+        .map(candidate => ({ path: candidate, priority: 0 }))
+        .filter(candidate => displayEdgeTerminalValidationDoesNotRegress(
+          edge,
+          withDisplayComputedPath(edge, candidate.path),
+          terminalSnapshot,
+        ))
         .map(candidate => ({
           path: candidate.path,
           hits: hitContext.countUnrelated(candidate.path, edge),
@@ -167,6 +181,7 @@ const repairRemainingObstacleHitsWithOuterLanes = <T extends Edge[]>(
         if (acceptedQuality.reverseOverlap > baselineQuality.reverseOverlap) continue;
         if (acceptedQuality.unrelatedOverlap > baselineQuality.unrelatedOverlap) continue;
         if (acceptedQuality.unexplainedRelatedOverlap > baselineQuality.unexplainedRelatedOverlap) continue;
+        if (!displayTerminalValidationDoesNotRegress(current, acceptedEdges, terminalSnapshot)) continue;
         current = acceptedEdges;
         changed = true;
         break;
@@ -189,6 +204,7 @@ export const repairDisplayObstacleHits = <T extends Edge[]>(
     return edges;
   }
   let current = edges;
+  const terminalSnapshot = createDisplayTerminalValidationSnapshot(nodes);
   let qualityEvaluations = 0;
   const fastBudget = options.maxCandidatesPerEdge <= 8 && options.maxQualityEvaluations <= 8;
   const boundedBudget = edges.length > 16 || nodes.length > 24;
@@ -245,6 +261,11 @@ export const repairDisplayObstacleHits = <T extends Edge[]>(
           priority: candidate.priority,
         }))
         .filter(candidate => candidate.path.length >= 2)
+        .filter(candidate => displayEdgeTerminalValidationDoesNotRegress(
+          edge,
+          withDisplayComputedPath(edge, candidate.path),
+          terminalSnapshot,
+        ))
         .filter((candidate) => {
           const key = candidate.path.map(point => `${Math.round(point.x)},${Math.round(point.y)}`).join('|');
           if (seenPaths.has(key)) return false;
@@ -323,6 +344,7 @@ export const repairDisplayObstacleHits = <T extends Edge[]>(
         const candidateEdges = current.map((candidateEdge, candidateIndex) => (
           candidateIndex === entry.edgeIndex ? withDisplayComputedPath(candidateEdge, candidate.path) : candidateEdge
         )) as T;
+        if (!displayTerminalValidationDoesNotRegress(current, candidateEdges, terminalSnapshot)) continue;
         if (contexts.qualityContext.evaluateChanged(candidateEdges, [entry.edgeIndex]).strictCrossings > baselineStrictCrossings) continue;
         const candidateObstacleHits = contexts.baselineObstacleHits - baselinePathHits + candidate.hits;
         if (candidateObstacleHits >= contexts.baselineObstacleHits) continue;
@@ -373,6 +395,11 @@ export const repairDisplayObstacleHits = <T extends Edge[]>(
           length: candidate.length,
         }))
         .filter(candidate => candidate.path.length >= 2)
+        .filter(candidate => displayEdgeTerminalValidationDoesNotRegress(
+          edge,
+          withDisplayComputedPath(edge, candidate.path),
+          terminalSnapshot,
+        ))
         .filter((candidate) => {
           const key = candidate.path.map(point => `${Math.round(point.x)},${Math.round(point.y)}`).join('|');
           if (seenCandidatePaths.has(key)) return false;
@@ -425,7 +452,7 @@ export const repairDisplayObstacleHits = <T extends Edge[]>(
           DISPLAY_RESIDUAL_OVERLAP_REPAIR_OPTIONS,
         ) as T;
         const microCleaned = repairDisplayMicroArtifacts(detachedCleaned) as T;
-        current = chooseFinalObstacleAwarePolishCandidate(
+        const polished = chooseFinalObstacleAwarePolishCandidate(
           nodes,
           bestEdges,
           strictCleaned,
@@ -433,6 +460,8 @@ export const repairDisplayObstacleHits = <T extends Edge[]>(
           detachedCleaned,
           microCleaned,
         );
+        if (!displayTerminalValidationDoesNotRegress(current, polished, terminalSnapshot)) continue;
+        current = polished;
         changed = true;
         processed += 1;
         if (contextsForCurrent().baselineObstacleHits === 0) break;

@@ -39,6 +39,7 @@ export const resolveBaseReactFlowDisplayCandidate = async ({
   persistentCandidateEdges,
   signal,
   isCurrent,
+  allowExternalCandidates = true,
   loadPrecompiledCandidate = loadBaseReactFlowPrecompiledRouteCandidate,
   loadTimeoutMs = PRECOMPILED_CANDIDATE_LOAD_TIMEOUT_MS,
 }: {
@@ -46,10 +47,14 @@ export const resolveBaseReactFlowDisplayCandidate = async ({
   persistentCandidateEdges: Edge[] | null;
   signal: AbortSignal;
   isCurrent: () => boolean;
+  allowExternalCandidates?: boolean;
   loadPrecompiledCandidate?: BaseReactFlowPrecompiledCandidateLoader;
   loadTimeoutMs?: number;
 }): Promise<BaseReactFlowDisplayCandidateResolution | null> => {
   if (signal.aborted || !isCurrent()) return null;
+  if (!allowExternalCandidates) {
+    return { candidateEdges: null, source: 'miss' };
+  }
 
   type LoadOutcome =
     | { kind: 'loaded'; candidateEdges: Edge[] | null }

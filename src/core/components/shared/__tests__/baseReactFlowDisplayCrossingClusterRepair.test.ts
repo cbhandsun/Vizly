@@ -183,6 +183,28 @@ describe('bounded display crossing cluster repair', () => {
 });
 
 describe('display candidate interaction context', () => {
+  it('counts a one-pixel interior crossing but excludes an exact endpoint contact', () => {
+    const moverPath = [{ x: 0, y: 50 }, { x: 100, y: 50 }];
+    const nearBendEdges = [
+      edge('mover', 'm-source', 'm-target', moverPath),
+      edge('near-bend', 'n-source', 'n-target', [{ x: 1, y: 0 }, { x: 1, y: 100 }]),
+    ];
+    const endpointContactEdges = [
+      nearBendEdges[0],
+      edge('endpoint-contact', 'e-source', 'e-target', [{ x: 0, y: 0 }, { x: 0, y: 100 }]),
+    ];
+    const evaluate = (edges: Edge[]) => createDisplayCandidateInteractionContext(
+      0,
+      edges,
+      extractDisplaySegments(edges).filter(segment => segment.edgeIndex !== 0),
+    ).evaluate(moverPath).strictCrossings;
+
+    expect(findDisplayStrictCrossingHits(nearBendEdges)).toHaveLength(1);
+    expect(evaluate(nearBendEdges)).toBe(1);
+    expect(findDisplayStrictCrossingHits(endpointContactEdges)).toHaveLength(0);
+    expect(evaluate(endpointContactEdges)).toBe(0);
+  });
+
   it('matches the standalone strict-crossing and unrelated-overlap scorers exactly', () => {
     const edges: Edge[] = [
       edge('mover', 'm-source', 'm-target', [{ x: 0, y: 5 }, { x: 30, y: 5 }]),
@@ -300,17 +322,19 @@ describe('display candidate interaction context', () => {
       expected: { strictCrossings: 0, unrelatedOverlap: 0 },
     },
     {
-      name: 'the open one-pixel strict-crossing boundaries',
+      name: 'the open half-pixel strict-crossing boundaries',
       path: [{ x: 0, y: 0 }, { x: 10, y: 0 }],
       otherSegments: [
-        segment(2, 'v', { x: 1, y: -10 }, { x: 1, y: 10 }, 0),
-        segment(2, 'v', { x: 1.000001, y: -10 }, { x: 1.000001, y: 10 }, 1),
-        segment(2, 'v', { x: 9, y: -10 }, { x: 9, y: 10 }, 2),
-        segment(2, 'v', { x: 8.999999, y: -10 }, { x: 8.999999, y: 10 }, 3),
-        segment(2, 'v', { x: 5, y: -1 }, { x: 5, y: 10 }, 4),
-        segment(2, 'v', { x: 5, y: -10 }, { x: 5, y: 1 }, 5),
+        segment(2, 'v', { x: 0.5, y: -10 }, { x: 0.5, y: 10 }, 0),
+        segment(2, 'v', { x: 0.500001, y: -10 }, { x: 0.500001, y: 10 }, 1),
+        segment(2, 'v', { x: 9.5, y: -10 }, { x: 9.5, y: 10 }, 2),
+        segment(2, 'v', { x: 9.499999, y: -10 }, { x: 9.499999, y: 10 }, 3),
+        segment(2, 'v', { x: 5, y: -0.5 }, { x: 5, y: 10 }, 4),
+        segment(2, 'v', { x: 5, y: -0.500001 }, { x: 5, y: 10 }, 5),
+        segment(2, 'v', { x: 5, y: -10 }, { x: 5, y: 0.5 }, 6),
+        segment(2, 'v', { x: 5, y: -10 }, { x: 5, y: 0.500001 }, 7),
       ],
-      expected: { strictCrossings: 2, unrelatedOverlap: 0 },
+      expected: { strictCrossings: 4, unrelatedOverlap: 0 },
     },
     {
       name: 'decimal overlap at the inclusive lane threshold',

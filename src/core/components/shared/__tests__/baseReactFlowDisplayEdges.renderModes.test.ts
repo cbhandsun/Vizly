@@ -9,6 +9,32 @@ import { displayEdgesHaveNodeAnchoredTerminals } from '../baseReactFlowTerminalA
 import { baseNodes } from './baseReactFlowDisplayEdges.testUtils';
 
 describe('baseReactFlowDisplayEdges render modes', () => {
+  it('honors explicit full quality for large-graph hints below the extreme graph cap', () => {
+    const mediumEdges = Array.from({ length: 44 }, (_, index): Edge => ({
+      id: `e${index}`,
+      source: 'source',
+      target: 'target',
+    }));
+    const mediumNodes = Array.from({ length: 45 }, (_, index): Node => ({
+      id: `n${index}`,
+      position: { x: index * 10, y: 0 },
+      data: {},
+    }));
+
+    expect(resolveDisplayQualityBudget(mediumEdges, mediumNodes, true).mode).toBe('fast');
+    expect(resolveDisplayQualityBudget(mediumEdges, mediumNodes, true, true).mode).toBe('bounded');
+    expect(resolveDisplayQualityBudget(
+      Array.from({ length: 81 }, (_, index): Edge => ({
+        id: `extreme-${index}`,
+        source: 'source',
+        target: 'target',
+      })),
+      mediumNodes,
+      true,
+      true,
+    ).mode).toBe('fast');
+  });
+
   it('converts large-graph edges to canvas-ref while preserving original type metadata', () => {
     const edges: Edge[] = [
       {
@@ -263,7 +289,7 @@ describe('baseReactFlowDisplayEdges render modes', () => {
     expect(path.every((point: any) => Number.isFinite(point.x) && Number.isFinite(point.y))).toBe(true);
   });
 
-  it('keeps layout-locked computed paths on the stable path renderer in basic mode while selecting a legal target side', () => {
+  it('keeps layout-locked computed paths on the stable path renderer in basic mode while selecting legal terminal sides', () => {
     const computedPath = [{ x: 50, y: 260 }, { x: 120, y: 260 }, { x: 350, y: 30 }];
     const edges: Edge[] = [
       {
@@ -293,15 +319,16 @@ describe('baseReactFlowDisplayEdges render modes', () => {
 
     expect(result[0].type).toBe('stablePath');
     const repairedPath = (result[0].data as any).computedPath;
-    expect(repairedPath[0]).toEqual(computedPath[0]);
-    expect(result[0].targetHandle).toBe('bottom');
-    expect(repairedPath[repairedPath.length - 1]).toEqual({ x: 350, y: 60 });
+    expect(result[0].sourceHandle).toBe('right');
+    expect(repairedPath[0]).toEqual({ x: 100, y: 230 });
+    expect(result[0].targetHandle).toBe('left');
+    expect(repairedPath[repairedPath.length - 1]).toEqual({ x: 300, y: 30 });
     expect(displayEdgesHaveNodeAnchoredTerminals(result, baseNodes)).toBe(true);
-    expect((result[0].data as any).endpointOrthogonalRepaired).toBe(true);
+    expect((result[0].data as any).terminalPortBridgeRepaired).toBe(true);
     expect(result[0].label).toBe('Locked path');
   });
 
-  it('keeps post-processed locked computed paths on the stable path renderer in smart mode while selecting a legal target side', () => {
+  it('keeps post-processed locked computed paths on the stable path renderer in smart mode while selecting legal terminal sides', () => {
     const computedPath = [{ x: 50, y: 260 }, { x: 120, y: 260 }, { x: 350, y: 30 }];
     const edges: Edge[] = [
       {
@@ -331,11 +358,12 @@ describe('baseReactFlowDisplayEdges render modes', () => {
 
     expect(result[0].type).toBe('stablePath');
     const repairedPath = (result[0].data as any).computedPath;
-    expect(repairedPath[0]).toEqual(computedPath[0]);
-    expect(result[0].targetHandle).toBe('bottom');
-    expect(repairedPath[repairedPath.length - 1]).toEqual({ x: 350, y: 60 });
+    expect(result[0].sourceHandle).toBe('right');
+    expect(repairedPath[0]).toEqual({ x: 100, y: 230 });
+    expect(result[0].targetHandle).toBe('left');
+    expect(repairedPath[repairedPath.length - 1]).toEqual({ x: 300, y: 30 });
     expect(displayEdgesHaveNodeAnchoredTerminals(result, baseNodes)).toBe(true);
-    expect((result[0].data as any).endpointOrthogonalRepaired).toBe(true);
+    expect((result[0].data as any).terminalPortBridgeRepaired).toBe(true);
     expect(result[0].label).toBe('Smart locked path');
   });
 

@@ -131,4 +131,3 @@ export const buildPairedTerminalStrictCandidates = <T extends Edge[]>(
 
   return candidates;
 };
-

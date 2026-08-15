@@ -278,3 +278,62 @@ export const buildFacingPortPathCandidates = (
     ))) === index
   ));
 };
+
+/**
+ * Reuses a clean peer's outward source trunk, then splices into a later
+ * perpendicular segment of the current route. This avoids adding a competing
+ * terminal stub beside an already valid shared trunk.
+ */
+export const buildSharedSourceTrunkAdoptionCandidates = (
+  path: readonly SharedNodePortPoint[],
+  peerPath: readonly SharedNodePortPoint[],
+  minStub = 48,
+  maxCandidates = 3,
+): SharedNodePortPoint[][] => {
+  if (
+    !isOrthogonalFinitePath(path)
+    || !isOrthogonalFinitePath(peerPath)
+    || !Number.isFinite(minStub)
+    || minStub <= 0
+    || !Number.isInteger(maxCandidates)
+    || maxCandidates <= 0
+  ) return [];
+  const terminal = peerPath[0];
+  const peerNext = peerPath[1];
+  const trunkAxis = axisOf(terminal, peerNext);
+  if (!trunkAxis) return [];
+  const outwardDirection = trunkAxis === 'h'
+    ? Math.sign(peerNext.x - terminal.x)
+    : Math.sign(peerNext.y - terminal.y);
+  if (outwardDirection === 0) return [];
+
+  const candidates: SharedNodePortPoint[][] = [];
+  const seen = new Set<string>();
+  for (let segmentIndex = 1; segmentIndex < path.length - 1; segmentIndex += 1) {
+    const segmentStart = path[segmentIndex];
+    const segmentEnd = path[segmentIndex + 1];
+    const segmentAxis = axisOf(segmentStart, segmentEnd);
+    if (!segmentAxis || segmentAxis === trunkAxis) continue;
+    const splice = trunkAxis === 'v'
+      ? { x: terminal.x, y: segmentStart.y }
+      : { x: segmentStart.x, y: terminal.y };
+    const outwardDistance = trunkAxis === 'v'
+      ? (splice.y - terminal.y) * outwardDirection
+      : (splice.x - terminal.x) * outwardDirection;
+    if (outwardDistance < minStub - EPSILON) continue;
+    const candidate = compactPath([
+      terminal,
+      splice,
+      segmentEnd,
+      ...path.slice(segmentIndex + 2),
+    ]);
+    if (!isOrthogonalFinitePath(candidate)) continue;
+    if (!samePoint(candidate[candidate.length - 1], path[path.length - 1])) continue;
+    const key = candidate.map(point => `${point.x}:${point.y}`).join('|');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    candidates.push(candidate);
+    if (candidates.length >= maxCandidates) break;
+  }
+  return candidates;
+};

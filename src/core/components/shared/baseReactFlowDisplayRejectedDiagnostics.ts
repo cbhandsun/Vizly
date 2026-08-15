@@ -3,7 +3,12 @@ import type { Edge, Node } from '@xyflow/react';
 import { calculateEdgePathQualityScore } from '../../strategies/shared/edgeStrictCrossingGuard';
 import { collectBoundedDisplayRoutingPairDiagnostics } from './baseReactFlowDisplayDiagnostics';
 import { withDisplayAbsolutePositions } from './baseReactFlowDisplayEdgeCore';
-import { getDisplayComputedPath, getDisplayNodeRect } from './baseReactFlowDisplayGeometry';
+import {
+  findDisplayStrictCrossingHits,
+  getDisplayComputedPath,
+  getDisplayNodeRect,
+} from './baseReactFlowDisplayGeometry';
+import { getDisplayHardQualityGateReport } from './baseReactFlowDisplayQualityGates';
 import { displayTerminalRoleNeedsDeclaredAxisRepair } from './baseReactFlowDisplayTerminalPortCandidates';
 import {
   createDisplayTerminalValidationSnapshot,
@@ -58,6 +63,11 @@ export const recordBaseReactFlowRejectedDisplayDiagnostics = ({
   );
   const terminalSnapshot = createDisplayTerminalValidationSnapshot(terminalNodes);
   const terminalReport = getDisplayTerminalValidationReport(edges, terminalSnapshot);
+  const hardGateDiagnostics = getDisplayHardQualityGateReport(
+    edges,
+    terminalNodes,
+    'polished',
+  );
   const summarizeEdge = (edge: Edge) => summarizeRejectedEdge(edge, terminalNodes);
   const hairpinEdges = edges.filter(edge => (
     calculateEdgePathQualityScore([edge]).hairpins > 0
@@ -84,13 +94,21 @@ export const recordBaseReactFlowRejectedDisplayDiagnostics = ({
     );
   });
   const unexplainedPairReport = collectBoundedDisplayRoutingPairDiagnostics({ edges });
+  const strictCrossings = findDisplayStrictCrossingHits(edges).slice(0, 4).map(({ a, b }) => ({
+    first: summarizeEdge(edges[a.edgeIndex]),
+    second: summarizeEdge(edges[b.edgeIndex]),
+    firstSegmentIndex: a.segmentIndex,
+    secondSegmentIndex: b.segmentIndex,
+  }));
   updateDisplayRoutingDebugState({
+    hardGateDiagnostics,
     terminalDiagnostics: {
       unanchored: terminalReport.unanchoredEdgeIndexes.slice(0, 3).map(
         index => summarizeEdge(edges[index]),
       ),
       hairpins: hairpinEdges.slice(0, 3).map(summarizeEdge),
       declaredAxisMismatches: declaredAxisMismatches.slice(0, 3).map(summarizeEdge),
+      strictCrossings,
       unexplainedPairs: unexplainedPairReport.pairs.map(pair => ({
         first: summarizeEdge(pair.first),
         second: summarizeEdge(pair.second),

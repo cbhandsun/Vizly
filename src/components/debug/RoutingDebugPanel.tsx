@@ -7,6 +7,9 @@ import { useTranslation } from 'react-i18next';
 import { PerformanceTab } from './tabs/PerformanceTab';
 import { CacheTab } from './tabs/CacheTab';
 import { VisualizerTab } from './tabs/VisualizerTab';
+import { registerRoutingDebugTranslations } from './routingDebugTranslations';
+
+registerRoutingDebugTranslations();
 
 export const RoutingDebugPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     const { t } = useTranslation();

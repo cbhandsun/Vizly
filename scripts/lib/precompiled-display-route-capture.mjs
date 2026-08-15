@@ -3,6 +3,21 @@
  * later `:repair` response remains invalid because it has a different request
  * identity; an in-job full-route repair is represented by one final response.
  */
+export const isFreshFullRouteResolution = value => (
+  value === 'full-route' || value === 'full-route-repaired'
+);
+
+export const isFreshFullRouteRequestResponse = (request, response) => (
+  Boolean(request)
+  && typeof request === 'object'
+  && request.operation === 'route'
+  && !Array.isArray(request.candidateEdges)
+  && (
+    response?.routeResolution === 'full-route'
+    || response?.routeResolution === 'full-route-repaired'
+  )
+);
+
 export const isMatchingHardCleanDisplayWorkerResponse = (request, response) => (
   Boolean(request)
   && typeof request === 'object'
@@ -79,9 +94,9 @@ export const createPrecompiledDisplayRoutePatches = (sourceEdges, routedEdges) =
       }
       const token = copyToken(routed[key]);
       if (typeof token === 'symbol') return null;
-      patch[key] = token;
+      if (key === 'type' && token !== source.type && token !== 'stablePath') return null;
+      if (!Object.is(token, source[key])) patch[key] = token;
     }
-    if (patch.type !== source.type && patch.type !== 'stablePath') return null;
     const sourceData = isRecord(source.data) ? source.data : {};
     const routedData = isRecord(routed.data) ? routed.data : null;
     if (!routedData) return null;
@@ -114,7 +129,12 @@ export const createPrecompiledDisplayRoutePatches = (sourceEdges, routedEdges) =
     } else if (typeof sourceData.treeRouting !== 'undefined') {
       return null;
     }
-    for (const key of ['sharedTrunkAware', 'sharedTrunkSynthesized', 'isTreeBus']) {
+    for (const key of [
+      'sharedTrunkAware',
+      'sharedTrunkSynthesized',
+      'isTreeBus',
+      'overextendedTargetTrunkCorridorReclaimed',
+    ]) {
       if (typeof routedData[key] !== 'undefined') {
         if (typeof routedData[key] !== 'boolean') return null;
         data[key] = routedData[key];
@@ -130,6 +150,7 @@ export const createPrecompiledDisplayRoutePatches = (sourceEdges, routedEdges) =
 
 export const renderPrecompiledDisplayRouteCaptureExpression = targetId => `(async () => {
   const isMatchingResponse = ${isMatchingHardCleanDisplayWorkerResponse.toString()};
+  const isFreshRequestResponse = ${isFreshFullRouteRequestResponse.toString()};
   const createPatches = ${createPrecompiledDisplayRoutePatches.toString()};
   const hashQueryIndex = window.location.hash.indexOf('?');
   const activeTargetId = hashQueryIndex >= 0
@@ -143,6 +164,7 @@ export const renderPrecompiledDisplayRouteCaptureExpression = targetId => `(asyn
     || routing.workerAbortCount !== 0
     || routing.requestId !== request?.requestId
     || !isMatchingResponse(request, response)
+    || !isFreshRequestResponse(request, response)
     || routing.workerResolution !== response.routeResolution
     || typeof routing.inputGeometryDigest !== 'string'
     || !/^geometry-v1:[0-9a-f]{32}$/.test(routing.inputGeometryDigest)
@@ -155,7 +177,12 @@ export const renderPrecompiledDisplayRouteCaptureExpression = targetId => `(asyn
   return {
     targetId: ${JSON.stringify(targetId)},
     routing,
-    requestShape: { nodes: request.nodes.length, edges: request.edges.length },
+    requestShape: {
+      operation: request.operation,
+      candidateEdges: Array.isArray(request.candidateEdges) ? request.candidateEdges.length : 0,
+      nodes: request.nodes.length,
+      edges: request.edges.length,
+    },
     patches,
     inputGeometryDigest: routing.inputGeometryDigest,
     outputRouteSignature: routing.outputRouteSignature,

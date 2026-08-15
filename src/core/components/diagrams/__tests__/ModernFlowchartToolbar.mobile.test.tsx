@@ -571,6 +571,38 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
         expect(onStrategyLayout).toHaveBeenCalledWith('tree', undefined, 'TB');
     });
 
+    it('disables the automatic-layout menu while another layout is running', async () => {
+        const onStrategyLayout = vi.fn();
+
+        render(
+            <ModernFlowchartToolbar
+                canUndo={false}
+                canRedo={false}
+                onUndo={vi.fn()}
+                onRedo={vi.fn()}
+                onZoomIn={vi.fn()}
+                onZoomOut={vi.fn()}
+                onFitView={vi.fn()}
+                autoRouting={false}
+                toggleAutoRouting={vi.fn()}
+                showGrid
+                toggleGrid={vi.fn()}
+                onShowShortcuts={vi.fn()}
+                showRuler={false}
+                toggleRuler={vi.fn()}
+                onStrategyLayout={onStrategyLayout}
+                layoutBusy
+            />,
+        );
+
+        const layoutButton = await screen.findByRole('button', { name: /layout\.tooltip|自动布局/i });
+        expect((layoutButton as HTMLButtonElement).disabled).toBe(true);
+        expect(layoutButton.getAttribute('aria-busy')).toBe('true');
+        fireEvent.click(layoutButton);
+        expect(onStrategyLayout).not.toHaveBeenCalled();
+        expect(screen.queryByRole('menuitemradio')).toBeNull();
+    });
+
     it('announces the current compound layout and exposes both checked radio states', async () => {
         render(
             <ModernFlowchartToolbar

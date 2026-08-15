@@ -22,6 +22,7 @@ import { buildNodeBoundaryAdjacentLaneCandidates } from './baseReactFlowDisplayN
 import { buildStrictEndpointDetourCandidates } from './baseReactFlowDisplayStrictEndpointDetourCandidates';
 import { buildTerminalCapDetourCandidates } from './baseReactFlowDisplayTerminalCapDetourCandidates';
 import { buildStrictLoopShortcutCandidates } from './baseReactFlowDisplayStrictLoopShortcutCandidates';
+import { buildSharedTargetOuterBridgeCandidates } from './baseReactFlowDisplaySharedTargetOuterBridge';
 import {
   repairDisplayObstacleHits,
   repairStrictBypassesIfNeeded,
@@ -60,6 +61,7 @@ const changedDisplayTerminalsRemainAnchored = (
 
 export const repairInternalStrictCrossingLanes = <T extends Edge[]>(edges: T, nodes: Node[]): T => {
   let current = edges;
+  const terminalValidation = createDisplayTerminalValidationSnapshot(nodes);
   for (let pass = 0; pass < 2; pass += 1) {
     const qualityContext = createEdgePathQualityEvaluationContext(current);
     const obstacleContext = createDisplayObstacleEvaluationContext(current, nodes);
@@ -111,6 +113,7 @@ export const repairInternalStrictCrossingLanes = <T extends Edge[]>(edges: T, no
           const candidateEdges = current.map((edge, edgeIndex) => (
             edgeIndex === segment.edgeIndex ? withDisplayComputedPath(edge, candidatePath) : edge
           )) as T;
+          if (!changedDisplayTerminalsRemainAnchored(current, candidateEdges, terminalValidation)) continue;
           const candidateQuality = qualityContext.evaluateChanged(candidateEdges, [segment.edgeIndex]);
           const candidateObstacleHits = obstacleContext.evaluateKnownChanges(candidateEdges, [segment.edgeIndex]);
           const candidateScore = obstacleRepairScore(candidateQuality, candidateObstacleHits);
@@ -285,6 +288,8 @@ export const repairFinalResidualStrictCrossings = <T extends Edge[]>(edges: T, n
         ...buildPairedTerminalStrictCandidates(current, hit.b, hit.a),
         ...buildCrossingCompanionOuterPortVariants(current, hit.a, hit.b, nodes),
         ...buildCrossingCompanionOuterPortVariants(current, hit.b, hit.a, nodes),
+        ...buildSharedTargetOuterBridgeCandidates(current, hit.a, hit.b, nodes),
+        ...buildSharedTargetOuterBridgeCandidates(current, hit.b, hit.a, nodes),
       ];
       for (const candidateEdges of pairedCandidates) {
         if (!changedDisplayTerminalsRemainAnchored(current, candidateEdges, terminalValidation)) continue;

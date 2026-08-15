@@ -3,6 +3,7 @@ import type { Edge, Node } from '@xyflow/react';
 
 import { separateDetachedParallelOverlaps } from '../edgeDetachedOverlapRepair';
 import { runEdgeRoutingPipeline } from '../edgeRoutingPipeline';
+import { countUnrelatedObstacleHits } from '../edgeWaypointCandidateRepair';
 
 const node = (
   id: string,
@@ -88,6 +89,43 @@ describe('runEdgeRoutingPipeline display contract', () => {
 
     expect(routed.sourceHandle).toBe('source-right-runtime-port-2');
     expect(routed.targetHandle).toBe('target-left-runtime-port-4');
+  });
+
+  it('never trades a lower crossing count for a path through a sibling business node', async () => {
+    const nodes: Node[] = [
+      node('source', 'custom', 40, 0, 120, 72),
+      node('sibling', 'custom', 40, 150, 120, 72),
+      node('target', 'custom', 40, 300, 120, 72),
+    ];
+    const input: Edge = {
+      id: 'source-target-through-sibling',
+      source: 'source',
+      target: 'target',
+      sourceHandle: 'bottom',
+      targetHandle: 'top',
+      data: {
+        computedPath: [
+          { x: 100, y: 72 },
+          { x: 100, y: 300 },
+        ],
+      },
+    };
+
+    const [routed] = await runEdgeRoutingPipeline(nodes, [input], { layoutDirection: 'TB' });
+    const obstacles = new Map(nodes.map(candidate => [candidate.id, {
+      x: candidate.position.x,
+      y: candidate.position.y,
+      width: Number(candidate.measured?.width ?? 0),
+      height: Number(candidate.measured?.height ?? 0),
+    }]));
+
+    expect(countUnrelatedObstacleHits(
+      routed.data?.computedPath as Array<{ x: number; y: number }>,
+      routed,
+      obstacles,
+    )).toBe(0);
+    expect(routed.sourceHandle).toBe('bottom');
+    expect(routed.targetHandle).toBe('top');
   });
 });
 

@@ -45,6 +45,7 @@ export const repairResidualOuterPortTransactionWithHardGate = <T extends Edge[]>
   )) return edges;
 
   const candidates = buildBoundedOuterPortTransactionCandidates(edges, nodes, {
+    includeStrictCrossings: true,
     maxCandidates: Math.min(64, maxExactEvaluations),
   });
   let remainingEvaluations = Math.min(64, Math.max(1, maxExactEvaluations));

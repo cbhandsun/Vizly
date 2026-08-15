@@ -28,6 +28,10 @@ import {
 } from '../../utils/HandlePicker';
 import { routeEdgesWithELK } from '../../utils/elkEdgeRouter';
 import { logElkEdgeRouterFallback } from '../layoutLogging';
+import {
+  COMMERCIAL_BUSINESS_NODE_CLEARANCE,
+  repairBusinessNodeClearanceRisks,
+} from './edgeBusinessNodeClearanceRepair';
 import { separateDetachedParallelOverlaps } from './edgeDetachedOverlapRepair';
 import { repairDetachedStrictCrossingBypasses } from './edgeDetachedStrictCrossingRepair';
 import { repairEndpointLaneCrossings } from './edgeEndpointLaneNudgeRepair';
@@ -638,6 +642,17 @@ export async function runEdgeRoutingPipeline(
     if (nextFinalEdges === finalEdges) break;
     finalEdges = nextFinalEdges;
   }
+  finalEdges = preservePipelineTerminalOwnership(edges, finalEdges);
+  // Crossing-focused refinements can reintroduce a shorter path through a
+  // sibling business node. Run the commercial node-clearance gate last so a
+  // lower crossing count can never win by violating the hard obstacle rule.
+  finalEdges = repairBusinessNodeClearanceRisks(finalEdges, pipelineNodes, {
+    minimumClearance: COMMERCIAL_BUSINESS_NODE_CLEARANCE,
+    // A real-node traversal is a hard failure. Permit one temporary line-line
+    // crossing so the route can escape the blocked corridor.
+    allowTransientStrictCrossing: true,
+  });
+  finalEdges = repairSharedTrunkAwareObstacles(finalEdges, pipelineNodes);
   finalEdges = preservePipelineTerminalOwnership(edges, finalEdges);
   finalEdges = lockComputedPathsForDisplay(finalEdges);
   return finalEdges;

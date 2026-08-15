@@ -1,4 +1,5 @@
 import type { DiagramRenderScene, RenderEdgeGeometry, RenderEdgeMarker, RenderNodeGeometry } from '../rendering/types';
+import { resolveEdgeContrastPaint } from '../rendering/edgeContrastPaint';
 import { getSvgMarkerId } from '../rendering/svgMarkerIds';
 import { isSafeSvgPathData } from './svgPathSafety';
 import { hasSafeSvgSceneGeometry } from './svgSceneGeometrySafety';
@@ -53,31 +54,99 @@ const collectMarkers = (scene: DiagramRenderScene): RenderEdgeMarker[] => {
   return [...map.values()];
 };
 
-const markerDef = (namespace: string, marker: RenderEdgeMarker): string => {
-  const id = getSvgMarkerId(namespace, marker);
-  const base = `<marker${attr('id', id)} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">`;
-  const body = marker.kind === 'openArrow'
-    ? `<path d="M 1 1 L 9 5 L 1 9" fill="none"${attr('stroke', marker.color)} stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>`
-    : marker.kind === 'diamond'
-      ? `<path d="M 1 5 L 5 1 L 9 5 L 5 9 Z"${attr('fill', marker.color)}/>`
-      : marker.kind === 'circle'
-        ? `<circle cx="5" cy="5" r="3.5"${attr('fill', marker.color)}/>`
-        : `<path d="M 0 0 L 10 5 L 0 10 Z"${attr('fill', marker.color)}/>`;
-  return `${base}${body}</marker>`;
+const markerShape = (
+  marker: RenderEdgeMarker,
+  color: string,
+  strokeWidth: number,
+  isUnderlay = false,
+): string => {
+  const className = isUnderlay ? ' class="vizly-export-marker-contrast-underlay"' : '';
+  if (marker.kind === 'openArrow') {
+    return `<path${className} d="M 1 1 L 9 5 L 1 9" fill="none"${attr('stroke', color)}${attr('stroke-width', strokeWidth)} stroke-linecap="round" stroke-linejoin="round"/>`;
+  }
+  const outline = isUnderlay
+    ? `${attr('stroke', color)}${attr('stroke-width', 2)} stroke-linejoin="round"`
+    : '';
+  if (marker.kind === 'diamond') {
+    return `<path${className} d="M 1 5 L 5 1 L 9 5 L 5 9 Z"${attr('fill', color)}${outline}/>`;
+  }
+  if (marker.kind === 'circle') {
+    return `<circle${className} cx="5" cy="5" r="3.5"${attr('fill', color)}${outline}/>`;
+  }
+  return `<path${className} d="M 0 0 L 10 5 L 0 10 Z"${attr('fill', color)}${outline}/>`;
 };
 
-const edgeToSvg = (edge: RenderEdgeGeometry, namespace: string): string => {
+const markerDef = (
+  namespace: string,
+  marker: RenderEdgeMarker,
+  canvasBackground: string,
+): string => {
+  const id = getSvgMarkerId(namespace, marker);
+  const semanticStrokeWidth = marker.kind === 'openArrow' ? 1.7 : 1;
+  const decision = resolveEdgeContrastPaint({
+    stroke: marker.color,
+    strokeWidth: semanticStrokeWidth,
+    canvasBackground,
+  });
+  const underlay = decision.kind === 'underlay'
+    ? markerShape(marker, decision.underlayColor, decision.underlayStrokeWidth, true)
+    : '';
+  const semanticShape = markerShape(marker, marker.color, semanticStrokeWidth);
+  const overflow = underlay ? ' overflow="visible"' : '';
+  return `<marker${attr('id', id)} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"${overflow}>${underlay}${semanticShape}</marker>`;
+};
+
+const polylineMidpoint = (points: readonly { x: number; y: number }[]): { x: number; y: number } => {
+  const fallback = points[0] ?? { x: 0, y: 0 };
+  const lengths = points.slice(1).map((point, index) => Math.hypot(
+    point.x - points[index].x,
+    point.y - points[index].y,
+  ));
+  const target = lengths.reduce((total, length) => total + length, 0) / 2;
+  let travelled = 0;
+  for (let index = 0; index < lengths.length; index += 1) {
+    const length = lengths[index];
+    if (travelled + length >= target && length > 0) {
+      const ratio = (target - travelled) / length;
+      return {
+        x: points[index].x + (points[index + 1].x - points[index].x) * ratio,
+        y: points[index].y + (points[index + 1].y - points[index].y) * ratio,
+      };
+    }
+    travelled += length;
+  }
+  return points.at(-1) ?? fallback;
+};
+
+const edgeToSvg = (
+  edge: RenderEdgeGeometry,
+  namespace: string,
+  canvasBackground: string,
+): string => {
   const markerStart = edge.markerStart.kind === 'none' ? '' : attr('marker-start', `url(#${getSvgMarkerId(namespace, edge.markerStart)})`);
   const markerEnd = edge.markerEnd.kind === 'none' ? '' : attr('marker-end', `url(#${getSvgMarkerId(namespace, edge.markerEnd)})`);
   const dash = edge.strokeDasharray ? attr('stroke-dasharray', edge.strokeDasharray) : '';
-  const labelPoint = edge.points[Math.floor(edge.points.length / 2)] ?? { x: 0, y: 0 };
+  const contrastDecision = resolveEdgeContrastPaint({
+    stroke: edge.stroke,
+    strokeWidth: edge.strokeWidth,
+    canvasBackground,
+    opacity: edge.markerOnly ? 1 : edge.opacity,
+    ancestorOpacity: 1,
+  });
+  const contrastUnderlay = !edge.markerOnly && contrastDecision.kind === 'underlay'
+    ? `<path class="vizly-export-edge-contrast-underlay"${attr('d', edge.path)} fill="none"${attr('stroke', contrastDecision.underlayColor)}${attr('stroke-width', contrastDecision.underlayStrokeWidth)} stroke-linecap="round" stroke-linejoin="round" opacity="1"${dash}/>`
+    : '';
+  const labelPoint = polylineMidpoint(edge.points);
   const labelLines = wrapText(edge.label, 28, 2);
   const labelWidth = labelLines.length ? clamp(Math.max(...labelLines.map(line => line.length)) * 7 + 16, 32, 220) : 0;
   const labelHeight = labelLines.length * 15 + 8;
   const label = edge.label
     ? `<g class="vizly-export-edge-label"><rect${attr('x', labelPoint.x - labelWidth / 2)}${attr('y', labelPoint.y - labelHeight / 2)}${attr('width', labelWidth)}${attr('height', labelHeight)} rx="4" fill="#ffffff"${attr('stroke', edge.stroke)} stroke-width="0.6" opacity="0.92"/>${textLinesToSvg(labelLines, labelPoint.x, labelPoint.y - ((labelLines.length - 1) * 15) / 2, 12, edge.stroke, undefined, 'middle')}</g>`
     : '';
-  return `<g${attr('data-edge-id', edge.id)}><path${attr('d', edge.path)} fill="none"${attr('stroke', edge.stroke)}${attr('stroke-width', edge.strokeWidth)} stroke-linecap="round" stroke-linejoin="round"${attr('opacity', edge.opacity)}${dash}${markerStart}${markerEnd}/>${label}</g>`;
+  const markerCarrierAttr = edge.markerOnly
+    ? attr('data-shared-trunk-marker-paint', 'owner-fallback')
+    : '';
+  return `<g${attr('data-edge-id', edge.id)}${markerCarrierAttr}>${contrastUnderlay}<path${attr('d', edge.path)} fill="none"${attr('stroke', edge.markerOnly ? 'transparent' : edge.stroke)}${attr('stroke-width', edge.strokeWidth)} stroke-linecap="round" stroke-linejoin="round"${attr('opacity', edge.markerOnly ? 1 : edge.opacity)}${dash}${markerStart}${markerEnd}/>${label}</g>`;
 };
 
 const splitLongToken = (token: string, maxChars: number): string[] => {
@@ -308,13 +377,18 @@ const assertExportableScene = (scene: DiagramRenderScene) => {
 export const exportRenderSceneToSvg = (scene: DiagramRenderScene, options: SvgExportOptions = {}): string => {
   assertExportableScene(scene);
   const namespace = `vizly-${options.title ?? 'diagram'}`;
+  const contrastCanvasBackground = scene.theme.background.trim().toLowerCase() === 'transparent'
+    ? '#ffffff'
+    : scene.theme.background;
   const markers = collectMarkers(scene);
-  const defs = markers.length ? `<defs>${markers.map(marker => markerDef(namespace, marker)).join('')}</defs>` : '';
+  const defs = markers.length
+    ? `<defs>${markers.map(marker => markerDef(namespace, marker, contrastCanvasBackground)).join('')}</defs>`
+    : '';
   const title = options.title ? `<title>${escapeXml(options.title)}</title>` : '';
   const background = options.includeBackground === false
     ? ''
     : `<rect${attr('x', scene.bounds.minX)}${attr('y', scene.bounds.minY)}${attr('width', scene.bounds.width)}${attr('height', scene.bounds.height)}${attr('fill', scene.theme.background)}/>`;
-  const edges = scene.edges.map(edge => edgeToSvg(edge, namespace)).join('');
+  const edges = scene.edges.map(edge => edgeToSvg(edge, namespace, contrastCanvasBackground)).join('');
   const nodes = scene.nodes.map(nodeToSvg).join('');
   const svg = [
     '<?xml version="1.0" encoding="UTF-8"?>',

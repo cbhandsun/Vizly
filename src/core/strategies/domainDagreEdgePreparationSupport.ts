@@ -40,6 +40,22 @@ export const readManualHandleSides = (data: RoutingEdgeData): string[] =>
     ? data.manualHandleSides.map(side => String(side).toLowerCase())
     : [];
 
+export const readManualHandleLocks = (
+  data: RoutingEdgeData,
+): { source: boolean; target: boolean } => {
+  const sides = readManualHandleSides(data);
+  const manualHandles = data.manualHandles ?? data._manualHandles;
+  const manualHandleRecord = asRoutingRecord(manualHandles);
+  return {
+    source: sides.includes('source')
+      || manualHandles === true
+      || Boolean(manualHandleRecord.source),
+    target: sides.includes('target')
+      || manualHandles === true
+      || Boolean(manualHandleRecord.target),
+  };
+};
+
 export const applyAutoHandleData = (
   edge: Edge,
   autoSource: boolean | undefined,

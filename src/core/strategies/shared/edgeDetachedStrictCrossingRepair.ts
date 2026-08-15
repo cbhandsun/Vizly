@@ -2,6 +2,7 @@ import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
 
 import {
   createEdgePathQualityEvaluationContext,
+  type EdgePathQualityScore,
 } from './edgeStrictCrossingGuard';
 import {
   buildDetachedStrictCrossingRepairSignature,
@@ -13,12 +14,15 @@ import {
   axisOf,
   compactPath,
   compareQualityScores,
+  createStrictCrossingSegmentIndex,
+  createRoutingObstacleGate,
   createDetachedOverlapStateEvaluationContext,
   edgesWithPaths,
   extractPathSegmentRefs,
   extractPathSegmentRefsForPath,
   findStrictCrossings,
   getEdgePath,
+  getRoutingObstacles,
   hasShortHairpin,
   pathEquals,
   pathManhattanLength,
@@ -44,6 +48,18 @@ export type DetachedStrictCrossingScoreEvaluationContextFactory = (
   edges: Edge[],
   nodes: ReactFlowNode[],
 ) => DetachedStrictCrossingScoreEvaluationContext;
+
+const strictRepairHardQualityDoesNotRegress = (
+  candidate: EdgePathQualityScore,
+  baseline: EdgePathQualityScore,
+): boolean => candidate.nonOrthogonalSegments <= baseline.nonOrthogonalSegments
+  && candidate.strictCrossings <= baseline.strictCrossings
+  && candidate.reverseOverlap <= baseline.reverseOverlap
+  && candidate.unrelatedOverlap <= baseline.unrelatedOverlap
+  && candidate.unexplainedRelatedOverlap <= baseline.unexplainedRelatedOverlap
+  && candidate.shortEndpointStubs <= baseline.shortEndpointStubs
+  && candidate.tinyInteriorDoglegs <= baseline.tinyInteriorDoglegs
+  && candidate.hairpins <= baseline.hairpins;
 
 const materializeRepairedPaths = (
   edges: Edge[],
@@ -308,6 +324,7 @@ const repairDetachedStrictCrossingPaths = (
   createScoreEvaluationContext: DetachedStrictCrossingScoreEvaluationContextFactory,
 ): Point[][] => {
   let paths = inputPaths;
+  const routingObstacleGate = createRoutingObstacleGate(edges, getRoutingObstacles(nodes));
   for (let iteration = 0; iteration < 3; iteration += 1) {
     const hits = findStrictCrossings(paths, edges);
     if (hits.length === 0) break;
@@ -316,6 +333,7 @@ const repairDetachedStrictCrossingPaths = (
     const qualityContext = createEdgePathQualityEvaluationContext(currentEdges);
     const currentQualityScore = qualityContext.evaluate(currentEdges);
     const currentSegments = extractPathSegmentRefs(paths, edges);
+    const strictCrossingSegmentIndex = createStrictCrossingSegmentIndex(currentSegments);
     let detachedScoreContext: DetachedStrictCrossingScoreEvaluationContext | null = null;
     let bestScore: number | null = null;
     let bestQualityScore = currentQualityScore;
@@ -336,6 +354,7 @@ const repairDetachedStrictCrossingPaths = (
         currentSegments.filter(item => item.edgeIndex === edgeIndex),
         currentSegments,
         edgeIndex,
+        strictCrossingSegmentIndex,
       );
       currentEdgeCrossingsByIndex.set(edgeIndex, crossings);
       return crossings;
@@ -418,6 +437,7 @@ const repairDetachedStrictCrossingPaths = (
             extractPathSegmentRefsForPath(candidatePath, segment.edgeIndex, edges),
             currentSegments,
             segment.edgeIndex,
+            strictCrossingSegmentIndex,
           );
           if (candidateEdgeCrossings > currentEdgeCrossings) continue;
 
@@ -429,11 +449,16 @@ const repairDetachedStrictCrossingPaths = (
             && candidateStrictCrossings < currentQualityScore.strictCrossings;
           if (!reducesStrictCrossings && !tiesReducedStrictCrossings) continue;
           const candidatePaths = paths.map((path, index) => (index === segment.edgeIndex ? candidatePath : path));
+          if (!routingObstacleGate(paths, candidatePaths, [segment.edgeIndex])) continue;
           const candidateEdges = edgesWithPaths(currentEdges, candidatePaths, [segment.edgeIndex]);
           const candidateQualityScore = qualityContext.evaluateChanged(
             candidateEdges,
             [segment.edgeIndex],
           );
+          if (!strictRepairHardQualityDoesNotRegress(
+            candidateQualityScore,
+            currentQualityScore,
+          )) continue;
           let candidateScore: number | null = null;
           let improvesReducedStrictCandidate = false;
           if (tiesReducedStrictCrossings) {
@@ -462,7 +487,20 @@ const repairDetachedStrictCrossingPaths = (
     paths = bestPaths;
   }
 
-  return paths;
+  const changedIndexes = paths.flatMap((path, edgeIndex) => (
+    pathEquals(path, inputPaths[edgeIndex] ?? []) ? [] : [edgeIndex]
+  ));
+  if (changedIndexes.length === 0) return inputPaths;
+  if (!routingObstacleGate(inputPaths, paths, changedIndexes)) return inputPaths;
+
+  const baselineEdges = edgesWithPaths(edges, inputPaths);
+  const candidateEdges = edgesWithPaths(baselineEdges, paths, changedIndexes);
+  const finalQualityContext = createEdgePathQualityEvaluationContext(baselineEdges);
+  const baselineQuality = finalQualityContext.evaluate(baselineEdges);
+  const candidateQuality = finalQualityContext.evaluateChanged(candidateEdges, changedIndexes);
+  return strictRepairHardQualityDoesNotRegress(candidateQuality, baselineQuality)
+    ? paths
+    : inputPaths;
 };
 
 const buildPathPatches = (

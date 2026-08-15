@@ -71,6 +71,39 @@ describe('baseReactFlowDisplayRoutingTransaction', () => {
     ]);
   });
 
+  it('replays a trusted route that clears stale terminal handles', () => {
+    const source: Edge[] = [{
+      id: 'edge',
+      source: 'source',
+      target: 'target',
+      sourceHandle: 'bottom',
+      targetHandle: 'top',
+      type: 'advanced-smart-step',
+      data: { computedPath: [{ x: 50, y: 100 }, { x: 50, y: 300 }] },
+    }];
+    const routed: Edge[] = [{
+      id: 'edge',
+      source: 'source',
+      target: 'target',
+      type: 'stablePath',
+      data: { computedPath: [{ x: 50, y: 100 }, { x: 50, y: 300 }] },
+    }];
+
+    const patches = createBaseReactFlowDisplayEdgePatches(source, routed);
+    const safePatches = patches
+      ? sanitizeBaseReactFlowTrustedDisplayPatches(source, patches)
+      : null;
+    const replayed = safePatches
+      ? mergeBaseReactFlowDisplayEdgePatches(source, safePatches)
+      : null;
+
+    expect(replayed).not.toBeNull();
+    expect(replayed?.[0].sourceHandle).toBeUndefined();
+    expect(replayed?.[0].targetHandle).toBeUndefined();
+    expect(computeBaseReactFlowDisplayOutputRouteSignature(replayed ?? []))
+      .toBe(computeBaseReactFlowDisplayOutputRouteSignature(routed));
+  });
+
   it('matches valid protocol-sized routes independently of the cache edge limit', () => {
     const routes = Array.from({ length: 301 }, (_, index) => ({
       id: `edge-${index}`,

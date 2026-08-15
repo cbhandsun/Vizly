@@ -30,6 +30,10 @@ const isRoutingPatchKeySafe = (key: string): boolean => (
   key !== '__proto__' && key !== 'prototype' && key !== 'constructor'
 );
 
+const hasOwnRoutingProperty = (value: object, key: PropertyKey): boolean => (
+  Object.prototype.hasOwnProperty.call(value, key)
+);
+
 const buildRoutingValuePatch = (baseline: unknown, routed: unknown): unknown | typeof ROUTING_PATCH_NO_CHANGE => {
   if (Object.is(baseline, routed)) return ROUTING_PATCH_NO_CHANGE;
   if (Array.isArray(routed)) {
@@ -84,6 +88,16 @@ export const createBaseReactFlowDisplayEdgePatches = (
     const patch = valuePatch === ROUTING_PATCH_NO_CHANGE || !isRoutingPatchObject(valuePatch)
       ? {}
       : valuePatch;
+    // Missing automatic terminal/type tokens are semantically different from
+    // retaining the source value. Trusted routing patches support explicit
+    // undefined, so encode these bounded deletions instead of silently
+    // replaying a stale manual handle into the route signature.
+    for (const key of ['sourceHandle', 'targetHandle', 'type'] as const) {
+      if (
+        hasOwnRoutingProperty(sourceEdge, key)
+        && !hasOwnRoutingProperty(routedEdge, key)
+      ) patch[key] = undefined;
+    }
     patches.push({
       id: routedEdge.id,
       source: routedEdge.source,
@@ -114,7 +128,7 @@ export const mergeBaseReactFlowDisplayEdgePatches = (
 };
 
 const hasOwn = (value: object, key: PropertyKey): boolean => (
-  Object.prototype.hasOwnProperty.call(value, key)
+  hasOwnRoutingProperty(value, key)
 );
 
 const sanitizeCacheRoutingPath = (value: unknown): Array<{ x: number; y: number }> | null => {

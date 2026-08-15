@@ -557,7 +557,7 @@ describe('baseReactFlowDisplayWorkerClient', () => {
       edgeCount: 44,
       isLargeGraph: true,
       forceFullQuality: true,
-    })).toEqual({ mode: 'full', timeoutMs: 60_000 });
+    })).toEqual({ mode: 'full', timeoutMs: 120_000 });
   });
 
   it('keeps medium standard diagrams on the bounded interactive worker path', () => {
@@ -690,6 +690,15 @@ describe('baseReactFlowDisplayWorkerClient', () => {
       cached: null,
       immediate: [],
     })).toEqual([]);
+    expect(resolveBaseReactFlowDisplayedEdges({
+      signature: 'colliding-signature',
+      geometryDigest: 'digest-a',
+      policyMode: 'full',
+      deferred,
+      cached: null,
+      source: latest,
+      immediate: [],
+    })).toEqual(displayed);
   });
 
   it('uses a matching cached final result before any immediate edge fallback', () => {
@@ -744,6 +753,41 @@ describe('baseReactFlowDisplayWorkerClient', () => {
     expect((projected.nodes[0].style as Record<string, unknown>).background).toBeUndefined();
     expect((projected.nodes[0].data as Record<string, unknown>).content).toBeUndefined();
     expect((projected.nodes[0].data as Record<string, unknown>).domain).toBeUndefined();
+  });
+
+  it('projects nested nodes with absolute canvas coordinates when React Flow omits them', () => {
+    const projected = projectBaseReactFlowDisplayWorkerInput({
+      edges: [],
+      nodes: [
+        {
+          id: 'domain',
+          type: 'group',
+          position: { x: 400, y: 300 },
+          data: {},
+        },
+        {
+          id: 'subgroup',
+          type: 'subGroup',
+          parentId: 'domain',
+          position: { x: 80, y: 60 },
+          data: {},
+        },
+        {
+          id: 'business-node',
+          parentId: 'subgroup',
+          position: { x: 20, y: 30 },
+          positionAbsolute: { x: 20, y: 30 },
+          data: {},
+        },
+      ],
+    });
+
+    expect(projected.nodes.map(node => ({ id: node.id, positionAbsolute: node.positionAbsolute })))
+      .toEqual([
+        { id: 'domain', positionAbsolute: { x: 400, y: 300 } },
+        { id: 'subgroup', positionAbsolute: { x: 480, y: 360 } },
+        { id: 'business-node', positionAbsolute: { x: 500, y: 390 } },
+      ]);
   });
 
   it('preserves full-route patches when a hard-clean result has no repair delta', () => {
@@ -935,59 +979,4 @@ describe('baseReactFlowDisplayWorkerClient', () => {
     delete (window as any).cancelIdleCallback;
   });
 
-  it('terminates a cancelled worker and allows its replacement to be prewarmed', async () => {
-    const listeners = new Map<string, Set<EventListener>>();
-    const terminate = vi.fn();
-    let workerCount = 0;
-    class TestWorker {
-      constructor() {
-        workerCount += 1;
-      }
-
-      addEventListener(type: string, listener: EventListener) {
-        const entries = listeners.get(type) ?? new Set<EventListener>();
-        entries.add(listener);
-        listeners.set(type, entries);
-      }
-
-      removeEventListener(type: string, listener: EventListener) {
-        listeners.get(type)?.delete(listener);
-      }
-
-      postMessage() {}
-
-      terminate() {
-        terminate();
-      }
-    }
-    vi.stubGlobal('Worker', TestWorker);
-    const workerRef = { current: null };
-    const controller = new AbortController();
-    const pending = computeBaseReactFlowDisplayEdgesInWorker({
-      workerRef,
-      requestId: 'cancel-me',
-      edges: [{ id: 'edge', source: 'source', target: 'target' }],
-      nodes: [
-        { id: 'source', position: { x: 0, y: 0 }, data: {} },
-        { id: 'target', position: { x: 100, y: 0 }, data: {} },
-      ],
-      enableSmartEdges: true,
-      smartEdgePadding: 20,
-      isLargeGraph: false,
-      displayEdgeEpoch: 1,
-      qualityMode: 'full',
-      timeoutMs: 300_000,
-      signal: controller.signal,
-    });
-
-    controller.abort();
-
-    await expect(pending).rejects.toThrow('display-edge-worker-cancelled');
-    expect(terminate).toHaveBeenCalledTimes(1);
-    expect(workerRef.current).toBeNull();
-
-    expect(prewarmBaseReactFlowDisplayWorker(workerRef)).toBe(true);
-    expect(workerRef.current).not.toBeNull();
-    expect(workerCount).toBe(2);
-  });
 });

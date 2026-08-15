@@ -23,14 +23,20 @@ const withAntdRoute = (loadPage: () => Promise<LazyPageModule>) => React.lazy(as
 });
 
 const DiagramViewerRoute = withAntdRoute(loadDiagramViewerRoute);
-const ThemeColorComparison = withAntdRoute(() => import('@/pages/ThemeColorComparison'));
-const ThemeSideBySideComparison = withAntdRoute(() => import('@/pages/ThemeSideBySideComparison'));
+const ThemeColorComparison = import.meta.env.DEV
+  ? withAntdRoute(() => import('@/pages/ThemeColorComparison'))
+  : null;
+const ThemeSideBySideComparison = import.meta.env.DEV
+  ? withAntdRoute(() => import('@/pages/ThemeSideBySideComparison'))
+  : null;
 const DocsPreview = withAntdRoute(() => import('@/pages/DocsPreview'));
 const Warehouse3DPage = withAntdRoute(() => import('@/pages/Warehouse3DPage'));
 const StorageConfigPage = withAntdRoute(() => import('@/pages/StorageConfigPage'));
 const DiagramManagementPage = withAntdRoute(() => import('@/pages/DiagramManagementPage'));
 const ShareViewPage = withAntdRoute(() => import('@/pages/ShareViewPage'));
-const UnifiedDesignerTestPage = withAntdRoute(() => import('@/pages/UnifiedDesignerTestPage'));
+const UnifiedDesignerTestPage = import.meta.env.DEV
+  ? withAntdRoute(() => import('@/pages/UnifiedDesignerTestPage'))
+  : null;
 
 const renderRoute = (fallback: React.ReactNode, RouteComponent: React.ComponentType) => (
   <Suspense fallback={typeof fallback === 'string' ? <div style={{ padding: 16 }}>{fallback}</div> : fallback}>
@@ -38,7 +44,11 @@ const renderRoute = (fallback: React.ReactNode, RouteComponent: React.ComponentT
   </Suspense>
 );
 
-const allowedTestModes = new Set(['colors', 'sidebyside', 'docs', '3d', 'unified']);
+const allowedTestModes = new Set([
+  'docs',
+  '3d',
+  ...(import.meta.env.DEV ? ['colors', 'sidebyside', 'unified'] : []),
+]);
 
 const AppRoutes = () => {
   // 根据路径或查询参数决定显示哪个组件
@@ -68,11 +78,11 @@ const AppRoutes = () => {
   }
 
   // 如果URL参数包含test=colors，显示主题颜色对比测试页面
-  if (testMode === 'colors') {
+  if (testMode === 'colors' && ThemeColorComparison) {
     return renderRoute('加载主题对比页面...', ThemeColorComparison);
   }
 
-  if (testMode === 'sidebyside') {
+  if (testMode === 'sidebyside' && ThemeSideBySideComparison) {
     return renderRoute('加载并排对比页面...', ThemeSideBySideComparison);
   }
 
@@ -98,7 +108,7 @@ const AppRoutes = () => {
     return renderRoute('加载图表管理...', DiagramManagementPage);
   }
 
-  if (path.startsWith('/unified-test') || testMode === 'unified') {
+  if (UnifiedDesignerTestPage && (path.startsWith('/unified-test') || testMode === 'unified')) {
     return renderRoute('加载统一外壳测试页...', UnifiedDesignerTestPage);
   }
 

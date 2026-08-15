@@ -7,6 +7,7 @@ import {
 } from '../../strategies/shared/edgeStrictCrossingGuard';
 import { createRoutingObstacleEvaluationContext } from '../../strategies/shared/edgeWaypointCandidateRepair';
 import { compactOrthogonalPath } from './baseReactFlowDisplayEdgeCore';
+import { resolveDisplayCrossingClusterCandidateBudget } from './baseReactFlowDisplayCrossingClusterBudget';
 import {
   buildDisplayRoutingObstacles,
   createDisplayCandidateInteractionContext,
@@ -40,7 +41,11 @@ import {
 import {
   displayCrossingClusterCrossingPairSignature,
   displayCrossingClusterEdgeStateSignature,
+  displayCrossingClusterFacingSidePair,
+  displayCrossingClusterOutwardStub,
   displayCrossingClusterPathSignature,
+  displayCrossingClusterPointOnSide,
+  displayCrossingClusterSideAxis,
   firstDisplayCrossingClusterStrictHits,
   selectDisplayCrossingClusterOtherSegments,
 } from './baseReactFlowDisplayCrossingClusterGeometry';
@@ -60,45 +65,16 @@ type BeamState<T extends Edge[]> = {
   changedIndexes: number[];
   signature: string;
 };
-const MAX_CLUSTER_EDGES = 24;
 const MAX_SEARCH_DEPTH = 4;
 const MAX_BEAM_WIDTH = 8;
 const MAX_STATE_EVALUATIONS = 12;
 const MAX_QUALITY_EVALUATIONS = 192;
+// Candidate construction used to enumerate tens of thousands of paths per
+// mover before the beam consumed at most twelve. Keep every side pair
+// represented, rotate source/target anchors diagonally, then cap local depth.
 const ENDPOINT_STUB = DISPLAY_CROSSING_CLUSTER_ENDPOINT_STUB;
 const ENDPOINT_CLEARANCES = [ENDPOINT_STUB, ENDPOINT_STUB * 2] as const;
 const CORRIDOR_OFFSETS = [24, 48] as const;
-const sideAxis = (side: DisplayCrossingClusterPortSide): 'h' | 'v' => (
-  side === 'left' || side === 'right' ? 'h' : 'v'
-);
-
-const outwardStub = (
-  anchor: DisplayPoint,
-  side: DisplayCrossingClusterPortSide,
-  clearance: number,
-): DisplayPoint => {
-  if (side === 'left') return { x: anchor.x - clearance, y: anchor.y };
-  if (side === 'right') return { x: anchor.x + clearance, y: anchor.y };
-  if (side === 'top') return { x: anchor.x, y: anchor.y - clearance };
-  return { x: anchor.x, y: anchor.y + clearance };
-};
-
-const pointOnSide = (
-  point: DisplayPoint,
-  rect: DisplayRect,
-  side: DisplayCrossingClusterPortSide,
-): boolean => {
-  if (side === 'left' || side === 'right') {
-    const sideX = side === 'left' ? rect.x : rect.x + rect.width;
-    return Math.abs(point.x - sideX) <= 2
-      && point.y >= rect.y - 2
-      && point.y <= rect.y + rect.height + 2;
-  }
-  const sideY = side === 'top' ? rect.y : rect.y + rect.height;
-  return Math.abs(point.y - sideY) <= 2
-    && point.x >= rect.x - 2
-    && point.x <= rect.x + rect.width + 2;
-};
 
 const inferTerminalSide = (
   edge: Edge,
@@ -121,26 +97,6 @@ const inferTerminalSide = (
   return distances[0][0];
 };
 
-const facingSidePair = (
-  sourceRect: DisplayRect,
-  targetRect: DisplayRect,
-): [DisplayCrossingClusterPortSide, DisplayCrossingClusterPortSide] => {
-  const sourceCenter = {
-    x: sourceRect.x + sourceRect.width / 2,
-    y: sourceRect.y + sourceRect.height / 2,
-  };
-  const targetCenter = {
-    x: targetRect.x + targetRect.width / 2,
-    y: targetRect.y + targetRect.height / 2,
-  };
-  const dx = targetCenter.x - sourceCenter.x;
-  const dy = targetCenter.y - sourceCenter.y;
-  if (Math.abs(dx) >= Math.abs(dy)) {
-    return dx >= 0 ? ['right', 'left'] : ['left', 'right'];
-  }
-  return dy >= 0 ? ['bottom', 'top'] : ['top', 'bottom'];
-};
-
 const candidateSidePairs = (
   edge: Edge,
   path: DisplayPoint[],
@@ -151,11 +107,11 @@ const candidateSidePairs = (
     inferTerminalSide(edge, 'source', path, sourceRect),
     inferTerminalSide(edge, 'target', path, targetRect),
   ];
-  const facing = facingSidePair(sourceRect, targetRect);
+  const facing = displayCrossingClusterFacingSidePair(sourceRect, targetRect);
   const adjacentTo = (
     side: DisplayCrossingClusterPortSide,
   ): DisplayCrossingClusterPortSide[] => (
-    sideAxis(side) === 'h' ? ['top', 'bottom'] : ['left', 'right']
+    displayCrossingClusterSideAxis(side) === 'h' ? ['top', 'bottom'] : ['left', 'right']
   );
   const sourceAdjacent = adjacentTo(current[0]);
   const targetAdjacent = adjacentTo(current[1]);
@@ -216,7 +172,9 @@ const terminalAnchors = (
         ? { x: value, y: side === 'top' ? rect.y : rect.y + rect.height }
         : { x: side === 'left' ? rect.x : rect.x + rect.width, y: value }
     ));
-  if (pointOnSide(currentEndpoint, rect, side)) anchors.unshift({ ...currentEndpoint });
+  if (displayCrossingClusterPointOnSide(currentEndpoint, rect, side)) {
+    anchors.unshift({ ...currentEndpoint });
+  }
   const seen = new Set<string>();
   return anchors.filter((point) => {
     const signature = `${Math.round(point.x * 10)}:${Math.round(point.y * 10)}`;
@@ -295,6 +253,8 @@ const buildMoverCandidates = (
   allSegments: readonly DisplaySegment[],
   moverIndex: number,
   opposingIndex: number,
+  maxLocalCandidates: number,
+  maxSidePairCandidates: number,
 ): DisplayCrossingClusterRankedCandidate[] => {
   const edge = edges[moverIndex];
   const path = getDisplayComputedPath(edge);
@@ -304,7 +264,9 @@ const buildMoverCandidates = (
   const targetRect = targetNode ? getDisplayNodeRect(targetNode) : null;
   if (path.length < 2 || !sourceRect || !targetRect) return [];
   const routingObstacleContext = createRoutingObstacleEvaluationContext(edge, obstacles);
-  const primaryCorridorAxis = sideAxis(facingSidePair(sourceRect, targetRect)[0]) === 'v'
+  const primaryCorridorAxis = displayCrossingClusterSideAxis(
+    displayCrossingClusterFacingSidePair(sourceRect, targetRect)[0],
+  ) === 'v'
     ? 'x'
     : 'y';
 
@@ -380,99 +342,138 @@ const buildMoverCandidates = (
     sourceRect,
     targetRect,
   ).entries()) {
+    if (candidates.length >= maxLocalCandidates) break;
     const sourceAnchors = terminalAnchors(
       sourceRect,
       sourceSide,
       path[0],
-      sideAxis(sourceSide) === 'v' ? globalXValues : globalYValues,
+      displayCrossingClusterSideAxis(sourceSide) === 'v' ? globalXValues : globalYValues,
     );
     const targetAnchors = terminalAnchors(
       targetRect,
       targetSide,
       path[path.length - 1],
-      sideAxis(targetSide) === 'v' ? globalXValues : globalYValues,
+      displayCrossingClusterSideAxis(targetSide) === 'v' ? globalXValues : globalYValues,
     );
-    for (const sourceAnchor of sourceAnchors) {
-      for (const targetAnchor of targetAnchors) {
-        for (const { sourceClearance, targetClearance } of clearancePairs) {
-          const sourceStub = outwardStub(sourceAnchor, sourceSide, sourceClearance);
-          const targetStub = outwardStub(targetAnchor, targetSide, targetClearance);
-          const xValues = memoizedBalancedCorridors('x', sourceStub.x, targetStub.x);
-          const yValues = memoizedBalancedCorridors('y', sourceStub.y, targetStub.y);
-          for (const corridorX of xValues) {
-            const compactedPath = compactOrthogonalPath([
-              sourceAnchor,
-              sourceStub,
-              { x: corridorX, y: sourceStub.y },
-              { x: corridorX, y: targetStub.y },
-              targetStub,
-              targetAnchor,
-            ]);
-            const candidatePathSignature = displayCrossingClusterPathSignature(compactedPath);
-            const signature = `${sourceSide}:${targetSide}:${candidatePathSignature}`;
-            if (compactedPath.length < 2 || seen.has(signature)) continue;
-            seen.add(signature);
-            const interactions = interactionContext.evaluate(compactedPath);
-            candidates.push({
-              kind: 'port-bridge',
-              group: corridorGroup('x', corridorX, sourceStub.x, targetStub.x),
-              laneExcursion: Math.max(
-                Math.min(sourceStub.x, targetStub.x) - corridorX,
-                corridorX - Math.max(sourceStub.x, targetStub.x),
-                0,
-              ),
-              length: displayPathLength(compactedPath),
-              obstacleHits: routingObstacleContext.countPathHits(compactedPath),
-              pairRank,
-              path: compactedPath,
-              pathSignature: candidatePathSignature,
-              sourceClearance,
-              sourceHandle: sourceSide,
-              sourceSide,
-              strictCrossings: interactions.strictCrossings,
-              targetClearance,
-              targetHandle: targetSide,
-              targetSide,
-              unrelatedOverlap: interactions.unrelatedOverlap,
-            });
-          }
-          for (const corridorY of yValues) {
-            const compactedPath = compactOrthogonalPath([
-              sourceAnchor,
-              sourceStub,
-              { x: sourceStub.x, y: corridorY },
-              { x: targetStub.x, y: corridorY },
-              targetStub,
-              targetAnchor,
-            ]);
-            const candidatePathSignature = displayCrossingClusterPathSignature(compactedPath);
-            const signature = `${sourceSide}:${targetSide}:${candidatePathSignature}`;
-            if (compactedPath.length < 2 || seen.has(signature)) continue;
-            seen.add(signature);
-            const interactions = interactionContext.evaluate(compactedPath);
-            candidates.push({
-              kind: 'port-bridge',
-              group: corridorGroup('y', corridorY, sourceStub.y, targetStub.y),
-              laneExcursion: Math.max(
-                Math.min(sourceStub.y, targetStub.y) - corridorY,
-                corridorY - Math.max(sourceStub.y, targetStub.y),
-                0,
-              ),
-              length: displayPathLength(compactedPath),
-              obstacleHits: routingObstacleContext.countPathHits(compactedPath),
-              pairRank,
-              path: compactedPath,
-              pathSignature: candidatePathSignature,
-              sourceClearance,
-              sourceHandle: sourceSide,
-              sourceSide,
-              strictCrossings: interactions.strictCrossings,
-              targetClearance,
-              targetHandle: targetSide,
-              targetSide,
-              unrelatedOverlap: interactions.unrelatedOverlap,
-            });
-          }
+    const pairStartCount = candidates.length;
+    const anchorPairs: Array<readonly [DisplayPoint, DisplayPoint]> = [];
+    for (
+      let diagonal = 0;
+      diagonal < sourceAnchors.length + targetAnchors.length - 1;
+      diagonal += 1
+    ) {
+      for (let sourceIndex = 0; sourceIndex < sourceAnchors.length; sourceIndex += 1) {
+        const targetIndex = diagonal - sourceIndex;
+        if (targetIndex < 0 || targetIndex >= targetAnchors.length) continue;
+        anchorPairs.push([sourceAnchors[sourceIndex], targetAnchors[targetIndex]]);
+      }
+    }
+    const appendPortCandidate = (
+      axis: 'x' | 'y',
+      corridor: number,
+      sourceAnchor: DisplayPoint,
+      sourceClearance: number,
+      sourceStub: DisplayPoint,
+      targetAnchor: DisplayPoint,
+      targetClearance: number,
+      targetStub: DisplayPoint,
+    ): void => {
+      if (
+        candidates.length >= maxLocalCandidates
+        || candidates.length - pairStartCount >= maxSidePairCandidates
+      ) return;
+      const compactedPath = compactOrthogonalPath(axis === 'x'
+        ? [
+          sourceAnchor,
+          sourceStub,
+          { x: corridor, y: sourceStub.y },
+          { x: corridor, y: targetStub.y },
+          targetStub,
+          targetAnchor,
+        ]
+        : [
+          sourceAnchor,
+          sourceStub,
+          { x: sourceStub.x, y: corridor },
+          { x: targetStub.x, y: corridor },
+          targetStub,
+          targetAnchor,
+        ]);
+      const candidatePathSignature = displayCrossingClusterPathSignature(compactedPath);
+      const signature = `${sourceSide}:${targetSide}:${candidatePathSignature}`;
+      if (compactedPath.length < 2 || seen.has(signature)) return;
+      seen.add(signature);
+      const interactions = interactionContext.evaluate(compactedPath);
+      const first = axis === 'x' ? sourceStub.x : sourceStub.y;
+      const second = axis === 'x' ? targetStub.x : targetStub.y;
+      candidates.push({
+        kind: 'port-bridge',
+        group: corridorGroup(axis, corridor, first, second),
+        laneExcursion: Math.max(
+          Math.min(first, second) - corridor,
+          corridor - Math.max(first, second),
+          0,
+        ),
+        length: displayPathLength(compactedPath),
+        obstacleHits: routingObstacleContext.countPathHits(compactedPath),
+        pairRank,
+        path: compactedPath,
+        pathSignature: candidatePathSignature,
+        sourceClearance,
+        sourceHandle: sourceSide,
+        sourceSide,
+        strictCrossings: interactions.strictCrossings,
+        targetClearance,
+        targetHandle: targetSide,
+        targetSide,
+        unrelatedOverlap: interactions.unrelatedOverlap,
+      });
+    };
+    pairCandidates: for (const [sourceAnchor, targetAnchor] of anchorPairs) {
+      for (const { sourceClearance, targetClearance } of clearancePairs) {
+        const sourceStub = displayCrossingClusterOutwardStub(
+          sourceAnchor,
+          sourceSide,
+          sourceClearance,
+        );
+        const targetStub = displayCrossingClusterOutwardStub(
+          targetAnchor,
+          targetSide,
+          targetClearance,
+        );
+        const xValues = memoizedBalancedCorridors('x', sourceStub.x, targetStub.x);
+        const yValues = memoizedBalancedCorridors('y', sourceStub.y, targetStub.y);
+        for (const corridorX of xValues) {
+          appendPortCandidate(
+            'x',
+            corridorX,
+            sourceAnchor,
+            sourceClearance,
+            sourceStub,
+            targetAnchor,
+            targetClearance,
+            targetStub,
+          );
+          if (
+            candidates.length >= maxLocalCandidates
+            || candidates.length - pairStartCount >= maxSidePairCandidates
+          ) break pairCandidates;
+        }
+        for (const corridorY of yValues) {
+          appendPortCandidate(
+            'y',
+            corridorY,
+            sourceAnchor,
+            sourceClearance,
+            sourceStub,
+            targetAnchor,
+            targetClearance,
+            targetStub,
+          );
+          if (
+            candidates.length >= maxLocalCandidates
+            || candidates.length - pairStartCount >= maxSidePairCandidates
+          ) break pairCandidates;
         }
       }
     }
@@ -574,7 +575,8 @@ export const repairBoundedMultiEdgeResidualStrictCrossings = <T extends Edge[]>(
   edges: T,
   nodes: Node[],
 ): T => {
-  if (edges.length === 0 || edges.length > MAX_CLUSTER_EDGES) return edges;
+  const candidateBudget = resolveDisplayCrossingClusterCandidateBudget(edges.length);
+  if (!candidateBudget) return edges;
   const qualityContext = createEdgePathQualityEvaluationContext(edges);
   const baselineQuality = qualityContext.evaluate(edges);
   if (baselineQuality.strictCrossings === 0 || hasDisplayCrossingClusterFixedPoint(edges, nodes)) return edges;
@@ -612,6 +614,8 @@ export const repairBoundedMultiEdgeResidualStrictCrossings = <T extends Edge[]>(
             state.segments,
             segment.edgeIndex,
             other.edgeIndex,
+            candidateBudget.maxLocalCandidates,
+            candidateBudget.maxSidePairCandidates,
           ));
         }
       }

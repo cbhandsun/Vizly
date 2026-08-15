@@ -11,6 +11,7 @@ import {
   displayEdgesRelated,
   displaySegmentsForPath,
   extractDisplaySegments,
+  findDisplayStrictCrossingHits,
   fullDisplayPortSide,
   getDisplayComputedPath,
   getDisplayNodeRect,
@@ -40,6 +41,7 @@ export type OuterPortTransactionCandidate<T extends Edge[]> = {
 };
 
 export type OuterPortCandidateOptions = {
+  includeStrictCrossings?: boolean;
   minStub?: number;
   maxSeedCandidates?: number;
   maxCandidates?: number;
@@ -100,7 +102,10 @@ export const interleaveOuterPortCandidateBuckets = <T>(buckets: T[][], limit: nu
   return result;
 };
 
-const findLargestDetachedOverlap = (edges: Edge[]): ResidualPair | null => {
+const findPrimaryResidualPair = (
+  edges: Edge[],
+  includeStrictCrossings: boolean,
+): ResidualPair | null => {
   const segmentsByEdge = edges.map((edge, edgeIndex) => (
     displaySegmentsForPath(getDisplayComputedPath(edge), edgeIndex)
   ));
@@ -115,13 +120,21 @@ const findLargestDetachedOverlap = (edges: Edge[]): ResidualPair | null => {
         segmentsByEdge[secondIndex],
       );
       if (
-        overlapLength <= MIN_EDGE_PATH_PENALIZED_OVERLAP
+        overlapLength < MIN_EDGE_PATH_PENALIZED_OVERLAP
         || (best && best.overlapLength >= overlapLength)
       ) continue;
       best = { firstIndex, secondIndex, overlapLength };
     }
   }
-  return best;
+  if (best) return best;
+  if (!includeStrictCrossings) return null;
+  const strictHit = findDisplayStrictCrossingHits(edges)[0];
+  if (!strictHit) return null;
+  return {
+    firstIndex: strictHit.a.edgeIndex,
+    secondIndex: strictHit.b.edgeIndex,
+    overlapLength: 0,
+  };
 };
 
 const endpoint = (rect: DisplayRect, side: OuterPortSide): DisplayPoint => {
@@ -214,7 +227,7 @@ const buildPortCandidates = (
           candidate.path,
           edges,
           externalSegments,
-        ) <= MIN_EDGE_PATH_PENALIZED_OVERLAP
+        ) < MIN_EDGE_PATH_PENALIZED_OVERLAP
       ));
       let sideCandidates = buildProfileCandidates(stubPlan.preferred, 0);
       if (sideCandidates.length === 0 && stubPlan.fallback.length > 0) {
@@ -272,7 +285,7 @@ export const buildBoundedOuterPortTransactionCandidates = <T extends Edge[]>(
   const maxSeedCandidates = Math.max(1, Math.min(32, options.maxSeedCandidates ?? 32));
   const maxCandidates = Math.max(1, Math.min(128, options.maxCandidates ?? 64));
   const maxPortCandidates = Math.max(4, Math.min(16, options.maxPortCandidatesPerEdge ?? 16));
-  const pair = findLargestDetachedOverlap(edges);
+  const pair = findPrimaryResidualPair(edges, options.includeStrictCrossings === true);
   if (!pair) return [];
   const nodeById = new Map(nodes.map(node => [node.id, node] as const));
   const obstacles = buildDisplayRoutingObstacles(nodes);
@@ -468,7 +481,7 @@ export const buildBoundedOuterPortTransactionCandidates = <T extends Edge[]>(
           path,
           seed.edges,
           otherSegments,
-        ) > MIN_EDGE_PATH_PENALIZED_OVERLAP) continue;
+        ) >= MIN_EDGE_PATH_PENALIZED_OVERLAP) continue;
         generated.push({
           edges: seed.edges.map((edge, index) => (
             index === movingEdgeIndex ? candidateEdge : edge

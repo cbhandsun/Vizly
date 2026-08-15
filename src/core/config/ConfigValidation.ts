@@ -550,25 +550,23 @@ export const commonSchemas: ConfigSchema[] = [
     tags: ['canvas', 'zoom']
   },
 
-  // 开发配置
-  {
+  ...(import.meta.env.DEV ? [{
     key: 'dev.enableDebugMode',
-    type: 'boolean',
+    type: 'boolean' as const,
     defaultValue: false,
     description: '启用调试模式',
     validator: validators.boolean.required(),
     group: 'development',
     tags: ['development', 'debug']
-  },
-  {
+  }, {
     key: 'dev.showPerformanceMetrics',
-    type: 'boolean',
+    type: 'boolean' as const,
     defaultValue: false,
     description: '显示性能指标',
     validator: validators.boolean.required(),
     group: 'development',
     tags: ['development', 'performance']
-  }
+  }] : [])
 ];
 
 // 配置验证工具函数

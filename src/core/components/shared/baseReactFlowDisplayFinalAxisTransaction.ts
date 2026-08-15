@@ -44,6 +44,17 @@ export const runFinalAxisTransaction = <T extends Edge[]>({
   if (axisCandidate === orthogonalCandidate) {
     return { finalized: null, anchoredFallback: null };
   }
+  const axisReport = getDisplayHardQualityGateReport(
+    axisCandidate,
+    repairNodes,
+    'polished',
+  );
+  if (axisReport.hardClean) {
+    return {
+      finalized: markBaseDisplayFinalized(axisCandidate, inputSignature),
+      anchoredFallback: axisCandidate,
+    };
+  }
 
   const boundedStrictCandidate = countStrictEdgeCrossings(axisCandidate) > 0
     ? repairBoundedPortAndInternalStrictCrossings(axisCandidate, repairNodes, 96) as T

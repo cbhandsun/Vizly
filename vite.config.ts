@@ -1,5 +1,5 @@
 /// <reference types="vitest" />
-import { defineConfig } from 'vitest/config'
+import { configDefaults, defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { dirname, resolve } from 'path'
@@ -329,6 +329,10 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
+    // Workspace audit snapshots are complete repository mirrors. Vitest's
+    // positional filters use substring matching, so a shard scoped to src/
+    // would otherwise execute the mirrored tests with a second React runtime.
+    exclude: [...configDefaults.exclude, '.codex-audit/**'],
     // Windows process startup dominates this suite: a representative isolated
     // jsdom shard dropped from 157.5s to 83.3s with threads. File isolation
     // remains enabled because shared environments leak mocks and storage state.

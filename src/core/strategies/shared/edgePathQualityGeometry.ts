@@ -1,6 +1,5 @@
 import type { Edge } from '@xyflow/react';
 
-import { edgeHasExplicitSharedTrunkIntent } from './edgeRoutingQualityIntent';
 export type Point = { x: number; y: number };
 const asRecord = (value: unknown): Record<string, unknown> => (
   typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -37,7 +36,9 @@ export type EdgePathQualityScore = {
 
 const EPS = 0.5;
 export const MIN_EDGE_PATH_PENALIZED_OVERLAP = 24;
+const BOUNDED_CROSSING_JUNCTION_LENGTH = 24;
 const VISUAL_PARALLEL_LANE_TOLERANCE = 4;
+const SHARED_TRUNK_COORDINATE_EPS = VISUAL_PARALLEL_LANE_TOLERANCE;
 const SHORT_ENDPOINT_STUB = 32;
 const TINY_INTERIOR_SEGMENT = 24;
 const HAIRPIN_BRIDGE = 140;
@@ -98,10 +99,10 @@ export function strictlyCrosses(first: Segment, second: Segment): boolean {
   const vertical = first.axis === 'v' ? first : second;
   const x = vertical.a.x;
   const y = horizontal.a.y;
-  return x > Math.min(horizontal.a.x, horizontal.b.x) + 1
-    && x < Math.max(horizontal.a.x, horizontal.b.x) - 1
-    && y > Math.min(vertical.a.y, vertical.b.y) + 1
-    && y < Math.max(vertical.a.y, vertical.b.y) - 1;
+  return x > Math.min(horizontal.a.x, horizontal.b.x) + EPS
+    && x < Math.max(horizontal.a.x, horizontal.b.x) - EPS
+    && y > Math.min(vertical.a.y, vertical.b.y) + EPS
+    && y < Math.max(vertical.a.y, vertical.b.y) - EPS;
 }
 
 function rangeOverlap(a1: number, a2: number, b1: number, b2: number): number {
@@ -119,6 +120,86 @@ function parallelOverlap(first: Segment, second: Segment): number {
   return rangeOverlap(first.a.y, first.b.y, second.a.y, second.b.y);
 }
 
+function adjacentSegment(
+  segments: readonly Segment[],
+  segment: Segment,
+  offset: -1 | 1,
+): Segment | null {
+  return segments.find(candidate => (
+    candidate.edgeIndex === segment.edgeIndex
+    && candidate.segmentIndex === segment.segmentIndex + offset
+  )) ?? null;
+}
+
+function segmentIsInside(first: Segment, second: Segment): boolean {
+  if (first.axis !== second.axis) return false;
+  if (first.axis === 'h') {
+    return Math.min(first.a.x, first.b.x) > Math.min(second.a.x, second.b.x) + EPS
+      && Math.max(first.a.x, first.b.x) < Math.max(second.a.x, second.b.x) - EPS;
+  }
+  return Math.min(first.a.y, first.b.y) > Math.min(second.a.y, second.b.y) + EPS
+    && Math.max(first.a.y, first.b.y) < Math.max(second.a.y, second.b.y) - EPS;
+}
+
+function oppositeSidesOfAxis(
+  before: Segment,
+  after: Segment,
+  junction: Segment,
+): boolean {
+  if (junction.axis === 'h') {
+    const beforeDelta = before.a.y - junction.a.y;
+    const afterDelta = after.b.y - junction.a.y;
+    return Math.abs(beforeDelta) > EPS
+      && Math.abs(afterDelta) > EPS
+      && Math.sign(beforeDelta) === -Math.sign(afterDelta);
+  }
+  const beforeDelta = before.a.x - junction.a.x;
+  const afterDelta = after.b.x - junction.a.x;
+  return Math.abs(beforeDelta) > EPS
+    && Math.abs(afterDelta) > EPS
+    && Math.sign(beforeDelta) === -Math.sign(afterDelta);
+}
+
+/**
+ * A 24px internal segment may deliberately follow a blocking segment before
+ * leaving on its opposite side. This is a bounded crossing junction, not a
+ * shared trunk: it must cover the whole short segment, stay inside the long
+ * segment, keep the same direction, and have orthogonal legs on opposite
+ * sides. Longer or terminal overlaps remain hard defects.
+ */
+function isBoundedCrossingJunctionOverlap(
+  first: Segment,
+  second: Segment,
+  firstSegments: readonly Segment[],
+  secondSegments: readonly Segment[],
+  overlap: number,
+): boolean {
+  const pairs = [
+    { junction: first, blocker: second, junctionSegments: firstSegments },
+    { junction: second, blocker: first, junctionSegments: secondSegments },
+  ];
+  return pairs.some(({ junction, blocker, junctionSegments }) => {
+    if (
+      Math.abs(junction.length - BOUNDED_CROSSING_JUNCTION_LENGTH) > EPS
+      || Math.abs(overlap - junction.length) > EPS
+      || junction.direction === 0
+      || junction.direction !== blocker.direction
+      || junction.segmentIndex <= 0
+      || junction.segmentIndex >= junction.segmentCount - 1
+      || !segmentIsInside(junction, blocker)
+    ) return false;
+    const before = adjacentSegment(junctionSegments, junction, -1);
+    const after = adjacentSegment(junctionSegments, junction, 1);
+    return Boolean(
+      before
+      && after
+      && before.axis !== junction.axis
+      && after.axis !== junction.axis
+      && oppositeSidesOfAxis(before, after, junction),
+    );
+  });
+}
+
 function edgesAreRelated(first: Edge, second: Edge): boolean {
   return first.source === second.source
     || first.source === second.target
@@ -126,29 +207,167 @@ function edgesAreRelated(first: Edge, second: Edge): boolean {
     || first.target === second.target;
 }
 
-function hasExplicitSharedTrunkIntent(edge: Edge): boolean {
-  return edgeHasExplicitSharedTrunkIntent(edge);
+const crossingTouchesSharedEndpoint = (
+  firstEdge: Edge,
+  secondEdge: Edge,
+  firstSegment: Segment,
+  secondSegment: Segment,
+): boolean => (
+  (
+    firstEdge.source === secondEdge.source
+    && firstSegment.segmentIndex === 0
+    && secondSegment.segmentIndex === 0
+    && sameTrunkPoint(firstSegment.a, secondSegment.a)
+  )
+  || (
+    firstEdge.target === secondEdge.target
+    && firstSegment.segmentIndex === firstSegment.segmentCount - 1
+    && secondSegment.segmentIndex === secondSegment.segmentCount - 1
+    && sameTrunkPoint(firstSegment.b, secondSegment.b)
+  )
+);
+
+const sameTrunkPoint = (first: Point, second: Point): boolean => (
+  Math.abs(first.x - second.x) <= SHARED_TRUNK_COORDINATE_EPS
+  && Math.abs(first.y - second.y) <= SHARED_TRUNK_COORDINATE_EPS
+);
+
+const endpointChainContainsSegments = (
+  firstSegment: Segment,
+  secondSegment: Segment,
+  firstSegments: readonly Segment[],
+  secondSegments: readonly Segment[],
+  target: boolean,
+): boolean => {
+  const firstOffset = target
+    ? firstSegment.segmentCount - 1 - firstSegment.segmentIndex
+    : firstSegment.segmentIndex;
+  const secondOffset = target
+    ? secondSegment.segmentCount - 1 - secondSegment.segmentIndex
+    : secondSegment.segmentIndex;
+  if (firstOffset !== secondOffset || firstOffset < 0) return false;
+
+  for (let offset = 0; offset <= firstOffset; offset += 1) {
+    const firstIndex = target ? firstSegment.segmentCount - 1 - offset : offset;
+    const secondIndex = target ? secondSegment.segmentCount - 1 - offset : offset;
+    const first = firstSegments.find(segment => segment.segmentIndex === firstIndex);
+    const second = secondSegments.find(segment => segment.segmentIndex === secondIndex);
+    if (!first || !second || first.axis !== second.axis) return false;
+    const [firstStart, firstEnd] = target ? [first.b, first.a] : [first.a, first.b];
+    const [secondStart, secondEnd] = target ? [second.b, second.a] : [second.a, second.b];
+    if (!sameTrunkPoint(firstStart, secondStart)) return false;
+    const firstDelta = first.axis === 'h'
+      ? firstEnd.x - firstStart.x
+      : firstEnd.y - firstStart.y;
+    const secondDelta = second.axis === 'h'
+      ? secondEnd.x - secondStart.x
+      : secondEnd.y - secondStart.y;
+    if (firstDelta * secondDelta <= EPS) return false;
+    if (offset < firstOffset && !sameTrunkPoint(firstEnd, secondEnd)) return false;
+  }
+  return true;
+};
+
+function overlapTouchesSharedEndpointTrunk(
+  first: Edge,
+  second: Edge,
+  firstSegment: Segment,
+  secondSegment: Segment,
+  firstSegments: readonly Segment[],
+  secondSegments: readonly Segment[],
+): boolean {
+  return (
+    first.source === second.source
+    && endpointChainContainsSegments(
+      firstSegment,
+      secondSegment,
+      firstSegments,
+      secondSegments,
+      false,
+    )
+  ) || (
+    first.target === second.target
+    && endpointChainContainsSegments(
+      firstSegment,
+      secondSegment,
+      firstSegments,
+      secondSegments,
+      true,
+    )
+  );
 }
 
-function overlapTouchesSharedEndpointTrunk(first: Edge, second: Edge, firstSegment: Segment, secondSegment: Segment): boolean {
-  const sameSource = first.source === second.source;
-  const sameTarget = first.target === second.target;
-  if (!sameSource && !sameTarget) return false;
+const terminalHandleSide = (value: string | null | undefined): string | null => {
+  const token = typeof value === 'string' ? value.trim().toLowerCase()[0] : undefined;
+  return token === 'l' || token === 'r' || token === 't' || token === 'b'
+    ? token
+    : null;
+};
 
-  if (sameSource && firstSegment.segmentIndex <= 1 && secondSegment.segmentIndex <= 1) {
-    return firstSegment.direction === secondSegment.direction;
+const hasDistinctSharedEndpointPorts = (first: Edge, second: Edge): boolean => {
+  if (first.source === second.source) {
+    const firstSide = terminalHandleSide(first.sourceHandle);
+    const secondSide = terminalHandleSide(second.sourceHandle);
+    return firstSide !== null && secondSide !== null && firstSide !== secondSide;
   }
-  if (
-    sameTarget
-    && firstSegment.segmentIndex >= firstSegment.segmentCount - 2
-    && secondSegment.segmentIndex >= secondSegment.segmentCount - 2
-  ) {
-    return firstSegment.direction === secondSegment.direction;
+  if (first.target === second.target) {
+    const firstSide = terminalHandleSide(first.targetHandle);
+    const secondSide = terminalHandleSide(second.targetHandle);
+    return firstSide !== null && secondSide !== null && firstSide !== secondSide;
   }
   return false;
-}
+};
 
-function isPermittedRelatedOverlap(first: Edge, second: Edge, firstSegment: Segment, secondSegment: Segment): boolean {
+const isInternalContainedSegment = (
+  contained: Segment,
+  carrier: Segment,
+  containedSegments: readonly Segment[],
+  overlap: number,
+): boolean => {
+  if (
+    contained.axis !== carrier.axis
+    || Math.abs(contained.length - overlap) > EPS
+    || contained.segmentIndex <= 0
+    || contained.segmentIndex >= contained.segmentCount - 1
+  ) return false;
+  const before = adjacentSegment(containedSegments, contained, -1);
+  const after = adjacentSegment(containedSegments, contained, 1);
+  return Boolean(
+    before
+    && after
+    && before.axis !== contained.axis
+    && after.axis !== contained.axis
+  );
+};
+
+/**
+ * Two distinct ports on the same endpoint may deliberately merge into one
+ * directed internal corridor before branching again. Treat the fully
+ * contained corridor as a real peer trunk; a partial overlap or a same-port
+ * leave-and-rejoin remains an unexplained hard defect.
+ */
+const overlapFormsContainedPeerTrunk = (
+  first: Edge,
+  second: Edge,
+  firstSegment: Segment,
+  secondSegment: Segment,
+  firstSegments: readonly Segment[],
+  secondSegments: readonly Segment[],
+): boolean => {
+  if (!hasDistinctSharedEndpointPorts(first, second)) return false;
+  const overlap = parallelOverlap(firstSegment, secondSegment);
+  return isInternalContainedSegment(firstSegment, secondSegment, firstSegments, overlap)
+    || isInternalContainedSegment(secondSegment, firstSegment, secondSegments, overlap);
+};
+
+function isPermittedRelatedOverlap(
+  first: Edge,
+  second: Edge,
+  firstSegment: Segment,
+  secondSegment: Segment,
+  firstSegments: readonly Segment[],
+  secondSegments: readonly Segment[],
+): boolean {
   if (
     firstSegment.direction !== 0
     && secondSegment.direction !== 0
@@ -156,8 +375,21 @@ function isPermittedRelatedOverlap(first: Edge, second: Edge, firstSegment: Segm
   ) {
     return false;
   }
-  if (overlapTouchesSharedEndpointTrunk(first, second, firstSegment, secondSegment)) return true;
-  return hasExplicitSharedTrunkIntent(first) && hasExplicitSharedTrunkIntent(second);
+  return overlapTouchesSharedEndpointTrunk(
+    first,
+    second,
+    firstSegment,
+    secondSegment,
+    firstSegments,
+    secondSegments,
+  ) || overlapFormsContainedPeerTrunk(
+    first,
+    second,
+    firstSegment,
+    secondSegment,
+    firstSegments,
+    secondSegments,
+  );
 }
 
 function pathLength(path: Point[]): number {
@@ -384,12 +616,28 @@ export function calculateEdgePairQuality(
   for (const first of firstSegments) {
     for (const second of secondSegments) {
       if (strictlyCrosses(first, second)) {
-        score.strictCrossings += 1;
+        if (!crossingTouchesSharedEndpoint(
+          firstEdge,
+          secondEdge,
+          first,
+          second,
+        )) score.strictCrossings += 1;
         continue;
       }
 
       const overlap = parallelOverlap(first, second);
-      if (overlap <= MIN_EDGE_PATH_PENALIZED_OVERLAP) continue;
+      if (overlap < MIN_EDGE_PATH_PENALIZED_OVERLAP) continue;
+
+      if (
+        !related
+        && isBoundedCrossingJunctionOverlap(
+          first,
+          second,
+          firstSegments,
+          secondSegments,
+          overlap,
+        )
+      ) continue;
 
       const roundedOverlap = Math.round(overlap);
       const reverse = first.direction !== 0
@@ -398,7 +646,14 @@ export function calculateEdgePairQuality(
       if (reverse) score.reverseOverlap += roundedOverlap;
       if (related) {
         score.relatedOverlap += roundedOverlap;
-        if (!isPermittedRelatedOverlap(firstEdge, secondEdge, first, second)) {
+        if (!isPermittedRelatedOverlap(
+          firstEdge,
+          secondEdge,
+          first,
+          second,
+          firstSegments,
+          secondSegments,
+        )) {
           score.unexplainedRelatedOverlap += roundedOverlap;
         }
       } else {

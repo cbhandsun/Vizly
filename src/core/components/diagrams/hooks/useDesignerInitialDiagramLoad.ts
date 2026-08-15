@@ -31,6 +31,7 @@ interface UseDesignerInitialDiagramLoadProps {
     id?: string;
     pluginId: string;
     activePresetLookup: DesignerPresetLookup;
+    bypassAutosave?: boolean;
     isCurrentDiagramInitialized: boolean;
     markCurrentDiagramInitialized: () => void;
     loadSaved: ReturnType<typeof useAutoSave>['loadSaved'];
@@ -46,6 +47,7 @@ export const useDesignerInitialDiagramLoad = ({
     id,
     pluginId,
     activePresetLookup,
+    bypassAutosave = false,
     isCurrentDiagramInitialized,
     markCurrentDiagramInitialized,
     loadSaved,
@@ -78,7 +80,9 @@ export const useDesignerInitialDiagramLoad = ({
         };
 
         const preset = activePresetLookup.preset;
-        let saved = mergePresetExplicitEdgeHandles(loadSaved(), preset);
+        let saved = bypassAutosave
+            ? null
+            : mergePresetExplicitEdgeHandles(loadSaved(), preset);
         let shouldLoadAutosave = false;
 
         if (saved) {
@@ -190,6 +194,7 @@ export const useDesignerInitialDiagramLoad = ({
         return () => { initializationController.abort(); };
     }, [
         activePresetLookup,
+        bypassAutosave,
         clearSaved,
         id,
         isCurrentDiagramInitialized,

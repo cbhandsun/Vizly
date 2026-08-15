@@ -92,10 +92,17 @@ describe('baseReactFlowRuntimeConfig', () => {
 
     expect(createBaseReactFlowDefaultEdgeOptions({ isLargeGraph: false })).toEqual({
       type: 'advanced-smart-step',
-      markerEnd: { type: 'arrowclosed', width: 10, height: 10 },
+      markerEnd: {
+        type: 'arrowclosed',
+        color: '#64748B',
+        width: 20,
+        height: 20,
+      },
       style: {
-        strokeOpacity: 0.98,
-        filter: 'drop-shadow(0 0 0.6px rgba(0,0,0,0.35))',
+        stroke: '#64748B',
+        strokeWidth: 1.5,
+        strokeOpacity: 1,
+        filter: 'none',
       },
     });
   });

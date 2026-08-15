@@ -31,6 +31,10 @@ import { repairAxisMismatchedTerminalsWithBoundedPortRoles } from './baseReactFl
 import { repairDisplayLoopShortcuts } from './baseReactFlowDisplayLoopShortcutRepair';
 import { repairDisplayMicroArtifacts } from '../../strategies/shared/edgeDisplayMicroCleanup';
 import { createBaseReactFlowDisplayMicroSafetyContext } from './baseReactFlowDisplayMicroSafety';
+import {
+  startDisplayRoutingPhaseTrace,
+  type DisplayRoutingPhaseTrace,
+} from './baseReactFlowDisplayRoutingTrace';
 
 export type BaseReactFlowMeasuredDisplayInitialEvaluation = Readonly<{
   edges: Edge[];
@@ -52,10 +56,22 @@ const sameEdgeReferences = (first: Edge[], second: Edge[]): boolean => (
   )
 );
 
+const isStrictDominatedMeasuredReport = (
+  report: BaseDisplayBoundedCandidateReport,
+): boolean => report.terminalsAttached
+  && report.obstacleHits === 0
+  && report.quality.nonOrthogonalSegments === 0
+  && report.quality.strictCrossings > 0
+  && report.quality.reverseOverlap === 0
+  && report.quality.unrelatedOverlap === 0
+  && report.quality.unexplainedRelatedOverlap === 0;
+
 export const repairBaseReactFlowMeasuredDisplayEdgesWithReport = (
   edges: Edge[],
   nodes: Node[],
   initialEvaluation?: BaseReactFlowMeasuredDisplayInitialEvaluation,
+  deferStrictDominatedResult = false,
+  onPhaseTrace?: (trace: DisplayRoutingPhaseTrace) => void,
 ): BaseReactFlowMeasuredDisplayRepairOutcome => {
   const trustedInitialEvaluation = initialEvaluation?.edges === edges
     && initialEvaluation.inputNodes === nodes
@@ -103,6 +119,9 @@ export const repairBaseReactFlowMeasuredDisplayEdgesWithReport = (
   );
   let currentReport = compactedReport;
   if (currentReport.hardClean) return outcomeFor(current, current, currentReport);
+  if (deferStrictDominatedResult && isStrictDominatedMeasuredReport(currentReport)) {
+    return outcomeFor(current, current, currentReport);
+  }
 
   const layoutDirection = typeof compacted[0]?.data?.layoutDirection === 'string'
     ? compacted[0].data.layoutDirection
@@ -127,23 +146,47 @@ export const repairBaseReactFlowMeasuredDisplayEdgesWithReport = (
   }
 
   if (getBaseReactFlowMeasuredRepairNeeds(currentReport).obstacle) {
-    if (acceptStage(repairDisplayObstacleHits(
+    const obstacleTimer = startDisplayRoutingPhaseTrace({
+      phase: 'final-clearance',
+      candidateCount: current.length,
+      onTrace: onPhaseTrace,
+    });
+    const obstacleHardClean = acceptStage(repairDisplayObstacleHits(
       current,
       repairNodes,
       layoutDirection,
       DISPLAY_FINAL_OVERLAP_OBSTACLE_REPAIR_OPTIONS,
-    ))) return outcomeFor(current, current, currentReport);
+    ));
+    obstacleTimer.finish(obstacleHardClean ? 'accepted' : 'fallback', current.length);
+    if (obstacleHardClean) return outcomeFor(current, current, currentReport);
+    if (deferStrictDominatedResult && isStrictDominatedMeasuredReport(currentReport)) {
+      return outcomeFor(current, current, currentReport);
+    }
   }
   if (getBaseReactFlowMeasuredRepairNeeds(currentReport).overlap) {
-    if (acceptStage(repairResidualDisplayOverlaps(
+    const overlapTimer = startDisplayRoutingPhaseTrace({
+      phase: 'incremental-closure',
+      candidateCount: current.length,
+      onTrace: onPhaseTrace,
+    });
+    const overlapHardClean = acceptStage(repairResidualDisplayOverlaps(
       current,
       repairNodes,
       DISPLAY_BOUNDED_DETACHED_OVERLAP_REPAIR_OPTIONS,
       DISPLAY_BOUNDED_RESIDUAL_OVERLAP_REPAIR_OPTIONS,
-    ))) return outcomeFor(current, current, currentReport);
+    ));
+    overlapTimer.finish(overlapHardClean ? 'accepted' : 'fallback', current.length);
+    if (overlapHardClean) return outcomeFor(current, current, currentReport);
   }
   if (getBaseReactFlowMeasuredRepairNeeds(currentReport).strict) {
-    if (acceptStage(repairFinalResidualStrictCrossings(current, repairNodes))) {
+    const strictTimer = startDisplayRoutingPhaseTrace({
+      phase: 'strict-primary',
+      candidateCount: current.length,
+      onTrace: onPhaseTrace,
+    });
+    const strictHardClean = acceptStage(repairFinalResidualStrictCrossings(current, repairNodes));
+    strictTimer.finish(strictHardClean ? 'accepted' : 'fallback', current.length);
+    if (strictHardClean) {
       return outcomeFor(current, current, currentReport);
     }
   }
@@ -277,6 +320,14 @@ export const repairBaseReactFlowMeasuredDisplayEdgesWithReport = (
       anchoredSelected,
       repairNodes,
       128,
+      strictCandidate => repairFastDisplayHardSafety(
+        repairAxisMismatchedTerminalsWithBoundedPortRoles(
+          repairFinalResidualStrictCrossings(strictCandidate, repairNodes),
+          repairNodes,
+          16,
+        ),
+        repairNodes,
+      ),
     );
     const fastClosed = repairFastDisplayHardSafety(loopClosed, repairNodes);
     const microClosed = repairDisplayMicroArtifacts(

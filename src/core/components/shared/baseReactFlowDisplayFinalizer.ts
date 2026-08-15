@@ -18,6 +18,10 @@ import { repairDeclaredTerminalRolesWithHardGate } from './baseReactFlowDeclared
 import { repairRenderSafeTerminalAxes } from './baseReactFlowRenderTerminalSafety';
 import { repairSharedPortAndTinyTerminalLanes } from './baseReactFlowDisplaySharedPortLaneRepair';
 import { repairFinalResidualStrictCrossings } from './baseReactFlowDisplayStrictResidualRepair';
+import {
+  startDisplayRoutingPhaseTrace,
+  type DisplayRoutingPhaseTrace,
+} from './baseReactFlowDisplayRoutingTrace';
 
 export type BaseReactFlowDisplayExactReport = Readonly<{
   inputNodes: Node[];
@@ -56,6 +60,18 @@ const hasOnlyDeclaredTerminalAxisDefect = (
     && quality.hairpins === 0;
 };
 
+const canDeferStrictOnlyMeasuredRepair = (
+  report: BaseDisplayBoundedCandidateReport,
+): boolean => {
+  const quality = report.quality;
+  return report.terminalsAttached
+    && quality.nonOrthogonalSegments === 0
+    && quality.strictCrossings > 0
+    && quality.reverseOverlap === 0
+    && quality.unrelatedOverlap === 0
+    && quality.unexplainedRelatedOverlap === 0;
+};
+
 export const createBaseReactFlowDisplayExactReport = (
   edges: Edge[],
   inputNodes: Node[],
@@ -89,6 +105,8 @@ export const finalizeBaseReactFlowDisplayEdgesWithReport = <T extends Edge[]>(
   fullRouteEdges: T,
   nodes: Node[],
   exactReport?: BaseReactFlowDisplayExactReport,
+  onPhaseTrace?: (trace: DisplayRoutingPhaseTrace) => void,
+  deferStrictOnlyMeasuredRepair = false,
 ): BaseReactFlowDisplayFinalizerOutcome<T> => {
   const trustedEvaluation = resolveTrustedInitialEvaluation(
     fullRouteEdges,
@@ -134,7 +152,16 @@ export const finalizeBaseReactFlowDisplayEdgesWithReport = <T extends Edge[]>(
     }
   }
 
+  if (deferStrictOnlyMeasuredRepair && canDeferStrictOnlyMeasuredRepair(routedReport)) {
+    return { edges: routedEdges, report: routedReport };
+  }
+
   if (!routedReport.hardClean) {
+    const measuredTimer = startDisplayRoutingPhaseTrace({
+      phase: 'measured-repair',
+      candidateCount: routedEdges.length,
+      onTrace: onPhaseTrace,
+    });
     const measuredSeed = routedEdges;
     const measuredOutcome = repairBaseReactFlowMeasuredDisplayEdgesWithReport(
       routedEdges,
@@ -145,9 +172,12 @@ export const finalizeBaseReactFlowDisplayEdgesWithReport = <T extends Edge[]>(
         repairNodes,
         report: routedReport,
       },
+      deferStrictOnlyMeasuredRepair,
+      onPhaseTrace,
     );
     routedEdges = measuredOutcome.edges as T;
     routedReport = measuredOutcome.report;
+    measuredTimer.finish(routedReport.hardClean ? 'accepted' : 'fallback', routedEdges.length);
   }
 
   if (
@@ -319,8 +349,12 @@ export const finalizeBaseReactFlowDisplayEdges = <T extends Edge[]>(
   fullRouteEdges: T,
   nodes: Node[],
   exactReport?: BaseReactFlowDisplayExactReport,
+  onPhaseTrace?: (trace: DisplayRoutingPhaseTrace) => void,
+  deferStrictOnlyMeasuredRepair = false,
 ): T => finalizeBaseReactFlowDisplayEdgesWithReport(
   fullRouteEdges,
   nodes,
   exactReport,
+  onPhaseTrace,
+  deferStrictOnlyMeasuredRepair,
 ).edges;

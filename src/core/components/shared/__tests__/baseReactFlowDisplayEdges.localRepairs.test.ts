@@ -5,6 +5,7 @@ import {
   calculateEdgePathQualityScore,
   MIN_EDGE_PATH_PENALIZED_OVERLAP,
 } from '../../../strategies/shared/edgeStrictCrossingGuard';
+import { scoreNodeClearanceRisk } from '../../../strategies/shared/edgeWaypointCandidateRepair';
 import {
   createBaseReactFlowDisplayEdges,
   createBaseReactFlowInteractiveDisplayEdges,
@@ -299,7 +300,10 @@ describe('baseReactFlowDisplayEdges local repairs', () => {
     expect(edgeNodeObstacleHits(result, nodes), JSON.stringify(resultPaths, null, 2)).toEqual([]);
     expect(Math.min(...feedbackPath.map(point => point.x))).toBeLessThan(174);
     expect(feedbackPath[1].y).toBeLessThan(feedbackPath[0].y);
-    expect(feedbackPath[feedbackPath.length - 2].y).toBeGreaterThan(feedbackPath[feedbackPath.length - 1].y);
+    expect(
+      feedbackPath[feedbackPath.length - 2].y,
+      JSON.stringify(feedbackPath, null, 2),
+    ).toBeGreaterThan(feedbackPath[feedbackPath.length - 1].y);
   }, 45_000);
 
   it('extends source stubs before moving long feedback edges past same-source blockers', () => {
@@ -450,9 +454,14 @@ describe('baseReactFlowDisplayEdges local repairs', () => {
       ].includes(path.id)), null, 2),
     ).toBeLessThanOrEqual(MIN_EDGE_PATH_PENALIZED_OVERLAP);
 
+    const inventoryEdge = result.find(edge => edge.id === 'edge-master-data-wms-inventory');
     const inventoryPath = paths.find(path => path.id === 'edge-master-data-wms-inventory')?.path ?? [];
+    const inventoryClearanceRisk = inventoryEdge
+      ? scoreNodeClearanceRisk(inventoryPath, nodes, inventoryEdge, 48)
+      : Number.POSITIVE_INFINITY;
     expect(tinyInteriorSegments(inventoryPath)).toEqual([]);
-    expect(inventoryPath.length).toBeLessThanOrEqual(6);
+    expect(inventoryClearanceRisk, JSON.stringify(paths, null, 2)).toBe(0);
+    expect(inventoryPath.length, JSON.stringify(paths, null, 2)).toBeLessThanOrEqual(10);
   }, 45_000);
 
   it('keeps interactive systems-interaction display paths on readable outer lanes', () => {

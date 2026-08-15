@@ -7,6 +7,7 @@ import {
 } from './baseReactFlowDisplayCache';
 import { isBaseReactFlowDisplayGeometryDigest } from './baseReactFlowDisplayInputIdentity';
 import { displayTerminalHandleChangeIsAllowed } from './baseReactFlowDisplayTerminalPolicy';
+import { baseReactFlowDisplayCommercialQualityIsClean } from './baseReactFlowDisplayCommercialQuality';
 
 export const BASE_REACT_FLOW_PRECOMPILED_ROUTE_SCHEMA = 'vizly-precompiled-display-route-v1';
 export const BASE_REACT_FLOW_PRECOMPILED_SOURCE_HASH_PATTERN = /^source-v1:[0-9a-f]{64}$/;
@@ -30,6 +31,7 @@ const ROUTING_INTENT_KEYS = [
   'sharedTrunkAware',
   'sharedTrunkSynthesized',
   'isTreeBus',
+  'overextendedTargetTrunkCorridorReclaimed',
 ] as const;
 const ROUTING_DATA_KEYS = new Set([
   'computedPath',
@@ -263,7 +265,7 @@ export const parseBaseReactFlowPrecompiledRouteArtifact = (
     || value.patches.length > MAX_PATCHES
   ) return null;
   const patches = parseBaseReactFlowPrecompiledRoutePatches(value.patches);
-  if (!patches) return null;
+  if (!patches || !baseReactFlowDisplayCommercialQualityIsClean(patches)) return null;
   return {
     edges: patches,
     hardClean: true,

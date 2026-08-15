@@ -1,11 +1,14 @@
 import type { Edge, Node } from '@xyflow/react';
 
 import { separateDetachedParallelOverlaps } from '../../strategies/shared/edgeDetachedOverlapRepair';
+import { repairDisplayMicroArtifacts } from '../../strategies/shared/edgeDisplayMicroCleanup';
 import { repairLocalDoglegArtifacts } from '../../strategies/shared/edgeLocalDoglegRepair';
 import { repairSharedEndpointPortOrderCrossings } from '../../strategies/shared/edgeSharedEndpointPortOrderRepair';
 import { markBaseDisplayFinalized } from './baseReactFlowDisplayEdgeCore';
 import { chooseFinalTerminalTransactionCandidate } from './baseReactFlowDisplayEvaluation';
+import { finalSameSideTrueTrunksDoNotRegress } from './baseReactFlowDisplayFinalEndpointOrder';
 import { compactDisplayEdgePaths } from './baseReactFlowDisplayGeometry';
+import { createBaseReactFlowDisplayMicroSafetyContext } from './baseReactFlowDisplayMicroSafety';
 import { getDisplayHardQualityGateReport } from './baseReactFlowDisplayQualityGates';
 import { repairFinalResidualStrictCrossings } from './baseReactFlowDisplayStrictResidualRepair';
 
@@ -41,13 +44,29 @@ export const finalizeFailClosedDisplayTransaction = <T extends Edge[]>(
     localCandidate,
     residualStrictCandidate,
   ) as T;
-  const report = getDisplayHardQualityGateReport(
+  const microCandidate = repairDisplayMicroArtifacts(
     selectedCandidate,
+    createBaseReactFlowDisplayMicroSafetyContext(selectedCandidate, repairNodes),
+  ) as T;
+  const selectedMicroCandidate = chooseFinalTerminalTransactionCandidate(
+    repairNodes,
+    selectedCandidate,
+    microCandidate,
+  ) as T;
+  const closedCandidate = finalSameSideTrueTrunksDoNotRegress(
+    selectedCandidate,
+    selectedMicroCandidate,
+    repairNodes,
+  )
+    ? selectedMicroCandidate
+    : selectedCandidate;
+  const report = getDisplayHardQualityGateReport(
+    closedCandidate,
     repairNodes,
     'polished',
   );
 
   return report.hardClean
-    ? markBaseDisplayFinalized(selectedCandidate, inputSignature)
-    : selectedCandidate;
+    ? markBaseDisplayFinalized(closedCandidate, inputSignature)
+    : closedCandidate;
 };

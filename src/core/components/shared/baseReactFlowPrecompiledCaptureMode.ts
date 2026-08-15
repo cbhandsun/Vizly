@@ -46,3 +46,24 @@ export const resolveBaseReactFlowPrecompiledCapturePresetId = ({
   const activePresetId = readSingleParameter(hash.slice(queryIndex + 1), 'diagram');
   return activePresetId === capturePresetId ? capturePresetId : null;
 };
+
+/**
+ * Regeneration is deliberately separate from capture mode. Capture mode keeps
+ * the production full-quality policy used by performance verification, while
+ * regeneration also bypasses every external route candidate so generated
+ * artifacts cannot validate and reproduce themselves.
+ */
+export const resolveBaseReactFlowPrecompiledRegenerationPresetId = ({
+  search,
+  hash,
+}: {
+  search: unknown;
+  hash: unknown;
+}): string | null => {
+  const regenerationPresetId = readSingleParameter(search, 'precompiledRegenerate');
+  if (!regenerationPresetId || typeof hash !== 'string') return null;
+  const queryIndex = hash.indexOf('?');
+  if (queryIndex < 0) return null;
+  const activePresetId = readSingleParameter(hash.slice(queryIndex + 1), 'diagram');
+  return activePresetId === regenerationPresetId ? regenerationPresetId : null;
+};

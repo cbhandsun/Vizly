@@ -28,7 +28,9 @@ describe('flowchart visual polish stylesheet', () => {
         expect(stylesheet).toContain('.diagram-root .react-flow__node.selected');
         expect(stylesheet).toContain('.diagram-root .react-flow__node.rf-connectable');
         expect(stylesheet).toContain('.diagram-root .react-flow__edge-stablePath');
-        expect(stylesheet).toContain('.diagram-root .react-flow__edge.selected .react-flow__edge-path');
+        expect(stylesheet).toContain(
+            ".diagram-root .react-flow__edge.selected:not(:has([data-shared-trunk-state='shared']))",
+        );
         expect(stylesheet).toContain('.diagram-root .edge-label-premium');
         expect(stylesheet).toContain('.diagram-root .stable-path-edge-label');
         expect(stylesheet).toContain("[data-theme='dark'] .diagram-root");
@@ -69,6 +71,78 @@ describe('flowchart visual polish stylesheet', () => {
 
         expect(viewSource).toContain(
             'isContextToolbarHidden: isContextToolbarHidden || Boolean(leftDrawerOpen)',
+        );
+    });
+
+    it('applies a low-zoom label budget with explicit main-route and trace restoration', () => {
+        const legacyStylesheet = readRelativeFile('../FlowchartDesigner.css');
+
+        expect(legacyStylesheet).toContain('.diagram-zoomed-out .stable-path-edge-label');
+        expect(legacyStylesheet).toContain('.diagram-zoomed-out .vizly-edge-label');
+        expect(legacyStylesheet).not.toMatch(
+            /\.diagram-zoomed-out \.react-flow__edge-path\s*\{[^}]*stroke-dasharray:\s*none/s,
+        );
+        expect(legacyStylesheet).toContain('.stable-path-edge-label--primary');
+        expect(legacyStylesheet).toContain('.stable-path-edge-label--trace-active');
+        expect(legacyStylesheet).toMatch(
+            /\.diagram-zoomed-out \.stable-path-edge-label:is\([\s\S]*?:focus-visible[\s\S]*?\)\s*\{[^}]*display:\s*block\s*!important;/s,
+        );
+    });
+
+    it('gives hover, selection, and focus a non-color trace hierarchy', () => {
+        const stylesheet = readRelativeFile('../FlowchartVisualPolish.css');
+        const legacyStylesheet = readRelativeFile('../FlowchartDesigner.css');
+
+        expect(stylesheet).toContain(
+            '.diagram-root:has(.react-flow__edge:is(:hover, .selected, :focus-visible))',
+        );
+        expect(stylesheet).toMatch(
+            /:has\(\.react-flow__edge:is\(:hover, \.selected, :focus-visible\)\)[\s\S]*?\.react-flow__edge-path:not\(\.shared-trunk-canonical-backbone\)[\s\S]*?\{[^}]*opacity:\s*var\(--flow-visual-edge-peer-opacity\)/s,
+        );
+        expect(stylesheet).toMatch(
+            /\.react-flow__edge:hover:not\(:has\(\[data-shared-trunk-state='shared'\]\)\)[\s\S]*?\.react-flow__edge-path\s*\{[^}]*stroke-width:\s*var\(--flow-visual-edge-hover-width\)\s*!important;/s,
+        );
+        expect(stylesheet).toMatch(
+            /\.react-flow__edge\.selected:not\(:has\(\[data-shared-trunk-state='shared'\]\)\)[\s\S]*?\.react-flow__edge-path\s*\{[^}]*stroke-width:\s*var\(--flow-visual-edge-selected-width\)\s*!important;/s,
+        );
+        expect(stylesheet).toMatch(
+            /\.shared-trunk-canonical-backbone\s*\{[^}]*stroke:\s*var\(--vizly-shared-canonical-stroke\)\s*!important;[^}]*opacity:\s*var\(--vizly-shared-canonical-opacity\)\s*!important;[^}]*filter:\s*none\s*!important;/s,
+        );
+        expect(stylesheet).toContain('.stable-path-edge-label--trace-active');
+        expect(stylesheet).toMatch(
+            /\.stable-path-edge-terminal\s*\{[^}]*fill:\s*rgba\(255, 255, 255, 0\.92\);[^}]*stroke:\s*var\(--flow-visual-accent\);[^}]*stroke-width:\s*1\.75px;/s,
+        );
+        expect(stylesheet).toMatch(
+            /\.stable-path-edge-label:focus-visible\s*\{[^}]*outline:\s*2px solid/s,
+        );
+        expect(legacyStylesheet).not.toMatch(
+            /\.react-flow__edge,\s*\.react-flow__edge\.selected\s*\{[^}]*z-index:\s*0\s*!important;/s,
+        );
+    });
+
+    it('uses a compact, stable commercial label treatment without blur or border reflow', () => {
+        const stylesheet = readRelativeFile('../FlowchartVisualPolish.css');
+
+        expect(stylesheet).toMatch(
+            /\.diagram-root \.stable-path-edge-label\s*\{[^}]*border-radius:\s*4px;[^}]*font-size:\s*11px;/s,
+        );
+        expect(stylesheet).not.toMatch(/\.stable-path-edge-label\s*\{[^}]*backdrop-filter:/s);
+        expect(stylesheet).toMatch(
+            /\.stable-path-edge-label:is\([\s\S]*?\)\s*\{[^}]*border-width:\s*1px;[^}]*font-weight:\s*650;/s,
+        );
+    });
+
+    it('keeps idle edge paint opaque and gives unstyled stable edges a compliant fallback', () => {
+        const stylesheet = readRelativeFile('../FlowchartVisualPolish.css');
+
+        expect(stylesheet).toMatch(
+            /\.diagram-root \.react-flow__edge-path\s*\{[^}]*opacity:\s*1;/s,
+        );
+        expect(stylesheet).toMatch(
+            /\[data-theme='dark'\] \.diagram-root \.react-flow__edge-path\s*\{[^}]*opacity:\s*1;/s,
+        );
+        expect(stylesheet).toMatch(
+            /\.react-flow__edge-stablePath \.react-flow__edge-path:not\(\[style\*='stroke:'\]\)\s*\{[^}]*stroke:\s*#64748b;[^}]*stroke-width:\s*1\.5px;[^}]*opacity:\s*1;/s,
         );
     });
 

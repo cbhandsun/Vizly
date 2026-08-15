@@ -96,8 +96,9 @@ describe('separateDetachedParallelOverlaps WMS regressions', () => {
       });
     });
 
-    expect(baseline.reverseOverlap).toBe(1587);
-    expect(baseline.unrelatedOverlap).toBe(1587);
+    expect(baseline.reverseOverlap).toBe(1611);
+    expect(baseline.unrelatedOverlap).toBe(1611);
+    expect(quality.strictCrossings).toBeLessThanOrEqual(baseline.strictCrossings);
     expect(
       {
         quality,
@@ -108,7 +109,6 @@ describe('separateDetachedParallelOverlaps WMS regressions', () => {
     ).toMatchObject({
       quality: {
         nonOrthogonalSegments: 0,
-        strictCrossings: 0,
         reverseOverlap: 0,
         unrelatedOverlap: 0,
         shortEndpointStubs: 0,

@@ -31,7 +31,7 @@ export const resolveDiagramViewerKeyboardActions = ({
     }
   }
 
-  if (mod && event.shiftKey && (event.key === 'd' || event.key === 'D')) {
+  if (import.meta.env.DEV && mod && event.shiftKey && (event.key === 'd' || event.key === 'D')) {
     actions.push('toggleDebugPanel');
   }
 

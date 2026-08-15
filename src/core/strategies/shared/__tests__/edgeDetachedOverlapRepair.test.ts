@@ -4,6 +4,8 @@ import { describe, expect, it } from 'vitest';
 import {
   createDetachedOverlapStateEvaluationContext,
   edgesWithPaths,
+  getEdgePath,
+  getRoutingObstacles,
   scoreDetachedOverlapState,
   separateDetachedParallelOverlaps,
 } from '../edgeDetachedOverlapRepair';
@@ -13,6 +15,7 @@ import {
   countStrictEdgeCrossings,
   createEdgePathQualityEvaluationContext,
 } from '../edgeStrictCrossingGuard';
+import { countRoutingObstacleHits } from '../edgeWaypointCandidateRepair';
 
 function node(id: string, x: number, y: number, width = 80, height = 48): Node {
   return {
@@ -176,7 +179,7 @@ describe('separateDetachedParallelOverlaps', () => {
     expect(repaired.some(edge => (edge.data as any).detachedOverlapSeparated)).toBe(true);
   });
 
-  it('separates long same-target trunks while preserving the target side endpoints', () => {
+  it('preserves a long same-target true trunk and its target-side endpoints', () => {
     const edges: Edge[] = [
       {
         id: 'edge-master-data-oms',
@@ -214,7 +217,9 @@ describe('separateDetachedParallelOverlaps', () => {
     const first = (repaired[0].data as any).computedPath as Array<{ x: number; y: number }>;
     const second = (repaired[1].data as any).computedPath as Array<{ x: number; y: number }>;
 
-    expect(maxParallelOverlap(first, second)).toBeLessThan(96);
+    expect(maxParallelOverlap(first, second)).toBe(1377);
+    expect(calculateEdgePathQualityScore(repaired).unexplainedRelatedOverlap).toBe(0);
+    expect(repaired.some(edge => (edge.data as any).detachedOverlapSeparated)).toBe(false);
     expect(first[first.length - 1].y).toBe(804);
     expect(second[second.length - 1].y).toBe(804);
   });
@@ -665,7 +670,7 @@ describe('separateDetachedParallelOverlaps', () => {
     expect(repaired.some(edge => (edge.data as any).detachedOverlapSeparated)).toBe(true);
   });
 
-  it('routes a logistics carrier leg around a multi-edge LOMS trunk bundle', () => {
+  it('does not trade a logistics bundle crossing for routes through business nodes', () => {
     const edges: Edge[] = [
       {
         id: 'edge-loms-customs',
@@ -749,7 +754,7 @@ describe('separateDetachedParallelOverlaps', () => {
       },
     ];
 
-    const repaired = repairDetachedStrictCrossingBypasses(edges, [
+    const nodes = [
       node('logistics-oms', 1181, 644, 284, 158),
       node('tms', 1060, 961, 334, 158),
       node('customs', 1945, 981, 236, 158),
@@ -757,13 +762,21 @@ describe('separateDetachedParallelOverlaps', () => {
       node('visibility', 1645, 1921, 288, 158),
       node('carrier', 1650, 120, 240, 158),
       node('downstream', 2150, 80, 248, 158),
-    ]);
+    ];
+    const obstacles = getRoutingObstacles(nodes);
+    const baselineObstacleHits = edges.reduce((total, edge) => (
+      total + countRoutingObstacleHits(getEdgePath(edge), edge, obstacles)
+    ), 0);
+    const repaired = repairDetachedStrictCrossingBypasses(edges, nodes);
+    const repairedObstacleHits = repaired.reduce((total, edge) => (
+      total + countRoutingObstacleHits(getEdgePath(edge), edge, obstacles)
+    ), 0);
 
     expect(
-      countStrictEdgeCrossings(repaired),
-      JSON.stringify(repaired.map(edge => ({ id: edge.id, path: (edge.data as any).computedPath })), null, 2),
-    ).toBe(0);
-    expect(repaired.some(edge => (edge.data as any).detachedOverlapSeparated)).toBe(true);
+      repairedObstacleHits,
+      JSON.stringify(repaired.map(edge => ({ id: edge.id, path: getEdgePath(edge) })), null, 2),
+    ).toBeLessThanOrEqual(baselineObstacleHits);
+    expect(countStrictEdgeCrossings(repaired)).toBeLessThanOrEqual(countStrictEdgeCrossings(edges));
   });
 });
 

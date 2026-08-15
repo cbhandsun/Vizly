@@ -1,3 +1,6 @@
+import { collapseCollinearBacktracks } from '../algorithms/smartEdgeUtils';
+import { createVerticalSegmentIndex, queryVerticalSegments } from './lineJumpSpatialIndex';
+
 /**
  * LineJumpEngine — 交叉跳线弧引擎
  * 
@@ -26,6 +29,12 @@ export interface LineSegment {
 export interface EdgeEndpointInfo {
     source?: string | null;
     target?: string | null;
+}
+
+export interface LineJumpEdgePath {
+    edgeId: string;
+    points: Point[];
+    endpointInfo?: EdgeEndpointInfo;
 }
 
 export interface IntersectionInfo {
@@ -76,6 +85,7 @@ function findIntersections(
 ): IntersectionInfo[] {
     const hSegments = segments.filter(s => s.isHorizontal);
     const vSegments = segments.filter(s => !s.isHorizontal);
+    const verticalIndex = createVerticalSegmentIndex(vSegments);
     const intersections: IntersectionInfo[] = [];
 
     for (const h of hSegments) {
@@ -83,26 +93,33 @@ function findIntersections(
         const hMaxX = Math.max(h.p1.x, h.p2.x);
         const hY = h.p1.y;
 
-        for (const v of vSegments) {
+        const candidateVerticalSegments = queryVerticalSegments(
+            verticalIndex,
+            hMinX + JUMP_RADIUS,
+            hMaxX - JUMP_RADIUS,
+        );
+        for (const v of candidateVerticalSegments) {
             // 同一条边不生成跳线
             if (h.edgeId === v.edgeId) continue;
-            if (shareEndpointGroup(h.edgeId, v.edgeId, edgeEndpointInfo)) continue;
 
             const vMinY = Math.min(v.p1.y, v.p2.y);
             const vMaxY = Math.max(v.p1.y, v.p2.y);
             const vX = v.p1.x;
 
-            const insideHorizontal = vX > hMinX + JUMP_RADIUS && vX < hMaxX - JUMP_RADIUS;
             const strictVerticalInterior = hY > vMinY + JUMP_RADIUS && hY < vMaxY - JUMP_RADIUS;
             const touchesVerticalEndpoint = (
                 Math.abs(hY - vMinY) <= ENDPOINT_CONTACT_TOLERANCE ||
                 Math.abs(hY - vMaxY) <= ENDPOINT_CONTACT_TOLERANCE
             ) && Math.abs(vMaxY - vMinY) > JUMP_RADIUS * 2;
+            const isSharedEndpointJunction = touchesVerticalEndpoint
+                && shareEndpointGroup(h.edgeId, v.edgeId, edgeEndpointInfo);
 
             // Strict crossings need a jump. So do non-buddy T contacts where
             // another edge endpoint lands inside a long horizontal sweep; those
-            // read visually as false connections.
-            if (insideHorizontal && (strictVerticalInterior || touchesVerticalEndpoint)) {
+            // read visually as false connections. Sharing a source/target only
+            // exempts the actual endpoint junction; it must not suppress a
+            // strict interior crossing elsewhere between the same buddy edges.
+            if (strictVerticalInterior || (touchesVerticalEndpoint && !isSharedEndpointJunction)) {
                 intersections.push({
                     point: { x: vX, y: hY },
                     horizontalEdgeId: h.edgeId,
@@ -126,6 +143,17 @@ function shareEndpointGroup(
     return (!!a.source && a.source === b.source) || (!!a.target && a.target === b.target);
 }
 
+/** Pure crossing collector shared by the live canvas registry and static exports. */
+export function collectLineJumpIntersections(edgePaths: readonly LineJumpEdgePath[]): IntersectionInfo[] {
+    const segments: LineSegment[] = [];
+    const endpointInfo = new Map<string, EdgeEndpointInfo>();
+    edgePaths.forEach(edgePath => {
+        segments.push(...extractSegments(edgePath.points, edgePath.edgeId));
+        if (edgePath.endpointInfo) endpointInfo.set(edgePath.edgeId, edgePath.endpointInfo);
+    });
+    return findIntersections(segments, endpointInfo);
+}
+
 /**
  * LineJumpEngine 单例
  * 
@@ -142,8 +170,6 @@ class LineJumpEngine {
     private edgePoints: Map<string, Point[]> = new Map();
     /** Edge endpoint ids, used to keep O2M/M2O buddy junctions intact. */
     private edgeEndpointInfo: Map<string, EdgeEndpointInfo> = new Map();
-    /** 缓存的全局线段 */
-    private segmentsCache: LineSegment[] | null = null;
     /** 缓存的全局交叉点 */
     private intersectionsCache: IntersectionInfo[] | null = null;
     /** 版本号（每次注册/注销递增，供外部检测变化） */
@@ -254,7 +280,6 @@ class LineJumpEngine {
     }
 
     private invalidateCache(): void {
-        this.segmentsCache = null;
         this.intersectionsCache = null;
         this.channelRoutingCache = null; // [P2-3] 同步清空通道分配缓存
         this.version++;
@@ -277,15 +302,12 @@ class LineJumpEngine {
     private computeIntersections(): IntersectionInfo[] {
         if (this.intersectionsCache) return this.intersectionsCache;
 
-        // 构建全局线段
-        const segments: LineSegment[] = [];
-        for (const [edgeId, points] of this.edgePoints) {
-            segments.push(...extractSegments(points, edgeId));
-        }
-        this.segmentsCache = segments;
-
-        // 计算交叉
-        this.intersectionsCache = findIntersections(segments, this.edgeEndpointInfo);
+        const edgePaths = [...this.edgePoints].map(([edgeId, points]) => ({
+            edgeId,
+            points,
+            endpointInfo: this.edgeEndpointInfo.get(edgeId),
+        }));
+        this.intersectionsCache = collectLineJumpIntersections(edgePaths);
         return this.intersectionsCache;
     }
 }
@@ -304,8 +326,6 @@ export { LineJumpEngine, JUMP_RADIUS };
  * @param filletRadius 倒角半径（用于重新生成 filleted path）
  * @returns SVG d-path 字符串
  */
-import { collapseCollinearBacktracks } from '../algorithms/smartEdgeUtils';
-
 /** 与 createFilletedPath 相同的最终正交化 pass */
 function enforceOrthogonality(pts: Point[]): Point[] {
     let diagFixed = false;

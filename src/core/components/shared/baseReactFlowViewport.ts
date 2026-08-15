@@ -4,6 +4,14 @@ type ReactFlowViewportInstance = {
   setViewport: (viewport: Viewport) => void;
 };
 
+const MIN_READABLE_EDGE_LABEL_ZOOM = 0.72;
+const MAX_EDGE_LABEL_SCALE = 2.4;
+
+const edgeLabelScaleForZoom = (zoom: number): number => {
+  if (!Number.isFinite(zoom) || zoom <= 0) return 1;
+  return Math.min(MAX_EDGE_LABEL_SCALE, Math.max(1, MIN_READABLE_EDGE_LABEL_ZOOM / zoom));
+};
+
 export const syncBaseReactFlowZoomClass = ({
   container,
   viewport,
@@ -14,6 +22,11 @@ export const syncBaseReactFlowZoomClass = ({
   zoomedOutClassName?: string;
 }): void => {
   if (!container) return;
+
+  container.style.setProperty(
+    '--diagram-edge-label-scale',
+    edgeLabelScaleForZoom(viewport.zoom).toFixed(3),
+  );
 
   if (viewport.zoom < 0.4) {
     if (!container.classList.contains(zoomedOutClassName)) {

@@ -46,6 +46,12 @@ import { repairFinalResidualStrictCrossingsFromKnownAnalysis } from './baseReact
 import { repairTerminalEndpointStrictCrossingStubs } from './baseReactFlowDisplayStrictTerminalRepair';
 import { getDisplayHardQualityGateReport } from './baseReactFlowDisplayQualityGates';
 import { markBaseDisplayFinalized } from './baseReactFlowDisplayEdgeCore';
+import { startDisplayRoutingPhaseTrace } from './baseReactFlowDisplayRoutingTrace';
+import {
+  createDisplayTerminalValidationSnapshot,
+  displayTerminalValidationDoesNotRegress,
+  keepDisplayTerminalValidationNonRegressing,
+} from './baseReactFlowTerminalValidation';
 import type { BaseReactFlowFullRouteContext } from './baseReactFlowDisplayFullRouteTypes';
 
 export type BaseReactFlowFullRouteStrictResult =
@@ -62,7 +68,19 @@ export const runBaseReactFlowFullRouteStrictPhase = (
     layoutDirection,
     inputSignature,
     useBoundedLargeRepair,
+    onPhaseTrace,
   } = context;
+  const primaryTimer = startDisplayRoutingPhaseTrace({
+    phase: 'strict-primary',
+    candidateCount: postSoftEdges.length,
+    onTrace: onPhaseTrace,
+  });
+  const terminalSnapshot = createDisplayTerminalValidationSnapshot(repairNodes);
+  const keepTerminalSafe = (baseline: Edge[], candidate: Edge[]): Edge[] => (
+    displayTerminalValidationDoesNotRegress(baseline, candidate, terminalSnapshot)
+      ? candidate
+      : baseline
+  );
   const finalDetachedObstacleCandidate = hasHardDisplayOverlapRisk(postSoftQuality)
     ? (() => {
       const detachedCandidate = separateDetachedParallelOverlaps(
@@ -95,13 +113,13 @@ export const runBaseReactFlowFullRouteStrictPhase = (
       );
     })()
     : postSoftEdges;
-  const finalEndpointStubCandidate = repairFinalShortEndpointStubs(
+  const finalEndpointStubCandidate = keepTerminalSafe(
     finalDetachedObstacleCandidate,
-    repairNodes,
+    repairFinalShortEndpointStubs(finalDetachedObstacleCandidate, repairNodes),
   );
-  const finalTargetHemisphereCandidate = synthesizeSharedTargetTrunks(
+  const finalTargetHemisphereCandidate = keepTerminalSafe(
     finalEndpointStubCandidate,
-    { nodes: repairNodes },
+    synthesizeSharedTargetTrunks(finalEndpointStubCandidate, { nodes: repairNodes }),
   );
   const finalPostTargetStrictCandidate = chooseFinalObstacleAwarePolishCandidate(
     repairNodes,
@@ -134,10 +152,15 @@ export const runBaseReactFlowFullRouteStrictPhase = (
       repairNodes,
     ),
   );
-  const finalExactResidualCandidate = repairExactThresholdResidualOverlaps(
+  const finalExactResidualRawCandidate = repairExactThresholdResidualOverlaps(
     finalDirectionalStrictCandidate,
     repairNodes,
     useBoundedLargeRepair ? 16 : 64,
+  );
+  const finalExactResidualCandidate = keepDisplayTerminalValidationNonRegressing(
+    finalDirectionalStrictCandidate,
+    finalExactResidualRawCandidate,
+    terminalSnapshot,
   );
   const finalExactStrictSweepCandidate = finalStrictDisplaySweep(
     finalExactResidualCandidate,
@@ -152,12 +175,15 @@ export const runBaseReactFlowFullRouteStrictPhase = (
       repairNodes,
     ),
   );
-  const finalDirectionalAfterResidualCandidate = chooseDirectionalOuterLaneCandidate(
-    repairNodes,
+  const finalDirectionalAfterResidualCandidate = keepTerminalSafe(
     finalPostResidualStrictCandidate,
-    repairEndpointOrthogonalPaths(
-      repairStrictCrossingsWithDirectionalOuterLanes(finalPostResidualStrictCandidate, repairNodes),
+    chooseDirectionalOuterLaneCandidate(
       repairNodes,
+      finalPostResidualStrictCandidate,
+      repairEndpointOrthogonalPaths(
+        repairStrictCrossingsWithDirectionalOuterLanes(finalPostResidualStrictCandidate, repairNodes),
+        repairNodes,
+      ),
     ),
   );
   const finalMicroCleanupCandidate = repairDisplayMicroArtifacts(finalDirectionalAfterResidualCandidate);
@@ -176,9 +202,9 @@ export const runBaseReactFlowFullRouteStrictPhase = (
     finalLocalCleanupCandidate,
     finalEndpointCleanupCandidate,
   );
-  const finalTerminalStrictCandidate = repairTerminalEndpointStrictCrossingStubs(
+  const finalTerminalStrictCandidate = keepTerminalSafe(
     finalBaseReturnCandidate,
-    repairNodes,
+    repairTerminalEndpointStrictCrossingStubs(finalBaseReturnCandidate, repairNodes),
   );
   const finalBaseReturnQuality = calculateEdgePathQualityScore(finalBaseReturnCandidate);
   const finalTerminalStrictQuality = calculateEdgePathQualityScore(finalTerminalStrictCandidate);
@@ -198,13 +224,25 @@ export const runBaseReactFlowFullRouteStrictPhase = (
   )
     ? finalTerminalStrictCandidate
     : finalBaseReturnCandidate;
+  primaryTimer.finish(
+    finalReturnCandidate === postSoftEdges ? 'skip' : 'accepted',
+    finalReturnCandidate === postSoftEdges ? 0 : finalReturnCandidate.length,
+  );
+  const closureTimer = startDisplayRoutingPhaseTrace({
+    phase: 'strict-closure',
+    candidateCount: finalReturnCandidate.length,
+    onTrace: onPhaseTrace,
+  });
   const finalReturnQualityBeforeInternalStrict = calculateEdgePathQualityScore(finalReturnCandidate);
   const finalBoundedInternalStrictCandidate = finalReturnQualityBeforeInternalStrict.strictCrossings > 0
-    ? repairBoundedPortAndInternalStrictCrossings(finalReturnCandidate, repairNodes, 8)
+    ? keepTerminalSafe(
+      finalReturnCandidate,
+      repairBoundedPortAndInternalStrictCrossings(finalReturnCandidate, repairNodes, 8),
+    )
     : finalReturnCandidate;
-  const finalBoundedInternalReadableCandidate = repairTerminalBoundaryStairs(
+  const finalBoundedInternalReadableCandidate = keepTerminalSafe(
     finalBoundedInternalStrictCandidate,
-    repairNodes,
+    repairTerminalBoundaryStairs(finalBoundedInternalStrictCandidate, repairNodes),
   );
   const finalBoundedInternalStrictReport = getDisplayHardQualityGateReport(
     finalBoundedInternalReadableCandidate,
@@ -212,6 +250,7 @@ export const runBaseReactFlowFullRouteStrictPhase = (
     'polished',
   );
   if (finalBoundedInternalStrictReport.hardClean) {
+    closureTimer.finish('accepted', finalBoundedInternalReadableCandidate.length);
     return {
       kind: 'finalized',
       edges: markBaseDisplayFinalized(finalBoundedInternalReadableCandidate, inputSignature),
@@ -220,7 +259,10 @@ export const runBaseReactFlowFullRouteStrictPhase = (
   const finalInternalStrictCandidate = calculateEdgePathQualityScore(
     finalBoundedInternalStrictCandidate,
   ).strictCrossings > 0
-    ? repairInternalStrictCrossingLanes(finalBoundedInternalStrictCandidate, repairNodes)
+    ? keepTerminalSafe(
+      finalBoundedInternalStrictCandidate,
+      repairInternalStrictCrossingLanes(finalBoundedInternalStrictCandidate, repairNodes),
+    )
     : finalBoundedInternalStrictCandidate;
   const finalInternalStrictQuality = calculateEdgePathQualityScore(finalInternalStrictCandidate);
   const finalStrictReturnCandidate = (
@@ -244,7 +286,10 @@ export const runBaseReactFlowFullRouteStrictPhase = (
     : finalReturnCandidate;
   const finalReturnQuality = calculateEdgePathQualityScore(finalStrictReturnCandidate);
   const finalReturnObstacleHits = countDisplayObstacleHits(finalStrictReturnCandidate, repairNodes);
-  const finalDoglegSweepCandidate = repairLocalDoglegArtifacts(finalStrictReturnCandidate, repairNodes);
+  const finalDoglegSweepCandidate = keepTerminalSafe(
+    finalStrictReturnCandidate,
+    repairLocalDoglegArtifacts(finalStrictReturnCandidate, repairNodes),
+  );
   const finalDoglegSweepQuality = calculateEdgePathQualityScore(finalDoglegSweepCandidate);
   const finalDoglegSweepReturnCandidate = (
     finalDoglegSweepQuality.tinyInteriorDoglegs < finalReturnQuality.tinyInteriorDoglegs
@@ -263,13 +308,16 @@ export const runBaseReactFlowFullRouteStrictPhase = (
   const finalDoglegSweepReturnQuality = finalDoglegSweepReturnCandidate === finalDoglegSweepCandidate
     ? finalDoglegSweepQuality
     : finalReturnQuality;
-  const finalResidualStrictCandidate = repairFinalResidualStrictCrossingsFromKnownAnalysis(
+  const finalResidualStrictCandidate = keepTerminalSafe(
     finalDoglegSweepReturnCandidate,
-    repairNodes,
-    {
-      rawStrictCrossings: finalDoglegSweepReturnQuality.strictCrossings,
-      renderStrictCrossings: countDisplayStrictCrossings(finalDoglegSweepReturnCandidate),
-    },
+    repairFinalResidualStrictCrossingsFromKnownAnalysis(
+      finalDoglegSweepReturnCandidate,
+      repairNodes,
+      {
+        rawStrictCrossings: finalDoglegSweepReturnQuality.strictCrossings,
+        renderStrictCrossings: countDisplayStrictCrossings(finalDoglegSweepReturnCandidate),
+      },
+    ),
   );
   const boundedFinalNearParallelCandidate = (
     useBoundedLargeRepair
@@ -288,7 +336,16 @@ export const runBaseReactFlowFullRouteStrictPhase = (
   );
   const boundedFinalReturnQuality = calculateEdgePathQualityScore(boundedFinalReturnCandidate);
   const finalBoundedStrictCandidate = boundedFinalReturnQuality.strictCrossings > 0
-    ? repairBoundedPortAndInternalStrictCrossings(boundedFinalReturnCandidate, repairNodes, 8)
+    ? keepTerminalSafe(
+      boundedFinalReturnCandidate,
+      repairBoundedPortAndInternalStrictCrossings(boundedFinalReturnCandidate, repairNodes, 8),
+    )
     : boundedFinalReturnCandidate;
+  closureTimer.finish(
+    finalBoundedStrictCandidate === finalReturnCandidate ? 'skip' : 'fallback',
+    finalBoundedStrictCandidate === finalReturnCandidate
+      ? 0
+      : finalBoundedStrictCandidate.length,
+  );
   return { kind: 'continue', edges: finalBoundedStrictCandidate };
 };

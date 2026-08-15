@@ -35,9 +35,11 @@ export const prepareBaseReactFlowFullRouteSeed = ({
   smartEdgePadding,
   isLargeGraph,
   displayEdgeEpoch,
+  forceFullQuality = false,
   reusePreparedGlobalRouting = false,
   skipBoundedAttempt = false,
   skipFinalizedReuse = false,
+  onPhaseTrace,
   createPreDisplayFinalEdges,
 }: BaseReactFlowDisplayEdgesArgs & {
   createPreDisplayFinalEdges?: BaseReactFlowPreDisplayFinalEdgesFactory;
@@ -57,7 +59,7 @@ export const prepareBaseReactFlowFullRouteSeed = ({
   if (
     createPreDisplayFinalEdges
     && !skipBoundedAttempt
-    && !isLargeGraph
+    && (!isLargeGraph || forceFullQuality)
     && edges.length > 24
     && edges.length <= 80
   ) {
@@ -98,7 +100,12 @@ export const prepareBaseReactFlowFullRouteSeed = ({
   const layoutDirection = typeof normalizedEdges[0]?.data?.layoutDirection === 'string'
     ? normalizedEdges[0].data.layoutDirection
     : 'TB';
-  const qualityBudget = resolveDisplayQualityBudget(normalizedEdges, repairNodes, isLargeGraph);
+  const qualityBudget = resolveDisplayQualityBudget(
+    normalizedEdges,
+    repairNodes,
+    isLargeGraph,
+    forceFullQuality,
+  );
   const useBoundedLargeRepair = qualityBudget.mode === 'bounded'
     && (normalizedEdges.length > 24 || repairNodes.length > 36);
 
@@ -140,6 +147,7 @@ export const prepareBaseReactFlowFullRouteSeed = ({
       useBoundedLargeRepair,
       canReusePreparedGlobalRouting,
       reusePreparedGlobalRouting,
+      onPhaseTrace,
     },
   };
 };

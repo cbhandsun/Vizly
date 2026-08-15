@@ -153,6 +153,7 @@ describe('useDesignerSystemSync initialization race safety', () => {
   const pending = new Map<string, DeferredCanvas[]>();
 
   beforeEach(() => {
+    window.history.replaceState({}, '', '/');
     pending.clear();
     mocks.marks.length = 0;
     mocks.initializedIds.clear();
@@ -287,5 +288,36 @@ describe('useDesignerSystemSync initialization race safety', () => {
     expect(committedNodeIds).toEqual(['restored-standard-node']);
     expect(mocks.clearSaved).not.toHaveBeenCalled();
     expect(mocks.loadStandardPresetCanvas).not.toHaveBeenCalled();
+  });
+
+  it('loads the canonical preset without reading or overwriting an existing autosave', async () => {
+    window.history.replaceState(
+      {},
+      '',
+      '/?canonicalPreset=blank-canvas-template#/?diagram=blank-canvas-template',
+    );
+    mocks.loadSaved.mockReturnValue({
+      diagramId: 'blank-canvas-template',
+      nodes: [],
+      edges: [],
+      timestamp: Date.now(),
+      isFreshSeed: false,
+    });
+
+    const { setNodes } = renderSync('blank-canvas-template');
+    expect(mocks.autoSaveEnabledValues.at(-1)).toBe(false);
+    expect(mocks.loadSaved).not.toHaveBeenCalled();
+
+    await act(async () => {
+      pending.get('blank-canvas-template')?.[0]?.resolve(canvasFor('canonical-standard-node'));
+      await Promise.resolve();
+    });
+
+    const committedNodeIds = setNodes.mock.calls.flatMap(([value]) => (
+      Array.isArray(value) && value[0] ? [value[0].id] : []
+    ));
+    expect(committedNodeIds).toEqual(['canonical-standard-node']);
+    expect(mocks.clearSaved).not.toHaveBeenCalled();
+    expect(mocks.saveNow).not.toHaveBeenCalled();
   });
 });

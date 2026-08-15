@@ -1,6 +1,7 @@
 import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
 
 import {
+  calculateEdgePathQualityScore,
   createEdgePathQualityEvaluationContext,
   type EdgePathQualityScore,
 } from './edgeStrictCrossingGuard';
@@ -38,6 +39,7 @@ import {
   segmentsRunOppositeDirections,
   isOppositeEndpointOverlap,
   extractPathSegmentRefsForPath,
+  createStrictCrossingSegmentIndex,
   strictCrossingsForEdgeSegments,
   findDetachedParallelOverlaps,
   scoreActionableDetachedOverlaps,
@@ -212,7 +214,7 @@ export function hasShortHairpin(path: Point[]): boolean {
   return false;
 }
 
-function createRoutingObstacleGate(
+export function createRoutingObstacleGate(
   edges: Edge[],
   obstacles: Map<string, Rect>,
 ): RoutingObstacleGate {
@@ -260,7 +262,8 @@ export function separateDetachedParallelOverlaps(
 
   const initialQuality = qualityBudget.evaluate(edges);
   if (!initialQuality) return edges;
-  let paths = edges.map(edge => compactPath(getEdgePath(edge)));
+  const initialPaths = edges.map(edge => compactPath(getEdgePath(edge)));
+  let paths = initialPaths;
   if (paths.filter(path => path.length >= 2).length < 2) return edges;
   if (
     initialQuality.reverseOverlap === 0
@@ -310,6 +313,7 @@ export function separateDetachedParallelOverlaps(
       ? scoreActionableDetachedOverlaps(paths, edges, minOverlap)
       : 0;
     const currentSegments = extractPathSegmentRefs(paths, edges);
+    const strictCrossingSegmentIndex = createStrictCrossingSegmentIndex(currentSegments);
     let bestScore: number | null = null;
     const getBestScore = () => {
       if (bestScore === null) bestScore = getCurrentScore();
@@ -455,6 +459,7 @@ export function separateDetachedParallelOverlaps(
           currentEdgeSegments,
           currentSegments,
           segment.edgeIndex,
+          strictCrossingSegmentIndex,
         );
         const endpointBypassByClearance = new Map<number, Point[] | null>();
         const terminalLaneCandidatesByClearance = new Map<number, Point[][]>();
@@ -521,6 +526,7 @@ export function separateDetachedParallelOverlaps(
               extractPathSegmentRefsForPath(candidatePath, segment.edgeIndex, edges),
               currentSegments,
               segment.edgeIndex,
+              strictCrossingSegmentIndex,
             );
             if (candidateEdgeCrossings > currentEdgeCrossings) continue;
             const candidateEdges = edgesWithPaths(currentEdges, candidatePaths, [segment.edgeIndex]);
@@ -610,6 +616,16 @@ export function separateDetachedParallelOverlaps(
   }
 
   if (!changed) return edges;
+  const changedIndexes = paths.flatMap((path, edgeIndex) => (
+    pathEquals(path, initialPaths[edgeIndex] ?? []) ? [] : [edgeIndex]
+  ));
+  if (changedIndexes.length === 0) return edges;
+  const finalEdges = edgesWithPaths(edges, paths, changedIndexes);
+  const finalQuality = calculateEdgePathQualityScore(finalEdges);
+  if (
+    !hardQualityDoesNotRegress(finalQuality, initialQuality)
+    || !routingObstacleGate(initialPaths, paths, changedIndexes)
+  ) return edges;
   return edges.map((edge, index) => {
     const path = paths[index];
     const original = compactPath(getEdgePath(edge));
@@ -635,6 +651,7 @@ function repairResidualReverseOrUnrelatedOverlap(
   if (hits.length === 0) return null;
 
   const currentSegments = extractPathSegmentRefs(paths, edges);
+  const strictCrossingSegmentIndex = createStrictCrossingSegmentIndex(currentSegments);
   let bestQuality = currentQuality;
   let bestActionableOverlapScore = useActionableOverlapScore
     ? scoreActionableDetachedOverlaps(paths, edges, minOverlap)
@@ -673,6 +690,7 @@ function repairResidualReverseOrUnrelatedOverlap(
         currentEdgeSegments,
         currentSegments,
         segment.edgeIndex,
+        strictCrossingSegmentIndex,
       );
       for (const delta of deltas) {
         const includeDeltaIndependentCandidates = delta === deltas[0];
@@ -704,6 +722,7 @@ function repairResidualReverseOrUnrelatedOverlap(
             candidateSegments,
             currentSegments,
             segment.edgeIndex,
+            strictCrossingSegmentIndex,
           ) > currentEdgeCrossings) continue;
 
           const candidatePaths = paths.map((path, index) => (index === segment.edgeIndex ? candidatePath : path));

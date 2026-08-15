@@ -298,7 +298,7 @@ export function useEditableEdgeInteractions({
         // [DEBUG] Alt+Click or Ctrl+Click: Select this edge for the Routing Debugger
         // Alt: quick ergonomic shortcut (works in most browsers when clicking SVG)
         // Ctrl: fallback for Windows where Alt may focus browser menu bar
-        if (e.altKey || (e.ctrlKey && !e.shiftKey && !e.metaKey)) {
+        if (import.meta.env.DEV && (e.altKey || (e.ctrlKey && !e.shiftKey && !e.metaKey))) {
             e.preventDefault();
             e.stopPropagation();
             try {

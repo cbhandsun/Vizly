@@ -21,6 +21,7 @@ import {
   axisOf,
   buildObstacleMap,
   compactPath,
+  countEdgeObstacleHits,
   hardQualityDoesNotRegress,
   indexedPathSegments,
   nodeRect,
@@ -29,7 +30,6 @@ import {
   sharedNodeRole,
   terminalSide,
   terminalSideIsFixed,
-  totalObstacleHits,
   withPath,
   type IndexedPathSegment,
   type Point,
@@ -617,7 +617,13 @@ export function repairSharedEndpointPortOrderCrossings(
     if (crossings.length === 0) break;
     const qualityContext = createEdgePathQualityEvaluationContext(current);
     const baselineQuality = qualityContext.evaluate(current);
-    const baselineObstacleHits = totalObstacleHits(current, obstacles);
+    const baselineObstacleHitsByEdge = current.map(edge => (
+      countEdgeObstacleHits(edge, obstacles)
+    ));
+    const baselineObstacleHits = baselineObstacleHitsByEdge.reduce(
+      (total, hits) => total + hits,
+      0,
+    );
     let accepted: Edge[] | null = null;
     let acceptedQuality = baselineQuality;
     let candidateEvaluations = 0;
@@ -736,7 +742,12 @@ export function repairSharedEndpointPortOrderCrossings(
           const candidateQuality = qualityContext.evaluateChanged(candidate, [attempt.edgeIndex]);
           if (candidateQuality.strictCrossings >= baselineQuality.strictCrossings) continue;
           if (!hardQualityDoesNotRegress(baselineQuality, candidateQuality)) continue;
-          if (totalObstacleHits(candidate, obstacles) > baselineObstacleHits) continue;
+          const candidateEdge = candidate[attempt.edgeIndex];
+          if (!candidateEdge) continue;
+          const candidateObstacleHits = baselineObstacleHits
+            - baselineObstacleHitsByEdge[attempt.edgeIndex]
+            + countEdgeObstacleHits(candidateEdge, obstacles);
+          if (candidateObstacleHits > baselineObstacleHits) continue;
           if (
             !accepted
             || candidateQuality.strictCrossings < acceptedQuality.strictCrossings

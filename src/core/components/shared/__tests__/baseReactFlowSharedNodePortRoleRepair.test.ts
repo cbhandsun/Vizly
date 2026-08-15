@@ -4,6 +4,7 @@ import {
   buildFacingPortPathCandidates,
   buildNearTerminalSideCandidates,
   buildSharedNodeTerminalSideCandidates,
+  buildSharedSourceTrunkAdoptionCandidates,
 } from '../baseReactFlowSharedNodePortRoleRepair';
 
 describe('buildSharedNodeTerminalSideCandidates', () => {
@@ -103,5 +104,31 @@ describe('buildSharedNodeTerminalSideCandidates', () => {
       { x: 4498.4, y: 1950.5 },
       { x: 4498.4, y: 1998.5 },
     ]);
+  });
+
+  it('reuses a peer source trunk and joins the first safe perpendicular segment', () => {
+    const path = [
+      { x: 1960, y: 1267 }, { x: 1960, y: 1315 }, { x: 2072, y: 1315 },
+      { x: 2072, y: 1521 }, { x: 2578, y: 1521 },
+      { x: 2578, y: 1253 }, { x: 2651, y: 1253 },
+    ];
+    const peerPath = [
+      { x: 1960, y: 1294 }, { x: 1960, y: 1366 }, { x: 2008, y: 1366 },
+    ];
+
+    expect(buildSharedSourceTrunkAdoptionCandidates(path, peerPath, 48, 1)).toEqual([[
+      { x: 1960, y: 1294 }, { x: 1960, y: 1521 },
+      { x: 2578, y: 1521 }, { x: 2578, y: 1253 }, { x: 2651, y: 1253 },
+    ]]);
+  });
+
+  it('rejects invalid shared-source input and too-short outward splices', () => {
+    expect(buildSharedSourceTrunkAdoptionCandidates([], [], 48, 1)).toEqual([]);
+    expect(buildSharedSourceTrunkAdoptionCandidates(
+      [{ x: 0, y: 0 }, { x: 0, y: 20 }, { x: 40, y: 20 }],
+      [{ x: 0, y: 0 }, { x: 0, y: 10 }],
+      48,
+      1,
+    )).toEqual([]);
   });
 });

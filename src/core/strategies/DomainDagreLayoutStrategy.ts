@@ -451,12 +451,18 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
         // ============================================
         // 第三阶段：智能边路由
         // ============================================
+        // Earlier layout phases replace node objects while arranging domains and
+        // subgroups. Rebuild the identity map here so port selection and endpoint
+        // anchoring never read the pre-layout positions captured by idMap above.
+        const routingNodeById = new Map<string, ReactFlowNode>(
+            updatedNodes.map(node => [node.id, node]),
+        );
         const finalRoutedEdges = await prepareDomainDagreEdges({
             nodes: updatedNodes,
             edges,
             options,
             config: cfg,
-            nodeById: idMap,
+            nodeById: routingNodeById,
             leafNodes,
         });
         updatedNodes = sortDomainDagreHierarchy(

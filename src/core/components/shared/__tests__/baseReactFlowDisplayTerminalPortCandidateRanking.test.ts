@@ -11,7 +11,7 @@ import {
 const edge = (id: string): Edge => ({ id, source: 'source', target: 'target' });
 
 describe('baseReactFlowDisplayTerminalPortCandidateRanking', () => {
-  it('prioritizes declared-axis completion only for the isolated-edge policy', () => {
+  it('keeps obstacles primary for graph candidates and uses axis completion as the tie-break', () => {
     const candidates = [edge('zero-obstacle'), edge('axis-clean')];
     const axisMismatches = (candidate: Edge) => candidate.id === 'axis-clean' ? 0 : 1;
     const obstacleHits = (candidate: Edge) => candidate.id === 'axis-clean' ? 1 : 0;
@@ -28,6 +28,14 @@ describe('baseReactFlowDisplayTerminalPortCandidateRanking', () => {
       obstacleHits,
       false,
     )[0]?.candidateEdge.id).toBe('zero-obstacle');
+
+    const equalObstacleHits = () => 0;
+    expect(rankDisplayTerminalPortCandidates(
+      candidates,
+      axisMismatches,
+      equalObstacleHits,
+      false,
+    )[0]?.candidateEdge.id).toBe('axis-clean');
   });
 
   it('keeps invalid candidates out of every candidate bucket', () => {
@@ -45,13 +53,14 @@ describe('baseReactFlowDisplayTerminalPortCandidateRanking', () => {
     ]);
   });
 
-  it('requires both clean axes and zero obstacles for isolated completion', () => {
+  it('requires both clean axes and zero obstacles before any candidate is complete', () => {
     const partial = { declaredAxisMismatches: 1, obstacleHits: 0 };
     const complete = { declaredAxisMismatches: 0, obstacleHits: 0 };
 
     expect(displayTerminalPortCandidateIsBetter(partial, 2, 0, true)).toBe(true);
     expect(displayTerminalPortCandidateIsComplete(partial, true)).toBe(false);
-    expect(displayTerminalPortCandidateIsComplete(partial, false)).toBe(true);
+    expect(displayTerminalPortCandidateIsComplete(partial, false)).toBe(false);
     expect(displayTerminalPortCandidateIsComplete(complete, true)).toBe(true);
+    expect(displayTerminalPortCandidateIsComplete(complete, false)).toBe(true);
   });
 });

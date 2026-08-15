@@ -12,6 +12,7 @@ import type {
     DiagramCollaborationStatus,
     DiagramExportFormat,
 } from '../../../types/diagram-components';
+import { haveSameDesignerHeaderLayoutState } from './designerHeaderMemoState';
 
 type TopActionProps = React.ComponentProps<typeof TopActionButtons>;
 type ToolbarProps = React.ComponentProps<typeof ModernFlowchartToolbar>;
@@ -78,6 +79,7 @@ export interface DesignerHeaderLayerProps {
         lastDomainStrategy?: string;
         lastDomainDirection?: string;
         lastNodeLayout?: string;
+        layoutBusy?: boolean;
         showRuler: boolean;
         toggleRuler: () => void;
         showMinimap?: boolean;
@@ -221,6 +223,7 @@ export const DesignerHeaderLayer = React.memo(
                     lastDomainStrategy={toolbar.lastDomainStrategy}
                     lastDomainDirection={toolbar.lastDomainDirection as 'TB' | 'LR' | undefined}
                     lastNodeLayout={toolbar.lastNodeLayout}
+                    layoutBusy={toolbar.layoutBusy}
                     showRuler={toolbar.showRuler}
                     toggleRuler={toolbar.toggleRuler}
                     showMinimap={toolbar.showMinimap}
@@ -277,6 +280,7 @@ export const DesignerHeaderLayer = React.memo(
             prevProps.toolbar.canUndo === nextProps.toolbar.canUndo &&
             prevProps.toolbar.canRedo === nextProps.toolbar.canRedo &&
             prevProps.toolbar.autoRouting === nextProps.toolbar.autoRouting &&
+            haveSameDesignerHeaderLayoutState(prevProps.toolbar, nextProps.toolbar) &&
             prevProps.toolbar.aiChatActive === nextProps.toolbar.aiChatActive &&
             prevProps.toolbar.showRuler === nextProps.toolbar.showRuler &&
             prevProps.toolbar.isDrawingMode === nextProps.toolbar.isDrawingMode &&

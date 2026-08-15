@@ -518,26 +518,67 @@ const anchorComputedPathEndpoints = (
   const anchoredTargetSide = closestRectSide(path[path.length - 1], targetRect);
   const requestedSourceSide = sideForHandle(edge.sourceHandle);
   const requestedTargetSide = sideForHandle(edge.targetHandle);
+  const sourceGeometrySide = pointDistanceToSide(path[0], sourceRect, anchoredSourceSide)
+      <= DISPLAY_ENDPOINT_BOUNDARY_TOLERANCE
+    && segmentLeavesTowardSide(path[0], path[1], anchoredSourceSide)
+    ? anchoredSourceSide
+    : null;
+  const targetGeometrySide = pointDistanceToSide(
+    path[path.length - 1],
+    targetRect,
+    anchoredTargetSide,
+  ) <= DISPLAY_ENDPOINT_BOUNDARY_TOLERANCE
+    && segmentLeavesTowardSide(
+      path[path.length - 1],
+      path[path.length - 2],
+      anchoredTargetSide,
+    )
+    ? anchoredTargetSide
+    : null;
+  const sourceHandleMaterialized = Boolean(
+    !requestedSourceSide
+    && sourceGeometrySide
+    && edgeTerminalSideCanSwitch(edge, 'source', sourceGeometrySide),
+  );
+  const targetHandleMaterialized = Boolean(
+    !requestedTargetSide
+    && targetGeometrySide
+    && edgeTerminalSideCanSwitch(edge, 'target', targetGeometrySide),
+  );
   const sourceHandleChanged = Boolean(
-    sourceAnchored
-    && requestedSourceSide
-    && requestedSourceSide !== anchoredSourceSide
-    && edgeTerminalSideCanSwitch(edge, 'source', anchoredSourceSide)
+    sourceHandleMaterialized
+    || (
+      sourceAnchored
+      && requestedSourceSide
+      && requestedSourceSide !== anchoredSourceSide
+      && edgeTerminalSideCanSwitch(edge, 'source', anchoredSourceSide)
+    )
   );
   const targetHandleChanged = Boolean(
-    targetAnchored
-    && requestedTargetSide
-    && requestedTargetSide !== anchoredTargetSide
-    && edgeTerminalSideCanSwitch(edge, 'target', anchoredTargetSide)
+    targetHandleMaterialized
+    || (
+      targetAnchored
+      && requestedTargetSide
+      && requestedTargetSide !== anchoredTargetSide
+      && edgeTerminalSideCanSwitch(edge, 'target', anchoredTargetSide)
+    )
   );
   const sourceChanged = sourceAnchored || sourceHandleChanged;
   const targetChanged = targetAnchored || targetHandleChanged;
   if (!sourceChanged && !targetChanged) return edge;
   const sourceHandle = sourceHandleChanged
-    ? resolveEdgeTerminalHandleForSide(edge, 'source', anchoredSourceSide)
+    ? resolveEdgeTerminalHandleForSide(
+      edge,
+      'source',
+      sourceGeometrySide ?? anchoredSourceSide,
+    )
     : edge.sourceHandle;
   const targetHandle = targetHandleChanged
-    ? resolveEdgeTerminalHandleForSide(edge, 'target', anchoredTargetSide)
+    ? resolveEdgeTerminalHandleForSide(
+      edge,
+      'target',
+      targetGeometrySide ?? anchoredTargetSide,
+    )
     : edge.targetHandle;
   const treeRouting = data.treeRouting && Array.isArray(data.treeRouting.points)
     ? {

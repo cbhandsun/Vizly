@@ -22,6 +22,7 @@ import {
   toSmartDisplayEdge,
 } from './baseReactFlowDisplayEdgeCore';
 import { compactDisplayEdgePaths } from './baseReactFlowDisplayGeometry';
+import { materializeDisplayTerminalHandles } from './baseReactFlowDisplayTerminalCommit';
 import {
   chooseDisplayStrictPolishCandidate,
   chooseFinalObstacleAwarePolishCandidate,
@@ -31,6 +32,7 @@ import {
   type DisplayQualityBudget,
   type DisplaySoftQualityOptions,
 } from './baseReactFlowDisplayEvaluation';
+import { repairBusinessNodeClearanceRisks } from '../../strategies/shared/edgeBusinessNodeClearanceRepair';
 import {
   finishDisplaySoftQuality,
   repairDisplayObstacleHits,
@@ -83,6 +85,28 @@ const finishDisplayQuality = <T extends Edge[]>(edges: T, nodes: Node[]): T => {
   return chooseFinalVisualPolishCandidate(swept, finalMicro);
 };
 
+const closeBusinessNodeClearanceTransaction = (
+  edges: Edge[],
+  nodes: Node[],
+): Edge[] => {
+  const clearanceCandidate = repairBusinessNodeClearanceRisks(edges, nodes, {
+    allowTransientStrictCrossing: true,
+  });
+  const residualCandidate = repairFinalResidualStrictCrossings(clearanceCandidate, nodes);
+  const directionalCandidate = repairEndpointOrthogonalPaths(
+    repairStrictCrossingsWithDirectionalOuterLanes(residualCandidate, nodes),
+    nodes,
+  );
+  return repairFinalResidualStrictCrossings(
+    chooseDirectionalOuterLaneCandidate(
+      nodes,
+      residualCandidate,
+      directionalCandidate,
+    ),
+    nodes,
+  );
+};
+
 const finishFastDisplayEdgesForRenderMode = ({
   finalQualityEdges,
   rawEdges,
@@ -113,6 +137,57 @@ const finishFastDisplayEdgesForRenderMode = ({
   const microCleaned = repairDisplayMicroArtifacts(terminalReadableEdges) as Edge[];
   const residualStrictCleaned = repairFinalResidualStrictCrossings(microCleaned, repairNodes);
   return markBaseDisplayFinalized(compactDisplayEdgePaths(residualStrictCleaned), inputSignature);
+};
+
+/**
+ * Commits an already quality-validated route to the renderer selected by the
+ * current display mode without running another geometry-polish transaction.
+ *
+ * Full-route safety phases can finish early after closing their last hard
+ * defect. Those candidates are geometrically final, but they still need the
+ * same smart/basic/canvas conversion as the normal post-render path. Keeping
+ * this conversion separate prevents an early safety exit from leaking raw
+ * edge types while also preserving an accepted shared-trunk transaction.
+ */
+export const commitDisplayEdgesForRenderMode = ({
+  finalQualityEdges,
+  rawEdges,
+  enableSmartEdges,
+  smartEdgePadding,
+  isLargeGraph,
+  inputSignature,
+  nodes,
+}: {
+  finalQualityEdges: Edge[];
+  rawEdges: Edge[];
+  enableSmartEdges: boolean;
+  smartEdgePadding: number;
+  isLargeGraph: boolean;
+  inputSignature: string;
+  nodes: Node[];
+}): Edge[] => {
+  const committedQualityEdges = materializeDisplayTerminalHandles(finalQualityEdges, nodes);
+  if (isLargeGraph) {
+    return markBaseDisplayFinalized(
+      committedQualityEdges.map(edge => (
+        String(edge.type || '').toLowerCase() === 'canvas-ref'
+          ? edge
+          : toCanvasRefEdge(edge)
+      )),
+      inputSignature,
+    );
+  }
+  const displayEdges = enableSmartEdges && Number.isFinite(smartEdgePadding)
+    ? committedQualityEdges.map((edge, index) => toSmartDisplayEdge({
+      edge,
+      rawEdge: rawEdges[index] ?? edge,
+      smartEdgePadding,
+    }))
+    : committedQualityEdges.map((edge, index) => toBasicDisplayEdge({
+      edge,
+      rawEdge: rawEdges[index] ?? edge,
+    }));
+  return markBaseDisplayFinalized(displayEdges, inputSignature);
 };
 
 const finishBoundedHardDisplayEdgesForRenderMode = ({
@@ -146,7 +221,12 @@ const finishBoundedHardDisplayEdgesForRenderMode = ({
     }));
   const readableEdges = restoreReadableRawLockedPaths(displayEdges, rawEdges, repairNodes);
   const terminalReadableEdges = repairTerminalBoundaryStairs(readableEdges, repairNodes);
-  const obstacleCleaned = repairDisplayObstacleHits(terminalReadableEdges, repairNodes, layoutDirection, finalSoft);
+  const obstacleCleaned = repairDisplayObstacleHits(
+    terminalReadableEdges,
+    repairNodes,
+    layoutDirection,
+    finalSoft,
+  );
   const obstacleMicroCleaned = repairDisplayMicroArtifacts(obstacleCleaned) as Edge[];
   const residualCleaned = hasHardDisplayOverlapRisk(calculateEdgePathQualityScore(obstacleMicroCleaned))
     ? repairResidualDisplayOverlaps(
@@ -281,8 +361,30 @@ export const finishInteractiveDisplayEdgesForRenderMode = ({
     postSelectedTerminalCleaned,
     postSelectedTerminalMicroCleaned,
   );
+  const clearanceSafe = repairBusinessNodeClearanceRisks(
+    postSelected,
+    repairNodes,
+    // The interactive frame only needs a safe visual corridor. The final
+    // worker transaction applies the full 48px commercial clearance; using a
+    // 16px preview corridor here avoids adding wide temporary doglegs while a
+    // node is still moving.
+    { minimumClearance: 16, allowTransientStrictCrossing: true },
+  );
+  const clearanceCompacted = repairLocalDoglegArtifacts(
+    clearanceSafe,
+    repairNodes,
+  );
+  const branchClearanceSafe = repairBusinessNodeClearanceRisks(
+    clearanceCompacted,
+    repairNodes,
+    { minimumClearance: 16, allowTransientStrictCrossing: true },
+  );
+  const clearanceStrictSafe = repairFinalResidualStrictCrossings(
+    branchClearanceSafe,
+    repairNodes,
+  );
   return markBaseDisplayFinalized(
-    compactDisplayEdgePaths(repairFinalResidualStrictCrossings(postSelected, repairNodes)),
+    compactDisplayEdgePaths(clearanceStrictSafe),
     inputSignature,
   );
 };
@@ -361,6 +463,37 @@ export const finalizeDisplayEdgesForRenderMode = ({
   inputSignature: string;
   qualityBudget: DisplayQualityBudget;
 }): Edge[] => {
+  if (isLargeGraph && qualityBudget.mode !== 'fast') {
+    const qualityFinishedEdges = finalizeDisplayEdgesForRenderMode({
+      finalQualityEdges,
+      rawEdges,
+      repairNodes,
+      renderNodes,
+      enableSmartEdges,
+      smartEdgePadding,
+      isLargeGraph: false,
+      layoutDirection,
+      inputSignature,
+      qualityBudget,
+    });
+    return markBaseDisplayFinalized(
+      qualityFinishedEdges.map(edge => toCanvasRefEdge(edge)),
+      inputSignature,
+    );
+  }
+  if (qualityBudget.mode === 'bounded' && (finalQualityEdges.length > 24 || repairNodes.length > 36)) {
+    const boundedHardFinished = finishBoundedHardDisplayEdgesForRenderMode({
+      finalQualityEdges,
+      rawEdges,
+      repairNodes,
+      layoutDirection,
+      enableSmartEdges,
+      smartEdgePadding,
+      inputSignature,
+      finalSoft: qualityBudget.finalSoft,
+    });
+    if (boundedHardFinished) return boundedHardFinished;
+  }
   if (isLargeGraph) {
     const containerReadableEdges = repairDisplayContainerBoundaryClearanceRisks(
       finalQualityEdges,
@@ -381,26 +514,16 @@ export const finalizeDisplayEdgesForRenderMode = ({
       inputSignature,
     });
   }
-  if (qualityBudget.mode === 'bounded' && (finalQualityEdges.length > 24 || repairNodes.length > 36)) {
-    const boundedHardFinished = finishBoundedHardDisplayEdgesForRenderMode({
-      finalQualityEdges,
-      rawEdges,
-      repairNodes,
-      layoutDirection,
-      enableSmartEdges,
-      smartEdgePadding,
-      inputSignature,
-      finalSoft: qualityBudget.finalSoft,
-    });
-    if (boundedHardFinished) return boundedHardFinished;
-  }
   if (enableSmartEdges) {
     if (typeof smartEdgePadding !== 'number' || !Number.isFinite(smartEdgePadding)) {
       const finished = finishDisplayQuality(polishRenderedDisplayEdges(finalQualityEdges, repairNodes), renderNodes);
       const softFinished = finishDisplaySoftQuality(finished, repairNodes, layoutDirection, qualityBudget.finalSoft);
       const strictFinished = repairFinalResidualStrictCrossings(softFinished, repairNodes);
       return markBaseDisplayFinalized(
-        repairDisplayContainerBoundaryClearanceRisks(strictFinished, repairNodes),
+        closeBusinessNodeClearanceTransaction(
+          repairDisplayContainerBoundaryClearanceRisks(strictFinished, repairNodes),
+          repairNodes,
+        ),
         inputSignature,
       );
     }
@@ -429,7 +552,10 @@ export const finalizeDisplayEdgesForRenderMode = ({
       repairNodes,
     );
     return markBaseDisplayFinalized(
-      repairDisplayContainerBoundaryClearanceRisks(strictSmartDisplayEdges, repairNodes),
+      closeBusinessNodeClearanceTransaction(
+        repairDisplayContainerBoundaryClearanceRisks(strictSmartDisplayEdges, repairNodes),
+        repairNodes,
+      ),
       inputSignature,
     );
   }
@@ -457,7 +583,10 @@ export const finalizeDisplayEdgesForRenderMode = ({
     repairNodes,
   );
   return markBaseDisplayFinalized(
-    repairDisplayContainerBoundaryClearanceRisks(strictBasicDisplayEdges, repairNodes),
+    closeBusinessNodeClearanceTransaction(
+      repairDisplayContainerBoundaryClearanceRisks(strictBasicDisplayEdges, repairNodes),
+      repairNodes,
+    ),
     inputSignature,
   );
 };

@@ -310,7 +310,7 @@ self.onmessage = (e: MessageEvent) => {
 
         // [Imp-9] Prepare Global Debug Data (VG/SpatialIndex)
         const debugDataExtras: Record<string, unknown> = {};
-        if (unifiedConfig.debug) {
+        if (import.meta.env.DEV && unifiedConfig.debug) {
             // Serialize VG
             if (visibilityGraphCache) {
                 const vg = visibilityGraphCache as VisibilityGraph;
@@ -457,7 +457,7 @@ self.onmessage = (e: MessageEvent) => {
             result.jobId = task.jobId;
 
             // [DEBUG] Attach Global Debug Data (VG/SpatialIndex)
-            if (unifiedConfig.debug && debugDataExtras) {
+            if (import.meta.env.DEV && unifiedConfig.debug) {
                 if (!result.debugInfo) result.debugInfo = { algorithmDebug: {} };
                 if (!result.debugInfo.algorithmDebug) result.debugInfo.algorithmDebug = {};
                 const existingAlgorithmDebug = isRecord(result.debugInfo.algorithmDebug)

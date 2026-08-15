@@ -1,5 +1,19 @@
 import type { Edge, Node } from '@xyflow/react';
+import {
+  collectLineJumpIntersections,
+  injectLineJumps,
+  JUMP_RADIUS,
+  type IntersectionInfo,
+} from '../services/LineJumpEngine';
 import { coerceRenderNumber, computeBezierPath, computeOrthogonalPath, computeStraightPath, normalizeRenderPoint, pointsToSvgPath, resolveEdgeMarker } from './edgeGeometry';
+import {
+  applySharedTrunkPaintPlan,
+  createSharedTrunkBackboneFragments,
+  createSharedTrunkJunctionFragments,
+  createSharedTrunkPaintFragments,
+  normalizeSharedTrunkPaintPoints,
+  readSharedTrunkPaintPlan,
+} from './sharedTrunkPaint';
 import { normalizeSvgFontWeight, normalizeSvgPaint, normalizeSvgStrokeDasharray } from './styleTokens';
 import type { DiagramRenderScene, RenderBounds, RenderEdgeGeometry, RenderNodeGeometry, RenderPoint } from './types';
 
@@ -259,13 +273,147 @@ const edgePointsFromData = (edge: Edge): RenderPoint[] => {
   return rawPoints.map(normalizeRenderPoint).filter((point): point is RenderPoint => !!point);
 };
 
-const buildEdge = (edge: Edge, nodesById: Map<string, RenderNodeGeometry>, warnings: string[]): RenderEdgeGeometry | null => {
-  const renderEdge = edge as RenderFlowEdge;
+/**
+ * Mirrors the canvas-only shared-trunk paint plan in exported scene geometry.
+ * Every member contributes only visible semantic fragments. The canonical
+ * owner additionally contributes markerless backbone fragments, so canvas and
+ * export preserve the same one-paint ownership model.
+ */
+const expandSharedTrunkRenderEdge = (
+  edge: RenderEdgeGeometry,
+  pointsValue: unknown,
+  edgeData: unknown,
+  jumps: readonly IntersectionInfo[],
+): RenderEdgeGeometry[] => {
+  const plan = readSharedTrunkPaintPlan(edgeData);
+  if (!plan || (plan.hiddenRanges.length === 0 && plan.backboneRanges.length === 0)) return [edge];
+
+  const normalizedPoints = normalizeSharedTrunkPaintPoints(pointsValue);
+  if (!normalizedPoints) return [edge];
+  const normalizedPathLength = normalizedPoints.reduce(
+    (total, point, index) => index === 0
+      ? total
+      : total + Math.hypot(
+        point.x - normalizedPoints[index - 1].x,
+        point.y - normalizedPoints[index - 1].y,
+      ),
+    0,
+  );
+  const fragments = createSharedTrunkPaintFragments(pointsValue, plan);
+  const backboneFragments = createSharedTrunkBackboneFragments(pointsValue, plan);
+  const junctionFragments = createSharedTrunkJunctionFragments(pointsValue, plan);
+
+  const fragmentLengths = fragments.map(fragment => fragment.points.reduce(
+    (total, point, index) => index === 0
+      ? total
+      : total + Math.hypot(
+        point.x - fragment.points[index - 1].x,
+        point.y - fragment.points[index - 1].y,
+      ),
+    0,
+  ));
+  const labelFragmentIndex = fragmentLengths.length === 0
+    ? -1
+    : fragmentLengths.reduce(
+      (bestIndex, length, index) => length > fragmentLengths[bestIndex] ? index : bestIndex,
+      0,
+    );
+  const renderFragmentPath = (points: readonly RenderPoint[]): string => (
+    injectLineJumps([...points], [...jumps], JUMP_RADIUS, 0) || pointsToSvgPath(points)
+  );
+
+  const semanticFragments: RenderEdgeGeometry[] = fragments.map((fragment, index) => ({
+    ...edge,
+    points: [...fragment.points],
+    path: renderFragmentPath(fragment.points),
+    // A label belongs to the logical edge, rather than every visible piece.
+    label: index === labelFragmentIndex ? edge.label : '',
+    markerStart: fragment.startsAtSource ? edge.markerStart : { kind: 'none', color: edge.stroke },
+    markerEnd: fragment.endsAtTarget ? edge.markerEnd : { kind: 'none', color: edge.stroke },
+  }));
+  const canonicalBackbones: RenderEdgeGeometry[] = backboneFragments.map((fragment, index) => ({
+    ...edge,
+    id: `${edge.id}::shared-backbone:${index}`,
+    points: [...fragment.points],
+    path: renderFragmentPath(fragment.points),
+    label: '',
+    stroke: fragment.paint.stroke,
+    strokeWidth: fragment.paint.strokeWidth,
+    strokeDasharray: fragment.paint.strokeDasharray || undefined,
+    opacity: fragment.paint.opacity,
+    markerStart: { kind: 'none' as const, color: fragment.paint.stroke },
+    markerEnd: { kind: 'none' as const, color: fragment.paint.stroke },
+    zIndex: edge.zIndex - 0.25,
+  }));
+  const canonicalJunctions: RenderEdgeGeometry[] = junctionFragments.map((fragment, index) => {
+    const junctionStrokeWidth = Math.max(5, fragment.paint.strokeWidth + 2);
+    const points = [
+      { x: fragment.point.x - 0.01, y: fragment.point.y },
+      { x: fragment.point.x + 0.01, y: fragment.point.y },
+    ];
+    return {
+      ...edge,
+      id: `${edge.id}::shared-junction:${index}`,
+      points,
+      path: pointsToSvgPath(points),
+      label: '',
+      stroke: fragment.paint.stroke,
+      strokeWidth: junctionStrokeWidth,
+      strokeDasharray: undefined,
+      opacity: 1,
+      markerStart: { kind: 'none' as const, color: fragment.paint.stroke },
+      markerEnd: { kind: 'none' as const, color: fragment.paint.stroke },
+      zIndex: edge.zIndex - 0.125,
+    };
+  });
+
+  const ownsCanonicalEndpoint = (role: 'source' | 'target'): boolean => (
+    plan.backboneRanges.some(range => (
+      range.role === role
+      && range.ownerEdgeId === edge.id
+      && (role === 'source' ? range.from <= 0.01 : range.to >= normalizedPathLength - 0.01)
+    ))
+  );
+  const needsSourceMarkerCarrier = edge.markerStart.kind !== 'none'
+    && ownsCanonicalEndpoint('source')
+    && !fragments.some(fragment => fragment.startsAtSource);
+  const needsTargetMarkerCarrier = edge.markerEnd.kind !== 'none'
+    && ownsCanonicalEndpoint('target')
+    && !fragments.some(fragment => fragment.endsAtTarget);
+  const markerCarrier: RenderEdgeGeometry[] = needsSourceMarkerCarrier || needsTargetMarkerCarrier
+    ? [{
+      ...edge,
+      id: `${edge.id}::shared-terminal-markers`,
+      label: '',
+      stroke: 'transparent',
+      strokeDasharray: undefined,
+      opacity: 1,
+      markerStart: needsSourceMarkerCarrier
+        ? edge.markerStart
+        : { kind: 'none', color: edge.stroke },
+      markerEnd: needsTargetMarkerCarrier
+        ? edge.markerEnd
+        : { kind: 'none', color: edge.stroke },
+      zIndex: edge.zIndex + 0.25,
+      markerOnly: true,
+    }]
+    : [];
+
+  return [...canonicalBackbones, ...canonicalJunctions, ...semanticFragments, ...markerCarrier];
+};
+
+const buildEdge = (
+  edge: Edge,
+  nodesById: Map<string, RenderNodeGeometry>,
+  warnings: string[],
+  jumpsByEdge: ReadonlyMap<string, readonly IntersectionInfo[]>,
+): RenderEdgeGeometry[] => {
+  const flowEdge = edge as RenderFlowEdge;
   const source = nodesById.get(String(edge.source));
   const target = nodesById.get(String(edge.target));
   if (!source || !target) {
     warnings.push(`edge:${edge.id}:missing-endpoint`);
-    return null;
+    return [];
   }
 
   const style = (edge.style ?? {}) as Record<string, unknown>;
@@ -275,15 +423,19 @@ const buildEdge = (edge: Edge, nodesById: Map<string, RenderNodeGeometry>, warni
   const dataPoints = edgePointsFromData(edge);
   const edgeData = asRecord(edge.data);
   const pathType = String(edgeData.pathType ?? edge.type ?? '').toLowerCase();
-  const path = dataPoints.length >= 2
+  const undecoratedPath = dataPoints.length >= 2
     ? pointsToSvgPath(dataPoints)
     : pathType.includes('bezier')
       ? computeBezierPath(sourcePoint, targetPoint)
       : pathType.includes('step') || pathType.includes('orthogonal') || pathType.includes('smart')
         ? computeOrthogonalPath(sourcePoint, targetPoint)
         : computeStraightPath(sourcePoint, targetPoint);
+  const jumps = jumpsByEdge.get(String(edge.id)) ?? [];
+  const path = dataPoints.length >= 2 && jumps.length > 0
+    ? injectLineJumps(dataPoints, [...jumps], JUMP_RADIUS, 0) || undecoratedPath
+    : undecoratedPath;
 
-  return {
+  const geometry: RenderEdgeGeometry = {
     id: String(edge.id),
     sourceId: String(edge.source),
     targetId: String(edge.target),
@@ -296,10 +448,11 @@ const buildEdge = (edge: Edge, nodesById: Map<string, RenderNodeGeometry>, warni
     strokeWidth: coerceRenderNumber(style.strokeWidth, 1.5, 0.5, 24),
     strokeDasharray: normalizeSvgStrokeDasharray(style.strokeDasharray),
     opacity: coerceRenderNumber(style.opacity, 1, 0, 1),
-    markerStart: resolveEdgeMarker(renderEdge.markerStart, stroke),
-    markerEnd: resolveEdgeMarker(renderEdge.markerEnd, stroke),
-    zIndex: coerceRenderNumber(renderEdge.zIndex, 0, -10_000, 10_000),
+    markerStart: resolveEdgeMarker(flowEdge.markerStart, stroke),
+    markerEnd: resolveEdgeMarker(flowEdge.markerEnd, stroke),
+    zIndex: coerceRenderNumber(flowEdge.zIndex, 0, -10_000, 10_000),
   };
+  return expandSharedTrunkRenderEdge(geometry, dataPoints, edgeData, jumps);
 };
 
 const boundsFromNodes = (nodes: RenderNodeGeometry[], padding: number): RenderBounds => {
@@ -322,7 +475,22 @@ export const buildRenderSceneFromReactFlow = (
   const padding = coerceRenderNumber(options.padding, 40, 0, 400);
   const renderNodes = nodes.map(buildNode).filter((node): node is RenderNodeGeometry => !!node);
   const nodesById = new Map(renderNodes.map(node => [node.id, node]));
-  const renderEdges = edges.map(edge => buildEdge(edge, nodesById, warnings)).filter((edge): edge is RenderEdgeGeometry => !!edge);
+  const displayEdges = applySharedTrunkPaintPlan(edges);
+  const jumpsByEdge = new Map<string, IntersectionInfo[]>();
+  collectLineJumpIntersections(displayEdges.flatMap(edge => {
+    const points = edgePointsFromData(edge);
+    return points.length >= 2 ? [{
+      edgeId: String(edge.id),
+      points,
+      endpointInfo: { source: String(edge.source), target: String(edge.target) },
+    }] : [];
+  })).forEach(jump => {
+    const existing = jumpsByEdge.get(jump.horizontalEdgeId) ?? [];
+    existing.push(jump);
+    jumpsByEdge.set(jump.horizontalEdgeId, existing);
+  });
+  const renderEdges = displayEdges
+    .flatMap(edge => buildEdge(edge, nodesById, warnings, jumpsByEdge));
   const bounds = boundsFromNodes(renderNodes, padding);
 
   const theme = {

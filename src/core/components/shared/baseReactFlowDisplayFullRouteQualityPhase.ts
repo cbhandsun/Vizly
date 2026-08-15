@@ -35,9 +35,13 @@ import {
   repairResidualDisplayOverlaps,
 } from './baseReactFlowDisplayOverlapRepair';
 import {
+  chooseFinalObstacleAwarePolishCandidate,
   chooseFinalVisualPolishCandidate,
   hasHardDisplayOverlapRisk,
+  keepPerEdgeObstacleNonRegressingCandidates,
 } from './baseReactFlowDisplayEvaluation';
+import { finalSameSideTrueTrunksDoNotRegress } from './baseReactFlowDisplayFinalEndpointOrder';
+import { startDisplayRoutingPhaseTrace } from './baseReactFlowDisplayRoutingTrace';
 import type { BaseReactFlowFullRouteContext } from './baseReactFlowDisplayFullRouteTypes';
 
 const repairEndpointOrthogonalPathsTwice = <T extends Edge[]>(
@@ -182,7 +186,13 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
   useBoundedLargeRepair,
   canReusePreparedGlobalRouting,
   reusePreparedGlobalRouting,
+  onPhaseTrace,
 }: BaseReactFlowFullRouteContext): Edge[] => {
+  const globalRouteTimer = startDisplayRoutingPhaseTrace({
+    phase: 'quality-global-route',
+    candidateCount: normalizedEdges.length,
+    onTrace: onPhaseTrace,
+  });
   const globallyRoutedEdges = canReusePreparedGlobalRouting
     ? normalizedEdges
     : reduceEdgeCrossingsWithWaypoints(
@@ -199,6 +209,15 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
       96,
       DISPLAY_DETACHED_OVERLAP_REPAIR_OPTIONS,
     );
+  globalRouteTimer.finish(
+    detachedRoutedEdges === normalizedEdges ? 'skip' : 'accepted',
+    detachedRoutedEdges === normalizedEdges ? 0 : detachedRoutedEdges.length,
+  );
+  const topologyTimer = startDisplayRoutingPhaseTrace({
+    phase: 'quality-topology',
+    candidateCount: detachedRoutedEdges.length,
+    onTrace: onPhaseTrace,
+  });
   const routedEndpointEdges = repairEndpointOrthogonalPathsTwice(detachedRoutedEdges, repairNodes);
   const initialTrunkEdges = synthesizeSharedEndpointTrunks(routedEndpointEdges, { nodes: repairNodes });
   const localTrunkEdges = repairLocalDoglegArtifacts(initialTrunkEdges, repairNodes);
@@ -219,6 +238,15 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
     repairSameNodeInOutCrossings(finalEndpointRepairedEdges, repairNodes),
     repairNodes,
   );
+  topologyTimer.finish(
+    sameNodeRoleRepairedEdges === detachedRoutedEdges ? 'skip' : 'accepted',
+    sameNodeRoleRepairedEdges === detachedRoutedEdges ? 0 : sameNodeRoleRepairedEdges.length,
+  );
+  const crossingSweepTimer = startDisplayRoutingPhaseTrace({
+    phase: 'quality-crossing-sweeps',
+    candidateCount: sameNodeRoleRepairedEdges.length,
+    onTrace: onPhaseTrace,
+  });
   const reverseFlowBypassEdges = repairEndpointOrthogonalPaths(
     repairReverseFlowBypassCrossings(sameNodeRoleRepairedEdges, repairNodes),
     repairNodes,
@@ -334,6 +362,17 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
     finalPreOverlapRepairCandidate,
     finalCrossingRepairCandidate,
   );
+  crossingSweepTimer.finish(
+    finalQualityCandidateEdges === sameNodeRoleRepairedEdges ? 'skip' : 'accepted',
+    finalQualityCandidateEdges === sameNodeRoleRepairedEdges
+      ? 0
+      : finalQualityCandidateEdges.length,
+  );
+  const strictClosureTimer = startDisplayRoutingPhaseTrace({
+    phase: 'quality-strict-closure',
+    candidateCount: finalQualityCandidateEdges.length,
+    onTrace: onPhaseTrace,
+  });
   const finalQualityBaseEdges = countStrictEdgeCrossings(finalQualityCandidateEdges) === 0
     ? finalQualityCandidateEdges
     : (() => {
@@ -390,6 +429,15 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
     if (nextFinalQualityEdges === finalQualityEdges) break;
     finalQualityEdges = nextFinalQualityEdges;
   }
+  strictClosureTimer.finish(
+    finalQualityEdges === finalQualityCandidateEdges ? 'skip' : 'accepted',
+    finalQualityEdges === finalQualityCandidateEdges ? 0 : finalQualityEdges.length,
+  );
+  const polishTimer = startDisplayRoutingPhaseTrace({
+    phase: 'quality-polish',
+    candidateCount: finalQualityEdges.length,
+    onTrace: onPhaseTrace,
+  });
 
   const finalLocalPolishCandidate = repairLocalDoglegArtifacts(finalQualityEdges, repairNodes);
   const finalDetachedPolishCandidate = separateLargeDetachedParallelOverlapsIfNeeded(
@@ -457,7 +505,7 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
     );
   }
   const preFinalizeResidualQuality = calculateEdgePathQualityScore(finalQualityEdges);
-  return hasHardDisplayOverlapRisk(preFinalizeResidualQuality)
+  const residualQualityEdges = hasHardDisplayOverlapRisk(preFinalizeResidualQuality)
     ? repairResidualDisplayOverlaps(
       finalQualityEdges,
       repairNodes,
@@ -469,4 +517,27 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
         : DISPLAY_EXTENDED_RESIDUAL_OVERLAP_REPAIR_OPTIONS,
     )
     : finalQualityEdges;
+  const obstacleSafeQualityEdges = keepPerEdgeObstacleNonRegressingCandidates(
+    normalizedEdges,
+    residualQualityEdges,
+    repairNodes,
+  );
+  const selectedQualityEdges = chooseFinalObstacleAwarePolishCandidate(
+    repairNodes,
+    normalizedEdges,
+    obstacleSafeQualityEdges,
+    residualQualityEdges,
+  );
+  const result = finalSameSideTrueTrunksDoNotRegress(
+    normalizedEdges,
+    selectedQualityEdges,
+    repairNodes,
+  )
+    ? selectedQualityEdges
+    : normalizedEdges;
+  polishTimer.finish(
+    result === finalQualityEdges ? 'skip' : 'accepted',
+    result === finalQualityEdges ? 0 : result.length,
+  );
+  return result;
 };

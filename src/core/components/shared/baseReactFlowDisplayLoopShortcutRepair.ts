@@ -1,6 +1,10 @@
 import type { Edge, Node } from '@xyflow/react';
 
 import { normalizeHandle } from '../../routing/utils/handleUtils';
+import { edgeTerminalPositionIsFixed } from '../../routing/utils/edgeTerminalPolicy';
+import { auditFinalSameSideEndpointOrder } from '../../strategies/shared/edgeFinalSameSideEndpointOrderRepair';
+import { scoreNodeClearanceRisk } from '../../strategies/shared/edgeWaypointCandidateRepair';
+import { compactOrthogonalPath } from './baseReactFlowDisplayEdgeCore';
 import {
   calculateEdgePathQualityScore,
   createEdgePathQualityEvaluationContext,
@@ -13,6 +17,7 @@ import {
   buildSharedNodeTerminalSideCandidates,
 } from './baseReactFlowSharedNodePortRoleRepair';
 import {
+  countDisplayObstacleHits,
   createDisplayObstacleEvaluationContext,
 } from './baseReactFlowDisplayEvaluation';
 import { buildObstacleSkirtCandidates } from './baseReactFlowDisplayObstacleCandidates';
@@ -21,21 +26,16 @@ import {
   collectPathHitObstacleRects,
   displayEdgesRelated,
   displayPathLength,
-  displayRangeOverlap,
   displaySegmentOverlap,
-  displaySegmentsForPath,
   extractDisplaySegments,
   fullDisplayPortSide,
   getDisplayComputedPath,
   getDisplayNodeRect,
-  NEAR_PARALLEL_LANE_TOLERANCE,
-  OBSTACLE_REPAIR_NODE_PADDING,
-  RESIDUAL_PARALLEL_LANE_GAP,
-  shiftDisplayInternalSegment,
   withDisplayComputedPath,
   type DisplayPoint,
 } from './baseReactFlowDisplayGeometry';
 import {
+  displayTerminalRoleNeedsDeclaredAxisRepair,
   displayTerminalSideCanSwitch,
   withDisplayPortBridge,
 } from './baseReactFlowDisplayTerminalPortCandidates';
@@ -43,6 +43,13 @@ import {
   createDisplayTerminalValidationSnapshot,
   getDisplayTerminalValidationReport,
 } from './baseReactFlowTerminalAxisRepair';
+import {
+  buildBlockingEdgeLaneNudgeVariants,
+  buildLoopLaneNudgeVariants,
+  buildStrictBlockingTerminalLaneShiftVariants,
+} from './baseReactFlowDisplayLoopShortcutCandidates';
+
+export { buildStrictBlockingTerminalLaneShiftVariants } from './baseReactFlowDisplayLoopShortcutCandidates';
 
 const hardLoopDefectsDoNotRegress = (
   baseline: EdgePathQualityScore,
@@ -58,7 +65,21 @@ const hardLoopDefectsDoNotRegress = (
   && candidate.hairpins <= baseline.hairpins
 );
 
-const loopDefectScore = (quality: EdgePathQualityScore): number => (
+const commercialDetourDefectScore = (edges: readonly Edge[]): number => edges.reduce(
+  (score, edge) => {
+    const path = getDisplayComputedPath(edge);
+    if (path.length < 4) return score;
+    const first = path[0];
+    const last = path[path.length - 1];
+    const direct = Math.abs(last.x - first.x) + Math.abs(last.y - first.y);
+    const length = displayPathLength(path);
+    if (direct <= 0 || length - direct < 96 || length / direct <= 1.25) return score;
+    return score + 1_000_000 + Math.max(0, length - direct * 1.25) * 100;
+  },
+  0,
+);
+
+const loopDefectScore = (quality: EdgePathQualityScore, edges: readonly Edge[]): number => (
   quality.nonOrthogonalSegments * 1_000_000_000
   + quality.strictCrossings * 100_000_000
   + quality.hairpins * 10_000_000
@@ -67,176 +88,132 @@ const loopDefectScore = (quality: EdgePathQualityScore): number => (
   + quality.unexplainedRelatedOverlap * 10_000
   + quality.shortEndpointStubs * 1_000_000
   + quality.tinyInteriorDoglegs * 500_000
+  + commercialDetourDefectScore(edges)
   + quality.detourPenalty * 10
   + quality.totalLength * 0.01
 );
 
-const buildLoopLaneNudgeVariants = (
+export const buildTerminalPreservingDirectShortcutCandidates = (
   path: DisplayPoint[],
-  edgeIndex: number,
-  edges: Edge[],
-  maxCandidates = 8,
 ): DisplayPoint[][] => {
-  const otherSegments = extractDisplaySegments(edges)
-    .filter(segment => segment.edgeIndex !== edgeIndex);
-  const variants: DisplayPoint[][] = [];
+  if (path.length < 5) return [];
+  const source = path[0];
+  const sourceStubEnd = path[1];
+  const targetStubStart = path[path.length - 2];
+  const target = path[path.length - 1];
+  const candidates = [
+    compactOrthogonalPath([
+      source,
+      sourceStubEnd,
+      { x: targetStubStart.x, y: sourceStubEnd.y },
+      targetStubStart,
+      target,
+    ]),
+    compactOrthogonalPath([
+      source,
+      sourceStubEnd,
+      { x: sourceStubEnd.x, y: targetStubStart.y },
+      targetStubStart,
+      target,
+    ]),
+  ];
   const seen = new Set<string>();
-  for (const segment of displaySegmentsForPath(path, edgeIndex)) {
-    if (segment.segmentIndex <= 0 || segment.segmentIndex >= path.length - 2) continue;
-    const segmentLane = segment.axis === 'v' ? segment.a.x : segment.a.y;
-    const mainStart = segment.axis === 'v' ? segment.a.y : segment.a.x;
-    const mainEnd = segment.axis === 'v' ? segment.b.y : segment.b.x;
-    const blockingLanes = otherSegments
-      .filter(other => other.axis === segment.axis)
-      .filter((other) => {
-        const otherLane = other.axis === 'v' ? other.a.x : other.a.y;
-        const otherStart = other.axis === 'v' ? other.a.y : other.a.x;
-        const otherEnd = other.axis === 'v' ? other.b.y : other.b.x;
-        return Math.abs(otherLane - segmentLane) <= NEAR_PARALLEL_LANE_TOLERANCE
-          && displayRangeOverlap(mainStart, mainEnd, otherStart, otherEnd) >= 16;
-      })
-      .map(other => (other.axis === 'v' ? other.a.x : other.a.y));
-    const lanes = [...new Set(blockingLanes.flatMap(blockingLane => (
-      [
-        NEAR_PARALLEL_LANE_TOLERANCE + 1,
-        RESIDUAL_PARALLEL_LANE_GAP,
-        48,
-      ].flatMap(gap => [blockingLane - gap, blockingLane + gap])
-    )))]
-      .sort((first, second) => Math.abs(first - segmentLane) - Math.abs(second - segmentLane));
-    for (const lane of lanes) {
-      const candidate = shiftDisplayInternalSegment(
-        path,
-        segment.segmentIndex,
-        segment.axis,
-        lane,
-      );
-      if (!candidate) continue;
-      const signature = candidate.map(point => `${point.x}:${point.y}`).join('|');
-      if (seen.has(signature)) continue;
-      seen.add(signature);
-      variants.push(candidate);
-      if (variants.length >= maxCandidates) return variants;
-    }
-  }
-  return variants;
+  return candidates.filter((candidate) => {
+    const signature = candidate.map(point => `${point.x}:${point.y}`).join('|');
+    if (seen.has(signature)) return false;
+    seen.add(signature);
+    return candidate.length >= 2;
+  });
 };
 
-const buildBlockingEdgeLaneNudgeVariants = (
+const buildTerminalPreservingObstacleShortcutSeeds = (
   path: DisplayPoint[],
-  edgeIndex: number,
-  edges: Edge[],
-  nodes: Node[],
-  maxCandidates = 8,
-): Array<{ edgeIndex: number; path: DisplayPoint[] }> => {
-  const candidateSegments = displaySegmentsForPath(path, edgeIndex);
-  const otherSegments = extractDisplaySegments(edges)
-    .filter(segment => segment.edgeIndex !== edgeIndex);
-  const variants: Array<{ edgeIndex: number; path: DisplayPoint[] }> = [];
+): DisplayPoint[][] => {
+  if (path.length < 5) return [];
+  const source = path[0];
+  const sourceStubEnd = path[1];
+  const targetStubStart = path[path.length - 2];
+  const target = path[path.length - 1];
+  return [
+    [
+      source,
+      sourceStubEnd,
+      { x: targetStubStart.x, y: sourceStubEnd.y },
+      targetStubStart,
+      target,
+    ],
+    [
+      source,
+      sourceStubEnd,
+      { x: sourceStubEnd.x, y: targetStubStart.y },
+      targetStubStart,
+      target,
+    ],
+  ];
+};
+
+const dedupeDisplayPaths = (paths: DisplayPoint[][]): DisplayPoint[][] => {
   const seen = new Set<string>();
-  for (const segment of candidateSegments) {
-    const segmentLane = segment.axis === 'v' ? segment.a.x : segment.a.y;
-    const segmentStart = segment.axis === 'v' ? segment.a.y : segment.a.x;
-    const segmentEnd = segment.axis === 'v' ? segment.b.y : segment.b.x;
-    for (const other of otherSegments) {
-      if (other.axis !== segment.axis) continue;
-      const otherPath = getDisplayComputedPath(edges[other.edgeIndex]);
-      if (other.segmentIndex <= 0 || other.segmentIndex >= otherPath.length - 2) continue;
-      const otherLane = other.axis === 'v' ? other.a.x : other.a.y;
-      const otherStart = other.axis === 'v' ? other.a.y : other.a.x;
-      const otherEnd = other.axis === 'v' ? other.b.y : other.b.x;
-      if (
-        Math.abs(otherLane - segmentLane) > NEAR_PARALLEL_LANE_TOLERANCE
-        || displayRangeOverlap(segmentStart, segmentEnd, otherStart, otherEnd) < 16
-      ) continue;
-      const before = path[segment.segmentIndex - 1];
-      const after = path[segment.segmentIndex + 2];
-      const outerCoordinates = [before, segment.a, segment.b, after]
-        .filter((point): point is DisplayPoint => Boolean(point))
-        .map(point => (segment.axis === 'v' ? point.x : point.y));
-      const minOuterCoordinate = Math.min(...outerCoordinates);
-      const maxOuterCoordinate = Math.max(...outerCoordinates);
-      const localLanes = [
-        NEAR_PARALLEL_LANE_TOLERANCE + 1,
-        RESIDUAL_PARALLEL_LANE_GAP,
-        48,
-      ].flatMap(gap => [segmentLane - gap, segmentLane + gap])
-        .sort((first, second) => Math.abs(first - otherLane) - Math.abs(second - otherLane));
-      const lanes = [...new Set([
-        maxOuterCoordinate + RESIDUAL_PARALLEL_LANE_GAP,
-        minOuterCoordinate - RESIDUAL_PARALLEL_LANE_GAP,
-        ...localLanes,
-      ])];
-      for (const lane of lanes) {
-        const shifted = shiftDisplayInternalSegment(
-          otherPath,
-          other.segmentIndex,
-          other.axis,
-          lane,
-        );
-        if (!shifted) continue;
-        const provisionalEdges = edges.map((edge, provisionalIndex) => (
-          provisionalIndex === edgeIndex
-            ? withDisplayComputedPath(edge, path)
-            : provisionalIndex === other.edgeIndex
-              ? withDisplayComputedPath(edge, shifted)
-              : edge
-        ));
-        const obstacleRects = [...buildDisplayRoutingObstacles(nodes).entries()]
-          .filter(([nodeId]) => (
-            nodeId !== edges[other.edgeIndex].source
-            && nodeId !== edges[other.edgeIndex].target
-          ))
-          .map(([, rect]) => rect);
-        const hitRects = collectPathHitObstacleRects(shifted, obstacleRects);
-        const obstacleLanes = [...new Set(hitRects.flatMap((rect) => {
-          if (other.axis === 'v') {
-            return [
-              rect.x - OBSTACLE_REPAIR_NODE_PADDING - RESIDUAL_PARALLEL_LANE_GAP,
-              rect.x + rect.width + OBSTACLE_REPAIR_NODE_PADDING + RESIDUAL_PARALLEL_LANE_GAP,
-            ];
-          }
-          return [
-            rect.y - OBSTACLE_REPAIR_NODE_PADDING - RESIDUAL_PARALLEL_LANE_GAP,
-            rect.y + rect.height + OBSTACLE_REPAIR_NODE_PADDING + RESIDUAL_PARALLEL_LANE_GAP,
-          ];
-        }))]
-          .filter(obstacleLane => (
-            lane > maxOuterCoordinate
-              ? obstacleLane > maxOuterCoordinate
-              : lane < minOuterCoordinate
-                ? obstacleLane < minOuterCoordinate
-                : true
-          ));
-        const obstacleLaneVariants = obstacleLanes
-          .map(obstacleLane => shiftDisplayInternalSegment(
-            otherPath,
-            other.segmentIndex,
-            other.axis,
-            obstacleLane,
-          ))
-          .filter((candidate): candidate is DisplayPoint[] => Boolean(candidate));
-        const shiftedVariants = [
-          shifted,
-          ...obstacleLaneVariants,
-          ...buildObstacleSkirtCandidates(
-            shifted,
-            nodes,
-            edges[other.edgeIndex],
-            provisionalEdges,
-          ).slice(0, 2),
-        ];
-        for (const shiftedVariant of shiftedVariants) {
-          const signature = `${other.edgeIndex}:${shiftedVariant.map(point => `${point.x}:${point.y}`).join('|')}`;
-          if (seen.has(signature)) continue;
-          seen.add(signature);
-          variants.push({ edgeIndex: other.edgeIndex, path: shiftedVariant });
-          if (variants.length >= maxCandidates) return variants;
-        }
-      }
-    }
-  }
-  return variants;
+  return paths.filter((path) => {
+    const signature = path.map(point => `${point.x}:${point.y}`).join('|');
+    if (seen.has(signature)) return false;
+    seen.add(signature);
+    return true;
+  });
+};
+
+const hasCommerciallyExcessiveDetour = (edges: readonly Edge[]): boolean => edges.some((edge) => {
+  const path = getDisplayComputedPath(edge);
+  if (path.length < 4) return false;
+  const first = path[0];
+  const last = path[path.length - 1];
+  const direct = Math.abs(last.x - first.x) + Math.abs(last.y - first.y);
+  const length = displayPathLength(path);
+  return direct > 0 && length - direct >= 96 && length / direct > 1.25;
+});
+
+const preservesLoopShortcutTrueTrunks = (
+  baseline: readonly Edge[],
+  candidate: readonly Edge[],
+  nodes: Node[],
+  allowCommercialStemReduction = false,
+): boolean => {
+  const before = auditFinalSameSideEndpointOrder(baseline, nodes).legalSharedTrunks;
+  const after = auditFinalSameSideEndpointOrder(candidate, nodes).legalSharedTrunks;
+  return before.every(trunk => after.some(next => (
+    next.nodeId === trunk.nodeId
+    && next.role === trunk.role
+    && next.side === trunk.side
+    && trunk.edgeIds.every(edgeId => next.edgeIds.includes(edgeId))
+    && next.commonStemLength + 1e-6 >= (
+      allowCommercialStemReduction ? 48 : trunk.commonStemLength
+    )
+  )));
+};
+
+const preservesLoopShortcutFixedTerminals = (
+  baseline: readonly Edge[],
+  candidate: readonly Edge[],
+): boolean => {
+  const byId = new Map(candidate.map(edge => [edge.id, edge] as const));
+  const samePoint = (first: DisplayPoint | undefined, second: DisplayPoint | undefined): boolean => (
+    Boolean(first && second)
+    && Math.abs(first!.x - second!.x) <= 0.5
+    && Math.abs(first!.y - second!.y) <= 0.5
+  );
+  return baseline.every((edge, index) => {
+    const next = candidate[index]?.id === edge.id ? candidate[index] : byId.get(edge.id);
+    if (!next) return false;
+    const beforePath = getDisplayComputedPath(edge);
+    const afterPath = getDisplayComputedPath(next);
+    return (!edgeTerminalPositionIsFixed(edge, 'source') || (
+      samePoint(beforePath[0], afterPath[0])
+      && Object.is(edge.sourceHandle, next.sourceHandle)
+    )) && (!edgeTerminalPositionIsFixed(edge, 'target') || (
+      samePoint(beforePath.at(-1), afterPath.at(-1))
+      && Object.is(edge.targetHandle, next.targetHandle)
+    ));
+  });
 };
 
 /**
@@ -249,21 +226,35 @@ export const repairDisplayLoopShortcuts = <T extends Edge[]>(
   edges: T,
   nodes: Node[],
   maxQualityEvaluations = 32,
+  closeStrictCandidate?: (candidate: T) => T,
 ): T => {
   if (maxQualityEvaluations <= 0 || edges.length === 0) return edges;
   const qualityContext = createEdgePathQualityEvaluationContext(edges);
   const obstacleContext = createDisplayObstacleEvaluationContext(edges, nodes);
   const terminalSnapshot = createDisplayTerminalValidationSnapshot(nodes);
+  const nodeById = new Map(nodes.map(node => [node.id, node] as const));
   const baselineQuality = qualityContext.evaluate(edges);
+  const hasExcessiveDetour = hasCommerciallyExcessiveDetour(edges);
+  const detourPolishMode = hasExcessiveDetour
+    && baselineQuality.nonOrthogonalSegments === 0
+    && baselineQuality.strictCrossings === 0
+    && baselineQuality.reverseOverlap === 0
+    && baselineQuality.unrelatedOverlap === 0
+    && baselineQuality.unexplainedRelatedOverlap === 0
+    && baselineQuality.shortEndpointStubs === 0
+    && baselineQuality.tinyInteriorDoglegs === 0
+    && baselineQuality.hairpins === 0;
   if (
     baselineQuality.hairpins === 0
     && baselineQuality.reverseOverlap === 0
     && baselineQuality.unrelatedOverlap === 0
     && baselineQuality.unexplainedRelatedOverlap === 0
     && baselineQuality.strictCrossings === 0
+    && !hasExcessiveDetour
   ) return edges;
 
   const baselineObstacleHits = obstacleContext.evaluate(edges);
+  const baselineExactObstacleHits = countDisplayObstacleHits(edges, nodes);
   const baselineTerminalReport = getDisplayTerminalValidationReport(edges, terminalSnapshot);
   const overlapHitsByEdge = new Map<number, number>();
   const graphSegments = extractDisplaySegments(edges);
@@ -315,59 +306,231 @@ export const repairDisplayLoopShortcuts = <T extends Edge[]>(
 
   let best = edges;
   let bestQuality = baselineQuality;
-  let bestScore = loopDefectScore(baselineQuality);
+  let bestScore = loopDefectScore(baselineQuality, edges);
   let evaluations = 0;
+  let strictClosureEvaluations = 0;
+  const collectChangedIndexes = (candidate: T, requestedIndexes: number[]): number[] => (
+    [...new Set([
+      ...requestedIndexes,
+      ...candidate.flatMap((candidateEdge, index) => (
+        candidateEdge !== edges[index] ? [index] : []
+      )),
+    ])]
+  );
   const considerCandidate = (candidate: T, changedIndexes: number[]): boolean => {
     if (evaluations >= maxQualityEvaluations) return false;
     evaluations += 1;
-    const candidateQuality = qualityContext.evaluateChanged(candidate, changedIndexes);
+    const allChangedIndexes = collectChangedIndexes(candidate, changedIndexes);
+    const candidateQuality = qualityContext.evaluateChanged(candidate, allChangedIndexes);
     if (!hardLoopDefectsDoNotRegress(baselineQuality, candidateQuality)) return false;
-    const candidateScore = loopDefectScore(candidateQuality);
+    const candidateScore = loopDefectScore(candidateQuality, candidate);
     if (candidateScore >= bestScore) return false;
-    if (obstacleContext.evaluateKnownChanges(candidate, changedIndexes) > baselineObstacleHits) return false;
+    if (
+      !preservesLoopShortcutTrueTrunks(edges, candidate, nodes, detourPolishMode)
+      || !preservesLoopShortcutFixedTerminals(edges, candidate)
+    ) return false;
+    if (obstacleContext.evaluateKnownChanges(candidate, allChangedIndexes) > baselineObstacleHits) return false;
+    if (countDisplayObstacleHits(candidate, nodes) > baselineExactObstacleHits) return false;
     const candidateTerminalReport = getDisplayTerminalValidationReport(candidate, terminalSnapshot);
     if (
       candidateTerminalReport.allAttached !== baselineTerminalReport.allAttached
       || candidateTerminalReport.allAnchored !== baselineTerminalReport.allAnchored
     ) return false;
+    if (allChangedIndexes.some((index) => {
+      const edge = candidate[index];
+      if (!edge) return true;
+      const sourceNode = nodeById.get(edge.source);
+      const targetNode = nodeById.get(edge.target);
+      const sourceRect = sourceNode ? getDisplayNodeRect(sourceNode) : null;
+      const targetRect = targetNode ? getDisplayNodeRect(targetNode) : null;
+      if (!sourceRect || !targetRect) return true;
+      const path = getDisplayComputedPath(edge);
+      return displayTerminalRoleNeedsDeclaredAxisRepair(edge, path, 'source', sourceRect)
+        || displayTerminalRoleNeedsDeclaredAxisRepair(edge, path, 'target', targetRect);
+    })) return false;
     best = candidate;
     bestQuality = candidateQuality;
     bestScore = candidateScore;
-    return bestQuality.hairpins === 0
+    const hardClean = bestQuality.hairpins === 0
       && bestQuality.strictCrossings === 0
       && bestQuality.reverseOverlap === 0
       && bestQuality.unrelatedOverlap === 0
       && bestQuality.unexplainedRelatedOverlap === 0;
+    return hardClean && (!detourPolishMode || !hasCommerciallyExcessiveDetour(best));
+  };
+  const considerStrictClosedShortcut = (
+    candidate: T,
+    changedIndexes: number[],
+  ): boolean => {
+    if (
+      !detourPolishMode
+      || !closeStrictCandidate
+      || strictClosureEvaluations >= 2
+      || evaluations >= maxQualityEvaluations
+    ) return false;
+    const allChangedIndexes = collectChangedIndexes(candidate, changedIndexes);
+    const candidateQuality = qualityContext.evaluateChanged(candidate, allChangedIndexes);
+    if (
+      candidateQuality.strictCrossings <= baselineQuality.strictCrossings
+      || candidateQuality.strictCrossings > baselineQuality.strictCrossings + 2
+      || candidateQuality.detourPenalty >= baselineQuality.detourPenalty
+      || candidateQuality.nonOrthogonalSegments > baselineQuality.nonOrthogonalSegments
+      || candidateQuality.reverseOverlap > baselineQuality.reverseOverlap
+      || candidateQuality.unrelatedOverlap > baselineQuality.unrelatedOverlap
+      || candidateQuality.unexplainedRelatedOverlap > baselineQuality.unexplainedRelatedOverlap
+      || candidateQuality.shortEndpointStubs > baselineQuality.shortEndpointStubs
+      || candidateQuality.tinyInteriorDoglegs > baselineQuality.tinyInteriorDoglegs
+      || candidateQuality.hairpins > baselineQuality.hairpins
+    ) return false;
+    strictClosureEvaluations += 1;
+    const renderClosed = closeStrictCandidate(candidate);
+    if (
+      !preservesLoopShortcutTrueTrunks(edges, renderClosed, nodes, detourPolishMode)
+      || !preservesLoopShortcutFixedTerminals(edges, renderClosed)
+    ) return false;
+    const closedChangedIndexes = renderClosed.flatMap((edge, index) => (
+      edge !== edges[index] ? [index] : []
+    ));
+    return closedChangedIndexes.length > 0
+      && considerCandidate(renderClosed, closedChangedIndexes);
   };
 
   const reservedPortEvaluations = Math.min(16, Math.max(4, maxQualityEvaluations / 2));
   const loopEvaluationLimit = Math.max(1, maxQualityEvaluations - reservedPortEvaluations);
   loopSearch: for (const { edgeIndex } of rankedEdgeIndexes) {
-    const path = getDisplayComputedPath(edges[edgeIndex]);
-    for (const candidatePath of buildStrictLoopShortcutCandidates(path, 16)) {
+    const perEdgeEvaluationBudget = Math.max(
+      12,
+      Math.floor(loopEvaluationLimit / Math.max(1, rankedEdgeIndexes.length)),
+    );
+    const edgeEvaluationLimit = Math.min(
+      loopEvaluationLimit,
+      evaluations + perEdgeEvaluationBudget,
+    );
+    const edge = best[edgeIndex];
+    const path = getDisplayComputedPath(edge);
+    const directShortcutPaths = detourPolishMode
+      ? buildTerminalPreservingDirectShortcutCandidates(path)
+      : [];
+    const edgeObstacleRects = [...buildDisplayRoutingObstacles(nodes)]
+      .filter(([nodeId]) => nodeId !== edge.source && nodeId !== edge.target)
+      .map(([, rect]) => rect);
+    const obstacleSafeShortcutPaths = detourPolishMode
+      ? dedupeDisplayPaths(buildTerminalPreservingObstacleShortcutSeeds(path)
+        .flatMap(seedPath => {
+          const seedEdges = best.map((candidateEdge, candidateIndex) => (
+            candidateIndex === edgeIndex
+              ? withDisplayComputedPath(candidateEdge, seedPath)
+              : candidateEdge
+          ));
+          return buildObstacleSkirtCandidates(
+            seedPath,
+            nodes,
+            withDisplayComputedPath(edge, seedPath),
+            seedEdges,
+          );
+        }))
+        .map((candidatePath, originalIndex) => ({
+          candidatePath,
+          obstacleHits: collectPathHitObstacleRects(candidatePath, edgeObstacleRects).length,
+          length: displayPathLength(candidatePath),
+          originalIndex,
+        }))
+        .sort((first, second) => (
+          first.obstacleHits - second.obstacleHits
+          || first.length - second.length
+          || first.candidatePath.length - second.candidatePath.length
+          || first.originalIndex - second.originalIndex
+        ))
+        // Clearance scoring checks every path against every business node.
+        // Pre-rank by exact obstacle safety and length so the expensive stage
+        // stays bounded without letting an unsafe short path crowd out a
+        // commercial-clearance lane.
+        .slice(0, 24)
+        .map(entry => ({
+          ...entry,
+          clearanceRisk: scoreNodeClearanceRisk(
+            entry.candidatePath,
+            nodes,
+            withDisplayComputedPath(edge, entry.candidatePath),
+          ),
+        }))
+        .sort((first, second) => (
+          first.obstacleHits - second.obstacleHits
+          || first.clearanceRisk - second.clearanceRisk
+          || first.length - second.length
+          || first.candidatePath.length - second.candidatePath.length
+          || first.originalIndex - second.originalIndex
+        ))
+        .slice(0, 12)
+        .map(entry => entry.candidatePath)
+      : [];
+    const shortcutCandidates = [
+      ...directShortcutPaths,
+      ...obstacleSafeShortcutPaths,
+      ...buildStrictLoopShortcutCandidates(path, 16),
+    ];
+    const edgeEvaluationStart = evaluations;
+    const primaryEvaluationLimit = Math.min(
+      edgeEvaluationLimit,
+      edgeEvaluationStart + (
+        // Tiny atomic repairs rely on paired terminal-lane variants; let that
+        // search keep the whole edge budget instead of accepting a merely
+        // adequate single-edge port switch first.
+        rankedEdgeIndexes.length <= 2
+          ? 0
+          : Math.max(4, Math.ceil(perEdgeEvaluationBudget * 0.75))
+      ),
+    );
+    for (const candidatePath of shortcutCandidates) {
+      if (evaluations >= loopEvaluationLimit) break loopSearch;
+      if (evaluations >= primaryEvaluationLimit) break;
+      const candidate = best.map((candidateEdge, candidateIndex) => (
+        candidateIndex === edgeIndex
+          ? withDisplayComputedPath(candidateEdge, candidatePath)
+          : candidateEdge
+      )) as T;
+      if (considerStrictClosedShortcut(candidate, [edgeIndex])) return best;
+      if (considerCandidate(candidate, [edgeIndex])) return best;
+    }
+    edgeCandidateSearch: for (const candidatePath of shortcutCandidates) {
       const variants = [
-        { mainPath: candidatePath, paired: null },
-        ...buildLoopLaneNudgeVariants(candidatePath, edgeIndex, edges)
-          .map(mainPath => ({ mainPath, paired: null })),
-        ...buildBlockingEdgeLaneNudgeVariants(candidatePath, edgeIndex, edges, nodes)
+        ...(detourPolishMode
+          ? buildStrictBlockingTerminalLaneShiftVariants(
+            candidatePath,
+            edgeIndex,
+            best,
+            nodes,
+          ).map(paired => ({ mainPath: candidatePath, paired }))
+          : []),
+        ...buildLoopLaneNudgeVariants(candidatePath, edgeIndex, best)
+          .map(nudgedPath => ({ mainPath: nudgedPath, paired: null })),
+        ...buildBlockingEdgeLaneNudgeVariants(candidatePath, edgeIndex, best, nodes)
           .map(paired => ({ mainPath: candidatePath, paired })),
       ];
       for (const { mainPath, paired } of variants) {
         if (evaluations >= loopEvaluationLimit) break loopSearch;
-        const candidate = edges.map((edge, index) => (
+        if (evaluations >= edgeEvaluationLimit) break edgeCandidateSearch;
+        const candidate = best.map((edge, index) => (
           index === edgeIndex
             ? withDisplayComputedPath(edge, mainPath)
             : index === paired?.edgeIndex
-              ? withDisplayComputedPath(edge, paired.path)
+              ? paired.sourceSide && paired.targetSide
+                ? withDisplayPortBridge(
+                  edge,
+                  paired.path,
+                  paired.sourceSide,
+                  paired.targetSide,
+                )
+                : withDisplayComputedPath(edge, paired.path)
               : edge
         )) as T;
         const changedIndexes = paired ? [edgeIndex, paired.edgeIndex] : [edgeIndex];
+        if (considerStrictClosedShortcut(candidate, changedIndexes)) return best;
         if (considerCandidate(candidate, changedIndexes)) return best;
       }
     }
   }
 
-  const nodeById = new Map(nodes.map(node => [node.id, node] as const));
   const routingObstacleRects = [...buildDisplayRoutingObstacles(nodes).values()];
   const outerBounds = routingObstacleRects.length > 0
     ? {

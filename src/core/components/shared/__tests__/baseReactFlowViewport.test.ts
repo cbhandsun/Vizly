@@ -17,11 +17,25 @@ describe('baseReactFlowViewport', () => {
       viewport: { x: 0, y: 0, zoom: 0.3 },
     });
     expect(container.classList.contains('diagram-zoomed-out')).toBe(true);
+    expect(container.style.getPropertyValue('--diagram-edge-label-scale')).toBe('2.400');
 
     syncBaseReactFlowZoomClass({
       container,
       viewport: { x: 0, y: 0, zoom: 0.8 },
     });
+    expect(container.classList.contains('diagram-zoomed-out')).toBe(false);
+    expect(container.style.getPropertyValue('--diagram-edge-label-scale')).toBe('1.000');
+  });
+
+  it('coerces invalid zoom to a safe label scale', () => {
+    const container = document.createElement('div');
+
+    syncBaseReactFlowZoomClass({
+      container,
+      viewport: { x: 0, y: 0, zoom: Number.NaN },
+    });
+
+    expect(container.style.getPropertyValue('--diagram-edge-label-scale')).toBe('1.000');
     expect(container.classList.contains('diagram-zoomed-out')).toBe(false);
   });
 

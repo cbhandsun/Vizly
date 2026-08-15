@@ -431,7 +431,9 @@ export function useSmartEdgeRouting(props: EdgeProps): UseSmartEdgeRoutingReturn
       return { x, y };
   })();
 
-  const isGlobalDebugMode = typeof window !== 'undefined' && window.localStorage?.getItem('__diagram_debug_mode__') === 'true';
+  const isGlobalDebugMode = import.meta.env.DEV
+    && typeof window !== 'undefined'
+    && window.localStorage?.getItem('__diagram_debug_mode__') === 'true';
   const shouldRenderDebugVisuals = edgeConfig.debug && isGlobalDebugMode;
   const shouldRenderPortHeatmap = edgeConfig.debugPortHeatmap && isGlobalDebugMode;
 

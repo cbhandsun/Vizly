@@ -166,8 +166,18 @@ export function buildObstacleMap(nodes: ReactFlowNode[]): Map<string, Rect> {
 
 export function totalObstacleHits(edges: Edge[], obstacles: Map<string, Rect>): number {
   return edges.reduce((total, edge) => (
-    total + countRoutingObstacleHits(getEdgePath(edge), edge, obstacles)
+    total + countEdgeObstacleHits(edge, obstacles)
   ), 0);
+}
+
+/**
+ * Exact per-edge obstacle contribution used by baseline-relative candidate
+ * evaluation. Shared-endpoint candidates replace one immutable edge at a
+ * time, so rescanning every unchanged route and obstacle for each candidate
+ * only adds cost and cannot change the resulting total.
+ */
+export function countEdgeObstacleHits(edge: Edge, obstacles: Map<string, Rect>): number {
+  return countRoutingObstacleHits(getEdgePath(edge), edge, obstacles);
 }
 
 export function hardQualityDoesNotRegress(

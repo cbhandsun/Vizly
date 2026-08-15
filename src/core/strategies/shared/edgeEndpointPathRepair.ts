@@ -10,9 +10,14 @@ import {
   type EndpointRect as Rect,
   type EndpointSide as Side,
 } from './edgeEndpointGeometry';
+import {
+  endpointSegmentHitsUnrelatedNode,
+  pathHitsUnrelatedNode,
+} from './edgeEndpointPathObstacle';
 
 const EPS = 0.5;
 const MIN_CONSTRAINED_STUB = 18;
+const MIN_INTERIOR_BRIDGE_SEGMENT = 24;
 const MIN_STUB = 32;
 const MIN_PREFERRED_STUB = 48;
 const MAX_STUB = 96;
@@ -425,9 +430,34 @@ function samePath(first: Point[], second: Point[]): boolean {
     ));
 }
 
+function avoidTinyEndpointBridgeRemainder(
+  path: Point[],
+  side: Side,
+  requestedLength: number,
+  endpoint: EndpointKind,
+): number {
+  if (path.length < 3) return requestedLength;
+  const anchor = endpoint === 'source' ? path[0] : path[path.length - 1];
+  const adjacent = endpoint === 'source' ? path[1] : path[path.length - 2];
+  const nextTurn = endpoint === 'source' ? path[2] : path[path.length - 3];
+  if (!isTangentialEndpointSegment(anchor, adjacent, side)) return requestedLength;
+  const availableLength = projectedDistance(anchor, side, nextTurn);
+  const remainder = availableLength - requestedLength;
+  if (
+    availableLength < MIN_CONSTRAINED_STUB + MIN_INTERIOR_BRIDGE_SEGMENT
+    || remainder <= EPS
+    || remainder >= MIN_INTERIOR_BRIDGE_SEGMENT
+  ) return requestedLength;
+  return Math.max(
+    MIN_CONSTRAINED_STUB,
+    Math.floor((availableLength - MIN_INTERIOR_BRIDGE_SEGMENT) * 100) / 100,
+  );
+}
+
 function repairStart(path: Point[], side: Side, stubLength: number): Point[] {
   if (path.length < 2) return path;
-  const stub = outwardPoint(path[0], side, stubLength);
+  const safeStubLength = avoidTinyEndpointBridgeRemainder(path, side, stubLength, 'source');
+  const stub = outwardPoint(path[0], side, safeStubLength);
   const preferVerticalFirst = side === 'l' || side === 'r';
 
   if (endpointDirectionOk(path[0], path[1], side)) {
@@ -446,7 +476,8 @@ function repairStart(path: Point[], side: Side, stubLength: number): Point[] {
 function repairStartWithContext(path: Point[], side: Side, stubLength: number, forceShorten: boolean): Point[] {
   if (!forceShorten) return repairStart(path, side, stubLength);
   if (path.length < 3) return repairStart(path, side, stubLength);
-  const stub = outwardPoint(path[0], side, stubLength);
+  const safeStubLength = avoidTinyEndpointBridgeRemainder(path, side, stubLength, 'source');
+  const stub = outwardPoint(path[0], side, safeStubLength);
   const preferVerticalFirst = side === 'l' || side === 'r';
   return compactPath([path[0], stub, ...bridgePoints(stub, path[2], preferVerticalFirst), ...path.slice(3)]);
 }
@@ -455,7 +486,8 @@ function repairEnd(path: Point[], side: Side, stubLength: number): Point[] {
   if (path.length < 2) return path;
   const end = path[path.length - 1];
   const previous = path[path.length - 2];
-  const stub = outwardPoint(end, side, stubLength);
+  const safeStubLength = avoidTinyEndpointBridgeRemainder(path, side, stubLength, 'target');
+  const stub = outwardPoint(end, side, safeStubLength);
   const preferVerticalFirst = side === 't' || side === 'b';
 
   if (endpointDirectionOk(end, previous, side)) {
@@ -489,7 +521,8 @@ function repairEndWithContext(path: Point[], side: Side, stubLength: number, for
   if (!forceShorten) return repairEnd(path, side, stubLength);
   if (path.length < 3) return repairEnd(path, side, stubLength);
   const end = path[path.length - 1];
-  const stub = outwardPoint(end, side, stubLength);
+  const safeStubLength = avoidTinyEndpointBridgeRemainder(path, side, stubLength, 'target');
+  const stub = outwardPoint(end, side, safeStubLength);
   const beforePrevious = path[path.length - 3];
   const preferVerticalFirst = side === 't' || side === 'b';
   return compactPath([
@@ -499,50 +532,6 @@ function repairEndWithContext(path: Point[], side: Side, stubLength: number, for
     stub,
     end,
   ]);
-}
-
-function isContainerNode(node: ReactFlowNode | undefined): boolean {
-  return new Set(['titleGroup', 'subGroup', 'group', 'domain', 'subDomain', 'swimlane'])
-    .has(String(node?.type ?? ''));
-}
-
-function segmentIntersectsRect(a: Point, b: Point, rect: Rect, padding = 12): boolean {
-  const x1 = rect.x - padding;
-  const y1 = rect.y - padding;
-  const x2 = rect.x + rect.width + padding;
-  const y2 = rect.y + rect.height + padding;
-  if (Math.abs(a.y - b.y) <= EPS) {
-    const y = a.y;
-    if (y < y1 || y > y2) return false;
-    return Math.max(Math.min(a.x, b.x), x1) < Math.min(Math.max(a.x, b.x), x2);
-  }
-  if (Math.abs(a.x - b.x) <= EPS) {
-    const x = a.x;
-    if (x < x1 || x > x2) return false;
-    return Math.max(Math.min(a.y, b.y), y1) < Math.min(Math.max(a.y, b.y), y2);
-  }
-  return false;
-}
-
-function endpointSegmentHitsUnrelatedNode(
-  edge: Edge,
-  a: Point,
-  b: Point,
-  nodeById: Map<string, ReactFlowNode>,
-): boolean {
-  for (const node of nodeById.values()) {
-    if (node.id === edge.source || node.id === edge.target || isContainerNode(node)) continue;
-    const rect = nodeRect(node);
-    if (rect && segmentIntersectsRect(a, b, rect, 2)) return true;
-  }
-  return false;
-}
-
-function pathHitsUnrelatedNode(edge: Edge, path: Point[], nodeById: Map<string, ReactFlowNode>): boolean {
-  for (let index = 0; index < path.length - 1; index += 1) {
-    if (endpointSegmentHitsUnrelatedNode(edge, path[index], path[index + 1], nodeById)) return true;
-  }
-  return false;
 }
 
 function countPathCrossingsAgainstOthers(path: Point[], edgeKey: string, edgePaths: EdgePathContext[]): number {

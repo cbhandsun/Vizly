@@ -212,14 +212,16 @@ export function refineLayout(
     groupCount,
   };
 
-  safeLog.debug(
-    `[LayoutRefinement] ${groupCount > 0 ? `${groupCount} groups | ` : ''}` +
-    `${totalLayers} layers | ` +
-    `channel: +${totalChannelSpacing} | ` +
-    `crossings: ${totalCrossingsBefore}→${totalCrossingsAfter} | ` +
-    `nudges: ${totalNudges} | ` +
-    `${stats.durationMs.toFixed(1)}ms`,
-  );
+  if (import.meta.env.DEV) {
+    safeLog.debug(
+      `[LayoutRefinement] ${groupCount > 0 ? `${groupCount} groups | ` : ''}` +
+      `${totalLayers} layers | ` +
+      `channel: +${totalChannelSpacing} | ` +
+      `crossings: ${totalCrossingsBefore}→${totalCrossingsAfter} | ` +
+      `nudges: ${totalNudges} | ` +
+      `${stats.durationMs.toFixed(1)}ms`,
+    );
+  }
 
   return { nodes: finalNodes, stats };
 }

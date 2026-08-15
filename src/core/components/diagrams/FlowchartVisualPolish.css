@@ -18,6 +18,9 @@
     --flow-visual-edge-label-bg: rgba(255, 255, 255, 0.96);
     --flow-visual-edge-label-border: rgba(100, 116, 139, 0.24);
     --flow-visual-edge-label-text: #334155;
+    --flow-visual-edge-hover-width: 2.25px;
+    --flow-visual-edge-selected-width: 2.75px;
+    --flow-visual-edge-peer-opacity: 0.32;
 }
 
 /* Nodes: preserve semantic fills while removing decorative glare and bounce. */
@@ -280,7 +283,10 @@
 
 /* Edges: calm by default, stronger only for hover and selection. */
 .diagram-root .react-flow__edge-path {
-    opacity: 0.86;
+    /* Keep the authored paint fully opaque so its measured non-text contrast
+       matches the canvas/export decision. A blanket translucent "calm" state
+       silently pulled otherwise compliant orange/slate strokes below 3:1. */
+    opacity: 1;
     stroke-linecap: round;
     stroke-linejoin: round;
     transition:
@@ -291,24 +297,164 @@
 }
 
 .diagram-root .react-flow__edge-stablePath .react-flow__edge-path:not([style*='stroke:']) {
-    stroke: #94a3b8;
-    stroke-width: 1.35px;
+    stroke: #64748b;
+    stroke-width: 1.5px;
     filter: none !important;
-    opacity: 0.94;
-}
-
-.diagram-root .react-flow__edge:hover .react-flow__edge-path {
-    stroke: var(--flow-visual-accent) !important;
-    stroke-width: 2.25px !important;
-    filter: drop-shadow(0 1px 2px var(--flow-visual-accent-soft)) !important;
     opacity: 1;
 }
 
-.diagram-root .react-flow__edge.selected .react-flow__edge-path {
+/* Low-contrast semantic strokes keep their authored color on the foreground.
+   A one-pixel, non-scaling neutral underlay supplies the 3:1 boundary; marker
+   shadows extend the same boundary without recoloring React Flow marker defs. */
+.diagram-root .vizly-edge-contrast-underlay {
+    stroke: var(--vizly-edge-contrast-underlay-color) !important;
+    stroke-width: var(--vizly-edge-contrast-underlay-width) !important;
+    opacity: 1 !important;
+    filter: none !important;
+    pointer-events: none;
+    transition: opacity 130ms ease;
+}
+
+.diagram-root .vizly-edge-contrast-marker-outline--dark {
+    /* The filter is attached to the referencing path, so SVG applies it to the
+       path and its marker. Keep the halo inside the crisp 1px underlay budget. */
+    filter: drop-shadow(0 0 0.65px var(--vizly-edge-marker-outline-color, #334155));
+}
+
+.diagram-root .vizly-edge-contrast-marker-outline--light {
+    filter: drop-shadow(0 0 0.65px var(--vizly-edge-marker-outline-color, #f8fafc));
+}
+
+.diagram-root .react-flow__edge:not(:has([data-shared-trunk-state='shared'])):is(
+        :hover,
+        .selected,
+        :focus-visible
+    )
+    .vizly-edge-contrast-underlay {
+    opacity: 0 !important;
+}
+
+.diagram-root .react-flow__edge:hover:not(:has([data-shared-trunk-state='shared']))
+    .react-flow__edge-path {
     stroke: var(--flow-visual-accent) !important;
-    stroke-width: 2.5px !important;
-    filter: drop-shadow(0 1px 2px var(--flow-visual-accent-ring)) !important;
+    stroke-width: var(--flow-visual-edge-hover-width) !important;
+    filter: none !important;
     opacity: 1;
+}
+
+.diagram-root .react-flow__edge.selected:not(:has([data-shared-trunk-state='shared']))
+    .react-flow__edge-path {
+    stroke: var(--flow-visual-accent) !important;
+    stroke-width: var(--flow-visual-edge-selected-width) !important;
+    filter: none !important;
+    opacity: 1;
+}
+
+/* Canonical paint is immutable interaction context. Member state is expressed
+   only by the markerless trace overlay, never by recoloring or dimming the bus. */
+.diagram-root .react-flow__edge .react-flow__edge-path.shared-trunk-canonical-backbone {
+    stroke: var(--vizly-shared-canonical-stroke) !important;
+    stroke-width: var(--vizly-shared-canonical-stroke-width) !important;
+    opacity: var(--vizly-shared-canonical-opacity) !important;
+    filter: none !important;
+}
+
+.diagram-root .react-flow__edge .shared-trunk-canonical-backbone-underlay {
+    opacity: 1 !important;
+    filter: none !important;
+}
+
+/* A true fan-out/fan-in tap is topology, not a line crossing. Render one
+   immutable round junction on the canonical owner so the relationship stays
+   explicit at default, selected, zoomed and exported states. */
+.diagram-root .react-flow__edge .react-flow__edge-path.shared-trunk-junction {
+    stroke: var(--vizly-shared-junction-stroke) !important;
+    stroke-width: var(--vizly-shared-junction-stroke-width) !important;
+    opacity: 1 !important;
+    filter: none !important;
+    pointer-events: none !important;
+}
+
+.diagram-root .react-flow__edge .shared-trunk-junction-underlay {
+    opacity: 1 !important;
+    filter: none !important;
+    pointer-events: none !important;
+}
+
+.diagram-root .react-flow__edge .react-flow__edge-path.shared-trunk-semantic-fragment {
+    stroke: var(--vizly-shared-semantic-stroke) !important;
+    stroke-width: var(--vizly-shared-semantic-stroke-width) !important;
+    opacity: var(--vizly-shared-semantic-opacity) !important;
+    filter: none !important;
+}
+
+.diagram-root .react-flow__edge .react-flow__edge-path.shared-trunk-accent-trace,
+.diagram-root .react-flow__edge .shared-trunk-accent-trace-underlay {
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+.diagram-root .react-flow__edge:is(:hover, .selected, :focus-visible)
+    .react-flow__edge-path.shared-trunk-accent-trace {
+    stroke: var(--flow-visual-accent) !important;
+    stroke-width: var(--vizly-shared-trace-width, 3.5px) !important;
+    opacity: 1 !important;
+    filter: none !important;
+}
+
+/* Active-route terminals make the full source-to-target relationship legible
+   without permanently adding dots to a dense canvas. The non-scaling outline
+   stays crisp while the ring itself follows the diagram zoom. */
+.diagram-root .stable-path-edge-terminals {
+    pointer-events: none;
+}
+
+.diagram-root .stable-path-edge-terminal {
+    fill: rgba(255, 255, 255, 0.92);
+    stroke: var(--flow-visual-accent);
+    stroke-width: 1.75px;
+    opacity: 1;
+    pointer-events: none;
+}
+
+/* The carrier is one transparent geometry path with no interaction sibling.
+   Its filter applies only the contrast boundary around the referenced marker. */
+.diagram-root .react-flow__edge .react-flow__edge-path.shared-trunk-terminal-marker-carrier {
+    stroke: transparent !important;
+    opacity: 1 !important;
+    pointer-events: none !important;
+}
+
+.diagram-root .react-flow__edge
+    .shared-trunk-terminal-marker-carrier:not(.vizly-edge-contrast-marker-outline--dark):not(
+        .vizly-edge-contrast-marker-outline--light
+    ) {
+    filter: none !important;
+}
+
+.diagram-root .react-flow__edge
+    .shared-trunk-terminal-marker-carrier.vizly-edge-contrast-marker-outline--dark,
+.diagram-root .react-flow__edge
+    .shared-trunk-terminal-marker-carrier.vizly-edge-contrast-marker-outline--light {
+    filter: drop-shadow(
+        0 0 0.65px var(--vizly-edge-marker-outline-color, #334155)
+    ) !important;
+}
+
+/* Trace hierarchy: the active route stays structurally prominent while peers
+   recede without changing their geometry, handles, or path signatures. */
+.diagram-root:has(.react-flow__edge:is(:hover, .selected, :focus-visible))
+    .react-flow__edge:not(:is(:hover, .selected, :focus-visible))
+    .react-flow__edge-path:not(.shared-trunk-canonical-backbone):not(
+        .shared-trunk-terminal-marker-carrier
+    ):not(.shared-trunk-accent-trace):not(.shared-trunk-junction),
+.diagram-root:has(.react-flow__edge:is(:hover, .selected, :focus-visible))
+    .react-flow__edge:not(:is(:hover, .selected, :focus-visible))
+    .vizly-edge-contrast-underlay:not(.shared-trunk-canonical-backbone-underlay):not(
+        .shared-trunk-accent-trace-underlay
+    ):not(.shared-trunk-junction-underlay) {
+    opacity: var(--flow-visual-edge-peer-opacity) !important;
+    transition: opacity 130ms ease;
 }
 
 .diagram-root .edge-glow-path {
@@ -358,11 +504,9 @@
     color: var(--flow-visual-edge-label-text) !important;
     background: var(--flow-visual-edge-label-bg);
     border: 1px solid var(--flow-visual-edge-label-border);
-    border-radius: 7px;
+    border-radius: 4px;
     padding: 3px 8px;
-    box-shadow: 0 2px 6px -3px rgba(15, 23, 42, 0.22);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.1);
     font-size: 11px;
     font-weight: 600;
     letter-spacing: 0;
@@ -371,10 +515,39 @@
 
 .diagram-root .stable-path-edge-label {
     padding: 2px 6px;
-    border-radius: 6px;
-    font-size: 12px;
+    border-radius: 4px;
+    font-size: 11px;
     font-weight: 600;
     white-space: nowrap;
+    transition:
+        opacity 130ms ease,
+        border-color 130ms ease,
+        border-width 130ms ease,
+        box-shadow 130ms ease;
+}
+
+.diagram-root:has(.react-flow__edge:is(:hover, .selected, :focus-visible))
+    .stable-path-edge-label:not(.stable-path-edge-label--trace-active) {
+    opacity: 0.48;
+}
+
+.diagram-root .stable-path-edge-label:is(
+    .stable-path-edge-label--trace-active,
+    :hover,
+    :focus-visible
+) {
+    opacity: 1;
+    border-color: var(--flow-visual-accent-ring);
+    border-width: 1px;
+    box-shadow:
+        0 2px 5px -2px rgba(15, 23, 42, 0.24),
+        0 0 0 2px var(--flow-visual-accent-soft);
+    font-weight: 650;
+}
+
+.diagram-root .stable-path-edge-label:focus-visible {
+    outline: 2px solid var(--flow-visual-accent);
+    outline-offset: 2px;
 }
 
 .diagram-root .edge-label-premium:hover {
@@ -437,7 +610,13 @@
 }
 
 [data-theme='dark'] .diagram-root .react-flow__edge-path {
-    opacity: 0.9;
+    opacity: 1;
+}
+
+@media (forced-colors: active) {
+    .diagram-root .vizly-edge-contrast-underlay {
+        stroke: CanvasText !important;
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -449,7 +628,8 @@
     .diagram-root .flowchart-quick-clone-btn,
     .diagram-root .react-flow__edge-path,
     .diagram-root .edge-selected-flow,
-    .diagram-root .edge-label-premium {
+    .diagram-root .edge-label-premium,
+    .diagram-root .stable-path-edge-label {
         animation: none !important;
         transition: none !important;
     }

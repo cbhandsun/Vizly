@@ -26,6 +26,7 @@ import {
 import { getDisplayHardQualityGateReport } from './baseReactFlowDisplayQualityGates';
 import { runFinalAxisTransaction } from './baseReactFlowDisplayFinalAxisTransaction';
 import { finalizeFailClosedDisplayTransaction } from './baseReactFlowDisplayFinalTransaction';
+import { repairResidualOuterPortTransactionWithHardGate } from './baseReactFlowDisplayOuterPortTransaction';
 import type { BaseReactFlowFullRouteContext } from './baseReactFlowDisplayFullRouteTypes';
 
 export const runBaseReactFlowFullRouteTerminalPhase = (
@@ -41,14 +42,49 @@ export const runBaseReactFlowFullRouteTerminalPhase = (
   const finalAttachedCandidate = finalBoundedTerminalReport.allAttached
     ? strictCandidate
     : repairDetachedTerminalsWithBoundedPortRoles(strictCandidate, repairNodes, 24);
-  const finalAxisAnchoredCandidate = anchorComputedDisplayEdgeEndpoints(
+  const directAxisCandidate = compactDisplayEdgePaths(
+    repairAxisMismatchedTerminalsWithBoundedPortRoles(
+      finalAttachedCandidate,
+      repairNodes,
+      Math.min(128, Math.max(32, finalAttachedCandidate.length * 4)),
+    ),
+  );
+  const finalAttachedReport = getDisplayHardQualityGateReport(
     finalAttachedCandidate,
     repairNodes,
+    'polished',
   );
-  const finalAttachedQuality = calculateEdgePathQualityScore(finalAttachedCandidate);
+  const directAxisReport = directAxisCandidate === finalAttachedCandidate
+    ? finalAttachedReport
+    : getDisplayHardQualityGateReport(
+      directAxisCandidate,
+      repairNodes,
+      'polished',
+    );
+  if (
+    directAxisCandidate !== finalAttachedCandidate
+    && directAxisReport.hardClean
+  ) {
+    return markBaseDisplayFinalized(directAxisCandidate, inputSignature);
+  }
+  const finalTerminalBaselineCandidate = (
+    directAxisCandidate !== finalAttachedCandidate
+    && directAxisReport.terminalsAttached
+    && directAxisReport.terminalsAnchored
+    && directAxisReport.obstacleHits <= finalAttachedReport.obstacleHits
+    && visualPolishHardQualityDoesNotRegress(
+      finalAttachedReport.quality,
+      directAxisReport.quality,
+    )
+  ) ? directAxisCandidate : finalAttachedCandidate;
+  const finalAxisAnchoredCandidate = anchorComputedDisplayEdgeEndpoints(
+    finalTerminalBaselineCandidate,
+    repairNodes,
+  );
+  const finalAttachedQuality = calculateEdgePathQualityScore(finalTerminalBaselineCandidate);
   const finalAxisAnchoredQuality = calculateEdgePathQualityScore(finalAxisAnchoredCandidate);
   const baselineTerminalReport = getDisplayTerminalValidationReport(
-    finalAttachedCandidate,
+    finalTerminalBaselineCandidate,
     terminalValidationSnapshot,
   );
   const candidateTerminalReport = getDisplayTerminalValidationReport(
@@ -65,7 +101,7 @@ export const runBaseReactFlowFullRouteTerminalPhase = (
     && candidateTerminalReport.allAttached
   )
     ? finalAxisAnchoredCandidate
-    : finalAttachedCandidate;
+    : finalTerminalBaselineCandidate;
   const finalPortRoleCandidate = repairAxisMismatchedTerminalsWithBoundedPortRoles(
     finalAxisCandidate,
     repairNodes,
@@ -138,6 +174,14 @@ export const runBaseReactFlowFullRouteTerminalPhase = (
       finalAttachedTransactionCandidate,
       finalOrthogonalTransactionCandidate,
     );
+  const finalOuterPortCandidate = repairResidualOuterPortTransactionWithHardGate(
+    finalFallbackTransactionCandidate,
+    repairNodes,
+    64,
+  );
+  if (finalOuterPortCandidate !== finalFallbackTransactionCandidate) {
+    return markBaseDisplayFinalized(finalOuterPortCandidate, inputSignature);
+  }
   return finalizeFailClosedDisplayTransaction(
     finalFallbackTransactionCandidate,
     repairNodes,

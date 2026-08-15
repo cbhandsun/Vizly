@@ -78,6 +78,8 @@ export interface RenderEdgeGeometry {
   markerStart: RenderEdgeMarker;
   markerEnd: RenderEdgeMarker;
   zIndex: number;
+  /** Transparent geometry carrier used to render one shared-trunk endpoint marker. */
+  markerOnly?: boolean;
 }
 
 export interface DiagramRenderScene {

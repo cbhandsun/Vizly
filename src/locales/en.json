@@ -272,53 +272,6 @@
             "aiShort": "AI",
             "settings": "Settings"
         },
-        "debug": {
-            "panel": {
-                "title": "Routing Debugger",
-                "close": "Close",
-                "toggleHint": "Toggle with {{shortcut}}",
-                "tab": {
-                    "perf": "Perf",
-                    "cache": "Cache",
-                    "visual": "Visual"
-                }
-            },
-            "visualizer": {
-                "title": "Pathfinding Visualizer",
-                "close": "Close",
-                "debug": "Debug",
-                "maximize": "Maximize",
-                "restore": "Restore",
-                "edgeIdPlaceholder": "Edge ID (e.g. edge-1)",
-                "selectEdgeHint": "Select an edge to debug it.",
-                "noDebugData": "No debug data",
-                "grid": "Grid",
-                "obstacles": "Obstacles",
-                "vg": "VG",
-                "quadTree": "QuadTree",
-                "legend": {
-                    "obstacle": "Obstacle",
-                    "source": "Source",
-                    "target": "Target",
-                    "lineCross": "Line Cross",
-                    "turn": "Turn",
-                    "buffer": "Buffer",
-                    "visited": "Visited",
-                    "rawPath": "Raw Path"
-                },
-                "stats": {
-                    "strategy": "Strategy: {{value}}",
-                    "grid": "Grid: {{value}}",
-                    "vg": "VG: {{value}}",
-                    "qt": "QT: {{value}}",
-                    "visited": "Visited: {{count}} nodes",
-                    "ports": "Ports: {{source}} → {{target}} | Dir: {{dir}} | Geo: {{geo}} | d=({{dx}},{{dy}})",
-                    "time": "Time: {{ms}}ms",
-                    "steps": "Steps: {{count}}",
-                    "length": "Length: {{value}}"
-                }
-            }
-        },
         "menu": {
             "title": "Diagrams",
             "more": "More",
@@ -626,7 +579,7 @@
             "searchCanvas": "Search canvas content (Ctrl+F)",
             "clearCache": "Reset Local Editor State",
             "clearCacheTitle": "Reset local editor state?",
-            "clearCacheContent": "This resets the flowchart editor’s local UI state and removes the current diagram’s local autosave and custom preset. AI configuration, storage settings, and other diagrams are preserved. This cannot be undone and the page will reload immediately; save or export first if needed.",
+            "clearCacheContent": "This resets the flowchart editor’s local UI state and removes the current diagram’s local autosave, custom preset, generated preset cache, and final routing cache. AI configuration, storage settings, and other diagrams’ content are preserved. This cannot be undone and the page will reload immediately; save or export first if needed.",
             "clearCacheConfirm": "Reset and Reload",
             "clearCacheDiagramUnavailable": "The current diagram could not be identified. Nothing was reset; reopen the diagram and try again.",
             "clearCacheFailed": "The local editor state could not be fully reset. Nothing was reloaded; check browser storage access and try again.",

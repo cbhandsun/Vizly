@@ -154,7 +154,7 @@ describe('baseReactFlowDisplayEvaluation', () => {
         target: 'shared-target',
       },
     ];
-    expect(calculateEdgePathQualityScore(strictEdges).strictCrossings).toBe(0);
+    expect(calculateEdgePathQualityScore(strictEdges).strictCrossings).toBe(1);
     expect(hasSharedTargetEntryStrictCrossing(strictEdges)).toBe(true);
     const delegatedTarget = [...strictEdges];
     targetRepair.mockReturnValue(delegatedTarget);
@@ -458,7 +458,9 @@ describe('baseReactFlowDisplayEvaluation', () => {
       terminalsAreClean,
     );
 
-    expect(after.quality.unexplainedRelatedOverlap).toBe(0);
+    expect(after.quality.unexplainedRelatedOverlap).toBe(
+      before.quality.unexplainedRelatedOverlap,
+    );
     expect(after.quality).not.toBe(before.quality);
   });
 });

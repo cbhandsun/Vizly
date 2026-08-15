@@ -19,7 +19,7 @@ describe('test:ci shard catalog', () => {
   it('keeps every shard in exactly one non-empty CI group', () => {
     const grouped = Object.values(TEST_CI_SHARD_GROUPS).flat();
     expect(TEST_CI_GROUP_NAMES).toEqual(['foundation', 'ui', 'flow', 'core', 'routing']);
-    expect(grouped).toHaveLength(43);
+    expect(grouped).toHaveLength(46);
     expect(new Set(grouped).size).toBe(grouped.length);
     expect(TEST_CI_SHARDS).toEqual(grouped);
     expect(Object.values(TEST_CI_SHARD_GROUPS).every((shards) => shards.length > 0)).toBe(true);
@@ -45,12 +45,12 @@ describe('test:ci shard catalog', () => {
       'test:ci:core-components-shared-flow-logistics',
       'test:ci:routing-services-performance',
     ]);
-    expect(shouldCollectTestCiCoverage('test:ci:routing-services', true)).toBe(true);
+    expect(shouldCollectTestCiCoverage('test:ci:routing-services-core', true)).toBe(true);
     expect(shouldCollectTestCiCoverage('test:ci:routing-services-performance', true)).toBe(false);
-    expect(shouldCollectTestCiCoverage('test:ci:routing-services', false)).toBe(false);
+    expect(shouldCollectTestCiCoverage('test:ci:routing-services-core', false)).toBe(false);
     expect(isTestCiTimingSensitiveShard('test:ci:core-components-shared-flow-logistics')).toBe(true);
-    expect(isTestCiTimingSensitiveShard('test:ci:routing-services')).toBe(false);
-    expect(getTestCiCoverageReportName('test:ci:routing-services')).toBe('test-ci-routing-services');
+    expect(isTestCiTimingSensitiveShard('test:ci:routing-services-core')).toBe(false);
+    expect(getTestCiCoverageReportName('test:ci:routing-services-core')).toBe('test-ci-routing-services-core');
   });
 
   it('isolates the resource-sensitive diagram interactions without slowing the full shard', () => {

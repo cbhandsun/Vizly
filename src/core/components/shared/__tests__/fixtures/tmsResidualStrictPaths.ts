@@ -58,3 +58,24 @@ export const tmsResidualStrictPaths: Record<string, Array<{ x: number; y: number
     { x: 116, y: 1314 }, { x: 116, y: 1386 }, { x: 1407, y: 1386 }, { x: 1407, y: 1707 },
   ],
 };
+
+/** Cold full-route output before crossed-spine closure (2026-08-09). */
+export const tmsCrossedCostSpinePaths: Record<string, Array<{ x: number; y: number }>> = {
+  'edge-cost-bi': [{ x: 1682, y: 2848 }, { x: 1682, y: 2921 }, { x: 1248, y: 2921 }, { x: 1248, y: 3008 }],
+  'edge-driver-tms-execution': [{ x: 1523, y: 1186 }, { x: 1523, y: 1242 }, { x: 1537, y: 1242 }, { x: 1537, y: 1930 }, { x: 1513, y: 1930 }, { x: 1513, y: 1986 }],
+  'edge-fleet-tms-planning': [{ x: 971, y: 1186 }, { x: 971, y: 1259 }, { x: 1466, y: 1259 }, { x: 1466, y: 1708 }],
+  'edge-frp-wms-integration': [{ x: 1627.8, y: 571 }, { x: 1555, y: 571 }, { x: 1555, y: 1010 }, { x: 648, y: 1010 }],
+  'edge-gps-tms-execution': [{ x: 1307.8, y: 571 }, { x: 1572.62, y: 571 }, { x: 1572.62, y: 2034 }, { x: 1512.62, y: 2034 }],
+  'edge-oms-wms-inbound': [{ x: 203.325, y: 571 }, { x: 116, y: 571 }, { x: 116, y: 962 }],
+  'edge-oms-wms-outbound': [{ x: 361, y: 630 }, { x: 361, y: 1145 }, { x: 116, y: 1145 }, { x: 116, y: 1218 }],
+  'edge-analysis-bi': [{ x: 1203.1333333333334, y: 2848 }, { x: 1203.1333333333334, y: 3008 }],
+  'edge-tms-mobile': [{ x: 1438, y: 2314 }, { x: 1438, y: 2193 }, { x: 1523, y: 2193 }, { x: 1523, y: 2092 }, { x: 1795.8, y: 2092 }, { x: 1795.8, y: 253 }, { x: 1706, y: 253 }, { x: 1706, y: 180 }],
+  'edge-tms-performance': [{ x: 1438, y: 2410 }, { x: 1438, y: 2483 }, { x: 1226, y: 2483 }, { x: 1226, y: 2752 }],
+  'edge-tms-carrier': [{ x: 1361, y: 2034 }, { x: -288, y: 2034 }, { x: -288, y: 84 }, { x: 1110, y: 84 }, { x: 1110, y: 132 }, { x: 1174, y: 132 }],
+  'edge-tms-execution-delivery': [{ x: 1373, y: 2082 }, { x: 1373, y: 2314 }],
+  'edge-tms-cost': [{ x: 1500.62, y: 1826 }, { x: 1500.62, y: 1922 }, { x: 1537, y: 1922 }, { x: 1537, y: 2752 }, { x: 1625.8, y: 2752 }],
+  'edge-tms-planning-execution': [{ x: 1436.62, y: 1826 }, { x: 1436.62, y: 1986 }],
+  'edge-upstream-oms': [{ x: 758, y: 168.5 }, { x: 758, y: 225 }, { x: 322, y: 225 }, { x: 322, y: 512 }],
+  'edge-wms-inbound-outbound': [{ x: 116, y: 1058 }, { x: 116, y: 1218 }],
+  'edge-wms-tms-planning': [{ x: 116, y: 1314 }, { x: 116, y: 1767 }, { x: 1348.62, y: 1767 }],
+};

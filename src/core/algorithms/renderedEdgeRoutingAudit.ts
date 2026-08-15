@@ -22,6 +22,42 @@ export interface RenderedAuditEdge {
     target: string;
     path: string;
     labelRect?: RenderedAuditRect;
+    /** Resolved values from the rendered SVG/CSS, not source-edge metadata. */
+    stroke?: unknown;
+    strokeWidth?: unknown;
+    strokeDasharray?: unknown;
+    opacity?: unknown;
+    markerStart?: unknown;
+    markerEnd?: unknown;
+    zoom?: unknown;
+    selected?: unknown;
+    labelVisible?: unknown;
+    /** Optional edge-specific contract used only when presentation auditing is enabled. */
+    expectedPresentation?: unknown;
+}
+
+export type RenderedAuditPresentationField =
+    | 'stroke'
+    | 'strokeWidth'
+    | 'strokeDasharray'
+    | 'opacity'
+    | 'markerStart'
+    | 'markerEnd'
+    | 'zoom'
+    | 'selected'
+    | 'labelVisible';
+
+export interface RenderedAuditPresentationPolicy {
+    requiredFields?: unknown;
+    lowZoomThreshold?: unknown;
+    minimumVisibleOpacity?: unknown;
+    minimumSelectedOpacity?: unknown;
+    minimumSelectedStrokeWidth?: unknown;
+}
+
+export interface RenderedRoutingAuditOptions {
+    /** Disabled by default so existing callers retain the geometry-only audit. */
+    presentation?: boolean | RenderedAuditPresentationPolicy;
 }
 
 export interface RenderedAuditRect {
@@ -39,6 +75,9 @@ export interface RenderedAuditFinding {
     measuredValue?: number;
     relatedNodeIds?: string[];
     relatedEdgeIds?: string[];
+    presentationField?: RenderedAuditPresentationField;
+    actualValue?: string | number | boolean;
+    expectedValue?: string | number | boolean;
     isHardConstraint: boolean;
 }
 
@@ -57,7 +96,6 @@ interface ParsedPathPoint {
 interface Segment {
     a: ParsedPathPoint;
     b: ParsedPathPoint;
-    edgeId: string;
     segmentIndex: number;
     pointCount: number;
 }
@@ -65,10 +103,205 @@ interface Segment {
 type EndpointSide = 'top' | 'right' | 'bottom' | 'left';
 
 const EPS = 1;
+const STRICT_CROSSING_INTERIOR_EPS = 0.5;
 const NODE_NEAR_PATH_WARNING_DISTANCE = 16;
 const PARALLEL_OVERLAP_ERROR_LENGTH = 24;
 const MAIN_AXIS_BACKTRACK_WARNING_DISTANCE = 48;
+const MAX_SHARED_TRUNK_SEGMENTS = 256;
 const CONTAINER_TYPES = new Set(['group', 'subGroup', 'titleGroup', 'domain', 'subDomain', 'swimlane']);
+const PRESENTATION_FIELDS: readonly RenderedAuditPresentationField[] = [
+    'stroke',
+    'strokeWidth',
+    'strokeDasharray',
+    'opacity',
+    'markerStart',
+    'markerEnd',
+    'zoom',
+    'selected',
+    'labelVisible',
+];
+const DEFAULT_REQUIRED_PRESENTATION_FIELDS: readonly RenderedAuditPresentationField[] = [
+    'stroke',
+    'strokeWidth',
+    'opacity',
+    'zoom',
+    'selected',
+    'labelVisible',
+];
+const MAX_PRESENTATION_STRING_LENGTH = 256;
+
+type ParsedPresentationScalar = string | number | boolean;
+
+type ParsedPresentationValue =
+    | { status: 'valid'; value: ParsedPresentationScalar }
+    | { status: 'missing' | 'invalid'; value?: never };
+
+interface ResolvedPresentationPolicy {
+    enabled: boolean;
+    requiredFields: ReadonlySet<RenderedAuditPresentationField>;
+    lowZoomThreshold: number;
+    minimumVisibleOpacity: number;
+    minimumSelectedOpacity: number;
+    minimumSelectedStrokeWidth: number;
+    invalidFields: string[];
+}
+
+const hasOwn = (value: object, key: PropertyKey): boolean =>
+    Object.prototype.hasOwnProperty.call(value, key);
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+    typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const isPresentationField = (value: unknown): value is RenderedAuditPresentationField =>
+    typeof value === 'string' && PRESENTATION_FIELDS.some(field => field === value);
+
+const hasControlCharacter = (value: string): boolean =>
+    [...value].some(character => character.charCodeAt(0) < 32);
+
+const finiteNumber = (
+    value: unknown,
+    minimum: number,
+    maximum: number,
+    allowPx = false,
+    allowPercent = false,
+): number | null => {
+    if (typeof value === 'number') {
+        return Number.isFinite(value) && value >= minimum && value <= maximum ? value : null;
+    }
+    if (typeof value !== 'string' || value.length > 64) return null;
+    const trimmed = value.trim();
+    if (allowPercent && /^[-+]?\d*\.?\d+%$/.test(trimmed)) {
+        const parsedPercent = Number(trimmed.slice(0, -1)) / 100;
+        return Number.isFinite(parsedPercent) && parsedPercent >= minimum && parsedPercent <= maximum
+            ? parsedPercent
+            : null;
+    }
+    const pattern = allowPx ? /^[-+]?\d*\.?\d+(?:e[-+]?\d+)?(?:px)?$/i : /^[-+]?\d*\.?\d+(?:e[-+]?\d+)?$/i;
+    if (!pattern.test(trimmed)) return null;
+    const parsed = Number(allowPx ? trimmed.replace(/px$/i, '') : trimmed);
+    return Number.isFinite(parsed) && parsed >= minimum && parsed <= maximum ? parsed : null;
+};
+
+const parseStroke = (value: unknown): ParsedPresentationValue => {
+    if (value === undefined || value === null) return { status: 'missing' };
+    if (typeof value !== 'string') return { status: 'invalid' };
+    const normalized = value.trim().toLowerCase().replace(/\s+/g, ' ');
+    if (normalized.length === 0 || normalized.length > 128 || /[;{}<>]/.test(normalized) || hasControlCharacter(normalized)) {
+        return { status: 'invalid' };
+    }
+    const isHex = /^#[0-9a-f]{3,8}$/i.test(normalized);
+    const isNamed = /^[a-z][a-z0-9-]{0,31}$/i.test(normalized);
+    const isFunctional = /^(?:rgb|rgba|hsl|hsla)\([0-9.,%+\-\s/]+\)$/i.test(normalized);
+    return isHex || isNamed || isFunctional
+        ? { status: 'valid', value: isFunctional ? normalized.replace(/\s+/g, '') : normalized }
+        : { status: 'invalid' };
+};
+
+const parseDasharray = (value: unknown): ParsedPresentationValue => {
+    if (value === undefined || value === null) return { status: 'valid', value: 'none' };
+    if (typeof value !== 'string' || value.length > MAX_PRESENTATION_STRING_LENGTH) return { status: 'invalid' };
+    const trimmed = value.trim().toLowerCase();
+    if (trimmed === '' || trimmed === 'none' || trimmed === '0' || trimmed === '0px') {
+        return { status: 'valid', value: 'none' };
+    }
+    const tokens = trimmed.split(/[\s,]+/).filter(Boolean);
+    if (tokens.length === 0 || tokens.length > 32) return { status: 'invalid' };
+    const values = tokens.map(token => finiteNumber(token, 0, 10_000, true));
+    if (values.some(item => item === null) || values.every(item => item === 0)) return { status: 'invalid' };
+    return { status: 'valid', value: values.map(item => Number(item).toString()).join(' ') };
+};
+
+const parseMarker = (value: unknown): ParsedPresentationValue => {
+    if (value === undefined || value === null) return { status: 'valid', value: 'none' };
+    if (typeof value !== 'string' || value.length > MAX_PRESENTATION_STRING_LENGTH) return { status: 'invalid' };
+    const normalized = value.trim();
+    if (normalized === '' || normalized.toLowerCase() === 'none') return { status: 'valid', value: 'none' };
+    const match = /^url\(\s*["']?#([A-Za-z][\w:.-]{0,127})["']?\s*\)$/.exec(normalized);
+    return match ? { status: 'valid', value: `url(#${match[1]})` } : { status: 'invalid' };
+};
+
+const parseBoolean = (value: unknown): ParsedPresentationValue => {
+    if (value === undefined || value === null) return { status: 'missing' };
+    if (typeof value === 'boolean') return { status: 'valid', value };
+    if (value === 'true' || value === 'false') return { status: 'valid', value: value === 'true' };
+    return { status: 'invalid' };
+};
+
+const parsePresentationField = (
+    field: RenderedAuditPresentationField,
+    value: unknown,
+): ParsedPresentationValue => {
+    if (field === 'stroke') return parseStroke(value);
+    if (field === 'strokeDasharray') return parseDasharray(value);
+    if (field === 'markerStart' || field === 'markerEnd') return parseMarker(value);
+    if (field === 'selected' || field === 'labelVisible') return parseBoolean(value);
+    if (value === undefined || value === null) return { status: 'missing' };
+    const number = field === 'strokeWidth'
+        ? finiteNumber(value, Number.EPSILON, 64, true)
+        : field === 'opacity'
+            ? finiteNumber(value, 0, 1, false, true)
+            : finiteNumber(value, Number.EPSILON, 32);
+    return number === null ? { status: 'invalid' } : { status: 'valid', value: number };
+};
+
+const policyNumber = (
+    policy: Record<string, unknown>,
+    field: string,
+    fallback: number,
+    minimum: number,
+    maximum: number,
+    invalidFields: string[],
+): number => {
+    if (!hasOwn(policy, field)) return fallback;
+    const parsed = finiteNumber(policy[field], minimum, maximum);
+    if (parsed !== null) return parsed;
+    invalidFields.push(field);
+    return fallback;
+};
+
+const resolvePresentationPolicy = (
+    value: RenderedRoutingAuditOptions['presentation'],
+): ResolvedPresentationPolicy => {
+    const disabled: ResolvedPresentationPolicy = {
+        enabled: false,
+        requiredFields: new Set(),
+        lowZoomThreshold: 0.4,
+        minimumVisibleOpacity: 0.1,
+        minimumSelectedOpacity: 0.85,
+        minimumSelectedStrokeWidth: 2,
+        invalidFields: [],
+    };
+    if (value === undefined || value === false) return disabled;
+
+    const invalidFields: string[] = [];
+    const policy = value === true ? {} : isRecord(value) ? value : {};
+    if (value !== true && !isRecord(value)) invalidFields.push('presentation');
+    let requiredFields: readonly RenderedAuditPresentationField[] = DEFAULT_REQUIRED_PRESENTATION_FIELDS;
+    if (hasOwn(policy, 'requiredFields')) {
+        const candidate = policy.requiredFields;
+        if (Array.isArray(candidate)
+            && candidate.length <= PRESENTATION_FIELDS.length
+            && candidate.every(isPresentationField)) {
+            requiredFields = [...new Set<RenderedAuditPresentationField>(candidate)];
+        } else {
+            invalidFields.push('requiredFields');
+        }
+    }
+    return {
+        enabled: true,
+        requiredFields: new Set(requiredFields),
+        lowZoomThreshold: policyNumber(policy, 'lowZoomThreshold', 0.4, Number.EPSILON, 4, invalidFields),
+        minimumVisibleOpacity: policyNumber(policy, 'minimumVisibleOpacity', 0.1, 0, 1, invalidFields),
+        minimumSelectedOpacity: policyNumber(policy, 'minimumSelectedOpacity', 0.85, 0, 1, invalidFields),
+        minimumSelectedStrokeWidth: policyNumber(policy, 'minimumSelectedStrokeWidth', 2, Number.EPSILON, 64, invalidFields),
+        invalidFields,
+    };
+};
+
+const presentationValuesEqual = (left: ParsedPresentationScalar, right: ParsedPresentationScalar): boolean =>
+    typeof left === 'number' && typeof right === 'number'
+        ? Math.abs(left - right) <= 0.001
+        : left === right;
 
 export function parseRenderedSvgPath(path: string): ParsedPathPoint[] {
     const tokens = [...String(path || '').matchAll(/[a-zA-Z]|[-+]?\d*\.?\d+(?:e[-+]?\d+)?/gi)].map(match => match[0]);
@@ -124,14 +357,14 @@ export function parseRenderedSvgPath(path: string): ParsedPathPoint[] {
     return points;
 }
 
-const structuralSegments = (edgeId: string, points: ParsedPathPoint[]): Segment[] => {
+const structuralSegments = (points: ParsedPathPoint[]): Segment[] => {
     const segments: Segment[] = [];
     for (let i = 0; i < points.length - 1; i++) {
         const a = points[i];
         const b = points[i + 1];
         if (b.command === 'A' || b.command === 'C' || b.command === 'Q') continue;
         if (Math.abs(a.x - b.x) <= EPS && Math.abs(a.y - b.y) <= EPS) continue;
-        segments.push({ a, b, edgeId, segmentIndex: i, pointCount: points.length });
+        segments.push({ a, b, segmentIndex: i, pointCount: points.length });
     }
     return segments;
 };
@@ -200,10 +433,10 @@ const segmentsStrictlyCross = (first: Segment, second: Segment): boolean => {
     const vB = firstVertical ? first.b : second.b;
     const x = vA.x;
     const y = hA.y;
-    return x > Math.min(hA.x, hB.x) + 2
-        && x < Math.max(hA.x, hB.x) - 2
-        && y > Math.min(vA.y, vB.y) + 2
-        && y < Math.max(vA.y, vB.y) - 2;
+    return x > Math.min(hA.x, hB.x) + STRICT_CROSSING_INTERIOR_EPS
+        && x < Math.max(hA.x, hB.x) - STRICT_CROSSING_INTERIOR_EPS
+        && y > Math.min(vA.y, vB.y) + STRICT_CROSSING_INTERIOR_EPS
+        && y < Math.max(vA.y, vB.y) - STRICT_CROSSING_INTERIOR_EPS;
 };
 
 const parallelOverlapLength = (first: Segment, second: Segment): number => {
@@ -224,19 +457,36 @@ const parallelOverlapLength = (first: Segment, second: Segment): number => {
 
 const isProtectedRenderedSharedTrunk = (
     first: Segment,
+    firstSegments: readonly Segment[],
     firstEdge: RenderedAuditEdge,
     second: Segment,
+    secondSegments: readonly Segment[],
     secondEdge: RenderedAuditEdge,
 ): boolean => {
-    if (firstEdge.source === secondEdge.source && first.segmentIndex === 0 && second.segmentIndex === 0) {
+    const chainContains = (target: boolean): boolean => {
+        const offsets = [first, second].map(segment => target ? segment.pointCount - 2 - segment.segmentIndex : segment.segmentIndex);
+        if (offsets[0] !== offsets[1] || offsets[0] < 0 || offsets[0] >= MAX_SHARED_TRUNK_SEGMENTS) return false;
+        for (let offset = 0; offset <= offsets[0]; offset++) {
+            const a = target ? firstSegments[firstSegments.length - 1 - offset] : firstSegments[offset];
+            const b = target ? secondSegments[secondSegments.length - 1 - offset] : secondSegments[offset];
+            if (!a || !b
+                || a.segmentIndex !== (target ? a.pointCount - 2 - offset : offset)
+                || b.segmentIndex !== (target ? b.pointCount - 2 - offset : offset)) return false;
+            const [aStart, aEnd] = target ? [a.b, a.a] : [a.a, a.b];
+            const [bStart, bEnd] = target ? [b.b, b.a] : [b.a, b.b];
+            const values = [aStart.x, aStart.y, aEnd.x, aEnd.y, bStart.x, bStart.y, bEnd.x, bEnd.y];
+            if (!values.every(Number.isFinite)
+                || Math.abs(aStart.x - bStart.x) > EPS || Math.abs(aStart.y - bStart.y) > EPS) return false;
+            const [aDx, aDy, bDx, bDy] = [aEnd.x - aStart.x, aEnd.y - aStart.y, bEnd.x - bStart.x, bEnd.y - bStart.y];
+            if (!((Math.abs(aDy) <= EPS && Math.abs(bDy) <= EPS && aDx * bDx > EPS)
+                || (Math.abs(aDx) <= EPS && Math.abs(bDx) <= EPS && aDy * bDy > EPS))) return false;
+            if (offset < offsets[0]
+                && (Math.abs(aEnd.x - bEnd.x) > EPS || Math.abs(aEnd.y - bEnd.y) > EPS)) return false;
+        }
         return true;
-    }
-    if (firstEdge.target === secondEdge.target
-        && first.segmentIndex >= first.pointCount - 3
-        && second.segmentIndex >= second.pointCount - 3) {
-        return true;
-    }
-    return false;
+    };
+    return (firstEdge.source === secondEdge.source && chainContains(false))
+        || (firstEdge.target === secondEdge.target && chainContains(true));
 };
 
 const distanceToSegment = (point: { x: number; y: number }, segment: Segment): number => {
@@ -330,11 +580,15 @@ const mainAxisBacktrackDistance = (points: OrthogonalPoint[]): number => {
     return Number(total.toFixed(2));
 };
 
-export function auditRenderedEdgeRouting(edges: RenderedAuditEdge[], nodes: RenderedAuditNode[]): RenderedRoutingAuditResult {
+export function auditRenderedEdgeRouting(
+    edges: RenderedAuditEdge[],
+    nodes: RenderedAuditNode[],
+    options: RenderedRoutingAuditOptions = {},
+): RenderedRoutingAuditResult {
     const nodeById = new Map(nodes.map(node => [node.id, node]));
     const parsedEdges = edges.map(edge => {
         const points = parseRenderedSvgPath(edge.path);
-        return { edge, points, segments: structuralSegments(edge.id, points) };
+        return { edge, points, segments: structuralSegments(points) };
     });
     const errors: RenderedAuditFinding[] = [];
     const warnings: RenderedAuditFinding[] = [];
@@ -346,9 +600,64 @@ export function auditRenderedEdgeRouting(edges: RenderedAuditEdge[], nodes: Rend
     const pushWarning = (finding: Omit<RenderedAuditFinding, 'severity' | 'isHardConstraint'>) => {
         warnings.push({ ...finding, severity: 'warning', isHardConstraint: false });
     };
+    const presentationPolicy = resolvePresentationPolicy(options.presentation);
+    for (const field of presentationPolicy.invalidFields) {
+        pushWarning({ rule: 'presentation-policy-invalid', reason: `Presentation audit policy field "${field}" is invalid; the safe default was used.` });
+    }
+    const auditPresentation = (edge: RenderedAuditEdge) => {
+        if (!presentationPolicy.enabled) return;
+        const expected = isRecord(edge.expectedPresentation) ? edge.expectedPresentation : null;
+        if (edge.expectedPresentation !== undefined && !expected) {
+            pushWarning({ edgeId: edge.id, rule: 'presentation-expectation-invalid', reason: 'Expected presentation must be a bounded object of supported fields.' });
+        }
+        if (expected && Object.keys(expected).some(key => !isPresentationField(key))) {
+            pushWarning({ edgeId: edge.id, rule: 'presentation-expectation-invalid', reason: 'Expected presentation contains an unsupported field.' });
+        }
+        const actualValues = new Map<RenderedAuditPresentationField, ParsedPresentationValue>();
+        for (const field of PRESENTATION_FIELDS) {
+            const actual = parsePresentationField(field, edge[field]);
+            actualValues.set(field, actual);
+            const expectedProvided = expected ? hasOwn(expected, field) : false;
+            if (actual.status === 'missing' && (presentationPolicy.requiredFields.has(field) || expectedProvided)) {
+                pushWarning({ edgeId: edge.id, rule: 'presentation-field-missing', reason: `Rendered presentation field "${field}" is missing.`, presentationField: field });
+            } else if (actual.status === 'invalid') {
+                pushWarning({ edgeId: edge.id, rule: 'presentation-field-invalid', reason: `Rendered presentation field "${field}" is invalid or outside its safe bound.`, presentationField: field });
+            }
+            if (!expectedProvided) continue;
+            const contract = parsePresentationField(field, expected?.[field]);
+            if (contract.status !== 'valid') {
+                pushWarning({ edgeId: edge.id, rule: 'presentation-expectation-invalid', reason: `Expected presentation field "${field}" is invalid.`, presentationField: field });
+            } else if (actual.status === 'valid' && !presentationValuesEqual(actual.value, contract.value)) {
+                pushWarning({ edgeId: edge.id, rule: 'presentation-field-mismatch', reason: `Rendered presentation field "${field}" differs from its edge contract.`, presentationField: field, actualValue: actual.value, expectedValue: contract.value });
+            }
+        }
+        const value = (field: RenderedAuditPresentationField) => actualValues.get(field)?.value;
+        const selectedValue = value('selected');
+        const selected = selectedValue === true;
+        const opacity = value('opacity');
+        const strokeWidth = value('strokeWidth');
+        const zoom = value('zoom');
+        const labelVisible = value('labelVisible');
+        if (typeof opacity === 'number' && opacity < presentationPolicy.minimumVisibleOpacity) {
+            pushWarning({ edgeId: edge.id, rule: 'edge-low-opacity', reason: 'Rendered edge opacity is below the visible presentation floor.', presentationField: 'opacity', actualValue: opacity, expectedValue: presentationPolicy.minimumVisibleOpacity });
+        }
+        if (selected && typeof opacity === 'number' && opacity < presentationPolicy.minimumSelectedOpacity) {
+            pushWarning({ edgeId: edge.id, rule: 'selected-edge-low-opacity', reason: 'Selected edge is not visually prominent enough.', presentationField: 'opacity', actualValue: opacity, expectedValue: presentationPolicy.minimumSelectedOpacity });
+        }
+        if (selected && typeof strokeWidth === 'number' && strokeWidth < presentationPolicy.minimumSelectedStrokeWidth) {
+            pushWarning({ edgeId: edge.id, rule: 'selected-edge-too-thin', reason: 'Selected edge stroke is below the trace emphasis floor.', presentationField: 'strokeWidth', actualValue: strokeWidth, expectedValue: presentationPolicy.minimumSelectedStrokeWidth });
+        }
+        if (selected && labelVisible === false) {
+            pushWarning({ edgeId: edge.id, rule: 'selected-label-hidden', reason: 'Selected edge label is hidden, breaking end-to-end trace readability.', presentationField: 'labelVisible', actualValue: false, expectedValue: true });
+        }
+        if (selectedValue === false && typeof zoom === 'number' && zoom < presentationPolicy.lowZoomThreshold && labelVisible === true) {
+            pushWarning({ edgeId: edge.id, rule: 'low-zoom-label-visible', reason: 'Unselected edge label exceeds the low-zoom label budget.', presentationField: 'labelVisible', actualValue: true, expectedValue: false });
+        }
+    };
 
     for (const parsed of parsedEdges) {
         const { edge, points, segments } = parsed;
+        auditPresentation(edge);
         const source = nodeById.get(edge.source);
         const target = nodeById.get(edge.target);
         const nearestBusinessNodeById = new Map<string, { node: RenderedAuditNode; distance: number }>();
@@ -470,7 +779,10 @@ export function auditRenderedEdgeRouting(edges: RenderedAuditEdge[], nodes: Rend
 
                     const overlap = parallelOverlapLength(first, second);
                     if (overlap >= PARALLEL_OVERLAP_ERROR_LENGTH
-                        && !isProtectedRenderedSharedTrunk(first, parsedEdges[i].edge, second, parsedEdges[j].edge)) {
+                        && !isProtectedRenderedSharedTrunk(
+                            first, parsedEdges[i].segments, parsedEdges[i].edge,
+                            second, parsedEdges[j].segments, parsedEdges[j].edge,
+                        )) {
                         pushError({
                             rule: 'edge-parallel-overlap',
                             reason: 'Two rendered structural segments share a non-protected lane long enough to obscure flow direction.',

@@ -6,7 +6,31 @@ import {
   selectBaseReactFlowFullRouteSeedEdges,
 } from '../baseReactFlowDisplayFullRoutePipeline';
 import { computeBaseReactFlowDisplayEdgeEpoch } from '../baseReactFlowDisplayEdgeCore';
+import type { BaseDisplayBoundedCandidateReport } from '../baseReactFlowDisplayEvaluation';
 import { baseNodes } from './baseReactFlowDisplayEdges.testUtils';
+
+const hardCleanReport: BaseDisplayBoundedCandidateReport = {
+  candidate: 'polished',
+  hardClean: true,
+  obstacleHits: 0,
+  terminalsAttached: true,
+  terminalsAnchored: true,
+  quality: {
+    nonOrthogonalSegments: 0,
+    strictCrossings: 0,
+    reverseOverlap: 0,
+    unrelatedOverlap: 0,
+    relatedOverlap: 0,
+    unexplainedRelatedOverlap: 0,
+    shortEndpointStubs: 0,
+    tinyInteriorDoglegs: 0,
+    hairpins: 0,
+    backtrackPenalty: 0,
+    detourPenalty: 0,
+    bends: 0,
+    totalLength: 0,
+  },
+};
 
 describe('bounded pre-display handoff', () => {
   it('keeps the prepared seed reference without mutating either phase input', () => {
@@ -43,7 +67,7 @@ describe('bounded pre-display handoff', () => {
       createPreDisplayFinalEdges: (args) => {
         calls += 1;
         skipFullRouteFallback = args.skipFullRouteFallback;
-        args.onBoundedCandidate?.({ hardClean: true } as any);
+        args.onBoundedCandidate?.(hardCleanReport);
         return [];
       },
     });
@@ -53,9 +77,53 @@ describe('bounded pre-display handoff', () => {
     expect(result).toEqual([]);
   });
 
+  it('uses the bounded seed for an explicit full-quality large-graph request', () => {
+    const edges: Edge[] = Array.from({ length: 25 }, (_, index) => ({
+      id: `edge-${index}`,
+      source: `source-${index}`,
+      target: `target-${index}`,
+    }));
+    let calls = 0;
+
+    const result = createBaseReactFlowFullRouteEdges({
+      edges,
+      nodes: [],
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: true,
+      forceFullQuality: true,
+      displayEdgeEpoch: 1,
+      createPreDisplayFinalEdges: (args) => {
+        calls += 1;
+        args.onBoundedCandidate?.(hardCleanReport);
+        return [];
+      },
+    });
+
+    expect(calls).toBe(1);
+    expect(result).toEqual([]);
+  });
+
   it('returns an already-finalized phase input by reference', () => {
     const edges: Edge[] = [
-      { id: 'edge', source: 'source', target: 'target', type: 'advanced-smart-step' },
+      {
+        id: 'edge',
+        source: 'source',
+        target: 'target',
+        sourceHandle: 'right',
+        targetHandle: 'left',
+        type: 'advanced-smart-step',
+        data: {
+          computedPath: [
+            { x: 100, y: 230 },
+            { x: 200, y: 230 },
+            { x: 200, y: 30 },
+            { x: 300, y: 30 },
+          ],
+          layoutPathLocked: true,
+          layoutDirection: 'TB',
+        },
+      },
     ];
     const first = createBaseReactFlowFullRouteEdges({
       edges,

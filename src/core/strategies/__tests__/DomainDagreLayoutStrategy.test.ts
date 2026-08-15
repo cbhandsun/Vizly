@@ -17,6 +17,7 @@ import {
     createBaseReactFlowDisplayEdges,
 } from '../../components/shared/baseReactFlowDisplayEdges';
 import { detectLocalDoglegRisks } from '../../algorithms/localDoglegQuality';
+import { countUnrelatedObstacleHits } from '../shared/edgeWaypointCandidateRepair';
 
 type PathPoint = { x: number; y: number };
 
@@ -291,6 +292,8 @@ describe('DomainDagreLayoutStrategy', () => {
 
         expect(feedback).toBeTruthy();
         expect(path.length).toBeGreaterThanOrEqual(2);
+        expect(feedback?.sourceHandle).toBe('top');
+        expect(feedback?.data?.autoSource).toBe(true);
         expect(path[1].y).toBeLessThan(path[0].y);
     }, 15_000);
 
@@ -377,6 +380,53 @@ describe('DomainDagreLayoutStrategy', () => {
             expect(beforeEnd.y).toBeLessThan(end.y);
         }
     }, 15_000);
+
+    it.each(['TB', 'LR'] as const)(
+      'keeps every WMS demand-allocation route out of unrelated business nodes in %s',
+      async (direction) => {
+        const demandFixture = fixtureData(demandAllocation);
+        const canvas = await standardDataToCanvas(demandFixture);
+        const presetLayout = demandFixture.layout;
+
+        const result = await new DomainDagreLayoutStrategy().calculateLayout(canvas.nodes, canvas.edges, {
+            type: LayoutType.DAGRE,
+            direction,
+            nodeLayout: 'dagre',
+            generateDomainGroups: true,
+            generateSubDomainGroups: true,
+            domainSubGroupDirection: 'LR',
+            subDomainNodeDirection: 'TB',
+            domainOrder: presetLayout.domainOrder,
+            subDomainOrder: presetLayout.subDomainOrder,
+        } as unknown as import('../../types/layout').LayoutOptions);
+        const obstacles = new Map(result.nodes.flatMap(candidate => {
+            if (['titleGroup', 'subGroup', 'group', 'domain'].includes(String(candidate.type ?? ''))) return [];
+            const position = (candidate as ReactFlowNode & { positionAbsolute?: PathPoint }).positionAbsolute
+                ?? absolutePositionOf(candidate, result.nodes);
+            return [[candidate.id, {
+                x: position.x,
+                y: position.y,
+                width: sizeOf(candidate).width,
+                height: sizeOf(candidate).height,
+            }] as const];
+        }));
+
+        const hardObstacleHits = result.edges.flatMap(edge => {
+            const hits = countUnrelatedObstacleHits(computedPathOf(edge), edge, obstacles);
+            return hits > 0 ? [{ edgeId: edge.id, hits }] : [];
+        });
+        const unlockedComputedPaths = result.edges.flatMap(edge => {
+            const hasPath = computedPathOf(edge).length >= 2;
+            const hasRenderLock = edge.data?.layoutPathLocked === true
+                || edge.data?._layoutPathLocked === true
+                || String(edge.type ?? '').toLowerCase() === 'stablepath';
+            return hasPath && !hasRenderLock ? [edge.id] : [];
+        });
+        expect(hardObstacleHits).toEqual([]);
+        expect(unlockedComputedPaths).toEqual([]);
+      },
+      15_000,
+    );
 
     it('separates Logistics TMS support and yard lanes after dagre routing', async () => {
         const logisticsFixture = fixtureData(logisticsStandardData);

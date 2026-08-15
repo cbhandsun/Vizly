@@ -73,7 +73,58 @@ const nearParallelResidualEdges = (overlapLength: number, laneOffset = 1): Edge[
   },
 ];
 
+const crossingOnlyEdges = (): Edge[] => [
+  {
+    id: 'crossing-a',
+    source: 'north-west',
+    target: 'south-east',
+    sourceHandle: 'bottom',
+    targetHandle: 'top',
+    data: { computedPath: [
+      { x: 40, y: 40 },
+      { x: 40, y: 120 },
+      { x: 340, y: 120 },
+      { x: 340, y: 200 },
+    ] },
+  },
+  {
+    id: 'crossing-b',
+    source: 'north-east',
+    target: 'south-west',
+    sourceHandle: 'bottom',
+    targetHandle: 'top',
+    data: { computedPath: [
+      { x: 340, y: 40 },
+      { x: 340, y: 80 },
+      { x: 200, y: 80 },
+      { x: 200, y: 160 },
+      { x: 40, y: 160 },
+      { x: 40, y: 200 },
+    ] },
+  },
+];
+
 describe('outer port transaction', () => {
+  it('enters the bounded port search for a strict-only residual when explicitly requested', () => {
+    expect(buildBoundedOuterPortTransactionCandidates(
+      crossingOnlyEdges(),
+      graphNodes,
+      { maxCandidates: 12 },
+    )).toHaveLength(0);
+    expect(buildBoundedOuterPortTransactionCandidates(
+      crossingOnlyEdges(),
+      graphNodes,
+      { includeStrictCrossings: true, maxCandidates: 12 },
+    ).length).toBeGreaterThan(0);
+
+    const repaired = repairResidualOuterPortTransactionWithHardGate(
+      crossingOnlyEdges(),
+      graphNodes,
+      64,
+    );
+    expect(getDisplayHardQualityGateReport(repaired, graphNodes, 'polished').hardClean).toBe(true);
+  });
+
   it('builds a bounded, coordinate-derived candidate set for detached overlaps', () => {
     const candidates = buildBoundedOuterPortTransactionCandidates(
       overlappingEdges(),
@@ -101,14 +152,14 @@ describe('outer port transaction', () => {
     },
   );
 
-  it('uses the same 24px minimum-overlap boundary as the full quality score', () => {
+  it('uses the same inclusive 24px overlap boundary as the rendered audit', () => {
     expect(buildBoundedOuterPortTransactionCandidates(
-      nearParallelResidualEdges(24),
+      nearParallelResidualEdges(23.99),
       graphNodes,
       { maxCandidates: 12 },
     )).toHaveLength(0);
     expect(buildBoundedOuterPortTransactionCandidates(
-      nearParallelResidualEdges(24.01),
+      nearParallelResidualEdges(24),
       graphNodes,
       { maxCandidates: 12 },
     ).length).toBeGreaterThan(0);

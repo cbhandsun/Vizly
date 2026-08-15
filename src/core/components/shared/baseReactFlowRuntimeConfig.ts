@@ -126,11 +126,23 @@ export const createBaseReactFlowDefaultEdgeOptions = ({
   isLargeGraph,
 }: {
   isLargeGraph: boolean;
-}) => ({
-  type: 'advanced-smart-step',
-  markerEnd: { type: 'arrowclosed' as const, width: 10, height: 10 },
-  style: {
-    strokeOpacity: 0.98,
-    filter: isLargeGraph ? 'none' : 'drop-shadow(0 0 0.6px rgba(0,0,0,0.35))',
-  },
-});
+}) => {
+  // Keep the mode parameter in the public contract; both modes now share the
+  // same shadow-free paint so zooming and virtualization do not change style.
+  void isLargeGraph;
+  return {
+    type: 'advanced-smart-step',
+    markerEnd: {
+      type: 'arrowclosed' as const,
+      color: '#64748B',
+      width: 20,
+      height: 20,
+    },
+    style: {
+      stroke: '#64748B',
+      strokeWidth: 1.5,
+      strokeOpacity: 1,
+      filter: 'none',
+    },
+  };
+};

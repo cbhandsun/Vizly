@@ -32,6 +32,19 @@ afterEach(() => {
 });
 
 describe('baseReactFlowDisplayCandidateResolver', () => {
+  it('bypasses both precompiled and persistent candidates during regeneration', async () => {
+    const load = vi.fn(async () => candidateEdges);
+    await expect(resolveBaseReactFlowDisplayCandidate({
+      input,
+      persistentCandidateEdges: candidateEdges,
+      signal: new AbortController().signal,
+      isCurrent: () => true,
+      allowExternalCandidates: false,
+      loadPrecompiledCandidate: load,
+    })).resolves.toEqual({ candidateEdges: null, source: 'miss' });
+    expect(load).not.toHaveBeenCalled();
+  });
+
   it('prefers a precompiled artifact over a persistent candidate', async () => {
     const load = vi.fn(async () => candidateEdges);
     await expect(resolveBaseReactFlowDisplayCandidate({

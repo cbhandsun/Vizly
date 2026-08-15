@@ -12,6 +12,7 @@ interface DropdownMenuTriggerButtonProps extends Omit<
     'data-advanced-export-focus-return'?: 'true';
     'data-cloud-save-focus-return'?: 'true';
     busy?: boolean;
+    disabled?: boolean;
     icon: React.ReactNode;
     menuId?: string;
     open: boolean;
@@ -22,7 +23,7 @@ interface DropdownMenuTriggerButtonProps extends Omit<
 export const DropdownMenuTriggerButton = React.forwardRef<
     HTMLButtonElement,
     DropdownMenuTriggerButtonProps
->(({ ariaLabel, busy = false, className, icon, menuId, open, onTriggerKeyDown, style, ...triggerProps }, ref) => (
+>(({ ariaLabel, busy = false, className, disabled = false, icon, menuId, open, onTriggerKeyDown, style, ...triggerProps }, ref) => (
     <Tooltip title={ariaLabel} open={open ? false : undefined} {...triggerProps}>
         <Button
             ref={ref}
@@ -34,6 +35,7 @@ export const DropdownMenuTriggerButton = React.forwardRef<
             aria-label={ariaLabel}
             aria-haspopup="menu"
             aria-busy={busy}
+            disabled={disabled}
             aria-expanded={open}
             aria-controls={menuId}
             onKeyDown={onTriggerKeyDown}

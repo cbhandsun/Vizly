@@ -4,6 +4,7 @@ import type {
   BaseDisplayBoundedCandidateReport,
   DisplayQualityBudget,
 } from './baseReactFlowDisplayEvaluation';
+import type { DisplayRoutingPhaseTrace } from './baseReactFlowDisplayRoutingTrace';
 
 export type BaseReactFlowDisplayEdgesArgs = {
   edges: Edge[];
@@ -12,21 +13,30 @@ export type BaseReactFlowDisplayEdgesArgs = {
   smartEdgePadding: number;
   isLargeGraph: boolean;
   displayEdgeEpoch: number;
+  /** Honors an explicit worker full-quality request below the extreme graph cap. */
+  forceFullQuality?: boolean;
   reusePreparedGlobalRouting?: boolean;
   skipBoundedAttempt?: boolean;
   skipFinalizedReuse?: boolean;
+  onPhaseTrace?: (trace: DisplayRoutingPhaseTrace) => void;
 };
 
-export type BaseReactFlowPreDisplayFinalEdgesFactory = (args: {
+export type BaseReactFlowPreDisplayFinalEdgesArgs = {
   edges: Edge[];
   nodes: Node[];
   enableSmartEdges: boolean;
   smartEdgePadding: number;
   isLargeGraph: boolean;
   displayEdgeEpoch: number;
+  /** Reuses the caller's interactive pass instead of routing that seed again. */
+  preparedInteractiveEdges?: Edge[];
   skipFullRouteFallback?: boolean;
   onBoundedCandidate?: (report: BaseDisplayBoundedCandidateReport) => void;
-}) => Edge[];
+};
+
+export type BaseReactFlowPreDisplayFinalEdgesFactory = (
+  args: BaseReactFlowPreDisplayFinalEdgesArgs,
+) => Edge[];
 
 export type BaseReactFlowFullRouteContext = {
   inputSignature: string;
@@ -42,6 +52,7 @@ export type BaseReactFlowFullRouteContext = {
   useBoundedLargeRepair: boolean;
   canReusePreparedGlobalRouting: boolean;
   reusePreparedGlobalRouting: boolean;
+  onPhaseTrace?: (trace: DisplayRoutingPhaseTrace) => void;
 };
 
 export type BaseReactFlowFullRouteSeedResult =

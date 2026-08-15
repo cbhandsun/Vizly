@@ -1,12 +1,14 @@
 // packages/core/src/components/custom-edges/renderers/AdvancedSmartEdgeGraphics.tsx
 import React, { memo, useMemo, useRef, useEffect } from 'react';
-import { BaseEdge, EdgeLabelRenderer, EdgeProps } from '@xyflow/react';
+import { EdgeLabelRenderer, EdgeProps } from '@xyflow/react';
 import { useEdgeTheme } from '../../diagrams/useEdgeUpdate';
 import { EdgeRoutingCoordinator } from '../../../services/EdgeRoutingCoordinator';
 import { UseSmartEdgeRoutingReturn } from '../hooks/useSmartEdgeRouting';
 import { UseEdgeLabelInteractionsReturn } from '../hooks/useEdgeLabelInteractions';
 import { createRenderEdgeGeometryFromEdgeProps, getPathEndpoints } from '../../../rendering/edgeGeometry';
 import type { EdgeLabelStyle } from '../../diagrams/EdgeLabelStyleMenu';
+import { useSyncNativeEdgeUpdaterEndpoints } from '../useSyncNativeEdgeUpdaterEndpoints';
+import { ContrastSafeBaseEdge } from '../ContrastSafeBaseEdge';
 
 interface EdgeGraphicsData {
     label?: unknown;
@@ -107,6 +109,11 @@ const InnerAdvancedSmartEdgeGraphics = ({ props, router, labelManager }: Advance
             opacity: 0.85,                                   // 轻微透明感区分预览态
         };
     }, [nodesDragging, style?.stroke, style?.strokeWidth]);
+    const renderedEdgeStyle = useMemo<React.CSSProperties>(
+        () => dragOverlayStyle ? { ...busStyle, ...dragOverlayStyle } : busStyle,
+        [busStyle, dragOverlayStyle],
+    );
+    const canvasBackground = currentTheme?.diagram?.canvas?.background ?? '#ffffff';
 
     // ---------- Theme-aware label styling ----------
     const resolvedLabel = (label ?? edgeData?.label);
@@ -140,7 +147,7 @@ const InnerAdvancedSmartEdgeGraphics = ({ props, router, labelManager }: Advance
 
     const handleClick = (e: React.MouseEvent) => {
         // [DEBUG] Alt+Click or Ctrl+Click → select this edge in the Routing Debugger
-        if (e.altKey || (e.ctrlKey && !e.shiftKey && !e.metaKey)) {
+        if (import.meta.env.DEV && (e.altKey || (e.ctrlKey && !e.shiftKey && !e.metaKey))) {
             e.preventDefault();
             e.stopPropagation();
             selectDebugEdge(id);
@@ -148,10 +155,18 @@ const InnerAdvancedSmartEdgeGraphics = ({ props, router, labelManager }: Advance
     };
 
     const gRef = useRef<SVGGElement>(null);
+    const updaterSource = visiblePathEndpoints?.source
+        ?? (workerSmartPoints && workerSmartPoints.length > 0 ? workerSmartPoints[0] : { x: sourceX, y: sourceY });
+    const updaterTarget = visiblePathEndpoints?.target
+        ?? (workerSmartPoints && workerSmartPoints.length > 1
+            ? workerSmartPoints[workerSmartPoints.length - 1]
+            : { x: targetX, y: targetY });
+    useSyncNativeEdgeUpdaterEndpoints(gRef, updaterSource, updaterTarget);
 
     // [DEBUG] Use native DOM listener instead of React synthetic event so that
     // CDP-simulated clicks (which may lose altKey in synthetic event path) also work.
     useEffect(() => {
+        if (!import.meta.env.DEV) return;
         const el = gRef.current;
         if (!el) return;
         const handler = (e: MouseEvent) => {
@@ -172,23 +187,24 @@ const InnerAdvancedSmartEdgeGraphics = ({ props, router, labelManager }: Advance
             style={{ cursor: 'pointer', opacity: opacity * crossfadeOpacity, transition: nodesDragging ? 'none' : 'opacity 0.25s ease-in-out' }}
         >
 
-            <BaseEdge
+            <ContrastSafeBaseEdge
                 id={id}
                 path={renderEdge.path}
+                canvasBackground={canvasBackground}
                 markerStart={markerStart}
                 markerEnd={markerEnd}
                 // dragOverlayStyle 只在渲染时合并，不污染 edge.style 持久化数据
-                style={dragOverlayStyle ? { ...busStyle, ...dragOverlayStyle } : busStyle}
+                style={renderedEdgeStyle}
                 interactionWidth={40}
             />
             
             <g className="custom-edge-updater-group">
                 <circle className="custom-edge-updater custom-edge-updater-source"
-                    cx={visiblePathEndpoints?.source.x ?? (workerSmartPoints && workerSmartPoints.length > 0 ? workerSmartPoints[0].x : sourceX)}
-                    cy={visiblePathEndpoints?.source.y ?? (workerSmartPoints && workerSmartPoints.length > 0 ? workerSmartPoints[0].y : sourceY)} />
+                    cx={updaterSource.x}
+                    cy={updaterSource.y} />
                 <circle className="custom-edge-updater custom-edge-updater-target"
-                    cx={visiblePathEndpoints?.target.x ?? (workerSmartPoints && workerSmartPoints.length > 1 ? workerSmartPoints[workerSmartPoints.length - 1].x : targetX)}
-                    cy={visiblePathEndpoints?.target.y ?? (workerSmartPoints && workerSmartPoints.length > 1 ? workerSmartPoints[workerSmartPoints.length - 1].y : targetY)} />
+                    cx={updaterTarget.x}
+                    cy={updaterTarget.y} />
             </g>
 
             {resolvedLabelText && (
@@ -196,7 +212,8 @@ const InnerAdvancedSmartEdgeGraphics = ({ props, router, labelManager }: Advance
                     <div
                         style={{
                             position: 'absolute',
-                            transform: `translate(-50%, -50%) translate(${finalLabelX}px, ${finalLabelY}px)`,
+                            transform: `translate(-50%, -50%) translate(${finalLabelX}px, ${finalLabelY}px) scale(var(--diagram-edge-label-scale, 1))`,
+                            transformOrigin: 'center',
                             pointerEvents: 'none',
                             whiteSpace: 'nowrap',
                             color: String(labelColor),
@@ -217,7 +234,7 @@ const InnerAdvancedSmartEdgeGraphics = ({ props, router, labelManager }: Advance
                             zIndex: 1,
                             ...labelStyle,
                         }}
-                        className="nodrag nopan"
+                        className="vizly-edge-label nodrag nopan"
                     >
                         {isEditing ? (
                             <textarea
@@ -300,7 +317,7 @@ const InnerAdvancedSmartEdgeGraphics = ({ props, router, labelManager }: Advance
                 </EdgeLabelRenderer>
             )}
 
-            {shouldRenderDebugVisuals && (
+            {import.meta.env.DEV && shouldRenderDebugVisuals && (
                 <g className="react-flow__edge-debug">
                     {obstacles?.map((o, i: number) => (
                         <rect key={`o-${i}`} x={o.x} y={o.y} width={o.width} height={o.height} fill="rgba(255,0,0,0.2)" stroke="red" strokeWidth={1} />

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const safeLogState = vi.hoisted(() => ({
   debug: vi.fn(),
@@ -8,21 +8,33 @@ const safeLogState = vi.hoisted(() => ({
   log: vi.fn(),
 }));
 
+const elkState = vi.hoisted(() => ({
+  layout: vi.fn(),
+  terminateWorker: vi.fn(),
+}));
+
 vi.mock('../consoleCleanup', () => ({
   safeLog: safeLogState,
 }));
 
 vi.mock('elkjs', () => ({
   default: class MockElk {
-    layout = vi.fn().mockRejectedValue(new Error('Authorization: Bearer live-token'));
+    layout = elkState.layout;
+    terminateWorker = elkState.terminateWorker;
   },
 }));
 
 import { routeEdgesWithELK } from '../elkEdgeRouter';
 
 describe('elkEdgeRouter', () => {
+  beforeEach(() => {
+    elkState.layout.mockRejectedValue(new Error('Authorization: Bearer live-token'));
+  });
+
   afterEach(() => {
     Object.values(safeLogState).forEach(mock => mock.mockReset());
+    Object.values(elkState).forEach(mock => mock.mockReset());
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
@@ -60,5 +72,22 @@ describe('elkEdgeRouter', () => {
     const errorPayload = JSON.stringify(safeLogState.error.mock.calls);
     expect(errorPayload).toContain('[redacted]');
     expect(errorPayload).not.toContain('live-token');
+    expect(elkState.terminateWorker).toHaveBeenCalledOnce();
+  });
+
+  it('falls back and terminates ELK when routing does not settle', async () => {
+    vi.useFakeTimers();
+    elkState.layout.mockReturnValue(new Promise(() => undefined));
+
+    const routingPromise = routeEdgesWithELK([], []);
+    await vi.advanceTimersByTimeAsync(3_000);
+    const paths = await routingPromise;
+
+    expect(paths.size).toBe(0);
+    expect(elkState.terminateWorker).toHaveBeenCalled();
+    expect(safeLogState.error).toHaveBeenCalledWith(
+      '[ELK Edge Router] Layout failed:',
+      expect.objectContaining({ message: 'ELK edge routing exceeded 3000ms' }),
+    );
   });
 });

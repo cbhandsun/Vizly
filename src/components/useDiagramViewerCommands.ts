@@ -142,7 +142,9 @@ export function useDiagramViewerCommands({
             isFullscreenActive: () => Boolean(document.fullscreenElement),
             exitFullscreen,
             onFullscreenExitFailure: logDiagramViewerFullscreenExitFailure,
-            toggleDebugPanel: () => setShowDebugPanel(previous => !previous),
+            toggleDebugPanel: () => {
+                if (import.meta.env.DEV) setShowDebugPanel(previous => !previous);
+            },
             openCommandPalette: () => setIsCommandOpen(true),
             openSettings: () => setIsSettingsOpen(true),
             triggerEditorCommand: (action) => window.dispatchEvent(new CustomEvent('editor:command', { detail: { action } })),
@@ -152,7 +154,7 @@ export function useDiagramViewerCommands({
         });
         window.addEventListener('keydown', onKeyDown);
         return () => window.removeEventListener('keydown', onKeyDown);
-    }, [editingEnabled, exitFullscreen, exitPresentation, isPresentationMode]);
+    }, [editingEnabled, exitFullscreen, exitPresentation, isPresentationMode, setIsCommandOpen]);
 
     const openDiagramInNewTab = useCallback((id: string) => {
         openDiagramViewerInNewTab({

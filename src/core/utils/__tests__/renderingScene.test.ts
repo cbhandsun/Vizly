@@ -1,8 +1,38 @@
 import { describe, expect, it } from 'vitest';
-import type { Edge, Node } from '@xyflow/react';
+import { MarkerType, type Edge, type Node } from '@xyflow/react';
 import { buildRenderSceneFromReactFlow, buildRenderSceneFromReactFlowSnapshot } from '../../rendering/reactFlowScene';
 
 describe('buildRenderSceneFromReactFlow', () => {
+  it('preserves deterministic stable-edge line jumps in the export scene', () => {
+    const nodes: Node[] = [
+      { id: 'left', position: { x: 0, y: 0 }, data: {} },
+      { id: 'right', position: { x: 160, y: 0 }, data: {} },
+      { id: 'top', position: { x: 80, y: -40 }, data: {} },
+      { id: 'bottom', position: { x: 80, y: 100 }, data: {} },
+    ];
+    const edges: Edge[] = [
+      {
+        id: 'horizontal',
+        source: 'left',
+        target: 'right',
+        type: 'stablePath',
+        data: { computedPath: [{ x: 0, y: 40 }, { x: 160, y: 40 }] },
+      },
+      {
+        id: 'vertical',
+        source: 'top',
+        target: 'bottom',
+        type: 'stablePath',
+        data: { computedPath: [{ x: 80, y: 0 }, { x: 80, y: 100 }] },
+      },
+    ];
+
+    const scene = buildRenderSceneFromReactFlow(nodes, edges);
+
+    expect(scene.edges.find(edge => edge.id === 'horizontal')?.path).toContain('A 6 6');
+    expect(scene.edges.find(edge => edge.id === 'vertical')?.path).not.toContain('A 6 6');
+  });
+
   it('normalizes visible React Flow nodes and edges into a render scene', () => {
     const nodes: Node[] = [
       {
@@ -45,6 +75,333 @@ describe('buildRenderSceneFromReactFlow', () => {
       markerEnd: { kind: 'arrow', color: '#111111' },
     });
     expect(scene.bounds).toMatchObject({ minX: 0, minY: 10, maxX: 370, maxY: 90 });
+  });
+
+  it('fails closed to one complete semantic edge when an orphan render-only plan is injected', () => {
+    const nodes = [
+      { id: 'owner-source', position: { x: 0, y: 0 }, data: {} },
+      { id: 'member-source', position: { x: 0, y: 120 }, data: {} },
+      { id: 'target', position: { x: 300, y: 0 }, data: {} },
+    ] satisfies Node[];
+    const edges = [
+      {
+        id: 'member',
+        source: 'member-source',
+        target: 'target',
+        label: 'Shared trunk label',
+        markerStart: { type: MarkerType.Arrow, color: '#2563eb' },
+        markerEnd: { type: MarkerType.ArrowClosed, color: '#2563eb' },
+        style: { stroke: '#2563eb' },
+        data: {
+          computedPath: [{ x: 0, y: 0 }, { x: 80, y: 0 }, { x: 160, y: 0 }],
+          __vizlySharedTrunkPaint: {
+            hiddenRanges: [{ from: 50, to: 110, role: 'target', ownerEdgeId: 'owner' }],
+            memberships: [{
+              id: 'target:target:owner',
+              role: 'target',
+              endpointId: 'target',
+              ownerEdgeId: 'owner',
+              edgeIds: ['member', 'owner'],
+              commonLength: 60,
+            }],
+            backboneRanges: [],
+          },
+        },
+      },
+    ] satisfies Edge[];
+
+    const scene = buildRenderSceneFromReactFlow(nodes, edges);
+    const memberFragments = scene.edges.filter(edge => edge.id === 'member');
+
+    expect(memberFragments).toHaveLength(1);
+    expect(memberFragments[0]).toMatchObject({
+      points: [{ x: 0, y: 0 }, { x: 80, y: 0 }, { x: 160, y: 0 }],
+      markerStart: { kind: 'arrow' },
+      markerEnd: { kind: 'arrow' },
+      label: 'Shared trunk label',
+    });
+  });
+
+  it('derives the shared-trunk paint plan when an export snapshot contains raw routed edges', () => {
+    const nodes = [
+      { id: 'source-a', position: { x: 0, y: 0 }, data: {} },
+      { id: 'source-b', position: { x: 0, y: 120 }, data: {} },
+      { id: 'target', position: { x: 240, y: 0 }, data: {} },
+    ] satisfies Node[];
+    const edges = [
+      {
+        id: 'a-owner', source: 'source-a', target: 'target',
+        style: { stroke: '#47cacc', strokeWidth: 2, strokeDasharray: '6 4' },
+        data: { computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 160, y: 0 }] },
+      },
+      {
+        id: 'b-member', source: 'source-b', target: 'target',
+        style: { stroke: '#47cacc', strokeWidth: 2, strokeDasharray: '6 4' },
+        data: { computedPath: [{ x: 100, y: 120 }, { x: 100, y: 0 }, { x: 160, y: 0 }] },
+      },
+    ] satisfies Edge[];
+
+    const scene = buildRenderSceneFromReactFlow(nodes, edges);
+
+    expect(scene.edges.find(edge => edge.id === 'a-owner')?.points).toEqual([
+      { x: 0, y: 0 }, { x: 100, y: 0 },
+    ]);
+    expect(scene.edges.find(edge => edge.id === 'b-member')?.points).toEqual([
+      { x: 100, y: 120 }, { x: 100, y: 0 },
+    ]);
+    expect(scene.edges.find(edge => edge.id === 'a-owner::shared-backbone:0')).toMatchObject({
+      points: [{ x: 100, y: 0 }, { x: 160, y: 0 }],
+      stroke: '#47CACC',
+      strokeWidth: 2,
+      strokeDasharray: '6 4',
+      label: '',
+      markerStart: { kind: 'none' },
+      markerEnd: { kind: 'none' },
+    });
+  });
+
+  it('exports a mixed-semantic source trunk once in neutral canonical paint', () => {
+    const nodes = [
+      { id: 'source', position: { x: 0, y: 0 }, data: {} },
+      { id: 'target-a', position: { x: 200, y: -100 }, data: {} },
+      { id: 'target-b', position: { x: 200, y: 100 }, data: {} },
+    ] satisfies Node[];
+    const edges = [
+      {
+        id: 'a-primary',
+        source: 'source',
+        target: 'target-a',
+        label: 'Primary branch',
+        markerEnd: { type: MarkerType.ArrowClosed, color: '#FF5722' },
+        style: { stroke: '#FF5722', strokeWidth: 3 },
+        data: { computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: -100 }] },
+      },
+      {
+        id: 'b-observability',
+        source: 'source',
+        target: 'target-b',
+        label: 'Trace branch',
+        markerEnd: { type: MarkerType.ArrowClosed, color: '#47CACC' },
+        style: { stroke: '#47CACC', strokeWidth: 2, strokeDasharray: '6 4' },
+        data: { computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }] },
+      },
+    ] satisfies Edge[];
+
+    const scene = buildRenderSceneFromReactFlow(nodes, edges);
+    const backbone = scene.edges.filter(edge => edge.id.includes('::shared-backbone:'));
+
+    expect(backbone).toHaveLength(1);
+    expect(backbone[0]).toMatchObject({
+      id: 'a-primary::shared-backbone:0',
+      points: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
+      stroke: '#64748B',
+      strokeWidth: 3,
+      strokeDasharray: undefined,
+      opacity: 0.92,
+      label: '',
+      markerStart: { kind: 'none' },
+      markerEnd: { kind: 'none' },
+    });
+    expect(scene.edges.find(edge => edge.id === 'a-primary')).toMatchObject({
+      points: [{ x: 100, y: 0 }, { x: 100, y: -100 }],
+      label: 'Primary branch',
+      markerEnd: { kind: 'arrow' },
+    });
+    expect(scene.edges.find(edge => edge.id === 'b-observability')).toMatchObject({
+      points: [{ x: 100, y: 0 }, { x: 100, y: 100 }],
+      label: 'Trace branch',
+      markerEnd: { kind: 'arrow' },
+    });
+  });
+
+  it('keeps nested canonical source intervals adjacent without repainting either interval', () => {
+    const nodes = [
+      { id: 'source', position: { x: 0, y: 0 }, data: {} },
+      { id: 'target-a', position: { x: 100, y: -100 }, data: {} },
+      { id: 'target-b', position: { x: 160, y: 100 }, data: {} },
+      { id: 'target-c', position: { x: 160, y: -100 }, data: {} },
+    ] satisfies Node[];
+    const edges = [
+      {
+        id: 'a-short', source: 'source', target: 'target-a',
+        style: { stroke: '#FF5722', strokeWidth: 3 },
+        data: { computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: -100 }] },
+      },
+      {
+        id: 'b-long', source: 'source', target: 'target-b',
+        style: { stroke: '#47CACC', strokeWidth: 2, strokeDasharray: '6 4' },
+        data: { computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 160, y: 0 }, { x: 160, y: 100 }] },
+      },
+      {
+        id: 'c-long', source: 'source', target: 'target-c',
+        style: { stroke: '#47CACC', strokeWidth: 2, strokeDasharray: '6 4' },
+        data: { computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 160, y: 0 }, { x: 160, y: -100 }] },
+      },
+    ] satisfies Edge[];
+
+    const backbones = buildRenderSceneFromReactFlow(nodes, edges).edges
+      .filter(edge => edge.id.includes('::shared-backbone:'));
+
+    expect(backbones).toHaveLength(2);
+    expect(backbones.map(backbone => backbone.points)).toEqual([
+      [{ x: 0, y: 0 }, { x: 100, y: 0 }],
+      [{ x: 100, y: 0 }, { x: 160, y: 0 }],
+    ]);
+    expect(backbones.map(backbone => backbone.stroke)).toEqual(['#64748B', '#47CACC']);
+  });
+
+  it('renders source and target canonical roles independently on one bridge edge', () => {
+    const nodes = [
+      { id: 'source', position: { x: 0, y: 0 }, data: {} },
+      { id: 'target', position: { x: 200, y: 0 }, data: {} },
+      { id: 'source-peer-target', position: { x: 60, y: -100 }, data: {} },
+      { id: 'target-peer-source', position: { x: 140, y: 100 }, data: {} },
+    ] satisfies Node[];
+    const bridge = {
+      id: 'bridge', source: 'source', target: 'target', label: 'Visible bridge branch',
+      markerStart: { type: MarkerType.Arrow, color: '#2563EB' },
+      markerEnd: { type: MarkerType.ArrowClosed, color: '#2563EB' },
+      style: { stroke: '#2563EB', strokeWidth: 3 },
+      data: { computedPath: [{ x: 0, y: 0 }, { x: 60, y: 0 }, { x: 140, y: 0 }, { x: 200, y: 0 }] },
+    } satisfies Edge;
+    const sourcePeer = {
+      id: 'source-peer', source: 'source', target: 'source-peer-target',
+      style: { stroke: '#2563EB', strokeWidth: 2 },
+      data: { computedPath: [{ x: 0, y: 0 }, { x: 60, y: 0 }, { x: 60, y: -100 }] },
+    } satisfies Edge;
+    const targetPeer = {
+      id: 'target-peer', source: 'target-peer-source', target: 'target',
+      style: { stroke: '#2563EB', strokeWidth: 2 },
+      data: { computedPath: [{ x: 140, y: 100 }, { x: 140, y: 0 }, { x: 200, y: 0 }] },
+    } satisfies Edge;
+
+    const sceneEdges = buildRenderSceneFromReactFlow(nodes, [bridge, sourcePeer, targetPeer]).edges;
+
+    expect(sceneEdges.filter(item => item.id.includes('::shared-backbone:')).map(item => item.points)).toEqual([
+      [{ x: 0, y: 0 }, { x: 60, y: 0 }],
+      [{ x: 140, y: 0 }, { x: 200, y: 0 }],
+    ]);
+    expect(sceneEdges.find(item => item.id === 'bridge')).toMatchObject({
+      points: [{ x: 60, y: 0 }, { x: 140, y: 0 }],
+      label: 'Visible bridge branch',
+      markerStart: { kind: 'none' },
+      markerEnd: { kind: 'none' },
+    });
+    expect(sceneEdges.find(item => item.id === 'bridge::shared-terminal-markers')).toMatchObject({
+      stroke: 'transparent',
+      label: '',
+      markerOnly: true,
+      markerStart: { kind: 'arrow', color: '#2563EB' },
+      markerEnd: { kind: 'arrow', color: '#2563EB' },
+    });
+  });
+
+  it('omits a fully shared dual-role member instead of placing its label on the backbone', () => {
+    const nodes = [
+      { id: 'source', position: { x: 0, y: 0 }, data: {} },
+      { id: 'target', position: { x: 120, y: 0 }, data: {} },
+      { id: 'source-peer-target', position: { x: 60, y: -100 }, data: {} },
+      { id: 'target-peer-source', position: { x: 60, y: 100 }, data: {} },
+    ] satisfies Node[];
+    const edge = {
+      id: 'z-dual-role-member',
+      source: 'source',
+      target: 'target',
+      label: 'Bridge label',
+      markerStart: { type: MarkerType.Arrow, color: '#2563eb' },
+      markerEnd: { type: MarkerType.ArrowClosed, color: '#2563eb' },
+      style: { stroke: '#2563eb', strokeWidth: 1.5 },
+      data: {
+        computedPath: [{ x: 0, y: 0 }, { x: 60, y: 0 }, { x: 120, y: 0 }],
+      },
+    } satisfies Edge;
+    const sourceOwner = {
+      id: 'source-owner', source: 'source', target: 'source-peer-target',
+      style: { stroke: '#2563eb', strokeWidth: 3 },
+      data: { computedPath: [{ x: 0, y: 0 }, { x: 60, y: 0 }, { x: 60, y: -100 }] },
+    } satisfies Edge;
+    const targetOwner = {
+      id: 'target-owner', source: 'target-peer-source', target: 'target',
+      style: { stroke: '#2563eb', strokeWidth: 3 },
+      data: { computedPath: [{ x: 60, y: 100 }, { x: 60, y: 0 }, { x: 120, y: 0 }] },
+    } satisfies Edge;
+
+    const sceneEdges = buildRenderSceneFromReactFlow(nodes, [edge, sourceOwner, targetOwner]).edges;
+
+    expect(sceneEdges.filter(item => item.id === edge.id)).toEqual([]);
+    expect(sceneEdges.some(item => item.label === 'Bridge label')).toBe(false);
+  });
+
+  it('keeps an edge whole when shared-trunk metadata or path points are invalid', () => {
+    const nodes = [
+      { id: 'source', position: { x: 0, y: 0 }, data: {} },
+      { id: 'target', position: { x: 300, y: 0 }, data: {} },
+    ] satisfies Node[];
+    const edge = {
+      id: 'invalid-shared-trunk',
+      source: 'source',
+      target: 'target',
+      label: 'Fallback label',
+      markerEnd: { type: MarkerType.ArrowClosed, color: '#2563eb' },
+      data: {
+        computedPath: Array.from({ length: 513 }, (_, index) => ({ x: index, y: 0 })),
+        __vizlySharedTrunkPaint: {
+          hiddenRanges: [{ from: 10, to: 20, role: 'source', ownerEdgeId: 'owner' }],
+          memberships: [],
+        },
+      },
+    } satisfies Edge;
+
+    const scene = buildRenderSceneFromReactFlow(nodes, [edge]);
+
+    expect(scene.edges).toHaveLength(1);
+    expect(scene.edges[0]).toMatchObject({ id: 'invalid-shared-trunk', label: 'Fallback label' });
+    expect(scene.edges[0].markerEnd).toMatchObject({ kind: 'arrow', color: '#2563eb' });
+    expect(scene.edges[0].points).toHaveLength(513);
+  });
+
+  it('fails closed to the full semantic edge when canonical paint metadata is invalid', () => {
+    const nodes = [
+      { id: 'source', position: { x: 0, y: 0 }, data: {} },
+      { id: 'target', position: { x: 160, y: 0 }, data: {} },
+    ] satisfies Node[];
+    const membership = {
+      id: 'source:source:owner', role: 'source', endpointId: 'source', ownerEdgeId: 'owner',
+      edgeIds: ['member', 'owner'], commonLength: 60,
+    } as const;
+    const edge = {
+      id: 'member', source: 'source', target: 'target', label: 'Safe fallback',
+      markerEnd: { type: MarkerType.ArrowClosed, color: '#2563EB' },
+      style: { stroke: '#2563EB', strokeWidth: 2 },
+      data: {
+        computedPath: [{ x: 0, y: 0 }, { x: 80, y: 0 }, { x: 160, y: 0 }],
+        __vizlySharedTrunkPaint: {
+          hiddenRanges: [{ from: 0, to: 60, role: 'source', ownerEdgeId: 'owner' }],
+          memberships: [membership],
+          backboneRanges: [{
+            from: 0,
+            to: 60,
+            role: 'source',
+            ownerEdgeId: 'owner',
+            membershipId: membership.id,
+            paint: {
+              token: 'semantic', stroke: 'url(javascript:alert(1))', strokeWidth: 2,
+              strokeDasharray: '', opacity: 1, strokeLinecap: 'round', strokeLinejoin: 'round',
+            },
+          }],
+        },
+      },
+    } satisfies Edge;
+
+    const scene = buildRenderSceneFromReactFlow(nodes, [edge]);
+
+    expect(scene.edges).toHaveLength(1);
+    expect(scene.edges[0]).toMatchObject({
+      id: 'member',
+      points: [{ x: 0, y: 0 }, { x: 80, y: 0 }, { x: 160, y: 0 }],
+      label: 'Safe fallback',
+      markerEnd: { kind: 'arrow' },
+    });
   });
 
   it('filters hidden nodes and edges with missing endpoints', () => {

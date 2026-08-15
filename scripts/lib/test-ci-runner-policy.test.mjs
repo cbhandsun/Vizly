@@ -1,4 +1,9 @@
+import { readdirSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
+
+import viteConfig from '../../vite.config.ts';
 
 import {
   isRetryableTestCiInfrastructureFailure,
@@ -10,6 +15,30 @@ import {
 } from './test-ci-runner-policy.mjs';
 
 describe('test:ci runner policy', () => {
+  it('excludes repository mirrors from every Vitest shard', () => {
+    expect(viteConfig.test?.exclude).toContain('.codex-audit/**');
+    expect(viteConfig.test?.exclude).toEqual(expect.arrayContaining([
+      '**/node_modules/**',
+      '**/.git/**',
+    ]));
+  });
+
+  it('requires DOM-backed hook tests in the Node shard to declare jsdom', () => {
+    const hookTestsDirectory = resolve(
+      process.cwd(),
+      'src/core/components/diagrams/hooks/__tests__',
+    );
+    const missingEnvironmentDeclaration = readdirSync(hookTestsDirectory)
+      .filter(fileName => /\.test\.[cm]?[jt]sx?$/.test(fileName))
+      .filter((fileName) => {
+        const source = readFileSync(resolve(hookTestsDirectory, fileName), 'utf8');
+        return source.includes('@testing-library/react')
+          && !source.slice(0, 256).includes('@vitest-environment jsdom');
+      });
+
+    expect(missingEnvironmentDeclaration).toEqual([]);
+  });
+
   it('uses one shard on Windows and two elsewhere by default', () => {
     expect(resolveTestCiConcurrency({ platform: 'win32' })).toBe(1);
     expect(resolveTestCiConcurrency({ platform: 'linux' })).toBe(2);

@@ -13,6 +13,7 @@ import {
 import { getApplicationDiagramRuntime } from '../../../ports/applicationDiagramRuntime';
 import { shouldUseGlobalDesignerPerformanceMode } from './designerSystemSyncPersistence';
 import { useDesignerInitialDiagramLoad } from './useDesignerInitialDiagramLoad';
+import { resolveCanonicalStandardPresetId } from './standardPresetCanonicalLoad';
 import {
     analyzeDesignerCanvas,
     projectDesignerStandardEdges,
@@ -435,8 +436,14 @@ export function useDesignerSystemSync({
         isCurrentDiagramInitialized,
         markCurrentDiagramInitialized,
     } = useDesignerPresetInitialization(id);
+    const canonicalPresetId = resolveCanonicalStandardPresetId(
+        typeof window === 'undefined' ? null : window.location,
+    );
+    const bypassAutosave = activePresetLookup.preset !== null
+        && canonicalPresetId === id;
     const autosaveEnabled = activePresetLookup.ready
-        && isCurrentDiagramInitialized;
+        && isCurrentDiagramInitialized
+        && !bypassAutosave;
 
     const { loadSaved, clearSaved, saveNow, saveState } = useAutoSave(nodes, edges, {
         interval: 60000,
@@ -471,6 +478,7 @@ export function useDesignerSystemSync({
         id,
         pluginId,
         activePresetLookup,
+        bypassAutosave,
         isCurrentDiagramInitialized,
         markCurrentDiagramInitialized,
         loadSaved,

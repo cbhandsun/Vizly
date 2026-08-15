@@ -8,6 +8,8 @@ import {
 } from './lib/precompiled-display-route-render.mjs';
 import { PRECOMPILED_DISPLAY_ROUTE_TARGETS } from './lib/precompiled-display-route-targets.mjs';
 import { hashPrecompiledDisplayRouteSource } from './lib/precompiled-display-route-source-hash.mjs';
+import { computePrecompiledDisplayRoutingSourceHash } from './lib/precompiled-display-route-source-set.mjs';
+import { auditPrecompiledDisplayRouteCommercialQuality } from './lib/precompiled-display-route-commercial-quality.mjs';
 
 const ROOT = resolve(process.cwd());
 const GENERATED_DIR = resolve(ROOT, 'src/core/components/shared/generated');
@@ -20,13 +22,14 @@ const INPUT_IDENTITY_PATH = resolve(
 const LOADERS_PATH = resolve(GENERATED_DIR, 'baseReactFlowPrecompiledRouteLoaders.ts');
 const ARTIFACT_DIR = resolve(GENERATED_DIR, 'precompiledRoutes');
 const ARTIFACT_SCHEMA = 'vizly-precompiled-display-route-v1';
-const MANIFEST_SCHEMA = 'vizly-precompiled-display-route-manifest-v2';
+const MANIFEST_SCHEMA = 'vizly-precompiled-display-route-manifest-v3';
 const MAX_ARTIFACT_BYTES = 2_000_000;
 
 const routingSource = await readFile(ROUTING_VERSION_PATH, 'utf8');
 const routingVersion = routingSource.match(/EDGE_ROUTING_CACHE_VERSION\s*=\s*['"]([^'"]+)['"]/)?.[1];
 if (!routingVersion) throw new Error('EDGE_ROUTING_CACHE_VERSION could not be read');
 const identitySourceHash = hashPrecompiledDisplayRouteSource(await readFile(INPUT_IDENTITY_PATH, 'utf8'));
+const routingSourceHash = await computePrecompiledDisplayRoutingSourceHash(ROOT);
 
 const manifestSource = await readFile(MANIFEST_PATH, 'utf8');
 const manifest = JSON.parse(manifestSource);
@@ -34,6 +37,7 @@ if (
   manifest?.schema !== MANIFEST_SCHEMA
   || manifest.routingVersion !== routingVersion
   || manifest.identitySourceHash !== identitySourceHash
+  || manifest.routingSourceHash !== routingSourceHash
   || !Array.isArray(manifest.entries)
   || manifest.entries.length !== PRECOMPILED_DISPLAY_ROUTE_TARGETS.length
 ) throw new Error('Precompiled route manifest is stale or malformed');
@@ -107,6 +111,13 @@ for (const entry of manifest.entries) {
     || !Array.isArray(artifact.patches)
     || artifact.patches.length === 0
   ) throw new Error(`Precompiled route artifact ${entry.artifactFile} is stale or malformed`);
+  const commercialIssues = auditPrecompiledDisplayRouteCommercialQuality(artifact.patches);
+  if (commercialIssues.length > 0) {
+    throw new Error(
+      `Precompiled route artifact ${entry.artifactFile} failed commercial quality: `
+      + JSON.stringify(commercialIssues),
+    );
+  }
   if (artifactSource !== renderPrecompiledRouteArtifact(artifact)) {
     throw new Error(`Precompiled route artifact ${entry.artifactFile} is not canonical`);
   }

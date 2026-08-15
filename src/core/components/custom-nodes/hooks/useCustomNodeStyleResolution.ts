@@ -161,6 +161,7 @@ export const useCustomNodeStyleResolution = ({
 
     // Debug checks
     const debugEnabled = useMemo(() => {
+        if (!import.meta.env.DEV) return false;
         try {
             const fromUrl = getQueryOrHashParamFromLocation(
                 typeof window === 'undefined' ? undefined : window.location,

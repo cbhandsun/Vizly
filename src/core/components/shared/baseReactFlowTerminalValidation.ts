@@ -22,8 +22,17 @@ const endpointDirectionsMatchNodes = (
   path: TerminalPoint[],
   nodeRects: Map<string, TerminalRect>,
   allowRenderedFilletTransitions = false,
-): boolean => {
-  if (path.length < 2) return false;
+): DisplayTerminalValidation => {
+  if (path.length < 2) {
+    return {
+      attached: false,
+      anchored: false,
+      sourceAttached: false,
+      sourceAnchored: false,
+      targetAttached: false,
+      targetAnchored: false,
+    };
+  }
   const source = path[0];
   const target = path[path.length - 1];
   const sourceRect = nodeRects.get(edge.source);
@@ -59,9 +68,6 @@ const endpointDirectionsMatchNodes = (
   const targetSide = hintedTargetSide && endpointLiesOnSide(target, targetRect, hintedTargetSide)
     ? hintedTargetSide
     : boundarySideFromTerminalEndpoint(target, targetRect);
-  if (!sourceSide || !targetSide) return false;
-  if (declaredSourceSide && declaredSourceSide !== sourceSide) return false;
-  if (declaredTargetSide && declaredTargetSide !== targetSide) return false;
 
   const terminalEscapesOutward = (
     orderedPath: TerminalPoint[],
@@ -69,7 +75,7 @@ const endpointDirectionsMatchNodes = (
     rect: TerminalRect | undefined,
     allowBoundaryTrunk: boolean,
   ): boolean => {
-    const [terminal, adjacent, next, afterNext] = orderedPath;
+    const [terminal, adjacent, next, afterNext, following] = orderedPath;
     if (!terminal || !adjacent) return false;
     const outwardAxis = expectedTerminalAxis(side);
     const firstAxis = terminalAxisOf(terminal, adjacent);
@@ -109,17 +115,64 @@ const endpointDirectionsMatchNodes = (
       if (!isBoundedRenderedFillet || !afterNext) return false;
       outwardPoint = afterNext;
     }
-    const coordinate = side === 't' || side === 'b' ? outwardPoint.y : outwardPoint.x;
+    let coordinate = side === 't' || side === 'b' ? outwardPoint.y : outwardPoint.x;
+    if (
+      allowRenderedFilletTransitions
+      && following
+      && !terminalCoordinateIsOutward(coordinate, adjacent, side)
+    ) {
+      const trailingDx = Math.abs(following.x - outwardPoint.x);
+      const trailingDy = Math.abs(following.y - outwardPoint.y);
+      const trailingMovesOutward = side === 't'
+        ? following.y < outwardPoint.y
+        : side === 'b'
+          ? following.y > outwardPoint.y
+          : side === 'l'
+            ? following.x < outwardPoint.x
+            : following.x > outwardPoint.x;
+      const isBoundedTrailingFillet = terminalAxisOf(outwardPoint, following) === null
+        && trailingDx > TERMINAL_EPSILON
+        && trailingDy > TERMINAL_EPSILON
+        && trailingDx <= MAX_RENDERED_FILLET_TRANSITION
+        && trailingDy <= MAX_RENDERED_FILLET_TRANSITION
+        && trailingMovesOutward;
+      if (isBoundedTrailingFillet) {
+        outwardPoint = following;
+        coordinate = side === 't' || side === 'b' ? outwardPoint.y : outwardPoint.x;
+      }
+    }
     return terminalCoordinateIsOutward(coordinate, adjacent, side);
   };
 
-  return terminalEscapesOutward(path, sourceSide, sourceRect, !declaredSourceSide)
-    && terminalEscapesOutward([...path].reverse(), targetSide, targetRect, !declaredTargetSide);
+  const sourceAttached = Boolean(boundarySideFromTerminalEndpoint(source, sourceRect));
+  const targetAttached = Boolean(boundarySideFromTerminalEndpoint(target, targetRect));
+  const sourceAnchored = Boolean(
+    sourceSide
+    && (!declaredSourceSide || declaredSourceSide === sourceSide)
+    && terminalEscapesOutward(path, sourceSide, sourceRect, !declaredSourceSide)
+  );
+  const targetAnchored = Boolean(
+    targetSide
+    && (!declaredTargetSide || declaredTargetSide === targetSide)
+    && terminalEscapesOutward([...path].reverse(), targetSide, targetRect, !declaredTargetSide)
+  );
+  return {
+    attached: sourceAttached && targetAttached,
+    anchored: sourceAnchored && targetAnchored,
+    sourceAttached,
+    sourceAnchored,
+    targetAttached,
+    targetAnchored,
+  };
 };
 
 export type DisplayTerminalValidation = {
   attached: boolean;
   anchored: boolean;
+  sourceAttached: boolean;
+  sourceAnchored: boolean;
+  targetAttached: boolean;
+  targetAnchored: boolean;
 };
 
 export type DisplayTerminalValidationSnapshot = {
@@ -149,23 +202,63 @@ export const createDisplayTerminalValidationSnapshot = (
   return {
     validateEdge: (edge) => {
       const path = readTerminalEdgePath(edge);
-      const anchored = endpointDirectionsMatchNodes(
+      return endpointDirectionsMatchNodes(
         edge,
         path,
         nodeRects,
         options.allowRenderedFilletTransitions === true,
       );
-      if (anchored) return { attached: true, anchored: true };
-      if (path.length < 2) return { attached: false, anchored: false };
-      return {
-        attached: Boolean(
-          boundarySideFromTerminalEndpoint(path[0], nodeRects.get(edge.source))
-          && boundarySideFromTerminalEndpoint(path[path.length - 1], nodeRects.get(edge.target))
-        ),
-        anchored: false,
-      };
     },
   };
+};
+
+export const displayEdgeTerminalValidationDoesNotRegress = (
+  baseline: Edge,
+  candidate: Edge,
+  snapshot: DisplayTerminalValidationSnapshot,
+): boolean => {
+  const before = snapshot.validateEdge(baseline);
+  const after = snapshot.validateEdge(candidate);
+  return (!before.sourceAttached || after.sourceAttached)
+    && (!before.sourceAnchored || after.sourceAnchored)
+    && (!before.targetAttached || after.targetAttached)
+    && (!before.targetAnchored || after.targetAnchored);
+};
+
+export const displayTerminalValidationDoesNotRegress = (
+  baseline: readonly Edge[],
+  candidate: readonly Edge[],
+  snapshot: DisplayTerminalValidationSnapshot,
+): boolean => {
+  const candidateById = new Map(candidate.map(edge => [edge.id, edge] as const));
+  return baseline.every((edge, index) => {
+    const nextEdge = candidate[index]?.id === edge.id
+      ? candidate[index]
+      : candidateById.get(edge.id);
+    if (!nextEdge) return false;
+    return displayEdgeTerminalValidationDoesNotRegress(edge, nextEdge, snapshot);
+  });
+};
+
+export const keepDisplayTerminalValidationNonRegressing = (
+  baseline: Edge[],
+  candidate: Edge[],
+  snapshot: DisplayTerminalValidationSnapshot,
+): Edge[] => {
+  if (baseline.length !== candidate.length) return baseline;
+  const candidateById = new Map(candidate.map(edge => [edge.id, edge] as const));
+  let changed = false;
+  const next = baseline.map((edge, index) => {
+    const candidateEdge = candidate[index]?.id === edge.id
+      ? candidate[index]
+      : candidateById.get(edge.id);
+    if (!candidateEdge) return edge;
+    const safe = displayEdgeTerminalValidationDoesNotRegress(edge, candidateEdge, snapshot);
+    if (!safe || candidateEdge === edge) return edge;
+    changed = true;
+    return candidateEdge;
+  });
+  return changed ? next : baseline;
 };
 
 export const getDisplayTerminalValidationReport = (
@@ -215,7 +308,7 @@ export const keepNodeAnchoredTerminalCandidates = (
   }
   return candidates.map((edge, index) => {
     const path = readTerminalEdgePath(edge);
-    return endpointDirectionsMatchNodes(edge, path, nodeRects)
+    return endpointDirectionsMatchNodes(edge, path, nodeRects).anchored
       ? edge
       : baseline[index] ?? edge;
   });

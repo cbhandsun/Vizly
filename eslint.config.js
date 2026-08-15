@@ -11,6 +11,7 @@ export default defineConfig([
     'dist-ssr',
     'coverage',
     '.coverage',
+    '.codex-audit',
     'test-results',
     'scratch',
     '.tmp-vizly-smoke-profile-*',

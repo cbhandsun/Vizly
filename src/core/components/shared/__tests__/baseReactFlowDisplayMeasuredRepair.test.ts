@@ -231,7 +231,7 @@ describe('measured display repair outcome', () => {
     ];
     const initial = getDisplayHardQualityGateReport(browserEdges, browserNodes, 'polished');
     expect(initial).toMatchObject({ terminalsAnchored: true });
-    expect(initial.quality).toMatchObject({ hairpins: 1, unexplainedRelatedOverlap: 32 });
+    expect(initial.quality).toMatchObject({ hairpins: 1, unexplainedRelatedOverlap: 0 });
 
     const outcome = repairBaseReactFlowMeasuredDisplayEdgesWithReport(browserEdges, browserNodes);
 

@@ -6,10 +6,18 @@ import {
   createDisplayTerminalValidationSnapshot,
   displayEdgesHaveNodeAttachedTerminals,
   displayEdgesHaveNodeAnchoredTerminals,
+  displayTerminalValidationDoesNotRegress,
   getDisplayTerminalValidationReport,
+  keepDisplayTerminalValidationNonRegressing,
   keepNodeAnchoredTerminalCandidates,
   repairTerminalHandleAxisCrossings,
 } from '../baseReactFlowTerminalAxisRepair';
+import {
+  createTerminalAxisCoordinatePools,
+  selectBoundedTerminalAxisCandidates,
+  selectNearestTerminalAxisCoordinates,
+  selectTerminalAxisOuterCoordinates,
+} from '../baseReactFlowTerminalAxisCandidateSelection';
 import { readTerminalEdgePath } from '../baseReactFlowTerminalGeometry';
 
 const node = (
@@ -104,6 +112,73 @@ describe('repairTerminalHandleAxisCrossings', () => {
       tinyInteriorDoglegs: quality.tinyInteriorDoglegs,
       hairpins: quality.hairpins,
     }, JSON.stringify(paths)).toEqual({
+      strictCrossings: 0,
+      reverseOverlap: 0,
+      unrelatedOverlap: 0,
+      unexplainedRelatedOverlap: 0,
+      tinyInteriorDoglegs: 0,
+      hairpins: 0,
+    });
+  });
+
+  it('keeps large-graph outer-lane bounding quality-equivalent', () => {
+    const measuredEdges = [
+      edge('customs', 'loms', 'customs-node', [
+        { x: 1323, y: 803 }, { x: 1323, y: 898 }, { x: 2063, y: 898 }, { x: 2063, y: 981 },
+      ]),
+      edge('carrier', 'tms', 'carrier-node', [
+        { x: 1288, y: 961 }, { x: 1288, y: 866 }, { x: 1546.25, y: 866 },
+        { x: 1546.25, y: 585 }, { x: 1769, y: 585 }, { x: 1769, y: 278 },
+      ]),
+      edge('downstream', 'tms', 'downstream-node', [
+        { x: 1374, y: 962 }, { x: 1470, y: 962 }, { x: 1470, y: 899 },
+        { x: 2418, y: 899 }, { x: 2418, y: 239 },
+      ]),
+    ];
+    const fillerEdges = Array.from({ length: 22 }, (_, index) => edge(
+      `filler-${index}`,
+      `filler-source-${index}`,
+      `filler-target-${index}`,
+      [
+        { x: 10_000, y: 10_000 + index * 100 },
+        { x: 10_100, y: 10_000 + index * 100 },
+      ],
+    ));
+    const fixtureNodes = [
+      node('loms', 1120.25, 605, 406, 197),
+      node('customs-node', 1853.25, 981.5, 420, 197),
+      node('tms', 1113.25, 962, 420, 236),
+      node('carrier-node', 1608.49, 80, 322, 197),
+      node('downstream-node', 2250.49, 119, 336, 119),
+    ];
+    const unbounded = repairTerminalHandleAxisCrossings(measuredEdges, fixtureNodes);
+    const result = repairTerminalHandleAxisCrossings(
+      [...measuredEdges, ...fillerEdges],
+      fixtureNodes,
+    );
+    const quality = calculateEdgePathQualityScore(result);
+    const boundedCorePaths = result
+      .slice(0, measuredEdges.length)
+      .map(readTerminalEdgePath);
+    const unboundedPaths = unbounded.map(readTerminalEdgePath);
+    const totalLength = (paths: Array<Array<{ x: number; y: number }>>): number => paths
+      .reduce((pathTotal, path) => pathTotal + path.slice(0, -1)
+        .reduce((segmentTotal, point, index) => (
+          segmentTotal
+          + Math.abs(path[index + 1].x - point.x)
+          + Math.abs(path[index + 1].y - point.y)
+        ), 0), 0);
+
+    expect(result.slice(0, measuredEdges.length).some(candidate => (
+      candidate.data?.terminalHandleAxisRepaired === true
+    ))).toBe(true);
+    expect(totalLength(boundedCorePaths)).toBeLessThanOrEqual(
+      totalLength(unboundedPaths) * 1.1,
+    );
+    expect(quality, JSON.stringify({
+      bounded: boundedCorePaths,
+      unbounded: unboundedPaths,
+    })).toMatchObject({
       strictCrossings: 0,
       reverseOverlap: 0,
       unrelatedOverlap: 0,
@@ -235,6 +310,44 @@ describe('repairTerminalHandleAxisCrossings', () => {
     expect(displayEdgesHaveNodeAttachedTerminals([anchored, wrongFixedAxis, detached], nodes)).toBe(false);
   });
 
+  it('rejects a candidate that trades one clean terminal role for another edge improvement', () => {
+    const nodes = [
+      node('source-a', 0, 0, 100, 60),
+      node('target-a', 0, 200, 100, 60),
+      node('source-b', 200, 0, 100, 60),
+      node('target-b', 200, 200, 100, 60),
+    ];
+    const cleanA = edge('a', 'source-a', 'target-a', [
+      { x: 50, y: 60 }, { x: 50, y: 200 },
+    ]);
+    const detachedB = edge('b', 'source-b', 'target-b', [
+      { x: 350, y: 60 }, { x: 250, y: 200 },
+    ]);
+    const detachedA = edge('a', 'source-a', 'target-a', [
+      { x: 150, y: 60 }, { x: 50, y: 200 },
+    ]);
+    const cleanB = edge('b', 'source-b', 'target-b', [
+      { x: 250, y: 60 }, { x: 250, y: 200 },
+    ]);
+    const snapshot = createDisplayTerminalValidationSnapshot(nodes);
+
+    expect(displayTerminalValidationDoesNotRegress(
+      [cleanA, detachedB],
+      [detachedA, cleanB],
+      snapshot,
+    )).toBe(false);
+    expect(displayTerminalValidationDoesNotRegress(
+      [cleanA, detachedB],
+      [cleanA, cleanB],
+      snapshot,
+    )).toBe(true);
+    expect(keepDisplayTerminalValidationNonRegressing(
+      [cleanA, detachedB],
+      [detachedA, cleanB],
+      snapshot,
+    )).toEqual([cleanA, cleanB]);
+  });
+
   it('accepts only bounded renderer fillet transitions after a boundary trunk', () => {
     const nodes = [
       node('source', 0, 0, 100, 60),
@@ -259,6 +372,15 @@ describe('repairTerminalHandleAxisCrossings', () => {
         ],
       },
     };
+    const dualFilletShortStub = {
+      ...edge('dual-fillet-short-stub', 'source', 'target', [
+        { x: 100, y: 30 }, { x: 160, y: 30 }, { x: 160, y: -18 },
+        { x: 250, y: -18 }, { x: 258, y: -26 }, { x: 292, y: -26 },
+        { x: 300, y: -18 }, { x: 300, y: 30 },
+      ]),
+      sourceHandle: 'right',
+      targetHandle: 'left',
+    };
 
     expect(displayEdgesHaveNodeAnchoredTerminals([renderedFillet], nodes)).toBe(false);
     expect(displayEdgesHaveNodeAnchoredTerminals([renderedFillet], nodes, {
@@ -267,6 +389,10 @@ describe('repairTerminalHandleAxisCrossings', () => {
     expect(displayEdgesHaveNodeAnchoredTerminals([oversizedTransition], nodes, {
       allowRenderedFilletTransitions: true,
     })).toBe(false);
+    expect(displayEdgesHaveNodeAnchoredTerminals([dualFilletShortStub], nodes)).toBe(false);
+    expect(displayEdgesHaveNodeAnchoredTerminals([dualFilletShortStub], nodes, {
+      allowRenderedFilletTransitions: true,
+    })).toBe(true);
   });
 
   it('does not treat renderer runtime handle locks as fixed semantic port constraints', () => {
@@ -375,3 +501,95 @@ const countStrictCrossings = (paths: Array<Array<{ x: number; y: number }>>): nu
   }
   return count;
 };
+
+const identityCandidatePath = <Point extends { x: number; y: number }>(path: Point[]): Point[] => path;
+
+describe('selectBoundedTerminalAxisCandidates', () => {
+  it('creates coordinate pools from path points and obstacle boundaries', () => {
+    expect(createTerminalAxisCoordinatePools(
+      [[{ x: 10, y: 20 }]],
+      new Map([['obstacle', { x: 100, y: 200, width: 30, height: 40 }]]),
+      4,
+      8,
+    )).toEqual({
+      x: [10, 6, 14, 2, 18, 100, 96, 104, 92, 108, 130, 126, 134, 122, 138],
+      y: [20, 16, 24, 12, 28, 200, 196, 204, 192, 208, 240, 236, 244, 232, 248],
+    });
+    expect(createTerminalAxisCoordinatePools([], new Map(), 4, 8)).toEqual({ x: [], y: [] });
+  });
+
+  it('ranks by raw Manhattan length before applying the candidate limit', () => {
+    const long = [{ x: 0, y: 0 }, { x: 10, y: 0 }];
+    const short = [{ x: 0, y: 0 }, { x: 2, y: 0 }];
+
+    expect(selectBoundedTerminalAxisCandidates([
+      { path: long, minimumPointCount: 0 },
+      { path: short, minimumPointCount: 0 },
+    ], identityCandidatePath, 1)).toEqual([short]);
+  });
+
+  it('filters undersized and duplicate compacted paths before consuming the limit', () => {
+    const duplicateA = [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 0 }];
+    const duplicateB = [{ x: 0, y: 0 }, { x: 2, y: 0 }];
+    const valid = [{ x: 0, y: 0 }, { x: 0, y: 3 }];
+    const compact = (path: Array<{ x: number; y: number }>) => path === duplicateA ? duplicateB : path;
+
+    expect(selectBoundedTerminalAxisCandidates([
+      { path: [{ x: 0, y: 0 }], minimumPointCount: 2 },
+      { path: duplicateA, minimumPointCount: 2 },
+      { path: duplicateB, minimumPointCount: 2 },
+      { path: valid, minimumPointCount: 2 },
+    ], compact, 2)).toEqual([duplicateB, valid]);
+  });
+
+  it('returns no candidates for an empty or non-positive limit', () => {
+    expect(selectBoundedTerminalAxisCandidates([], identityCandidatePath, 4)).toEqual([]);
+    expect(selectBoundedTerminalAxisCandidates([
+      { path: [{ x: 0, y: 0 }, { x: 1, y: 0 }], minimumPointCount: 0 },
+    ], identityCandidatePath, 0)).toEqual([]);
+  });
+
+  it('normalizes nearest coordinates and bounds large outer products with extremes', () => {
+    expect(selectNearestTerminalAxisCoordinates(
+      [Number.NaN, 10.004, 10.003, 30, 20],
+      18,
+      2,
+    )).toEqual([20, 10]);
+    expect(selectTerminalAxisOuterCoordinates({
+      targetValues: [0, 10, 20, 30, 40],
+      trunkValues: [100, 110, 120, 130, 140],
+      targetPreferred: 21,
+      trunkPreferred: 119,
+      boundProduct: true,
+      maximumCandidateCount: 4,
+      targetNearestLimit: 2,
+      trunkNearestLimit: 2,
+    })).toEqual({
+      targetLanes: [20, 30, 0, 40],
+      trunks: [120, 110, 100, 140],
+    });
+  });
+
+  it('retains complete small products and handles empty coordinate pools', () => {
+    expect(selectTerminalAxisOuterCoordinates({
+      targetValues: [0, 10],
+      trunkValues: [100, 110],
+      targetPreferred: 0,
+      trunkPreferred: 100,
+      boundProduct: true,
+      maximumCandidateCount: 4,
+      targetNearestLimit: 1,
+      trunkNearestLimit: 1,
+    })).toEqual({ targetLanes: [0, 10], trunks: [100, 110] });
+    expect(selectTerminalAxisOuterCoordinates({
+      targetValues: [],
+      trunkValues: [],
+      targetPreferred: 0,
+      trunkPreferred: 0,
+      boundProduct: true,
+      maximumCandidateCount: 0,
+      targetNearestLimit: 0,
+      trunkNearestLimit: 0,
+    })).toEqual({ targetLanes: [], trunks: [] });
+  });
+});

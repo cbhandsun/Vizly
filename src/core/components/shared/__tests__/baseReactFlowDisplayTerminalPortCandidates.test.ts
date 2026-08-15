@@ -128,6 +128,17 @@ describe('baseReactFlowDisplayTerminalPortCandidates', () => {
     )).toBe(true);
   });
 
+  it('keeps an outward source breakout valid at an exact node corner', () => {
+    const rect = { x: 0, y: 0, width: 100, height: 100 };
+
+    expect(displayTerminalRoleNeedsDeclaredAxisRepair(
+      edge(),
+      [{ x: 100, y: 100 }, { x: 148, y: 100 }, { x: 300, y: 100 }],
+      'source',
+      rect,
+    )).toBe(false);
+  });
+
   it('preserves a terminal tangent while adding an outward declared-axis stub', () => {
     const rect = { x: 2651.2, y: 1204.5, width: 144, height: 96 };
     const path = [
@@ -217,4 +228,5 @@ describe('baseReactFlowDisplayTerminalPortCandidates', () => {
       expect(path[1].y < 0 || path[1].y > 100).toBe(true);
     }
   });
+
 });

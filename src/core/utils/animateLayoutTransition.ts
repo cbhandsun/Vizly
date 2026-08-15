@@ -18,12 +18,45 @@ const ANIMATION_NODE_THRESHOLD = 200;
  * 默认动画时长 (ms)
  */
 const DEFAULT_DURATION = 300;
+const RENDER_FRAME_WATCHDOG_MS = 1_000;
 const activeAnimations = new WeakMap<React.Dispatch<React.SetStateAction<Node[]>>, () => void>();
 const suspendedUntil = new WeakMap<React.Dispatch<React.SetStateAction<Node[]>>, number>();
 
 interface AnimationTarget {
     from: { x: number; y: number };
     to: { x: number; y: number };
+}
+
+/**
+ * Run layout reconciliation after two render frames, but preserve liveness when
+ * an embedded preview or background tab suspends requestAnimationFrame.
+ */
+export function runAfterLayoutRenderFrames(callback: () => void): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+        let firstFrameId: number | null = null;
+        let secondFrameId: number | null = null;
+        let settled = false;
+
+        const finish = () => {
+            if (settled) return;
+            settled = true;
+            if (firstFrameId !== null) cancelAnimationFrame(firstFrameId);
+            if (secondFrameId !== null) cancelAnimationFrame(secondFrameId);
+            clearTimeout(watchdogId);
+            try {
+                callback();
+                resolve();
+            } catch (error: unknown) {
+                reject(error);
+            }
+        };
+
+        const watchdogId = setTimeout(finish, RENDER_FRAME_WATCHDOG_MS);
+        firstFrameId = requestAnimationFrame(() => {
+            firstFrameId = null;
+            secondFrameId = requestAnimationFrame(finish);
+        });
+    });
 }
 
 export function cancelLayoutTransition(setNodes: React.Dispatch<React.SetStateAction<Node[]>>) {
@@ -99,18 +132,42 @@ export function animateLayoutTransition(
         targetNodeMap.set(node.id, node);
     }
 
-    return new Promise<void>((resolve) => {
+    return new Promise<void>((resolve, reject) => {
         let animationMap: Map<string, AnimationTarget> | null = null;
         let startTime: number | null = null;
         let rafId: number | null = null;
+        let watchdogId: ReturnType<typeof setTimeout> | null = null;
         let cancelled = false;
 
-        activeAnimations.set(setNodes, () => {
-            cancelled = true;
+        const clearScheduledWork = () => {
             if (rafId !== null) cancelAnimationFrame(rafId);
-            options?.onComplete?.();
-            resolve();
+            if (watchdogId !== null) clearTimeout(watchdogId);
+            rafId = null;
+            watchdogId = null;
+        };
+
+        const settle = (applyTarget: boolean) => {
+            if (cancelled) return;
+            cancelled = true;
+            clearScheduledWork();
+            activeAnimations.delete(setNodes);
+            try {
+                if (applyTarget) setNodes(targetNodes);
+                options?.onComplete?.();
+                resolve();
+            } catch (error: unknown) {
+                reject(error);
+            }
+        };
+
+        const finish = () => settle(true);
+
+        activeAnimations.set(setNodes, () => {
+            settle(false);
         });
+        // Background tabs and embedded previews may suspend requestAnimationFrame.
+        // Always settle the layout transaction within a bounded wall-clock window.
+        watchdogId = setTimeout(finish, Math.max(duration + 1_000, 1_250));
 
         // 第一步：捕获当前位置（通过 setNodes updater 读取最新 state）
         setNodes(currentNodes => {
@@ -134,13 +191,7 @@ export function animateLayoutTransition(
 
             // 如果没有节点需要动画，直接返回目标状态
             if (animationMap.size === 0) {
-                setTimeout(() => {
-                    if (cancelled) return;
-                    activeAnimations.delete(setNodes);
-                    setNodes(targetNodes);
-                    options?.onComplete?.();
-                    resolve();
-                }, 0);
+                setTimeout(finish, 0);
                 return currentNodes; // 不改变当前帧
             }
 
@@ -160,10 +211,7 @@ export function animateLayoutTransition(
 
             if (progress >= 1) {
                 // 动画结束：精确设置最终位置（使用完整的 targetNodes 替换）
-                activeAnimations.delete(setNodes);
-                setNodes(targetNodes);
-                options?.onComplete?.();
-                resolve();
+                finish();
                 return;
             }
 

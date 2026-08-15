@@ -272,6 +272,30 @@ describe('baseReactFlowDisplayEdgeCore', () => {
     );
   });
 
+  it('keeps the route input identity stable across the finalized renderer swap', () => {
+    const input = {
+      nodes: baseNodes,
+      edges: [{
+        id: 'renderer-swap',
+        source: 'source',
+        target: 'target',
+        type: 'advanced-smart-step',
+      }] as Edge[],
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: false,
+    };
+
+    expect(computeBaseDisplayInputSignature({
+      ...input,
+      edges: [{ ...input.edges[0], type: 'stablePath' }],
+    })).toBe(computeBaseDisplayInputSignature(input));
+    expect(computeBaseDisplayInputSignature({
+      ...input,
+      edges: [{ ...input.edges[0], type: 'canvas-ref' }],
+    })).not.toBe(computeBaseDisplayInputSignature(input));
+  });
+
   it('invalidates display cache signatures for sub-pixel boundaries and fixed handle positions', () => {
     const edges: Edge[] = [{
       id: 'e1',

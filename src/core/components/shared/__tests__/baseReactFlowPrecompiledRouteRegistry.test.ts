@@ -12,7 +12,9 @@ import {
   parseBaseReactFlowPrecompiledRouteArtifact,
   sanitizeBaseReactFlowPrecompiledRoutePatches,
 } from '../baseReactFlowPrecompiledRouteArtifact';
+import { loadBaseReactFlowPrecompiledRouteAsset } from '../baseReactFlowPrecompiledRouteAsset';
 import {
+  hasBaseReactFlowPrecompiledRouteCandidateInRegistry,
   loadBaseReactFlowPrecompiledRouteCandidateFromRegistry,
 } from '../baseReactFlowPrecompiledRouteRegistry';
 import {
@@ -20,6 +22,7 @@ import {
 } from '../baseReactFlowPrecompiledRoutePrefetch';
 import { createBaseReactFlowDisplayEdgePatches } from '../baseReactFlowDisplayRoutingTransaction';
 import { GENERATED_BASE_REACT_FLOW_PRECOMPILED_ROUTE_LOADERS } from '../generated/baseReactFlowPrecompiledRouteLoaders';
+import generatedDemandAllocationArtifact from '../generated/precompiledRoutes/route-1155107368.json';
 
 const SOURCE_HASH = `source-v1:${'a'.repeat(64)}`;
 const TEST_PRESET_ID = 'test-preset';
@@ -102,6 +105,29 @@ const artifact = {
 };
 
 describe('baseReactFlowPrecompiledRouteRegistry', () => {
+  it('recognizes only an own exact signature and geometry descriptor', () => {
+    const descriptor = {
+      sourceHash: SOURCE_HASH,
+      geometryDigest: inputGeometryDigest,
+      load: vi.fn(async () => artifact),
+    };
+    expect(hasBaseReactFlowPrecompiledRouteCandidateInRegistry(
+      inputSignature,
+      inputGeometryDigest,
+      { [inputSignature]: descriptor },
+    )).toBe(true);
+    expect(hasBaseReactFlowPrecompiledRouteCandidateInRegistry(
+      inputSignature,
+      'geometry-v1:00000000000000000000000000000000',
+      { [inputSignature]: descriptor },
+    )).toBe(false);
+    expect(hasBaseReactFlowPrecompiledRouteCandidateInRegistry(
+      'toString',
+      inputGeometryDigest,
+      {},
+    )).toBe(false);
+  });
+
   it('lazy-loads an exact signature and digest hit into the current source graph', async () => {
     const load = vi.fn(async () => artifact);
     await expect(loadBaseReactFlowPrecompiledRouteCandidateFromRegistry(
@@ -196,6 +222,7 @@ describe('baseReactFlowPrecompiledRouteRegistry', () => {
         ...(routedEdges[0].data || {}),
         sharedTrunkAware: true,
         sharedTrunkSynthesized: false,
+        overextendedTargetTrunkCorridorReclaimed: true,
       },
     }];
     const intentArtifact = {
@@ -456,17 +483,94 @@ describe('baseReactFlowPrecompiledRouteRegistry', () => {
     })).toBeNull();
   });
 
-  it('keeps the generated WMS artifact parseable through its lazy descriptor', async () => {
+  it('rejects a hard-clean claim with an excessive bend chain', () => {
+    const excessiveBendEdges: Edge[] = [{
+      ...routedEdges[0],
+      data: {
+        computedPath: [
+          { x: 100, y: 30 }, { x: 100, y: 50 }, { x: 120, y: 50 },
+          { x: 120, y: 70 }, { x: 140, y: 70 }, { x: 140, y: 90 },
+          { x: 160, y: 90 }, { x: 160, y: 110 }, { x: 180, y: 110 },
+          { x: 180, y: 130 }, { x: 200, y: 130 }, { x: 200, y: 150 },
+          { x: 220, y: 150 }, { x: 220, y: 170 }, { x: 300, y: 170 },
+        ],
+      },
+    }];
+    const excessiveBendArtifact = {
+      ...artifact,
+      outputRouteSignature: computeBaseReactFlowDisplayOutputRouteSignature(excessiveBendEdges),
+      patches: createBaseReactFlowDisplayEdgePatches(sourceEdges, excessiveBendEdges),
+    };
+
+    expect(parseBaseReactFlowPrecompiledRouteArtifact(excessiveBendArtifact, {
+      inputSignature,
+      inputGeometryDigest,
+      sourceHash: SOURCE_HASH,
+    })).toBeNull();
+  });
+
+  it('keeps the generated WMS artifact parseable through its data descriptor', () => {
     const [generatedSignature, descriptor] = Object.entries(
       GENERATED_BASE_REACT_FLOW_PRECOMPILED_ROUTE_LOADERS,
     )[0] ?? [];
     expect(generatedSignature).toMatch(/^\d{1,10}$/);
     expect(descriptor).toBeTruthy();
-    const raw = await descriptor.load();
-    expect(parseBaseReactFlowPrecompiledRouteArtifact(raw, {
+    expect(descriptor.load).toEqual(expect.any(Function));
+    expect(parseBaseReactFlowPrecompiledRouteArtifact(generatedDemandAllocationArtifact, {
       inputSignature: generatedSignature,
       inputGeometryDigest: descriptor.geometryDigest,
       sourceHash: descriptor.sourceHash,
     })).not.toBeNull();
+  });
+});
+
+describe('precompiled route asset boundary', () => {
+  const sameOriginUrl = new URL('/assets/route-1.json', globalThis.location.href);
+
+  it('loads a bounded same-origin JSON document with constrained fetch options', async () => {
+    const fetchArtifact = vi.fn(async () => new Response('{"hardClean":true}', {
+      headers: { 'content-length': '18', 'content-type': 'application/json' },
+    }));
+
+    await expect(loadBaseReactFlowPrecompiledRouteAsset(sameOriginUrl, fetchArtifact))
+      .resolves.toEqual({ hardClean: true });
+    expect(fetchArtifact).toHaveBeenCalledWith(sameOriginUrl, {
+      credentials: 'same-origin',
+      headers: { accept: 'application/json' },
+      redirect: 'error',
+    });
+  });
+
+  it.each([
+    ['cross-origin URL', new URL('https://example.invalid/route.json')],
+    ['non-HTTP URL', new URL('file:///tmp/route.json')],
+  ])('rejects a %s before issuing a request', async (_label, url) => {
+    const fetchArtifact = vi.fn();
+    await expect(loadBaseReactFlowPrecompiledRouteAsset(url, fetchArtifact)).rejects.toThrow(
+      'same-origin HTTP(S)',
+    );
+    expect(fetchArtifact).not.toHaveBeenCalled();
+  });
+
+  it('rejects non-success responses, declared oversize bodies, and actual oversize bodies', async () => {
+    await expect(loadBaseReactFlowPrecompiledRouteAsset(
+      sameOriginUrl,
+      async () => new Response('', { status: 503 }),
+    )).rejects.toThrow('HTTP 503');
+    await expect(loadBaseReactFlowPrecompiledRouteAsset(
+      sameOriginUrl,
+      async () => new Response('{}', { headers: { 'content-length': '1000001' } }),
+    )).rejects.toThrow('byte limit');
+    await expect(loadBaseReactFlowPrecompiledRouteAsset(
+      sameOriginUrl,
+      async () => new Response(`"${'x'.repeat(1_000_001)}"`),
+    )).rejects.toThrow('byte limit');
+  });
+
+  it.each(['', 'not-json'])('rejects invalid JSON body %j', async (body) => {
+    await expect(loadBaseReactFlowPrecompiledRouteAsset(
+      sameOriginUrl,
+      async () => new Response(body),
+    )).rejects.toBeInstanceOf(SyntaxError);
   });
 });

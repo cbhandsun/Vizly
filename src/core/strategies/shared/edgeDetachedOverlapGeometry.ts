@@ -37,8 +37,16 @@ export type StrictCrossingHit = {
   b: PathSegmentRef;
 };
 
+export type StrictCrossingSegmentIndex = Readonly<{
+  horizontal: readonly PathSegmentRef[];
+  vertical: readonly PathSegmentRef[];
+  horizontalByY: readonly PathSegmentRef[];
+  verticalByX: readonly PathSegmentRef[];
+}>;
+
 export const EPS = 0.5;
 const VISUAL_PARALLEL_LANE_TOLERANCE = 4;
+const SHARED_TRUNK_COORDINATE_EPS = VISUAL_PARALLEL_LANE_TOLERANCE;
 const ENDPOINT_TRUNK_WINDOW = 160;
 
 const num = (value: unknown, fallback: number): number => (
@@ -133,10 +141,10 @@ export function strictCross(first: Segment, second: Segment): boolean {
   const v = first.axis === 'v' ? first : second;
   const x = v.a.x;
   const y = h.a.y;
-  return x > Math.min(h.a.x, h.b.x) + 1
-    && x < Math.max(h.a.x, h.b.x) - 1
-    && y > Math.min(v.a.y, v.b.y) + 1
-    && y < Math.max(v.a.y, v.b.y) - 1;
+  return x > Math.min(h.a.x, h.b.x) + EPS
+    && x < Math.max(h.a.x, h.b.x) - EPS
+    && y > Math.min(v.a.y, v.b.y) + EPS
+    && y < Math.max(v.a.y, v.b.y) - EPS;
 }
 
 export function nodeRect(node: ReactFlowNode | undefined): Rect | null {
@@ -222,16 +230,47 @@ export function isEndpointSharedTrunkOverlap(
   first: PathSegmentRef,
   second: PathSegmentRef,
   edges: Edge[],
-  overlap: number,
+  _overlap: number,
+  firstEdgeSegments: readonly PathSegmentRef[] = [first],
+  secondEdgeSegments: readonly PathSegmentRef[] = [second],
 ): boolean {
   const firstEdge = edges[first.edgeIndex];
   const secondEdge = edges[second.edgeIndex];
   if (!firstEdge || !secondEdge) return false;
-  if (firstEdge.source === secondEdge.source) return true;
-  return firstEdge.target === secondEdge.target
-    && first.fromEnd <= ENDPOINT_TRUNK_WINDOW
-    && second.fromEnd <= ENDPOINT_TRUNK_WINDOW
-    && overlap <= ENDPOINT_TRUNK_WINDOW;
+  const samePoint = (firstPoint: Point, secondPoint: Point): boolean => (
+    Math.abs(firstPoint.x - secondPoint.x) <= SHARED_TRUNK_COORDINATE_EPS
+    && Math.abs(firstPoint.y - secondPoint.y) <= SHARED_TRUNK_COORDINATE_EPS
+  );
+  const chainContains = (target: boolean): boolean => {
+    const firstOffset = target ? first.pointCount - 2 - first.segIdx : first.segIdx;
+    const secondOffset = target ? second.pointCount - 2 - second.segIdx : second.segIdx;
+    if (firstOffset !== secondOffset || firstOffset < 0) return false;
+    for (let offset = 0; offset <= firstOffset; offset += 1) {
+      const firstIndex = target ? first.pointCount - 2 - offset : offset;
+      const secondIndex = target ? second.pointCount - 2 - offset : offset;
+      const firstPart = firstEdgeSegments.find(segment => segment.segIdx === firstIndex);
+      const secondPart = secondEdgeSegments.find(segment => segment.segIdx === secondIndex);
+      if (!firstPart || !secondPart || firstPart.axis !== secondPart.axis) return false;
+      const [firstStart, firstEnd] = target
+        ? [firstPart.b, firstPart.a]
+        : [firstPart.a, firstPart.b];
+      const [secondStart, secondEnd] = target
+        ? [secondPart.b, secondPart.a]
+        : [secondPart.a, secondPart.b];
+      if (!samePoint(firstStart, secondStart)) return false;
+      const firstDelta = firstPart.axis === 'h'
+        ? firstEnd.x - firstStart.x
+        : firstEnd.y - firstStart.y;
+      const secondDelta = secondPart.axis === 'h'
+        ? secondEnd.x - secondStart.x
+        : secondEnd.y - secondStart.y;
+      if (firstDelta * secondDelta <= EPS) return false;
+      if (offset < firstOffset && !samePoint(firstEnd, secondEnd)) return false;
+    }
+    return true;
+  };
+  return (firstEdge.source === secondEdge.source && chainContains(false))
+    || (firstEdge.target === secondEdge.target && chainContains(true));
 }
 
 export function isReversePairOverlap(first: PathSegmentRef, second: PathSegmentRef, edges: Edge[]): boolean {
@@ -325,14 +364,72 @@ export function extractPathSegmentRefsForPath(path: Point[], edgeIndex: number, 
   return refs;
 }
 
+export function createStrictCrossingSegmentIndex(
+  segments: readonly PathSegmentRef[],
+): StrictCrossingSegmentIndex {
+  const horizontal: PathSegmentRef[] = [];
+  const vertical: PathSegmentRef[] = [];
+  for (const segment of segments) {
+    (segment.axis === 'h' ? horizontal : vertical).push(segment);
+  }
+  return {
+    horizontal,
+    vertical,
+    horizontalByY: [...horizontal].sort((first, second) => first.a.y - second.a.y),
+    verticalByX: [...vertical].sort((first, second) => first.a.x - second.a.x),
+  };
+}
+
+const firstCoordinateAbove = (
+  segments: readonly PathSegmentRef[],
+  value: number,
+  coordinate: (segment: PathSegmentRef) => number,
+): number => {
+  let lower = 0;
+  let upper = segments.length;
+  while (lower < upper) {
+    const middle = lower + Math.floor((upper - lower) / 2);
+    if (coordinate(segments[middle]) <= value) lower = middle + 1;
+    else upper = middle;
+  }
+  return lower;
+};
+
+const strictCrossingCandidates = (
+  segment: PathSegmentRef,
+  segmentIndex: StrictCrossingSegmentIndex,
+): readonly PathSegmentRef[] => {
+  const perpendicularSegments = segment.axis === 'h'
+    ? segmentIndex.verticalByX
+    : segmentIndex.horizontalByY;
+  const coordinate = segment.axis === 'h'
+    ? (candidate: PathSegmentRef) => candidate.a.x
+    : (candidate: PathSegmentRef) => candidate.a.y;
+  const start = segment.axis === 'h'
+    ? Math.min(segment.a.x, segment.b.x) + EPS
+    : Math.min(segment.a.y, segment.b.y) + EPS;
+  const end = segment.axis === 'h'
+    ? Math.max(segment.a.x, segment.b.x) - EPS
+    : Math.max(segment.a.y, segment.b.y) - EPS;
+  if (end <= start) return [];
+
+  const first = firstCoordinateAbove(perpendicularSegments, start, coordinate);
+  let last = first;
+  while (last < perpendicularSegments.length && coordinate(perpendicularSegments[last]) < end) {
+    last += 1;
+  }
+  return perpendicularSegments.slice(first, last);
+};
+
 export function strictCrossingsForEdgeSegments(
   candidateSegments: PathSegmentRef[],
   allSegments: PathSegmentRef[],
   edgeIndex: number,
+  segmentIndex = createStrictCrossingSegmentIndex(allSegments),
 ): number {
   let total = 0;
   for (const candidate of candidateSegments) {
-    for (const other of allSegments) {
+    for (const other of strictCrossingCandidates(candidate, segmentIndex)) {
       if (other.edgeIndex === edgeIndex) continue;
       if (strictCross(candidate, other)) total += 1;
     }
@@ -342,6 +439,12 @@ export function strictCrossingsForEdgeSegments(
 
 export function findDetachedParallelOverlaps(paths: Point[][], edges: Edge[], minOverlap = 96): DetachedOverlapHit[] {
   const segments = extractPathSegmentRefs(paths, edges);
+  const segmentsByEdgeIndex = new Map<number, PathSegmentRef[]>();
+  for (const segment of segments) {
+    const current = segmentsByEdgeIndex.get(segment.edgeIndex) ?? [];
+    current.push(segment);
+    segmentsByEdgeIndex.set(segment.edgeIndex, current);
+  }
   const hits: DetachedOverlapHit[] = [];
   for (let i = 0; i < segments.length; i += 1) {
     for (let j = i + 1; j < segments.length; j += 1) {
@@ -349,7 +452,14 @@ export function findDetachedParallelOverlaps(paths: Point[][], edges: Edge[], mi
       const second = segments[j];
       if (first.edgeIndex === second.edgeIndex || first.axis !== second.axis) continue;
       const overlap = segmentOverlap(first, second);
-      if (isEndpointSharedTrunkOverlap(first, second, edges, overlap)) continue;
+      if (isEndpointSharedTrunkOverlap(
+        first,
+        second,
+        edges,
+        overlap,
+        segmentsByEdgeIndex.get(first.edgeIndex),
+        segmentsByEdgeIndex.get(second.edgeIndex),
+      )) continue;
       if (overlap >= minOverlap) hits.push({ a: first, b: second, overlap });
     }
   }
@@ -397,12 +507,25 @@ function hitRepairPriority(hit: DetachedOverlapHit, edges: Edge[]): number {
 
 export function findStrictCrossings(paths: Point[][], edges: Edge[]): StrictCrossingHit[] {
   const segments = extractPathSegmentRefs(paths, edges);
+  const segmentIndex = createStrictCrossingSegmentIndex(segments);
+  const { horizontal: horizontalSegments } = segmentIndex;
+  const segmentOrder = new Map(segments.map((segment, index) => [segment, index] as const));
   const hits: StrictCrossingHit[] = [];
-  for (let i = 0; i < segments.length; i += 1) {
-    for (let j = i + 1; j < segments.length; j += 1) {
-      if (segments[i].edgeIndex === segments[j].edgeIndex) continue;
-      if (strictCross(segments[i], segments[j])) hits.push({ a: segments[i], b: segments[j] });
+  for (const horizontal of horizontalSegments) {
+    for (const vertical of strictCrossingCandidates(horizontal, segmentIndex)) {
+      if (horizontal.edgeIndex === vertical.edgeIndex) continue;
+      if (!strictCross(horizontal, vertical)) continue;
+      const horizontalOrder = segmentOrder.get(horizontal) ?? 0;
+      const verticalOrder = segmentOrder.get(vertical) ?? 0;
+      hits.push(horizontalOrder < verticalOrder
+        ? { a: horizontal, b: vertical }
+        : { a: vertical, b: horizontal });
     }
   }
-  return hits;
+  return hits.sort((first, second) => {
+    const firstA = segmentOrder.get(first.a) ?? 0;
+    const secondA = segmentOrder.get(second.a) ?? 0;
+    if (firstA !== secondA) return firstA - secondA;
+    return (segmentOrder.get(first.b) ?? 0) - (segmentOrder.get(second.b) ?? 0);
+  });
 }

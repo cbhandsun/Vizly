@@ -1,6 +1,9 @@
 import type { Edge, Node } from '@xyflow/react';
 import { DISPLAY_WORKER_MAX_COORDINATE_MAGNITUDE } from './baseReactFlowDisplayWorkerProtocol';
 
+type DisplayWorkerSourceNode = Node & { positionAbsolute?: unknown };
+type DisplayWorkerProjectedNode = Node & { positionAbsolute: { x: number; y: number } };
+
 const DISPLAY_WORKER_VALUE_DEPTH = 8;
 const DISPLAY_WORKER_MAX_ARRAY_ITEMS = 2_000;
 const DISPLAY_WORKER_MAX_OBJECT_KEYS = 120;
@@ -49,35 +52,62 @@ const projectDisplayWorkerPosition = (value: unknown, fallback = { x: 0, y: 0 })
   };
 };
 
-const projectDisplayWorkerNodes = (nodes: Node[]): Node[] => nodes.map((node) => {
-  const extendedNode = node as Node & { positionAbsolute?: unknown };
-  const style = node.style && typeof node.style === 'object' ? node.style as Record<string, unknown> : {};
-  const data = node.data && typeof node.data === 'object' ? node.data as Record<string, unknown> : {};
-  const projectedStyle = {
-    width: projectDisplayWorkerStyleDimension(style.width),
-    height: projectDisplayWorkerStyleDimension(style.height),
-  };
-  const projectedLayoutDirection = projectDisplayWorkerValue(data.layoutDirection);
-  return {
-    id: node.id,
-    type: node.type,
-    parentId: node.parentId,
-    position: projectDisplayWorkerPosition(node.position),
-    positionAbsolute: extendedNode.positionAbsolute
-      ? projectDisplayWorkerPosition(extendedNode.positionAbsolute)
-      : undefined,
-    width: finiteNumberOrUndefined(node.width),
-    height: finiteNumberOrUndefined(node.height),
-    measured: node.measured && typeof node.measured === 'object'
-      ? {
-        width: finiteNumberOrUndefined(node.measured.width),
-        height: finiteNumberOrUndefined(node.measured.height),
-      }
-      : undefined,
-    style: Object.values(projectedStyle).some(value => typeof value !== 'undefined') ? projectedStyle : undefined,
-    data: typeof projectedLayoutDirection === 'undefined' ? {} : { layoutDirection: projectedLayoutDirection },
-  } as Node;
-});
+const resolveDisplayWorkerAbsolutePosition = (
+  node: DisplayWorkerSourceNode,
+  nodeById: Map<string, DisplayWorkerSourceNode>,
+): { x: number; y: number } => {
+  const explicit = node.positionAbsolute;
+  // Nested adapters do not assign one stable meaning to positionAbsolute.
+  // Their declared parent chain is authoritative; only roots may reuse it.
+  if (explicit && !node.parentId) return projectDisplayWorkerPosition(explicit);
+
+  const position = projectDisplayWorkerPosition(node.position);
+  let x = position.x;
+  let y = position.y;
+  let current = node;
+  const visited = new Set([node.id]);
+  for (let depth = 0; current.parentId && depth < 20; depth += 1) {
+    if (visited.has(current.parentId)) break;
+    const parent = nodeById.get(current.parentId);
+    if (!parent) break;
+    const parentPosition = projectDisplayWorkerPosition(parent.position);
+    x += parentPosition.x;
+    y += parentPosition.y;
+    visited.add(parent.id);
+    current = parent;
+  }
+  return { x, y };
+};
+
+const projectDisplayWorkerNodes = (nodes: DisplayWorkerSourceNode[]): DisplayWorkerProjectedNode[] => {
+  const nodeById = new Map(nodes.map(node => [node.id, node] as const));
+  return nodes.map((node) => {
+    const style = node.style && typeof node.style === 'object' ? node.style as Record<string, unknown> : {};
+    const data = node.data && typeof node.data === 'object' ? node.data as Record<string, unknown> : {};
+    const projectedStyle = {
+      width: projectDisplayWorkerStyleDimension(style.width),
+      height: projectDisplayWorkerStyleDimension(style.height),
+    };
+    const projectedLayoutDirection = projectDisplayWorkerValue(data.layoutDirection);
+    return {
+      id: node.id,
+      type: node.type,
+      parentId: node.parentId,
+      position: projectDisplayWorkerPosition(node.position),
+      positionAbsolute: resolveDisplayWorkerAbsolutePosition(node, nodeById),
+      width: finiteNumberOrUndefined(node.width),
+      height: finiteNumberOrUndefined(node.height),
+      measured: node.measured && typeof node.measured === 'object'
+        ? {
+          width: finiteNumberOrUndefined(node.measured.width),
+          height: finiteNumberOrUndefined(node.measured.height),
+        }
+        : undefined,
+      style: Object.values(projectedStyle).some(value => typeof value !== 'undefined') ? projectedStyle : undefined,
+      data: typeof projectedLayoutDirection === 'undefined' ? {} : { layoutDirection: projectedLayoutDirection },
+    } as DisplayWorkerProjectedNode;
+  });
+};
 
 const projectDisplayWorkerEdges = (edges: Edge[]): Edge[] => edges.map((edge) => ({
   id: edge.id,
@@ -97,7 +127,10 @@ const projectDisplayWorkerEdges = (edges: Edge[]): Edge[] => edges.map((edge) =>
 export const projectBaseReactFlowDisplayWorkerInput = ({
   edges,
   nodes,
-}: { edges: Edge[]; nodes: Node[] }): { edges: Edge[]; nodes: Node[] } => ({
+}: { edges: Edge[]; nodes: DisplayWorkerSourceNode[] }): {
+  edges: Edge[];
+  nodes: DisplayWorkerProjectedNode[];
+} => ({
   edges: projectDisplayWorkerEdges(edges),
   nodes: projectDisplayWorkerNodes(nodes),
 });

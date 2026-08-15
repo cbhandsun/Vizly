@@ -11,6 +11,7 @@ import {
   type DisplayPoint,
   type DisplayRect,
 } from './baseReactFlowDisplayGeometry';
+export { inferTerminalGeometrySide } from './baseReactFlowDisplayTerminalSide';
 
 export const MIN_DISPLAY_ENDPOINT_STUB = 48;
 const MAX_TERMINAL_STUB_NUMERIC_DRIFT = 2;
@@ -280,59 +281,4 @@ export const buildDeclaredTerminalInsetNudgeCandidates = (
     ]);
     return role === 'source' ? candidate : [...candidate].reverse();
   });
-};
-
-export const inferTerminalGeometrySide = (
-  path: DisplayPoint[],
-  role: 'source' | 'target',
-  rect: DisplayRect,
-): 'top' | 'bottom' | 'left' | 'right' | null => {
-  if (path.length < 2) return null;
-  const oriented = role === 'source' ? path : [...path].reverse();
-  const [terminal, adjacent, next] = oriented;
-  if (!terminal || !adjacent) return null;
-  const candidates = (['top', 'bottom', 'left', 'right'] as const)
-    .map((side) => {
-      const horizontalSide = side === 'left' || side === 'right';
-      const onBoundary = side === 'top'
-        ? Math.abs(terminal.y - rect.y) <= 3
-          && terminal.x >= rect.x - 3 && terminal.x <= rect.x + rect.width + 3
-        : side === 'bottom'
-          ? Math.abs(terminal.y - (rect.y + rect.height)) <= 3
-            && terminal.x >= rect.x - 3 && terminal.x <= rect.x + rect.width + 3
-          : side === 'left'
-            ? Math.abs(terminal.x - rect.x) <= 3
-              && terminal.y >= rect.y - 3 && terminal.y <= rect.y + rect.height + 3
-            : Math.abs(terminal.x - (rect.x + rect.width)) <= 3
-              && terminal.y >= rect.y - 3 && terminal.y <= rect.y + rect.height + 3;
-      if (!onBoundary) return null;
-      const expectedAxis = horizontalSide ? 'h' : 'v';
-      const firstAxis = displayAxisOf(terminal, adjacent);
-      const outward = (point: DisplayPoint): boolean => (
-        side === 'left'
-          ? point.x < terminal.x - 1
-          : side === 'right'
-            ? point.x > terminal.x + 1
-            : side === 'top'
-              ? point.y < terminal.y - 1
-              : point.y > terminal.y + 1
-      );
-      if (firstAxis === expectedAxis && outward(adjacent)) return { side, score: 0 };
-      if (!next || !firstAxis || firstAxis === expectedAxis) return null;
-      const adjacentStaysOnBoundary = side === 'top'
-        ? Math.abs(adjacent.y - rect.y) <= 3
-        : side === 'bottom'
-          ? Math.abs(adjacent.y - (rect.y + rect.height)) <= 3
-          : side === 'left'
-            ? Math.abs(adjacent.x - rect.x) <= 3
-            : Math.abs(adjacent.x - (rect.x + rect.width)) <= 3;
-      if (!adjacentStaysOnBoundary || displayAxisOf(adjacent, next) !== expectedAxis) return null;
-      return outward(next) ? { side, score: 1 } : null;
-    })
-    .filter((candidate): candidate is {
-      side: 'top' | 'bottom' | 'left' | 'right';
-      score: number;
-    } => Boolean(candidate))
-    .sort((first, second) => first.score - second.score);
-  return candidates[0]?.side ?? null;
 };

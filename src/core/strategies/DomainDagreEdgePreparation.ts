@@ -4,23 +4,23 @@ import { decideEdgeRouting, assignGlobalPorts, type RoutingConfig } from '../uti
 import { expandHandle, normalizeHandle } from '../routing/utils/handleUtils';
 import { logDomainDagreMissingNodeHandle } from './layoutLogging';
 import { repairSharedTrunkAwareCrossings } from './shared/edgeRoutingPipeline';
+import { repairSharedTrunkAwareObstacles } from './shared/edgeRoutingWaypointRefinement';
 import {
-    buildEndpointOrthogonalFallbackPath,
-    lockComputedPathOnEdge,
-    resolveRoutingResultPath,
-} from './shared/edgeFallbackPath';
+    COMMERCIAL_BUSINESS_NODE_CLEARANCE,
+    repairBusinessNodeClearanceRisks,
+} from './shared/edgeBusinessNodeClearanceRepair';
+import { chooseCommercialRouteCandidate } from './shared/edgeCommercialRouteGuard';
+import { lockComputedPathOnEdge, resolveRoutingResultPath } from './shared/edgeFallbackPath';
 import { repairEndpointOrthogonalPaths } from './shared/edgeEndpointPathRepair';
 import { separateDetachedParallelOverlaps } from './shared/edgeDetachedOverlapRepair';
 import { reorderDomainDagrePortAnchors } from './domainDagrePortAnchorOrdering';
-import {
-    repairSharedTargetEntryCrossings,
-    synthesizeSharedEndpointTrunks,
-} from './shared/edgeSharedTrunkSynthesis';
+import { prepareDomainDagreInteractiveEdges } from './domainDagreInteractiveEdgePreparation';
 import {
     applyAutoHandleData,
     asRoutingRecord,
     finiteRoutingNumber as finiteNumber,
     readDirectionalHandlePolicy,
+    readManualHandleLocks,
     readManualHandleSides,
     routingNodeAbsolutePosition,
     routingNodeSize,
@@ -121,82 +121,12 @@ export async function prepareDomainDagreEdges({
 
     const edgeRoutingQuality = String(options.edgeRoutingQuality ?? 'full');
     if (edgeRoutingQuality === 'interactive') {
-        const layoutDir = String(options.direction || 'TB').toUpperCase();
-        const pickInteractiveHandles = (source: RoutingNode, target: RoutingNode) => {
-            const sourcePos = routingNodeAbsolutePosition(source);
-            const targetPos = routingNodeAbsolutePosition(target);
-            const sourceSize = routingNodeSize(source);
-            const targetSize = routingNodeSize(target);
-            const dx = (targetPos.x + targetSize.width / 2) - (sourcePos.x + sourceSize.width / 2);
-            const dy = (targetPos.y + targetSize.height / 2) - (sourcePos.y + sourceSize.height / 2);
-            if (layoutDir === 'LR' || layoutDir === 'RL' || Math.abs(dx) > Math.abs(dy) * 1.35) {
-                return dx >= 0
-                    ? { sourceHandle: 'right', targetHandle: 'left' }
-                    : { sourceHandle: 'left', targetHandle: 'right' };
-            }
-            return dy >= 0
-                ? { sourceHandle: 'bottom', targetHandle: 'top' }
-                : { sourceHandle: 'top', targetHandle: 'bottom' };
-        };
-        const interactiveEdges = clonedEdges.map(edge => {
-            const source = idMap.get(edge.source);
-            const target = idMap.get(edge.target);
-            if (!source || !target) {
-                return {
-                    ...edge,
-                    sourceHandle: edge.sourceHandle || (layoutDir === 'LR' || layoutDir === 'RL' ? 'right' : 'bottom'),
-                    targetHandle: edge.targetHandle || (layoutDir === 'LR' || layoutDir === 'RL' ? 'left' : 'top'),
-                    data: {
-                        ...(edge.data || {}),
-                        algorithm: 'domain-dagre-interactive',
-                        trunkPolishVersion: 2,
-                    },
-                };
-            }
-            const handles = pickInteractiveHandles(source, target);
-            const nextEdge = {
-                ...edge,
-                sourceHandle: expandHandle(edge.sourceHandle || handles.sourceHandle),
-                targetHandle: expandHandle(edge.targetHandle || handles.targetHandle),
-                data: {
-                    ...(edge.data || {}),
-                    autoSource: !edge.sourceHandle,
-                    autoTarget: !edge.targetHandle,
-                    auto: [
-                        ...(!edge.sourceHandle ? ['source'] : []),
-                        ...(!edge.targetHandle ? ['target'] : []),
-                    ],
-                    algorithm: 'domain-dagre-interactive',
-                    trunkPolishVersion: 2,
-                },
-            } as Edge;
-            lockComputedPathOnEdge(nextEdge, buildEndpointOrthogonalFallbackPath({
-                source,
-                target,
-                sourceHandle: nextEdge.sourceHandle,
-                targetHandle: nextEdge.targetHandle,
-                nodeById: idMap,
-                stubLength: 40,
-            }));
-            return nextEdge;
+        return prepareDomainDagreInteractiveEdges({
+            nodes: updatedNodes,
+            edges: clonedEdges,
+            options,
+            nodeById: idMap,
         });
-        const trunkPolishedEdges = repairSharedTargetEntryCrossings(
-            synthesizeSharedEndpointTrunks(interactiveEdges, { nodes: updatedNodes }),
-        ).map(edge => ({
-            ...edge,
-            data: {
-                ...(edge.data || {}),
-                algorithm: 'domain-dagre-interactive',
-                trunkPolishVersion: 2,
-                layoutPathLocked: true,
-                runtimeHandleLock: {
-                    ...asRoutingRecord(asRoutingRecord(edge.data).runtimeHandleLock),
-                    source: true,
-                    target: true,
-                },
-            },
-        })) as Edge[];
-        return trunkPolishedEdges;
     }
 
 
@@ -293,15 +223,9 @@ export async function prepareDomainDagreEdges({
         const sUsage = nodeUsage[source.id] || {};
         const tUsage = nodeUsage[target.id] || {};
         const edgeDataForManual = asRoutingRecord(edge.data);
-        const manualSides = readManualHandleSides(edgeDataForManual);
-        const manualHandles = edgeDataForManual.manualHandles ?? edgeDataForManual._manualHandles;
-        const manualHandleRecord = asRoutingRecord(manualHandles);
-        const hasManualSourceHandle = manualSides.includes('source')
-            || manualHandles === true
-            || Boolean(manualHandleRecord.source);
-        const hasManualTargetHandle = manualSides.includes('target')
-            || manualHandles === true
-            || Boolean(manualHandleRecord.target);
+        const manualHandleLocks = readManualHandleLocks(edgeDataForManual);
+        const hasManualSourceHandle = manualHandleLocks.source;
+        const hasManualTargetHandle = manualHandleLocks.target;
 
         let explicitSourceHandle = edge.sourceHandle && hasManualSourceHandle && !isAutoHandle(edge, 'source')
             ? normalizeHandle(edge.sourceHandle)
@@ -489,7 +413,7 @@ export async function prepareDomainDagreEdges({
     // decideEdgeRouting 返回的 handle 已经是正确的全称格式，
     // 直接使用即可。
     // ═══════════════════════════════════════════════════════════════
-    const finalRoutedEdges = separateDetachedParallelOverlaps(
+    let finalRoutedEdges = separateDetachedParallelOverlaps(
         repairEndpointOrthogonalPaths(
             repairEndpointOrthogonalPaths(
                 separateDetachedParallelOverlaps(
@@ -502,6 +426,45 @@ export async function prepareDomainDagreEdges({
         ),
         updatedNodes,
         24,
+    );
+    // Domain Dagre owns a dedicated routing path and does not enter the shared
+    // pipeline's final obstacle gate. Apply the same hard constraint here after
+    // crossing/overlap refinements, using the full hierarchy for absolute rects.
+    const clearanceCandidate = repairBusinessNodeClearanceRisks(finalRoutedEdges, updatedNodes, {
+        minimumClearance: COMMERCIAL_BUSINESS_NODE_CLEARANCE,
+        allowTransientStrictCrossing: true,
+    });
+    const obstacleCandidate = repairSharedTrunkAwareObstacles(finalRoutedEdges, updatedNodes);
+    const clearanceObstacleCandidate = repairSharedTrunkAwareObstacles(
+        clearanceCandidate,
+        updatedNodes,
+    );
+    const obstacleCrossingCandidate = repairSharedTrunkAwareCrossings(
+        obstacleCandidate,
+        updatedNodes,
+    );
+    const clearanceObstacleCrossingCandidate = repairSharedTrunkAwareCrossings(
+        clearanceObstacleCandidate,
+        updatedNodes,
+    );
+    const obstacleCrossingSafeCandidate = repairSharedTrunkAwareObstacles(
+        obstacleCrossingCandidate,
+        updatedNodes,
+    );
+    const clearanceObstacleCrossingSafeCandidate = repairSharedTrunkAwareObstacles(
+        clearanceObstacleCrossingCandidate,
+        updatedNodes,
+    );
+    finalRoutedEdges = chooseCommercialRouteCandidate(
+        updatedNodes,
+        finalRoutedEdges,
+        clearanceCandidate,
+        obstacleCandidate,
+        clearanceObstacleCandidate,
+        obstacleCrossingCandidate,
+        clearanceObstacleCrossingCandidate,
+        obstacleCrossingSafeCandidate,
+        clearanceObstacleCrossingSafeCandidate,
     );
     return finalRoutedEdges;
 }
@@ -577,6 +540,17 @@ export function applyDomainDagreEdgeRouting(
     nodes.forEach(n => {
         n.positionAbsolute = getAbsPos(n);
     });
+
+    if (String(options.edgeRoutingQuality ?? 'full') === 'interactive') {
+        const interactiveEdges = prepareDomainDagreInteractiveEdges({
+            nodes,
+            edges,
+            options,
+            nodeById: idMap,
+        });
+        edges.splice(0, edges.length, ...interactiveEdges);
+        return;
+    }
 
     const cfgEdge = asRoutingRecord(asRoutingRecord(cfg).edge);
     const routingConfig: RoutingConfig = {

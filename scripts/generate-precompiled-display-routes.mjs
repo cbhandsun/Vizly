@@ -3,7 +3,10 @@ import { basename, dirname, resolve, sep } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
 import { withPrecompiledRouteBrowser } from './lib/precompiled-display-route-cdp.mjs';
-import { renderPrecompiledDisplayRouteCaptureExpression } from './lib/precompiled-display-route-capture.mjs';
+import {
+  isFreshFullRouteResolution,
+  renderPrecompiledDisplayRouteCaptureExpression,
+} from './lib/precompiled-display-route-capture.mjs';
 import {
   renderPrecompiledRouteArtifact,
   renderPrecompiledRouteLoaders,
@@ -11,6 +14,8 @@ import {
 } from './lib/precompiled-display-route-render.mjs';
 import { PRECOMPILED_DISPLAY_ROUTE_TARGETS } from './lib/precompiled-display-route-targets.mjs';
 import { hashPrecompiledDisplayRouteSource } from './lib/precompiled-display-route-source-hash.mjs';
+import { computePrecompiledDisplayRoutingSourceHash } from './lib/precompiled-display-route-source-set.mjs';
+import { auditPrecompiledDisplayRouteCommercialQuality } from './lib/precompiled-display-route-commercial-quality.mjs';
 
 const ROOT = resolve(process.cwd());
 const BASE_URL = String(process.env.PRECOMPILED_ROUTE_BASE_URL || '').trim().replace(/\/$/, '');
@@ -20,7 +25,7 @@ const ARTIFACT_DIR = resolve(GENERATED_DIR, 'precompiledRoutes');
 const MANIFEST_PATH = resolve(GENERATED_DIR, 'baseReactFlowPrecompiledRouteManifest.json');
 const LOADERS_PATH = resolve(GENERATED_DIR, 'baseReactFlowPrecompiledRouteLoaders.ts');
 const SCHEMA = 'vizly-precompiled-display-route-v1';
-const MANIFEST_SCHEMA = 'vizly-precompiled-display-route-manifest-v2';
+const MANIFEST_SCHEMA = 'vizly-precompiled-display-route-manifest-v3';
 const MAX_ARTIFACT_BYTES = 2_000_000;
 const ROUTING_VERSION_PATH = resolve(ROOT, 'src/core/routing/routingVersion.ts');
 const INPUT_IDENTITY_PATH = resolve(
@@ -54,8 +59,17 @@ const writeAtomic = async (path, contents) => {
 
 const captureScript = `(() => {
   const NativeWorker = window.Worker;
+  window.__vizlyDisplayRoutingDiagnosticsEnabled = true;
   window.__vizlyPrecompiledRouteRequest = null;
   window.__vizlyPrecompiledRouteResponse = null;
+  window.__vizlyPrecompiledRouteWorkerErrors = [];
+  window.__vizlyPrecompiledRoutePageErrors = [];
+  const recordPageError = value => {
+    window.__vizlyPrecompiledRoutePageErrors.push(String(value || 'page-error').slice(0, 256));
+    window.__vizlyPrecompiledRoutePageErrors = window.__vizlyPrecompiledRoutePageErrors.slice(-8);
+  };
+  window.addEventListener('error', event => recordPageError(event?.message));
+  window.addEventListener('unhandledrejection', event => recordPageError(event?.reason));
   class CapturingWorker extends NativeWorker {
     constructor(...args) {
       super(...args);
@@ -65,6 +79,24 @@ const captureScript = `(() => {
         if (response && request && response.requestId === request.requestId) {
           try { window.__vizlyPrecompiledRouteResponse = structuredClone(response); } catch {}
         }
+      });
+      this.addEventListener('error', event => {
+        window.__vizlyPrecompiledRouteWorkerErrors.push({
+          message: String(event?.message || 'worker-error').slice(0, 256),
+          line: Number.isFinite(event?.lineno) ? event.lineno : null,
+          column: Number.isFinite(event?.colno) ? event.colno : null,
+        });
+        window.__vizlyPrecompiledRouteWorkerErrors =
+          window.__vizlyPrecompiledRouteWorkerErrors.slice(-8);
+      });
+      this.addEventListener('messageerror', () => {
+        window.__vizlyPrecompiledRouteWorkerErrors.push({
+          message: 'worker-message-deserialization-failed',
+          line: null,
+          column: null,
+        });
+        window.__vizlyPrecompiledRouteWorkerErrors =
+          window.__vizlyPrecompiledRouteWorkerErrors.slice(-8);
       });
     }
     postMessage(message, transfer) {
@@ -93,6 +125,7 @@ const captureTarget = async (session, target, source, routingVersion) => {
     return true;
   })()`);
   const url = `${BASE_URL}/?precompiledCapture=${encodeURIComponent(preset.id)}`
+    + `&precompiledRegenerate=${encodeURIComponent(preset.id)}`
     + `#/?diagram=${encodeURIComponent(preset.id)}`;
   await session.send('Page.navigate', { url });
   const deadline = Date.now() + readGenerationTimeoutMs();
@@ -104,12 +137,38 @@ const captureTarget = async (session, target, source, routingVersion) => {
       captured = null;
     }
     if (captured) break;
+    const finalQualityRejected = await session.evaluate(`(() => (
+      window.__vizlyBaseReactFlowDisplayRouting?.stage === 'final-quality-rejected'
+    ))()`);
+    if (finalQualityRejected) break;
     await delay(500);
   }
   if (!captured) {
     const status = await session.evaluate(`(() => {
       const routing = window.__vizlyBaseReactFlowDisplayRouting || {};
       const request = window.__vizlyPrecompiledRouteRequest;
+      const response = window.__vizlyPrecompiledRouteResponse;
+      const compactEdge = edge => ({
+        id: edge?.id,
+        source: edge?.source,
+        target: edge?.target,
+        type: edge?.type,
+        sourceHandle: edge?.sourceHandle,
+        targetHandle: edge?.targetHandle,
+        computedPath: Array.isArray(edge?.data?.computedPath)
+          ? edge.data.computedPath
+          : null,
+        routingData: {
+          auto: edge?.data?.auto,
+          autoSource: edge?.data?.autoSource,
+          autoTarget: edge?.data?.autoTarget,
+          layoutDirection: edge?.data?.layoutDirection,
+          layoutPathLocked: edge?.data?.layoutPathLocked,
+          runtimeHandleLock: edge?.data?.runtimeHandleLock,
+          elkPath: Array.isArray(edge?.data?.elkPath) ? edge.data.elkPath : null,
+          treeRouting: edge?.data?.treeRouting,
+        },
+      });
       return {
         stage: routing.stage,
         signature: routing.signature,
@@ -120,6 +179,41 @@ const captureTarget = async (session, target, source, routingVersion) => {
         requestOperation: request?.operation,
         requestNodes: Array.isArray(request?.nodes) ? request.nodes.length : null,
         requestEdges: Array.isArray(request?.edges) ? request.edges.length : null,
+        responseHardClean: response?.hardClean,
+        responseRouteResolution: response?.routeResolution,
+        responseError: response?.error,
+        responsePhaseTrace: Array.isArray(response?.phaseTrace) ? response.phaseTrace : null,
+        hardGateDiagnostics: routing.hardGateDiagnostics ?? null,
+        terminalDiagnostics: routing.terminalDiagnostics ?? null,
+        phaseProgressTrace: Array.isArray(routing.phaseProgressTrace)
+          ? routing.phaseProgressTrace
+          : null,
+        lastPhaseTrace: routing.lastPhaseTrace ?? null,
+        requestNodeGeometry: Array.isArray(request?.nodes)
+          ? request.nodes.map(node => ({
+            id: node?.id,
+            parentId: node?.parentId,
+            position: node?.position,
+            positionAbsolute: node?.positionAbsolute,
+            width: node?.width,
+            height: node?.height,
+            measured: node?.measured,
+          }))
+          : null,
+        requestEdgeRoutes: Array.isArray(request?.edges)
+          ? request.edges.map(compactEdge)
+          : null,
+        responseEdges: Array.isArray(response?.edges)
+          ? response.edges.map(compactEdge)
+          : null,
+        workerErrors: Array.isArray(window.__vizlyPrecompiledRouteWorkerErrors)
+          ? window.__vizlyPrecompiledRouteWorkerErrors
+          : [],
+        pageErrors: Array.isArray(window.__vizlyPrecompiledRoutePageErrors)
+          ? window.__vizlyPrecompiledRoutePageErrors
+          : [],
+        documentState: document.readyState,
+        bodyText: document.body?.innerText?.slice(0, 256) ?? null,
       };
     })()`);
     throw new Error(`Timed out generating ${preset.id}: ${JSON.stringify(status)}`);
@@ -136,8 +230,17 @@ const captureTarget = async (session, target, source, routingVersion) => {
     || typeof routing.signature !== 'string'
     || routing.workerStartCount !== 1
     || routing.workerAbortCount !== 0
+    || captured.requestShape.operation !== 'route'
+    || captured.requestShape.candidateEdges !== 0
     || patches.length !== captured.requestShape.edges
   ) throw new Error(`Generated route identity mismatch for ${preset.id}`);
+  const commercialIssues = auditPrecompiledDisplayRouteCommercialQuality(patches);
+  if (commercialIssues.length > 0) {
+    throw new Error(
+      `Generated route failed commercial quality for ${preset.id}: `
+      + JSON.stringify(commercialIssues),
+    );
+  }
   console.log(
     `Captured ${preset.id}: ${workerResolution}, workerStart=${routing.workerStartCount}, routeMs=${routing.routeMs}.`,
   );
@@ -225,6 +328,7 @@ const main = async () => {
   await assertProductionPreview();
   const routingVersion = await readRoutingVersion();
   const identitySourceHash = hashPrecompiledDisplayRouteSource(await readFile(INPUT_IDENTITY_PATH, 'utf8'));
+  const routingSourceHash = await computePrecompiledDisplayRoutingSourceHash(ROOT);
   const sources = await Promise.all(PRECOMPILED_DISPLAY_ROUTE_TARGETS.map(async target => ({
     target,
     source: await readFile(resolve(ROOT, target.sourcePath), 'utf8'),
@@ -274,6 +378,7 @@ const main = async () => {
     schema: MANIFEST_SCHEMA,
     routingVersion,
     identitySourceHash,
+    routingSourceHash,
     entries,
   };
   const manifestContents = renderPrecompiledRouteManifest(manifest);
@@ -281,8 +386,10 @@ const main = async () => {
   const expectedArtifactFiles = [...artifactContents.keys()].sort();
   const existingArtifactFiles = await listGeneratedArtifactFiles();
   if (CHECK_MODE) {
-    if (captures.some(capture => capture.measurement.workerResolution !== 'validated-candidate')) {
-      throw new Error('Production reproducibility check did not validate the precompiled candidate');
+    if (captures.some(capture => (
+      !isFreshFullRouteResolution(capture.measurement.workerResolution)
+    ))) {
+      throw new Error('Production reproducibility check did not compute a fresh full route');
     }
     if (existingArtifactFiles.join('\n') !== expectedArtifactFiles.join('\n')) {
       throw new Error('Generated precompiled route artifact set is stale');

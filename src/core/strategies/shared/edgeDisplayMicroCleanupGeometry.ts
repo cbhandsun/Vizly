@@ -57,6 +57,13 @@ export const OUTER_DETOUR_COLLAPSE_OFFSETS = [
 ];
 export const MAX_HAIRPIN_COLLAPSE_BRIDGE = 104;
 export const MAX_MICRO_CANDIDATES_PER_EDGE = 72;
+export const LARGE_GRAPH_MICRO_CANDIDATES_PER_EDGE = 36;
+
+export const resolveMicroCandidateBudget = (edgeCount: number): number => (
+  Number.isSafeInteger(edgeCount) && edgeCount > 32
+    ? LARGE_GRAPH_MICRO_CANDIDATES_PER_EDGE
+    : MAX_MICRO_CANDIDATES_PER_EDGE
+);
 
 export function getEdgePath(edge: Edge): Point[] {
   const raw = edge.data?.computedPath || edge.data?.elkPath || [];
@@ -563,26 +570,30 @@ export function buildTinySideStepLaneBypassCandidates(points: Point[], segmentIn
     : Math.sign(sideStepEnd.y - sideStepStart.y);
   if (sideDirection === 0) return [];
 
-  return [24, 32, 48, 64, 80, 96, 128, 160].map((clearance) => {
-    const lane = sideStepAxis === 'h'
-      ? sideStepStart.x + sideDirection * clearance
-      : sideStepStart.y + sideDirection * clearance;
-    const bypass = incomingAxis === 'h'
-      ? [
-        { x: before.x, y: lane },
-        { x: continuationEnd.x, y: lane },
-      ]
-      : [
-        { x: lane, y: before.y },
-        { x: lane, y: continuationEnd.y },
-      ];
-    const candidate = compactPath([
-      ...points.slice(0, segmentIndex + 1),
-      ...bypass,
-      ...points.slice(segmentIndex + 4),
-    ]);
-    return hasSameEndpoints(points, candidate) && allSegmentsOrthogonal(candidate) ? candidate : null;
-  }).filter((candidate): candidate is Point[] => candidate !== null);
+  return [24, 32, 48, 64, 80, 96, 128, 160].flatMap(clearance => (
+    [sideDirection, -sideDirection].map((laneDirection) => {
+      const lane = sideStepAxis === 'h'
+        ? sideStepStart.x + laneDirection * clearance
+        : sideStepStart.y + laneDirection * clearance;
+      const bypass = incomingAxis === 'h'
+        ? [
+          { x: before.x, y: lane },
+          { x: continuationEnd.x, y: lane },
+        ]
+        : [
+          { x: lane, y: before.y },
+          { x: lane, y: continuationEnd.y },
+        ];
+      const candidate = compactPath([
+        ...points.slice(0, segmentIndex + 1),
+        ...bypass,
+        ...points.slice(segmentIndex + 4),
+      ]);
+      return hasSameEndpoints(points, candidate) && allSegmentsOrthogonal(candidate)
+        ? candidate
+        : null;
+    })
+  )).filter((candidate): candidate is Point[] => candidate !== null);
 }
 
 export function buildTinyEndpointBridgeCollapseCandidate(points: Point[], atStart: boolean): Point[] | null {

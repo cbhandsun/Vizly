@@ -255,7 +255,7 @@ function containerBoundaryClearanceVariants(
     }
 
     for (const rect of containers) {
-      let lane: number | null = null;
+      const lanes: number[] = [];
       if (axis === 'v') {
         const parallelSpan = overlapLength(start.y, end.y, rect.y, rect.y + rect.height);
         if (parallelSpan < CONTAINER_PARALLEL_MIN_SPAN) continue;
@@ -263,12 +263,12 @@ function containerBoundaryClearanceVariants(
           start.x < rect.x - EPS
           && rect.x - start.x < CONTAINER_BOUNDARY_CLEARANCE
         ) {
-          lane = rect.x - CONTAINER_BOUNDARY_CLEARANCE;
+          lanes.push(rect.x - CONTAINER_BOUNDARY_CLEARANCE);
         } else if (
           start.x > rect.x + rect.width + EPS
           && start.x - (rect.x + rect.width) < CONTAINER_BOUNDARY_CLEARANCE
         ) {
-          lane = rect.x + rect.width + CONTAINER_BOUNDARY_CLEARANCE;
+          lanes.push(rect.x + rect.width + CONTAINER_BOUNDARY_CLEARANCE);
         }
       } else {
         const parallelSpan = overlapLength(start.x, end.x, rect.x, rect.x + rect.width);
@@ -277,25 +277,26 @@ function containerBoundaryClearanceVariants(
           start.y < rect.y - EPS
           && rect.y - start.y < CONTAINER_BOUNDARY_CLEARANCE
         ) {
-          lane = rect.y - CONTAINER_BOUNDARY_CLEARANCE;
+          lanes.push(rect.y - CONTAINER_BOUNDARY_CLEARANCE);
         } else if (
           start.y > rect.y + rect.height + EPS
           && start.y - (rect.y + rect.height) < CONTAINER_BOUNDARY_CLEARANCE
         ) {
-          lane = rect.y + rect.height + CONTAINER_BOUNDARY_CLEARANCE;
+          lanes.push(rect.y + rect.height + CONTAINER_BOUNDARY_CLEARANCE);
         }
       }
-      if (lane === null || !Number.isFinite(lane)) continue;
-
-      const shifted = path.map(point => ({ ...point }));
-      if (axis === 'v') {
-        shifted[index].x = lane;
-        shifted[index + 1].x = lane;
-      } else {
-        shifted[index].y = lane;
-        shifted[index + 1].y = lane;
+      for (const lane of lanes) {
+        if (!Number.isFinite(lane)) continue;
+        const shifted = path.map(point => ({ ...point }));
+        if (axis === 'v') {
+          shifted[index].x = lane;
+          shifted[index + 1].x = lane;
+        } else {
+          shifted[index].y = lane;
+          shifted[index + 1].y = lane;
+        }
+        variants.push(compactPath(shifted));
       }
-      variants.push(compactPath(shifted));
     }
   }
 
@@ -652,6 +653,7 @@ export function repairDisplaySoftQualityRisks(
     if (
       initialObstacleHits === 0
       && initialContainerRisk === 0
+      && !pathHasNodeRoutingRisk(path, nodes, edge)
       && !pathHasVisualComplexityRisk(path)
     ) continue;
     processed += 1;

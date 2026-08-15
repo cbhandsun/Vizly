@@ -25,6 +25,8 @@ describe('standardPresetCanvasCache', () => {
                 source: 'node-a',
                 target: 'node-b',
                 data: { label: 'Edge A' },
+                style: { stroke: '#FF5722', strokeWidth: 3 },
+                markerEnd: { type: 'arrowclosed', color: '#FF5722' },
             }],
         };
         const convert = vi.fn(async () => canvas);
@@ -41,9 +43,13 @@ describe('standardPresetCanvasCache', () => {
 
         (first.nodes[0].data as any).label = 'Changed';
         (first.edges[0].data as any).label = 'Changed Edge';
+        first.edges[0].style = { ...first.edges[0].style, stroke: '#000000' };
+        first.edges[0].markerEnd = { type: 'arrowclosed', color: '#000000' };
 
         expect((second.nodes[0].data as any).label).toBe('Node A');
         expect((second.edges[0].data as any).label).toBe('Edge A');
+        expect(second.edges[0].style?.stroke).toBe('#FF5722');
+        expect(second.edges[0].markerEnd).toEqual({ type: 'arrowclosed', color: '#FF5722' });
     });
 
     it('clears failed conversions so the same preset id can retry', async () => {
@@ -161,6 +167,73 @@ describe('standardPresetCanvasCache', () => {
 
         await expect(load('SystemsInteractionStandardData', preset)).resolves.toEqual(refreshedCanvas);
 
+        expect(convert).toHaveBeenCalledTimes(2);
+    });
+
+    it('drops styleless cached canvases when the preset declares semantic edge presentation', async () => {
+        const nodes: CanvasData['nodes'] = [
+            { id: 'node-a', position: { x: 0, y: 0 }, data: {} },
+            { id: 'node-b', position: { x: 200, y: 0 }, data: {} },
+        ];
+        const staleCanvas: CanvasData = {
+            nodes,
+            edges: [{ id: 'edge-a', source: 'node-a', target: 'node-b' }],
+        };
+        const refreshedCanvas: CanvasData = {
+            nodes,
+            edges: [{
+                id: 'edge-a',
+                source: 'node-a',
+                target: 'node-b',
+                style: { stroke: '#47CACC', strokeWidth: 2, strokeDasharray: '6 4' },
+                markerEnd: { type: 'arrowclosed', color: '#47CACC' },
+            }],
+        };
+        const preset = {
+            nodes: [{ id: 'node-a' }, { id: 'node-b' }],
+            edges: [{
+                id: 'edge-a',
+                style: { stroke: '#47CACC', strokeWidth: 2, strokeDasharray: '6 4' },
+            }],
+        };
+        const convert = vi.fn()
+            .mockResolvedValueOnce(staleCanvas)
+            .mockResolvedValueOnce(refreshedCanvas);
+        const load = createStandardPresetCanvasLoader(convert);
+
+        await expect(load('LogisticsStandardData', preset)).resolves.toEqual(refreshedCanvas);
+        expect(convert).toHaveBeenCalledTimes(2);
+    });
+
+    it('drops cached canvases that lost a styleless preset edge role', async () => {
+        const nodes: CanvasData['nodes'] = [
+            { id: 'node-a', position: { x: 0, y: 0 }, data: {} },
+            { id: 'node-b', position: { x: 200, y: 0 }, data: {} },
+        ];
+        const staleCanvas: CanvasData = {
+            nodes,
+            edges: [{ id: 'edge-a', source: 'node-a', target: 'node-b', type: 'advanced-smart-step' }],
+        };
+        const refreshedCanvas: CanvasData = {
+            nodes,
+            edges: [{
+                id: 'edge-a',
+                source: 'node-a',
+                target: 'node-b',
+                type: 'advanced-smart-step',
+                className: 'vizly-edge-role-data',
+            }],
+        };
+        const preset = {
+            nodes: [{ id: 'node-a' }, { id: 'node-b' }],
+            edges: [{ id: 'edge-a', type: 'data' }],
+        };
+        const convert = vi.fn()
+            .mockResolvedValueOnce(staleCanvas)
+            .mockResolvedValueOnce(refreshedCanvas);
+        const load = createStandardPresetCanvasLoader(convert);
+
+        await expect(load('DeamndAllocation', preset)).resolves.toEqual(refreshedCanvas);
         expect(convert).toHaveBeenCalledTimes(2);
     });
 

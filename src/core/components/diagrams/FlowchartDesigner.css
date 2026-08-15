@@ -532,13 +532,9 @@ circle.react-flow__edgeupdater:active {
     cursor: grabbing;
 }
 
-/* Keep edges below nodes even when an edge is hovered/selected, so routes never paint over node cards. */
+/* Keep the edge layer below nodes without overriding React Flow's per-edge
+   stacking. Selected/focused edges can still be promoted inside this layer. */
 .react-flow__edges {
-    z-index: 0 !important;
-}
-
-.react-flow__edge,
-.react-flow__edge.selected {
     z-index: 0 !important;
 }
 
@@ -1640,17 +1636,28 @@ circle.custom-edge-updater {
     overflow: hidden !important;
 }
 
-/* 杈圭嚎闄嶇骇锛氬彇娑堟墍鏈夊鏉傝櫄绾夸笌鍔ㄧ敾杩炵嚎 */
+/* Keep semantic dash patterns at overview scale; only motion is disabled. */
 .diagram-zoomed-out .react-flow__edge-path {
-    stroke-dasharray: none !important;
     animation: none !important;
 }
 
 /* 杩炵嚎鏂囧瓧闄嶇骇 */
 .diagram-zoomed-out .react-flow__edge-textbg,
 .diagram-zoomed-out .react-flow__edge-text,
-.diagram-zoomed-out .edge-label-container {
+.diagram-zoomed-out .edge-label-container,
+.diagram-zoomed-out .stable-path-edge-label,
+.diagram-zoomed-out .vizly-edge-label {
     display: none !important;
+}
+
+/* Preserve a strict low-zoom label budget: only a semantic main route or the
+   route being traced may restore its label. */
+.diagram-zoomed-out .stable-path-edge-label:is(
+    .stable-path-edge-label--primary,
+    .stable-path-edge-label--trace-active,
+    :focus-visible
+) {
+    display: block !important;
 }
 
 /* ============================================

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { Edge, Node } from '@xyflow/react';
+import { MarkerType, type Edge, type Node } from '@xyflow/react';
 
 vi.mock('../../layout/LayoutOptimizer', () => ({
     LayoutOptimizer: {
@@ -11,6 +11,7 @@ vi.mock('../../layout/LayoutOptimizer', () => ({
 }));
 
 import type { StandardDiagramData } from '../../../models/DiagramModels';
+import logisticsStandardData from '../../../../data/standardized/LogisticsStandardData.json';
 import { canvasToPureStandardData, canvasToStandardData, standardDataToCanvas } from '../designerUtils';
 import { coerceStandardDiagramImport } from '../../../utils/diagramJsonImport';
 
@@ -120,4 +121,79 @@ describe('standardDataToCanvas', () => {
         });
         expect(restored.nodes.filter(node => node.id === 'group-1')).toHaveLength(1);
     });
+
+    it.each([
+        ['saved coordinates', true],
+        ['generated layout', false],
+    ])('preserves semantic edge presentation with %s', async (_scenario, hasSavedCoordinates) => {
+        const diagram = makeDiagram();
+        diagram.nodes = diagram.nodes.map((node, index) => ({
+            ...node,
+            metadata: hasSavedCoordinates
+                ? { canvasPosition: { x: index * 240, y: index * 120 } }
+                : undefined,
+        }));
+        diagram.edges = [{
+            id: 'semantic-edge',
+            source: 'valid',
+            target: 'invalid',
+            type: 'dependency',
+            label: 'Inventory sync',
+            style: {
+                stroke: '#47CACC',
+                strokeWidth: 2,
+                strokeDasharray: '6 4',
+                opacity: 0.82,
+            },
+            markerEnd: {
+                type: MarkerType.ArrowClosed,
+                color: '#47CACC',
+                width: 12,
+                height: 14,
+            },
+        }];
+
+        const result = await standardDataToCanvas(diagram);
+        const edge = result.edges.find(candidate => candidate.id === 'semantic-edge');
+
+        expect(edge).toMatchObject({
+            type: 'dependency',
+            className: 'vizly-edge-role-dependency',
+            label: 'Inventory sync',
+            style: {
+                stroke: '#47CACC',
+                strokeWidth: 2,
+                strokeDasharray: '6 4',
+                opacity: 0.82,
+            },
+            markerEnd: {
+                type: MarkerType.ArrowClosed,
+                color: '#47CACC',
+                width: 12,
+                height: 14,
+            },
+        });
+    });
+
+    it('keeps logistics multi-domain semantic styles and derives matching marker colors', async () => {
+        const diagram = coerceStandardDiagramImport(logisticsStandardData, {
+            id: 'logistics-architecture-v1',
+            title: 'Logistics architecture',
+        });
+        const result = await standardDataToCanvas(diagram);
+        const byId = new Map(result.edges.map(edge => [edge.id, edge]));
+
+        expect(byId.get('edge-upstream-loms')).toMatchObject({
+            style: { stroke: '#FF5722', strokeWidth: 3 },
+            markerEnd: { type: MarkerType.ArrowClosed, color: '#FF5722' },
+        });
+        expect(byId.get('edge-loms-visibility')).toMatchObject({
+            style: { stroke: '#47CACC', strokeWidth: 2, strokeDasharray: '6 4' },
+            markerEnd: { type: MarkerType.ArrowClosed, color: '#47CACC' },
+        });
+        expect(byId.get('edge-wms-bms')).toMatchObject({
+            style: { stroke: '#78909C', strokeWidth: 2, strokeDasharray: '5 5' },
+            markerEnd: { type: MarkerType.ArrowClosed, color: '#78909C' },
+        });
+    }, 20_000);
 });

@@ -56,6 +56,7 @@ interface FlowchartToolbarProps {
     lastDomainDirection?: 'TB' | 'LR';
     /** 当前选中的域内节点排布 */
     lastNodeLayout?: string;
+    layoutBusy?: boolean;
     showRuler: boolean;
     toggleRuler: () => void;
     showMinimap?: boolean;
@@ -125,6 +126,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
     lastDomainStrategy,
     lastDomainDirection,
     lastNodeLayout,
+    layoutBusy = false,
     showRuler,
     toggleRuler,
     showMinimap,
@@ -511,10 +513,13 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                         open={layoutDropdown.open}
                         onOpenChange={layoutDropdown.handleOpenChange}
                         overlayClassName="flowchart-layout-menu"
+                        disabled={layoutBusy}
                     >
                         <DropdownMenuTriggerButton
                             ref={layoutDropdown.triggerRef}
                             ariaLabel={layoutTriggerLabel}
+                            busy={layoutBusy}
+                            disabled={layoutBusy}
                             open={layoutDropdown.open}
                             onTriggerKeyDown={layoutDropdown.handleTriggerKeyDown}
                             icon={<FaSitemap size={13} />}

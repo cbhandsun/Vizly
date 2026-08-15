@@ -99,7 +99,7 @@ const CustomNodeGraphicsComponent: React.FC<CustomNodeGraphicsProps> = ({
     const _effectiveIcon = d?.icon || resolvedIcon || null;
 
     const renderDebugOverlay = () => {
-        if (!debugEnabled) return null;
+        if (!import.meta.env.DEV || !debugEnabled) return null;
         const labelText = `${String(d?.domainClass || '—')} | ${String(domainKey || '')}`;
         return (
             <div

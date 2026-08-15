@@ -20,6 +20,27 @@ export interface RoutingTrunkDebugData {
 type DebugDataListener = (data: unknown) => void;
 type DebugSelectionListener = (edgeId: string | null) => void;
 
+export interface EdgeRoutingDebugStatePort {
+  getSelectedEdgeId(): string | null;
+  selectEdge(edgeId: string | null): void;
+  registerDataListener(listener: DebugDataListener | null): void;
+  registerSelectionListener(listener: DebugSelectionListener | null): void;
+  prepareJob(job: PathFindingJob): void;
+  recordClassification(edge: { id: string; type?: string }, delta: number): void;
+  recordTrunk(edgeIds: readonly string[], trunk: RoutingTrunkDebugData['trunk']): void;
+  emitResult(
+    edgeId: string,
+    result: PathFindingResult,
+    job: Partial<PathFindingJob> | undefined,
+    graphDebug: boolean | undefined,
+  ): void;
+  buildPayload(
+    edgeId: string,
+    result: PathFindingResult,
+    job: Partial<PathFindingJob> | undefined,
+  ): Record<string, unknown>;
+}
+
 type DebugNode = {
   id?: unknown;
   x?: unknown;
@@ -84,7 +105,7 @@ export const refreshDebugRoutingRequestEndpoints = (request: RoutingBatchRequest
 };
 
 /** Owns optional developer-tool state without coupling it to routing orchestration. */
-export class EdgeRoutingDebugState {
+export class EdgeRoutingDebugState implements EdgeRoutingDebugStatePort {
   private selectedEdgeId: string | null = null;
   private dataListener: DebugDataListener | null = null;
   private selectionListener: DebugSelectionListener | null = null;
@@ -182,3 +203,33 @@ export class EdgeRoutingDebugState {
     }
   }
 }
+
+class DisabledEdgeRoutingDebugState implements EdgeRoutingDebugStatePort {
+  public getSelectedEdgeId(): null { return null; }
+  public selectEdge(_edgeId: string | null): void {}
+  public registerDataListener(_listener: DebugDataListener | null): void {}
+  public registerSelectionListener(_listener: DebugSelectionListener | null): void {}
+  public prepareJob(_job: PathFindingJob): void {}
+  public recordClassification(_edge: { id: string; type?: string }, _delta: number): void {}
+  public recordTrunk(
+    _edgeIds: readonly string[],
+    _trunk: RoutingTrunkDebugData['trunk'],
+  ): void {}
+  public emitResult(
+    _edgeId: string,
+    _result: PathFindingResult,
+    _job: Partial<PathFindingJob> | undefined,
+    _graphDebug: boolean | undefined,
+  ): void {}
+  public buildPayload(
+    _edgeId: string,
+    _result: PathFindingResult,
+    _job: Partial<PathFindingJob> | undefined,
+  ): Record<string, unknown> { return {}; }
+}
+
+export const createEdgeRoutingDebugState = (
+  onListenerError?: (error: unknown) => void,
+): EdgeRoutingDebugStatePort => import.meta.env.DEV
+  ? new EdgeRoutingDebugState(onListenerError)
+  : new DisabledEdgeRoutingDebugState();

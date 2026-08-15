@@ -41,7 +41,6 @@ import {
   ensureMeasuredForNodes,
   reflowSubGroupChildrenDagre
 } from '../utils/layoutUtils';
-import { logLayoutDiagnosticsSummary, logSubGroupDebugSample } from './layoutLogging';
 import { runEdgeRoutingPipeline } from './shared/edgeRoutingPipeline';
 import { resolveDomainHorizontalLayoutBoundary } from './domainHorizontalLayoutBoundary';
 import {
@@ -53,7 +52,6 @@ import { unifyContainerHeightsByMaximum } from './shared/domainContainerSizeNorm
 
 type LayoutNode = ReactFlowNode<Record<string, unknown>>;
 
-const GROUP_TYPES = new Set(['subGroup', 'titleGroup', 'group', 'domain']);
 const asRecord = (value: unknown): Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
     ? value as Record<string, unknown>
@@ -159,31 +157,6 @@ export class DomainHorizontalLayoutStrategy implements ILayoutStrategy {
       showDomainGroups: showDomain,
       showSubDomainGroups: showSub,
     });
-    /** 函数级注释：诊断输出（可选） */
-    const runDiagnostics = (list: LayoutNode[]) => {
-      try {
-        const enable = Boolean(layeredCfg.get<boolean>('diagram.layout.diagnostics', true));
-        if (!enable) return;
-        const isGroupType = (type: unknown) => GROUP_TYPES.has(String(type ?? ''));
-        const domains = Array.from(new Set(list.map(nodeDomain).filter(Boolean)));
-        const summary: Array<{ domain: string; subGroups: number; biz: number; orphanCount: number }> = [];
-        for (const d of domains) {
-          const sgList = list.filter(n => String(n.type ?? '') === 'subGroup' && nodeDomain(n) === d);
-          const sgChildren = new Set<string>();
-          sgList.forEach(sg => {
-            const ch = nodeChildren(sg);
-            ch.forEach(id => sgChildren.add(id));
-          });
-          const biz = list.filter(n => !isGroupType(n.type) && nodeDomain(n) === d && !isHiddenNode(n));
-          const orphan = biz.filter(n => !sgChildren.has(n.id)).map(n => n.id);
-          summary.push({ domain: d, subGroups: sgList.length, biz: biz.length, orphanCount: orphan.length });
-        }
-        logLayoutDiagnosticsSummary(summary);
-      } catch {
-        // ignore
-      }
-    };
-
     updatedNodes = purgeSubGroupChildrenBySemantic(updatedNodes);
     updatedNodes = assignChildrenToSubGroupsBySemantic(updatedNodes);
     updatedNodes = normalizeSubGroupDomainByChildren(updatedNodes);
@@ -191,7 +164,6 @@ export class DomainHorizontalLayoutStrategy implements ILayoutStrategy {
     updatedNodes = assignChildrenToSubGroupsBySemantic(updatedNodes);
     updatedNodes = auditAndFixSubGroupChildrenBindings(updatedNodes);
     updatedNodes = rebindDomainHorizontalChildren(updatedNodes);
-    runDiagnostics(updatedNodes);
 
     // 域顺序
     const originalIndex = new Map<string, number>(nodes.map((n, i) => [String(n.id), i] as const));
@@ -546,21 +518,6 @@ export class DomainHorizontalLayoutStrategy implements ILayoutStrategy {
     updatedNodes = unifySubGroupWidthsByDomain(updatedNodes);
     updatedNodes = recomputeSubGroupContainersBasic(updatedNodes);
     updatedNodes = unifySubGroupLeftAnchors(updatedNodes);
-    {
-      const enableDebug = Boolean(LayeredConfigManager.getInstance().get<boolean>('diagram.layout.debug', false));
-      if (enableDebug) {
-        const logItems = updatedNodes.filter(n => String(n.type || '') === 'subGroup').slice(0, 8);
-        const out = logItems.map(sg => ({
-          id: sg.id,
-          domain: sg.data.domain,
-          subDomain: sg.data.subDomain,
-          pos: sg.position,
-          size: { w: nodeWidth(sg, 0), h: nodeHeight(sg, 0) },
-          childrenCount: nodeChildren(sg).length,
-        }));
-        logSubGroupDebugSample(out);
-      }
-    }
     // 域尺寸计算时机调整：推迟到子域纵向堆叠与统一后
 
     const repackDomainsWithUniformGap = (list: LayoutNode[]) => {

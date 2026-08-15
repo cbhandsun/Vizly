@@ -1,5 +1,6 @@
 import type { DisplayGeometryBarrierResolution } from './baseReactFlowDisplayGeometryBarrier';
 import type { DisplayRoutingPhaseTrace } from './baseReactFlowDisplayRoutingTrace';
+import type { BaseDisplayBoundedCandidateReport } from './baseReactFlowDisplayEvaluation';
 import type {
   DisplayEdgesWorkerResponse,
   DisplayEdgesWorkerRouteResolution,
@@ -37,6 +38,7 @@ type DisplayRoutingDebugState = {
   geometryBarrierResolution?: DisplayGeometryBarrierResolution;
   geometryBarrierMs?: number;
   geometryBarrierSamples?: number;
+  hardGateDiagnostics?: BaseDisplayBoundedCandidateReport;
 };
 
 type DisplayRoutingDebugWindow = Window & {

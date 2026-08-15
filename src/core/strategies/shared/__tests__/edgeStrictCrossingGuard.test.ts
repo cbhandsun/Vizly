@@ -363,6 +363,20 @@ describe('edgeStrictCrossingGuard', () => {
     expect(calculateEdgePathQualityScore(tooLong).unrelatedOverlap).toBeGreaterThan(0);
   });
 
+  it('uses the rendered-audit inclusive 24px overlap boundary', () => {
+    const exactBoundary = [
+      edge('boundary-a', [{ x: 0, y: 0 }, { x: 100, y: 0 }]),
+      edge('boundary-b', [{ x: 76, y: 0 }, { x: 160, y: 0 }]),
+    ];
+    const belowBoundary = [
+      edge('below-a', [{ x: 0, y: 0 }, { x: 100, y: 0 }]),
+      edge('below-b', [{ x: 76.01, y: 0 }, { x: 160, y: 0 }]),
+    ];
+
+    expect(calculateEdgePathQualityScore(exactBoundary).unrelatedOverlap).toBe(24);
+    expect(calculateEdgePathQualityScore(belowBoundary).unrelatedOverlap).toBe(0);
+  });
+
   it('allows same-source overlap only when it is the endpoint trunk', () => {
     const sharedSourceTrunk = [
       linkedEdge('hub-left', 'hub', 'left', [
@@ -398,7 +412,7 @@ describe('edgeStrictCrossingGuard', () => {
     expect(calculateEdgePathQualityScore(distantSharedLane).unexplainedRelatedOverlap).toBeGreaterThan(0);
   });
 
-  it('does not flag explicitly synthesized shared trunks as unexplained related overlap', () => {
+  it('does not let stale shared-trunk metadata hide a non-prefix overlap', () => {
     const explicitTrunk = [
       linkedEdge('hub-left', 'hub', 'left', [
         { x: 0, y: 0 },
@@ -417,7 +431,7 @@ describe('edgeStrictCrossingGuard', () => {
     ];
 
     expect(calculateEdgePathQualityScore(explicitTrunk).relatedOverlap).toBeGreaterThan(0);
-    expect(calculateEdgePathQualityScore(explicitTrunk).unexplainedRelatedOverlap).toBe(0);
+    expect(calculateEdgePathQualityScore(explicitTrunk).unexplainedRelatedOverlap).toBeGreaterThan(0);
   });
 
   it('rejects non-orthogonal candidates before softer quality tie-breakers', () => {
@@ -679,14 +693,14 @@ describe('edgeStrictCrossingGuard', () => {
     (sharedIntentChanged[1].data as any).sharedTrunkAware = true;
     expectIncrementalParity(baseline, sharedIntentChanged);
     expect(calculateEdgePathQualityScore(sharedIntentChanged).unexplainedRelatedOverlap)
-      .toBeLessThan(baselineScore.unexplainedRelatedOverlap);
+      .toBe(baselineScore.unexplainedRelatedOverlap);
 
     const treeBusIntentChanged = cloneEdges(baseline);
     (treeBusIntentChanged[0].data as any).isTreeBus = true;
     (treeBusIntentChanged[1].data as any).isTreeBus = true;
     expectIncrementalParity(baseline, treeBusIntentChanged);
     expect(calculateEdgePathQualityScore(treeBusIntentChanged).unexplainedRelatedOverlap)
-      .toBeLessThan(baselineScore.unexplainedRelatedOverlap);
+      .toBe(baselineScore.unexplainedRelatedOverlap);
 
     const treeRoutingIntentChanged = cloneEdges(baseline);
     for (const index of [0, 1]) {
@@ -700,7 +714,7 @@ describe('edgeStrictCrossingGuard', () => {
     }
     expectIncrementalParity(baseline, treeRoutingIntentChanged);
     expect(calculateEdgePathQualityScore(treeRoutingIntentChanged).unexplainedRelatedOverlap)
-      .toBeLessThan(baselineScore.unexplainedRelatedOverlap);
+      .toBe(baselineScore.unexplainedRelatedOverlap);
 
     const treePathChanged = cloneEdges(baseline);
     delete (treePathChanged[4].data as any).computedPath;

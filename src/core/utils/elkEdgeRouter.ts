@@ -20,6 +20,8 @@ interface Point {
     y: number;
 }
 
+const ELK_EDGE_ROUTING_TIMEOUT_MS = 3_000;
+
 const finiteDimension = (value: unknown, fallback: number): number =>
     typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : fallback;
 
@@ -194,8 +196,14 @@ export async function routeEdgesWithELK(
         })),
     };
 
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
     try {
-        const result = await elk.layout(graph);
+        const timeoutPromise = new Promise<never>((_, reject) => {
+            timeoutId = setTimeout(() => {
+                reject(new Error(`ELK edge routing exceeded ${ELK_EDGE_ROUTING_TIMEOUT_MS}ms`));
+            }, ELK_EDGE_ROUTING_TIMEOUT_MS);
+        });
+        const result = await Promise.race([elk.layout(graph), timeoutPromise]);
 
         // 提取边路径
         const edgePaths = new Map<string, Point[]>();
@@ -224,6 +232,9 @@ export async function routeEdgesWithELK(
     } catch (error) {
         safeLog.error('[ELK Edge Router] Layout failed:', redactSensitiveLogValue(error));
         return new Map();
+    } finally {
+        if (timeoutId !== null) clearTimeout(timeoutId);
+        elk.terminateWorker();
     }
 }
 

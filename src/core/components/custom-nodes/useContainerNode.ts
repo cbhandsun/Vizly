@@ -84,6 +84,7 @@ export function useContainerNode({
 
   // ─── 调试开关 ──────────────────────────────────────
   const debugEnabled = ((): boolean => {
+    if (!import.meta.env.DEV) return false;
     try {
       const fromUrl = getQueryOrHashParamFromLocation(
         typeof window === 'undefined' ? undefined : window.location,

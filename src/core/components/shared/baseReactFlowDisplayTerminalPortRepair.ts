@@ -4,17 +4,16 @@ import { normalizeHandle } from '../../routing/utils/handleUtils';
 import { countRoutingObstacleHits } from '../../strategies/shared/edgeWaypointCandidateRepair';
 import {
   createEdgePathQualityEvaluationContext,
-  type EdgePathQualityScore,
 } from '../../strategies/shared/edgeStrictCrossingGuard';
 import {
   buildFacingPortPathCandidates,
   buildNearTerminalSideCandidates,
+  buildSharedSourceTrunkAdoptionCandidates,
   buildSharedNodeTerminalSideCandidates,
 } from './baseReactFlowSharedNodePortRoleRepair';
 import { anchorComputedDisplayEdgeEndpoints } from './baseReactFlowDisplayEdgeCore';
 import {
   buildDisplayRoutingObstacles,
-  displayAxisOf,
   displayPointsCoincide,
   fullDisplayPortSide,
   getDisplayComputedPath,
@@ -25,14 +24,10 @@ import {
 import { createDisplayObstacleEvaluationContext } from './baseReactFlowDisplayEvaluation';
 import {
   buildDeclaredTerminalAxisStubCandidates,
-  buildOppositeRoleSharedNodeCandidates,
   displayTerminalRoleNeedsDeclaredAxisRepair,
   displayTerminalSideCanSwitch,
   withDisplayPortBridge,
 } from './baseReactFlowDisplayTerminalPortCandidates';
-import {
-  repairBoundedReverseParallelOverlapsWithCandidates,
-} from './baseReactFlowDisplayOverlapRepair';
 import {
   createDisplayTerminalValidationSnapshot,
 } from './baseReactFlowTerminalAxisRepair';
@@ -55,6 +50,12 @@ import {
   displayTerminalPortCandidateIsComplete,
   rankDisplayTerminalPortCandidates,
 } from './baseReactFlowDisplayTerminalPortCandidateRanking';
+import { buildPairedTerminalPortRoleCandidates } from './baseReactFlowDisplayPairedPortRoleCandidates';
+import { repairResidualSharedSourceTrunkAxisMismatches } from './baseReactFlowDisplaySharedTrunkAxisRepair';
+import {
+  buildApproachSideTerminalCandidate,
+  detachedTerminalQualityDoesNotRegress,
+} from './baseReactFlowDisplayTerminalPortQuality';
 
 export { repairTerminalHandleHemisphereHairpins } from './baseReactFlowDisplayHemisphereHairpinRepair';
 
@@ -66,47 +67,6 @@ export {
   displayTerminalSideCanSwitch,
   withDisplayPortBridge,
 } from './baseReactFlowDisplayTerminalPortCandidates';
-
-const detachedTerminalQualityDoesNotRegress = (
-  baseline: EdgePathQualityScore,
-  candidate: EdgePathQualityScore,
-): boolean => (
-  candidate.nonOrthogonalSegments <= baseline.nonOrthogonalSegments
-  && candidate.strictCrossings <= baseline.strictCrossings
-  && candidate.reverseOverlap <= baseline.reverseOverlap
-  && candidate.unrelatedOverlap <= baseline.unrelatedOverlap
-  && candidate.unexplainedRelatedOverlap <= baseline.unexplainedRelatedOverlap
-  && candidate.shortEndpointStubs <= baseline.shortEndpointStubs
-  && candidate.tinyInteriorDoglegs <= baseline.tinyInteriorDoglegs
-  && candidate.hairpins <= baseline.hairpins
-);
-
-const buildApproachSideTerminalCandidate = (
-  path: DisplayPoint[],
-  role: 'source' | 'target',
-  rect: NonNullable<ReturnType<typeof getDisplayNodeRect>>,
-): { path: DisplayPoint[]; side: 'top' | 'bottom' | 'left' | 'right' } | null => {
-  if (path.length < 2) return null;
-  const terminalIndex = role === 'source' ? 0 : path.length - 1;
-  const adjacentIndex = role === 'source' ? 1 : path.length - 2;
-  const terminal = path[terminalIndex];
-  const adjacent = path[adjacentIndex];
-  const axis = displayAxisOf(terminal, adjacent);
-  if (!axis) return null;
-  const side = axis === 'h'
-    ? (adjacent.x < terminal.x ? 'left' : 'right')
-    : (adjacent.y < terminal.y ? 'top' : 'bottom');
-  const endpoint = side === 'left'
-    ? { x: rect.x, y: Math.max(rect.y, Math.min(rect.y + rect.height, adjacent.y)) }
-    : side === 'right'
-      ? { x: rect.x + rect.width, y: Math.max(rect.y, Math.min(rect.y + rect.height, adjacent.y)) }
-      : side === 'top'
-        ? { x: Math.max(rect.x, Math.min(rect.x + rect.width, adjacent.x)), y: rect.y }
-        : { x: Math.max(rect.x, Math.min(rect.x + rect.width, adjacent.x)), y: rect.y + rect.height };
-  const candidatePath = path.map(point => ({ ...point }));
-  candidatePath[terminalIndex] = endpoint;
-  return { path: candidatePath, side };
-};
 
 export const repairDetachedTerminalsWithBoundedPortRoles = <T extends Edge[]>(
   edges: T,
@@ -251,6 +211,31 @@ export const repairDetachedTerminalsWithBoundedPortRoles = <T extends Edge[]>(
 
     const declaredSourceSide = fullDisplayPortSide(normalizeHandle(edge.sourceHandle));
     const declaredTargetSide = fullDisplayPortSide(normalizeHandle(edge.targetHandle));
+    if (declaredTargetSide) {
+      for (const peer of current) {
+        if (peer.id === edge.id || peer.source !== edge.source) continue;
+        const peerValidation = terminalValidation.validateEdge(peer);
+        const peerSourceSide = fullDisplayPortSide(normalizeHandle(peer.sourceHandle));
+        if (
+          !peerValidation.sourceAnchored
+          || !peerSourceSide
+          || !displayTerminalSideCanSwitch(edge, 'source', peerSourceSide)
+        ) continue;
+        for (const candidatePath of buildSharedSourceTrunkAdoptionCandidates(
+          path,
+          getDisplayComputedPath(peer),
+          MIN_DISPLAY_ENDPOINT_STUB,
+          3,
+        )) {
+          appendEdgeCandidate(withDisplayPortBridge(
+            edge,
+            candidatePath,
+            peerSourceSide,
+            declaredTargetSide,
+          ));
+        }
+      }
+    }
     if (declaredSourceSide && declaredTargetSide) {
       for (const directPath of buildFacingPortPathCandidates(
         sourceRect,
@@ -314,7 +299,11 @@ export const repairAxisMismatchedTerminalsWithBoundedPortRoles = <T extends Edge
   const routingObstacles = buildDisplayRoutingObstacles(nodes);
   const terminalValidation = createDisplayTerminalValidationSnapshot(nodes);
   const countDeclaredAxisMismatches = createDisplayDeclaredAxisMismatchCounter(nodes);
-  for (let pass = 0; pass < edges.length && qualityEvaluations < maxQualityEvaluations; pass += 1) {
+  for (
+    let pass = 0;
+    pass < edges.length * 2 && qualityEvaluations < maxQualityEvaluations;
+    pass += 1
+  ) {
     const edgeIndex = current
       .map((edge, index) => {
         if (skippedEdgeIds.has(edge.id)) return null;
@@ -403,6 +392,19 @@ export const repairAxisMismatchedTerminalsWithBoundedPortRoles = <T extends Edge
     const approachSource = buildApproachSideTerminalCandidate(path, 'source', sourceRect);
     const approachTarget = buildApproachSideTerminalCandidate(path, 'target', targetRect);
     if (
+      geometrySourceSide
+      && geometryTargetSide
+      && displayTerminalSideCanSwitch(edge, 'source', geometrySourceSide)
+      && displayTerminalSideCanSwitch(edge, 'target', geometryTargetSide)
+    ) {
+      appendPriorityCandidate(withDisplayPortBridge(
+        edge,
+        path,
+        geometrySourceSide,
+        geometryTargetSide,
+      ));
+    }
+    if (
       approachSource
       && approachTarget
       && displayTerminalSideCanSwitch(edge, 'source', approachSource.side)
@@ -415,19 +417,6 @@ export const repairAxisMismatchedTerminalsWithBoundedPortRoles = <T extends Edge
         approachPath,
         approachSource.side,
         approachTarget.side,
-      ));
-    }
-    if (
-      geometrySourceSide
-      && geometryTargetSide
-      && displayTerminalSideCanSwitch(edge, 'source', geometrySourceSide)
-      && displayTerminalSideCanSwitch(edge, 'target', geometryTargetSide)
-    ) {
-      appendPriorityCandidate(withDisplayPortBridge(
-        edge,
-        path,
-        geometrySourceSide,
-        geometryTargetSide,
       ));
     }
 
@@ -512,6 +501,16 @@ export const repairAxisMismatchedTerminalsWithBoundedPortRoles = <T extends Edge
         role === 'source' ? sourceRect : targetRect,
       )
     ));
+    if (roles.length === 2) {
+      for (const candidateEdge of buildPairedTerminalPortRoleCandidates({
+        edge,
+        path,
+        sourceRect,
+        targetRect,
+      })) {
+        appendPriorityCandidate(candidateEdge);
+      }
+    }
     for (const role of roles.length > 0 ? roles : (['source', 'target'] as const)) {
       const rect = role === 'source' ? sourceRect : targetRect;
       const neighbor = role === 'source' ? path[1] : path[path.length - 2];
@@ -651,6 +650,11 @@ export const repairAxisMismatchedTerminalsWithBoundedPortRoles = <T extends Edge
     for (const { candidateEdge, declaredAxisMismatches } of rankedCandidateEdges) {
       if (qualityEvaluations >= maxQualityEvaluations) break;
       qualityEvaluations += 1;
+      // This transaction is atomic: rollbackIncompleteDeclaredAxisTransactions
+      // rejects partial repairs at the end, so accepting one here only burns the
+      // bounded search budget and can prevent a later complete handle/stub
+      // candidate from being considered.
+      if (declaredAxisMismatches !== 0) continue;
       const candidate = current.map((item, index) => (
         index === edgeIndex ? candidateEdge : item
       )) as T;
@@ -677,21 +681,15 @@ export const repairAxisMismatchedTerminalsWithBoundedPortRoles = <T extends Edge
       continue;
     }
     current = accepted;
+    // A completed peer can expose a safe shared source/target trunk for an edge
+    // that failed earlier in this bounded transaction. Retry those edges after
+    // the graph state changes instead of treating the first failure as final.
+    skippedEdgeIds.clear();
   }
-  return rollbackIncompleteDeclaredAxisTransactions(
+  const completed = rollbackIncompleteDeclaredAxisTransactions(
     edges,
     current,
     countDeclaredAxisMismatches,
   );
+  return repairResidualSharedSourceTrunkAxisMismatches(completed, nodes, 24);
 };
-
-export const repairBoundedReverseParallelOverlaps = <T extends Edge[]>(
-  edges: T,
-  nodes: Node[],
-  maxQualityEvaluations = 8,
-): T => repairBoundedReverseParallelOverlapsWithCandidates(
-  edges,
-  nodes,
-  maxQualityEvaluations,
-  buildOppositeRoleSharedNodeCandidates,
-);

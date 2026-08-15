@@ -348,11 +348,12 @@ export function edgeRoutingSegmentIntersectsRect(
 
 export function getRoutingObstacles(nodes: ReactFlowNode[]): Map<string, EdgeRoutingRect> {
   const result = new Map<string, EdgeRoutingRect>();
+  const nodeMap = new Map<string, ReactFlowNode>(nodes.map(node => [node.id, node] as const));
   const ignoredTypes = new Set(['titleGroup', 'subGroup', 'group', 'domain']);
   for (const node of nodes) {
     if (ignoredTypes.has(String(node.type || ''))) continue;
     const positionedNode = node as PositionedRoutingNode;
-    const position = positionedNode.positionAbsolute ?? node.position;
+    const position = positionedNode.positionAbsolute ?? computeAbsolutePosition(node, nodeMap);
     const width = finiteNumberOrFallback(
       node.measured?.width ?? node.width ?? node.style?.width,
       100,

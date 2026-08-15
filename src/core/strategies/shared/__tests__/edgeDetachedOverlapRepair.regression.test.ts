@@ -2,6 +2,8 @@ import type { Edge, Node } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
 
 import {
+  getEdgePath,
+  getRoutingObstacles,
   separateDetachedParallelOverlaps,
 } from '../edgeDetachedOverlapRepair';
 import { repairDetachedStrictCrossingBypasses } from '../edgeDetachedStrictCrossingRepair';
@@ -9,6 +11,7 @@ import {
   calculateEdgePathQualityScore,
   countStrictEdgeCrossings,
 } from '../edgeStrictCrossingGuard';
+import { countRoutingObstacleHits } from '../edgeWaypointCandidateRepair';
 
 function node(id: string, x: number, y: number, width = 80, height = 48): Node {
   return {
@@ -18,6 +21,13 @@ function node(id: string, x: number, y: number, width = 80, height = 48): Node {
     style: { width, height },
     data: {},
   };
+}
+
+function totalRoutingObstacleHits(edges: Edge[], nodes: Node[]): number {
+  const obstacles = getRoutingObstacles(nodes);
+  return edges.reduce((total, edge) => (
+    total + countRoutingObstacleHits(getEdgePath(edge), edge, obstacles)
+  ), 0);
 }
 
 describe('separateDetachedParallelOverlaps', () => {
@@ -197,7 +207,7 @@ describe('separateDetachedParallelOverlaps', () => {
     expect(repaired.some(edge => (edge.data as any).detachedOverlapSeparated)).toBe(true);
   });
 
-  it('tries maze bypasses for a single strict crossing on a long transport detour', () => {
+  it('rejects a maze bypass that removes a crossing by entering a business node', () => {
     const edges: Edge[] = [
       {
         id: 'edge-master-data-wms',
@@ -245,10 +255,19 @@ describe('separateDetachedParallelOverlaps', () => {
     expect(
       countStrictEdgeCrossings(repaired),
       JSON.stringify(repaired.map(edge => ({ id: edge.id, path: (edge.data as any).computedPath })), null, 2),
+    ).toBe(1);
+    expect(
+      totalRoutingObstacleHits(repaired, [
+        node('master-data', 32, 2816, 420, 236),
+        node('wms', -4, 1054, 420, 236),
+        node('tms', 23, 1974, 420, 236),
+        node('oms', 32, 568, 420, 236),
+      ]),
+      JSON.stringify(repaired.map(edge => ({ id: edge.id, path: getEdgePath(edge) })), null, 2),
     ).toBe(0);
   });
 
-  it('uses a readable far-side return bridge for a TMS carrier trunk crossing', () => {
+  it('uses a readable far-side return bridge without adding node hits', () => {
     const edges: Edge[] = [
       {
         id: 'edge-tms-carrier',
@@ -306,9 +325,7 @@ describe('separateDetachedParallelOverlaps', () => {
       },
     ];
 
-    expect(countStrictEdgeCrossings(edges)).toBe(1);
-
-    const repaired = repairDetachedStrictCrossingBypasses(edges, [
+    const nodes = [
       node('tms', 1200, 1985, 300, 160),
       node('carrier', 1160, 40, 240, 140),
       node('wms', 0, 1240, 220, 160),
@@ -316,19 +333,27 @@ describe('separateDetachedParallelOverlaps', () => {
       node('oms', 200, 520, 160, 140),
       node('wms-inbound', 0, 1030, 160, 120),
       node('wms-outbound', 0, 1210, 160, 120),
-    ]);
+    ];
+    const baselineObstacleHits = totalRoutingObstacleHits(edges, nodes);
+    expect(countStrictEdgeCrossings(edges)).toBe(1);
+
+    const repaired = repairDetachedStrictCrossingBypasses(edges, nodes);
     const quality = calculateEdgePathQualityScore(repaired);
 
     expect(
       countStrictEdgeCrossings(repaired),
       JSON.stringify(repaired.map(edge => ({ id: edge.id, path: (edge.data as any).computedPath })), null, 2),
     ).toBe(0);
+    expect(
+      totalRoutingObstacleHits(repaired, nodes),
+      JSON.stringify(repaired.map(edge => ({ id: edge.id, path: getEdgePath(edge) })), null, 2),
+    ).toBeLessThanOrEqual(baselineObstacleHits);
     expect(quality.nonOrthogonalSegments).toBe(0);
     expect(quality.shortEndpointStubs).toBe(0);
     expect(quality.tinyInteriorDoglegs).toBe(0);
   });
 
-  it('bypasses strict crossings between related systems interaction return paths', () => {
+  it('keeps only the obstacle-safe subset of related strict-crossing bypasses', () => {
     const edges: Edge[] = [
       {
         id: 'edge-master-data-wms-inventory',
@@ -390,20 +415,126 @@ describe('separateDetachedParallelOverlaps', () => {
       },
     ];
 
-    expect(countStrictEdgeCrossings(edges)).toBe(2);
-
-    const repaired = repairDetachedStrictCrossingBypasses(edges, [
+    const nodes = [
       node('master-data', 32, 590, 420, 156),
       node('oms-atc', 32, 1296, 420, 158),
       node('oms-fulfill', 32, 1614, 420, 158),
       node('wms-inventory', 32, 2171, 420, 158),
       node('wms-outbound', 32, 2489, 420, 158),
-    ]);
+    ];
+    const baselineObstacleHits = totalRoutingObstacleHits(edges, nodes);
+    expect(countStrictEdgeCrossings(edges)).toBe(2);
+
+    const repaired = repairDetachedStrictCrossingBypasses(edges, nodes);
 
     expect(
       countStrictEdgeCrossings(repaired),
       JSON.stringify(repaired.map(edge => ({ id: edge.id, path: (edge.data as any).computedPath })), null, 2),
+    ).toBe(1);
+    expect(
+      totalRoutingObstacleHits(repaired, nodes),
+      JSON.stringify(repaired.map(edge => ({ id: edge.id, path: getEdgePath(edge) })), null, 2),
+    ).toBeLessThanOrEqual(baselineObstacleHits);
+  });
+
+  it('does not trade the WMS QC strict crossing for routes through business nodes', () => {
+    const nodes = [
+      node('operation', 3495.6, 776.5, 216, 73),
+      node('qc-exec', 4054.6, 1003, 106, 60),
+      node('loading-handover', 4042.6, 1223, 130, 60),
+      node('wcs-integration', 4031.6, 1443, 152, 73),
+    ];
+    const edges: Edge[] = [
+      {
+        id: 'quality-check',
+        source: 'operation',
+        target: 'qc-exec',
+        data: {
+          computedPath: [
+            { x: 3496, y: 829 },
+            { x: 3441, y: 829 },
+            { x: 3441, y: 847 },
+            { x: 3496, y: 847 },
+            { x: 3496, y: 1015 },
+            { x: 3448, y: 1015 },
+            { x: 3448, y: 1033 },
+            { x: 4055, y: 1033 },
+          ],
+        },
+      },
+      {
+        id: 'equipment-link',
+        source: 'operation',
+        target: 'wcs-integration',
+        data: {
+          computedPath: [
+            { x: 3711.6, y: 849.5 },
+            { x: 3711.6, y: 1480 },
+            { x: 4031.6, y: 1480 },
+          ],
+        },
+      },
+    ];
+    const baselineObstacleHits = totalRoutingObstacleHits(edges, nodes);
+
+    expect(countStrictEdgeCrossings(edges)).toBe(1);
+    expect(baselineObstacleHits).toBe(0);
+
+    const repaired = repairDetachedStrictCrossingBypasses(edges, nodes);
+    const repairedObstacleHits = totalRoutingObstacleHits(repaired, nodes);
+
+    expect(
+      repairedObstacleHits,
+      JSON.stringify(repaired.map(edge => ({ id: edge.id, path: getEdgePath(edge) })), null, 2),
+    ).toBeLessThanOrEqual(baselineObstacleHits);
+  });
+
+  it('still accepts an obstacle-safe strict-crossing bypass when a clear lane exists', () => {
+    const nodes = [
+      node('horizontal-source', -80, 76, 80, 48),
+      node('horizontal-target', 300, 76, 80, 48),
+      node('vertical-source', 126, -48, 48, 48),
+      node('vertical-target', 126, 240, 48, 48),
+    ];
+    const edges: Edge[] = [
+      {
+        id: 'horizontal-flow',
+        source: 'horizontal-source',
+        target: 'horizontal-target',
+        data: {
+          computedPath: [
+            { x: 0, y: 100 },
+            { x: 40, y: 100 },
+            { x: 40, y: 120 },
+            { x: 260, y: 120 },
+            { x: 260, y: 100 },
+            { x: 300, y: 100 },
+          ],
+        },
+      },
+      {
+        id: 'vertical-flow',
+        source: 'vertical-source',
+        target: 'vertical-target',
+        data: {
+          computedPath: [
+            { x: 150, y: 0 },
+            { x: 150, y: 240 },
+          ],
+        },
+      },
+    ];
+
+    expect(countStrictEdgeCrossings(edges)).toBe(1);
+    expect(totalRoutingObstacleHits(edges, nodes)).toBe(0);
+
+    const repaired = repairDetachedStrictCrossingBypasses(edges, nodes);
+
+    expect(
+      countStrictEdgeCrossings(repaired),
+      JSON.stringify(repaired.map(edge => ({ id: edge.id, path: getEdgePath(edge) })), null, 2),
     ).toBe(0);
+    expect(totalRoutingObstacleHits(repaired, nodes)).toBe(0);
   });
 
   it('moves a WMS bridge edge to an adjacent lane instead of keeping a long reverse shared segment', () => {
@@ -448,7 +579,10 @@ describe('separateDetachedParallelOverlaps', () => {
     const second = (repaired[1].data as any).computedPath as Array<{ x: number; y: number }>;
 
     expect(quality.nonOrthogonalSegments).toBe(0);
-    expect(quality.strictCrossings).toBe(0);
+    expect(
+      quality.strictCrossings,
+      JSON.stringify(repaired.map(edge => ({ id: edge.id, path: getEdgePath(edge) })), null, 2),
+    ).toBe(0);
     expect(
       quality.reverseOverlap,
       JSON.stringify(repaired.map(edge => ({ id: edge.id, path: (edge.data as any).computedPath })), null, 2),

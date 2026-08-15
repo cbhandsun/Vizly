@@ -132,7 +132,9 @@ export function runDomainVerticalPhaseOne(
   }
 
   const allTitleGroupsHidden = areAllTitleGroupDomainsHidden(updatedNodes);
-  safeLog.debug(`[DOMAIN-HIDDEN-CHECK] allDomainsHidden=${allTitleGroupsHidden}`);
+  if (import.meta.env.DEV) {
+    safeLog.debug(`[DOMAIN-HIDDEN-CHECK] allDomainsHidden=${allTitleGroupsHidden}`);
+  }
 
   if (!allTitleGroupsHidden && nodeLayoutName === 'dagre') {
     const domainPadH = num(cfg?.domain?.padding?.horizontal, 24);

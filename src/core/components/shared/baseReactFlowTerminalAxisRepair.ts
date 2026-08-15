@@ -17,12 +17,21 @@ import {
   type TerminalRect as Rect,
   type TerminalHandleSide as Side,
 } from './baseReactFlowTerminalGeometry';
+import {
+  createTerminalAxisCoordinatePools,
+  selectBoundedTerminalAxisCandidates,
+  selectNearestTerminalAxisCoordinates,
+  selectTerminalAxisOuterCoordinates,
+  type TerminalAxisCandidateSeed,
+} from './baseReactFlowTerminalAxisCandidateSelection';
 
 export {
   createDisplayTerminalValidationSnapshot,
+  displayTerminalValidationDoesNotRegress,
   displayEdgesHaveNodeAnchoredTerminals,
   displayEdgesHaveNodeAttachedTerminals,
   getDisplayTerminalValidationReport,
+  keepDisplayTerminalValidationNonRegressing,
   keepNodeAnchoredTerminalCandidates,
   type DisplayTerminalValidation,
   type DisplayTerminalValidationOptions,
@@ -291,30 +300,6 @@ const outwardCoordinate = (point: Point, side: Side, distance = MIN_STUB): numbe
   return point.x + distance;
 };
 
-const nearestUnique = (values: number[], preferred: number, limit: number): number[] => {
-  const unique = [...new Set(values.filter(Number.isFinite).map(value => Math.round(value * 100) / 100))];
-  return unique.sort((a, b) => Math.abs(a - preferred) - Math.abs(b - preferred)).slice(0, limit);
-};
-
-const coordinatePools = (paths: Point[][], obstacles: Map<string, Rect>) => {
-  const x: number[] = [];
-  const y: number[] = [];
-  const add = (target: number[], value: number): void => {
-    target.push(value, value - LANE_GAP, value + LANE_GAP, value - MIN_STUB, value + MIN_STUB);
-  };
-  for (const path of paths) for (const point of path) {
-    add(x, point.x);
-    add(y, point.y);
-  }
-  for (const rect of obstacles.values()) {
-    add(x, rect.x);
-    add(x, rect.x + rect.width);
-    add(y, rect.y);
-    add(y, rect.y + rect.height);
-  }
-  return { x, y };
-};
-
 const withPath = (edge: Edge, path: Point[]): Edge => {
   const data: Record<string, unknown> = {
     ...(edge.data || {}),
@@ -357,6 +342,7 @@ const terminalAxisCandidates = (
   path: Point[],
   pools: { x: number[]; y: number[] },
   nodeRects: Map<string, Rect>,
+  boundOuterProduct: boolean,
 ): Point[][] => {
   if (path.length < 2) return [];
   const sourceSide = inferSideFromEndpoint(path[0], nodeRects.get(edge.source))
@@ -378,12 +364,12 @@ const terminalAxisCandidates = (
   const targetPreferred = outwardCoordinate(target, targetSide);
   const axisValues = sourceAxis === 'v' ? pools.y : pools.x;
   const trunkValues = sourceAxis === 'v' ? pools.x : pools.y;
-  const sourceLanes = nearestUnique(
+  const sourceLanes = selectNearestTerminalAxisCoordinates(
     [sourcePreferred, ...axisValues.filter(value => isOutward(value, source, sourceSide))],
     sourcePreferred,
     MAX_TERMINAL_LANES,
   );
-  const targetLanes = nearestUnique(
+  const targetLanes = selectNearestTerminalAxisCoordinates(
     [targetPreferred, ...axisValues.filter(value => isOutward(value, target, targetSide))],
     sourceAxis === 'v' ? path[path.length - 2].y : path[path.length - 2].x,
     MAX_TERMINAL_LANES,
@@ -391,71 +377,88 @@ const terminalAxisCandidates = (
   const currentTrunk = sourceAxis === 'v'
     ? path[Math.min(1, path.length - 1)].x
     : path[Math.min(1, path.length - 1)].y;
-  const trunks = nearestUnique(trunkValues, currentTrunk, MAX_TRUNK_LANES);
-  const candidates: Point[][] = [];
+  const trunks = selectNearestTerminalAxisCoordinates(
+    trunkValues,
+    currentTrunk,
+    MAX_TRUNK_LANES,
+  );
+  const candidateSeeds: TerminalAxisCandidateSeed[] = [];
+  const pushCandidate = (candidate: Point[], minimumPointCount = 0): void => {
+    candidateSeeds.push({ path: candidate, minimumPointCount });
+  };
 
   const sharedLanes = [...new Set(axisValues
     .filter(value => isOutward(value, source, sourceSide) && isOutward(value, target, targetSide))
     .map(value => Math.round(value * 100) / 100))];
   for (const lane of sharedLanes) {
-    candidates.push(sourceAxis === 'v'
-      ? compactPath([source, { x: source.x, y: lane }, { x: target.x, y: lane }, target])
-      : compactPath([source, { x: lane, y: source.y }, { x: lane, y: target.y }, target]));
+    pushCandidate(sourceAxis === 'v'
+      ? [source, { x: source.x, y: lane }, { x: target.x, y: lane }, target]
+      : [source, { x: lane, y: source.y }, { x: lane, y: target.y }, target]);
   }
 
-  const outerTargetLanes = [...new Set(axisValues
-    .filter(value => isOutward(value, target, targetSide))
-    .map(value => Math.round(value * 100) / 100))];
-  const outerTrunks = [...new Set(trunkValues.map(value => Math.round(value * 100) / 100))];
+  // Bound the outer-lane cartesian product before materializing candidate
+  // seeds. Large diagrams can expose hundreds of unique path and obstacle
+  // coordinates; ranking every target-lane × trunk pair only to discard all
+  // but 4,096 candidates made this terminal repair dominate cold routing.
+  // Keep the nearest commercial lanes plus both global extremes so genuine
+  // outer-skirt bypasses remain available.
+  const {
+    targetLanes: outerTargetLanes,
+    trunks: outerTrunks,
+  } = selectTerminalAxisOuterCoordinates({
+    targetValues: axisValues.filter(value => isOutward(value, target, targetSide)),
+    trunkValues,
+    targetPreferred: sourceAxis === 'v'
+      ? path[path.length - 2].y
+      : path[path.length - 2].x,
+    trunkPreferred: currentTrunk,
+    boundProduct: boundOuterProduct,
+    maximumCandidateCount: MAX_AXIS_CANDIDATES,
+    targetNearestLimit: MAX_TERMINAL_LANES * 8,
+    trunkNearestLimit: MAX_TRUNK_LANES * 4,
+  });
   for (const targetLane of outerTargetLanes) for (const trunk of outerTrunks) {
-    candidates.push(sourceAxis === 'v'
-      ? compactPath([
+    pushCandidate(sourceAxis === 'v'
+      ? [
         source,
         { x: source.x, y: sourcePreferred },
         { x: trunk, y: sourcePreferred },
         { x: trunk, y: targetLane },
         { x: target.x, y: targetLane },
         target,
-      ])
-      : compactPath([
+      ]
+      : [
         source,
         { x: sourcePreferred, y: source.y },
         { x: sourcePreferred, y: trunk },
         { x: targetLane, y: trunk },
         { x: targetLane, y: target.y },
         target,
-      ]));
+      ]);
   }
 
   for (const sourceLane of sourceLanes) for (const targetLane of targetLanes) for (const trunk of trunks) {
     const candidate = sourceAxis === 'v'
-      ? compactPath([
+      ? [
         source,
         { x: source.x, y: sourceLane },
         { x: trunk, y: sourceLane },
         { x: trunk, y: targetLane },
         { x: target.x, y: targetLane },
         target,
-      ])
-      : compactPath([
+      ]
+      : [
         source,
         { x: sourceLane, y: source.y },
         { x: sourceLane, y: trunk },
         { x: targetLane, y: trunk },
         { x: targetLane, y: target.y },
         target,
-      ]);
-    if (candidate.length >= 4) candidates.push(candidate);
+      ];
+    pushCandidate(candidate, 4);
   }
-  return candidates
-    .map((candidate, originalIndex) => ({
-      candidate,
-      length: pathLength(candidate),
-      originalIndex,
-    }))
-    .sort((first, second) => first.length - second.length || first.originalIndex - second.originalIndex)
-    .slice(0, MAX_AXIS_CANDIDATES)
-    .map(entry => entry.candidate);
+
+  return selectBoundedTerminalAxisCandidates(candidateSeeds, compactPath, MAX_AXIS_CANDIDATES);
 };
 
 const terminalEndpointNudgeCandidates = (
@@ -639,7 +642,7 @@ export const repairTerminalHandleAxisCrossings = (edges: Edge[], nodes: Node[]):
           : pathLength(paths[first]) - pathLength(paths[second]))
       ))
       .slice(0, 2);
-    const pools = coordinatePools(paths, obstacles);
+    const pools = createTerminalAxisCoordinatePools(paths, obstacles, LANE_GAP, MIN_STUB);
     let best = current;
     let bestScore = Number.POSITIVE_INFINITY;
     let solvedPhase = false;
@@ -650,7 +653,7 @@ export const repairTerminalHandleAxisCrossings = (edges: Edge[], nodes: Node[]):
       const candidateGroups = [
         terminalEndpointNudgeCandidates(edge, path, nodeRects),
         localOverlapBypassCandidates(edgeIndex, paths, current),
-        terminalAxisCandidates(edge, path, pools, nodeRects),
+        terminalAxisCandidates(edge, path, pools, nodeRects, current.length > 24),
       ];
       for (const candidatePathsForEdge of candidateGroups) {
         for (const candidatePath of candidatePathsForEdge) {

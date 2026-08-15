@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Edge, Node } from '@xyflow/react';
+import { MarkerType, type Edge, type Node } from '@xyflow/react';
 import { buildRenderSceneFromReactFlow } from '../../rendering/reactFlowScene';
 import {
   SvgExportError,
@@ -164,6 +164,176 @@ describe('svgExport', () => {
     expect(svg).toContain('class="vizly-export-edge-label"');
     expect(svg).toContain('<rect x=');
     expect(svg).toContain('opacity="0.92"');
+  });
+
+  it('exports a complete semantic edge when an orphan render-only plan is injected', () => {
+    const sharedNodes = [
+      { id: 'source', position: { x: 0, y: 0 }, data: {} },
+      { id: 'target', position: { x: 240, y: 0 }, data: {} },
+    ] satisfies Node[];
+    const sharedEdges = [{
+      id: 'member',
+      source: 'source',
+      target: 'target',
+      label: 'One label',
+      markerStart: { type: MarkerType.Arrow, color: '#2563eb' },
+      markerEnd: { type: MarkerType.ArrowClosed, color: '#2563eb' },
+      style: { stroke: '#2563eb' },
+      data: {
+        computedPath: [{ x: 0, y: 0 }, { x: 80, y: 0 }, { x: 160, y: 0 }],
+        __vizlySharedTrunkPaint: {
+          hiddenRanges: [{ from: 50, to: 110, role: 'source', ownerEdgeId: 'owner' }],
+          memberships: [{
+            id: 'source:source:owner',
+            role: 'source',
+            endpointId: 'source',
+            ownerEdgeId: 'owner',
+            edgeIds: ['member', 'owner'],
+            commonLength: 60,
+          }],
+          backboneRanges: [],
+        },
+      },
+    }] satisfies Edge[];
+
+    const svg = exportRenderSceneToSvg(buildRenderSceneFromReactFlow(sharedNodes, sharedEdges));
+
+    expect(svg).toContain('<path d="M 0 0 L 80 0 L 160 0"');
+    expect(svg).not.toContain('<path d="M 0 0 L 50 0"');
+    expect(svg).not.toContain('<path d="M 110 0 L 160 0"');
+    expect(svg.match(/marker-start=/gu)).toHaveLength(1);
+    expect(svg.match(/marker-end=/gu)).toHaveLength(1);
+    expect(svg.match(/class="vizly-export-edge-label"/gu)).toHaveLength(1);
+    expect(svg.match(/One label/gu)).toHaveLength(1);
+    expect(svg).toContain('<text x="80" y="0"');
+  });
+
+  it('exports one markerless neutral backbone for mixed semantic branches', () => {
+    const sharedNodes = [
+      { id: 'source', position: { x: 0, y: 0 }, data: {} },
+      { id: 'target-a', position: { x: 100, y: -100 }, data: {} },
+      { id: 'target-b', position: { x: 100, y: 100 }, data: {} },
+    ] satisfies Node[];
+    const sharedEdges = [
+      {
+        id: 'a-primary', source: 'source', target: 'target-a', label: 'Primary',
+        style: { stroke: '#FF5722', strokeWidth: 3 },
+        markerEnd: { type: MarkerType.ArrowClosed, color: '#FF5722' },
+        data: { computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: -100 }] },
+      },
+      {
+        id: 'b-trace', source: 'source', target: 'target-b', label: 'Trace',
+        style: { stroke: '#47CACC', strokeWidth: 2, strokeDasharray: '6 4' },
+        markerEnd: { type: MarkerType.ArrowClosed, color: '#47CACC' },
+        data: { computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }] },
+      },
+    ] satisfies Edge[];
+
+    const svg = exportRenderSceneToSvg(buildRenderSceneFromReactFlow(sharedNodes, sharedEdges));
+    const backboneGroup = svg.match(
+      /<g data-edge-id="a-primary::shared-backbone:0">[\s\S]*?<\/g>/u,
+    )?.[0] ?? '';
+    const junctionGroup = svg.match(
+      /<g data-edge-id="a-primary::shared-junction:0">[\s\S]*?<\/g>/u,
+    )?.[0] ?? '';
+
+    expect(backboneGroup).toContain('d="M 0 0 L 100 0"');
+    expect(backboneGroup).toContain('stroke="#64748B"');
+    expect(backboneGroup).toContain('stroke-width="3"');
+    expect(backboneGroup).not.toContain('marker-start=');
+    expect(backboneGroup).not.toContain('marker-end=');
+    expect(backboneGroup).not.toContain('vizly-export-edge-label');
+    expect(junctionGroup).toContain('d="M 99.99 0 L 100.01 0"');
+    expect(junctionGroup).toContain('stroke="#64748B"');
+    expect(junctionGroup).toContain('stroke-width="5"');
+    expect(junctionGroup).not.toContain('marker-start=');
+    expect(junctionGroup).not.toContain('marker-end=');
+    expect(junctionGroup).not.toContain('vizly-export-edge-label');
+    expect(svg.match(/marker-end=/gu)).toHaveLength(2);
+    expect(svg.match(/class="vizly-export-edge-label"/gu)).toHaveLength(2);
+  });
+
+  it('exports one owner marker-only carrier for a three-member target backbone', () => {
+    const sharedNodes = [
+      { id: 'source-a', position: { x: 0, y: -100 }, data: {} },
+      { id: 'source-b', position: { x: 100, y: -100 }, data: {} },
+      { id: 'source-c', position: { x: 100, y: 100 }, data: {} },
+      { id: 'target', position: { x: 200, y: 0 }, data: {} },
+    ] satisfies Node[];
+    const semanticStyle = { stroke: '#47CACC', strokeWidth: 2, strokeDasharray: '6 4' } as const;
+    const targetMarker = { type: MarkerType.ArrowClosed, color: '#47CACC' } as const;
+    const sharedEdges = [
+      {
+        id: 'a-source', source: 'source-a', target: 'target', style: semanticStyle, markerEnd: targetMarker,
+        data: { computedPath: [{ x: 0, y: -100 }, { x: 0, y: 0 }, { x: 100, y: 0 }, { x: 200, y: 0 }] },
+      },
+      {
+        id: 'b-source', source: 'source-b', target: 'target', style: semanticStyle, markerEnd: targetMarker,
+        data: { computedPath: [{ x: 100, y: -100 }, { x: 100, y: 0 }, { x: 200, y: 0 }] },
+      },
+      {
+        id: 'c-source', source: 'source-c', target: 'target', style: semanticStyle, markerEnd: targetMarker,
+        data: { computedPath: [{ x: 100, y: 100 }, { x: 100, y: 0 }, { x: 200, y: 0 }] },
+      },
+    ] satisfies Edge[];
+
+    const scene = buildRenderSceneFromReactFlow(sharedNodes, sharedEdges);
+    const carriers = scene.edges.filter(edge => edge.markerOnly);
+    const backbones = scene.edges.filter(edge => edge.id.includes('::shared-backbone:'));
+    const svg = exportRenderSceneToSvg(scene);
+
+    expect(backbones).toHaveLength(1);
+    expect(backbones[0].markerEnd.kind).toBe('none');
+    expect(carriers).toHaveLength(1);
+    expect(carriers[0]).toMatchObject({
+      id: 'a-source::shared-terminal-markers',
+      stroke: 'transparent',
+      label: '',
+      markerStart: { kind: 'none' },
+      markerEnd: { kind: 'arrow', color: '#47CACC' },
+    });
+    expect(scene.edges.filter(edge => !edge.markerOnly && edge.markerEnd.kind !== 'none')).toEqual([]);
+    expect(svg.match(/data-shared-trunk-marker-paint="owner-fallback"/gu)).toHaveLength(1);
+    expect(svg.match(/marker-end="url\(#/gu)).toHaveLength(1);
+    expect(svg.match(/stroke="transparent"/gu)).toHaveLength(1);
+  });
+
+  it('omits a fully hidden dual-role member label instead of placing it on the SVG backbone', () => {
+    const sharedNodes = [
+      { id: 'source', position: { x: 0, y: 0 }, data: {} },
+      { id: 'target', position: { x: 120, y: 0 }, data: {} },
+      { id: 'source-peer-target', position: { x: 60, y: -100 }, data: {} },
+      { id: 'target-peer-source', position: { x: 60, y: 100 }, data: {} },
+    ] satisfies Node[];
+    const sharedEdge = {
+      id: 'z-dual-role-member',
+      source: 'source',
+      target: 'target',
+      label: 'Bridge label',
+      markerEnd: { type: MarkerType.ArrowClosed, color: '#2563eb' },
+      style: { stroke: '#2563eb', strokeWidth: 1.5 },
+      data: {
+        computedPath: [{ x: 0, y: 0 }, { x: 60, y: 0 }, { x: 120, y: 0 }],
+      },
+    } satisfies Edge;
+    const sourceOwner = {
+      id: 'source-owner', source: 'source', target: 'source-peer-target',
+      style: { stroke: '#2563eb', strokeWidth: 3 },
+      data: { computedPath: [{ x: 0, y: 0 }, { x: 60, y: 0 }, { x: 60, y: -100 }] },
+    } satisfies Edge;
+    const targetOwner = {
+      id: 'target-owner', source: 'target-peer-source', target: 'target',
+      style: { stroke: '#2563eb', strokeWidth: 3 },
+      data: { computedPath: [{ x: 60, y: 100 }, { x: 60, y: 0 }, { x: 120, y: 0 }] },
+    } satisfies Edge;
+
+    const svg = exportRenderSceneToSvg(buildRenderSceneFromReactFlow(
+      sharedNodes,
+      [sharedEdge, sourceOwner, targetOwner],
+    ));
+
+    expect(svg).not.toContain('data-edge-id="z-dual-role-member"');
+    expect(svg).not.toContain('Bridge label');
   });
 
   it('rejects externally injected edge path data before rendering', () => {

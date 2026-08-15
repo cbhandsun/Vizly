@@ -19,6 +19,8 @@ export type DisplayRect = { x: number; y: number; width: number; height: number 
 export const NEAR_PARALLEL_LANE_TOLERANCE = 4;
 export const OBSTACLE_REPAIR_NODE_PADDING = 8;
 export const RESIDUAL_PARALLEL_LANE_GAP = 24;
+const SHARED_TRUNK_COORDINATE_EPS = NEAR_PARALLEL_LANE_TOLERANCE;
+const STRICT_CROSSING_INTERIOR_EPS = 0.5;
 
 const DISPLAY_CONTAINER_NODE_TYPES = new Set([
   'titleGroup',
@@ -232,6 +234,67 @@ export const displaySegmentsForPath = (
   return segments;
 };
 
+/**
+ * A shared endpoint alone does not make an overlap a trunk. Every preceding
+ * source segment (or following target segment) must be the same directed
+ * geometric chain. This mirrors the rendered audit and keeps source/target
+ * identities independent for dual-trunk edges.
+ */
+export const isProtectedDisplaySharedTrunkPair = (
+  first: DisplaySegment,
+  firstPath: DisplayPoint[],
+  firstEdge: Edge,
+  second: DisplaySegment,
+  secondPath: DisplayPoint[],
+  secondEdge: Edge,
+): boolean => {
+  const chainContains = (target: boolean): boolean => {
+    const firstOffset = target
+      ? firstPath.length - 2 - first.segmentIndex
+      : first.segmentIndex;
+    const secondOffset = target
+      ? secondPath.length - 2 - second.segmentIndex
+      : second.segmentIndex;
+    if (firstOffset !== secondOffset || firstOffset < 0) return false;
+    const firstSegments = displaySegmentsForPath(firstPath, first.edgeIndex);
+    const secondSegments = displaySegmentsForPath(secondPath, second.edgeIndex);
+    for (let offset = 0; offset <= firstOffset; offset += 1) {
+      const firstIndex = target ? firstPath.length - 2 - offset : offset;
+      const secondIndex = target ? secondPath.length - 2 - offset : offset;
+      const firstPart = firstSegments.find(segment => segment.segmentIndex === firstIndex);
+      const secondPart = secondSegments.find(segment => segment.segmentIndex === secondIndex);
+      if (!firstPart || !secondPart || firstPart.axis !== secondPart.axis) return false;
+      const [firstStart, firstEnd] = target
+        ? [firstPart.b, firstPart.a]
+        : [firstPart.a, firstPart.b];
+      const [secondStart, secondEnd] = target
+        ? [secondPart.b, secondPart.a]
+        : [secondPart.a, secondPart.b];
+      if (
+        Math.abs(firstStart.x - secondStart.x) > SHARED_TRUNK_COORDINATE_EPS
+        || Math.abs(firstStart.y - secondStart.y) > SHARED_TRUNK_COORDINATE_EPS
+      ) return false;
+      const firstDelta = firstPart.axis === 'h'
+        ? firstEnd.x - firstStart.x
+        : firstEnd.y - firstStart.y;
+      const secondDelta = secondPart.axis === 'h'
+        ? secondEnd.x - secondStart.x
+        : secondEnd.y - secondStart.y;
+      if (firstDelta * secondDelta <= 0.5) return false;
+      if (
+        offset < firstOffset
+        && (
+          Math.abs(firstEnd.x - secondEnd.x) > SHARED_TRUNK_COORDINATE_EPS
+          || Math.abs(firstEnd.y - secondEnd.y) > SHARED_TRUNK_COORDINATE_EPS
+        )
+      ) return false;
+    }
+    return true;
+  };
+  return (firstEdge.source === secondEdge.source && chainContains(false))
+    || (firstEdge.target === secondEdge.target && chainContains(true));
+};
+
 export const extractDisplaySegments = (edges: Edge[]): DisplaySegment[] => (
   edges.flatMap((edge, edgeIndex) => displaySegmentsForPath(getDisplayComputedPath(edge), edgeIndex))
 );
@@ -244,10 +307,10 @@ export const displayStrictCrossesHorizontal = (
   if (vertical.axis !== 'v') return false;
   const x = vertical.a.x;
   const y = horizontalStart.y;
-  return x > Math.min(horizontalStart.x, horizontalEnd.x) + 1
-    && x < Math.max(horizontalStart.x, horizontalEnd.x) - 1
-    && y > Math.min(vertical.a.y, vertical.b.y) + 1
-    && y < Math.max(vertical.a.y, vertical.b.y) - 1;
+  return x > Math.min(horizontalStart.x, horizontalEnd.x) + STRICT_CROSSING_INTERIOR_EPS
+    && x < Math.max(horizontalStart.x, horizontalEnd.x) - STRICT_CROSSING_INTERIOR_EPS
+    && y > Math.min(vertical.a.y, vertical.b.y) + STRICT_CROSSING_INTERIOR_EPS
+    && y < Math.max(vertical.a.y, vertical.b.y) - STRICT_CROSSING_INTERIOR_EPS;
 };
 
 export const displayStrictCrossesVertical = (
@@ -258,10 +321,10 @@ export const displayStrictCrossesVertical = (
   if (horizontal.axis !== 'h') return false;
   const x = verticalStart.x;
   const y = horizontal.a.y;
-  return x > Math.min(horizontal.a.x, horizontal.b.x) + 1
-    && x < Math.max(horizontal.a.x, horizontal.b.x) - 1
-    && y > Math.min(verticalStart.y, verticalEnd.y) + 1
-    && y < Math.max(verticalStart.y, verticalEnd.y) - 1;
+  return x > Math.min(horizontal.a.x, horizontal.b.x) + STRICT_CROSSING_INTERIOR_EPS
+    && x < Math.max(horizontal.a.x, horizontal.b.x) - STRICT_CROSSING_INTERIOR_EPS
+    && y > Math.min(verticalStart.y, verticalEnd.y) + STRICT_CROSSING_INTERIOR_EPS
+    && y < Math.max(verticalStart.y, verticalEnd.y) - STRICT_CROSSING_INTERIOR_EPS;
 };
 
 export const findDisplayStrictCrossingHits = (
@@ -397,10 +460,10 @@ export const createDisplayCandidateInteractionContext = (
           const max = Math.max(first.x, second.x);
           for (const other of verticalSegments) {
             if (
-              other.fixed > min + 1
-              && other.fixed < max - 1
-              && fixed > other.min + 1
-              && fixed < other.max - 1
+              other.fixed > min + STRICT_CROSSING_INTERIOR_EPS
+              && other.fixed < max - STRICT_CROSSING_INTERIOR_EPS
+              && fixed > other.min + STRICT_CROSSING_INTERIOR_EPS
+              && fixed < other.max - STRICT_CROSSING_INTERIOR_EPS
             ) {
               strictCrossings += 1;
             }
@@ -421,10 +484,10 @@ export const createDisplayCandidateInteractionContext = (
           const max = Math.max(first.y, second.y);
           for (const other of horizontalSegments) {
             if (
-              fixed > other.min + 1
-              && fixed < other.max - 1
-              && other.fixed > min + 1
-              && other.fixed < max - 1
+              fixed > other.min + STRICT_CROSSING_INTERIOR_EPS
+              && fixed < other.max - STRICT_CROSSING_INTERIOR_EPS
+              && other.fixed > min + STRICT_CROSSING_INTERIOR_EPS
+              && other.fixed < max - STRICT_CROSSING_INTERIOR_EPS
             ) {
               strictCrossings += 1;
             }

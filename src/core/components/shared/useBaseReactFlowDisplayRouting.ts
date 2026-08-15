@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   BASE_DISPLAY_ROUTING_VERSION,
   computeBaseReactFlowDisplayOutputRouteSignature,
-  readBaseReactFlowDisplayEdgesCacheEntry,
   writeBaseReactFlowDisplayEdgesCache,
 } from './baseReactFlowDisplayEdgeCore';
 import {
@@ -10,7 +9,6 @@ import {
   computeBaseReactFlowDisplayEdgesIncrementallyInWorker,
   disposeBaseReactFlowDisplayWorker,
   prewarmBaseReactFlowDisplayWorker,
-  resolveBaseReactFlowDisplayedEdges,
   resolveBaseReactFlowDisplayQualityPolicy,
   scheduleBaseReactFlowDisplayCacheWrite,
   type DeferredDisplayEdges,
@@ -22,7 +20,6 @@ import {
   createBaseReactFlowDisplayEdgePatches,
   doBaseReactFlowDisplayRoutesMatchExactly,
   mergeBaseReactFlowDisplayRoutingTransactions,
-  mergeTrustedBaseReactFlowDisplayCacheEntry,
   resolveBaseReactFlowDisplayCacheReplaySignature,
 } from './baseReactFlowDisplayRoutingTransaction';
 import { resolveBaseReactFlowDisplayCandidate } from './baseReactFlowDisplayCandidateResolver';
@@ -41,11 +38,6 @@ import {
   resolveBaseReactFlowDragAwareInputIdentity,
 } from './baseReactFlowDragRoutingFreeze';
 import {
-  createBaseReactFlowInteractiveFallbackEdges,
-  createBaseReactFlowNodeDragFallbackEdges,
-  shouldUseBaseReactFlowNodeDragFallback,
-} from './baseReactFlowDisplayFallback';
-import {
   logBaseReactFlowEventBindingFailure,
   logBaseReactFlowQualityFallback,
 } from './baseReactFlowLogging';
@@ -55,6 +47,13 @@ import type {
   UseBaseReactFlowDisplayRoutingOptions,
   UseBaseReactFlowDisplayRoutingResult,
 } from './baseReactFlowDisplayRoutingTypes';
+import {
+  isBaseReactFlowFreshRegenerationRequested,
+  useBaseReactFlowCachedDisplayCandidate,
+  useBaseReactFlowPrecompiledPreviewGate,
+  useBaseReactFlowResolvedDisplayEdges,
+  useBaseReactFlowResolvedOrDragFallbackEdges,
+} from './useBaseReactFlowDisplayCandidateBootstrap';
 
 export type {
   UseBaseReactFlowDisplayRoutingOptions,
@@ -117,6 +116,7 @@ export const useBaseReactFlowDisplayRouting = ({
     cacheSignature: displayEdgeCacheSignature,
     geometryDigest: inputGeometryDigest,
   } = displayInputIdentity;
+  const forceFreshFullRoute = isBaseReactFlowFreshRegenerationRequested();
 
   const displayQualityPolicy = useMemo(() => (
     resolveBaseReactFlowDisplayQualityPolicy({
@@ -132,7 +132,7 @@ export const useBaseReactFlowDisplayRouting = ({
   ), [routingNodes.length, edges.length, isLargeGraph]);
 
   const committedFinalDisplayEntry = useMemo(() => (
-    routingGeometryReady
+    routingGeometryReady && !forceFreshFullRoute
       ? readBaseReactFlowDisplayCommittedSnapshot({
         inputSignature: displayEdgeCacheSignature,
         inputGeometryDigest,
@@ -142,36 +142,45 @@ export const useBaseReactFlowDisplayRouting = ({
   ), [
     displayEdgeCacheSignature,
     edges,
+    forceFreshFullRoute,
     inputGeometryDigest,
     routingGeometryReady,
   ]);
 
   useEffect(() => {
+    if (forceFreshFullRoute) {
+      committedSnapshotBaselineRef.current = null;
+      return;
+    }
     if (committedFinalDisplayEntry) {
       committedSnapshotBaselineRef.current = committedFinalDisplayEntry.baseline;
     }
-  }, [committedFinalDisplayEntry]);
+  }, [committedFinalDisplayEntry, forceFreshFullRoute]);
 
   useEffect(() => {
     if (displayQualityPolicy.mode === 'skip' || committedFinalDisplayEntry) return;
     prewarmBaseReactFlowDisplayWorker(displayEdgeWorkerRef);
   }, [committedFinalDisplayEntry, displayQualityPolicy.mode]);
 
-  const cachedFinalDisplayEntry = useMemo(() => (
-    routingGeometryReady && !committedFinalDisplayEntry
-      ? readBaseReactFlowDisplayEdgesCacheEntry(displayEdgeCacheSignature)
-      : null
-  ), [
-    committedFinalDisplayEntry,
-    displayEdgeCacheSignature,
+  const cachedDisplayCandidateEdges = useBaseReactFlowCachedDisplayCandidate({
     routingGeometryReady,
-  ]);
-
-  const cachedDisplayCandidateEdges = useMemo(() => {
-    if (!cachedFinalDisplayEntry || cachedFinalDisplayEntry.hardClean !== true) return null;
-    return mergeTrustedBaseReactFlowDisplayCacheEntry(edges, cachedFinalDisplayEntry);
-  }, [cachedFinalDisplayEntry, edges]);
-
+    bypassReusableRoutes: forceFreshFullRoute,
+    hasCommittedFinalDisplayEntry: Boolean(committedFinalDisplayEntry),
+    inputSignature: displayEdgeCacheSignature,
+    edges,
+  });
+  const holdUnverifiedImmediateEdges = useBaseReactFlowPrecompiledPreviewGate({
+    routingGeometryReady,
+    forceFreshFullRoute,
+    hasCommittedFinalDisplayEntry: Boolean(committedFinalDisplayEntry),
+    inputSignature: displayEdgeCacheSignature,
+    inputGeometryDigest,
+    nodes: routingNodes,
+    edges,
+    enableSmartEdges,
+    smartEdgePadding,
+    isLargeGraph,
+  });
   const [deferredDisplayEdges, setDeferredDisplayEdges] = useState<DeferredDisplayEdges | null>(null);
 
   useEffect(() => {
@@ -242,7 +251,9 @@ export const useBaseReactFlowDisplayRouting = ({
     }
     const displayWorkerQualityMode = displayQualityPolicy.mode;
 
-    const retainedCommittedBaseline = committedSnapshotBaselineRef.current;
+    const retainedCommittedBaseline = forceFreshFullRoute
+      ? null
+      : committedSnapshotBaselineRef.current;
     const retainedCommittedEntry = doesBaseReactFlowDisplayCommittedBaselineMatchIdentity(
       retainedCommittedBaseline,
       displayEdgeCacheSignature,
@@ -353,7 +364,7 @@ export const useBaseReactFlowDisplayRouting = ({
         geometryBarrierSamples: geometryBarrier.sampleCount,
       });
       const incrementalPlan = createBaseReactFlowDisplayIncrementalPlan({
-        baseline: committedSnapshotBaselineRef.current,
+        baseline: forceFreshFullRoute ? null : committedSnapshotBaselineRef.current,
         nextInputSignature: displayEdgeCacheSignature,
         nextInputGeometryDigest: inputGeometryDigest,
         nextNodes: activeRoutingInput.nodes,
@@ -390,6 +401,7 @@ export const useBaseReactFlowDisplayRouting = ({
             isLargeGraph: activeRoutingInput.isLargeGraph,
           },
           persistentCandidateEdges: cachedDisplayCandidateEdges,
+          allowExternalCandidates: !forceFreshFullRoute,
           signal: workerAbortController.signal,
           isCurrent: () => (
             !cancelled
@@ -650,6 +662,7 @@ export const useBaseReactFlowDisplayRouting = ({
     committedFinalDisplayEntry,
     displayEdgeCacheSignature,
     displayQualityPolicy,
+    forceFreshFullRoute,
     inputGeometryDigest,
     isContainerReady,
     isNodeDragFallbackPending,
@@ -659,34 +672,26 @@ export const useBaseReactFlowDisplayRouting = ({
     routingGeometryReady,
   ]);
 
-  const immediateDisplayEdges = useMemo(
-    () => createBaseReactFlowInteractiveFallbackEdges(edges),
-    [edges],
-  );
-
-  const resolvedDisplayEdges = resolveBaseReactFlowDisplayedEdges({
-    signature: displayEdgeCacheSignature,
-    geometryDigest: inputGeometryDigest,
+  const resolvedDisplayEdges = useBaseReactFlowResolvedDisplayEdges({
+    edges,
+    inputSignature: displayEdgeCacheSignature,
+    inputGeometryDigest,
     policyMode: displayQualityPolicy.mode,
     deferred: deferredDisplayEdges,
     cached: committedFinalDisplayEntry?.edges ?? null,
-    immediate: immediateDisplayEdges,
+    holdUnverifiedImmediateEdges,
   });
 
-  const hasResolvedDisplayEdges = edges.length === 0 || resolvedDisplayEdges.length > 0;
-  const useNodeDragFallback = shouldUseBaseReactFlowNodeDragFallback({
+  const displayedEdges = useBaseReactFlowResolvedOrDragFallbackEdges({
+    sourceEdges: edges,
+    resolvedEdges: resolvedDisplayEdges,
     isNodeDragging,
     dragFallbackPending: isNodeDragFallbackPending,
-    hasResolvedEdges: hasResolvedDisplayEdges,
-    sourceEdgeCount: edges.length,
+    nodeDragFallbackIds,
   });
-  const nodeDragFallbackEdges = useMemo(
-    () => createBaseReactFlowNodeDragFallbackEdges(edges, nodeDragFallbackIds),
-    [edges, nodeDragFallbackIds],
-  );
 
   return {
-    edges: useNodeDragFallback ? nodeDragFallbackEdges : resolvedDisplayEdges,
+    edges: displayedEdges,
     // BaseReactFlow is always canvas-owned, including the geometry bootstrap
     // window. Standalone custom edges retain the context default ('edge').
     routingOwner: 'canvas',

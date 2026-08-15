@@ -21,6 +21,7 @@ import * as declaredRoleRepair from '../baseReactFlowDeclaredTerminalRoleRepair'
 import * as endpointStubRepair from '../baseReactFlowDisplayEndpointStubRepair';
 import * as displayFinalizer from '../baseReactFlowDisplayFinalizer';
 import * as fullRoutePipeline from '../baseReactFlowDisplayFullRoutePipeline';
+import * as finalSafetyClosure from '../baseReactFlowDisplayFinalSafetyClosure';
 import * as measuredDisplayRepair from '../baseReactFlowDisplayMeasuredRepair';
 import * as outerPortTransaction from '../baseReactFlowDisplayOuterPortTransaction';
 import { getDisplayHardQualityGateReport } from '../baseReactFlowDisplayQualityGates';
@@ -59,18 +60,17 @@ const edges: Edge[] = [
     target: 'target',
     sourceHandle: 'right',
     targetHandle: 'left',
-    type: 'advanced-smart-step',
+    type: 'stablePath',
     data: {
       autoSource: false,
       autoTarget: false,
       computedPath: [
         { x: 100, y: 30 },
-        { x: 148, y: 30 },
-        { x: 252, y: 30 },
         { x: 300, y: 30 },
       ],
       layoutDirection: 'LR',
       layoutPathLocked: true,
+      _layoutPathLocked: true,
       runtimeHandleLock: { source: true, target: true },
     },
   },
@@ -144,8 +144,75 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
         phase: 'candidate-validation',
         resolution: 'hit',
       }),
+      expect.objectContaining({ phase: 'final-clearance', resolution: 'skip' }),
+      expect.objectContaining({ phase: 'final-hard-safety', resolution: 'skip' }),
     ]);
     expect(fullRouteSpy).not.toHaveBeenCalled();
+  });
+
+  it('keeps an exact validated route without repeating the final safety closure', () => {
+    const closureSpy = vi.spyOn(
+      finalSafetyClosure,
+      'repairBaseReactFlowFinalSafetyClosure',
+    ).mockImplementation(candidateEdges => candidateEdges.map(edge => ({
+      ...edge,
+      data: {
+        ...edge.data,
+        endpointOrderRepaired: false,
+      },
+    })));
+
+    const response = computeBaseReactFlowDisplayEdgesWorkerResponse({
+      operation: 'validate-or-route',
+      requestId: 'validate-idempotent-safety-closure',
+      edges,
+      candidateEdges: edges,
+      candidateSource: 'precompiled',
+      nodes,
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: false,
+      displayEdgeEpoch: 1,
+      qualityMode: 'full',
+    });
+
+    expect(response).toMatchObject({
+      requestId: 'validate-idempotent-safety-closure',
+      edges,
+      hardClean: true,
+      routeResolution: 'validated-candidate',
+    });
+    expect(closureSpy).not.toHaveBeenCalled();
+  });
+
+  it('locks a validated smart candidate to the computed-path renderer', () => {
+    const smartCandidate = edges.map(edge => ({
+      ...edge,
+      type: 'advanced-smart-step',
+      data: {
+        ...edge.data,
+        layoutPathLocked: false,
+        _layoutPathLocked: false,
+      },
+    }));
+    const response = computeBaseReactFlowDisplayEdgesWorkerResponse({
+      operation: 'validate-or-route',
+      requestId: 'validate-smart-render-contract',
+      edges: smartCandidate,
+      candidateEdges: smartCandidate,
+      candidateSource: 'precompiled',
+      nodes,
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: false,
+      displayEdgeEpoch: 1,
+      qualityMode: 'full',
+    });
+
+    expect(response.routeResolution).toBe('repaired-candidate');
+    expect(response.edges?.[0].type).toBe('stablePath');
+    expect(response.edges?.[0].data?.layoutPathLocked).toBe(true);
+    expect(response.edges?.[0].data?._layoutPathLocked).toBe(true);
   });
 
   it('reroutes invalid, stale, and malformed cache candidates in the same worker job', () => {
@@ -244,7 +311,8 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
 
     expect(response.hardClean).toBe(true);
     expect(response.edges).toHaveLength(301);
-    expect(response.routeResolution).toBe('validated-candidate');
+    expect(response.routeResolution).toBe('repaired-candidate');
+    expect(response.edges?.every(edge => edge.type === 'stablePath')).toBe(true);
     expect(fullRouteSpy).not.toHaveBeenCalled();
   });
 
@@ -279,9 +347,19 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
     expect(workerResponse.phaseTrace?.map(trace => trace.phase)).toEqual([
       'candidate-validation',
       'seed',
+      'quality-global-route',
+      'quality-topology',
+      'quality-crossing-sweeps',
+      'quality-strict-closure',
+      'quality-polish',
       'quality',
+      'post-render-finalize',
+      'post-render-soft-closure',
       'post-render',
       'finalizer',
+      'final-clearance',
+      'final-hard-safety',
+      'final-safety-closure',
     ]);
   });
 
@@ -334,9 +412,13 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
       hardClean: true,
       routeResolution: 'full-route-repaired',
     });
-    expect(response.phaseTrace?.at(-1)).toMatchObject({
+    expect(response.phaseTrace).toContainEqual(expect.objectContaining({
       phase: 'measured-repair',
       resolution: 'accepted',
+    }));
+    expect(response.phaseTrace?.at(-1)).toMatchObject({
+      phase: 'final-safety-closure',
+      resolution: 'skip',
     });
   });
 
@@ -829,8 +911,6 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
       'cache-quality-good',
       [
         { x: 100, y: 30 },
-        { x: 148, y: 30 },
-        { x: 252, y: 30 },
         { x: 300, y: 30 },
       ],
       nodes,
@@ -839,7 +919,11 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
       requestId: 'cache-quality-good',
       edges: good.candidate,
       hardClean: true,
-      routeResolution: 'validated-candidate',
+      routeResolution: 'repaired-candidate',
+    });
+    expect(good.response.edges?.[0].data).toMatchObject({
+      layoutPathLocked: true,
+      _layoutPathLocked: true,
     });
     expect(resolveBaseReactFlowDisplayedEdges({
       signature: 'cache-quality-good',
@@ -864,7 +948,7 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
       },
       cached: null,
       immediate: [sourceEdge],
-    })).toEqual(good.candidate);
+    })).toEqual(good.response.edges);
 
     const obstacleNodes: Node[] = [
       nodes[0],

@@ -19,9 +19,11 @@ const KeyboardShortcutPanel = React.lazy(() => import('../KeyboardShortcutPanel'
 const FlowchartShortcutsHelpModal = React.lazy(() => import('../FlowchartShortcutsHelpModal').then(module => ({
     default: module.FlowchartShortcutsHelpModal,
 })));
-const PerformanceDashboard = React.lazy(() => import('../PerformanceDashboard').then(module => ({
-    default: module.PerformanceDashboard,
-})));
+const PerformanceDashboard = import.meta.env.DEV
+    ? React.lazy(() => import('../PerformanceDashboard').then(module => ({
+        default: module.PerformanceDashboard,
+    })))
+    : null;
 const PresentationMode = React.lazy(() => import('../../presentation/PresentationMode'));
 const DiffOverlay = React.lazy(() => import('../DiffOverlay'));
 
@@ -157,7 +159,7 @@ export const DesignerOverlaysLayer: React.FC<DesignerOverlaysLayerProps> = ({
             </div>
 
             {/* ⭐ 性能仪表盘 */}
-            {status.showPerformanceDashboard && (
+            {import.meta.env.DEV && status.showPerformanceDashboard && PerformanceDashboard && (
                 <React.Suspense fallback={null}>
                     <div style={{
                         position: 'absolute',

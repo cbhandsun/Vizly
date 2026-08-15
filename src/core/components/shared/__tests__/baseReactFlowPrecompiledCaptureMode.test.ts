@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveBaseReactFlowPrecompiledCapturePresetId } from '../baseReactFlowPrecompiledCaptureMode';
+import {
+  resolveBaseReactFlowPrecompiledCapturePresetId,
+  resolveBaseReactFlowPrecompiledRegenerationPresetId,
+} from '../baseReactFlowPrecompiledCaptureMode';
 
 describe('baseReactFlowPrecompiledCaptureMode', () => {
   it('accepts one matching bounded preset identity', () => {
@@ -8,6 +11,19 @@ describe('baseReactFlowPrecompiledCaptureMode', () => {
       search: '?precompiledCapture=wms-process-flow-v1',
       hash: '#/?diagram=wms-process-flow-v1',
     })).toBe('wms-process-flow-v1');
+    expect(resolveBaseReactFlowPrecompiledRegenerationPresetId({
+      search: '?precompiledRegenerate=wms-process-flow-v1',
+      hash: '#/?diagram=wms-process-flow-v1',
+    })).toBe('wms-process-flow-v1');
+  });
+
+  it('keeps ordinary capture separate from cache-free regeneration', () => {
+    const input = {
+      search: '?precompiledCapture=wms-process-flow-v1',
+      hash: '#/?diagram=wms-process-flow-v1',
+    };
+    expect(resolveBaseReactFlowPrecompiledCapturePresetId(input)).toBe('wms-process-flow-v1');
+    expect(resolveBaseReactFlowPrecompiledRegenerationPresetId(input)).toBeNull();
   });
 
   it.each([

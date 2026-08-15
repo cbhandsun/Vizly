@@ -63,6 +63,13 @@ export const buildObstacleSkirtCandidates = (
         const rightLane = Math.round(rect.x + rect.width + OBSTACLE_REPAIR_NODE_PADDING + 1);
         const nearX = horizontalDirection >= 0 ? leftLane : rightLane;
         const farX = horizontalDirection >= 0 ? rightLane : leftLane;
+        const commercialTopY = rect.y
+          - OBSTACLE_REPAIR_NODE_PADDING
+          - RESIDUAL_PARALLEL_LANE_GAP * 2;
+        const commercialBottomY = rect.y
+          + rect.height
+          + OBSTACLE_REPAIR_NODE_PADDING
+          + RESIDUAL_PARALLEL_LANE_GAP * 2;
         const detourLanes = sortedUniqueNumbers([
           rect.y - OBSTACLE_REPAIR_NODE_PADDING - 1,
           rect.y - OBSTACLE_REPAIR_NODE_PADDING - 8,
@@ -70,6 +77,13 @@ export const buildObstacleSkirtCandidates = (
           rect.y + rect.height + OBSTACLE_REPAIR_NODE_PADDING + 8,
           rect.y - OBSTACLE_REPAIR_NODE_PADDING - RESIDUAL_PARALLEL_LANE_GAP,
           rect.y + rect.height + OBSTACLE_REPAIR_NODE_PADDING + RESIDUAL_PARALLEL_LANE_GAP,
+          commercialTopY,
+          commercialBottomY,
+        ], start.y);
+        const fullSpanDetourLanes = sortedUniqueNumbers([
+          ...detourLanes.slice(0, 6),
+          commercialTopY,
+          commercialBottomY,
         ], start.y);
         const localBoxY = sortedUniqueNumbers([
           ...detourLanes,
@@ -132,7 +146,7 @@ export const buildObstacleSkirtCandidates = (
           }
         }
 
-        for (const detourY of detourLanes.slice(0, 6)) {
+        for (const detourY of fullSpanDetourLanes) {
           appendCandidate([
             ...path.slice(0, segmentIndex + 1),
             { x: start.x, y: detourY },
@@ -193,6 +207,13 @@ export const buildObstacleSkirtCandidates = (
         const bottomLane = Math.round(rect.y + rect.height + OBSTACLE_REPAIR_NODE_PADDING + 1);
         const nearY = verticalDirection >= 0 ? topLane : bottomLane;
         const farY = verticalDirection >= 0 ? bottomLane : topLane;
+        const commercialLeftX = rect.x
+          - OBSTACLE_REPAIR_NODE_PADDING
+          - RESIDUAL_PARALLEL_LANE_GAP * 2;
+        const commercialRightX = rect.x
+          + rect.width
+          + OBSTACLE_REPAIR_NODE_PADDING
+          + RESIDUAL_PARALLEL_LANE_GAP * 2;
         const detourLanes = sortedUniqueNumbers([
           rect.x - OBSTACLE_REPAIR_NODE_PADDING - 1,
           rect.x - OBSTACLE_REPAIR_NODE_PADDING - 8,
@@ -200,6 +221,13 @@ export const buildObstacleSkirtCandidates = (
           rect.x + rect.width + OBSTACLE_REPAIR_NODE_PADDING + 8,
           rect.x - OBSTACLE_REPAIR_NODE_PADDING - RESIDUAL_PARALLEL_LANE_GAP,
           rect.x + rect.width + OBSTACLE_REPAIR_NODE_PADDING + RESIDUAL_PARALLEL_LANE_GAP,
+          commercialLeftX,
+          commercialRightX,
+        ], start.x);
+        const fullSpanDetourLanes = sortedUniqueNumbers([
+          ...detourLanes.slice(0, 6),
+          commercialLeftX,
+          commercialRightX,
         ], start.x);
         const localBoxX = sortedUniqueNumbers([
           ...detourLanes,
@@ -261,7 +289,7 @@ export const buildObstacleSkirtCandidates = (
           }
         }
 
-        for (const detourX of detourLanes.slice(0, 6)) {
+        for (const detourX of fullSpanDetourLanes) {
           appendCandidate([
             ...path.slice(0, segmentIndex + 1),
             { x: detourX, y: start.y },

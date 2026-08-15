@@ -1,5 +1,6 @@
 import type { Edge, Node, XYPosition } from '@xyflow/react';
 
+import { PathFinder } from '../../routing/algorithms/PathFinder';
 import { expandHandle } from '../../routing/utils/handleUtils';
 
 type FastPoint = { x: number; y: number };
@@ -8,6 +9,7 @@ type FastRect = { id: string; x: number; y: number; width: number; height: numbe
 const EPSILON = 0.5;
 const OBSTACLE_PADDING = 8;
 const LANE_CLEARANCE = 12;
+const GRID_FALLBACK_MAX_PEER_EDGES = 31;
 const CONTAINER_TYPES = new Set(['titleGroup', 'subGroup', 'group', 'domain', 'subDomain', 'swimlane']);
 
 const finiteNumber = (value: unknown, fallback = 0): number => (
@@ -124,9 +126,207 @@ const pathLength = (path: FastPoint[]): number => path.reduce((total, point, ind
   return total + Math.abs(point.x - previous.x) + Math.abs(point.y - previous.y);
 }, 0);
 
+type FastSegment = Readonly<{
+  axis: 'horizontal' | 'vertical';
+  a: FastPoint;
+  b: FastPoint;
+}>;
+
+const orthogonalSegments = (path: FastPoint[]): FastSegment[] => path
+  .slice(0, -1)
+  .flatMap<FastSegment>((point, index): FastSegment[] => {
+    const next = path[index + 1];
+    if (Math.abs(point.x - next.x) <= EPSILON) {
+      return [{ axis: 'vertical' as const, a: point, b: next } satisfies FastSegment];
+    }
+    if (Math.abs(point.y - next.y) <= EPSILON) {
+      return [{ axis: 'horizontal' as const, a: point, b: next } satisfies FastSegment];
+    }
+    return [];
+  });
+
+const strictlyBetween = (value: number, first: number, second: number): boolean => (
+  value > Math.min(first, second) + EPSILON
+  && value < Math.max(first, second) - EPSILON
+);
+
+const segmentsStrictlyCross = (first: FastSegment, second: FastSegment): boolean => {
+  if (first.axis === second.axis) return false;
+  const horizontal = first.axis === 'horizontal' ? first : second;
+  const vertical = first.axis === 'vertical' ? first : second;
+  return strictlyBetween(vertical.a.x, horizontal.a.x, horizontal.b.x)
+    && strictlyBetween(horizontal.a.y, vertical.a.y, vertical.b.y);
+};
+
+const pathStrictCrossings = (
+  path: FastPoint[],
+  otherPaths: FastPoint[][],
+): number => {
+  const candidateSegments = orthogonalSegments(path);
+  return otherPaths.reduce((total, otherPath) => {
+    const otherSegments = orthogonalSegments(otherPath);
+    return total + candidateSegments.reduce((candidateTotal, candidateSegment) => (
+      candidateTotal + otherSegments.filter(otherSegment => (
+        segmentsStrictlyCross(candidateSegment, otherSegment)
+      )).length
+    ), 0);
+  }, 0);
+};
+
+const simplifyCrossingFreePath = (
+  path: FastPoint[],
+  rects: FastRect[],
+  otherPaths: FastPoint[][],
+): FastPoint[] => {
+  if (path.length < 4) return path;
+  const safe = (candidate: FastPoint[]): boolean => (
+    pathObstacleHits(candidate, rects) === 0
+    && pathStrictCrossings(candidate, otherPaths) === 0
+  );
+  const sourceStub = path[1];
+  const targetStub = path.at(-2);
+  if (!sourceStub || !targetStub) return path;
+  const core = [sourceStub, ...path.slice(2, -2), targetStub];
+  const simplified = [core[0]];
+  let index = 0;
+  while (index < core.length - 1) {
+    let accepted: FastPoint[] | null = null;
+    let acceptedIndex = index + 1;
+    for (let nextIndex = core.length - 1; nextIndex > index; nextIndex -= 1) {
+      const start = core[index];
+      const end = core[nextIndex];
+      const candidates = Math.abs(start.x - end.x) <= EPSILON
+        || Math.abs(start.y - end.y) <= EPSILON
+        ? [[start, end]]
+        : [
+            [start, { x: end.x, y: start.y }, end],
+            [start, { x: start.x, y: end.y }, end],
+          ];
+      const best = candidates
+        .filter(safe)
+        .sort((first, second) => pathLength(first) - pathLength(second))[0];
+      if (!best) continue;
+      accepted = best;
+      acceptedIndex = nextIndex;
+      break;
+    }
+    if (!accepted) accepted = [core[index], core[index + 1]];
+    simplified.push(...accepted.slice(1));
+    index = acceptedIndex;
+  }
+  const result = compactPath([path[0], ...simplified, path.at(-1)!]);
+  return safe(result) ? result : path;
+};
+
 const handleSide = (handle: string | null | undefined): string => (
   String(expandHandle(String(handle || '')) || '').toLowerCase()
 );
+
+const terminalStub = (
+  point: FastPoint,
+  handle: string | null | undefined,
+  distance: number,
+): FastPoint => {
+  switch (handleSide(handle)) {
+    case 'left': return { x: point.x - distance, y: point.y };
+    case 'right': return { x: point.x + distance, y: point.y };
+    case 'top': return { x: point.x, y: point.y - distance };
+    case 'bottom': return { x: point.x, y: point.y + distance };
+    default: return point;
+  }
+};
+
+const findGridObstacleFallback = (
+  edge: Edge,
+  path: FastPoint[],
+  rects: FastRect[],
+  otherPaths: FastPoint[][],
+): FastPoint[] | null => {
+  const start = path[0];
+  const end = path.at(-1);
+  if (!start || !end) return null;
+  const stubDistance = 24;
+  const startStub = terminalStub(start, edge.sourceHandle, stubDistance);
+  const endStub = terminalStub(end, edge.targetHandle, stubDistance);
+  const coordinates = [start, end, startStub, endStub, ...path, ...otherPaths.flat()];
+  const margin = 96;
+  const bbox = {
+    minX: Math.min(...coordinates.map(point => point.x), ...rects.map(rect => rect.x)) - margin,
+    minY: Math.min(...coordinates.map(point => point.y), ...rects.map(rect => rect.y)) - margin,
+    maxX: Math.max(
+      ...coordinates.map(point => point.x),
+      ...rects.map(rect => rect.x + rect.width),
+    ) + margin,
+    maxY: Math.max(
+      ...coordinates.map(point => point.y),
+      ...rects.map(rect => rect.y + rect.height),
+    ) + margin,
+  };
+  const pathBarriers: FastRect[] = otherPaths.flatMap((otherPath, pathIndex) => {
+    const sharesStart = otherPath.some(point => samePoint(point, start));
+    const sharesEnd = otherPath.some(point => samePoint(point, end));
+    return otherPath.slice(0, -1).flatMap((point, segmentIndex) => {
+      const next = otherPath[segmentIndex + 1];
+      if (
+        (sharesStart && segmentIndex === 0)
+        || (sharesEnd && segmentIndex === otherPath.length - 2)
+      ) return [];
+      if (Math.abs(point.x - next.x) <= EPSILON) {
+        const length = Math.abs(next.y - point.y);
+        return length <= 2 ? [] : [{
+          id: `path-${pathIndex}-${segmentIndex}`,
+          x: point.x - 1,
+          y: Math.min(point.y, next.y) + 1,
+          width: 2,
+          height: length - 2,
+        }];
+      }
+      if (Math.abs(point.y - next.y) <= EPSILON) {
+        const length = Math.abs(next.x - point.x);
+        return length <= 2 ? [] : [{
+          id: `path-${pathIndex}-${segmentIndex}`,
+          x: Math.min(point.x, next.x) + 1,
+          y: point.y - 1,
+          width: length - 2,
+          height: 2,
+        }];
+      }
+      return [];
+    });
+  });
+  const hardObstacles = [...rects, ...pathBarriers];
+  const finder = new PathFinder();
+  let best: FastPoint[] | null = null;
+  let bestStrict = Number.POSITIVE_INFINITY;
+  let bestLength = Number.POSITIVE_INFINITY;
+  for (const gridSize of [8, 12, 16]) {
+    const routed = finder.findPath(
+      bbox,
+      startStub,
+      endStub,
+      gridSize,
+      40_000,
+      hardObstacles,
+    );
+    if (!routed) continue;
+    let candidate = orthogonalizePath(
+      edge,
+      compactPath([start, startStub, ...routed, endStub, end]),
+      rects,
+    );
+    candidate = simplifyCrossingFreePath(candidate, rects, otherPaths);
+    if (pathObstacleHits(candidate, rects) > 0) continue;
+    const strict = pathStrictCrossings(candidate, otherPaths);
+    const length = pathLength(candidate);
+    if (strict < bestStrict || (strict === bestStrict && length < bestLength)) {
+      best = candidate;
+      bestStrict = strict;
+      bestLength = length;
+    }
+    if (bestStrict === 0) break;
+  }
+  return best;
+};
 
 const preferredDiagonalBend = (
   edge: Edge,
@@ -243,6 +443,8 @@ const detourCandidates = (
   path: FastPoint[],
   segmentIndex: number,
   rect: FastRect,
+  allRects: FastRect[],
+  otherPaths: FastPoint[][],
 ): FastPoint[][] => {
   const a = path[segmentIndex];
   const b = path[segmentIndex + 1];
@@ -252,33 +454,107 @@ const detourCandidates = (
     const direction = b.y >= a.y ? 1 : -1;
     const approachY = direction > 0 ? rect.y - LANE_CLEARANCE : rect.y + rect.height + LANE_CLEARANCE;
     const exitY = direction > 0 ? rect.y + rect.height + LANE_CLEARANCE : rect.y - LANE_CLEARANCE;
-    return [rect.x - LANE_CLEARANCE, rect.x + rect.width + LANE_CLEARANCE].map(laneX => compactPath([
-      ...prefix,
-      a,
-      { x: a.x, y: approachY },
-      { x: laneX, y: approachY },
-      { x: laneX, y: exitY },
-      { x: a.x, y: exitY },
-      b,
-      ...suffix,
-    ]));
+    const localLanes = [rect.x - LANE_CLEARANCE, rect.x + rect.width + LANE_CLEARANCE];
+    const pathLanes = otherPaths
+      .flatMap(otherPath => otherPath.flatMap(point => [
+        point.x - LANE_CLEARANCE,
+        point.x + LANE_CLEARANCE,
+      ]));
+    const rectLanes = allRects.flatMap(otherRect => [
+        otherRect.x - LANE_CLEARANCE,
+        otherRect.x + otherRect.width + LANE_CLEARANCE,
+      ]);
+    const expandedLanes = [...rectLanes, ...pathLanes]
+      .filter(laneX => (
+        laneX <= rect.x - LANE_CLEARANCE
+        || laneX >= rect.x + rect.width + LANE_CLEARANCE
+      ));
+    const lanes = [...new Set([
+      ...localLanes,
+      ...rectLanes,
+      ...expandedLanes
+        .sort((first, second) => Math.abs(first - a.x) - Math.abs(second - a.x))
+        .slice(0, 32),
+    ])];
+    return lanes.flatMap(laneX => [
+      compactPath([
+        ...prefix,
+        a,
+        { x: a.x, y: approachY },
+        { x: laneX, y: approachY },
+        { x: laneX, y: exitY },
+        { x: a.x, y: exitY },
+        b,
+        ...suffix,
+      ]),
+      // A local skirt can still cut every edge entering or leaving the
+      // obstacle. Reusing the incoming segment's own axis lets the route move
+      // outside that feeder fan before it turns around the node.
+      compactPath([
+        ...prefix,
+        a,
+        { x: laneX, y: a.y },
+        { x: laneX, y: exitY },
+        { x: a.x, y: exitY },
+        b,
+        ...suffix,
+      ]),
+    ]);
   }
   const direction = b.x >= a.x ? 1 : -1;
   const approachX = direction > 0 ? rect.x - LANE_CLEARANCE : rect.x + rect.width + LANE_CLEARANCE;
   const exitX = direction > 0 ? rect.x + rect.width + LANE_CLEARANCE : rect.x - LANE_CLEARANCE;
-  return [rect.y - LANE_CLEARANCE, rect.y + rect.height + LANE_CLEARANCE].map(laneY => compactPath([
-    ...prefix,
-    a,
-    { x: approachX, y: a.y },
-    { x: approachX, y: laneY },
-    { x: exitX, y: laneY },
-    { x: exitX, y: a.y },
-    b,
-    ...suffix,
-  ]));
+  const localLanes = [rect.y - LANE_CLEARANCE, rect.y + rect.height + LANE_CLEARANCE];
+  const pathLanes = otherPaths
+    .flatMap(otherPath => otherPath.flatMap(point => [
+      point.y - LANE_CLEARANCE,
+      point.y + LANE_CLEARANCE,
+    ]));
+  const rectLanes = allRects.flatMap(otherRect => [
+      otherRect.y - LANE_CLEARANCE,
+      otherRect.y + otherRect.height + LANE_CLEARANCE,
+    ]);
+  const expandedLanes = [...rectLanes, ...pathLanes]
+    .filter(laneY => (
+      laneY <= rect.y - LANE_CLEARANCE
+      || laneY >= rect.y + rect.height + LANE_CLEARANCE
+    ));
+  const lanes = [...new Set([
+    ...localLanes,
+    ...rectLanes,
+    ...expandedLanes
+      .sort((first, second) => Math.abs(first - a.y) - Math.abs(second - a.y))
+      .slice(0, 32),
+  ])];
+  return lanes.flatMap(laneY => [
+    compactPath([
+      ...prefix,
+      a,
+      { x: approachX, y: a.y },
+      { x: approachX, y: laneY },
+      { x: exitX, y: laneY },
+      { x: exitX, y: a.y },
+      b,
+      ...suffix,
+    ]),
+    compactPath([
+      ...prefix,
+      a,
+      { x: a.x, y: laneY },
+      { x: exitX, y: laneY },
+      { x: exitX, y: a.y },
+      b,
+      ...suffix,
+    ]),
+  ]);
 };
 
-const repairObstacleHits = (path: FastPoint[], rects: FastRect[]): FastPoint[] => {
+const repairObstacleHits = (
+  path: FastPoint[],
+  rects: FastRect[],
+  strictCrossingScore: (candidate: FastPoint[]) => number = () => 0,
+  otherPaths: FastPoint[][] = [],
+): FastPoint[] => {
   let current = path;
   const maximumPasses = Math.max(1, Math.min(16, rects.length * 2));
   for (let pass = 0; pass < maximumPasses; pass += 1) {
@@ -286,7 +562,10 @@ const repairObstacleHits = (path: FastPoint[], rects: FastRect[]): FastPoint[] =
     if (interiorWaypoint) {
       const baselineHits = pathObstacleHits(current, rects);
       let best = current;
-      let bestScore = baselineHits * 1_000_000_000 + pathLength(current) + current.length * 4;
+      let bestScore = baselineHits * 1_000_000_000_000
+        + strictCrossingScore(current) * 1_000_000_000
+        + pathLength(current)
+        + current.length * 4;
       for (const candidate of interiorWaypointEscapeCandidates(
         current,
         interiorWaypoint.pointIndex,
@@ -294,7 +573,10 @@ const repairObstacleHits = (path: FastPoint[], rects: FastRect[]): FastPoint[] =
       )) {
         const candidateHits = pathObstacleHits(candidate, rects);
         if (candidateHits >= baselineHits) continue;
-        const score = candidateHits * 1_000_000_000 + pathLength(candidate) + candidate.length * 4;
+        const score = candidateHits * 1_000_000_000_000
+          + strictCrossingScore(candidate) * 1_000_000_000
+          + pathLength(candidate)
+          + candidate.length * 4;
         if (score < bestScore) {
           best = candidate;
           bestScore = score;
@@ -309,11 +591,23 @@ const repairObstacleHits = (path: FastPoint[], rects: FastRect[]): FastPoint[] =
     if (!hit) break;
     const baselineHits = pathObstacleHits(current, rects);
     let best = current;
-    let bestScore = baselineHits * 1_000_000_000 + pathLength(current) + current.length * 4;
-    for (const candidate of detourCandidates(current, hit.segmentIndex, hit.rect)) {
+    let bestScore = baselineHits * 1_000_000_000_000
+      + strictCrossingScore(current) * 1_000_000_000
+      + pathLength(current)
+      + current.length * 4;
+    for (const candidate of detourCandidates(
+      current,
+      hit.segmentIndex,
+      hit.rect,
+      rects,
+      otherPaths,
+    )) {
       const candidateHits = pathObstacleHits(candidate, rects);
       if (candidateHits >= baselineHits) continue;
-      const score = candidateHits * 1_000_000_000 + pathLength(candidate) + candidate.length * 4;
+      const score = candidateHits * 1_000_000_000_000
+        + strictCrossingScore(candidate) * 1_000_000_000
+        + pathLength(candidate)
+        + candidate.length * 4;
       if (score < bestScore) {
         best = candidate;
         bestScore = score;
@@ -351,14 +645,37 @@ export const repairFastDisplayHardSafety = (edges: Edge[], nodes: Node[]): Edge[
   if (edges.length === 0 || nodes.length === 0) return edges;
   const rects = nodeRects(nodes);
   let changed = false;
-  const repairedEdges = edges.map((edge) => {
+  const repairedEdges = [...edges];
+  edges.forEach((edge, edgeIndex) => {
     const path = fastComputedPath(edge);
-    if (path.length < 2) return edge;
+    if (path.length < 2) return;
     const obstacles = relevantRects(edge, rects);
     const orthogonal = orthogonalizePath(edge, path, obstacles);
-    const repaired = repairObstacleHits(orthogonal, obstacles);
+    const otherPaths = repairedEdges.flatMap((otherEdge, otherIndex) => (
+      otherIndex === edgeIndex ? [] : [fastComputedPath(otherEdge)]
+    ));
+    let repaired = repairObstacleHits(
+      orthogonal,
+      obstacles,
+      candidate => pathStrictCrossings(candidate, otherPaths),
+      otherPaths,
+    );
+    const baselineStrict = pathStrictCrossings(orthogonal, otherPaths);
+    const repairedStrict = pathStrictCrossings(repaired, otherPaths);
+    if (
+      repairedStrict > baselineStrict
+      && otherPaths.length <= GRID_FALLBACK_MAX_PEER_EDGES
+    ) {
+      const gridFallback = findGridObstacleFallback(edge, orthogonal, obstacles, otherPaths);
+      if (
+        gridFallback
+        && pathStrictCrossings(gridFallback, otherPaths) < repairedStrict
+      ) {
+        repaired = gridFallback;
+      }
+    }
     if (repaired.length === path.length && repaired.every((point, index) => samePoint(point, path[index]))) {
-      return edge;
+      return;
     }
     const originalData = (edge.data || {}) as Record<string, unknown>;
     const data: Record<string, unknown> = {
@@ -375,7 +692,7 @@ export const repairFastDisplayHardSafety = (edges: Edge[], nodes: Node[]): Edge[
       }
     }
     changed = true;
-    return { ...edge, data };
+    repairedEdges[edgeIndex] = { ...edge, data };
   });
   return changed ? repairedEdges : edges;
 };

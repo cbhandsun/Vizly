@@ -74,6 +74,10 @@ import { useBaseReactFlowFitController } from './useBaseReactFlowFitController';
 import { SmartEdgeRoutingOwnerContext } from '../custom-edges/smartEdgeRoutingOwnership';
 import { resolveBaseReactFlowRoutingComputation } from './baseReactFlowDragRoutingFreeze';
 import { BaseReactFlowInitializationOverlay } from './BaseReactFlowInitializationOverlay';
+import { applySharedTrunkPaintPlan } from '../../rendering/sharedTrunkPaint';
+import { buildDisplayRoutingObstacles } from './baseReactFlowDisplayGeometry';
+import { EdgeLabelObstacleContext } from '../custom-edges/edgeLabelObstacleContext';
+import { applyBaseReactFlowEdgePresentation } from './baseReactFlowEdgePresentation';
 
 // 模块级常量：避免在组件参数默认值中创建新引用
 const DEFAULT_VIEWPORT = { x: 0, y: 0, zoom: 1 };
@@ -272,6 +276,10 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
   const routingNodes = useMemo(() => (
     mergeBaseReactFlowMeasuredNodes(visibleNodes, internalFlowNodes)
   ), [visibleNodes, internalFlowNodes]);
+  const edgeLabelObstacles = useMemo(
+    () => [...buildDisplayRoutingObstacles(routingNodes).values()],
+    [routingNodes],
+  );
 
   const isLargeGraph = useMemo(() => {
     return computeBaseReactFlowIsLargeGraph({
@@ -409,6 +417,14 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
     nodeDragFallbackIds,
     onNodeDragFallbackResolved: handleNodeDragFallbackResolved,
   });
+  const commercialDisplayEdges = useMemo(
+    () => applyBaseReactFlowEdgePresentation(displayEdges, edges),
+    [displayEdges, edges],
+  );
+  const trunkPaintDisplayEdges = useMemo(
+    () => applySharedTrunkPaintPlan(commercialDisplayEdges),
+    [commercialDisplayEdges],
+  );
 
   const nodeInternalsRefreshKey = useMemo(
     () => createBaseReactFlowNodeInternalsRefreshSnapshot(visibleNodes).key,
@@ -560,12 +576,13 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
         height: '100%',
         position: 'relative',
       } : { width: '100%', height: '100%', position: 'relative' }}>
+        <EdgeLabelObstacleContext.Provider value={edgeLabelObstacles}>
         <SmartEdgeRoutingOwnerContext.Provider value={smartEdgeRoutingOwner}>
         <ReactFlow
           proOptions={proOptions}
           onlyRenderVisibleElements={isLargeGraph}
           nodes={visibleNodes}
-          edges={displayEdges}
+          edges={trunkPaintDisplayEdges}
           nodeTypes={nodeTypes}
           edgeTypes={mergedEdgeTypes} // 使用合并后的边类型
           defaultEdgeOptions={defaultEdgeOptions}
@@ -659,6 +676,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
           {children}
         </ReactFlow>
         </SmartEdgeRoutingOwnerContext.Provider>
+        </EdgeLabelObstacleContext.Provider>
       </div>
       {!isContainerReady && <BaseReactFlowInitializationOverlay />}
     </div>

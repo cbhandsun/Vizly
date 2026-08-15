@@ -13,7 +13,7 @@ import {
   RETURN_LOOP_CLEARANCES,
   SHARED_TRUNK_DETOUR_CLEARANCES,
   MAX_HAIRPIN_COLLAPSE_BRIDGE,
-  MAX_MICRO_CANDIDATES_PER_EDGE,
+  resolveMicroCandidateBudget,
   getEdgePath,
   withComputedPath,
   axisOf,
@@ -42,6 +42,17 @@ import {
 import type {
   Point,
 } from './edgeDisplayMicroCleanupGeometry';
+import { buildOuterPerimeterMicroCandidates } from './edgeDisplayMicroCleanupPerimeter';
+
+const VISUAL_SMALL_INTERIOR_SEGMENT = 40;
+
+const hasVisualSmallInteriorSegment = (points: Point[]): boolean => {
+  for (let index = 1; index < points.length - 2; index += 1) {
+    const length = segmentLength(points[index], points[index + 1]);
+    if (length >= TINY_INTERIOR_SEGMENT && length < VISUAL_SMALL_INTERIOR_SEGMENT) return true;
+  }
+  return false;
+};
 
 export type DisplayMicroCleanupSafetyScore = Readonly<{
   obstacleHits: number;
@@ -316,7 +327,8 @@ function qualityAllowsMicroCleanup(
   if (candidate.shortEndpointStubs > baseline.shortEndpointStubs) return false;
   if (candidate.tinyInteriorDoglegs > baseline.tinyInteriorDoglegs) return false;
   if (candidate.hairpins > baseline.hairpins) return false;
-  return candidate.shortEndpointStubs < baseline.shortEndpointStubs
+  return candidate.strictCrossings < baseline.strictCrossings
+    || candidate.shortEndpointStubs < baseline.shortEndpointStubs
     || candidate.tinyInteriorDoglegs < baseline.tinyInteriorDoglegs
     || candidate.hairpins < baseline.hairpins
     || (
@@ -343,7 +355,8 @@ function qualityAllowsCompoundMicroCleanup(
   if (candidate.shortEndpointStubs > baseline.shortEndpointStubs) return false;
   if (candidate.tinyInteriorDoglegs > baseline.tinyInteriorDoglegs) return false;
   if (candidate.hairpins > baseline.hairpins) return false;
-  return candidate.shortEndpointStubs < baseline.shortEndpointStubs
+  return candidate.strictCrossings < baseline.strictCrossings
+    || candidate.shortEndpointStubs < baseline.shortEndpointStubs
     || candidate.tinyInteriorDoglegs < baseline.tinyInteriorDoglegs
     || candidate.hairpins < baseline.hairpins
     || (
@@ -355,8 +368,50 @@ function qualityAllowsCompoundMicroCleanup(
       candidate.bends <= baseline.bends
       && candidate.detourPenalty < baseline.detourPenalty
       && candidate.totalLength <= baseline.totalLength - 80
-    );
+  );
 }
+
+const selectMicroCandidateLaneExtrema = (
+  candidates: readonly Point[][],
+  budget: number,
+): Point[][] => {
+  if (budget <= 0 || candidates.length === 0) return [];
+  const bounds = new WeakMap<Point[], Readonly<{
+    minX: number;
+    maxX: number;
+    minY: number;
+    maxY: number;
+  }>>();
+  const getBounds = (path: Point[]) => {
+    const cached = bounds.get(path);
+    if (cached) return cached;
+    const next = {
+      minX: Math.min(...path.map(point => point.x)),
+      maxX: Math.max(...path.map(point => point.x)),
+      minY: Math.min(...path.map(point => point.y)),
+      maxY: Math.max(...path.map(point => point.y)),
+    };
+    bounds.set(path, next);
+    return next;
+  };
+  const orders = [
+    (first: Point[], second: Point[]) => getBounds(first).minX - getBounds(second).minX,
+    (first: Point[], second: Point[]) => getBounds(second).maxX - getBounds(first).maxX,
+    (first: Point[], second: Point[]) => getBounds(first).minY - getBounds(second).minY,
+    (first: Point[], second: Point[]) => getBounds(second).maxY - getBounds(first).maxY,
+  ];
+  const selected: Point[][] = [];
+  const seen = new Set<Point[]>();
+  for (const compare of orders) {
+    for (const candidate of [...candidates].sort(compare).slice(0, 2)) {
+      if (seen.has(candidate)) continue;
+      seen.add(candidate);
+      selected.push(candidate);
+      if (selected.length >= budget) return selected;
+    }
+  }
+  return selected;
+};
 
 function buildCompoundStrictCrossingCleanup(
   currentEdges: Edge[],
@@ -509,14 +564,19 @@ export function repairDisplayMicroArtifacts(
   safetyContext?: DisplayMicroCleanupSafetyContext,
 ): Edge[] {
   const initialQuality = calculateEdgePathQualityScore(edges);
+  const hasVisualSmallSegment = edges.some(edge => (
+    hasVisualSmallInteriorSegment(compactPath(getEdgePath(edge)))
+  ));
   if (
     initialQuality.shortEndpointStubs === 0
     && initialQuality.tinyInteriorDoglegs === 0
     && initialQuality.hairpins === 0
     && initialQuality.detourPenalty === 0
+    && !hasVisualSmallSegment
   ) return edges;
 
   let currentEdges = edges;
+  const candidateBudget = resolveMicroCandidateBudget(edges.length);
   let currentSafety = safetyContext?.baseline;
   const cumulativeChangedIndexes = new Set<number>();
   for (let cleanupPass = 0; cleanupPass < 2; cleanupPass += 1) {
@@ -526,11 +586,13 @@ export function repairDisplayMicroArtifacts(
       const path = compactPath(getEdgePath(edge));
       if (path.length < 3) continue;
       const pathMetrics = pathMicroMetrics(path);
+      const hasVisualSmallSegmentForEdge = hasVisualSmallInteriorSegment(path);
       if (
         pathMetrics.shortEndpointStubs === 0
         && pathMetrics.tinyInteriorDoglegs === 0
         && pathMetrics.hairpins === 0
         && pathDetourPenalty(path) === 0
+        && !hasVisualSmallSegmentForEdge
       ) {
         continue;
       }
@@ -544,6 +606,9 @@ export function repairDisplayMicroArtifacts(
         ...buildTerminalStubSideApproachCandidates(path, false),
         ...buildOuterDetourCollapseCandidates(edge, path, currentEdges),
       ].filter((candidate): candidate is Point[] => candidate !== null);
+      const sideStepLaneCandidates: Point[][] = [];
+      const sharedTrunkCandidates: Point[][] = [];
+      const outerPerimeterCandidates: Point[][] = [];
       for (let index = 0; index + 4 < path.length; index += 1) {
         const collapsed = buildConsecutiveTinyCornerCollapse(path, index);
         if (collapsed) candidates.push(collapsed);
@@ -552,7 +617,9 @@ export function repairDisplayMicroArtifacts(
         const parallelContinuationCollapsed = buildTinyParallelContinuationCollapseCandidate(path, index);
         if (parallelContinuationCollapsed) candidates.push(parallelContinuationCollapsed);
         candidates.push(...buildTinyBridgeExtensionCandidates(path, index));
-        candidates.push(...buildTinySideStepLaneBypassCandidates(path, index));
+        const sideStepCandidates = buildTinySideStepLaneBypassCandidates(path, index);
+        candidates.push(...sideStepCandidates);
+        sideStepLaneCandidates.push(...sideStepCandidates);
         const trailingTinyStair = buildTrailingTinyStairCollapseCandidate(path, index);
         if (trailingTinyStair) candidates.push(trailingTinyStair);
         const tinyBridgeCollapsed = buildTinyInteriorBridgeCollapseCandidate(path, index);
@@ -579,7 +646,18 @@ export function repairDisplayMicroArtifacts(
         if (collapsed) candidates.push(collapsed);
       }
       if (pathMetrics.tinyInteriorDoglegs > 0) {
-        candidates.push(...buildSharedSourceTrunkDetourCandidates(currentEdges, edgeIndex, path));
+        const sharedSourceCandidates = buildSharedSourceTrunkDetourCandidates(
+          currentEdges,
+          edgeIndex,
+          path,
+        );
+        candidates.push(...sharedSourceCandidates);
+        sharedTrunkCandidates.push(...sharedSourceCandidates);
+        if (safetyContext) {
+          const perimeterCandidates = buildOuterPerimeterMicroCandidates(currentEdges, path);
+          candidates.push(...perimeterCandidates);
+          outerPerimeterCandidates.push(...perimeterCandidates);
+        }
       }
 
       let bestPath = path;
@@ -589,7 +667,7 @@ export function repairDisplayMicroArtifacts(
       let bestSafety = currentSafety;
       let bestChangedIndexes: readonly number[] = [...cumulativeChangedIndexes];
       const seenCandidates = new Set<string>();
-      const rankedCandidates = candidates
+      const normalizedCandidates = candidates
         .map(candidate => compactPath(candidate))
         .filter((normalized) => {
           if (normalized.length < 2 || !hasCompatibleDisplayEndpoints(path, normalized)) return false;
@@ -597,9 +675,36 @@ export function repairDisplayMicroArtifacts(
           if (seenCandidates.has(key)) return false;
           seenCandidates.add(key);
           return true;
-        })
-        .sort((first, second) => microCandidateRank(first) - microCandidateRank(second))
-        .slice(0, MAX_MICRO_CANDIDATES_PER_EDGE);
+        });
+      const laneDiversityBudget = Math.min(8, candidateBudget);
+      const priorityCandidateKeys = new Set([
+        ...selectMicroCandidateLaneExtrema(
+          sideStepLaneCandidates.map(candidate => compactPath(candidate)),
+          laneDiversityBudget,
+        ),
+        ...selectMicroCandidateLaneExtrema(
+          outerPerimeterCandidates.map(candidate => compactPath(candidate)),
+          laneDiversityBudget,
+        ),
+        ...sharedTrunkCandidates
+          .map(candidate => compactPath(candidate))
+          .sort((first, second) => microCandidateRank(first) - microCandidateRank(second))
+          .slice(0, laneDiversityBudget),
+      ].map(candidate => candidate.map(point => `${point.x}:${point.y}`).join('|')));
+      const priorityCandidates = normalizedCandidates.filter(candidate => (
+        priorityCandidateKeys.has(candidate.map(point => `${point.x}:${point.y}`).join('|'))
+      ));
+      const reservedPriorityCandidateCount = Math.min(
+        priorityCandidates.length,
+        laneDiversityBudget * 2,
+      );
+      const rankedCandidates = [
+        ...[...normalizedCandidates]
+          .sort((first, second) => microCandidateRank(first) - microCandidateRank(second))
+          .slice(0, candidateBudget - reservedPriorityCandidateCount),
+        ...priorityCandidates,
+      ].filter((candidate, index, selected) => selected.indexOf(candidate) === index)
+        .slice(0, candidateBudget);
 
       for (const normalized of rankedCandidates) {
         const candidatePathMetrics = pathMicroMetrics(normalized);

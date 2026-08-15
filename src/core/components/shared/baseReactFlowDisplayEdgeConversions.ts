@@ -1,6 +1,7 @@
-import type { Edge } from '@xyflow/react';
+import type { Edge, Node } from '@xyflow/react';
 
 import { isFinitePoint } from './baseReactFlowDisplayCache';
+import { materializeDisplayTerminalHandles } from './baseReactFlowDisplayTerminalCommit';
 
 const preserveSmartEdgeTypes = new Set([
   'mindmapedge',
@@ -28,6 +29,42 @@ const hasTrustedComputedPath = (edge: Edge): boolean => {
     && Array.isArray(data.computedPath)
     && data.computedPath.length >= 2
     && data.computedPath.every(isFinitePoint);
+};
+
+/**
+ * Commits worker-validated geometry to the renderer that consumes computedPath.
+ * Callers must only pass an internally finalized transaction; arbitrary imported
+ * paths intentionally remain subject to the normal trust checks above.
+ */
+export const lockFinalDisplayComputedPaths = <T extends Edge[]>(
+  edges: T,
+  nodes?: Node[],
+): T => {
+  const resolvedEdges = nodes ? materializeDisplayTerminalHandles(edges, nodes) : edges;
+  return resolvedEdges.map((edge) => {
+    const data = asRecord(edge.data);
+    const hasRenderableComputedPath = Array.isArray(data.computedPath)
+      && data.computedPath.length >= 2
+      && data.computedPath.every(isFinitePoint);
+    if (
+      !hasRenderableComputedPath
+      || String(edge.type || '').toLowerCase() === 'canvas-ref'
+    ) return edge;
+    if (
+      edge.type === 'stablePath'
+      && data.layoutPathLocked === true
+      && data._layoutPathLocked === true
+    ) return edge;
+    return {
+      ...edge,
+      type: 'stablePath',
+      data: {
+        ...data,
+        layoutPathLocked: true,
+        _layoutPathLocked: true,
+      },
+    };
+  }) as T;
 };
 
 export const toCanvasRefEdge = (edge: Edge): Edge => ({
@@ -60,7 +97,11 @@ export const toSmartDisplayEdge = ({
 
   if (hasTrustedComputedPath(edge)) {
     if (edge.type === 'stablePath' && nextLabel === edge.label && edge === rawEdge) return edge;
-    return { ...edge, type: 'stablePath', label: nextLabel };
+    return {
+      ...edge,
+      type: 'stablePath',
+      ...(typeof nextLabel === 'undefined' ? {} : { label: nextLabel }),
+    };
   }
 
   const hasDataPad = dataObj.obstaclePadding !== undefined && dataObj.obstaclePadding !== null;
@@ -84,7 +125,12 @@ export const toSmartDisplayEdge = ({
   if (!needsPadPatch && !needsLabelPatch && !needsTypePatch && edge === rawEdge) return edge;
 
   const finalData = needsLabelPatch ? { ...dataWithPad, label: nextLabel } : dataWithPad;
-  return { ...edge, type: targetType, data: finalData, label: nextLabel };
+  return {
+    ...edge,
+    type: targetType,
+    data: finalData,
+    ...(typeof nextLabel === 'undefined' ? {} : { label: nextLabel }),
+  };
 };
 
 export const toBasicDisplayEdge = ({
@@ -97,7 +143,11 @@ export const toBasicDisplayEdge = ({
   if (hasTrustedComputedPath(edge)) {
     const nextLabel = edge.label ?? readDataLabel(asRecord(edge.data).label);
     if (edge.type === 'stablePath' && nextLabel === edge.label && edge === rawEdge) return edge;
-    return { ...edge, type: 'stablePath', label: nextLabel };
+    return {
+      ...edge,
+      type: 'stablePath',
+      ...(typeof nextLabel === 'undefined' ? {} : { label: nextLabel }),
+    };
   }
 
   const type = String(edge.type || '');
@@ -110,5 +160,9 @@ export const toBasicDisplayEdge = ({
   })();
   const nextLabel = edge.label ?? readDataLabel(asRecord(edge.data).label);
   if (nextType === edge.type && nextLabel === edge.label && edge === rawEdge) return edge;
-  return { ...edge, type: nextType, label: nextLabel };
+  return {
+    ...edge,
+    type: nextType,
+    ...(typeof nextLabel === 'undefined' ? {} : { label: nextLabel }),
+  };
 };

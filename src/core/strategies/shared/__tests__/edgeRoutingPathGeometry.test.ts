@@ -9,6 +9,7 @@ import {
 } from '../edgeRoutingPipeline';
 import {
   computeAbsolutePosition,
+  getRoutingObstacles,
   lockComputedPathsForDisplay,
   sanitizeComputedPaths,
   setAbsolutePositions,
@@ -45,6 +46,21 @@ describe('edge routing module boundaries', () => {
     const second = node('second', 30, 40, 'first');
     const cyclicMap = new Map([first, second].map(item => [item.id, item] as const));
     expect(computeAbsolutePosition(first, cyclicMap)).toEqual({ x: 40, y: 60 });
+  });
+
+  it('builds nested routing obstacles in canvas coordinates without positionAbsolute', () => {
+    const root = node('root', 100, 200);
+    root.type = 'group';
+    const child = node('child', 20, 30, 'root');
+    child.width = 180;
+    child.height = 96;
+
+    expect(getRoutingObstacles([root, child]).get('child')).toEqual({
+      x: 120,
+      y: 230,
+      width: 180,
+      height: 96,
+    });
   });
 
   it('sanitizes and locks paths without mutating the input edge data', () => {

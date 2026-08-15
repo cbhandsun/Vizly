@@ -41,8 +41,10 @@ export const rankDisplayTerminalPortCandidates = (
   .sort((first, second) => (
     (prioritizeDeclaredAxisCompletion
       ? first.declaredAxisMismatches - second.declaredAxisMismatches
-      : 0)
-    || first.obstacleHits - second.obstacleHits
+      : first.obstacleHits - second.obstacleHits)
+    || (prioritizeDeclaredAxisCompletion
+      ? first.obstacleHits - second.obstacleHits
+      : first.declaredAxisMismatches - second.declaredAxisMismatches)
     || first.order - second.order
   ));
 
@@ -51,16 +53,21 @@ export const displayTerminalPortCandidateIsBetter = (
   acceptedDeclaredAxisMismatches: number,
   acceptedObstacleHits: number,
   prioritizeDeclaredAxisCompletion: boolean,
-): boolean => prioritizeDeclaredAxisCompletion
-  ? candidate.declaredAxisMismatches < acceptedDeclaredAxisMismatches
+): boolean => (
+  prioritizeDeclaredAxisCompletion
+    ? candidate.declaredAxisMismatches < acceptedDeclaredAxisMismatches
     || (
       candidate.declaredAxisMismatches === acceptedDeclaredAxisMismatches
       && candidate.obstacleHits < acceptedObstacleHits
     )
-  : candidate.obstacleHits < acceptedObstacleHits;
+    : candidate.obstacleHits < acceptedObstacleHits
+      || (
+        candidate.obstacleHits === acceptedObstacleHits
+        && candidate.declaredAxisMismatches < acceptedDeclaredAxisMismatches
+      )
+);
 
 export const displayTerminalPortCandidateIsComplete = (
   candidate: Pick<RankedDisplayTerminalPortCandidate, 'declaredAxisMismatches' | 'obstacleHits'>,
-  prioritizeDeclaredAxisCompletion: boolean,
-): boolean => candidate.obstacleHits === 0
-  && (!prioritizeDeclaredAxisCompletion || candidate.declaredAxisMismatches === 0);
+  _prioritizeDeclaredAxisCompletion: boolean,
+): boolean => candidate.obstacleHits === 0 && candidate.declaredAxisMismatches === 0;

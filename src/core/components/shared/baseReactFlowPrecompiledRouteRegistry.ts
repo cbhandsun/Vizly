@@ -32,6 +32,25 @@ export type BaseReactFlowPrecompiledRouteLoaderRegistry = Record<
   GeneratedBaseReactFlowPrecompiledRouteDescriptor
 >;
 
+export const hasBaseReactFlowPrecompiledRouteCandidateInRegistry = (
+  inputSignature: string,
+  inputGeometryDigest: string,
+  registry: BaseReactFlowPrecompiledRouteLoaderRegistry,
+): boolean => {
+  if (!Object.prototype.hasOwnProperty.call(registry, inputSignature)) return false;
+  const descriptor = registry[inputSignature];
+  return Boolean(descriptor && descriptor.geometryDigest === inputGeometryDigest);
+};
+
+export const hasBaseReactFlowPrecompiledRouteCandidate = (
+  inputSignature: string,
+  inputGeometryDigest: string,
+): boolean => hasBaseReactFlowPrecompiledRouteCandidateInRegistry(
+  inputSignature,
+  inputGeometryDigest,
+  GENERATED_BASE_REACT_FLOW_PRECOMPILED_ROUTE_LOADERS,
+);
+
 /**
  * Precompiled artifacts have a stricter build-time schema than mutable browser
  * storage and may carry the three router-owned trunk booleans. They therefore

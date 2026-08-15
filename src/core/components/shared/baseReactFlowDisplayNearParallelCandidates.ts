@@ -34,6 +34,21 @@ export const buildNearParallelLaneNudgePaths = (
   const addLane = (lane: number) => {
     if (Number.isFinite(lane)) laneCandidates.add(Math.round(lane));
   };
+  const isEndpointSegment = segment.segmentIndex <= 0 || segment.segmentIndex >= path.length - 2;
+  if (!isEndpointSegment) {
+    // Prefer collapsing an H-V-H / V-H-V stair onto either existing outer
+    // lane before inventing a new lane. This removes the common case where an
+    // interior segment doubles back onto a sibling's terminal breakout while
+    // also reducing bends and total length. The full quality, terminal and
+    // obstacle gates still decide whether either straightening is safe.
+    for (const neighborIndex of [segment.segmentIndex - 2, segment.segmentIndex + 2]) {
+      const neighborStart = path[neighborIndex];
+      const neighborEnd = path[neighborIndex + 1];
+      if (!neighborStart || !neighborEnd) continue;
+      if (displayAxisOf(neighborStart, neighborEnd) !== segment.axis) continue;
+      addLane(segment.axis === 'v' ? neighborStart.x : neighborStart.y);
+    }
+  }
   [-1, 1].forEach((direction) => {
     if (segment.axis === 'v') {
       [
@@ -93,7 +108,6 @@ export const buildNearParallelLaneNudgePaths = (
     if (compacted.length >= 2 && compacted.every(isFinitePoint)) candidatePaths.push(compacted);
   };
 
-  const isEndpointSegment = segment.segmentIndex <= 0 || segment.segmentIndex >= path.length - 2;
   if (isEndpointSegment) {
     const start = path[segment.segmentIndex];
     const end = path[segment.segmentIndex + 1];

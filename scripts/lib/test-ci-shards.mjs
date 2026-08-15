@@ -24,6 +24,7 @@ export const TEST_CI_SHARD_GROUPS = Object.freeze({
     'test:ci:ui-diagrams',
   ]),
   flow: Object.freeze([
+    'test:ci:core-components-shared-bounded-seed-policy',
     'test:ci:core-components-shared-flow',
     'test:ci:core-components-shared-flow-quality',
     'test:ci:core-components-shared-flow-logistics',
@@ -48,9 +49,11 @@ export const TEST_CI_SHARD_GROUPS = Object.freeze({
   ]),
   routing: Object.freeze([
     'test:ci:routing-core',
-    'test:ci:routing-services',
+    'test:ci:routing-services-core',
+    'test:ci:routing-quality',
     'test:ci:routing-services-performance',
-    'test:ci:routing-layout',
+    'test:ci:routing-layout-strategies',
+    'test:ci:routing-layout-utils',
   ]),
 });
 

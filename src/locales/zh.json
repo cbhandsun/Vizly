@@ -271,53 +271,6 @@
             "aiShort": "AI",
             "settings": "设置"
         },
-        "debug": {
-            "panel": {
-                "title": "路由调试器",
-                "close": "关闭",
-                "toggleHint": "使用 {{shortcut}} 开关调试面板",
-                "tab": {
-                    "perf": "性能",
-                    "cache": "缓存",
-                    "visual": "可视化"
-                }
-            },
-            "visualizer": {
-                "title": "寻路可视化",
-                "close": "关闭",
-                "debug": "调试",
-                "maximize": "最大化",
-                "restore": "还原",
-                "edgeIdPlaceholder": "边 ID（例如 edge-1）",
-                "selectEdgeHint": "选择一条连线以进行调试。",
-                "noDebugData": "暂无调试数据",
-                "grid": "网格",
-                "obstacles": "障碍",
-                "vg": "可视图",
-                "quadTree": "四叉树",
-                "legend": {
-                    "obstacle": "障碍",
-                    "source": "起点",
-                    "target": "终点",
-                    "lineCross": "穿越线",
-                    "turn": "拐点",
-                    "buffer": "缓冲",
-                    "visited": "访问过",
-                    "rawPath": "原始路径"
-                },
-                "stats": {
-                    "strategy": "策略：{{value}}",
-                    "grid": "网格：{{value}}",
-                    "vg": "可视图：{{value}}",
-                    "qt": "四叉树：{{value}}",
-                    "visited": "访问：{{count}} 个节点",
-                    "ports": "端口：{{source}} → {{target}}｜方向：{{dir}}｜几何：{{geo}}｜d=({{dx}},{{dy}})",
-                    "time": "耗时：{{ms}}ms",
-                    "steps": "步数：{{count}}",
-                    "length": "长度：{{value}}"
-                }
-            }
-        },
         "menu": {
             "title": "图表选择",
             "more": "更多",
@@ -627,7 +580,7 @@
             "searchCanvas": "搜索画布内容 (Ctrl+F)",
             "clearCache": "重置本地编辑状态",
             "clearCacheTitle": "重置本地编辑状态？",
-            "clearCacheContent": "将重置流程图编辑器的本地界面状态，并删除当前图表的本地自动保存与自定义预设。AI 配置、存储设置及其他图表不会受到影响。此操作无法撤销，页面将立即刷新；如需保留当前内容，请先保存或导出。",
+            "clearCacheContent": "将重置流程图编辑器的本地界面状态，并删除当前图表的本地自动保存、自定义预设、标准图生成缓存及最终连线路由缓存。AI 配置、存储设置及其他图表内容不会受到影响。此操作无法撤销，页面将立即刷新；如需保留当前内容，请先保存或导出。",
             "clearCacheConfirm": "重置并刷新",
             "clearCacheDiagramUnavailable": "无法识别当前图表，未执行重置。请重新打开图表后再试。",
             "clearCacheFailed": "未能完整重置本地编辑状态，页面不会刷新。请检查浏览器存储权限后重试。",

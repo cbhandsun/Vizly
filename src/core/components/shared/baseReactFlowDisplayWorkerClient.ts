@@ -25,9 +25,16 @@ import {
 } from './baseReactFlowDisplayRoutingTransaction';
 import { createDisplayWorkerFinalQualityError } from './baseReactFlowDisplayWorkerFailure';
 import { projectBaseReactFlowDisplayWorkerInput } from './baseReactFlowDisplayWorkerProjection';
+import {
+  DISPLAY_WORKER_TIMEOUT_MS,
+  INTERACTIVE_DISPLAY_WORKER_TIMEOUT_MS,
+  PRECOMPILED_CAPTURE_WORKER_TIMEOUT_MS,
+  resolveBaseReactFlowDisplayWorkerTimeoutMs,
+} from './baseReactFlowDisplayWorkerTimeout';
 
 export type { DisplayQualityMode } from './baseReactFlowDisplayWorkerProtocol';
 export { projectBaseReactFlowDisplayWorkerInput } from './baseReactFlowDisplayWorkerProjection';
+export { resolveBaseReactFlowDisplayWorkerTimeoutMs } from './baseReactFlowDisplayWorkerTimeout';
 export {
   createBaseReactFlowDisplayEdgePatches,
   doBaseReactFlowDisplayRoutesMatchExactly,
@@ -73,8 +80,6 @@ export type DisplayQualityPolicy = {
 
 type DisplayQualityCancel = () => void;
 
-const DISPLAY_WORKER_TIMEOUT_MS = 60_000;
-const INTERACTIVE_DISPLAY_WORKER_TIMEOUT_MS = 12_000;
 const INTERACTIVE_DISPLAY_NODE_THRESHOLD = 30;
 const INTERACTIVE_DISPLAY_EDGE_THRESHOLD = 24;
 const DISPLAY_QUALITY_GEOMETRY_SETTLE_MS = 320;
@@ -106,7 +111,7 @@ export const resolveBaseReactFlowDisplayQualityPolicy = ({
   if (forceFullQuality) {
     return {
       mode: 'full',
-      timeoutMs: DISPLAY_WORKER_TIMEOUT_MS,
+      timeoutMs: PRECOMPILED_CAPTURE_WORKER_TIMEOUT_MS,
     };
   }
   if (
@@ -167,19 +172,22 @@ export const resolveBaseReactFlowDisplayedEdges = ({
   deferred,
   cached,
   immediate,
+  source,
 }: {
   signature: string;
   geometryDigest: string;
   policyMode: DisplayQualityPolicy['mode'];
   deferred: DeferredDisplayEdges | null;
   cached: Edge[] | null;
+  source?: Edge[];
   immediate: Edge[];
 }): Edge[] => {
+  const patchSource = source ?? immediate;
   if (
     deferred?.signature === signature
     && deferred.geometryDigest === geometryDigest
   ) {
-    return mergeBaseReactFlowDisplayEdgePatches(immediate, deferred.displayPatches) ?? [];
+    return mergeBaseReactFlowDisplayEdgePatches(patchSource, deferred.displayPatches) ?? [];
   }
   if (cached) return cached;
   // A full-quality route is an enhancement, not a prerequisite for rendering.
@@ -480,20 +488,6 @@ const requestBaseReactFlowDisplayEdgesWorker = ({
     }
   })
 );
-
-export const resolveBaseReactFlowDisplayWorkerTimeoutMs = (
-  timeoutMs: number,
-  qualityMode: DisplayQualityMode,
-): number => {
-  const maximumTimeoutMs = qualityMode === 'interactive'
-    ? INTERACTIVE_DISPLAY_WORKER_TIMEOUT_MS
-    : DISPLAY_WORKER_TIMEOUT_MS;
-  const fallbackTimeoutMs = qualityMode === 'interactive'
-    ? INTERACTIVE_DISPLAY_WORKER_TIMEOUT_MS
-    : DISPLAY_WORKER_TIMEOUT_MS;
-  const candidate = Number.isFinite(timeoutMs) ? Math.round(timeoutMs) : fallbackTimeoutMs;
-  return Math.max(1_000, Math.min(candidate, maximumTimeoutMs));
-};
 
 export const computeBaseReactFlowDisplayEdgesInWorker = async ({
   workerRef,

@@ -266,7 +266,11 @@ export const computeBaseDisplayInputSignature = ({
     feed(edge.target);
     feed(edge.sourceHandle);
     feed(edge.targetHandle);
-    feed(edge.type);
+    // The full-route transaction commits every routed edge to StablePathEdge.
+    // Treat that renderer swap as presentation state so feeding a finalized
+    // result back into the pipeline remains idempotent. Dedicated canvas
+    // references still form a distinct routing class.
+    feed(String(edge.type || '').toLowerCase() === 'canvas-ref' ? 'canvas-ref' : 'routed-edge');
     feed(data.autoSource);
     feed(data.autoTarget);
     feed(Array.isArray(data.auto) ? data.auto.map(String).join(',') : data.auto);
@@ -654,11 +658,26 @@ export const isBaseDisplayFinalized = (edges: Edge[], signature: string): boolea
 export const markBaseDisplayFinalized = <T extends Edge[]>(edges: T, signature: string): T => (
   edges.map((edge) => {
     const data = asRecord(edge.data);
-    if (data[BASE_DISPLAY_FINALIZED_SIGNATURE] === signature) return edge;
+    const hasRenderableComputedPath = Array.isArray(data.computedPath)
+      && data.computedPath.length >= 2
+      && data.computedPath.every(isFinitePoint);
+    const preservesDedicatedRenderer = String(edge.type || '').toLowerCase() === 'canvas-ref';
+    const needsStablePath = hasRenderableComputedPath && !preservesDedicatedRenderer;
+    const alreadyFinalized = data[BASE_DISPLAY_FINALIZED_SIGNATURE] === signature;
+    const alreadyRenderLocked = !needsStablePath || (
+      edge.type === 'stablePath'
+      && data.layoutPathLocked === true
+      && data._layoutPathLocked === true
+    );
+    if (alreadyFinalized && alreadyRenderLocked) return edge;
     return {
       ...edge,
+      ...(needsStablePath ? { type: 'stablePath' } : {}),
       data: {
         ...data,
+        ...(needsStablePath
+          ? { layoutPathLocked: true, _layoutPathLocked: true }
+          : {}),
         [BASE_DISPLAY_FINALIZED_SIGNATURE]: signature,
       },
     };

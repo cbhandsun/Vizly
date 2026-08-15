@@ -1,6 +1,8 @@
 import type { Edge, Node } from '@xyflow/react';
 import { EDGE_ROUTING_CACHE_VERSION } from '../../../routing/routingVersion';
+import { isSafeCssColor } from '../../../themes/themeImportSecurity';
 import { coerceStandardDiagramImport } from '../../../utils/diagramJsonImport';
+import { appendBaseReactFlowEdgeSemanticClassName } from '../../shared/baseReactFlowEdgePresentation';
 
 export type CanvasData = { nodes: Node[]; edges: Edge[] };
 export interface StandardPresetInput {
@@ -57,6 +59,13 @@ export const cloneCanvasData = (canvas: CanvasData): CanvasData => {
         })),
         edges: canvas.edges.map((edge) => ({
             ...edge,
+            style: edge.style ? { ...edge.style } : edge.style,
+            markerStart: edge.markerStart && typeof edge.markerStart === 'object'
+                ? { ...edge.markerStart }
+                : edge.markerStart,
+            markerEnd: edge.markerEnd && typeof edge.markerEnd === 'object'
+                ? { ...edge.markerEnd }
+                : edge.markerEnd,
             data: edge.data ? { ...edge.data } : edge.data,
         })),
     };
@@ -109,6 +118,60 @@ const isFinitePosition = (position: unknown): position is { x: number; y: number
     && Number.isFinite(position.y)
 );
 
+const SEMANTIC_EDGE_STYLE_FIELDS = ['stroke', 'strokeWidth', 'strokeDasharray'] as const;
+
+const isPersistedEdgePresentationCompatible = (
+    canvas: CanvasData,
+    preset: StandardPresetInput,
+): boolean => {
+    if (!Array.isArray(preset.edges)) return true;
+    const canvasEdgeById = new Map(canvas.edges.map(edge => [String(edge.id), edge]));
+
+    return preset.edges.every((rawPresetEdge) => {
+        if (!isRecord(rawPresetEdge) || rawPresetEdge.id === undefined || rawPresetEdge.id === null) return true;
+        const expectedSemanticClassName = appendBaseReactFlowEdgeSemanticClassName(
+            undefined,
+            rawPresetEdge.type,
+        );
+        const presetStyle = isRecord(rawPresetEdge.style) ? rawPresetEdge.style : undefined;
+        const expectedStyleEntries = SEMANTIC_EDGE_STYLE_FIELDS
+            .filter(field => presetStyle?.[field] !== undefined)
+            .map(field => [field, presetStyle?.[field]] as const);
+        const presetMarker = rawPresetEdge.markerEnd;
+        const expectedStroke = typeof presetStyle?.stroke === 'string'
+            && isSafeCssColor(presetStyle.stroke)
+            ? presetStyle.stroke.trim()
+            : undefined;
+        if (
+            expectedStyleEntries.length === 0
+            && presetMarker === undefined
+            && !expectedStroke
+            && !expectedSemanticClassName
+        ) return true;
+
+        const canvasEdge = canvasEdgeById.get(String(rawPresetEdge.id));
+        if (!canvasEdge) return false;
+        if (
+            expectedSemanticClassName
+            && !String(canvasEdge.className ?? '').split(/\s+/).includes(expectedSemanticClassName)
+        ) return false;
+        const canvasStyle = isRecord(canvasEdge.style) ? canvasEdge.style : undefined;
+        if (!expectedStyleEntries.every(([field, value]) => Object.is(canvasStyle?.[field], value))) {
+            return false;
+        }
+
+        if (isRecord(presetMarker)) {
+            if (!isRecord(canvasEdge.markerEnd)) return false;
+            return Object.entries(presetMarker).every(([field, value]) => (
+                Object.is((canvasEdge.markerEnd as Record<string, unknown>)[field], value)
+            ));
+        }
+        if (presetMarker !== undefined) return Object.is(canvasEdge.markerEnd, presetMarker);
+        if (!expectedStroke) return true;
+        return isRecord(canvasEdge.markerEnd) && canvasEdge.markerEnd.color === expectedStroke;
+    });
+};
+
 const parseCachedCanvasData = (raw: string | null): CanvasData | null => {
     if (!raw) return null;
     try {
@@ -149,6 +212,7 @@ const isPersistedSubGroupNode = (node: Node): boolean => (
 );
 
 const isPersistedCanvasCompatibleWithPreset = (canvas: CanvasData, preset: StandardPresetInput): boolean => {
+    if (!isPersistedEdgePresentationCompatible(canvas, preset)) return false;
     const layout = isRecord(preset.layout) ? preset.layout : {};
     const nodes = canvas.nodes;
     if (layout.generateDomainGroups === false && nodes.some(isPersistedTitleGroupNode)) {

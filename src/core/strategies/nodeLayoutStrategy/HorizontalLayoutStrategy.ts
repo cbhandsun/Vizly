@@ -157,11 +157,6 @@ export class HorizontalLayoutStrategy implements ILayoutStrategy {
            if (matchKey) arr = subOrderOptRaw[matchKey];
         }
 
-        // Debug log for '作业域' to help troubleshooting
-        if ((dTrim.includes('作业域') || dTrim.includes('Job')) && import.meta.env.DEV) {
-           const _idx = Array.isArray(arr) ? findInArr(arr) : 'N/A';
-        }
-
         if (Array.isArray(arr)) { 
           const idx = findInArr(arr); 
           return idx >= 0 ? idx : Number.POSITIVE_INFINITY; 

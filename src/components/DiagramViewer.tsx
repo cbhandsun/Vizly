@@ -26,9 +26,7 @@ import {
 import { clearBlankTemplateLocalState } from './diagramViewerStorage';
 import { appMessage } from '@/core/utils/antdStaticBridge';
 import { resolvePluginId } from '@/core/plugins/registry';
-import { ensureBuiltInPlugins } from '@/core/plugins/builtInPlugins';
 import { getStandardPresetDocTypeById } from '@/data/standardized/presetMetadata';
-import { loadStandardPresetById } from '@/data/standardized/presetLoader';
 import { getDiagramDocTypeFromStorage } from '@/core/utils/diagramTypeStorage';
 import { createAutoSavePayload } from '@/core/utils/autoSaveStorage';
 import { getCustomPreset } from '@/core/utils/customPresetStorage';
@@ -75,33 +73,8 @@ import { getPersistedDiagramTitle } from './diagramViewerTitle';
 import { persistDiagramTitle } from './diagramViewerRename';
 import { ensureDiagramViewerExportAllowed } from './diagramViewerExportPolicy';
 import type { DiagramExportFormat } from '@/core/types/diagram-components';
-import type { DiagramComponentProps } from '@/core/types/diagram-components';
 import { coerceClipboardData } from '@/core/utils/flowchartClipboard';
-
-const PLUGIN_EMPTY_CANVAS_IDS = new Set(['flowchart']);
-
-const loadFlowchartDesigner = async (pluginId?: string, presetId?: string) => {
-    if (presetId) {
-        void import('@/core/components/shared/baseReactFlowPrecompiledRoutePrefetch')
-            .then(
-                module => module.prefetchBaseReactFlowPrecompiledRoute(presetId),
-                () => false
-            );
-    }
-    const [{ default: FlowchartDesigner }] = await Promise.all([
-        import('@/core/components/diagrams/FlowchartDesigner'),
-        ensureBuiltInPlugins(pluginId || 'flowchart'),
-        loadStandardPresetById(presetId),
-    ]);
-
-    return {
-        default: (props: DiagramComponentProps) => React.createElement(
-            FlowchartDesigner,
-            pluginId ? { ...props, pluginId } : props
-        )
-    };
-};
-
+import { loadFlowchartDesigner, PLUGIN_EMPTY_CANVAS_IDS } from './diagramViewerFlowchartLoader';
 
 const DiagramViewer: React.FC = () => {
     const { t } = useTranslation();

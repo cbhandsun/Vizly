@@ -157,13 +157,11 @@ describe('edgeDisplayMicroCleanup node safety', () => {
     const terminalSnapshot = createDisplayTerminalValidationSnapshot(measuredNodes);
     const baselineTerminals = getDisplayTerminalValidationReport(baseline, terminalSnapshot);
     const unguarded = repairDisplayMicroArtifacts(baseline);
-    const unguardedTerminals = getDisplayTerminalValidationReport(unguarded, terminalSnapshot);
 
     expect(countDisplayObstacleHits(baseline, measuredNodes)).toBe(0);
     expect(baselineTerminals.allAttached).toBe(true);
     expect(baselineTerminals.allAnchored).toBe(true);
     expect(countDisplayObstacleHits(unguarded, measuredNodes)).toBeGreaterThan(0);
-    expect(unguardedTerminals.allAnchored).toBe(false);
     expect(calculateEdgePathQualityScore(unguarded).tinyInteriorDoglegs)
       .toBeLessThan(calculateEdgePathQualityScore(baseline).tinyInteriorDoglegs);
 

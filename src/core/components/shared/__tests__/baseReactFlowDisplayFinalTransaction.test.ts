@@ -1,7 +1,9 @@
 import type { Edge, Node } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
 
+import { calculateEdgePathQualityScore } from '../../../strategies/shared/edgeStrictCrossingGuard';
 import { finalizeFailClosedDisplayTransaction } from '../baseReactFlowDisplayFinalTransaction';
+import { getDisplayComputedPath } from '../baseReactFlowDisplayGeometry';
 
 const nodes: Array<Node & { positionAbsolute: { x: number; y: number } }> = [
   {
@@ -41,7 +43,10 @@ describe('finalizeFailClosedDisplayTransaction', () => {
       'clean-signature',
     );
 
-    expect((result[0].data as any).__baseDisplayFinalizedSignature).toBe('clean-signature');
+    expect(result[0].data?.__baseDisplayFinalizedSignature).toBe('clean-signature');
+    expect(result[0].type).toBe('stablePath');
+    expect(result[0].data?.layoutPathLocked).toBe(true);
+    expect(result[0].data?._layoutPathLocked).toBe(true);
   });
 
   it('does not finalize a transaction with detached terminals', () => {
@@ -51,7 +56,7 @@ describe('finalizeFailClosedDisplayTransaction', () => {
       'unsafe-signature',
     );
 
-    expect((result[0].data as any).__baseDisplayFinalizedSignature).toBeUndefined();
+    expect(result[0].data?.__baseDisplayFinalizedSignature).toBeUndefined();
   });
 
   it('removes redundant collinear waypoints before the final commit', () => {
@@ -64,9 +69,47 @@ describe('finalizeFailClosedDisplayTransaction', () => {
       'compact-signature',
     );
 
-    expect((result[0].data as any).computedPath).toEqual([
+    expect(result[0].data?.computedPath).toEqual([
       { x: 100, y: 50 }, { x: 300, y: 50 },
     ]);
-    expect((result[0].data as any).__baseDisplayFinalizedSignature).toBe('compact-signature');
+    expect(result[0].data?.__baseDisplayFinalizedSignature).toBe('compact-signature');
+  });
+
+  it('closes a newly safe interior micro dogleg before the final hard gate', () => {
+    const microNodes = nodes.map(node => node.id === 'target'
+      ? {
+        ...node,
+        position: { x: 300, y: 200 },
+        positionAbsolute: { x: 300, y: 200 },
+      }
+      : node);
+    const baseline = edgeWithPath([
+      { x: 100, y: 50 },
+      { x: 148, y: 50 },
+      { x: 148, y: 110 },
+      { x: 210, y: 110 },
+      { x: 210, y: 122 },
+      { x: 252, y: 122 },
+      { x: 252, y: 250 },
+      { x: 300, y: 250 },
+    ]);
+
+    const result = finalizeFailClosedDisplayTransaction(
+      baseline,
+      microNodes,
+      'micro-closure-signature',
+    );
+
+    expect(calculateEdgePathQualityScore(baseline).tinyInteriorDoglegs).toBe(1);
+    expect(calculateEdgePathQualityScore(result).tinyInteriorDoglegs).toBe(0);
+    expect(getDisplayComputedPath(result[0])).toEqual([
+      { x: 100, y: 50 },
+      { x: 148, y: 50 },
+      { x: 148, y: 122 },
+      { x: 252, y: 122 },
+      { x: 252, y: 250 },
+      { x: 300, y: 250 },
+    ]);
+    expect(result[0].data?.__baseDisplayFinalizedSignature).toBe('micro-closure-signature');
   });
 });

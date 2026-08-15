@@ -188,19 +188,20 @@ export const CONFIG_DEFINITIONS: Record<string, ConfigDefinition> = {
     group: 'export'
   },
 
-  // 开发配置
-  'dev.enableDebugMode': {
-    key: 'dev.enableDebugMode',
-    defaultValue: false,
-    description: '启用调试模式',
-    persistent: false,
-    group: 'development'
-  },
-  'dev.showPerformanceMetrics': {
-    key: 'dev.showPerformanceMetrics',
-    defaultValue: false,
-    description: '显示性能指标',
-    persistent: false,
-    group: 'development'
-  }
+  ...(import.meta.env.DEV ? {
+    'dev.enableDebugMode': {
+      key: 'dev.enableDebugMode',
+      defaultValue: false,
+      description: '启用调试模式',
+      persistent: false,
+      group: 'development'
+    },
+    'dev.showPerformanceMetrics': {
+      key: 'dev.showPerformanceMetrics',
+      defaultValue: false,
+      description: '显示性能指标',
+      persistent: false,
+      group: 'development'
+    }
+  } : {})
 };

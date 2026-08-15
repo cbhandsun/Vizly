@@ -143,7 +143,7 @@ const TitleGroupNode = React.memo(({ id, data, selected }: NodeProps<Node<TitleG
   };
 
   const renderDebugOverlay = () => {
-    if (!debugEnabled) return null;
+    if (!import.meta.env.DEV || !debugEnabled) return null;
     const labelText = `${String(data?.domainClass || '—')} | ${String(domainKey || '')}`;
     return (
       <div className="title-group-debug" style={{ border: `1px solid ${borderColor}` }}>

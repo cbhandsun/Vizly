@@ -55,7 +55,7 @@ import { assignBusRoutingMetadata } from './edgeRoutingBusGroupProcessing';
 import { buildEdgeRoutingFailureFallback } from './edgeRoutingFailureFallback';
 import { EdgeRoutingIncrementalState } from './edgeRoutingIncrementalState';
 import { EdgeRoutingResultContext } from './edgeRoutingResultContext';
-import { EdgeRoutingDebugState, refreshDebugRoutingRequestEndpoints } from './edgeRoutingDebugState';
+import { createEdgeRoutingDebugState, refreshDebugRoutingRequestEndpoints } from './edgeRoutingDebugState';
 import { buildEdgeRoutingCacheParams } from './edgeRoutingCacheParams';
 import { coerceEdgeRoutingSnapshotNodes } from './edgeRoutingNodeChangeDetection';
 import {
@@ -93,7 +93,7 @@ export class EdgeRoutingCoordinator {
     // [P0-2] Topology, graph-version, and dirty-edge state
     private incrementalState = new EdgeRoutingIncrementalState(logEdgeRoutingGraphVersionSubscriberFailure);
     private resultContext = new EdgeRoutingResultContext();
-    private debugState = new EdgeRoutingDebugState(logEdgeRoutingDebugListenerFailure);
+    private debugState = createEdgeRoutingDebugState(logEdgeRoutingDebugListenerFailure);
     private scheduler = new EdgeRoutingScheduler(() => {
         void this.triggerBatchRouting();
     });
@@ -268,6 +268,7 @@ export class EdgeRoutingCoordinator {
     }
 
     public forceDebugReRoute(edgeId?: string | null): void {
+        if (!import.meta.env.DEV) return;
         const targetId = edgeId ?? this.debugState.getSelectedEdgeId();
         if (!targetId) {
             return;
@@ -472,6 +473,7 @@ export class EdgeRoutingCoordinator {
     }
 
     public getCachedDebugPayload(edgeId: string): Record<string, unknown> | null {
+        if (!import.meta.env.DEV) return null;
         const entry = this.latestRequests.get(edgeId);
         if (!entry) return null;
         const result = this.getCachedResult(entry.request);
@@ -776,20 +778,7 @@ export class EdgeRoutingCoordinator {
         clearRenderedPathCache();
         EdgeRoutingCoordinator.instance = null;
     }
-    /**
-     * [FIX] In/Out Port Zone Separation on Same Side.
-     *
-     * 闂锛氳妭鐐?N 鐨勬煇涓€渚у悓鏃舵湁鍑鸿竟锛圢 浣滀负 source锛夊拰鍏ヨ竟锛圢 浣滀负 target锛夋椂锛?
-     * 涓ょ被绔彛閮戒互渚ц竟涓績涓哄熀鍑嗭紝瀵艰嚧閲嶅彔銆?
-     *
-     * 淇绛栫暐锛?
-     *   - bus trunk 鍑鸿竟缁勶細鏁翠綋绠?1 涓?outgoing slot锛堜繚鎸?trunk 鍏变韩绔彛涓嶅彉锛?
-     *   - bus trunk 鍏ヨ竟缁勶細鏁翠綋绠?1 涓?incoming slot
-     *   - 闈?bus 鍗曠嫭鍑鸿竟锛氬悇鍗?1 涓?outgoing slot
-     *   - 闈?bus 鍗曠嫭鍏ヨ竟锛氬悇鍗?1 涓?incoming slot
-     *   - 鍙湁鍚屼晶鍚屾椂瀛樺湪鍑烘Ы鍜屽叆妲芥椂鎵嶅垎绂伙紱鍗曠被鍒欒烦杩囷紙淇濇寔灞呬腑锛?
-     *   - 鎸夊绔川蹇冩帓搴忓喅瀹氬嚭缁?鍏ョ粍鍝釜鍦ㄥ墠锛岄伩鍏嶈瑙変氦鍙?
-     */
+    /** Separates incoming and outgoing port zones on the same node side. */
     private assignSameSidePortSeparation(jobs: PathFindingJob[], graph: SharedGraphContext): void {
         separateSameSidePorts(jobs, graph, this.latestRequests);
     }

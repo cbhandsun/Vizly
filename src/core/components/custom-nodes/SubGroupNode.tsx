@@ -172,7 +172,7 @@ const SubGroupNode = ({ id, data, zIndex, selected, isConnectable }: NodeProps<N
       />
 
       {/* 已回撤形状渲染 */}
-      {debugEnabled && (
+      {import.meta.env.DEV && debugEnabled && (
         /**
          * 函数级注释：调试角标
          * 用途：显示 domainClass | 域键 与主题主色小方块，便于肉眼确认联动。

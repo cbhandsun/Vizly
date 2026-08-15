@@ -41,6 +41,7 @@ export {
 } from './baseReactFlowDisplayCache';
 export type { BaseReactFlowDisplayEdgesCacheEntry } from './baseReactFlowDisplayCache';
 export {
+  lockFinalDisplayComputedPaths,
   toBasicDisplayEdge,
   toCanvasRefEdge,
   toSmartDisplayEdge,
@@ -347,18 +348,23 @@ export const withDisplayAbsolutePositions = (nodes: Node[], nodeById: Map<string
   );
   const resolvePosition = (node: Node, seen = new Set<string>()): XYPosition => {
     const displayNode = node as DisplayNode;
+    const measuredAbsolute = displayNode.positionAbsolute;
+    if (
+      measuredAbsolute
+      && typeof measuredAbsolute.x === 'number'
+      && Number.isFinite(measuredAbsolute.x)
+      && typeof measuredAbsolute.y === 'number'
+      && Number.isFinite(measuredAbsolute.y)
+    ) {
+      return { x: measuredAbsolute.x, y: measuredAbsolute.y };
+    }
     const parentId = node.parentId;
-    const localPosition = node.position ?? displayNode.positionAbsolute ?? { x: 0, y: 0 };
+    const localPosition = node.position ?? { x: 0, y: 0 };
     const local = {
       x: finiteNumber(localPosition.x, 0),
       y: finiteNumber(localPosition.y, 0),
     };
-    if (!parentId || seen.has(parentId)) {
-      const absolute = displayNode.positionAbsolute;
-      return absolute
-        ? { x: finiteNumber(absolute.x, local.x), y: finiteNumber(absolute.y, local.y) }
-        : local;
-    }
+    if (!parentId || seen.has(parentId)) return local;
     const parent = nodeById.get(parentId);
     if (!parent) return local;
     seen.add(parentId);
