@@ -8,7 +8,7 @@ import {
   toggleKanban,
 } from "./mindElixirStore";
 import { classifyTasksWithAI, type TaskItemInput } from "./mindmapAIService";
-import { Button, Checkbox, Tooltip, message, Tag } from "antd";
+import { Button, Checkbox, Tooltip, Tag } from "antd";
 import {
   ProjectOutlined,
   CloseOutlined,
@@ -28,6 +28,7 @@ import { cleanMindMapNodePatch } from "./mindmapNodePatchSecurity";
 import { logMindmapKanbanRefreshFailure } from "./mindmapPanelLogging";
 import { extractKanbanTasks, type KanbanTask } from "./mindmapKanbanTasks";
 import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
+import { appMessage } from "@/core/utils/antdStaticBridge";
 import "./MindMapTaskKanban.css";
 type TaskNode = NodeObj & { task?: MindMapTaskMeta };
 
@@ -48,7 +49,17 @@ export const MindMapTaskKanban: React.FC = () => {
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState("");
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const closeKanban = useCallback(() => toggleKanban(false), []);
+  const openRef = useRef(false);
+  const aiRequestIdRef = useRef(0);
+  const invalidateAIRequest = useCallback(() => {
+    openRef.current = false;
+    aiRequestIdRef.current += 1;
+    setAiClassifying(false);
+  }, []);
+  const closeKanban = useCallback(() => {
+    invalidateAIRequest();
+    toggleKanban(false);
+  }, [invalidateAIRequest]);
   const { containerRef, handleKeyDown } = useModalFocusTrap<HTMLDivElement>({
     active: open,
     initialFocusRef: closeButtonRef,
@@ -57,7 +68,14 @@ export const MindMapTaskKanban: React.FC = () => {
 
   // 订阅实例和开闭状态
   useEffect(() => subscribeMindElixir((m) => setMind(m)), []);
-  useEffect(() => subscribeKanban((o) => setOpen(o)), []);
+  useEffect(() => subscribeKanban((nextOpen) => {
+    openRef.current = nextOpen;
+    if (!nextOpen) {
+      aiRequestIdRef.current += 1;
+      setAiClassifying(false);
+    }
+    setOpen(nextOpen);
+  }), []);
 
   const refreshTasks = useCallback(() => {
     if (!mind) return;
@@ -157,11 +175,14 @@ export const MindMapTaskKanban: React.FC = () => {
   // ─── AI 智能整理看板 ────────────────────────────────────────────────────────
   const handleAIClassify = async () => {
     if (!mind || tasks.length === 0) return;
+    const requestId = aiRequestIdRef.current + 1;
+    aiRequestIdRef.current = requestId;
     setAiClassifying(true);
-    const hideLoading = message.loading(
+    const hideLoading = appMessage.loading(
       t("plugins.mindmap.kanban.aiPlanning"),
       0,
     );
+    const requestIsCurrent = () => openRef.current && aiRequestIdRef.current === requestId;
 
     const taskInputs: TaskItemInput[] = tasks.map((t) => ({
       id: t.id,
@@ -171,9 +192,10 @@ export const MindMapTaskKanban: React.FC = () => {
 
     try {
       const result = await classifyTasksWithAI(taskInputs);
+      if (!requestIsCurrent()) return;
 
       if ("error" in result) {
-        message.error(t("plugins.mindmap.kanban.planningFailed"));
+        appMessage.error(t("plugins.mindmap.kanban.planningFailed"));
         setAnnouncement(t("plugins.mindmap.kanban.planningFailed"));
       } else {
         let updatedCount = 0;
@@ -205,22 +227,23 @@ export const MindMapTaskKanban: React.FC = () => {
           const successMessage = t("plugins.mindmap.kanban.planningSuccess", {
             count: updatedCount,
           });
-          message.success(successMessage);
+          appMessage.success(successMessage);
           setAnnouncement(successMessage);
         } else {
           const emptyMessage = t("plugins.mindmap.kanban.noEligibleTasks");
-          message.warning(emptyMessage);
+          appMessage.warning(emptyMessage);
           setAnnouncement(emptyMessage);
         }
       }
     } catch (error: unknown) {
+      if (!requestIsCurrent()) return;
       logMindmapKanbanRefreshFailure(error);
       const failureMessage = t("plugins.mindmap.kanban.planningFailed");
-      message.error(failureMessage);
+      appMessage.error(failureMessage);
       setAnnouncement(failureMessage);
     } finally {
       hideLoading();
-      setAiClassifying(false);
+      if (aiRequestIdRef.current === requestId) setAiClassifying(false);
     }
   };
 
@@ -268,11 +291,11 @@ export const MindMapTaskKanban: React.FC = () => {
     try {
       await navigator.clipboard.writeText(mdText);
       const copySuccess = t("plugins.mindmap.kanban.copySuccess");
-      message.success(copySuccess);
+      appMessage.success(copySuccess);
       setAnnouncement(copySuccess);
     } catch {
       const copyFailure = t("plugins.mindmap.kanban.copyFailed");
-      message.error(copyFailure);
+      appMessage.error(copyFailure);
       setAnnouncement(copyFailure);
     }
   };

@@ -68,18 +68,14 @@ vi.mock('../mindmapPanelLogging', () => ({
     logMindmapKanbanRefreshFailure: vi.fn(),
 }));
 
-vi.mock('antd', async importOriginal => {
-    const actual = await importOriginal<typeof import('antd')>();
-    return {
-        ...actual,
-        message: {
-            error: harness.messageError,
-            loading: vi.fn(() => harness.messageLoadingHide),
-            success: harness.messageSuccess,
-            warning: harness.messageWarning,
-        },
-    };
-});
+vi.mock('@/core/utils/antdStaticBridge', () => ({
+    appMessage: {
+        error: harness.messageError,
+        loading: vi.fn(() => harness.messageLoadingHide),
+        success: harness.messageSuccess,
+        warning: harness.messageWarning,
+    },
+}));
 
 import { MindMapTaskKanban } from '../MindMapTaskKanban';
 
@@ -179,12 +175,44 @@ describe('MindMapTaskKanban commercial interactions', () => {
         expect(planButton.hasAttribute('disabled')).toBe(false);
     });
 
+    it('discards an AI result after the board closes', async () => {
+        let resolveClassification: ((value: {
+            classifications: Array<{ id: string; priority: '高'; status: 'doing' }>;
+        }) => void) | undefined;
+        harness.classifyTasksWithAI.mockImplementationOnce(() => new Promise(resolve => {
+            resolveClassification = resolve;
+        }));
+        renderClosedBoard();
+        await openBoard();
+        await screen.findByRole('combobox', { name: 'Move First task to another column' });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Plan with AI' }));
+        await waitFor(() => expect(harness.classifyTasksWithAI).toHaveBeenCalledTimes(1));
+        act(() => harness.kanbanListener?.(false));
+        expect(screen.queryByRole('dialog')).toBeNull();
+
+        await act(async () => {
+            resolveClassification?.({
+                classifications: [{ id: 'task-1', priority: '高', status: 'doing' }],
+            });
+            await Promise.resolve();
+        });
+
+        expect(harness.reshapeNode).not.toHaveBeenCalled();
+        expect(harness.messageSuccess).not.toHaveBeenCalled();
+        expect(harness.messageError).not.toHaveBeenCalled();
+        expect(harness.messageWarning).not.toHaveBeenCalled();
+        expect(harness.messageLoadingHide).toHaveBeenCalledTimes(1);
+    });
+
     it('uses responsive safe areas, stacked mobile columns, and reduced-motion fallbacks', () => {
         const source = readFileSync(resolve(process.cwd(), 'src/core/components/mindmap-v2/MindMapTaskKanban.tsx'), 'utf8');
         const css = readFileSync(resolve(process.cwd(), 'src/core/components/mindmap-v2/MindMapTaskKanban.css'), 'utf8');
         const toolbarSource = readFileSync(resolve(process.cwd(), 'src/core/components/mindmap-v2/MindElixirToolbar.tsx'), 'utf8');
 
         expect(source).not.toContain("document.createElement('style')");
+        expect(source).not.toContain('message.');
+        expect(source).toContain('appMessage.loading(');
         expect(source).toContain('useModalFocusTrap');
         expect(toolbarSource.indexOf('data-testid="mindmap-kanban-trigger"')).toBeLessThan(
             toolbarSource.indexOf('{/* Undo / Redo */}'),
