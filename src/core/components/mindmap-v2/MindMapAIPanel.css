@@ -1,0 +1,31 @@
+.mindmap-ai-panel {
+    position: absolute;
+    z-index: 10000;
+    top: 104px;
+    right: calc(max(var(--right-sidebar-offset, 0px), 16px) + env(safe-area-inset-right, 0px));
+    bottom: 72px;
+    display: flex;
+    width: min(380px, calc(100% - var(--right-sidebar-offset, 0px) - 88px));
+    min-width: 0;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    background: rgba(15, 18, 36, 0.92);
+    box-shadow: -10px 0 50px rgba(0, 0, 0, 0.42);
+    backdrop-filter: blur(24px) saturate(180%);
+}
+
+.mindmap-ai-panel:focus-visible {
+    outline: 2px solid #818cf8;
+    outline-offset: -2px;
+}
+
+@media (max-width: 767px) {
+    .mindmap-ai-panel {
+        right: calc(16px + env(safe-area-inset-right, 0px));
+        bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+        left: calc(16px + env(safe-area-inset-left, 0px));
+        width: auto;
+    }
+}

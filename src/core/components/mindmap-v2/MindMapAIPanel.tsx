@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button, Input, message, Segmented, Select, Spin, Tag } from 'antd';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Button, Input, Segmented, Select, Spin } from 'antd';
 import {
     BranchesOutlined,
     BulbOutlined,
@@ -32,6 +32,11 @@ import {
 } from './mindmapTaskClassification';
 import { cleanMindMapData, cleanMindMapTopic, refreshMindElixirWithSanitizedData } from './mindmapTreeSanitizer';
 import { cleanMindMapNodePatch } from './mindmapNodePatchSecurity';
+import { createMindMapAIRequestLifecycle } from './mindMapAIPanelRequestLifecycle';
+import { readMindMapEmptyState } from './mindMapEmptyState';
+import { appMessage, appModal } from '@/core/utils/antdStaticBridge';
+import { getViewportOverlayContainer } from '@/core/components/ui/viewportOverlayPortal';
+import './MindMapAIPanel.css';
 
 const { TextArea } = Input;
 
@@ -75,22 +80,53 @@ export function MindMapAIPanel() {
     const [targetNodeId, setTargetNodeId] = useState<string>('root');
     const [suggestions, setSuggestions] = useState<string[]>([]);
     const [loading, setLoading] = useState(false);
+    const [confirmingReplace, setConfirmingReplace] = useState(false);
     const [, setMapTick] = useState(0);
+    const requestLifecycle = useMemo(() => createMindMapAIRequestLifecycle(), []);
+    const panelOpenRef = useRef(false);
+    const replaceConfirmRef = useRef<{ destroy: () => void } | null>(null);
 
-    useEffect(() => subscribeAIPanel(setOpen), []);
-    useEffect(() => subscribeMindElixir(setMind), []);
+    const invalidatePendingRequest = useCallback(() => {
+        requestLifecycle.invalidate();
+        setLoading(false);
+    }, [requestLifecycle]);
+
+    useEffect(() => subscribeAIPanel(nextOpen => {
+        panelOpenRef.current = nextOpen;
+        if (!nextOpen) {
+            replaceConfirmRef.current?.destroy();
+            replaceConfirmRef.current = null;
+            setConfirmingReplace(false);
+            invalidatePendingRequest();
+            setSuggestions([]);
+        }
+        setOpen(nextOpen);
+    }), [invalidatePendingRequest]);
+
+    useEffect(() => subscribeMindElixir(nextMind => {
+        replaceConfirmRef.current?.destroy();
+        replaceConfirmRef.current = null;
+        setConfirmingReplace(false);
+        invalidatePendingRequest();
+        setSuggestions([]);
+        setMind(nextMind);
+    }), [invalidatePendingRequest]);
 
     useEffect(() => {
         if (!mind) return;
         const handleSelect = (nodes: NodeObj[]) => {
             const id = nodes[0]?.id;
             if (id) {
+                invalidatePendingRequest();
+                setSuggestions([]);
                 setSelectedNodeId(id);
                 setTargetNodeId(id);
             }
         };
         const handleSelectNew = (node: NodeObj) => {
             if (node?.id) {
+                invalidatePendingRequest();
+                setSuggestions([]);
                 setSelectedNodeId(node.id);
                 setTargetNodeId(node.id);
             }
@@ -104,7 +140,7 @@ export function MindMapAIPanel() {
             mind.bus.removeListener('selectNewNode', handleSelectNew);
             mind.bus.removeListener('operation', handleOperation);
         };
-    }, [mind]);
+    }, [invalidatePendingRequest, mind]);
 
     const data = mind?.getData();
     const nodeOptions = useMemo(() => {
@@ -132,29 +168,66 @@ export function MindMapAIPanel() {
         setTimeout(() => mind.toCenter(), 80);
     }, [mind]);
 
-    const handleCreateMap = useCallback(async () => {
-        if (!mind || !prompt.trim() || loading) return;
+    const beginRequest = useCallback(() => {
+        const requestId = requestLifecycle.begin();
         setLoading(true);
+        return requestId;
+    }, [requestLifecycle]);
+
+    const executeCreateMap = useCallback(async (requestedPrompt: string) => {
+        if (!mind || !panelOpenRef.current || getMindElixirInstance() !== mind || loading) return;
+        const requestId = beginRequest();
         setSuggestions([]);
         try {
-            const result = await generateMindMapFromPrompt(prompt.trim());
+            const result = await generateMindMapFromPrompt(requestedPrompt);
+            if (!requestLifecycle.isCurrent(requestId)) return;
             if ('error' in result) {
-                message.error(result.error);
+                appMessage.error(result.error);
                 return;
             }
             const current = mind.getData();
             refreshMindElixirWithSanitizedData(mind, cleanMindMapData({ ...current, nodeData: result.nodeData }));
             applyOperation('ai_generate_map', result.nodeData);
-            message.success(`已生成 ${countNodes(result.nodeData)} 个节点`);
+            appMessage.success(`已生成 ${countNodes(result.nodeData)} 个节点`);
             setPrompt('');
+        } catch {
+            if (requestLifecycle.isCurrent(requestId)) {
+                appMessage.error('生成导图失败，请重试');
+            }
         } finally {
-            setLoading(false);
+            if (requestLifecycle.isCurrent(requestId)) setLoading(false);
         }
-    }, [applyOperation, loading, mind, prompt]);
+    }, [applyOperation, beginRequest, loading, mind, requestLifecycle]);
+
+    const handleCreateMap = useCallback(() => {
+        if (!mind || !prompt.trim() || loading || confirmingReplace) return;
+        const requestedPrompt = prompt.trim();
+        const generate = () => executeCreateMap(requestedPrompt);
+        if (readMindMapEmptyState(mind)) {
+            void generate();
+            return;
+        }
+        setConfirmingReplace(true);
+        replaceConfirmRef.current = appModal.confirm({
+            title: '替换当前思维导图？',
+            content: '生成完整导图会覆盖当前节点和分支。此操作可以通过撤销恢复。',
+            okText: '确认替换并生成',
+            cancelText: '取消',
+            centered: true,
+            keyboard: true,
+            maskClosable: false,
+            getContainer: getViewportOverlayContainer,
+            onOk: generate,
+            afterClose: () => {
+                replaceConfirmRef.current = null;
+                setConfirmingReplace(false);
+            },
+        });
+    }, [confirmingReplace, executeCreateMap, loading, mind, prompt]);
 
     const handleExpand = useCallback(async () => {
         if (!mind || !targetNode || loading) return;
-        setLoading(true);
+        const requestId = beginRequest();
         setSuggestions([]);
         try {
             const tree = mind.getData().nodeData;
@@ -164,18 +237,23 @@ export function MindMapAIPanel() {
                 count: 6,
                 mapTitle: tree.topic,
             });
+            if (!requestLifecycle.isCurrent(requestId)) return;
             if (result.error) {
-                message.error(result.error);
+                appMessage.error(result.error);
                 return;
             }
-            setSuggestions(result.topics);
+            setSuggestions([...new Set(result.topics.map(topic => cleanMindMapTopic(topic)).filter(Boolean))]);
+        } catch {
+            if (requestLifecycle.isCurrent(requestId)) {
+                appMessage.error('生成子主题失败，请重试');
+            }
         } finally {
-            setLoading(false);
+            if (requestLifecycle.isCurrent(requestId)) setLoading(false);
         }
-    }, [loading, mind, targetNode]);
+    }, [beginRequest, loading, mind, requestLifecycle, targetNode]);
 
     const addSuggestion = useCallback((topic: string) => {
-        if (!mind || !targetNode) return;
+        if (!mind || !targetNode || loading) return;
         const node = findNodeById(mind.getData().nodeData, targetNode.id);
         if (!node) return;
         const child: NodeObj = {
@@ -187,10 +265,10 @@ export function MindMapAIPanel() {
         refreshCleanMindMap(mind);
         applyOperation('ai_add_suggestion', node);
         setSuggestions(items => items.filter(item => item !== topic));
-    }, [applyOperation, mind, targetNode]);
+    }, [applyOperation, loading, mind, targetNode]);
 
     const addAllSuggestions = useCallback(() => {
-        if (!mind || !targetNode || suggestions.length === 0) return;
+        if (!mind || !targetNode || suggestions.length === 0 || loading) return;
         const node = findNodeById(mind.getData().nodeData, targetNode.id);
         if (!node) return;
         appendChildren(node, suggestions.map(topic => ({
@@ -201,18 +279,19 @@ export function MindMapAIPanel() {
         refreshCleanMindMap(mind);
         applyOperation('ai_add_all_suggestions', node);
         setSuggestions([]);
-    }, [applyOperation, mind, suggestions, targetNode]);
+    }, [applyOperation, loading, mind, suggestions, targetNode]);
 
     const handleSummarize = useCallback(async () => {
         if (!mind || !targetNode || !targetNode.children?.length || loading) return;
-        setLoading(true);
+        const requestId = beginRequest();
         try {
             const result = await summarizeNodeWithAI(
                 targetNode.topic,
                 targetNode.children.map(child => child.topic)
             );
+            if (!requestLifecycle.isCurrent(requestId)) return;
             if ('error' in result) {
-                message.error(result.error);
+                appMessage.error(result.error);
                 return;
             }
             const node = findNodeById(mind.getData().nodeData, targetNode.id);
@@ -220,15 +299,19 @@ export function MindMapAIPanel() {
             node.topic = cleanMindMapTopic(result.topic);
             refreshCleanMindMap(mind);
             applyOperation('ai_summarize_node', node);
-            message.success('已归纳当前节点');
+            appMessage.success('已归纳当前节点');
+        } catch {
+            if (requestLifecycle.isCurrent(requestId)) {
+                appMessage.error('归纳节点失败，请重试');
+            }
         } finally {
-            setLoading(false);
+            if (requestLifecycle.isCurrent(requestId)) setLoading(false);
         }
-    }, [applyOperation, loading, mind, targetNode]);
+    }, [applyOperation, beginRequest, loading, mind, requestLifecycle, targetNode]);
 
     const handleRefine = useCallback(async () => {
         if (!mind || !targetNode || !prompt.trim() || loading) return;
-        setLoading(true);
+        const requestId = beginRequest();
         try {
             const tree = mind.getData().nodeData;
             const result = await processNodeWithAICustomAction({
@@ -237,8 +320,9 @@ export function MindMapAIPanel() {
                 ancestorPath: getAncestorPath(tree, targetNode.id),
                 mapTitle: tree.topic,
             });
+            if (!requestLifecycle.isCurrent(requestId)) return;
             if (result.error) {
-                message.error(result.error);
+                appMessage.error(result.error);
                 return;
             }
 
@@ -259,49 +343,80 @@ export function MindMapAIPanel() {
             refreshCleanMindMap(mind);
             applyOperation('ai_refine_node', node);
             setPrompt('');
-            message.success('AI 处理已应用');
+            appMessage.success('AI 处理已应用');
+        } catch {
+            if (requestLifecycle.isCurrent(requestId)) {
+                appMessage.error('AI 处理失败，请重试');
+            }
         } finally {
-            setLoading(false);
+            if (requestLifecycle.isCurrent(requestId)) setLoading(false);
         }
-    }, [applyOperation, loading, mind, prompt, targetNode]);
+    }, [applyOperation, beginRequest, loading, mind, prompt, requestLifecycle, targetNode]);
 
     const handleClassifyTasks = useCallback(async () => {
         if (!mind || !targetNode || loading) return;
         const tree = mind.getData().nodeData;
         if (taskCandidates.length === 0) {
-            message.info('当前分支没有可分类的叶子任务');
+            appMessage.info('当前分支没有可分类的叶子任务');
             return;
         }
 
-        setLoading(true);
+        const requestId = beginRequest();
         try {
             const result = await classifyTasksWithAI(taskCandidates);
+            if (!requestLifecycle.isCurrent(requestId)) return;
             if ('error' in result) {
-                message.error(result.error);
+                appMessage.error(result.error);
                 return;
             }
             const applied = applyTaskClassifications(tree, result.classifications);
             refreshCleanMindMap(mind);
             applyOperation('ai_classify_tasks', tree);
-            message.success(`已规划 ${applied} 个任务`);
+            appMessage.success(`已规划 ${applied} 个任务`);
+        } catch {
+            if (requestLifecycle.isCurrent(requestId)) {
+                appMessage.error('规划任务失败，请重试');
+            }
         } finally {
-            setLoading(false);
+            if (requestLifecycle.isCurrent(requestId)) setLoading(false);
         }
-    }, [applyOperation, loading, mind, targetNode, taskCandidates]);
+    }, [applyOperation, beginRequest, loading, mind, requestLifecycle, targetNode, taskCandidates]);
 
     const handleClassifyTasksLocally = useCallback(() => {
-        if (!mind || !targetNode) return;
+        if (!mind || !targetNode || loading) return;
         const tree = mind.getData().nodeData;
         if (taskCandidates.length === 0) {
-            message.info('当前分支没有可分类的叶子任务');
+            appMessage.info('当前分支没有可分类的叶子任务');
             return;
         }
 
         const applied = applyTaskClassifications(tree, classifyTaskCandidatesLocally(taskCandidates));
         refreshCleanMindMap(mind);
         applyOperation('local_classify_tasks', tree);
-        message.success(`已快速规划 ${applied} 个任务`);
-    }, [applyOperation, mind, targetNode, taskCandidates]);
+        appMessage.success(`已快速规划 ${applied} 个任务`);
+    }, [applyOperation, loading, mind, targetNode, taskCandidates]);
+
+    const handleClose = useCallback(() => {
+        replaceConfirmRef.current?.destroy();
+        replaceConfirmRef.current = null;
+        setConfirmingReplace(false);
+        panelOpenRef.current = false;
+        invalidatePendingRequest();
+        setSuggestions([]);
+        toggleAIPanel(false);
+    }, [invalidatePendingRequest]);
+
+    const handleModeChange = useCallback((value: string | number) => {
+        invalidatePendingRequest();
+        setSuggestions([]);
+        setMode(value as AIMode);
+    }, [invalidatePendingRequest]);
+
+    const handleTargetChange = useCallback((nodeId: string) => {
+        invalidatePendingRequest();
+        setSuggestions([]);
+        setTargetNodeId(nodeId);
+    }, [invalidatePendingRequest]);
 
     if (!open) return null;
 
@@ -310,23 +425,27 @@ export function MindMapAIPanel() {
     const canSummarize = !!targetNode?.children?.length;
 
     return (
-        <div aria-label="AI 思维导图助手" role="complementary" style={panelStyle}>
+        <div
+            aria-busy={loading}
+            aria-label="AI 思维导图助手"
+            className="mindmap-ai-panel"
+            role="complementary"
+        >
             <div style={headerStyle}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <RobotOutlined style={{ color: '#8b5cf6', fontSize: 18 }} />
+                    <RobotOutlined aria-hidden="true" style={{ color: '#8b5cf6', fontSize: 18 }} />
                     <span style={{ color: '#fff', fontWeight: 650 }}>AI 思维导图助手</span>
                 </div>
-                <Button aria-label="关闭 AI 思维导图助手" title="关闭 AI 思维导图助手" type="text" icon={<CloseOutlined />} onClick={() => toggleAIPanel(false)} style={iconButtonStyle} />
+                <Button aria-label="关闭 AI 思维导图助手" title="关闭 AI 思维导图助手" type="text" icon={<CloseOutlined />} onClick={handleClose} style={iconButtonStyle} />
             </div>
 
             <div style={bodyStyle}>
                 <Segmented
+                    aria-label="AI 思维导图操作模式"
                     block
+                    disabled={loading}
                     value={mode}
-                    onChange={value => {
-                        setMode(value as AIMode);
-                        setSuggestions([]);
-                    }}
+                    onChange={handleModeChange}
                     options={[
                         { label: '建图', value: 'create', icon: <DeploymentUnitOutlined /> },
                         { label: '扩展', value: 'expand', icon: <BranchesOutlined /> },
@@ -339,9 +458,11 @@ export function MindMapAIPanel() {
                     <div style={fieldStyle}>
                         <label style={labelStyle}>目标节点</label>
                         <Select
+                            aria-label="AI 操作目标节点"
+                            disabled={loading}
                             showSearch
                             value={targetNodeId || selectedNodeId}
-                            onChange={setTargetNodeId}
+                            onChange={handleTargetChange}
                             options={nodeOptions}
                             optionFilterProp="label"
                             style={{ width: '100%' }}
@@ -354,16 +475,18 @@ export function MindMapAIPanel() {
                         <label style={labelStyle}>输入主题或业务问题</label>
                         <TextArea
                             aria-label="AI 建图主题或业务问题"
+                            disabled={loading}
                             value={prompt}
                             onChange={event => setPrompt(event.target.value)}
                             placeholder="例如：仓储系统产品规划、B2B 订单履约流程、AI 客服落地方案..."
                             autoSize={{ minRows: 4, maxRows: 7 }}
                         />
                         <Button
+                            aria-label="生成完整导图"
                             type="primary"
                             icon={<DeploymentUnitOutlined />}
                             loading={loading}
-                            disabled={!prompt.trim()}
+                            disabled={!prompt.trim() || confirmingReplace}
                             onClick={handleCreateMap}
                             block
                         >
@@ -378,6 +501,7 @@ export function MindMapAIPanel() {
                             AI 会基于当前节点路径生成可选择的子主题，先预览再插入。
                         </div>
                         <Button
+                            aria-label="生成子主题建议"
                             type="primary"
                             icon={<BranchesOutlined />}
                             loading={loading}
@@ -388,7 +512,7 @@ export function MindMapAIPanel() {
                             生成子主题建议
                         </Button>
                         {canSummarize && (
-                            <Button icon={<FileTextOutlined />} loading={loading} onClick={handleSummarize} block>
+                            <Button aria-label="根据子节点归纳标题" icon={<FileTextOutlined />} loading={loading} onClick={handleSummarize} block>
                                 根据子节点归纳标题
                             </Button>
                         )}
@@ -400,12 +524,14 @@ export function MindMapAIPanel() {
                         <label style={labelStyle}>处理指令</label>
                         <TextArea
                             aria-label="AI 思维导图处理指令"
+                            disabled={loading}
                             value={prompt}
                             onChange={event => setPrompt(event.target.value)}
                             placeholder="例如：翻译成英文；补一段备注；扩写 5 个实施步骤；加上风险标签..."
                             autoSize={{ minRows: 4, maxRows: 8 }}
                         />
                         <Button
+                            aria-label="应用到目标节点"
                             type="primary"
                             icon={<BulbOutlined />}
                             loading={loading}
@@ -424,6 +550,7 @@ export function MindMapAIPanel() {
                             当前分支有 {taskCandidates.length} 个叶子任务。AI 会批量写入任务状态和优先级，并同步到看板与导出。
                         </div>
                         <Button
+                            aria-label="规划当前分支任务"
                             type="primary"
                             icon={<CheckSquareOutlined />}
                             loading={loading}
@@ -434,8 +561,9 @@ export function MindMapAIPanel() {
                             规划当前分支任务
                         </Button>
                         <Button
+                            aria-label="规则快速规划"
                             icon={<CheckSquareOutlined />}
-                            disabled={!targetNode || taskCandidates.length === 0}
+                            disabled={!targetNode || taskCandidates.length === 0 || loading}
                             onClick={handleClassifyTasksLocally}
                             block
                         >
@@ -445,7 +573,7 @@ export function MindMapAIPanel() {
                 )}
 
                 {loading && (
-                    <div style={loadingStyle}>
+                    <div aria-live="polite" role="status" style={loadingStyle}>
                         <Spin size="small" />
                         <span>AI 正在处理...</span>
                     </div>
@@ -455,18 +583,19 @@ export function MindMapAIPanel() {
                     <div style={suggestionsStyle}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <span style={labelStyle}>建议子主题</span>
-                            <Button size="small" type="link" onClick={addAllSuggestions}>全部插入</Button>
+                            <Button aria-label="全部插入建议子主题" disabled={loading} size="small" type="link" onClick={addAllSuggestions}>全部插入</Button>
                         </div>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                             {suggestions.map(topic => (
-                                <Tag
+                                <Button
                                     key={topic}
-                                    color="processing"
-                                    style={{ cursor: 'pointer', padding: '4px 8px', margin: 0 }}
+                                    disabled={loading}
                                     onClick={() => addSuggestion(topic)}
+                                    size="small"
+                                    style={suggestionButtonStyle}
                                 >
                                     + {topic}
-                                </Tag>
+                                </Button>
                             ))}
                         </div>
                     </div>
@@ -475,23 +604,6 @@ export function MindMapAIPanel() {
         </div>
     );
 }
-
-const panelStyle: React.CSSProperties = {
-    position: 'absolute',
-    top: 104,
-    right: 0,
-    bottom: 72,
-    width: 'min(380px, calc(100% - 20px))',
-    zIndex: 10000,
-    display: 'flex',
-    flexDirection: 'column',
-    background: 'rgba(15, 18, 36, 0.92)',
-    backdropFilter: 'blur(24px) saturate(180%)',
-    borderLeft: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: '14px 0 0 14px',
-    overflow: 'hidden',
-    boxShadow: '-10px 0 50px rgba(0,0,0,0.42)',
-};
 
 const headerStyle: React.CSSProperties = {
     minHeight: 58,
@@ -549,6 +661,16 @@ const suggestionsStyle: React.CSSProperties = {
     borderRadius: 10,
     background: 'rgba(255,255,255,0.04)',
     border: '1px solid rgba(255,255,255,0.08)',
+};
+
+const suggestionButtonStyle: React.CSSProperties = {
+    minHeight: 32,
+    height: 'auto',
+    padding: '4px 8px',
+    color: '#91caff',
+    whiteSpace: 'normal',
+    borderColor: 'rgba(22, 119, 255, 0.35)',
+    background: 'rgba(22, 119, 255, 0.12)',
 };
 
 const iconButtonStyle: React.CSSProperties = {

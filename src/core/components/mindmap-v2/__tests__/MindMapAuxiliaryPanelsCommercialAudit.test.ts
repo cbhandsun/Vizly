@@ -105,12 +105,18 @@ describe('mind map auxiliary panel commercial audit contract', () => {
 
     it('keeps the AI assistant below application chrome and names its inputs', () => {
         const source = readSource('MindMapAIPanel.tsx');
+        const css = readSource('MindMapAIPanel.css');
 
         expect(source).toContain('aria-label="AI 思维导图助手"');
         expect(source).toContain('aria-label="关闭 AI 思维导图助手"');
         expect(source).toContain('aria-label="AI 建图主题或业务问题"');
         expect(source).toContain('aria-label="AI 思维导图处理指令"');
-        expect(source).toMatch(/const panelStyle:[\s\S]*?top:\s*104,[\s\S]*?bottom:\s*72,[\s\S]*?width:\s*'min\(380px, calc\(100% - 20px\)\)'/);
+        expect(source).toContain('className="mindmap-ai-panel"');
+        expect(source).toContain('appModal.confirm({');
+        expect(source).toContain('appMessage.error(');
+        expect(source).not.toContain('message.');
+        expect(css).toMatch(/\.mindmap-ai-panel\s*\{[\s\S]*?top:\s*104px;[\s\S]*?right:\s*calc\(max\(var\(--right-sidebar-offset, 0px\), 16px\)/);
+        expect(css).toContain('width: min(380px, calc(100% - var(--right-sidebar-offset, 0px) - 88px));');
         expect(source).toMatch(/const iconButtonStyle:[\s\S]*?minWidth:\s*44,[\s\S]*?height:\s*44,/);
     });
 });
