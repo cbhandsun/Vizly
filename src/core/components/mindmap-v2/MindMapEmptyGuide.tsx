@@ -1,13 +1,23 @@
 /** Empty-state onboarding for a mind map that only contains its root node. */
-import React, { useCallback, useEffect, useId, useState } from 'react';
+import React, { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import { BrainCircuit, WandSparkles, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import { getMindElixirInstance } from './mindElixirStore';
+import {
+    getMindElixirInstance,
+    subscribeAIPanel,
+    subscribeMindElixir,
+} from './mindElixirStore';
 import { generateMindMapFromPrompt } from './mindmapAIService';
-import { cleanMindMapData, refreshMindElixirWithSanitizedData } from './mindmapTreeSanitizer';
+import {
+    cleanMindMapData,
+    cleanMindMapTopic,
+    MINDMAP_MAX_TOPIC_LENGTH,
+    refreshMindElixirWithSanitizedData,
+} from './mindmapTreeSanitizer';
 import { logMindmapEmptyGuideCheckFailure } from './mindmapPanelLogging';
 import { bindMindMapEmptyState, readMindMapEmptyState } from './mindMapEmptyState';
+import { createMindMapAIRequestLifecycle } from './mindMapAIPanelRequestLifecycle';
 import styles from './MindMapEmptyGuide.module.css';
 
 const TIPS = [
@@ -23,52 +33,92 @@ const MindMapEmptyGuide: React.FC = () => {
     const titleId = useId();
     const [isEmpty, setIsEmpty] = useState(false);
     const [visible, setVisible] = useState(true);
+    const [aiPanelOpen, setAIPanelOpen] = useState(false);
     const [prompt, setPrompt] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
-    const mind = getMindElixirInstance();
+    const [mind, setMind] = useState(() => getMindElixirInstance());
+    const requestLifecycle = useMemo(() => createMindMapAIRequestLifecycle(), []);
 
-    const checkEmpty = useCallback(() => {
+    const invalidatePendingRequest = useCallback(() => {
+        requestLifecycle.invalidate();
+        setLoading(false);
+        setError('');
+    }, [requestLifecycle]);
+
+    useEffect(() => subscribeMindElixir(nextMind => {
+        invalidatePendingRequest();
+        setMind(nextMind);
+    }), [invalidatePendingRequest]);
+
+    useEffect(() => {
+        const unsubscribe = subscribeAIPanel(nextOpen => {
+            if (nextOpen) invalidatePendingRequest();
+            setAIPanelOpen(nextOpen);
+        });
+        return () => {
+            unsubscribe();
+            requestLifecycle.invalidate();
+        };
+    }, [invalidatePendingRequest, requestLifecycle]);
+
+    const updateEmptyState = useCallback((nextEmpty: boolean) => {
+        if (!nextEmpty) invalidatePendingRequest();
+        setIsEmpty(nextEmpty);
+    }, [invalidatePendingRequest]);
+
+    const isCurrentRequestContext = useCallback((requestId: number) => {
+        if (!mind || !requestLifecycle.isCurrent(requestId)) {
+            return false;
+        }
         try {
-            if (mind) setIsEmpty(readMindMapEmptyState(mind));
+            return readMindMapEmptyState(mind);
         } catch (caughtError) {
             logMindmapEmptyGuideCheckFailure(caughtError);
+            return false;
         }
-    }, [mind]);
+    }, [mind, requestLifecycle]);
 
     const handleAIGenerate = async () => {
-        if (!mind || !prompt.trim() || loading) return;
+        const requestedPrompt = cleanMindMapTopic(prompt.trim(), '');
+        if (!mind || !requestedPrompt || loading) return;
+        const requestId = requestLifecycle.begin();
         setLoading(true);
         setError('');
         try {
-            const result = await generateMindMapFromPrompt(prompt.trim());
+            const result = await generateMindMapFromPrompt(requestedPrompt);
+            if (!isCurrentRequestContext(requestId)) return;
             if ('error' in result) {
                 setError(result.error || t('plugins.mindmap.emptyGuide.generateFailed'));
             } else {
                 refreshMindElixirWithSanitizedData(mind, cleanMindMapData({ nodeData: result.nodeData }));
                 mind.toCenter();
                 setPrompt('');
-                checkEmpty();
             }
-        } catch (caughtError: unknown) {
-            setError(caughtError instanceof Error
-                ? caughtError.message
-                : t('plugins.mindmap.emptyGuide.requestFailed'));
+        } catch {
+            if (isCurrentRequestContext(requestId)) {
+                setError(t('plugins.mindmap.emptyGuide.requestFailed'));
+            }
         } finally {
-            setLoading(false);
+            if (requestLifecycle.isCurrent(requestId)) setLoading(false);
         }
     };
+
+    const handleDismiss = useCallback(() => {
+        invalidatePendingRequest();
+        setVisible(false);
+    }, [invalidatePendingRequest]);
 
     useEffect(() => {
         if (!mind) return;
         return bindMindMapEmptyState({
             mind,
-            onChange: setIsEmpty,
+            onChange: updateEmptyState,
             onFailure: logMindmapEmptyGuideCheckFailure,
         });
-    }, [mind]);
+    }, [mind, updateEmptyState]);
 
-    if (!isEmpty || !visible) return null;
+    if (!isEmpty || !visible || aiPanelOpen) return null;
 
     return (
         <section className={styles.guide} role="region" aria-labelledby={titleId}>
@@ -78,7 +128,7 @@ const MindMapEmptyGuide: React.FC = () => {
                     className={styles.dismiss}
                     aria-label={t('plugins.mindmap.emptyGuide.dismissLabel')}
                     title={t('plugins.mindmap.emptyGuide.dismissLabel')}
-                    onClick={() => setVisible(false)}
+                    onClick={handleDismiss}
                 >
                     <span>{t('plugins.mindmap.emptyGuide.dismiss')}</span>
                     <X size={15} aria-hidden="true" />
@@ -98,6 +148,7 @@ const MindMapEmptyGuide: React.FC = () => {
                     <input
                         type="text"
                         aria-label={t('plugins.mindmap.emptyGuide.promptLabel')}
+                        maxLength={MINDMAP_MAX_TOPIC_LENGTH}
                         placeholder={t('plugins.mindmap.emptyGuide.promptPlaceholder')}
                         value={prompt}
                         onChange={event => setPrompt(event.target.value)}

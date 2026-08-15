@@ -1,38 +1,55 @@
 // @vitest-environment jsdom
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import MindMapEmptyGuide from '../MindMapEmptyGuide';
 
+interface MockMind {
+    bus: { addListener: ReturnType<typeof vi.fn>; removeListener: ReturnType<typeof vi.fn> };
+    container: HTMLElement;
+    getData: () => { nodeData: { id: string; topic: string; children: unknown[] } };
+    toCenter: ReturnType<typeof vi.fn>;
+}
+
 const harness = vi.hoisted(() => ({
-    bind: vi.fn(({ onChange }: { onChange: (isEmpty: boolean) => void }) => {
-        onChange(true);
-        return vi.fn();
-    }),
+    activeMind: null as MockMind | null,
+    aiListener: null as ((open: boolean) => void) | null,
+    bind: vi.fn(),
+    empty: true,
+    generate: vi.fn(),
+    mindListener: null as ((mind: MockMind | null) => void) | null,
+    refresh: vi.fn(),
 }));
 
 vi.mock('../mindElixirStore', () => ({
-    getMindElixirInstance: () => ({
-        bus: { addListener: vi.fn(), removeListener: vi.fn() },
-        container: document.createElement('div'),
-        getData: () => ({ nodeData: { id: 'root', topic: 'Root', children: [] } }),
-        toCenter: vi.fn(),
-    }),
+    getMindElixirInstance: () => harness.activeMind,
+    subscribeAIPanel: (listener: (open: boolean) => void) => {
+        harness.aiListener = listener;
+        return vi.fn();
+    },
+    subscribeMindElixir: (listener: (mind: MockMind | null) => void) => {
+        harness.mindListener = listener;
+        return vi.fn();
+    },
 }));
 
 vi.mock('../mindMapEmptyState', () => ({
     bindMindMapEmptyState: harness.bind,
-    readMindMapEmptyState: () => true,
+    readMindMapEmptyState: () => harness.empty,
 }));
 
 vi.mock('../mindmapAIService', () => ({
-    generateMindMapFromPrompt: vi.fn(),
+    generateMindMapFromPrompt: (prompt: string) => harness.generate(prompt),
 }));
 
 vi.mock('../mindmapTreeSanitizer', () => ({
+    MINDMAP_MAX_TOPIC_LENGTH: 200,
     cleanMindMapData: vi.fn(value => value),
-    refreshMindElixirWithSanitizedData: vi.fn(),
+    cleanMindMapTopic: (value: unknown, fallback = '(untitled)') => (
+        typeof value === 'string' && value ? value.slice(0, 200) : fallback
+    ),
+    refreshMindElixirWithSanitizedData: (...args: unknown[]) => harness.refresh(...args),
 }));
 
 vi.mock('react-i18next', () => ({
@@ -59,27 +76,132 @@ vi.mock('react-i18next', () => ({
     }),
 }));
 
-describe('MindMapEmptyGuide', () => {
-    it('renders a localized named region with discoverable controls and shortcuts', async () => {
-        render(<MindMapEmptyGuide />);
+const createMind = (): MockMind => ({
+    bus: { addListener: vi.fn(), removeListener: vi.fn() },
+    container: document.createElement('div'),
+    getData: () => ({ nodeData: { id: 'root', topic: 'Root', children: [] } }),
+    toCenter: vi.fn(),
+});
 
-        const guide = await screen.findByRole('region', { name: 'Start your mind map' });
-        expect(guide).toBeTruthy();
-        expect(screen.getByRole('textbox', { name: 'Topic for AI mind map generation' })).toBeTruthy();
+const renderGuide = async () => {
+    const result = render(<MindMapEmptyGuide />);
+    await screen.findByRole('region', { name: 'Start your mind map' });
+    return result;
+};
+
+const startPendingGeneration = async () => {
+    let resolveRequest: ((value: { nodeData: { id: string; topic: string; children: unknown[] } }) => void) | undefined;
+    harness.generate.mockReturnValueOnce(new Promise(resolve => {
+        resolveRequest = resolve;
+    }));
+    await renderGuide();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Topic for AI mind map generation' }), {
+        target: { value: 'Pending map' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Generate with AI' }));
+    await waitFor(() => expect(harness.generate).toHaveBeenCalledTimes(1));
+    return resolveRequest;
+};
+
+beforeEach(() => {
+    harness.activeMind = createMind();
+    harness.aiListener = null;
+    harness.mindListener = null;
+    harness.empty = true;
+    harness.generate.mockReset();
+    harness.refresh.mockReset();
+    harness.bind.mockReset();
+    harness.bind.mockImplementation(({ onChange }: { onChange: (isEmpty: boolean) => void }) => {
+        onChange(harness.empty);
+        return vi.fn();
+    });
+});
+
+describe('MindMapEmptyGuide', () => {
+    it('renders a localized named region with bounded controls and shortcuts', async () => {
+        await renderGuide();
+
+        expect(screen.getByRole('textbox', { name: 'Topic for AI mind map generation' }).getAttribute('maxlength')).toBe('200');
         expect((screen.getByRole('button', { name: 'Generate with AI' }) as HTMLButtonElement).disabled).toBe(true);
         expect(screen.getByLabelText('Mind map keyboard shortcuts').textContent).toContain('TabAdd child');
-        expect(screen.queryByText('不再显示 ×')).toBeNull();
+    });
+
+    it('sanitizes and bounds the prompt before applying a generated tree', async () => {
+        harness.generate.mockResolvedValueOnce({
+            nodeData: { id: 'root', topic: 'Generated', children: [] },
+        });
+        const mind = harness.activeMind;
+        await renderGuide();
+        fireEvent.change(screen.getByRole('textbox', { name: 'Topic for AI mind map generation' }), {
+            target: { value: `  ${'x'.repeat(220)}  ` },
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Generate with AI' }));
+
+        await waitFor(() => expect(harness.generate).toHaveBeenCalledWith('x'.repeat(200)));
+        expect(harness.refresh).toHaveBeenCalledTimes(1);
+        expect(mind?.toCenter).toHaveBeenCalledTimes(1);
     });
 
     it('describes dismissal as temporary behavior and restores the guide on remount', async () => {
-        const first = render(<MindMapEmptyGuide />);
-        const dismiss = await screen.findByRole('button', { name: 'Dismiss getting-started guide' });
-
-        fireEvent.click(dismiss);
+        const first = await renderGuide();
+        fireEvent.click(screen.getByRole('button', { name: 'Dismiss getting-started guide' }));
         await waitFor(() => expect(screen.queryByRole('region', { name: 'Start your mind map' })).toBeNull());
 
         first.unmount();
-        render(<MindMapEmptyGuide />);
+        await renderGuide();
+    });
+
+    it('ignores a generated tree that resolves after the guide is dismissed', async () => {
+        const resolveRequest = await startPendingGeneration();
+        fireEvent.click(screen.getByRole('button', { name: 'Dismiss getting-started guide' }));
+
+        await act(async () => {
+            resolveRequest?.({ nodeData: { id: 'root', topic: 'Late', children: [] } });
+            await Promise.resolve();
+        });
+
+        expect(harness.refresh).not.toHaveBeenCalled();
+    });
+
+    it('hides behind the dedicated AI panel and ignores its pending response', async () => {
+        const resolveRequest = await startPendingGeneration();
+        act(() => harness.aiListener?.(true));
+        expect(screen.queryByRole('region', { name: 'Start your mind map' })).toBeNull();
+
+        await act(async () => {
+            resolveRequest?.({ nodeData: { id: 'root', topic: 'Late', children: [] } });
+            await Promise.resolve();
+        });
+        expect(harness.refresh).not.toHaveBeenCalled();
+
+        act(() => harness.aiListener?.(false));
         expect(await screen.findByRole('region', { name: 'Start your mind map' })).toBeTruthy();
+    });
+
+    it('ignores a pending response after the active mind-map instance changes', async () => {
+        const resolveRequest = await startPendingGeneration();
+        const replacement = createMind();
+        harness.activeMind = replacement;
+        act(() => harness.mindListener?.(replacement));
+
+        await act(async () => {
+            resolveRequest?.({ nodeData: { id: 'root', topic: 'Wrong map', children: [] } });
+            await Promise.resolve();
+        });
+
+        expect(harness.refresh).not.toHaveBeenCalled();
+    });
+
+    it('shows localized generic feedback without exposing thrown provider details', async () => {
+        harness.generate.mockRejectedValueOnce(new Error('provider-secret://must-not-surface'));
+        await renderGuide();
+        fireEvent.change(screen.getByRole('textbox', { name: 'Topic for AI mind map generation' }), {
+            target: { value: 'Failure case' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Generate with AI' }));
+
+        const alert = await screen.findByRole('alert');
+        expect(alert.textContent).toBe('Request failed.');
+        expect(alert.textContent).not.toContain('provider-secret');
     });
 });

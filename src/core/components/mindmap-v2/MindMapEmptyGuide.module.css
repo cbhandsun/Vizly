@@ -1,11 +1,11 @@
 .guide {
     position: absolute;
     bottom: calc(50% + 48px);
-    left: 50%;
+    right: var(--right-sidebar-offset, 0px);
+    left: var(--left-sidebar-offset, 0px);
     z-index: 100;
     display: flex;
-    width: min(560px, calc(100% - 48px));
-    transform: translateX(-50%);
+    width: auto;
     flex-direction: column;
     align-items: center;
     gap: 10px;
@@ -198,5 +198,12 @@
 
     .tips {
         display: none;
+    }
+}
+
+@media (max-width: 767px) {
+    .guide {
+        right: calc(16px + env(safe-area-inset-right, 0px));
+        left: calc(16px + env(safe-area-inset-left, 0px));
     }
 }
