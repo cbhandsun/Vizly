@@ -28,6 +28,7 @@ export interface AutoSaveOptions {
     storageKey?: string; // default 'flowchart-autosave-default'
     enabled?: boolean; // default true
     diagramId?: string; // ensures storage key matches diagram ID
+    routingVersion?: string; // invalidates persisted automatic paths across routing upgrades
     onSaveSuccess?: () => void;
     onSaveError?: (error: Error) => void;
     getMetadata?: () => unknown;
@@ -40,10 +41,18 @@ const createAutoSaveScopeKey = (storageKey: string, diagramId?: string) => (
 const createAutoSaveContentKey = (
     storageKey: string,
     diagramId: string | undefined,
+    routingVersion: string | undefined,
     nodes: Node[],
     edges: Edge[],
     metadata: unknown,
-) => JSON.stringify({ storageKey, diagramId: diagramId ?? null, nodes, edges, metadata });
+) => JSON.stringify({
+    storageKey,
+    diagramId: diagramId ?? null,
+    routingVersion: routingVersion ?? null,
+    nodes,
+    edges,
+    metadata,
+});
 
 /** GC: remove autosave entries not accessed in 7 days */
 function gcAutosaveEntries() {
@@ -80,6 +89,7 @@ export const useAutoSave = (
         storageKey = 'flowchart-autosave-default',
         enabled = true,
         diagramId,
+        routingVersion,
         onSaveSuccess,
         onSaveError,
         getMetadata,
@@ -140,6 +150,7 @@ export const useAutoSave = (
             const contentKey = createAutoSaveContentKey(
                 storageKey,
                 diagramId,
+                routingVersion,
                 currentNodes,
                 currentEdges,
                 metadata,
@@ -153,6 +164,7 @@ export const useAutoSave = (
             const now = Date.now();
             const data = createAutoSavePayload({
                 diagramId,
+                routingVersion,
                 nodes: currentNodes,
                 edges: currentEdges,
                 timestamp: now,
@@ -201,7 +213,7 @@ export const useAutoSave = (
                 appMessage.error(`Auto-save failed: ${errorMsg}`);
             }
         }
-    }, [storageKey, diagramId, onSaveSuccess, onSaveError, getMetadata, scopeKey]);
+    }, [storageKey, diagramId, routingVersion, onSaveSuccess, onSaveError, getMetadata, scopeKey]);
 
     useLayoutEffect(() => {
         saveRef.current = save;
@@ -240,6 +252,7 @@ export const useAutoSave = (
             const contentKey = createAutoSaveContentKey(
                 storageKey,
                 diagramId,
+                routingVersion,
                 currentNodes,
                 currentEdges,
                 metadata,
@@ -248,6 +261,7 @@ export const useAutoSave = (
             try {
                 const data = createAutoSavePayload({
                     diagramId,
+                    routingVersion,
                     nodes: currentNodes,
                     edges: currentEdges,
                     timestamp: Date.now(),
@@ -262,13 +276,13 @@ export const useAutoSave = (
         };
         window.addEventListener('beforeunload', handleBeforeUnload);
         return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-    }, [enabled, storageKey, diagramId, getMetadata, scopeKey]);
+    }, [enabled, storageKey, diagramId, routingVersion, getMetadata, scopeKey]);
 
     // Manual save trigger
     const saveNow = useCallback(() => save(), [save]);
 
     // Load saved data, also refreshes lastAccessedAt to prevent GC expiry
-    const loadSaved = useCallback((): Pick<AutoSavePayload, 'diagramId' | 'nodes' | 'edges' | 'isFreshSeed' | 'timestamp' | 'metadata'> | null => {
+    const loadSaved = useCallback((): Pick<AutoSavePayload, 'diagramId' | 'routingVersion' | 'nodes' | 'edges' | 'isFreshSeed' | 'timestamp' | 'metadata'> | null => {
         try {
             const saved = localStorage.getItem(storageKey);
             if (!saved) return null;
@@ -290,6 +304,7 @@ export const useAutoSave = (
             lastSavedContentRef.current = createAutoSaveContentKey(
                 storageKey,
                 data.diagramId,
+                data.routingVersion,
                 data.nodes,
                 data.edges,
                 data.metadata,
@@ -302,6 +317,7 @@ export const useAutoSave = (
 
             return {
                 diagramId: data.diagramId,
+                routingVersion: data.routingVersion,
                 nodes: data.nodes || [],
                 edges: data.edges || [],
                 isFreshSeed: !!data.isFreshSeed,

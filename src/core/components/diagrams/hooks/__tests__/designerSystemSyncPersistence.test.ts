@@ -1,5 +1,6 @@
 import type { Node } from '@xyflow/react';
 import { describe, expect, it, vi } from 'vitest';
+import { EDGE_ROUTING_CACHE_VERSION } from '../../../../routing/routingVersion';
 
 import {
   clearDesignerFreshSeedFlag,
@@ -93,6 +94,25 @@ describe('mergePresetExplicitEdgeHandles', () => {
       className: 'vizly-edge-role-support',
       style: { stroke: '#123456', strokeWidth: 2, strokeDasharray: '5 5' },
       markerEnd: { type: 'arrowclosed', color: '#123456' },
+    });
+  });
+
+  it('replaces a stale semantic role class while preserving unrelated saved classes', () => {
+    const merged = mergePresetExplicitEdgeHandles({
+      nodes: [{ id: 'A' }, { id: 'B' }],
+      edges: [{
+        id: 'edge',
+        source: 'A',
+        target: 'B',
+        className: 'user-authored vizly-edge-role-main',
+      }],
+    }, {
+      nodes: [{ id: 'A' }, { id: 'B' }],
+      edges: [{ id: 'edge', source: 'A', target: 'B', type: 'data' }],
+    });
+
+    expect(merged.edges[0]).toMatchObject({
+      className: 'user-authored vizly-edge-role-data',
     });
   });
 
@@ -219,6 +239,44 @@ describe('mergePresetExplicitEdgeHandles', () => {
 
     expect(merged.edges[0].style).toEqual({ stroke: '#123456', strokeWidth: 2 });
     expect(merged.edges[0].markerEnd).toBeUndefined();
+  });
+
+  it('invalidates legacy preset routes but leaves current and user-only routes intact', () => {
+    const legacyPath = [{ x: 191, y: 742 }, { x: -24, y: 742 }];
+    const legacy = mergePresetExplicitEdgeHandles({
+      nodes: [{ id: 'A' }, { id: 'B' }],
+      edges: [
+        {
+          id: 'preset-edge', source: 'A', target: 'B', type: 'stablePath',
+          data: { computedPath: legacyPath, layoutPathLocked: true, label: 'business' },
+        },
+        {
+          id: 'user-edge', source: 'A', target: 'B', type: 'stablePath',
+          className: 'user-authored vizly-edge-role-feedback',
+          data: { computedPath: legacyPath, layoutPathLocked: true },
+        },
+      ],
+    }, { edges: [{ id: 'preset-edge', type: 'main' }] });
+
+    expect(legacy.edges[0]).toMatchObject({
+      type: 'advanced-smart-step',
+      data: { label: 'business' },
+    });
+    expect(legacy.edges[0].data.computedPath).toBeUndefined();
+    expect(legacy.edges[1].data.computedPath).toEqual(legacyPath);
+    expect(legacy.edges[1].className).toBe('user-authored vizly-edge-role-feedback');
+
+    const current = mergePresetExplicitEdgeHandles({
+      routingVersion: EDGE_ROUTING_CACHE_VERSION,
+      nodes: [{ id: 'A' }, { id: 'B' }],
+      edges: [{
+        id: 'preset-edge', source: 'A', target: 'B', type: 'stablePath',
+        data: { computedPath: legacyPath, layoutPathLocked: true },
+      }],
+    }, { edges: [{ id: 'preset-edge', type: 'main' }] });
+
+    expect(current.edges[0].type).toBe('stablePath');
+    expect(current.edges[0].data.computedPath).toEqual(legacyPath);
   });
 });
 

@@ -14,6 +14,7 @@ import { getApplicationDiagramRuntime } from '../../../ports/applicationDiagramR
 import { shouldUseGlobalDesignerPerformanceMode } from './designerSystemSyncPersistence';
 import { useDesignerInitialDiagramLoad } from './useDesignerInitialDiagramLoad';
 import { resolveCanonicalStandardPresetId } from './standardPresetCanonicalLoad';
+import { EDGE_ROUTING_CACHE_VERSION } from '../../../routing/routingVersion';
 import {
     analyzeDesignerCanvas,
     projectDesignerStandardEdges,
@@ -450,6 +451,7 @@ export function useDesignerSystemSync({
         storageKey: `flowchart-autosave-v2-${id || 'default'}`,
         enabled: autosaveEnabled,
         diagramId: id,
+        routingVersion: EDGE_ROUTING_CACHE_VERSION,
         onSaveSuccess: undefined,
         onSaveError: (error) => logDesignerSystemSyncAutoSaveFailure(error),
         getMetadata: getAutoSaveMetadata,

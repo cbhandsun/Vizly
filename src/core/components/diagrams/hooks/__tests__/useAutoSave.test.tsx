@@ -12,6 +12,7 @@ const AutoSaveProbe: React.FC<{
     edges?: Edge[];
     storageKey?: string;
     diagramId?: string;
+    routingVersion?: string;
     enabled?: boolean;
     onReady?: (api: ReturnType<typeof useAutoSave>) => void;
     getMetadata?: () => unknown;
@@ -20,6 +21,7 @@ const AutoSaveProbe: React.FC<{
     edges = [],
     storageKey = 'flowchart-autosave-v2-test',
     diagramId = 'test',
+    routingVersion,
     enabled = false,
     onReady,
     getMetadata,
@@ -28,6 +30,7 @@ const AutoSaveProbe: React.FC<{
         enabled,
         storageKey,
         diagramId,
+        routingVersion,
         getMetadata,
     });
 
@@ -117,6 +120,26 @@ describe('useAutoSave', () => {
 
         expect(JSON.parse(localStorage.getItem('flowchart-autosave-v2-test') || '{}')).toMatchObject({
             metadata: { multiPage: { activePageId: 'page-2' } },
+        });
+    });
+
+    it('persists and restores the routing version boundary', async () => {
+        let api: ReturnType<typeof useAutoSave> | undefined;
+        render(
+            <AutoSaveProbe
+                nodes={[{ id: 'versioned', position: { x: 0, y: 0 }, data: {} }]}
+                routingVersion="routing-v-current"
+                onReady={(nextApi) => { api = nextApi; }}
+            />
+        );
+
+        await waitFor(() => expect(api).toBeDefined());
+        await act(async () => { await api?.saveNow(); });
+
+        expect(JSON.parse(localStorage.getItem('flowchart-autosave-v2-test') || '{}'))
+            .toMatchObject({ routingVersion: 'routing-v-current' });
+        act(() => {
+            expect(api?.loadSaved()).toMatchObject({ routingVersion: 'routing-v-current' });
         });
     });
 

@@ -5,6 +5,8 @@ export const AUTOSAVE_PREFIX = 'flowchart-autosave-v2-';
 export const AUTOSAVE_GC_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export const MAX_AUTOSAVE_JSON_CHARS = 2 * 1024 * 1024;
 const MAX_DIAGRAM_ID_LENGTH = 180;
+const MAX_ROUTING_VERSION_LENGTH = 256;
+const ROUTING_VERSION_PATTERN = /^[a-zA-Z0-9._:-]+$/;
 // Multi-page snapshots add four structural levels before reaching node data.
 // Keep a hard bound while allowing the same nested node payloads as the primary canvas.
 const MAX_AUX_DEPTH = 12;
@@ -15,6 +17,7 @@ const BLOCKED_AUX_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
 
 export interface AutoSavePayload {
     diagramId?: string;
+    routingVersion?: string;
     nodes: Node[];
     edges: Edge[];
     timestamp?: number;
@@ -40,6 +43,16 @@ const coerceDiagramId = (value: unknown): string | undefined => {
     if (typeof value !== 'string') return undefined;
     const trimmed = value.trim();
     return trimmed.length > 0 && trimmed.length <= MAX_DIAGRAM_ID_LENGTH ? trimmed : undefined;
+};
+
+const coerceRoutingVersion = (value: unknown): string | undefined => {
+    if (typeof value !== 'string') return undefined;
+    const trimmed = value.trim();
+    return trimmed.length > 0
+        && trimmed.length <= MAX_ROUTING_VERSION_LENGTH
+        && ROUTING_VERSION_PATTERN.test(trimmed)
+        ? trimmed
+        : undefined;
 };
 
 const sanitizeAuxValue = (value: unknown, depth = 0): unknown => {
@@ -81,9 +94,11 @@ export const coerceAutoSavePayload = (value: unknown): AutoSavePayload | null =>
     const timestamp = coerceTimestamp(value.timestamp);
     const lastAccessedAt = coerceTimestamp(value.lastAccessedAt);
     const diagramId = coerceDiagramId(value.diagramId);
+    const routingVersion = coerceRoutingVersion(value.routingVersion);
 
     return {
         ...(diagramId ? { diagramId } : {}),
+        ...(routingVersion ? { routingVersion } : {}),
         nodes: clipboardData.nodes,
         edges: clipboardData.edges,
         ...(timestamp !== undefined ? { timestamp } : {}),
@@ -97,6 +112,7 @@ export const coerceAutoSavePayload = (value: unknown): AutoSavePayload | null =>
 
 export const createAutoSavePayload = (params: {
     diagramId?: string;
+    routingVersion?: string;
     nodes: unknown[];
     edges: unknown[];
     timestamp?: number;
@@ -107,6 +123,7 @@ export const createAutoSavePayload = (params: {
     const now = params.timestamp ?? Date.now();
     return coerceAutoSavePayload({
         diagramId: params.diagramId,
+        routingVersion: params.routingVersion,
         nodes: params.nodes,
         edges: params.edges,
         timestamp: now,

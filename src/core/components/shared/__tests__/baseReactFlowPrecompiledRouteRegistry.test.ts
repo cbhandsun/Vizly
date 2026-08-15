@@ -10,6 +10,7 @@ import { computeBaseReactFlowDisplayGeometryDigest } from '../baseReactFlowDispl
 import {
   BASE_REACT_FLOW_PRECOMPILED_ROUTE_SCHEMA,
   parseBaseReactFlowPrecompiledRouteArtifact,
+  parseBaseReactFlowPrecompiledRoutePatches,
   sanitizeBaseReactFlowPrecompiledRoutePatches,
 } from '../baseReactFlowPrecompiledRouteArtifact';
 import { loadBaseReactFlowPrecompiledRouteAsset } from '../baseReactFlowPrecompiledRouteAsset';
@@ -21,8 +22,9 @@ import {
   prefetchBaseReactFlowPrecompiledRouteFromRegistry,
 } from '../baseReactFlowPrecompiledRoutePrefetch';
 import { createBaseReactFlowDisplayEdgePatches } from '../baseReactFlowDisplayRoutingTransaction';
+import { auditBaseReactFlowDisplayCommercialQuality } from '../baseReactFlowDisplayCommercialQuality';
 import { GENERATED_BASE_REACT_FLOW_PRECOMPILED_ROUTE_LOADERS } from '../generated/baseReactFlowPrecompiledRouteLoaders';
-import generatedDemandAllocationArtifact from '../generated/precompiledRoutes/route-1155107368.json';
+import generatedDemandAllocationArtifact from '../generated/precompiledRoutes/route-2686061601.json';
 
 const SOURCE_HASH = `source-v1:${'a'.repeat(64)}`;
 const TEST_PRESET_ID = 'test-preset';
@@ -509,13 +511,38 @@ describe('baseReactFlowPrecompiledRouteRegistry', () => {
     })).toBeNull();
   });
 
-  it('keeps the generated WMS artifact parseable through its data descriptor', () => {
-    const [generatedSignature, descriptor] = Object.entries(
+  it('keeps the generated demand-allocation artifact parseable through its data descriptor', () => {
+    const generatedEntry = Object.entries(
       GENERATED_BASE_REACT_FLOW_PRECOMPILED_ROUTE_LOADERS,
-    )[0] ?? [];
+    ).find(([, candidate]) => (
+      candidate.presetId === 'wms-demand-allocation-strategy-v2'
+    ));
+    expect(generatedEntry).toBeTruthy();
+    if (!generatedEntry) throw new Error('Missing generated demand-allocation route descriptor');
+    const [generatedSignature, descriptor] = generatedEntry;
     expect(generatedSignature).toMatch(/^\d{1,10}$/);
     expect(descriptor).toBeTruthy();
     expect(descriptor.load).toEqual(expect.any(Function));
+    const parsedPatches = parseBaseReactFlowPrecompiledRoutePatches(
+      generatedDemandAllocationArtifact.patches,
+    );
+    expect(parsedPatches).not.toBeNull();
+    expect(auditBaseReactFlowDisplayCommercialQuality(parsedPatches ?? [])).toEqual([]);
+    expect({
+      schema: generatedDemandAllocationArtifact.schema,
+      routingVersion: generatedDemandAllocationArtifact.routingVersion,
+      sourceHash: generatedDemandAllocationArtifact.sourceHash,
+      inputSignature: generatedDemandAllocationArtifact.inputSignature,
+      inputGeometryDigest: generatedDemandAllocationArtifact.inputGeometryDigest,
+      hardClean: generatedDemandAllocationArtifact.hardClean,
+    }).toEqual({
+      schema: BASE_REACT_FLOW_PRECOMPILED_ROUTE_SCHEMA,
+      routingVersion: BASE_DISPLAY_ROUTING_VERSION,
+      sourceHash: descriptor.sourceHash,
+      inputSignature: generatedSignature,
+      inputGeometryDigest: descriptor.geometryDigest,
+      hardClean: true,
+    });
     expect(parseBaseReactFlowPrecompiledRouteArtifact(generatedDemandAllocationArtifact, {
       inputSignature: generatedSignature,
       inputGeometryDigest: descriptor.geometryDigest,
@@ -526,6 +553,43 @@ describe('baseReactFlowPrecompiledRouteRegistry', () => {
 
 describe('precompiled route asset boundary', () => {
   const sameOriginUrl = new URL('/assets/route-1.json', globalThis.location.href);
+
+  it('deduplicates concurrent and repeated default asset loads', async () => {
+    const cachedUrl = new URL('/assets/route-cache-success.json', globalThis.location.href);
+    const fetchArtifact = vi.fn(async () => new Response('{"hardClean":true}', {
+      headers: { 'content-length': '18', 'content-type': 'application/json' },
+    }));
+    vi.stubGlobal('fetch', fetchArtifact);
+    try {
+      const [first, second] = await Promise.all([
+        loadBaseReactFlowPrecompiledRouteAsset(cachedUrl),
+        loadBaseReactFlowPrecompiledRouteAsset(cachedUrl),
+      ]);
+      await expect(loadBaseReactFlowPrecompiledRouteAsset(cachedUrl))
+        .resolves.toEqual({ hardClean: true });
+      expect(first).toEqual({ hardClean: true });
+      expect(second).toEqual({ hardClean: true });
+      expect(fetchArtifact).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('evicts a failed default asset load so a retry can recover', async () => {
+    const retryUrl = new URL('/assets/route-cache-retry.json', globalThis.location.href);
+    const fetchArtifact = vi.fn()
+      .mockResolvedValueOnce(new Response('', { status: 503 }))
+      .mockResolvedValueOnce(new Response('{"hardClean":true}'));
+    vi.stubGlobal('fetch', fetchArtifact);
+    try {
+      await expect(loadBaseReactFlowPrecompiledRouteAsset(retryUrl)).rejects.toThrow('HTTP 503');
+      await expect(loadBaseReactFlowPrecompiledRouteAsset(retryUrl))
+        .resolves.toEqual({ hardClean: true });
+      expect(fetchArtifact).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 
   it('loads a bounded same-origin JSON document with constrained fetch options', async () => {
     const fetchArtifact = vi.fn(async () => new Response('{"hardClean":true}', {

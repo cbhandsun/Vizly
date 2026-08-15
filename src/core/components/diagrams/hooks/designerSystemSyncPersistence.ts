@@ -6,6 +6,7 @@ import { expandHandle } from '../../../routing/utils/handleUtils';
 import { isSafeCssColor } from '../../../themes/themeImportSecurity';
 import { parseAutoSavePayload } from '../../../utils/autoSaveStorage';
 import { appendBaseReactFlowEdgeSemanticClassName } from '../../shared/baseReactFlowEdgePresentation';
+import { invalidateStalePresetEdgeAutomaticRoute } from './autosaveRoutingMigration';
 import { logDesignerSystemSyncFreshSeedClearFailure } from './designerSystemSyncLogging';
 
 type DiagramRecord = Record<string, unknown> & { nodes?: unknown; edges?: unknown };
@@ -192,7 +193,16 @@ const mergePresetEdgePresentation = (
   const markerEnd: EdgeMarkerType | undefined = markerSeed && typeof savedMarker === 'object'
     ? { ...markerSeed, ...savedMarker }
     : savedMarker ?? presetMarker ?? markerSeed;
-  const className = appendBaseReactFlowEdgeSemanticClassName(edge.className, presetEdge?.type);
+  const savedClassNameWithoutSemanticRole = presetEdge && typeof edge.className === 'string'
+    ? edge.className
+      .split(/\s+/)
+      .filter(className => !className.startsWith('vizly-edge-role-'))
+      .join(' ')
+    : edge.className;
+  const className = appendBaseReactFlowEdgeSemanticClassName(
+    savedClassNameWithoutSemanticRole,
+    presetEdge?.type,
+  );
 
   if (style === edge.style && markerEnd === edge.markerEnd && className === edge.className) return edge;
   return {
@@ -232,6 +242,7 @@ export const clearDesignerFreshSeedFlag = (
 export const mergePresetExplicitEdgeHandles = <T>(saved: T, preset: unknown): T => {
   if (!isRecord(saved) || !Array.isArray((saved as DiagramRecord).edges)) return saved;
   const savedRecord = saved as DiagramRecord;
+  const savedRoutingVersion = savedRecord.routingVersion;
   const presetById = new Map<string, DiagramEdgeRecord>();
   if (isRecord(preset) && Array.isArray((preset as DiagramRecord).edges)) {
     for (const rawEdge of (preset as DiagramRecord).edges as unknown[]) {
@@ -252,7 +263,14 @@ export const mergePresetExplicitEdgeHandles = <T>(saved: T, preset: unknown): T 
     if (!isRecord(rawEdge)) return rawEdge;
     const savedEdge = rawEdge as unknown as Edge<DiagramEdgeData>;
     const presetEdge = presetById.get(String(savedEdge.id));
-    const edge = mergePresetEdgePresentation(savedEdge, presetEdge);
+    const edgeWithPresentation = mergePresetEdgePresentation(savedEdge, presetEdge);
+    const edge = presetEdge
+      ? invalidateStalePresetEdgeAutomaticRoute(
+        edgeWithPresentation,
+        presetEdge,
+        savedRoutingVersion,
+      )
+      : edgeWithPresentation;
     const hasPresetExplicitHandles = Boolean(presetEdge?.sourceHandle || presetEdge?.targetHandle);
     const existingSource = edge.sourceHandle ? expandHandle(String(edge.sourceHandle)) : edge.sourceHandle;
     const existingTarget = edge.targetHandle ? expandHandle(String(edge.targetHandle)) : edge.targetHandle;

@@ -13,6 +13,7 @@ describe('autoSaveStorage', () => {
     it('accepts valid autosave payloads and preserves safe metadata fields', () => {
         const payload = createAutoSavePayload({
             diagramId: ' diagram-a ',
+            routingVersion: ' routing-v2:stable ',
             nodes: [{ id: 'n1', position: { x: 1, y: 2 }, data: { label: 'A' } } as any],
             edges: [{ id: 'e1', source: 'n1', target: 'n1' } as any],
             timestamp: 1000,
@@ -23,6 +24,7 @@ describe('autoSaveStorage', () => {
 
         expect(payload).toEqual({
             diagramId: 'diagram-a',
+            routingVersion: 'routing-v2:stable',
             nodes: [expect.objectContaining({ id: 'n1', position: { x: 1, y: 2 } })],
             edges: [expect.objectContaining({ id: 'e1', source: 'n1', target: 'n1' })],
             timestamp: 1000,
@@ -62,6 +64,16 @@ describe('autoSaveStorage', () => {
             edges: [],
         })).toBeNull();
         expect(parseAutoSavePayload('x'.repeat(MAX_AUTOSAVE_JSON_CHARS + 1))).toBeNull();
+        expect(coerceAutoSavePayload({
+            nodes: [],
+            edges: [],
+            routingVersion: 'routing version with spaces',
+        })?.routingVersion).toBeUndefined();
+        expect(coerceAutoSavePayload({
+            nodes: [],
+            edges: [],
+            routingVersion: 'x'.repeat(257),
+        })?.routingVersion).toBeUndefined();
     });
 
     it('sanitizes autosave node data, layout, and metadata objects', () => {
