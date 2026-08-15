@@ -1,9 +1,9 @@
 {
   "schema": "vizly-precompiled-display-route-v1",
-  "routingVersion": "2026-08-14-autosave-route-migration-v177",
+  "routingVersion": "8",
   "sourceHash": "source-v1:da286fbefa1a0d0a3ba3bf5a6589d2edba849af0f477ddb910ecad4d91649986",
-  "inputSignature": "3386287051",
-  "inputGeometryDigest": "geometry-v1:8caa031c98632b206c404cde1c032aa4",
+  "inputSignature": "2227874906",
+  "inputGeometryDigest": "geometry-v1:c7415b4ede1d799a85fb898c964a720e",
   "outputRouteSignature": "route-v2:14:62:90aa1efad1fd39d8",
   "hardClean": true,
   "patches": [
@@ -12,6 +12,7 @@
       "source": "l-oms",
       "target": "customs",
       "type": "stablePath",
+      "sourceHandle": "bottom",
       "targetHandle": "left",
       "data": {
         "computedPath": [
@@ -53,6 +54,8 @@
       "source": "l-oms",
       "target": "tms",
       "type": "stablePath",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
       "data": {
         "computedPath": [
           {
@@ -72,6 +75,8 @@
       "source": "l-oms",
       "target": "visibility",
       "type": "stablePath",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
       "data": {
         "computedPath": [
           {
@@ -108,6 +113,8 @@
       "source": "l-oms",
       "target": "wms",
       "type": "stablePath",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
       "data": {
         "computedPath": [
           {
@@ -135,6 +142,8 @@
       "source": "tms",
       "target": "bms",
       "type": "stablePath",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
       "data": {
         "computedPath": [
           {
@@ -163,6 +172,8 @@
       "source": "tms",
       "target": "carrier-portal",
       "type": "stablePath",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
       "data": {
         "computedPath": [
           {
@@ -192,6 +203,7 @@
       "target": "downstream",
       "type": "stablePath",
       "sourceHandle": "right",
+      "targetHandle": "bottom",
       "data": {
         "computedPath": [
           {
@@ -224,6 +236,8 @@
       "source": "tms",
       "target": "visibility",
       "type": "stablePath",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
       "data": {
         "computedPath": [
           {
@@ -252,6 +266,8 @@
       "source": "tms",
       "target": "yms",
       "type": "stablePath",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
       "data": {
         "computedPath": [
           {
@@ -280,6 +296,8 @@
       "source": "upstream",
       "target": "l-oms",
       "type": "stablePath",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
       "data": {
         "computedPath": [
           {
@@ -306,6 +324,8 @@
       "source": "visibility",
       "target": "downstream",
       "type": "stablePath",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
       "data": {
         "computedPath": [
           {
@@ -333,6 +353,8 @@
       "source": "wms",
       "target": "bms",
       "type": "stablePath",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
       "data": {
         "computedPath": [
           {
@@ -361,6 +383,8 @@
       "source": "wms",
       "target": "visibility",
       "type": "stablePath",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
       "data": {
         "computedPath": [
           {
@@ -397,6 +421,8 @@
       "source": "wms",
       "target": "wcs",
       "type": "stablePath",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
       "data": {
         "computedPath": [
           {

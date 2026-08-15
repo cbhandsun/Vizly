@@ -64,12 +64,13 @@ export const buildFlowchartLayoutMenuModel = ({
         forceGroup: translate('designer.flowchart.layout.forceGroup', '力导向'),
         force: translate('designer.flowchart.layout.force', '⊙ 力导向'),
         domainGroup: translate('designer.flowchart.layout.domainGroup', '域感知布局'),
-        domainDagreLr: translate('designer.flowchart.layout.domainDagreLR', '◈ DomainDagre (左→右)'),
         domainDagreTb: translate('designer.flowchart.layout.domainDagreTB', '◈ DomainDagre (上→下) (默认)'),
         domainDagreSubHorizontalTb: translate(
             'designer.flowchart.layout.domainDagreSubHorizontalTB',
             '◈ DomainDagre (子域水平)',
         ),
+        domainElkTb: translate('designer.flowchart.layout.elkTB', 'ELK 正交分层 (上→下)'),
+        domainElkLr: translate('designer.flowchart.layout.elkLR', 'ELK 正交分层 (左→右)'),
         domainVertical: translate('designer.flowchart.layout.domainVertical', '▥ DomainVertical (上→下)'),
         domainHorizontal: translate('designer.flowchart.layout.domainHorizontal', '▦ DomainHorizontal (左→右)'),
         nodeGroup: translate('designer.flowchart.layout.nodeLayoutGroup', '域内节点排布'),
@@ -114,9 +115,10 @@ export const buildFlowchartLayoutMenuModel = ({
         'tree-tb': labels.treeTb,
         'tree-lr': labels.treeLr,
         force: labels.force,
-        'domain-dagre-lr': labels.domainDagreLr,
         'domain-dagre-tb': labels.domainDagreTb,
         'domain-dagre-sub-horizontal-tb': labels.domainDagreSubHorizontalTb,
+        'domain-elk-tb': labels.domainElkTb,
+        'domain-elk-lr': labels.domainElkLr,
         'domain-vertical': labels.domainVertical,
         'domain-horizontal': labels.domainHorizontal,
         'node-flow': labels.nodeFlow,
@@ -169,12 +171,6 @@ export const buildFlowchartLayoutMenuModel = ({
                 type: 'group' as const,
                 children: [
                     domainItem(
-                        'domain-dagre-lr',
-                        labels.domainDagreLr,
-                        () => onStrategyLayout('domain-dagre', lastNodeLayout, 'LR'),
-                        <FaRegObjectGroup style={{ transform: 'rotate(-90deg)' }} />,
-                    ),
-                    domainItem(
                         'domain-dagre-tb',
                         labels.domainDagreTb,
                         () => onStrategyLayout('domain-dagre', lastNodeLayout, 'TB'),
@@ -185,6 +181,18 @@ export const buildFlowchartLayoutMenuModel = ({
                         labels.domainDagreSubHorizontalTb,
                         () => onStrategyLayout('domain-dagre-sub-horizontal', 'dagre', 'TB'),
                         <FaRegObjectGroup />,
+                    ),
+                    domainItem(
+                        'domain-elk-tb',
+                        labels.domainElkTb,
+                        () => onStrategyLayout('domain-elk', 'elk-layered', 'TB'),
+                        <FaSitemap />,
+                    ),
+                    domainItem(
+                        'domain-elk-lr',
+                        labels.domainElkLr,
+                        () => onStrategyLayout('domain-elk', 'elk-layered', 'LR'),
+                        <FaSitemap style={{ transform: 'rotate(-90deg)' }} />,
                     ),
                     { type: 'divider' as const },
                     domainItem(

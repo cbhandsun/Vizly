@@ -19,7 +19,6 @@ import {
 import { findDisplayStrictCrossingHits } from '../baseReactFlowDisplayGeometry';
 import {
   edgeRoutingQualityIntentToken,
-  parseEdgeRoutingQualityIntent,
 } from '../../../strategies/shared/edgeRoutingQualityIntent';
 import {
   canSkipLargeDetachedOverlapRepair,
@@ -36,14 +35,9 @@ const edge = (path: Array<{ x: number; y: number }>): Edge => ({
 });
 
 describe('baseReactFlowDisplayEvaluation', () => {
-  it('parses only explicit routing-quality intent flags', () => {
+  it('tokenizes only explicit routing-quality intent flags', () => {
     const intentEdge = edge([{ x: 0, y: 0 }, { x: 100, y: 0 }]);
-    expect(parseEdgeRoutingQualityIntent(intentEdge)).toEqual({
-      sharedTrunkSynthesized: false,
-      sharedTrunkAware: false,
-      isTreeBus: false,
-      hasTreeRouting: false,
-    });
+    expect(edgeRoutingQualityIntentToken(intentEdge)).toBe('0000');
     expect(edgeRoutingQualityIntentToken({
       ...intentEdge,
       data: {

@@ -2,6 +2,7 @@ import type { Edge, Node } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
 
 import {
+  buildCommercialBranchedTerminalShortcutCandidates,
   buildCommercialParallelTerminalCorridorShortcutPaths,
   buildCommercialSameSideRectangularShortcutPaths,
   buildCommercialSourceTerminalShortcutCandidates,
@@ -282,4 +283,23 @@ describe('commercial terminal shortcuts', () => {
       { x: 204, y: 3789 },
     ]);
   });
+
+  it('branches a facing-port shortcut after the source safety stub', () => {
+    const facingEdge: Edge = {
+      id: 'facing', source: 'source', target: 'target',
+      sourceHandle: 'bottom', targetHandle: 'top',
+      data: { computedPath: [
+        { x: 1228, y: 1796 }, { x: 1228, y: 2828 },
+        { x: 216, y: 2828 }, { x: 216, y: 2884 },
+      ] },
+    };
+
+    expect(getDisplayComputedPath(buildCommercialBranchedTerminalShortcutCandidates(facingEdge)[0]))
+      .toEqual([
+        { x: 1228, y: 1796 }, { x: 1228, y: 1852 },
+        { x: 1172, y: 1852 }, { x: 1172, y: 2772 },
+        { x: 216, y: 2772 }, { x: 216, y: 2884 },
+      ]);
+  });
+
 });

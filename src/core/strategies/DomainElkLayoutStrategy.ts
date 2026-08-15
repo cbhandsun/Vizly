@@ -10,33 +10,25 @@ import {
   finalizeDomainWidthsByProjection,
   finalizeDomainHeightsByProjection,
   resolveDomainContainerOverlaps,
-  scatterNodesAtSamePoint,
-  resolveAllNodeOverlapsGlobal,
 } from '../utils/layoutUtils'
-import { decideEdgeRouting, separateParallelEdges, globalOptimizeEdgeRouting, distributePortConnections, bundleEdges, layerBasedEdgeRouting, optimizeEdgeLabelPositions, beautifyOrthogonalEdges, optimizeTreeBusRouting } from '../utils/HandlePicker'
-import { expandHandle } from '../routing/utils/handleUtils'
 import { logDomainElkContainerUpdateFailure } from './layoutLogging';
 import { resolveDomainNodeLayoutAlgorithm } from './domainNodeLayoutEngine';
+import {
+  DOMAIN_ELK_LAYERED_QUALITY_OPTIONS,
+  resolveDomainElkEdgeRouting,
+  resolveDomainElkSpacing,
+} from './domainElkLayoutProfile';
+import { collectDomainElkLayoutRoutes } from './domainElkLayoutRoutes';
 
 type LayoutNode = ReactFlowNode<Record<string, unknown>> & {
   positionAbsolute?: XYPosition;
 };
-const asRecord = (value: unknown): Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : {};
 const finiteNumber = (value: unknown, fallback: number): number =>
   typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 const nodeSize = (node: LayoutNode, fallbackWidth: number, fallbackHeight: number) => ({
   width: finiteNumber(node.measured?.width ?? node.style?.width ?? node.width, fallbackWidth),
   height: finiteNumber(node.measured?.height ?? node.style?.height ?? node.height, fallbackHeight),
 });
-const configuredDirection = (): unknown => {
-  const config = asRecord(diagramConfigManager.getConfig());
-  return asRecord(asRecord(config.diagram).layout).direction
-    ?? asRecord(config.layout).direction;
-};
-
 /**
  * 域级 ELK 整体布局策略
  * 函数级注释：
@@ -60,129 +52,72 @@ export class DomainElkLayoutStrategy implements ILayoutStrategy {
    * - 5) 域容器间重叠消解，确保“统一域宽/严格包含/不重叠”。
    */
   async calculateLayout(nodes: LayoutNode[], edges: Edge[], options: LayoutOptions): Promise<{ nodes: LayoutNode[]; edges: Edge[] }> {
-    const num = finiteNumber
     let updatedNodes: LayoutNode[] = ensureMeasuredForNodes(nodes)
 
     const EXCLUDE_TYPES = new Set(['subGroup', 'titleGroup', 'group', 'domain'])
-    const originalIndex = new Map<string, number>(updatedNodes.map((n, i) => [String(n.id), i] as const))
-    const domainOf = (x: LayoutNode): string => {
-      return String(x.data.domain ?? '').trim()
-    }
-    const subOf = (x: LayoutNode): string => {
-      const s1 = String(
-        x.data.subDomain
-          ?? x.data.subdomain
-          ?? asRecord(x.data.metadata).subDomain
-          ?? ''
-      )
-      return s1.trim()
-    }
-    const domainOrderArr = options.domainOrder
-    const domainOrderIndex = new Map<string, number>((Array.isArray(domainOrderArr) && domainOrderArr.length
-      ? domainOrderArr
-      : updatedNodes.map(n => domainOf(n)).filter(Boolean)).map((d, i) => [String(d).trim(), i] as const))
-    const subOrderOpt = options.subDomainOrder
-    const explicitSubIdx = (dk: string, sk: string): number => {
-      const dTrim = String(dk || '').trim()
-      const sTrim = String(sk || '').trim()
-      if (Array.isArray(subOrderOpt)) {
-        const idx = subOrderOpt.indexOf(sTrim)
-        return idx >= 0 ? idx : Number.POSITIVE_INFINITY
-      }
-      if (subOrderOpt && typeof subOrderOpt === 'object') {
-        const arr = subOrderOpt[dTrim] || subOrderOpt[String(dTrim)] || []
-        if (Array.isArray(arr)) {
-          const idx = arr.indexOf(sTrim)
-          return idx >= 0 ? idx : Number.POSITIVE_INFINITY
-        }
-      }
-      return Number.POSITIVE_INFINITY
-    }
-    const orderKeyOfNode = (n: ReactFlowNode): number => {
-      const dk = domainOf(n)
-      const sk = subOf(n)
-      const exp = explicitSubIdx(dk, sk)
-      if (isFinite(exp)) return exp
-      // 查找该域该子域在原始数据中的首次出现
-      for (let i = 0; i < updatedNodes.length; i++) {
-        const currentNode = updatedNodes[i]
-        const d = domainOf(currentNode)
-        const s = subOf(currentNode)
-        if (d === dk && s === sk) return i
-      }
-      const self = originalIndex.get(String(n.id))
-      return typeof self === 'number' ? self : Number.POSITIVE_INFINITY
-    }
-    let layoutCandidates: LayoutNode[] = updatedNodes.filter(n => !EXCLUDE_TYPES.has(String(n.type || '')))
-    layoutCandidates = layoutCandidates.slice().sort((a, b) => {
-      const da = domainOrderIndex.get(domainOf(a))
-      const db = domainOrderIndex.get(domainOf(b))
-      const pa = typeof da === 'number' ? da : Number.POSITIVE_INFINITY
-      const pb = typeof db === 'number' ? db : Number.POSITIVE_INFINITY
-      if (pa !== pb) return pa - pb
-      return orderKeyOfNode(a) - orderKeyOfNode(b)
-    })
-    const scopedEdges = (edges || []).filter(e => layoutCandidates.some(n => n.id === e.source) && layoutCandidates.some(n => n.id === e.target))
+    const layoutCandidates = updatedNodes.filter(n => !EXCLUDE_TYPES.has(String(n.type || '')))
+    const candidateIds = new Set(layoutCandidates.map(node => node.id))
+    const scopedEdges = edges.filter(edge => candidateIds.has(edge.source) && candidateIds.has(edge.target))
     const left = Math.max(40, finiteNumber(options.padding?.left, 40))
     const top = Math.max(40, finiteNumber(options.padding?.top, 40))
     const layoutConfig = diagramConfigManager.getLayoutConfig()
     const fullConfig = diagramConfigManager.getConfig()
+    const layeredConfig = LayeredConfigManager.getInstance()
+    const dirRaw = String(options.direction ?? '').toUpperCase()
+    const hGapCfg = resolveDomainElkSpacing(
+      options.spacing?.horizontal,
+      layeredConfig.get<number>('diagram.layout.ELK_NODE_SPACING', layoutConfig.NODE_H_GAP),
+    )
+    const vGapCfg = resolveDomainElkSpacing(
+      options.spacing?.vertical,
+      layeredConfig.get<number>('diagram.layout.ELK_LAYER_SPACING', fullConfig.node.gap.vertical),
+    )
     const getW = (n: LayoutNode) => nodeSize(n, Math.max(120, layoutConfig.NODE_MIN_WIDTH), fullConfig.node.height).width
     const getH = (n: LayoutNode) => nodeSize(n, Math.max(120, layoutConfig.NODE_MIN_WIDTH), fullConfig.node.height).height
 
-    try {
         const { default: ELK } = await import('elkjs')
         const elk = new ELK()
-        const dirRaw = String(options.direction ?? configuredDirection() ?? '').toUpperCase()
-        const elkDirOverride = String(LayeredConfigManager.getInstance().get<string>('diagram.layout.ELK_DIRECTION', '') || '').toUpperCase()
+        const elkDirOverride = String(layeredConfig.get<string>('diagram.layout.ELK_DIRECTION', '') || '').toUpperCase()
         const elkDir = elkDirOverride && ['RIGHT', 'DOWN', 'LEFT', 'UP'].includes(elkDirOverride)
           ? elkDirOverride
           : (dirRaw === 'LR' || dirRaw === 'RIGHT' ? 'RIGHT' : dirRaw === 'RL' || dirRaw === 'LEFT' ? 'LEFT' : dirRaw === 'BT' || dirRaw === 'UP' ? 'UP' : 'DOWN')
-        const hGapCfg = num(LayeredConfigManager.getInstance().get<number>('diagram.layout.ELK_NODE_SPACING', layoutConfig.NODE_H_GAP), 56)
-        const vGapCfg = num(LayeredConfigManager.getInstance().get<number>('diagram.layout.ELK_LAYER_SPACING', fullConfig.node.gap.vertical), 80)
-        const placement = String(LayeredConfigManager.getInstance().get<string>('diagram.layout.ELK_NODE_PLACEMENT', 'NETWORK_SIMPLEX') || 'NETWORK_SIMPLEX').toUpperCase()
-        const mergeEdges = Boolean(LayeredConfigManager.getInstance().get<boolean>('diagram.layout.ELK_MERGE_EDGES', true))
-        const edgeRouting = String(LayeredConfigManager.getInstance().get<string>('diagram.layout.ELK_EDGE_ROUTING', 'POLYLINE') || 'POLYLINE').toUpperCase()
-        const layering = String(LayeredConfigManager.getInstance().get<string>('diagram.layout.ELK_LAYERING', 'NETWORK_SIMPLEX') || 'NETWORK_SIMPLEX').toUpperCase()
-        const fixedAlignment = String(LayeredConfigManager.getInstance().get<string>('diagram.layout.ELK_FIXED_ALIGNMENT', 'NONE') || 'NONE').toUpperCase()
-        const considerModelOrder = true
-        const cycleBreaking = String(LayeredConfigManager.getInstance().get<string>('diagram.layout.ELK_CYCLE_BREAKING', 'GREEDY') || 'GREEDY').toUpperCase()
-        const portBorderOffset = Number(LayeredConfigManager.getInstance().get<number>('diagram.layout.ELK_PORT_BORDER_OFFSET', 4) || 4)
-        const labelSpacing = Number(LayeredConfigManager.getInstance().get<number>('diagram.layout.ELK_LABEL_SPACING', 8) || 8)
-        const edgeNodeSpacing = Number(LayeredConfigManager.getInstance().get<number>('diagram.layout.ELK_EDGE_NODE_SPACING', 8) || 8)
-        const edgeEdgeSpacing = Number(LayeredConfigManager.getInstance().get<number>('diagram.layout.ELK_EDGE_EDGE_SPACING', 4) || 4)
-        const portPortSpacing = Number(LayeredConfigManager.getInstance().get<number>('diagram.layout.ELK_PORT_PORT_SPACING', 4) || 4)
+        const placement = String(layeredConfig.get<string>('diagram.layout.ELK_NODE_PLACEMENT', 'NETWORK_SIMPLEX') || 'NETWORK_SIMPLEX').toUpperCase()
+        const mergeEdges = Boolean(layeredConfig.get<boolean>('diagram.layout.ELK_MERGE_EDGES', true))
+        const edgeRouting = resolveDomainElkEdgeRouting(
+          options.edgeRouting,
+          layeredConfig.get<string>('diagram.layout.ELK_EDGE_ROUTING', 'ORTHOGONAL'),
+        )
+        const layering = String(layeredConfig.get<string>('diagram.layout.ELK_LAYERING', 'NETWORK_SIMPLEX') || 'NETWORK_SIMPLEX').toUpperCase()
+        const fixedAlignment = String(layeredConfig.get<string>('diagram.layout.ELK_FIXED_ALIGNMENT', 'NONE') || 'NONE').toUpperCase()
+        const cycleBreaking = String(layeredConfig.get<string>('diagram.layout.ELK_CYCLE_BREAKING', 'GREEDY') || 'GREEDY').toUpperCase()
+        const portBorderOffset = Number(layeredConfig.get<number>('diagram.layout.ELK_PORT_BORDER_OFFSET', 4) || 4)
+        const labelSpacing = Number(layeredConfig.get<number>('diagram.layout.ELK_LABEL_SPACING', 8) || 8)
+        const edgeNodeSpacing = Number(layeredConfig.get<number>('diagram.layout.ELK_EDGE_NODE_SPACING', 8) || 8)
+        const edgeEdgeSpacing = Number(layeredConfig.get<number>('diagram.layout.ELK_EDGE_EDGE_SPACING', 4) || 4)
+        const portPortSpacing = Number(layeredConfig.get<number>('diagram.layout.ELK_PORT_PORT_SPACING', 4) || 4)
         let elkAlgorithm = resolveDomainNodeLayoutAlgorithm(
           options.nodeLayout,
-          LayeredConfigManager.getInstance().get<string>('diagram.layout.ELK_ALGORITHM', 'layered'),
+          layeredConfig.get<string>('diagram.layout.ELK_ALGORITHM', 'layered'),
         )
 
-        // Map short names to full qualified names
-        const algoMap: Record<string, string> = {
-          'layered': 'org.eclipse.elk.layered',
-          'force': 'org.eclipse.elk.force',
-          'stress': 'org.eclipse.elk.stress',
-          'radial': 'org.eclipse.elk.radial',
-          'mrtree': 'org.eclipse.elk.mrtree',
-          'disco': 'org.eclipse.elk.disco',
-        };
-        if (algoMap[elkAlgorithm]) elkAlgorithm = algoMap[elkAlgorithm];
+        if (!elkAlgorithm.startsWith('org.')) elkAlgorithm = `org.eclipse.elk.${elkAlgorithm}`
         const graph: ElkNode = {
           id: 'elk-domain-layout',
           layoutOptions: {
             'elk.algorithm': elkAlgorithm,
             'elk.direction': elkDir,
-            'elk.spacing.nodeNode': String(Math.max(24, hGapCfg)),
-            'elk.layered.spacing.nodeNodeBetweenLayers': String(Math.max(24, vGapCfg)),
+            ...DOMAIN_ELK_LAYERED_QUALITY_OPTIONS,
+            'elk.spacing.nodeNode': String(hGapCfg),
+            'elk.layered.spacing.nodeNodeBetweenLayers': String(vGapCfg),
+            'elk.layered.spacing.edgeNodeBetweenLayers': String(Math.max(24, edgeNodeSpacing)),
             'elk.spacing.edgeNode': String(edgeNodeSpacing),
             'elk.spacing.edgeEdge': String(edgeEdgeSpacing),
             'elk.spacing.portPort': String(portPortSpacing),
             'elk.layered.mergeEdges': String(mergeEdges),
             'elk.layered.nodePlacement.strategy': placement,
-            'elk.layered.edgeRouting': edgeRouting,
+            'elk.edgeRouting': edgeRouting,
             'elk.layered.layering.strategy': layering,
             'elk.layered.nodePlacement.bk.fixedAlignment': fixedAlignment,
-            'elk.layered.considerModelOrder': String(considerModelOrder),
             'elk.layered.cycleBreaking.strategy': cycleBreaking,
             'elk.port.borderOffset': String(portBorderOffset),
             'elk.spacing.labelLabel': String(labelSpacing),
@@ -191,190 +126,44 @@ export class DomainElkLayoutStrategy implements ILayoutStrategy {
           edges: scopedEdges.map(e => ({ id: e.id || `${e.source}->${e.target}`, sources: [e.source], targets: [e.target] })),
         }
         const res = await elk.layout(graph)
+        const routedPaths = collectDomainElkLayoutRoutes(res.edges, { x: left, y: top })
         const idToPos: Record<string, { x: number; y: number }> = {}
         for (const c of (res.children || [])) idToPos[c.id] = { x: Math.round((c.x || 0) + left), y: Math.round((c.y || 0) + top) }
         for (const n of layoutCandidates) {
           const p = idToPos[n.id] || { x: left, y: top }
           n.position = { x: p.x, y: p.y }
         }
-        const axis = elkDir === 'RIGHT' ? 'y' : 'x'
-        scatterNodesAtSamePoint(layoutCandidates, axis, axis === 'x' ? hGapCfg : vGapCfg, 2)
-        // 双轴补散列，进一步避免角落聚集
-        try { scatterNodesAtSamePoint(layoutCandidates, axis === 'x' ? 'y' : 'x', axis === 'x' ? vGapCfg : hGapCfg, 2) } catch { }
-    } catch { }
     // 纯节点布局模式：不进行域/子域容器约束，但做自由业务节点的重叠消解
     try {
-      // 1. 刷新所有节点尺寸（含 measured）
-      updatedNodes = ensureMeasuredForNodes(updatedNodes);
-
-      // 2. [新增] 强制更新子域容器尺寸（包裹内容）
-      updatedNodes = recomputeSubGroupContainersBasic(updatedNodes);
-
-      // 3. [新增] 强制更新域容器尺寸（包裹内容与子域）
-      updatedNodes = finalizeDomainWidthsByProjection(updatedNodes);
-      updatedNodes = finalizeDomainHeightsByProjection(updatedNodes);
-
-      // 4. [新增] 域容器防重叠（垂直堆叠）
-      const cfgLayout = asRecord(diagramConfigManager.getLayoutConfig())
-      const domainVGap = Math.max(40, num(cfgLayout.DOMAIN_V_GAP, 40));
-      updatedNodes = resolveDomainContainerOverlaps(updatedNodes, domainVGap);
-
-      // 5. 全局节点防重叠（含子域内节点）
-      const hGap = Math.max(12, num(cfgLayout?.NODE_H_GAP, 120))
-      const vGap = Math.max(8, num(cfgLayout?.NODE_V_GAP, 80))
-      updatedNodes = resolveAllNodeOverlapsGlobal(updatedNodes, hGap, vGap)
-
-      // 6. [新增] 再次刷新容器尺寸以适应微调
+      // ELK only changed business-node coordinates, so the dimensions measured
+      // before layout remain valid. Recompute the containing projections once.
       updatedNodes = recomputeSubGroupContainersBasic(updatedNodes);
       updatedNodes = finalizeDomainWidthsByProjection(updatedNodes);
       updatedNodes = finalizeDomainHeightsByProjection(updatedNodes);
+      // Container overlap resolution only translates a domain and its members;
+      // it does not change their dimensions, so a second projection scan was
+      // redundant. ELK itself owns business-node non-overlap and rank spacing.
+      updatedNodes = resolveDomainContainerOverlaps(updatedNodes, 40);
 
     } catch (err) {
       logDomainElkContainerUpdateFailure(err);
     }
-    // 统一智能连线决策：赋予 ELK 布局下连线端口选择的智能
-    const edgeIdMap = new Map<string, LayoutNode>(updatedNodes.map(n => [n.id, n] as const))
-    const cfgEdge = asRecord(diagramConfigManager.getConfig().edge)
-
-    // P1: Edge-Edge Avoidance - 收集已路由边的路径
-    const routedPaths: Array<{ points: Array<{ x: number; y: number }> }> = []
-
-    // 计算布局方向（在循环外一次性计算）
-    const dirRaw = String(options.direction ?? configuredDirection() ?? '').toUpperCase()
-    let layoutDir: 'TB' | 'LR' | 'RL' | 'BT' = 'TB'
-    if (dirRaw === 'LR' || dirRaw === 'RIGHT') layoutDir = 'LR'
-    else if (dirRaw === 'RL' || dirRaw === 'LEFT') layoutDir = 'RL'
-    else if (dirRaw === 'BT' || dirRaw === 'UP') layoutDir = 'BT'
-
-    const finalEdges = edges.map(edge => {
-      const edgeType = String(edge.type || '').toLowerCase()
-      const baseType = edgeType.includes('smart') ? edge.type : 'smart-step'
-      const newData = {
-        ...(edge.data || {}),
-        intraContainerNoObstacle: true,
-        obstacleScope: 'corridor',
-        obstaclePadding: 24,
-        pathOptions: { ...(edge.data?.pathOptions || {}), gridRatio: 1.04, borderRadius: 4 } // [FIX] Hyper-Glass V3: 4px sharp corners
-      }
-
-      const srcNode = edgeIdMap.get(edge.source)
-      const tgtNode = edgeIdMap.get(edge.target)
-
-      let finalType = baseType
-      let finalSourceHandle = edge.sourceHandle
-      let finalTargetHandle = edge.targetHandle
-
-      if (srcNode && tgtNode) {
-        const routingConfig = {
-          mode: 'advanced-smart' as const,
-          globalPath: (cfgEdge.pathType || 'step') as string,
-          autoPathSelection: true,
-          layoutDirection: layoutDir,
-          directionalHandlePolicy: 'force' as const, // ELK 布局层级分明，强制方向效果更好
-          angleToleranceDeg: Number(cfgEdge.angleToleranceDeg ?? 36),
-          routedPaths, // P1: 传入已路由路径
-        }
-        const choice = decideEdgeRouting(srcNode, tgtNode, updatedNodes, routingConfig)
-        finalType = choice.type
-        finalSourceHandle = choice.sourceHandle
-        finalTargetHandle = choice.targetHandle
-
-        // P1: 记录此边的完整计算路径
-        if (choice.computedPath && choice.computedPath.length >= 2) {
-          routedPaths.push({ points: choice.computedPath })
-        } else {
-          // Fallback: 使用起点终点
-          const sPos = srcNode.positionAbsolute ?? srcNode.position
-          const tPos = tgtNode.positionAbsolute ?? tgtNode.position
-          const { width: sW, height: sH } = nodeSize(srcNode, 100, 50)
-          const { width: tW, height: tH } = nodeSize(tgtNode, 100, 50)
-
-          const handleToAnchor = (pos: XYPosition, w: number, h: number, handle: string | null | undefined) => {
-            switch (handle) {
-              case 'l': return { x: pos.x, y: pos.y + h / 2 }
-              case 'r': return { x: pos.x + w, y: pos.y + h / 2 }
-              case 't': return { x: pos.x + w / 2, y: pos.y }
-              case 'b': return { x: pos.x + w / 2, y: pos.y + h }
-              default: return { x: pos.x + w / 2, y: pos.y + h / 2 }
-            }
-          }
-
-          const startPt = handleToAnchor(sPos, sW, sH, finalSourceHandle)
-          const endPt = handleToAnchor(tPos, tW, tH, finalTargetHandle)
-          routedPaths.push({ points: [startPt, endPt] })
-        }
-      }
-
+    // Domain ELK owns ranking and coordinates only. All production callers
+    // render through BaseReactFlow, whose Worker transaction owns the final
+    // route, ports, buses and hard-quality gate.
+    const routedEdges = edges.map(edge => {
+      const path = routedPaths.get(edge.id || `${edge.source}->${edge.target}`)
+      if (!path) return edge
       return {
         ...edge,
-        type: finalType,
-        sourceHandle: finalSourceHandle ? expandHandle(String(finalSourceHandle)) : finalSourceHandle,
-        targetHandle: finalTargetHandle ? expandHandle(String(finalTargetHandle)) : finalTargetHandle,
-        data: newData
+        data: {
+          ...edge.data,
+          elkPath: path,
+          layoutRoutingCandidate: true,
+        },
       }
     })
-
-    // P2: 全局路由优化（可选）
-    const enableGlobalOptimization = asRecord(diagramConfigManager.getConfig().edge).globalOptimization !== false
-    let optimizedEdges = finalEdges
-    if (enableGlobalOptimization && finalEdges.length > 1) {
-      optimizedEdges = globalOptimizeEdgeRouting(
-        finalEdges,
-        updatedNodes,
-        { mode: 'advanced-smart', layoutDirection: layoutDir, directionalHandlePolicy: 'force', topK: 4 },
-        3
-      )
-    }
-
-    // 并行边分离：避免同节点对的多边堆叠
-    const separatedEdges = separateParallelEdges(optimizedEdges, 12)
-
-    // P3: 动态多端口分布
-    const distributedEdges = distributePortConnections(separatedEdges, updatedNodes, 16)
-
-    // P4: 高级边捆绑（默认启用）
-    const bundlingEnabled = asRecord(diagramConfigManager.getConfig().edge).bundling !== false
-    const bundledEdges = bundleEdges(distributedEdges, updatedNodes, {
-      enabled: bundlingEnabled,
-      layoutDirection: layoutDir,
-      regionSize: 200,
-      minBundleSize: 2,
-      bundleSpacing: 8
-    })
-
-    // P5: 分层边路由 (长边控制点)
-    const layeredEdges = layerBasedEdgeRouting(bundledEdges, updatedNodes, {
-      enabled: true,
-      layerThreshold: 400,
-      layoutDirection: layoutDir
-    })
-
-    // P7: 正交边美化
-    const beautifiedEdges = beautifyOrthogonalEdges(layeredEdges, updatedNodes, {
-      enabled: true,
-      minSegmentLength: 20
-    })
-
-    // P8: 树状总线路由
-    const treeEdges = optimizeTreeBusRouting(beautifiedEdges, updatedNodes, {
-      enabled: true,
-      minBusSize: 2,
-      layoutDirection: layoutDir
-    })
-
-    // P6: 边标签智能避让 (最后执行)
-    const labeledEdges = optimizeEdgeLabelPositions(treeEdges, updatedNodes, {
-      enabled: true,
-      labelPadding: 8
-    })
-
-    const finalEdgesExpanded = labeledEdges.map(edge => ({
-      ...edge,
-      sourceHandle: edge.sourceHandle ? expandHandle(String(edge.sourceHandle)) : edge.sourceHandle,
-      targetHandle: edge.targetHandle ? expandHandle(String(edge.targetHandle)) : edge.targetHandle,
-    }))
-
-    return { nodes: updatedNodes, edges: finalEdgesExpanded }
+    return { nodes: updatedNodes, edges: routedEdges }
   }
 }
 

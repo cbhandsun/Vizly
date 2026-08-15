@@ -97,4 +97,9 @@
 .react-flow__edge.vizly-debug-ok path.react-flow__edge-path,
 .react-flow__edge.vizly-debug-ok path {
   animation: debug-ok-flash 1.5s ease-out forwards;
-}
+}
+.vizly-layout-committing .react-flow__edges,
+.vizly-layout-committing .react-flow__edgelabel-renderer {
+  opacity: 0;
+  pointer-events: none;
+}

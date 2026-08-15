@@ -43,6 +43,7 @@ export function useAutoRouting({
         } catch { return false; }
     });
     const [isLayoutStable, setIsLayoutStable] = useState(true);
+    const [isLayoutBusy, setIsLayoutBusy] = useState(false);
     const routingPreferenceVersionRef = useRef(0);
     const layoutInFlightRef = useRef(false);
 
@@ -61,6 +62,7 @@ export function useAutoRouting({
         reactFlowInstance,
         diagramId,
         loadLayoutPresetMap,
+        setLayoutStable: setIsLayoutStable,
     });
 
     // 布局时自动启用 autoRouting + 管理稳定性标记
@@ -68,16 +70,17 @@ export function useAutoRouting({
         if (layoutInFlightRef.current) return;
         layoutInFlightRef.current = true;
         const routingPreferenceVersion = routingPreferenceVersionRef.current;
-        setIsLayoutStable(false);
+        setIsLayoutBusy(true);
         try {
-            await _handleStrategyLayout(...args);
+            const committed = await _handleStrategyLayout(...args);
             // 用户可能在异步布局执行期间手动关闭自动布线。布局完成只能在
             // 用户偏好未变化时应用默认开启值，避免迟到响应覆盖最新操作。
-            if (routingPreferenceVersionRef.current === routingPreferenceVersion) {
+            if (committed && routingPreferenceVersionRef.current === routingPreferenceVersion) {
                 setAutoRoutingEnabledState(true);
             }
         } finally {
             layoutInFlightRef.current = false;
+            setIsLayoutBusy(false);
             setIsLayoutStable(true);
         }
     }, [_handleStrategyLayout]);
@@ -117,6 +120,7 @@ export function useAutoRouting({
         autoRoutingEnabled,
         setAutoRoutingEnabled,
         isLayoutStable,
+        isLayoutBusy,
         handleStrategyLayout,
         lastDomainStrategy,
         lastDomainDirection,

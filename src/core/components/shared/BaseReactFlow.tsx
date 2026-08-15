@@ -78,6 +78,7 @@ import { applySharedTrunkPaintPlan } from '../../rendering/sharedTrunkPaint';
 import { buildDisplayRoutingObstacles } from './baseReactFlowDisplayGeometry';
 import { EdgeLabelObstacleContext } from '../custom-edges/edgeLabelObstacleContext';
 import { applyBaseReactFlowEdgePresentation } from './baseReactFlowEdgePresentation';
+import { useLayoutStability } from '../../context/LayoutStabilityContext';
 
 // 模块级常量：避免在组件参数默认值中创建新引用
 const DEFAULT_VIEWPORT = { x: 0, y: 0, zoom: 1 };
@@ -173,6 +174,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
   const updateNodeInternals = useUpdateNodeInternals();
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+  const isLayoutStable = useLayoutStability();
   const [isNodeDragging, setIsNodeDragging] = useState(false);
   const [isNodeDragFallbackPending, setIsNodeDragFallbackPending] = useState(false);
   const [nodeDragFallbackIds, setNodeDragFallbackIds] = useState<readonly string[]>([]);
@@ -408,6 +410,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
     edges,
     routingNodes,
     routingGeometryReady,
+    routingPaused: !isLayoutStable,
     isContainerReady,
     enableSmartEdges,
     smartEdgePadding,
@@ -569,7 +572,11 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
   const effectiveReconnectRadius = resolveBaseReactFlowReconnectRadius(reconnectRadius);
 
   return (
-    <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden', ...style }} className={className}>
+    <div
+      ref={containerRef}
+      style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden', ...style }}
+      className={`${className} ${isLayoutStable ? '' : 'vizly-layout-committing'}`.trim()}
+    >
       <div style={counterZoom !== 1 ? {
         zoom: counterZoom,
         width: '100%',

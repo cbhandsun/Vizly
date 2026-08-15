@@ -3,6 +3,7 @@ import type { Edge } from '@xyflow/react';
 
 import {
   computeBaseReactFlowDisplayEdgesInWorker,
+  repairBaseReactFlowDisplayEdgesInWorker,
   resolveBaseReactFlowDisplayWorkerTimeoutMs,
 } from '../baseReactFlowDisplayWorkerClient';
 import {
@@ -72,6 +73,11 @@ const installWorkerHarness = () => {
     emitEvent: (type: 'error' | 'messageerror') => {
       for (const listener of activeListeners?.get(type) ?? []) listener(new Event(type));
     },
+    emitMessage: (data: unknown) => {
+      for (const listener of activeListeners?.get('message') ?? []) {
+        listener({ data } as MessageEvent);
+      }
+    },
   };
 };
 
@@ -82,6 +88,33 @@ afterEach(() => {
 });
 
 describe('baseReactFlowDisplayWorker lifecycle', () => {
+  it('returns a non-clean repair candidate when the layout transaction owns the hard gate', async () => {
+    const edges = [{ id: 'edge', source: 'source', target: 'target' }];
+    const harness = installWorkerHarness();
+    const repair = repairBaseReactFlowDisplayEdgesInWorker({
+      workerRef: { current: null },
+      requestId: 'repair-caller-gated',
+      edges,
+      nodes: [
+        { id: 'source', position: { x: 0, y: 0 }, data: {} },
+        { id: 'target', position: { x: 100, y: 0 }, data: {} },
+      ],
+      requireHardClean: false,
+    });
+    harness.emitMessage({
+      requestId: 'repair-caller-gated',
+      edges,
+      hardClean: false,
+      routeResolution: 'repair',
+    });
+
+    await expect(repair).resolves.toMatchObject({
+      edges,
+      hardClean: false,
+      routeResolution: 'repair',
+    });
+  });
+
   it('replays only a copy-isolated hard-clean runtime committed snapshot', () => {
     const sourceEdges: Edge[] = [{
       id: 'edge',
@@ -749,11 +782,11 @@ describe('baseReactFlowDisplayWorker lifecycle', () => {
     })).toBe(false);
   });
 
-  it('commits bounded interactive results without starting a second repair pass', () => {
+  it('rejects every non-hard-clean result regardless of interactive mode', () => {
     expect(shouldRepairBaseReactFlowDisplayResult({
       qualityMode: 'interactive',
       hardClean: false,
-    })).toBe(false);
+    })).toBe(true);
     expect(shouldRepairBaseReactFlowDisplayResult({
       qualityMode: 'full',
       hardClean: false,
@@ -763,7 +796,7 @@ describe('baseReactFlowDisplayWorker lifecycle', () => {
       hardClean: false,
       routeResolution: 'full-route',
       routesMatch: true,
-    })).toBe(true);
+    })).toBe(false);
     expect(canCommitBaseReactFlowDisplayResult({
       qualityMode: 'interactive',
       hardClean: false,

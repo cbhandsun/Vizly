@@ -95,7 +95,11 @@ export const createPrecompiledDisplayRoutePatches = (sourceEdges, routedEdges) =
       const token = copyToken(routed[key]);
       if (typeof token === 'symbol') return null;
       if (key === 'type' && token !== source.type && token !== 'stablePath') return null;
-      if (!Object.is(token, source[key])) patch[key] = token;
+      // Worker requests are projected before routing, while runtime replay is
+      // merged over the unprojected business edge. Persist the complete
+      // rendered terminal/type contract so a candidate does not depend on
+      // projection-only defaults that are absent from the source diagram.
+      patch[key] = token;
     }
     const sourceData = isRecord(source.data) ? source.data : {};
     const routedData = isRecord(routed.data) ? routed.data : null;
@@ -104,6 +108,12 @@ export const createPrecompiledDisplayRoutePatches = (sourceEdges, routedEdges) =
     const computedPath = copyPath(routedData.computedPath, true);
     if (!computedPath) return null;
     data.computedPath = computedPath;
+    if (typeof routedData.h !== 'undefined') {
+      if (typeof routedData.h !== 'string' || routedData.h.length > 128) return null;
+      data.h = routedData.h;
+    } else if (typeof sourceData.h !== 'undefined') {
+      return null;
+    }
     if (typeof routedData.elkPath !== 'undefined') {
       const elkPath = copyPath(routedData.elkPath, false);
       if (!elkPath) return null;

@@ -21,6 +21,7 @@ export enum LayoutType {
   MAIN_BUS_SWIMLANE = 'main-bus-swimlane',
   DOMAIN_FIRST = 'domain-first',
   ELK = 'elk',
+  ELK_LAYERED = 'elk-layered',
   DAGRE = 'dagre'
 }
 
@@ -43,6 +44,8 @@ export interface LayoutOptions {
   nodeLayout?: LayoutType;
   /** 路由阶段质量：交互时允许更轻量的计算。 */
   edgeRoutingQuality?: 'full' | 'interactive';
+  /** ELK layout edge-routing hint; final display routing is still hard-gated. */
+  edgeRouting?: 'ORTHOGONAL' | 'POLYLINE' | 'SPLINES';
   /** 水平对齐方式 */
   horizontalAlign?: AlignmentType;
   /** 垂直对齐方式 */

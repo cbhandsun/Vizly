@@ -478,7 +478,7 @@ export const useFlowchartDesignerController = ({
     }, [clearCanvasSelection, isCommentMode, contextMenuPaneClick]);
 
     // Features
-    const { autoRoutingEnabled, setAutoRoutingEnabled, isLayoutStable, handleStrategyLayout, lastDomainStrategy, lastDomainDirection, lastNodeLayout } = useAutoRouting({
+    const { autoRoutingEnabled, setAutoRoutingEnabled, isLayoutStable, isLayoutBusy, handleStrategyLayout, lastDomainStrategy, lastDomainDirection, lastNodeLayout } = useAutoRouting({
         setNodes,
         setEdges,
         nodesRef,
@@ -704,7 +704,7 @@ export const useFlowchartDesignerController = ({
         handleReconnectEnd, handleReconnectStart, handleSearchReplaceAll, handleSearchReplaceMatch, handleSendToBack, handleSmartOptimize, handleStrategyLayout,
         handleToggleHighlightMainFlow, handleToggleShowOnlyMainFlow, handleTouchEnd, handleTouchStart, handleUseTemplate, handleWrappedCloudSave,
         handleWrappedDirectSave, hasCopiedStyle, highlightMainFlow, historyPanelVisible, id, isCommentMode, isConnecting, isContextToolbarHidden,
-        isDirectSaveDisabled, isDragging, isDraggingNode, isDrawingMode, isInitialDiagramLoading, isLayoutStable, isMarqueeActive, isMobile, isReadonly,
+        isDirectSaveDisabled, isDragging, isDraggingNode, isDrawingMode, isInitialDiagramLoading, isLayoutBusy, isLayoutStable, isMarqueeActive, isMobile, isReadonly,
         isSidebarHidden, isSpacePressed, isValidConnection, isVersionHistoryOpen, isYjsSynced, collaborationStatus, jsonEditorInitialContent, jsonEditorVisible, jumpTo, laserEnabled,
         lastDomainDirection, lastDomainStrategy, lastNodeLayout, layerSyncedNodes, layers, leftDrawerOpen, leftDrawerWidth, messageContextHolder,
         mobilePropertyDrawerVisible, multiPage: { ...multiPage, ...commentAwarePageLifecycle }, nodes, nodesRef, notificationContextHolder, onAiTabIntercept, onCloudSave, onConnectStart, onDirectSave,

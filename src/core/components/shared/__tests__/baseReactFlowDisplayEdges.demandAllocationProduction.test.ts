@@ -43,6 +43,10 @@ describe('demand-allocation production display routing', () => {
       };
     });
     const e10 = metrics.find(metric => metric.id === 'e10');
+    const e10Edge = result.find(edge => edge.id === 'e10');
+    const rawStrictCrossings = findDisplayStrictCrossingHits(result);
+    const rawE10SoftBridge = e10Edge?.data?.h;
+    const e10SoftBridge = typeof rawE10SoftBridge === 'string' ? rawE10SoftBridge : '';
     const e13 = metrics.find(metric => metric.id === 'e13');
     const e3 = metrics.find(metric => metric.id === 'e3');
     const e22 = metrics.find(metric => metric.id === 'e22');
@@ -53,17 +57,31 @@ describe('demand-allocation production display routing', () => {
       hardReport,
       metrics,
       phaseTrace: response.phaseTrace,
+      e10Path: e10Edge ? getDisplayComputedPath(e10Edge) : [],
+      e10SoftBridge,
+      rawStrictCrossingCount: rawStrictCrossings.length,
     }, null, 2);
 
     expect(response.error, diagnostics).toBeUndefined();
     expect(response.hardClean, diagnostics).toBe(true);
     expect(hardReport.hardClean, diagnostics).toBe(true);
     expect(countRenderUnsafeEndpointStubs(result), diagnostics).toBe(0);
-    expect(findDisplayStrictCrossingHits(result), diagnostics).toEqual([]);
+    expect(rawStrictCrossings, diagnostics).toHaveLength(1);
     expect(countCommercialObstacleHits(result, request.nodes), diagnostics).toBe(0);
     expect(e10, diagnostics).toBeDefined();
-    expect(e10?.detourRatio, diagnostics).toBeLessThanOrEqual(1.9);
-    expect(e10?.bends, diagnostics).toBeLessThanOrEqual(6);
+    expect(e10Edge, diagnostics).toBeDefined();
+    if (!e10Edge) return;
+    const e10Path = getDisplayComputedPath(e10Edge);
+    expect(e10Edge?.sourceHandle, diagnostics).toBe('bottom');
+    expect(e10Edge?.targetHandle, diagnostics).toBe('top');
+    expect(Math.min(...e10Path.map(point => point.y)), diagnostics)
+      .toBeGreaterThanOrEqual(1_700);
+    expect(e10?.detourRatio, diagnostics).toBeLessThanOrEqual(1.35);
+    expect(e10?.bends, diagnostics).toBeLessThanOrEqual(3);
+    const rawCrossing = rawStrictCrossings[0];
+    const horizontal = rawCrossing.a.axis === 'h' ? rawCrossing.a : rawCrossing.b;
+    const vertical = rawCrossing.a.axis === 'v' ? rawCrossing.a : rawCrossing.b;
+    expect(e10SoftBridge, diagnostics).toContain(`;${vertical.a.x},${horizontal.a.y};`);
     expect(e13, diagnostics).toBeDefined();
     expect(e13?.detourRatio, diagnostics).toBeLessThanOrEqual(1.5);
     expect(e13?.bends, diagnostics).toBeLessThanOrEqual(4);

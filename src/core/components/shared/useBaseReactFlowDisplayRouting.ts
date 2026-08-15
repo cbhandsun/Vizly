@@ -15,7 +15,11 @@ import {
   type DisplayRoutingInput,
 } from './baseReactFlowDisplayWorkerClient';
 import { resolveBaseReactFlowPrecompiledCapturePresetId } from './baseReactFlowPrecompiledCaptureMode';
-import { updateDisplayRoutingDebugState } from './baseReactFlowDisplayRoutingDebug';
+import {
+  updateDisplayRoutingDebugState,
+  updateDisplayRoutingFinalAppliedState,
+  updateDisplayRoutingLifecycleState,
+} from './baseReactFlowDisplayRoutingDebug';
 import {
   createBaseReactFlowDisplayEdgePatches,
   doBaseReactFlowDisplayRoutesMatchExactly,
@@ -69,6 +73,7 @@ export const useBaseReactFlowDisplayRouting = ({
   edges,
   routingNodes,
   routingGeometryReady,
+  routingPaused = false,
   isContainerReady,
   enableSmartEdges,
   smartEdgePadding,
@@ -231,22 +236,17 @@ export const useBaseReactFlowDisplayRouting = ({
     }
 
     if (!routingGeometryReady) {
-      updateDisplayRoutingDebugState({
-        stage: 'wait-geometry',
-        signature: displayEdgeCacheSignature,
-        nodeCount,
-        edgeCount,
-      });
+      updateDisplayRoutingLifecycleState('wait-geometry', displayEdgeCacheSignature, nodeCount, edgeCount);
+      return undefined;
+    }
+
+    if (routingPaused) {
+      updateDisplayRoutingLifecycleState('wait-layout-transaction', displayEdgeCacheSignature, nodeCount, edgeCount);
       return undefined;
     }
 
     if (displayQualityPolicy.mode === 'skip') {
-      updateDisplayRoutingDebugState({
-        stage: 'skip-policy',
-        signature: displayEdgeCacheSignature,
-        nodeCount,
-        edgeCount,
-      });
+      updateDisplayRoutingLifecycleState('skip-policy', displayEdgeCacheSignature, nodeCount, edgeCount);
       return undefined;
     }
     const displayWorkerQualityMode = displayQualityPolicy.mode;
@@ -263,8 +263,7 @@ export const useBaseReactFlowDisplayRouting = ({
       : null;
     if (committedFinalDisplayEntry || retainedCommittedEntry) {
       const finalAppliedAt = Date.now();
-      updateDisplayRoutingDebugState({
-        stage: 'final-applied',
+      updateDisplayRoutingFinalAppliedState({
         signature: displayEdgeCacheSignature,
         inputGeometryDigest,
         outputRouteSignature: committedFinalDisplayEntry?.outputRouteSignature
@@ -295,21 +294,11 @@ export const useBaseReactFlowDisplayRouting = ({
     }
 
     if (!isContainerReady) {
-      updateDisplayRoutingDebugState({
-        stage: 'wait-container',
-        signature: displayEdgeCacheSignature,
-        nodeCount,
-        edgeCount,
-      });
+      updateDisplayRoutingLifecycleState('wait-container', displayEdgeCacheSignature, nodeCount, edgeCount);
       return undefined;
     }
     if (isNodeDragging) {
-      updateDisplayRoutingDebugState({
-        stage: 'paused-node-drag',
-        signature: displayEdgeCacheSignature,
-        nodeCount,
-        edgeCount,
-      });
+      updateDisplayRoutingLifecycleState('paused-node-drag', displayEdgeCacheSignature, nodeCount, edgeCount);
       return undefined;
     }
 
@@ -508,7 +497,7 @@ export const useBaseReactFlowDisplayRouting = ({
         }
         const latestRoutingInput = displayRoutingInputRef.current;
         if (!latestRoutingInput || !isRequestCurrent()) return;
-        if (workerResult.hardClean !== true) {
+        if (import.meta.env.DEV && workerResult.hardClean !== true) {
           if (isBaseReactFlowDisplayDiagnosticsEnabled()) {
             recordBaseReactFlowRejectedDisplayDiagnostics({
               edges: workerResult.edges,
@@ -585,8 +574,7 @@ export const useBaseReactFlowDisplayRouting = ({
             committedSnapshotBaselineRef.current = committedSnapshot.baseline;
           }
         }
-        updateDisplayRoutingDebugState({
-          stage: 'final-applied',
+        updateDisplayRoutingFinalAppliedState({
           signature: displayEdgeCacheSignature,
           requestId,
           nodeCount,
@@ -670,6 +658,7 @@ export const useBaseReactFlowDisplayRouting = ({
     nodeDragFallbackKey,
     onNodeDragFallbackResolved,
     routingGeometryReady,
+    routingPaused,
   ]);
 
   const resolvedDisplayEdges = useBaseReactFlowResolvedDisplayEdges({

@@ -649,6 +649,7 @@ export const repairBaseReactFlowDisplayEdgesInWorker = async ({
   nodes,
   timeoutMs = DISPLAY_WORKER_TIMEOUT_MS,
   signal,
+  requireHardClean = true,
 }: {
   workerRef: MutableRefObject<Worker | null>;
   requestId: string;
@@ -656,6 +657,7 @@ export const repairBaseReactFlowDisplayEdgesInWorker = async ({
   nodes: Node[];
   timeoutMs?: number;
   signal?: AbortSignal;
+  requireHardClean?: boolean;
 }): Promise<BaseReactFlowDisplayWorkerResult> => {
   const projectedInput = projectBaseReactFlowDisplayWorkerInput({ edges, nodes });
   const result = await requestBaseReactFlowDisplayEdgesWorker({
@@ -671,7 +673,7 @@ export const repairBaseReactFlowDisplayEdgesInWorker = async ({
     signal,
   });
   if (signal?.aborted) throw new Error('display-edge-worker-cancelled');
-  if (result.hardClean !== true) {
+  if (requireHardClean && result.hardClean !== true) {
     throw createDisplayWorkerFinalQualityError(
       result.edges,
       projectedInput.nodes,

@@ -193,11 +193,7 @@ export const buildCommercialSourceTerminalShortcutCandidates = (
       sourceSide,
     );
     const sourceAnchor = anchorForHandle(sourceRect, sourceHandle);
-    const sourceStub = terminalStub(
-      sourceAnchor,
-      sourceSide,
-      MIN_RENDER_SAFE_ENDPOINT_STUB,
-    );
+    const sourceStub = terminalStub(sourceAnchor, sourceSide);
     for (let anchorIndex = 2; anchorIndex < path.length - 1; anchorIndex += 1) {
       const routeAnchor = path[anchorIndex];
       const corridorPaths = sourceCorridorLaneCoordinates(
@@ -458,4 +454,37 @@ export const buildCommercialParallelTerminalCorridorShortcutPaths = (
       first.length - second.length
       || displayPathLength(first) - displayPathLength(second)
     ));
+};
+
+/** Separates a facing-port shortcut immediately after its legal source stub. */
+export const buildCommercialBranchedTerminalShortcutCandidates = (edge: Edge): Edge[] => {
+  const path = getDisplayComputedPath(edge);
+  const source = path[0];
+  const target = path.at(-1);
+  const sourceSide = sideForHandle(edge.sourceHandle);
+  const targetSide = sideForHandle(edge.targetHandle);
+  if (!source || !target || !sourceSide || !targetSide) return [];
+  const vertical = sourceSide === 'top' || sourceSide === 'bottom';
+  if (vertical !== (targetSide === 'top' || targetSide === 'bottom')) return [];
+  const sourceStub = terminalStub(source, sourceSide);
+  const targetApproach = terminalStub(target, targetSide, MIN_RENDER_SAFE_ENDPOINT_STUB * 2);
+  const lane = (vertical ? sourceStub.x : sourceStub.y) + (
+    Math.sign(vertical ? target.x - source.x : target.y - source.y) || 1
+  ) * MIN_RENDER_SAFE_ENDPOINT_STUB;
+  const branchPoint = (axis: number): { x: number; y: number } => (
+    vertical ? { x: lane, y: axis } : { x: axis, y: lane }
+  );
+  return [withDisplayPortBridge(
+    edge,
+    compactOrthogonalPath([
+      source,
+      sourceStub,
+      branchPoint(vertical ? sourceStub.y : sourceStub.x),
+      branchPoint(vertical ? targetApproach.y : targetApproach.x),
+      targetApproach,
+      target,
+    ]),
+    sourceSide,
+    targetSide,
+  )];
 };

@@ -15,6 +15,11 @@ describe('resolveDomainNodeLayoutAlgorithm', () => {
     );
   });
 
+  it('pins the explicit orthogonal layered layout to ELK layered', () => {
+    expect(resolveDomainNodeLayoutAlgorithm('elk-layered', 'stress')).toBe('layered');
+    expect(resolveDomainNodeLayoutAlgorithm('ELK_LAYERED', 'force')).toBe('layered');
+  });
+
   it('falls back safely for empty and non-string boundary values', () => {
     expect(resolveDomainNodeLayoutAlgorithm('', '')).toBe('layered');
     expect(resolveDomainNodeLayoutAlgorithm({ mode: 'fcose' }, Number.NaN)).toBe('layered');

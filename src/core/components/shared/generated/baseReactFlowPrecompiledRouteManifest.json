@@ -1,34 +1,34 @@
 {
   "schema": "vizly-precompiled-display-route-manifest-v3",
-  "routingVersion": "2026-08-14-autosave-route-migration-v177",
+  "routingVersion": "8",
   "identitySourceHash": "source-v1:cfaa2450d3809ba2c686379d46c2603773ac472175eeac70cdfe7ece51347781",
-  "routingSourceHash": "source-v1:912942efec08cf8a41c2ea6bd0de531fa34cf8f780dcefdd58af98c5000b2006",
+  "routingSourceHash": "source-v1:5d838599a85bc24ed7ae1fb9d81a25b52aa3647374a2a55a9bb5c365a0c6cabb",
   "entries": [
-    {
-      "presetId": "wms-demand-allocation-strategy-v2",
-      "sourcePath": "src/data/standardized/DeamndAllocation.json",
-      "artifactFile": "route-2686061601.json",
-      "sourceHash": "source-v1:ea82c502ab6535b5c8f8367c591861e540396a41955a15c6b5f94f922264b7de",
-      "inputSignature": "2686061601",
-      "inputGeometryDigest": "geometry-v1:08d319168ab9f952bdaa648c26bedd4e",
-      "outputRouteSignature": "route-v2:26:162:e9b975517ce9367f"
-    },
     {
       "presetId": "logistics-architecture-v1",
       "sourcePath": "src/data/standardized/LogisticsStandardData.json",
-      "artifactFile": "route-3386287051.json",
+      "artifactFile": "route-2227874906.json",
       "sourceHash": "source-v1:da286fbefa1a0d0a3ba3bf5a6589d2edba849af0f477ddb910ecad4d91649986",
-      "inputSignature": "3386287051",
-      "inputGeometryDigest": "geometry-v1:8caa031c98632b206c404cde1c032aa4",
+      "inputSignature": "2227874906",
+      "inputGeometryDigest": "geometry-v1:c7415b4ede1d799a85fb898c964a720e",
       "outputRouteSignature": "route-v2:14:62:90aa1efad1fd39d8"
+    },
+    {
+      "presetId": "wms-demand-allocation-strategy-v2",
+      "sourcePath": "src/data/standardized/DeamndAllocation.json",
+      "artifactFile": "route-4033567064.json",
+      "sourceHash": "source-v1:ea82c502ab6535b5c8f8367c591861e540396a41955a15c6b5f94f922264b7de",
+      "inputSignature": "4033567064",
+      "inputGeometryDigest": "geometry-v1:88bc95a87015a654ea8cb0f6f1c246c0",
+      "outputRouteSignature": "route-v2:26:164:d5d329ce2707b4c4"
     },
     {
       "presetId": "wms-process-flow-v1",
       "sourcePath": "src/data/standardized/WmsProcessFlowStandardData.json",
-      "artifactFile": "route-917577053.json",
+      "artifactFile": "route-4172950488.json",
       "sourceHash": "source-v1:2a580f110590a416ff1aeb9fb5a3cd21536428e26368841fd160f87243cc25d3",
-      "inputSignature": "917577053",
-      "inputGeometryDigest": "geometry-v1:46d562df5afe93a7e4a437f3e023615b",
+      "inputSignature": "4172950488",
+      "inputGeometryDigest": "geometry-v1:bc5cdf7d0ca289e500ec8289eb4854d9",
       "outputRouteSignature": "route-v2:44:195:201731ee3ab0cfac"
     }
   ]

@@ -5,10 +5,18 @@ import logisticsStandardData from '../../../../data/standardized/LogisticsStanda
 import type { StandardDiagramData } from '../../../models/DiagramModels';
 import { standardDataToCanvas } from '../../diagrams/designerUtils';
 import { computeBaseReactFlowDisplayEdgeEpoch } from '../baseReactFlowDisplayEdgeCore';
+import { computeBaseReactFlowDisplayOutputRouteSignature } from '../baseReactFlowDisplayCache';
 import { computeBaseReactFlowDisplayEdgesWorkerResponse } from '../baseReactFlowDisplayEdges.worker';
+import {
+  parseBaseReactFlowPrecompiledRouteArtifact,
+  sanitizeBaseReactFlowPrecompiledRoutePatches,
+} from '../baseReactFlowPrecompiledRouteArtifact';
+import { mergeTrustedBaseReactFlowPrecompiledRouteArtifact } from '../baseReactFlowPrecompiledRouteRegistry';
+import { mergeBaseReactFlowDisplayEdgePatches } from '../baseReactFlowDisplayRoutingTransaction';
 import { projectBaseReactFlowDisplayWorkerInput } from '../baseReactFlowDisplayWorkerClient';
 import { parseDisplayEdgesWorkerRequest } from '../baseReactFlowDisplayWorkerProtocol';
 import demandAllocationProductionRequest from './fixtures/demandAllocationProductionWorkerRequest.json';
+import demandAllocationArtifact from '../generated/precompiledRoutes/route-4033567064.json';
 import './baseReactFlowDisplayEdges.testUtils';
 
 type RoutePoint = { x: number; y: number };
@@ -34,6 +42,33 @@ const routeSnapshot = (edges: Edge[]) => edges.map(edge => ({
 }));
 
 describe('BaseReactFlow precompiled route stability', () => {
+  it('replays the generated WMS demand-allocation artifact over the production source graph', () => {
+    const request = parseDisplayEdgesWorkerRequest(demandAllocationProductionRequest);
+    expect(request).not.toBeNull();
+    if (!request) return;
+    const entry = parseBaseReactFlowPrecompiledRouteArtifact(demandAllocationArtifact, {
+      inputSignature: demandAllocationArtifact.inputSignature,
+      inputGeometryDigest: demandAllocationArtifact.inputGeometryDigest,
+      sourceHash: demandAllocationArtifact.sourceHash,
+    });
+    expect(entry).not.toBeNull();
+    if (!entry) return;
+
+    const safePatches = sanitizeBaseReactFlowPrecompiledRoutePatches(request.edges, entry.edges);
+    expect(safePatches).not.toBeNull();
+    if (!safePatches) return;
+    const merged = mergeBaseReactFlowDisplayEdgePatches(request.edges, safePatches);
+    expect(merged).not.toBeNull();
+    if (!merged) return;
+    const mergedSignature = computeBaseReactFlowDisplayOutputRouteSignature(merged);
+    const diagnostics = JSON.stringify({
+      mergedSignature,
+      artifactSignature: entry.outputRouteSignature,
+    }, null, 2);
+    expect(mergedSignature, diagnostics).toBe(entry.outputRouteSignature);
+    expect(mergeTrustedBaseReactFlowPrecompiledRouteArtifact(request.edges, entry)).toEqual(merged);
+  });
+
   it('accepts a freshly generated Logistics full route without rewriting it', async () => {
     const canvas = await standardDataToCanvas(
       logisticsStandardData as unknown as StandardDiagramData,

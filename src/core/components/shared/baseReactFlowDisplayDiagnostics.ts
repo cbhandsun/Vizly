@@ -23,7 +23,7 @@ const DEFAULT_MAX_EDGE_COUNT = 64;
 const DEFAULT_MAX_DURATION_MS = 8;
 const DEFAULT_MAX_REPORTED_PAIRS = 3;
 
-/** Expensive display-routing diagnostics are opt-in in every build. */
+/** Expensive pair diagnostics are opt-in and compiled out of production. */
 export const isBaseReactFlowDisplayDiagnosticsEnabled = (
   windowLike: DisplayDiagnosticsWindow | undefined = (
     typeof window === 'undefined' ? undefined : window

@@ -104,6 +104,8 @@ describe('precompiled display route capture', () => {
       source: 'source',
       target: 'target',
       type: 'stablePath',
+      sourceHandle: 'right',
+      targetHandle: 'left',
       data: {
         computedPath: [{ x: 0, y: 0 }, { x: 50, y: 0 }, { x: 50, y: 50 }, { x: 100, y: 50 }],
         sharedTrunkAware: true,
@@ -122,6 +124,26 @@ describe('precompiled display route capture', () => {
       sourceHandle: 'bottom',
       targetHandle: 'top',
     }]);
+  });
+
+  it('captures unchanged projected terminals so replay is independent of raw source defaults', () => {
+    const patches = createPrecompiledDisplayRoutePatches(source, routed);
+    expect(patches?.[0]).toMatchObject({
+      type: 'stablePath',
+      sourceHandle: 'right',
+      targetHandle: 'left',
+    });
+  });
+
+  it('captures only bounded line-hop quality identity', () => {
+    expect(createPrecompiledDisplayRoutePatches(source, [{
+      ...routed[0],
+      data: { ...routed[0].data, h: ';50,50;' },
+    }])?.[0].data).toMatchObject({ h: ';50,50;' });
+    expect(createPrecompiledDisplayRoutePatches(source, [{
+      ...routed[0],
+      data: { ...routed[0].data, h: 'x'.repeat(129) },
+    }])).toBeNull();
   });
 
   it('rejects malformed intent and routing-field deletion', () => {

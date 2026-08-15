@@ -1,15 +1,231 @@
 import type { Edge, Node } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
 import {
+  clearLayoutRuntimeAbsolutePosition,
+  LAYERED_TREE_ROUTING_SPACING,
   loadLayoutStrategyPresetFromCandidates,
   normalizeLayoutVisibilityNodes,
   resolveLayoutStrategyGeneratedGroupOptions,
   resolveLayoutStrategyPresetFromCandidates,
-  sanitizeLayoutEdges,
   stripHiddenGeneratedLayoutNodes,
 } from '../useLayoutStrategy';
+import {
+  prepareLayeredLayoutEdges,
+  sanitizeLayoutEdges,
+} from '../layeredLayoutEdgePreparation';
+
+describe('LAYERED_TREE_ROUTING_SPACING', () => {
+  it('reserves two terminal stubs and a routing channel between ranks', () => {
+    expect(LAYERED_TREE_ROUTING_SPACING.levelSpacing).toBeGreaterThanOrEqual(48 * 2 + 24);
+    expect(LAYERED_TREE_ROUTING_SPACING.nodeSpacing).toBeGreaterThanOrEqual(48 * 2 + 24);
+  });
+});
+
+describe('clearLayoutRuntimeAbsolutePosition', () => {
+  it('removes stale React Flow geometry from a staged node', () => {
+    const node = {
+      id: 'node',
+      position: { x: 400, y: 500 },
+      positionAbsolute: { x: 10, y: 20 },
+      data: {},
+    } as Node & { positionAbsolute: { x: number; y: number } };
+
+    const result = clearLayoutRuntimeAbsolutePosition(node) as Node & {
+      positionAbsolute?: unknown;
+    };
+
+    expect(result.position).toEqual({ x: 400, y: 500 });
+    expect(result.positionAbsolute).toBeUndefined();
+  });
+});
+
+describe('prepareLayeredLayoutEdges', () => {
+  const nodes = [
+    {
+      id: 'source',
+      position: { x: 0, y: 0 },
+      width: 200,
+      height: 80,
+      data: {},
+    },
+    {
+      id: 'below',
+      position: { x: 40, y: 180 },
+      width: 200,
+      height: 80,
+      data: {},
+    },
+    {
+      id: 'same-rank',
+      position: { x: 420, y: 0 },
+      width: 200,
+      height: 80,
+      data: {},
+    },
+  ] as Node[];
+
+  it('keeps a forward TB edge on the vertical axis', () => {
+    const [edge] = prepareLayeredLayoutEdges(nodes, [{
+      id: 'forward',
+      source: 'source',
+      target: 'below',
+    }] as Edge[], 'TB');
+
+    expect(edge).toMatchObject({ sourceHandle: 'bottom', targetHandle: 'top' });
+  });
+
+  it('uses horizontal candidates for a same-rank edge in a TB layout', () => {
+    const [edge] = prepareLayeredLayoutEdges(nodes, [{
+      id: 'same-rank',
+      source: 'source',
+      target: 'same-rank',
+    }] as Edge[], 'TB');
+
+    expect(edge).toMatchObject({ sourceHandle: 'right', targetHandle: 'left' });
+  });
+
+  it('uses side ports for a far diagonal cross-layer edge', () => {
+    const farDiagonalNodes = [
+      { id: 'source', position: { x: 0, y: 0 }, width: 200, height: 80, data: {} },
+      { id: 'target', position: { x: 1_200, y: 400 }, width: 200, height: 80, data: {} },
+    ] as Node[];
+    const [edge] = prepareLayeredLayoutEdges(farDiagonalNodes, [{
+      id: 'far-diagonal',
+      source: 'source',
+      target: 'target',
+    }] as Edge[], 'TB');
+
+    expect(edge).toMatchObject({ sourceHandle: 'right', targetHandle: 'left' });
+  });
+
+  it('resolves cross-container ports from absolute rather than relative geometry', () => {
+    const nestedNodes = [
+      { id: 'source-domain', position: { x: 0, y: 400 }, data: {} },
+      { id: 'target-domain', position: { x: 1_500, y: 0 }, data: {} },
+      {
+        id: 'source',
+        parentId: 'source-domain',
+        position: { x: 100, y: 0 },
+        width: 200,
+        height: 80,
+        data: {},
+      },
+      {
+        id: 'target',
+        parentId: 'target-domain',
+        position: { x: 100, y: 0 },
+        width: 200,
+        height: 80,
+        data: {},
+      },
+    ] as Node[];
+    const [edge] = prepareLayeredLayoutEdges(nestedNodes, [{
+      id: 'cross-container',
+      source: 'source',
+      target: 'target',
+    }] as Edge[], 'LR');
+
+    expect(edge).toMatchObject({
+      sourceHandle: 'right',
+      targetHandle: 'left',
+    });
+  });
+
+  it('uses safe dimensions when staged nodes have not been measured yet', () => {
+    const unmeasuredNodes = [
+      { id: 'source', position: { x: 0, y: 0 }, data: {} },
+      { id: 'target', position: { x: 400, y: 0 }, data: {} },
+    ] as Node[];
+    const [edge] = prepareLayeredLayoutEdges(unmeasuredNodes, [{
+      id: 'same-rank-unmeasured',
+      source: 'source',
+      target: 'target',
+    }] as Edge[], 'TB');
+
+    expect(edge).toMatchObject({ sourceHandle: 'right', targetHandle: 'left' });
+  });
+
+  it('removes route ownership from the previous layout before staging', () => {
+    const [edge] = prepareLayeredLayoutEdges(nodes, [{
+      id: 'stale-route',
+      source: 'source',
+      target: 'below',
+      type: 'stablePath',
+      data: {
+        computedPath: [{ x: 1, y: 2 }, { x: 3, y: 4 }],
+        elkPath: [{ x: 1, y: 2 }, { x: 3, y: 4 }],
+        treeRouting: { points: [{ x: 1, y: 2 }, { x: 3, y: 4 }] },
+        layoutPathLocked: true,
+        _layoutPathLocked: true,
+        runtimeHandleLock: { source: true, target: true },
+        _runtimeHandleLock: true,
+        auto: true,
+        autoSource: true,
+        autoTarget: true,
+        isTreeBus: true,
+        sharedTrunkAware: true,
+        sharedTrunkSynthesized: true,
+        useElkRouting: true,
+        h: [';1,2;'],
+        pathOptions: 'invalid',
+        businessMarker: 'preserved',
+      },
+    }] as Edge[], 'TB');
+    const data = edge.data as Record<string, unknown>;
+
+    expect(edge.type).toBe('advanced-smart-step');
+    expect(data.computedPath).toBeUndefined();
+    expect(data.elkPath).toBeUndefined();
+    expect(data.treeRouting).toBeUndefined();
+    expect(data.layoutPathLocked).toBeUndefined();
+    expect(data._layoutPathLocked).toBeUndefined();
+    expect(data._runtimeHandleLock).toBeUndefined();
+    expect(data.auto).toBeUndefined();
+    expect(data.autoSource).toBeUndefined();
+    expect(data.autoTarget).toBeUndefined();
+    expect(data.isTreeBus).toBeUndefined();
+    expect(data.sharedTrunkAware).toBeUndefined();
+    expect(data.sharedTrunkSynthesized).toBeUndefined();
+    expect(data.useElkRouting).toBeUndefined();
+    expect(data.h).toBeUndefined();
+    expect(data.businessMarker).toBe('preserved');
+    expect(data).toMatchObject({
+      intraContainerNoObstacle: true,
+      obstacleScope: 'corridor',
+      obstaclePadding: 24,
+      pathOptions: { gridRatio: 1.04, borderRadius: 4 },
+      layoutDirection: 'TB',
+    });
+  });
+});
 
 describe('sanitizeLayoutEdges', () => {
+  it.each([
+    ['TB', 'bottom', 'top'],
+    ['LR', 'right', 'left'],
+  ] as const)(
+    'assigns directed terminal sides for an unrestricted %s layered edge',
+    (direction, sourceHandle, targetHandle) => {
+      const nodes = [
+        { id: 'source', position: { x: 0, y: 0 }, data: {} },
+        { id: 'target', position: { x: 120, y: 120 }, data: {} },
+      ] as Node[];
+      const edges = [{
+        id: 'edge-source-target',
+        source: 'source',
+        target: 'target',
+        sourceHandle: null,
+        targetHandle: null,
+        data: {},
+      }] as Edge[];
+
+      const [edge] = sanitizeLayoutEdges(nodes, edges, direction);
+
+      expect(edge.sourceHandle).toBe(sourceHandle);
+      expect(edge.targetHandle).toBe(targetHandle);
+    },
+  );
+
   it('preserves layout path trust metadata from the routing strategy', () => {
     const nodes = [
       { id: 'source', position: { x: 0, y: 0 }, data: {} },
@@ -37,7 +253,7 @@ describe('sanitizeLayoutEdges', () => {
 
     expect(edge.sourceHandle).toBe('bottom');
     expect(edge.targetHandle).toBe('top');
-    expect(edge.type).toBe('stablePath');
+    expect(edge.type).not.toBe('stablePath');
     expect(edge.data).toMatchObject({
       layoutPathLocked: true,
       _layoutPathLocked: true,
@@ -49,6 +265,30 @@ describe('sanitizeLayoutEdges', () => {
       { x: 50, y: 40 },
       { x: 50, y: 120 },
     ]);
+  });
+
+  it('does not manufacture an unvalidated orthogonal bend for a diagonal layout candidate', () => {
+    const nodes = [
+      { id: 'source', position: { x: 0, y: 0 }, data: {} },
+      { id: 'target', position: { x: 120, y: 120 }, data: {} },
+    ] as Node[];
+    const candidate = [
+      { x: 100, y: 40 },
+      { x: 95, y: 41 },
+      { x: 95, y: 120 },
+    ];
+    const [edge] = sanitizeLayoutEdges(nodes, [{
+      id: 'edge-source-target',
+      source: 'source',
+      target: 'target',
+      data: {
+        computedPath: candidate,
+        layoutPathLocked: true,
+      },
+    }], 'LR');
+
+    expect(edge.type).not.toBe('stablePath');
+    expect((edge.data as Record<string, unknown>).computedPath).toEqual(candidate);
   });
 });
 

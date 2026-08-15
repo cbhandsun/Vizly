@@ -1,22 +1,24 @@
 import { useCallback, useState, MutableRefObject } from 'react';
 import { Node, Edge, ReactFlowInstance } from '@xyflow/react';
-import { animateLayoutTransition, runAfterLayoutRenderFrames } from '../../../utils/animateLayoutTransition';
-import { EdgeRoutingCoordinator } from '../../../services/EdgeRoutingCoordinator';
-import { flushObstacles } from '../../custom-edges/obstacleContext';
 import { buildChildrenMap, getDescendantIds } from './useCollapsibleGroups';
 import { dispatchDiagramControl } from '../../shared/diagramControl';
 import { applyLayout, forceDirectedLayout, treeLayout } from '../../../utils/LayoutAlgorithms';
 import { coerceDiagramId, getQueryOrHashParamFromLocation } from '../../../utils/inputBoundary';
-import { refreshDomainLayoutEdgeForRender } from './layoutEdgeRefresh';
 import {
     preserveEdgesOnEmptyLayoutResult,
     resolveLayoutSourceEdges,
 } from './layoutEdgeBoundary';
+import { useLayoutRoutingTransaction } from './useLayoutRoutingTransaction';
+import { clearBaseReactFlowLayoutEdgeRoutingData } from '../../shared/baseReactFlowLayoutRoutingTransaction';
+import { isDirectedForestLayoutGraph } from './treeLayoutTopology';
+import {
+    clearLayoutEdgeRoutingType,
+    prepareLayeredLayoutEdges,
+} from './layeredLayoutEdgePreparation';
 import type { ILayoutStrategy } from '../../../types/layout-strategy';
 import type { LayoutOptions } from '../../../types/layout';
 import {
     logLayoutNoLayoutableNodes,
-    logLayoutOrphanEdgeDropped,
     logLayoutStrategyFailure,
 } from './diagramInteractionLogging';
 
@@ -30,6 +32,7 @@ interface UseLayoutStrategyParams {
     reactFlowInstance: ReactFlowInstance | null;
     diagramId?: string;
     loadLayoutPresetMap?: () => Promise<Record<string, unknown>>;
+    setLayoutStable?: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 const asRecord = (value: unknown): Record<string, unknown> => (
@@ -37,6 +40,23 @@ const asRecord = (value: unknown): Record<string, unknown> => (
         ? value as Record<string, unknown>
         : {}
 );
+
+type RuntimePositionedLayoutNode = Node & {
+    positionAbsolute?: unknown;
+};
+
+export const LAYERED_TREE_ROUTING_SPACING = Object.freeze({
+    // Same-rank edges also need two 48px terminal stubs.
+    nodeSpacing: 120,
+    // Two 48px commercial terminal stubs plus a 24px shared channel.
+    levelSpacing: 120,
+});
+
+/** React Flow runtime geometry must not override a newly staged layout. */
+export const clearLayoutRuntimeAbsolutePosition = (node: Node): Node => ({
+    ...node,
+    positionAbsolute: undefined,
+} as RuntimePositionedLayoutNode);
 
 const coerceStringArray = (value: unknown): string[] | undefined => {
     if (!Array.isArray(value)) return undefined;
@@ -159,151 +179,6 @@ export const normalizeLayoutVisibilityNodes = (rawNodes: Node[]): Node[] => {
     });
 };
 
-/**
- * 边验证：确保布局后所有边有效
- *
- * 后处理管道 (P7 beautifyOrthogonalEdges / P8 optimizeTreeBusRouting) 使用短格式 handle ID ('r'/'l'/'t'/'b')
- * 而 FlowchartNode 只注册了全称 Handle ID ('right'/'left'/'top'/'bottom')
- * 必须先正确映射短格式→全称，再验证有效性
- */
-export function sanitizeLayoutEdges(resultNodes: Node[], resultEdges: Edge[], dir: 'TB' | 'LR'): Edge[] {
-    const nodeIdSet = new Set(resultNodes.map(n => n.id));
-    const expandHandle = (h: string | null | undefined): string | null => {
-        if (!h) return null;
-        const s = h.toLowerCase();
-        if (s === 'r' || s === 'right') return 'right';
-        if (s === 'l' || s === 'left') return 'left';
-        if (s === 't' || s === 'top') return 'top';
-        if (s === 'b' || s === 'bottom') return 'bottom';
-        return null;
-    };
-    const isH = dir === 'LR';
-    const defSrc = isH ? 'right' : 'bottom';
-    const defTgt = isH ? 'left' : 'top';
-    const axisOf = (a: { x: number; y: number }, b: { x: number; y: number }): 'h' | 'v' | null => {
-        if (Math.abs(a.y - b.y) < 1.5 && Math.abs(a.x - b.x) > 1.5) return 'h';
-        if (Math.abs(a.x - b.x) < 1.5 && Math.abs(a.y - b.y) > 1.5) return 'v';
-        return null;
-    };
-    const normalizeComputedPath = (raw: unknown): Array<{ x: number; y: number }> | undefined => {
-        if (!Array.isArray(raw) || raw.length < 2) return undefined;
-        const points = raw
-            .map((point: unknown) => {
-                const record = asRecord(point);
-                return { x: Number(record.x), y: Number(record.y) };
-            })
-            .filter(p => Number.isFinite(p.x) && Number.isFinite(p.y));
-        if (points.length < 2) return undefined;
-
-        const orthogonal: Array<{ x: number; y: number }> = [points[0]];
-        for (let i = 1; i < points.length; i++) {
-            const prev = orthogonal[orthogonal.length - 1];
-            const curr = points[i];
-            if (Math.abs(prev.x - curr.x) > 1.5 && Math.abs(prev.y - curr.y) > 1.5) {
-                const next = points[i + 1];
-                const hv = { x: curr.x, y: prev.y };
-                const vh = { x: prev.x, y: curr.y };
-                const hvScore = next && axisOf(hv, curr) !== axisOf(curr, next) ? 1 : 0;
-                const vhScore = next && axisOf(vh, curr) !== axisOf(curr, next) ? 1 : 0;
-                orthogonal.push(hvScore <= vhScore ? hv : vh);
-            }
-            orthogonal.push(curr);
-        }
-
-        const collapse = (pts: Array<{ x: number; y: number }>) => {
-            if (pts.length < 3) return pts;
-            const out: Array<{ x: number; y: number }> = [pts[0]];
-            for (let i = 1; i < pts.length - 1; i++) {
-                const prev = out[out.length - 1];
-                const curr = pts[i];
-                const next = pts[i + 1];
-                const sameX = Math.abs(prev.x - curr.x) < 1.5 && Math.abs(curr.x - next.x) < 1.5;
-                const sameY = Math.abs(prev.y - curr.y) < 1.5 && Math.abs(curr.y - next.y) < 1.5;
-                if (!sameX && !sameY) out.push(curr);
-            }
-            out.push(pts[pts.length - 1]);
-            return out;
-        };
-
-        let cleaned = collapse(orthogonal);
-        let changed = true;
-        while (changed) {
-            changed = false;
-            for (let i = 1; i < cleaned.length - 1; i++) {
-                const prev = cleaned[i - 1];
-                const curr = cleaned[i];
-                const next = cleaned[i + 1];
-                const shortIn = Math.abs(prev.x - curr.x) + Math.abs(prev.y - curr.y) < 8;
-                const shortOut = Math.abs(curr.x - next.x) + Math.abs(curr.y - next.y) < 8;
-                if ((shortIn || shortOut) && axisOf(prev, next)) {
-                    cleaned = [...cleaned.slice(0, i), ...cleaned.slice(i + 1)];
-                    changed = true;
-                    break;
-                }
-            }
-        }
-        return collapse(cleaned);
-    };
-    let _orphan = 0, _expanded = 0, _defaulted = 0;
-
-    const sanitized = resultEdges
-        .filter(e => {
-            const ok = nodeIdSet.has(e.source) && nodeIdSet.has(e.target);
-            if (!ok) {
-                _orphan++;
-                logLayoutOrphanEdgeDropped({
-                    edgeId: e.id,
-                    hasSource: nodeIdSet.has(e.source),
-                    hasTarget: nodeIdSet.has(e.target),
-                });
-            }
-            return ok;
-        })
-        .map(e => {
-            const edge = { ...e };
-            // [FIX] 展开短格式 handle（P7/P8 后处理可能写入 'r'/'l'/'t'/'b'）并应用方向默认值
-            // 保留策略已计算的路由决策，避免清空为 null 后运行时在动画过渡期使用旧坐标重算
-            const srcH = expandHandle(e.sourceHandle);
-            const tgtH = expandHandle(e.targetHandle);
-            edge.sourceHandle = srcH || defSrc;
-            edge.targetHandle = tgtH || defTgt;
-            if (srcH) _expanded++; else _defaulted++;
-            if (tgtH) _expanded++; else _defaulted++;
-
-            // ⭐ [FIX] 切换布局时清除连线的自定义控制点缓冲，让重新计算的布局能够生效起步；但保留布局策略计算好的路径/总线/ELK信息
-            const computedPath = normalizeComputedPath(e.data?.computedPath);
-            edge.data = {
-                ...edge.data,
-                waypoints: [],
-                computedPath: computedPath ?? e.data?.computedPath,
-                elkPath: e.data?.elkPath,
-                treeRouting: e.data?.treeRouting,
-                isTreeBus: e.data?.isTreeBus,
-                useElkRouting: e.data?.useElkRouting,
-                algorithm: e.data?.algorithm,
-                layoutPathLocked: e.data?.layoutPathLocked,
-                _layoutPathLocked: e.data?._layoutPathLocked,
-                sharedTrunkAware: e.data?.sharedTrunkAware,
-                stablePathQuality: e.data?.stablePathQuality,
-                _layoutEpoch: e.data?._layoutEpoch
-            };
-            if (
-                computedPath
-                && (edge.data.layoutPathLocked === true || edge.data._layoutPathLocked === true)
-            ) {
-                // React Flow's built-in smoothstep renderer ignores computedPath.
-                // A domain strategy's locked path must render immediately while
-                // the display worker validates the final candidate; otherwise a
-                // rejected worker leaves every edge on invalid transition-time
-                // handle coordinates in wide LR layouts.
-                edge.type = 'stablePath';
-            }
-
-            return edge;
-        });
-
-    return sanitized;
-}
 
 export function useLayoutStrategy({
     setNodes,
@@ -314,6 +189,7 @@ export function useLayoutStrategy({
     reactFlowInstance,
     diagramId,
     loadLayoutPresetMap,
+    setLayoutStable,
 }: UseLayoutStrategyParams) {
     // [对齐 SVG 版] 跟踪当前域布局策略和方向
     const [lastDomainStrategy, setLastDomainStrategy] = useState<string>('domain-dagre');
@@ -326,6 +202,14 @@ export function useLayoutStrategy({
             dispatchDiagramControl('fit', diagramId);
         });
     }, [diagramId]);
+    const commitLayout = useLayoutRoutingTransaction({
+        setNodes,
+        setEdges,
+        setLayoutStable,
+        nodesRef,
+        edgesRef,
+        takeSnapshot,
+    });
 
     /** ═══════════════════════════════════════════════════════════════
      * 统一布局入口（对齐 SVG 版 handleAutoLayout）
@@ -335,14 +219,6 @@ export function useLayoutStrategy({
      * ═══════════════════════════════════════════════════════════════ */
     const handleStrategyLayout = useCallback(async (strategyName: string, nodeLayout?: string, direction?: 'TB' | 'LR') => {
         const dir = direction || 'TB';
-
-        // [对齐 SVG 版] 跟踪当前域布局策略和方向
-        if (strategyName.startsWith('domain-')) {
-            setLastDomainStrategy(strategyName);
-            setLastDomainDirection(dir);
-            if (nodeLayout) setLastNodeLayout(nodeLayout);
-        }
-        takeSnapshot(nodesRef.current, edgesRef.current);
 
         try {
             const rawNodes = nodesRef.current;
@@ -375,7 +251,7 @@ export function useLayoutStrategy({
             const nonLayoutTypes = new Set(['mindmap', 'mindmap-boundary', 'sticky-note']);
             const excludedTypes = new Set([...containerTypes, ...nonLayoutTypes]);
             const plainNodes = allNodes.filter(n => !excludedTypes.has(n.type || ''));
-            const layoutNodes = plainNodes.map(n => ({
+            const layoutNodes = plainNodes.map(n => clearLayoutRuntimeAbsolutePosition({
                 ...n,
                 position: toAbsolutePosition(n),
                 parentId: undefined,
@@ -383,37 +259,63 @@ export function useLayoutStrategy({
             }));
             const nodeIdSet = new Set(layoutNodes.map(n => n.id));
             const layoutEdges = allEdges.filter(e => nodeIdSet.has(e.source) && nodeIdSet.has(e.target));
-            if (layoutNodes.length === 0) { logLayoutNoLayoutableNodes(); return; }
+            if (layoutNodes.length === 0) { logLayoutNoLayoutableNodes(); return false; }
 
             if (strategyName === 'tree') {
                 // ── 扁平树形布局（对齐 SVG 版：不检测域） ──
                 const { refineLayout } = await import('../../../strategies/shared/LayoutRefinement');
-                const positions = treeLayout(layoutNodes, layoutEdges, { direction: dir });
-                const newNodes = applyLayout(layoutNodes, positions);
+                const usesNativeTreeLayout = isDirectedForestLayoutGraph(layoutNodes, layoutEdges);
+                let newNodes: Node[];
+                let treeSourceEdges = layoutEdges;
+                if (usesNativeTreeLayout) {
+                    const positions = treeLayout(layoutNodes, layoutEdges, {
+                        direction: dir,
+                        ...LAYERED_TREE_ROUTING_SPACING,
+                    });
+                    newNodes = applyLayout(layoutNodes, positions);
+                } else {
+                    // A graph with multiple parents or feedback cycles is not a
+                    // tree. Use the industry layered engine for ranking while
+                    // retaining the user's Tree command and the common hard
+                    // routing transaction.
+                    const { DomainElkLayoutStrategy } = await import('../../../strategies/DomainElkLayoutStrategy');
+                    const layered = await new DomainElkLayoutStrategy().calculateLayout(
+                        layoutNodes,
+                        layoutEdges,
+                        {
+                            type: 'elk-layered' as LayoutOptions['type'],
+                            direction: dir,
+                            nodeLayout: 'elk-layered' as LayoutOptions['nodeLayout'],
+                            spacing: {
+                                horizontal: LAYERED_TREE_ROUTING_SPACING.nodeSpacing,
+                                vertical: LAYERED_TREE_ROUTING_SPACING.levelSpacing,
+                            },
+                            edgeRouting: 'ORTHOGONAL',
+                            padding: { top: 40, right: 20, bottom: 20, left: 20 },
+                        },
+                    );
+                    newNodes = layered.nodes;
+                    treeSourceEdges = layered.edges;
+                }
                 // [FIX] 保留非流程图节点
                 const treeNodeIds = new Set(newNodes.map(n => n.id));
                 const treePreserved = allNodes.filter(n => nonLayoutTypes.has(n.type || '') && !treeNodeIds.has(n.id));
                 const treeResultRaw = [...newNodes, ...treePreserved];
                 // ⭐ 路由感知后处理：优化节点位置以改善连线质量
-                const { nodes: treeResult } = refineLayout(treeResultRaw, layoutEdges, {
-                    direction: dir,
-                    enableChannelSpacing: true,
-                    enableCrossingMinimization: true,
-                    enableNodeNudging: false,
-                });
-                // [FIX] Clear handles + cached data BEFORE animation — let smart port selection decide
-                setEdges(prev => prev.map(e => ({ ...e, sourceHandle: null, targetHandle: null, data: { ...e.data, waypoints: [], computedPath: undefined, elkPath: undefined, algorithm: undefined, _layoutEpoch: undefined } })));
-                EdgeRoutingCoordinator.getInstance().forceClearAllCaches();
-                // ⭐ 平滑过渡动画（edges already have clean data）
-                await animateLayoutTransition(setNodes, treeResult, { onComplete: twoStepFitView });
-                // [FIX] Post-animation safety clear
-                EdgeRoutingCoordinator.getInstance().forceClearAllCaches();
-                // [FIX] Double RAF: let RF recompute positionAbsolute, then re-trigger edges
-                await runAfterLayoutRenderFrames(() => {
-                    EdgeRoutingCoordinator.getInstance().forceClearAllCaches();
-                    setEdges(prev => prev.map(e => ({ ...e, data: { ...e.data, _layoutEpoch: Date.now() } })));
-                    flushObstacles();
-                });
+                const treeResult = usesNativeTreeLayout
+                    ? refineLayout(treeResultRaw, layoutEdges, {
+                        direction: dir,
+                        enableChannelSpacing: true,
+                        enableCrossingMinimization: true,
+                        enableNodeNudging: false,
+                    }).nodes
+                    : treeResultRaw;
+                // A layered tree has a strong flow direction. Supplying fixed
+                // side candidates gives the router the same port constraint
+                // used by commercial layered layout engines. Same-rank and
+                // return edges still follow their actual relative geometry.
+                const treeEdges = prepareLayeredLayoutEdges(treeResult, treeSourceEdges, dir);
+                await commitLayout({ nodes: treeResult, edges: treeEdges, onCommitted: twoStepFitView });
             } else if (strategyName === 'force') {
                 // ── 扁平力导向布局（对齐 SVG 版：不检测域） ──
                 const { refineLayout } = await import('../../../strategies/shared/LayoutRefinement');
@@ -430,27 +332,18 @@ export function useLayoutStrategy({
                     enableCrossingMinimization: true,
                     enableNodeNudging: false,
                 });
-                // [FIX] Clear handles + cached data BEFORE animation — let smart port selection decide
-                setEdges(prev => prev.map(e => ({
+                const forceEdges = layoutEdges.map(e => ({
                     ...e,
                     sourceHandle: null,
                     targetHandle: null,
-                    data: { ...e.data, waypoints: [], computedPath: undefined, elkPath: undefined, algorithm: undefined, _layoutEpoch: undefined }
-                })));
-                EdgeRoutingCoordinator.getInstance().forceClearAllCaches();
-                // ⭐ 平滑过渡动画（edges already have clean data）
-                await animateLayoutTransition(setNodes, forceResult, { onComplete: twoStepFitView });
-                // [FIX] Post-animation safety clear
-                EdgeRoutingCoordinator.getInstance().forceClearAllCaches();
-                // [FIX] Double RAF: let RF recompute positionAbsolute, then re-trigger edges
-                await runAfterLayoutRenderFrames(() => {
-                    EdgeRoutingCoordinator.getInstance().forceClearAllCaches();
-                    setEdges(prev => prev.map(e => ({ ...e, data: { ...e.data, _layoutEpoch: Date.now() } })));
-                    flushObstacles();
-                });
+                    type: clearLayoutEdgeRoutingType(e),
+                    data: clearBaseReactFlowLayoutEdgeRoutingData(e.data),
+                }));
+                await commitLayout({ nodes: forceResult, edges: forceEdges, onCommitted: twoStepFitView });
             } else {
                 // ── 域感知策略布局 ──
                 const isDomainDagre = strategyName === 'domain-dagre' || strategyName === 'domain-dagre-sub-horizontal' || strategyName === 'dagre';
+                const isDomainElk = strategyName === 'domain-elk' || strategyName === 'elk';
                 const isDomainDagreSubHorizontal = strategyName === 'domain-dagre-sub-horizontal';
                 const finalNodeLayout = isDomainDagre
                     ? 'dagre'
@@ -531,7 +424,10 @@ export function useLayoutStrategy({
                     type: strategy.getName() as LayoutOptions['type'],
                     direction: dir,
                     nodeLayout: finalNodeLayout as LayoutOptions['nodeLayout'],
-                    spacing: { horizontal: 50, vertical: 50 },
+                    spacing: isDomainElk
+                        ? { horizontal: 120, vertical: 120 }
+                        : { horizontal: 50, vertical: 50 },
+                    edgeRouting: isDomainElk ? 'ORTHOGONAL' : undefined,
                     padding: { top: 40, right: 20, bottom: 20, left: 20 },
                     ...generatedGroupOptions,
                     fitDomainContent: true,
@@ -558,29 +454,29 @@ export function useLayoutStrategy({
                         result.edges,
                         finalNodeIds,
                     );
-                    setEdges(sanitizeLayoutEdges(finalNodes, preservedResultEdges, dir));
-                    EdgeRoutingCoordinator.getInstance().forceClearAllCaches();
-                    await animateLayoutTransition(setNodes, finalNodes, { onComplete: twoStepFitView });
-                    // [FIX] Post-animation safety clear
-                    EdgeRoutingCoordinator.getInstance().forceClearAllCaches();
-                    // [FIX] ROOT CAUSE FIX: After setNodes(targetNodes), React Flow needs one render cycle
-                    // to recompute `internals.positionAbsolute` for child nodes (those with parentId).
-                    // Smart edges read `nodeLookup.internals.positionAbsolute` — if stale, centeredCoords
-                    // get wrong absolute coords (e.g. sourceY=2570 instead of 200).
-                    // Double RAF ensures RF's internal state is updated before we force edge re-render.
-                    await runAfterLayoutRenderFrames(() => {
-                        EdgeRoutingCoordinator.getInstance().forceClearAllCaches();
-                        // Touch edges to force re-render with fresh positionAbsolute.
-                        const layoutEpoch = Date.now();
-                        setEdges(prev => prev.map(e => refreshDomainLayoutEdgeForRender(e, layoutEpoch)));
-                        flushObstacles();
-                    });
+                    // Layered layout engines own ranking and node coordinates;
+                    // the shared Worker transaction owns ports and final paths.
+                    const finalEdges = isDomainElk || isDomainDagre
+                        ? prepareLayeredLayoutEdges(finalNodes, preservedResultEdges, dir)
+                        : preservedResultEdges.map(edge => ({
+                            ...edge,
+                            sourceHandle: null,
+                            targetHandle: null,
+                            type: clearLayoutEdgeRoutingType(edge),
+                            data: clearBaseReactFlowLayoutEdgeRoutingData(edge.data),
+                        }));
+                    await commitLayout({ nodes: finalNodes, edges: finalEdges, onCommitted: twoStepFitView });
                 }
             }
+            setLastDomainStrategy(strategyName);
+            setLastDomainDirection(dir);
+            if (nodeLayout) setLastNodeLayout(nodeLayout);
+            return true;
         } catch (err) {
             logLayoutStrategyFailure(strategyName, err);
+            return false;
         }
-    }, [diagramId, loadLayoutPresetMap, reactFlowInstance, setNodes, setEdges, takeSnapshot, nodesRef, edgesRef, twoStepFitView]);
+    }, [commitLayout, diagramId, loadLayoutPresetMap, reactFlowInstance, nodesRef, edgesRef, twoStepFitView]);
 
     return {
         handleStrategyLayout,

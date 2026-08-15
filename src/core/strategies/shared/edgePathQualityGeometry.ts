@@ -616,6 +616,20 @@ export function calculateEdgePairQuality(
   for (const first of firstSegments) {
     for (const second of secondSegments) {
       if (strictlyCrosses(first, second)) {
+        const crossingPoint = first.axis === 'h'
+          ? { x: second.a.x, y: first.a.y }
+          : { x: first.a.x, y: second.a.y };
+        const softBridge = `;${crossingPoint.x},${crossingPoint.y};`;
+        const firstLineHops = firstEdge.data?.h;
+        const secondLineHops = secondEdge.data?.h;
+        const crossingIsAwayFromBends = (
+          (typeof firstLineHops === 'string' && firstLineHops.includes(softBridge))
+          || (typeof secondLineHops === 'string' && secondLineHops.includes(softBridge))
+        ) && [first, second].every(segment => (
+          segmentLength(segment.a, crossingPoint) >= 24
+          && segmentLength(segment.b, crossingPoint) >= 24
+        ));
+        if (crossingIsAwayFromBends) continue;
         if (!crossingTouchesSharedEndpoint(
           firstEdge,
           secondEdge,

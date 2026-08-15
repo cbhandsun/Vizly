@@ -1,9 +1,9 @@
 {
   "schema": "vizly-precompiled-display-route-v1",
-  "routingVersion": "2026-08-14-autosave-route-migration-v177",
+  "routingVersion": "8",
   "sourceHash": "source-v1:2a580f110590a416ff1aeb9fb5a3cd21536428e26368841fd160f87243cc25d3",
-  "inputSignature": "917577053",
-  "inputGeometryDigest": "geometry-v1:46d562df5afe93a7e4a437f3e023615b",
+  "inputSignature": "4172950488",
+  "inputGeometryDigest": "geometry-v1:bc5cdf7d0ca289e500ec8289eb4854d9",
   "outputRouteSignature": "route-v2:44:195:201731ee3ab0cfac",
   "hardClean": true,
   "patches": [
@@ -12,6 +12,8 @@
       "source": "allocation",
       "target": "allocation-rollback",
       "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
@@ -40,6 +42,7 @@
       "target": "atp-check",
       "type": "stablePath",
       "sourceHandle": "top",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
@@ -72,6 +75,8 @@
       "source": "allocation",
       "target": "batch-lot",
       "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
@@ -99,6 +104,8 @@
       "source": "allocation",
       "target": "reservation",
       "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
@@ -126,6 +133,8 @@
       "source": "allocation",
       "target": "slotting",
       "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
@@ -144,6 +153,8 @@
       "source": "allocation",
       "target": "task-generate",
       "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
@@ -179,6 +190,8 @@
       "source": "allocation",
       "target": "wave-planning",
       "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
@@ -214,6 +227,8 @@
       "source": "exception-alert",
       "target": "labor-kpi",
       "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
@@ -240,6 +255,8 @@
       "source": "labor-kpi",
       "target": "labor-schedule-feedback",
       "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
@@ -259,6 +276,7 @@
       "target": "allocation",
       "type": "stablePath",
       "sourceHandle": "bottom",
+      "targetHandle": "right",
       "data": {
         "computedPath": [
           {
@@ -369,6 +387,7 @@
       "target": "exception-alert",
       "type": "stablePath",
       "sourceHandle": "left",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
@@ -396,6 +415,8 @@
       "source": "operation",
       "target": "labor-kpi",
       "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
@@ -431,6 +452,8 @@
       "source": "operation",
       "target": "loading-handover",
       "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
@@ -458,6 +481,8 @@
       "source": "operation",
       "target": "packing-exec",
       "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
@@ -486,6 +511,7 @@
       "target": "path-heatmap",
       "type": "stablePath",
       "sourceHandle": "left",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
@@ -515,6 +541,7 @@
       "target": "picking-exec",
       "type": "stablePath",
       "sourceHandle": "top",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
@@ -539,6 +566,8 @@
       "source": "operation",
       "target": "qc-exec",
       "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
@@ -566,6 +595,8 @@
       "source": "operation",
       "target": "real-time-board",
       "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
@@ -594,6 +625,7 @@
       "target": "replenish-exec",
       "type": "stablePath",
       "sourceHandle": "top",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
@@ -626,6 +658,8 @@
       "source": "operation",
       "target": "sorting-exec",
       "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
@@ -653,6 +687,8 @@
       "source": "operation",
       "target": "uph-calc",
       "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
@@ -681,6 +717,8 @@
       "source": "operation",
       "target": "wcs-integration",
       "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
@@ -709,6 +747,8 @@
       "source": "order-input",
       "target": "allocation",
       "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
@@ -736,6 +776,8 @@
       "source": "order-input",
       "target": "order-exception",
       "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
@@ -773,6 +815,7 @@
       "target": "order-import",
       "type": "stablePath",
       "sourceHandle": "top",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
@@ -797,6 +840,8 @@
       "source": "order-input",
       "target": "order-sla-classify",
       "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
@@ -815,6 +860,8 @@
       "source": "order-input",
       "target": "order-split-merge",
       "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
@@ -843,6 +890,8 @@
       "source": "order-input",
       "target": "order-validate",
       "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
@@ -870,6 +919,8 @@
       "source": "path-heatmap",
       "target": "labor-kpi",
       "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
@@ -904,6 +955,8 @@
       "source": "real-time-board",
       "target": "labor-kpi",
       "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
@@ -931,6 +984,7 @@
       "target": "pack-task-gen",
       "type": "stablePath",
       "sourceHandle": "bottom",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
@@ -955,6 +1009,8 @@
       "source": "task-generate",
       "target": "pick-task-gen",
       "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
@@ -991,6 +1047,8 @@
       "source": "task-generate",
       "target": "qc-task-gen",
       "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
@@ -1018,6 +1076,8 @@
       "source": "task-generate",
       "target": "replenish-task-gen",
       "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
@@ -1046,6 +1106,8 @@
       "source": "task-generate",
       "target": "sort-task-gen",
       "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
@@ -1064,6 +1126,8 @@
       "source": "task-generate",
       "target": "task-group",
       "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
@@ -1115,6 +1179,8 @@
       "source": "task-group",
       "target": "container-assign",
       "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
@@ -1135,6 +1201,7 @@
       "target": "cutoff-grouping",
       "type": "stablePath",
       "sourceHandle": "bottom",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
@@ -1158,6 +1225,8 @@
       "source": "task-group",
       "target": "operation",
       "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
@@ -1193,6 +1262,8 @@
       "source": "task-group",
       "target": "priority-sequence",
       "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
@@ -1221,6 +1292,8 @@
       "source": "task-group",
       "target": "wave-build",
       "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
@@ -1249,6 +1322,8 @@
       "source": "task-group",
       "target": "zone-group",
       "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
@@ -1276,6 +1351,8 @@
       "source": "uph-calc",
       "target": "labor-kpi",
       "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {

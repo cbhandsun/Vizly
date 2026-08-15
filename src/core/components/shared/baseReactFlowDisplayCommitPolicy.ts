@@ -4,12 +4,11 @@ import type {
 } from './baseReactFlowDisplayWorkerProtocol';
 
 export const shouldRepairBaseReactFlowDisplayResult = ({
-  qualityMode,
   hardClean,
 }: {
   qualityMode: DisplayQualityMode;
   hardClean: boolean;
-}): boolean => qualityMode === 'full' && !hardClean;
+}): boolean => !hardClean;
 
 export const canCommitBaseReactFlowDisplayResult = ({
   qualityMode,
@@ -21,10 +20,10 @@ export const canCommitBaseReactFlowDisplayResult = ({
   hardClean: boolean;
   routeResolution: DisplayEdgesWorkerRouteResolution;
   routesMatch: boolean;
-}): boolean => routesMatch && (
-  hardClean
-  || (
-    qualityMode === 'interactive'
-    && routeResolution === 'full-route'
-  )
-);
+}): boolean => {
+  // Quality mode and route resolution describe how a candidate was produced;
+  // neither is permission to display a route that failed the hard gate.
+  void qualityMode;
+  void routeResolution;
+  return routesMatch && hardClean;
+};

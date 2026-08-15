@@ -1,0 +1,295 @@
+import type { Edge, Node } from '@xyflow/react';
+import type { MutableRefObject } from 'react';
+
+import { computeBaseReactFlowDisplayOutputRouteSignature } from './baseReactFlowDisplayCache';
+import { writeBaseReactFlowDisplayCommittedSnapshot } from './baseReactFlowDisplayCommittedSnapshot';
+import { anchorComputedDisplayEdgeEndpoints } from './baseReactFlowDisplayEndpointAnchoring';
+import {
+  canCommitBaseReactFlowDisplayResult,
+  shouldRepairBaseReactFlowDisplayResult,
+} from './baseReactFlowDisplayCommitPolicy';
+import { computeBaseReactFlowDisplayInputIdentityBundle } from './baseReactFlowDisplayInputIdentity';
+import { synthesizeStableFallbackPath } from './baseReactFlowDisplayEdgeCore';
+import {
+  createBaseReactFlowDisplayEdgePatches,
+  doBaseReactFlowDisplayRoutesMatchExactly,
+  mergeBaseReactFlowDisplayRoutingTransactions,
+} from './baseReactFlowDisplayRoutingTransaction';
+import {
+  computeBaseReactFlowDisplayEdgesInWorker,
+  projectBaseReactFlowDisplayWorkerInput,
+  repairBaseReactFlowDisplayEdgesInWorker,
+  type BaseReactFlowDisplayWorkerResult,
+} from './baseReactFlowDisplayWorkerClient';
+import { DISPLAY_WORKER_TIMEOUT_MS } from './baseReactFlowDisplayWorkerTimeout';
+import { recordBaseReactFlowRejectedDisplayDiagnostics } from './baseReactFlowDisplayRejectedDiagnostics';
+
+export type BaseReactFlowLayoutRoutingCommit = Readonly<{
+  routedEdges: Edge[];
+}>;
+
+export const clearBaseReactFlowLayoutEdgeRoutingData = (data: Edge['data']): Edge['data'] => ({
+  ...data,
+  waypoints: [],
+  computedPath: undefined,
+  elkPath: undefined,
+  treeRouting: undefined,
+  algorithm: undefined,
+  auto: undefined,
+  autoSource: undefined,
+  autoTarget: undefined,
+  _layoutEpoch: undefined,
+  layoutPathLocked: undefined,
+  _layoutPathLocked: undefined,
+  runtimeHandleLock: undefined,
+  _runtimeHandleLock: undefined,
+  __baseDisplayFinalizedSignature: undefined,
+  stablePathQuality: undefined,
+  isTreeBus: undefined,
+  sharedTrunkAware: undefined,
+  sharedTrunkSynthesized: undefined,
+  overextendedTargetTrunkCorridorReclaimed: undefined,
+  useElkRouting: undefined,
+  layoutRoutingCandidate: undefined,
+  h: undefined,
+});
+
+/**
+ * The full-quality worker refines an existing orthogonal candidate. Dynamic
+ * layouts therefore receive a private, geometry-anchored seed; this candidate
+ * is never visible and still has to pass the final hard-quality transaction.
+ */
+export const seedBaseReactFlowStagedLayoutEdges = ({
+  sourceEdges,
+  sourceNodes,
+}: {
+  sourceEdges: Edge[];
+  sourceNodes: Node[];
+}): Edge[] => {
+  const projected = projectBaseReactFlowDisplayWorkerInput({
+    edges: sourceEdges,
+    nodes: sourceNodes,
+  });
+  const nodeById = new Map(projected.nodes.map(node => [node.id, node] as const));
+  const seededEdges = projected.edges.map((edge) => {
+    if (String(edge.type ?? '').toLowerCase() === 'canvas-ref') return edge;
+    const data = edge.data && typeof edge.data === 'object'
+      ? edge.data as Record<string, unknown>
+      : {};
+    const elkPath = data.layoutRoutingCandidate === true && Array.isArray(data.elkPath)
+      && data.elkPath.length >= 2
+      && data.elkPath.every(point => (
+        point !== null
+        && typeof point === 'object'
+        && !Array.isArray(point)
+        && Number.isFinite((point as Record<string, unknown>).x)
+        && Number.isFinite((point as Record<string, unknown>).y)
+      ))
+      ? data.elkPath as Array<{ x: number; y: number }>
+      : null;
+    if (elkPath) {
+      return {
+        ...edge,
+        type: 'stablePath',
+        data: {
+          ...clearBaseReactFlowLayoutEdgeRoutingData(edge.data),
+          computedPath: elkPath.map(point => ({ ...point })),
+          layoutPathLocked: true,
+          _layoutPathLocked: true,
+          algorithm: 'elk-layout-candidate',
+        },
+      };
+    }
+    return synthesizeStableFallbackPath({
+      edge: {
+        ...edge,
+        type: 'stablePath',
+        data: clearBaseReactFlowLayoutEdgeRoutingData(edge.data),
+      },
+      nodeById,
+    });
+  });
+  return anchorComputedDisplayEdgeEndpoints(seededEdges, projected.nodes);
+};
+
+/**
+ * Validates an off-screen route against the exact edge graph that will be
+ * committed. Its snapshot is keyed to the target geometry, so React Flow can
+ * only reuse it when the rendered geometry is identical.
+ */
+export const commitBaseReactFlowStagedLayoutRoutingResult = ({
+  sourceEdges,
+  sourceNodes,
+  workerResult,
+  enableSmartEdges = true,
+  smartEdgePadding = 20,
+  isLargeGraph = false,
+}: {
+  sourceEdges: Edge[];
+  sourceNodes: Node[];
+  workerResult: BaseReactFlowDisplayWorkerResult;
+  enableSmartEdges?: boolean;
+  smartEdgePadding?: number;
+  isLargeGraph?: boolean;
+}): BaseReactFlowLayoutRoutingCommit | null => {
+  const workerRoutingPatches = createBaseReactFlowDisplayEdgePatches(
+    workerResult.projectedEdges,
+    workerResult.edges,
+  );
+  if (!workerRoutingPatches) return null;
+
+  const merged = mergeBaseReactFlowDisplayRoutingTransactions({
+    latestSourceEdges: sourceEdges,
+    workerRoutingPatches,
+  });
+  if (!merged) return null;
+
+  const routesMatch = doBaseReactFlowDisplayRoutesMatchExactly(
+    workerResult.edges,
+    merged.edges,
+  );
+  if (!canCommitBaseReactFlowDisplayResult({
+    qualityMode: 'full',
+    hardClean: workerResult.hardClean,
+    routeResolution: workerResult.routeResolution,
+    routesMatch,
+  })) return null;
+
+  const outputRouteSignature = computeBaseReactFlowDisplayOutputRouteSignature(merged.edges);
+  const displayPatches = createBaseReactFlowDisplayEdgePatches(merged.edges, merged.edges);
+  if (!outputRouteSignature || !displayPatches) return null;
+  const identity = computeBaseReactFlowDisplayInputIdentityBundle({
+    nodes: sourceNodes,
+    edges: merged.edges,
+    enableSmartEdges,
+    smartEdgePadding,
+    isLargeGraph,
+  });
+  if (!writeBaseReactFlowDisplayCommittedSnapshot({
+    inputSignature: identity.cacheSignature,
+    inputGeometryDigest: identity.geometryDigest,
+    sourceEdges: merged.edges,
+    sourceNodes,
+    displayPatches,
+    outputRouteSignature,
+  })) return null;
+  return { routedEdges: merged.edges };
+};
+
+/** Routes target layout geometry without mutating the visible graph. */
+export const stageBaseReactFlowLayoutRouting = async ({
+  workerRef,
+  requestId,
+  sourceEdges,
+  sourceNodes,
+  enableSmartEdges = true,
+  smartEdgePadding = 20,
+  isLargeGraph,
+  signal,
+}: {
+  workerRef: MutableRefObject<Worker | null>;
+  requestId: string;
+  sourceEdges: Edge[];
+  sourceNodes: Node[];
+  enableSmartEdges?: boolean;
+  smartEdgePadding?: number;
+  isLargeGraph: boolean;
+  signal?: AbortSignal;
+}): Promise<BaseReactFlowLayoutRoutingCommit> => {
+  const unseededSourceEdges = sourceEdges.map(edge => ({
+    ...edge,
+    data: clearBaseReactFlowLayoutEdgeRoutingData(edge.data),
+  }));
+  const projectedSource = projectBaseReactFlowDisplayWorkerInput({
+    edges: unseededSourceEdges,
+    nodes: sourceNodes,
+  });
+  const stagedSeedEdges = seedBaseReactFlowStagedLayoutEdges({
+    sourceEdges,
+    sourceNodes,
+  });
+  // ELK and the geometry-anchored fallback already provide a complete hidden
+  // candidate. Run the bounded measured repair first: clean candidates commit
+  // in one short pass, while rejected candidates still fall through to the
+  // unchanged full-quality route and hard gate.
+  const candidateRepairResult = await repairBaseReactFlowDisplayEdgesInWorker({
+    workerRef,
+    requestId: `${requestId}:candidate-repair`,
+    edges: stagedSeedEdges,
+    nodes: sourceNodes,
+    timeoutMs: DISPLAY_WORKER_TIMEOUT_MS,
+    signal,
+    requireHardClean: false,
+  });
+  const candidateCommit = candidateRepairResult.hardClean
+    ? commitBaseReactFlowStagedLayoutRoutingResult({
+      sourceEdges: unseededSourceEdges,
+      sourceNodes: projectedSource.nodes,
+      workerResult: {
+        ...candidateRepairResult,
+        projectedEdges: projectedSource.edges,
+      },
+      enableSmartEdges,
+      smartEdgePadding,
+      isLargeGraph,
+    })
+    : null;
+  if (candidateCommit) return candidateCommit;
+  const fallbackSeedEdges = seedBaseReactFlowStagedLayoutEdges({
+    sourceEdges: unseededSourceEdges,
+    sourceNodes,
+  });
+  const initialResult = await computeBaseReactFlowDisplayEdgesInWorker({
+    workerRef,
+    requestId,
+    edges: fallbackSeedEdges,
+    nodes: sourceNodes,
+    enableSmartEdges,
+    smartEdgePadding,
+    isLargeGraph,
+    displayEdgeEpoch: 0,
+    qualityMode: 'full',
+    timeoutMs: DISPLAY_WORKER_TIMEOUT_MS,
+    signal,
+  });
+  const repairedResult = shouldRepairBaseReactFlowDisplayResult({
+    qualityMode: 'full',
+    hardClean: initialResult.hardClean,
+  })
+    ? await repairBaseReactFlowDisplayEdgesInWorker({
+      workerRef,
+      requestId: `${requestId}:repair`,
+      edges: initialResult.edges,
+      nodes: sourceNodes,
+      timeoutMs: DISPLAY_WORKER_TIMEOUT_MS,
+      signal,
+      requireHardClean: false,
+    })
+    : initialResult;
+  const workerResult = {
+    ...(repairedResult === initialResult ? initialResult : repairedResult),
+    // Route patches must be calculated against the unseeded business graph;
+    // otherwise an unchanged successful seed would disappear during merge.
+    projectedEdges: projectedSource.edges,
+  };
+  const committed = commitBaseReactFlowStagedLayoutRoutingResult({
+    sourceEdges: unseededSourceEdges,
+    sourceNodes: projectedSource.nodes,
+    workerResult,
+    enableSmartEdges,
+    smartEdgePadding,
+    isLargeGraph,
+  });
+  if (!committed) {
+    if (import.meta.env.DEV) {
+      recordBaseReactFlowRejectedDisplayDiagnostics({
+        edges: workerResult.edges,
+        nodes: sourceNodes,
+        sourceEdges,
+        initialEdges: initialResult.edges,
+      });
+    }
+    throw new Error('layout-routing-hard-quality-rejected');
+  }
+  return committed;
+};

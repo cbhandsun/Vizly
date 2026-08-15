@@ -47,6 +47,7 @@ import {
   repairFastDisplayHardSafety,
 } from './baseReactFlowFastEdgeSafety';
 import { getDisplayComputedPath } from './baseReactFlowDisplayGeometry';
+import { commercialEdgeDetoursDoNotRegress } from './baseReactFlowDisplayCommercialDetourGuard';
 
 interface DisplayEdgesWorkerScope {
   postMessage: (response: DisplayEdgesWorkerResponse) => void;
@@ -344,7 +345,7 @@ const finalizeContainerClearanceResponse = (
       || response.routeResolution === 'repaired-candidate'
     )
   ) {
-    return finalizeContainerClearanceResponse(finalizedResponse, nodes, {
+    const stabilizedResponse = finalizeContainerClearanceResponse(finalizedResponse, nodes, {
       ...options,
       commercialStabilizationPass: (options.commercialStabilizationPass ?? 0) + 1,
       // Stabilization must start from the last accepted route. Reusing the
@@ -353,6 +354,16 @@ const finalizeContainerClearanceResponse = (
       // exact endpoint roles and legal true-trunk membership intact.
       preferredEdges: finalizedResponse.edges,
     });
+    const stabilizedEdges = stabilizedResponse.edges;
+    return stabilizedEdges
+      && stabilizedResponse.hardClean !== false
+      && commercialEdgeDetoursDoNotRegress(
+        finalizedResponse.edges ?? [],
+        stabilizedEdges,
+        Array.from(stabilizedEdges.keys()),
+      )
+      ? stabilizedResponse
+      : finalizedResponse;
   }
   return finalizedResponse;
 };

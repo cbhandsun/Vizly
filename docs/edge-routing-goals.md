@@ -356,6 +356,19 @@
 55. **双角色边补入缺失真主干时允许有界局部折返** — 已经属于另一端 true trunk 的自动 dual-trunk edge，若补入同端现有真主干会增加少量 backtrack，不得仅凭该软分数否决真实共享关系；但例外只能作用于跨 side 的双角色成员，默认新增 backtrack 上限为 `128px`。候选仍须保留另一端 trunk 的 edge set 与 common stem，且非正交、严格交叉、节点命中、反向/无关/未解释 overlap、短 stub、tiny dogleg、hairpin、端点 attached/anchored 和端口顺序全部不得退化。超过上限、普通单角色边或人工/固定端口一律沿用原硬门禁并拒绝候选。
 56. **源端与目标端捷径必须可独立提交** — 一条硬门禁已通过的外侧路线，可能只需要调整 source side，也可能只需要调整 target side；不能把“另一端已经做过运行时换侧”升级成整边不可再优化。单端捷径应保留另一端已接受的 corridor、端口和 true trunk membership，只在本端使用 `>=56px` 的 render-safe endpoint stub 接回既有路线；候选生成器与最终短 stub 门禁必须复用同一最小值，禁止生成后必然被终审淘汰的 32/48px 微短桩。候选先做逐边节点净距、障碍和短 stub 预筛，再进入全图正交、严格交叉、overlap、端口顺序和双端主干门禁。候选数、每边深度与全图评估次数必须分别有上限，禁止通过 16 个 side pair 的无差别全图枚举换取少量折点优化。
 
+## 近期布局与路由协同方案（2026-08）
+
+1. **布局按拓扑分派** — `Tree` 只直接处理有向有根森林；多父节点、反馈环和自环自动交给同方向的 ELK Layered 排名。菜单语义仍保持 Tree，但不再把非树图强塞进树算法。
+2. **提供显式行业分层布局** — 增加 `ELK Orthogonal Layered (Top–Bottom)` 与 `ELK Orthogonal Layered (Left–Right)`。它们使用 ELK Layered 的正交路由提示、模型顺序策略、layer sweep crossing minimization、two-sided greedy switch、straight-edge preference 与有界 thoroughness。
+3. **布局与最终路由职责分离** — ELK 布局阶段只计算节点层级与坐标；最终边路径统一交给 Worker 中的完整路由事务。布局阶段不得先执行一次完整 HandlePicker/全局路由，再把结果清空后重复计算。
+4. **轻量路由画像必须保留** — 延迟完整寻路只省略路径搜索，不得丢弃 `obstacleScope`、`obstaclePadding`、节点内走廊策略和正交渲染参数，否则会把本可一次通过的图推入昂贵 repair/finalizer 阶段。
+5. **新布局仍遵守同一发布门禁** — 目标节点位置与候选边在屏幕外计算；只有精确路由补丁、端点 attached/anchored、正交、避障、严格交叉、overlap 与商业软质量均通过后才原子替换可见图。失败时保留旧图，不显示中间路径。
+6. **端口侧由最终几何决定** — 分层布局默认沿主方向进出；同层边和横向跨度显著大于纵向跨度的远对角边改用左右端口，避免被固定 bottom/top 端口迫使绕外圈。
+7. **性能验收必须绑定质量** — 同一图的冷/热布局分别记录节点布局、初始路由、repair/finalizer 与最终提交耗时；只有最终 route signature 和完整 hard report 等价时才能宣称提速。大图不得通过删除轻量画像、降低阈值或扩大超时制造表面性能。
+8. **DomainDagre 收口稳定方向** — DomainDagre 保留已通过硬门禁的纵向域感知布局；多父节点、反馈环与跨域边密集图的横向入口由 ELK Layered LR 取代。不得为保留不稳定的菜单项而降低障碍、严格交叉或端点门禁。
+9. **ELK 候选必须有独立安全回退** — 单段、有限、正交的 ELK section 可作为屏幕外的布局候选，先进入有界 measured repair；只有完整硬门禁通过才能直接提交。候选被拒绝时，必须从已清理的业务边重新生成独立几何 seed 并走原完整路由，不得用被拒绝的 ELK 路径污染回退基线；最终快照和补丁始终以未 seed 的业务图作为身份基线。
+10. **预编译补丁必须自包含渲染契约** — 产物生成以 Worker 投影边为路由输入，但运行时会合并到未投影的业务边；因此 `type`、source/target handle、路径、tree intent、trunk intent 与有界 line-hop 质量身份必须完整写入 routing-only patch，不能因其在投影输入中“未变化”而省略。生成后必须用真实生产源边重放并逐字匹配 output route signature，禁止只验证 artifact 自身 schema。
+
 ## 验证标准
 
 1. **以真实 SVG 几何为准** — 最终判断必须检查渲染后的 path/points，不能只看 worker metadata 或 peer group 信息

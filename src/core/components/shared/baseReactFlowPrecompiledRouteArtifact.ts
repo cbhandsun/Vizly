@@ -37,6 +37,7 @@ const ROUTING_DATA_KEYS = new Set([
   'computedPath',
   'elkPath',
   'treeRouting',
+  'h',
   ...ROUTING_INTENT_KEYS,
 ]);
 const TREE_ROUTING_KEYS = new Set(['effectiveSourceHandle', 'effectiveTargetHandle', 'points']);
@@ -101,6 +102,10 @@ const isRoutingDataPatch = (value: unknown, pointBudget: { total: number }): boo
   for (const key of ROUTING_INTENT_KEYS) {
     if (typeof value[key] !== 'undefined' && typeof value[key] !== 'boolean') return false;
   }
+  if (
+    typeof value.h !== 'undefined'
+    && (typeof value.h !== 'string' || value.h.length > 128)
+  ) return false;
   if (
     typeof value.computedPath !== 'undefined'
     && !isRoutingPath(value.computedPath, true, pointBudget)

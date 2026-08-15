@@ -1,5 +1,6 @@
 import type { Edge, Node } from '@xyflow/react';
 
+import { getEdgePath } from '../../strategies/shared/edgePathQualityGeometry';
 import { calculateEdgePathQualityScore } from '../../strategies/shared/edgeStrictCrossingGuard';
 import { collectBoundedDisplayRoutingPairDiagnostics } from './baseReactFlowDisplayDiagnostics';
 import { withDisplayAbsolutePositions } from './baseReactFlowDisplayEdgeCore';
@@ -44,7 +45,16 @@ const summarizeRejectedEdge = (
     sourcePortPolicy: data.sourcePortPolicy,
     targetPortPolicy: data.targetPortPolicy,
     layoutDirection: data.layoutDirection,
-    path: data.computedPath,
+    path: getEdgePath(edge),
+    routeStorage: {
+      computedPath: Array.isArray(data.computedPath),
+      elkPath: Array.isArray(data.elkPath),
+      treePath: Array.isArray(
+        data.treeRouting && typeof data.treeRouting === 'object'
+          ? (data.treeRouting as Record<string, unknown>).points
+          : undefined,
+      ),
+    },
     sourceNode: summarizeRejectedNode(nodes, edge.source),
     targetNode: summarizeRejectedNode(nodes, edge.target),
   };
@@ -53,9 +63,13 @@ const summarizeRejectedEdge = (
 export const recordBaseReactFlowRejectedDisplayDiagnostics = ({
   edges,
   nodes,
+  sourceEdges,
+  initialEdges,
 }: {
   edges: Edge[];
   nodes: Node[];
+  sourceEdges?: Edge[];
+  initialEdges?: Edge[];
 }): void => {
   const terminalNodes = withDisplayAbsolutePositions(
     nodes,
@@ -117,6 +131,28 @@ export const recordBaseReactFlowRejectedDisplayDiagnostics = ({
       pairBudget: {
         evaluatedPairCount: unexplainedPairReport.evaluatedPairCount,
         truncated: unexplainedPairReport.truncated,
+      },
+      routeSummary: {
+        routedEdgeCount: edges.filter(edge => getEdgePath(edge).length >= 2).length,
+        initialRoutedEdgeCount: initialEdges?.filter(edge => getEdgePath(edge).length >= 2).length,
+        sourceEdgeCount: sourceEdges?.length,
+        sourceTypes: sourceEdges?.slice(0, 20).map(edge => ({
+          id: edge.id,
+          type: edge.type,
+          sourceHandle: edge.sourceHandle,
+          targetHandle: edge.targetHandle,
+          sourcePortPolicy: (edge.data as Record<string, unknown> | undefined)?.sourcePortPolicy,
+          targetPortPolicy: (edge.data as Record<string, unknown> | undefined)?.targetPortPolicy,
+          runtimeHandleLock: (edge.data as Record<string, unknown> | undefined)?.runtimeHandleLock,
+          pathPointCount: getEdgePath(edge).length,
+        })),
+        initialTypes: initialEdges?.slice(0, 20).map(edge => ({
+          id: edge.id,
+          type: edge.type,
+          sourceHandle: edge.sourceHandle,
+          targetHandle: edge.targetHandle,
+          pathPointCount: getEdgePath(edge).length,
+        })),
       },
     },
   });

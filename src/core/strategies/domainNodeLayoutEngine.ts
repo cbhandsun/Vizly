@@ -8,6 +8,7 @@ export const resolveDomainNodeLayoutAlgorithm = (
   configuredAlgorithm: unknown,
 ): string => {
   const requested = normalizeLayoutName(requestedLayout);
+  if (requested === 'elklayered') return 'layered';
   if (requested.includes('concentric')) return 'radial';
   if (requested.includes('cytoscape') || requested.includes('fcose')) return 'force';
 

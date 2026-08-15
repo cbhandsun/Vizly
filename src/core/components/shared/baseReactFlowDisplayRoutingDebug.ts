@@ -72,6 +72,24 @@ export const updateDisplayRoutingDebugState = (patch: DisplayRoutingDebugState):
   }
 };
 
+export const updateDisplayRoutingLifecycleState = (
+  stage: string,
+  signature: string,
+  nodeCount: number,
+  edgeCount: number,
+): void => updateDisplayRoutingDebugState({ stage, signature, nodeCount, edgeCount });
+
+export const updateDisplayRoutingFinalAppliedState = (
+  patch: DisplayRoutingDebugState,
+): void => updateDisplayRoutingDebugState({
+  ...patch,
+  stage: 'final-applied',
+  boundedCandidate: undefined,
+  boundedCandidateTrace: undefined,
+  hardGateDiagnostics: undefined,
+  terminalDiagnostics: undefined,
+});
+
 export const appendDisplayRoutingPhaseProgress = (
   trace: DisplayRoutingPhaseTrace,
 ): void => {

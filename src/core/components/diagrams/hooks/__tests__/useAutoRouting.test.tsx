@@ -73,7 +73,7 @@ describe('useAutoRouting layout preference coordination', () => {
         mocks.autoPathSelection = true;
         mocks.forceClearAllCaches.mockReset();
         mocks.handleStrategyLayout.mockReset();
-        mocks.handleStrategyLayout.mockResolvedValue(undefined);
+        mocks.handleStrategyLayout.mockResolvedValue(true);
         mocks.syncAutoPathSelection.mockReset();
         mocks.applyRoutingProfile.mockReset();
     });
@@ -87,7 +87,8 @@ describe('useAutoRouting layout preference coordination', () => {
         act(() => {
             layoutPromise = result.current.handleStrategyLayout('tree');
         });
-        expect(result.current.isLayoutStable).toBe(false);
+        expect(result.current.isLayoutStable).toBe(true);
+        expect(result.current.isLayoutBusy).toBe(true);
 
         act(() => {
             result.current.setAutoRoutingEnabled(false);
@@ -97,6 +98,7 @@ describe('useAutoRouting layout preference coordination', () => {
 
         expect(result.current.autoRoutingEnabled).toBe(false);
         expect(result.current.isLayoutStable).toBe(true);
+        expect(result.current.isLayoutBusy).toBe(false);
     });
 
     it('enables routing after layout when the user preference did not change', async () => {
@@ -107,6 +109,7 @@ describe('useAutoRouting layout preference coordination', () => {
 
         expect(result.current.autoRoutingEnabled).toBe(true);
         expect(result.current.isLayoutStable).toBe(true);
+        expect(result.current.isLayoutBusy).toBe(false);
     });
 
     it('restores the stable flag when layout execution rejects', async () => {
@@ -118,6 +121,7 @@ describe('useAutoRouting layout preference coordination', () => {
         });
 
         expect(result.current.isLayoutStable).toBe(true);
+        expect(result.current.isLayoutBusy).toBe(false);
     });
 
     it('ignores overlapping layout requests until the active layout completes', async () => {
@@ -134,10 +138,12 @@ describe('useAutoRouting layout preference coordination', () => {
         });
 
         expect(mocks.handleStrategyLayout).toHaveBeenCalledTimes(1);
-        expect(result.current.isLayoutStable).toBe(false);
+        expect(result.current.isLayoutStable).toBe(true);
+        expect(result.current.isLayoutBusy).toBe(true);
 
         deferred.resolve();
         await act(async () => firstLayout);
         expect(result.current.isLayoutStable).toBe(true);
+        expect(result.current.isLayoutBusy).toBe(false);
     });
 });

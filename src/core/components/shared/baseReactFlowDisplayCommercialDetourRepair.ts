@@ -15,6 +15,7 @@ import {
 import { createBaseReactFlowFinalEndpointEvaluation } from './baseReactFlowDisplayFinalEndpointEvaluation';
 import { commercialEdgeDetoursDoNotRegress } from './baseReactFlowDisplayCommercialDetourGuard';
 import {
+  buildCommercialBranchedTerminalShortcutCandidates,
   buildCommercialSameSideRectangularShortcutPaths,
   buildCommercialParallelTerminalCorridorShortcutPaths,
   buildCommercialSourceTerminalShortcutCandidates,
@@ -38,6 +39,7 @@ import {
 import { getDisplayHardQualityGateReport } from './baseReactFlowDisplayQualityGates';
 import { doBaseReactFlowDisplayRoutesMatchExactly } from './baseReactFlowDisplayRoutingTransaction';
 import { repairFinalResidualStrictCrossings } from './baseReactFlowDisplayStrictResidualRepair';
+import { withDisplayLocalShortcutSoftCrossingBridge } from './baseReactFlowDisplaySoftCrossingBridge';
 import { repairAxisMismatchedTerminalsWithBoundedPortRoles } from './baseReactFlowDisplayTerminalPortRepair';
 import { preservesCommercialTrueTrunkMembership } from './baseReactFlowDisplayTrueTrunkContract';
 
@@ -187,10 +189,14 @@ const repairTerminalChangingOuterStairs = <T extends Edge[]>(
   for (const { edgeIndex } of rankedEdgeIndexes) {
     if (options.eligibleEdgeIds && !options.eligibleEdgeIds.has(edges[edgeIndex].id)) continue;
     const baselinePath = getDisplayComputedPath(best[edgeIndex]);
-    for (const candidateEdge of buildCommercialTerminalShortcutCandidates(
+    const terminalCandidates = buildCommercialTerminalShortcutCandidates(
       best[edgeIndex],
       nodes,
-    )) {
+    ).flatMap(candidate => [
+      candidate,
+      ...buildCommercialBranchedTerminalShortcutCandidates(candidate),
+    ]);
+    for (const candidateEdge of terminalCandidates) {
       if (evaluations >= FINAL_COMMERCIAL_TERMINAL_SHORTCUT_EVALUATIONS) return best;
       evaluations += 1;
       const candidatePath = getDisplayComputedPath(candidateEdge);
@@ -208,6 +214,11 @@ const repairTerminalChangingOuterStairs = <T extends Edge[]>(
       const candidate = best.map((edge, index) => (
         index === edgeIndex ? candidateEdge : edge
       )) as T;
+      candidate[edgeIndex] = withDisplayLocalShortcutSoftCrossingBridge(
+        candidateEdge,
+        candidate,
+        displayPathLength(baselinePath) - displayPathLength(candidatePath),
+      );
       if (!changedEdgesObstacleHitsDoNotRegress(best, candidate, [edgeIndex], nodes)) continue;
       if (evaluation.unsafeEndpointStubs(candidate) > evaluation.unsafeEndpointStubs(best)) continue;
       const candidateReport = evaluation.hardReport(candidate);
@@ -282,7 +293,10 @@ const repairSourceTerminalOuterStairs = <T extends Edge[]>(
     const shortcutCandidates = buildCommercialSourceTerminalShortcutCandidates(
       best[edgeIndex],
       nodes,
-    );
+    ).flatMap(candidate => [
+      ...buildCommercialBranchedTerminalShortcutCandidates(candidate),
+      candidate,
+    ]);
     for (const candidateEdge of [...hardDefectCandidates, ...shortcutCandidates]) {
       if (evaluations >= FINAL_COMMERCIAL_SOURCE_SHORTCUT_EVALUATIONS) return best;
       if (edgeEvaluations >= FINAL_COMMERCIAL_SOURCE_SHORTCUT_EVALUATIONS_PER_EDGE) break;
@@ -303,6 +317,11 @@ const repairSourceTerminalOuterStairs = <T extends Edge[]>(
       const candidate = best.map((edge, index) => (
         index === edgeIndex ? candidateEdge : edge
       )) as T;
+      candidate[edgeIndex] = withDisplayLocalShortcutSoftCrossingBridge(
+        candidateEdge,
+        candidate,
+        displayPathLength(baselinePath) - displayPathLength(candidatePath),
+      );
       if (!changedEdgesObstacleHitsDoNotRegress(best, candidate, [edgeIndex], nodes)) continue;
       if (evaluation.unsafeEndpointStubs(candidate) > evaluation.unsafeEndpointStubs(best)) continue;
       const candidateReport = evaluation.hardReport(candidate);

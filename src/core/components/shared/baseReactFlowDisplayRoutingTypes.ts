@@ -4,6 +4,7 @@ export type UseBaseReactFlowDisplayRoutingOptions = {
   edges: Edge[];
   routingNodes: Node[];
   routingGeometryReady: boolean;
+  routingPaused?: boolean;
   isContainerReady: boolean;
   enableSmartEdges: boolean;
   smartEdgePadding: number;
