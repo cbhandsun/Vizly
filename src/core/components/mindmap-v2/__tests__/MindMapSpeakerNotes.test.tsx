@@ -2,6 +2,8 @@
 
 import React from 'react';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import i18next, { type i18n } from 'i18next';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -88,5 +90,44 @@ describe('MindMapSpeakerNotes commercial presentation fallback', () => {
         expect(screen.getByRole('status').textContent).toContain('正在准备可选的 AI 演讲提词');
         expect(screen.getByRole('button', { name: '关闭本次演示的提词器' })).toBeTruthy();
         expect(screen.queryByText('💼 专业商务')).toBeNull();
+    });
+
+    it('labels the tone selector and keeps panel styling in a static stylesheet', async () => {
+        configureMindMapAIRuntime({
+            loadConfig: async () => ({
+                activeModelKey: 'provider:model',
+                providers: [{
+                    id: 'provider',
+                    enabled: true,
+                    apiKey: 'test-key',
+                    baseUrl: 'https://example.test',
+                }],
+            }),
+            requestChatCompletionJson: async () => ({
+                choices: [{ message: { content: 'Prepared speaker notes' } }],
+            }),
+            formatRequestError: async () => 'Request failed',
+        });
+
+        await renderSpeakerNotes('en');
+
+        expect(await screen.findByText('Prepared speaker notes')).toBeTruthy();
+        expect(screen.getByRole('combobox', {
+            name: 'AI speaker notes · Professional',
+        })).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Copy speaker notes' }).style.minWidth)
+            .toBe('40px');
+
+        const source = readFileSync(resolve(
+            process.cwd(),
+            'src/core/components/mindmap-v2/MindMapSpeakerNotes.tsx',
+        ), 'utf8');
+        const css = readFileSync(resolve(
+            process.cwd(),
+            'src/core/components/mindmap-v2/MindMapSpeakerNotes.css',
+        ), 'utf8');
+        expect(source).not.toContain('document.createElement');
+        expect(source).not.toContain('message.');
+        expect(css).toContain('@media (prefers-reduced-motion: reduce)');
     });
 });

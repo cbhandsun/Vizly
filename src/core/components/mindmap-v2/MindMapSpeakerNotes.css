@@ -1,0 +1,41 @@
+@keyframes vizlySpeakerNotesSlideIn {
+    from {
+        opacity: 0;
+        transform: translateX(40px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes vizlySpeakerNotesFadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #vizly-mind-elixir-root [data-testid="mindmap-speaker-notes-compact"],
+    #vizly-mind-elixir-root [data-testid="mindmap-speaker-notes-panel"] {
+        animation: none !important;
+    }
+}
+
+#vizly-mind-elixir-root [data-testid="mindmap-speaker-notes-panel"] div::-webkit-scrollbar {
+    width: 6px;
+}
+
+#vizly-mind-elixir-root [data-testid="mindmap-speaker-notes-panel"] div::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 3px;
+}
+
+#vizly-mind-elixir-root [data-testid="mindmap-speaker-notes-panel"] div::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+}

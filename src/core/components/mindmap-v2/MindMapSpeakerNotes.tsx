@@ -7,8 +7,10 @@ import { isMindMapAIConfigurationError } from './mindMapAIErrorPresentation';
 import { mergeSpeakerNotesIntoNodeNote } from './mindmapSpeakerNotesSecurity';
 import { cleanMindMapNodePatch } from './mindmapNodePatchSecurity';
 import { logMindmapSpeakerNotesSaveFailure } from './mindmapPanelLogging';
-import { Spin, Button, Select, Tooltip, message } from 'antd';
+import { Spin, Button, Select, Tooltip } from 'antd';
 import { CloseOutlined, CopyOutlined, ReloadOutlined, SaveOutlined, MessageOutlined, SoundOutlined } from '@ant-design/icons';
+import { appMessage } from '@/core/utils/antdStaticBridge';
+import './MindMapSpeakerNotes.css';
 
 const TONE_VALUES = ['专业商务', '幽默风趣', '通俗易懂', '严谨理性'] as const;
 
@@ -21,10 +23,13 @@ export const MindMapSpeakerNotes: React.FC = () => {
     const [tone, setTone] = useState('专业商务');
     const [error, setError] = useState<string | null>(null);
     const [dismissed, setDismissed] = useState(false);
+    const [saving, setSaving] = useState(false);
 
     // 缓存上一次请求的节点ID和语气，避免重复请求
     const lastRequestKeyRef = useRef<string>('');
-    const activeRequestKeyRef = useRef<string>('');
+    const activeRequestIdRef = useRef(0);
+    const activeSaveIdRef = useRef(0);
+    const presentationNodeIdRef = useRef<string | null>(null);
     const dismissedRef = useRef(false);
     const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -41,21 +46,22 @@ export const MindMapSpeakerNotes: React.FC = () => {
             ? node.children.map(c => c.topic).join('，')
             : undefined;
 
-        activeRequestKeyRef.current = requestKey;
+        const requestId = activeRequestIdRef.current + 1;
+        activeRequestIdRef.current = requestId;
         setLoading(true);
         setError(null);
 
+        const requestIsCurrent = () => {
+            const presentation = getPresentationState();
+            return activeRequestIdRef.current === requestId
+                && !dismissedRef.current
+                && presentation.isPresenting
+                && presentation.presentationNode?.id === nodeId;
+        };
+
         try {
             const result = await generateSpeakerNotes(node.topic, noteText, childText, currentTone);
-            const presentation = getPresentationState();
-            if (
-                activeRequestKeyRef.current !== requestKey
-                || dismissedRef.current
-                || !presentation.isPresenting
-                || presentation.presentationNode?.id !== nodeId
-            ) {
-                return;
-            }
+            if (!requestIsCurrent()) return;
 
             if ('error' in result) {
                 setError(result.error || '请求失败，请重试');
@@ -65,26 +71,12 @@ export const MindMapSpeakerNotes: React.FC = () => {
                 lastRequestKeyRef.current = requestKey;
             }
         } catch {
-            const presentation = getPresentationState();
-            if (
-                activeRequestKeyRef.current === requestKey
-                && !dismissedRef.current
-                && presentation.isPresenting
-                && presentation.presentationNode?.id === nodeId
-            ) {
+            if (requestIsCurrent()) {
                 setError('请求失败，请重试');
                 setNotes('');
             }
         } finally {
-            const presentation = getPresentationState();
-            if (
-                activeRequestKeyRef.current === requestKey
-                && !dismissedRef.current
-                && presentation.isPresenting
-                && presentation.presentationNode?.id === nodeId
-            ) {
-                setLoading(false);
-            }
+            if (requestIsCurrent()) setLoading(false);
         }
     }, []);
 
@@ -92,16 +84,29 @@ export const MindMapSpeakerNotes: React.FC = () => {
     useEffect(() => {
         const syncState = () => {
             const state = getPresentationState();
+            const nextNodeId = state.presentationNode?.id ?? null;
+            if (presentationNodeIdRef.current !== nextNodeId) {
+                activeRequestIdRef.current += 1;
+                activeSaveIdRef.current += 1;
+                lastRequestKeyRef.current = '';
+                setNotes('');
+                setError(null);
+                setLoading(false);
+                setSaving(false);
+            }
+            presentationNodeIdRef.current = nextNodeId;
             setIsPresenting(state.isPresenting);
             setCurrentNode(state.presentationNode);
             if (!state.isPresenting || !state.presentationNode) {
                 dismissedRef.current = false;
                 setDismissed(false);
-                activeRequestKeyRef.current = '';
+                activeRequestIdRef.current += 1;
+                activeSaveIdRef.current += 1;
                 lastRequestKeyRef.current = '';
                 setNotes('');
                 setError(null);
                 setLoading(false);
+                setSaving(false);
             }
         };
         syncState();
@@ -110,7 +115,7 @@ export const MindMapSpeakerNotes: React.FC = () => {
 
     // 监听节点或语气变化
     useEffect(() => {
-        if (!isPresenting || !currentNode) {
+        if (!isPresenting || !currentNode || dismissedRef.current) {
             return;
         }
 
@@ -121,6 +126,11 @@ export const MindMapSpeakerNotes: React.FC = () => {
         if (lastRequestKeyRef.current === requestKey) {
             return;
         }
+
+        activeRequestIdRef.current += 1;
+        setNotes('');
+        setError(null);
+        setLoading(true);
 
         // 清理上一次的 debounce 定时器
         if (debounceTimerRef.current) {
@@ -148,32 +158,46 @@ export const MindMapSpeakerNotes: React.FC = () => {
     const handleDismiss = () => {
         dismissedRef.current = true;
         setDismissed(true);
-        activeRequestKeyRef.current = '';
+        activeRequestIdRef.current += 1;
+        activeSaveIdRef.current += 1;
         if (debounceTimerRef.current) {
             clearTimeout(debounceTimerRef.current);
             debounceTimerRef.current = null;
         }
         setLoading(false);
+        setSaving(false);
     };
 
     const handleCopyNotes = async () => {
         if (!notes.trim()) return;
         try {
             await navigator.clipboard.writeText(notes);
-            message.success(t('plugins.mindmap.speakerNotes.copySuccess'));
+            appMessage.success(t('plugins.mindmap.speakerNotes.copySuccess'));
         } catch {
-            message.error(t('plugins.mindmap.speakerNotes.copyFailed'));
+            appMessage.error(t('plugins.mindmap.speakerNotes.copyFailed'));
         }
     };
 
     const handleSaveNotes = async () => {
-        if (!currentNode || !notes.trim()) return;
+        if (!currentNode || !notes.trim() || saving) return;
         const mind = getMindElixirInstance();
         if (!mind) return;
 
+        const nodeId = currentNode.id;
+        const saveId = activeSaveIdRef.current + 1;
+        activeSaveIdRef.current = saveId;
+        setSaving(true);
+        const saveIsCurrent = () => {
+            const presentation = getPresentationState();
+            return activeSaveIdRef.current === saveId
+                && !dismissedRef.current
+                && presentation.isPresenting
+                && presentation.presentationNode?.id === nodeId;
+        };
+
         try {
-            const tpcEl = mind.findEle(currentNode.id);
-            if (!tpcEl) return;
+            const tpcEl = mind.findEle(nodeId);
+            if (!tpcEl) throw new Error('Speaker notes target node is unavailable');
             const nextNote = mergeSpeakerNotesIntoNodeNote(currentNode.note, notes);
             const cleanPatch = cleanMindMapNodePatch({ note: nextNote });
             await mind.reshapeNode(tpcEl, { ...currentNode, ...cleanPatch });
@@ -183,11 +207,16 @@ export const MindMapSpeakerNotes: React.FC = () => {
                 obj: changedNode,
                 origin: currentNode,
             });
+            if (!saveIsCurrent()) return;
             setCurrentNode(changedNode);
-            message.success(t('plugins.mindmap.speakerNotes.saveSuccess'));
+            appMessage.success(t('plugins.mindmap.speakerNotes.saveSuccess'));
         } catch (err) {
             logMindmapSpeakerNotesSaveFailure(err);
-            message.error(t('plugins.mindmap.speakerNotes.saveFailed'));
+            if (saveIsCurrent()) {
+                appMessage.error(t('plugins.mindmap.speakerNotes.saveFailed'));
+            }
+        } finally {
+            if (activeSaveIdRef.current === saveId) setSaving(false);
         }
     };
 
@@ -245,11 +274,15 @@ export const MindMapSpeakerNotes: React.FC = () => {
     }
 
     return (
-        <aside style={containerStyle} aria-label={t('plugins.mindmap.speakerNotes.panelLabel')}>
+        <aside
+            style={containerStyle}
+            aria-label={t('plugins.mindmap.speakerNotes.panelLabel')}
+            data-testid="mindmap-speaker-notes-panel"
+        >
             {/* 磨砂玻璃头部 */}
             <div style={headerStyle}>
                 <div style={titleWrapperStyle}>
-                    <MessageOutlined style={{ color: '#818cf8', fontSize: 16 }} />
+                    <MessageOutlined style={{ color: '#818cf8', fontSize: 16 }} aria-hidden="true" />
                     <span style={titleStyle}>{t('plugins.mindmap.speakerNotes.title')}</span>
                 </div>
                 <div style={actionsStyle}>
@@ -258,6 +291,7 @@ export const MindMapSpeakerNotes: React.FC = () => {
                         options={toneOptions}
                         value={tone}
                         onChange={(val) => setTone(val)}
+                        aria-label={`${t('plugins.mindmap.speakerNotes.title')} · ${t(`plugins.mindmap.speakerNotes.tones.${tone}`)}`}
                         dropdownStyle={dropdownStyle}
                         style={selectStyle}
                     />
@@ -278,7 +312,8 @@ export const MindMapSpeakerNotes: React.FC = () => {
                             size="small"
                             icon={<SaveOutlined />}
                             onClick={handleSaveNotes}
-                            disabled={!notes.trim() || loading}
+                            disabled={!notes.trim() || loading || saving}
+                            loading={saving}
                             aria-label={t('plugins.mindmap.speakerNotes.save')}
                             style={iconButtonStyle}
                         />
@@ -366,7 +401,7 @@ const containerStyle: React.CSSProperties = {
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
-    animation: 'slideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
+    animation: 'vizlySpeakerNotesSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
     fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
 };
 
@@ -422,8 +457,9 @@ const compactLoadingStyle: React.CSSProperties = {
 
 const headerStyle: React.CSSProperties = {
     display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    gap: '12px',
     padding: '16px 20px',
     borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
 };
@@ -444,7 +480,7 @@ const titleStyle: React.CSSProperties = {
 const actionsStyle: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
+    gap: '4px',
 };
 
 const selectStyle: React.CSSProperties = {
@@ -457,6 +493,8 @@ const dropdownStyle: React.CSSProperties = {
 };
 
 const iconButtonStyle: React.CSSProperties = {
+    minWidth: '40px',
+    minHeight: '40px',
     color: 'rgba(255, 255, 255, 0.65)',
     background: 'transparent',
     border: 'none',
@@ -544,7 +582,7 @@ const notesTextStyle: React.CSSProperties = {
     lineHeight: '1.8',
     whiteSpace: 'pre-wrap',
     letterSpacing: '0.4px',
-    animation: 'fadeIn 0.28s ease',
+    animation: 'vizlySpeakerNotesFadeIn 0.28s ease',
 };
 
 const footerStyle: React.CSSProperties = {
@@ -556,40 +594,3 @@ const footerStyle: React.CSSProperties = {
     fontSize: '11px',
     color: 'rgba(255, 255, 255, 0.4)',
 };
-
-// 动画注入逻辑（以确保 slideIn 动画生效）
-if (typeof document !== 'undefined') {
-    const styleId = 'me-speaker-notes-animation';
-    if (!document.getElementById(styleId)) {
-        const style = document.createElement('style');
-        style.id = styleId;
-        style.textContent = `
-            @keyframes slideIn {
-                from { transform: translateX(40px); opacity: 0; }
-                to { transform: translateX(0); opacity: 1; }
-            }
-            @keyframes fadeIn {
-                from { opacity: 0; }
-                to { opacity: 1; }
-            }
-            @media (prefers-reduced-motion: reduce) {
-                #vizly-mind-elixir-root [data-testid="mindmap-speaker-notes-compact"],
-                #vizly-mind-elixir-root aside[aria-label] {
-                    animation: none !important;
-                }
-            }
-            /* 自定义滚动条风格 */
-            #vizly-mind-elixir-root div::-webkit-scrollbar {
-                width: 6px;
-            }
-            #vizly-mind-elixir-root div::-webkit-scrollbar-thumb {
-                background: rgba(255, 255, 255, 0.15);
-                border-radius: 3px;
-            }
-            #vizly-mind-elixir-root div::-webkit-scrollbar-thumb:hover {
-                background: rgba(255, 255, 255, 0.3);
-            }
-        `;
-        document.head.appendChild(style);
-    }
-}
