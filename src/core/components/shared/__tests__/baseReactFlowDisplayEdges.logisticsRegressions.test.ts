@@ -5,9 +5,7 @@ import { standardDataToCanvas } from '../../diagrams/designerUtils';
 import { auditFinalSameSideEndpointOrder } from '../../../strategies/shared/edgeFinalSameSideEndpointOrderRepair';
 import { auditFinalSameSidePassageOrder } from '../../../strategies/shared/edgeFinalSameSidePassageOrderRepair';
 import { calculateEdgePathQualityScore } from '../../../strategies/shared/edgeStrictCrossingGuard';
-import {
-  displayEdgesHaveNodeAnchoredTerminals,
-} from '../baseReactFlowTerminalAxisRepair';
+import { displayEdgesHaveNodeAnchoredTerminals } from '../baseReactFlowTerminalAxisRepair';
 import {
   createBaseReactFlowDisplayEdges,
 } from '../baseReactFlowDisplayEdges';

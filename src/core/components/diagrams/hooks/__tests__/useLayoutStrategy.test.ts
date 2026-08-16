@@ -197,6 +197,55 @@ describe('prepareLayeredLayoutEdges', () => {
       layoutDirection: 'TB',
     });
   });
+
+  it('promotes a freshly calculated locked route to a hidden Worker candidate', () => {
+    const computedPath = [
+      { x: 200, y: 40 },
+      { x: 300, y: 40 },
+      { x: 300, y: 180 },
+      { x: 140, y: 180 },
+    ];
+    const [edge] = prepareLayeredLayoutEdges(nodes, [{
+      id: 'fresh-layout-route',
+      source: 'source',
+      target: 'below',
+      type: 'stablePath',
+      data: {
+        computedPath,
+        layoutPathLocked: true,
+        algorithm: 'domain-dagre-full',
+      },
+    }] as Edge[], 'TB', { promoteLockedComputedPath: true });
+
+    expect(edge).toMatchObject({
+      sourceHandle: 'right',
+      targetHandle: 'top',
+      type: 'advanced-smart-step',
+      data: {
+        computedPath: undefined,
+        elkPath: computedPath,
+        layoutRoutingCandidate: true,
+      },
+    });
+  });
+
+  it('does not promote an unlocked or malformed computed path', () => {
+    const [unlocked, malformed] = prepareLayeredLayoutEdges(nodes, [{
+      id: 'unlocked', source: 'source', target: 'below',
+      data: { computedPath: [{ x: 200, y: 40 }, { x: 40, y: 180 }] },
+    }, {
+      id: 'malformed', source: 'source', target: 'below',
+      data: {
+        layoutPathLocked: true,
+        computedPath: [{ x: 200, y: 40 }, { x: Number.NaN, y: 180 }],
+      },
+    }] as Edge[], 'TB', { promoteLockedComputedPath: true });
+
+    expect(unlocked.data?.layoutRoutingCandidate).toBeUndefined();
+    expect(unlocked.data?.elkPath).toBeUndefined();
+    expect(malformed.data?.layoutRoutingCandidate).toBeUndefined();
+    expect(malformed.data?.elkPath).toBeUndefined();
+  });
 });
 
 describe('sanitizeLayoutEdges', () => {

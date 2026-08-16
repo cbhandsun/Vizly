@@ -20,6 +20,7 @@ const validRepairRequest = {
     data: { computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }] },
   }],
   nodes,
+  repairMode: 'bounded',
 } as const;
 
 describe('baseReactFlowDisplayWorkerProtocol', () => {
@@ -242,6 +243,7 @@ describe('baseReactFlowDisplayWorkerProtocol', () => {
       requestId: 'bounded-data',
       edges: [{ id: 'edge', source: 'source', target: 'target', data }],
       nodes,
+      repairMode: 'bounded',
     });
     const cyclic: Record<string, unknown> = {};
     cyclic.self = cyclic;
@@ -273,6 +275,16 @@ describe('baseReactFlowDisplayWorkerProtocol', () => {
       requestId: 'point-budget',
       edges: overPointBudgetEdges,
       nodes,
+      repairMode: 'bounded',
+    })).toBeNull();
+  });
+
+  it('rejects missing or unknown repair modes at the worker boundary', () => {
+    const { repairMode: _repairMode, ...missingMode } = validRepairRequest;
+    expect(parseDisplayEdgesWorkerRequest(missingMode)).toBeNull();
+    expect(parseDisplayEdgesWorkerRequest({
+      ...validRepairRequest,
+      repairMode: 'unbounded',
     })).toBeNull();
   });
 

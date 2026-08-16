@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   buildFlowchartLayoutMenuModel,
   resolveActiveDomainLayoutKey,
+  resolveNodeLayoutHostStrategy,
 } from '../flowchartToolbarLayoutMenu';
 
 const asRecord = (value: unknown): Record<string, unknown> => (
@@ -47,5 +48,24 @@ describe('flowchartToolbarLayoutMenu', () => {
     expect(typeof click).toBe('function');
     if (typeof click === 'function') click();
     expect(onStrategyLayout).toHaveBeenCalledWith('domain-elk', 'elk-layered', 'LR');
+  });
+
+  it('routes node-layout choices to an engine that implements them', () => {
+    const onStrategyLayout = vi.fn();
+    const forceModel = buildFlowchartLayoutMenuModel({
+      lastDomainStrategy: 'force',
+      lastDomainDirection: 'TB',
+      lastNodeLayout: 'dagre',
+      onStrategyLayout,
+      translate: (_key, fallback) => fallback,
+    });
+    const flowItem = collectItems(forceModel.items).find(item => item.key === 'node-flow');
+    expect(typeof flowItem?.onClick).toBe('function');
+    if (typeof flowItem?.onClick === 'function') flowItem.onClick();
+    expect(onStrategyLayout).toHaveBeenCalledWith('domain-vertical', 'flow', 'TB');
+
+    expect(resolveNodeLayoutHostStrategy('tree', 'TB')).toBe('domain-vertical');
+    expect(resolveNodeLayoutHostStrategy('domain-elk', 'LR')).toBe('domain-horizontal');
+    expect(resolveNodeLayoutHostStrategy('domain-horizontal', 'TB')).toBe('domain-horizontal');
   });
 });

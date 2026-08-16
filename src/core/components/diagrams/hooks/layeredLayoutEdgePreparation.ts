@@ -168,6 +168,15 @@ const readLayoutRoute = (value: unknown): Array<{ x: number; y: number }> | null
     return points;
 };
 
+type LayeredLayoutEdgePreparationOptions = Readonly<{
+    /**
+     * The caller has just calculated these locked paths against resultNodes.
+     * Promote them to hidden Worker candidates; they are never displayable
+     * until the shared hard-quality transaction accepts them.
+     */
+    promoteLockedComputedPath?: boolean;
+}>;
+
 const closestLayoutHandle = (
     node: Node,
     point: { x: number; y: number },
@@ -189,6 +198,7 @@ export const prepareLayeredLayoutEdges = (
     resultNodes: Node[],
     resultEdges: Edge[],
     direction: 'TB' | 'LR',
+    options: LayeredLayoutEdgePreparationOptions = {},
 ): Edge[] => {
     const nodeById = new Map(resultNodes.map(node => [node.id, node] as const));
     const absoluteNodeById = new Map(
@@ -198,9 +208,17 @@ export const prepareLayeredLayoutEdges = (
     const clearedEdges = resultEdges.map((edge) => {
         const sourceNode = absoluteNodeById.get(edge.source);
         const targetNode = absoluteNodeById.get(edge.target);
-        const layoutRoute = edge.data?.layoutRoutingCandidate === true
+        const explicitLayoutRoute = edge.data?.layoutRoutingCandidate === true
             ? readLayoutRoute(edge.data.elkPath)
             : null;
+        const currentLockedRoute = options.promoteLockedComputedPath
+            && (
+                edge.data?.layoutPathLocked === true
+                || edge.data?._layoutPathLocked === true
+            )
+            ? readLayoutRoute(edge.data?.computedPath)
+            : null;
+        const layoutRoute = explicitLayoutRoute ?? currentLockedRoute;
         const handles = sourceNode && targetNode && layoutRoute
             ? {
                 sourceHandle: closestLayoutHandle(sourceNode, layoutRoute[0]),

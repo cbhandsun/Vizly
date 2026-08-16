@@ -120,6 +120,12 @@ export type DisplayEdgesWorkerRepairRequest = {
   requestId: string;
   edges: Edge[];
   nodes: Node[];
+  /**
+   * Bounded repair performs only the measured, local repair pass. Finalized
+   * repair additionally runs the commercial safety closure and is reserved for
+   * callers that have not already paid for a full route/finalization pass.
+   */
+  repairMode: 'bounded' | 'finalized';
 };
 
 export type DisplayEdgesWorkerIncrementalRouteRequest = Omit<
@@ -407,7 +413,14 @@ export const parseDisplayEdgesWorkerRequest = (
   const edges = value.edges as Edge[];
   const nodes = value.nodes as Node[];
   if (value.operation === 'repair') {
-    return { operation: 'repair', requestId, edges, nodes };
+    if (value.repairMode !== 'bounded' && value.repairMode !== 'finalized') return null;
+    return {
+      operation: 'repair',
+      requestId,
+      edges,
+      nodes,
+      repairMode: value.repairMode,
+    };
   }
   if (
     value.operation !== 'route'

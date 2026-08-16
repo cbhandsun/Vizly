@@ -25,6 +25,7 @@ import {
 } from '../baseReactFlowDisplayRoutingTransaction';
 import { projectBaseReactFlowDisplayWorkerInput } from '../baseReactFlowDisplayWorkerClient';
 import {
+  createDisplayTerminalValidationSnapshot,
   displayEdgesHaveNodeAnchoredTerminals,
   displayEdgesHaveNodeAttachedTerminals,
 } from '../baseReactFlowTerminalAxisRepair';
@@ -68,7 +69,7 @@ describe('baseReactFlowDisplayEdges WMS and TMS regressions', () => {
       nodes: projected.nodes,
       enableSmartEdges: true,
       smartEdgePadding: 20,
-      isLargeGraph: false,
+      isLargeGraph: true,
       displayEdgeEpoch: computeBaseReactFlowDisplayEdgeEpoch(projected),
       qualityMode: 'full',
     });
@@ -152,6 +153,28 @@ describe('baseReactFlowDisplayEdges WMS and TMS regressions', () => {
       targetHandle: edge.targetHandle,
       path: finitePointPath(edge.data?.computedPath),
     }));
+    const nonOrthogonalPaths = paths.flatMap(route => (
+      route.path.some((point, index) => {
+        const next = route.path[index + 1];
+        if (!next) return false;
+        const deltaX = Math.abs(point.x - next.x);
+        const deltaY = Math.abs(point.y - next.y);
+        return !(
+          (deltaX <= 0.5 && deltaY > 0.5)
+          || (deltaY <= 0.5 && deltaX > 0.5)
+        );
+      }) ? [route] : []
+    ));
+    const tinyInteriorPaths = paths.flatMap(route => {
+      const tinySegments = route.path.slice(1, -2).flatMap((point, index) => {
+        const next = route.path[index + 2];
+        const length = next
+          ? Math.abs(point.x - next.x) + Math.abs(point.y - next.y)
+          : Number.POSITIVE_INFINITY;
+        return length < 24 ? [{ from: point, to: next, length }] : [];
+      });
+      return tinySegments.length > 0 ? [{ ...route, tinySegments }] : [];
+    });
     const workerRoutingPatches = createBaseReactFlowDisplayEdgePatches(projected.edges, result);
     const mergedTransactions = workerRoutingPatches
       ? mergeBaseReactFlowDisplayRoutingTransactions({
@@ -163,8 +186,26 @@ describe('baseReactFlowDisplayEdges WMS and TMS regressions', () => {
     const finalOutputRouteSignature = mergedTransactions
       ? computeBaseReactFlowDisplayOutputRouteSignature(mergedTransactions.edges)
       : null;
+    const terminalValidation = createDisplayTerminalValidationSnapshot(absoluteNodes);
+    const terminalDiagnostics = JSON.stringify({
+      durationMs,
+      unanchoredEdges: result.flatMap(edge => {
+        const validation = terminalValidation.validateEdge(edge);
+        return validation.anchored ? [] : [{
+          id: edge.id,
+          sourceHandle: edge.sourceHandle,
+          targetHandle: edge.targetHandle,
+          path: finitePointPath(edge.data?.computedPath),
+          validation,
+        }];
+      }),
+      phaseTrace,
+    }, null, 2);
 
-    expect(quality.nonOrthogonalSegments, JSON.stringify({ quality, paths }, null, 2)).toBe(0);
+    expect(
+      quality.nonOrthogonalSegments,
+      JSON.stringify({ quality, nonOrthogonalPaths }, null, 2),
+    ).toBe(0);
     expect(
       quality.strictCrossings,
       JSON.stringify({ strictCrossings: strictPathCrossings(paths), paths }, null, 2),
@@ -176,11 +217,14 @@ describe('baseReactFlowDisplayEdges WMS and TMS regressions', () => {
       JSON.stringify(unexplainedRelatedOverlapPairs(result), null, 2),
     ).toBe(0);
     expect(quality.shortEndpointStubs).toBe(0);
-    expect(quality.tinyInteriorDoglegs).toBe(0);
+    expect(
+      quality.tinyInteriorDoglegs,
+      JSON.stringify({ quality, tinyInteriorPaths }, null, 2),
+    ).toBe(0);
     expect(quality.hairpins).toBe(0);
     expect(edgeNodeObstacleHits(result, absoluteNodes), JSON.stringify(paths, null, 2)).toEqual([]);
-    expect(displayEdgesHaveNodeAttachedTerminals(result, absoluteNodes)).toBe(true);
-    expect(displayEdgesHaveNodeAnchoredTerminals(result, absoluteNodes)).toBe(true);
+    expect(displayEdgesHaveNodeAttachedTerminals(result, absoluteNodes), terminalDiagnostics).toBe(true);
+    expect(displayEdgesHaveNodeAnchoredTerminals(result, absoluteNodes), terminalDiagnostics).toBe(true);
     expect(finalOutputRouteSignature).not.toBeNull();
     expect(result.some(edge => (
       edge.data?.sharedTrunkAware === true || edge.data?.sharedTrunkSynthesized === true
@@ -224,6 +268,7 @@ describe('baseReactFlowDisplayEdges WMS and TMS regressions', () => {
     const absoluteNodes = withAbsoluteNodePositions(projected.nodes);
     const quality = calculateEdgePathQualityScore(result);
     const hardReport = getDisplayHardQualityGateReport(result, absoluteNodes, 'polished');
+    const terminalValidation = createDisplayTerminalValidationSnapshot(absoluteNodes);
     const diagnostics = JSON.stringify({
       hardClean: response.hardClean,
       routeResolution: response.routeResolution,
@@ -232,6 +277,15 @@ describe('baseReactFlowDisplayEdges WMS and TMS regressions', () => {
       obstacleHits: edgeNodeObstacleHits(result, absoluteNodes),
       terminalsAttached: displayEdgesHaveNodeAttachedTerminals(result, absoluteNodes),
       terminalsAnchored: displayEdgesHaveNodeAnchoredTerminals(result, absoluteNodes),
+      unanchoredEdges: result
+        .map(edge => ({
+          id: edge.id,
+          sourceHandle: edge.sourceHandle,
+          targetHandle: edge.targetHandle,
+          path: finitePointPath(edge.data?.computedPath),
+          validation: terminalValidation.validateEdge(edge),
+        }))
+        .filter(edge => !edge.validation.anchored),
       phaseTrace: response.phaseTrace,
     }, null, 2);
 

@@ -53,6 +53,17 @@ describe('forceLayoutGeometry', () => {
     expect(result[1]).toBe(nodes[1]);
   });
 
+  it('produces stable explicit-layout geometry independent of prior positions', () => {
+    const firstNodes = [createNode('a', 0, 0), createNode('b', 100, 50)];
+    const movedNodes = [createNode('a', 5_000, -2_000), createNode('b', -900, 8_000)];
+    const edges: Edge[] = [{ id: 'a-b', source: 'a', target: 'b' }];
+
+    const first = forceDirectedLayout(firstNodes, edges, { initialization: 'deterministic' });
+    const moved = forceDirectedLayout(movedNodes, edges, { initialization: 'deterministic' });
+
+    expect([...moved.entries()]).toEqual([...first.entries()]);
+  });
+
   it('calculates summary geometry from valid targets only', () => {
     const valid = createNode('valid', 0, 0, { width: 80, height: 30 });
     const invalid = createNode('invalid', 0, 0, { width: 10, height: 10 });

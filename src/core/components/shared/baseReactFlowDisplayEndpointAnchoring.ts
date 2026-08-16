@@ -4,6 +4,7 @@ import {
   edgeTerminalSideCanSwitch,
   resolveEdgeTerminalHandleForSide,
 } from '../../routing/utils/edgeTerminalPolicy';
+import { calculateEdgePathQualityScore } from '../../strategies/shared/edgeStrictCrossingGuard';
 import {
   fastDisplayHardSafetyIsClean,
 } from './baseReactFlowFastEdgeSafety';
@@ -15,6 +16,11 @@ import {
   getNodeRect,
   sideForHandle,
 } from './baseReactFlowDisplayEdgeGeometry';
+import { ensureMinimumOutwardTerminalStub } from './baseReactFlowDisplayMinimumTerminalStub';
+import {
+  computedEndpointPathOf,
+  displayEndpointCandidateDegradesGraph,
+} from './baseReactFlowDisplayEndpointCandidateQuality';
 
 type EndpointEdgeData = Record<string, unknown> & {
   computedPath?: unknown;
@@ -24,6 +30,7 @@ type EndpointEdgeData = Record<string, unknown> & {
 const LOCKED_ENDPOINT_MAX_CORRECTION = 80;
 const DISPLAY_ENDPOINT_BOUNDARY_TOLERANCE = 2;
 const DISPLAY_ENDPOINT_OUTWARD_STUB = 48;
+const DISPLAY_ENDPOINT_MIN_OUTWARD_STUB = 32;
 const DISPLAY_PORT_AXIS_DOMINANCE = 1.4;
 const DISPLAY_PORT_CORNER_TOLERANCE = 16;
 const DISPLAY_PORT_CORNER_INSET = 16;
@@ -143,13 +150,23 @@ const ensureOutwardTerminalStub = (
       || Math.abs(adjacent.y - terminal.y) > 0.5
       || Math.abs(adjacent.x - terminal.x) <= 0.5
       || Math.abs(next.x - adjacent.x) > 0.5
-      || (next.y - boundaryY) * outward < DISPLAY_ENDPOINT_OUTWARD_STUB
+      || (next.y - boundaryY) * outward < DISPLAY_ENDPOINT_MIN_OUTWARD_STUB
     ) return false;
-    const laneY = boundaryY + outward * DISPLAY_ENDPOINT_OUTWARD_STUB;
+    const availableStub = (next.y - boundaryY) * outward;
+    const usesExistingLane = availableStub < DISPLAY_ENDPOINT_OUTWARD_STUB + 24;
+    const laneY = usesExistingLane
+      ? next.y
+      : boundaryY + outward * DISPLAY_ENDPOINT_OUTWARD_STUB;
     path[terminalIndex] = { ...terminal, y: boundaryY };
     const stub = { x: terminal.x, y: laneY };
     const corner = { x: adjacent.x, y: laneY };
-    path.splice(adjacentIndex, 1, ...(isSource ? [stub, corner] : [corner, stub]));
+    path.splice(
+      adjacentIndex,
+      1,
+      ...(usesExistingLane
+        ? [stub]
+        : isSource ? [stub, corner] : [corner, stub]),
+    );
     return true;
   }
 
@@ -162,124 +179,33 @@ const ensureOutwardTerminalStub = (
     || Math.abs(adjacent.x - terminal.x) > 0.5
     || Math.abs(adjacent.y - terminal.y) <= 0.5
     || Math.abs(next.y - adjacent.y) > 0.5
-    || (next.x - boundaryX) * outward < DISPLAY_ENDPOINT_OUTWARD_STUB
+    || (next.x - boundaryX) * outward < DISPLAY_ENDPOINT_MIN_OUTWARD_STUB
   ) return false;
-  const laneX = boundaryX + outward * DISPLAY_ENDPOINT_OUTWARD_STUB;
+  const availableStub = (next.x - boundaryX) * outward;
+  const usesExistingLane = availableStub < DISPLAY_ENDPOINT_OUTWARD_STUB + 24;
+  const laneX = usesExistingLane
+    ? next.x
+    : boundaryX + outward * DISPLAY_ENDPOINT_OUTWARD_STUB;
   path[terminalIndex] = { ...terminal, x: boundaryX };
   const stub = { x: laneX, y: terminal.y };
   const corner = { x: laneX, y: adjacent.y };
-  path.splice(adjacentIndex, 1, ...(isSource ? [stub, corner] : [corner, stub]));
+  path.splice(
+    adjacentIndex,
+    1,
+    ...(usesExistingLane
+      ? [stub]
+      : isSource ? [stub, corner] : [corner, stub]),
+  );
   return true;
 };
 
-const computedPathOf = (edge: Edge): XYPosition[] => {
-  const path = ((edge.data || {}) as Record<string, unknown>).computedPath;
-  return Array.isArray(path) && path.every(isFinitePoint) ? path : [];
-};
-
-const pathsStrictlyCross = (first: XYPosition[], second: XYPosition[]): boolean => {
-  const tolerance = 0.5;
-  for (let firstIndex = 0; firstIndex < first.length - 1; firstIndex += 1) {
-    const firstStart = first[firstIndex];
-    const firstEnd = first[firstIndex + 1];
-    const firstVertical = Math.abs(firstStart.x - firstEnd.x) <= tolerance;
-    const firstHorizontal = Math.abs(firstStart.y - firstEnd.y) <= tolerance;
-    if (!firstVertical && !firstHorizontal) continue;
-    for (let secondIndex = 0; secondIndex < second.length - 1; secondIndex += 1) {
-      const secondStart = second[secondIndex];
-      const secondEnd = second[secondIndex + 1];
-      const secondVertical = Math.abs(secondStart.x - secondEnd.x) <= tolerance;
-      const secondHorizontal = Math.abs(secondStart.y - secondEnd.y) <= tolerance;
-      if (firstHorizontal && secondVertical) {
-        const minX = Math.min(firstStart.x, firstEnd.x) + tolerance;
-        const maxX = Math.max(firstStart.x, firstEnd.x) - tolerance;
-        const minY = Math.min(secondStart.y, secondEnd.y) + tolerance;
-        const maxY = Math.max(secondStart.y, secondEnd.y) - tolerance;
-        if (secondStart.x > minX && secondStart.x < maxX && firstStart.y > minY && firstStart.y < maxY) {
-          return true;
-        }
-      } else if (firstVertical && secondHorizontal) {
-        const minX = Math.min(secondStart.x, secondEnd.x) + tolerance;
-        const maxX = Math.max(secondStart.x, secondEnd.x) - tolerance;
-        const minY = Math.min(firstStart.y, firstEnd.y) + tolerance;
-        const maxY = Math.max(firstStart.y, firstEnd.y) - tolerance;
-        if (firstStart.x > minX && firstStart.x < maxX && secondStart.y > minY && secondStart.y < maxY) {
-          return true;
-        }
-      }
-    }
-  }
-  return false;
-};
-
-const collinearPathOverlapLength = (first: XYPosition[], second: XYPosition[]): number => {
-  const tolerance = 0.5;
-  let overlap = 0;
-  for (let firstIndex = 0; firstIndex < first.length - 1; firstIndex += 1) {
-    const firstStart = first[firstIndex];
-    const firstEnd = first[firstIndex + 1];
-    const firstVertical = Math.abs(firstStart.x - firstEnd.x) <= tolerance;
-    const firstHorizontal = Math.abs(firstStart.y - firstEnd.y) <= tolerance;
-    for (let secondIndex = 0; secondIndex < second.length - 1; secondIndex += 1) {
-      const secondStart = second[secondIndex];
-      const secondEnd = second[secondIndex + 1];
-      const secondVertical = Math.abs(secondStart.x - secondEnd.x) <= tolerance;
-      const secondHorizontal = Math.abs(secondStart.y - secondEnd.y) <= tolerance;
-      if (firstHorizontal && secondHorizontal && Math.abs(firstStart.y - secondStart.y) <= tolerance) {
-        overlap += Math.max(
-          0,
-          Math.min(Math.max(firstStart.x, firstEnd.x), Math.max(secondStart.x, secondEnd.x))
-            - Math.max(Math.min(firstStart.x, firstEnd.x), Math.min(secondStart.x, secondEnd.x)),
-        );
-      } else if (firstVertical && secondVertical && Math.abs(firstStart.x - secondStart.x) <= tolerance) {
-        overlap += Math.max(
-          0,
-          Math.min(Math.max(firstStart.y, firstEnd.y), Math.max(secondStart.y, secondEnd.y))
-            - Math.max(Math.min(firstStart.y, firstEnd.y), Math.min(secondStart.y, secondEnd.y)),
-        );
-      }
-    }
-  }
-  return overlap;
-};
-
-const reverseCollinearPathOverlapLength = (first: XYPosition[], second: XYPosition[]): number => {
-  const tolerance = 0.5;
-  let overlap = 0;
-  for (let firstIndex = 0; firstIndex < first.length - 1; firstIndex += 1) {
-    const firstStart = first[firstIndex];
-    const firstEnd = first[firstIndex + 1];
-    const firstVertical = Math.abs(firstStart.x - firstEnd.x) <= tolerance;
-    const firstHorizontal = Math.abs(firstStart.y - firstEnd.y) <= tolerance;
-    const firstDirection = firstVertical
-      ? Math.sign(firstEnd.y - firstStart.y)
-      : firstHorizontal ? Math.sign(firstEnd.x - firstStart.x) : 0;
-    for (let secondIndex = 0; secondIndex < second.length - 1; secondIndex += 1) {
-      const secondStart = second[secondIndex];
-      const secondEnd = second[secondIndex + 1];
-      const secondVertical = Math.abs(secondStart.x - secondEnd.x) <= tolerance;
-      const secondHorizontal = Math.abs(secondStart.y - secondEnd.y) <= tolerance;
-      const secondDirection = secondVertical
-        ? Math.sign(secondEnd.y - secondStart.y)
-        : secondHorizontal ? Math.sign(secondEnd.x - secondStart.x) : 0;
-      if (!firstDirection || firstDirection !== -secondDirection) continue;
-      if (firstHorizontal && secondHorizontal && Math.abs(firstStart.y - secondStart.y) <= tolerance) {
-        overlap += Math.max(
-          0,
-          Math.min(Math.max(firstStart.x, firstEnd.x), Math.max(secondStart.x, secondEnd.x))
-            - Math.max(Math.min(firstStart.x, firstEnd.x), Math.min(secondStart.x, secondEnd.x)),
-        );
-      } else if (firstVertical && secondVertical && Math.abs(firstStart.x - secondStart.x) <= tolerance) {
-        overlap += Math.max(
-          0,
-          Math.min(Math.max(firstStart.y, firstEnd.y), Math.max(secondStart.y, secondEnd.y))
-            - Math.max(Math.min(firstStart.y, firstEnd.y), Math.min(secondStart.y, secondEnd.y)),
-        );
-      }
-    }
-  }
-  return overlap;
-};
+const removeDegenerateDisplayPathPoints = (path: XYPosition[]): XYPosition[] => (
+  path.filter((point, index) => {
+    if (index === 0) return true;
+    const previous = path[index - 1];
+    return Math.abs(point.x - previous.x) > 0.5 || Math.abs(point.y - previous.y) > 0.5;
+  })
+);
 
 const displayPathLength = (path: XYPosition[]): number => path.slice(1).reduce((total, point, index) => (
   total + Math.abs(point.x - path[index].x) + Math.abs(point.y - path[index].y)
@@ -424,7 +350,7 @@ const buildPreferredPortSideCandidate = (
   nodeById: Map<string, Node>,
 ): Edge => {
   const data = (edge.data || {}) as EndpointEdgeData;
-  const path = computedPathOf(edge);
+  const path = computedEndpointPathOf(edge);
   if (path.length < 4) return edge;
   const sourceRect = getNodeRect(nodeById.get(edge.source), nodeById);
   const targetRect = getNodeRect(nodeById.get(edge.target), nodeById);
@@ -600,6 +526,24 @@ const anchorComputedPathEndpoints = (
   };
 };
 
+const normalizeComputedDisplayPath = (edge: Edge): Edge => {
+  const data = (edge.data || {}) as EndpointEdgeData;
+  if (!Array.isArray(data.computedPath) || !data.computedPath.every(isFinitePoint)) return edge;
+  const path = data.computedPath as XYPosition[];
+  const normalizedPath = removeDegenerateDisplayPathPoints(path);
+  if (normalizedPath.length === path.length) return edge;
+  return {
+    ...edge,
+    data: {
+      ...data,
+      computedPath: normalizedPath,
+      treeRouting: data.treeRouting && Array.isArray(data.treeRouting.points)
+        ? { ...data.treeRouting, points: normalizedPath }
+        : data.treeRouting,
+    },
+  };
+};
+
 const addComputedPathEndpointStubs = (
   edge: Edge,
   nodeById: Map<string, Node>,
@@ -614,54 +558,75 @@ const addComputedPathEndpointStubs = (
   const targetRect = getNodeRect(nodeById.get(edge.target), nodeById);
   if (!sourceRect || !targetRect) return edge;
   const path = (data.computedPath as XYPosition[]).map(point => ({ ...point }));
-  const sourceChanged = ensureOutwardTerminalStub(path, 0, sourceRect, edge.sourceHandle);
-  const targetChanged = ensureOutwardTerminalStub(
+  let sourceChanged = ensureOutwardTerminalStub(path, 0, sourceRect, edge.sourceHandle);
+  let targetChanged = ensureOutwardTerminalStub(
     path,
     path.length - 1,
     targetRect,
     edge.targetHandle,
   );
+  sourceChanged = ensureMinimumOutwardTerminalStub(
+    path,
+    0,
+    sourceRect,
+    edge.sourceHandle,
+    closestRectSide(path[0], sourceRect),
+  ) || sourceChanged;
+  targetChanged = ensureMinimumOutwardTerminalStub(
+    path,
+    path.length - 1,
+    targetRect,
+    edge.targetHandle,
+    closestRectSide(path[path.length - 1], targetRect),
+  ) || targetChanged;
   if (!sourceChanged && !targetChanged) return edge;
+  const committedPath = removeDegenerateDisplayPathPoints(path);
   return {
     ...edge,
     data: {
       ...data,
-      computedPath: path,
+      computedPath: committedPath,
       treeRouting: data.treeRouting && Array.isArray(data.treeRouting.points)
-        ? { ...data.treeRouting, points: path }
+        ? { ...data.treeRouting, points: committedPath }
         : data.treeRouting,
     },
   };
 };
 
-const displayCandidateDegradesGraph = ({
-  candidate,
-  original,
-  edgeIndex,
-  contextEdges,
-  nodes,
-}: {
-  candidate: Edge;
-  original: Edge;
-  edgeIndex: number;
-  contextEdges: Edge[];
-  nodes: Node[];
-}): boolean => {
-  if (!fastDisplayHardSafetyIsClean([candidate], nodes)) return true;
-  const originalPath = computedPathOf(original);
-  const candidatePath = computedPathOf(candidate);
-  if (candidatePath.length < 2) return true;
-  return contextEdges.some((other, otherIndex) => {
-    if (otherIndex === edgeIndex) return false;
-    const otherPath = computedPathOf(other);
-    if (pathsStrictlyCross(candidatePath, otherPath)) return true;
-    const related = candidate.source === other.source
-      || candidate.source === other.target
-      || candidate.target === other.source
-      || candidate.target === other.target;
-    const overlap = related ? reverseCollinearPathOverlapLength : collinearPathOverlapLength;
-    return overlap(candidatePath, otherPath) > overlap(originalPath, otherPath) + 0.5;
+/**
+ * Commits only terminal boundary geometry after route quality selection.
+ *
+ * Unlike the interactive endpoint beautifier below, this boundary does not
+ * fold dominant-axis elbows. It keeps the accepted route lanes intact while
+ * snapping sub-pixel terminal drift and turning a boundary tangent into one
+ * short outward stub when the adjacent lane already provides enough room.
+ */
+export const commitComputedDisplayEdgeTerminals = (
+  edges: Edge[],
+  nodes: Node[],
+): Edge[] => {
+  const nodeById = new Map(nodes.map(node => [node.id, node]));
+  const anchored = edges
+    .map(edge => anchorComputedPathEndpoints(edge, nodeById))
+    .map(normalizeComputedDisplayPath);
+  const accepted = [...anchored];
+  accepted.forEach((edge, index) => {
+    const candidate = addComputedPathEndpointStubs(edge, nodeById);
+    if (candidate === edge) return;
+    if (fastDisplayHardSafetyIsClean([candidate], nodes)) accepted[index] = candidate;
   });
+  const baselineQuality = calculateEdgePathQualityScore(anchored);
+  const acceptedQuality = calculateEdgePathQualityScore(accepted);
+  return acceptedQuality.nonOrthogonalSegments <= baselineQuality.nonOrthogonalSegments
+    && acceptedQuality.strictCrossings <= baselineQuality.strictCrossings
+    && acceptedQuality.reverseOverlap <= baselineQuality.reverseOverlap
+    && acceptedQuality.unrelatedOverlap <= baselineQuality.unrelatedOverlap
+    && acceptedQuality.unexplainedRelatedOverlap <= baselineQuality.unexplainedRelatedOverlap
+    && acceptedQuality.shortEndpointStubs <= baselineQuality.shortEndpointStubs
+    && acceptedQuality.tinyInteriorDoglegs <= baselineQuality.tinyInteriorDoglegs
+    && acceptedQuality.hairpins <= baselineQuality.hairpins
+    ? accepted
+    : anchored;
 };
 
 export const anchorComputedDisplayEdgeEndpoints = (edges: Edge[], nodes: Node[]): Edge[] => {
@@ -670,7 +635,7 @@ export const anchorComputedDisplayEdgeEndpoints = (edges: Edge[], nodes: Node[])
   const accepted = [...anchored];
   accepted.forEach((edge, index) => {
     const candidate = buildPreferredPortSideCandidate(edge, nodeById);
-    if (candidate !== edge && !displayCandidateDegradesGraph({
+    if (candidate !== edge && !displayEndpointCandidateDegradesGraph({
       candidate,
       original: edge,
       edgeIndex: index,
@@ -681,7 +646,7 @@ export const anchorComputedDisplayEdgeEndpoints = (edges: Edge[], nodes: Node[])
   accepted.forEach((edge, index) => {
     const candidate = addComputedPathEndpointStubs(edge, nodeById);
     if (candidate === edge) return;
-    if (!displayCandidateDegradesGraph({
+    if (!displayEndpointCandidateDegradesGraph({
       candidate,
       original: edge,
       edgeIndex: index,

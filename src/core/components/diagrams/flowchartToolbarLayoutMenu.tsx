@@ -47,6 +47,21 @@ export const resolveActiveDomainLayoutKey = (
     return lastDomainStrategy;
 };
 
+/**
+ * Domain-internal node layouts are implemented by the vertical/horizontal
+ * domain engines. Tree, force, ELK, and DomainDagre commands have their own
+ * fixed ranking models, so replaying one of them from the node-layout menu
+ * would silently ignore the selected node arrangement.
+ */
+export const resolveNodeLayoutHostStrategy = (
+    lastDomainStrategy?: string,
+    lastDomainDirection?: 'TB' | 'LR',
+): 'domain-vertical' | 'domain-horizontal' => (
+    lastDomainStrategy === 'domain-horizontal' || lastDomainDirection === 'LR'
+        ? 'domain-horizontal'
+        : 'domain-vertical'
+);
+
 export const buildFlowchartLayoutMenuModel = ({
     lastDomainDirection,
     lastDomainStrategy,
@@ -56,6 +71,10 @@ export const buildFlowchartLayoutMenuModel = ({
 }: BuildFlowchartLayoutMenuModelOptions): FlowchartLayoutMenuModel => {
     const activeDomainKey = resolveActiveDomainLayoutKey(lastDomainStrategy, lastDomainDirection);
     const activeNodeKey = lastNodeLayout ? `node-${lastNodeLayout}` : undefined;
+    const nodeLayoutHostStrategy = resolveNodeLayoutHostStrategy(
+        lastDomainStrategy,
+        lastDomainDirection,
+    );
 
     const labels = {
         treeGroup: translate('designer.flowchart.layout.treeGroup', '树形布局'),
@@ -103,7 +122,7 @@ export const buildFlowchartLayoutMenuModel = ({
         key,
         label,
         onClick: () => onStrategyLayout?.(
-            lastDomainStrategy || 'domain-dagre',
+            nodeLayoutHostStrategy,
             nodeLayout,
             lastDomainDirection || 'TB',
         ),

@@ -366,6 +366,7 @@ describe('baseReactFlowDisplayWorkerClient', () => {
     expect(workerRef.current).toBe(warmedWorker);
     expect(harness.getWorkerCount()).toBe(1);
     expect(harness.posted.map(request => request.operation)).toEqual(['route', 'repair']);
+    expect(harness.posted[1]).toMatchObject({ repairMode: 'finalized' });
     expect(requestErrorListenerCounts).toEqual([1, 1]);
     expect(harness.getLatestListenerCount('error')).toBe(1);
     expect(harness.getLatestListenerCount('messageerror')).toBe(1);

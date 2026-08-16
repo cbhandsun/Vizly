@@ -9,6 +9,8 @@ export interface ForceLayoutOptions {
   idealDistance?: number;
   /** 步长衰减（默认 0.3） */
   stepSize?: number;
+  /** 显式自动布局可使用稳定圆形种子，避免结果依赖上一次布局。 */
+  initialization?: 'current' | 'deterministic';
 }
 
 const DEFAULT_ITERATIONS = 50;
@@ -63,6 +65,7 @@ export function forceDirectedLayout(
     MAX_IDEAL_DISTANCE,
   );
   const stepSize = boundedNumber(options?.stepSize, DEFAULT_STEP_SIZE, 0, MAX_STEP_SIZE);
+  const deterministicInitialization = options?.initialization === 'deterministic';
 
   const positions = new Map<string, Point>();
   if (nodes.length === 0) return positions;
@@ -71,8 +74,12 @@ export function forceDirectedLayout(
   for (let index = 0; index < nodes.length; index++) {
     const node = nodes[index];
     workingPositions[node.id] = {
-      x: finiteOr(node.position?.x, 400 + Math.cos(index * 2.4) * 200),
-      y: finiteOr(node.position?.y, 300 + Math.sin(index * 2.4) * 200),
+      x: deterministicInitialization
+        ? 400 + Math.cos(index * 2.4) * 200
+        : finiteOr(node.position?.x, 400 + Math.cos(index * 2.4) * 200),
+      y: deterministicInitialization
+        ? 300 + Math.sin(index * 2.4) * 200
+        : finiteOr(node.position?.y, 300 + Math.sin(index * 2.4) * 200),
     };
   }
 

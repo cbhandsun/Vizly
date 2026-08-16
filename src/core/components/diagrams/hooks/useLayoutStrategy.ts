@@ -19,6 +19,7 @@ import type { ILayoutStrategy } from '../../../types/layout-strategy';
 import type { LayoutOptions } from '../../../types/layout';
 import {
     logLayoutNoLayoutableNodes,
+    logLayoutStrategySafetyFallback,
     logLayoutStrategyFailure,
 } from './diagramInteractionLogging';
 
@@ -322,26 +323,53 @@ export function useLayoutStrategy({
             } else if (strategyName === 'force') {
                 // ── 扁平力导向布局（对齐 SVG 版：不检测域） ──
                 const { refineLayout } = await import('../../../strategies/shared/LayoutRefinement');
-                const positions = forceDirectedLayout(layoutNodes, layoutEdges);
-                const newNodes = applyLayout(layoutNodes, positions);
+                const { resolveForceLayoutEngine } = await import('./forceLayoutTopology');
+                const forceEngine = resolveForceLayoutEngine(layoutNodes, layoutEdges);
+                let newNodes: Node[];
+                let forceSourceEdges = layoutEdges;
+                if (forceEngine === 'force') {
+                    const positions = forceDirectedLayout(layoutNodes, layoutEdges, {
+                        initialization: 'deterministic',
+                    });
+                    newNodes = applyLayout(layoutNodes, positions);
+                } else {
+                    const layered = await (await loadDomainElkStrategy()).calculateLayout(
+                        layoutNodes,
+                        layoutEdges,
+                        {
+                            type: 'elk-layered' as LayoutOptions['type'],
+                            direction: dir,
+                            nodeLayout: 'elk-layered' as LayoutOptions['nodeLayout'],
+                            spacing: { horizontal: 120, vertical: 120 },
+                            edgeRouting: 'ORTHOGONAL',
+                            padding: { top: 40, right: 20, bottom: 20, left: 20 },
+                        },
+                    );
+                    newNodes = layered.nodes;
+                    forceSourceEdges = layered.edges;
+                }
                 // [FIX] 保留非流程图节点
                 const forceNodeIds = new Set(newNodes.map(n => n.id));
                 const forcePreserved = allNodes.filter(n => nonLayoutTypes.has(n.type || '') && !forceNodeIds.has(n.id));
                 const forceResultRaw = [...newNodes, ...forcePreserved];
                 // ⭐ 路由感知后处理
-                const { nodes: forceResult } = refineLayout(forceResultRaw, layoutEdges, {
-                    direction: dir,
-                    enableChannelSpacing: true,
-                    enableCrossingMinimization: true,
-                    enableNodeNudging: false,
-                });
-                const forceEdges = layoutEdges.map(e => ({
-                    ...e,
-                    sourceHandle: null,
-                    targetHandle: null,
-                    type: clearLayoutEdgeRoutingType(e),
-                    data: clearBaseReactFlowLayoutEdgeRoutingData(e.data),
-                }));
+                const forceResult = forceEngine === 'force'
+                    ? refineLayout(forceResultRaw, layoutEdges, {
+                        direction: dir,
+                        enableChannelSpacing: true,
+                        enableCrossingMinimization: true,
+                        enableNodeNudging: false,
+                    }).nodes
+                    : forceResultRaw;
+                const forceEdges = forceEngine === 'force'
+                    ? layoutEdges.map(e => ({
+                        ...e,
+                        sourceHandle: null,
+                        targetHandle: null,
+                        type: clearLayoutEdgeRoutingType(e),
+                        data: clearBaseReactFlowLayoutEdgeRoutingData(e.data),
+                    }))
+                    : prepareLayeredLayoutEdges(forceResult, forceSourceEdges, dir);
                 await commitLayout({ nodes: forceResult, edges: forceEdges, onCommitted: twoStepFitView });
             } else {
                 // ── 域感知策略布局 ──
@@ -426,7 +454,45 @@ export function useLayoutStrategy({
                     domainSubGroupDirection: strategyName === 'domain-dagre-sub-horizontal' ? 'LR' : dir,
                     subDomainNodeDirection: dir,
                 };
-                const result = await strategy.calculateLayout(layoutNodes, layoutEdges, layoutOptions);
+                const legacyFallback = !isDomainElk
+                    ? await import('./legacyDomainLayoutFallback')
+                    : null;
+                let usedDomainElk = isDomainElk;
+                if (
+                    legacyFallback?.shouldPreferElkForLegacyDomainTopology(layoutNodes, layoutEdges)
+                ) {
+                    logLayoutStrategySafetyFallback(strategyName);
+                    strategy = await loadDomainElkStrategy();
+                    usedDomainElk = true;
+                }
+                const effectiveLayoutOptions = usedDomainElk
+                    ? {
+                        ...layoutOptions,
+                        type: 'elk-layered' as LayoutOptions['type'],
+                        nodeLayout: 'elk-layered' as LayoutOptions['nodeLayout'],
+                        spacing: { horizontal: 120, vertical: 120 },
+                        edgeRouting: 'ORTHOGONAL' as const,
+                    }
+                    : layoutOptions;
+                let result = await strategy.calculateLayout(
+                    layoutNodes,
+                    layoutEdges,
+                    effectiveLayoutOptions,
+                );
+                if (!usedDomainElk) {
+                    if (legacyFallback?.shouldUseElkSafetyFallback(result.nodes, result.edges)) {
+                        logLayoutStrategySafetyFallback(strategyName);
+                        const elkStrategy = await loadDomainElkStrategy();
+                        result = await elkStrategy.calculateLayout(layoutNodes, layoutEdges, {
+                            ...layoutOptions,
+                            type: 'elk-layered' as LayoutOptions['type'],
+                            nodeLayout: 'elk-layered' as LayoutOptions['nodeLayout'],
+                            spacing: { horizontal: 120, vertical: 120 },
+                            edgeRouting: 'ORTHOGONAL',
+                        });
+                        usedDomainElk = true;
+                    }
+                }
 
                 if (result.nodes.length > 0) {
                     // [FIX] 保留非流程图节点（mindmap、sticky-note 等）：布局算法不处理它们，但不能丢弃
@@ -446,8 +512,13 @@ export function useLayoutStrategy({
                     );
                     // Layered layout engines own ranking and node coordinates;
                     // the shared Worker transaction owns ports and final paths.
-                    const finalEdges = isDomainElk || isDomainDagre
-                        ? prepareLayeredLayoutEdges(finalNodes, preservedResultEdges, dir)
+                    const finalEdges = usedDomainElk || isDomainDagre
+                        ? prepareLayeredLayoutEdges(
+                            finalNodes,
+                            preservedResultEdges,
+                            dir,
+                            { promoteLockedComputedPath: isDomainDagre && !usedDomainElk },
+                        )
                         : preservedResultEdges.map(edge => ({
                             ...edge,
                             sourceHandle: null,

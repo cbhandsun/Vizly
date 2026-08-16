@@ -280,6 +280,7 @@ export const stageBaseReactFlowLayoutRouting = async ({
     timeoutMs: DISPLAY_WORKER_TIMEOUT_MS,
     signal,
     requireHardClean: false,
+    repairMode: 'bounded',
   });
   const candidateCommit = candidateRepairResult.hardClean
     ? commitBaseReactFlowStagedLayoutRoutingResult({
@@ -326,6 +327,7 @@ export const stageBaseReactFlowLayoutRouting = async ({
       timeoutMs: DISPLAY_WORKER_TIMEOUT_MS,
       signal,
       requireHardClean: false,
+      repairMode: 'bounded',
     })
     : initialResult;
   const workerResult = {

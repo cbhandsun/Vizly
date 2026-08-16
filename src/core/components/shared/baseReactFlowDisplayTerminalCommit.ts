@@ -48,8 +48,9 @@ export const materializeDisplayTerminalHandles = <T extends Edge[]>(
       rect: NonNullable<typeof sourceRect>,
     ): string | null | undefined => {
       const current = role === 'source' ? edge.sourceHandle : edge.targetHandle;
-      if (sideForHandle(current)) return current;
       const side = inferTerminalGeometrySide(path, role, rect);
+      const currentSide = sideForHandle(current);
+      if (side && currentSide === side) return current;
       if (!side || !edgeTerminalSideCanSwitch(edge, role, side)) return current;
       return resolveEdgeTerminalHandleForSide(edge, role, side);
     };

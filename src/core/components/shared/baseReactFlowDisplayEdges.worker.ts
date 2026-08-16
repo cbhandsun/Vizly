@@ -391,13 +391,15 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
       request.nodes,
     );
     repairTimer.finish(repaired.report.hardClean ? 'accepted' : 'rejected', repaired.edges.length);
-    return finalizeContainerClearanceResponse({
+    const repairResponse: DisplayEdgesWorkerResponse = {
       requestId: request.requestId,
       edges: repaired.edges,
       hardClean: repaired.report.hardClean,
       routeResolution: 'repair',
       phaseTrace,
-    }, request.nodes, {
+    };
+    if (request.repairMode === 'bounded') return repairResponse;
+    return finalizeContainerClearanceResponse(repairResponse, request.nodes, {
       isLargeGraph: request.nodes.length > 36 || request.edges.length > 36,
       onPhaseTrace: recordPhaseTrace,
       preferredEdges: request.edges,

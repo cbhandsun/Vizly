@@ -33,6 +33,10 @@ export const logLayoutStrategyFailure = (strategyName: string, error: unknown): 
   safeLog.error(`[useLayoutStrategy] Layout failed (${strategyName}):`, redactSensitiveLogValue(error));
 };
 
+export const logLayoutStrategySafetyFallback = (strategyName: string): void => {
+  safeLog.info(`[useLayoutStrategy] Using ELK safety fallback for hard-defective ${strategyName} geometry.`);
+};
+
 export const logSmartRoutingConfigLayerSyncFailure = (error: unknown): void => {
   safeLog.warn('[useSmartRoutingConfig] Layered config sync failed:', redactSensitiveLogValue(error));
 };

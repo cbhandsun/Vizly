@@ -15,6 +15,7 @@ import {
 import { restoreReadableRawLockedPaths } from '../../strategies/shared/edgeReadableRawPathRestore';
 import { repairTerminalBoundaryStairs } from '../../strategies/shared/edgeTerminalBoundaryStairRepair';
 import { calculateEdgePathQualityScore } from '../../strategies/shared/edgeStrictCrossingGuard';
+import { commitComputedDisplayEdgeTerminals } from './baseReactFlowDisplayEndpointAnchoring';
 import {
   markBaseDisplayFinalized,
   toBasicDisplayEdge,
@@ -166,7 +167,10 @@ export const commitDisplayEdgesForRenderMode = ({
   inputSignature: string;
   nodes: Node[];
 }): Edge[] => {
-  const committedQualityEdges = materializeDisplayTerminalHandles(finalQualityEdges, nodes);
+  const committedQualityEdges = commitComputedDisplayEdgeTerminals(
+    materializeDisplayTerminalHandles(finalQualityEdges, nodes),
+    nodes,
+  );
   if (isLargeGraph) {
     return markBaseDisplayFinalized(
       committedQualityEdges.map(edge => (

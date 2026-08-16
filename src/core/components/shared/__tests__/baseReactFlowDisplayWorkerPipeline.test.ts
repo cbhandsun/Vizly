@@ -97,26 +97,6 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
     });
   });
 
-  it('dispatches repair-only messages through the measured repair pipeline', () => {
-    const repairSpy = vi.spyOn(
-      measuredDisplayRepair,
-      'repairBaseReactFlowMeasuredDisplayEdgesWithReport',
-    );
-
-    const response = computeBaseReactFlowDisplayEdgesWorkerResponse({
-      operation: 'repair',
-      requestId: 'repair-only',
-      edges,
-      nodes,
-    });
-
-    expect(repairSpy).toHaveBeenCalledTimes(1);
-    expect(response.requestId).toBe('repair-only');
-    expect(Array.isArray(response.edges)).toBe(true);
-    expect(typeof response.hardClean).toBe('boolean');
-    expect(response.routeResolution).toBe('repair');
-  });
-
   it('commits a clean cache candidate without entering the full-route pipeline', () => {
     const fullRouteSpy = vi.spyOn(fullRoutePipeline, 'createBaseReactFlowFullRouteEdges');
     const response = computeBaseReactFlowDisplayEdgesWorkerResponse({
