@@ -2,8 +2,12 @@ import type { Edge, Node } from '@xyflow/react';
 import type { MutableRefObject } from 'react';
 
 import { computeBaseReactFlowDisplayOutputRouteSignature } from './baseReactFlowDisplayCache';
-import { writeBaseReactFlowDisplayCommittedSnapshot } from './baseReactFlowDisplayCommittedSnapshot';
+import {
+  readBaseReactFlowDisplayCommittedSnapshot,
+  writeBaseReactFlowDisplayCommittedSnapshot,
+} from './baseReactFlowDisplayCommittedSnapshot';
 import { anchorComputedDisplayEdgeEndpoints } from './baseReactFlowDisplayEndpointAnchoring';
+import { lockFinalDisplayComputedPaths } from './baseReactFlowDisplayEdgeConversions';
 import {
   canCommitBaseReactFlowDisplayResult,
   shouldRepairBaseReactFlowDisplayResult,
@@ -155,25 +159,56 @@ export const commitBaseReactFlowStagedLayoutRoutingResult = ({
     routesMatch,
   })) return null;
 
-  const outputRouteSignature = computeBaseReactFlowDisplayOutputRouteSignature(merged.edges);
-  const displayPatches = createBaseReactFlowDisplayEdgePatches(merged.edges, merged.edges);
-  if (!outputRouteSignature || !displayPatches) return null;
-  const identity = computeBaseReactFlowDisplayInputIdentityBundle({
-    nodes: sourceNodes,
-    edges: merged.edges,
+  if (!writeBaseReactFlowStagedLayoutSnapshot({
+    sourceEdges,
+    routedEdges: merged.edges,
+    sourceNodes,
     enableSmartEdges,
     smartEdgePadding,
     isLargeGraph,
-  });
-  if (!writeBaseReactFlowDisplayCommittedSnapshot({
-    inputSignature: identity.cacheSignature,
-    inputGeometryDigest: identity.geometryDigest,
-    sourceEdges: merged.edges,
-    sourceNodes,
-    displayPatches,
-    outputRouteSignature,
   })) return null;
   return { routedEdges: merged.edges };
+};
+
+const writeBaseReactFlowStagedLayoutSnapshot = ({
+  sourceEdges,
+  routedEdges,
+  sourceNodes,
+  enableSmartEdges,
+  smartEdgePadding,
+  isLargeGraph,
+}: {
+  sourceEdges: Edge[];
+  routedEdges: Edge[];
+  sourceNodes: Node[];
+  enableSmartEdges: boolean;
+  smartEdgePadding: number;
+  isLargeGraph: boolean;
+}): boolean => {
+  const outputRouteSignature = computeBaseReactFlowDisplayOutputRouteSignature(routedEdges);
+  const displayPatches = createBaseReactFlowDisplayEdgePatches(routedEdges, routedEdges);
+  if (!outputRouteSignature || !displayPatches) return false;
+  const writeSnapshot = (edges: Edge[], patches: Edge[]): boolean => {
+    const identity = computeBaseReactFlowDisplayInputIdentityBundle({
+      nodes: sourceNodes,
+      edges,
+      enableSmartEdges,
+      smartEdgePadding,
+      isLargeGraph,
+    });
+    return writeBaseReactFlowDisplayCommittedSnapshot({
+      inputSignature: identity.cacheSignature,
+      inputGeometryDigest: identity.geometryDigest,
+      sourceEdges: edges,
+      sourceNodes,
+      displayPatches: patches,
+      outputRouteSignature,
+    });
+  };
+  const primaryWritten = writeSnapshot(routedEdges, displayPatches);
+  const sourcePatches = createBaseReactFlowDisplayEdgePatches(sourceEdges, routedEdges);
+  if (sourcePatches) writeSnapshot(sourceEdges, sourcePatches);
+  return primaryWritten;
 };
 
 /** Routes target layout geometry without mutating the visible graph. */
@@ -204,6 +239,31 @@ export const stageBaseReactFlowLayoutRouting = async ({
     edges: unseededSourceEdges,
     nodes: sourceNodes,
   });
+  const projectedIdentity = computeBaseReactFlowDisplayInputIdentityBundle({
+    nodes: projectedSource.nodes,
+    edges: projectedSource.edges,
+    enableSmartEdges,
+    smartEdgePadding,
+    isLargeGraph,
+  });
+  const cached = readBaseReactFlowDisplayCommittedSnapshot({
+    inputSignature: projectedIdentity.cacheSignature,
+    inputGeometryDigest: projectedIdentity.geometryDigest,
+    sourceEdges: unseededSourceEdges,
+  });
+  const cachedEdges = cached
+    ? lockFinalDisplayComputedPaths(cached.edges, projectedSource.nodes)
+    : null;
+  if (cachedEdges && writeBaseReactFlowStagedLayoutSnapshot({
+    sourceEdges: unseededSourceEdges,
+    routedEdges: cachedEdges,
+    sourceNodes: projectedSource.nodes,
+    enableSmartEdges,
+    smartEdgePadding,
+    isLargeGraph,
+  })) {
+    return { routedEdges: cachedEdges };
+  }
   const stagedSeedEdges = seedBaseReactFlowStagedLayoutEdges({
     sourceEdges,
     sourceNodes,
@@ -234,7 +294,9 @@ export const stageBaseReactFlowLayoutRouting = async ({
       isLargeGraph,
     })
     : null;
-  if (candidateCommit) return candidateCommit;
+  if (candidateCommit) {
+    return candidateCommit;
+  }
   const fallbackSeedEdges = seedBaseReactFlowStagedLayoutEdges({
     sourceEdges: unseededSourceEdges,
     sourceNodes,

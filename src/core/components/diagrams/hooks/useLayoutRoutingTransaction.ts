@@ -11,6 +11,7 @@ import {
 } from '../../shared/baseReactFlowRuntimeConfig';
 import {
   disposeBaseReactFlowDisplayWorker,
+  prewarmBaseReactFlowDisplayWorker,
 } from '../../shared/baseReactFlowDisplayWorkerClient';
 import {
   stageBaseReactFlowLayoutRouting,
@@ -49,10 +50,15 @@ export const useLayoutRoutingTransaction = ({
   const abortControllerRef = useRef<AbortController | null>(null);
   const requestSequenceRef = useRef(0);
 
-  useEffect(() => () => {
-    abortControllerRef.current?.abort();
-    abortControllerRef.current = null;
-    disposeBaseReactFlowDisplayWorker(workerRef);
+  useEffect(() => {
+    // Worker module fetching/compilation overlaps ordinary canvas use instead
+    // of becoming part of the first explicit layout interaction.
+    prewarmBaseReactFlowDisplayWorker(workerRef);
+    return () => {
+      abortControllerRef.current?.abort();
+      abortControllerRef.current = null;
+      disposeBaseReactFlowDisplayWorker(workerRef);
+    };
   }, []);
 
   return useCallback(async ({

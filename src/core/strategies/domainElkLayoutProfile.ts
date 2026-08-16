@@ -5,7 +5,6 @@ export const DOMAIN_ELK_LAYERED_QUALITY_OPTIONS = Object.freeze({
   'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
   'elk.layered.crossingMinimization.greedySwitch.type': 'TWO_SIDED',
   'elk.layered.nodePlacement.favorStraightEdges': 'true',
-  'elk.layered.thoroughness': '20',
 });
 
 const MIN_ELK_SPACING = 24;
@@ -44,3 +43,7 @@ export const resolveDomainElkEdgeRouting = (
   }
   return 'ORTHOGONAL';
 };
+
+export const resolveDomainElkThoroughness = (nodeCount: number): string => (
+  nodeCount > 250 ? '5' : nodeCount > 80 ? '8' : '12'
+);

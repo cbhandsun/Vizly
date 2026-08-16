@@ -4,6 +4,7 @@ import {
   DOMAIN_ELK_LAYERED_QUALITY_OPTIONS,
   resolveDomainElkEdgeRouting,
   resolveDomainElkSpacing,
+  resolveDomainElkThoroughness,
 } from '../domainElkLayoutProfile';
 import { collectDomainElkLayoutRoutes } from '../domainElkLayoutRoutes';
 
@@ -33,6 +34,11 @@ describe('domainElkLayoutProfile', () => {
   ])('bounds invalid or extreme spacing (%s, %s)', (explicit, configured, expected) => {
     expect(resolveDomainElkSpacing(explicit, configured)).toBe(expected);
   });
+
+  it.each([[80, '12'], [81, '8'], [250, '8'], [251, '5']])(
+    'scales interactive thoroughness at %s nodes',
+    (nodeCount, expected) => expect(resolveDomainElkThoroughness(nodeCount)).toBe(expected),
+  );
 
   it.each([
     ['', '', 'ORTHOGONAL'],

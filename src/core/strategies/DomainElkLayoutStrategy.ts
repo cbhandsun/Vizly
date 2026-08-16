@@ -17,6 +17,7 @@ import {
   DOMAIN_ELK_LAYERED_QUALITY_OPTIONS,
   resolveDomainElkEdgeRouting,
   resolveDomainElkSpacing,
+  resolveDomainElkThoroughness,
 } from './domainElkLayoutProfile';
 import { collectDomainElkLayoutRoutes } from './domainElkLayoutRoutes';
 
@@ -107,6 +108,7 @@ export class DomainElkLayoutStrategy implements ILayoutStrategy {
             'elk.algorithm': elkAlgorithm,
             'elk.direction': elkDir,
             ...DOMAIN_ELK_LAYERED_QUALITY_OPTIONS,
+            'elk.layered.thoroughness': resolveDomainElkThoroughness(layoutCandidates.length),
             'elk.spacing.nodeNode': String(hGapCfg),
             'elk.layered.spacing.nodeNodeBetweenLayers': String(vGapCfg),
             'elk.layered.spacing.edgeNodeBetweenLayers': String(Math.max(24, edgeNodeSpacing)),

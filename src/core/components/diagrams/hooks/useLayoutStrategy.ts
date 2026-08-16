@@ -52,6 +52,10 @@ export const LAYERED_TREE_ROUTING_SPACING = Object.freeze({
     levelSpacing: 120,
 });
 
+const loadDomainElkStrategy = async (): Promise<ILayoutStrategy> => {
+    return new (await import('../../../strategies/DomainElkLayoutStrategy')).DomainElkLayoutStrategy();
+};
+
 /** React Flow runtime geometry must not override a newly staged layout. */
 export const clearLayoutRuntimeAbsolutePosition = (node: Node): Node => ({
     ...node,
@@ -278,8 +282,7 @@ export function useLayoutStrategy({
                     // tree. Use the industry layered engine for ranking while
                     // retaining the user's Tree command and the common hard
                     // routing transaction.
-                    const { DomainElkLayoutStrategy } = await import('../../../strategies/DomainElkLayoutStrategy');
-                    const layered = await new DomainElkLayoutStrategy().calculateLayout(
+                    const layered = await (await loadDomainElkStrategy()).calculateLayout(
                         layoutNodes,
                         layoutEdges,
                         {
@@ -344,7 +347,6 @@ export function useLayoutStrategy({
                 // ── 域感知策略布局 ──
                 const isDomainDagre = strategyName === 'domain-dagre' || strategyName === 'domain-dagre-sub-horizontal' || strategyName === 'dagre';
                 const isDomainElk = strategyName === 'domain-elk' || strategyName === 'elk';
-                const isDomainDagreSubHorizontal = strategyName === 'domain-dagre-sub-horizontal';
                 const finalNodeLayout = isDomainDagre
                     ? 'dagre'
                     : (nodeLayout || 'flow');
@@ -352,18 +354,16 @@ export function useLayoutStrategy({
                 let domainOrder: string[] | undefined;
                 let subDomainOrder: Record<string, string[]> | undefined;
                 let generatedGroupOptions = resolveLayoutStrategyGeneratedGroupOptions(undefined, allNodes);
+                const locationDiagramId = getQueryOrHashParamFromLocation(
+                    typeof window === 'undefined' ? undefined : window.location,
+                    'diagram'
+                );
+                const presetCandidate = loadLayoutStrategyPresetFromCandidates(
+                    loadLayoutPresetMap,
+                    [diagramId, locationDiagramId || undefined],
+                );
                 try {
-                    const locationDiagramId = getQueryOrHashParamFromLocation(
-                        typeof window === 'undefined' ? undefined : window.location,
-                        'diagram'
-                    );
-                    const candidate = await loadLayoutStrategyPresetFromCandidates(
-                        loadLayoutPresetMap,
-                        [
-                            diagramId,
-                            locationDiagramId || undefined,
-                        ],
-                    );
+                    const candidate = await presetCandidate;
                     const preset = candidate.preset;
                     if (preset) {
                         const presetRecord = asRecord(preset);
@@ -398,23 +398,13 @@ export function useLayoutStrategy({
                 let strategy: ILayoutStrategy;
                 // [FIX] domain-dagre 始终走 DomainDagreLayoutStrategy（唯一支持 domainOrder 的策略）
                 if (isDomainDagre) {
-                    const { DomainDagreLayoutStrategy } = await import('../../../strategies/DomainDagreLayoutStrategy');
-                    strategy = new DomainDagreLayoutStrategy();
-                } else if (strategyName === 'domain-vertical') {
-                    const { DomainVerticalLayoutStrategy } = await import('../../../strategies/DomainVerticalLayoutStrategy');
-                    strategy = new DomainVerticalLayoutStrategy();
+                    strategy = new (await import('../../../strategies/DomainDagreLayoutStrategy')).DomainDagreLayoutStrategy();
                 } else if (strategyName === 'domain-horizontal') {
-                    const { DomainHorizontalLayoutStrategy } = await import('../../../strategies/DomainHorizontalLayoutStrategy');
-                    strategy = new DomainHorizontalLayoutStrategy();
-                } else if (strategyName === 'domain-elk' || strategyName === 'elk') {
-                    const { DomainElkLayoutStrategy } = await import('../../../strategies/DomainElkLayoutStrategy');
-                    strategy = new DomainElkLayoutStrategy();
-                } else if (strategyName === 'dagre') {
-                    const { DomainDagreLayoutStrategy } = await import('../../../strategies/DomainDagreLayoutStrategy');
-                    strategy = new DomainDagreLayoutStrategy();
+                    strategy = new (await import('../../../strategies/DomainHorizontalLayoutStrategy')).DomainHorizontalLayoutStrategy();
+                } else if (isDomainElk) {
+                    strategy = await loadDomainElkStrategy();
                 } else {
-                    const { DomainVerticalLayoutStrategy } = await import('../../../strategies/DomainVerticalLayoutStrategy');
-                    strategy = new DomainVerticalLayoutStrategy();
+                    strategy = new (await import('../../../strategies/DomainVerticalLayoutStrategy')).DomainVerticalLayoutStrategy();
                 }
 
                 const layoutOptions: LayoutOptions & {
@@ -433,7 +423,7 @@ export function useLayoutStrategy({
                     fitDomainContent: true,
                     domainOrder,
                     subDomainOrder,
-                    domainSubGroupDirection: isDomainDagreSubHorizontal ? 'LR' : dir,
+                    domainSubGroupDirection: strategyName === 'domain-dagre-sub-horizontal' ? 'LR' : dir,
                     subDomainNodeDirection: dir,
                 };
                 const result = await strategy.calculateLayout(layoutNodes, layoutEdges, layoutOptions);

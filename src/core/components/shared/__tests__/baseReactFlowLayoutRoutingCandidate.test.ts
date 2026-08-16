@@ -82,6 +82,48 @@ describe('baseReactFlow layout routing candidate sequence', () => {
     expect(workerMocks.compute).not.toHaveBeenCalled();
   });
 
+  it('replays an exact hard-clean layout without starting another Worker request', async () => {
+    workerMocks.repair.mockImplementation(async ({ edges: candidateEdges }: { edges: Edge[] }) => (
+      successfulResult(candidateEdges)
+    ));
+
+    const first = await stageBaseReactFlowLayoutRouting({
+      workerRef: { current: null },
+      requestId: 'layout:cached-first',
+      sourceEdges: edges,
+      sourceNodes: nodes,
+      isLargeGraph: false,
+    });
+    const second = await stageBaseReactFlowLayoutRouting({
+      workerRef: { current: null },
+      requestId: 'layout:cached-second',
+      sourceEdges: edges,
+      sourceNodes: nodes,
+      isLargeGraph: false,
+    });
+    expect(workerMocks.repair).toHaveBeenCalledOnce();
+    await stageBaseReactFlowLayoutRouting({
+      workerRef: { current: null },
+      requestId: 'layout:cached-shifted',
+      sourceEdges: edges,
+      sourceNodes: nodes.map(node => node.id === 'target'
+        ? { ...node, position: { x: 320, y: 0 } }
+        : node),
+      isLargeGraph: false,
+    });
+
+    expect(second.routedEdges[0]).toMatchObject({
+      type: 'stablePath',
+      data: {
+        computedPath: first.routedEdges[0].data?.computedPath,
+        layoutPathLocked: true,
+        _layoutPathLocked: true,
+      },
+    });
+    expect(workerMocks.repair).toHaveBeenCalledTimes(2);
+    expect(workerMocks.compute).not.toHaveBeenCalled();
+  });
+
   it('falls through to the unchanged full-quality route when the bounded candidate is rejected', async () => {
     workerMocks.repair.mockImplementationOnce(async ({ edges: candidateEdges }: { edges: Edge[] }) => ({
       ...successfulResult(candidateEdges),
