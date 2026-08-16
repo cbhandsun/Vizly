@@ -73,6 +73,12 @@ export class DomainCompoundElkLayoutStrategy extends AbstractElkLayoutStrategy {
       'elk.layered.spacing.nodeNodeBetweenLayers': String(verticalSpacing),
       'elk.layered.spacing.edgeNodeBetweenLayers': '40',
       'elk.layered.mergeEdges': 'true',
+      'elk.layered.mergeHierarchyEdges': 'true',
+      // ELK's ordinary greedy switch is ignored for INCLUDE_CHILDREN graphs.
+      // Prefer cross-hierarchy sweeps and enable the hierarchy-aware variant
+      // so domain boundaries participate in crossing minimization.
+      'elk.layered.crossingMinimization.hierarchicalSweepiness': '1.0',
+      'elk.layered.crossingMinimization.greedySwitchHierarchical.type': 'TWO_SIDED',
       ...DOMAIN_ELK_LAYERED_QUALITY_OPTIONS,
     };
     const businessNodes = nodes.filter(node => !GROUP_TYPES.has(String(node.type || '')));

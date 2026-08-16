@@ -55,6 +55,12 @@ describe('DomainCompoundElkLayoutStrategy', () => {
     );
 
     const rootChildren = graph.children ?? [];
+    expect(graph.layoutOptions).toMatchObject({
+      'elk.hierarchyHandling': 'INCLUDE_CHILDREN',
+      'elk.layered.mergeHierarchyEdges': 'true',
+      'elk.layered.crossingMinimization.hierarchicalSweepiness': '1.0',
+      'elk.layered.crossingMinimization.greedySwitchHierarchical.type': 'TWO_SIDED',
+    });
     expect(rootChildren.map(child => child.id)).toEqual(['domain-a', 'sub-b-two']);
     expect(new Set(rootChildren.map(child => child.id)).size).toBe(rootChildren.length);
     const domainA = rootChildren.find(child => child.id === 'domain-a');
