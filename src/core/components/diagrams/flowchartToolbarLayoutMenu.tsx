@@ -1,6 +1,7 @@
 import React from 'react';
 import type { MenuProps } from 'antd';
 import { FaObjectGroup, FaRegObjectGroup, FaSitemap } from 'react-icons/fa';
+import { usesSelectableDomainNodeArrangement } from './flowchartLayoutStrategyMode';
 
 type ToolbarMenuItem = Extract<
     NonNullable<NonNullable<MenuProps['items']>[number]>,
@@ -70,7 +71,9 @@ export const buildFlowchartLayoutMenuModel = ({
     translate,
 }: BuildFlowchartLayoutMenuModelOptions): FlowchartLayoutMenuModel => {
     const activeDomainKey = resolveActiveDomainLayoutKey(lastDomainStrategy, lastDomainDirection);
-    const activeNodeKey = lastNodeLayout ? `node-${lastNodeLayout}` : undefined;
+    const activeNodeKey = lastNodeLayout && usesSelectableDomainNodeArrangement(lastDomainStrategy)
+        ? `node-${lastNodeLayout}`
+        : undefined;
     const nodeLayoutHostStrategy = resolveNodeLayoutHostStrategy(
         lastDomainStrategy,
         lastDomainDirection,
@@ -82,14 +85,23 @@ export const buildFlowchartLayoutMenuModel = ({
         treeLr: translate('designer.flowchart.layout.treeLR', '↔ 树形 (左→右)'),
         forceGroup: translate('designer.flowchart.layout.forceGroup', '力导向'),
         force: translate('designer.flowchart.layout.force', '⊙ 力导向'),
+        globalElkGroup: translate('designer.flowchart.layout.globalElkGroup', '全图分层布局'),
         domainGroup: translate('designer.flowchart.layout.domainGroup', '域感知布局'),
         domainDagreTb: translate('designer.flowchart.layout.domainDagreTB', '◈ DomainDagre (上→下) (默认)'),
         domainDagreSubHorizontalTb: translate(
             'designer.flowchart.layout.domainDagreSubHorizontalTB',
             '◈ DomainDagre (子域水平)',
         ),
-        domainElkTb: translate('designer.flowchart.layout.elkTB', 'ELK 正交分层 (上→下)'),
-        domainElkLr: translate('designer.flowchart.layout.elkLR', 'ELK 正交分层 (左→右)'),
+        domainCompoundElkTb: translate(
+            'designer.flowchart.layout.domainCompoundElkTB',
+            'Domain ELK 组合 (上→下)',
+        ),
+        domainCompoundElkLr: translate(
+            'designer.flowchart.layout.domainCompoundElkLR',
+            'Domain ELK 组合 (左→右)',
+        ),
+        domainElkTb: translate('designer.flowchart.layout.globalElkTB', '全图 ELK 正交分层 (上→下)'),
+        domainElkLr: translate('designer.flowchart.layout.globalElkLR', '全图 ELK 正交分层 (左→右)'),
         domainVertical: translate('designer.flowchart.layout.domainVertical', '▥ DomainVertical (上→下)'),
         domainHorizontal: translate('designer.flowchart.layout.domainHorizontal', '▦ DomainHorizontal (左→右)'),
         nodeGroup: translate('designer.flowchart.layout.nodeLayoutGroup', '域内节点排布'),
@@ -136,6 +148,8 @@ export const buildFlowchartLayoutMenuModel = ({
         force: labels.force,
         'domain-dagre-tb': labels.domainDagreTb,
         'domain-dagre-sub-horizontal-tb': labels.domainDagreSubHorizontalTb,
+        'domain-compound-elk-tb': labels.domainCompoundElkTb,
+        'domain-compound-elk-lr': labels.domainCompoundElkLr,
         'domain-elk-tb': labels.domainElkTb,
         'domain-elk-lr': labels.domainElkLr,
         'domain-vertical': labels.domainVertical,
@@ -185,6 +199,28 @@ export const buildFlowchartLayoutMenuModel = ({
         ...(onStrategyLayout ? [
             { type: 'divider' as const },
             {
+                key: 'group-global-elk',
+                label: labels.globalElkGroup,
+                type: 'group' as const,
+                children: [
+                    domainItem(
+                        'domain-elk-tb',
+                        labels.domainElkTb,
+                        () => onStrategyLayout('domain-elk', 'elk-layered', 'TB'),
+                        <FaSitemap />,
+                    ),
+                    domainItem(
+                        'domain-elk-lr',
+                        labels.domainElkLr,
+                        () => onStrategyLayout('domain-elk', 'elk-layered', 'LR'),
+                        <FaSitemap style={{ transform: 'rotate(-90deg)' }} />,
+                    ),
+                ],
+            },
+        ] : []),
+        ...(onStrategyLayout ? [
+            { type: 'divider' as const },
+            {
                 key: 'group-domain',
                 label: labels.domainGroup,
                 type: 'group' as const,
@@ -202,16 +238,16 @@ export const buildFlowchartLayoutMenuModel = ({
                         <FaRegObjectGroup />,
                     ),
                     domainItem(
-                        'domain-elk-tb',
-                        labels.domainElkTb,
-                        () => onStrategyLayout('domain-elk', 'elk-layered', 'TB'),
-                        <FaSitemap />,
+                        'domain-compound-elk-tb',
+                        labels.domainCompoundElkTb,
+                        () => onStrategyLayout('domain-compound-elk', undefined, 'TB'),
+                        <FaObjectGroup />,
                     ),
                     domainItem(
-                        'domain-elk-lr',
-                        labels.domainElkLr,
-                        () => onStrategyLayout('domain-elk', 'elk-layered', 'LR'),
-                        <FaSitemap style={{ transform: 'rotate(-90deg)' }} />,
+                        'domain-compound-elk-lr',
+                        labels.domainCompoundElkLr,
+                        () => onStrategyLayout('domain-compound-elk', undefined, 'LR'),
+                        <FaObjectGroup style={{ transform: 'rotate(-90deg)' }} />,
                     ),
                     { type: 'divider' as const },
                     domainItem(

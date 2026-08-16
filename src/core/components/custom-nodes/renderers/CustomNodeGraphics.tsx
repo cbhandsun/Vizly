@@ -15,6 +15,8 @@ const hexToRgba = (hex: string, alpha: number): string => {
 };
 
 const edgeHandleStyle = { background: 'transparent', width: '1px', height: '1px', zIndex: 10 };
+const primaryHandleClassName = 'custom-node-handle-primary';
+const compatibilityHandleClassName = 'custom-node-handle-compatibility';
 const HANDLE_SIDES = [
     { full: 'top', short: 't', position: Position.Top },
     { full: 'bottom', short: 'b', position: Position.Bottom },
@@ -265,10 +267,41 @@ const CustomNodeGraphicsComponent: React.FC<CustomNodeGraphicsProps> = ({
                     <>
                         {HANDLE_SIDES.map(({ full, short, position }) => (
                             <React.Fragment key={full}>
-                                <Handle type="target" position={position} id={full} style={edgeHandleStyle} />
-                                <Handle type="source" position={position} id={full} style={edgeHandleStyle} />
-                                <Handle type="target" position={position} id={short} style={edgeHandleStyle} />
-                                <Handle type="source" position={position} id={short} style={edgeHandleStyle} />
+                                {/*
+                                  Legacy target/short-id handles remain measurable so saved edges keep
+                                  resolving to the same ports. They must never become a second visual port:
+                                  connection-state CSS used to reveal all four coincident handles as a
+                                  narrow U-shaped ghost. Render the canonical source handle last so it is
+                                  also the sole interactive visual affordance on each side.
+                                */}
+                                <Handle
+                                    type="target"
+                                    position={position}
+                                    id={full}
+                                    className={compatibilityHandleClassName}
+                                    style={edgeHandleStyle}
+                                />
+                                <Handle
+                                    type="target"
+                                    position={position}
+                                    id={short}
+                                    className={compatibilityHandleClassName}
+                                    style={edgeHandleStyle}
+                                />
+                                <Handle
+                                    type="source"
+                                    position={position}
+                                    id={short}
+                                    className={compatibilityHandleClassName}
+                                    style={edgeHandleStyle}
+                                />
+                                <Handle
+                                    type="source"
+                                    position={position}
+                                    id={full}
+                                    className={primaryHandleClassName}
+                                    style={edgeHandleStyle}
+                                />
                             </React.Fragment>
                         ))}
                     </>

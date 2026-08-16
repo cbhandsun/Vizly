@@ -5,6 +5,10 @@ import {
   resolveActiveDomainLayoutKey,
   resolveNodeLayoutHostStrategy,
 } from '../flowchartToolbarLayoutMenu';
+import {
+  isGlobalFullGraphLayoutStrategy,
+  usesSelectableDomainNodeArrangement,
+} from '../flowchartLayoutStrategyMode';
 
 const asRecord = (value: unknown): Record<string, unknown> => (
   value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -24,6 +28,18 @@ const collectItems = (value: unknown): Record<string, unknown>[] => {
 };
 
 describe('flowchartToolbarLayoutMenu', () => {
+  it('distinguishes global strategies from composable domain layouts', () => {
+    expect(isGlobalFullGraphLayoutStrategy('tree')).toBe(true);
+    expect(isGlobalFullGraphLayoutStrategy('force')).toBe(true);
+    expect(isGlobalFullGraphLayoutStrategy('domain-elk')).toBe(true);
+    expect(isGlobalFullGraphLayoutStrategy('domain-dagre')).toBe(false);
+    expect(usesSelectableDomainNodeArrangement('domain-vertical')).toBe(true);
+    expect(usesSelectableDomainNodeArrangement('domain-horizontal')).toBe(true);
+    expect(usesSelectableDomainNodeArrangement('domain-dagre')).toBe(true);
+    expect(usesSelectableDomainNodeArrangement('domain-dagre-sub-horizontal')).toBe(true);
+    expect(usesSelectableDomainNodeArrangement('domain-compound-elk')).toBe(false);
+  });
+
   it('exposes ELK layered layouts in both supported directions', () => {
     const onStrategyLayout = vi.fn();
     const model = buildFlowchartLayoutMenuModel({
@@ -36,12 +52,21 @@ describe('flowchartToolbarLayoutMenu', () => {
     const items = collectItems(model.items);
     const elkTb = items.find(item => item.key === 'domain-elk-tb');
     const elkLr = items.find(item => item.key === 'domain-elk-lr');
+    const globalElkGroup = items.find(item => item.key === 'group-global-elk');
+    const domainGroup = items.find(item => item.key === 'group-domain');
     const legacyDagreLr = items.find(item => item.key === 'domain-dagre-lr');
 
     expect(elkTb).toBeDefined();
     expect(elkLr).toBeDefined();
+    expect(collectItems(globalElkGroup?.children).map(item => item.key)).toEqual([
+      'domain-elk-tb',
+      'domain-elk-lr',
+    ]);
+    expect(collectItems(domainGroup?.children).map(item => item.key)).not.toContain('domain-elk-tb');
     expect(legacyDagreLr).toBeUndefined();
     expect(model.selectedKeys).toContain('domain-elk-lr');
+    expect(model.selectedKeys).not.toContain('node-elk');
+    expect(model.statusText).not.toContain(' + ');
     expect(resolveActiveDomainLayoutKey('domain-elk', 'TB')).toBe('domain-elk-tb');
 
     const click = elkLr?.onClick;
@@ -60,6 +85,8 @@ describe('flowchartToolbarLayoutMenu', () => {
       translate: (_key, fallback) => fallback,
     });
     const flowItem = collectItems(forceModel.items).find(item => item.key === 'node-flow');
+    expect(forceModel.selectedKeys).toEqual(['force']);
+    expect(forceModel.statusText).not.toContain('Dagre');
     expect(typeof flowItem?.onClick).toBe('function');
     if (typeof flowItem?.onClick === 'function') flowItem.onClick();
     expect(onStrategyLayout).toHaveBeenCalledWith('domain-vertical', 'flow', 'TB');
@@ -67,5 +94,24 @@ describe('flowchartToolbarLayoutMenu', () => {
     expect(resolveNodeLayoutHostStrategy('tree', 'TB')).toBe('domain-vertical');
     expect(resolveNodeLayoutHostStrategy('domain-elk', 'LR')).toBe('domain-horizontal');
     expect(resolveNodeLayoutHostStrategy('domain-horizontal', 'TB')).toBe('domain-horizontal');
+  });
+
+  it('exposes compound ELK as a domain-preserving layered mode', () => {
+    const onStrategyLayout = vi.fn();
+    const model = buildFlowchartLayoutMenuModel({
+      lastDomainStrategy: 'domain-compound-elk',
+      lastDomainDirection: 'LR',
+      lastNodeLayout: 'dagre',
+      onStrategyLayout,
+      translate: (_key, fallback) => fallback,
+    });
+    const items = collectItems(model.items);
+    const compoundLr = items.find(item => item.key === 'domain-compound-elk-lr');
+
+    expect(compoundLr).toBeDefined();
+    expect(model.selectedKeys).toEqual(['domain-compound-elk-lr']);
+    expect(model.statusText).toBe('Domain ELK 组合 (左→右)');
+    if (typeof compoundLr?.onClick === 'function') compoundLr.onClick();
+    expect(onStrategyLayout).toHaveBeenCalledWith('domain-compound-elk', undefined, 'LR');
   });
 });

@@ -19,9 +19,13 @@ import type { ILayoutStrategy } from '../../../types/layout-strategy';
 import type { LayoutOptions } from '../../../types/layout';
 import {
     logLayoutNoLayoutableNodes,
+    logLayoutStrategyDomainPreservingFallback,
     logLayoutStrategySafetyFallback,
     logLayoutStrategyFailure,
 } from './diagramInteractionLogging';
+import {
+    isGlobalFullGraphLayoutStrategy,
+} from '../flowchartLayoutStrategyMode';
 
 
 interface UseLayoutStrategyParams {
@@ -53,8 +57,19 @@ export const LAYERED_TREE_ROUTING_SPACING = Object.freeze({
     levelSpacing: 120,
 });
 
-const loadDomainElkStrategy = async (): Promise<ILayoutStrategy> => {
-    return new (await import('../../../strategies/DomainElkLayoutStrategy')).DomainElkLayoutStrategy();
+let domainElkStrategyPromise: Promise<ILayoutStrategy> | undefined;
+let domainCompoundElkStrategyPromise: Promise<ILayoutStrategy> | undefined;
+
+export const loadDomainElkStrategy = (): Promise<ILayoutStrategy> => {
+    domainElkStrategyPromise ??= import('../../../strategies/DomainElkLayoutStrategy')
+        .then(({ DomainElkLayoutStrategy }) => new DomainElkLayoutStrategy());
+    return domainElkStrategyPromise;
+};
+
+export const loadDomainCompoundElkStrategy = (): Promise<ILayoutStrategy> => {
+    domainCompoundElkStrategyPromise ??= import('../../../strategies/DomainCompoundElkLayoutStrategy')
+        .then(({ DomainCompoundElkLayoutStrategy }) => new DomainCompoundElkLayoutStrategy());
+    return domainCompoundElkStrategyPromise;
 };
 
 /** React Flow runtime geometry must not override a newly staged layout. */
@@ -196,9 +211,11 @@ export function useLayoutStrategy({
     loadLayoutPresetMap,
     setLayoutStable,
 }: UseLayoutStrategyParams) {
-    // [对齐 SVG 版] 跟踪当前域布局策略和方向
+    // lastDomainStrategy is retained as a public compatibility name, but it
+    // represents the active top-level layout strategy (domain-aware or global).
     const [lastDomainStrategy, setLastDomainStrategy] = useState<string>('domain-dagre');
     const [lastDomainDirection, setLastDomainDirection] = useState<'TB' | 'LR'>('TB');
+    // Remember the domain-internal arrangement across temporary global modes.
     const [lastNodeLayout, setLastNodeLayout] = useState<string>('dagre');
 
     // [FIX] 精准两步 fitView：调用统一的 diagramControl 'fit' 逻辑，自适应侧边栏和最小缩放比例
@@ -224,6 +241,9 @@ export function useLayoutStrategy({
      * ═══════════════════════════════════════════════════════════════ */
     const handleStrategyLayout = useCallback(async (strategyName: string, nodeLayout?: string, direction?: 'TB' | 'LR') => {
         const dir = direction || 'TB';
+        const appliedDirection = dir;
+        let appliedStrategyName = strategyName;
+        let appliedNodeLayout = nodeLayout;
 
         try {
             const rawNodes = nodesRef.current;
@@ -375,6 +395,7 @@ export function useLayoutStrategy({
                 // ── 域感知策略布局 ──
                 const isDomainDagre = strategyName === 'domain-dagre' || strategyName === 'domain-dagre-sub-horizontal' || strategyName === 'dagre';
                 const isDomainElk = strategyName === 'domain-elk' || strategyName === 'elk';
+                const isDomainCompoundElk = strategyName === 'domain-compound-elk';
                 const finalNodeLayout = isDomainDagre
                     ? 'dagre'
                     : (nodeLayout || 'flow');
@@ -431,6 +452,8 @@ export function useLayoutStrategy({
                     strategy = new (await import('../../../strategies/DomainHorizontalLayoutStrategy')).DomainHorizontalLayoutStrategy();
                 } else if (isDomainElk) {
                     strategy = await loadDomainElkStrategy();
+                } else if (isDomainCompoundElk) {
+                    strategy = await loadDomainCompoundElkStrategy();
                 } else {
                     strategy = new (await import('../../../strategies/DomainVerticalLayoutStrategy')).DomainVerticalLayoutStrategy();
                 }
@@ -442,10 +465,10 @@ export function useLayoutStrategy({
                     type: strategy.getName() as LayoutOptions['type'],
                     direction: dir,
                     nodeLayout: finalNodeLayout as LayoutOptions['nodeLayout'],
-                    spacing: isDomainElk
+                    spacing: isDomainElk || isDomainCompoundElk
                         ? { horizontal: 120, vertical: 120 }
                         : { horizontal: 50, vertical: 50 },
-                    edgeRouting: isDomainElk ? 'ORTHOGONAL' : undefined,
+                    edgeRouting: isDomainElk || isDomainCompoundElk ? 'ORTHOGONAL' : undefined,
                     padding: { top: 40, right: 20, bottom: 20, left: 20 },
                     ...generatedGroupOptions,
                     fitDomainContent: true,
@@ -454,18 +477,61 @@ export function useLayoutStrategy({
                     domainSubGroupDirection: strategyName === 'domain-dagre-sub-horizontal' ? 'LR' : dir,
                     subDomainNodeDirection: dir,
                 };
-                const legacyFallback = !isDomainElk
-                    ? await import('./legacyDomainLayoutFallback')
-                    : null;
+                const legacyFallback = await import('./legacyDomainLayoutFallback');
+                const canUseFlatElkFallback = Boolean(
+                    legacyFallback?.canUseFlatElkSafetyFallback(
+                        generatedGroupOptions,
+                        layoutNodes,
+                    ),
+                );
                 let usedDomainElk = isDomainElk;
-                if (
-                    legacyFallback?.shouldPreferElkForLegacyDomainTopology(layoutNodes, layoutEdges)
-                ) {
+                let usedDomainCompoundElk = isDomainCompoundElk;
+                let usedDomainDagre = isDomainDagre;
+                const calculateDomainCompoundElkFallback = async (
+                    fallbackDirection: 'TB' | 'LR' = appliedDirection,
+                ) => {
+                    const compoundStrategy = await loadDomainCompoundElkStrategy();
+                    const fallbackResult = await compoundStrategy.calculateLayout(
+                        layoutNodes,
+                        layoutEdges,
+                        {
+                            ...layoutOptions,
+                            type: 'elk-layered' as LayoutOptions['type'],
+                            nodeLayout: 'elk-layered' as LayoutOptions['nodeLayout'],
+                            direction: fallbackDirection,
+                            spacing: { horizontal: 120, vertical: 120 },
+                            edgeRouting: 'ORTHOGONAL',
+                        },
+                    );
+                    usedDomainCompoundElk = true;
+                    usedDomainDagre = false;
+                    appliedStrategyName = 'domain-compound-elk';
+                    appliedNodeLayout = undefined;
+                    return fallbackResult;
+                };
+                const topologyFallback = !isDomainElk && !isDomainCompoundElk
+                    ? legacyFallback.resolveLegacyDomainTopologyFallback(
+                        generatedGroupOptions,
+                        layoutNodes,
+                        layoutEdges,
+                    )
+                    : null;
+                if (topologyFallback === 'flat-elk') {
                     logLayoutStrategySafetyFallback(strategyName);
                     strategy = await loadDomainElkStrategy();
                     usedDomainElk = true;
+                    usedDomainDagre = false;
+                    appliedStrategyName = 'domain-elk';
+                    appliedNodeLayout = undefined;
+                } else if (topologyFallback === 'domain-compound-elk') {
+                    logLayoutStrategyDomainPreservingFallback(strategyName);
+                    strategy = await loadDomainCompoundElkStrategy();
+                    usedDomainCompoundElk = true;
+                    usedDomainDagre = false;
+                    appliedStrategyName = 'domain-compound-elk';
+                    appliedNodeLayout = undefined;
                 }
-                const effectiveLayoutOptions = usedDomainElk
+                const effectiveLayoutOptions = usedDomainElk || usedDomainCompoundElk
                     ? {
                         ...layoutOptions,
                         type: 'elk-layered' as LayoutOptions['type'],
@@ -479,8 +545,13 @@ export function useLayoutStrategy({
                     layoutEdges,
                     effectiveLayoutOptions,
                 );
-                if (!usedDomainElk) {
-                    if (legacyFallback?.shouldUseElkSafetyFallback(result.nodes, result.edges)) {
+                if (!usedDomainElk && !usedDomainCompoundElk) {
+                    const qualityFallback = legacyFallback.resolveLegacyDomainQualityFallback(
+                        generatedGroupOptions,
+                        result.nodes,
+                        result.edges,
+                    );
+                    if (qualityFallback === 'flat-elk') {
                         logLayoutStrategySafetyFallback(strategyName);
                         const elkStrategy = await loadDomainElkStrategy();
                         result = await elkStrategy.calculateLayout(layoutNodes, layoutEdges, {
@@ -491,47 +562,105 @@ export function useLayoutStrategy({
                             edgeRouting: 'ORTHOGONAL',
                         });
                         usedDomainElk = true;
+                        usedDomainDagre = false;
+                        appliedStrategyName = 'domain-elk';
+                        appliedNodeLayout = undefined;
+                    } else if (
+                        qualityFallback === 'domain-compound-elk'
+                        && !usedDomainCompoundElk
+                    ) {
+                        logLayoutStrategyDomainPreservingFallback(strategyName);
+                        result = await calculateDomainCompoundElkFallback();
                     }
                 }
 
                 if (result.nodes.length > 0) {
-                    // [FIX] 保留非流程图节点（mindmap、sticky-note 等）：布局算法不处理它们，但不能丢弃
-                    const resultNodeIds = new Set(result.nodes.map(node => node.id));
-                    const preservedNodes = allNodes.filter(n => nonLayoutTypes.has(n.type || '') && !resultNodeIds.has(n.id));
-                    const finalNodes = stripHiddenGeneratedLayoutNodes(
-                        [...result.nodes, ...preservedNodes],
-                        generatedGroupOptions,
-                    );
-                    // 域布局策略已完成所有位置计算，禁止后处理微调
-                    // [FIX] Clear edges + cache BEFORE animation
-                    const finalNodeIds = new Set(finalNodes.map(node => node.id));
-                    const preservedResultEdges = preserveEdgesOnEmptyLayoutResult(
-                        layoutEdges,
-                        result.edges,
-                        finalNodeIds,
-                    );
-                    // Layered layout engines own ranking and node coordinates;
-                    // the shared Worker transaction owns ports and final paths.
-                    const finalEdges = usedDomainElk || isDomainDagre
-                        ? prepareLayeredLayoutEdges(
-                            finalNodes,
-                            preservedResultEdges,
-                            dir,
-                            { promoteLockedComputedPath: isDomainDagre && !usedDomainElk },
-                        )
-                        : preservedResultEdges.map(edge => ({
-                            ...edge,
-                            sourceHandle: null,
-                            targetHandle: null,
-                            type: clearLayoutEdgeRoutingType(edge),
-                            data: clearBaseReactFlowLayoutEdgeRoutingData(edge.data),
-                        }));
-                    await commitLayout({ nodes: finalNodes, edges: finalEdges, onCommitted: twoStepFitView });
+                    const commitDomainResult = async (
+                        candidate: typeof result,
+                        candidateUsesElk: boolean,
+                        candidateUsesCompoundElk: boolean,
+                        candidateUsesDomainDagre: boolean,
+                        candidateDirection: 'TB' | 'LR',
+                    ) => {
+                        // Preserve non-flow nodes; semantic containers are
+                        // regenerated by the domain-aware strategy itself.
+                        const resultNodeIds = new Set(candidate.nodes.map(node => node.id));
+                        const preservedNodes = allNodes.filter(n => (
+                            nonLayoutTypes.has(n.type || '') && !resultNodeIds.has(n.id)
+                        ));
+                        const finalNodes = stripHiddenGeneratedLayoutNodes(
+                            [...candidate.nodes, ...preservedNodes],
+                            generatedGroupOptions,
+                        );
+                        const finalNodeIds = new Set(finalNodes.map(node => node.id));
+                        const preservedResultEdges = preserveEdgesOnEmptyLayoutResult(
+                            layoutEdges,
+                            candidate.edges,
+                            finalNodeIds,
+                        );
+                        const finalEdges = candidateUsesElk
+                            || candidateUsesCompoundElk
+                            || candidateUsesDomainDagre
+                            ? prepareLayeredLayoutEdges(
+                                finalNodes,
+                                preservedResultEdges,
+                                candidateDirection,
+                                {
+                                    promoteLockedComputedPath:
+                                        candidateUsesDomainDagre
+                                        && !candidateUsesElk
+                                        && !candidateUsesCompoundElk,
+                                },
+                            )
+                            : preservedResultEdges.map(edge => ({
+                                ...edge,
+                                sourceHandle: null,
+                                targetHandle: null,
+                                type: clearLayoutEdgeRoutingType(edge),
+                                data: clearBaseReactFlowLayoutEdgeRoutingData(edge.data),
+                            }));
+                        await commitLayout({
+                            nodes: finalNodes,
+                            edges: finalEdges,
+                            onCommitted: twoStepFitView,
+                        });
+                    };
+
+                    try {
+                        await commitDomainResult(
+                            result,
+                            usedDomainElk,
+                            usedDomainCompoundElk,
+                            usedDomainDagre,
+                            appliedDirection,
+                        );
+                    } catch (error) {
+                        const hardQualityRejected = Boolean(
+                            legacyFallback.isLayoutRoutingHardQualityRejection(error),
+                        );
+                        if (usedDomainElk || usedDomainCompoundElk) throw error;
+                        const canRetryWithDomainCompoundElk = !usedDomainElk
+                            && !usedDomainCompoundElk
+                            && !canUseFlatElkFallback
+                            && hardQualityRejected;
+                        if (!canRetryWithDomainCompoundElk) throw error;
+                        logLayoutStrategyDomainPreservingFallback(strategyName);
+                        result = await calculateDomainCompoundElkFallback();
+                        await commitDomainResult(
+                            result,
+                            false,
+                            true,
+                            false,
+                            appliedDirection,
+                        );
+                    }
                 }
             }
-            setLastDomainStrategy(strategyName);
-            setLastDomainDirection(dir);
-            if (nodeLayout) setLastNodeLayout(nodeLayout);
+            setLastDomainStrategy(appliedStrategyName);
+            setLastDomainDirection(appliedDirection);
+            if (appliedNodeLayout && !isGlobalFullGraphLayoutStrategy(appliedStrategyName)) {
+                setLastNodeLayout(appliedNodeLayout);
+            }
             return true;
         } catch (err) {
             logLayoutStrategyFailure(strategyName, err);

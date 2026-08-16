@@ -78,6 +78,7 @@ describe('baseReactFlow layout routing candidate sequence', () => {
     expect(workerMocks.repair.mock.calls[0][0]).toMatchObject({
       requestId: 'layout:1:candidate-repair',
       requireHardClean: false,
+      timeoutMs: 12_000,
     });
     expect(workerMocks.compute).not.toHaveBeenCalled();
   });
@@ -163,11 +164,39 @@ describe('baseReactFlow layout routing candidate sequence', () => {
     expect(workerMocks.compute.mock.calls[0][0]).toMatchObject({
       requestId: 'layout:2',
       qualityMode: 'full',
+      timeoutMs: 12_000,
     });
     expect(workerMocks.compute.mock.calls[0][0]).not.toHaveProperty('cachedCandidateEdges');
     expect(workerMocks.compute.mock.calls[0][0].edges[0]).toMatchObject({
       type: 'stablePath',
       data: { algorithm: 'display-stable-fallback' },
     });
+  });
+
+  it('rejects a failed full route without starting a second expensive repair pass', async () => {
+    workerMocks.repair.mockImplementationOnce(async ({ edges: candidateEdges }: {
+      edges: Edge[];
+    }) => ({
+      ...successfulResult(candidateEdges),
+      hardClean: false,
+    }));
+    workerMocks.compute.mockImplementation(async ({ edges: candidateEdges }: {
+      edges: Edge[];
+    }) => ({
+      ...successfulResult(candidateEdges),
+      hardClean: false,
+      routeResolution: 'full-route' as const,
+    }));
+
+    await expect(stageBaseReactFlowLayoutRouting({
+      workerRef: { current: null },
+      requestId: 'layout:bounded-failure',
+      sourceEdges: edges,
+      sourceNodes: nodes,
+      isLargeGraph: false,
+    })).rejects.toThrow('layout-routing-hard-quality-rejected');
+
+    expect(workerMocks.repair).toHaveBeenCalledOnce();
+    expect(workerMocks.compute).toHaveBeenCalledOnce();
   });
 });

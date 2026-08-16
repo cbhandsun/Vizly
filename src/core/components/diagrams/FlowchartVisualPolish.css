@@ -183,6 +183,25 @@
         box-shadow 120ms ease;
 }
 
+/*
+ * CustomNode keeps legacy target and short-id handles in the DOM for saved-edge
+ * compatibility. They share the exact same port coordinate as the canonical
+ * long-id source handle, so revealing them during connection mode paints a
+ * multi-layer U-shaped ghost. Keep them measurable but permanently paint-free;
+ * the canonical handle remains the only visible affordance on each side.
+ */
+.diagram-root .react-flow__node-custom .react-flow__handle.custom-node-handle-compatibility,
+.diagram-root .react-flow.connecting .react-flow__node-custom .react-flow__handle.custom-node-handle-compatibility {
+    width: 1px !important;
+    height: 1px !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    opacity: 0 !important;
+}
+
 .diagram-root .react-flow__node-custom:hover .react-flow__handle.source:is(
     [data-handleid='top'],
     [data-handleid='right'],

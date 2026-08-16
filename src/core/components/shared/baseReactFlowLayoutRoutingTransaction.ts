@@ -10,7 +10,6 @@ import { anchorComputedDisplayEdgeEndpoints } from './baseReactFlowDisplayEndpoi
 import { lockFinalDisplayComputedPaths } from './baseReactFlowDisplayEdgeConversions';
 import {
   canCommitBaseReactFlowDisplayResult,
-  shouldRepairBaseReactFlowDisplayResult,
 } from './baseReactFlowDisplayCommitPolicy';
 import { computeBaseReactFlowDisplayInputIdentityBundle } from './baseReactFlowDisplayInputIdentity';
 import { synthesizeStableFallbackPath } from './baseReactFlowDisplayEdgeCore';
@@ -25,7 +24,7 @@ import {
   repairBaseReactFlowDisplayEdgesInWorker,
   type BaseReactFlowDisplayWorkerResult,
 } from './baseReactFlowDisplayWorkerClient';
-import { DISPLAY_WORKER_TIMEOUT_MS } from './baseReactFlowDisplayWorkerTimeout';
+import { LAYOUT_DISPLAY_WORKER_TIMEOUT_MS } from './baseReactFlowDisplayWorkerTimeout';
 import { recordBaseReactFlowRejectedDisplayDiagnostics } from './baseReactFlowDisplayRejectedDiagnostics';
 
 export type BaseReactFlowLayoutRoutingCommit = Readonly<{
@@ -277,7 +276,7 @@ export const stageBaseReactFlowLayoutRouting = async ({
     requestId: `${requestId}:candidate-repair`,
     edges: stagedSeedEdges,
     nodes: sourceNodes,
-    timeoutMs: DISPLAY_WORKER_TIMEOUT_MS,
+    timeoutMs: LAYOUT_DISPLAY_WORKER_TIMEOUT_MS,
     signal,
     requireHardClean: false,
     repairMode: 'bounded',
@@ -312,26 +311,11 @@ export const stageBaseReactFlowLayoutRouting = async ({
     isLargeGraph,
     displayEdgeEpoch: 0,
     qualityMode: 'full',
-    timeoutMs: DISPLAY_WORKER_TIMEOUT_MS,
+    timeoutMs: LAYOUT_DISPLAY_WORKER_TIMEOUT_MS,
     signal,
   });
-  const repairedResult = shouldRepairBaseReactFlowDisplayResult({
-    qualityMode: 'full',
-    hardClean: initialResult.hardClean,
-  })
-    ? await repairBaseReactFlowDisplayEdgesInWorker({
-      workerRef,
-      requestId: `${requestId}:repair`,
-      edges: initialResult.edges,
-      nodes: sourceNodes,
-      timeoutMs: DISPLAY_WORKER_TIMEOUT_MS,
-      signal,
-      requireHardClean: false,
-      repairMode: 'bounded',
-    })
-    : initialResult;
   const workerResult = {
-    ...(repairedResult === initialResult ? initialResult : repairedResult),
+    ...initialResult,
     // Route patches must be calculated against the unseeded business graph;
     // otherwise an unchanged successful seed would disappear during merge.
     projectedEdges: projectedSource.edges,

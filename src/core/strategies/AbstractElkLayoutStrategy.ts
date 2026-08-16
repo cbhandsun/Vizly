@@ -15,6 +15,10 @@ import {
 } from '../utils/layoutUtils';
 import ElkWorker from '../workers/elkLayout.worker?worker';
 import { logLayoutWorkerTimeout, logWorkerLayoutFailure } from './layoutLogging';
+import {
+  applyDomainElkLayoutRoutes,
+  collectDomainElkLayoutRoutes,
+} from './domainElkLayoutRoutes';
 
 export interface ElkLayoutResult {
   nodes: ReactFlowNode[];
@@ -126,15 +130,22 @@ export abstract class AbstractElkLayoutStrategy implements ILayoutStrategy {
     return new Promise((resolve) => {
       const worker = this.getWorker();
       const layoutId = `${this.getName()}-${Date.now()}-${Math.random()}`;
+      let settled = false;
+
+      const settle = (result: ElkLayoutResult) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeoutId);
+        worker.removeEventListener('message', handleMessage);
+        resolve(result);
+      };
 
       const handleMessage = (event: MessageEvent<ElkWorkerResponse>) => {
         const { id, result, error } = event.data;
         if (id === layoutId) {
-          worker.removeEventListener('message', handleMessage);
-
           if (error) {
             logWorkerLayoutFailure(this.getName(), error);
-            resolve({ nodes: updatedNodes, edges });
+            settle({ nodes: updatedNodes, edges });
           } else {
 
 
@@ -164,7 +175,14 @@ export abstract class AbstractElkLayoutStrategy implements ILayoutStrategy {
               result.children.forEach(child => updateNodePositions(child, padding.x, padding.y));
             }
 
-            resolve({ nodes: updatedNodes, edges });
+            const routes = collectDomainElkLayoutRoutes(
+              result?.edges,
+              { x: padding.x, y: padding.y },
+            );
+            settle({
+              nodes: updatedNodes,
+              edges: applyDomainElkLayoutRoutes(edges, routes),
+            });
           }
         }
       };
@@ -178,10 +196,9 @@ export abstract class AbstractElkLayoutStrategy implements ILayoutStrategy {
       });
 
       // 超时保护 (30秒)
-      setTimeout(() => {
-        worker.removeEventListener('message', handleMessage);
+      const timeoutId = setTimeout(() => {
         logLayoutWorkerTimeout(this.getName());
-        resolve({ nodes: updatedNodes, edges });
+        settle({ nodes: updatedNodes, edges });
       }, 30000);
     });
   }

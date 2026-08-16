@@ -4,6 +4,72 @@ import { getDisplayHardQualityGateReport } from '../../shared/baseReactFlowDispl
 import { getDisplayComputedPath } from '../../shared/baseReactFlowDisplayGeometry';
 import { isDirectedForestLayoutGraph } from './treeLayoutTopology';
 
+interface GeneratedGroupLayoutOptions {
+  generateDomainGroups?: boolean;
+  generateSubDomainGroups?: boolean;
+}
+
+const hasMeaningfulSemanticGrouping = (nodes: Node[]): boolean => nodes.some((node) => {
+  const data = node.data && typeof node.data === 'object' && !Array.isArray(node.data)
+    ? node.data as Record<string, unknown>
+    : {};
+  const domain = typeof data.domain === 'string' ? data.domain.trim() : '';
+  const subDomain = typeof data.subDomain === 'string' ? data.subDomain.trim() : '';
+  return Boolean(
+    (domain && domain !== 'default' && domain !== '默认域')
+    || subDomain,
+  );
+});
+
+/**
+ * The flat ELK engine cannot recreate generated domain/sub-domain containers.
+ * It is therefore a valid legacy-layout fallback only when the diagram has
+ * explicitly disabled both semantic container layers.
+ */
+export const canUseFlatElkSafetyFallback = (
+  options: GeneratedGroupLayoutOptions,
+  nodes: Node[] = [],
+): boolean => (
+  (
+    options.generateDomainGroups === false
+    && options.generateSubDomainGroups === false
+  )
+  || (nodes.length > 0 && !hasMeaningfulSemanticGrouping(nodes))
+);
+
+export type LegacyDomainQualityFallback = 'flat-elk' | 'domain-compound-elk';
+
+export const isLayoutRoutingHardQualityRejection = (error: unknown): boolean => (
+  error instanceof Error && error.message === 'layout-routing-hard-quality-rejected'
+);
+
+export const resolveLegacyDomainTopologyFallback = (
+  options: GeneratedGroupLayoutOptions,
+  nodes: Node[],
+  edges: Edge[],
+): LegacyDomainQualityFallback | null => {
+  if (!shouldPreferElkForLegacyDomainTopology(nodes, edges)) return null;
+  return canUseFlatElkSafetyFallback(options, nodes)
+    ? 'flat-elk'
+    : 'domain-compound-elk';
+};
+
+/**
+ * A hard-defective domain candidate must not silently discard semantic
+ * containers. Flat diagrams may use ELK; grouped diagrams fall back to the
+ * domain-preserving layered engine.
+ */
+export const resolveLegacyDomainQualityFallback = (
+  options: GeneratedGroupLayoutOptions,
+  nodes: Node[],
+  edges: Edge[],
+): LegacyDomainQualityFallback | null => {
+  if (!shouldUseElkSafetyFallback(nodes, edges)) return null;
+  return canUseFlatElkSafetyFallback(options, nodes)
+    ? 'flat-elk'
+    : 'domain-compound-elk';
+};
+
 export const shouldPreferElkForLegacyDomainTopology = (
   nodes: Node[],
   edges: Edge[],

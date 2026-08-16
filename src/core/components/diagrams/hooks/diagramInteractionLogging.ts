@@ -37,6 +37,10 @@ export const logLayoutStrategySafetyFallback = (strategyName: string): void => {
   safeLog.info(`[useLayoutStrategy] Using ELK safety fallback for hard-defective ${strategyName} geometry.`);
 };
 
+export const logLayoutStrategyDomainPreservingFallback = (strategyName: string): void => {
+  safeLog.info(`[useLayoutStrategy] Using domain-preserving layered fallback for hard-defective ${strategyName} geometry.`);
+};
+
 export const logSmartRoutingConfigLayerSyncFailure = (error: unknown): void => {
   safeLog.warn('[useSmartRoutingConfig] Layered config sync failed:', redactSensitiveLogValue(error));
 };

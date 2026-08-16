@@ -1,3 +1,4 @@
+import type { Edge } from '@xyflow/react';
 import type { ElkExtendedEdge, ElkPoint } from 'elkjs';
 
 export type DomainElkLayoutRoutePoint = Readonly<{ x: number; y: number }>;
@@ -58,4 +59,30 @@ export const collectDomainElkLayoutRoutes = (
     if (isOrthogonalRoute(route)) routes.set(edge.id, route);
   }
   return routes;
+};
+
+/**
+ * Hands ELK's already-computed orthogonal route to the authoritative display
+ * router as a candidate. The display Worker still validates ports, obstacles,
+ * overlaps and every hard quality gate before the path may be rendered.
+ */
+export const applyDomainElkLayoutRoutes = <T extends Edge[]>(
+  edges: T,
+  routes: ReadonlyMap<string, readonly DomainElkLayoutRoutePoint[]>,
+): T => {
+  let changed = false;
+  const routed = edges.map((edge) => {
+    const path = routes.get(edge.id || `${edge.source}->${edge.target}`);
+    if (!path) return edge;
+    changed = true;
+    return {
+      ...edge,
+      data: {
+        ...edge.data,
+        elkPath: path.map(point => ({ ...point })),
+        layoutRoutingCandidate: true,
+      },
+    };
+  }) as T;
+  return changed ? routed : edges;
 };

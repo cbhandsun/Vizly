@@ -19,7 +19,10 @@ import {
   resolveDomainElkSpacing,
   resolveDomainElkThoroughness,
 } from './domainElkLayoutProfile';
-import { collectDomainElkLayoutRoutes } from './domainElkLayoutRoutes';
+import {
+  applyDomainElkLayoutRoutes,
+  collectDomainElkLayoutRoutes,
+} from './domainElkLayoutRoutes';
 
 type LayoutNode = ReactFlowNode<Record<string, unknown>> & {
   positionAbsolute?: XYPosition;
@@ -153,18 +156,7 @@ export class DomainElkLayoutStrategy implements ILayoutStrategy {
     // Domain ELK owns ranking and coordinates only. All production callers
     // render through BaseReactFlow, whose Worker transaction owns the final
     // route, ports, buses and hard-quality gate.
-    const routedEdges = edges.map(edge => {
-      const path = routedPaths.get(edge.id || `${edge.source}->${edge.target}`)
-      if (!path) return edge
-      return {
-        ...edge,
-        data: {
-          ...edge.data,
-          elkPath: path,
-          layoutRoutingCandidate: true,
-        },
-      }
-    })
+    const routedEdges = applyDomainElkLayoutRoutes(edges, routedPaths)
     return { nodes: updatedNodes, edges: routedEdges }
   }
 }

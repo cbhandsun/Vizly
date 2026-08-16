@@ -37,6 +37,22 @@ describe('flowchart visual polish stylesheet', () => {
         expect(stylesheet).toContain('@media (prefers-reduced-motion: reduce)');
     });
 
+    it('keeps legacy custom-node handles measurable without painting stacked ghost ports', () => {
+        const stylesheet = readRelativeFile('../FlowchartVisualPolish.css');
+        const customNodeGraphics = readRelativeFile(
+            '../../custom-nodes/renderers/CustomNodeGraphics.tsx',
+        );
+
+        expect(customNodeGraphics).toContain("'custom-node-handle-primary'");
+        expect(customNodeGraphics).toContain("'custom-node-handle-compatibility'");
+        expect(customNodeGraphics.lastIndexOf('className={primaryHandleClassName}')).toBeGreaterThan(
+            customNodeGraphics.lastIndexOf('className={compatibilityHandleClassName}'),
+        );
+        expect(stylesheet).toMatch(
+            /\.react-flow\.connecting[^{]*\.custom-node-handle-compatibility\s*\{[^}]*background:\s*transparent\s*!important;[^}]*border:\s*0\s*!important;[^}]*box-shadow:\s*none\s*!important;[^}]*opacity:\s*0\s*!important;/s,
+        );
+    });
+
     it('keeps selection feedback static instead of adding perpetual glow animations', () => {
         const stylesheet = readRelativeFile('../FlowchartVisualPolish.css');
 

@@ -6,7 +6,10 @@ import {
   resolveDomainElkSpacing,
   resolveDomainElkThoroughness,
 } from '../domainElkLayoutProfile';
-import { collectDomainElkLayoutRoutes } from '../domainElkLayoutRoutes';
+import {
+  applyDomainElkLayoutRoutes,
+  collectDomainElkLayoutRoutes,
+} from '../domainElkLayoutRoutes';
 
 describe('domainElkLayoutProfile', () => {
   it('uses official ELK layered quality option identifiers', () => {
@@ -91,6 +94,26 @@ describe('domainElkLayoutProfile', () => {
     ]);
     expect(routes.has('diagonal')).toBe(false);
     expect(routes.has('hyperedge')).toBe(false);
+  });
+
+  it('marks only matched ELK paths as display-routing candidates', () => {
+    const edges = [
+      { id: 'matched', source: 'a', target: 'b', data: { retained: true } },
+      { id: 'unmatched', source: 'b', target: 'c' },
+    ];
+    const routed = applyDomainElkLayoutRoutes(edges, new Map([
+      ['matched', [{ x: 10, y: 20 }, { x: 10, y: 80 }]],
+    ]));
+
+    expect(routed).not.toBe(edges);
+    expect(routed[0]).toMatchObject({
+      data: {
+        retained: true,
+        elkPath: [{ x: 10, y: 20 }, { x: 10, y: 80 }],
+        layoutRoutingCandidate: true,
+      },
+    });
+    expect(routed[1]).toBe(edges[1]);
   });
 
 });
