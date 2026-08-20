@@ -1,0 +1,10 @@
+.mutedIcon {
+    color: #94a3b8;
+}
+
+.error {
+    margin-top: 6px;
+    color: #b91c1c;
+    font-size: 12px;
+    line-height: 1.5;
+}

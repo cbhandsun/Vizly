@@ -2842,6 +2842,7 @@
                 "branchWidthValue": "Set branch width to {{value}}",
                 "defaultValue": "Default",
                 "hyperlink": "Link",
+                "invalidHyperlink": "Enter a valid HTTP or HTTPS link.",
                 "note": "Note",
                 "notePlaceholder": "Add a note…",
                 "canvasTheme": "Canvas theme",

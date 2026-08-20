@@ -9,7 +9,7 @@ import {
 import {
     FontSizeOutlined, DeleteOutlined, PlusOutlined, EditOutlined,
     ApartmentOutlined, BorderOutlined, FileTextOutlined, GatewayOutlined,
-    LinkOutlined, MinusOutlined, RadiusSettingOutlined, SelectOutlined, TagsOutlined,
+    MinusOutlined, RadiusSettingOutlined, SelectOutlined, TagsOutlined,
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import type { NodeObj, TagObj } from 'mind-elixir';
@@ -21,7 +21,7 @@ import {
     type TaskPriority,
     type TaskStatus,
 } from './mindmapTaskModel';
-import { toSafeExternalUrl, toSafeImageUrl } from '../../utils/sanitizeHtml';
+import { toSafeImageUrl } from '../../utils/sanitizeHtml';
 import {
     cleanMindMapColor,
     cleanMindMapTagObjects,
@@ -51,6 +51,7 @@ import { updateMindMapNodePatchAndRestoreSelection } from './mindMapNodeMutation
 import { useMindMapPropertySelection } from './useMindMapPropertySelection';
 import { MindMapPropertyAISection } from './MindMapPropertyAISection';
 import { MindMapPropertyMediaControls } from './MindMapPropertyMediaControls';
+import { MindMapPropertyLinkField } from './MindMapPropertyLinkField';
 import { useMindMapNodeDeletion } from './useMindMapNodeDeletion';
 import { useMindMapPropertyAI } from './useMindMapPropertyAI';
 import styles from './MindMapPropertyPanel.module.css';
@@ -96,7 +97,6 @@ const NodePropertyPanel: React.FC<{
     const [textColor, setTextColor] = useState(cleanMindMapColor(node.style?.color) ?? '');
     const [bgColor, setBgColor] = useState(cleanMindMapColor(node.style?.background) ?? '');
     const [branchColor, setBranchColor] = useState(cleanMindMapColor(node.branchColor) ?? '');
-    const [hyperLink, setHyperLink] = useState(node.hyperLink ?? '');
     const [note, setNote] = useState(cleanMindMapNote(node.note) ?? '');
     const [imageUrl, setImageUrl] = useState(node.image?.url ?? '');
     const [icons, setIcons] = useState<string[]>(cleanMindMapIcons(node.icons) ?? []);
@@ -122,7 +122,6 @@ const NodePropertyPanel: React.FC<{
         setTextColor(cleanMindMapColor(node.style?.color) ?? '');
         setBgColor(cleanMindMapColor(node.style?.background) ?? '');
         setBranchColor(cleanMindMapColor(node.branchColor) ?? '');
-        setHyperLink(node.hyperLink ?? '');
         setNote(cleanMindMapNote(node.note) ?? '');
         setImageUrl(node.image?.url ?? '');
         setIcons(cleanMindMapIcons(node.icons) ?? []);
@@ -163,12 +162,6 @@ const NodePropertyPanel: React.FC<{
         applyImageUrl(safeUrl ?? '');
         return true;
     }, [applyImageUrl, imageUrl]);
-
-    const saveHyperLink = () => {
-        const safeUrl = toSafeExternalUrl(hyperLink);
-        setHyperLink(safeUrl ?? '');
-        reshape({ hyperLink: safeUrl ?? undefined });
-    };
 
     const handleTopicBlur = useCallback(() => {
         if (!mind || !topic.trim()) return;
@@ -485,12 +478,12 @@ const NodePropertyPanel: React.FC<{
 
             {/* HyperLink */}
             <Row label={t(propertyKey('hyperlink'))}>
-                <Input prefix={<LinkOutlined className={styles.mutedIcon} />}
-                    aria-label={t(propertyKey('hyperlink'))}
-                    placeholder="https://..." value={hyperLink} size="small"
-                    onChange={e => setHyperLink(e.target.value)}
-                    onBlur={saveHyperLink}
-                    onPressEnter={saveHyperLink} />
+                <MindMapPropertyLinkField
+                    initialValue={node.hyperLink ?? ''}
+                    invalidMessage={t(propertyKey('invalidHyperlink'))}
+                    label={t(propertyKey('hyperlink'))}
+                    onCommit={hyperLink => reshape({ hyperLink })}
+                />
             </Row>
 
             {/* Note */}

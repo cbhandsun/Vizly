@@ -22,6 +22,10 @@ const controlsSource = readFileSync(
     resolve(process.cwd(), 'src/core/components/mindmap-v2/MindMapPropertyPanelControls.tsx'),
     'utf8',
 );
+const linkFieldSource = readFileSync(
+    resolve(process.cwd(), 'src/core/components/mindmap-v2/MindMapPropertyLinkField.tsx'),
+    'utf8',
+);
 
 const collectStringPaths = (value: unknown, prefix = ''): string[] => {
     if (typeof value === 'string') return [prefix];
@@ -94,9 +98,9 @@ describe('mind map property panel localization', () => {
         }
     });
 
-    it('names interactive fields and removes hard-coded emoji decoration from the panel shell', () => {
-        expect(propertyPanelSource).toContain("aria-label={t('plugins.mindmap.propertyPanel.nodeTextInput')}");
-        expect(propertyPanelSource).toContain("aria-label={t('plugins.mindmap.propertyPanel.taskStatus')}");
+    it('names interactive fields and keeps presentation and link validation in focused modules', () => {
+        expect(propertyPanelSource).toContain("aria-label={t(propertyKey('nodeTextInput'))}");
+        expect(propertyPanelSource).toContain("aria-label={t(propertyKey('taskStatus'))}");
         expect(propertyPanelSource).toContain('aria-pressed={shapeClass === key}');
         expect(propertyPanelSource).toContain('aria-pressed={branchWidth === w}');
         expect(propertyPanelSource).not.toContain("'📍 根节点'");
@@ -104,8 +108,13 @@ describe('mind map property panel localization', () => {
         expect(propertyPanelSource).not.toContain("'rgba(255,255,255,0.6)'");
         expect(propertyPanelSource).not.toContain('{preview}');
         expect(propertyPanelSource).toContain('<PropertyShapeIcon icon={icon} />');
-        expect(propertyPanelSource).toContain("color: shapeClass === key ? '#4338ca' : '#475569'");
-        expect(propertyPanelSource).toContain("background: branchWidth === w ? '#4f46e5' : '#64748b'");
+        expect(propertyPanelSource).toContain('className={styles.shapeButton}');
+        expect(propertyPanelSource).toContain('className={styles.branchButton}');
+        expect(propertyPanelSource).toContain('<MindMapPropertyLinkField');
+        expect(linkFieldSource).toContain('toSafeExternalUrl(trimmed)');
+        expect(linkFieldSource).toContain('aria-invalid={Boolean(error)}');
+        expect(linkFieldSource).toContain('aria-describedby={error ? errorId : undefined}');
+        expect(linkFieldSource).toContain('className={styles.error} role="alert"');
         expect(controlsSource).not.toContain('💡 点击节点可编辑属性');
         expect(controlsSource).toContain('aria-pressed={isActive}');
         expect(controlsSource).not.toContain('option.theme.name');
