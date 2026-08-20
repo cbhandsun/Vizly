@@ -2,8 +2,14 @@
 
 import { act, renderHook } from '@testing-library/react';
 import type { Edge, Node } from '@xyflow/react';
-import type { SetStateAction } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { MessageInstance } from 'antd/es/message/interface';
+import i18next, { type i18n } from 'i18next';
+import type { ReactNode, SetStateAction } from 'react';
+import { I18nextProvider, initReactI18next } from 'react-i18next';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import en from '../../../../../locales/en.json';
+import zh from '../../../../../locales/zh.json';
 
 interface SavedCanvas {
   diagramId: string;
@@ -149,10 +155,26 @@ const canvasFor = (id: string) => ({
 
 const createSetter = <T,>() => vi.fn<(value: SetStateAction<T[]>) => void>();
 
+let testI18n: i18n;
+
+beforeAll(async () => {
+  testI18n = i18next.createInstance();
+  await testI18n.use(initReactI18next).init({
+    lng: 'en',
+    fallbackLng: 'en',
+    resources: {
+      en: { translation: en },
+      zh: { translation: zh },
+    },
+    interpolation: { escapeValue: false },
+  });
+});
+
 describe('useDesignerSystemSync initialization race safety', () => {
   const pending = new Map<string, DeferredCanvas[]>();
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    await testI18n.changeLanguage('en');
     window.history.replaceState({}, '', '/');
     pending.clear();
     mocks.marks.length = 0;
@@ -173,9 +195,15 @@ describe('useDesignerSystemSync initialization race safety', () => {
     });
   });
 
-  const renderSync = (initialId: string) => {
+  const renderSync = (
+    initialId: string,
+    messageApi?: Pick<MessageInstance, 'info' | 'success'>,
+  ) => {
     const setNodes = createSetter<Node>();
     const setEdges = createSetter<Edge>();
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <I18nextProvider i18n={testI18n}>{children}</I18nextProvider>
+    );
     const hook = renderHook(
       ({ id }) => useDesignerSystemSync({
         id,
@@ -187,8 +215,9 @@ describe('useDesignerSystemSync initialization race safety', () => {
         reactFlowInstance: null,
         isDragging: false,
         pluginId: 'flowchart',
+        messageApi,
       }),
-      { initialProps: { id: initialId } },
+      { initialProps: { id: initialId }, wrapper },
     );
     return { ...hook, setNodes, setEdges };
   };
@@ -288,6 +317,60 @@ describe('useDesignerSystemSync initialization race safety', () => {
     expect(committedNodeIds).toEqual(['restored-standard-node']);
     expect(mocks.clearSaved).not.toHaveBeenCalled();
     expect(mocks.loadStandardPresetCanvas).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['en', 'Your last edit was restored. Review it before continuing.'],
+    ['zh', '已恢复上次编辑内容，请检查后继续'],
+  ] as const)('announces autosave recovery in %s', async (language, expectedMessage) => {
+    await testI18n.changeLanguage(language);
+    const info = vi.fn<MessageInstance['info']>();
+    const success = vi.fn<MessageInstance['success']>();
+    mocks.loadSaved.mockReturnValue({
+      diagramId: 'blank-canvas-template',
+      ...canvasFor('restored-localized-node'),
+      timestamp: Date.now(),
+      isFreshSeed: false,
+    });
+
+    renderSync('blank-canvas-template', { info, success });
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(info).toHaveBeenCalledWith({
+      key: 'flowchart-autosave-recovery',
+      content: expectedMessage,
+      duration: 5,
+    });
+    expect(success).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['en', 'Template loaded'],
+    ['zh', '模板加载成功'],
+  ] as const)('announces a fresh template load in %s', async (language, expectedMessage) => {
+    await testI18n.changeLanguage(language);
+    const info = vi.fn<MessageInstance['info']>();
+    const success = vi.fn<MessageInstance['success']>();
+    mocks.loadSaved.mockReturnValue({
+      diagramId: 'blank-canvas-template',
+      ...canvasFor('fresh-localized-node'),
+      timestamp: Date.now(),
+      isFreshSeed: true,
+    });
+
+    renderSync('blank-canvas-template', { info, success });
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(success).toHaveBeenCalledWith(expectedMessage);
+    expect(info).not.toHaveBeenCalled();
   });
 
   it('loads the canonical preset without reading or overwriting an existing autosave', async () => {

@@ -763,7 +763,13 @@
             "annotationEnabled": "批注模式已开启，点击画布即可添加批注",
             "annotationDisabled": "批注模式已关闭"
         },
+        "initialLoad": {
+            "templateLoaded": "模板加载成功",
+            "autosaveRecovered": "已恢复上次编辑内容，请检查后继续"
+        },
         "pages": {
+            "management": "页面管理",
+            "actions": "{{name}} 页面操作",
             "tabList": "页面",
             "new": "新建页面",
             "createSuccess": "已新建页面",

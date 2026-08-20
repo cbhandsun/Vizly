@@ -37,7 +37,7 @@ export interface UseDesignerSystemSyncProps {
     reactFlowInstance: ReactFlowInstance<Node, Edge> | null;
     isDragging: boolean;
     pluginId: string;
-    messageApi?: MessageInstance;
+    messageApi?: Pick<MessageInstance, 'info' | 'success'>;
     getAutoSaveMetadata?: () => unknown;
     restoreAutoSaveMetadata?: (metadata: unknown) => { nodes: Node[]; edges: Edge[] } | null;
 }

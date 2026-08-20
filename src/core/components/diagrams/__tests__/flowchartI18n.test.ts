@@ -36,6 +36,8 @@ describe('flowchart interaction copy', () => {
         const minimapSource = readRelativeFile('../../shared/FixedMiniMap.tsx');
         const shapesSource = readRelativeFile('../FlowchartShapesPanel.tsx');
         const sidebarSource = readRelativeFile('../ModernFlowchartSidebar.tsx');
+        const pageTabsSource = readRelativeFile('../PageTabs.tsx');
+        const initialLoadSource = readRelativeFile('../hooks/useDesignerInitialDiagramLoad.ts');
         const pluginSource = readRelativeFile('../../../plugins/FlowchartPlugin.tsx');
         const pluginModalSource = readRelativeFile('../ui/PluginManagerModal.tsx');
         const nodeSource = readRelativeFile('../../custom-nodes/FlowchartNode.tsx');
@@ -78,6 +80,14 @@ describe('flowchart interaction copy', () => {
         expect(nodeSource).toContain('tabIndex={0}');
         expect(nodeSource).toContain("t('designer.flowchart.quickAddDirection'");
         expect(nodeSource).not.toContain('`${shape} 节点:');
+        expect(pageTabsSource).toContain("defaultValue: 'Page management'");
+        expect(pageTabsSource).toContain("defaultValue: '{{name}} page actions'");
+        expect(pageTabsSource).not.toContain("defaultValue: '页面管理'");
+        expect(pageTabsSource).not.toContain("defaultValue: '{{name}} 页面操作'");
+        expect(initialLoadSource).toContain("t('designer.initialLoad.templateLoaded')");
+        expect(initialLoadSource).toContain("t('designer.initialLoad.autosaveRecovered')");
+        expect(initialLoadSource).not.toContain("messageApi?.success('加载模板成功')");
+        expect(initialLoadSource).not.toContain("content: '已恢复上次编辑内容，请检查后继续'");
     });
 
     it('keeps Chinese and English translation keys aligned', () => {
@@ -155,9 +165,13 @@ describe('flowchart interaction copy', () => {
             expect(read(zh, ['designer', 'architecture', 'emptyState', key])).toBeTypeOf('string');
             expect(read(en, ['designer', 'architecture', 'emptyState', key])).toBeTypeOf('string');
         }
-        for (const key of ['defaultName', 'deleteDescription', 'deleteSuccess', 'restoreAction', 'restoreSuccess']) {
+        for (const key of ['management', 'actions', 'defaultName', 'deleteDescription', 'deleteSuccess', 'restoreAction', 'restoreSuccess']) {
             expect(read(zh, ['designer', 'pages', key])).toBeTypeOf('string');
             expect(read(en, ['designer', 'pages', key])).toBeTypeOf('string');
+        }
+        for (const key of ['templateLoaded', 'autosaveRecovered']) {
+            expect(read(zh, ['designer', 'initialLoad', key])).toBeTypeOf('string');
+            expect(read(en, ['designer', 'initialLoad', key])).toBeTypeOf('string');
         }
         for (const key of ['network', 'compute', 'data', 'business']) {
             expect(read(zh, ['designer', 'architecture', 'categories', key])).toBeTypeOf('string');
@@ -238,6 +252,23 @@ describe('flowchart interaction copy', () => {
             expect(read(zh, ['workspace', key])).toBeTypeOf('string');
             expect(read(en, ['workspace', key])).toBeTypeOf('string');
         }
+    });
+
+    it('keeps page management and recovery copy locale-specific', () => {
+        const enManagement = readLocaleString('../../../../locales/en.json', ['designer', 'pages', 'management']);
+        const enActions = readLocaleString('../../../../locales/en.json', ['designer', 'pages', 'actions']);
+        const enRecovery = readLocaleString('../../../../locales/en.json', ['designer', 'initialLoad', 'autosaveRecovered']);
+        const zhManagement = readLocaleString('../../../../locales/zh.json', ['designer', 'pages', 'management']);
+        const zhActions = readLocaleString('../../../../locales/zh.json', ['designer', 'pages', 'actions']);
+        const zhRecovery = readLocaleString('../../../../locales/zh.json', ['designer', 'initialLoad', 'autosaveRecovered']);
+
+        expect(enManagement).toBe('Page management');
+        expect(enActions).toBe('{{name}} page actions');
+        expect(enRecovery).toBe('Your last edit was restored. Review it before continuing.');
+        expect(`${enManagement} ${enActions} ${enRecovery}`).not.toMatch(/[\u3400-\u9fff]/u);
+        expect(zhManagement).toBe('页面管理');
+        expect(zhActions).toBe('{{name}} 页面操作');
+        expect(zhRecovery).toBe('已恢复上次编辑内容，请检查后继续');
     });
 
     it('states the scoped and irreversible impact of resetting local editor state', () => {

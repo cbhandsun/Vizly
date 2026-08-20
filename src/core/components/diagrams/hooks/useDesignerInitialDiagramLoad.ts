@@ -1,6 +1,7 @@
 import { useEffect, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import type { Edge, Node } from '@xyflow/react';
 import type { MessageInstance } from 'antd/es/message/interface';
+import { useTranslation } from 'react-i18next';
 import { PluginRegistry } from '../../../services/PluginRegistry';
 import { EdgeRoutingCoordinator } from '../../../services/EdgeRoutingCoordinator';
 import { cancelLayoutTransition, suspendLayoutTransitions } from '../../../utils/animateLayoutTransition';
@@ -37,7 +38,7 @@ interface UseDesignerInitialDiagramLoadProps {
     loadSaved: ReturnType<typeof useAutoSave>['loadSaved'];
     clearSaved: ReturnType<typeof useAutoSave>['clearSaved'];
     restoreAutoSaveMetadata?: (metadata: unknown) => { nodes: Node[]; edges: Edge[] } | null;
-    messageApi?: MessageInstance;
+    messageApi?: Pick<MessageInstance, 'info' | 'success'>;
     setNodes: Dispatch<SetStateAction<Node[]>>;
     setEdges: Dispatch<SetStateAction<Edge[]>>;
     needsInitialFitView: MutableRefObject<boolean>;
@@ -58,6 +59,8 @@ export const useDesignerInitialDiagramLoad = ({
     setEdges,
     needsInitialFitView,
 }: UseDesignerInitialDiagramLoadProps) => {
+    const { t } = useTranslation();
+
     useEffect(() => {
         if (isCurrentDiagramInitialized) return;
         cancelLayoutTransition(setNodes);
@@ -120,12 +123,12 @@ export const useDesignerInitialDiagramLoad = ({
                     EdgeRoutingCoordinator.getInstance().freeze();
 
                     if (saved.isFreshSeed) {
-                        messageApi?.success('加载模板成功');
+                        messageApi?.success(t('designer.initialLoad.templateLoaded'));
                         clearDesignerFreshSeedFlag(`flowchart-autosave-v2-${id || 'default'}`);
                     } else {
                         messageApi?.info({
                             key: 'flowchart-autosave-recovery',
-                            content: '已恢复上次编辑内容，请检查后继续',
+                            content: t('designer.initialLoad.autosaveRecovered'),
                             duration: 5,
                         });
                     }
@@ -206,5 +209,6 @@ export const useDesignerInitialDiagramLoad = ({
         restoreAutoSaveMetadata,
         setEdges,
         setNodes,
+        t,
     ]);
 };

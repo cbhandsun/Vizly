@@ -755,7 +755,13 @@
             "annotationEnabled": "Annotation mode on. Click the canvas to add an annotation.",
             "annotationDisabled": "Annotation mode off"
         },
+        "initialLoad": {
+            "templateLoaded": "Template loaded",
+            "autosaveRecovered": "Your last edit was restored. Review it before continuing."
+        },
         "pages": {
+            "management": "Page management",
+            "actions": "{{name}} page actions",
             "tabList": "Pages",
             "new": "New page",
             "createSuccess": "New page created",

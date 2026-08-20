@@ -377,7 +377,7 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
     return (
         <div
             role="group"
-            aria-label={t('designer.pages.management', { defaultValue: '页面管理' })}
+            aria-label={t('designer.pages.management', { defaultValue: 'Page management' })}
             className="page-tabs"
             style={
                 {
@@ -430,7 +430,7 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                 <div
                     aria-label={t('designer.pages.actions', {
                         name: activePage.name,
-                        defaultValue: '{{name}} 页面操作',
+                        defaultValue: '{{name}} page actions',
                     })}
                     className="page-tabs__actions"
                     role="group"
