@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Modal, Input, Tabs, Switch, Tag, Button, Typography, Space, Empty, Badge, Skeleton } from 'antd';
 import { 
@@ -41,6 +41,8 @@ export const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ visible,
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('all');
   const [pendingDisableId, setPendingDisableId] = useState<string | null>(null);
+  const disableCancelRef = useRef<HTMLButtonElement>(null);
+  const pluginSwitchRefs = useRef(new Map<string, HTMLDivElement>());
 
   const registry = useMemo(() => PluginRegistry.getInstance(), []);
 
@@ -67,6 +69,30 @@ export const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ visible,
     }
   }, [visible, registry]);
 
+  const localizedPluginMetadata = useMemo(() => {
+    const defaultDescription = t('pluginMarketplace.defaultDesc');
+    return new Map(plugins.map(plugin => {
+      const fallbackName = plugin.name.trim() || plugin.id;
+      const fallbackDescription = plugin.description?.trim() || defaultDescription;
+      return [plugin.id, {
+        name: t(`pluginMarketplace.builtinPlugins.${plugin.id}.name`, { defaultValue: fallbackName }),
+        description: t(`pluginMarketplace.builtinPlugins.${plugin.id}.description`, {
+          defaultValue: fallbackDescription,
+        }),
+      }];
+    }));
+  }, [plugins, t]);
+
+  const focusPluginSwitch = useCallback((pluginId: string) => {
+    requestAnimationFrame(() => pluginSwitchRefs.current.get(pluginId)?.focus());
+  }, []);
+
+  useEffect(() => {
+    if (!pendingDisableId) return;
+    const frameId = requestAnimationFrame(() => disableCancelRef.current?.focus());
+    return () => cancelAnimationFrame(frameId);
+  }, [pendingDisableId]);
+
   const commitPluginStatus = (id: string, active: boolean): boolean => {
     if (!registry.setPluginActive(id, active)) {
       appMessage.error(t('pluginMarketplace.statusChangeFailed'));
@@ -88,18 +114,31 @@ export const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ visible,
     ? plugins.find(plugin => plugin.id === pendingDisableId)
     : undefined;
 
+  const cancelDisablePlugin = useCallback(() => {
+    if (!pendingDisableId) return;
+    const pluginId = pendingDisableId;
+    setPendingDisableId(null);
+    focusPluginSwitch(pluginId);
+  }, [focusPluginSwitch, pendingDisableId]);
+
   const confirmDisablePlugin = () => {
     if (!pendingDisablePlugin) return;
-    if (!commitPluginStatus(pendingDisablePlugin.id, false)) return;
+    const pluginId = pendingDisablePlugin.id;
+    if (!commitPluginStatus(pluginId, false)) return;
     setPendingDisableId(null);
     if (activeTab === 'installed') setActiveTab('all');
+    focusPluginSwitch(pluginId);
   };
 
   const filteredPlugins = useMemo(() => {
     return plugins.filter(p => {
-      const matchSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          p.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          p.tags?.some(t => t.toLowerCase().includes(searchQuery.toLowerCase()));
+      const normalizedQuery = searchQuery.trim().toLocaleLowerCase();
+      const metadata = localizedPluginMetadata.get(p.id);
+      const matchSearch = !normalizedQuery
+        || metadata?.name.toLocaleLowerCase().includes(normalizedQuery)
+        || metadata?.description.toLocaleLowerCase().includes(normalizedQuery)
+        || p.id.toLocaleLowerCase().includes(normalizedQuery)
+        || p.tags?.some(tag => tag.toLocaleLowerCase().includes(normalizedQuery));
       
       const matchTab = activeTab === 'all' || 
                        (activeTab === 'installed' && activeMap[p.id]) ||
@@ -108,11 +147,15 @@ export const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ visible,
       
       return matchSearch && matchTab;
     });
-  }, [plugins, searchQuery, activeTab, activeMap]);
+  }, [plugins, searchQuery, activeTab, activeMap, localizedPluginMetadata]);
 
   const renderPluginCard = (plugin: DiagramTypePlugin) => {
     const isActive = activeMap[plugin.id];
     const brandColor = plugin.brandColor || '#1890ff';
+    const metadata = localizedPluginMetadata.get(plugin.id) ?? {
+      name: plugin.name,
+      description: plugin.description || t('pluginMarketplace.defaultDesc'),
+    };
 
     return (
       <div 
@@ -126,7 +169,7 @@ export const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ visible,
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Text className="plugin-card-title" ellipsis>{plugin.name}</Text>
+              <Text className="plugin-card-title" ellipsis>{metadata.name}</Text>
               {plugin.category === 'Core' && <Badge status="processing" />}
             </div>
             <Space size={4} wrap>
@@ -138,7 +181,7 @@ export const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ visible,
 
         <div className="plugin-card-body">
           <Paragraph className="plugin-card-desc">
-            {plugin.description || t('pluginMarketplace.defaultDesc')}
+            {metadata.description}
           </Paragraph>
           
           <Space size={16} style={{ marginTop: 8 }}>
@@ -168,7 +211,7 @@ export const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ visible,
             aria-checked={Boolean(isActive)}
             aria-label={t(
               isActive ? 'pluginMarketplace.disablePlugin' : 'pluginMarketplace.enablePlugin',
-              { name: plugin.name },
+              { name: metadata.name },
             )}
             aria-describedby={pendingDisableId === plugin.id ? 'plugin-disable-warning' : undefined}
             onClick={() => requestPluginToggle(plugin.id, !isActive)}
@@ -176,6 +219,10 @@ export const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ visible,
               if (event.key !== 'Enter' && event.key !== ' ') return;
               event.preventDefault();
               requestPluginToggle(plugin.id, !isActive);
+            }}
+            ref={(element) => {
+              if (element) pluginSwitchRefs.current.set(plugin.id, element);
+              else pluginSwitchRefs.current.delete(plugin.id);
             }}
           >
             <Switch size="small" checked={isActive} tabIndex={-1} aria-hidden="true" />
@@ -193,13 +240,22 @@ export const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ visible,
       onCancel={onClose}
       getContainer={getViewportOverlayContainer}
       zIndex={COMMERCIAL_VIEWPORT_MODAL_Z_INDEX}
+      keyboard={!pendingDisableId}
       footer={null}
       width={860}
       centered
       closable={false}
       styles={{ body: { padding: 0 }, mask: { backdropFilter: 'blur(4px)' } }}
     >
-      <div className="marketplace-container">
+      <div
+        className="marketplace-container"
+        onKeyDownCapture={(event) => {
+          if (event.key !== 'Escape' || !pendingDisableId) return;
+          event.preventDefault();
+          event.stopPropagation();
+          cancelDisablePlugin();
+        }}
+      >
         <Button
           type="text"
           className="plugin-manager-close"
@@ -300,12 +356,18 @@ export const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ visible,
                 className="plugin-disable-warning"
                 type="warning"
                 showIcon
-                title={t('pluginMarketplace.confirmDisableTitle', { name: pendingDisablePlugin.name })}
+                title={t('pluginMarketplace.confirmDisableTitle', {
+                  name: localizedPluginMetadata.get(pendingDisablePlugin.id)?.name ?? pendingDisablePlugin.name,
+                })}
                 description={(
                   <div>
                     <div>{t('pluginMarketplace.confirmDisableDescription')}</div>
                     <Space className="plugin-disable-warning-actions" wrap>
-                      <Button aria-label={t('common.cancel')} onClick={() => setPendingDisableId(null)}>
+                      <Button
+                        ref={disableCancelRef}
+                        aria-label={t('common.cancel')}
+                        onClick={cancelDisablePlugin}
+                      >
                         {t('common.cancel')}
                       </Button>
                       <Button

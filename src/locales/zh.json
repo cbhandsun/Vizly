@@ -3431,7 +3431,13 @@
         "emptyCategory": "还没有发现符合该分类的插件",
         "deliveryTitle": "从远程交付中心加载 (Delivery)",
         "deliveryDesc": "输入第三方插件的 Manifest URL 进行动态加载。",
-        "configDevUrl": "配置开发者 URL"
+        "configDevUrl": "配置开发者 URL",
+        "builtinPlugins": {
+            "flowchart": {
+                "name": "通用画布",
+                "description": "Vizly 的核心画布引擎，支持自由布局、智能连线与全量基础形状，适用于大多数通用绘图场景。"
+            }
+        }
     },
     "services": {
         "docGen": {

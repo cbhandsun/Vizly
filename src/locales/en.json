@@ -3600,10 +3600,17 @@
         "tabInstalled": "Enabled",
         "searchPlaceholder": "Search plugins...",
         "clearSearch": "Clear plugin search",
-        "resultsCount": "Showing {{count}} plugins",
+        "resultsCount_one": "Showing {{count}} plugin",
+        "resultsCount_other": "Showing {{count}} plugins",
         "confirmDisableTitle": "Disable plugin: {{name}}?",
         "confirmDisableDescription": "Diagrams that use this plugin will no longer be available to view or edit. The plugin card will remain visible so you can restore it immediately.",
-        "confirmDisableAction": "Disable plugin"
+        "confirmDisableAction": "Disable plugin",
+        "builtinPlugins": {
+            "flowchart": {
+                "name": "General Canvas",
+                "description": "Vizly's core canvas engine with freeform layout, smart connections, and a complete set of basic shapes for general diagramming."
+            }
+        }
     },
     "comment": {
         "pageScope": "Current page: {{name}}",
