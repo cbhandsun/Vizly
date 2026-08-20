@@ -82,8 +82,9 @@ describe('mind map auxiliary panel commercial audit contract', () => {
         );
 
         expect(source).toContain('role="search"');
-        expect(source).toContain('aria-label="搜索并替换思维导图节点"');
-        expect(source).toContain('aria-label="搜索节点"');
+        expect(source).toContain("const { t } = useTranslation()");
+        expect(source).toContain("aria-label={t('plugins.mindmap.searchPanel.regionLabel')}");
+        expect(source).toContain("aria-label={t('plugins.mindmap.searchPanel.searchInputLabel')}");
         expect(source).toContain('aria-controls="me-search-replace-row"');
         expect(source).toContain('aria-live="polite"');
         expect(source).toContain('maxLength={MINDMAP_MAX_TOPIC_LENGTH}');
@@ -94,6 +95,7 @@ describe('mind map auxiliary panel commercial audit contract', () => {
         expect(source).toContain('returnTarget.focus({ preventScroll: true })');
         expect(source).toContain('disabled={total === 0}');
         expect(source).not.toContain('document.createElement(\'style\')');
+        expect(source).not.toContain('aria-label="搜索');
         expect(source).not.toContain('⇌');
         expect(source).not.toContain('✓ {replaceCount}');
         expect(plugin).toContain("shortcutKey === 'h'");

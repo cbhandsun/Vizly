@@ -9,6 +9,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Input, type InputRef } from 'antd';
+import { useTranslation } from 'react-i18next';
 import {
     CheckOutlined,
     CloseOutlined,
@@ -52,6 +53,7 @@ type ReshapeNodeTarget = Parameters<MindElixirInstance['reshapeNode']>[0];
 const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const MindMapSearch: React.FC<MindMapSearchProps> = ({ open, onClose, replaceRequested = false }) => {
+    const { t } = useTranslation();
     const mind = getMindElixirInstance();
     const inputRef = useRef<InputRef>(null);
     const replaceInputRef = useRef<InputRef>(null);
@@ -209,15 +211,15 @@ const MindMapSearch: React.FC<MindMapSearchProps> = ({ open, onClose, replaceReq
             const newTopic = obj.topic.replace(new RegExp(escapeRegExp(query), 'gi'), replaceText);
             mind.reshapeNode(tpc as ReshapeNodeTarget, { ...obj, ...cleanMindMapNodePatch({ topic: newTopic }) });
             setReplaceCount(1);
-            setReplaceStatus('已替换当前匹配项');
+            setReplaceStatus(t('plugins.mindmap.searchPanel.replaceOneSuccess'));
             // Move to next after replacing
             setTimeout(() => goNext(), 60);
         } catch (error) {
             logMindmapSearchFailure('replaceOne', error);
             setReplaceCount(null);
-            setReplaceStatus('替换失败，请重试');
+            setReplaceStatus(t('plugins.mindmap.searchPanel.replaceFailure'));
         }
-    }, [mind, matchIds, matchIdx, query, replaceText, goNext]);
+    }, [mind, matchIds, matchIdx, query, replaceText, goNext, t]);
 
     const doReplaceAll = useCallback(() => {
         if (!mind || matchIds.length === 0 || !query.trim()) return;
@@ -242,21 +244,21 @@ const MindMapSearch: React.FC<MindMapSearchProps> = ({ open, onClose, replaceReq
         }
         setReplaceCount(count);
         setReplaceStatus(failureCount > 0
-            ? `批量替换完成：成功 ${count} 处，失败 ${failureCount} 处`
-            : `批量替换完成：成功 ${count} 处`);
+            ? t('plugins.mindmap.searchPanel.replaceAllPartial', { success: count, failure: failureCount })
+            : t('plugins.mindmap.searchPanel.replaceAllSuccess', { count }));
         setMatchIdx(0);
         focusReplacement();
-    }, [focusReplacement, mind, matchIds, query, replaceText]);
+    }, [focusReplacement, mind, matchIds, query, replaceText, t]);
 
     if (!open) return null;
 
     const total = matchIds.length;
     const current = total > 0 ? Math.min(matchIdx, total - 1) + 1 : 0;
     const resultStatus = !query.trim()
-        ? '输入关键词开始搜索'
+        ? t('plugins.mindmap.searchPanel.statusPrompt')
         : total > 0
-            ? `第 ${current} 项，共 ${total} 项`
-            : '未找到匹配节点';
+            ? t('plugins.mindmap.searchPanel.statusPosition', { current, total })
+            : t('plugins.mindmap.searchPanel.statusEmpty');
 
     const toggleReplace = () => {
         const next = !showReplace;
@@ -267,10 +269,13 @@ const MindMapSearch: React.FC<MindMapSearchProps> = ({ open, onClose, replaceReq
     const requestReplaceAll = () => {
         replaceAllConfirmOpenRef.current = true;
         appModal.confirm({
-            title: `替换 ${total} 个匹配节点？`,
-            content: `查找“${query}” → 替换为“${replaceText || '空文本'}”`,
-            okText: '确认替换',
-            cancelText: '取消',
+            title: t('plugins.mindmap.searchPanel.confirmTitle', { count: total }),
+            content: t('plugins.mindmap.searchPanel.confirmContent', {
+                query,
+                replacement: replaceText || t('plugins.mindmap.searchPanel.emptyText'),
+            }),
+            okText: t('plugins.mindmap.searchPanel.confirm'),
+            cancelText: t('plugins.mindmap.searchPanel.cancel'),
             centered: true,
             keyboard: true,
             maskClosable: false,
@@ -285,7 +290,7 @@ const MindMapSearch: React.FC<MindMapSearchProps> = ({ open, onClose, replaceReq
 
     return (
         <div
-            aria-label="搜索并替换思维导图节点"
+            aria-label={t('plugins.mindmap.searchPanel.regionLabel')}
             className="mind-map-search-panel"
             id="me-search-panel"
             role="search"
@@ -298,39 +303,45 @@ const MindMapSearch: React.FC<MindMapSearchProps> = ({ open, onClose, replaceReq
                 <SearchOutlined className="mind-map-search-leading-icon" />
                 <Input
                     ref={inputRef}
-                    aria-label="搜索节点"
+                    aria-label={t('plugins.mindmap.searchPanel.searchInputLabel')}
                     maxLength={MINDMAP_MAX_TOPIC_LENGTH}
                     value={query}
                     onChange={e => setQuery(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    placeholder="搜索节点..."
+                    placeholder={t('plugins.mindmap.searchPanel.searchPlaceholder')}
                     variant="borderless"
                     className="mind-map-search-input"
                 />
                 {query.trim() && (
                     <span className={`mind-map-search-result-count${total === 0 ? ' is-empty' : ''}`} aria-hidden="true">
-                        {total > 0 ? `${current}/${total}` : '无匹配'}
+                        {total > 0
+                            ? t('plugins.mindmap.searchPanel.resultCount', { current, total })
+                            : t('plugins.mindmap.searchPanel.noMatchesShort')}
                     </span>
                 )}
-                <button aria-label="上一个搜索结果" className="mind-map-search-icon-button" disabled={total === 0} onClick={goPrev} title="上一个 (Shift+Enter)" type="button">
+                <button aria-label={t('plugins.mindmap.searchPanel.previousLabel')} className="mind-map-search-icon-button" disabled={total === 0} onClick={goPrev} title={t('plugins.mindmap.searchPanel.previousTitle')} type="button">
                     <UpOutlined />
                 </button>
-                <button aria-label="下一个搜索结果" className="mind-map-search-icon-button" disabled={total === 0} onClick={goNext} title="下一个 (Enter)" type="button">
+                <button aria-label={t('plugins.mindmap.searchPanel.nextLabel')} className="mind-map-search-icon-button" disabled={total === 0} onClick={goNext} title={t('plugins.mindmap.searchPanel.nextTitle')} type="button">
                     <DownOutlined />
                 </button>
                 {/* Toggle replace row */}
                 <button
                     aria-controls="me-search-replace-row"
                     aria-expanded={showReplace}
-                    aria-label={showReplace ? '收起替换控件' : '展开替换控件'}
+                    aria-label={t(showReplace
+                        ? 'plugins.mindmap.searchPanel.collapseReplaceLabel'
+                        : 'plugins.mindmap.searchPanel.expandReplaceLabel')}
                     className={`mind-map-search-icon-button mind-map-search-replace-toggle${showReplace ? ' is-active' : ''}`}
                     onClick={toggleReplace}
-                    title={showReplace ? '关闭替换' : '展开替换 (Ctrl+H)'}
+                    title={t(showReplace
+                        ? 'plugins.mindmap.searchPanel.collapseReplaceTitle'
+                        : 'plugins.mindmap.searchPanel.expandReplaceTitle')}
                     type="button"
                 >
                     <SwapOutlined />
                 </button>
-                <button aria-label="关闭搜索" className="mind-map-search-icon-button" onClick={onClose} title="关闭 (Esc)" type="button">
+                <button aria-label={t('plugins.mindmap.searchPanel.closeLabel')} className="mind-map-search-icon-button" onClick={onClose} title={t('plugins.mindmap.searchPanel.closeTitle')} type="button">
                     <CloseOutlined />
                 </button>
             </div>
@@ -341,7 +352,7 @@ const MindMapSearch: React.FC<MindMapSearchProps> = ({ open, onClose, replaceReq
                     <SwapOutlined aria-hidden="true" className="mind-map-search-replace-icon" />
                     <Input
                         ref={replaceInputRef}
-                        aria-label="替换文本"
+                        aria-label={t('plugins.mindmap.searchPanel.replaceInputLabel')}
                         maxLength={MINDMAP_MAX_TOPIC_LENGTH}
                         value={replaceText}
                         onChange={e => {
@@ -349,7 +360,7 @@ const MindMapSearch: React.FC<MindMapSearchProps> = ({ open, onClose, replaceReq
                             setReplaceCount(null);
                             setReplaceStatus('');
                         }}
-                        placeholder="替换为..."
+                        placeholder={t('plugins.mindmap.searchPanel.replacePlaceholder')}
                         variant="borderless"
                         className="mind-map-search-input mind-map-search-replace-input"
                         onKeyDown={e => {
@@ -357,23 +368,23 @@ const MindMapSearch: React.FC<MindMapSearchProps> = ({ open, onClose, replaceReq
                             if (e.key === 'Enter') { e.preventDefault(); doReplaceOne(); }
                         }}
                     />
-                    <button aria-label="替换当前匹配项" className="mind-map-search-replace-button" onClick={doReplaceOne} disabled={total === 0} title="替换当前 (Enter)" type="button">
-                        替换
+                    <button aria-label={t('plugins.mindmap.searchPanel.replaceCurrentLabel')} className="mind-map-search-replace-button" onClick={doReplaceOne} disabled={total === 0} title={t('plugins.mindmap.searchPanel.replaceCurrentTitle')} type="button">
+                        {t('plugins.mindmap.searchPanel.replaceCurrentButton')}
                     </button>
                     <button
                         aria-haspopup="dialog"
-                        aria-label={`替换所有匹配项，共 ${total} 个节点`}
+                        aria-label={t('plugins.mindmap.searchPanel.replaceAllLabel', { count: total })}
                         className="mind-map-search-replace-button is-primary"
                         disabled={total === 0}
                         onClick={requestReplaceAll}
-                        title="全部替换"
+                        title={t('plugins.mindmap.searchPanel.replaceAllTitle')}
                         type="button"
                     >
-                        全替
+                        {t('plugins.mindmap.searchPanel.replaceAllButton')}
                     </button>
                     {replaceCount !== null && (
                         <span className="mind-map-search-replace-count" aria-hidden="true">
-                            <CheckOutlined aria-hidden="true" /> {replaceCount} 处
+                            <CheckOutlined aria-hidden="true" /> {t('plugins.mindmap.searchPanel.replacementCount', { count: replaceCount })}
                         </span>
                     )}
                 </div>

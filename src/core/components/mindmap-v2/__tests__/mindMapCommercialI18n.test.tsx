@@ -126,6 +126,15 @@ describe('mind map commercial control translations', () => {
         expect(zh.plugins.mindmap.toolbar.stats).toContain('{{depth}}');
     });
 
+    it('keeps the search and replace resource shape aligned across locales', () => {
+        expect(Object.keys(en.plugins.mindmap.searchPanel).sort()).toEqual(
+            Object.keys(zh.plugins.mindmap.searchPanel).sort(),
+        );
+        expect(en.plugins.mindmap.searchPanel.statusPosition).toContain('{{current}}');
+        expect(en.plugins.mindmap.searchPanel.confirmContent).toContain('{{replacement}}');
+        expect(zh.plugins.mindmap.searchPanel.replaceAllPartial).toContain('{{failure}}');
+    });
+
     beforeEach(() => {
         mindHarness.listeners.clear();
         vi.stubGlobal('ResizeObserver', class {
