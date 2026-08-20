@@ -10,6 +10,8 @@ import en from '../../../../locales/en.json';
 import zh from '../../../../locales/zh.json';
 import MindMapBatchBar from '../MindMapBatchBar';
 import { MindMapDirectionSelector } from '../MindMapDirectionSelector';
+import { buildLocalizedMindMapTemplates } from '../mindmapTemplateCatalog';
+import type { TemplateNode } from '../mindmapTemplateModel';
 import { MindMapPropertyAISection } from '../MindMapPropertyAISection';
 import { MindMapPropertyMediaControls } from '../MindMapPropertyMediaControls';
 import { MindMapNoteEditorPanel } from '../MindMapNoteEditorPanel';
@@ -133,6 +135,41 @@ describe('mind map commercial control translations', () => {
         expect(en.plugins.mindmap.searchPanel.statusPosition).toContain('{{current}}');
         expect(en.plugins.mindmap.searchPanel.confirmContent).toContain('{{replacement}}');
         expect(zh.plugins.mindmap.searchPanel.replaceAllPartial).toContain('{{failure}}');
+    });
+
+    it('keeps the node-template catalog and interpolation contract aligned across locales', () => {
+        const enTemplates = en.plugins.mindmap.templates;
+        const zhTemplates = zh.plugins.mindmap.templates;
+        expect(Object.keys(enTemplates).sort()).toEqual(Object.keys(zhTemplates).sort());
+        expect(Object.keys(enTemplates.catalog).sort()).toEqual(Object.keys(zhTemplates.catalog).sort());
+        for (const key of Object.keys(enTemplates.catalog) as Array<keyof typeof enTemplates.catalog>) {
+            expect(Object.keys(enTemplates.catalog[key].topics).sort())
+                .toEqual(Object.keys(zhTemplates.catalog[key].topics).sort());
+        }
+        expect(enTemplates.replaceConfirmTitle).toContain('{{template}}');
+        expect(enTemplates.replaceConfirmContent_other).toContain('{{count}}');
+        expect(zhTemplates.replaceConfirmContent_other).toContain('{{template}}');
+        expect(enTemplates.insertSuccess_other).toContain('{{count}}');
+    });
+
+    it('resolves every localized template label, description, and node topic', async () => {
+        const collectTopics = (tree: TemplateNode): string[] => [
+            tree.topic,
+            ...(tree.children ?? []).flatMap(collectTopics),
+        ];
+
+        for (const language of ['en', 'zh'] as const) {
+            await testI18n.changeLanguage(language);
+            const templates = buildLocalizedMindMapTemplates(testI18n.t);
+            expect(templates).toHaveLength(6);
+            for (const template of templates) {
+                expect(template.label).not.toMatch(/^plugins\.mindmap\.templates\./);
+                expect(template.description).not.toMatch(/^plugins\.mindmap\.templates\./);
+                expect(collectTopics(template.tree)).not.toContainEqual(
+                    expect.stringMatching(/^plugins\.mindmap\.templates\./),
+                );
+            }
+        }
     });
 
     beforeEach(() => {

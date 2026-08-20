@@ -3016,12 +3016,156 @@
                 "replaceAllPartial": "Batch replace complete: {{success}} succeeded, {{failure}} failed",
                 "confirmTitle_one": "Replace the matching node?",
                 "confirmTitle_other": "Replace {{count}} matching nodes?",
-                "confirmContent": "Find “{{query}}” → replace with “{{replacement}}”",
-                "emptyText": "empty text",
-                "confirm": "Replace",
-                "cancel": "Cancel"
-            },
-            "outline": {
+      "confirmContent": "Find “{{query}}” → replace with “{{replacement}}”",
+      "emptyText": "empty text",
+      "confirm": "Replace",
+      "cancel": "Cancel"
+    },
+    "templates": {
+      "openLabel": "Open node templates",
+      "menuLabel": "Mind map node templates",
+      "insertBadge": "Insert",
+      "notReady": "The mind map is still loading. Try again in a moment.",
+      "selectNodeFirst": "Select a node before inserting this template.",
+      "selectionUnavailable": "The selected node is no longer available. Select another node and try again.",
+      "replaceConfirmTitle": "Apply the {{template}} template?",
+      "replaceConfirmContent_one": "Applying “{{template}}” will replace the current node. You can undo this action.",
+      "replaceConfirmContent_other": "Applying “{{template}}” will replace all {{count}} current nodes. You can undo this action.",
+      "replaceConfirmAction": "Apply template",
+      "cancel": "Cancel",
+      "replaceSuccess": "Applied the {{template}} template",
+      "replaceFailed": "The template could not be applied. Your current mind map was preserved.",
+      "insertSuccess_one": "Inserted {{count}} child node",
+      "insertSuccess_other": "Inserted {{count}} child nodes",
+      "insertFailed": "The template could not be inserted. Try again.",
+      "catalog": {
+        "swot": {
+          "label": "SWOT analysis",
+          "description": "Strengths, weaknesses, opportunities, and threats",
+          "topics": {
+            "root": "SWOT analysis",
+            "strengths": "Strengths",
+            "strength1": "Strength 1",
+            "strength2": "Strength 2",
+            "weaknesses": "Weaknesses",
+            "weakness1": "Weakness 1",
+            "weakness2": "Weakness 2",
+            "opportunities": "Opportunities",
+            "opportunity1": "Opportunity 1",
+            "opportunity2": "Opportunity 2",
+            "threats": "Threats",
+            "threat1": "Threat 1",
+            "threat2": "Threat 2"
+          }
+        },
+        "meeting": {
+          "label": "Meeting notes",
+          "description": "Agenda, decisions, actions, and follow-up",
+          "topics": {
+            "root": "Meeting notes",
+            "details": "Meeting details",
+            "date": "Date",
+            "attendees": "Attendees",
+            "facilitator": "Facilitator",
+            "agenda": "Agenda",
+            "agenda1": "Agenda item 1",
+            "agenda2": "Agenda item 2",
+            "decisions": "Decisions",
+            "decision1": "Decision 1",
+            "decision2": "Decision 2",
+            "actions": "Action items",
+            "actionFormat": "Owner → task → due date",
+            "followUp": "Follow-up",
+            "nextAgenda": "Next meeting agenda"
+          }
+        },
+        "project": {
+          "label": "Project plan",
+          "description": "Goals, milestones, risks, and resources",
+          "topics": {
+            "root": "Project plan",
+            "goals": "Project goals",
+            "primaryGoal": "Primary goal",
+            "successMetrics": "Success metrics",
+            "milestones": "Milestones",
+            "phase1": "Phase 1 — discovery",
+            "phase2": "Phase 2 — design and development",
+            "phase3": "Phase 3 — testing and launch",
+            "risks": "Risk assessment",
+            "risk1": "Risk 1 — high",
+            "risk2": "Risk 2 — medium",
+            "resources": "Resources",
+            "people": "People",
+            "budget": "Budget",
+            "tools": "Tools",
+            "tracking": "Progress tracking",
+            "completedThisWeek": "Completed this week",
+            "nextWeek": "Next week"
+          }
+        },
+        "reading": {
+          "label": "Reading notes",
+          "description": "Key ideas, reflections, and applications",
+          "topics": {
+            "root": "Reading notes",
+            "bookDetails": "Book details",
+            "bookTitle": "Title",
+            "author": "Author",
+            "rating": "Rating",
+            "keyIdeas": "Key ideas",
+            "idea1": "Key idea 1",
+            "idea2": "Key idea 2",
+            "idea3": "Key idea 3",
+            "quotes": "Notable passages",
+            "quote1": "Passage 1",
+            "quote2": "Passage 2",
+            "reflections": "Personal reflections",
+            "reflection": "Reflection and analysis",
+            "application": "Practical application",
+            "practice": "How to put this into practice"
+          }
+        },
+        "problem": {
+          "label": "Problem analysis",
+          "description": "5W1H root-cause analysis",
+          "topics": {
+            "root": "Problem analysis",
+            "what": "What — define the problem",
+            "symptoms": "Observed symptoms",
+            "why": "Why — identify root causes",
+            "cause1": "Root cause 1",
+            "cause2": "Root cause 2",
+            "cause3": "Root cause 3",
+            "where": "Where — locate the issue",
+            "scope": "Affected scope",
+            "when": "When — establish timing",
+            "timeline": "Timeline",
+            "who": "Who — identify stakeholders",
+            "stakeholders": "Affected people",
+            "how": "How — plan the response",
+            "solution1": "Solution 1",
+            "solution2": "Solution 2"
+          }
+        },
+        "brainstorm": {
+          "label": "Brainstorm",
+          "description": "Insert an idea tree below the selected node",
+          "topics": {
+            "root": "Insert below the selected node",
+            "ideaA": "Idea A",
+            "detailA1": "Detail A1",
+            "detailA2": "Detail A2",
+            "ideaB": "Idea B",
+            "detailB1": "Detail B1",
+            "detailB2": "Detail B2",
+            "ideaC": "Idea C",
+            "detailC1": "Detail C1",
+            "ideaD": "Idea D"
+          }
+        }
+      }
+    },
+    "outline": {
                 "title": "Outline",
                 "editHint": "Click to edit",
                 "noNodes": "No nodes"

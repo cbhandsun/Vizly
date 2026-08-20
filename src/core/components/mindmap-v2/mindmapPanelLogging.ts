@@ -102,6 +102,10 @@ export const logMindmapTemplateInsertFailure = (error: unknown): void => {
   safeLog.error('[MindMapTemplates] insert failed:', redactSensitiveLogValue(error));
 };
 
+export const logMindmapTemplateReplaceFailure = (error: unknown): void => {
+  safeLog.error('[MindMapTemplates] replacement failed:', redactSensitiveLogValue(error));
+};
+
 export const logMindmapKanbanRefreshFailure = (error: unknown): void => {
   safeLog.error('[MindMapTaskKanban] refresh failed:', redactSensitiveLogValue(error));
 };

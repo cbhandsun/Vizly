@@ -14,6 +14,7 @@ const auxiliaryPanelButtonsSource = readFileSync(resolve(process.cwd(), 'src/cor
 const focusButtonSource = readFileSync(resolve(process.cwd(), 'src/core/components/mindmap-v2/MindMapFocusButton.tsx'), 'utf8');
 const summaryButtonSource = readFileSync(resolve(process.cwd(), 'src/core/components/mindmap-v2/MindMapSummaryButton.tsx'), 'utf8');
 const treeExpansionButtonsSource = readFileSync(resolve(process.cwd(), 'src/core/components/mindmap-v2/MindMapTreeExpansionButtons.tsx'), 'utf8');
+const historyCommandSource = readFileSync(resolve(process.cwd(), 'src/core/components/mindmap-v2/mindmapToolbarHistoryCommand.ts'), 'utf8');
 
 describe('MindElixirToolbar commercial interaction contract', () => {
     it('uses one accessible toolbar button contract and semantic toolbar boundaries', () => {
@@ -56,8 +57,9 @@ describe('MindElixirToolbar commercial interaction contract', () => {
         expect(source).toContain('subscribeMindMapHistoryAvailability(mind, listener)');
         expect(source).toContain('disabled={!mind || !historyAvailability.canUndo}');
         expect(source).toContain('disabled={!mind || !historyAvailability.canRedo}');
-        expect(source).toContain("logMindmapToolbarHistoryFailure('undo', error)");
-        expect(source).toContain("logMindmapToolbarHistoryFailure('redo', error)");
+        expect(source).toContain("runMindMapToolbarHistoryCommand(mind, 'undo', refreshStats)");
+        expect(source).toContain("runMindMapToolbarHistoryCommand(mind, 'redo', refreshStats)");
+        expect(historyCommandSource).toContain('logMindmapToolbarHistoryFailure(action, error)');
     });
 
     it('makes relationship-line mode visibly cancellable from the keyboard', () => {

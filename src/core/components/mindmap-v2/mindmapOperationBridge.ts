@@ -9,7 +9,8 @@ export type VizlyMindMapOperation =
     | { name: 'editArrowLabel'; obj: MindElixirArrow }
     | { name: 'expandAllBranches'; obj: NodeObj }
     | { name: 'import'; obj: NodeObj }
-    | { name: 'outline_structure_change'; obj: NodeObj };
+    | { name: 'outline_structure_change'; obj: NodeObj }
+    | { name: 'template_apply'; obj: NodeObj };
 
 export type VizlyMindMapData = Omit<MindElixirData, 'direction'> & {
     direction?: number;

@@ -45,6 +45,7 @@ import { useTranslation } from 'react-i18next';
 import type { MindElixirInstance } from 'mind-elixir';
 import { getMindElixirInstance, subscribeMindElixir, setPresentationState, toggleKanban, subscribeKanban, toggleAIPanel, subscribeAIPanel } from './mindElixirStore';
 import { countNodes, getTreeDepth } from './migrate';
+import { runMindMapToolbarHistoryCommand } from './mindmapToolbarHistoryCommand';
 import { VIZLY_THEMES } from './theme';
 import { usePresentationMode } from './MindMapPresentationMode';
 import { emitOpenSearch } from './mindmapSearchStore';
@@ -55,7 +56,6 @@ import { cleanMindMapChildNode } from './mindmapBridgeSecurity';
 import {
     logMindmapToolbarAddRootChildFailure,
     logMindmapToolbarAutoArrangeFailure,
-    logMindmapToolbarHistoryFailure,
     logMindmapToolbarFitFailure,
     logMindmapToolbarStatsUpdateFailure,
     logMindmapToolbarZoomFailure,
@@ -193,23 +193,42 @@ const MindElixirToolbar: React.FC = () => {
         }
     }, [mind]);
 
-    const handleUndo = useCallback(() => {
+    const [stats, setStats] = useState({ nodes: 0, depth: 0 });
+    const refreshStats = useCallback(() => {
         if (!mind) return;
         try {
-            mind.undo();
+            const data = mind.getData();
+            setStats({
+                nodes: countNodes(data.nodeData),
+                depth: getTreeDepth(data.nodeData),
+            });
         } catch (error) {
-            logMindmapToolbarHistoryFailure('undo', error);
+            logMindmapToolbarStatsUpdateFailure(error);
         }
     }, [mind]);
 
+    useEffect(() => {
+        if (!mind) return;
+        let active = true;
+        queueMicrotask(() => {
+            if (active) refreshStats();
+        });
+        mind.bus.addListener('operation', refreshStats);
+        return () => {
+            active = false;
+            mind.bus.removeListener('operation', refreshStats);
+        };
+    }, [mind, refreshStats]);
+
+    const handleUndo = useCallback(() => {
+        if (!mind) return;
+        runMindMapToolbarHistoryCommand(mind, 'undo', refreshStats);
+    }, [mind, refreshStats]);
+
     const handleRedo = useCallback(() => {
         if (!mind) return;
-        try {
-            mind.redo();
-        } catch (error) {
-            logMindmapToolbarHistoryFailure('redo', error);
-        }
-    }, [mind]);
+        runMindMapToolbarHistoryCommand(mind, 'redo', refreshStats);
+    }, [mind, refreshStats]);
 
     const subscribeHistoryAvailability = useCallback(
         (listener: () => void) => subscribeMindMapHistoryAvailability(mind, listener),
@@ -399,26 +418,6 @@ const MindElixirToolbar: React.FC = () => {
         handleOpmlFileChange,
         handleJsonFileChange,
     } = useMindElixirImportActions(mind, { onStatus: handleImportStatus });
-
-    // ── Stats ─────────────────────────────────────────────────────────────────
-    const [stats, setStats] = useState({ nodes: 0, depth: 0 });
-    useEffect(() => {
-        if (!mind) return;
-        const update = () => {
-            try {
-                const data = mind.getData();
-                setStats({
-                    nodes: countNodes(data.nodeData),
-                    depth: getTreeDepth(data.nodeData),
-                });
-            } catch (error) {
-                logMindmapToolbarStatsUpdateFailure(error);
-            }
-        };
-        update();
-        mind.bus.addListener('operation', update);
-        return () => { mind.bus.removeListener('operation', update); };
-    }, [mind]);
 
     return (
         <div

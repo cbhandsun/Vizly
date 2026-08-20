@@ -49,6 +49,7 @@ describe('mindmapPanelLogging', () => {
     logging.logMindmapYjsRemoteSyncParseFailure(new Error('api_key=yjs-remote-secret'));
     logging.logMindmapYjsCleanupFailure(new Error('token=yjs-cleanup-secret'));
     logging.logMindmapTemplateInsertFailure(new Error('password=template-insert-secret'));
+    logging.logMindmapTemplateReplaceFailure(new Error('token=template-replace-secret'));
     logging.logMindmapKanbanRefreshFailure(new Error('token=kanban-refresh-secret'));
     logging.logMindmapHistoryRestoreFailure(new Error('secret=history-restore-secret'));
     logging.logMindmapEmptyGuideCheckFailure(new Error('password=empty-guide-secret'));
@@ -84,6 +85,7 @@ describe('mindmapPanelLogging', () => {
     expect(errorPayload).toContain('[MindMapYjsIntegration] Remote sync parse error:');
     expect(warnPayload).toContain('[MindMapYjsIntegration] Cleanup listener removal failed:');
     expect(errorPayload).toContain('[MindMapTemplates] insert failed:');
+    expect(errorPayload).toContain('[MindMapTemplates] replacement failed:');
     expect(errorPayload).toContain('[MindMapTaskKanban] refresh failed:');
     expect(errorPayload).toContain('[MindMapHistoryPanel] restore failed:');
     expect(warnPayload).toContain('[MindMapEmptyGuide] empty-state check failed:');
@@ -116,6 +118,7 @@ describe('mindmapPanelLogging', () => {
     expect(errorPayload).not.toContain('yjs-remote-secret');
     expect(warnPayload).not.toContain('yjs-cleanup-secret');
     expect(errorPayload).not.toContain('template-insert-secret');
+    expect(errorPayload).not.toContain('template-replace-secret');
     expect(errorPayload).not.toContain('kanban-refresh-secret');
     expect(errorPayload).not.toContain('history-restore-secret');
     expect(warnPayload).not.toContain('empty-guide-secret');
