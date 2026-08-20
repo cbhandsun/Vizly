@@ -2,8 +2,17 @@
   "schema": "vizly-precompiled-display-route-manifest-v3",
   "routingVersion": "8",
   "identitySourceHash": "source-v1:cfaa2450d3809ba2c686379d46c2603773ac472175eeac70cdfe7ece51347781",
-  "routingSourceHash": "source-v1:7016502bc3254f07602b6576cca0324d30f67f50675aefa7c6e6de248985cc0d",
+  "routingSourceHash": "source-v1:678b8299fbf65f487608fa7c78ae3a4557936adb63bf062754d84326d2b840c9",
   "entries": [
+    {
+      "presetId": "wms-process-flow-v1",
+      "sourcePath": "src/data/standardized/WmsProcessFlowStandardData.json",
+      "artifactFile": "route-1352090637.json",
+      "sourceHash": "source-v1:2a580f110590a416ff1aeb9fb5a3cd21536428e26368841fd160f87243cc25d3",
+      "inputSignature": "1352090637",
+      "inputGeometryDigest": "geometry-v1:4838f4b415ecf3e4360ecdb05733cba8",
+      "outputRouteSignature": "route-v2:44:195:973728645e9fe816"
+    },
     {
       "presetId": "logistics-architecture-v1",
       "sourcePath": "src/data/standardized/LogisticsStandardData.json",
@@ -21,15 +30,6 @@
       "inputSignature": "4033567064",
       "inputGeometryDigest": "geometry-v1:88bc95a87015a654ea8cb0f6f1c246c0",
       "outputRouteSignature": "route-v2:26:164:d5d329ce2707b4c4"
-    },
-    {
-      "presetId": "wms-process-flow-v1",
-      "sourcePath": "src/data/standardized/WmsProcessFlowStandardData.json",
-      "artifactFile": "route-4172950488.json",
-      "sourceHash": "source-v1:2a580f110590a416ff1aeb9fb5a3cd21536428e26368841fd160f87243cc25d3",
-      "inputSignature": "4172950488",
-      "inputGeometryDigest": "geometry-v1:bc5cdf7d0ca289e500ec8289eb4854d9",
-      "outputRouteSignature": "route-v2:44:195:201731ee3ab0cfac"
     }
   ]
 }
