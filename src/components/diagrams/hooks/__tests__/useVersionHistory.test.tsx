@@ -194,6 +194,40 @@ describe('useVersionHistory', () => {
         expect(messageMocks.error).toHaveBeenCalledWith('The current diagram data could not be read');
     });
 
+    it('falls back to the validated diagram bridge when React Flow has no active canvas', async () => {
+        const setNodes = vi.fn();
+        const setEdges = vi.fn();
+        const bridge = {
+            id: 'diagram-1',
+            nodes: originalNodes,
+            edges: originalEdges,
+            getCanvasSnapshot: vi.fn(() => ({ nodes: originalNodes, edges: originalEdges })),
+        };
+        (window as unknown as { __flowDataBridge: Record<string, typeof bridge> }).__flowDataBridge = {
+            'diagram-1': bridge,
+        };
+        const { result } = renderHook(() => useVersionHistory('diagram-1'));
+
+        await waitFor(() => expect(storageMocks.listVersions).toHaveBeenCalledWith('diagram-1'));
+
+        let entered = false;
+        await act(async () => {
+            entered = await result.current.enterPreview(
+                'version-1',
+                setNodes,
+                setEdges,
+                () => [],
+                () => [],
+            );
+        });
+
+        expect(entered).toBe(true);
+        expect(bridge.getCanvasSnapshot).toHaveBeenCalledTimes(1);
+        expect(setNodes).toHaveBeenCalledWith(previewNodes);
+        expect(setEdges).toHaveBeenCalledWith(previewEdges);
+        expect(result.current.exitPreview()).toEqual({ nodes: originalNodes, edges: originalEdges });
+    });
+
     it('exposes a persistent load error and clears it after a successful retry', async () => {
         storageMocks.listVersions.mockRejectedValueOnce(new Error('offline'));
         const { result } = renderHook(() => useVersionHistory('diagram-1'));

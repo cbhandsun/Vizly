@@ -32,6 +32,12 @@ const readCurrentCanvasSnapshot = (getNodes: () => Node[], getEdges: () => Edge[
         return null;
     }
 };
+const readPreviewBaseSnapshot = (
+    diagramId: string,
+    getNodes: () => Node[],
+    getEdges: () => Edge[],
+) => readCurrentCanvasSnapshot(getNodes, getEdges)
+    ?? readBridgeCanvasSnapshot(getFlowDataBridge(diagramId));
 
 export function useVersionHistory(diagramId: string) {
     const { t } = useTranslation();
@@ -166,7 +172,11 @@ export function useVersionHistory(diagramId: string) {
             return false;
         }
 
-        const currentSnapshot = readCurrentCanvasSnapshot(getCurrentNodes, getCurrentEdges);
+        const currentSnapshot = readPreviewBaseSnapshot(
+            diagramId,
+            getCurrentNodes,
+            getCurrentEdges,
+        );
         if (!currentSnapshot) {
             appMessage.error(t('designer.versionHistoryPanel.canvasUnavailable'));
             return false;
