@@ -27,7 +27,8 @@ describe('AIChatViewLayout accessibility contract', () => {
         expect(source).toContain('role="status"');
         expect(source).toContain("t('aiChat.configStatusTitle')");
         expect(source).toContain("t('aiChat.configureNow')");
-        expect(source).toContain('disabled={!loading && (!inputValue.trim() || !configurationState.ready)}');
+        expect(source).toContain('const canSubmit = configurationState.ready || canSubmitWithoutConfiguration;');
+        expect(source).toContain('disabled={!loading && (!inputValue.trim() || !canSubmit)}');
         expect(source).toContain("t('aiChat.configureBeforeSending')");
         expect(css).toMatch(/\.ai-chat-configuration-status[\s\S]*?min-height: var\(--commercial-touch-target, 44px\)/);
     });

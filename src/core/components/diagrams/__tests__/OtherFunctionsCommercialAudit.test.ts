@@ -94,7 +94,7 @@ describe('other-function commercial interaction safeguards', () => {
         expect(viewerSource).toContain("import('@/core/components/diagrams/KeyboardShortcutPanel')");
         expect(viewerSource).not.toContain("import('@/core/components/ui/ShortcutsHelpModal')");
         expect(modalSource).toContain('getContainer={getContainer ?? (() => document.body)}');
-        expect(flowchartModalSource).toContain('getContainer={() => document.body}');
+        expect(flowchartModalSource).toContain('getContainer={getContainer ?? (() => document.body)}');
         expect(panelCss).toMatch(/\.keyboard-shortcut-panel \.ant-modal-close[\s\S]*?width: var\(--commercial-touch-target, 44px\)[\s\S]*?height: var\(--commercial-touch-target, 44px\)/);
         expect(modalCss).toMatch(/\.commercial-shortcuts-modal \.ant-modal-close[\s\S]*?width: var\(--commercial-touch-target, 44px\)[\s\S]*?height: var\(--commercial-touch-target, 44px\)/);
         expect(modalCss).toMatch(/\.commercial-shortcuts-modal \.ant-modal[\s\S]*?max-width: calc\(100vw - 16px\)/);
@@ -177,7 +177,7 @@ describe('other-function commercial interaction safeguards', () => {
         expect(source).toContain("aria-label={t('designer.versionHistoryPanel.messageLabel')}");
         expect(source).toContain('aria-describedby={previewVersion');
         expect(source).toContain("t('designer.versionHistoryPanel.messageHint'");
-        expect(source).toContain('if (isSaving || previewVersion) return;');
+        expect(source).toContain('if (activeOperation || previewVersion) return;');
         expect(source).toContain("t('designer.versionHistoryPanel.previewReadonly')");
         expect(source).not.toMatch(/[\u3400-\u9fff]/u);
     });

@@ -69,7 +69,11 @@ const renderMenu = (options: { type: 'node' | 'multi-node'; target: Node; select
       onAction={onAction}
       selectedNodes={options.selectedNodes}
       selectedEdges={[]}
-      nodes={[options.target, ...options.selectedNodes.filter(item => item.id !== options.target.id)]}
+      nodes={[
+        options.target,
+        ...options.selectedNodes.filter(item => item.id !== options.target.id),
+        node('canvas-peer'),
+      ]}
       canUndo={false}
       canRedo={false}
     />,

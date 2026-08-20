@@ -17,6 +17,10 @@ vi.mock('react-i18next', () => ({
     }),
 }));
 
+vi.mock('../PropertyPanel', () => ({
+    default: () => <div data-testid="property-panel-stub" />,
+}));
+
 const Harness = () => {
     const [open, setOpen] = useState(false);
 
