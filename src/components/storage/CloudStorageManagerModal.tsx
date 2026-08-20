@@ -12,7 +12,6 @@ import { useNavigate } from 'react-router';
 import { dataRegistry } from '../../data/DataRegistry';
 import { unifiedStorage } from '../../services/UnifiedStorageService';
 import { DiagramMetadata } from '../../services/storage/types';
-import type { StandardDiagramData } from '@/core/models/DiagramModels';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/context/useAuth';
 import { coerceToStandardDiagramDataWithReport } from '@/core/utils/coerceDiagram';
@@ -36,6 +35,7 @@ import { CloudStorageManagerSearch, CloudStorageManagerTitle } from './CloudStor
 import { CloudStorageRecoveryAlert } from './CloudStorageRecoveryAlert';
 import { CloudStorageEmptyState } from './CloudStorageEmptyState';
 import { runCloudStorageBatchDelete } from './cloudStorageBatchDelete';
+import type { CloudStorageManagerModalProps } from './cloudStorageManagerModalTypes';
 import {
     createCloudStorageManagerScope,
     invalidateCloudStorageManagerScope,
@@ -55,14 +55,6 @@ const { Meta } = Card;
 const AuthModal = React.lazy(() => import('@/components/auth/AuthModal').then(module => ({
     default: module.AuthModal,
 })));
-
-interface CloudStorageManagerModalProps {
-    open: boolean;
-    onCancel: () => void;
-    onSelect?: (data: StandardDiagramData) => void;
-    /** 如果提供，云端图表将在设计器中打开（通过 standardDataToCanvas 转换） */
-    onOpenInDesigner?: (data: StandardDiagramData) => void;
-}
 
 export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> = ({ open, onCancel, onSelect, onOpenInDesigner }) => {
     const navigate = useNavigate();

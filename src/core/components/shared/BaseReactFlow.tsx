@@ -45,7 +45,6 @@ import {
   normalizeBaseReactFlowRenderableNodes,
 } from './baseReactFlowRenderableNodes';
 import { useBaseReactFlowDisplayRouting } from './useBaseReactFlowDisplayRouting';
-import { resolveBaseReactFlowNodeDragFallbackIds } from './baseReactFlowDisplayFallback';
 import {
   bindBaseReactFlowWheelHandler,
   createBaseReactFlowWheelHandler,
@@ -79,6 +78,7 @@ import { buildDisplayRoutingObstacles } from './baseReactFlowDisplayGeometry';
 import { EdgeLabelObstacleContext } from '../custom-edges/edgeLabelObstacleContext';
 import { applyBaseReactFlowEdgePresentation } from './baseReactFlowEdgePresentation';
 import { useLayoutStability } from '../../context/LayoutStabilityContext';
+import { useBaseReactFlowNodeDragState } from './useBaseReactFlowNodeDragState';
 
 // 模块级常量：避免在组件参数默认值中创建新引用
 const DEFAULT_VIEWPORT = { x: 0, y: 0, zoom: 1 };
@@ -175,29 +175,14 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const isLayoutStable = useLayoutStability();
-  const [isNodeDragging, setIsNodeDragging] = useState(false);
-  const [isNodeDragFallbackPending, setIsNodeDragFallbackPending] = useState(false);
-  const [nodeDragFallbackIds, setNodeDragFallbackIds] = useState<readonly string[]>([]);
-  const handleNodeDragStart = useCallback<NonNullable<BaseReactFlowProps['onNodeDragStart']>>(
-    (event, node, draggedNodes) => {
-      setIsNodeDragging(true);
-      setIsNodeDragFallbackPending(true);
-      setNodeDragFallbackIds(resolveBaseReactFlowNodeDragFallbackIds(node.id, draggedNodes));
-      onNodeDragStart?.(event, node, draggedNodes);
-    },
-    [onNodeDragStart],
-  );
-  const handleNodeDragStop = useCallback<NonNullable<BaseReactFlowProps['onNodeDragStop']>>(
-    (event, node, draggedNodes) => {
-      setIsNodeDragging(false);
-      onNodeDragStop?.(event, node, draggedNodes);
-    },
-    [onNodeDragStop],
-  );
-  const handleNodeDragFallbackResolved = useCallback(() => {
-    setIsNodeDragFallbackPending(false);
-    setNodeDragFallbackIds(current => current.length === 0 ? current : []);
-  }, []);
+  const {
+    handleNodeDragFallbackResolved,
+    handleNodeDragStart,
+    handleNodeDragStop,
+    isNodeDragFallbackPending,
+    isNodeDragging,
+    nodeDragFallbackIds,
+  } = useBaseReactFlowNodeDragState({ onNodeDragStart, onNodeDragStop });
 
   // 全局滚轮灵敏度（函数级注释）：从配置系统读取，用于主画布自定义缩放
   const globalSensitivity = useMemo(() => {

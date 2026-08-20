@@ -6,6 +6,10 @@ const source = readFileSync(
     resolve(process.cwd(), 'src/core/components/mindmap-v2/MindMapFloatingBar.tsx'),
     'utf8',
 );
+const floatingButtonSource = readFileSync(
+    resolve(process.cwd(), 'src/core/components/mindmap-v2/MindMapFloatingBarButton.tsx'),
+    'utf8',
+);
 const css = readFileSync(
     resolve(process.cwd(), 'src/core/components/mindmap-v2/FloatingBar.module.css'),
     'utf8',
@@ -59,7 +63,7 @@ describe('MindMapFloatingBar commercial interaction contract', () => {
     it('keeps node actions named, keyboard visible, and inside narrow viewports', () => {
         expect(source).toContain('role="toolbar"');
         expect(source).toContain("aria-label={t('plugins.mindmap.floatingBar.toolbarLabel')}");
-        expect(source).toContain('aria-label={tip}');
+        expect(floatingButtonSource).toContain('aria-label={tip}');
         expect(source).toContain("aria-label={t('plugins.mindmap.floatingBar.aiAssistant')}");
         expect(source).toContain("aria-label={t('plugins.mindmap.floatingBar.branchColor')}");
         expect(source).toContain('resolveMindMapFloatingBarTop({');
@@ -106,7 +110,7 @@ describe('MindMapFloatingBar commercial interaction contract', () => {
     });
 
     it('exposes branch state and native keyboard navigation for contextual actions', () => {
-        expect(source).toContain('aria-expanded={ariaExpanded}');
+        expect(floatingButtonSource).toContain('aria-expanded={ariaExpanded}');
         expect(source).toContain('ariaExpanded={isExpanded}');
         expect(source).toContain("document.querySelector<HTMLElement>('.designer-right-sidebar')");
         expect(source).toContain('maxWidth: Math.max(0, safeVisibleRight - 16)');

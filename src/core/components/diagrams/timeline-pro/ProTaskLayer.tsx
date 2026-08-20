@@ -14,6 +14,13 @@ import { useProTaskDependencyKeyboard } from './useProTaskDependencyKeyboard';
 import type { ProTimelineDependencyConnectionResult } from './proTimelineDependencyConnection';
 import { useProTaskInlineEditing } from './useProTaskInlineEditing';
 import { isProTimelineAdditiveSelection } from './proTimelineViewportInteraction';
+import {
+    PRO_TASK_BAR_HEIGHT as BAR_HEIGHT,
+    PRO_TASK_BAR_TOP_MARGIN as BAR_TOP_MARGIN,
+    PRO_TASK_HEADER_HEIGHT as HEADER_HEIGHT,
+    PRO_TASK_ROW_HEIGHT as ROW_HEIGHT,
+    type ProTaskDragState as DragState,
+} from './proTaskLayerGeometry';
 
 export interface ProTaskLayerProps {
     tasks: ProjectedProTimelineTask[];
@@ -28,23 +35,6 @@ export interface ProTaskLayerProps {
     ) => ProTimelineDependencyConnectionResult | void;
     criticalPathTaskIds?: Set<string>;
     cyclicTaskIds?: Set<string>;
-}
-
-const ROW_HEIGHT = 42;
-const HEADER_HEIGHT = 52;
-const BAR_HEIGHT = 28;
-const BAR_TOP_MARGIN = (ROW_HEIGHT - BAR_HEIGHT) / 2;
-
-interface DragState {
-    taskId: string;
-    mode: 'move' | 'resize-right' | 'progress' | 'connect';
-    startMouseX: number;
-    startMouseY: number;
-    origX: number;
-    origY?: number;
-    origW: number;
-    origProgress: number;
-    targetTaskId?: string | null;
 }
 
 export default function ProTaskLayer({ 

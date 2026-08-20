@@ -56,6 +56,10 @@ import {
 import { useMindMapFloatingSelection } from './useMindMapFloatingSelection';
 import { useMindMapNodeDeletion } from './useMindMapNodeDeletion';
 import type { MindMapFloatingBarNode } from './mindMapFloatingBarTypes';
+import {
+    MindMapFloatingBarButton,
+    MindMapFloatingBarDivider,
+} from './MindMapFloatingBarButton';
 import styles from './FloatingBar.module.css';
 
 const errorMessage = (error: unknown, fallback: string): string =>
@@ -381,31 +385,6 @@ const MindMapFloatingBar: React.FC = () => {
         }
     };
 
-    // ── Button style ─────────────────────────────────────────────────────────
-    const Btn: React.FC<{
-        ariaExpanded?: boolean;
-        danger?: boolean;
-        icon: React.ReactNode;
-        onClick: () => void;
-        tip: string;
-    }> = ({ ariaExpanded, icon, tip, danger, onClick }) => (
-        <Tooltip title={tip} placement="top" mouseEnterDelay={0.4}>
-            <button
-                type="button"
-                className={`${styles.btn} ${danger ? styles.btnDanger : ''}`}
-                aria-label={tip}
-                aria-expanded={ariaExpanded}
-                title={tip}
-                onClick={onClick}
-            >
-                <span aria-hidden="true">{icon}</span>
-            </button>
-        </Tooltip>
-    );
-
-    // Divider
-    const Div = () => <div className={styles.divider} />;
-
     const handleAddChild = () => {
         const tpc = getTpc();
         if (!tpc) return;
@@ -523,33 +502,33 @@ const MindMapFloatingBar: React.FC = () => {
                 </Tooltip>
             </Popover>
 
-            <Div />
+            <MindMapFloatingBarDivider />
 
             {/* Add child */}
-            <Btn icon={<PlusOutlined />} tip={t('plugins.mindmap.floatingBar.addChild')}
+            <MindMapFloatingBarButton icon={<PlusOutlined />} tip={t('plugins.mindmap.floatingBar.addChild')}
                 onClick={handleAddChild} />
 
             {/* Add sibling — not for root */}
             {!isRoot && (
-                <Btn icon={<ApartmentOutlined />} tip={t('plugins.mindmap.floatingBar.addSibling')}
+                <MindMapFloatingBarButton icon={<ApartmentOutlined />} tip={t('plugins.mindmap.floatingBar.addSibling')}
                     onClick={() => act(() => { const tpc = getTpc(); if (tpc) mind.insertSibling('after', tpc, cleanMindMapChildNode()); })} />
             )}
 
             {/* Duplicate — not for root */}
             {!isRoot && (
-                <Btn icon={<CopyOutlined />} tip={t('plugins.mindmap.floatingBar.duplicateSibling')}
+                <MindMapFloatingBarButton icon={<CopyOutlined />} tip={t('plugins.mindmap.floatingBar.duplicateSibling')}
                     onClick={handleDuplicate} />
             )}
 
-            <Div />
+            <MindMapFloatingBarDivider />
 
             {/* Edit */}
-            <Btn icon={<EditOutlined />} tip={t('plugins.mindmap.floatingBar.edit')}
+            <MindMapFloatingBarButton icon={<EditOutlined />} tip={t('plugins.mindmap.floatingBar.edit')}
                 onClick={() => act(() => { const tpc = getTpc(); if (tpc) mind.editTopic(tpc); })} />
 
             {/* Expand/Collapse — only if has children */}
             {hasChildren && (
-                <Btn
+                <MindMapFloatingBarButton
                     icon={isExpanded ? <DownOutlined /> : <RightOutlined />}
                     tip={t(isExpanded
                         ? 'plugins.mindmap.actions.collapse'
@@ -558,7 +537,7 @@ const MindMapFloatingBar: React.FC = () => {
                     onClick={() => act(() => { const tpc = getTpc(); if (tpc) mind.expandNode(tpc, !isExpanded); })} />
             )}
 
-            <Div />
+            <MindMapFloatingBarDivider />
 
             {/* Branch color quick picker */}
             <Popover
@@ -703,8 +682,8 @@ const MindMapFloatingBar: React.FC = () => {
             {/* Delete — not for root */}
             {!isRoot && (
                 <>
-                    <Div />
-                    <Btn icon={<DeleteOutlined />} tip={t('plugins.mindmap.actions.deleteNode')} danger
+                    <MindMapFloatingBarDivider />
+                    <MindMapFloatingBarButton icon={<DeleteOutlined />} tip={t('plugins.mindmap.actions.deleteNode')} danger
                         onClick={() => requestDelete(obj)} />
                 </>
             )}
