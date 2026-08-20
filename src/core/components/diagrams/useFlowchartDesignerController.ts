@@ -700,6 +700,7 @@ export const useFlowchartDesignerController = ({
         getPreviousState, getReactFlowSnapshot, gridColor, gridVariant, groupedTemplates, guides, handleAddFreehandStroke, handleAddMindMap, handleAddNode, handleAddStickyNote, handleAlign,
         handleBeforeUpdate, handleBringToFront, handleContextMenuAction, handleDeleteWithToast, handleDistribute, handleDuplicateWithToast, handleGroupWithToast, handleUngroupWithToast,
         handleEdgeClick, handleEdgeDoubleClick, handleFitView, handleFocusNode, handleGridRotate, handleImport, handleRequestImport, handleLock, handleOpacity,
+        handleSmartLayout,
         handleOpenJsonEditor, handleOpenSettings, handlePaneClick, handlePresentationFocus, handleReactFlowInit, handleReadonlyChange, handleReconnect,
         handleReconnectEnd, handleReconnectStart, handleSearchReplaceAll, handleSearchReplaceMatch, handleSendToBack, handleSmartOptimize, handleStrategyLayout,
         handleToggleHighlightMainFlow, handleToggleShowOnlyMainFlow, handleTouchEnd, handleTouchStart, handleUseTemplate, handleWrappedCloudSave,

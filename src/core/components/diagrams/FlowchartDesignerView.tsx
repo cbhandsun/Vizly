@@ -124,6 +124,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
         handleSearchReplaceMatch,
         handleSendToBack,
         handleSmartOptimize,
+        handleSmartLayout,
         handleStrategyLayout,
         handleToggleHighlightMainFlow,
         handleToggleShowOnlyMainFlow,
@@ -461,6 +462,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                     setCanvasSearchVisible(true);
                                 },
                                 onStrategyLayout: handleStrategyLayout,
+                                onSmartLayout: handleSmartLayout,
                                 lastDomainStrategy,
                                 lastDomainDirection,
                                 lastNodeLayout,

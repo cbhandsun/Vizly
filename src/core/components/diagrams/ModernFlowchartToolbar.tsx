@@ -50,6 +50,8 @@ interface FlowchartToolbarProps {
     onShowCanvasSearch?: () => void;
     /** 域感知策略布局回调（统一入口） */
     onStrategyLayout?: (strategyName: string, nodeLayout?: string, direction?: 'TB' | 'LR') => void;
+    /** 根据当前图结构选择低风险布局预设 */
+    onSmartLayout?: () => void | Promise<void>;
     /** 当前选中的域布局策略 */
     lastDomainStrategy?: string;
     /** 当前选中的域布局方向 */
@@ -123,6 +125,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
     onShowShortcuts,
     onShowCanvasSearch,
     onStrategyLayout,
+    onSmartLayout,
     lastDomainStrategy,
     lastDomainDirection,
     lastNodeLayout,
@@ -201,9 +204,10 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
         lastDomainDirection,
         lastDomainStrategy,
         lastNodeLayout,
+        onSmartLayout,
         onStrategyLayout,
         translate: (key, fallback) => t(key, fallback),
-    }), [lastDomainDirection, lastDomainStrategy, lastNodeLayout, onStrategyLayout, t]);
+    }), [lastDomainDirection, lastDomainStrategy, lastNodeLayout, onSmartLayout, onStrategyLayout, t]);
 
     const layoutBaseLabel = t('designer.flowchart.layout.tooltip', '自动布局');
     const layoutTriggerLabel = layoutMenuModel.statusText

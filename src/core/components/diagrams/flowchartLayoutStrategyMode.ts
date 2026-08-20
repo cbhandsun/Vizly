@@ -31,3 +31,13 @@ export const resolveLayoutDomainOrder = (
     if (explicitOrder) return explicitOrder;
     return isOrderedDomainLaneLayoutStrategy(strategyName) ? undefined : implicitOrder;
 };
+
+export const resolveDomainLayoutRoutingQuality = (
+    strategyName?: string,
+): 'interactive' | undefined => (
+    isOrderedDomainLaneLayoutStrategy(strategyName) ? 'interactive' : undefined
+);
+
+export const shouldPromoteDomainDagreRouteCandidate = (
+    strategyName?: string,
+): boolean => !isOrderedDomainLaneLayoutStrategy(strategyName);

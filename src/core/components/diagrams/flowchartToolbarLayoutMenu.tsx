@@ -1,6 +1,6 @@
 import React from 'react';
 import type { MenuProps } from 'antd';
-import { FaObjectGroup, FaRegObjectGroup, FaSitemap } from 'react-icons/fa';
+import { FaMagic, FaObjectGroup, FaRegObjectGroup, FaSitemap, FaSlidersH } from 'react-icons/fa';
 import { usesSelectableDomainNodeArrangement } from './flowchartLayoutStrategyMode';
 
 type ToolbarMenuItem = Extract<
@@ -18,6 +18,7 @@ interface BuildFlowchartLayoutMenuModelOptions {
     lastDomainDirection?: 'TB' | 'LR';
     lastDomainStrategy?: string;
     lastNodeLayout?: string;
+    onSmartLayout?: () => void | Promise<void>;
     onStrategyLayout?: (strategyName: string, nodeLayout?: string, direction?: 'TB' | 'LR') => void;
     translate: TranslateLayoutLabel;
 }
@@ -67,6 +68,7 @@ export const buildFlowchartLayoutMenuModel = ({
     lastDomainDirection,
     lastDomainStrategy,
     lastNodeLayout,
+    onSmartLayout,
     onStrategyLayout,
     translate,
 }: BuildFlowchartLayoutMenuModelOptions): FlowchartLayoutMenuModel => {
@@ -80,39 +82,43 @@ export const buildFlowchartLayoutMenuModel = ({
     );
 
     const labels = {
-        treeGroup: translate('designer.flowchart.layout.treeGroup', '树形布局'),
+        recommendedGroup: translate('designer.flowchart.layout.recommendedGroup', '常用场景'),
+        smart: translate('designer.flowchart.layout.smartRecommendation', '智能推荐'),
+        advanced: translate('designer.flowchart.layout.advancedGroup', '高级布局'),
+        treeGroup: translate('designer.flowchart.layout.advancedGlobalGroup', '全图布局（隐藏域容器）'),
         treeTb: translate('designer.flowchart.layout.treeTB', '↕ 树形 (上→下)'),
         treeLr: translate('designer.flowchart.layout.treeLR', '↔ 树形 (左→右)'),
-        forceGroup: translate('designer.flowchart.layout.forceGroup', '力导向'),
-        force: translate('designer.flowchart.layout.force', '⊙ 力导向'),
-        globalElkGroup: translate('designer.flowchart.layout.globalElkGroup', '全图分层布局'),
-        domainGroup: translate('designer.flowchart.layout.domainGroup', '域感知布局'),
-        domainDagreTb: translate('designer.flowchart.layout.domainDagreTB', '◈ DomainDagre (上→下) (默认)'),
+        force: translate('designer.flowchart.layout.forceExplore', '⊙ 关系探索（力导向）'),
+        domainGroup: translate('designer.flowchart.layout.advancedDomainGroup', '保留域的布局'),
+        domainDagreTb: translate('designer.flowchart.layout.standardProcessTB', '标准流程（保留域·上→下）'),
         domainDagreSubHorizontalTb: translate(
-            'designer.flowchart.layout.domainDagreSubHorizontalTB',
-            '◈ DomainDagre (子域水平)',
+            'designer.flowchart.layout.standardProcessSubHorizontalTB',
+            '标准流程（子域横排）',
         ),
         domainCompoundElkTb: translate(
-            'designer.flowchart.layout.domainCompoundElkTB',
-            'Domain ELK 组合 (上→下)',
+            'designer.flowchart.layout.complexProcessTB',
+            '复杂流程（保留域·上→下）',
         ),
         domainCompoundElkLr: translate(
-            'designer.flowchart.layout.domainCompoundElkLR',
-            'Domain ELK 组合 (左→右)',
+            'designer.flowchart.layout.complexProcessLR',
+            '复杂流程（保留域·左→右）',
         ),
         domainLanesTb: translate(
-            'designer.flowchart.layout.domainLanesTB',
-            '域泳道 + Dagre (上→下)',
+            'designer.flowchart.layout.cyclicLanesTB',
+            '循环流程泳道（上→下）',
         ),
         domainLanesLr: translate(
-            'designer.flowchart.layout.domainLanesLR',
-            '域泳道 + Dagre (左→右)',
+            'designer.flowchart.layout.cyclicLanesLR',
+            '循环流程泳道（左→右）',
         ),
-        domainElkTb: translate('designer.flowchart.layout.globalElkTB', '全图 ELK 正交分层 (上→下)'),
-        domainElkLr: translate('designer.flowchart.layout.globalElkLR', '全图 ELK 正交分层 (左→右)'),
-        domainVertical: translate('designer.flowchart.layout.domainVertical', '▥ DomainVertical (上→下)'),
-        domainHorizontal: translate('designer.flowchart.layout.domainHorizontal', '▦ DomainHorizontal (左→右)'),
-        nodeGroup: translate('designer.flowchart.layout.nodeLayoutGroup', '域内节点排布'),
+        domainElkTb: translate('designer.flowchart.layout.globalOrthogonalTB', '全图正交分层（上→下）'),
+        domainElkLr: translate('designer.flowchart.layout.globalOrthogonalLR', '全图正交分层（左→右）'),
+        domainVertical: translate('designer.flowchart.layout.freeDomainTB', '▥ 自由域布局（上→下）'),
+        domainHorizontal: translate('designer.flowchart.layout.freeDomainLR', '▦ 自由域布局（左→右）'),
+        nodeGroup: translate(
+            'designer.flowchart.layout.advancedNodeArrangementGroup',
+            '域内排布（切换为自由域布局）',
+        ),
         nodeFlow: translate('designer.flowchart.layout.nodeFlow', '▷ 流式'),
         nodeGrid: translate('designer.flowchart.layout.nodeGrid', '⊞ 网格'),
         nodeHorizontal: translate('designer.flowchart.layout.nodeHorizontal', '⊟ 水平'),
@@ -177,7 +183,7 @@ export const buildFlowchartLayoutMenuModel = ({
         .filter((label): label is string => Boolean(label))
         .map(stripDecorativePrefix);
 
-    const items: NonNullable<MenuProps['items']> = [
+    const advancedItems: NonNullable<MenuProps['items']> = [
         {
             key: 'group-tree',
             label: labels.treeGroup,
@@ -195,39 +201,21 @@ export const buildFlowchartLayoutMenuModel = ({
                     () => onStrategyLayout?.('tree', undefined, 'LR'),
                     <FaSitemap style={{ transform: 'rotate(-90deg)' }} />,
                 ),
-            ],
-        },
-        { type: 'divider' as const },
-        {
-            key: 'group-force',
-            label: labels.forceGroup,
-            type: 'group' as const,
-            children: [
                 domainItem('force', labels.force, () => onStrategyLayout?.('force', undefined, 'TB')),
+                domainItem(
+                    'domain-elk-tb',
+                    labels.domainElkTb,
+                    () => onStrategyLayout?.('domain-elk', 'elk-layered', 'TB'),
+                    <FaSitemap />,
+                ),
+                domainItem(
+                    'domain-elk-lr',
+                    labels.domainElkLr,
+                    () => onStrategyLayout?.('domain-elk', 'elk-layered', 'LR'),
+                    <FaSitemap style={{ transform: 'rotate(-90deg)' }} />,
+                ),
             ],
         },
-        ...(onStrategyLayout ? [
-            { type: 'divider' as const },
-            {
-                key: 'group-global-elk',
-                label: labels.globalElkGroup,
-                type: 'group' as const,
-                children: [
-                    domainItem(
-                        'domain-elk-tb',
-                        labels.domainElkTb,
-                        () => onStrategyLayout('domain-elk', 'elk-layered', 'TB'),
-                        <FaSitemap />,
-                    ),
-                    domainItem(
-                        'domain-elk-lr',
-                        labels.domainElkLr,
-                        () => onStrategyLayout('domain-elk', 'elk-layered', 'LR'),
-                        <FaSitemap style={{ transform: 'rotate(-90deg)' }} />,
-                    ),
-                ],
-            },
-        ] : []),
         ...(onStrategyLayout ? [
             { type: 'divider' as const },
             {
@@ -235,12 +223,6 @@ export const buildFlowchartLayoutMenuModel = ({
                 label: labels.domainGroup,
                 type: 'group' as const,
                 children: [
-                    domainItem(
-                        'domain-dagre-tb',
-                        labels.domainDagreTb,
-                        () => onStrategyLayout('domain-dagre', lastNodeLayout, 'TB'),
-                        <FaRegObjectGroup />,
-                    ),
                     domainItem(
                         'domain-dagre-sub-horizontal-tb',
                         labels.domainDagreSubHorizontalTb,
@@ -254,22 +236,10 @@ export const buildFlowchartLayoutMenuModel = ({
                         <FaObjectGroup />,
                     ),
                     domainItem(
-                        'domain-compound-elk-lr',
-                        labels.domainCompoundElkLr,
-                        () => onStrategyLayout('domain-compound-elk', undefined, 'LR'),
-                        <FaObjectGroup style={{ transform: 'rotate(-90deg)' }} />,
-                    ),
-                    domainItem(
                         'domain-lanes-tb',
                         labels.domainLanesTb,
                         () => onStrategyLayout('domain-lanes', undefined, 'TB'),
                         <FaRegObjectGroup />,
-                    ),
-                    domainItem(
-                        'domain-lanes-lr',
-                        labels.domainLanesLr,
-                        () => onStrategyLayout('domain-lanes', undefined, 'LR'),
-                        <FaRegObjectGroup style={{ transform: 'rotate(-90deg)' }} />,
                     ),
                     { type: 'divider' as const },
                     domainItem(
@@ -300,6 +270,47 @@ export const buildFlowchartLayoutMenuModel = ({
                 ],
             },
         ] : []),
+    ];
+
+    const items: NonNullable<MenuProps['items']> = [
+        {
+            key: 'group-recommended',
+            label: labels.recommendedGroup,
+            type: 'group' as const,
+            children: [
+                ...(onSmartLayout ? [{
+                    key: 'smart-recommendation',
+                    label: labels.smart,
+                    icon: <FaMagic />,
+                    onClick: () => { void onSmartLayout(); },
+                }] : []),
+                domainItem(
+                    'domain-dagre-tb',
+                    labels.domainDagreTb,
+                    () => onStrategyLayout?.('domain-dagre', lastNodeLayout, 'TB'),
+                    <FaRegObjectGroup />,
+                ),
+                domainItem(
+                    'domain-compound-elk-lr',
+                    labels.domainCompoundElkLr,
+                    () => onStrategyLayout?.('domain-compound-elk', undefined, 'LR'),
+                    <FaObjectGroup style={{ transform: 'rotate(-90deg)' }} />,
+                ),
+                domainItem(
+                    'domain-lanes-lr',
+                    labels.domainLanesLr,
+                    () => onStrategyLayout?.('domain-lanes', undefined, 'LR'),
+                    <FaRegObjectGroup style={{ transform: 'rotate(-90deg)' }} />,
+                ),
+            ],
+        },
+        { type: 'divider' as const },
+        {
+            key: 'advanced-layouts',
+            label: labels.advanced,
+            icon: <FaSlidersH />,
+            children: advancedItems,
+        },
     ];
 
     return {

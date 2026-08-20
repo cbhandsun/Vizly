@@ -567,8 +567,8 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
         fireEvent.click(layoutButton);
 
         expect(layoutButton.getAttribute('aria-expanded')).toBe('true');
-        fireEvent.click(await screen.findByRole('menuitemradio', { name: /树形.*上→下/ }));
-        expect(onStrategyLayout).toHaveBeenCalledWith('tree', undefined, 'TB');
+        fireEvent.click(await screen.findByRole('menuitemradio', { name: /标准流程.*上→下/ }));
+        expect(onStrategyLayout).toHaveBeenCalledWith('domain-dagre', undefined, 'TB');
     });
 
     it('disables the automatic-layout menu while another layout is running', async () => {
@@ -628,25 +628,21 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
         );
 
         const trigger = await screen.findByRole('button', {
-            name: /自动布局：DomainDagre.*上→下/,
+            name: /自动布局：标准流程.*上→下/,
         });
         fireEvent.click(trigger);
 
         const domainLayout = await screen.findByRole('menuitemradio', {
-            name: /DomainDagre.*上→下/,
-        });
-        const nodeLayout = screen.getByRole('menuitemradio', {
-            name: /Dagre分层/,
+            name: /标准流程.*上→下/,
         });
         const inactiveLayout = screen.getByRole('menuitemradio', {
-            name: /树形.*上→下/,
+            name: /循环流程泳道.*左→右/,
         });
 
         expect(domainLayout.getAttribute('aria-checked')).toBe('true');
-        expect(nodeLayout.getAttribute('aria-checked')).toBe('false');
         expect(inactiveLayout.getAttribute('aria-checked')).toBe('false');
         expect(domainLayout.className).toContain('ant-dropdown-menu-item-selected');
-        expect(nodeLayout.className).not.toContain('ant-dropdown-menu-item-selected');
+        expect(screen.getByRole('menuitem', { name: /高级布局/ })).toBeDefined();
     });
 
     it('opens the automatic-layout menu with ArrowDown and focuses its first action', async () => {
@@ -673,7 +669,7 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
         const trigger = await screen.findByRole('button', { name: /layout\.tooltip|自动布局/i });
         fireEvent.keyDown(trigger, { key: 'ArrowDown' });
 
-        const firstItem = await screen.findByRole('menuitemradio', { name: /树形.*上→下/ });
+        const firstItem = await screen.findByRole('menuitemradio', { name: /标准流程.*上→下/ });
         await waitFor(() => expect(document.activeElement).toBe(firstItem));
         expect(trigger.getAttribute('aria-expanded')).toBe('true');
     });

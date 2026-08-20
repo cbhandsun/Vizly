@@ -7,7 +7,9 @@ import {
 } from '../flowchartToolbarLayoutMenu';
 import {
   isGlobalFullGraphLayoutStrategy,
+  resolveDomainLayoutRoutingQuality,
   resolveLayoutDomainOrder,
+  shouldPromoteDomainDagreRouteCandidate,
   usesSelectableDomainNodeArrangement,
 } from '../flowchartLayoutStrategyMode';
 
@@ -45,6 +47,10 @@ describe('flowchartToolbarLayoutMenu', () => {
       .toEqual(['explicit-b', 'explicit-a']);
     expect(resolveLayoutDomainOrder('domain-dagre', undefined, ['scan-a', 'scan-b']))
       .toEqual(['scan-a', 'scan-b']);
+    expect(resolveDomainLayoutRoutingQuality('domain-lanes')).toBe('interactive');
+    expect(resolveDomainLayoutRoutingQuality('domain-dagre')).toBeUndefined();
+    expect(shouldPromoteDomainDagreRouteCandidate('domain-lanes')).toBe(false);
+    expect(shouldPromoteDomainDagreRouteCandidate('domain-dagre')).toBe(true);
   });
 
   it('exposes ELK layered layouts in both supported directions', () => {
@@ -59,13 +65,16 @@ describe('flowchartToolbarLayoutMenu', () => {
     const items = collectItems(model.items);
     const elkTb = items.find(item => item.key === 'domain-elk-tb');
     const elkLr = items.find(item => item.key === 'domain-elk-lr');
-    const globalElkGroup = items.find(item => item.key === 'group-global-elk');
+    const globalGroup = items.find(item => item.key === 'group-tree');
     const domainGroup = items.find(item => item.key === 'group-domain');
     const legacyDagreLr = items.find(item => item.key === 'domain-dagre-lr');
 
     expect(elkTb).toBeDefined();
     expect(elkLr).toBeDefined();
-    expect(collectItems(globalElkGroup?.children).map(item => item.key)).toEqual([
+    expect(collectItems(globalGroup?.children).map(item => item.key)).toEqual([
+      'tree-tb',
+      'tree-lr',
+      'force',
       'domain-elk-tb',
       'domain-elk-lr',
     ]);
@@ -130,7 +139,7 @@ describe('flowchartToolbarLayoutMenu', () => {
 
     expect(compoundLr).toBeDefined();
     expect(model.selectedKeys).toEqual(['domain-compound-elk-lr']);
-    expect(model.statusText).toBe('Domain ELK 组合 (左→右)');
+    expect(model.statusText).toBe('复杂流程（保留域·左→右）');
     if (typeof compoundLr?.onClick === 'function') compoundLr.onClick();
     expect(onStrategyLayout).toHaveBeenCalledWith('domain-compound-elk', undefined, 'LR');
   });
@@ -149,8 +158,38 @@ describe('flowchartToolbarLayoutMenu', () => {
 
     expect(lanesLr).toBeDefined();
     expect(model.selectedKeys).toEqual(['domain-lanes-lr']);
-    expect(model.statusText).toBe('域泳道 + Dagre (左→右)');
+    expect(model.statusText).toBe('循环流程泳道（左→右）');
     if (typeof lanesLr?.onClick === 'function') lanesLr.onClick();
     expect(onStrategyLayout).toHaveBeenCalledWith('domain-lanes', undefined, 'LR');
+  });
+
+  it('keeps common scenarios visible and moves algorithm choices under advanced layout', () => {
+    const onSmartLayout = vi.fn();
+    const model = buildFlowchartLayoutMenuModel({
+      lastDomainStrategy: 'domain-dagre',
+      lastDomainDirection: 'TB',
+      lastNodeLayout: 'dagre',
+      onSmartLayout,
+      onStrategyLayout: vi.fn(),
+      translate: (_key, fallback) => fallback,
+    });
+    const recommended = asRecord(model.items[0]);
+    const advanced = asRecord(model.items[2]);
+
+    expect(recommended.key).toBe('group-recommended');
+    expect(collectItems(recommended.children).map(item => item.key)).toEqual([
+      'smart-recommendation',
+      'domain-dagre-tb',
+      'domain-compound-elk-lr',
+      'domain-lanes-lr',
+    ]);
+    expect(advanced.key).toBe('advanced-layouts');
+    expect(collectItems(advanced.children).map(item => item.key)).toContain('node-grid');
+
+    const smart = collectItems(recommended.children)
+      .find(item => item.key === 'smart-recommendation');
+    expect(typeof smart?.onClick).toBe('function');
+    if (typeof smart?.onClick === 'function') smart.onClick();
+    expect(onSmartLayout).toHaveBeenCalledOnce();
   });
 });

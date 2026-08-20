@@ -26,7 +26,9 @@ import {
 import {
     isGlobalFullGraphLayoutStrategy,
     isOrderedDomainLaneLayoutStrategy,
+    resolveDomainLayoutRoutingQuality,
     resolveLayoutDomainOrder,
+    shouldPromoteDomainDagreRouteCandidate,
 } from '../flowchartLayoutStrategyMode';
 
 
@@ -478,6 +480,7 @@ export function useLayoutStrategy({
                         ? { horizontal: 120, vertical: 120 }
                         : { horizontal: 50, vertical: 50 },
                     edgeRouting: isDomainElk || isDomainCompoundElk ? 'ORTHOGONAL' : undefined,
+                    edgeRoutingQuality: resolveDomainLayoutRoutingQuality(strategyName),
                     padding: { top: 40, right: 20, bottom: 20, left: 20 },
                     ...generatedGroupOptions,
                     fitDomainContent: true,
@@ -619,7 +622,8 @@ export function useLayoutStrategy({
                                     promoteLockedComputedPath:
                                         candidateUsesDomainDagre
                                         && !candidateUsesElk
-                                        && !candidateUsesCompoundElk,
+                                        && !candidateUsesCompoundElk
+                                        && shouldPromoteDomainDagreRouteCandidate(strategyName),
                                 },
                             )
                             : preservedResultEdges.map(edge => ({

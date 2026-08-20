@@ -32,12 +32,44 @@ interface GraphMetrics {
     isLinearChain: boolean;     // 线性链（每节点 ≤2 连接）
     isTree: boolean;            // 树形（无环 + 单根）
     hasCycles: boolean;         // 有环
+    hasDomainCycles: boolean;   // 跨域商图有环
     maxDepth: number;           // 最大深度
     widthToHeightRatio: number; // 宽高比（bounds）
     containerCount: number;     // 容器节点数量
 }
 
 const CONTAINER_TYPES = new Set(['titleGroup', 'subGroup', 'swimlane', 'group', 'domain']);
+
+const hasDirectedCycle = (
+    nodeIds: Iterable<string>,
+    pairs: Iterable<readonly [string, string]>,
+): boolean => {
+    const ids = new Set(nodeIds);
+    const inDegree = new Map<string, number>([...ids].map(id => [id, 0]));
+    const adjacency = new Map<string, Set<string>>();
+    for (const [source, target] of pairs) {
+        if (!ids.has(source) || !ids.has(target)) continue;
+        const targets = adjacency.get(source) ?? new Set<string>();
+        if (targets.has(target)) continue;
+        targets.add(target);
+        adjacency.set(source, targets);
+        inDegree.set(target, (inDegree.get(target) ?? 0) + 1);
+    }
+
+    const queue = [...ids].filter(id => (inDegree.get(id) ?? 0) === 0);
+    let visited = 0;
+    for (let cursor = 0; cursor < queue.length; cursor += 1) {
+        const id = queue[cursor];
+        if (!id) continue;
+        visited += 1;
+        for (const target of adjacency.get(id) ?? []) {
+            const nextDegree = (inDegree.get(target) ?? 0) - 1;
+            inDegree.set(target, nextDegree);
+            if (nextDegree === 0) queue.push(target);
+        }
+    }
+    return visited < ids.size;
+};
 
 function analyzeGraph(nodes: Node[], edges: Edge[]): GraphMetrics {
     const normalNodes = nodes.filter(n => !CONTAINER_TYPES.has(n.type || ''));
@@ -53,12 +85,18 @@ function analyzeGraph(nodes: Node[], edges: Edge[]): GraphMetrics {
     // 度数统计
     const degree = new Map<string, number>();
     const inDegree = new Map<string, number>();
-    normalNodes.forEach(n => { degree.set(n.id, 0); inDegree.set(n.id, 0); });
+    const outDegree = new Map<string, number>();
+    normalNodes.forEach(n => {
+        degree.set(n.id, 0);
+        inDegree.set(n.id, 0);
+        outDegree.set(n.id, 0);
+    });
 
     edges.forEach(e => {
         degree.set(e.source, (degree.get(e.source) || 0) + 1);
         degree.set(e.target, (degree.get(e.target) || 0) + 1);
         inDegree.set(e.target, (inDegree.get(e.target) || 0) + 1);
+        outDegree.set(e.source, (outDegree.get(e.source) || 0) + 1);
     });
 
     const degrees = [...degree.values()];
@@ -67,11 +105,29 @@ function analyzeGraph(nodes: Node[], edges: Edge[]): GraphMetrics {
 
     // 线性链检测
     const isLinearChain = normalNodes.length > 1 &&
-        degrees.every(d => d <= 2) &&
+        normalNodes.every(node => (
+            (inDegree.get(node.id) ?? 0) <= 1
+            && (outDegree.get(node.id) ?? 0) <= 1
+        )) &&
         edges.length === normalNodes.length - 1;
 
-    // 简易环检测 (边数 >= 节点数 → 有环)
-    const hasCycles = edges.length >= normalNodes.length;
+    const normalNodeIds = new Set(normalNodes.map(node => node.id));
+    const normalPairs = edges
+        .filter(edge => normalNodeIds.has(edge.source) && normalNodeIds.has(edge.target))
+        .map(edge => [edge.source, edge.target] as const);
+    const hasCycles = hasDirectedCycle(normalNodeIds, normalPairs);
+    const domainByNodeId = new Map(normalNodes.map(node => [
+        node.id,
+        typeof node.data?.domain === 'string' ? node.data.domain.trim() : '',
+    ] as const));
+    const domainPairs = normalPairs.flatMap(([source, target]) => {
+        const sourceDomain = domainByNodeId.get(source);
+        const targetDomain = domainByNodeId.get(target);
+        return sourceDomain && targetDomain && sourceDomain !== targetDomain
+            ? [[sourceDomain, targetDomain] as const]
+            : [];
+    });
+    const hasDomainCycles = hasDirectedCycle(domains, domainPairs);
 
     // 树形检测
     const roots = normalNodes.filter(n => (inDegree.get(n.id) || 0) === 0);
@@ -118,6 +174,7 @@ function analyzeGraph(nodes: Node[], edges: Edge[]): GraphMetrics {
         isLinearChain,
         isTree,
         hasCycles,
+        hasDomainCycles,
         maxDepth,
         widthToHeightRatio: w / h,
         containerCount: containers.length,
@@ -127,22 +184,49 @@ function analyzeGraph(nodes: Node[], edges: Edge[]): GraphMetrics {
 export function recommendLayout(nodes: Node[], edges: Edge[]): LayoutRecommendation {
     const m = analyzeGraph(nodes, edges);
 
-    // ─── 规则 1：多域 → 域级编排 ─────────────────────
-    if (m.domainCount >= 3) {
+    // ─── 规则 1：多域 → 优先保留语义容器 ─────────────
+    if (m.domainCount >= 2) {
+        if (m.hasDomainCycles || m.hasCycles) {
+            return {
+                domainStrategy: 'domain-lanes',
+                nodeLayout: 'dagre',
+                direction: 'LR',
+                reason: `${m.domainCount} 个域且存在反馈环，循环流程泳道可避免分层布局反复回退`,
+                confidence: 0.92,
+            };
+        }
+        if (m.containerCount > m.domainCount || m.edgeCount > m.nodeCount) {
+            return {
+                domainStrategy: 'domain-compound-elk',
+                nodeLayout: 'dagre',
+                direction: 'LR',
+                reason: `${m.domainCount} 个域且包含复合层级，复杂流程布局可减少失败回退`,
+                confidence: 0.88,
+            };
+        }
         if (m.isTree || m.maxDepth > 3) {
             return {
-                domainStrategy: 'dagre',
+                domainStrategy: 'domain-dagre',
                 nodeLayout: 'dagre',
                 direction: m.widthToHeightRatio > 1.5 ? 'LR' : 'TB',
-                reason: `${m.domainCount} 个域 + 树形结构（深度 ${m.maxDepth}），Dagre 分层布局最适合`,
+                reason: `${m.domainCount} 个域且层级清晰，标准流程布局可保留域结构`,
                 confidence: 0.85,
             };
         }
+        if (m.avgDegree > 3) {
+            return {
+                domainStrategy: 'domain-compound-elk',
+                nodeLayout: 'dagre',
+                direction: 'LR',
+                reason: `${m.domainCount} 个域且连接密集，复杂流程布局更适合跨域正交连线`,
+                confidence: 0.82,
+            };
+        }
         return {
-            domainStrategy: 'domain-vertical',
-            nodeLayout: 'grid',
+            domainStrategy: 'domain-dagre',
+            nodeLayout: 'dagre',
             direction: 'TB',
-            reason: `${m.domainCount} 个域，域纵向编排 + 网格排布`,
+            reason: `${m.domainCount} 个域，使用保留域的标准流程布局`,
             confidence: 0.8,
         };
     }
@@ -150,7 +234,7 @@ export function recommendLayout(nodes: Node[], edges: Edge[]): LayoutRecommendat
     // ─── 规则 2：线性链 → 水平/垂直 ─────────────────
     if (m.isLinearChain) {
         return {
-            domainStrategy: 'dagre',
+            domainStrategy: 'tree',
             nodeLayout: 'horizontal',
             direction: m.nodeCount > 8 ? 'LR' : 'TB',
             reason: `线性链（${m.nodeCount} 节点），${m.nodeCount > 8 ? '横向' : '纵向'}排列`,
@@ -161,8 +245,8 @@ export function recommendLayout(nodes: Node[], edges: Edge[]): LayoutRecommendat
     // ─── 规则 3：纯树形 → Dagre ─────────────────────
     if (m.isTree) {
         return {
-            domainStrategy: 'dagre',
-            nodeLayout: 'dagre',
+            domainStrategy: 'tree',
+            nodeLayout: 'flow',
             direction: m.maxDepth > m.nodeCount / 3 ? 'TB' : 'LR',
             reason: `树形结构（深度 ${m.maxDepth}），Dagre 自动分层`,
             confidence: 0.88,
@@ -172,7 +256,7 @@ export function recommendLayout(nodes: Node[], edges: Edge[]): LayoutRecommendat
     // ─── 规则 4：高度连接（网状）→ ELK ──────────────
     if (m.avgDegree > 3 || m.hasCycles) {
         return {
-            domainStrategy: 'elk',
+            domainStrategy: 'domain-elk',
             nodeLayout: 'dagre',
             direction: 'TB',
             reason: `网状拓扑（平均度 ${m.avgDegree.toFixed(1)}），ELK 力导向+约束布局`,
@@ -183,8 +267,8 @@ export function recommendLayout(nodes: Node[], edges: Edge[]): LayoutRecommendat
     // ─── 规则 5：少量节点（≤10）→ Centered ──────────
     if (m.nodeCount <= 10 && m.edgeCount <= 15) {
         return {
-            domainStrategy: 'dagre',
-            nodeLayout: 'centered',
+            domainStrategy: 'tree',
+            nodeLayout: 'flow',
             direction: 'TB',
             reason: `小型图（${m.nodeCount} 节点），居中布局视觉最佳`,
             confidence: 0.7,
@@ -194,8 +278,8 @@ export function recommendLayout(nodes: Node[], edges: Edge[]): LayoutRecommendat
     // ─── 规则 6：大型图（≥50）→ Dagre + Grid ────────
     if (m.nodeCount >= 50) {
         return {
-            domainStrategy: 'dagre',
-            nodeLayout: 'grid',
+            domainStrategy: 'domain-elk',
+            nodeLayout: 'elk-layered',
             direction: 'TB',
             reason: `大型图（${m.nodeCount} 节点），Dagre 分层 + 网格排布`,
             confidence: 0.7,
@@ -204,7 +288,7 @@ export function recommendLayout(nodes: Node[], edges: Edge[]): LayoutRecommendat
 
     // ─── 默认 → Dagre TB ────────────────────────────
     return {
-        domainStrategy: 'dagre',
+        domainStrategy: 'domain-dagre',
         nodeLayout: 'dagre',
         direction: 'TB',
         reason: `通用图结构（${m.nodeCount} 节点, ${m.edgeCount} 边），Dagre 分层布局`,
