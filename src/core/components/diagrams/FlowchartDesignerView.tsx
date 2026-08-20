@@ -187,7 +187,6 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
         quickAddMenu,
         reactFlowInstance,
         reactFlowWrapper,
-        toggleGroupCollapse,
         redo,
         renderThemeSelector,
         rightSidebarWidth,
