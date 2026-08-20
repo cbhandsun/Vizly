@@ -87,6 +87,15 @@ describe('MindMapPropertyAISection', () => {
         expect(first.textContent).toContain('添加中');
     });
 
+    it('disables every AI action while an expansion request is active', async () => {
+        renderSection({ expanding: true, suggestions: ['风险识别'] });
+
+        expect(screen.getByRole('region', { name: 'AI 节点操作' }).getAttribute('aria-busy')).toBe('true');
+        expect((screen.getByRole('button', { name: 'AI 扩展子主题' }) as HTMLButtonElement).disabled).toBe(true);
+        expect((screen.getByRole('button', { name: 'AI 智能归纳当前节点' }) as HTMLButtonElement).disabled).toBe(true);
+        expect((await screen.findByRole('button', { name: '将风险识别添加为子主题' }) as HTMLButtonElement).disabled).toBe(true);
+    });
+
     it('announces failures and offers direct recovery for missing AI configuration', async () => {
         const listener = vi.fn();
         const unsubscribe = subscribeMindMapAIConfigRequest(listener);
@@ -100,6 +109,17 @@ describe('MindMapPropertyAISection', () => {
         fireEvent.click(screen.getByRole('button', { name: '打开 AI 设置' }));
         expect(listener).toHaveBeenCalledTimes(1);
         unsubscribe();
+    });
+
+    it('disables configuration recovery while another AI operation is active', async () => {
+        renderSection({
+            error: '请先配置有效的 AI Provider 和 API Key',
+            needsConfiguration: true,
+            suggestions: [],
+            summarizing: true,
+        });
+
+        expect((await screen.findByRole('button', { name: '打开 AI 设置' }) as HTMLButtonElement).disabled).toBe(true);
     });
 
     it('keeps progress feedback in a polite live region', () => {

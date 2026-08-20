@@ -6,6 +6,8 @@ import { useTranslation } from 'react-i18next';
 import { requestMindMapAIConfig } from './mindMapAIConfigEvent';
 import styles from './MindMapPropertyAISection.module.css';
 
+const aiKey = (suffix: string): string => `plugins.mindmap.propertyAI.${suffix}`;
+
 interface MindMapPropertyAISectionProps {
     applyingTopic: string | null;
     error: string;
@@ -40,9 +42,14 @@ export const MindMapPropertyAISection: React.FC<MindMapPropertyAISectionProps> =
     const suggestionsId = useId();
     const open = suggestions.length > 0 || Boolean(error);
     const isApplying = applyingTopic !== null;
+    const busy = expanding || summarizing || isApplying;
 
     return (
-        <section className={styles.section} aria-label={t('plugins.mindmap.propertyAI.sectionLabel')}>
+        <section
+            className={styles.section}
+            aria-label={t(aiKey('sectionLabel'))}
+            aria-busy={busy}
+        >
             <Popover
                 trigger="click"
                 placement="left"
@@ -51,7 +58,7 @@ export const MindMapPropertyAISection: React.FC<MindMapPropertyAISectionProps> =
                 title={(
                     <span id={titleId} className={styles.title}>
                         <RobotOutlined aria-hidden="true" />
-                        {t('plugins.mindmap.propertyAI.suggestionsTitle')}
+                        {t(aiKey('suggestionsTitle'))}
                     </span>
                 )}
                 content={(
@@ -60,7 +67,7 @@ export const MindMapPropertyAISection: React.FC<MindMapPropertyAISectionProps> =
                         className={styles.popover}
                         role="dialog"
                         aria-labelledby={titleId}
-                        aria-busy={isApplying}
+                        aria-busy={busy}
                     >
                         {error && (
                             <div className={styles.error} role="alert">
@@ -70,27 +77,28 @@ export const MindMapPropertyAISection: React.FC<MindMapPropertyAISectionProps> =
                                         type="button"
                                         className={styles.recovery}
                                         onClick={requestMindMapAIConfig}
+                                        disabled={busy}
                                     >
-                                        {t('plugins.mindmap.propertyAI.openConfiguration')}
+                                        {t(aiKey('openConfiguration'))}
                                     </button>
                                 )}
                             </div>
                         )}
                         {suggestions.length > 0 && (
-                            <ul className={styles.list} aria-label={t('plugins.mindmap.propertyAI.suggestionsList')}>
+                            <ul className={styles.list} aria-label={t(aiKey('suggestionsList'))}>
                                 {suggestions.map(suggestion => (
                                     <li key={suggestion}>
                                         <button
                                             type="button"
                                             className={styles.suggestion}
                                             onClick={() => onApplySuggestion(suggestion)}
-                                            disabled={isApplying}
-                                            aria-label={t('plugins.mindmap.propertyAI.applySuggestion', { topic: suggestion })}
+                                            disabled={busy}
+                                            aria-label={t(aiKey('applySuggestion'), { topic: suggestion })}
                                         >
                                             <PlusOutlined aria-hidden="true" />
                                             <span>{suggestion}</span>
                                             {applyingTopic === suggestion && (
-                                                <span className={styles.pending}>{t('plugins.mindmap.propertyAI.applying')}</span>
+                                                <span className={styles.pending}>{t(aiKey('applying'))}</span>
                                             )}
                                         </button>
                                     </li>
@@ -107,12 +115,14 @@ export const MindMapPropertyAISection: React.FC<MindMapPropertyAISectionProps> =
                     icon={<RobotOutlined aria-hidden="true" />}
                     onClick={onExpand}
                     loading={expanding}
+                    disabled={busy}
                     className={styles.action}
+                    aria-label={t(aiKey('expand'))}
                     aria-haspopup="dialog"
                     aria-expanded={open}
                     aria-controls={suggestionsId}
                 >
-                    {t('plugins.mindmap.propertyAI.expand')}
+                    {t(aiKey('expand'))}
                 </Button>
             </Popover>
 
@@ -123,9 +133,11 @@ export const MindMapPropertyAISection: React.FC<MindMapPropertyAISectionProps> =
                     icon={<RobotOutlined aria-hidden="true" />}
                     onClick={onSummarize}
                     loading={summarizing}
+                    disabled={busy}
                     className={styles.action}
+                    aria-label={t(aiKey('summarize'))}
                 >
-                    {t('plugins.mindmap.propertyAI.summarize')}
+                    {t(aiKey('summarize'))}
                 </Button>
             )}
 

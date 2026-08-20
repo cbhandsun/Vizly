@@ -1,0 +1,80 @@
+.panel { padding: 12px 16px; }
+.header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.title { font-size: 13px; }
+.fullWidth { width: 100%; }
+.editAction { width: 100%; margin-bottom: 8px; }
+.topicInput { font-size: 13px; }
+.tagList { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+.tag { margin: 0; }
+.presetTagButton {
+    padding: 1px 7px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+}
+.mutedIcon { color: #94a3b8; }
+.divider { margin: 10px 0; }
+.shapeList { display: flex; gap: 5px; }
+.shapeButton {
+    flex: 1;
+    padding: 4px 2px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    background: #f8fafc;
+    color: #475569;
+    cursor: pointer;
+    font-size: 16px;
+    text-align: center;
+    transition: all 0.12s;
+}
+.shapeButton[aria-pressed='true'] {
+    border: 2px solid #6366f1;
+    background: rgba(99, 102, 241, 0.15);
+    color: #4338ca;
+}
+.shapeIcon { font-size: 16px; line-height: 1; }
+.shapeLabel { margin-top: 3px; font-size: 10.5px; }
+.branchList { display: flex; align-items: center; gap: 6px; }
+.branchButton {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    justify-content: center;
+    height: 28px;
+    border: 1px solid #cbd5e1;
+    border-radius: 5px;
+    background: #f8fafc;
+    cursor: pointer;
+    transition: all 0.12s;
+}
+.branchButton[aria-pressed='true'] {
+    border: 2px solid #6366f1;
+    background: rgba(99, 102, 241, 0.12);
+}
+.branchLine { width: 80%; border-radius: 3px; background: #64748b; }
+.branchButton[aria-pressed='true'] .branchLine { background: #4f46e5; }
+.noteInput { font-size: 12px; }
+.shortcuts {
+    padding: 8px 12px;
+    border: 1px solid rgba(99, 102, 241, 0.1);
+    border-radius: 8px;
+    background: rgba(99, 102, 241, 0.04);
+    color: rgba(0, 0, 0, 0.5);
+    font-size: 11.5px;
+    line-height: 2;
+}
+.shortcut { display: flex; align-items: center; gap: 8px; }
+.shortcutKey {
+    display: inline-block;
+    min-width: 40px;
+    padding: 1px 5px;
+    border: 1px solid #e2e8f0;
+    border-bottom: 2px solid #cbd5e1;
+    border-radius: 4px;
+    background: #f1f5f9;
+    color: #475569;
+    font-family: monospace;
+    font-size: 10.5px;
+    text-align: center;
+}
+.scrollContainer { height: 100%; overflow-y: auto; }

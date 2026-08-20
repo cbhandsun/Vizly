@@ -14,7 +14,6 @@ import {
 import { useTranslation } from 'react-i18next';
 import type { NodeObj, TagObj } from 'mind-elixir';
 import { getMindElixirInstance, subscribeMindElixir } from './mindElixirStore';
-import { expandNodeWithAI, getAncestorPath, summarizeNodeWithAI } from './mindmapAIService';
 import {
     applyTaskMeta,
     getTaskMeta,
@@ -34,7 +33,6 @@ import {
 } from './mindmapTreeSanitizer';
 import { cleanMindMapChildNode } from './mindmapBridgeSecurity';
 import {
-    logMindmapPropertyAiAddChildFailure,
     logMindmapPropertyQuickActionFailure,
     logMindmapPropertyReshapeFailure,
     logMindmapPropertySetTopicFailure,
@@ -52,10 +50,10 @@ import {
 import { updateMindMapNodePatchAndRestoreSelection } from './mindMapNodeMutation';
 import { useMindMapPropertySelection } from './useMindMapPropertySelection';
 import { MindMapPropertyAISection } from './MindMapPropertyAISection';
-import { isMindMapAIConfigurationError } from './mindMapAIErrorPresentation';
-import { presentMindMapPropertyAIError } from './mindMapPropertyAIError';
 import { MindMapPropertyMediaControls } from './MindMapPropertyMediaControls';
 import { useMindMapNodeDeletion } from './useMindMapNodeDeletion';
+import { useMindMapPropertyAI } from './useMindMapPropertyAI';
+import styles from './MindMapPropertyPanel.module.css';
 
 const { Text } = Typography;
 const { TextArea } = Input;
@@ -66,8 +64,7 @@ type ExtendedMindMapNode = NodeObj & {
 };
 type MindMapNodePatch = Partial<NodeObj> & Partial<Pick<ExtendedMindMapNode, 'shapeClass' | 'branchWidth' | 'task'>>;
 
-const errorMessage = (error: unknown, fallback: string): string =>
-    error instanceof Error && error.message ? error.message : fallback;
+const propertyKey = (suffix: string): string => `plugins.mindmap.propertyPanel.${suffix}`;
 
 const tagBorderColor = (tag: TagObj): string => {
     const style = tag.style as Record<string, unknown> | undefined;
@@ -228,109 +225,25 @@ const NodePropertyPanel: React.FC<{
 
     const isRoot = !node.parent;
 
-    // AI expand state
-    const [aiExpanding, setAiExpanding] = useState(false);
-    const [aiSummarizing, setAiSummarizing] = useState(false);
-    const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
-    const [aiError, setAiError] = useState('');
-    const [aiStatus, setAiStatus] = useState('');
-    const [aiApplyingTopic, setAiApplyingTopic] = useState<string | null>(null);
-    const [aiNeedsConfiguration, setAiNeedsConfiguration] = useState(false);
-
-    const handleAIExpand = useCallback(async () => {
-        if (!mind || aiExpanding) return;
-        setAiExpanding(true);
-        setAiSuggestions([]);
-        setAiError('');
-        setAiStatus('');
-        setAiNeedsConfiguration(false);
-        try {
-            const data = mind.getData();
-            const ancestorPath = getAncestorPath(data.nodeData, node.id);
-            const mapTitle = data.nodeData.topic;
-            const result = await expandNodeWithAI({ node, ancestorPath, count: 5, mapTitle });
-            if (result.error) {
-                setAiNeedsConfiguration(isMindMapAIConfigurationError(result.error));
-                setAiError(presentMindMapPropertyAIError(result.error, key => t(key)));
-            }
-            else {
-                const suggestions = [...new Set(result.topics)];
-                setAiSuggestions(suggestions);
-                setAiStatus(t('plugins.mindmap.propertyAI.generated', { count: suggestions.length }));
-            }
-        } catch (e: unknown) {
-            setAiError(errorMessage(e, t('plugins.mindmap.propertyAI.expandFailed')));
-        } finally {
-            setAiExpanding(false);
-        }
-    }, [mind, node, aiExpanding, t]);
-
-    const handleAISummarize = useCallback(async () => {
-        if (!mind || aiSummarizing || !node.children?.length) return;
-        setAiSummarizing(true);
-        setAiError('');
-        setAiStatus('');
-        setAiNeedsConfiguration(false);
-        try {
-            const childrenTopics = node.children.map(child => child.topic || '');
-            const result = await summarizeNodeWithAI(node.topic, childrenTopics);
-            if ('error' in result) {
-                setAiNeedsConfiguration(isMindMapAIConfigurationError(result.error));
-                setAiError(presentMindMapPropertyAIError(result.error, key => t(key)));
-            } else if (result.topic && result.topic !== node.topic) {
-                const tpcEl = mind.findEle(node.id);
-                if (tpcEl) {
-                    mind.setNodeTopic(tpcEl, cleanMindMapTopic(result.topic));
-                    setAiStatus(t('plugins.mindmap.propertyAI.summaryUpdated'));
-                }
-            } else {
-                setAiStatus(t('plugins.mindmap.propertyAI.summaryUnchanged'));
-            }
-        } catch (e: unknown) {
-            setAiError(errorMessage(e, t('plugins.mindmap.propertyAI.summarizeFailed')));
-        } finally {
-            setAiSummarizing(false);
-        }
-    }, [mind, node, aiSummarizing, t]);
-
-    const handleAIApply = useCallback(async (topic: string) => {
-        if (!mind || aiApplyingTopic) return;
-        setAiApplyingTopic(topic);
-        setAiError('');
-        setAiStatus('');
-        setAiNeedsConfiguration(false);
-        try {
-            const tpcEl = mind.findEle(node.id);
-            if (!tpcEl) {
-                setAiError(t('plugins.mindmap.propertyAI.applyUnavailable'));
-                return;
-            }
-            mind.selectNode(tpcEl);
-            await mind.addChild(tpcEl, cleanMindMapChildNode({ label: topic }, mind.generateNewObj?.().id ?? `n_${Date.now()}`));
-            setAiSuggestions(current => current.filter(suggestion => suggestion !== topic));
-            setAiStatus(t('plugins.mindmap.propertyAI.applied', { topic }));
-        } catch (e) {
-            logMindmapPropertyAiAddChildFailure(e);
-            setAiError(t('plugins.mindmap.propertyAI.applyFailed'));
-        } finally {
-            setAiApplyingTopic(null);
-        }
-
-    }, [aiApplyingTopic, mind, node, t]);
+    const ai = useMindMapPropertyAI({
+        mind,
+        node,
+        translate: (key, values) => t(key, values),
+    });
 
     return (
-        <div style={{ padding: '12px 16px' }}>
+        <div className={styles.panel}>
             {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+            <div className={styles.header}>
 
-                <Text strong style={{ fontSize: 13 }}>
+                <Text strong className={styles.title}>
                     {isRoot ? <ApartmentOutlined aria-hidden="true" /> : <FileTextOutlined aria-hidden="true" />}
-                    {' '}{t(isRoot ? 'plugins.mindmap.propertyPanel.rootNode' : 'plugins.mindmap.propertyPanel.nodeProperties')}
+                    {' '}{t(propertyKey(isRoot ? 'rootNode' : 'nodeProperties'))}
                 </Text>
                 <Space size={2}>
-                    <Tooltip title={t('plugins.mindmap.propertyPanel.addChild')}>
+                    <Tooltip title={t(propertyKey('addChild'))}>
                         <Button size="small" type="text" icon={<PlusOutlined />}
-                            aria-label={t('plugins.mindmap.propertyPanel.addChild')}
+                            aria-label={t(propertyKey('addChild'))}
                             onClick={() => {
                                 try {
                                     const el = mind?.findEle(node.id);
@@ -340,9 +253,9 @@ const NodePropertyPanel: React.FC<{
                                 }
                             }} />
                     </Tooltip>
-                    {!isRoot && <Tooltip title={t('plugins.mindmap.propertyPanel.addSibling')}>
+                    {!isRoot && <Tooltip title={t(propertyKey('addSibling'))}>
                         <Button size="small" type="text" icon={<PlusOutlined rotate={90} />}
-                            aria-label={t('plugins.mindmap.propertyPanel.addSibling')}
+                            aria-label={t(propertyKey('addSibling'))}
                             onClick={() => {
                                 try {
                                     const el = mind?.findEle(node.id);
@@ -361,7 +274,7 @@ const NodePropertyPanel: React.FC<{
             </div>
 
             <Button size="small" type="dashed" icon={<EditOutlined />}
-                aria-label={t('plugins.mindmap.propertyPanel.editOnCanvas')}
+                aria-label={t(propertyKey('editOnCanvas'))}
                 onClick={() => {
                     try {
                         const el = mind?.findEle(node.id);
@@ -370,32 +283,32 @@ const NodePropertyPanel: React.FC<{
                         logMindmapPropertyQuickActionFailure('beginEdit', error);
                     }
                 }}
-                style={{ width: '100%', marginBottom: 8 }}>
-                {t('plugins.mindmap.propertyPanel.editOnCanvas')}
+                className={styles.editAction}>
+                {t(propertyKey('editOnCanvas'))}
             </Button>
 
             <MindMapPropertyAISection
-                applyingTopic={aiApplyingTopic}
-                error={aiError}
-                expanding={aiExpanding}
+                applyingTopic={ai.applyingTopic}
+                error={ai.error}
+                expanding={ai.expanding}
                 hasChildren={Boolean(node.children?.length)}
-                needsConfiguration={aiNeedsConfiguration}
-                status={aiStatus}
-                suggestions={aiSuggestions}
-                summarizing={aiSummarizing}
-                onApplySuggestion={topic => { void handleAIApply(topic); }}
-                onDismiss={() => { setAiSuggestions([]); setAiError(''); setAiNeedsConfiguration(false); }}
-                onExpand={() => { void handleAIExpand(); }}
-                onSummarize={() => { void handleAISummarize(); }}
+                needsConfiguration={ai.needsConfiguration}
+                status={ai.status}
+                suggestions={ai.suggestions}
+                summarizing={ai.summarizing}
+                onApplySuggestion={topic => { void ai.applySuggestion(topic); }}
+                onDismiss={ai.dismiss}
+                onExpand={() => { void ai.expand(); }}
+                onSummarize={() => { void ai.summarize(); }}
             />
 
             {/* Topic */}
-            <Row label={t('plugins.mindmap.propertyPanel.nodeText')}>
+            <Row label={t(propertyKey('nodeText'))}>
                 <TextArea value={topic} onChange={e => setTopic(e.target.value)}
-                    aria-label={t('plugins.mindmap.propertyPanel.nodeTextInput')}
+                    aria-label={t(propertyKey('nodeTextInput'))}
                     onBlur={handleTopicBlur}
                     onPressEnter={e => { e.preventDefault(); handleTopicBlur(); }}
-                    autoSize={{ minRows: 1, maxRows: 4 }} style={{ fontSize: 13 }} />
+                    autoSize={{ minRows: 1, maxRows: 4 }} className={styles.topicInput} />
             </Row>
 
             <MindMapPropertyMediaControls
@@ -409,76 +322,76 @@ const NodePropertyPanel: React.FC<{
             />
 
             {/* Tags */}
-            <Row label={t('plugins.mindmap.propertyPanel.tags')}>
-                <div style={{ marginBottom: 6, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+            <Row label={t(propertyKey('tags'))}>
+                <div className={styles.tagList}>
                     {tags.map(t => (
                         <Tag key={t.text} closable onClose={() => handleTagRemove(t.text)}
-                            style={{ ...(t.style as React.CSSProperties ?? {}), margin: 0 }}>
+                            className={styles.tag} style={t.style as React.CSSProperties ?? {}}>
                             {t.text}
                         </Tag>
                     ))}
                 </div>
-                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
+                <div className={styles.tagList}>
                     {panelOptions.presetTags.map(pt => (
                         <button key={pt.text} onClick={() => handleTagAdd(pt)}
                             type="button"
-                            aria-label={t('plugins.mindmap.propertyPanel.addPresetTag', { tag: pt.text })}
+                            aria-label={t(propertyKey('addPresetTag'), { tag: pt.text })}
                             disabled={tags.some(tag => tag.text === pt.text)}
+                            className={styles.presetTagButton}
                             style={{ ...(pt.style as React.CSSProperties ?? {}),
                                 border: `1px solid ${tagBorderColor(pt)}`,
-                                borderRadius: 4, fontSize: 11, padding: '1px 7px',
-                                cursor: 'pointer', opacity: tags.some(t => t.text === pt.text) ? 0.4 : 1 }}>
+                                opacity: tags.some(t => t.text === pt.text) ? 0.4 : 1 }}>
                             {pt.text}
                         </button>
                     ))}
                 </div>
-                <Input size="small" placeholder={t('plugins.mindmap.propertyPanel.customTagPlaceholder')}
-                    aria-label={t('plugins.mindmap.propertyPanel.customTagInput')}
-                    prefix={<TagsOutlined style={{ color: '#94a3b8' }} />}
+                <Input size="small" placeholder={t(propertyKey('customTagPlaceholder'))}
+                    aria-label={t(propertyKey('customTagInput'))}
+                    prefix={<TagsOutlined className={styles.mutedIcon} />}
                     value={tagInput} onChange={e => setTagInput(e.target.value)}
                     onPressEnter={handleTagInputConfirm}
                     onBlur={handleTagInputConfirm} />
             </Row>
 
-            <Divider style={{ margin: '10px 0' }} />
+            <Divider className={styles.divider} />
 
-            <Row label={t('plugins.mindmap.propertyPanel.taskStatus')}>
+            <Row label={t(propertyKey('taskStatus'))}>
                 <Select
-                    aria-label={t('plugins.mindmap.propertyPanel.taskStatus')}
+                    aria-label={t(propertyKey('taskStatus'))}
                     size="small"
                     value={taskStatus}
                     options={panelOptions.taskStatuses}
                     onChange={value => updateTask({ status: value })}
-                    style={{ width: '100%' }}
+                    className={styles.fullWidth}
                 />
             </Row>
 
-            <Row label={t('plugins.mindmap.propertyPanel.taskPriority')}>
+            <Row label={t(propertyKey('taskPriority'))}>
                 <Select
-                    aria-label={t('plugins.mindmap.propertyPanel.taskPriority')}
+                    aria-label={t(propertyKey('taskPriority'))}
                     size="small"
                     value={taskPriority}
                     options={panelOptions.taskPriorities}
                     onChange={value => updateTask({ priority: value })}
-                    style={{ width: '100%' }}
+                    className={styles.fullWidth}
                 />
             </Row>
 
-            <Row label={t('plugins.mindmap.propertyPanel.taskAssignee')}>
+            <Row label={t(propertyKey('taskAssignee'))}>
                 <Input
-                    aria-label={t('plugins.mindmap.propertyPanel.taskAssignee')}
+                    aria-label={t(propertyKey('taskAssignee'))}
                     size="small"
                     value={taskAssignee}
-                    placeholder={t('plugins.mindmap.propertyPanel.taskAssigneePlaceholder')}
+                    placeholder={t(propertyKey('taskAssigneePlaceholder'))}
                     onChange={e => setTaskAssignee(e.target.value)}
                     onBlur={() => updateTask({ assignee: taskAssignee.trim() })}
                     onPressEnter={() => updateTask({ assignee: taskAssignee.trim() })}
                 />
             </Row>
 
-            <Row label={t('plugins.mindmap.propertyPanel.dueDate')}>
+            <Row label={t(propertyKey('dueDate'))}>
                 <Input
-                    aria-label={t('plugins.mindmap.propertyPanel.dueDate')}
+                    aria-label={t(propertyKey('dueDate'))}
                     size="small"
                     type="date"
                     value={taskDueDate}
@@ -489,48 +402,48 @@ const NodePropertyPanel: React.FC<{
                 />
             </Row>
 
-            <Row label={t('plugins.mindmap.propertyPanel.taskProgress')}>
+            <Row label={t(propertyKey('taskProgress'))}>
                 <InputNumber
-                    aria-label={t('plugins.mindmap.propertyPanel.taskProgress')}
+                    aria-label={t(propertyKey('taskProgress'))}
                     min={0}
                     max={100}
                     value={taskProgress}
                     suffix="%"
-                    style={{ width: '100%' }}
+                    className={styles.fullWidth}
                     onChange={value => updateTask({ progress: value ?? 0 })}
                 />
             </Row>
 
-            <Divider style={{ margin: '10px 0' }} />
+            <Divider className={styles.divider} />
 
             {/* Font size */}
-            <Row label={t('plugins.mindmap.propertyPanel.fontSize')}>
+            <Row label={t(propertyKey('fontSize'))}>
                 <InputNumber min={10} max={48} value={fontSize}
-                    aria-label={t('plugins.mindmap.propertyPanel.fontSize')}
+                    aria-label={t(propertyKey('fontSize'))}
                     onChange={v => { if (!v) return; setFontSize(v); reshape({ style: { ...node.style, fontSize: `${v}px` } }); }}
-                    suffix="px" style={{ width: '100%' }} prefix={<FontSizeOutlined />} />
+                    suffix="px" className={styles.fullWidth} prefix={<FontSizeOutlined />} />
             </Row>
 
             {/* Text color */}
-            <Row label={t('plugins.mindmap.propertyPanel.textColor')}>
+            <Row label={t(propertyKey('textColor'))}>
                 <ColorSwatch value={textColor} onChange={c => { setTextColor(c); reshape({ style: { ...node.style, color: c || undefined } }); }} withTransparent />
             </Row>
 
             {/* Background color */}
-            <Row label={t('plugins.mindmap.propertyPanel.backgroundColor')}>
+            <Row label={t(propertyKey('backgroundColor'))}>
                 <ColorSwatch value={bgColor} onChange={c => { setBgColor(c); reshape({ style: { ...node.style, background: c || undefined } }); }} withTransparent />
             </Row>
 
             {/* Branch color */}
-            <Row label={t('plugins.mindmap.propertyPanel.branchColor')}>
+            <Row label={t(propertyKey('branchColor'))}>
                 <ColorSwatch value={branchColor} onChange={c => { setBranchColor(c); reshape({ branchColor: c || undefined }); }} withTransparent />
             </Row>
 
             {/* Node shape */}
-            <Row label={t('plugins.mindmap.propertyPanel.nodeShape')}>
-                <div style={{ display: 'flex', gap: 5 }}>
+            <Row label={t(propertyKey('nodeShape'))}>
+                <div className={styles.shapeList}>
                     {MIND_MAP_PROPERTY_SHAPES.map(({ key, translationKey, icon }) => {
-                        const label = t(`plugins.mindmap.propertyPanel.shapes.${translationKey}`);
+                        const label = t(propertyKey(`shapes.${translationKey}`));
                         return (
                         <button key={key || 'default'}
                             title={label}
@@ -541,59 +454,39 @@ const NodePropertyPanel: React.FC<{
                                 setShapeClass(key);
                                 reshape({ shapeClass: key || undefined });
                             }}
-                            style={{
-                                flex: 1, padding: '4px 2px', borderRadius: 6, cursor: 'pointer',
-                                fontSize: 16, textAlign: 'center',
-                                border: shapeClass === key
-                                    ? '2px solid #6366f1'
-                                    : '1px solid #cbd5e1',
-                                background: shapeClass === key
-                                    ? 'rgba(99,102,241,0.15)'
-                                    : '#f8fafc',
-                                color: shapeClass === key ? '#4338ca' : '#475569',
-                                transition: 'all 0.12s',
-                            }}>
-                            <div aria-hidden="true" style={{ fontSize: 16, lineHeight: 1 }}><PropertyShapeIcon icon={icon} /></div>
-                            <div style={{ fontSize: 10.5, marginTop: 3 }}>{label}</div>
+                            className={styles.shapeButton}>
+                            <div aria-hidden="true" className={styles.shapeIcon}><PropertyShapeIcon icon={icon} /></div>
+                            <div className={styles.shapeLabel}>{label}</div>
                         </button>
                     );})}
                 </div>
             </Row>
 
             {/* Branch line width */}
-            <Row label={t('plugins.mindmap.propertyPanel.branchWidth')}>
-                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <Row label={t(propertyKey('branchWidth'))}>
+                <div className={styles.branchList}>
                     {[0, 1, 2, 4, 6].map(w => (
                         <button key={w}
                             type="button"
-                            title={w === 0 ? t('plugins.mindmap.propertyPanel.defaultValue') : `${w}px`}
-                            aria-label={t('plugins.mindmap.propertyPanel.branchWidthValue', { value: w === 0 ? t('plugins.mindmap.propertyPanel.defaultValue') : `${w}px` })}
+                            title={w === 0 ? t(propertyKey('defaultValue')) : `${w}px`}
+                            aria-label={t(propertyKey('branchWidthValue'), { value: w === 0 ? t(propertyKey('defaultValue')) : `${w}px` })}
                             aria-pressed={branchWidth === w}
                             onClick={() => { setBranchWidth(w); reshape({ branchWidth: w || undefined }); }}
-                            style={{
-                                flex: 1, height: 28, borderRadius: 5, cursor: 'pointer',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                border: branchWidth === w ? '2px solid #6366f1' : '1px solid #cbd5e1',
-                                background: branchWidth === w ? 'rgba(99,102,241,0.12)' : '#f8fafc',
-                                transition: 'all 0.12s',
-                            }}>
+                            className={styles.branchButton}>
                             <div style={{
                                 height: w === 0 ? 1.5 : Math.min(w, 6),
-                                width: '80%',
-                                background: branchWidth === w ? '#4f46e5' : '#64748b',
-                                borderRadius: 3,
-                            }} />
+                            }} className={styles.branchLine} />
                         </button>
                     ))}
                 </div>
             </Row>
 
-            <Divider style={{ margin: '10px 0' }} />
+            <Divider className={styles.divider} />
 
             {/* HyperLink */}
-            <Row label={t('plugins.mindmap.propertyPanel.hyperlink')}>
-                <Input prefix={<LinkOutlined style={{ color: '#94a3b8' }} />}
-                    aria-label={t('plugins.mindmap.propertyPanel.hyperlink')}
+            <Row label={t(propertyKey('hyperlink'))}>
+                <Input prefix={<LinkOutlined className={styles.mutedIcon} />}
+                    aria-label={t(propertyKey('hyperlink'))}
                     placeholder="https://..." value={hyperLink} size="small"
                     onChange={e => setHyperLink(e.target.value)}
                     onBlur={saveHyperLink}
@@ -601,30 +494,26 @@ const NodePropertyPanel: React.FC<{
             </Row>
 
             {/* Note */}
-            <Row label={t('plugins.mindmap.propertyPanel.note')}>
-                <TextArea placeholder={t('plugins.mindmap.propertyPanel.notePlaceholder')} value={note}
-                    aria-label={t('plugins.mindmap.propertyPanel.note')}
+            <Row label={t(propertyKey('note'))}>
+                <TextArea placeholder={t(propertyKey('notePlaceholder'))} value={note}
+                    aria-label={t(propertyKey('note'))}
                     onChange={e => setNote(e.target.value)}
                     onBlur={() => {
                         const cleanNote = cleanMindMapNote(note);
                         setNote(cleanNote ?? '');
                         reshape({ note: cleanNote });
                     }}
-                    autoSize={{ minRows: 2, maxRows: 5 }} style={{ fontSize: 12 }} />
+                    autoSize={{ minRows: 2, maxRows: 5 }} className={styles.noteInput} />
             </Row>
 
-            <Divider style={{ margin: '10px 0' }} />
+            <Divider className={styles.divider} />
 
             {/* Keyboard cheatsheet */}
-            <div style={{ background: 'rgba(99,102,241,0.04)', border: '1px solid rgba(99,102,241,0.1)',
-                borderRadius: 8, padding: '8px 12px', fontSize: 11.5, color: 'rgba(0,0,0,0.5)', lineHeight: 2 }}>
+            <div className={styles.shortcuts}>
                 {MIND_MAP_PROPERTY_SHORTCUTS.map(shortcut => (
-                    <div key={shortcut.key} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                        <kbd style={{ display: 'inline-block', padding: '1px 5px', background: '#f1f5f9',
-                            border: '1px solid #e2e8f0', borderBottom: '2px solid #cbd5e1',
-                            borderRadius: 4, fontSize: 10.5, fontFamily: 'monospace',
-                            color: '#475569', minWidth: 40, textAlign: 'center' }}>{shortcut.key}</kbd>
-                        <span>{t(`plugins.mindmap.propertyPanel.shortcuts.${shortcut.translationKey}`)}</span>
+                    <div key={shortcut.key} className={styles.shortcut}>
+                        <kbd className={styles.shortcutKey}>{shortcut.key}</kbd>
+                        <span>{t(propertyKey(`shortcuts.${shortcut.translationKey}`))}</span>
                     </div>
                 ))}
             </div>
@@ -649,7 +538,7 @@ const MindMapPropertyPanel: React.FC<MindMapPropertyPanelProps> = ({ activeTheme
     });
 
     return (
-        <div style={{ height: '100%', overflowY: 'auto' }}>
+        <div className={styles.scrollContainer}>
             {selectedNode
                 ? <NodePropertyPanel
                     key={selectedNode.id}

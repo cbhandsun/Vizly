@@ -32,6 +32,8 @@ describe('mindmapPanelLogging', () => {
     logging.logMindmapPropertyReshapeFailure(new Error('credential=reshape-secret'));
     logging.logMindmapPropertySetTopicFailure(new Error('token=set-topic-secret'));
     logging.logMindmapPropertyAiAddChildFailure(new Error('Authorization: Bearer ai-add-secret'));
+    logging.logMindmapPropertyAiRequestFailure('expand', new Error('token=ai-expand-secret'));
+    logging.logMindmapPropertyAiRequestFailure('summarize', new Error('cookie=ai-summary-secret'));
     logging.logMindmapPropertyImageUploadRejected({ reason: 'cookie=image-upload-secret' });
     logging.logMindmapPropertyQuickActionFailure('addChild', new Error('token=quick-add-child-secret'));
     logging.logMindmapPropertyQuickActionFailure('addSibling', new Error('token=quick-add-sibling-secret'));
@@ -65,6 +67,8 @@ describe('mindmapPanelLogging', () => {
     expect(warnPayload).toContain('[MindMapPropertyPanel] reshapeNode failed:');
     expect(warnPayload).toContain('[MindMapPropertyPanel] setNodeTopic failed:');
     expect(warnPayload).toContain('[MindMapPropertyPanel] AI addChild failed:');
+    expect(warnPayload).toContain('[MindMapPropertyPanel] AI expand failed:');
+    expect(warnPayload).toContain('[MindMapPropertyPanel] AI summarize failed:');
     expect(warnPayload).toContain('[MindMapPropertyPanel] image upload rejected:');
     expect(warnPayload).toContain('[MindMapPropertyPanel] addChild failed:');
     expect(warnPayload).toContain('[MindMapPropertyPanel] addSibling failed:');
@@ -95,6 +99,8 @@ describe('mindmapPanelLogging', () => {
     expect(warnPayload).not.toContain('reshape-secret');
     expect(warnPayload).not.toContain('set-topic-secret');
     expect(warnPayload).not.toContain('ai-add-secret');
+    expect(warnPayload).not.toContain('ai-expand-secret');
+    expect(warnPayload).not.toContain('ai-summary-secret');
     expect(warnPayload).not.toContain('image-upload-secret');
     expect(warnPayload).not.toContain('quick-add-child-secret');
     expect(warnPayload).not.toContain('quick-add-sibling-secret');

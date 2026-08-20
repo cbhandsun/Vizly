@@ -13,8 +13,11 @@ describe('presentMindMapPropertyAIError', () => {
             .toBe('translated:plugins.mindmap.propertyAI.modelRequired');
     });
 
-    it('preserves bounded provider errors that do not have a known localization key', () => {
-        expect(presentMindMapPropertyAIError('request failed safely', key => key))
-            .toBe('request failed safely');
+    it('replaces unknown provider details with a contextual localized fallback', () => {
+        expect(presentMindMapPropertyAIError(
+            'request failed at https://provider.invalid?token=secret',
+            key => key,
+            'plugins.mindmap.propertyAI.summarizeFailed',
+        )).toBe('plugins.mindmap.propertyAI.summarizeFailed');
     });
 });

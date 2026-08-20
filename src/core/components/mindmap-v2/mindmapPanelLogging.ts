@@ -45,6 +45,13 @@ export const logMindmapPropertyAiAddChildFailure = (error: unknown): void => {
   safeLog.warn('[MindMapPropertyPanel] AI addChild failed:', redactSensitiveLogValue(error));
 };
 
+export const logMindmapPropertyAiRequestFailure = (
+  action: 'expand' | 'summarize',
+  error: unknown
+): void => {
+  safeLog.warn(`[MindMapPropertyPanel] AI ${action} failed:`, redactSensitiveLogValue(error));
+};
+
 export const logMindmapPropertyImageUploadRejected = (reason: unknown): void => {
   safeLog.warn('[MindMapPropertyPanel] image upload rejected:', redactSensitiveLogValue(reason));
 };
