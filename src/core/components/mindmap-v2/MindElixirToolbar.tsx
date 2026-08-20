@@ -56,6 +56,7 @@ import {
     logMindmapToolbarAddRootChildFailure,
     logMindmapToolbarAutoArrangeFailure,
     logMindmapToolbarHistoryFailure,
+    logMindmapToolbarFitFailure,
     logMindmapToolbarStatsUpdateFailure,
     logMindmapToolbarZoomFailure,
 } from './mindmapToolbarLogging';
@@ -83,6 +84,7 @@ import {
     MIND_MAP_MIN_SCALE,
     toMindMapZoomPercent,
 } from './mindMapZoom';
+import { fitMindMapToVisibleViewport } from './mindMapVisibleViewportFit';
 import './MindElixirToolbar.css';
 
 
@@ -166,7 +168,12 @@ const MindElixirToolbar: React.FC = () => {
     }, [mind]);
 
     const handleFitView = useCallback(() => {
-        mind?.toCenter();
+        if (!mind) return;
+        try {
+            fitMindMapToVisibleViewport(mind);
+        } catch (error) {
+            logMindmapToolbarFitFailure(error);
+        }
     }, [mind]);
 
     const handleAutoArrange = useCallback(() => {

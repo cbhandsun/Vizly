@@ -157,4 +157,10 @@ describe('MindElixirToolbar commercial interaction contract', () => {
         expect(source).toContain('disabled={zoomVal >= MIND_MAP_MAX_SCALE * 100}');
         expect(source).toContain('logMindmapToolbarZoomFailure(error)');
     });
+
+    it('fits against the real interactive viewport instead of centering beneath the sidebar', () => {
+        expect(source).toContain('fitMindMapToVisibleViewport(mind)');
+        expect(source).toContain('logMindmapToolbarFitFailure(error)');
+        expect(source).not.toContain('const handleFitView = useCallback(() => {\n        mind?.toCenter();');
+    });
 });

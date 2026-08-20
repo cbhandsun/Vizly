@@ -41,6 +41,10 @@ export const logMindmapToolbarZoomFailure = (error: unknown): void => {
   safeLog.warn('[MindMapToolbar] zoom failed:', redactSensitiveLogValue(error));
 };
 
+export const logMindmapToolbarFitFailure = (error: unknown): void => {
+  safeLog.warn('[MindMapToolbar] fit viewport failed:', redactSensitiveLogValue(error));
+};
+
 export const logMindmapToolbarHistoryFailure = (
   action: 'redo' | 'undo',
   error: unknown,
