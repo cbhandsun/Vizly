@@ -38,7 +38,6 @@ export interface EnhancedThemeSelectorProps {
   style?: React.CSSProperties;
   showPresets?: boolean;
   showCustomThemes?: boolean;
-  showPerformanceMetrics?: boolean;
   showImportExport?: boolean;
   borderless?: boolean;
   variant?: 'default' | 'icon';
@@ -76,7 +75,6 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
   style,
   showPresets = true,
   showCustomThemes = true,
-  showPerformanceMetrics = false,
   showImportExport = true,
   borderless = false,
   variant = 'default',
@@ -546,15 +544,6 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
   // 渲染设置面板
   const renderSettings = () => (
     <div className="flex flex-col gap-6">
-      {showPerformanceMetrics && (
-        <div className="flex flex-col gap-3">
-          <h4 className="text-xs font-bold tracking-wider text-gray-500 uppercase dark:text-gray-400">{t('theme.selector.performance')}</h4>
-          <div className="p-4 rounded-xl bg-white/30 dark:bg-black/20 border border-black/5 dark:border-white/5">
-            {/* 性能指标显示 */}
-          </div>
-        </div>
-      )}
-
       {showImportExport && (
         <div className="flex flex-col gap-3">
           <h4 className="text-xs font-bold tracking-wider text-gray-500 uppercase dark:text-gray-400">{t('theme.selector.import')}/{t('theme.selector.export')}</h4>

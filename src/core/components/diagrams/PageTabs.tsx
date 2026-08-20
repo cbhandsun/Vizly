@@ -10,7 +10,6 @@ import { Input, Popconfirm, theme, Tooltip } from 'antd';
 import type { InputRef } from 'antd';
 import { useTranslation } from 'react-i18next';
 
-import type { DiagramPage } from './hooks/useMultiPage';
 import { MAX_DIAGRAM_PAGE_NAME_LENGTH, MAX_DIAGRAM_PAGES } from './multiPagePersistence';
 import { isPageNameAvailable, normalizePageName } from './multiPageNaming';
 import { resolvePageContentMetrics } from './pageCanvasMetadata';
@@ -24,25 +23,8 @@ import { usePageTabsPendingRename } from './usePageTabsPendingRename';
 import { usePageTabsMutations } from './usePageTabsMutations';
 import { useTransientStatusMessage } from './useTransientStatusMessage';
 import { getViewportOverlayContainer } from '../ui/viewportOverlayPortal';
+import type { DiagramPage, PageTabsProps } from './pageTabsTypes';
 import './PageTabs.css';
-
-interface PageTabsProps {
-    pages: DiagramPage[];
-    activePageId: string;
-    onSwitchPage: (id: string) => void;
-    onAddPage: () => string | null;
-    onDiscardPage?: (id: string) => boolean;
-    onDeletePage: (id: string) => boolean;
-    onRestoreDeletedPage?: () => string | null;
-    onRenamePage: (id: string, name: string) => boolean;
-    onDuplicatePage?: (id: string, preferredName: string) => string | null;
-    onMovePage?: (id: string, direction: 'left' | 'right') => boolean;
-    canRestoreDeletedPage?: boolean;
-    restorableDeletedPageName?: string | null;
-    activePageNodeCount?: number;
-    activePageEdgeCount?: number;
-    disabled?: boolean;
-}
 
 /** 底部页面 Tab 栏 — 类似 Excel 的 sheet tabs。 */
 export const PageTabs: React.FC<PageTabsProps> = React.memo(({

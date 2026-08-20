@@ -69,9 +69,9 @@
         "search": "Search workspace",
         "searchPlaceholder": "Find your diagrams...",
         "clearSearch": "Clear search",
+        "viewRecent": "View recent diagrams",
         "searchResultsStatus": "{{count}} matching diagrams",
         "searchNoResultsStatus": "No diagrams match {{query}}",
-        "viewRecent": "View recent diagrams",
         "toggleTheme": "Toggle theme",
         "settings": "Settings",
         "storageSettings": "Storage and sync",
@@ -790,7 +790,10 @@
             "restoreAction": "Restore deleted page",
             "restoreNamedAction": "Restore page “{{name}}”",
             "restoreSuccess": "Restored page “{{name}}”",
-            "restoreFailed": "Could not restore page “{{name}}”. Try again."
+            "restoreFailed": "Could not restore page “{{name}}”. Try again.",
+            "undoAction": "Undo this action",
+            "undoSuccess": "Page action undone",
+            "undoFailed": "Could not undo the page action. Try again."
         },
         "architecture": {
             "addComponent": "Add {{component}} component",
@@ -1743,7 +1746,6 @@
             "light": "Light",
             "dark": "Dark",
             "baseTheme": "Base Theme",
-            "performance": "Performance Metrics",
             "import": "Import",
             "export": "Export",
             "emptyCustom": "No custom themes yet",

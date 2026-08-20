@@ -68,9 +68,9 @@
         "search": "搜索工作区",
         "searchPlaceholder": "搜索你的图表...",
         "clearSearch": "清除搜索",
+        "viewRecent": "查看最近图表",
         "searchResultsStatus": "找到 {{count}} 个匹配图表",
         "searchNoResultsStatus": "没有匹配“{{query}}”的图表",
-        "viewRecent": "查看最近图表",
         "toggleTheme": "切换主题",
         "settings": "设置",
         "storageSettings": "存储与同步",
@@ -798,7 +798,10 @@
             "restoreAction": "恢复删除的页面",
             "restoreNamedAction": "恢复页面“{{name}}”",
             "restoreSuccess": "已恢复页面“{{name}}”",
-            "restoreFailed": "无法恢复页面“{{name}}”，请重试"
+            "restoreFailed": "无法恢复页面“{{name}}”，请重试",
+            "undoAction": "撤销此操作",
+            "undoSuccess": "已撤销页面操作",
+            "undoFailed": "无法撤销页面操作，请重试"
         },
         "architecture": {
             "addComponent": "添加{{component}}组件",
@@ -1898,7 +1901,6 @@
             "dark": "暗色",
             "import": "导入",
             "export": "导出",
-            "performance": "性能指标",
             "emptyCustom": "暂无自定义主题",
             "deleteConfirmTitle": "删除「{{name}}」？",
             "deleteConfirmDescription": "删除后无法恢复。",
