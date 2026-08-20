@@ -10,6 +10,7 @@ import {
     RobotOutlined,
 } from '@ant-design/icons';
 import type { NodeObj } from 'mind-elixir';
+import { useTranslation } from 'react-i18next';
 import {
     getMindElixirInstance,
     subscribeAIPanel,
@@ -34,6 +35,7 @@ import { cleanMindMapData, cleanMindMapTopic, refreshMindElixirWithSanitizedData
 import { cleanMindMapNodePatch } from './mindmapNodePatchSecurity';
 import { createMindMapAIRequestLifecycle } from './mindMapAIPanelRequestLifecycle';
 import { readMindMapEmptyState } from './mindMapEmptyState';
+import { getMindMapAIPanelErrorKey } from './mindMapAIPanelError';
 import { appMessage, appModal } from '@/core/utils/antdStaticBridge';
 import { getViewportOverlayContainer } from '@/core/components/ui/viewportOverlayPortal';
 import './MindMapAIPanel.css';
@@ -72,6 +74,7 @@ function refreshCleanMindMap(mind: ReturnType<typeof getMindElixirInstance>) {
 }
 
 export function MindMapAIPanel() {
+    const { t } = useTranslation();
     const [open, setOpen] = useState(false);
     const [mind, setMind] = useState(getMindElixirInstance());
     const [mode, setMode] = useState<AIMode>('create');
@@ -85,6 +88,10 @@ export function MindMapAIPanel() {
     const requestLifecycle = useMemo(() => createMindMapAIRequestLifecycle(), []);
     const panelOpenRef = useRef(false);
     const replaceConfirmRef = useRef<{ destroy: () => void } | null>(null);
+
+    const localizeServiceError = useCallback((error: unknown) => (
+        t(`plugins.mindmap.aiPanel.errors.${getMindMapAIPanelErrorKey(error)}`)
+    ), [t]);
 
     const invalidatePendingRequest = useCallback(() => {
         requestLifecycle.invalidate();
@@ -146,10 +153,12 @@ export function MindMapAIPanel() {
     const nodeOptions = useMemo(() => {
         if (!data?.nodeData) return [];
         return flattenNodes(data.nodeData).map(node => ({
-            label: node.id === data.nodeData.id ? `${node.topic}（根节点）` : node.topic,
+            label: node.id === data.nodeData.id
+                ? t('plugins.mindmap.aiPanel.rootNodeOption', { topic: node.topic })
+                : node.topic,
             value: node.id,
         }));
-    }, [data]);
+    }, [data, t]);
 
     const targetNode = useMemo(() => {
         if (!data?.nodeData) return null;
@@ -182,22 +191,24 @@ export function MindMapAIPanel() {
             const result = await generateMindMapFromPrompt(requestedPrompt);
             if (!requestLifecycle.isCurrent(requestId)) return;
             if ('error' in result) {
-                appMessage.error(result.error);
+                appMessage.error(localizeServiceError(result.error));
                 return;
             }
             const current = mind.getData();
             refreshMindElixirWithSanitizedData(mind, cleanMindMapData({ ...current, nodeData: result.nodeData }));
             applyOperation('ai_generate_map', result.nodeData);
-            appMessage.success(`已生成 ${countNodes(result.nodeData)} 个节点`);
+            appMessage.success(t('plugins.mindmap.aiPanel.createSuccess', {
+                count: countNodes(result.nodeData),
+            }));
             setPrompt('');
         } catch {
             if (requestLifecycle.isCurrent(requestId)) {
-                appMessage.error('生成导图失败，请重试');
+                appMessage.error(t('plugins.mindmap.aiPanel.createFailed'));
             }
         } finally {
             if (requestLifecycle.isCurrent(requestId)) setLoading(false);
         }
-    }, [applyOperation, beginRequest, loading, mind, requestLifecycle]);
+    }, [applyOperation, beginRequest, loading, localizeServiceError, mind, requestLifecycle, t]);
 
     const handleCreateMap = useCallback(() => {
         if (!mind || !prompt.trim() || loading || confirmingReplace) return;
@@ -209,10 +220,10 @@ export function MindMapAIPanel() {
         }
         setConfirmingReplace(true);
         replaceConfirmRef.current = appModal.confirm({
-            title: '替换当前思维导图？',
-            content: '生成完整导图会覆盖当前节点和分支。此操作可以通过撤销恢复。',
-            okText: '确认替换并生成',
-            cancelText: '取消',
+            title: t('plugins.mindmap.aiPanel.replaceConfirmTitle'),
+            content: t('plugins.mindmap.aiPanel.replaceConfirmContent'),
+            okText: t('plugins.mindmap.aiPanel.replaceConfirmAction'),
+            cancelText: t('plugins.mindmap.aiPanel.cancel'),
             centered: true,
             keyboard: true,
             maskClosable: false,
@@ -223,7 +234,7 @@ export function MindMapAIPanel() {
                 setConfirmingReplace(false);
             },
         });
-    }, [confirmingReplace, executeCreateMap, loading, mind, prompt]);
+    }, [confirmingReplace, executeCreateMap, loading, mind, prompt, t]);
 
     const handleExpand = useCallback(async () => {
         if (!mind || !targetNode || loading) return;
@@ -239,18 +250,18 @@ export function MindMapAIPanel() {
             });
             if (!requestLifecycle.isCurrent(requestId)) return;
             if (result.error) {
-                appMessage.error(result.error);
+                appMessage.error(localizeServiceError(result.error));
                 return;
             }
             setSuggestions([...new Set(result.topics.map(topic => cleanMindMapTopic(topic)).filter(Boolean))]);
         } catch {
             if (requestLifecycle.isCurrent(requestId)) {
-                appMessage.error('生成子主题失败，请重试');
+                appMessage.error(t('plugins.mindmap.aiPanel.expandFailed'));
             }
         } finally {
             if (requestLifecycle.isCurrent(requestId)) setLoading(false);
         }
-    }, [beginRequest, loading, mind, requestLifecycle, targetNode]);
+    }, [beginRequest, loading, localizeServiceError, mind, requestLifecycle, t, targetNode]);
 
     const addSuggestion = useCallback((topic: string) => {
         if (!mind || !targetNode || loading) return;
@@ -291,7 +302,7 @@ export function MindMapAIPanel() {
             );
             if (!requestLifecycle.isCurrent(requestId)) return;
             if ('error' in result) {
-                appMessage.error(result.error);
+                appMessage.error(localizeServiceError(result.error));
                 return;
             }
             const node = findNodeById(mind.getData().nodeData, targetNode.id);
@@ -299,15 +310,15 @@ export function MindMapAIPanel() {
             node.topic = cleanMindMapTopic(result.topic);
             refreshCleanMindMap(mind);
             applyOperation('ai_summarize_node', node);
-            appMessage.success('已归纳当前节点');
+            appMessage.success(t('plugins.mindmap.aiPanel.summarizeSuccess'));
         } catch {
             if (requestLifecycle.isCurrent(requestId)) {
-                appMessage.error('归纳节点失败，请重试');
+                appMessage.error(t('plugins.mindmap.aiPanel.summarizeFailed'));
             }
         } finally {
             if (requestLifecycle.isCurrent(requestId)) setLoading(false);
         }
-    }, [applyOperation, beginRequest, loading, mind, requestLifecycle, targetNode]);
+    }, [applyOperation, beginRequest, loading, localizeServiceError, mind, requestLifecycle, t, targetNode]);
 
     const handleRefine = useCallback(async () => {
         if (!mind || !targetNode || !prompt.trim() || loading) return;
@@ -322,7 +333,7 @@ export function MindMapAIPanel() {
             });
             if (!requestLifecycle.isCurrent(requestId)) return;
             if (result.error) {
-                appMessage.error(result.error);
+                appMessage.error(localizeServiceError(result.error));
                 return;
             }
 
@@ -343,21 +354,21 @@ export function MindMapAIPanel() {
             refreshCleanMindMap(mind);
             applyOperation('ai_refine_node', node);
             setPrompt('');
-            appMessage.success('AI 处理已应用');
+            appMessage.success(t('plugins.mindmap.aiPanel.refineSuccess'));
         } catch {
             if (requestLifecycle.isCurrent(requestId)) {
-                appMessage.error('AI 处理失败，请重试');
+                appMessage.error(t('plugins.mindmap.aiPanel.refineFailed'));
             }
         } finally {
             if (requestLifecycle.isCurrent(requestId)) setLoading(false);
         }
-    }, [applyOperation, beginRequest, loading, mind, prompt, requestLifecycle, targetNode]);
+    }, [applyOperation, beginRequest, loading, localizeServiceError, mind, prompt, requestLifecycle, t, targetNode]);
 
     const handleClassifyTasks = useCallback(async () => {
         if (!mind || !targetNode || loading) return;
         const tree = mind.getData().nodeData;
         if (taskCandidates.length === 0) {
-            appMessage.info('当前分支没有可分类的叶子任务');
+            appMessage.info(t('plugins.mindmap.aiPanel.noTaskCandidates'));
             return;
         }
 
@@ -366,35 +377,35 @@ export function MindMapAIPanel() {
             const result = await classifyTasksWithAI(taskCandidates);
             if (!requestLifecycle.isCurrent(requestId)) return;
             if ('error' in result) {
-                appMessage.error(result.error);
+                appMessage.error(localizeServiceError(result.error));
                 return;
             }
             const applied = applyTaskClassifications(tree, result.classifications);
             refreshCleanMindMap(mind);
             applyOperation('ai_classify_tasks', tree);
-            appMessage.success(`已规划 ${applied} 个任务`);
+            appMessage.success(t('plugins.mindmap.aiPanel.taskPlanSuccess', { count: applied }));
         } catch {
             if (requestLifecycle.isCurrent(requestId)) {
-                appMessage.error('规划任务失败，请重试');
+                appMessage.error(t('plugins.mindmap.aiPanel.taskPlanFailed'));
             }
         } finally {
             if (requestLifecycle.isCurrent(requestId)) setLoading(false);
         }
-    }, [applyOperation, beginRequest, loading, mind, requestLifecycle, targetNode, taskCandidates]);
+    }, [applyOperation, beginRequest, loading, localizeServiceError, mind, requestLifecycle, t, targetNode, taskCandidates]);
 
     const handleClassifyTasksLocally = useCallback(() => {
         if (!mind || !targetNode || loading) return;
         const tree = mind.getData().nodeData;
         if (taskCandidates.length === 0) {
-            appMessage.info('当前分支没有可分类的叶子任务');
+            appMessage.info(t('plugins.mindmap.aiPanel.noTaskCandidates'));
             return;
         }
 
         const applied = applyTaskClassifications(tree, classifyTaskCandidatesLocally(taskCandidates));
         refreshCleanMindMap(mind);
         applyOperation('local_classify_tasks', tree);
-        appMessage.success(`已快速规划 ${applied} 个任务`);
-    }, [applyOperation, loading, mind, targetNode, taskCandidates]);
+        appMessage.success(t('plugins.mindmap.aiPanel.localTaskPlanSuccess', { count: applied }));
+    }, [applyOperation, loading, mind, t, targetNode, taskCandidates]);
 
     const handleClose = useCallback(() => {
         replaceConfirmRef.current?.destroy();
@@ -427,38 +438,38 @@ export function MindMapAIPanel() {
     return (
         <div
             aria-busy={loading}
-            aria-label="AI 思维导图助手"
+            aria-label={t('plugins.mindmap.aiPanel.panelLabel')}
             className="mindmap-ai-panel"
             role="complementary"
         >
             <div style={headerStyle}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <RobotOutlined aria-hidden="true" style={{ color: '#8b5cf6', fontSize: 18 }} />
-                    <span style={{ color: '#fff', fontWeight: 650 }}>AI 思维导图助手</span>
+                    <span style={{ color: '#fff', fontWeight: 650 }}>{t('plugins.mindmap.aiPanel.title')}</span>
                 </div>
-                <Button aria-label="关闭 AI 思维导图助手" title="关闭 AI 思维导图助手" type="text" icon={<CloseOutlined />} onClick={handleClose} style={iconButtonStyle} />
+                <Button aria-label={t('plugins.mindmap.aiPanel.close')} title={t('plugins.mindmap.aiPanel.close')} type="text" icon={<CloseOutlined />} onClick={handleClose} style={iconButtonStyle} />
             </div>
 
             <div style={bodyStyle}>
                 <Segmented
-                    aria-label="AI 思维导图操作模式"
+                    aria-label={t('plugins.mindmap.aiPanel.modeGroup')}
                     block
                     disabled={loading}
                     value={mode}
                     onChange={handleModeChange}
                     options={[
-                        { label: '建图', value: 'create', icon: <DeploymentUnitOutlined /> },
-                        { label: '扩展', value: 'expand', icon: <BranchesOutlined /> },
-                        { label: '处理', value: 'refine', icon: <BulbOutlined /> },
-                        { label: '任务', value: 'tasks', icon: <CheckSquareOutlined /> },
+                        { label: t('plugins.mindmap.aiPanel.modes.create'), value: 'create', icon: <DeploymentUnitOutlined /> },
+                        { label: t('plugins.mindmap.aiPanel.modes.expand'), value: 'expand', icon: <BranchesOutlined /> },
+                        { label: t('plugins.mindmap.aiPanel.modes.refine'), value: 'refine', icon: <BulbOutlined /> },
+                        { label: t('plugins.mindmap.aiPanel.modes.tasks'), value: 'tasks', icon: <CheckSquareOutlined /> },
                     ]}
                 />
 
                 {!isCreate && (
                     <div style={fieldStyle}>
-                        <label style={labelStyle}>目标节点</label>
+                        <label style={labelStyle}>{t('plugins.mindmap.aiPanel.targetNode')}</label>
                         <Select
-                            aria-label="AI 操作目标节点"
+                            aria-label={t('plugins.mindmap.aiPanel.targetNodeLabel')}
                             disabled={loading}
                             showSearch
                             value={targetNodeId || selectedNodeId}
@@ -472,17 +483,17 @@ export function MindMapAIPanel() {
 
                 {isCreate && (
                     <div style={fieldStyle}>
-                        <label style={labelStyle}>输入主题或业务问题</label>
+                        <label style={labelStyle}>{t('plugins.mindmap.aiPanel.createPrompt')}</label>
                         <TextArea
-                            aria-label="AI 建图主题或业务问题"
+                            aria-label={t('plugins.mindmap.aiPanel.createPromptLabel')}
                             disabled={loading}
                             value={prompt}
                             onChange={event => setPrompt(event.target.value)}
-                            placeholder="例如：仓储系统产品规划、B2B 订单履约流程、AI 客服落地方案..."
+                            placeholder={t('plugins.mindmap.aiPanel.createPlaceholder')}
                             autoSize={{ minRows: 4, maxRows: 7 }}
                         />
                         <Button
-                            aria-label="生成完整导图"
+                            aria-label={t('plugins.mindmap.aiPanel.createAction')}
                             type="primary"
                             icon={<DeploymentUnitOutlined />}
                             loading={loading}
@@ -490,7 +501,7 @@ export function MindMapAIPanel() {
                             onClick={handleCreateMap}
                             block
                         >
-                            生成完整导图
+                            {t('plugins.mindmap.aiPanel.createAction')}
                         </Button>
                     </div>
                 )}
@@ -498,10 +509,10 @@ export function MindMapAIPanel() {
                 {isExpand && (
                     <div style={fieldStyle}>
                         <div style={hintStyle}>
-                            AI 会基于当前节点路径生成可选择的子主题，先预览再插入。
+                            {t('plugins.mindmap.aiPanel.expandHint')}
                         </div>
                         <Button
-                            aria-label="生成子主题建议"
+                            aria-label={t('plugins.mindmap.aiPanel.expandAction')}
                             type="primary"
                             icon={<BranchesOutlined />}
                             loading={loading}
@@ -509,11 +520,11 @@ export function MindMapAIPanel() {
                             onClick={handleExpand}
                             block
                         >
-                            生成子主题建议
+                            {t('plugins.mindmap.aiPanel.expandAction')}
                         </Button>
                         {canSummarize && (
-                            <Button aria-label="根据子节点归纳标题" icon={<FileTextOutlined />} loading={loading} onClick={handleSummarize} block>
-                                根据子节点归纳标题
+                            <Button aria-label={t('plugins.mindmap.aiPanel.summarizeAction')} icon={<FileTextOutlined />} loading={loading} onClick={handleSummarize} block>
+                                {t('plugins.mindmap.aiPanel.summarizeAction')}
                             </Button>
                         )}
                     </div>
@@ -521,17 +532,17 @@ export function MindMapAIPanel() {
 
                 {mode === 'refine' && (
                     <div style={fieldStyle}>
-                        <label style={labelStyle}>处理指令</label>
+                        <label style={labelStyle}>{t('plugins.mindmap.aiPanel.refinePrompt')}</label>
                         <TextArea
-                            aria-label="AI 思维导图处理指令"
+                            aria-label={t('plugins.mindmap.aiPanel.refinePromptLabel')}
                             disabled={loading}
                             value={prompt}
                             onChange={event => setPrompt(event.target.value)}
-                            placeholder="例如：翻译成英文；补一段备注；扩写 5 个实施步骤；加上风险标签..."
+                            placeholder={t('plugins.mindmap.aiPanel.refinePlaceholder')}
                             autoSize={{ minRows: 4, maxRows: 8 }}
                         />
                         <Button
-                            aria-label="应用到目标节点"
+                            aria-label={t('plugins.mindmap.aiPanel.refineAction')}
                             type="primary"
                             icon={<BulbOutlined />}
                             loading={loading}
@@ -539,7 +550,7 @@ export function MindMapAIPanel() {
                             onClick={handleRefine}
                             block
                         >
-                            应用到目标节点
+                            {t('plugins.mindmap.aiPanel.refineAction')}
                         </Button>
                     </div>
                 )}
@@ -547,10 +558,10 @@ export function MindMapAIPanel() {
                 {mode === 'tasks' && (
                     <div style={fieldStyle}>
                         <div style={hintStyle}>
-                            当前分支有 {taskCandidates.length} 个叶子任务。AI 会批量写入任务状态和优先级，并同步到看板与导出。
+                            {t('plugins.mindmap.aiPanel.taskHint', { count: taskCandidates.length })}
                         </div>
                         <Button
-                            aria-label="规划当前分支任务"
+                            aria-label={t('plugins.mindmap.aiPanel.taskPlanAction')}
                             type="primary"
                             icon={<CheckSquareOutlined />}
                             loading={loading}
@@ -558,16 +569,16 @@ export function MindMapAIPanel() {
                             onClick={handleClassifyTasks}
                             block
                         >
-                            规划当前分支任务
+                            {t('plugins.mindmap.aiPanel.taskPlanAction')}
                         </Button>
                         <Button
-                            aria-label="规则快速规划"
+                            aria-label={t('plugins.mindmap.aiPanel.localTaskPlanAction')}
                             icon={<CheckSquareOutlined />}
                             disabled={!targetNode || taskCandidates.length === 0 || loading}
                             onClick={handleClassifyTasksLocally}
                             block
                         >
-                            规则快速规划
+                            {t('plugins.mindmap.aiPanel.localTaskPlanAction')}
                         </Button>
                     </div>
                 )}
@@ -575,20 +586,21 @@ export function MindMapAIPanel() {
                 {loading && (
                     <div aria-live="polite" role="status" style={loadingStyle}>
                         <Spin size="small" />
-                        <span>AI 正在处理...</span>
+                        <span>{t('plugins.mindmap.aiPanel.loading')}</span>
                     </div>
                 )}
 
                 {suggestions.length > 0 && (
                     <div style={suggestionsStyle}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={labelStyle}>建议子主题</span>
-                            <Button aria-label="全部插入建议子主题" disabled={loading} size="small" type="link" onClick={addAllSuggestions}>全部插入</Button>
+                            <span style={labelStyle}>{t('plugins.mindmap.aiPanel.suggestions')}</span>
+                            <Button aria-label={t('plugins.mindmap.aiPanel.insertAll')} disabled={loading} size="small" type="link" onClick={addAllSuggestions}>{t('plugins.mindmap.aiPanel.insertAllShort')}</Button>
                         </div>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                             {suggestions.map(topic => (
                                 <Button
                                     key={topic}
+                                    aria-label={t('plugins.mindmap.aiPanel.insertSuggestion', { topic })}
                                     disabled={loading}
                                     onClick={() => addSuggestion(topic)}
                                     size="small"

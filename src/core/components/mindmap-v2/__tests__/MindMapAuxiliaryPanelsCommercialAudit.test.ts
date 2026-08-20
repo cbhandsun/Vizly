@@ -109,10 +109,13 @@ describe('mind map auxiliary panel commercial audit contract', () => {
         const source = readSource('MindMapAIPanel.tsx');
         const css = readSource('MindMapAIPanel.css');
 
-        expect(source).toContain('aria-label="AI 思维导图助手"');
-        expect(source).toContain('aria-label="关闭 AI 思维导图助手"');
-        expect(source).toContain('aria-label="AI 建图主题或业务问题"');
-        expect(source).toContain('aria-label="AI 思维导图处理指令"');
+        expect(source).toContain('const { t } = useTranslation()');
+        expect(source).toContain("aria-label={t('plugins.mindmap.aiPanel.panelLabel')}");
+        expect(source).toContain("aria-label={t('plugins.mindmap.aiPanel.close')}");
+        expect(source).toContain("aria-label={t('plugins.mindmap.aiPanel.createPromptLabel')}");
+        expect(source).toContain("aria-label={t('plugins.mindmap.aiPanel.refinePromptLabel')}");
+        expect(source).toContain("aria-label={t('plugins.mindmap.aiPanel.insertSuggestion', { topic })}");
+        expect(source).not.toMatch(/aria-label="[^"{]+"/);
         expect(source).toContain('className="mindmap-ai-panel"');
         expect(source).toContain('appModal.confirm({');
         expect(source).toContain('appMessage.error(');

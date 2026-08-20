@@ -152,6 +152,19 @@ describe('mind map commercial control translations', () => {
         expect(enTemplates.insertSuccess_other).toContain('{{count}}');
     });
 
+    it('keeps the AI assistant resource shape and count interpolation aligned', () => {
+        const enPanel = en.plugins.mindmap.aiPanel;
+        const zhPanel = zh.plugins.mindmap.aiPanel;
+        expect(Object.keys(enPanel).sort()).toEqual(Object.keys(zhPanel).sort());
+        expect(Object.keys(enPanel.modes).sort()).toEqual(Object.keys(zhPanel.modes).sort());
+        expect(Object.keys(enPanel.errors).sort()).toEqual(Object.keys(zhPanel.errors).sort());
+        expect(enPanel.rootNodeOption).toContain('{{topic}}');
+        expect(zhPanel.rootNodeOption).toContain('{{topic}}');
+        expect(enPanel.taskHint_other).toContain('{{count}}');
+        expect(zhPanel.taskPlanSuccess_other).toContain('{{count}}');
+        expect(enPanel.insertSuggestion).toContain('{{topic}}');
+    });
+
     it('resolves every localized template label, description, and node topic', async () => {
         const collectTopics = (tree: TemplateNode): string[] => [
             tree.topic,

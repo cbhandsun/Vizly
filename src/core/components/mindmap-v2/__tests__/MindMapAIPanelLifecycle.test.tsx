@@ -4,6 +4,7 @@ import React from 'react';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { MindElixirInstance, NodeObj } from 'mind-elixir';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import i18n from '@/i18n';
 
 vi.stubGlobal('ResizeObserver', class ResizeObserverStub {
     disconnect() {}
@@ -82,16 +83,21 @@ const openPanel = async (mind: MindElixirInstance) => {
     registerMindElixirInstance(mind);
     render(<MindMapAIPanel />);
     act(() => toggleAIPanel(true));
-    expect(await screen.findByRole('complementary', { name: 'AI 思维导图助手' })).toBeTruthy();
+    expect(await screen.findByRole('complementary', {
+        name: i18n.t('plugins.mindmap.aiPanel.panelLabel'),
+    })).toBeTruthy();
 };
 
 const switchToExpand = async () => {
-    const expandMode = screen.getByText('扩展');
+    const expandMode = screen.getByText(i18n.t('plugins.mindmap.aiPanel.modes.expand'));
     fireEvent.click(expandMode);
-    return screen.findByRole('button', { name: '生成子主题建议' });
+    return screen.findByRole('button', {
+        name: i18n.t('plugins.mindmap.aiPanel.expandAction'),
+    });
 };
 
-beforeEach(() => {
+beforeEach(async () => {
+    await i18n.changeLanguage('zh');
     harness.classifyTasks.mockReset();
     harness.confirm.mockReset();
     harness.confirmOptions = undefined;
@@ -151,14 +157,18 @@ describe('MindMapAIPanel request lifecycle', () => {
         await openPanel(mind);
         fireEvent.click(await switchToExpand());
         await waitFor(() => expect(harness.expandNode).toHaveBeenCalledTimes(1));
-        fireEvent.click(screen.getByRole('button', { name: '关闭 AI 思维导图助手' }));
+        fireEvent.click(screen.getByRole('button', {
+            name: i18n.t('plugins.mindmap.aiPanel.close'),
+        }));
 
         await act(async () => {
             resolveExpansion?.({ topics: ['Late suggestion'] });
             await Promise.resolve();
         });
 
-        expect(screen.queryByRole('complementary', { name: 'AI 思维导图助手' })).toBeNull();
+        expect(screen.queryByRole('complementary', {
+            name: i18n.t('plugins.mindmap.aiPanel.panelLabel'),
+        })).toBeNull();
         expect(screen.queryByRole('button', { name: '+ Late suggestion' })).toBeNull();
     });
 
@@ -171,9 +181,32 @@ describe('MindMapAIPanel request lifecycle', () => {
         fireEvent.click(await switchToExpand());
 
         await waitFor(() => {
-            expect(harness.messageError).toHaveBeenCalledWith('生成子主题失败，请重试');
+            expect(harness.messageError).toHaveBeenCalledWith(
+                i18n.t('plugins.mindmap.aiPanel.expandFailed'),
+            );
         });
-        expect((screen.getByRole('button', { name: '生成子主题建议' }) as HTMLButtonElement).disabled).toBe(false);
+        expect((screen.getByRole('button', {
+            name: i18n.t('plugins.mindmap.aiPanel.expandAction'),
+        }) as HTMLButtonElement).disabled).toBe(false);
+    });
+
+    it('does not expose a Chinese service error in an English workspace', async () => {
+        await i18n.changeLanguage('en');
+        const root: NodeObj = { id: 'root', topic: 'Root', children: [] };
+        const { mind } = createMind(root);
+        harness.expandNode.mockResolvedValueOnce({
+            topics: [],
+            error: '请先在 AI 设置中配置有效的 Provider 和 API Key',
+        });
+
+        await openPanel(mind);
+        fireEvent.click(await switchToExpand());
+
+        await waitFor(() => {
+            expect(harness.messageError).toHaveBeenCalledWith(
+                'Configure a valid AI provider and API key before continuing.',
+            );
+        });
     });
 
     it('requires confirmation before replacing a non-empty map', async () => {
@@ -185,10 +218,14 @@ describe('MindMapAIPanel request lifecycle', () => {
         });
 
         await openPanel(mind);
-        fireEvent.change(screen.getByRole('textbox', { name: 'AI 建图主题或业务问题' }), {
+        fireEvent.change(screen.getByRole('textbox', {
+            name: i18n.t('plugins.mindmap.aiPanel.createPromptLabel'),
+        }), {
             target: { value: 'Replacement map' },
         });
-        fireEvent.click(screen.getByRole('button', { name: '生成完整导图' }));
+        fireEvent.click(screen.getByRole('button', {
+            name: i18n.t('plugins.mindmap.aiPanel.createAction'),
+        }));
 
         expect(harness.confirm).toHaveBeenCalledTimes(1);
         expect(harness.generateMap).not.toHaveBeenCalled();
@@ -203,7 +240,38 @@ describe('MindMapAIPanel request lifecycle', () => {
         expect(harness.generateMap).toHaveBeenCalledWith('Replacement map');
         expect(refresh).toHaveBeenCalledTimes(1);
         act(() => options.afterClose?.());
-        expect(screen.getByRole('complementary', { name: 'AI 思维导图助手' }).getAttribute('aria-busy')).toBe('false');
-        expect((screen.getByRole('textbox', { name: 'AI 建图主题或业务问题' }) as HTMLTextAreaElement).value).toBe('');
+        expect(screen.getByRole('complementary', {
+            name: i18n.t('plugins.mindmap.aiPanel.panelLabel'),
+        }).getAttribute('aria-busy')).toBe('false');
+        expect((screen.getByRole('textbox', {
+            name: i18n.t('plugins.mindmap.aiPanel.createPromptLabel'),
+        }) as HTMLTextAreaElement).value).toBe('');
+    });
+
+    it('localizes all four operation modes and their accessible names in English', async () => {
+        await i18n.changeLanguage('en');
+        const root: NodeObj = { id: 'root', topic: 'Root', children: [] };
+        const { mind } = createMind(root);
+
+        await openPanel(mind);
+        expect(screen.getByRole('button', { name: 'Close AI mind map assistant' })).toBeTruthy();
+        expect(screen.getByRole('textbox', {
+            name: 'Topic or business question for AI mind map generation',
+        })).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Generate complete mind map' })).toBeTruthy();
+
+        fireEvent.click(screen.getByText('Expand', { exact: true }));
+        expect(await screen.findByRole('combobox', { name: 'AI operation target node' })).toBeTruthy();
+        expect(screen.getByText('Root (root node)')).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Generate child-topic suggestions' })).toBeTruthy();
+
+        fireEvent.click(screen.getByText('Process', { exact: true }));
+        expect(screen.getByRole('textbox', { name: 'AI mind map processing instruction' })).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Apply to target node' })).toBeTruthy();
+
+        fireEvent.click(screen.getByText('Tasks', { exact: true }));
+        expect(screen.getByText(/This branch has 0 leaf tasks/)).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Plan tasks in this branch' })).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Quick plan with rules' })).toBeTruthy();
     });
 });
