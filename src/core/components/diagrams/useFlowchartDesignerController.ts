@@ -1,6 +1,5 @@
 import React, { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import { message, notification } from 'antd';
-import { ReactFlowInstance, addEdge, type Connection, type Edge } from '@xyflow/react';
 
 import { useDesignerCanvasState } from './hooks/useDesignerCanvasState';
 import { useDesignerInteractions } from './hooks/useDesignerInteractions';
@@ -20,14 +19,10 @@ import { useMobileInteractions } from '../../hooks/useMobileInteractions';
 import { useCollapsibleGroups } from './hooks/useCollapsibleGroups';
 import { useLayerManagement } from './hooks/useLayerManagement';
 import { useMultiPage } from './hooks/useMultiPage';
-import { dispatchDiagramControl } from '../shared/diagramControl';
 import { useDesignerBatchUpdates } from './hooks/useDesignerBatchUpdates';
 import { useAutoRouting } from './hooks/useAutoRouting';
 import { useFlowchartExportControls } from './hooks/useFlowchartExportControls';
 import { useDesignerCommands } from './hooks/useDesignerCommands';
-import { createFlowchartImportHandler, type FlowchartImportEvent } from './flowchartImportHandler';
-import { scheduleFlowchartInitialFit } from './flowchartInitialFit';
-import { registerImportedFlowchartDiagram } from './flowchartImportRegistration';
 import { useFlowchartPluginRuntime } from './hooks/useFlowchartPluginRuntime';
 import { useFlowchartExternalEvents } from './hooks/useFlowchartExternalEvents';
 import { useFlowchartShellState } from './hooks/useFlowchartShellState';
@@ -37,7 +32,7 @@ import { coerceCollaborationPresenceUsers } from './collaborationPresence';
 import { shouldShowFlowchartMinimapByDefault } from './flowchartResponsiveChrome';
 import { useFlowchartChromeCoordination } from './hooks/useFlowchartChromeCoordination';
 import { useFlowchartHostActions } from './hooks/useFlowchartHostActions';
-import { useMobileFlowchartViewportGuard, useScheduledFlowchartFit } from './hooks/useMobileFlowchartViewportGuard';
+import { useMobileFlowchartViewportGuard } from './hooks/useMobileFlowchartViewportGuard';
 import { useFlowchartSearchReplaceActions } from './hooks/useFlowchartSearchReplaceActions';
 import { useFlowchartCreationTools } from './hooks/useFlowchartCreationTools';
 import { useFlowchartImportRequest } from './hooks/useFlowchartImportRequest';
@@ -47,6 +42,11 @@ import { useFlowchartImportNotifications } from './hooks/useFlowchartImportNotif
 import { useHistoryFeedbackActions } from './historyActionFeedback';
 import { useFlowchartNodeFocus } from './hooks/useFlowchartNodeFocus';
 import { useFlowchartCanvasExit } from './hooks/useFlowchartCanvasExit';
+import { useFlowchartConnectionHandler } from './hooks/useFlowchartConnectionHandler';
+import { useFlowchartPaneDoubleClick } from './hooks/useFlowchartPaneDoubleClick';
+import { useFlowchartImportHandler } from './hooks/useFlowchartImportHandler';
+import { useFlowchartReverseImportFeedback } from './hooks/useFlowchartReverseImportFeedback';
+import { useFlowchartReactFlowInit } from './hooks/useFlowchartReactFlowInit';
 import { resolveFlowchartCustomDomainLayoutCapability } from './flowchartLayoutCapabilities';
 
 export const useFlowchartDesignerController = ({
@@ -295,6 +295,13 @@ export const useFlowchartDesignerController = ({
     });
 
     // 2. Interactions Domain Controller
+    const handleConnect = useFlowchartConnectionHandler({
+        edgesRef,
+        nodesRef,
+        relationshipLabel: t('designer.flowchart.relationshipEdgeLabel'),
+        setEdges,
+        takeSnapshot,
+    });
     const interactionsParams = useDesignerInteractions({
         nodes, edges, nodesRef, edgesRef, setNodes, setEdges,
         selectedNodes, setSelectedNodes,
@@ -303,26 +310,7 @@ export const useFlowchartDesignerController = ({
         activePlugin, pluginCtx,
         onNodesChange, onEdgesChange,
         virtualizedNodes: nodesWithCollapseState, edgesWithCollapseState: edgesWithCollapseState,
-         onConnect: (params: Connection) => {
-             takeSnapshot(nodesRef.current, edgesRef.current);
-             
-             const isRelationship = (params.sourceHandle?.includes('relationship') || params.targetHandle?.includes('relationship'));
-             
-             if (isRelationship) {
-                 const id = `rel-${Date.now()}`;
-                  const newEdge: Edge = {
-                     ...params,
-                     id,
-                     type: 'relationshipEdge',
-                     data: { label: t('designer.flowchart.relationshipEdgeLabel') },
-                     animated: true
-                 };
-                 setEdges(eds => addEdge(newEdge, eds));
-                 return;
-             }
-             
-             setEdges(eds => addEdge(params, eds));
-         },
+        onConnect: handleConnect,
         preset, showOnlyMainFlow, highlightMainFlow,
         layers,
         activeLayerId,
@@ -513,13 +501,8 @@ export const useFlowchartDesignerController = ({
         reactFlowInstance, viewport, createFromTemplate, templates, selectedNodes, updateNodesBatch,
     });
 
-    const notifyReverseImportSuccess = useCallback((filename: string) => {
-        messageApi.success(t('designer.flowchart.import.reverseSuccess', { filename }));
-    }, [messageApi, t]);
-    const scheduleReverseImportFit = useScheduledFlowchartFit(handleFitView, 300);
-    const selectExternalRightTab = useCallback((tab: string) => {
-        setActiveRightTab(tab === 'ai' ? 'ai' : 'property');
-    }, [setActiveRightTab]);
+    const { notifyReverseImportSuccess, scheduleReverseImportFit, selectExternalRightTab } =
+        useFlowchartReverseImportFeedback(messageApi, t, handleFitView, setActiveRightTab);
 
     useFlowchartExternalEvents({
         snapshot: { getNodes: getCurrentNodes, getEdges: getCurrentEdges, takeSnapshot },
@@ -555,23 +538,12 @@ export const useFlowchartDesignerController = ({
         },
     });
 
-    const handleImport = useCallback((event: FlowchartImportEvent) => createFlowchartImportHandler({
-        t,
-        messageApi,
-        activePlugin,
-        businessDataId: businessData?.id,
-        diagramId: id,
-        setNodes,
-        setEdges,
-        onBeforeCanvasReplace: handleBeforeUpdate,
-        editingEnabled,
-        fitView: handleFitView,
-        registerStandardReload: registerImportedFlowchartDiagram,
-        importInFlightRef,
-        onImportStarted: handleImportStarted,
-        onImportFinished: handleImportFinished,
-        getOperationScope,
-    })(event), [t, messageApi, activePlugin, businessData?.id, id, setNodes, setEdges, handleBeforeUpdate, editingEnabled, handleFitView, handleImportFinished, handleImportStarted, getOperationScope]);
+    const handleImport = useFlowchartImportHandler({
+        t, messageApi, activePlugin, businessDataId: businessData?.id, diagramId: id,
+        setNodes, setEdges, onBeforeCanvasReplace: handleBeforeUpdate, editingEnabled,
+        fitView: handleFitView, importInFlightRef, onImportStarted: handleImportStarted,
+        onImportFinished: handleImportFinished, getOperationScope,
+    });
 
     const onSelectionChange = useCanonicalSelectionChange({
         nodesRef,
@@ -580,21 +552,10 @@ export const useFlowchartDesignerController = ({
         setSelectedEdges,
     });
 
-    const onPaneDoubleClick = useCallback((event: React.MouseEvent | MouseEvent) => {
-        if (!reactFlowInstance) return;
-        const flowPos = reactFlowInstance.screenToFlowPosition({
-            x: event.clientX,
-            y: event.clientY,
-        });
-        openQuickAddMenu(flowPos.x, flowPos.y);
-    }, [openQuickAddMenu, reactFlowInstance]);
+    const onPaneDoubleClick = useFlowchartPaneDoubleClick({ openQuickAddMenu, reactFlowInstance });
 
     const handleOpenJsonEditor = useCallback(() => setJsonEditorVisible(true), [setJsonEditorVisible]);
     const setShowShortcuts = useCallback(() => setShortcutHelpVisible(true), [setShortcutHelpVisible]);
-
-    // ─── Modular migration stubs removed ───
-
-
 
     // 4. System Sync Domain Controller
     const { performanceMode, isInitialDiagramLoading, saveState } = useDesignerSystemSync({
@@ -655,14 +616,7 @@ export const useFlowchartDesignerController = ({
         takeSnapshot,
     });
 
-    // 🚀 P2 性能优化：稳定的 onInit 回调，避?CanvasShell memo 失效
-    const handleReactFlowInit = useCallback((instance: ReactFlowInstance) => {
-        setReactFlowInstance(instance);
-        scheduleFlowchartInitialFit({
-            reactFlowInstance: instance,
-            dispatchFit: () => dispatchDiagramControl('fit', id),
-        });
-    }, [id, setReactFlowInstance]);
+    const handleReactFlowInit = useFlowchartReactFlowInit({ diagramId: id, setReactFlowInstance });
 
     const onPaneMouseMove = useCallback((event: React.MouseEvent) => {
         if (!reactFlowInstance) return;

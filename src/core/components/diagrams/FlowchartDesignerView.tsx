@@ -1,5 +1,5 @@
 import React from 'react';
-import { ConnectionMode, Node } from '@xyflow/react';
+import { ConnectionMode } from '@xyflow/react';
 
 import { LiveCursors } from './collaboration/LiveCursors';
 import { appMessage } from '@/core/utils/antdStaticBridge';
@@ -17,20 +17,13 @@ import { FlowchartFileDropOverlay } from './FlowchartFileDropOverlay';
 import { FlowchartOnboardingHint } from './FlowchartOnboardingHint';
 import { PageScopedPluginCanvas } from './PageScopedPluginCanvas';
 import { shouldShowFlowchartOnboarding } from './flowchartResponsiveChrome';
-import { resolveFlowchartLeftClearance } from './flowchartChromeLayout';
-import { getFlowchartMarqueeCanvasInteraction } from './flowchartMarqueeInteraction';
 import { FreehandDrawingLayer } from './FreehandDrawingLayer';
 import { RemoteCursors } from './ui/RemoteCursors';
 import { UnifiedDesignerShell } from './UnifiedDesignerShell';
-import { persistFlowchartOnboardingDismissed } from './flowchartOnboardingStorage';
 import { shouldOpenDesignerAiSidebar } from './designerRightSidebarState';
 import {
-    CONTAINER_COLLAPSE_REQUEST_EVENT,
-    readContainerCollapseRequest,
-} from './containerCollapseRequest';
-import {
     resolveFlowchartPluginContribution,
-    type FlowchartDesignerViewModel,
+    type FlowchartDesignerViewProps,
 } from './flowchartDesignerViewModel';
 import {
     FlowchartDesignerLeftSidebar,
@@ -38,19 +31,15 @@ import {
     FlowchartDesignerRightSidebarRegion,
 } from './FlowchartDesignerShellRegions';
 import { filterCommentsForPage } from './commentPageScope';
-import { useFlowchartFileDrop } from './hooks/useFlowchartFileDrop';
-import { supportsReactFlowMinimap } from './reactFlowMinimapCapability';
+import { useFlowchartDesignerViewSetup } from './useFlowchartDesignerViewSetup';
 
 export type { FlowchartDesignerViewModel } from './flowchartDesignerViewModel';
 
-interface FlowchartDesignerViewProps {
-    model: FlowchartDesignerViewModel;
-}
-
-interface NodePositionUpdate {
-    id: string;
-    position: { x: number; y: number };
-}
+import {
+    applyFlowchartNodePositionUpdates,
+    dismissFlowchartOnboarding,
+    type NodePositionUpdate,
+} from './flowchartDesignerViewHelpers';
 
 /**
  * Presentation-only half of FlowchartDesigner. State ownership and event wiring
@@ -148,7 +137,6 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
         isMarqueeActive,
         isMobile,
         isReadonly,
-        isSidebarHidden,
         isSpacePressed,
         isValidConnection,
         isYjsSynced,
@@ -161,7 +149,6 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
         lastNodeLayout,
         layerSyncedNodes,
         leftDrawerOpen,
-        leftDrawerWidth,
         messageContextHolder,
         multiPage,
         nodes,
@@ -171,8 +158,6 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
         onCloudSave,
         onConnectStart,
         onDirectSave,
-        onDragOver,
-        onDrop,
         onEdgeContextMenu,
         onEdgesChangeWithLock,
         onNodeContextMenu,
@@ -255,30 +240,14 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
         yAwareness,
     } = model;
 
-    React.useEffect(() => {
-        const handleCollapseRequest = (event: Event) => {
-            const nodeId = readContainerCollapseRequest(event);
-            if (nodeId) toggleGroupCollapse(nodeId);
-        };
-        window.addEventListener(CONTAINER_COLLAPSE_REQUEST_EVENT, handleCollapseRequest);
-        return () => window.removeEventListener(CONTAINER_COLLAPSE_REQUEST_EVENT, handleCollapseRequest);
-    }, [toggleGroupCollapse]);
-
-    const actualLeftOffset = resolveFlowchartLeftClearance({
-        isSidebarHidden,
-        leftDrawerOpen,
-        leftDrawerWidth,
-    });
-    const editingEnabled = !isReadonly && !presentationActive;
-    const showEditingChrome = !presentationActive;
-    const marqueeCanvasInteraction = getFlowchartMarqueeCanvasInteraction(isMarqueeActive);
-    const fileDrop = useFlowchartFileDrop({
-        importFile: handleImport, requestImport: handleRequestImport,
-        onCanvasDragOver: onDragOver, onCanvasDrop: onDrop,
-        confirmOkText: t('designer.flowchart.import.confirmDropOk', '继续导入'),
-        enabled: editingEnabled,
-    });
-    const reactFlowMinimapSupported = supportsReactFlowMinimap(activePlugin);
+    const {
+        actualLeftOffset,
+        editingEnabled,
+        fileDrop,
+        marqueeCanvasInteraction,
+        reactFlowMinimapSupported,
+        showEditingChrome,
+    } = useFlowchartDesignerViewSetup(model);
 
     return (
         <UnifiedDesignerShell
@@ -332,15 +301,12 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                         })}
                         mod={/Mac/i.test(navigator.platform) ? '⌘' : 'Ctrl'}
                         onOpenCommandPalette={() => setCommandPaletteVisible(true)}
-                        onDismiss={() => {
-                            setOnboardingDismissed(true);
-                            persistFlowchartOnboardingDismissed();
-                        }}
+                        onDismiss={() => dismissFlowchartOnboarding(setOnboardingDismissed)}
                     />}
                     {editingEnabled && <FlowchartEmptyState
                         visible={pluginId !== 'mindmap' && !isInitialDiagramLoading && nodes.length === 0 && !jsonEditorVisible && !isDragging && !isConnecting && !quickAddMenu?.visible}
                         pluginId={pluginId}
-                        onOpenShapePicker={() => setMobileRequestedPanel('shapes')}
+                        onOpenShapePicker={() => setMobileRequestedPanel('shapes-search')}
                     />}
                     {isInitialDiagramLoading && (
                         <div
@@ -625,11 +591,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                             updateEdgesBatch,
                                             onUpdateNodes: (updates: NodePositionUpdate[]) => {
                                                 takeSnapshot(nodesRef.current, edgesRef.current);
-                                                const updatesMap = new Map(updates.map(update => [update.id, update]));
-                                                setNodes((currentNodes: Node[]) => currentNodes.map((node) => {
-                                                    const update = updatesMap.get(node.id);
-                                                    return (update && update.position) ? { ...node, position: update.position } : node;
-                                                }));
+                                                setNodes(currentNodes => applyFlowchartNodePositionUpdates(currentNodes, updates));
                                             },
                                             handleDeleteWithToast,
                                             handleDuplicateWithToast,
@@ -659,6 +621,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                             activePageId: multiPage.activePageId,
                                             onSwitchPage: multiPage.switchPage,
                                             onAddPage: multiPage.addPage,
+                                            onDiscardPage: multiPage.discardPage,
                                             onDeletePage: multiPage.deletePage,
                                             onRestoreDeletedPage: multiPage.restoreDeletedPage,
                                             onRenamePage: multiPage.renamePage,

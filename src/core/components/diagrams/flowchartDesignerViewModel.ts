@@ -5,6 +5,8 @@ import type { useFlowchartDesignerController } from './useFlowchartDesignerContr
 export type FlowchartDesignerViewModel =
     ReturnType<typeof useFlowchartDesignerController>['viewModel'];
 
+export interface FlowchartDesignerViewProps { model: FlowchartDesignerViewModel }
+
 export const resolveFlowchartPluginContribution = <T>(
     region: 'sidebar' | 'toolbar' | 'canvas',
     contribute: (() => T) | null | undefined,
