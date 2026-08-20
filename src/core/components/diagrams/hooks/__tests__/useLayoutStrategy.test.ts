@@ -229,6 +229,36 @@ describe('prepareLayeredLayoutEdges', () => {
     });
   });
 
+  it('uses the terminal segment axis when a route ends on an ambiguous side boundary', () => {
+    const ambiguousNodes = [
+      { id: 'source', position: { x: 0, y: 0 }, width: 200, height: 80, data: {} },
+      { id: 'target', position: { x: 40, y: 180 }, width: 200, height: 80, data: {} },
+    ] as Node[];
+    const verticalRouteEndingAtTargetLeftCenter = [
+      { x: 40, y: 80 },
+      { x: 40, y: 220 },
+    ];
+
+    const [edge] = prepareLayeredLayoutEdges(ambiguousNodes, [{
+      id: 'axis-authoritative',
+      source: 'source',
+      target: 'target',
+      data: {
+        layoutRoutingCandidate: true,
+        elkPath: verticalRouteEndingAtTargetLeftCenter,
+      },
+    }] as Edge[], 'TB');
+
+    expect(edge).toMatchObject({
+      sourceHandle: 'bottom',
+      targetHandle: 'top',
+      data: {
+        elkPath: verticalRouteEndingAtTargetLeftCenter,
+        layoutRoutingCandidate: true,
+      },
+    });
+  });
+
   it('does not promote an unlocked or malformed computed path', () => {
     const [unlocked, malformed] = prepareLayeredLayoutEdges(nodes, [{
       id: 'unlocked', source: 'source', target: 'below',

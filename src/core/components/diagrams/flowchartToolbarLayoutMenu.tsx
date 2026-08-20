@@ -226,24 +226,40 @@ export const buildFlowchartLayoutMenuModel = ({
         nodeItem('node-vertical', labels.nodeVertical, 'vertical'),
     ];
 
+    const primaryTopBottomItem = customDomainLayoutAvailable
+        ? domainItem(
+            'domain-dagre-tb',
+            labels.domainDagreTb,
+            () => onStrategyLayout?.('domain-dagre', undefined, 'TB'),
+            <FaRegObjectGroup />,
+        )
+        : domainItem(
+            'domain-compound-elk-tb',
+            labels.domainCompoundElkTb,
+            () => onStrategyLayout?.('domain-compound-elk', undefined, 'TB'),
+            <FaObjectGroup />,
+        );
+
     const moreEngineItems: NonNullable<MenuProps['items']> = [
         ...(onStrategyLayout ? [{
             key: 'group-domain',
             label: labels.domainGroup,
             type: 'group' as const,
             children: [
-                domainItem(
-                    'domain-dagre-sub-horizontal-tb',
-                    labels.domainDagreSubHorizontalTb,
-                    () => onStrategyLayout('domain-dagre-sub-horizontal', 'dagre', 'TB'),
-                    <FaRegObjectGroup />,
-                ),
-                domainItem(
-                    'domain-compound-elk-tb',
-                    labels.domainCompoundElkTb,
-                    () => onStrategyLayout('domain-compound-elk', undefined, 'TB'),
-                    <FaObjectGroup />,
-                ),
+                ...(customDomainLayoutAvailable ? [
+                    domainItem(
+                        'domain-dagre-sub-horizontal-tb',
+                        labels.domainDagreSubHorizontalTb,
+                        () => onStrategyLayout('domain-dagre-sub-horizontal', 'dagre', 'TB'),
+                        <FaRegObjectGroup />,
+                    ),
+                    domainItem(
+                        'domain-compound-elk-tb',
+                        labels.domainCompoundElkTb,
+                        () => onStrategyLayout('domain-compound-elk', undefined, 'TB'),
+                        <FaObjectGroup />,
+                    ),
+                ] : []),
                 domainItem(
                     'domain-lanes-tb',
                     labels.domainLanesTb,
@@ -298,12 +314,7 @@ export const buildFlowchartLayoutMenuModel = ({
                     icon: <FaMagic />,
                     onClick: () => { void onSmartLayout(); },
                 }] : []),
-                domainItem(
-                    'domain-dagre-tb',
-                    labels.domainDagreTb,
-                    () => onStrategyLayout?.('domain-dagre', undefined, 'TB'),
-                    <FaRegObjectGroup />,
-                ),
+                primaryTopBottomItem,
                 domainItem(
                     'domain-compound-elk-lr',
                     labels.domainCompoundElkLr,

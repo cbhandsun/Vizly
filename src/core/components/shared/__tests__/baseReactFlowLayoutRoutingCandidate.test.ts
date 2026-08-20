@@ -18,7 +18,11 @@ vi.mock('../baseReactFlowDisplayWorkerClient', async importOriginal => {
 });
 
 import { clearBaseReactFlowDisplayCommittedSnapshots } from '../baseReactFlowDisplayCommittedSnapshot';
-import { stageBaseReactFlowLayoutRouting } from '../baseReactFlowLayoutRoutingTransaction';
+import {
+  seedBaseReactFlowStagedLayoutEdges,
+  stageBaseReactFlowLayoutRouting,
+} from '../baseReactFlowLayoutRoutingTransaction';
+import { getDisplayHardQualityGateReport } from '../baseReactFlowDisplayQualityGates';
 
 const nodes: Node[] = [
   {
@@ -81,6 +85,47 @@ describe('baseReactFlow layout routing candidate sequence', () => {
       timeoutMs: 12_000,
     });
     expect(workerMocks.compute).not.toHaveBeenCalled();
+  });
+
+  it('repairs terminal-axis and hairpin defects before the hidden Worker pass', () => {
+    const defectNodes = [
+      {
+        id: 'check-limit', position: { x: 737, y: 1602 },
+        measured: { width: 249, height: 96 }, data: {},
+      },
+      {
+        id: 'pool-a-entry', position: { x: 753, y: 1818 },
+        measured: { width: 217, height: 96 }, data: {},
+      },
+      {
+        id: 'task-direct-a', position: { x: 731, y: 3665 },
+        measured: { width: 172, height: 96 }, data: {},
+      },
+      {
+        id: 'end-wms', position: { x: 438, y: 3881 },
+        measured: { width: 174, height: 96 }, data: {},
+      },
+    ] as Node[];
+    const defectEdges = [
+      {
+        id: 'e5', source: 'check-limit', target: 'pool-a-entry',
+        sourceHandle: 'left', targetHandle: 'left', type: 'advanced-smart-step', data: {},
+      },
+      {
+        id: 'e21', source: 'task-direct-a', target: 'end-wms',
+        sourceHandle: 'left', targetHandle: 'left', type: 'advanced-smart-step', data: {},
+      },
+    ] as Edge[];
+
+    const seeded = seedBaseReactFlowStagedLayoutEdges({
+      sourceEdges: defectEdges,
+      sourceNodes: defectNodes,
+    });
+    const report = getDisplayHardQualityGateReport(seeded, defectNodes, 'polished');
+
+    expect(report.terminalsAttached).toBe(true);
+    expect(report.terminalsAnchored).toBe(true);
+    expect(report.quality.hairpins).toBe(0);
   });
 
   it('replays an exact hard-clean layout without starting another Worker request', async () => {

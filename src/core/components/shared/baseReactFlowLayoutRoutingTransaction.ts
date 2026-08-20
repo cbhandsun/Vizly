@@ -26,6 +26,8 @@ import {
 } from './baseReactFlowDisplayWorkerClient';
 import { LAYOUT_DISPLAY_WORKER_TIMEOUT_MS } from './baseReactFlowDisplayWorkerTimeout';
 import { recordBaseReactFlowRejectedDisplayDiagnostics } from './baseReactFlowDisplayRejectedDiagnostics';
+import { repairAxisMismatchedTerminalsWithBoundedPortRoles } from './baseReactFlowDisplayTerminalPortRepair';
+import { repairResidualHairpinBridges } from '../../strategies/shared/edgeHairpinBridgeWidenRepair';
 
 export type BaseReactFlowLayoutRoutingCommit = Readonly<{
   routedEdges: Edge[];
@@ -112,7 +114,13 @@ export const seedBaseReactFlowStagedLayoutEdges = ({
       nodeById,
     });
   });
-  return anchorComputedDisplayEdgeEndpoints(seededEdges, projected.nodes);
+  const anchoredEdges = anchorComputedDisplayEdgeEndpoints(seededEdges, projected.nodes);
+  const axisRepairedEdges = repairAxisMismatchedTerminalsWithBoundedPortRoles(
+    anchoredEdges,
+    projected.nodes,
+    Math.min(128, Math.max(32, anchoredEdges.length * 4)),
+  );
+  return repairResidualHairpinBridges(axisRepairedEdges, projected.nodes);
 };
 
 /**

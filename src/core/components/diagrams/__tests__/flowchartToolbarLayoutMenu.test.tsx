@@ -266,18 +266,31 @@ describe('flowchartToolbarLayoutMenu', () => {
   });
 
   it('disables only custom composition controls for graphs that require a preset engine', () => {
+    const onStrategyLayout = vi.fn();
     const model = buildFlowchartLayoutMenuModel({
       customDomainLayoutAvailable: false,
       lastDomainStrategy: 'domain-compound-elk',
       lastDomainDirection: 'LR',
-      onStrategyLayout: vi.fn(),
+      onStrategyLayout,
       translate: (_key, fallback) => fallback,
     });
     const items = collectItems(model.items);
+    const recommended = collectItems(asRecord(model.items[0]).children);
+    const moreEngines = collectItems(asRecord(model.items[4]).children);
 
     expect(items.find(item => item.key === 'custom-domain-direction')?.disabled).toBe(true);
     expect(items.find(item => item.key === 'custom-node-arrangement')?.disabled).toBe(true);
     expect(items.find(item => item.key === 'domain-compound-elk-lr')?.disabled).not.toBe(true);
     expect(asRecord(model.items[2]).label).toContain('当前图含合流或循环');
+    expect(recommended.map(item => item.key)).toEqual([
+      'domain-compound-elk-tb',
+      'domain-compound-elk-lr',
+      'domain-lanes-lr',
+    ]);
+    expect(moreEngines.map(item => item.key)).not.toContain('domain-compound-elk-tb');
+
+    const topBottom = recommended.find(item => item.key === 'domain-compound-elk-tb');
+    if (typeof topBottom?.onClick === 'function') topBottom.onClick();
+    expect(onStrategyLayout).toHaveBeenCalledWith('domain-compound-elk', undefined, 'TB');
   });
 });

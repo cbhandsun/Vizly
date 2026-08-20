@@ -194,6 +194,46 @@ const closestLayoutHandle = (
     return candidates[0].handle;
 };
 
+const LAYOUT_ROUTE_TERMINAL_AXIS_SNAP_MAX = 80;
+
+/**
+ * A route endpoint can sit on one node side while its terminal segment clearly
+ * enters through another side (most commonly a vertical segment ending near a
+ * left/right corner). The segment axis is the authoritative port contract; the
+ * nearest boundary is only a fallback when the route is diagonal, degenerate,
+ * or too far from the required side to be snapped safely.
+ */
+const resolveLayoutRouteTerminalHandle = (
+    node: Node,
+    terminal: { x: number; y: number },
+    adjacent: { x: number; y: number } | undefined,
+): LayoutTerminalHandles['sourceHandle'] => {
+    if (!adjacent) return closestLayoutHandle(node, terminal);
+    const position = (node as Node & { positionAbsolute?: Node['position'] })
+        .positionAbsolute ?? node.position;
+    const size = getLayoutNodeSize(node);
+    const deltaX = adjacent.x - terminal.x;
+    const deltaY = adjacent.y - terminal.y;
+    const horizontal = Math.abs(deltaX) > 0.5 && Math.abs(deltaY) <= 0.5;
+    const vertical = Math.abs(deltaY) > 0.5 && Math.abs(deltaX) <= 0.5;
+
+    if (horizontal) {
+        const handle = deltaX > 0 ? 'right' : 'left';
+        const boundaryX = handle === 'right' ? position.x + size.width : position.x;
+        if (Math.abs(terminal.x - boundaryX) <= LAYOUT_ROUTE_TERMINAL_AXIS_SNAP_MAX) {
+            return handle;
+        }
+    }
+    if (vertical) {
+        const handle = deltaY > 0 ? 'bottom' : 'top';
+        const boundaryY = handle === 'bottom' ? position.y + size.height : position.y;
+        if (Math.abs(terminal.y - boundaryY) <= LAYOUT_ROUTE_TERMINAL_AXIS_SNAP_MAX) {
+            return handle;
+        }
+    }
+    return closestLayoutHandle(node, terminal);
+};
+
 export const prepareLayeredLayoutEdges = (
     resultNodes: Node[],
     resultEdges: Edge[],
@@ -221,8 +261,16 @@ export const prepareLayeredLayoutEdges = (
         const layoutRoute = explicitLayoutRoute ?? currentLockedRoute;
         const handles = sourceNode && targetNode && layoutRoute
             ? {
-                sourceHandle: closestLayoutHandle(sourceNode, layoutRoute[0]),
-                targetHandle: closestLayoutHandle(targetNode, layoutRoute[layoutRoute.length - 1]),
+                sourceHandle: resolveLayoutRouteTerminalHandle(
+                    sourceNode,
+                    layoutRoute[0],
+                    layoutRoute[1],
+                ),
+                targetHandle: resolveLayoutRouteTerminalHandle(
+                    targetNode,
+                    layoutRoute[layoutRoute.length - 1],
+                    layoutRoute[layoutRoute.length - 2],
+                ),
             }
             : sourceNode && targetNode
                 ? resolveLayeredLayoutTerminalHandles(sourceNode, targetNode, direction)

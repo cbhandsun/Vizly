@@ -42,6 +42,54 @@ const asRecord = (value: unknown): Record<string, unknown> =>
 const isGroupType = (type: unknown): boolean =>
   new Set(['subGroup', 'titleGroup', 'group', 'domain']).has(String(type || ''));
 
+/**
+ * ELK child coordinates are relative to their compound parent. React Flow uses
+ * the same contract whenever `parentId` is present, so only root children may
+ * receive the canvas padding/absolute offset. Writing accumulated coordinates
+ * into nested nodes makes React Flow add every parent a second time and also
+ * gives the edge router a different graph from the one ELK actually ranked.
+ */
+export const applyElkResultNodeGeometry = (
+  children: ElkNode[] | undefined,
+  nodeById: Map<string, ReactFlowNode>,
+  padding: { x: number; y: number },
+): void => {
+  const visit = (
+    node: ElkNode,
+    parentAbsoluteX: number,
+    parentAbsoluteY: number,
+    parentElkId?: string,
+  ) => {
+    const localX = finiteNumber(node.x, 0);
+    const localY = finiteNumber(node.y, 0);
+    const absoluteX = parentAbsoluteX + localX;
+    const absoluteY = parentAbsoluteY + localY;
+    const targetNode = nodeById.get(node.id);
+    if (targetNode) {
+      const usesElkParent = Boolean(parentElkId && targetNode.parentId === parentElkId);
+      targetNode.position = usesElkParent
+        ? { x: localX, y: localY }
+        : { x: absoluteX, y: absoluteY };
+
+      const width = finiteNumber(node.width, 0);
+      const height = finiteNumber(node.height, 0);
+      if (width > 0 && height > 0 && isGroupType(targetNode.type)) {
+        targetNode.style = { ...targetNode.style, width, height };
+        targetNode.measured = { width, height };
+      }
+    }
+
+    node.children?.forEach(child => visit(
+      child,
+      absoluteX,
+      absoluteY,
+      node.id,
+    ));
+  };
+
+  children?.forEach(child => visit(child, padding.x, padding.y));
+};
+
 export abstract class AbstractElkLayoutStrategy implements ILayoutStrategy {
   private worker: Worker | null = null;
 
@@ -149,31 +197,7 @@ export abstract class AbstractElkLayoutStrategy implements ILayoutStrategy {
           } else {
 
 
-            const updateNodePositions = (node: ElkNode, parentX: number, parentY: number) => {
-              const currentX = parentX + (node.x || 0);
-              const currentY = parentY + (node.y || 0);
-
-              const targetNode = idMap.get(node.id);
-              if (targetNode) {
-                // 更新位置
-                targetNode.position = { x: currentX, y: currentY };
-
-                // 更新尺寸（ELK 会计算容器的包围盒尺寸）
-                if (node.width && node.height && isGroupType(targetNode.type)) {
-                  targetNode.style = { ...targetNode.style, width: node.width, height: node.height };
-                  targetNode.measured = { width: node.width, height: node.height };
-                }
-              }
-
-              if (node.children) {
-                node.children.forEach(child => updateNodePositions(child, currentX, currentY));
-              }
-            };
-
-            // 根节点坐标为 padding
-            if (result?.children) {
-              result.children.forEach(child => updateNodePositions(child, padding.x, padding.y));
-            }
+            applyElkResultNodeGeometry(result?.children, idMap, padding);
 
             const routes = collectDomainElkLayoutRoutes(
               result?.edges,
