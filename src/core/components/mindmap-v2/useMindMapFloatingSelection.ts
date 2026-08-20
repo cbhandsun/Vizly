@@ -25,6 +25,7 @@ export function useMindMapFloatingSelection(
     onSelectionCleared: () => void,
 ) {
     const [position, setPosition] = useState<MindMapFloatingBarPosition | null>(null);
+    const [interactionReady, setInteractionReady] = useState(true);
     const selectedNodeIdRef = useRef<string | null>(null);
 
     const refreshForNode = useCallback((nodeId: string): boolean => {
@@ -44,10 +45,46 @@ export function useMindMapFloatingSelection(
         let disposed = false;
         let selectionVersion = 0;
         let operationTimer: ReturnType<typeof setTimeout> | null = null;
+        let interactionReleaseTimer: ReturnType<typeof setTimeout> | number | null = null;
+        let pointerActive = false;
+
+        const cancelInteractionRelease = () => {
+            if (interactionReleaseTimer === null) return;
+            if (typeof cancelAnimationFrame === 'function') {
+                cancelAnimationFrame(interactionReleaseTimer as number);
+            }
+            clearTimeout(interactionReleaseTimer);
+            interactionReleaseTimer = null;
+        };
+
+        const releaseInteractionAfterPointerSequence = () => {
+            if (!pointerActive) return;
+            pointerActive = false;
+            cancelInteractionRelease();
+            const release = () => {
+                interactionReleaseTimer = null;
+                if (!disposed) setInteractionReady(true);
+            };
+            interactionReleaseTimer = typeof requestAnimationFrame === 'function'
+                ? requestAnimationFrame(release)
+                : setTimeout(release, 0);
+        };
+
+        const onPointerDown = (event: PointerEvent) => {
+            const target = event.target;
+            if (
+                event.button !== 0
+                || !(target instanceof Node)
+                || !activeMind.container.contains(target)
+            ) return;
+            cancelInteractionRelease();
+            pointerActive = true;
+        };
 
         function clearSelection() {
             selectedNodeIdRef.current = null;
             setPosition(null);
+            setInteractionReady(true);
             onSelectionCleared();
         }
 
@@ -68,8 +105,11 @@ export function useMindMapFloatingSelection(
                 reconcileTransientDeselection();
                 return;
             }
+            const selectionChanged = selectedNodeIdRef.current !== node.id;
             selectionVersion += 1;
             selectedNodeIdRef.current = node.id;
+            if (selectionChanged && pointerActive) setInteractionReady(false);
+            else if (!pointerActive) setInteractionReady(true);
             try {
                 if (!refreshForNode(node.id)) setPosition(null);
             } catch (error) {
@@ -99,6 +139,10 @@ export function useMindMapFloatingSelection(
         activeMind.bus.addListener('unselectNodes', onDeselect);
         activeMind.bus.addListener('operation', onOperation);
         legacyBus.addListener('unselectNode', onDeselect);
+        window.addEventListener('pointerdown', onPointerDown, true);
+        window.addEventListener('pointerup', releaseInteractionAfterPointerSequence, true);
+        window.addEventListener('pointercancel', releaseInteractionAfterPointerSequence, true);
+        window.addEventListener('blur', releaseInteractionAfterPointerSequence);
 
         const existingTopic = resolveSelectedMindMapTopic(activeMind, null);
         const existingNodeId = existingTopic?.dataset?.nodeid ?? '';
@@ -110,13 +154,18 @@ export function useMindMapFloatingSelection(
         return () => {
             disposed = true;
             if (operationTimer) clearTimeout(operationTimer);
+            cancelInteractionRelease();
             activeMind.bus.removeListener('selectNodes', onSelect);
             activeMind.bus.removeListener('selectNewNode', onSelectNewNode);
             activeMind.bus.removeListener('unselectNodes', onDeselect);
             activeMind.bus.removeListener('operation', onOperation);
             legacyBus.removeListener('unselectNode', onDeselect);
+            window.removeEventListener('pointerdown', onPointerDown, true);
+            window.removeEventListener('pointerup', releaseInteractionAfterPointerSequence, true);
+            window.removeEventListener('pointercancel', releaseInteractionAfterPointerSequence, true);
+            window.removeEventListener('blur', releaseInteractionAfterPointerSequence);
         };
     }, [mind, onSelectionCleared, refreshForNode]);
 
-    return { position, refreshForNode };
+    return { interactionReady, position, refreshForNode };
 }

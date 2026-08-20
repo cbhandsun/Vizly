@@ -102,6 +102,7 @@ const MindMapFloatingBar: React.FC = () => {
         setNoteSession(null); setAiOpen(false); setBoundaryOpen(false);
     }, []);
     const {
+        interactionReady,
         position: pos,
         refreshForNode: refreshFloatingBarForNode,
     } = useMindMapFloatingSelection(mind, closeSelectionOverlays);
@@ -149,7 +150,7 @@ const MindMapFloatingBar: React.FC = () => {
         };
     }, [pos]);
 
-    if (!pos || !mind) return deleteDialog;
+    if (!pos || !mind || !interactionReady) return deleteDialog;
 
     const getTpc = () => {
         try { return mind.findEle(pos.nodeId); } catch (error) {
@@ -527,7 +528,7 @@ const MindMapFloatingBar: React.FC = () => {
                 onClick={() => act(() => { const tpc = getTpc(); if (tpc) mind.editTopic(tpc); })} />
 
             {/* Expand/Collapse — only if has children */}
-            {hasChildren && (
+            {hasChildren && !isRoot && (
                 <MindMapFloatingBarButton
                     icon={isExpanded ? <DownOutlined /> : <RightOutlined />}
                     tip={t(isExpanded

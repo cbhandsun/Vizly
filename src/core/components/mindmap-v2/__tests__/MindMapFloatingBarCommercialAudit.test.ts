@@ -112,6 +112,11 @@ describe('MindMapFloatingBar commercial interaction contract', () => {
     it('exposes branch state and native keyboard navigation for contextual actions', () => {
         expect(floatingButtonSource).toContain('aria-expanded={ariaExpanded}');
         expect(source).toContain('ariaExpanded={isExpanded}');
+        expect(source).toContain('!pos || !mind || !interactionReady');
+        expect(source).toContain('{hasChildren && !isRoot && (');
+        expect(contextMenuSource).toContain('{hasChildren && !isRoot && (');
+        expect(selectionHookSource).toContain("window.addEventListener('pointerdown'");
+        expect(selectionHookSource).toContain("window.addEventListener('pointerup'");
         expect(source).toContain("document.querySelector<HTMLElement>('.designer-right-sidebar')");
         expect(source).toContain('maxWidth: Math.max(0, safeVisibleRight - 16)');
         expect(contextMenuSource).toContain('role="menu"');

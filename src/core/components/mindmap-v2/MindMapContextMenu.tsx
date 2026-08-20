@@ -290,7 +290,7 @@ const MindMapContextMenu: React.FC<Props> = ({ visible, x, y, nodeId, onClose, o
                 </>
             )}
 
-            {hasChildren && (
+            {hasChildren && !isRoot && (
                 <Item
                     icon={isExpanded ? <CaretDownOutlined /> : <CaretRightOutlined />}
                     label={t(isExpanded
