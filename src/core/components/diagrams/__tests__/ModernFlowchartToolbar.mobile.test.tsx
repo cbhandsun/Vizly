@@ -64,6 +64,15 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
         expect(toolbarCss).toMatch(
             /html\[data-theme='dark'\] body \.flowchart-mobile-more-menu \.ant-dropdown-menu\s*\{[\s\S]*?background-color: rgba\(28, 28, 41, 0\.98\) !important;/,
         );
+        expect(toolbarCss).toMatch(
+            /body \.flowchart-layout-menu \.ant-dropdown-menu\s*\{[\s\S]*?min-width: min\(304px, calc\(100vw - 16px\)\);[\s\S]*?background-color: rgba\(255, 255, 255, 0\.98\) !important;/,
+        );
+        expect(toolbarCss).toMatch(
+            /html\[data-theme='dark'\] body \.flowchart-layout-menu \.ant-dropdown-menu\s*\{[\s\S]*?background-color: rgba\(28, 28, 41, 0\.98\) !important;/,
+        );
+        expect(toolbarCss).toMatch(
+            /body \.flowchart-layout-menu \.ant-dropdown-menu-submenu-popup\s*\{\s*position: absolute;/,
+        );
     });
 
     beforeEach(() => {
@@ -598,6 +607,7 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
         const layoutButton = await screen.findByRole('button', { name: /layout\.tooltip|自动布局/i });
         expect((layoutButton as HTMLButtonElement).disabled).toBe(true);
         expect(layoutButton.getAttribute('aria-busy')).toBe('true');
+        expect(layoutButton.querySelector('.anticon-loading')).not.toBeNull();
         fireEvent.click(layoutButton);
         expect(onStrategyLayout).not.toHaveBeenCalled();
         expect(screen.queryByRole('menuitemradio')).toBeNull();
@@ -642,7 +652,10 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
         expect(domainLayout.getAttribute('aria-checked')).toBe('true');
         expect(inactiveLayout.getAttribute('aria-checked')).toBe('false');
         expect(domainLayout.className).toContain('ant-dropdown-menu-item-selected');
-        expect(screen.getByRole('menuitem', { name: /高级布局/ })).toBeDefined();
+        expect(screen.getByText(/自定义组合/)).toBeDefined();
+        expect(screen.getByRole('menuitem', { name: /域排列方向/ })).toBeDefined();
+        expect(screen.getByRole('menuitem', { name: /域／子域内节点排布/ })).toBeDefined();
+        expect(screen.getByRole('menuitem', { name: /更多布局引擎/ })).toBeDefined();
     });
 
     it('opens the automatic-layout menu with ArrowDown and focuses its first action', async () => {

@@ -1,3 +1,28 @@
+body .flowchart-layout-menu .ant-dropdown-menu {
+    min-width: min(304px, calc(100vw - 16px));
+    max-width: calc(100vw - 16px);
+    background-color: rgba(255, 255, 255, 0.98) !important;
+    border: 1px solid rgba(148, 163, 184, 0.28) !important;
+    box-shadow: 0 18px 48px rgba(15, 23, 42, 0.24) !important;
+    backdrop-filter: blur(28px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
+}
+
+/* Ant renders nested dropdown menus inside the root overlay. Its generic
+   `.ant-dropdown .ant-dropdown-menu { position: relative }` selector is more
+   specific than the submenu popup rule, which otherwise makes the submenu
+   participate in root-menu layout and creates a tall blank scroll surface. */
+body .flowchart-layout-menu .ant-dropdown-menu-submenu-popup {
+    position: absolute;
+}
+
+html.dark body .flowchart-layout-menu .ant-dropdown-menu,
+html[data-theme='dark'] body .flowchart-layout-menu .ant-dropdown-menu {
+    background-color: rgba(28, 28, 41, 0.98) !important;
+    border-color: rgba(148, 163, 184, 0.22) !important;
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.44) !important;
+}
+
 body .flowchart-mobile-more-menu {
     position: fixed !important;
     inset: 80px auto auto 8px !important;

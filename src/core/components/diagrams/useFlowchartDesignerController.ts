@@ -47,6 +47,7 @@ import { useFlowchartImportNotifications } from './hooks/useFlowchartImportNotif
 import { useHistoryFeedbackActions } from './historyActionFeedback';
 import { useFlowchartNodeFocus } from './hooks/useFlowchartNodeFocus';
 import { useFlowchartCanvasExit } from './hooks/useFlowchartCanvasExit';
+import { resolveFlowchartCustomDomainLayoutCapability } from './flowchartLayoutCapabilities';
 
 export const useFlowchartDesignerController = ({
     id,
@@ -168,6 +169,10 @@ export const useFlowchartDesignerController = ({
         setSelectedNodes,
         setSelectedEdges,
     });
+    const customDomainLayoutCapability = useMemo(
+        () => resolveFlowchartCustomDomainLayoutCapability(nodes, edges),
+        [edges, nodes],
+    );
 
     const handlePresentationFocus = useCallback((ids: string[]) => {
         if (ids && ids.length > 0) handleFocusNode(ids[0]);
@@ -695,6 +700,7 @@ export const useFlowchartDesignerController = ({
     const viewModel = {
         ANNOTATION_COLORS, activeLayerId, activePlugin, activeRightTab, activeUsers, addAnnotation, aiChatVisible, annotationMode, annotations, autoRoutingEnabled,
         canRedo, canUndo, canvasBg, canvasSearchVisible, canvasSearchReplaceVisible, closeMenu, commandPaletteItems, commandPaletteVisible, connectPreview, copyStyle, createLayer,
+        customDomainLayoutAvailable: customDomainLayoutCapability.available,
         currentZoom, deleteAnnotation, deleteLayer, deleteTemplate, diagramIdForExport, diffResult, dynamicEdgeTypes, dynamicNodeTypes, edges,
         edgesRef, enhancedOnConnect, enhancedOnConnectEnd, exportModalVisible, extraExportItems, fileInputRef,
         getPreviousState, getReactFlowSnapshot, gridColor, gridVariant, groupedTemplates, guides, handleAddFreehandStroke, handleAddMindMap, handleAddNode, handleAddStickyNote, handleAlign,

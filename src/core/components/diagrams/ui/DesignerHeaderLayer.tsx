@@ -77,6 +77,7 @@ export interface DesignerHeaderLayerProps {
         onShowCanvasSearch: () => void;
         onStrategyLayout: ToolbarProps['onStrategyLayout'];
         onSmartLayout?: ToolbarProps['onSmartLayout'];
+        customDomainLayoutAvailable?: boolean;
         lastDomainStrategy?: string;
         lastDomainDirection?: string;
         lastNodeLayout?: string;
@@ -222,6 +223,7 @@ export const DesignerHeaderLayer = React.memo(
                     onShowCanvasSearch={toolbar.onShowCanvasSearch}
                     onStrategyLayout={toolbar.onStrategyLayout}
                     onSmartLayout={toolbar.onSmartLayout}
+                    customDomainLayoutAvailable={toolbar.customDomainLayoutAvailable}
                     lastDomainStrategy={toolbar.lastDomainStrategy}
                     lastDomainDirection={toolbar.lastDomainDirection as 'TB' | 'LR' | undefined}
                     lastNodeLayout={toolbar.lastNodeLayout}

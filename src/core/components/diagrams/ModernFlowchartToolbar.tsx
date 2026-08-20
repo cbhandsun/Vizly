@@ -11,6 +11,7 @@ import {
 import { BackgroundVariant } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import { Tooltip, Button, Dropdown, MenuProps, Popover, Grid } from 'antd';
+import { LoadingOutlined } from '@ant-design/icons';
 import { appMessage, appModal } from '../../utils/antdStaticBridge';
 import { executeConfirmedLocalEditorReset } from '../../utils/localEditorReset';
 import { FlowchartAlignmentTools } from './FlowchartAlignmentTools';
@@ -33,6 +34,7 @@ import {
 } from '../ui/viewportOverlayPortal';
 
 interface FlowchartToolbarProps {
+    customDomainLayoutAvailable?: boolean;
     canUndo: boolean;
     canRedo: boolean;
     onUndo: () => void;
@@ -118,6 +120,7 @@ const COMMERCIAL_MOBILE_TOUCH_STYLE: React.CSSProperties = {
 };
 
 export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
+    customDomainLayoutAvailable = true,
     canUndo, canRedo, onUndo, onRedo,
     onZoomIn, onZoomOut, onResetZoom, onFitView,
     autoRouting, toggleAutoRouting,
@@ -201,13 +204,14 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
     }, [handleMoreDropdownOpenChange, moreDropdownTriggerRef, onShowShortcuts]);
 
     const layoutMenuModel = useMemo(() => buildFlowchartLayoutMenuModel({
+        customDomainLayoutAvailable,
         lastDomainDirection,
         lastDomainStrategy,
         lastNodeLayout,
         onSmartLayout,
         onStrategyLayout,
         translate: (key, fallback) => t(key, fallback),
-    }), [lastDomainDirection, lastDomainStrategy, lastNodeLayout, onSmartLayout, onStrategyLayout, t]);
+    }), [customDomainLayoutAvailable, lastDomainDirection, lastDomainStrategy, lastNodeLayout, onSmartLayout, onStrategyLayout, t]);
 
     const layoutBaseLabel = t('designer.flowchart.layout.tooltip', '自动布局');
     const layoutTriggerLabel = layoutMenuModel.statusText
@@ -526,7 +530,9 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                             disabled={layoutBusy}
                             open={layoutDropdown.open}
                             onTriggerKeyDown={layoutDropdown.handleTriggerKeyDown}
-                            icon={<FaSitemap size={13} />}
+                            icon={layoutBusy
+                                ? <LoadingOutlined spin aria-hidden="true" />
+                                : <FaSitemap size={13} />}
                             className={tbtn}
                             style={mobileToolbarButtonStyle}
                         />

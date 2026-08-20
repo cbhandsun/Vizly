@@ -1,7 +1,11 @@
 import React from 'react';
 import type { MenuProps } from 'antd';
 import { FaMagic, FaObjectGroup, FaRegObjectGroup, FaSitemap, FaSlidersH } from 'react-icons/fa';
-import { usesSelectableDomainNodeArrangement } from './flowchartLayoutStrategyMode';
+import {
+    createCustomDomainLayoutCommand,
+    resolveCustomDomainLayoutDirection,
+    usesSelectableDomainNodeArrangement,
+} from './flowchartLayoutStrategyMode';
 
 type ToolbarMenuItem = Extract<
     NonNullable<NonNullable<MenuProps['items']>[number]>,
@@ -15,6 +19,7 @@ type LayoutRadioMenuItem = ToolbarMenuItem & React.AriaAttributes & {
 type TranslateLayoutLabel = (key: string, fallback: string) => string;
 
 interface BuildFlowchartLayoutMenuModelOptions {
+    customDomainLayoutAvailable?: boolean;
     lastDomainDirection?: 'TB' | 'LR';
     lastDomainStrategy?: string;
     lastNodeLayout?: string;
@@ -41,8 +46,8 @@ export const resolveActiveDomainLayoutKey = (
 ): string | undefined => {
     if (!lastDomainStrategy) return undefined;
     if (lastDomainStrategy === 'force') return 'force';
-    if (lastDomainStrategy === 'domain-vertical') return 'domain-vertical';
-    if (lastDomainStrategy === 'domain-horizontal') return 'domain-horizontal';
+    if (lastDomainStrategy === 'domain-vertical') return 'custom-domain-tb';
+    if (lastDomainStrategy === 'domain-horizontal') return 'custom-domain-lr';
     if (lastDomainDirection) {
         return `${lastDomainStrategy}-${lastDomainDirection.toLowerCase()}`;
     }
@@ -58,13 +63,13 @@ export const resolveActiveDomainLayoutKey = (
 export const resolveNodeLayoutHostStrategy = (
     lastDomainStrategy?: string,
     lastDomainDirection?: 'TB' | 'LR',
-): 'domain-vertical' | 'domain-horizontal' => (
-    lastDomainStrategy === 'domain-horizontal' || lastDomainDirection === 'LR'
-        ? 'domain-horizontal'
-        : 'domain-vertical'
-);
+): 'domain-vertical' | 'domain-horizontal' => createCustomDomainLayoutCommand(
+    resolveCustomDomainLayoutDirection(lastDomainStrategy, lastDomainDirection),
+    undefined,
+).strategyName;
 
 export const buildFlowchartLayoutMenuModel = ({
+    customDomainLayoutAvailable = true,
     lastDomainDirection,
     lastDomainStrategy,
     lastNodeLayout,
@@ -73,10 +78,14 @@ export const buildFlowchartLayoutMenuModel = ({
     translate,
 }: BuildFlowchartLayoutMenuModelOptions): FlowchartLayoutMenuModel => {
     const activeDomainKey = resolveActiveDomainLayoutKey(lastDomainStrategy, lastDomainDirection);
-    const activeNodeKey = lastNodeLayout && usesSelectableDomainNodeArrangement(lastDomainStrategy)
-        ? `node-${lastNodeLayout}`
+    const customDomainLayoutActive = usesSelectableDomainNodeArrangement(lastDomainStrategy);
+    const activeNodeKey = customDomainLayoutActive
+        ? `node-${createCustomDomainLayoutCommand(
+            resolveCustomDomainLayoutDirection(lastDomainStrategy, lastDomainDirection),
+            lastNodeLayout,
+        ).nodeLayout}`
         : undefined;
-    const nodeLayoutHostStrategy = resolveNodeLayoutHostStrategy(
+    const customDomainDirection = resolveCustomDomainLayoutDirection(
         lastDomainStrategy,
         lastDomainDirection,
     );
@@ -84,7 +93,16 @@ export const buildFlowchartLayoutMenuModel = ({
     const labels = {
         recommendedGroup: translate('designer.flowchart.layout.recommendedGroup', '常用场景'),
         smart: translate('designer.flowchart.layout.smartRecommendation', '智能推荐'),
-        advanced: translate('designer.flowchart.layout.advancedGroup', '高级布局'),
+        customCombination: translate('designer.flowchart.layout.customCombination', '自定义组合'),
+        customCombinationGroup: translate(
+            'designer.flowchart.layout.customCombinationGroup',
+            '自定义组合（适合简单树形图）',
+        ),
+        customUnavailable: translate(
+            'designer.flowchart.layout.customUnavailable',
+            '当前图含合流或循环，请使用常用场景',
+        ),
+        moreEngines: translate('designer.flowchart.layout.moreEngines', '更多布局引擎'),
         treeGroup: translate('designer.flowchart.layout.advancedGlobalGroup', '全图布局（隐藏域容器）'),
         treeTb: translate('designer.flowchart.layout.treeTB', '↕ 树形 (上→下)'),
         treeLr: translate('designer.flowchart.layout.treeLR', '↔ 树形 (左→右)'),
@@ -113,17 +131,18 @@ export const buildFlowchartLayoutMenuModel = ({
         ),
         domainElkTb: translate('designer.flowchart.layout.globalOrthogonalTB', '全图正交分层（上→下）'),
         domainElkLr: translate('designer.flowchart.layout.globalOrthogonalLR', '全图正交分层（左→右）'),
-        domainVertical: translate('designer.flowchart.layout.freeDomainTB', '▥ 自由域布局（上→下）'),
-        domainHorizontal: translate('designer.flowchart.layout.freeDomainLR', '▦ 自由域布局（左→右）'),
+        domainDirectionGroup: translate('designer.flowchart.layout.domainDirectionGroup', '域排列方向'),
+        domainVertical: translate('designer.flowchart.layout.freeDomainTB', '域纵向排列（上→下）'),
+        domainHorizontal: translate('designer.flowchart.layout.freeDomainLR', '域横向排列（左→右）'),
         nodeGroup: translate(
             'designer.flowchart.layout.advancedNodeArrangementGroup',
-            '域内排布（切换为自由域布局）',
+            '域／子域内节点排布',
         ),
-        nodeFlow: translate('designer.flowchart.layout.nodeFlow', '▷ 流式'),
-        nodeGrid: translate('designer.flowchart.layout.nodeGrid', '⊞ 网格'),
-        nodeHorizontal: translate('designer.flowchart.layout.nodeHorizontal', '⊟ 水平'),
-        nodeVertical: translate('designer.flowchart.layout.nodeVertical', '⊞ 垂直'),
-        nodeDagre: translate('designer.flowchart.layout.nodeDagre', '◈ Dagre分层 (默认)'),
+        nodeFlow: translate('designer.flowchart.layout.nodeFlow', '流式换行'),
+        nodeGrid: translate('designer.flowchart.layout.nodeGrid', '网格排列'),
+        nodeHorizontal: translate('designer.flowchart.layout.nodeHorizontal', '水平排列'),
+        nodeVertical: translate('designer.flowchart.layout.nodeVertical', '垂直排列'),
+        nodeDagre: translate('designer.flowchart.layout.nodeDagre', '自动分层（推荐）'),
     };
 
     const domainItem = (
@@ -147,14 +166,24 @@ export const buildFlowchartLayoutMenuModel = ({
     ): LayoutRadioMenuItem => radioMenuItem({
         key,
         label,
-        onClick: () => onStrategyLayout?.(
-            nodeLayoutHostStrategy,
-            nodeLayout,
-            lastDomainDirection || 'TB',
-        ),
+        onClick: () => {
+            const command = createCustomDomainLayoutCommand(customDomainDirection, nodeLayout);
+            onStrategyLayout?.(command.strategyName, command.nodeLayout, command.direction);
+        },
         role: 'menuitemradio',
         'aria-checked': activeNodeKey === key,
     });
+
+    const customDirectionItem = (
+        key: string,
+        label: string,
+        direction: 'TB' | 'LR',
+    ): LayoutRadioMenuItem => domainItem(key, label, () => {
+        const command = createCustomDomainLayoutCommand(direction, lastNodeLayout);
+        onStrategyLayout?.(command.strategyName, command.nodeLayout, command.direction);
+    }, direction === 'LR'
+        ? <FaObjectGroup style={{ transform: 'rotate(-90deg)' }} />
+        : <FaObjectGroup />);
 
     const labelByKey: Record<string, string> = {
         'tree-tb': labels.treeTb,
@@ -168,8 +197,8 @@ export const buildFlowchartLayoutMenuModel = ({
         'domain-lanes-lr': labels.domainLanesLr,
         'domain-elk-tb': labels.domainElkTb,
         'domain-elk-lr': labels.domainElkLr,
-        'domain-vertical': labels.domainVertical,
-        'domain-horizontal': labels.domainHorizontal,
+        'custom-domain-tb': labels.domainVertical,
+        'custom-domain-lr': labels.domainHorizontal,
         'node-flow': labels.nodeFlow,
         'node-grid': labels.nodeGrid,
         'node-horizontal': labels.nodeHorizontal,
@@ -177,13 +206,52 @@ export const buildFlowchartLayoutMenuModel = ({
         'node-dagre': labels.nodeDagre,
     };
 
-    const selectedKeys = [activeDomainKey, activeNodeKey].filter(Boolean) as string[];
+    const selectedKeys = customDomainLayoutActive
+        ? [activeDomainKey, activeNodeKey].filter(Boolean) as string[]
+        : [activeDomainKey].filter(Boolean) as string[];
     const statusParts = selectedKeys
         .map((key) => labelByKey[key])
         .filter((label): label is string => Boolean(label))
         .map(stripDecorativePrefix);
 
-    const advancedItems: NonNullable<MenuProps['items']> = [
+    const customDirectionItems: NonNullable<MenuProps['items']> = [
+        customDirectionItem('custom-domain-tb', labels.domainVertical, 'TB'),
+        customDirectionItem('custom-domain-lr', labels.domainHorizontal, 'LR'),
+    ];
+    const customNodeItems: NonNullable<MenuProps['items']> = [
+        nodeItem('node-dagre', labels.nodeDagre, 'dagre'),
+        nodeItem('node-flow', labels.nodeFlow, 'flow'),
+        nodeItem('node-grid', labels.nodeGrid, 'grid'),
+        nodeItem('node-horizontal', labels.nodeHorizontal, 'horizontal'),
+        nodeItem('node-vertical', labels.nodeVertical, 'vertical'),
+    ];
+
+    const moreEngineItems: NonNullable<MenuProps['items']> = [
+        ...(onStrategyLayout ? [{
+            key: 'group-domain',
+            label: labels.domainGroup,
+            type: 'group' as const,
+            children: [
+                domainItem(
+                    'domain-dagre-sub-horizontal-tb',
+                    labels.domainDagreSubHorizontalTb,
+                    () => onStrategyLayout('domain-dagre-sub-horizontal', 'dagre', 'TB'),
+                    <FaRegObjectGroup />,
+                ),
+                domainItem(
+                    'domain-compound-elk-tb',
+                    labels.domainCompoundElkTb,
+                    () => onStrategyLayout('domain-compound-elk', undefined, 'TB'),
+                    <FaObjectGroup />,
+                ),
+                domainItem(
+                    'domain-lanes-tb',
+                    labels.domainLanesTb,
+                    () => onStrategyLayout('domain-lanes', undefined, 'TB'),
+                    <FaRegObjectGroup />,
+                ),
+            ],
+        }, { type: 'divider' as const }] : []),
         {
             key: 'group-tree',
             label: labels.treeGroup,
@@ -216,60 +284,6 @@ export const buildFlowchartLayoutMenuModel = ({
                 ),
             ],
         },
-        ...(onStrategyLayout ? [
-            { type: 'divider' as const },
-            {
-                key: 'group-domain',
-                label: labels.domainGroup,
-                type: 'group' as const,
-                children: [
-                    domainItem(
-                        'domain-dagre-sub-horizontal-tb',
-                        labels.domainDagreSubHorizontalTb,
-                        () => onStrategyLayout('domain-dagre-sub-horizontal', 'dagre', 'TB'),
-                        <FaRegObjectGroup />,
-                    ),
-                    domainItem(
-                        'domain-compound-elk-tb',
-                        labels.domainCompoundElkTb,
-                        () => onStrategyLayout('domain-compound-elk', undefined, 'TB'),
-                        <FaObjectGroup />,
-                    ),
-                    domainItem(
-                        'domain-lanes-tb',
-                        labels.domainLanesTb,
-                        () => onStrategyLayout('domain-lanes', undefined, 'TB'),
-                        <FaRegObjectGroup />,
-                    ),
-                    { type: 'divider' as const },
-                    domainItem(
-                        'domain-vertical',
-                        labels.domainVertical,
-                        () => onStrategyLayout('domain-vertical', lastNodeLayout, 'TB'),
-                        <FaObjectGroup />,
-                    ),
-                    domainItem(
-                        'domain-horizontal',
-                        labels.domainHorizontal,
-                        () => onStrategyLayout('domain-horizontal', lastNodeLayout, 'LR'),
-                        <FaObjectGroup style={{ transform: 'rotate(-90deg)' }} />,
-                    ),
-                ],
-            },
-            { type: 'divider' as const },
-            {
-                key: 'group-node-layout',
-                label: labels.nodeGroup,
-                type: 'group' as const,
-                children: [
-                    nodeItem('node-flow', labels.nodeFlow, 'flow'),
-                    nodeItem('node-grid', labels.nodeGrid, 'grid'),
-                    nodeItem('node-horizontal', labels.nodeHorizontal, 'horizontal'),
-                    nodeItem('node-vertical', labels.nodeVertical, 'vertical'),
-                    nodeItem('node-dagre', labels.nodeDagre, 'dagre'),
-                ],
-            },
-        ] : []),
     ];
 
     const items: NonNullable<MenuProps['items']> = [
@@ -287,7 +301,7 @@ export const buildFlowchartLayoutMenuModel = ({
                 domainItem(
                     'domain-dagre-tb',
                     labels.domainDagreTb,
-                    () => onStrategyLayout?.('domain-dagre', lastNodeLayout, 'TB'),
+                    () => onStrategyLayout?.('domain-dagre', undefined, 'TB'),
                     <FaRegObjectGroup />,
                 ),
                 domainItem(
@@ -306,16 +320,42 @@ export const buildFlowchartLayoutMenuModel = ({
         },
         { type: 'divider' as const },
         {
-            key: 'advanced-layouts',
-            label: labels.advanced,
-            icon: <FaSlidersH />,
-            children: advancedItems,
+            key: 'group-custom-combination',
+            label: customDomainLayoutAvailable
+                ? labels.customCombinationGroup
+                : `${labels.customCombinationGroup} · ${labels.customUnavailable}`,
+            type: 'group' as const,
+            children: [
+                {
+                    key: 'custom-domain-direction',
+                    label: labels.domainDirectionGroup,
+                    icon: <FaObjectGroup />,
+                    disabled: !customDomainLayoutAvailable,
+                    children: customDirectionItems,
+                },
+                {
+                    key: 'custom-node-arrangement',
+                    label: labels.nodeGroup,
+                    icon: <FaSlidersH />,
+                    disabled: !customDomainLayoutAvailable,
+                    children: customNodeItems,
+                },
+            ],
+        },
+        { type: 'divider' as const },
+        {
+            key: 'more-layout-engines',
+            label: labels.moreEngines,
+            icon: <FaSitemap />,
+            children: moreEngineItems,
         },
     ];
 
     return {
         items,
         selectedKeys,
-        statusText: statusParts.length > 0 ? statusParts.join(' + ') : undefined,
+        statusText: statusParts.length > 0
+            ? `${customDomainLayoutActive ? `${labels.customCombination}：` : ''}${statusParts.join(' + ')}`
+            : undefined,
     };
 };
