@@ -14,6 +14,7 @@ export interface FlowchartCanvasPreferences {
     readonly gridVariant: FlowchartCanvasGridVariant;
     readonly showMinimap: boolean;
     readonly showRuler: boolean;
+    readonly snapEnabled: boolean;
 }
 
 export interface FlowchartCanvasPreferencesStorage {
@@ -32,8 +33,11 @@ const isGridVariant = (value: unknown): value is FlowchartCanvasGridVariant => (
 );
 
 export const coerceFlowchartCanvasPreferences = (value: unknown): FlowchartCanvasPreferences | null => {
-    if (!isRecord(value)
-        || !Object.hasOwn(value, 'version')
+    if (!isRecord(value)) return null;
+
+    const hasSnapPreference = Object.hasOwn(value, 'snapEnabled');
+    const snapEnabled = hasSnapPreference ? value.snapEnabled : undefined;
+    if (!Object.hasOwn(value, 'version')
         || !Object.hasOwn(value, 'showGrid')
         || !Object.hasOwn(value, 'gridVariant')
         || !Object.hasOwn(value, 'showMinimap')
@@ -42,7 +46,8 @@ export const coerceFlowchartCanvasPreferences = (value: unknown): FlowchartCanva
         || typeof value.showGrid !== 'boolean'
         || !isGridVariant(value.gridVariant)
         || typeof value.showMinimap !== 'boolean'
-        || typeof value.showRuler !== 'boolean') {
+        || typeof value.showRuler !== 'boolean'
+        || (hasSnapPreference && typeof snapEnabled !== 'boolean')) {
         return null;
     }
 
@@ -52,6 +57,7 @@ export const coerceFlowchartCanvasPreferences = (value: unknown): FlowchartCanva
         gridVariant: value.gridVariant,
         showMinimap: value.showMinimap,
         showRuler: value.showRuler,
+        snapEnabled: typeof snapEnabled === 'boolean' ? snapEnabled : true,
     };
 };
 

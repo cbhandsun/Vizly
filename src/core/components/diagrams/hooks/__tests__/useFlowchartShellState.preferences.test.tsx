@@ -29,6 +29,15 @@ const persistedPreferences = {
     gridVariant: 'cross' as const,
     showMinimap: false,
     showRuler: true,
+    snapEnabled: false,
+};
+
+const legacyPreferences = {
+    version: 1 as const,
+    showGrid: false,
+    gridVariant: 'cross' as const,
+    showMinimap: false,
+    showRuler: true,
 };
 
 afterEach(() => {
@@ -61,6 +70,7 @@ describe('flowchart canvas preference boundary', () => {
         JSON.stringify({ ...persistedPreferences, gridVariant: 'mesh' }),
         JSON.stringify({ ...persistedPreferences, showMinimap: 1 }),
         JSON.stringify({ ...persistedPreferences, showRuler: null }),
+        JSON.stringify({ ...persistedPreferences, snapEnabled: 'off' }),
         'x'.repeat(513),
     ])('rejects empty, malformed, incompatible, or extreme input %#', value => {
         expect(parseFlowchartCanvasPreferences(value)).toBeNull();
@@ -75,6 +85,22 @@ describe('flowchart canvas preference boundary', () => {
             __proto__: { polluted: true },
         })).toEqual(persistedPreferences);
         expect((Object.prototype as { polluted?: boolean }).polluted).toBeUndefined();
+    });
+
+    it('migrates legacy records with a safe snap default without losing display choices', () => {
+        expect(parseFlowchartCanvasPreferences(JSON.stringify(legacyPreferences))).toEqual({
+            ...legacyPreferences,
+            snapEnabled: true,
+        });
+
+        const inheritedSnapPreference = Object.assign(
+            Object.create({ snapEnabled: false }) as Record<string, unknown>,
+            legacyPreferences,
+        );
+        expect(coerceFlowchartCanvasPreferences(inheritedSnapPreference)).toEqual({
+            ...legacyPreferences,
+            snapEnabled: true,
+        });
     });
 
     it('reads and writes only the bounded preference record', () => {
@@ -125,6 +151,7 @@ describe('useFlowchartShellState canvas preference lifecycle', () => {
             gridVariant: BackgroundVariant.Cross,
             showMinimap: false,
             showRuler: true,
+            snapEnabled: false,
         });
 
         expect(resolveFlowchartInitialCanvasPreferences(
@@ -136,6 +163,7 @@ describe('useFlowchartShellState canvas preference lifecycle', () => {
             gridVariant: BackgroundVariant.Dots,
             showMinimap: false,
             showRuler: false,
+            snapEnabled: true,
         });
     });
 
@@ -151,12 +179,14 @@ describe('useFlowchartShellState canvas preference lifecycle', () => {
         expect(result.current.gridVariant).toBe(BackgroundVariant.Cross);
         expect(result.current.showMinimap).toBe(false);
         expect(result.current.showRuler).toBe(true);
+        expect(result.current.snapEnabled).toBe(false);
 
         act(() => {
             result.current.setShowGrid(true);
             result.current.setGridVariant(BackgroundVariant.Dots);
             result.current.setShowMinimap(true);
             result.current.setShowRuler(false);
+            result.current.setSnapEnabled(true);
         });
 
         await waitFor(() => expect(setItem).toHaveBeenCalledWith(
@@ -167,6 +197,7 @@ describe('useFlowchartShellState canvas preference lifecycle', () => {
                 gridVariant: 'dots',
                 showMinimap: true,
                 showRuler: false,
+                snapEnabled: true,
             }),
         ));
     });
@@ -180,6 +211,7 @@ describe('useFlowchartShellState canvas preference lifecycle', () => {
         expect(result.current.showGrid).toBe(true);
         expect(result.current.gridVariant).toBe(BackgroundVariant.Dots);
         expect(result.current.showMinimap).toBe(false);
+        expect(result.current.snapEnabled).toBe(true);
 
         rerender({ grid: { style: 'hidden' } });
         await waitFor(() => expect(result.current.showGrid).toBe(false));

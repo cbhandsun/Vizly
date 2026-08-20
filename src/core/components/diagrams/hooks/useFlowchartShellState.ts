@@ -43,6 +43,7 @@ interface FlowchartInitialCanvasPreferences {
     gridVariant: BackgroundVariant;
     showMinimap: boolean;
     showRuler: boolean;
+    snapEnabled: boolean;
 }
 
 const resolveGridVariant = (
@@ -88,6 +89,7 @@ export const resolveFlowchartInitialCanvasPreferences = (
             gridVariant: resolveGridVariant(persistedPreferences.gridVariant),
             showMinimap: persistedPreferences.showMinimap,
             showRuler: persistedPreferences.showRuler,
+            snapEnabled: persistedPreferences.snapEnabled,
         };
     }
 
@@ -97,6 +99,7 @@ export const resolveFlowchartInitialCanvasPreferences = (
         gridVariant: themeGridState?.gridVariant ?? BackgroundVariant.Lines,
         showMinimap: initialShowMinimap,
         showRuler: false,
+        snapEnabled: true,
     };
 };
 
@@ -131,7 +134,7 @@ export function useFlowchartShellState(themeGrid: unknown, initialShowMinimap = 
     const [onboardingDismissed, setOnboardingDismissed] = useState(readFlowchartOnboardingDismissed);
     const [showGrid, setShowGrid] = useState(initialCanvasPreferences.showGrid);
     const [showMinimap, setShowMinimap] = useState(initialCanvasPreferences.showMinimap);
-    const [snapEnabled, setSnapEnabled] = useState(true);
+    const [snapEnabled, setSnapEnabled] = useState(initialCanvasPreferences.snapEnabled);
     const [showRuler, setShowRuler] = useState(initialCanvasPreferences.showRuler);
     const [gridVariant, setGridVariant] = useState<BackgroundVariant>(initialCanvasPreferences.gridVariant);
     const lastThemeGridSignatureRef = useRef(getThemeGridSignature(
@@ -163,8 +166,9 @@ export function useFlowchartShellState(themeGrid: unknown, initialShowMinimap = 
             gridVariant: serializeGridVariant(gridVariant),
             showMinimap,
             showRuler,
+            snapEnabled,
         });
-    }, [gridVariant, showGrid, showMinimap, showRuler]);
+    }, [gridVariant, showGrid, showMinimap, showRuler, snapEnabled]);
 
     useEffect(() => {
         if (!presentationActive) {
