@@ -3465,7 +3465,7 @@
         "testTimeout": "The connection test timed out. Check the network and endpoint, then retry.",
         "leaveConfirm": {
             "title": "Discard unsaved storage configuration?",
-            "content": "Leaving will discard unsaved changes to the endpoint, bucket, and access credentials.",
+            "content": "Leaving will discard all unsaved connection settings and access credentials.",
             "confirm": "Discard and leave",
             "keepEditing": "Keep editing"
         },

@@ -329,7 +329,7 @@ const StorageConfigPage: React.FC = () => {
                         level={1}
                         tabIndex={-1}
                     >
-                        <CloudServerOutlined /> {t('storageConfig.pageTitle')}
+                        <CloudServerOutlined aria-hidden="true" /> {t('storageConfig.pageTitle')}
                     </Title>
                     <Paragraph type="secondary">{t('storageConfig.pageDescription')}</Paragraph>
                     <Alert

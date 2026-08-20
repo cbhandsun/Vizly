@@ -3577,7 +3577,7 @@
         "testTimeout": "连接测试超时，请检查网络和服务地址后重试。",
         "leaveConfirm": {
             "title": "放弃未保存的存储配置？",
-            "content": "离开后，本次对 Endpoint、Bucket 和访问凭据的未保存修改将丢失。",
+            "content": "离开后，所有未保存的连接设置和访问凭据修改都将丢失。",
             "confirm": "放弃并离开",
             "keepEditing": "继续编辑"
         },

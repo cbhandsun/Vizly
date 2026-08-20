@@ -232,10 +232,11 @@ describe('StorageConfigPage validation recovery', () => {
 
         const pageTitle = screen.getByRole('heading', {
             level: 1,
-            name: 'cloud-server storageConfig.pageTitle',
+            name: 'storageConfig.pageTitle',
         });
         await waitFor(() => expect(document.activeElement).toBe(pageTitle));
         expect(pageTitle).toHaveAttribute('tabindex', '-1');
+        expect(pageTitle).not.toHaveAccessibleName(/cloud-server/i);
 
         unmount();
         renderStorageConfig();
