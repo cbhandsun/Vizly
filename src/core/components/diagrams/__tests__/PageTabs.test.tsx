@@ -42,7 +42,9 @@ vi.mock('react-i18next', () => ({
                 'designer.pages.renameSuccess': '页面已重命名为“{{name}}”',
                 'designer.pages.delete': '删除页面 {{name}}',
                 'designer.pages.deleteConfirm': '删除「{{name}}」？',
-                'designer.pages.deleteDescription': '将删除此页面中的 {{nodeCount}} 个节点和 {{edgeCount}} 条连线。关闭或重新加载图表前，可恢复最近删除的页面。',
+                'designer.pages.deleteNodeCount': '{{count}} 个节点',
+                'designer.pages.deleteConnectionCount': '{{count}} 条连线',
+                'designer.pages.deleteDescription': '将删除此页面中的 {{nodeCountLabel}}和 {{connectionCountLabel}}。关闭或重新加载图表前，可恢复最近删除的页面。',
                 'designer.pages.deleteAction': '删除',
                 'designer.pages.deleteSuccess': '已删除“{{name}}”，可使用“恢复删除的页面”找回',
                 'designer.pages.deleteFailed': '无法删除页面“{{name}}”，请重试',
@@ -60,7 +62,9 @@ vi.mock('react-i18next', () => ({
                 .replace('{{name}}', String(options?.name ?? ''))
                 .replace('{{count}}', String(options?.count ?? ''))
                 .replace('{{nodeCount}}', String(options?.nodeCount ?? ''))
-                .replace('{{edgeCount}}', String(options?.edgeCount ?? ''));
+                .replace('{{edgeCount}}', String(options?.edgeCount ?? ''))
+                .replace('{{nodeCountLabel}}', String(options?.nodeCountLabel ?? ''))
+                .replace('{{connectionCountLabel}}', String(options?.connectionCountLabel ?? ''));
         },
     }),
 }));

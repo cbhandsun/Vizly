@@ -1,6 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { createInstance } from 'i18next';
 import { describe, expect, it } from 'vitest';
+import en from '../../../../locales/en.json';
+import zh from '../../../../locales/zh.json';
 import {
     calculateCanvasVisibleLeft,
     calculateCanvasVisibleRight,
@@ -165,7 +168,12 @@ describe('flowchart interaction copy', () => {
             expect(read(zh, ['designer', 'architecture', 'emptyState', key])).toBeTypeOf('string');
             expect(read(en, ['designer', 'architecture', 'emptyState', key])).toBeTypeOf('string');
         }
-        for (const key of ['management', 'actions', 'defaultName', 'deleteDescription', 'deleteSuccess', 'restoreAction', 'restoreSuccess']) {
+        for (const key of [
+            'management', 'actions', 'defaultName', 'deleteDescription', 'deleteNodeCount',
+            'deleteNodeCount_one', 'deleteNodeCount_other', 'deleteConnectionCount',
+            'deleteConnectionCount_one', 'deleteConnectionCount_other', 'deleteSuccess',
+            'restoreAction', 'restoreSuccess',
+        ]) {
             expect(read(zh, ['designer', 'pages', key])).toBeTypeOf('string');
             expect(read(en, ['designer', 'pages', key])).toBeTypeOf('string');
         }
@@ -409,5 +417,48 @@ describe('flowchart interaction copy', () => {
             viewportY: 0,
             zoom: 0,
         })).toBeNull();
+    });
+
+    it('pluralizes page deletion content metrics before composing the confirmation', async () => {
+        const translation = createInstance();
+        await translation.init({
+            lng: 'en',
+            fallbackLng: 'en',
+            resources: {
+                en: { translation: en },
+                zh: { translation: zh },
+            },
+        });
+
+        const deletionDescription = (language: 'en' | 'zh', nodeCount: number, connectionCount: number) => {
+            const nodeCountLabel = translation.t('designer.pages.deleteNodeCount', {
+                lng: language,
+                count: nodeCount,
+            });
+            const connectionCountLabel = translation.t('designer.pages.deleteConnectionCount', {
+                lng: language,
+                count: connectionCount,
+            });
+
+            return translation.t('designer.pages.deleteDescription', {
+                lng: language,
+                nodeCountLabel,
+                connectionCountLabel,
+            });
+        };
+
+        expect(deletionDescription('en', 1, 0)).toBe(
+            'This deletes 1 node and 0 connections from this page. You can restore the latest deleted page before closing or reloading this diagram.',
+        );
+        expect(deletionDescription('en', 2, 1)).toBe(
+            'This deletes 2 nodes and 1 connection from this page. You can restore the latest deleted page before closing or reloading this diagram.',
+        );
+        expect(deletionDescription('en', 0, 2)).not.toContain('(s)');
+        expect(deletionDescription('zh', 1, 0)).toBe(
+            '将删除此页面中的 1 个节点和 0 条连线。关闭或重新加载图表前，可恢复最近删除的页面。',
+        );
+        expect(deletionDescription('zh', 2, 1)).toBe(
+            '将删除此页面中的 2 个节点和 1 条连线。关闭或重新加载图表前，可恢复最近删除的页面。',
+        );
     });
 });

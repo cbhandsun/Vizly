@@ -363,6 +363,16 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
             activePageEdgeCount,
         )
         : null;
+    const deletePageNodeCount = activePageContentMetrics?.nodeCount ?? activePage?.nodes.length ?? 0;
+    const deletePageConnectionCount = activePageContentMetrics?.edgeCount ?? activePage?.edges.length ?? 0;
+    const deletePageNodeCountLabel = t('designer.pages.deleteNodeCount', {
+        count: deletePageNodeCount,
+        defaultValue: '{{count}} nodes',
+    });
+    const deletePageConnectionCountLabel = t('designer.pages.deleteConnectionCount', {
+        count: deletePageConnectionCount,
+        defaultValue: '{{count}} connections',
+    });
     const pageLimitMessage = t('designer.pages.limitReached', {
         count: MAX_DIAGRAM_PAGES,
         defaultValue: '最多可创建 {{count}} 个页面',
@@ -572,9 +582,9 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                                     description={(
                                         <span id={deleteDialogDescriptionId}>
                                             {t('designer.pages.deleteDescription', {
-                                                nodeCount: activePageContentMetrics?.nodeCount ?? activePage.nodes.length,
-                                                edgeCount: activePageContentMetrics?.edgeCount ?? activePage.edges.length,
-                                                defaultValue: '将删除此页面中的 {{nodeCount}} 个节点和 {{edgeCount}} 条连线。关闭或重新加载图表前，可恢复最近删除的页面。',
+                                                nodeCountLabel: deletePageNodeCountLabel,
+                                                connectionCountLabel: deletePageConnectionCountLabel,
+                                                defaultValue: 'This deletes {{nodeCountLabel}} and {{connectionCountLabel}} from this page. You can restore the latest deleted page before closing or reloading this diagram.',
                                             })}
                                         </span>
                                     )}
