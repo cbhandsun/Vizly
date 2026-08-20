@@ -89,6 +89,7 @@ export const resolveDomainLayoutRoutingQuality = (
     isOrderedDomainLaneLayoutStrategy(strategyName) ? 'interactive' : undefined
 );
 
+/** Layout routes are candidates only; the hidden transaction still hard-gates them. */
 export const shouldPromoteDomainDagreRouteCandidate = (
-    strategyName?: string,
-): boolean => !isOrderedDomainLaneLayoutStrategy(strategyName);
+    _strategyName?: string,
+): boolean => true;

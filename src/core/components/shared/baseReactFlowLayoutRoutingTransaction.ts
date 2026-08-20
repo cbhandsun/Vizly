@@ -196,9 +196,16 @@ const writeBaseReactFlowStagedLayoutSnapshot = ({
   const displayPatches = createBaseReactFlowDisplayEdgePatches(routedEdges, routedEdges);
   if (!outputRouteSignature || !displayPatches) return false;
   const writeSnapshot = (edges: Edge[], patches: Edge[]): boolean => {
-    const identity = computeBaseReactFlowDisplayInputIdentityBundle({
-      nodes: sourceNodes,
+    // Layout strategies keep child coordinates relative to their domain. The
+    // display router identifies the same nodes by their projected absolute
+    // geometry, so staged snapshots must use that canonical representation too.
+    const projectedInput = projectBaseReactFlowDisplayWorkerInput({
       edges,
+      nodes: sourceNodes,
+    });
+    const identity = computeBaseReactFlowDisplayInputIdentityBundle({
+      nodes: projectedInput.nodes,
+      edges: projectedInput.edges,
       enableSmartEdges,
       smartEdgePadding,
       isLargeGraph,

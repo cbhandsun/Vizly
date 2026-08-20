@@ -208,4 +208,84 @@ describe('baseReactFlowLayoutRoutingTransaction', () => {
       sourceEdges: committed!.routedEdges,
     })).toBeNull();
   });
+
+  it('keys nested layout snapshots by the absolute geometry used by display routing', () => {
+    const nestedNodes: Node[] = [
+      {
+        id: 'domain',
+        position: { x: 400, y: 300 },
+        width: 500,
+        height: 300,
+        measured: { width: 500, height: 300 },
+        data: {},
+      },
+      {
+        id: 'nested-source',
+        parentId: 'domain',
+        position: { x: 40, y: 60 },
+        width: 100,
+        height: 60,
+        measured: { width: 100, height: 60 },
+        data: {},
+      },
+      {
+        id: 'nested-target',
+        parentId: 'domain',
+        position: { x: 260, y: 60 },
+        width: 100,
+        height: 60,
+        measured: { width: 100, height: 60 },
+        data: {},
+      },
+    ];
+    const nestedEdges: Edge[] = [{
+      id: 'nested-edge',
+      source: 'nested-source',
+      target: 'nested-target',
+      sourceHandle: 'right',
+      targetHandle: 'left',
+      type: 'advanced-smart-step',
+      data: {},
+    }];
+    const projected = projectBaseReactFlowDisplayWorkerInput({
+      edges: nestedEdges,
+      nodes: nestedNodes,
+    });
+    const committed = commitBaseReactFlowStagedLayoutRoutingResult({
+      sourceEdges: nestedEdges,
+      sourceNodes: nestedNodes,
+      workerResult: {
+        projectedEdges: projected.edges,
+        edges: [{
+          ...projected.edges[0],
+          type: 'stablePath',
+          data: {
+            computedPath: [{ x: 540, y: 390 }, { x: 660, y: 390 }],
+          },
+        }],
+        hardClean: true,
+        routeResolution: 'full-route',
+        phaseTrace: [],
+      },
+    });
+
+    expect(committed).not.toBeNull();
+    const displayInput = projectBaseReactFlowDisplayWorkerInput({
+      edges: committed!.routedEdges,
+      nodes: nestedNodes,
+    });
+    const displayIdentity = computeBaseReactFlowDisplayInputIdentityBundle({
+      nodes: displayInput.nodes,
+      edges: displayInput.edges,
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: false,
+    });
+
+    expect(readBaseReactFlowDisplayCommittedSnapshot({
+      inputSignature: displayIdentity.cacheSignature,
+      inputGeometryDigest: displayIdentity.geometryDigest,
+      sourceEdges: committed!.routedEdges,
+    })?.edges).toEqual(committed!.routedEdges);
+  });
 });

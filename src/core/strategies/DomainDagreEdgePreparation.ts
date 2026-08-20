@@ -18,7 +18,6 @@ import { prepareDomainDagreInteractiveEdges } from './domainDagreInteractiveEdge
 import {
     applyAutoHandleData,
     asRoutingRecord,
-    finiteRoutingNumber as finiteNumber,
     readDirectionalHandlePolicy,
     readManualHandleLocks,
     readManualHandleSides,
@@ -64,9 +63,15 @@ export async function prepareDomainDagreEdges({
         const absPos = getAbsPos(n);
         n.positionAbsolute = absPos;
 
-        // [FIX] 忽略 React Flow 的 measured（它可能在不同渲染周期有不同值），只使用 ensureMeasuredForNodes 写入的 style
-        const w = finiteNumber(n.style?.width ?? n.width, 200);
-        const h = finiteNumber(n.style?.height ?? n.height, 80);
+        // normalizeDomainDagreNodes has already bounded the measured geometry.
+        // Preserve it for the hidden routing transaction so React Flow does not
+        // invalidate the committed snapshot when it measures the same nodes.
+        const size = routingNodeSize(n, 200, 80);
+        // React Flow publishes DOM measurements through integer-valued
+        // offset dimensions. Canonicalize the hidden lane geometry the same
+        // way so subpixel container sizes do not invalidate a clean route.
+        const w = Math.max(1, Math.round(size.width));
+        const h = Math.max(1, Math.round(size.height));
         n.width = w;
         n.height = h;
         n.measured = { width: w, height: h };

@@ -17,6 +17,7 @@ import { EnhancedThemeSelector } from './ui/EnhancedThemeSelector';
 import { ErrorBoundary } from './ui/ErrorBoundary';
 import { subscribeMindMapAIConfigRequest } from '@/core/components/mindmap-v2/mindMapAIConfigEvent';
 import { CloudSaveAuthRecovery } from './diagrams/CloudSaveAuthRecovery';
+import { loadLayoutPresetMapForDiagram } from '@/data/standardized/layoutPresetMapLoader';
 
 const RoutingDebugPanel = import.meta.env.DEV
     ? lazy(() => import('./debug/RoutingDebugPanel').then(module => ({ default: module.RoutingDebugPanel })))
@@ -34,7 +35,6 @@ const MermaidImportModal = lazy(() => import('./ui/MermaidImportModal').then(mod
 const DraggableSettingsPanel = lazy(() => import('./ui/DraggableSettingsPanel').then(module => ({ default: module.DraggableSettingsPanel })));
 const TemplateCascaderMenu = lazy(() => import('./diagrams/ui/TemplateCascaderMenu').then(module => ({ default: module.TemplateCascaderMenu })));
 
-const loadLayoutPresetMap = () => import('@/data/standardized').then(({ PRESET_MAP }) => PRESET_MAP);
 const renderVersionHistoryPanel = (props: { diagramId: string; isOpen: boolean; onClose: () => void }) => (
     <Suspense fallback={null}>
         <VersionHistoryPanel {...props} />
@@ -194,6 +194,10 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
     const [aiConfigProviderId, setAiConfigProviderId] = useState<string | undefined>();
     const [aiConfigSession, setAiConfigSession] = useState(0);
     const settingsPanelTitle = t('designer.settings.title');
+    const loadCurrentLayoutPresetMap = useCallback(
+        () => loadLayoutPresetMapForDiagram(selectedDiagramId),
+        [selectedDiagramId],
+    );
 
     const openAIConfig = useCallback((providerId?: string) => {
         setAiConfigProviderId(providerId);
@@ -328,7 +332,7 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
                                                 isVersionHistoryOpen={isVersionHistoryOpen}
                                                 onOpenVersionHistory={() => setIsVersionHistoryOpen(true)}
                                                 onVersionHistoryClose={() => setIsVersionHistoryOpen(false)}
-                                                loadLayoutPresetMap={loadLayoutPresetMap}
+                                                loadLayoutPresetMap={loadCurrentLayoutPresetMap}
                                                 renderVersionHistoryPanel={renderVersionHistoryPanel}
                                                 renderAIChatPanel={({ onClose }) => (
                                                     <Suspense fallback={<div className="p-4 text-center text-gray-500">Loading AI...</div>}>

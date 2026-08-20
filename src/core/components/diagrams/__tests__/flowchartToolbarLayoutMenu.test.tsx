@@ -53,7 +53,7 @@ describe('flowchartToolbarLayoutMenu', () => {
       .toEqual(['scan-a', 'scan-b']);
     expect(resolveDomainLayoutRoutingQuality('domain-lanes')).toBe('interactive');
     expect(resolveDomainLayoutRoutingQuality('domain-dagre')).toBeUndefined();
-    expect(shouldPromoteDomainDagreRouteCandidate('domain-lanes')).toBe(false);
+    expect(shouldPromoteDomainDagreRouteCandidate('domain-lanes')).toBe(true);
     expect(shouldPromoteDomainDagreRouteCandidate('domain-dagre')).toBe(true);
     expect(createCustomDomainLayoutCommand('TB', 'grid')).toEqual({
       direction: 'TB',
