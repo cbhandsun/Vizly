@@ -234,6 +234,7 @@ export const MindMapSpeakerNotes: React.FC = () => {
                 style={compactContainerStyle}
                 aria-label={t('plugins.mindmap.speakerNotes.panelLabel')}
                 data-testid="mindmap-speaker-notes-compact"
+                data-presentation-accessible="true"
             >
                 <div style={compactHeaderStyle}>
                     <div style={titleWrapperStyle}>
@@ -278,6 +279,7 @@ export const MindMapSpeakerNotes: React.FC = () => {
             style={containerStyle}
             aria-label={t('plugins.mindmap.speakerNotes.panelLabel')}
             data-testid="mindmap-speaker-notes-panel"
+            data-presentation-accessible="true"
         >
             {/* 磨砂玻璃头部 */}
             <div style={headerStyle}>

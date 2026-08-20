@@ -17,6 +17,7 @@ import {
     logMindmapPresentationFullscreenFailure,
     logMindmapPresentationNavigateFailure,
 } from './mindmapPanelLogging';
+import { isolatePresentationAccessibility } from './presentationAccessibilityIsolation';
 
 // ─── DFS 遍历节点 ─────────────────────────────────────────────────────────────
 function flattenNodesDFS(node: NodeObj, result: string[] = []): string[] {
@@ -292,6 +293,7 @@ export function usePresentationMode(
     const onStopRef = useRef(onStop);
     const onNodeFocusRef = useRef(onNodeFocus);
     const returnFocusRef = useRef<HTMLElement | null>(null);
+    const restoreAccessibilityRef = useRef<() => void>(() => undefined);
     const stopRef = useRef<() => void>(() => undefined);
     const labelsRef = useRef<PresentationHudLabels>({
         ...DEFAULT_HUD_LABELS,
@@ -355,6 +357,8 @@ export function usePresentationMode(
 
         const container = getContainer();
         container?.classList.remove('me-presenting');
+        restoreAccessibilityRef.current();
+        restoreAccessibilityRef.current = () => undefined;
 
         // Exit fullscreen
         if (document.fullscreenElement) {
@@ -409,6 +413,8 @@ export function usePresentationMode(
 
         // Navigate to first node
         navigateTo(0, ids, data.nodeData);
+        restoreAccessibilityRef.current();
+        restoreAccessibilityRef.current = isolatePresentationAccessibility(container);
         requestAnimationFrame(() => document.getElementById('me-presentation-hud')?.focus({ preventScroll: true }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [mind, navigateTo, stop]);
@@ -454,6 +460,11 @@ export function usePresentationMode(
             document.removeEventListener('fullscreenchange', handleFullscreenChange);
         };
     }, [mind, navigateTo, stop]);
+
+    useEffect(() => () => {
+        restoreAccessibilityRef.current();
+        restoreAccessibilityRef.current = () => undefined;
+    }, []);
 
     return {
         get isActive() { return isActiveRef.current; },

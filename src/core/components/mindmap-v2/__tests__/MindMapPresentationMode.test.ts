@@ -143,6 +143,8 @@ describe('MindMapPresentationMode HUD', () => {
         const hud = document.getElementById('me-presentation-hud');
         expect(document.activeElement).toBe(hud);
         expect(selectNode).toHaveBeenCalledWith(topicElements.get('root'));
+        expect(trigger.hasAttribute('inert')).toBe(true);
+        expect(priorFocus.hasAttribute('inert')).toBe(true);
 
         const next = hud?.querySelectorAll<HTMLButtonElement>('button')[1];
         act(() => next?.click());
@@ -154,6 +156,8 @@ describe('MindMapPresentationMode HUD', () => {
         act(() => exit?.click());
         expect(document.getElementById('me-presentation-hud')).toBeNull();
         expect(document.activeElement).toBe(trigger);
+        expect(trigger.hasAttribute('inert')).toBe(false);
+        expect(priorFocus.hasAttribute('inert')).toBe(false);
         expect(clearSelection).toHaveBeenCalledOnce();
         expect(onStop).toHaveBeenCalledOnce();
 
