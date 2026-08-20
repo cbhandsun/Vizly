@@ -71,7 +71,10 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
             /html\[data-theme='dark'\] body \.flowchart-layout-menu \.ant-dropdown-menu\s*\{[\s\S]*?background-color: rgba\(28, 28, 41, 0\.98\) !important;/,
         );
         expect(toolbarCss).toMatch(
-            /body \.flowchart-layout-menu \.ant-dropdown-menu-submenu-popup\s*\{\s*position: absolute;/,
+            /body \.flowchart-layout-menu > \.ant-dropdown-menu\s*\{\s*overflow: visible;/,
+        );
+        expect(toolbarCss).toMatch(
+            /body \.flowchart-layout-menu \.ant-dropdown-menu-submenu-popup\s*\{[\s\S]*?position: absolute;[\s\S]*?max-width: calc\(100vw - 16px\);[\s\S]*?max-height: calc\(100dvh - 16px\);[\s\S]*?overflow-y: auto;/,
         );
     });
 

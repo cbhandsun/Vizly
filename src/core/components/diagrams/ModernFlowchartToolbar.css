@@ -8,12 +8,21 @@ body .flowchart-layout-menu .ant-dropdown-menu {
     -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
 }
 
-/* Ant renders nested dropdown menus inside the root overlay. Its generic
-   `.ant-dropdown .ant-dropdown-menu { position: relative }` selector is more
-   specific than the submenu popup rule, which otherwise makes the submenu
-   participate in root-menu layout and creates a tall blank scroll surface. */
+/* Nested engine menus are positioned outside the root menu box. Ant's menu
+   surface clips overflow by default, which makes the submenu accessible to
+   the DOM while rendering none of it on screen. */
+body .flowchart-layout-menu > .ant-dropdown-menu {
+    overflow: visible;
+}
+
+/* Keep the popup out of root-menu flow so it does not create a tall blank
+   scroll surface, while allowing Ant's left/right collision placement. */
 body .flowchart-layout-menu .ant-dropdown-menu-submenu-popup {
     position: absolute;
+    max-width: calc(100vw - 16px);
+    max-height: calc(100dvh - 16px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
 }
 
 html.dark body .flowchart-layout-menu .ant-dropdown-menu,
