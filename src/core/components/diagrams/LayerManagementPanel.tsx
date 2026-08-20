@@ -58,8 +58,9 @@ interface LayerManagementPanelProps {
 const ColorPicker: React.FC<{
     current?: string;
     onSelect: (color: string | undefined) => void;
+    onDismiss: () => void;
     touchTargetSize: number;
-}> = ({ current, onSelect, touchTargetSize }) => {
+}> = ({ current, onSelect, onDismiss, touchTargetSize }) => {
     const { t } = useTranslation();
     const buttonRefs = useRef(new Map<string, HTMLButtonElement>());
 
@@ -70,6 +71,12 @@ const ColorPicker: React.FC<{
     }, [onSelect]);
 
     const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLButtonElement>, value: string | undefined) => {
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            event.stopPropagation();
+            onDismiss();
+            return;
+        }
         const currentIndex = COLOR_PICKER_VALUES.findIndex(candidate => candidate === value);
         let nextIndex: number | null = null;
         if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
@@ -84,10 +91,15 @@ const ColorPicker: React.FC<{
         if (nextIndex === null) return;
         event.preventDefault();
         focusAndSelect(COLOR_PICKER_VALUES[nextIndex]);
-    }, [focusAndSelect]);
+    }, [focusAndSelect, onDismiss]);
 
     return (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, width: touchTargetSize * 4 + 18 }} aria-label={t('designer.layersPanel.colorGroup')} role="radiogroup">
+        <div
+            style={{ display: 'flex', flexWrap: 'wrap', gap: 6, width: touchTargetSize * 4 + 18 }}
+            aria-label={t('designer.layersPanel.colorGroup')}
+            role="radiogroup"
+            data-preserve-drawer-on-escape="true"
+        >
         {LAYER_COLORS.map(({ value, labelKey }) => {
             const label = t(`designer.layersPanel.colors.${labelKey}`);
             return (
@@ -169,13 +181,15 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
     const [editingLayerId, setEditingLayerId] = useState<string | null>(null);
     const [editName, setEditName] = useState('');
     const [editError, setEditError] = useState<string | null>(null);
+    const [openColorLayerId, setOpenColorLayerId] = useState<string | null>(null);
     const [pendingDeleteLayer, setPendingDeleteLayer] = useState<LayerConfig | null>(null);
     const createTriggerRef = useRef<HTMLButtonElement>(null);
     const createInputRef = useRef<InputRef>(null);
     const editInputRef = useRef<InputRef>(null);
     const skipNextEditBlurRef = useRef(false);
-    const focusCreatedLayerRef = useRef(false);
+    const focusActiveLayerAfterMutationRef = useRef(false);
     const layerRowRefs = useRef(new Map<string, HTMLDivElement>());
+    const colorTriggerRefs = useRef(new Map<string, HTMLButtonElement | HTMLAnchorElement>());
     const touchTargetSize = useMemo(
         () => resolveLayerTouchTargetSize(getUiScale()),
         [],
@@ -195,10 +209,15 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
         requestAnimationFrame(() => layerRowRefs.current.get(layerId)?.focus());
     }, []);
 
+    const dismissColorPicker = useCallback((layerId: string) => {
+        setOpenColorLayerId(currentLayerId => currentLayerId === layerId ? null : currentLayerId);
+        requestAnimationFrame(() => colorTriggerRefs.current.get(layerId)?.focus());
+    }, []);
+
     useEffect(() => {
-        if (!focusCreatedLayerRef.current || !activeLayerId) return;
+        if (!focusActiveLayerAfterMutationRef.current || !activeLayerId) return;
         if (!layers.some(layer => layer.id === activeLayerId)) return;
-        focusCreatedLayerRef.current = false;
+        focusActiveLayerAfterMutationRef.current = false;
         focusLayerRow(activeLayerId);
     }, [activeLayerId, focusLayerRow, layers]);
 
@@ -254,7 +273,7 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
             createInputRef.current?.focus();
             return;
         }
-        focusCreatedLayerRef.current = true;
+        focusActiveLayerAfterMutationRef.current = true;
         setIsCreating(false);
         setCreateName('');
         setCreateError(null);
@@ -387,6 +406,7 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
                         const sourceIndex = layers.findIndex(candidate => candidate.id === layer.id);
                         const canMoveUp = sourceIndex >= 0 && sourceIndex < layers.length - 1;
                         const canMoveDown = sourceIndex > 0;
+                        const rowBorderColor = isActive ? '#1890ff' : '#d9d9d9';
 
                         return (
                             <div
@@ -405,9 +425,13 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
                                     padding: '10px 12px',
                                     marginBottom: 4,
                                     borderRadius: 4,
-                                    border: isActive ? '1px solid #1890ff' : '1px solid #d9d9d9',
+                                    borderTop: `1px solid ${rowBorderColor}`,
+                                    borderRight: `1px solid ${rowBorderColor}`,
+                                    borderBottom: `1px solid ${rowBorderColor}`,
                                     cursor: 'pointer',
-                                    borderLeft: layer.color ? `4px solid ${layer.color}` : undefined,
+                                    borderLeft: layer.color
+                                        ? `4px solid ${layer.color}`
+                                        : `1px solid ${rowBorderColor}`,
                                 }}
                                 onClick={() => onSetActive(layer.id)}
                                 onKeyDown={(event) => handleLayerKeyDown(event, displayIndex)}
@@ -509,10 +533,14 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
 
                                         {onSetColor && (
                                             <Popover
+                                                open={openColorLayerId === layer.id}
+                                                onOpenChange={(open) => setOpenColorLayerId(open ? layer.id : null)}
+                                                destroyOnHidden
                                                 content={
                                                     <ColorPicker
                                                         current={layer.color}
                                                         onSelect={(color) => onSetColor(layer.id, color)}
+                                                        onDismiss={() => dismissColorPicker(layer.id)}
                                                         touchTargetSize={touchTargetSize}
                                                     />
                                                 }
@@ -521,6 +549,10 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
                                             >
                                                 <Tooltip title={t('designer.layersPanel.colorMarker')}>
                                                     <Button
+                                                        ref={(element) => {
+                                                            if (element) colorTriggerRefs.current.set(layer.id, element);
+                                                            else colorTriggerRefs.current.delete(layer.id);
+                                                        }}
                                                         type="text"
                                                         tabIndex={isActive ? 0 : -1}
                                                         style={actionButtonStyle}
@@ -617,6 +649,7 @@ export const LayerManagementPanel: React.FC<LayerManagementPanelProps> = ({
                 onCancel={() => setPendingDeleteLayer(null)}
                 onOk={() => {
                     if (!pendingDeleteLayer) return;
+                    focusActiveLayerAfterMutationRef.current = true;
                     onDelete(pendingDeleteLayer.id);
                     setPendingDeleteLayer(null);
                 }}

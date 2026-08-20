@@ -7,6 +7,7 @@ import { I18nextProvider } from 'react-i18next';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LayerManagementPanel } from '../LayerManagementPanel';
+import { bindIconRailEscapeClose } from '../iconRailKeyboard';
 import en from '../../../../locales/en.json';
 import i18n from '../../../../i18n';
 
@@ -177,6 +178,40 @@ describe('LayerManagementPanel', () => {
             expect(document.activeElement).toBe(red);
         });
         expect(screen.getAllByRole('radio').filter(radio => radio.getAttribute('tabindex') === '0')).toHaveLength(1);
+    });
+
+    it('closes only the color picker on Escape and restores its trigger focus', async () => {
+        const closeDrawer = vi.fn();
+        const unbindDrawerEscape = bindIconRailEscapeClose(window, closeDrawer);
+
+        render(
+            <LayerManagementPanel
+                layers={[layer]}
+                activeLayerId="layer-0"
+                onSetActive={vi.fn()}
+                onToggleVisibility={vi.fn()}
+                onToggleLock={vi.fn()}
+                onRename={vi.fn()}
+                onCreate={vi.fn()}
+                onDelete={vi.fn()}
+                onReorder={vi.fn()}
+                onSetColor={vi.fn()}
+            />,
+        );
+
+        const trigger = screen.getByRole('button', { name: '设置图层颜色：默认图层' });
+        fireEvent.click(trigger);
+        const noColor = await screen.findByRole('radio', { name: '图层颜色：无颜色' });
+        const colorPopover = noColor.closest('.ant-popover');
+        noColor.focus();
+        fireEvent.keyDown(noColor, { key: 'Escape' });
+
+        await waitFor(() => {
+            expect(colorPopover?.getAttribute('style')).toContain('pointer-events: none');
+            expect(document.activeElement).toBe(trigger);
+        });
+        expect(closeDrawer).not.toHaveBeenCalled();
+        unbindDrawerEscape();
     });
 
     it('creates a normalized layer name without relying on a browser prompt', () => {
@@ -459,6 +494,36 @@ describe('LayerManagementPanel', () => {
 
         fireEvent.click(screen.getByRole('button', { name: '确认删除图层' }));
         expect(onDelete).toHaveBeenCalledWith('layer-review');
+    });
+
+    it('focuses the surviving active layer after confirming deletion', async () => {
+        const DeleteHarness = () => {
+            const [harnessLayers, setHarnessLayers] = useState([layer, reviewLayer]);
+            const [activeLayerId, setActiveLayerId] = useState('layer-review');
+            return (
+                <LayerManagementPanel
+                    layers={harnessLayers}
+                    activeLayerId={activeLayerId}
+                    onSetActive={setActiveLayerId}
+                    onToggleVisibility={vi.fn()}
+                    onToggleLock={vi.fn()}
+                    onRename={vi.fn()}
+                    onCreate={vi.fn()}
+                    onDelete={(layerId) => {
+                        setHarnessLayers(current => current.filter(candidate => candidate.id !== layerId));
+                        setActiveLayerId('layer-0');
+                    }}
+                    onReorder={vi.fn()}
+                />
+            );
+        };
+
+        render(<DeleteHarness />);
+        fireEvent.click(screen.getByRole('button', { name: '删除图层：评审图层' }));
+        fireEvent.click(await screen.findByRole('button', { name: '确认删除图层' }));
+
+        const survivingLayer = await screen.findByRole('option', { name: '默认图层' });
+        await waitFor(() => expect(document.activeElement).toBe(survivingLayer));
     });
 
     it('localizes layer controls, validation, colors, and deletion in English', async () => {
