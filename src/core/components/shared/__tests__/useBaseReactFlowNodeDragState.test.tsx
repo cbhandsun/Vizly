@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 
 import { act, renderHook } from '@testing-library/react';
-import type React from 'react';
 import type { Node } from '@xyflow/react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -25,7 +24,7 @@ describe('useBaseReactFlowNodeDragState', () => {
   it('tracks drag fallback nodes and forwards lifecycle callbacks', () => {
     const onNodeDragStart = vi.fn<NonNullable<BaseReactFlowProps['onNodeDragStart']>>();
     const onNodeDragStop = vi.fn<NonNullable<BaseReactFlowProps['onNodeDragStop']>>();
-    const event = {} as React.MouseEvent;
+    const event = new MouseEvent('pointermove');
     const hook = renderHook(() => useBaseReactFlowNodeDragState({
       onNodeDragStart,
       onNodeDragStop,

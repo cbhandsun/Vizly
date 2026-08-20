@@ -1,6 +1,6 @@
 import demandAllocationArtifact from '../../generated/precompiledRoutes/route-4033567064.json';
 import logisticsArtifact from '../../generated/precompiledRoutes/route-2227874906.json';
-import wmsProcessArtifact from '../../generated/precompiledRoutes/route-4172950488.json';
+import wmsProcessArtifact from '../../generated/precompiledRoutes/route-1352090637.json';
 
 const artifactsByPresetId: Readonly<Record<string, unknown>> = {
   'wms-demand-allocation-strategy-v2': demandAllocationArtifact,
