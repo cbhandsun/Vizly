@@ -100,6 +100,14 @@ export const buildFlowchartLayoutMenuModel = ({
             'designer.flowchart.layout.domainCompoundElkLR',
             'Domain ELK 组合 (左→右)',
         ),
+        domainLanesTb: translate(
+            'designer.flowchart.layout.domainLanesTB',
+            '域泳道 + Dagre (上→下)',
+        ),
+        domainLanesLr: translate(
+            'designer.flowchart.layout.domainLanesLR',
+            '域泳道 + Dagre (左→右)',
+        ),
         domainElkTb: translate('designer.flowchart.layout.globalElkTB', '全图 ELK 正交分层 (上→下)'),
         domainElkLr: translate('designer.flowchart.layout.globalElkLR', '全图 ELK 正交分层 (左→右)'),
         domainVertical: translate('designer.flowchart.layout.domainVertical', '▥ DomainVertical (上→下)'),
@@ -150,6 +158,8 @@ export const buildFlowchartLayoutMenuModel = ({
         'domain-dagre-sub-horizontal-tb': labels.domainDagreSubHorizontalTb,
         'domain-compound-elk-tb': labels.domainCompoundElkTb,
         'domain-compound-elk-lr': labels.domainCompoundElkLr,
+        'domain-lanes-tb': labels.domainLanesTb,
+        'domain-lanes-lr': labels.domainLanesLr,
         'domain-elk-tb': labels.domainElkTb,
         'domain-elk-lr': labels.domainElkLr,
         'domain-vertical': labels.domainVertical,
@@ -248,6 +258,18 @@ export const buildFlowchartLayoutMenuModel = ({
                         labels.domainCompoundElkLr,
                         () => onStrategyLayout('domain-compound-elk', undefined, 'LR'),
                         <FaObjectGroup style={{ transform: 'rotate(-90deg)' }} />,
+                    ),
+                    domainItem(
+                        'domain-lanes-tb',
+                        labels.domainLanesTb,
+                        () => onStrategyLayout('domain-lanes', undefined, 'TB'),
+                        <FaRegObjectGroup />,
+                    ),
+                    domainItem(
+                        'domain-lanes-lr',
+                        labels.domainLanesLr,
+                        () => onStrategyLayout('domain-lanes', undefined, 'LR'),
+                        <FaRegObjectGroup style={{ transform: 'rotate(-90deg)' }} />,
                     ),
                     { type: 'divider' as const },
                     domainItem(

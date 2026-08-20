@@ -603,7 +603,7 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
         expect(screen.queryByRole('menuitemradio')).toBeNull();
     });
 
-    it('announces the current compound layout and exposes both checked radio states', async () => {
+    it('announces fixed Dagre domain layout without claiming a second node arrangement', async () => {
         render(
             <ModernFlowchartToolbar
                 canUndo={false}
@@ -628,7 +628,7 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
         );
 
         const trigger = await screen.findByRole('button', {
-            name: /自动布局：DomainDagre.*Dagre分层/,
+            name: /自动布局：DomainDagre.*上→下/,
         });
         fireEvent.click(trigger);
 
@@ -643,10 +643,10 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
         });
 
         expect(domainLayout.getAttribute('aria-checked')).toBe('true');
-        expect(nodeLayout.getAttribute('aria-checked')).toBe('true');
+        expect(nodeLayout.getAttribute('aria-checked')).toBe('false');
         expect(inactiveLayout.getAttribute('aria-checked')).toBe('false');
         expect(domainLayout.className).toContain('ant-dropdown-menu-item-selected');
-        expect(nodeLayout.className).toContain('ant-dropdown-menu-item-selected');
+        expect(nodeLayout.className).not.toContain('ant-dropdown-menu-item-selected');
     });
 
     it('opens the automatic-layout menu with ArrowDown and focuses its first action', async () => {

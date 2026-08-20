@@ -158,6 +158,12 @@ export interface LayoutOptions {
   groupPadding?: number;
   /** 域标题高度 */
   domainTitleHeight?: number;
+  /**
+   * 域容器的顶层放置模型。
+   * - topology：根据跨域边进行拓扑分层；
+   * - ordered-lanes：忽略域级环，按显式/扫描顺序稳定排列为泳道。
+   */
+  domainPlacement?: 'topology' | 'ordered-lanes';
   /** 显式域顺序（优先级最高） */
   domainOrder?: string[];
   /** 显式子域顺序（优先级最高，按域分组） */

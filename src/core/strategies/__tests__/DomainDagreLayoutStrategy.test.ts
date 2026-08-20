@@ -454,6 +454,39 @@ describe('DomainDagreLayoutStrategy', () => {
         expect(maxParallelOverlap(tmsVisibility, wmsVisibility)).toBeLessThan(96);
     }, 15_000);
 
+    it('keeps cyclic Logistics domains hard-clean in ordered lane mode', async () => {
+        const logisticsFixture = fixtureData(logisticsStandardData);
+        const canvas = await standardDataToCanvas(logisticsFixture);
+        const presetLayout = logisticsFixture.layout;
+        const result = await new DomainDagreLayoutStrategy().calculateLayout(canvas.nodes, canvas.edges, {
+            type: LayoutType.DAGRE,
+            direction: 'LR',
+            nodeLayout: 'dagre',
+            domainPlacement: 'ordered-lanes',
+            generateDomainGroups: true,
+            generateSubDomainGroups: true,
+            domainSubGroupDirection: 'LR',
+            subDomainNodeDirection: 'LR',
+            domainOrder: presetLayout.domainOrder,
+            subDomainOrder: presetLayout.subDomainOrder,
+        } as unknown as import('../../types/layout').LayoutOptions);
+        const displayEdges = createBaseReactFlowDisplayEdges({
+            edges: result.edges,
+            nodes: result.nodes,
+            enableSmartEdges: true,
+            smartEdgePadding: 20,
+            isLargeGraph: false,
+            displayEdgeEpoch: computeBaseReactFlowDisplayEdgeEpoch({
+                nodes: result.nodes,
+                edges: result.edges,
+            }),
+        });
+
+        expect(nonOrthogonalSegments(displayEdges)).toEqual([]);
+        expect(shortEndpointStubs(displayEdges, 48)).toEqual([]);
+        expect(unrelatedStrictCrossings(displayEdges)).toEqual([]);
+    }, 15_000);
+
     it('keeps Logistics explicit hub lanes displayable after standard conversion', async () => {
         const canvas = await standardDataToCanvas(fixtureData(logisticsStandardData));
         const displayEdges = createBaseReactFlowDisplayEdges({

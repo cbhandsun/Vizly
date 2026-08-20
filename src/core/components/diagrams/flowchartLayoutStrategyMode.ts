@@ -17,6 +17,17 @@ export const isGlobalFullGraphLayoutStrategy = (strategyName?: string): boolean 
 export const usesSelectableDomainNodeArrangement = (strategyName?: string): boolean => (
     strategyName === 'domain-vertical'
     || strategyName === 'domain-horizontal'
-    || strategyName === 'domain-dagre'
-    || strategyName === 'domain-dagre-sub-horizontal'
 );
+
+export const isOrderedDomainLaneLayoutStrategy = (strategyName?: string): boolean => (
+    strategyName === 'domain-lanes'
+);
+
+export const resolveLayoutDomainOrder = (
+    strategyName: string | undefined,
+    explicitOrder: string[] | undefined,
+    implicitOrder: string[],
+): string[] | undefined => {
+    if (explicitOrder) return explicitOrder;
+    return isOrderedDomainLaneLayoutStrategy(strategyName) ? undefined : implicitOrder;
+};

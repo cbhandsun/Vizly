@@ -32,7 +32,10 @@ import {
     sortDomainDagreSubGroups,
 } from './domainDagreHierarchy';
 import { runDomainDagreSimplifiedPath } from './domainDagreSimplifiedPaths';
-import { runDomainDagreTopLevelLayout } from './domainDagreTopLevelLayout';
+import {
+    runDomainDagreOrderedLaneLayout,
+    runDomainDagreTopLevelLayout,
+} from './domainDagreTopLevelLayout';
 import { runDomainDagreNestedLayout } from './domainDagreNestedLayout';
 /**
  * 域级 Dagre 布局策略
@@ -92,6 +95,7 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
             subDomainPaddingBottom: sdBottomSafe,
             subDomainTitleH: sdTitleH,
             domainTitleH: dTitleH,
+            domainPlacement,
             defaultNodeWidth: defaultNodeW,
             defaultNodeHeight: defaultNodeH,
             domainWhitelist,
@@ -383,7 +387,7 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
         updatedNodes.forEach(n => idMap.set(n.id, n));
 
 
-        runDomainDagreTopLevelLayout({
+        const topLevelLayoutContext = {
             nodes: updatedNodes,
             edges,
             domains: updatedNodes.filter(n => String(n.type || '') === 'titleGroup' && !isHidden(n)),
@@ -395,7 +399,12 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
             isHorizontal,
             domainGap,
             getNodeDimensions,
-        });
+        };
+        if (domainPlacement === 'ordered-lanes') {
+            runDomainDagreOrderedLaneLayout(topLevelLayoutContext);
+        } else {
+            runDomainDagreTopLevelLayout(topLevelLayoutContext);
+        }
 
         // ============================================
         // 子域整体居中处理（在所有域级布局完成后）

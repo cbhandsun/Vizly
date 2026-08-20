@@ -7,6 +7,7 @@ import {
 } from '../flowchartToolbarLayoutMenu';
 import {
   isGlobalFullGraphLayoutStrategy,
+  resolveLayoutDomainOrder,
   usesSelectableDomainNodeArrangement,
 } from '../flowchartLayoutStrategyMode';
 
@@ -35,9 +36,15 @@ describe('flowchartToolbarLayoutMenu', () => {
     expect(isGlobalFullGraphLayoutStrategy('domain-dagre')).toBe(false);
     expect(usesSelectableDomainNodeArrangement('domain-vertical')).toBe(true);
     expect(usesSelectableDomainNodeArrangement('domain-horizontal')).toBe(true);
-    expect(usesSelectableDomainNodeArrangement('domain-dagre')).toBe(true);
-    expect(usesSelectableDomainNodeArrangement('domain-dagre-sub-horizontal')).toBe(true);
+    expect(usesSelectableDomainNodeArrangement('domain-dagre')).toBe(false);
+    expect(usesSelectableDomainNodeArrangement('domain-dagre-sub-horizontal')).toBe(false);
     expect(usesSelectableDomainNodeArrangement('domain-compound-elk')).toBe(false);
+    expect(resolveLayoutDomainOrder('domain-lanes', undefined, ['scan-a', 'scan-b']))
+      .toBeUndefined();
+    expect(resolveLayoutDomainOrder('domain-lanes', ['explicit-b', 'explicit-a'], ['scan-a', 'scan-b']))
+      .toEqual(['explicit-b', 'explicit-a']);
+    expect(resolveLayoutDomainOrder('domain-dagre', undefined, ['scan-a', 'scan-b']))
+      .toEqual(['scan-a', 'scan-b']);
   });
 
   it('exposes ELK layered layouts in both supported directions', () => {
@@ -94,6 +101,19 @@ describe('flowchartToolbarLayoutMenu', () => {
     expect(resolveNodeLayoutHostStrategy('tree', 'TB')).toBe('domain-vertical');
     expect(resolveNodeLayoutHostStrategy('domain-elk', 'LR')).toBe('domain-horizontal');
     expect(resolveNodeLayoutHostStrategy('domain-horizontal', 'TB')).toBe('domain-horizontal');
+
+    const dagreModel = buildFlowchartLayoutMenuModel({
+      lastDomainStrategy: 'domain-dagre',
+      lastDomainDirection: 'TB',
+      lastNodeLayout: 'dagre',
+      onStrategyLayout,
+      translate: (_key, fallback) => fallback,
+    });
+    const dagreFlowItem = collectItems(dagreModel.items).find(item => item.key === 'node-flow');
+    expect(dagreModel.selectedKeys).toEqual(['domain-dagre-tb']);
+    expect(dagreModel.statusText).not.toContain(' + ');
+    if (typeof dagreFlowItem?.onClick === 'function') dagreFlowItem.onClick();
+    expect(onStrategyLayout).toHaveBeenLastCalledWith('domain-vertical', 'flow', 'TB');
   });
 
   it('exposes compound ELK as a domain-preserving layered mode', () => {
@@ -113,5 +133,24 @@ describe('flowchartToolbarLayoutMenu', () => {
     expect(model.statusText).toBe('Domain ELK 组合 (左→右)');
     if (typeof compoundLr?.onClick === 'function') compoundLr.onClick();
     expect(onStrategyLayout).toHaveBeenCalledWith('domain-compound-elk', undefined, 'LR');
+  });
+
+  it('exposes ordered domain lanes without claiming a selectable node arrangement', () => {
+    const onStrategyLayout = vi.fn();
+    const model = buildFlowchartLayoutMenuModel({
+      lastDomainStrategy: 'domain-lanes',
+      lastDomainDirection: 'LR',
+      lastNodeLayout: 'flow',
+      onStrategyLayout,
+      translate: (_key, fallback) => fallback,
+    });
+    const items = collectItems(model.items);
+    const lanesLr = items.find(item => item.key === 'domain-lanes-lr');
+
+    expect(lanesLr).toBeDefined();
+    expect(model.selectedKeys).toEqual(['domain-lanes-lr']);
+    expect(model.statusText).toBe('域泳道 + Dagre (左→右)');
+    if (typeof lanesLr?.onClick === 'function') lanesLr.onClick();
+    expect(onStrategyLayout).toHaveBeenCalledWith('domain-lanes', undefined, 'LR');
   });
 });

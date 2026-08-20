@@ -4,6 +4,7 @@ type UnknownRecord = Record<string, unknown>;
 
 export type DomainDagreDirection = 'TB' | 'BT' | 'LR' | 'RL';
 export type DomainDagreSubDomainOrder = string[] | Record<string, string[]>;
+export type DomainDagrePlacement = 'topology' | 'ordered-lanes';
 
 export interface DomainDagreLayoutBoundary {
   domainGap: number;
@@ -24,6 +25,7 @@ export interface DomainDagreLayoutBoundary {
   subDomainPaddingBottom: number;
   subDomainTitleH: number;
   domainTitleH: number;
+  domainPlacement: DomainDagrePlacement;
   defaultNodeWidth: number;
   defaultNodeHeight: number;
   domainWhitelist?: string[];
@@ -105,6 +107,12 @@ export const coerceDomainDagreDirection = (
     : fallback;
 };
 
+export const coerceDomainDagrePlacement = (value: unknown): DomainDagrePlacement => (
+  boundedString(value, 32)?.toLowerCase() === 'ordered-lanes'
+    ? 'ordered-lanes'
+    : 'topology'
+);
+
 const normalizeSemanticKey = (value: unknown): string => (
   boundedString(value)?.toLowerCase()
     .replace(/\u3000|\u00a0/g, '')
@@ -167,6 +175,7 @@ export const resolveDomainDagreLayoutBoundary = (
     subDomainPaddingBottom: boundedDomainDagreNumber(readPath(config, ['subDomain', 'padding', 'bottom']), 16),
     subDomainTitleH: boundedDomainDagreNumber(readPath(config, ['subDomain', 'title', 'height']), 48),
     domainTitleH: boundedDomainDagreNumber(readPath(config, ['domain', 'title', 'height']), 48),
+    domainPlacement: coerceDomainDagrePlacement(optionRecord?.domainPlacement),
     defaultNodeWidth: boundedDomainDagreNumber(readPath(config, ['node', 'width']), 200, 1, 10_000),
     defaultNodeHeight: boundedDomainDagreNumber(readPath(config, ['node', 'height']), 80, 1, 10_000),
     domainWhitelist: boundedStringArray(optionRecord?.domainWhitelist),

@@ -25,6 +25,8 @@ import {
 } from './diagramInteractionLogging';
 import {
     isGlobalFullGraphLayoutStrategy,
+    isOrderedDomainLaneLayoutStrategy,
+    resolveLayoutDomainOrder,
 } from '../flowchartLayoutStrategyMode';
 
 
@@ -235,7 +237,7 @@ export function useLayoutStrategy({
 
     /** ═══════════════════════════════════════════════════════════════
      * 统一布局入口（对齐 SVG 版 handleAutoLayout）
-     * strategyName: 'tree' | 'force' | 'domain-vertical' | 'domain-horizontal' | 'domain-dagre' | 'domain-dagre-sub-horizontal'
+     * strategyName: 'tree' | 'force' | 'domain-vertical' | 'domain-horizontal' | 'domain-dagre' | 'domain-dagre-sub-horizontal' | 'domain-lanes'
      * nodeLayout: 'flow' | 'grid' | 'horizontal' | 'vertical' | 'dagre'
      * direction: 'TB' | 'LR'
      * ═══════════════════════════════════════════════════════════════ */
@@ -393,13 +395,16 @@ export function useLayoutStrategy({
                 await commitLayout({ nodes: forceResult, edges: forceEdges, onCommitted: twoStepFitView });
             } else {
                 // ── 域感知策略布局 ──
-                const isDomainDagre = strategyName === 'domain-dagre' || strategyName === 'domain-dagre-sub-horizontal' || strategyName === 'dagre';
+                const isDomainLane = isOrderedDomainLaneLayoutStrategy(strategyName);
+                const isDomainDagre = strategyName === 'domain-dagre' || strategyName === 'domain-dagre-sub-horizontal' || strategyName === 'dagre' || isDomainLane;
                 const isDomainElk = strategyName === 'domain-elk' || strategyName === 'elk';
                 const isDomainCompoundElk = strategyName === 'domain-compound-elk';
                 const finalNodeLayout = isDomainDagre
                     ? 'dagre'
                     : (nodeLayout || 'flow');
-                // [FIX] 获取域排序：显式配置 > 标准数据节点出现顺序 > 策略内部扫描兜底
+                // Explicit semantic order wins. Ordinary domain layouts retain
+                // the legacy scan-order fallback; cyclic swimlanes leave an
+                // absent order unset so their bounded net-flow sweep can run.
                 let domainOrder: string[] | undefined;
                 let subDomainOrder: Record<string, string[]> | undefined;
                 let generatedGroupOptions = resolveLayoutStrategyGeneratedGroupOptions(undefined, allNodes);
@@ -437,7 +442,11 @@ export function useLayoutStrategy({
                                 }
                             }
                             if (implicitOrder.length > 0) {
-                                domainOrder = implicitOrder;
+                                domainOrder = resolveLayoutDomainOrder(
+                                    strategyName,
+                                    domainOrder,
+                                    implicitOrder,
+                                );
                                 if (!subDomainOrder) subDomainOrder = implicitSubOrder;
                             }
                         }
@@ -472,6 +481,7 @@ export function useLayoutStrategy({
                     padding: { top: 40, right: 20, bottom: 20, left: 20 },
                     ...generatedGroupOptions,
                     fitDomainContent: true,
+                    domainPlacement: isDomainLane ? 'ordered-lanes' : 'topology',
                     domainOrder,
                     subDomainOrder,
                     domainSubGroupDirection: strategyName === 'domain-dagre-sub-horizontal' ? 'LR' : dir,
@@ -509,7 +519,7 @@ export function useLayoutStrategy({
                     appliedNodeLayout = undefined;
                     return fallbackResult;
                 };
-                const topologyFallback = !isDomainElk && !isDomainCompoundElk
+                const topologyFallback = !isDomainElk && !isDomainCompoundElk && !isDomainLane
                     ? legacyFallback.resolveLegacyDomainTopologyFallback(
                         generatedGroupOptions,
                         layoutNodes,
@@ -545,7 +555,7 @@ export function useLayoutStrategy({
                     layoutEdges,
                     effectiveLayoutOptions,
                 );
-                if (!usedDomainElk && !usedDomainCompoundElk) {
+                if (!usedDomainElk && !usedDomainCompoundElk && !isDomainLane) {
                     const qualityFallback = legacyFallback.resolveLegacyDomainQualityFallback(
                         generatedGroupOptions,
                         result.nodes,
@@ -642,6 +652,7 @@ export function useLayoutStrategy({
                         const canRetryWithDomainCompoundElk = !usedDomainElk
                             && !usedDomainCompoundElk
                             && !canUseFlatElkFallback
+                            && !isDomainLane
                             && hardQualityRejected;
                         if (!canRetryWithDomainCompoundElk) throw error;
                         logLayoutStrategyDomainPreservingFallback(strategyName);

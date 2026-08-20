@@ -19,6 +19,7 @@ describe('domain Dagre layout boundary', () => {
     }, {
       direction: 'bad',
       subDomainNodeDirection: 'lr',
+      domainPlacement: 'ORDERED-LANES',
       generateDomainGroups: 'false',
       domainWhitelist: [' A ', 'A', 1],
       subDomainOrder: { ' Domain A ': [' First ', 'Second'] },
@@ -30,6 +31,7 @@ describe('domain Dagre layout boundary', () => {
       nodeGapV: 60,
       direction: 'RL',
       subDomainNodeDirection: 'LR',
+      domainPlacement: 'ordered-lanes',
       widthCompensation: 10,
       titleSafe: 8,
       showDomainGroups: true,
@@ -37,6 +39,11 @@ describe('domain Dagre layout boundary', () => {
     });
     expect(getDomainDagreSubDomainOrderIndex(boundary.subDomainOrder, 'domaina', 'first')).toBe(0);
     expect(getDomainDagreSubDomainOrderIndex(boundary.subDomainOrder, 'missing', 'first')).toBe(Infinity);
+  });
+
+  it('falls back to topology placement for malformed lane input', () => {
+    expect(resolveDomainDagreLayoutBoundary({}, {}, { domainPlacement: 'grid' }).domainPlacement)
+      .toBe('topology');
   });
 
   it('normalizes each coordinate and dimension independently', () => {
