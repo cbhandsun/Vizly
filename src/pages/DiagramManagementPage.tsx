@@ -337,12 +337,18 @@ const WorkspaceDashboardPage: React.FC = () => {
                 ? t('workspace.signedInAs', { email: user.email })
                 : t('workspace.signIn'),
             isAuthenticated: Boolean(user),
-            onOpenSignIn: openAuthModal,
-            onOpenStorageSettings: () => navigate('/storage-config'),
             storageSettingsLabel: t('workspace.storageSettings'),
         }),
-        [navigate, openAuthModal, t, user],
+        [t, user],
     );
+
+    const handleSettingsMenuClick: NonNullable<MenuProps['onClick']> = useCallback(({ key }) => {
+        if (key === 'storage-settings') {
+            navigate('/storage-config');
+            return;
+        }
+        if (key === 'account' && !user) openAuthModal();
+    }, [navigate, openAuthModal, user]);
 
     return (
         <div className="workspace-dashboard">
@@ -355,6 +361,7 @@ const WorkspaceDashboardPage: React.FC = () => {
                 onNavigateToResults={() => focusFirstWorkspaceResult(workspaceResultsRef.current)}
                 onNavigateHome={() => navigate('/manage')}
                 settingsMenu={settingsMenu}
+                onSettingsMenuClick={handleSettingsMenuClick}
                 settingsTriggerRef={settingsTriggerRef}
                 isAuthenticated={Boolean(user)}
                 avatarUrl={typeof user?.user_metadata?.avatar_url === 'string' ? user.user_metadata.avatar_url : undefined}

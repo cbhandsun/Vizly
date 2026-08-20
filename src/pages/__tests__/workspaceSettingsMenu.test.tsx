@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { createWorkspaceSettingsMenu } from '../workspaceSettingsMenu';
 
@@ -12,8 +12,6 @@ describe('createWorkspaceSettingsMenu', () => {
     const items = createWorkspaceSettingsMenu({
       accountLabel: 'Sign in',
       isAuthenticated: false,
-      onOpenSignIn: vi.fn(),
-      onOpenStorageSettings: vi.fn(),
       storageSettingsLabel: 'Storage and sync',
     });
 
@@ -26,8 +24,6 @@ describe('createWorkspaceSettingsMenu', () => {
     const items = createWorkspaceSettingsMenu({
       accountLabel: 'Signed in as user@example.com',
       isAuthenticated: true,
-      onOpenSignIn: vi.fn(),
-      onOpenStorageSettings: vi.fn(),
       storageSettingsLabel: 'Storage and sync',
     });
 

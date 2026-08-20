@@ -22,6 +22,7 @@ interface WorkspaceGlobalHeaderProps {
   onNavigateToResults?: () => boolean;
   onNavigateHome: () => void;
   settingsMenu: MenuProps['items'];
+  onSettingsMenuClick?: MenuProps['onClick'];
   settingsTriggerRef?: RefObject<HTMLButtonElement | null>;
   isAuthenticated: boolean;
   avatarUrl?: string;
@@ -36,6 +37,7 @@ export const WorkspaceGlobalHeader = ({
   onNavigateToResults,
   onNavigateHome,
   settingsMenu,
+  onSettingsMenuClick,
   settingsTriggerRef: externalSettingsTriggerRef,
   isAuthenticated,
   avatarUrl,
@@ -190,7 +192,10 @@ export const WorkspaceGlobalHeader = ({
           id: WORKSPACE_SETTINGS_MENU_ID,
           items: settingsMenu,
           'aria-label': t('workspace.settings'),
-          onClick: () => { restoreSettingsFocusRef.current = true; },
+          onClick: event => {
+            restoreSettingsFocusRef.current = true;
+            onSettingsMenuClick?.(event);
+          },
           onKeyDown: handleSettingsMenuKeyDown,
         }}
         trigger={['click']}

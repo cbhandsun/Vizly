@@ -66,16 +66,18 @@ vi.mock('../WorkspaceGlobalHeader', async () => {
     WorkspaceGlobalHeader: ({
       settingsMenu,
       settingsTriggerRef,
+      onSettingsMenuClick,
     }: {
       settingsMenu?: Array<unknown>;
       settingsTriggerRef?: React.Ref<HTMLButtonElement>;
+      onSettingsMenuClick?: (event: { key: string }) => void;
     }) => {
       const [menuVisible, setMenuVisible] = ReactModule.useState(true);
       ReactModule.useEffect(() => {
         headerMocks.hideMenu = () => setMenuVisible(false);
         return () => { headerMocks.hideMenu = null; };
       }, []);
-      const accountItem = settingsMenu?.find((item): item is { key: string; onClick?: () => void } => (
+      const accountItem = settingsMenu?.find((item): item is { key: string } => (
         typeof item === 'object'
         && item !== null
         && 'key' in item
@@ -89,7 +91,7 @@ vi.mock('../WorkspaceGlobalHeader', async () => {
             <button
               type="button"
               onClick={() => {
-                accountItem?.onClick?.();
+                if (accountItem) onSettingsMenuClick?.({ key: accountItem.key });
               }}
             >
               open sign in
