@@ -1538,6 +1538,7 @@
             "nameLabel": "图表名称",
             "defaultName": "未命名流程图",
             "nameRequired": "名称不能为空",
+            "nameTooLong": "名称不能超过 {{max}} 个字符",
             "saving": "正在保存至 {{target}}...",
             "localSuccess": "已存入本地模板库",
             "cloudSuccess": "存入云端成功",

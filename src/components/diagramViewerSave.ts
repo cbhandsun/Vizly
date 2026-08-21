@@ -40,7 +40,27 @@ const parseRequiredText = (value: unknown, maxLength = 500): string | null => {
   return text && text.length <= maxLength ? text : null;
 };
 
-export const normalizeDiagramSaveAsName = (value: unknown): string | null => parseRequiredText(value, 500);
+export const DIAGRAM_SAVE_AS_NAME_MAX_LENGTH = 500;
+
+export type DiagramSaveAsNameValidation =
+  | { ok: true; value: string }
+  | { ok: false; error: 'required' | 'tooLong' };
+
+export const validateDiagramSaveAsName = (value: unknown): DiagramSaveAsNameValidation => {
+  if (typeof value !== 'string' || !value.trim()) {
+    return { ok: false, error: 'required' };
+  }
+
+  const normalizedName = parseRequiredText(value, DIAGRAM_SAVE_AS_NAME_MAX_LENGTH);
+  return normalizedName
+    ? { ok: true, value: normalizedName }
+    : { ok: false, error: 'tooLong' };
+};
+
+export const normalizeDiagramSaveAsName = (value: unknown): string | null => {
+  const validation = validateDiagramSaveAsName(value);
+  return validation.ok ? validation.value : null;
+};
 
 export const isDiagramViewerBridgeSavable = (
   bridge: DiagramBridgeLike | null | undefined,

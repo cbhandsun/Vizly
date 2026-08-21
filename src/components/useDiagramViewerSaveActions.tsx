@@ -1,5 +1,6 @@
-import { useCallback } from 'react';
+import { createRef, useCallback } from 'react';
 import type { TFunction } from 'i18next';
+import type { InputRef } from 'antd';
 import Input from 'antd/es/input';
 import type { DiagramSaveAsTarget } from '@/core/types/diagram-components';
 
@@ -13,10 +14,11 @@ import {
     logDiagramViewerSaveAsFailure,
 } from './diagramViewerLogging';
 import {
+    DIAGRAM_SAVE_AS_NAME_MAX_LENGTH,
     isDiagramViewerBridgeSavable,
-    normalizeDiagramSaveAsName,
     saveDiagramViewerCloudReplica,
     saveDiagramViewerDirectCloud,
+    validateDiagramSaveAsName,
 } from './diagramViewerSave';
 
 interface UseDiagramViewerSaveActionsOptions {
@@ -53,45 +55,48 @@ export function useDiagramViewerSaveActions({
 
         const defaultName = bridge.metadata?.title || bridge.name || t('diagramViewer.saveAs.defaultName');
         const targetLabel = getSaveTargetLabel(target, t);
+        const nameInputRef = createRef<InputRef>();
         let newName = String(defaultName);
-        appModal.confirm({
-            title: t('diagramViewer.saveAs.title', { target: targetLabel }),
-            content: (
-                <div style={{ marginTop: 16 }}>
-                    <p style={{ marginBottom: 8, color: '#666' }}>{t('diagramViewer.saveAs.namePlaceholder')}</p>
-                    <Input
-                        aria-label={t('diagramViewer.saveAs.nameLabel')}
-                        defaultValue={newName}
-                        onChange={event => { newName = event.target.value; }}
-                    />
-                </div>
-            ),
-            okText: t('common.confirm'),
-            cancelText: t('common.cancel'),
-            onOk: async () => {
-                const normalizedName = normalizeDiagramSaveAsName(newName);
-                if (!normalizedName) {
-                    appMessage.error(t('diagramViewer.saveAs.nameRequired'));
-                    return;
-                }
+        let isSaving = false;
 
-                const hideLoading = appMessage.loading(t('diagramViewer.saveAs.saving', { target: targetLabel }), 0);
-                try {
-                    const dataToSave = {
-                        ...bridge,
-                        id: crypto.randomUUID(),
-                        name: normalizedName,
-                        metadata: { ...(bridge.metadata || {}), title: normalizedName },
-                    };
+        const handleConfirm = async () => {
+            if (isSaving) return;
 
-                    if (target === 'local') {
-                        if (!addCustomPreset(normalizedName, dataToSave)) {
-                            throw new Error('本地模板数据无效');
-                        }
-                        appMessage.success(t('diagramViewer.saveAs.localSuccess'));
-                        return;
+            const validation = validateDiagramSaveAsName(newName);
+            if (!validation.ok) {
+                appMessage.error(t(
+                    validation.error === 'tooLong'
+                        ? 'diagramViewer.saveAs.nameTooLong'
+                        : 'diagramViewer.saveAs.nameRequired',
+                    { max: DIAGRAM_SAVE_AS_NAME_MAX_LENGTH },
+                ));
+                window.requestAnimationFrame(() => nameInputRef.current?.focus());
+                return;
+            }
+            const normalizedName = validation.value;
+
+            isSaving = true;
+            modalHandle?.update({
+                okButtonProps: { loading: true, onClick: () => { void handleConfirm(); } },
+                cancelButtonProps: { disabled: true },
+            });
+            const hideLoading = appMessage.loading(t('diagramViewer.saveAs.saving', { target: targetLabel }), 0);
+            let saveSucceeded = false;
+            try {
+                const dataToSave = {
+                    ...bridge,
+                    id: crypto.randomUUID(),
+                    name: normalizedName,
+                    metadata: { ...(bridge.metadata || {}), title: normalizedName },
+                };
+
+                if (target === 'local') {
+                    if (!addCustomPreset(normalizedName, dataToSave)) {
+                        throw new Error('本地模板数据无效');
                     }
-
+                    appMessage.success(t('diagramViewer.saveAs.localSuccess'));
+                    saveSucceeded = true;
+                } else {
                     const savedId = await saveDiagramViewerCloudReplica({
                         bridge,
                         selectedDiagramId,
@@ -104,13 +109,44 @@ export function useDiagramViewerSaveActions({
                     });
                     onCloudReplicaSaved(savedId);
                     appMessage.success(t('diagramViewer.saveAs.cloudSuccess'));
-                } catch (error) {
-                    logDiagramViewerSaveAsFailure(target, error);
-                    appMessage.error(t('diagramViewer.saveAs.error', { message: getErrorMessage(error) }));
-                } finally {
-                    hideLoading();
+                    saveSucceeded = true;
                 }
-            },
+            } catch (error) {
+                logDiagramViewerSaveAsFailure(target, error);
+                appMessage.error(t('diagramViewer.saveAs.error', { message: getErrorMessage(error) }));
+            } finally {
+                hideLoading();
+                isSaving = false;
+            }
+
+            if (saveSucceeded) {
+                modalHandle?.destroy();
+            } else {
+                modalHandle?.update({
+                    okButtonProps: { loading: false, onClick: () => { void handleConfirm(); } },
+                    cancelButtonProps: { disabled: false },
+                });
+            }
+        };
+
+        const modalHandle = appModal.confirm({
+            title: t('diagramViewer.saveAs.title', { target: targetLabel }),
+            content: (
+                <div style={{ marginTop: 16 }}>
+                    <p style={{ marginBottom: 8, color: '#666' }}>{t('diagramViewer.saveAs.namePlaceholder')}</p>
+                    <Input
+                        ref={nameInputRef}
+                        aria-label={t('diagramViewer.saveAs.nameLabel')}
+                        defaultValue={newName}
+                        maxLength={DIAGRAM_SAVE_AS_NAME_MAX_LENGTH}
+                        showCount
+                        onChange={event => { newName = event.target.value; }}
+                    />
+                </div>
+            ),
+            okText: t('common.confirm'),
+            cancelText: t('common.cancel'),
+            okButtonProps: { onClick: () => { void handleConfirm(); } },
         });
     }, [onCloudReplicaSaved, selectedDiagramId, t]);
 

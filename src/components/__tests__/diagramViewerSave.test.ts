@@ -10,6 +10,7 @@ import {
   saveDiagramViewerCloudReplica,
   saveDiagramViewerDirectCloud,
   syncDiagramViewerBridgeCloudReplica,
+  validateDiagramSaveAsName,
 } from '../diagramViewerSave';
 
 describe('diagramViewerSave', () => {
@@ -18,6 +19,16 @@ describe('diagramViewerSave', () => {
     expect(normalizeDiagramSaveAsName('')).toBeNull();
     expect(normalizeDiagramSaveAsName(null)).toBeNull();
     expect(normalizeDiagramSaveAsName('x'.repeat(501))).toBeNull();
+  });
+
+  it('distinguishes missing and oversized save-as names', () => {
+    expect(validateDiagramSaveAsName('  Diagram name  ')).toEqual({
+      ok: true,
+      value: 'Diagram name',
+    });
+    expect(validateDiagramSaveAsName('   ')).toEqual({ ok: false, error: 'required' });
+    expect(validateDiagramSaveAsName(null)).toEqual({ ok: false, error: 'required' });
+    expect(validateDiagramSaveAsName('x'.repeat(501))).toEqual({ ok: false, error: 'tooLong' });
   });
 
   it('checks whether a bridge has savable diagram data', () => {
