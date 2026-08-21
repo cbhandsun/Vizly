@@ -155,6 +155,27 @@ describe('ProTimelinePropertyPanel', () => {
         expect(context.takeSnapshot).not.toHaveBeenCalled();
     });
 
+    it('renders malformed imported values through safe field boundaries', () => {
+        const malformed = phaseNode();
+        malformed.data = {
+            ...malformed.data,
+            label: `Launch\u0000${'x'.repeat(200)}`,
+            assignee: { unsafe: true },
+            status: 'unknown',
+            priority: 'urgent',
+            progress: Number.POSITIVE_INFINITY,
+        };
+        const { context } = createHarness([malformed]);
+
+        render(<ProTimelinePropertyPanel ctx={context} selectedNodes={[malformed]} selectedEdges={[]} />);
+
+        const name = screen.getByLabelText('Task name') as HTMLInputElement;
+        expect(Array.from(name.value)).toHaveLength(160);
+        expect(name.value).not.toContain('\u0000');
+        expect((screen.getByLabelText('Assignee') as HTMLInputElement).value).toBe('');
+        expect(screen.getByText('Current progress 0%')).toBeTruthy();
+    });
+
     it('uses one stable message slot for repeated date validation failures', () => {
         expect(createTimelineDateValidationMessage('End date is invalid')).toEqual({
             key: 'timeline-property-date-validation',
@@ -162,6 +183,30 @@ describe('ProTimelinePropertyPanel', () => {
         });
         expect(createTimelineDateValidationMessage('Start date is invalid').key)
             .toBe('timeline-property-date-validation');
+    });
+
+    it('keeps a rejected date visibly marked without saving it', () => {
+        const node = phaseNode();
+        const { context } = createHarness([node]);
+        const { rerender } = render(
+            <ProTimelinePropertyPanel ctx={context} selectedNodes={[node]} selectedEdges={[]} />,
+        );
+        const endDate = screen.getByLabelText('End date') as HTMLInputElement;
+
+        fireEvent.change(endDate, { target: { value: '2026-08-09' } });
+        fireEvent.keyDown(endDate, { key: 'Enter', code: 'Enter' });
+
+        expect(messageMocks.warning).toHaveBeenCalledTimes(1);
+        expect((screen.getByLabelText('End date') as HTMLInputElement).getAttribute('aria-invalid')).toBe('true');
+        expect(screen.getByRole('alert').textContent).toBe(
+            'plugins.timeline.propertyPanel.validation.end-before-start',
+        );
+        expect(context.takeSnapshot).not.toHaveBeenCalled();
+
+        const otherNode = phaseNode('other');
+        rerender(<ProTimelinePropertyPanel ctx={context} selectedNodes={[otherNode]} selectedEdges={[]} />);
+        rerender(<ProTimelinePropertyPanel ctx={context} selectedNodes={[node]} selectedEdges={[]} />);
+        expect(screen.queryByRole('alert')).toBeNull();
     });
 
     it('uses an accessible dialog and snapshots cascade deletion', async () => {

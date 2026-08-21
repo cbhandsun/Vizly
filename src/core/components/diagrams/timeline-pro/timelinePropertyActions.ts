@@ -3,6 +3,12 @@ import type { Edge, Node } from '@xyflow/react';
 import { formatDateOnly, parseDateOnlyTime } from '../../../utils/dateOnly';
 
 export type TimelineDateField = 'date' | 'endDate';
+export type TimelineTaskType = 'phase' | 'milestone' | 'summary' | 'event';
+export type TimelineTaskStatus = 'pending' | 'active' | 'done';
+export type TimelineTaskPriority = 'high' | 'medium' | 'low';
+
+export const TIMELINE_TASK_NAME_MAX_LENGTH = 160;
+export const TIMELINE_TASK_ASSIGNEE_MAX_LENGTH = 120;
 export type TimelineDateUpdateResult =
     | { ok: true; updates: Partial<Record<TimelineDateField, string>> }
     | { ok: false; reason: 'invalid' | 'end-before-start' };
@@ -14,6 +20,41 @@ const normalizeCanonicalDate = (value: unknown): string | null => {
     const time = parseDateOnlyTime(trimmed);
     if (time === null || formatDateOnly(new Date(time)) !== trimmed) return null;
     return trimmed;
+};
+
+const isOneOf = <T extends string>(value: unknown, options: readonly T[]): value is T => (
+    typeof value === 'string' && options.includes(value as T)
+);
+
+export const readTimelineTaskType = (value: unknown): TimelineTaskType => (
+    isOneOf(value, ['phase', 'milestone', 'summary', 'event'] as const) ? value : 'phase'
+);
+
+export const readTimelineTaskStatus = (value: unknown): TimelineTaskStatus => (
+    isOneOf(value, ['pending', 'active', 'done'] as const) ? value : 'pending'
+);
+
+export const readTimelineTaskPriority = (value: unknown): TimelineTaskPriority | undefined => (
+    isOneOf(value, ['high', 'medium', 'low'] as const) ? value : undefined
+);
+
+export const readTimelineProgress = (value: unknown): number => {
+    const numeric = typeof value === 'number'
+        ? value
+        : typeof value === 'string' && value.trim() !== ''
+            ? Number(value)
+            : Number.NaN;
+    if (!Number.isFinite(numeric)) return 0;
+    return Math.min(100, Math.max(0, numeric));
+};
+
+export const sanitizeTimelineText = (value: unknown, maxLength: number): string => {
+    if (typeof value !== 'string' || maxLength <= 0) return '';
+    const sanitized = Array.from(value, character => {
+        const codePoint = character.codePointAt(0) ?? 0;
+        return codePoint < 32 || codePoint === 127 ? ' ' : character;
+    }).join('');
+    return Array.from(sanitized).slice(0, maxLength).join('');
 };
 
 export const buildTimelineDateUpdate = (

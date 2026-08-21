@@ -5,6 +5,11 @@ import {
     buildTimelineDateUpdate,
     buildTimelineDeletionPlan,
     readTimelineDate,
+    readTimelineProgress,
+    readTimelineTaskPriority,
+    readTimelineTaskStatus,
+    readTimelineTaskType,
+    sanitizeTimelineText,
 } from '../timelinePropertyActions';
 
 const task = (id: string, parentId?: string): Node => ({
@@ -22,6 +27,24 @@ describe('timelinePropertyActions', () => {
         expect(readTimelineDate('2026-02-30')).toBeNull();
         expect(readTimelineDate('99999-12-31')).toBeNull();
         expect(readTimelineDate(20260810)).toBeNull();
+    });
+
+    it('coerces imported property values into safe UI boundaries', () => {
+        expect(readTimelineTaskType('event')).toBe('event');
+        expect(readTimelineTaskType('script')).toBe('phase');
+        expect(readTimelineTaskStatus(null)).toBe('pending');
+        expect(readTimelineTaskPriority('urgent')).toBeUndefined();
+        expect(readTimelineProgress('42.5')).toBe(42.5);
+        expect(readTimelineProgress(-10)).toBe(0);
+        expect(readTimelineProgress(500)).toBe(100);
+        expect(readTimelineProgress(Number.POSITIVE_INFINITY)).toBe(0);
+    });
+
+    it('sanitizes control characters and limits imported text by Unicode characters', () => {
+        expect(sanitizeTimelineText('Owner\u0000\nName', 20)).toBe('Owner  Name');
+        expect(sanitizeTimelineText('😀😀😀', 2)).toBe('😀😀');
+        expect(sanitizeTimelineText({ unsafe: true }, 20)).toBe('');
+        expect(sanitizeTimelineText('unchanged', 0)).toBe('');
     });
 
     it('rejects reversed ranges without mutating the task data', () => {

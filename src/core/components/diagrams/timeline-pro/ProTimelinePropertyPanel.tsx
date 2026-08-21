@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import type { Edge, Node } from '@xyflow/react';
 import { Collapse, Typography, Empty, Input, DatePicker, Slider, Select, Divider, Button } from 'antd';
 import { SettingOutlined, DeleteOutlined } from '@ant-design/icons';
@@ -11,7 +11,14 @@ import { getWorkDaysSigned } from '../../../hooks/useProTimelineEngine';
 import {
     buildTimelineDateUpdate,
     buildTimelineDeletionPlan,
+    readTimelineProgress,
+    readTimelineTaskPriority,
+    readTimelineTaskStatus,
+    readTimelineTaskType,
     readTimelineDate,
+    sanitizeTimelineText,
+    TIMELINE_TASK_ASSIGNEE_MAX_LENGTH,
+    TIMELINE_TASK_NAME_MAX_LENGTH,
     type TimelineDateField,
 } from './timelinePropertyActions';
 import { createTimelineDateValidationMessage } from './timelineDateValidationFeedback';
@@ -25,11 +32,18 @@ export interface ProTimelinePropertyPanelProps {
     selectedEdges: Edge[];
 }
 
-export const ProTimelinePropertyPanel: React.FC<ProTimelinePropertyPanelProps> = ({
+const ProTimelinePropertyPanelContent: React.FC<ProTimelinePropertyPanelProps> = ({
     ctx, selectedNodes
 }) => {
     const { t } = useTranslation();
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [dateValidationState, setDateValidationState] = useState<{
+        nodeId: string | null;
+        errors: Partial<Record<TimelineDateField, 'invalid' | 'end-before-start'>>;
+    }>({
+        nodeId: null,
+        errors: {},
+    });
     const [theme] = useTheme();
     const continuousEditRef = useRef<string | null>(null);
     const isDark = theme?.mode === 'dark';
@@ -39,11 +53,10 @@ export const ProTimelinePropertyPanel: React.FC<ProTimelinePropertyPanelProps> =
     const activeNodeId = selectedNodes && selectedNodes.length === 1 ? selectedNodes[0].id : null;
     const freshNode = selectedNodes && selectedNodes.length === 1 ? selectedNodes[0] : null;
     const nodeData = freshNode ? freshNode.data : null;
-    const isGanttTask = nodeData && ['phase', 'milestone', 'summary', 'event'].includes(nodeData.type as string);
-
-    useEffect(() => {
-        continuousEditRef.current = null;
-    }, [activeNodeId]);
+    const rawTaskType = nodeData?.type;
+    const isGanttTask = nodeData && ['phase', 'milestone', 'summary', 'event'].includes(
+        typeof rawTaskType === 'string' ? rawTaskType : '',
+    );
 
     const updateNodeData = useCallback((key: string, value: unknown, continuous = false) => {
         if (!selectedNodes || !selectedNodes[0]) return;
@@ -83,10 +96,23 @@ export const ProTimelinePropertyPanel: React.FC<ProTimelinePropertyPanelProps> =
             appMessage.warning(createTimelineDateValidationMessage(
                 t(`plugins.timeline.propertyPanel.validation.${result.reason}`),
             ));
+            setDateValidationState(current => ({
+                nodeId: activeNodeId,
+                errors: {
+                    ...(current.nodeId === activeNodeId ? current.errors : {}),
+                    [field]: result.reason,
+                },
+            }));
             return;
         }
+        setDateValidationState(current => ({
+            nodeId: activeNodeId,
+            errors: current.nodeId === activeNodeId
+                ? { ...current.errors, [field]: undefined }
+                : {},
+        }));
         updateNodeData(field, result.updates[field]);
-    }, [nodeData, t, updateNodeData]);
+    }, [activeNodeId, nodeData, t, updateNodeData]);
 
     const handleDelete = useCallback(() => {
         if (!activeNodeId || !ctx) return;
@@ -129,6 +155,15 @@ export const ProTimelinePropertyPanel: React.FC<ProTimelinePropertyPanelProps> =
     const baselineDiff = baselineStartDate && normalizedStartDate
         ? getWorkDaysSigned(baselineStartDate, normalizedStartDate)
         : null;
+    const taskType = readTimelineTaskType(nodeData?.type);
+    const taskStatus = readTimelineTaskStatus(nodeData?.status);
+    const taskPriority = readTimelineTaskPriority(nodeData?.priority);
+    const taskProgress = readTimelineProgress(nodeData?.progress);
+    const taskName = sanitizeTimelineText(nodeData?.label, TIMELINE_TASK_NAME_MAX_LENGTH);
+    const taskAssignee = sanitizeTimelineText(nodeData?.assignee, TIMELINE_TASK_ASSIGNEE_MAX_LENGTH);
+    const dateValidationErrors = dateValidationState.nodeId === activeNodeId
+        ? dateValidationState.errors
+        : {};
 
     const items = [
         {
@@ -142,8 +177,13 @@ export const ProTimelinePropertyPanel: React.FC<ProTimelinePropertyPanelProps> =
                         </label>
                         <Input 
                             id="timeline-task-name"
-                            value={nodeData?.label as string || ''} 
-                            onChange={e => updateNodeData('label', e.target.value, true)}
+                            value={taskName}
+                            maxLength={TIMELINE_TASK_NAME_MAX_LENGTH}
+                            onChange={e => updateNodeData(
+                                'label',
+                                sanitizeTimelineText(e.target.value, TIMELINE_TASK_NAME_MAX_LENGTH),
+                                true,
+                            )}
                             onBlur={() => finishContinuousEdit('label')}
                             onPressEnter={event => event.currentTarget.blur()}
                         />
@@ -152,10 +192,10 @@ export const ProTimelinePropertyPanel: React.FC<ProTimelinePropertyPanelProps> =
                         <div style={{ fontSize: 12, color: labelColor, marginBottom: 4 }}>{t('plugins.timeline.propertyPanel.fields.type')}</div>
                         <Select
                             aria-label={t('plugins.timeline.propertyPanel.fields.type')}
-                            value={nodeData?.type as string || 'phase'}
+                            value={taskType}
                             style={{ width: '100%' }}
                             onChange={val => updateNodeData('type', val)}
-                            disabled={nodeData?.type === 'summary'}
+                            disabled={taskType === 'summary'}
                             options={[
                                 { value: 'phase', label: t('plugins.timeline.propertyPanel.types.phase') },
                                 { value: 'milestone', label: t('plugins.timeline.propertyPanel.types.milestone') },
@@ -163,12 +203,12 @@ export const ProTimelinePropertyPanel: React.FC<ProTimelinePropertyPanelProps> =
                             ]}
                         />
                     </div>
-                    {nodeData?.type !== 'summary' && (
+                    {taskType !== 'summary' && (
                         <div>
                             <div style={{ fontSize: 12, color: labelColor, marginBottom: 4 }}>{t('plugins.timeline.propertyPanel.fields.status')}</div>
                             <Select
                                 aria-label={t('plugins.timeline.propertyPanel.fields.status')}
-                                value={nodeData?.status as string || 'pending'}
+                                value={taskStatus}
                                 style={{ width: '100%' }}
                                 onChange={val => updateNodeData('status', val)}
                                 options={[
@@ -185,8 +225,13 @@ export const ProTimelinePropertyPanel: React.FC<ProTimelinePropertyPanelProps> =
                         </label>
                         <Input 
                             id="timeline-task-assignee"
-                            value={nodeData?.assignee as string || ''} 
-                            onChange={e => updateNodeData('assignee', e.target.value, true)}
+                            value={taskAssignee}
+                            maxLength={TIMELINE_TASK_ASSIGNEE_MAX_LENGTH}
+                            onChange={e => updateNodeData(
+                                'assignee',
+                                sanitizeTimelineText(e.target.value, TIMELINE_TASK_ASSIGNEE_MAX_LENGTH),
+                                true,
+                            )}
                             onBlur={() => finishContinuousEdit('assignee')}
                             onPressEnter={event => event.currentTarget.blur()}
                             placeholder={t('plugins.timeline.propertyPanel.placeholders.assignee')}
@@ -196,7 +241,7 @@ export const ProTimelinePropertyPanel: React.FC<ProTimelinePropertyPanelProps> =
                         <div style={{ fontSize: 12, color: labelColor, marginBottom: 4 }}>{t('plugins.timeline.propertyPanel.fields.priority')}</div>
                         <Select
                             aria-label={t('plugins.timeline.propertyPanel.fields.priority')}
-                            value={nodeData?.priority as string || undefined}
+                            value={taskPriority}
                             style={{ width: '100%' }}
                             onChange={val => updateNodeData('priority', val || undefined)}
                             allowClear
@@ -220,38 +265,54 @@ export const ProTimelinePropertyPanel: React.FC<ProTimelinePropertyPanelProps> =
                         <div style={{ fontSize: 12, color: labelColor, marginBottom: 4 }}>{t('plugins.timeline.propertyPanel.fields.startDate')}</div>
                         <DatePicker 
                             aria-label={t('plugins.timeline.propertyPanel.fields.startDate')}
-                            disabled={nodeData?.type === 'summary'}
+                            aria-describedby={dateValidationErrors.date ? 'timeline-start-date-error' : undefined}
+                            aria-invalid={Boolean(dateValidationErrors.date)}
+                            disabled={taskType === 'summary'}
                             value={startDayjs}
                             format="YYYY-MM-DD"
                             onChange={val => handleDateChange('date', val)}
                             style={{ width: '100%' }}
                             allowClear={false}
+                            status={dateValidationErrors.date ? 'error' : undefined}
                         />
+                        {dateValidationErrors.date && (
+                            <Text id="timeline-start-date-error" type="danger" role="alert" style={{ fontSize: 12 }}>
+                                {t(`plugins.timeline.propertyPanel.validation.${dateValidationErrors.date}`)}
+                            </Text>
+                        )}
                     </div>
-                    {nodeData?.type !== 'milestone' && (
+                    {taskType !== 'milestone' && (
                         <div>
                             <div style={{ fontSize: 12, color: labelColor, marginBottom: 4 }}>{t('plugins.timeline.propertyPanel.fields.endDate')}</div>
                             <DatePicker 
                                 aria-label={t('plugins.timeline.propertyPanel.fields.endDate')}
-                                disabled={nodeData?.type === 'summary'}
+                                aria-describedby={dateValidationErrors.endDate ? 'timeline-end-date-error' : undefined}
+                                aria-invalid={Boolean(dateValidationErrors.endDate)}
+                                disabled={taskType === 'summary'}
                                 value={endDayjs}
                                 format="YYYY-MM-DD"
                                 onChange={val => handleDateChange('endDate', val)}
                                 style={{ width: '100%' }}
                                 allowClear={false}
+                                status={dateValidationErrors.endDate ? 'error' : undefined}
                             />
+                            {dateValidationErrors.endDate && (
+                                <Text id="timeline-end-date-error" type="danger" role="alert" style={{ fontSize: 12 }}>
+                                    {t(`plugins.timeline.propertyPanel.validation.${dateValidationErrors.endDate}`)}
+                                </Text>
+                            )}
                         </div>
                     )}
-                    {nodeData?.type !== 'milestone' && nodeData?.type !== 'event' && (
+                    {taskType !== 'milestone' && taskType !== 'event' && (
                         <div>
                             <div style={{ fontSize: 12, color: labelColor, marginBottom: 4 }}>
-                                {t('plugins.timeline.propertyPanel.fields.progress', { value: (nodeData?.progress as number) || 0 })}
+                                {t('plugins.timeline.propertyPanel.fields.progress', { value: taskProgress })}
                             </div>
                             <Slider 
                                 ariaLabelForHandle={t('plugins.timeline.propertyPanel.fields.progressLabel')}
-                                disabled={nodeData?.type === 'summary'}
+                                disabled={taskType === 'summary'}
                                 min={0} max={100} 
-                                value={(nodeData?.progress as number) || 0} 
+                                value={taskProgress}
                                 onChange={val => updateNodeData('progress', val, true)}
                                 onChangeComplete={() => finishContinuousEdit('progress')}
                             />
@@ -372,4 +433,9 @@ export const ProTimelinePropertyPanel: React.FC<ProTimelinePropertyPanelProps> =
             />
         </div>
     );
+};
+
+export const ProTimelinePropertyPanel: React.FC<ProTimelinePropertyPanelProps> = props => {
+    const activeNodeId = props.selectedNodes.length === 1 ? props.selectedNodes[0]?.id : null;
+    return <ProTimelinePropertyPanelContent key={activeNodeId ?? 'no-selection'} {...props} />;
 };
