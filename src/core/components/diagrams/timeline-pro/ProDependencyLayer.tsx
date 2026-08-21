@@ -11,6 +11,7 @@ import {
     isProTimelineDependencyActivationKey,
     isProTimelineDependencyDeleteKey,
 } from './proTimelineDependencyInteraction';
+import { PRO_TASK_ROW_HEIGHT as ROW_HEIGHT } from './proTaskLayerGeometry';
 
 export interface ProDependencyLayerProps {
     tasks: ProGanttTask[];
@@ -29,7 +30,6 @@ export interface ProDependencyLayerProps {
     cyclicTaskIds?: Set<string>;
 }
 
-const ROW_HEIGHT = 42;
 const HEADER_HEIGHT = 52;
 const BAR_HEIGHT = 28;
 const BAR_TOP_MARGIN = (ROW_HEIGHT - BAR_HEIGHT) / 2;

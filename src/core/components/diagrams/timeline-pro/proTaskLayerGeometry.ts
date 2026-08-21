@@ -1,4 +1,4 @@
-export const PRO_TASK_ROW_HEIGHT = 42;
+export const PRO_TASK_ROW_HEIGHT = 44;
 export const PRO_TASK_HEADER_HEIGHT = 52;
 export const PRO_TASK_BAR_HEIGHT = 28;
 export const PRO_TASK_BAR_TOP_MARGIN = (PRO_TASK_ROW_HEIGHT - PRO_TASK_BAR_HEIGHT) / 2;

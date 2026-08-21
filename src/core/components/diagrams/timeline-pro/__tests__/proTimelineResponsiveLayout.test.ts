@@ -2,6 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
+import { PRO_TASK_ROW_HEIGHT } from '../proTaskLayerGeometry';
+
 const css = fs.readFileSync(
     path.resolve(process.cwd(), 'src/core/components/diagrams/timeline-pro/ProTimelineCanvas.css'),
     'utf8',
@@ -20,6 +22,10 @@ const taskLayerCss = fs.readFileSync(
 );
 
 describe('professional timeline responsive layout', () => {
+    it('uses the commercial touch target as the canonical task row height', () => {
+        expect(PRO_TASK_ROW_HEIGHT).toBe(44);
+    });
+
     it('reserves the mobile top toolbar and bottom editing controls', () => {
         expect(css).toMatch(/@media \(max-width: 768px\)[\s\S]*?\.pro-timeline-workspace\s*\{[\s\S]*?top:\s*calc\(96px \+ env\(safe-area-inset-top, 0px\)\);/);
         expect(css).toMatch(/\.pro-timeline-workspace\s*\{[\s\S]*?bottom:\s*calc\(164px \+ env\(safe-area-inset-bottom, 0px\)\);/);

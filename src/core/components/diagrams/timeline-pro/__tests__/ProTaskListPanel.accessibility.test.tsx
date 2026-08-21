@@ -293,7 +293,8 @@ describe('ProTaskListPanel accessibility', () => {
         fireEvent.keyDown(option, { key });
 
         expect(onTaskExpandToggle).toHaveBeenCalledTimes(expectedCall ? 1 : 0);
-        expect(screen.getByRole('button', { name: `${expanded ? '收起' : '展开'}任务 Project launch` })).toBeTruthy();
+        const hierarchyControl = screen.getByRole('button', { name: `${expanded ? '收起' : '展开'}任务 Project launch` });
+        expect(hierarchyControl.className).toContain('pro-timeline-task-hierarchy-toggle');
     });
 
     it('exposes a keyboard-adjustable width separator', () => {

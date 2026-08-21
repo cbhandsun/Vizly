@@ -36,9 +36,9 @@ import {
   createProTimelineTaskAddition,
   createProTimelineTaskDeletion,
 } from './proTimelineTaskTransactions';
+import { PRO_TASK_ROW_HEIGHT as ROW_HEIGHT } from './proTaskLayerGeometry';
 import './ProTimelineCanvas.css';
 
-const ROW_HEIGHT = 42;
 const HEADER_HEIGHT = 52;
 
 export default function ProTimelineCanvas() {

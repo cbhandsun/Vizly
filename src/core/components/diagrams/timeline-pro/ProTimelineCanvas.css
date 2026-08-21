@@ -124,6 +124,85 @@
     background: transparent;
 }
 
+.pro-timeline-row-actions,
+.pro-timeline-row-actions--desktop {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    gap: 4px;
+}
+
+.pro-timeline-row-action-button {
+    display: inline-flex;
+    width: 20px;
+    height: 20px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    cursor: pointer;
+    opacity: 0.82;
+}
+
+.pro-timeline-row-action-button:hover,
+.pro-timeline-row-action-button:focus-visible {
+    background: color-mix(in srgb, currentColor 12%, transparent);
+    opacity: 1;
+}
+
+.pro-timeline-row-actions--mobile {
+    display: none;
+}
+
+@media (max-width: 768px), (pointer: coarse) {
+    .pro-timeline-row-actions--desktop {
+        display: none;
+    }
+
+    .pro-timeline-row-actions--mobile {
+        display: inline-flex;
+        width: var(--commercial-touch-target, 44px);
+        min-width: var(--commercial-touch-target, 44px);
+        height: var(--commercial-touch-target, 44px);
+        min-height: var(--commercial-touch-target, 44px);
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        cursor: pointer;
+        touch-action: manipulation;
+    }
+
+    .pro-timeline-row-actions-menu .ant-dropdown-menu-item {
+        min-height: var(--commercial-touch-target, 44px);
+    }
+
+    .pro-timeline-task-hierarchy-toggle {
+        position: relative;
+        z-index: 2;
+    }
+
+    .pro-timeline-task-hierarchy-toggle,
+    .pro-timeline-task-connect-control,
+    .pro-timeline-task-progress-handle {
+        touch-action: manipulation;
+    }
+
+    .pro-timeline-task-hierarchy-toggle::before,
+    .pro-timeline-task-connect-control::before,
+    .pro-timeline-task-progress-handle::before {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: var(--commercial-touch-target, 44px);
+        height: var(--commercial-touch-target, 44px);
+        content: '';
+        transform: translate(-50%, -50%);
+    }
+
+    .pro-timeline-task-bar {
+        overflow: visible !important;
+    }
+}
+
 .pro-timeline-view-mode {
     display: flex;
     align-items: center;

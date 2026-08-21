@@ -1,8 +1,8 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import type { Edge } from '@xyflow/react';
 import { ProGanttTask, getWorkDays, addWorkDays, getWorkDaysSigned, useProTimelineEngine } from '../../../hooks/useProTimelineEngine';
-import { Dropdown, Select, Tooltip } from 'antd';
-import { CaretRightOutlined, CaretDownOutlined, CalendarOutlined, FlagFilled, ClockCircleOutlined, FolderOpenOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
+import { Select, Tooltip } from 'antd';
+import { CaretRightOutlined, CaretDownOutlined, CalendarOutlined, FlagFilled, ClockCircleOutlined, FolderOpenOutlined } from '@ant-design/icons';
 import { useTheme } from '../../../themes/useCoreTheme';
 import { todayDateOnly } from '../../../utils/dateOnly';
 import type { Theme } from '../../../themes/types/ThemeTypes';
@@ -17,6 +17,8 @@ import {
 import { isProTimelineAdditiveSelection } from './proTimelineViewportInteraction';
 import { getProTimelineDeletionFallbackId } from './proTimelineTaskTransactions';
 import { ProTaskDeleteDialog } from './ProTaskDeleteDialog';
+import { ProTaskRowActions } from './ProTaskRowActions';
+import { PRO_TASK_ROW_HEIGHT as ROW_HEIGHT } from './proTaskLayerGeometry';
 import {
     createPendingProTaskDeletion,
     PRO_TASK_DELETE_IMPACT_LABELS_ZH,
@@ -42,7 +44,6 @@ export interface ProTaskListPanelProps {
     cyclicTaskIds?: Set<string>;
 }
 
-const ROW_HEIGHT = 42;
 const HEADER_HEIGHT = 52;
 
 const getTypeIcons = (theme: Theme | null): Record<string, React.ReactNode> => ({
@@ -342,6 +343,7 @@ export default function ProTaskListPanel({
                                 {hasChildren && (
                                     <button
                                         type="button"
+                                        className="pro-timeline-task-hierarchy-toggle"
                                         aria-expanded={isExpanded}
                                         aria-label={`${isExpanded ? '收起' : '展开'}任务 ${accessibleTaskName}`}
                                         onClick={(e) => { e.stopPropagation(); onTaskExpandToggle?.(task.id); }}
@@ -408,53 +410,17 @@ export default function ProTaskListPanel({
                                 )}
                             </div>
 
-                            {/* Hover Quick Add Menu & Delete Button */}
-                            {showRowActions && (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
-                                    <Dropdown
-                                        menu={{
-                                            items: [
-                                                { key: 'phase', icon: <FolderOpenOutlined />, label: '添加子阶段' },
-                                                { key: 'milestone', icon: <FlagFilled />, label: '添加里程碑' }
-                                            ],
-                                            onClick: ({ key }) => {
-                                                if (onTaskAdd && (key === 'phase' || key === 'milestone')) {
-                                                    onTaskAdd(task.id, key);
-                                                }
-                                            }
-                                        }}
-                                        trigger={['click']}
-                                        placement="bottomRight"
-                                    >
-                                        <button
-                                            type="button"
-                                            aria-haspopup="menu"
-                                            aria-label={`为 ${accessibleTaskName} 添加子项`}
-                                            style={{ width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', borderRadius: 4, color: primaryColor, opacity: 0.8 }}
-                                            onMouseEnter={e => e.currentTarget.style.background = isDark ? 'rgba(255, 255, 255, 0.1)' : '#e6f7ff'}
-                                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                                            title="添加子项"
-                                        >
-                                            <PlusOutlined aria-hidden style={{ fontSize: 12 }} />
-                                        </button>
-                                    </Dropdown>
-
-                                    <button
-                                        type="button"
-                                        aria-haspopup="dialog"
-                                        aria-label={`删除 ${accessibleTaskName} 及其所有子任务`}
-                                        style={{ width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', borderRadius: 4, color: theme?.palette?.error?.main || '#ff4d4f', opacity: 0.8 }}
-                                        onClick={() => setPendingTaskDeletion(
-                                            createPendingProTaskDeletion(tasks, edges, task.id, accessibleTaskName),
-                                        )}
-                                        onMouseEnter={e => e.currentTarget.style.background = isDark ? 'rgba(255,77,79,0.15)' : '#fff1f0'}
-                                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                                        title="删除该任务及其所有子任务"
-                                    >
-                                        <DeleteOutlined aria-hidden style={{ fontSize: 12 }} />
-                                    </button>
-                                </div>
-                            )}
+                            {showRowActions ? (
+                                <ProTaskRowActions
+                                    taskName={accessibleTaskName}
+                                    primaryColor={primaryColor}
+                                    deleteColor={theme?.palette?.error?.main || '#ff4d4f'}
+                                    onAdd={(type) => onTaskAdd?.(task.id, type)}
+                                    onDelete={() => setPendingTaskDeletion(
+                                        createPendingProTaskDeletion(tasks, edges, task.id, accessibleTaskName),
+                                    )}
+                                />
+                            ) : null}
 
                             {/* Assignee */}
                             <div
