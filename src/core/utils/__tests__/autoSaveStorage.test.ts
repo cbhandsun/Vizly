@@ -18,6 +18,7 @@ describe('autoSaveStorage', () => {
             edges: [{ id: 'e1', source: 'n1', target: 'n1' } as any],
             timestamp: 1000,
             isFreshSeed: true,
+            requiresRecoveryReview: true,
             layout: { direction: 'LR' },
             metadata: { type: 'flowchart' },
         });
@@ -31,6 +32,7 @@ describe('autoSaveStorage', () => {
             lastAccessedAt: 1000,
             version: '1.0',
             isFreshSeed: true,
+            requiresRecoveryReview: true,
             layout: { direction: 'LR' },
             metadata: { type: 'flowchart' },
         });
@@ -50,6 +52,24 @@ describe('autoSaveStorage', () => {
             timestamp: 1,
             version: '1.0',
         });
+    });
+
+    it('accepts only an explicit recovery-review marker', () => {
+        expect(coerceAutoSavePayload({
+            nodes: [],
+            edges: [],
+            requiresRecoveryReview: true,
+        })?.requiresRecoveryReview).toBe(true);
+        expect(coerceAutoSavePayload({
+            nodes: [],
+            edges: [],
+            requiresRecoveryReview: 'true',
+        })?.requiresRecoveryReview).toBeUndefined();
+        expect(coerceAutoSavePayload({
+            nodes: [],
+            edges: [],
+            requiresRecoveryReview: false,
+        })?.requiresRecoveryReview).toBeUndefined();
     });
 
     it('rejects malformed payloads and unsafe node data', () => {

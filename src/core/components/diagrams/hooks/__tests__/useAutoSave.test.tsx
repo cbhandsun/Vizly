@@ -99,6 +99,8 @@ describe('useAutoSave', () => {
             nodes: [expect.objectContaining({ id: 'ok' })],
             version: '1.0',
         });
+        expect(JSON.parse(localStorage.getItem('flowchart-autosave-v2-test') || '{}'))
+            .not.toHaveProperty('requiresRecoveryReview');
     });
 
     it('persists metadata-only changes instead of treating them as duplicate saves', async () => {
@@ -178,6 +180,33 @@ describe('useAutoSave', () => {
         });
     });
 
+    it('returns a one-time recovery marker and clears it from storage after load', async () => {
+        const payload = createAutoSavePayload({
+            diagramId: 'test',
+            nodes: [{ id: 'restored', position: { x: 0, y: 0 }, data: {} }],
+            edges: [],
+            timestamp: Date.now(),
+            requiresRecoveryReview: true,
+        });
+        expect(payload).not.toBeNull();
+        localStorage.setItem('flowchart-autosave-v2-test', JSON.stringify(payload));
+
+        let api: ReturnType<typeof useAutoSave> | undefined;
+        render(
+            <AutoSaveProbe
+                nodes={payload?.nodes ?? []}
+                onReady={(nextApi) => { api = nextApi; }}
+            />
+        );
+        await waitFor(() => expect(api).toBeDefined());
+
+        act(() => {
+            expect(api?.loadSaved()).toMatchObject({ requiresRecoveryReview: true });
+        });
+        expect(JSON.parse(localStorage.getItem('flowchart-autosave-v2-test') || '{}'))
+            .not.toHaveProperty('requiresRecoveryReview');
+    });
+
     it('synchronously saves the current diagram on beforeunload after a scope change', async () => {
         let api: ReturnType<typeof useAutoSave> | undefined;
         const nodes = [{ id: 'same', position: { x: 0, y: 0 }, data: {} }] satisfies Node[];
@@ -209,6 +238,7 @@ describe('useAutoSave', () => {
         expect(JSON.parse(localStorage.getItem('flowchart-autosave-v2-b') || '{}')).toMatchObject({
             diagramId: 'diagram-b',
             nodes: [expect.objectContaining({ id: 'same' })],
+            requiresRecoveryReview: true,
         });
     });
 

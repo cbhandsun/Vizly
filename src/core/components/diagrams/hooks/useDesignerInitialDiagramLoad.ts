@@ -125,7 +125,7 @@ export const useDesignerInitialDiagramLoad = ({
                     if (saved.isFreshSeed) {
                         messageApi?.success(t('designer.initialLoad.templateLoaded'));
                         clearDesignerFreshSeedFlag(`flowchart-autosave-v2-${id || 'default'}`);
-                    } else {
+                    } else if (saved.requiresRecoveryReview) {
                         messageApi?.info({
                             key: 'flowchart-autosave-recovery',
                             content: t('designer.initialLoad.autosaveRecovered'),

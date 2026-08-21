@@ -265,6 +265,7 @@ export const useAutoSave = (
                     nodes: currentNodes,
                     edges: currentEdges,
                     timestamp: Date.now(),
+                    requiresRecoveryReview: true,
                     metadata,
                 });
                 if (!data) return;
@@ -282,7 +283,7 @@ export const useAutoSave = (
     const saveNow = useCallback(() => save(), [save]);
 
     // Load saved data, also refreshes lastAccessedAt to prevent GC expiry
-    const loadSaved = useCallback((): Pick<AutoSavePayload, 'diagramId' | 'routingVersion' | 'nodes' | 'edges' | 'isFreshSeed' | 'timestamp' | 'metadata'> | null => {
+    const loadSaved = useCallback((): Pick<AutoSavePayload, 'diagramId' | 'routingVersion' | 'nodes' | 'edges' | 'isFreshSeed' | 'requiresRecoveryReview' | 'timestamp' | 'metadata'> | null => {
         try {
             const saved = localStorage.getItem(storageKey);
             if (!saved) return null;
@@ -296,7 +297,11 @@ export const useAutoSave = (
 
             // Refresh access time to prevent premature GC
             try {
-                localStorage.setItem(storageKey, JSON.stringify(refreshAutoSaveAccess(data)));
+                const refreshedData = refreshAutoSaveAccess(data);
+                if (refreshedData.requiresRecoveryReview) {
+                    delete refreshedData.requiresRecoveryReview;
+                }
+                localStorage.setItem(storageKey, JSON.stringify(refreshedData));
             } catch (error) {
                 logAutoSaveAccessRefreshFailure(storageKey, error);
             }
@@ -321,6 +326,7 @@ export const useAutoSave = (
                 nodes: data.nodes || [],
                 edges: data.edges || [],
                 isFreshSeed: !!data.isFreshSeed,
+                requiresRecoveryReview: !!data.requiresRecoveryReview,
                 timestamp: data.timestamp,   // required for isFreshSeed TTL check
                 metadata: data.metadata,
             };

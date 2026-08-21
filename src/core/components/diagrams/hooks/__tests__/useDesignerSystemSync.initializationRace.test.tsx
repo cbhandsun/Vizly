@@ -16,6 +16,7 @@ interface SavedCanvas {
   nodes: Node[];
   edges: Edge[];
   isFreshSeed: boolean;
+  requiresRecoveryReview?: boolean;
   timestamp: number;
   metadata?: unknown;
 }
@@ -331,6 +332,7 @@ describe('useDesignerSystemSync initialization race safety', () => {
       ...canvasFor('restored-localized-node'),
       timestamp: Date.now(),
       isFreshSeed: false,
+      requiresRecoveryReview: true,
     });
 
     renderSync('blank-canvas-template', { info, success });
@@ -345,6 +347,27 @@ describe('useDesignerSystemSync initialization race safety', () => {
       content: expectedMessage,
       duration: 5,
     });
+    expect(success).not.toHaveBeenCalled();
+  });
+
+  it('restores a routine autosave without claiming that recovery occurred', async () => {
+    const info = vi.fn<MessageInstance['info']>();
+    const success = vi.fn<MessageInstance['success']>();
+    mocks.loadSaved.mockReturnValue({
+      diagramId: 'blank-canvas-template',
+      ...canvasFor('routine-autosave-node'),
+      timestamp: Date.now(),
+      isFreshSeed: false,
+    });
+
+    renderSync('blank-canvas-template', { info, success });
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(info).not.toHaveBeenCalled();
     expect(success).not.toHaveBeenCalled();
   });
 

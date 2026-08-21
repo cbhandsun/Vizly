@@ -24,6 +24,7 @@ export interface AutoSavePayload {
     lastAccessedAt?: number;
     version: '1.0';
     isFreshSeed?: boolean;
+    requiresRecoveryReview?: boolean;
     layout?: unknown;
     metadata?: unknown;
 }
@@ -105,6 +106,7 @@ export const coerceAutoSavePayload = (value: unknown): AutoSavePayload | null =>
         ...(lastAccessedAt !== undefined ? { lastAccessedAt } : {}),
         version: '1.0',
         ...(value.isFreshSeed === true ? { isFreshSeed: true } : {}),
+        ...(value.requiresRecoveryReview === true ? { requiresRecoveryReview: true } : {}),
         ...(value.layout !== undefined ? { layout: sanitizeAuxValue(value.layout) } : {}),
         ...(value.metadata !== undefined ? { metadata: sanitizeAuxValue(value.metadata) } : {}),
     };
@@ -117,6 +119,7 @@ export const createAutoSavePayload = (params: {
     edges: unknown[];
     timestamp?: number;
     isFreshSeed?: boolean;
+    requiresRecoveryReview?: boolean;
     layout?: unknown;
     metadata?: unknown;
 }): AutoSavePayload | null => {
@@ -130,6 +133,7 @@ export const createAutoSavePayload = (params: {
         lastAccessedAt: now,
         version: '1.0',
         isFreshSeed: params.isFreshSeed,
+        requiresRecoveryReview: params.requiresRecoveryReview,
         layout: params.layout,
         metadata: params.metadata,
     });
