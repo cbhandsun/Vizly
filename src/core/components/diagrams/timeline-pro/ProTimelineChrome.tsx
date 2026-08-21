@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { CameraOutlined, DeleteOutlined, TeamOutlined, ZoomInOutlined, ZoomOutOutlined } from '@ant-design/icons';
-import { Button, Modal, Switch, Tooltip } from 'antd';
+import { Button, Modal, Tooltip } from 'antd';
 
 import type { ProTimelineViewMode } from '../../../hooks/useProTimelineEngine';
 import {
   getProTimelineZoomControlState,
   stepProTimelineZoom,
 } from './proTimelineChromeBoundary';
+import { ProTimelineSwitchControl } from './ProTimelineSwitchControl';
 import { ProTimelineViewModeControl } from './ProTimelineViewModeControl';
 
 const KEYFRAMES_ID = 'pro-timeline-keyframes';
@@ -79,6 +80,7 @@ export const ProTimelineChrome: React.FC<ProTimelineChromeProps> = ({
     }}>
       <Tooltip title="分析团队工时与资源负载">
         <Button
+          className="pro-timeline-control-target"
           type="text"
           size="small"
           shape="circle"
@@ -100,9 +102,8 @@ export const ProTimelineChrome: React.FC<ProTimelineChromeProps> = ({
         </span>
         <Tooltip title={criticalPathUnavailableReason ?? '显示或隐藏关键路径'}>
           <span>
-            <Switch
-              aria-label="显示关键路径"
-              size="small"
+            <ProTimelineSwitchControl
+              ariaLabel="显示关键路径"
               checked={!criticalPathUnavailableReason && showCriticalPath}
               disabled={Boolean(criticalPathUnavailableReason)}
               onChange={onToggleCriticalPath}
@@ -115,9 +116,8 @@ export const ProTimelineChrome: React.FC<ProTimelineChromeProps> = ({
         <span style={{ color: secondaryTextColor, fontWeight: 500 }}>对比基线</span>
         <Tooltip title={hasBaseline ? '显示或隐藏基线对比' : '请先保存当前排期为基线'}>
           <span>
-            <Switch
-              aria-label="显示基线对比"
-              size="small"
+            <ProTimelineSwitchControl
+              ariaLabel="显示基线对比"
               checked={hasBaseline && showBaseline}
               disabled={!hasBaseline}
               onChange={onToggleBaseline}
@@ -127,13 +127,14 @@ export const ProTimelineChrome: React.FC<ProTimelineChromeProps> = ({
       </div>
       <div style={{ width: 1, height: 16, backgroundColor: borderColor }} />
       <Tooltip title="锁定当前排期为基线快照">
-        <Button ref={saveBaselineButtonRef} aria-label="保存当前排期为基线" type="text" size="small" shape="circle" icon={<CameraOutlined />} onClick={onSaveBaseline} style={{ color: secondaryTextColor }} />
+        <Button className="pro-timeline-control-target" ref={saveBaselineButtonRef} aria-label="保存当前排期为基线" type="text" size="small" shape="circle" icon={<CameraOutlined />} onClick={onSaveBaseline} style={{ color: secondaryTextColor }} />
       </Tooltip>
       <Tooltip
         title={hasBaseline ? '清空基线排期' : '当前没有可清空的基线'}
         open={clearBaselineConfirmOpen ? false : undefined}
       >
         <Button
+          className="pro-timeline-control-target"
           aria-label="清空排期基线"
           type="text"
           size="small"
@@ -177,6 +178,7 @@ export const ProTimelineChrome: React.FC<ProTimelineChromeProps> = ({
       <Tooltip title={zoomControlState.canZoomOut ? '缩小时间轴区域' : '已达到最小缩放比例 15%'}>
         <span>
           <Button
+            className="pro-timeline-control-target"
             aria-label="缩小时间轴"
             aria-keyshortcuts="-"
             type="text"
@@ -191,6 +193,7 @@ export const ProTimelineChrome: React.FC<ProTimelineChromeProps> = ({
       <Tooltip title={zoomControlState.canReset ? '点击恢复默认 100% 比例' : '当前已是默认 100% 比例'}>
         <button
           type="button"
+          className="pro-timeline-control-target pro-timeline-zoom-reset"
           aria-label="恢复时间轴到 100%"
           aria-keyshortcuts="0"
           disabled={!zoomControlState.canReset}
@@ -208,6 +211,7 @@ export const ProTimelineChrome: React.FC<ProTimelineChromeProps> = ({
       <Tooltip title={zoomControlState.canZoomIn ? '放大时间轴区域' : '已达到最大缩放比例 500%'}>
         <span>
           <Button
+            className="pro-timeline-control-target"
             aria-label="放大时间轴"
             aria-keyshortcuts="+"
             type="text"

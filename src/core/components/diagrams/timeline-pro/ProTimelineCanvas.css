@@ -152,6 +152,55 @@
     font-weight: 600;
 }
 
+.pro-timeline-switch-control {
+    display: inline-flex;
+    width: 24px;
+    height: 24px;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    color: inherit;
+    background: transparent;
+    border: 0;
+    border-radius: 999px;
+    cursor: pointer;
+}
+
+.pro-timeline-switch-control__track {
+    position: relative;
+    display: block;
+    width: 24px;
+    height: 14px;
+    background: var(--ant-color-fill-secondary, rgba(0, 0, 0, 0.16));
+    border-radius: 999px;
+    transition: background-color 160ms ease;
+}
+
+.pro-timeline-switch-control__thumb {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 10px;
+    height: 10px;
+    background: var(--ant-color-bg-container, #fff);
+    border-radius: 50%;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22);
+    transition: transform 160ms ease;
+}
+
+.pro-timeline-switch-control[aria-checked="true"] .pro-timeline-switch-control__track {
+    background: var(--ant-color-primary, #1677ff);
+}
+
+.pro-timeline-switch-control[aria-checked="true"] .pro-timeline-switch-control__thumb {
+    transform: translateX(10px);
+}
+
+.pro-timeline-switch-control:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+}
+
 .pro-timeline-task-resize-handle:focus-visible {
     background: color-mix(in srgb, var(--ant-color-primary, #1677ff) 20%, transparent) !important;
 }
@@ -207,16 +256,29 @@
         flex: 0 0 auto;
     }
 
+    .pro-timeline-control-target,
+    .pro-timeline-switch-control,
+    .pro-timeline-view-mode__option {
+        width: var(--commercial-touch-target, 44px) !important;
+        min-width: var(--commercial-touch-target, 44px) !important;
+        height: var(--commercial-touch-target, 44px) !important;
+        min-height: var(--commercial-touch-target, 44px) !important;
+    }
+
+    .pro-timeline-zoom-reset {
+        padding-inline: 4px !important;
+    }
+
     .pro-timeline-chrome--analysis {
         bottom: 116px !important;
         padding-inline: 8px !important;
         gap: 8px !important;
-        justify-content: center;
+        justify-content: flex-start;
     }
 
     .pro-timeline-chrome--scale {
         bottom: 64px !important;
-        justify-content: center;
+        justify-content: flex-start;
     }
 }
 
