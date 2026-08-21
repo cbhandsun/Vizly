@@ -15,6 +15,7 @@ const focusButtonSource = readFileSync(resolve(process.cwd(), 'src/core/componen
 const summaryButtonSource = readFileSync(resolve(process.cwd(), 'src/core/components/mindmap-v2/MindMapSummaryButton.tsx'), 'utf8');
 const treeExpansionButtonsSource = readFileSync(resolve(process.cwd(), 'src/core/components/mindmap-v2/MindMapTreeExpansionButtons.tsx'), 'utf8');
 const historyCommandSource = readFileSync(resolve(process.cwd(), 'src/core/components/mindmap-v2/mindmapToolbarHistoryCommand.ts'), 'utf8');
+const exportFeedbackSource = readFileSync(resolve(process.cwd(), 'src/core/components/mindmap-v2/mindMapExportFeedback.ts'), 'utf8');
 
 describe('MindElixirToolbar commercial interaction contract', () => {
     it('uses one accessible toolbar button contract and semantic toolbar boundaries', () => {
@@ -36,7 +37,13 @@ describe('MindElixirToolbar commercial interaction contract', () => {
         expect(source).toMatch(/\/\* Export dropdown \*\/[\s\S]*?<Dropdown[\s\S]*?autoFocus/);
         expect(source).toContain('ref={exportTriggerRef}');
         expect(source).toContain("requestAnimationFrame(() => exportTriggerRef.current?.focus({ preventScroll: true }))");
-        expect(source).toContain("appMessage[status.kind === 'error' ? 'error' : 'success'](feedback)");
+        expect(source).toContain('showMindMapExportFeedback(status, t)');
+        expect(exportFeedbackSource).toContain("t('export.progress', { format: status.format })");
+        expect(exportFeedbackSource).toContain("t('export.inProgress', { format: status.activeFormat })");
+        expect(exportFeedbackSource).toContain("t('export.printOpened')");
+        expect(source).toContain('disabled: activeExportFormat !== null');
+        expect(exportFeedbackSource).toContain('if (status.kind === \'error\') appMessage.error(message)');
+        expect(exportFeedbackSource).toContain('else appMessage.success(message)');
         expect(source).toContain("aria-expanded={openMenu === 'import'}");
         expect(source).toMatch(/\/\* Import dropdown \(MD \+ OPML \+ JSON\) \*\/[\s\S]*?<Dropdown[\s\S]*?autoFocus/);
         expect(source).toContain('ref={importTriggerRef}');

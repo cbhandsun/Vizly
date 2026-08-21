@@ -68,6 +68,7 @@ import { persistMindMapThemeKey, resolveMindMapThemeKey } from './mindmapThemeSt
 import { createMindElixirArrowModeController } from './mindElixirArrowModeController';
 import { type MindMapImportStatus, useMindElixirImportActions } from './useMindElixirImportActions';
 import { type MindMapExportStatus, useMindElixirExportActions } from './useMindElixirExportActions';
+import { showMindMapExportFeedback } from './mindMapExportFeedback';
 import { useMindElixirCanvasPreferences } from './useMindElixirCanvasPreferences';
 import MindMapToolbarIconButton from './MindMapToolbarIconButton';
 import MindMapAuxiliaryPanelButtons from './MindMapAuxiliaryPanelButtons';
@@ -261,16 +262,17 @@ const MindElixirToolbar: React.FC = () => {
     const [openMenu, setOpenMenu] = useState<MindMapToolbarMenu | null>(null);
     const exportTriggerRef = useRef<HTMLButtonElement>(null);
     const importTriggerRef = useRef<HTMLButtonElement>(null);
-    const handleExportStatus = useCallback((status: MindMapExportStatus) => {
-        const feedback = t(status.kind === 'error' ? 'export.failed' : 'export.success', {
-            format: status.format,
-        });
-        appMessage[status.kind === 'error' ? 'error' : 'success'](feedback);
-        setOpenMenu(null);
+    const restoreExportTriggerFocus = useCallback(() => {
         requestAnimationFrame(() => exportTriggerRef.current?.focus({ preventScroll: true }));
-    }, [t]);
+    }, []);
+    const handleExportStatus = useCallback((status: MindMapExportStatus) => {
+        setOpenMenu(null);
+        restoreExportTriggerFocus();
+        showMindMapExportFeedback(status, t);
+    }, [restoreExportTriggerFocus, t]);
 
     const {
+        activeFormat: activeExportFormat,
         handleExportSvg,
         handleExportPng,
         handleExportMarkdown,
@@ -362,8 +364,8 @@ const MindElixirToolbar: React.FC = () => {
 
     const exportMenuItems = [
         { key: 'svg',      label: t('plugins.mindmap.toolbar.exportSvg'),      icon: <ExportOutlined />,  onClick: handleExportSvg },
-        { key: 'png',      label: t('plugins.mindmap.toolbar.exportPng'),      icon: <DownloadOutlined />, onClick: handleExportPng },
-        { key: 'xmind',   label: t('plugins.mindmap.toolbar.exportXmind'),    icon: <DownloadOutlined />, onClick: handleExportXmind },
+        { key: 'png',      label: t('plugins.mindmap.toolbar.exportPng'),      icon: <DownloadOutlined />, onClick: handleExportPng, disabled: activeExportFormat !== null },
+        { key: 'xmind',   label: t('plugins.mindmap.toolbar.exportXmind'),    icon: <DownloadOutlined />, onClick: handleExportXmind, disabled: activeExportFormat !== null },
         { type: 'divider' as const },
         { key: 'markdown', label: t('plugins.mindmap.toolbar.exportMarkdown'), icon: <DownloadOutlined />, onClick: handleExportMarkdown },
         { key: 'opml',     label: t('plugins.mindmap.toolbar.exportOpml'),     icon: <DownloadOutlined />, onClick: handleExportOpml },

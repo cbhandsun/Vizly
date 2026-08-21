@@ -1,7 +1,7 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { MindElixirInstance } from 'mind-elixir';
 
-import { downloadBlob } from '../../utils/downloadUtils';
+import { downloadBlob, sanitizeDownloadFileName } from '../../utils/downloadUtils';
 import { exportXmind } from './exportXmind';
 import {
     downloadText,
@@ -13,6 +13,13 @@ import { nodeObjToPitchMarkdown } from './mindmapPitchExport';
 import { logMindmapToolbarExportFailure } from './mindmapToolbarLogging';
 
 const PRINT_BODY_CLASS = 'vizly-mindmap-print';
+const MIND_MAP_EXPORT_BASE_MAX_LENGTH = 96;
+
+export const buildMindMapExportFileName = (topic: unknown, suffix: string): string => {
+    const safeBaseName = sanitizeDownloadFileName(topic, 'mindmap', MIND_MAP_EXPORT_BASE_MAX_LENGTH)
+        .replace(/\.(?:json|markdown|md|opml|png|svg|vizly|xmind|xml)$/i, '');
+    return `${safeBaseName || 'mindmap'}${suffix}`;
+};
 
 export type MindMapExportFormat =
     | 'SVG'
@@ -25,10 +32,10 @@ export type MindMapExportFormat =
     | 'Flowchart'
     | 'PDF';
 
-export interface MindMapExportStatus {
-    format: MindMapExportFormat;
-    kind: 'error' | 'success';
-}
+export type MindMapExportStatus =
+    | { format: MindMapExportFormat; kind: 'error' | 'started' | 'success' }
+    | { activeFormat: MindMapExportFormat; format: MindMapExportFormat; kind: 'busy' }
+    | { format: 'PDF'; kind: 'print-opened' };
 
 export interface MindMapExportActionOptions {
     onStatus?: (status: MindMapExportStatus) => void;
@@ -79,18 +86,61 @@ export const useMindElixirExportActions = (
     options: MindMapExportActionOptions = {},
 ) => {
     const { onStatus } = options;
-    const reportSuccess = useCallback((format: MindMapExportFormat) => {
-        onStatus?.({ format, kind: 'success' });
+    const [activeFormat, setActiveFormat] = useState<MindMapExportFormat | null>(null);
+    const activeFormatRef = useRef<MindMapExportFormat | null>(null);
+    const mountedRef = useRef(true);
+    useEffect(() => {
+        mountedRef.current = true;
+        return () => {
+            mountedRef.current = false;
+        };
+    }, []);
+    const emitStatus = useCallback((status: MindMapExportStatus) => {
+        if (mountedRef.current) onStatus?.(status);
     }, [onStatus]);
+    const reportSuccess = useCallback((format: MindMapExportFormat) => {
+        emitStatus({ format, kind: 'success' });
+    }, [emitStatus]);
     const reportFailure = useCallback((format: MindMapExportFormat, error: unknown) => {
         logMindmapToolbarExportFailure(format, error);
-        onStatus?.({ format, kind: 'error' });
-    }, [onStatus]);
+        emitStatus({ format, kind: 'error' });
+    }, [emitStatus]);
+    const beginAsyncExport = useCallback((format: MindMapExportFormat): boolean => {
+        const currentFormat = activeFormatRef.current;
+        if (currentFormat) {
+            emitStatus({ activeFormat: currentFormat, format, kind: 'busy' });
+            return false;
+        }
+        activeFormatRef.current = format;
+        if (mountedRef.current) setActiveFormat(format);
+        emitStatus({ format, kind: 'started' });
+        return true;
+    }, [emitStatus]);
+    const finishAsyncExport = useCallback((format: MindMapExportFormat) => {
+        if (activeFormatRef.current !== format) return;
+        activeFormatRef.current = null;
+        if (mountedRef.current) setActiveFormat(null);
+    }, []);
+    const runAsyncExport = useCallback(async (
+        format: MindMapExportFormat,
+        operation: () => Promise<void>,
+    ) => {
+        if (!beginAsyncExport(format)) return;
+        try {
+            await operation();
+            finishAsyncExport(format);
+            reportSuccess(format);
+        } catch (error) {
+            finishAsyncExport(format);
+            reportFailure(format, error);
+        }
+    }, [beginAsyncExport, finishAsyncExport, reportFailure, reportSuccess]);
 
     const handleExportSvg = useCallback(() => {
         if (!mind) return;
         try {
-            downloadBlob(mind.exportSvg(), 'mindmap.svg', 'mindmap.svg');
+            const fileName = buildMindMapExportFileName(mind.getData().nodeData.topic, '.svg');
+            downloadBlob(mind.exportSvg(), fileName, 'mindmap.svg');
             reportSuccess('SVG');
         } catch (error) {
             reportFailure('SVG', error);
@@ -99,24 +149,23 @@ export const useMindElixirExportActions = (
 
     const handleExportPng = useCallback(async () => {
         if (!mind) return;
-        try {
+        await runAsyncExport('PNG', async () => {
+            const fileName = buildMindMapExportFileName(mind.getData().nodeData.topic, '.png');
             const blob = await mind.exportPng();
             if (!blob) throw new Error('PNG export returned no data.');
-            downloadBlob(blob, 'mindmap.png', 'mindmap.png');
-            reportSuccess('PNG');
-        } catch (error) {
-            reportFailure('PNG', error);
-        }
-    }, [mind, reportFailure, reportSuccess]);
+            downloadBlob(blob, fileName, 'mindmap.png');
+        });
+    }, [mind, runAsyncExport]);
 
     const exportText = useCallback((
         format: MindMapExportFormat,
-        fileName: string,
+        suffix: string,
         mimeType: string,
         content: (instance: MindElixirInstance) => string,
     ) => {
         if (!mind) return;
         try {
+            const fileName = buildMindMapExportFileName(mind.getData().nodeData.topic, suffix);
             downloadText(fileName, content(mind), mimeType);
             reportSuccess(format);
         } catch (error) {
@@ -125,45 +174,44 @@ export const useMindElixirExportActions = (
     }, [mind, reportFailure, reportSuccess]);
 
     const handleExportMarkdown = useCallback(() => exportText(
-        'Markdown', 'mindmap.md', 'text/markdown', instance => nodeObjToMarkdown(instance.getData().nodeData),
+        'Markdown', '.md', 'text/markdown', instance => nodeObjToMarkdown(instance.getData().nodeData),
     ), [exportText]);
     const handleExportOpml = useCallback(() => exportText(
-        'OPML', 'mindmap.opml', 'application/xml', instance => nodeObjToOpml(instance.getData().nodeData),
+        'OPML', '.opml', 'application/xml', instance => nodeObjToOpml(instance.getData().nodeData),
     ), [exportText]);
     const handleExportJson = useCallback(() => exportText(
-        'JSON', 'mindmap.json', 'application/json', instance => JSON.stringify(instance.getData(), null, 2),
+        'JSON', '.json', 'application/json', instance => JSON.stringify(instance.getData(), null, 2),
     ), [exportText]);
     const handleExportFlowchart = useCallback(() => exportText(
-        'Flowchart', 'mindmap_to_flowchart.vizly', 'application/json',
+        'Flowchart', '_flowchart.vizly', 'application/json',
         instance => nodeObjToFlowchartJson(instance.getData().nodeData),
     ), [exportText]);
     const handleExportPitchMarkdown = useCallback(() => exportText(
-        'Pitch markdown', 'mindmap_pitch.md', 'text/markdown;charset=utf-8',
+        'Pitch markdown', '_pitch.md', 'text/markdown;charset=utf-8',
         instance => nodeObjToPitchMarkdown(instance.getData().nodeData),
     ), [exportText]);
 
     const handleExportXmind = useCallback(async () => {
         if (!mind) return;
-        try {
+        await runAsyncExport('XMind', async () => {
             const nodeData = mind.getData().nodeData;
-            await exportXmind(nodeData, nodeData.topic ?? 'mindmap');
-            reportSuccess('XMind');
-        } catch (error) {
-            reportFailure('XMind', error);
-        }
-    }, [mind, reportFailure, reportSuccess]);
+            const fileName = buildMindMapExportFileName(nodeData.topic, '');
+            await exportXmind(nodeData, fileName);
+        });
+    }, [mind, runAsyncExport]);
 
     const handleExportPdf = useCallback(() => {
         if (!mind) return;
         try {
             printMindMap();
-            reportSuccess('PDF');
+            emitStatus({ format: 'PDF', kind: 'print-opened' });
         } catch (error) {
             reportFailure('PDF', error);
         }
-    }, [mind, reportFailure, reportSuccess]);
+    }, [emitStatus, mind, reportFailure]);
 
     return {
+        activeFormat,
         handleExportSvg,
         handleExportPng,
         handleExportMarkdown,
