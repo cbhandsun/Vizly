@@ -26,6 +26,7 @@ import {
   updateProTimelineTaskSelection,
 } from './proTimelineViewportInteraction';
 import { useProTimelineViewportInteractions } from './useProTimelineViewportInteractions';
+import { hasProTimelineBaseline } from './proTimelineBaselineAvailability';
 import './ProTimelineCanvas.css';
 
 const ROW_HEIGHT = 42;
@@ -71,6 +72,10 @@ export default function ProTimelineCanvas() {
   
   const nodes = useNodes();
   const edges = useEdges();
+  const hasBaseline = useMemo(
+    () => hasProTimelineBaseline(nodes.map(node => node.data)),
+    [nodes],
+  );
   const { updateNodeData, setNodes, setEdges } = useReactFlow();
   const {
       handleDeleteDependency,
@@ -97,6 +102,7 @@ export default function ProTimelineCanvas() {
   }, [setNodes]);
 
   const handleClearBaseline = useCallback(() => {
+      if (!hasBaseline) return;
       setNodes(ns => ns.map(n => ({
           ...n,
           data: {
@@ -105,8 +111,9 @@ export default function ProTimelineCanvas() {
               baselineEndDate: undefined
           }
       })));
+      if (showBaseline) toggleBaseline();
       appMessage.success('已成功清空当前项目的基线排期');
-  }, [setNodes]);
+  }, [hasBaseline, setNodes, showBaseline, toggleBaseline]);
 
     const tasks = useMemo(
         () => projectProTimelineTasks(nodes, edges),
@@ -669,6 +676,7 @@ export default function ProTimelineCanvas() {
             showCriticalPath={showCriticalPath}
             onToggleCriticalPath={toggleCriticalPath}
             showBaseline={showBaseline}
+            hasBaseline={hasBaseline}
             onToggleBaseline={toggleBaseline}
             onSaveBaseline={handleSaveBaseline}
             onClearBaseline={handleClearBaseline}

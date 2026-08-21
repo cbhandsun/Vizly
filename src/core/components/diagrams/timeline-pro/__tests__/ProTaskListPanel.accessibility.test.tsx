@@ -9,6 +9,7 @@ import { ProResourceDrawer } from '../ProResourceDrawer';
 import ProTaskListPanel from '../ProTaskListPanel';
 import ProTaskLayer from '../ProTaskLayer';
 import ProDependencyLayer from '../ProDependencyLayer';
+import { ProTimelineChrome } from '../ProTimelineChrome';
 import type { ProjectedProTimelineTask } from '../proTimelineTaskProjection';
 import {
     getResourceTaskAccessibleLabel,
@@ -100,6 +101,61 @@ const renderPanel = (overrides: Partial<React.ComponentProps<typeof ProTaskListP
         {...overrides}
     />,
 );
+
+const renderTimelineChrome = (
+    overrides: Partial<React.ComponentProps<typeof ProTimelineChrome>> = {},
+) => render(
+    <ProTimelineChrome
+        borderColor="#ddd"
+        glassBackground="#fff"
+        shadowColor="rgba(0, 0, 0, 0.1)"
+        secondaryTextColor="#666"
+        showResourceDrawer={false}
+        onOpenResourceDrawer={vi.fn()}
+        showCriticalPath={false}
+        onToggleCriticalPath={vi.fn()}
+        showBaseline={false}
+        hasBaseline={false}
+        onToggleBaseline={vi.fn()}
+        onSaveBaseline={vi.fn()}
+        onClearBaseline={vi.fn()}
+        viewMode="day"
+        onViewModeChange={vi.fn()}
+        zoomLevel={1}
+        onZoomChange={vi.fn()}
+        {...overrides}
+    />,
+);
+
+describe('ProTimelineChrome baseline availability', () => {
+    it('disables comparison and clearing until a baseline exists', () => {
+        const onToggleBaseline = vi.fn();
+        const onClearBaseline = vi.fn();
+        renderTimelineChrome({ onToggleBaseline, onClearBaseline });
+
+        const comparison = screen.getByRole('switch', { name: '显示基线对比' });
+        const clear = screen.getByRole('button', { name: '清空排期基线' });
+        expect(comparison).toHaveProperty('disabled', true);
+        expect(clear).toHaveProperty('disabled', true);
+
+        fireEvent.click(comparison);
+        fireEvent.click(clear);
+        expect(onToggleBaseline).not.toHaveBeenCalled();
+        expect(onClearBaseline).not.toHaveBeenCalled();
+    });
+
+    it('enables baseline actions after a valid snapshot exists', () => {
+        const onToggleBaseline = vi.fn();
+        const onClearBaseline = vi.fn();
+        renderTimelineChrome({ hasBaseline: true, onToggleBaseline, onClearBaseline });
+
+        fireEvent.click(screen.getByRole('switch', { name: '显示基线对比' }));
+        fireEvent.click(screen.getByRole('button', { name: '清空排期基线' }));
+
+        expect(onToggleBaseline).toHaveBeenCalledTimes(1);
+        expect(onClearBaseline).toHaveBeenCalledTimes(1);
+    });
+});
 
 describe('ProTaskListPanel accessibility', () => {
     it('exposes the task collection and descriptive selectable tasks', () => {

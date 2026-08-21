@@ -17,6 +17,7 @@ type ProTimelineChromeProps = {
   showCriticalPath: boolean;
   onToggleCriticalPath: () => void;
   showBaseline: boolean;
+  hasBaseline: boolean;
   onToggleBaseline: () => void;
   onSaveBaseline: () => void;
   onClearBaseline: () => void;
@@ -36,6 +37,7 @@ export const ProTimelineChrome: React.FC<ProTimelineChromeProps> = ({
   showCriticalPath,
   onToggleCriticalPath,
   showBaseline,
+  hasBaseline,
   onToggleBaseline,
   onSaveBaseline,
   onClearBaseline,
@@ -71,14 +73,24 @@ export const ProTimelineChrome: React.FC<ProTimelineChromeProps> = ({
       <div style={{ width: 1, height: 16, backgroundColor: borderColor }} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
         <span style={{ color: secondaryTextColor, fontWeight: 500 }}>对比基线</span>
-        <Switch aria-label="显示基线对比" size="small" checked={showBaseline} onChange={onToggleBaseline} />
+        <Tooltip title={hasBaseline ? '显示或隐藏基线对比' : '请先保存当前排期为基线'}>
+          <span>
+            <Switch
+              aria-label="显示基线对比"
+              size="small"
+              checked={hasBaseline && showBaseline}
+              disabled={!hasBaseline}
+              onChange={onToggleBaseline}
+            />
+          </span>
+        </Tooltip>
       </div>
       <div style={{ width: 1, height: 16, backgroundColor: borderColor }} />
       <Tooltip title="锁定当前排期为基线快照">
         <Button aria-label="保存当前排期为基线" type="text" size="small" shape="circle" icon={<CameraOutlined />} onClick={onSaveBaseline} style={{ color: secondaryTextColor }} />
       </Tooltip>
-      <Tooltip title="清空基线排期">
-        <Button aria-label="清空排期基线" type="text" size="small" shape="circle" icon={<DeleteOutlined />} onClick={onClearBaseline} danger />
+      <Tooltip title={hasBaseline ? '清空基线排期' : '当前没有可清空的基线'}>
+        <Button aria-label="清空排期基线" type="text" size="small" shape="circle" icon={<DeleteOutlined />} onClick={onClearBaseline} disabled={!hasBaseline} danger />
       </Tooltip>
     </div>
 
