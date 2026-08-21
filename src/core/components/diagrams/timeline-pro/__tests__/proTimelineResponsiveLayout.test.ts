@@ -6,6 +6,10 @@ const css = fs.readFileSync(
     path.resolve(process.cwd(), 'src/core/components/diagrams/timeline-pro/ProTimelineCanvas.css'),
     'utf8',
 );
+const canvasSource = fs.readFileSync(
+    path.resolve(process.cwd(), 'src/core/components/diagrams/timeline-pro/ProTimelineCanvas.tsx'),
+    'utf8',
+);
 const resourceDrawerCss = fs.readFileSync(
     path.resolve(process.cwd(), 'src/core/components/diagrams/timeline-pro/ProResourceDrawer.css'),
     'utf8',
@@ -24,8 +28,12 @@ describe('professional timeline responsive layout', () => {
     it('preserves useful canvas width and keeps timeline chrome visible on narrow screens', () => {
         expect(css).toMatch(/\.pro-timeline-task-list\s*\{[\s\S]*?width:\s*min\(280px, 48vw\) !important;/);
         expect(css).toMatch(/\.pro-timeline-task-column--secondary,[\s\S]*?\.pro-timeline-task-resize-handle\s*\{[\s\S]*?display:\s*none !important;/);
-        expect(css).toMatch(/\.pro-timeline-chrome\s*\{[\s\S]*?right:\s*12px !important;/);
-        expect(css).toMatch(/\.pro-timeline-chrome--analysis\s*\{[\s\S]*?bottom:\s*64px !important;/);
+        expect(canvasSource).toMatch(/<ProResourceDrawer[\s\S]*?<\/div>\s*<ProTimelineChrome/);
+        expect(css).toMatch(/\.pro-timeline-chrome\s*\{[\s\S]*?left:\s*12px !important;[\s\S]*?right:\s*12px !important;/);
+        expect(css).toMatch(/\.pro-timeline-chrome\s*\{[\s\S]*?overflow-x:\s*auto;[\s\S]*?white-space:\s*nowrap;/);
+        expect(css).toMatch(/\.pro-timeline-chrome > \*\s*\{[\s\S]*?flex:\s*0 0 auto;/);
+        expect(css).toMatch(/\.pro-timeline-chrome--analysis\s*\{[\s\S]*?bottom:\s*116px !important;/);
+        expect(css).toMatch(/\.pro-timeline-chrome--scale\s*\{[\s\S]*?bottom:\s*64px !important;/);
     });
 
     it('provides visible keyboard focus for task actions and the desktop resize separator', () => {

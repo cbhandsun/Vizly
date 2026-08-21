@@ -14,6 +14,7 @@ import {
     readTimelineDate,
     type TimelineDateField,
 } from './timelinePropertyActions';
+import { createTimelineDateValidationMessage } from './timelineDateValidationFeedback';
 
 const { Text } = Typography;
 
@@ -77,7 +78,9 @@ export const ProTimelinePropertyPanel: React.FC<ProTimelinePropertyPanelProps> =
             : null;
         const result = buildTimelineDateUpdate(nodeData, field, candidate);
         if (!result.ok) {
-            appMessage.warning(t(`plugins.timeline.propertyPanel.validation.${result.reason}`));
+            appMessage.warning(createTimelineDateValidationMessage(
+                t(`plugins.timeline.propertyPanel.validation.${result.reason}`),
+            ));
             return;
         }
         updateNodeData(field, result.updates[field]);

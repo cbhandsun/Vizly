@@ -1144,15 +1144,22 @@ circle.custom-edge-updater {
 }
 
 .designer-right-sidebar .ant-tabs-content {
+    width: 100%;
+    min-width: 0;
     height: 100%;
 }
 
 .designer-right-sidebar .ant-tabs-tabpane {
+    flex: 1 1 100%;
+    width: 100%;
+    min-width: 0;
     height: 100%;
 }
 
 /* Tabs 鍐呯洿鎺ュ瓙 div锛堝鍣?wrapper锛変篃瑕佹拺婊?*/
 .designer-right-sidebar .ant-tabs-tabpane>div {
+    width: 100%;
+    min-width: 0;
     height: 100%;
 }
 

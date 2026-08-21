@@ -650,25 +650,6 @@ export default function ProTimelineCanvas() {
                 />
             </div>
 
-            <ProTimelineChrome
-                borderColor={borderColor}
-                glassBackground={glassBg}
-                shadowColor={shadowColor}
-                secondaryTextColor={secondaryTextColor}
-                showResourceDrawer={showResourceDrawer}
-                onOpenResourceDrawer={() => setShowResourceDrawer(true)}
-                showCriticalPath={showCriticalPath}
-                onToggleCriticalPath={toggleCriticalPath}
-                showBaseline={showBaseline}
-                onToggleBaseline={toggleBaseline}
-                onSaveBaseline={handleSaveBaseline}
-                onClearBaseline={handleClearBaseline}
-                viewMode={viewMode}
-                onViewModeChange={setViewMode}
-                zoomLevel={zoomLevel}
-                onZoomChange={zoomAroundViewportPoint}
-            />
-
             {/* ===== Pro Resource Drawer ===== */}
             <ProResourceDrawer
                 open={showResourceDrawer}
@@ -677,6 +658,25 @@ export default function ProTimelineCanvas() {
                 onTaskClick={onTaskClick}
             />
         </div>
+
+        <ProTimelineChrome
+            borderColor={borderColor}
+            glassBackground={glassBg}
+            shadowColor={shadowColor}
+            secondaryTextColor={secondaryTextColor}
+            showResourceDrawer={showResourceDrawer}
+            onOpenResourceDrawer={() => setShowResourceDrawer(true)}
+            showCriticalPath={showCriticalPath}
+            onToggleCriticalPath={toggleCriticalPath}
+            showBaseline={showBaseline}
+            onToggleBaseline={toggleBaseline}
+            onSaveBaseline={handleSaveBaseline}
+            onClearBaseline={handleClearBaseline}
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            zoomLevel={zoomLevel}
+            onZoomChange={zoomAroundViewportPoint}
+        />
     </div>
   );
 }

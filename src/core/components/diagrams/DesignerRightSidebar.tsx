@@ -534,7 +534,10 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
                                         data-testid="designer-property-scroll-region"
                                         style={{
                                             height: '100%',
+                                            width: '100%',
+                                            flex: '1 1 100%',
                                             minHeight: 0,
+                                            minWidth: 0,
                                             overflowY: 'auto',
                                             overscrollBehavior: 'contain',
                                             padding: '0 8px',

@@ -13,6 +13,8 @@ describe('designer sidebar commercial touch contract', () => {
         expect(source.match(/height: COMMERCIAL_TOUCH_TARGET/g)).toHaveLength(2);
         expect(source).toContain('minHeight: COMMERCIAL_TOUCH_TARGET');
         expect(css).toMatch(/\.designer-right-sidebar \.ant-tabs-nav,[\s\S]*?\.designer-right-sidebar \.ant-tabs-tab,[\s\S]*?\.designer-right-sidebar \.ant-tabs-tab-btn[\s\S]*?min-height: var\(--commercial-touch-target, 44px\)/);
+        expect(css).toMatch(/\.designer-right-sidebar \.ant-tabs-tabpane\s*\{[\s\S]*?flex:\s*1 1 100%;[\s\S]*?width:\s*100%;[\s\S]*?min-width:\s*0;/);
+        expect(css).toMatch(/\.designer-right-sidebar \.ant-tabs-tabpane>div\s*\{[\s\S]*?width:\s*100%;[\s\S]*?min-width:\s*0;/);
     });
 
     it('keeps property fields, section headers, and the AI composer touch-safe', () => {

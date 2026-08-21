@@ -138,18 +138,34 @@
     }
 
     .pro-timeline-chrome {
+        left: 12px !important;
         right: 12px !important;
-        max-width: calc(100% - 24px);
+        box-sizing: border-box;
+        max-width: none;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        scrollbar-width: none;
+        white-space: nowrap;
+    }
+
+    .pro-timeline-chrome::-webkit-scrollbar {
+        display: none;
+    }
+
+    .pro-timeline-chrome > * {
+        flex: 0 0 auto;
     }
 
     .pro-timeline-chrome--analysis {
-        bottom: 64px !important;
+        bottom: 116px !important;
         padding-inline: 8px !important;
         gap: 8px !important;
+        justify-content: center;
     }
 
     .pro-timeline-chrome--scale {
-        bottom: 12px !important;
+        bottom: 64px !important;
+        justify-content: center;
     }
 }
 

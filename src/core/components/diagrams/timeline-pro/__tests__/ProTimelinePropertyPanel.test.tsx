@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { PluginContext } from '../../../../types/plugin';
 import { ProTimelinePropertyPanel } from '../ProTimelinePropertyPanel';
+import { createTimelineDateValidationMessage } from '../timelineDateValidationFeedback';
 
 class ResizeObserverMock {
     observe() {}
@@ -152,6 +153,15 @@ describe('ProTimelinePropertyPanel', () => {
         });
 
         expect(context.takeSnapshot).not.toHaveBeenCalled();
+    });
+
+    it('uses one stable message slot for repeated date validation failures', () => {
+        expect(createTimelineDateValidationMessage('End date is invalid')).toEqual({
+            key: 'timeline-property-date-validation',
+            content: 'End date is invalid',
+        });
+        expect(createTimelineDateValidationMessage('Start date is invalid').key)
+            .toBe('timeline-property-date-validation');
     });
 
     it('snapshots cascade deletion and keeps unrelated tasks and connectors', () => {

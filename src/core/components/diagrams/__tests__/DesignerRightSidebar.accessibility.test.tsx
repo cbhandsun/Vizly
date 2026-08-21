@@ -206,7 +206,10 @@ describe('DesignerRightSidebar mobile dialog accessibility', () => {
 
         const scrollRegion = await screen.findByTestId('designer-property-scroll-region');
         expect(scrollRegion.style.height).toBe('100%');
+        expect(scrollRegion.style.width).toBe('100%');
+        expect(scrollRegion.style.flex).toBe('1 1 100%');
         expect(scrollRegion.style.minHeight).toBe('0px');
+        expect(scrollRegion.style.minWidth).toBe('0px');
         expect(scrollRegion.style.overflowY).toBe('auto');
         expect(scrollRegion.style.overscrollBehavior).toBe('contain');
 
