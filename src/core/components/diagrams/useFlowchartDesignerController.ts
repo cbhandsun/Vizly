@@ -411,6 +411,7 @@ export const useFlowchartDesignerController = ({
         createLocalizedPageName,
     );
     const getOperationScope = useDiagramOperationScope(diagramId, multiPage.getPageOperationScope);
+    const viewportPersistenceKey = `${diagramIdForExport}:${multiPage.activePageId}`;
     const commentAwarePageLifecycle = useCommentAwarePageDeletion(
         multiPage.deletePage,
         multiPage.restoreDeletedPage,
@@ -616,7 +617,7 @@ export const useFlowchartDesignerController = ({
         takeSnapshot,
     });
 
-    const handleReactFlowInit = useFlowchartReactFlowInit({ diagramId: id, setReactFlowInstance });
+    const handleReactFlowInit = useFlowchartReactFlowInit({ diagramId: id, viewportPersistenceKey, setReactFlowInstance });
 
     const onPaneMouseMove = useCallback((event: React.MouseEvent) => {
         if (!reactFlowInstance) return;
@@ -666,7 +667,7 @@ export const useFlowchartDesignerController = ({
         handleToggleHighlightMainFlow, handleToggleShowOnlyMainFlow, handleTouchEnd, handleTouchStart, handleUseTemplate, handleWrappedCloudSave,
         handleWrappedDirectSave, hasCopiedStyle, highlightMainFlow, historyPanelVisible, id, isCommentMode, isConnecting, isContextToolbarHidden,
         isDirectSaveDisabled, isDragging, isDraggingNode, isDrawingMode, isInitialDiagramLoading, isLayoutBusy, isLayoutStable, isMarqueeActive, isMobile, isReadonly,
-        isSidebarHidden, isSpacePressed, isValidConnection, isVersionHistoryOpen, isYjsSynced, collaborationStatus, jsonEditorInitialContent, jsonEditorVisible, jumpTo, laserEnabled,
+        isSidebarHidden, isSpacePressed, isValidConnection, isVersionHistoryOpen, isYjsSynced, collaborationStatus, jsonEditorInitialContent, jsonEditorVisible, jumpTo, laserEnabled, viewportPersistenceKey,
         lastDomainDirection, lastDomainStrategy, lastNodeLayout, layerSyncedNodes, layers, leftDrawerOpen, leftDrawerWidth, messageContextHolder,
         mobilePropertyDrawerVisible, multiPage: { ...multiPage, ...commentAwarePageLifecycle }, nodes, nodesRef, notificationContextHolder, onAiTabIntercept, onCloudSave, onConnectStart, onDirectSave,
         onDragOver, onDrop, onEdgeContextMenu, onEdgesChangeWithLock, onNodeContextMenu, onNodeDrag, onNodeDragStop, onNodesChangeWithLock, onSmartNodeDrag,

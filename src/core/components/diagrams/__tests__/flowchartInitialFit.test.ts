@@ -65,7 +65,7 @@ describe('flowchartInitialFit', () => {
       "import { useFlowchartReactFlowInit } from './hooks/useFlowchartReactFlowInit';",
     );
     expect(flowchartDesignerControllerSource).toContain(
-      'useFlowchartReactFlowInit({ diagramId: id, setReactFlowInstance })',
+      'useFlowchartReactFlowInit({ diagramId: id, viewportPersistenceKey, setReactFlowInstance })',
     );
     expect(flowchartReactFlowInitSource).toContain(
       "import { dispatchDiagramControl } from '../../shared/diagramControl';",

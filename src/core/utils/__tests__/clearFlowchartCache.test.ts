@@ -5,6 +5,7 @@ import {
     clearFlowchartCache,
     getFlowchartCacheKeysToClear,
     getFlowchartRuntimeCacheKeysToClear,
+    getViewportSessionCacheKeysToClear,
 } from '../clearFlowchartCache';
 import { getLayerStorageKeys } from '../layerStorage';
 
@@ -63,6 +64,8 @@ describe('clearFlowchartCache', () => {
         localStorage.setItem('DiagramView.AIConfig_user-a', '{"apiKey":"secret"}');
         localStorage.setItem('diagram_storage_config', '{"provider":"s3"}');
         sessionStorage.setItem('layered-config-session', '{"theme":"dark"}');
+        sessionStorage.setItem('vizly:viewport:v1:diagram-a%3Apage-1', '{"x":0,"y":0,"zoom":1}');
+        sessionStorage.setItem('vizly:viewport:v1:diagram-b%3Apage-1', '{"x":1,"y":2,"zoom":1}');
         sessionStorage.setItem('diagram_storage_config_secret', 'storage-secret');
 
         clearFlowchartCache('diagram-a');
@@ -87,6 +90,7 @@ describe('clearFlowchartCache', () => {
             'vizly:baseReactFlowDisplayEdges:route-v132:signature-b'
         )).toBeNull();
         expect(sessionStorage.getItem('layered-config-session')).toBeNull();
+        expect(sessionStorage.getItem('vizly:viewport:v1:diagram-a%3Apage-1')).toBeNull();
 
         expect(localStorage.getItem('diagramMenu.selectedDiagramId')).toBe('diagram-a');
         expect(localStorage.getItem(diagramBLayerKeys.layers)).toBe('[{"id":"layer-b"}]');
@@ -99,6 +103,23 @@ describe('clearFlowchartCache', () => {
         expect(localStorage.getItem('DiagramView.AIConfig_user-a')).toBe('{"apiKey":"secret"}');
         expect(localStorage.getItem('diagram_storage_config')).toBe('{"provider":"s3"}');
         expect(sessionStorage.getItem('diagram_storage_config_secret')).toBe('storage-secret');
+        expect(sessionStorage.getItem('vizly:viewport:v1:diagram-b%3Apage-1')).toBe('{"x":1,"y":2,"zoom":1}');
+    });
+
+    it('discovers scoped viewport cache keys and bounds session enumeration failures', () => {
+        sessionStorage.setItem('vizly:viewport:v1:diagram-a%3Apage-1', '{}');
+        sessionStorage.setItem('vizly:viewport:v1:diagram-a%3Apage-2', '{}');
+        sessionStorage.setItem('vizly:viewport:v1:diagram-b%3Apage-1', '{}');
+
+        expect(getViewportSessionCacheKeysToClear(sessionStorage, 'diagram-a')).toEqual([
+            'vizly:viewport:v1:diagram-a%3Apage-1',
+            'vizly:viewport:v1:diagram-a%3Apage-2',
+        ]);
+        expect(getViewportSessionCacheKeysToClear(sessionStorage, 'unsafe:diagram')).toEqual([]);
+        expect(getViewportSessionCacheKeysToClear({
+            get length(): number { throw new Error('blocked'); },
+            key: () => null,
+        }, 'diagram-a')).toEqual([]);
     });
 
     it('bounds runtime cache discovery and rejects unsafe diagram identifiers', () => {

@@ -1,8 +1,12 @@
 type Viewport = { x: number; y: number; zoom: number };
 
+import { isUsablePersistedDiagramViewport } from '../../utils/viewportPersistence';
+
 type ReactFlowViewportInstance = {
   setViewport: (viewport: Viewport) => void;
 };
+
+export type BaseReactFlowInitialFitMode = 'fitWidthTop' | 'fitAll' | 'none' | 'restoreOrFitAll';
 
 const MIN_READABLE_EDGE_LABEL_ZOOM = 0.72;
 const MAX_EDGE_LABEL_SCALE = 2.4;
@@ -46,15 +50,38 @@ export const restoreBaseReactFlowViewportOnInit = ({
   lastViewport,
 }: {
   instance: ReactFlowViewportInstance;
-  fitMode: 'fitWidthTop' | 'fitAll' | 'none';
+  fitMode: BaseReactFlowInitialFitMode;
   lastViewport: Viewport | null | undefined;
 }): boolean => {
-  if (!lastViewport || fitMode !== 'none') {
+  if (
+    (fitMode !== 'none' && fitMode !== 'restoreOrFitAll')
+    || !isUsableBaseReactFlowViewport(lastViewport)
+  ) {
     return false;
   }
 
   instance.setViewport(lastViewport);
   return true;
+};
+
+export const isUsableBaseReactFlowViewport = (
+  viewport: Viewport | null | undefined,
+): viewport is Viewport => isUsablePersistedDiagramViewport(viewport);
+
+/**
+ * `restoreOrFitAll` is resolved once per mounted canvas. This prevents an
+ * initial blank canvas without turning subsequent node/layout changes into a
+ * permanently pinned fit operation that would overwrite the user's viewport.
+ */
+export const resolveBaseReactFlowInitialFitMode = ({
+  fitMode,
+  lastViewport,
+}: {
+  fitMode: BaseReactFlowInitialFitMode;
+  lastViewport: Viewport | null | undefined;
+}): 'fitWidthTop' | 'fitAll' | 'none' => {
+  if (fitMode !== 'restoreOrFitAll') return fitMode;
+  return isUsableBaseReactFlowViewport(lastViewport) ? 'none' : 'fitAll';
 };
 
 export const createBaseReactFlowExportStateHandlers = ({

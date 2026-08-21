@@ -1,16 +1,42 @@
 export type Viewport = { x: number; y: number; zoom: number };
 
 import { getQueryParamFromSearch, getWindowSearchString } from '../../utils/inputBoundary';
+import {
+  buildViewportSessionStorageKey,
+  isUsablePersistedDiagramViewport,
+  readPersistedDiagramViewport,
+  writePersistedDiagramViewport,
+} from '../../utils/viewportPersistence';
 import { logViewportStoreFailure } from './viewportLogging';
 
 let lastViewport: Viewport | null = null;
+const scopedViewports = new Map<string, Viewport>();
+const pendingPersistence = new Map<string, ReturnType<typeof setTimeout>>();
+const VIEWPORT_PERSIST_DELAY_MS = 160;
 
 type ViewportListener = (vp: Viewport) => void;
 const listeners = new Set<ViewportListener>();
 
-export const getLastViewport = (): Viewport | null => {
+const readSessionStorage = (): Storage | null => {
+  if (typeof window === 'undefined') return null;
+  return window.sessionStorage;
+};
+
+export const getLastViewport = (scope?: unknown): Viewport | null => {
   try {
-    return lastViewport;
+    const storageKey = buildViewportSessionStorageKey(scope);
+    if (!storageKey) return lastViewport;
+
+    const cachedViewport = scopedViewports.get(storageKey);
+    if (cachedViewport) return cachedViewport;
+
+    const storage = readSessionStorage();
+    if (!storage) return null;
+    const persistedViewport = readPersistedDiagramViewport(storage, scope);
+    if (!persistedViewport) return null;
+    scopedViewports.set(storageKey, persistedViewport);
+    lastViewport = persistedViewport;
+    return persistedViewport;
   } catch (error) {
     logViewportStoreFailure('getLastViewport', error);
     return null;
@@ -36,9 +62,12 @@ export const subscribeViewport = (listener: ViewportListener) => {
   }
 };
 
-export const setLastViewport = (vp: Viewport) => {
+export const setLastViewport = (vp: unknown, scope?: unknown) => {
   try {
+    if (!isUsablePersistedDiagramViewport(vp)) return;
     lastViewport = vp;
+    const storageKey = buildViewportSessionStorageKey(scope);
+    if (storageKey) scopedViewports.set(storageKey, vp);
     // 通知所有订阅者
     listeners.forEach((fn) => {
       try { fn(vp); } catch (error) {
@@ -47,6 +76,44 @@ export const setLastViewport = (vp: Viewport) => {
     });
   } catch (error) {
     logViewportStoreFailure('setLastViewport', error);
+  }
+};
+
+export const persistLastViewport = (vp: unknown, scope?: unknown): boolean => {
+  try {
+    if (!isUsablePersistedDiagramViewport(vp)) return false;
+    setLastViewport(vp, scope);
+    const storageKey = buildViewportSessionStorageKey(scope);
+    if (storageKey) {
+      const pendingTimer = pendingPersistence.get(storageKey);
+      if (pendingTimer) clearTimeout(pendingTimer);
+      pendingPersistence.delete(storageKey);
+    }
+    const storage = readSessionStorage();
+    if (!storage) return false;
+    return writePersistedDiagramViewport(storage, scope, vp);
+  } catch (error) {
+    logViewportStoreFailure('persistLastViewport', error);
+    return false;
+  }
+};
+
+export const schedulePersistLastViewport = (vp: unknown, scope?: unknown): boolean => {
+  try {
+    if (!isUsablePersistedDiagramViewport(vp)) return false;
+    const storageKey = buildViewportSessionStorageKey(scope);
+    if (!storageKey || !readSessionStorage()) return false;
+    setLastViewport(vp, scope);
+    const pendingTimer = pendingPersistence.get(storageKey);
+    if (pendingTimer) clearTimeout(pendingTimer);
+    pendingPersistence.set(storageKey, setTimeout(() => {
+      pendingPersistence.delete(storageKey);
+      persistLastViewport(vp, scope);
+    }, VIEWPORT_PERSIST_DELAY_MS));
+    return true;
+  } catch (error) {
+    logViewportStoreFailure('schedulePersistLastViewport', error);
+    return false;
   }
 };
 

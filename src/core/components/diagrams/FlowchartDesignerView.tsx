@@ -12,6 +12,7 @@ import { DesignerCanvasFeaturesLayer } from './ui/DesignerCanvasFeaturesLayer';
 import { DiagramEditingProvider } from './DiagramEditingContext';
 import { DesignerHeaderLayer } from './ui/DesignerHeaderLayer';
 import { FlowchartCanvasShell } from './FlowchartCanvasShell';
+import { runAndPersistViewportAction } from './flowchartViewportActions';
 import { FlowchartEmptyState } from './FlowchartEmptyState';
 import { FlowchartFileDropOverlay } from './FlowchartFileDropOverlay';
 import { FlowchartOnboardingHint } from './FlowchartOnboardingHint';
@@ -67,6 +68,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
         currentZoom,
         deleteAnnotation,
         diagramIdForExport,
+        viewportPersistenceKey,
         dynamicEdgeTypes,
         dynamicNodeTypes,
         edges,
@@ -415,7 +417,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                 onRedo: redo,
                                 onZoomIn: () => reactFlowInstance?.zoomIn(),
                                 onZoomOut: () => reactFlowInstance?.zoomOut(),
-                                onResetZoom: () => reactFlowInstance?.zoomTo(1, { duration: 220 }),
+                                onResetZoom: () => runAndPersistViewportAction({ action: () => reactFlowInstance?.zoomTo(1, { duration: 220 }), getViewport: () => reactFlowInstance?.getViewport(), persistenceKey: viewportPersistenceKey }),
                                 onFitView: handleFitView,
                                 autoRouting: autoRoutingEnabled,
                                 toggleAutoRouting: () => setAutoRoutingEnabled(!autoRoutingEnabled),
@@ -516,6 +518,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                             >
                                 <GestureOverlay zoom={currentZoom} visible={showOverlay} />
                                 <FlowchartCanvasShell
+                                    viewportPersistenceKey={viewportPersistenceKey}
                                     nodes={isInitialDiagramLoading
                                         ? []
                                         : performanceMode

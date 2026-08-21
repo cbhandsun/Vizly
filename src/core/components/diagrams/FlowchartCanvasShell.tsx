@@ -65,6 +65,7 @@ export interface FlowchartCanvasShellProps {
     onReconnectStart?: (event: MouseEvent | React.MouseEvent | TouchEvent | React.TouchEvent, edge: Edge, handleType: 'source' | 'target') => void;
     onReconnectEnd?: (event: MouseEvent | React.MouseEvent | TouchEvent | React.TouchEvent, edge: Edge) => void;
     backgroundGridColor?: string;
+    viewportPersistenceKey?: string;
     children?: React.ReactNode;
 }
 
@@ -118,6 +119,7 @@ export const FlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> = React.m
     onReconnectStart,
     onReconnectEnd,
     backgroundGridColor,
+    viewportPersistenceKey,
     children
 }) => {
     const {
@@ -205,9 +207,10 @@ export const FlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> = React.m
             onConnect={editingEnabled ? onConnect : undefined}
             onConnectStart={editingEnabled ? onConnectStart : undefined}
             onConnectEnd={editingEnabled ? onConnectEnd : undefined}
-            fitMode="none"
+            fitMode="restoreOrFitAll"
             fitPadding={0.1}
             pinFit={false}
+            viewportPersistenceKey={viewportPersistenceKey}
             style={{ width: '100%', height: '100%' }}
             enableSmartEdges={enableSmartEdges}
             showControls={false}

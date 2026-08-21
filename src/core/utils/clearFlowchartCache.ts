@@ -1,5 +1,6 @@
 import { logFlowchartCacheClearFailure } from './flowchartCacheLogging';
 import { getLayerStorageKeys } from './layerStorage';
+import { VIEWPORT_SESSION_STORAGE_PREFIX } from './viewportPersistence';
 
 const LOCAL_UI_CACHE_KEYS = [
     'commandPalette.recent',
@@ -93,10 +94,49 @@ const discoverFlowchartRuntimeCacheKeys = (
     return { keys: [...keys], enumerationFailed };
 };
 
+const discoverViewportSessionCacheKeys = (
+    storage: Pick<Storage, 'key' | 'length'>,
+    diagramId?: string | null,
+): { keys: string[]; enumerationFailed: boolean } => {
+    const normalizedDiagramId = normalizeDiagramId(diagramId);
+    const clearAllViewportKeys = normalizedDiagramId === null;
+    const diagramPrefix = normalizedDiagramId && SAFE_DIAGRAM_ID_PATTERN.test(normalizedDiagramId)
+        ? `${VIEWPORT_SESSION_STORAGE_PREFIX}${encodeURIComponent(`${normalizedDiagramId}:`)}`
+        : null;
+    const keys = new Set<string>();
+    let length: number;
+    try {
+        length = Math.min(storage.length, MAX_STORAGE_KEYS_TO_SCAN);
+    } catch (error) {
+        logFlowchartCacheClearFailure('sessionStorage', '<viewport-cache-index>', error);
+        return { keys: [], enumerationFailed: true };
+    }
+
+    let enumerationFailed = false;
+    for (let index = 0; index < length; index += 1) {
+        let key: string | null;
+        try {
+            key = storage.key(index);
+        } catch (error) {
+            enumerationFailed = true;
+            logFlowchartCacheClearFailure('sessionStorage', `<viewport-cache-index:${index}>`, error);
+            continue;
+        }
+        if (!key || key.length > 2_048 || !key.startsWith(VIEWPORT_SESSION_STORAGE_PREFIX)) continue;
+        if (clearAllViewportKeys || (diagramPrefix && key.startsWith(diagramPrefix))) keys.add(key);
+    }
+    return { keys: [...keys], enumerationFailed };
+};
+
 export const getFlowchartRuntimeCacheKeysToClear = (
     storage: Pick<Storage, 'key' | 'length'>,
     diagramId?: string | null,
 ): string[] => discoverFlowchartRuntimeCacheKeys(storage, diagramId).keys;
+
+export const getViewportSessionCacheKeysToClear = (
+    storage: Pick<Storage, 'key' | 'length'>,
+    diagramId?: string | null,
+): string[] => discoverViewportSessionCacheKeys(storage, diagramId).keys;
 
 export const getFlowchartCacheKeysToClear = (diagramId?: string | null) => {
     const localStorageKeys = new Set<string>(LOCAL_UI_CACHE_KEYS);
@@ -120,9 +160,13 @@ export const getFlowchartCacheKeysToClear = (diagramId?: string | null) => {
 export const clearFlowchartCache = (diagramId?: string | null): FlowchartCacheClearResult => {
     const { localStorageKeys, sessionStorageKeys } = getFlowchartCacheKeysToClear(diagramId);
     const runtimeCacheDiscovery = discoverFlowchartRuntimeCacheKeys(localStorage, diagramId);
+    const viewportCacheDiscovery = discoverViewportSessionCacheKeys(sessionStorage, diagramId);
     const failures: FlowchartCacheClearFailure[] = runtimeCacheDiscovery.enumerationFailed
         ? [{ storageType: 'localStorage', operation: 'enumerate' }]
         : [];
+    if (viewportCacheDiscovery.enumerationFailed) {
+        failures.push({ storageType: 'sessionStorage', operation: 'enumerate' });
+    }
     let removedCount = 0;
 
     for (const key of [...localStorageKeys, ...runtimeCacheDiscovery.keys]) {
@@ -135,7 +179,7 @@ export const clearFlowchartCache = (diagramId?: string | null): FlowchartCacheCl
         }
     }
 
-    for (const key of sessionStorageKeys) {
+    for (const key of [...sessionStorageKeys, ...viewportCacheDiscovery.keys]) {
         try {
             sessionStorage.removeItem(key);
             removedCount += 1;

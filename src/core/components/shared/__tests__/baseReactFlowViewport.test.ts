@@ -4,6 +4,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   createBaseReactFlowExportStateHandlers,
+  isUsableBaseReactFlowViewport,
+  resolveBaseReactFlowInitialFitMode,
   restoreBaseReactFlowViewportOnInit,
   syncBaseReactFlowZoomClass,
 } from '../baseReactFlowViewport';
@@ -54,6 +56,50 @@ describe('baseReactFlowViewport', () => {
       instance: { setViewport },
       fitMode: 'fitAll',
       lastViewport: { x: 10, y: 20, zoom: 1.5 },
+    })).toBe(false);
+    expect(setViewport).not.toHaveBeenCalled();
+  });
+
+  it('restores a valid viewport or requests one initial fit for restore-or-fit-all mode', () => {
+    const viewport = { x: -120, y: 44, zoom: 0.75 };
+    const setViewport = vi.fn();
+
+    expect(resolveBaseReactFlowInitialFitMode({
+      fitMode: 'restoreOrFitAll',
+      lastViewport: viewport,
+    })).toBe('none');
+    expect(restoreBaseReactFlowViewportOnInit({
+      instance: { setViewport },
+      fitMode: 'restoreOrFitAll',
+      lastViewport: viewport,
+    })).toBe(true);
+    expect(setViewport).toHaveBeenCalledWith(viewport);
+
+    expect(resolveBaseReactFlowInitialFitMode({
+      fitMode: 'restoreOrFitAll',
+      lastViewport: null,
+    })).toBe('fitAll');
+  });
+
+  it.each([
+    null,
+    undefined,
+    { x: Number.NaN, y: 0, zoom: 1 },
+    { x: 0, y: Number.POSITIVE_INFINITY, zoom: 1 },
+    { x: 0, y: 0, zoom: 0 },
+    { x: 0, y: 0, zoom: 9 },
+  ])('rejects an invalid stored viewport (%j)', (lastViewport) => {
+    const setViewport = vi.fn();
+
+    expect(isUsableBaseReactFlowViewport(lastViewport)).toBe(false);
+    expect(resolveBaseReactFlowInitialFitMode({
+      fitMode: 'restoreOrFitAll',
+      lastViewport,
+    })).toBe('fitAll');
+    expect(restoreBaseReactFlowViewportOnInit({
+      instance: { setViewport },
+      fitMode: 'restoreOrFitAll',
+      lastViewport,
     })).toBe(false);
     expect(setViewport).not.toHaveBeenCalled();
   });

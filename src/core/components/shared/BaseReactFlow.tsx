@@ -14,7 +14,8 @@ import FixedMiniMap from './FixedMiniMap';
 import { AdvancedSmartStepEdge, AdvancedSmartBezierEdge, AdvancedSmartStraightEdge } from '../custom-edges/AdvancedSmartEdge';
 import { SmartOrthogonalEdge } from '../custom-edges/SmartOrthogonalEdge';
 import { diagramConfigManager } from '@/core/config/DiagramConfig';
-import { getLastViewport, setLastViewport, getUiScale } from './viewportStore';
+import { schedulePersistLastViewport, getUiScale } from './viewportStore';
+import { usePersistedViewport } from './usePersistedViewport';
 import { ElkEdge } from '../custom-edges/ElkEdge'; // 导入 ElkEdge
 import { StablePathEdge } from '../custom-edges/StablePathEdge'; // 导入稳定路径边组件
 import { enhancedTextMeasurement } from '../../utils/EnhancedTextMeasurement';
@@ -29,6 +30,7 @@ import {
 } from './baseReactFlowNodeInternals';
 import {
   createBaseReactFlowExportStateHandlers,
+  resolveBaseReactFlowInitialFitMode,
   restoreBaseReactFlowViewportOnInit,
   syncBaseReactFlowZoomClass,
 } from './baseReactFlowViewport';
@@ -111,6 +113,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
   fitPadding = 16,
   pinFit = true,
   fitTriggerKey,
+  viewportPersistenceKey,
   miniMapStyle,
   miniMapZoomable = true,
   miniMapPannable = true,
@@ -173,6 +176,11 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
   const rfStore = useStoreApi();
   const updateNodeInternals = useUpdateNodeInternals();
   const containerRef = useRef<HTMLDivElement>(null);
+  const { initialViewport, persistViewport } = usePersistedViewport(viewportPersistenceKey);
+  const [initialFitMode] = useState(() => resolveBaseReactFlowInitialFitMode({
+    fitMode,
+    lastViewport: initialViewport,
+  }));
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const isLayoutStable = useLayoutStability();
   const {
@@ -362,7 +370,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
     visibleNodeCount: visibleNodes.length,
     edges,
     containerSize,
-    fitMode,
+    fitMode: initialFitMode,
     fitTriggerKey,
     pinFit,
     fitPadding,
@@ -470,13 +478,13 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
     restoreBaseReactFlowViewportOnInit({
       instance,
       fitMode,
-      lastViewport: getLastViewport(),
+      lastViewport: initialViewport,
     });
 
     if (onInit) {
       onInit(instance);
     }
-  }, [onInit, fitMode]);
+  }, [onInit, fitMode, initialViewport]);
 
   // 处理视口变化
   /**
@@ -488,7 +496,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
    */
   const handleViewportChange = useCallback((viewport: { x: number; y: number; zoom: number }) => {
     // 始终广播最新视口，以驱动 minimap 可视区域矩形实时更新
-    setLastViewport(viewport);
+    schedulePersistLastViewport(viewport, viewportPersistenceKey);
 
     // Semantic Zoom Feature: 动态追加 CSS 类名以进行子树 DOM 降级
     syncBaseReactFlowZoomClass({
@@ -499,7 +507,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
     if (onViewportChange) {
       onViewportChange(viewport);
     }
-  }, [onViewportChange]);
+  }, [onViewportChange, viewportPersistenceKey]);
 
   /**
    * 计算并更新容器就绪状态（防抖 & 不可逆门限）
@@ -586,6 +594,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
           onSelectionChange={onSelectionChange}
           onInit={handleInit}
           onViewportChange={handleViewportChange}
+          onMoveEnd={persistViewport}
           fitView={fitView && fitMode === 'fitAll'}
           minZoom={minZoom}
           maxZoom={maxZoom}

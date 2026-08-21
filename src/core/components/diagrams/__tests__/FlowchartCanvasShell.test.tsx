@@ -30,7 +30,7 @@ describe('FlowchartCanvasShell', () => {
     vi.unstubAllGlobals();
   });
 
-  it('does not refit or pin the viewport on canvas rerenders', () => {
+  it('delegates one-time viewport restore-or-fit without pinning later rerenders', () => {
     const noop = vi.fn();
 
     render(
@@ -63,14 +63,16 @@ describe('FlowchartCanvasShell', () => {
         connectPreview={null}
         connectionMode={'loose' as never}
         isDragging={false}
+        viewportPersistenceKey="diagram-a:page-1"
       />,
     );
 
     const props = baseReactFlowProps.mock.calls.at(-1)?.[0];
     expect(props).toMatchObject({
-      fitMode: 'none',
+      fitMode: 'restoreOrFitAll',
       fitPadding: 0.1,
       pinFit: false,
+      viewportPersistenceKey: 'diagram-a:page-1',
       nodesFocusable: true,
       edgesFocusable: true,
       multiSelectionKeyCode: null,

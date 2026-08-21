@@ -40,11 +40,12 @@ export interface BaseReactFlowProps {
   onEdgesChange?: (changes: EdgeChange[]) => void;
   onConnect?: (params: Connection) => void;
   children?: React.ReactNode;
-  fitMode?: 'fitWidthTop' | 'fitAll' | 'none';
+  fitMode?: 'fitWidthTop' | 'fitAll' | 'none' | 'restoreOrFitAll';
   fitPadding?: number;
   pinFit?: boolean;
   disableZoomCompensation?: boolean;
   fitTriggerKey?: string | number;
+  viewportPersistenceKey?: string;
   miniMapStyle?: React.CSSProperties;
   miniMapZoomable?: boolean;
   miniMapPannable?: boolean;
