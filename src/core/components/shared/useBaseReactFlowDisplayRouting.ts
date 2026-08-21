@@ -16,6 +16,8 @@ import {
 } from './baseReactFlowDisplayWorkerClient';
 import { resolveBaseReactFlowPrecompiledCapturePresetId } from './baseReactFlowPrecompiledCaptureMode';
 import {
+  readDisplayRoutingDebugState,
+  resolveDisplayRoutingCommittedReuseTiming,
   updateDisplayRoutingDebugState,
   updateDisplayRoutingFinalAppliedState,
   updateDisplayRoutingLifecycleState,
@@ -187,7 +189,6 @@ export const useBaseReactFlowDisplayRouting = ({
     isLargeGraph,
   });
   const [deferredDisplayEdges, setDeferredDisplayEdges] = useState<DeferredDisplayEdges | null>(null);
-
   useEffect(() => {
     displayRoutingInputRef.current = {
       cacheSignature: displayEdgeCacheSignature,
@@ -214,7 +215,7 @@ export const useBaseReactFlowDisplayRouting = ({
     const routingInput = displayRoutingInputRef.current;
     const nodeCount = routingInput?.nodes.length ?? 0;
     const edgeCount = routingInput?.edges.length ?? 0;
-
+    const previousDebugState = readDisplayRoutingDebugState();
     updateDisplayRoutingDebugState({
       stage: 'effect-enter',
       signature: displayEdgeCacheSignature,
@@ -262,18 +263,24 @@ export const useBaseReactFlowDisplayRouting = ({
       ? retainedCommittedBaseline
       : null;
     if (committedFinalDisplayEntry || retainedCommittedEntry) {
-      const finalAppliedAt = Date.now();
+      const outputRouteSignature = committedFinalDisplayEntry?.outputRouteSignature
+        ?? retainedCommittedEntry?.outputRouteSignature;
+      const committedReuseTiming = resolveDisplayRoutingCommittedReuseTiming({
+        current: previousDebugState,
+        signature: displayEdgeCacheSignature,
+        inputGeometryDigest,
+        outputRouteSignature,
+        now: Date.now(),
+      });
       updateDisplayRoutingFinalAppliedState({
         signature: displayEdgeCacheSignature,
         inputGeometryDigest,
-        outputRouteSignature: committedFinalDisplayEntry?.outputRouteSignature
-          ?? retainedCommittedEntry?.outputRouteSignature,
+        outputRouteSignature,
         routingVersion: BASE_DISPLAY_ROUTING_VERSION,
         cacheTrustLevel: 'runtime-committed',
         nodeCount,
         edgeCount,
-        finalAppliedAt,
-        routeMs: 0,
+        ...committedReuseTiming,
         workerStartCount: displayEdgeWorkerStartCountRef.current,
         workerAbortCount: displayEdgeWorkerAbortCountRef.current,
       });
@@ -302,9 +309,7 @@ export const useBaseReactFlowDisplayRouting = ({
       return undefined;
     }
 
-    // A cancelled in-flight request terminates its worker. Re-prewarm here so a
-    // replacement can compile during the geometry-settle window without leaking
-    // a new worker when the component is actually unmounting.
+    // Re-prewarm after cancellation so the replacement compiles during geometry settle.
     prewarmBaseReactFlowDisplayWorker(displayEdgeWorkerRef);
 
     let cancelled = false;
@@ -576,11 +581,16 @@ export const useBaseReactFlowDisplayRouting = ({
         }
         updateDisplayRoutingFinalAppliedState({
           signature: displayEdgeCacheSignature,
+          inputGeometryDigest,
+          routingVersion: BASE_DISPLAY_ROUTING_VERSION,
           requestId,
           nodeCount,
           edgeCount: mergedFinalEdges.length,
+          scheduledAt,
+          workerStartedAt: workerStartedAt ?? undefined,
           finalAppliedAt,
           routeMs: workerStartedAt === null ? undefined : finalAppliedAt - workerStartedAt,
+          totalRouteMs: finalAppliedAt - scheduledAt,
           workerStartCount: displayEdgeWorkerStartCountRef.current,
           workerAbortCount: displayEdgeWorkerAbortCountRef.current,
           workerResolution: workerResult.routeResolution,
@@ -591,6 +601,7 @@ export const useBaseReactFlowDisplayRouting = ({
           phaseTrace: workerResult.phaseTrace,
           affectedEdgeCount: workerResult.affectedEdgeCount,
           fallbackLevel: workerResult.fallbackLevel,
+          hardGateDiagnostics: workerResult.hardReport,
         });
         setDeferredDisplayEdges({
           signature: displayEdgeCacheSignature,

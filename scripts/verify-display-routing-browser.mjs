@@ -279,6 +279,8 @@ const finalIncrementalExpression = nodeId => `(() => {
       baselinePatches: request.baselinePatches,
     }` : 'null'},
     requestOperation: request.operation,
+    workerRequestAt: request.__browserCapturedAt,
+    workerResponseAt: response.__browserCapturedAt,
     mutableEdgeCount: Array.isArray(request.mutableEdgeIds)
       ? request.mutableEdgeIds.length
       : null,
@@ -714,7 +716,10 @@ const main = async () => {
         && Number.isFinite(incremental.routing.workerStartedAt)
         ? incremental.routing.workerStartedAt - incremental.routing.scheduledAt
         : null;
-      incremental.workerToFinalMs = Number.isFinite(incremental.routing.workerStartedAt)
+      incremental.workerToFinalMs = Number.isFinite(incremental.workerRequestAt)
+        && Number.isFinite(incremental.routing.finalAppliedAt)
+        ? incremental.routing.finalAppliedAt - incremental.workerRequestAt
+        : Number.isFinite(incremental.routing.workerStartedAt)
         && Number.isFinite(incremental.routing.finalAppliedAt)
         ? incremental.routing.finalAppliedAt - incremental.routing.workerStartedAt
         : null;

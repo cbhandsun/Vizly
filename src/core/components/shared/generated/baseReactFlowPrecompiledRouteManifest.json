@@ -1,35 +1,35 @@
 {
   "schema": "vizly-precompiled-display-route-manifest-v3",
-  "routingVersion": "8",
+  "routingVersion": "9",
   "identitySourceHash": "source-v1:cfaa2450d3809ba2c686379d46c2603773ac472175eeac70cdfe7ece51347781",
-  "routingSourceHash": "source-v1:678b8299fbf65f487608fa7c78ae3a4557936adb63bf062754d84326d2b840c9",
+  "routingSourceHash": "source-v1:dfbb63bf142892c20db1f284a4c22f06145ea8ef09f2ded6ae2776ab3201994a",
   "entries": [
     {
-      "presetId": "wms-process-flow-v1",
-      "sourcePath": "src/data/standardized/WmsProcessFlowStandardData.json",
-      "artifactFile": "route-1352090637.json",
-      "sourceHash": "source-v1:2a580f110590a416ff1aeb9fb5a3cd21536428e26368841fd160f87243cc25d3",
-      "inputSignature": "1352090637",
-      "inputGeometryDigest": "geometry-v1:4838f4b415ecf3e4360ecdb05733cba8",
-      "outputRouteSignature": "route-v2:44:195:973728645e9fe816"
+      "presetId": "wms-demand-allocation-strategy-v2",
+      "sourcePath": "src/data/standardized/DeamndAllocation.json",
+      "artifactFile": "route-1128202745.json",
+      "sourceHash": "source-v1:ea82c502ab6535b5c8f8367c591861e540396a41955a15c6b5f94f922264b7de",
+      "inputSignature": "1128202745",
+      "inputGeometryDigest": "geometry-v1:33c0469ded248c5966bf7967bda21635",
+      "outputRouteSignature": "route-v2:26:164:d5d329ce2707b4c4"
     },
     {
       "presetId": "logistics-architecture-v1",
       "sourcePath": "src/data/standardized/LogisticsStandardData.json",
-      "artifactFile": "route-2227874906.json",
+      "artifactFile": "route-2377177811.json",
       "sourceHash": "source-v1:da286fbefa1a0d0a3ba3bf5a6589d2edba849af0f477ddb910ecad4d91649986",
-      "inputSignature": "2227874906",
-      "inputGeometryDigest": "geometry-v1:c7415b4ede1d799a85fb898c964a720e",
-      "outputRouteSignature": "route-v2:14:62:90aa1efad1fd39d8"
+      "inputSignature": "2377177811",
+      "inputGeometryDigest": "geometry-v1:ebc450b10058ac19f7765871baed1505",
+      "outputRouteSignature": "route-v2:14:61:8e8bdf697cad3bb7"
     },
     {
-      "presetId": "wms-demand-allocation-strategy-v2",
-      "sourcePath": "src/data/standardized/DeamndAllocation.json",
-      "artifactFile": "route-4033567064.json",
-      "sourceHash": "source-v1:ea82c502ab6535b5c8f8367c591861e540396a41955a15c6b5f94f922264b7de",
-      "inputSignature": "4033567064",
-      "inputGeometryDigest": "geometry-v1:88bc95a87015a654ea8cb0f6f1c246c0",
-      "outputRouteSignature": "route-v2:26:164:d5d329ce2707b4c4"
+      "presetId": "wms-process-flow-v1",
+      "sourcePath": "src/data/standardized/WmsProcessFlowStandardData.json",
+      "artifactFile": "route-401264928.json",
+      "sourceHash": "source-v1:2a580f110590a416ff1aeb9fb5a3cd21536428e26368841fd160f87243cc25d3",
+      "inputSignature": "401264928",
+      "inputGeometryDigest": "geometry-v1:88a231b54675f045e0ee857191999849",
+      "outputRouteSignature": "route-v2:44:195:22dd064a56dcd838"
     }
   ]
 }

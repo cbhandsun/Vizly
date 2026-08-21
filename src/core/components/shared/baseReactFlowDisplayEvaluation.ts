@@ -8,6 +8,8 @@ import {
   type EdgePathQualityScore,
 } from '../../strategies/shared/edgeStrictCrossingGuard';
 import { edgeRoutingQualityIntentToken } from '../../strategies/shared/edgeRoutingQualityIntent';
+import { MINIMUM_BUSINESS_NODE_CLEARANCE } from '../../strategies/shared/edgeBusinessNodeClearanceRepair';
+import { createNodeClearanceGraphEvaluationContext } from '../../strategies/shared/edgeWaypointCandidateRepair';
 import {
   compactDisplayEdgePaths,
   displayRoutingObstaclesSignature,
@@ -52,6 +54,9 @@ export type BaseDisplayBoundedCandidateReport = {
   terminalsAttached: boolean;
   terminalsAnchored: boolean;
   quality: EdgePathQualityScore;
+  /** Visual-risk diagnostics for unrelated business-node clearance below 16px. */
+  minimumClearanceViolations?: number;
+  minimumClearanceViolationEdgeIds?: string[];
 };
 
 export type DisplayTerminalGateEvaluation = {
@@ -429,6 +434,7 @@ type DisplayHardGateMetrics = {
   renderNormalizedEdges: Edge[];
   quality: EdgePathQualityScore;
   obstacleHits: number;
+  minimumClearanceViolationEdgeIds: string[];
 };
 
 const displayHardGateMetricsCache = new WeakMap<Edge[], WeakMap<Node[], DisplayHardGateMetrics>>();
@@ -454,11 +460,22 @@ const getDisplayHardGateMetrics = (edges: Edge[], nodes: Node[]): DisplayHardGat
   // The renderer removes redundant collinear waypoints before drawing. Score
   // that same normalized geometry so a crossing cannot hide at a split point.
   const renderNormalizedEdges = compactDisplayEdgePaths(edges);
+  const nodeClearanceContext = createNodeClearanceGraphEvaluationContext(nodes);
+  const minimumClearanceViolationEdgeIds = renderNormalizedEdges.flatMap(edge => (
+    nodeClearanceContext.score(
+      getDisplayComputedPath(edge),
+      edge,
+      MINIMUM_BUSINESS_NODE_CLEARANCE,
+    ) > 0.5
+      ? [edge.id]
+      : []
+  ));
   const metrics: DisplayHardGateMetrics = {
     signature,
     renderNormalizedEdges,
     quality: calculateEdgePathQualityScore(renderNormalizedEdges),
     obstacleHits: countDisplayObstacleHits(renderNormalizedEdges, nodes),
+    minimumClearanceViolationEdgeIds,
   };
   const nextByNodes = byNodes ?? new WeakMap<Node[], DisplayHardGateMetrics>();
   nextByNodes.set(nodes, metrics);
@@ -484,7 +501,7 @@ export const getDisplayHardQualityGateReport = (
   evaluateTerminals: DisplayTerminalGateEvaluator,
 ): BaseDisplayBoundedCandidateReport => {
   const metrics = getDisplayHardGateMetrics(edges, nodes);
-  const { quality, obstacleHits } = metrics;
+  const { quality, obstacleHits, minimumClearanceViolationEdgeIds } = metrics;
   const { terminalsAttached, terminalsAnchored } = evaluateTerminals(
     metrics.renderNormalizedEdges,
     nodes,
@@ -506,6 +523,8 @@ export const getDisplayHardQualityGateReport = (
     terminalsAttached,
     terminalsAnchored,
     quality,
+    minimumClearanceViolations: minimumClearanceViolationEdgeIds.length,
+    minimumClearanceViolationEdgeIds: minimumClearanceViolationEdgeIds.slice(0, 32),
   };
 };
 

@@ -43,7 +43,9 @@ export const DISPLAY_ROUTING_BROWSER_CAPTURE_SCRIPT = `(() => {
             window.__vizlyBoundedCandidates.push(structuredClone(response));
             window.__vizlyBoundedCandidates = window.__vizlyBoundedCandidates.slice(-16);
           }
-          window.__vizlyRoutingResponses.push(structuredClone(response));
+          const capturedResponse = structuredClone(response);
+          capturedResponse.__browserCapturedAt = Date.now();
+          window.__vizlyRoutingResponses.push(capturedResponse);
           window.__vizlyRoutingResponses = window.__vizlyRoutingResponses.slice(-16);
         } catch {}
       });
@@ -51,7 +53,9 @@ export const DISPLAY_ROUTING_BROWSER_CAPTURE_SCRIPT = `(() => {
     postMessage(message, transfer) {
       if (message && typeof message.requestId === 'string') {
         try {
-          window.__vizlyRoutingRequests.push(structuredClone(message));
+          const capturedRequest = structuredClone(message);
+          capturedRequest.__browserCapturedAt = Date.now();
+          window.__vizlyRoutingRequests.push(capturedRequest);
           window.__vizlyRoutingRequests = window.__vizlyRoutingRequests.slice(-16);
         } catch {}
       }

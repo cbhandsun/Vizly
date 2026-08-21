@@ -161,6 +161,10 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
       edges,
       hardClean: true,
       routeResolution: 'validated-candidate',
+      hardReport: {
+        hardClean: true,
+        minimumClearanceViolations: 0,
+      },
     });
     expect(closureSpy).not.toHaveBeenCalled();
   });

@@ -1,10 +1,10 @@
 {
   "schema": "vizly-precompiled-display-route-v1",
-  "routingVersion": "8",
+  "routingVersion": "9",
   "sourceHash": "source-v1:2a580f110590a416ff1aeb9fb5a3cd21536428e26368841fd160f87243cc25d3",
-  "inputSignature": "1352090637",
-  "inputGeometryDigest": "geometry-v1:4838f4b415ecf3e4360ecdb05733cba8",
-  "outputRouteSignature": "route-v2:44:195:973728645e9fe816",
+  "inputSignature": "401264928",
+  "inputGeometryDigest": "geometry-v1:88a231b54675f045e0ee857191999849",
+  "outputRouteSignature": "route-v2:44:195:22dd064a56dcd838",
   "hardClean": true,
   "patches": [
     {
@@ -869,11 +869,11 @@
             "y": 1582
           },
           {
-            "x": 581,
+            "x": 574.5,
             "y": 1582
           },
           {
-            "x": 581,
+            "x": 574.5,
             "y": 1815
           },
           {

@@ -36,6 +36,7 @@ import {
   createBaseReactFlowRoutingAffectedClosure,
   createBaseReactFlowRoutingChangeSet,
 } from '../baseReactFlowDisplayRoutingChangeSet';
+import { resolveDisplayRoutingCommittedReuseTiming } from '../baseReactFlowDisplayRoutingDebug';
 
 const installWorkerHarness = () => {
   const terminate = vi.fn();
@@ -803,5 +804,50 @@ describe('baseReactFlowDisplayWorker lifecycle', () => {
       routeResolution: 'full-route',
       routesMatch: false,
     })).toBe(false);
+  });
+
+  it('preserves measured route timing when the committed render reuses the exact route', () => {
+    const current = {
+      stage: 'final-applied',
+      signature: 'input-1',
+      inputGeometryDigest: 'geometry-1',
+      outputRouteSignature: 'route-v2:1:2:0123456789abcdef',
+      scheduledAt: 100,
+      workerStartedAt: 180,
+      finalAppliedAt: 620,
+      routeMs: 440,
+      totalRouteMs: 520,
+    };
+
+    expect(resolveDisplayRoutingCommittedReuseTiming({
+      current,
+      signature: 'input-1',
+      inputGeometryDigest: 'geometry-1',
+      outputRouteSignature: 'route-v2:1:2:0123456789abcdef',
+      now: 900,
+    })).toMatchObject({
+      scheduledAt: 100,
+      workerStartedAt: 180,
+      finalAppliedAt: 620,
+      routeMs: 440,
+      totalRouteMs: 520,
+    });
+
+    expect(resolveDisplayRoutingCommittedReuseTiming({
+      current,
+      signature: 'input-2',
+      inputGeometryDigest: 'geometry-2',
+      outputRouteSignature: 'route-v2:1:2:fedcba9876543210',
+      now: 900,
+    })).toEqual({
+      scheduledAt: undefined,
+      workerStartedAt: undefined,
+      finalAppliedAt: 900,
+      routeMs: undefined,
+      totalRouteMs: undefined,
+      phaseTrace: undefined,
+      workerResolution: undefined,
+      hardGateDiagnostics: undefined,
+    });
   });
 });

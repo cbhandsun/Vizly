@@ -7,13 +7,81 @@ import {
   repairBusinessNodeClearanceRisks,
 } from '../edgeBusinessNodeClearanceRepair';
 import { calculateEdgePathQualityScore } from '../edgeStrictCrossingGuard';
-import { scoreNodeClearanceRisk } from '../edgeWaypointCandidateRepair';
+import {
+  createNodeClearanceGraphEvaluationContext,
+  scoreNodeClearanceRisk,
+} from '../edgeWaypointCandidateRepair';
 
 const pathFor = (edge: Edge): Array<{ x: number; y: number }> => (
   (edge.data as { computedPath?: Array<{ x: number; y: number }> } | undefined)?.computedPath ?? []
 );
 
 describe('repairBusinessNodeClearanceRisks', () => {
+  it('normalizes a sibling branch lane from 41.5px to the 48px commercial boundary', () => {
+    const nodes: Node[] = [
+      { id: 'order-input', position: { x: 102, y: 1534 }, data: {}, measured: { width: 190, height: 96 } },
+      { id: 'order-sla-classify', position: { x: 622.5, y: 1545.5 }, data: {}, measured: { width: 191, height: 73 } },
+      { id: 'order-split-merge', position: { x: 643, y: 1778.5 }, data: {}, measured: { width: 191, height: 73 } },
+    ];
+    const edges: Edge[] = [
+      {
+        id: 'e-order-sla',
+        source: 'order-input',
+        target: 'order-sla-classify',
+        data: { computedPath: [{ x: 292, y: 1582 }, { x: 622.5, y: 1582 }] },
+      },
+      {
+        id: 'e-order-split',
+        source: 'order-input',
+        target: 'order-split-merge',
+        data: {
+          computedPath: [
+            { x: 292, y: 1582 },
+            { x: 581, y: 1582 },
+            { x: 581, y: 1815 },
+            { x: 643, y: 1815 },
+          ],
+          sharedTrunkAware: true,
+          sharedTrunkSynthesized: true,
+        },
+      },
+    ];
+
+    const repaired = repairBusinessNodeClearanceRisks(edges, nodes, {
+      minimumClearance: COMMERCIAL_BUSINESS_NODE_CLEARANCE,
+    });
+    const graphClearance = createNodeClearanceGraphEvaluationContext(nodes);
+
+    expect(scoreNodeClearanceRisk(
+      pathFor(edges[1]),
+      nodes,
+      edges[1],
+      COMMERCIAL_BUSINESS_NODE_CLEARANCE,
+    )).toBeGreaterThan(0);
+    expect(graphClearance.score(
+      pathFor(edges[1]),
+      edges[1],
+      COMMERCIAL_BUSINESS_NODE_CLEARANCE,
+    )).toBe(scoreNodeClearanceRisk(
+      pathFor(edges[1]),
+      nodes,
+      edges[1],
+      COMMERCIAL_BUSINESS_NODE_CLEARANCE,
+    ));
+    expect(scoreNodeClearanceRisk(
+      pathFor(repaired[1]),
+      nodes,
+      repaired[1],
+      COMMERCIAL_BUSINESS_NODE_CLEARANCE,
+    )).toBe(0);
+    expect(pathFor(repaired[1])).toEqual([
+      { x: 292, y: 1582 },
+      { x: 574.5, y: 1582 },
+      { x: 574.5, y: 1815 },
+      { x: 643, y: 1815 },
+    ]);
+  });
+
   it('moves an internal lane away from a business node without leaving its container', () => {
     const nodes: Node[] = [
       { id: 'container', type: 'titleGroup', position: { x: 0, y: 0 }, data: {}, measured: { width: 500, height: 300 } },

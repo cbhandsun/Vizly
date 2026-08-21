@@ -24,10 +24,22 @@ import {
 import { createBaseReactFlowDisplayEdgePatches } from '../baseReactFlowDisplayRoutingTransaction';
 import { auditBaseReactFlowDisplayCommercialQuality } from '../baseReactFlowDisplayCommercialQuality';
 import { GENERATED_BASE_REACT_FLOW_PRECOMPILED_ROUTE_LOADERS } from '../generated/baseReactFlowPrecompiledRouteLoaders';
-import generatedDemandAllocationArtifact from '../generated/precompiledRoutes/route-4033567064.json';
+import { getGeneratedPrecompiledRouteArtifactForTest } from './fixtures/generatedPrecompiledRouteArtifacts';
 
 const SOURCE_HASH = `source-v1:${'a'.repeat(64)}`;
 const TEST_PRESET_ID = 'test-preset';
+const generatedDemandAllocationArtifact = getGeneratedPrecompiledRouteArtifactForTest(
+  'wms-demand-allocation-strategy-v2',
+) as {
+  schema: typeof BASE_REACT_FLOW_PRECOMPILED_ROUTE_SCHEMA;
+  routingVersion: string;
+  sourceHash: string;
+  inputSignature: string;
+  inputGeometryDigest: string;
+  outputRouteSignature: string;
+  hardClean: true;
+  patches: Edge[];
+};
 
 type NodeWithResolvedPosition = Node & {
   positionAbsolute: { x: number; y: number };

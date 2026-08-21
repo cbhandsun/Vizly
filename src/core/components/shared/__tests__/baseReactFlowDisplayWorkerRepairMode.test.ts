@@ -5,6 +5,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { computeBaseReactFlowDisplayEdgesWorkerResponse } from '../baseReactFlowDisplayEdges.worker';
 import * as measuredDisplayRepair from '../baseReactFlowDisplayMeasuredRepair';
+import { getDisplayComputedPath } from '../baseReactFlowDisplayGeometry';
+import { COMMERCIAL_BUSINESS_NODE_CLEARANCE } from '../../../strategies/shared/edgeBusinessNodeClearanceRepair';
+import { scoreNodeClearanceRisk } from '../../../strategies/shared/edgeWaypointCandidateRepair';
 
 const nodes: Node[] = [
   { id: 'source', position: { x: 0, y: 0 }, measured: { width: 100, height: 60 }, data: {} },
@@ -43,5 +46,47 @@ describe('baseReactFlowDisplayEdges worker repair mode', () => {
     expect(Array.isArray(response.edges)).toBe(true);
     expect(typeof response.hardClean).toBe('boolean');
     expect(response.routeResolution).toBe('repair');
+  });
+
+  it('closes a bounded repair route that passes within the 16px visual floor', () => {
+    const repairNodes: Node[] = [
+      { id: 'source', position: { x: 4221, y: 695 }, measured: { width: 204, height: 96 }, data: {} },
+      { id: 'nearby', position: { x: 4545, y: 695 }, measured: { width: 204, height: 96 }, data: {} },
+      { id: 'target', position: { x: 5051, y: 636 }, measured: { width: 204, height: 96 }, data: {} },
+    ];
+    const response = computeBaseReactFlowDisplayEdgesWorkerResponse({
+      operation: 'repair',
+      requestId: 'repair-minimum-clearance',
+      repairMode: 'bounded',
+      nodes: repairNodes,
+      edges: [{
+        id: 'edge',
+        source: 'source',
+        target: 'target',
+        sourceHandle: 'right',
+        targetHandle: 'left',
+        data: { computedPath: [
+          { x: 4425, y: 743 },
+          { x: 4473, y: 743 },
+          { x: 4473, y: 684 },
+          { x: 5051, y: 684 },
+        ] },
+      }],
+    });
+
+    expect(response.hardClean).toBe(true);
+    expect(response.hardReport?.minimumClearanceViolations).toBe(0);
+    expect(scoreNodeClearanceRisk(
+      getDisplayComputedPath(response.edges?.[0] ?? edges[0]),
+      repairNodes,
+      response.edges?.[0] ?? edges[0],
+      COMMERCIAL_BUSINESS_NODE_CLEARANCE,
+    )).toBe(0);
+    expect(response.edges?.[0]?.data?.computedPath).not.toEqual([
+      { x: 4425, y: 743 },
+      { x: 4473, y: 743 },
+      { x: 4473, y: 684 },
+      { x: 5051, y: 684 },
+    ]);
   });
 });

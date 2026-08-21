@@ -16,8 +16,16 @@ import { mergeBaseReactFlowDisplayEdgePatches } from '../baseReactFlowDisplayRou
 import { projectBaseReactFlowDisplayWorkerInput } from '../baseReactFlowDisplayWorkerClient';
 import { parseDisplayEdgesWorkerRequest } from '../baseReactFlowDisplayWorkerProtocol';
 import demandAllocationProductionRequest from './fixtures/demandAllocationProductionWorkerRequest.json';
-import demandAllocationArtifact from '../generated/precompiledRoutes/route-4033567064.json';
+import { getGeneratedPrecompiledRouteArtifactForTest } from './fixtures/generatedPrecompiledRouteArtifacts';
 import './baseReactFlowDisplayEdges.testUtils';
+
+const demandAllocationArtifact = getGeneratedPrecompiledRouteArtifactForTest(
+  'wms-demand-allocation-strategy-v2',
+) as {
+  inputSignature: string;
+  inputGeometryDigest: string;
+  sourceHash: string;
+};
 
 type RoutePoint = { x: number; y: number };
 

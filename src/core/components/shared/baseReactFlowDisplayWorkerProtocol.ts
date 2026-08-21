@@ -158,6 +158,7 @@ export type DisplayEdgesWorkerResponse = {
   requestId: string;
   edges?: Edge[];
   hardClean?: boolean;
+  hardReport?: BaseDisplayBoundedCandidateReport;
   routeResolution?: DisplayEdgesWorkerRouteResolution;
   error?: string;
   boundedCandidate?: BaseDisplayBoundedCandidateReport;
@@ -524,6 +525,24 @@ const isBoundedCandidate = (value: unknown): value is BaseDisplayBoundedCandidat
       return isFiniteNumber(metric) && metric >= 0 && metric <= MAX_QUALITY_METRIC;
     })
   ) return false;
+  const clearanceViolations = value.minimumClearanceViolations;
+  if (
+    typeof clearanceViolations !== 'undefined'
+    && (
+      !Number.isSafeInteger(clearanceViolations)
+      || (clearanceViolations as number) < 0
+      || (clearanceViolations as number) > DISPLAY_WORKER_MAX_GRAPH_ITEMS
+    )
+  ) return false;
+  const clearanceEdgeIds = value.minimumClearanceViolationEdgeIds;
+  if (
+    typeof clearanceEdgeIds !== 'undefined'
+    && (
+      !Array.isArray(clearanceEdgeIds)
+      || clearanceEdgeIds.length > 32
+      || !clearanceEdgeIds.every(edgeId => isBoundedString(edgeId, MAX_IDENTIFIER_LENGTH))
+    )
+  ) return false;
   const pairs = value.unrelatedOverlapPairs;
   if (typeof pairs === 'undefined') return true;
   return Array.isArray(pairs)
@@ -591,6 +610,7 @@ export const parseDisplayEdgesWorkerResponse = (
   if (hasError) {
     if (
       typeof value.routeResolution !== 'undefined'
+      || typeof value.hardReport !== 'undefined'
       || typeof value.phaseTrace !== 'undefined'
       || typeof value.phaseProgress !== 'undefined'
       || typeof value.affectedEdgeCount !== 'undefined'
@@ -604,6 +624,7 @@ export const parseDisplayEdgesWorkerResponse = (
   if (hasBoundedCandidate) {
     if (
       typeof value.hardClean !== 'undefined'
+      || typeof value.hardReport !== 'undefined'
       || typeof value.routeResolution !== 'undefined'
       || typeof value.phaseTrace !== 'undefined'
       || typeof value.phaseProgress !== 'undefined'
@@ -617,6 +638,7 @@ export const parseDisplayEdgesWorkerResponse = (
   if (hasPhaseProgress) {
     if (
       typeof value.hardClean !== 'undefined'
+      || typeof value.hardReport !== 'undefined'
       || typeof value.routeResolution !== 'undefined'
       || typeof value.phaseTrace !== 'undefined'
       || typeof value.affectedEdgeCount !== 'undefined'
@@ -629,6 +651,9 @@ export const parseDisplayEdgesWorkerResponse = (
   const phaseTrace = typeof value.phaseTrace === 'undefined'
     ? []
     : parseDisplayRoutingPhaseTrace(value.phaseTrace);
+  const hardReport = typeof value.hardReport === 'undefined'
+    ? undefined
+    : (isBoundedCandidate(value.hardReport) ? value.hardReport : null);
   const hasIncrementalMetadata = typeof value.affectedEdgeCount !== 'undefined'
     || typeof value.fallbackLevel !== 'undefined';
   const incrementalMetadataIsValid = !hasIncrementalMetadata || (
@@ -640,8 +665,10 @@ export const parseDisplayEdgesWorkerResponse = (
   if (
     !isDisplayEdgesWorkerEdgeList(value.edges)
     || !phaseTrace
+    || hardReport === null
     || !incrementalMetadataIsValid
     || typeof value.hardClean !== 'boolean'
+    || (hardReport !== undefined && hardReport.hardClean !== value.hardClean)
     || (
       value.routeResolution !== 'validated-candidate'
       && value.routeResolution !== 'repaired-candidate'
@@ -655,6 +682,7 @@ export const parseDisplayEdgesWorkerResponse = (
     requestId: expectedRequestId,
     edges: value.edges,
     hardClean: value.hardClean,
+    hardReport,
     routeResolution: value.routeResolution,
     phaseTrace,
     affectedEdgeCount: hasIncrementalMetadata

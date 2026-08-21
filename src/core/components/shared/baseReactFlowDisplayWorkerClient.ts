@@ -3,6 +3,7 @@ import type { MutableRefObject } from 'react';
 import {
   parseDisplayEdgesWorkerResponse,
   readDisplayEdgesWorkerRequestId,
+  type DisplayEdgesWorkerResponse,
   type DisplayEdgesWorkerRequest,
   type DisplayEdgesWorkerCandidateSource,
   type DisplayEdgesWorkerRouteResolution,
@@ -53,6 +54,7 @@ export type DeferredDisplayEdges = {
 export type BaseReactFlowDisplayWorkerResult = {
   edges: Edge[];
   hardClean: boolean;
+  hardReport?: DisplayEdgesWorkerResponse['hardReport'];
   routeResolution: DisplayEdgesWorkerRouteResolution;
   /** Exact DTO edge baseline that produced the worker response. */
   projectedEdges: Edge[];
@@ -439,6 +441,7 @@ const requestBaseReactFlowDisplayEdgesWorker = ({
         resolve({
           edges: responseEdges,
           hardClean: response.hardClean === true,
+          hardReport: response.hardReport,
           routeResolution,
           phaseTrace: response.phaseTrace ?? [],
           affectedEdgeCount: response.affectedEdgeCount,

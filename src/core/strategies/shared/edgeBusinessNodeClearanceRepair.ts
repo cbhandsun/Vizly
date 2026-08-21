@@ -29,6 +29,8 @@ export interface BusinessNodeClearanceRepairOptions {
 
 const EPS = 0.5;
 export const COMMERCIAL_BUSINESS_NODE_CLEARANCE = 48;
+/** Minimum local repair target; commercial routing targets 48px or more. */
+export const MINIMUM_BUSINESS_NODE_CLEARANCE = 16;
 export const COMMERCIAL_BUSINESS_NODE_ROUTING_CLEARANCE = 192;
 const CONTAINER_CLEARANCE_OVERFLOW = (
   COMMERCIAL_BUSINESS_NODE_ROUTING_CLEARANCE - COMMERCIAL_BUSINESS_NODE_CLEARANCE
@@ -501,17 +503,17 @@ const clearanceCandidates = (
               containerRects,
               axis,
               start,
-              detourLane,
+              lane,
               originalSegmentStart,
               originalSegmentEnd,
             )) continue;
             const candidate = path.map(point => ({ ...point }));
             if (axis === 'v') {
-              candidate[index].x = detourLane;
-              candidate[index + 1].x = detourLane;
+              candidate[index].x = lane;
+              candidate[index + 1].x = lane;
             } else {
-              candidate[index].y = detourLane;
-              candidate[index + 1].y = detourLane;
+              candidate[index].y = lane;
+              candidate[index + 1].y = lane;
             }
             candidates.push(compactPath(candidate));
           }
@@ -556,7 +558,10 @@ export const repairBusinessNodeClearanceRisks = (
   options: BusinessNodeClearanceRepairOptions = {},
 ): Edge[] => {
   const minimumClearance = Number.isFinite(options.minimumClearance)
-    ? Math.max(16, Math.min(256, options.minimumClearance ?? COMMERCIAL_BUSINESS_NODE_ROUTING_CLEARANCE))
+    ? Math.max(
+      MINIMUM_BUSINESS_NODE_CLEARANCE,
+      Math.min(256, options.minimumClearance ?? COMMERCIAL_BUSINESS_NODE_ROUTING_CLEARANCE),
+    )
     : COMMERCIAL_BUSINESS_NODE_ROUTING_CLEARANCE;
   const obstacles = new Map<string, Rect>();
   for (const node of nodes) {

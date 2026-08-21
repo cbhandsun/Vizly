@@ -295,6 +295,23 @@ describe('baseReactFlowDisplayEdges WMS and TMS regressions', () => {
     expect(edgeNodeObstacleHits(result, absoluteNodes), diagnostics).toEqual([]);
     expect(displayEdgesHaveNodeAttachedTerminals(result, absoluteNodes), diagnostics).toBe(true);
     expect(displayEdgesHaveNodeAnchoredTerminals(result, absoluteNodes), diagnostics).toBe(true);
+
+    const replay = computeBaseReactFlowDisplayEdgesWorkerResponse({
+      operation: 'validate-or-route',
+      requestId: 'wms-process-large-worker-replay',
+      edges: projected.edges,
+      nodes: projected.nodes,
+      candidateEdges: result,
+      candidateSource: 'precompiled',
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: true,
+      displayEdgeEpoch: computeBaseReactFlowDisplayEdgeEpoch(projected),
+      qualityMode: 'full',
+    });
+    expect(replay.hardReport?.minimumClearanceViolationEdgeIds, diagnostics)
+      .not.toContain('e-labor-alloc-fb');
+    expect(replay.hardReport?.minimumClearanceViolations, diagnostics).toBe(0);
   }, 90_000);
 
   it('routes TMS execution trunks outside stepped cost blockers', async () => {

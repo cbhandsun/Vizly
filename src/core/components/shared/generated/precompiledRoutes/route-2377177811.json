@@ -1,10 +1,10 @@
 {
   "schema": "vizly-precompiled-display-route-v1",
-  "routingVersion": "8",
+  "routingVersion": "9",
   "sourceHash": "source-v1:da286fbefa1a0d0a3ba3bf5a6589d2edba849af0f477ddb910ecad4d91649986",
-  "inputSignature": "2227874906",
-  "inputGeometryDigest": "geometry-v1:c7415b4ede1d799a85fb898c964a720e",
-  "outputRouteSignature": "route-v2:14:62:90aa1efad1fd39d8",
+  "inputSignature": "2377177811",
+  "inputGeometryDigest": "geometry-v1:ebc450b10058ac19f7765871baed1505",
+  "outputRouteSignature": "route-v2:14:61:8e8bdf697cad3bb7",
   "hardClean": true,
   "patches": [
     {
@@ -219,12 +219,12 @@
             "y": 775
           },
           {
-            "x": 1961,
+            "x": 1979,
             "y": 775
           },
           {
-            "x": 1961,
-            "y": 179.5
+            "x": 1979,
+            "y": 180
           }
         ],
         "sharedTrunkAware": true,
@@ -246,11 +246,11 @@
           },
           {
             "x": 1054,
-            "y": 1256
+            "y": 1400
           },
           {
             "x": 1434,
-            "y": 1256
+            "y": 1400
           },
           {
             "x": 1434,
@@ -324,25 +324,21 @@
       "source": "visibility",
       "target": "downstream",
       "type": "stablePath",
-      "sourceHandle": "top",
+      "sourceHandle": "right",
       "targetHandle": "bottom",
       "data": {
         "computedPath": [
           {
-            "x": 1523,
-            "y": 1540
+            "x": 1582.3374999999999,
+            "y": 1599
           },
           {
-            "x": 1523,
-            "y": 1483
+            "x": 1979,
+            "y": 1599
           },
           {
-            "x": 1961,
-            "y": 1483
-          },
-          {
-            "x": 1961,
-            "y": 179.5
+            "x": 1979,
+            "y": 180
           }
         ],
         "sharedTrunkSynthesized": true
@@ -396,11 +392,11 @@
             "y": 1020
           },
           {
-            "x": 382,
+            "x": 378,
             "y": 1020
           },
           {
-            "x": 382,
+            "x": 378,
             "y": 1450
           },
           {

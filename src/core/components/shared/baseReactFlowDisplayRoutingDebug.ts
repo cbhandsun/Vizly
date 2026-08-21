@@ -7,7 +7,7 @@ import type {
   DisplayRoutingFallbackLevel,
 } from './baseReactFlowDisplayWorkerProtocol';
 
-type DisplayRoutingDebugState = {
+export type DisplayRoutingDebugState = {
   stage?: string;
   signature?: string;
   nodeCount?: number;
@@ -19,6 +19,8 @@ type DisplayRoutingDebugState = {
   finalAppliedAt?: number;
   cacheHitAt?: number;
   routeMs?: number;
+  /** User-visible latency from scheduling through final state commit. */
+  totalRouteMs?: number;
   workerStartCount?: number;
   workerAbortCount?: number;
   error?: string;
@@ -82,13 +84,67 @@ export const updateDisplayRoutingLifecycleState = (
 export const updateDisplayRoutingFinalAppliedState = (
   patch: DisplayRoutingDebugState,
 ): void => updateDisplayRoutingDebugState({
-  ...patch,
-  stage: 'final-applied',
   boundedCandidate: undefined,
   boundedCandidateTrace: undefined,
   hardGateDiagnostics: undefined,
   terminalDiagnostics: undefined,
+  ...patch,
+  stage: 'final-applied',
 });
+
+export const resolveDisplayRoutingCommittedReuseTiming = ({
+  current,
+  signature,
+  inputGeometryDigest,
+  outputRouteSignature,
+  now,
+}: {
+  current: DisplayRoutingDebugState | undefined;
+  signature: string;
+  inputGeometryDigest: string;
+  outputRouteSignature?: string;
+  now: number;
+}): Pick<DisplayRoutingDebugState,
+  | 'scheduledAt'
+  | 'workerStartedAt'
+  | 'finalAppliedAt'
+  | 'routeMs'
+  | 'totalRouteMs'
+  | 'phaseTrace'
+  | 'workerResolution'
+  | 'hardGateDiagnostics'
+> => {
+  const sameCommittedRoute = current?.stage === 'final-applied'
+    && current.signature === signature
+    && current.inputGeometryDigest === inputGeometryDigest
+    && current.outputRouteSignature === outputRouteSignature;
+  if (sameCommittedRoute) {
+    return {
+      scheduledAt: current.scheduledAt,
+      workerStartedAt: current.workerStartedAt,
+      finalAppliedAt: current.finalAppliedAt,
+      routeMs: current.routeMs,
+      totalRouteMs: current.totalRouteMs,
+      phaseTrace: current.phaseTrace,
+      workerResolution: current.workerResolution,
+      hardGateDiagnostics: current.hardGateDiagnostics,
+    };
+  }
+  return {
+    scheduledAt: undefined,
+    workerStartedAt: undefined,
+    finalAppliedAt: now,
+    routeMs: undefined,
+    totalRouteMs: undefined,
+    phaseTrace: undefined,
+    workerResolution: undefined,
+    hardGateDiagnostics: undefined,
+  };
+};
+
+export const readDisplayRoutingDebugState = (): DisplayRoutingDebugState | undefined => (
+  readDisplayRoutingDebugWindow()?.__vizlyBaseReactFlowDisplayRouting
+);
 
 export const appendDisplayRoutingPhaseProgress = (
   trace: DisplayRoutingPhaseTrace,

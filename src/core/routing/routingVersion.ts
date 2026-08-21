@@ -1,1 +1,1 @@
-export const EDGE_ROUTING_CACHE_VERSION = '8';
+export const EDGE_ROUTING_CACHE_VERSION = '9';

@@ -101,6 +101,7 @@
     "generate:precompiled-routes": "node scripts/generate-precompiled-display-routes.mjs",
     "generate:precompiled-routes:check": "node scripts/generate-precompiled-display-routes.mjs --check",
     "verify:display-routing-browser": "node scripts/verify-display-routing-browser.mjs",
+    "verify:display-routing-matrix": "node scripts/verify-display-routing-matrix.mjs",
     "check:precompiled-routes": "node scripts/check-precompiled-display-routes.mjs",
     "check:secrets": "node scripts/check-secrets.mjs",
     "check:dom-sinks": "node scripts/check-dom-sinks.mjs",

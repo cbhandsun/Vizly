@@ -26,6 +26,7 @@ export const assertDisplayRoutingPerformanceBudget = (
   throw new Error(`Routing performance budget exceeded:\n${JSON.stringify({
     dragCase,
     measurements,
+    incrementalRouting: incremental?.routing ?? null,
     initialPhaseTrace: initial?.phaseTrace ?? [],
     incrementalPhaseTrace: incremental?.response?.phaseTrace ?? [],
     budgets: DISPLAY_ROUTING_PERFORMANCE_BUDGET_MS,

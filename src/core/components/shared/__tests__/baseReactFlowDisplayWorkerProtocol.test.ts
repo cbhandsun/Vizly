@@ -290,12 +290,47 @@ describe('baseReactFlowDisplayWorkerProtocol', () => {
 
   it('rejects conflicting, non-finite, cyclic, and forged response variants', () => {
     const validEdges = validRepairRequest.edges;
+    const hardReport = {
+      candidate: 'polished',
+      hardClean: true,
+      obstacleHits: 0,
+      terminalsAttached: true,
+      terminalsAnchored: true,
+      minimumClearanceViolations: 0,
+      minimumClearanceViolationEdgeIds: [],
+      quality: {
+        nonOrthogonalSegments: 0,
+        strictCrossings: 0,
+        reverseOverlap: 0,
+        unrelatedOverlap: 0,
+        relatedOverlap: 0,
+        unexplainedRelatedOverlap: 0,
+        shortEndpointStubs: 0,
+        tinyInteriorDoglegs: 0,
+        hairpins: 0,
+        backtrackPenalty: 0,
+        detourPenalty: 0,
+        bends: 0,
+        totalLength: 100,
+      },
+    } as const;
     expect(parseDisplayEdgesWorkerResponse({
       requestId: 'repair-1',
       edges: validEdges,
       hardClean: true,
+      hardReport,
       routeResolution: 'repair',
-    }, 'repair-1')).not.toBeNull();
+    }, 'repair-1')).toMatchObject({ hardReport });
+    expect(parseDisplayEdgesWorkerResponse({
+      requestId: 'repair-1',
+      edges: validEdges,
+      hardClean: true,
+      hardReport: {
+        ...hardReport,
+        minimumClearanceViolationEdgeIds: ['x'.repeat(20_001)],
+      },
+      routeResolution: 'repair',
+    }, 'repair-1')).toBeNull();
     expect(parseDisplayEdgesWorkerResponse({
       requestId: 'route-1',
       edges: validEdges,

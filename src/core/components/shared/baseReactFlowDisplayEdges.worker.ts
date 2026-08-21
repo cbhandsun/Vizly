@@ -10,7 +10,10 @@ import {
 import { createBaseReactFlowFullRouteEdges } from './baseReactFlowDisplayFullRoutePipeline';
 import type { BaseDisplayBoundedCandidateReport } from './baseReactFlowDisplayEvaluation';
 import { repairBaseReactFlowMeasuredDisplayEdgesWithReport } from './baseReactFlowDisplayMeasuredRepair';
-import { baseReactFlowDisplayHardQualityIsClean } from './baseReactFlowDisplayQualityGates';
+import {
+  baseReactFlowDisplayHardQualityIsClean,
+  getDisplayHardQualityGateReport,
+} from './baseReactFlowDisplayQualityGates';
 import { baseReactFlowDisplayCommercialQualityIsClean } from './baseReactFlowDisplayCommercialQuality';
 import { createBaseReactFlowInteractiveDisplayEdges } from './baseReactFlowDisplayQualitySeedPipeline';
 import { createBaseReactFlowPreDisplayFinalEdges } from './baseReactFlowDisplayPreDisplayPipeline';
@@ -33,10 +36,6 @@ import {
 import { createBaseReactFlowIncrementalDisplayEdges } from './baseReactFlowDisplayIncrementalRoute';
 import { repairDisplayContainerBoundaryClearanceRisks } from '../../strategies/shared/edgeDisplaySoftQualityRepair';
 import {
-  COMMERCIAL_BUSINESS_NODE_CLEARANCE,
-} from '../../strategies/shared/edgeBusinessNodeClearanceRepair';
-import { scoreNodeClearanceRisk } from '../../strategies/shared/edgeWaypointCandidateRepair';
-import {
   repairBaseReactFlowFinalCommercialDetours,
   repairBaseReactFlowFinalEndpointOrder,
 } from './baseReactFlowDisplayFinalEndpointOrder';
@@ -46,77 +45,51 @@ import {
   fastDisplayHardSafetyIsClean,
   repairFastDisplayHardSafety,
 } from './baseReactFlowFastEdgeSafety';
-import { getDisplayComputedPath } from './baseReactFlowDisplayGeometry';
 import { commercialEdgeDetoursDoNotRegress } from './baseReactFlowDisplayCommercialDetourGuard';
+import {
+  eligibleCommercialClearanceDoesNotRegress,
+  displayBusinessNodeCommercialClearanceIsClean,
+  repairBaseReactFlowDisplayBusinessNodeClearance,
+} from './baseReactFlowDisplayBusinessNodeClearance';
+import {
+  doesDisplayCandidateMatchSourceGraph,
+  finalDisplayRenderContractIsLocked,
+} from './baseReactFlowDisplayCandidateValidation';
+import {
+  displayEdgesWorkerScope,
+  postDisplayEdgesResponse,
+} from './baseReactFlowDisplayWorkerScope';
 
-interface DisplayEdgesWorkerScope {
-  postMessage: (response: DisplayEdgesWorkerResponse) => void;
-  onmessage: ((event: MessageEvent<unknown>) => void) | null;
-}
-
-const displayEdgesWorkerScope = typeof self !== 'undefined'
-  && !('document' in self)
-  ? self as unknown as DisplayEdgesWorkerScope
-  : null;
-
-const postDisplayEdgesResponse = (response: DisplayEdgesWorkerResponse): void => {
-  displayEdgesWorkerScope?.postMessage(response);
+const withExactDisplayHardReport = (
+  response: DisplayEdgesWorkerResponse,
+  repairNodes: DisplayEdgesWorkerRequest['nodes'],
+): DisplayEdgesWorkerResponse => {
+  if (!response.edges) return response;
+  const hardReport = getDisplayHardQualityGateReport(
+    response.edges,
+    repairNodes,
+    'polished',
+  );
+  return {
+    ...response,
+    hardClean: hardReport.hardClean,
+    hardReport,
+  };
 };
 
-const doesDisplayCandidateMatchSourceGraph = (
-  sourceEdges: DisplayEdgesWorkerRequest['edges'],
-  candidateEdges: DisplayEdgesWorkerRequest['edges'],
-): boolean => (
-  sourceEdges.length === candidateEdges.length
-  && sourceEdges.every((edge, index) => {
-    const candidate = candidateEdges[index];
-    return candidate?.id === edge.id
-      && candidate.source === edge.source
-      && candidate.target === edge.target;
+const repairMinimumBusinessNodeClearance = (
+  edges: NonNullable<DisplayEdgesWorkerResponse['edges']>,
+  repairNodes: DisplayEdgesWorkerRequest['nodes'],
+  eligibleEdgeIds?: ReadonlySet<string>,
+  allowTransientStrictCrossing = true,
+): NonNullable<DisplayEdgesWorkerResponse['edges']> => (
+  repairBaseReactFlowDisplayBusinessNodeClearance(edges, repairNodes, {
+    eligibleEdgeIds,
+    // The owning final hard-safety transaction closes a temporary peer-edge
+    // crossing atomically; the intermediate candidate is never rendered.
+    allowTransientStrictCrossing,
   })
 );
-
-const precompiledCandidateCommercialClearanceIsClean = (
-  edges: DisplayEdgesWorkerRequest['edges'],
-  nodes: DisplayEdgesWorkerRequest['nodes'],
-): boolean => edges.every(edge => scoreNodeClearanceRisk(
-  getDisplayComputedPath(edge),
-  nodes,
-  edge,
-  COMMERCIAL_BUSINESS_NODE_CLEARANCE,
-) <= 0.5);
-
-const eligibleCommercialClearanceDoesNotRegress = (
-  baselineEdges: DisplayEdgesWorkerRequest['edges'],
-  candidateEdges: DisplayEdgesWorkerRequest['edges'],
-  nodes: DisplayEdgesWorkerRequest['nodes'],
-  eligibleEdgeIds: ReadonlySet<string> | undefined,
-): boolean => {
-  if (!eligibleEdgeIds || eligibleEdgeIds.size === 0) return true;
-  const candidateById = new Map(candidateEdges.map(edge => [edge.id, edge] as const));
-  return baselineEdges.every((edge) => {
-    if (!eligibleEdgeIds.has(edge.id)) return true;
-    const candidate = candidateById.get(edge.id);
-    if (!candidate) return false;
-    return scoreNodeClearanceRisk(
-      getDisplayComputedPath(candidate),
-      nodes,
-      candidate,
-      COMMERCIAL_BUSINESS_NODE_CLEARANCE,
-    ) <= scoreNodeClearanceRisk(
-      getDisplayComputedPath(edge),
-      nodes,
-      edge,
-      COMMERCIAL_BUSINESS_NODE_CLEARANCE,
-    ) + 0.5;
-  });
-};
-
-const finalDisplayRenderContractIsLocked = (
-  sourceEdges: DisplayEdgesWorkerRequest['edges'],
-  lockedEdges: DisplayEdgesWorkerRequest['edges'],
-): boolean => sourceEdges.length === lockedEdges.length
-  && lockedEdges.every((edge, index) => edge === sourceEdges[index]);
 
 const finalizeContainerClearanceResponse = (
   response: DisplayEdgesWorkerResponse,
@@ -148,16 +121,32 @@ const finalizeContainerClearanceResponse = (
       maxQualityEvaluations: options.isLargeGraph ? 16 : 32,
     },
   );
-  clearanceTimer.finish(clearanceEdges === response.edges ? 'skip' : 'accepted');
+  const requiresMinimumClearanceClosure = response.routeResolution === 'validated-candidate'
+    || response.routeResolution === 'repaired-candidate'
+    || response.routeResolution === 'repair';
+  const requiresLateMinimumClearanceClosure = requiresMinimumClearanceClosure
+    || response.routeResolution === 'full-route'
+    || response.routeResolution === 'full-route-repaired';
+  const businessClearanceEdges = requiresMinimumClearanceClosure
+    ? repairMinimumBusinessNodeClearance(
+      clearanceEdges,
+      repairNodes,
+      options.eligibleEdgeIds,
+    )
+    : clearanceEdges;
+  clearanceTimer.finish(
+    businessClearanceEdges === response.edges ? 'skip' : 'accepted',
+    businessClearanceEdges === response.edges ? 0 : businessClearanceEdges.length,
+  );
   const hardSafetyTimer = startDisplayRoutingPhaseTrace({
     phase: 'final-hard-safety',
     candidateCount: clearanceEdges.length,
     onTrace: options.onPhaseTrace,
   });
-  const safeClearanceEdges = fastDisplayHardSafetyIsClean(clearanceEdges, repairNodes)
-    ? clearanceEdges
-    : repairFastDisplayHardSafety(clearanceEdges, repairNodes);
-  hardSafetyTimer.finish(safeClearanceEdges === clearanceEdges ? 'skip' : 'accepted');
+  const safeClearanceEdges = fastDisplayHardSafetyIsClean(businessClearanceEdges, repairNodes)
+    ? businessClearanceEdges
+    : repairFastDisplayHardSafety(businessClearanceEdges, repairNodes);
+  hardSafetyTimer.finish(safeClearanceEdges === businessClearanceEdges ? 'skip' : 'accepted');
   if (response.routeResolution === 'validated-candidate') {
     // A trusted candidate has already passed both hard and commercial gates.
     // If the boundary/hard-safety closure did not change it, preserve it
@@ -174,7 +163,7 @@ const finalizeContainerClearanceResponse = (
         safeClearanceEdges === response.edges
         || doBaseReactFlowDisplayRoutesMatchExactly(response.edges, safeClearanceEdges)
       )
-    ) return response;
+    ) return withExactDisplayHardReport(response, repairNodes);
   }
   const endpointOrderedCandidate = repairBaseReactFlowFinalEndpointOrder(
     safeClearanceEdges,
@@ -265,10 +254,6 @@ const finalizeContainerClearanceResponse = (
       // can become a reusable precompiled candidate. Cache hits and
       // incremental/repair responses already passed their own bounded quality
       // work, so keep their latency-sensitive fast path.
-      // The middle stabilization pass is allowed to settle endpoint order,
-      // but the terminal pass must re-apply bounded commercial shortening:
-      // otherwise that middle pass can restore an older, longer corridor and
-      // there is no later polish stage to remove it again.
       skipLoopShortcut: (options.commercialStabilizationPass ?? 0) === 1
         || !(
           response.routeResolution === 'full-route'
@@ -292,8 +277,28 @@ const finalizeContainerClearanceResponse = (
   // contract once more on the exact route that will be rendered, while using
   // that route as the true-trunk baseline so legitimate shared stems remain
   // atomic. Nothing may rewrite geometry after this point except path locking.
+  const lateMinimumClearanceCandidate = requiresLateMinimumClearanceClosure
+    ? repairMinimumBusinessNodeClearance(
+      commercialEdges,
+      repairNodes,
+      options.eligibleEdgeIds,
+    )
+    : commercialEdges;
+  const lateMinimumClearanceEdges = baseReactFlowDisplayHardQualityIsClean(
+    lateMinimumClearanceCandidate,
+    repairNodes,
+  )
+    ? lateMinimumClearanceCandidate
+    : commercialEdges;
+  if (lateMinimumClearanceEdges !== commercialEdges) {
+    startDisplayRoutingPhaseTrace({
+      phase: 'final-clearance',
+      candidateCount: commercialEdges.length,
+      onTrace: options.onPhaseTrace,
+    }).finish('accepted', lateMinimumClearanceEdges.length);
+  }
   const finalCommercialSafetyClosedEdges = repairBaseReactFlowFinalSafetyClosure(
-    commercialEdges,
+    lateMinimumClearanceEdges,
     repairNodes,
     { eligibleEdgeIds: options.eligibleEdgeIds },
   );
@@ -348,10 +353,6 @@ const finalizeContainerClearanceResponse = (
     const stabilizedResponse = finalizeContainerClearanceResponse(finalizedResponse, nodes, {
       ...options,
       commercialStabilizationPass: (options.commercialStabilizationPass ?? 0) + 1,
-      // Stabilization must start from the last accepted route. Reusing the
-      // original preferred geometry here can restore a longer pre-polish
-      // corridor on pass two even though the commercial transaction kept the
-      // exact endpoint roles and legal true-trunk membership intact.
       preferredEdges: finalizedResponse.edges,
     });
     const stabilizedEdges = stabilizedResponse.edges;
@@ -363,9 +364,9 @@ const finalizeContainerClearanceResponse = (
         Array.from(stabilizedEdges.keys()),
       )
       ? stabilizedResponse
-      : finalizedResponse;
+      : withExactDisplayHardReport(finalizedResponse, repairNodes);
   }
-  return finalizedResponse;
+  return withExactDisplayHardReport(finalizedResponse, repairNodes);
 };
 
 export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
@@ -398,7 +399,22 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
       routeResolution: 'repair',
       phaseTrace,
     };
-    if (request.repairMode === 'bounded') return repairResponse;
+    if (request.repairMode === 'bounded') {
+      const repairNodes = withDisplayAbsolutePositions(
+        request.nodes,
+        new Map(request.nodes.map(node => [node.id, node] as const)),
+      );
+      const clearanceEdges = repairMinimumBusinessNodeClearance(
+        repaired.edges,
+        repairNodes,
+        undefined,
+        false,
+      );
+      const safeEdges = baseReactFlowDisplayHardQualityIsClean(clearanceEdges, repairNodes)
+        ? clearanceEdges
+        : repaired.edges;
+      return withExactDisplayHardReport({ ...repairResponse, edges: safeEdges }, repairNodes);
+    }
     return finalizeContainerClearanceResponse(repairResponse, request.nodes, {
       isLargeGraph: request.nodes.length > 36 || request.edges.length > 36,
       onPhaseTrace: recordPhaseTrace,
@@ -471,14 +487,55 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
       phaseTrace,
     };
     const lockedCandidateEdges = lockFinalDisplayComputedPaths(candidateEdges, request.nodes);
+    const candidateRepairNodes = withDisplayAbsolutePositions(
+      request.nodes,
+      new Map(request.nodes.map(node => [node.id, node] as const)),
+    );
+    const renderContractIsLocked = finalDisplayRenderContractIsLocked(
+      candidateEdges,
+      lockedCandidateEdges,
+    );
+    const exceedsCommercialPromotionBudget = candidateEdges.length > 80
+      || candidateRepairNodes.length > 120;
+    const persistentBoundaryCandidate = candidateSource === 'persistent'
+      ? repairDisplayContainerBoundaryClearanceRisks(candidateEdges, candidateRepairNodes, {
+        maxEdges: request.isLargeGraph ? 4 : 8,
+        maxQualityEvaluations: request.isLargeGraph ? 16 : 32,
+      })
+      : candidateEdges;
+    const persistentBoundaryIsClean = persistentBoundaryCandidate === candidateEdges
+      || doBaseReactFlowDisplayRoutesMatchExactly(candidateEdges, persistentBoundaryCandidate);
     if (
-      candidateSource === 'precompiled'
-      && precompiledCandidateCommercialClearanceIsClean(candidateEdges, request.nodes)
+      (
+        exceedsCommercialPromotionBudget
+        || displayBusinessNodeCommercialClearanceIsClean(candidateEdges, candidateRepairNodes)
+      )
+      && persistentBoundaryIsClean
       && (
-        finalDisplayRenderContractIsLocked(candidateEdges, lockedCandidateEdges)
+        renderContractIsLocked
         || doBaseReactFlowDisplayRoutesMatchExactly(candidateEdges, lockedCandidateEdges)
       )
-    ) return validatedCandidateResponse;
+    ) {
+      if (candidateSource !== 'precompiled') {
+        for (const phase of ['final-clearance', 'final-hard-safety'] as const) {
+          startDisplayRoutingPhaseTrace({
+            phase,
+            candidateCount: candidateEdges.length,
+            onTrace: recordPhaseTrace,
+          }).finish('skip');
+        }
+      }
+      return withExactDisplayHardReport(
+        candidateSource === 'precompiled' || renderContractIsLocked
+        ? validatedCandidateResponse
+        : {
+          ...validatedCandidateResponse,
+          edges: lockedCandidateEdges,
+          routeResolution: 'repaired-candidate',
+        },
+        candidateRepairNodes,
+      );
+    }
     return finalizeContainerClearanceResponse(validatedCandidateResponse, request.nodes, {
       isLargeGraph: request.isLargeGraph,
       onPhaseTrace: recordPhaseTrace,

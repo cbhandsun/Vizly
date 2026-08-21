@@ -438,7 +438,6 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
     candidateCount: finalQualityEdges.length,
     onTrace: onPhaseTrace,
   });
-
   const finalLocalPolishCandidate = repairLocalDoglegArtifacts(finalQualityEdges, repairNodes);
   const finalDetachedPolishCandidate = separateLargeDetachedParallelOverlapsIfNeeded(
     finalLocalPolishCandidate,

@@ -30,6 +30,7 @@ import {
 } from './baseReactFlowDisplayEvaluation';
 import { finalSameSideTrueTrunksDoNotRegress } from './baseReactFlowDisplayFinalEndpointOrder';
 import {
+  commitDisplayEdgesForRenderMode,
   finalizeDisplayEdgesForRenderMode,
 } from './baseReactFlowDisplayRenderPipeline';
 import { displayHardQualityGatesAreClean } from './baseReactFlowDisplayQualityGates';
@@ -67,6 +68,29 @@ export const runBaseReactFlowFullRoutePostRenderPhase = (
     useBoundedLargeRepair,
     onPhaseTrace,
   } = context;
+  if (qualityReport.hardClean) {
+    const directCommitTimer = startDisplayRoutingPhaseTrace({
+      phase: 'post-render-finalize',
+      candidateCount: finalQualityEdges.length,
+      onTrace: onPhaseTrace,
+    });
+    const committedEdges = commitDisplayEdgesForRenderMode({
+      finalQualityEdges,
+      rawEdges: routeSeedEdges,
+      enableSmartEdges,
+      smartEdgePadding,
+      isLargeGraph,
+      inputSignature,
+      nodes: renderNodes,
+    });
+    directCommitTimer.finish('accepted', committedEdges.length);
+    startDisplayRoutingPhaseTrace({
+      phase: 'post-render-soft-closure',
+      candidateCount: committedEdges.length,
+      onTrace: onPhaseTrace,
+    }).finish('skip');
+    return { kind: 'finalized', edges: committedEdges };
+  }
   const finalizeTimer = startDisplayRoutingPhaseTrace({
     phase: 'post-render-finalize',
     candidateCount: finalQualityEdges.length,
@@ -137,7 +161,14 @@ export const runBaseReactFlowFullRoutePostRenderPhase = (
     ? postFinalizeMicroCandidate
     : finalizedEdges;
   const postFinalizeResidualCleaned = postFinalizeMicroCleaned;
-  const postFinalizeObstacleCleaned = isLargeGraph && qualityBudget.mode === 'fast'
+  const postFinalizeQuality = calculateEdgePathQualityScore(postFinalizeResidualCleaned);
+  // Soft obstacle/visual search is costly and cannot close strict overlap
+  // defects atomically. Let the dedicated bounded overlap/strict phases close
+  // those defects first instead of spending seconds on a candidate that the
+  // hard gate must reject.
+  const mustCloseHardOverlapFirst = hasHardDisplayOverlapRisk(postFinalizeQuality);
+  const postFinalizeObstacleCleaned = (finalizedEdges.length <= 24 && mustCloseHardOverlapFirst)
+    || (isLargeGraph && qualityBudget.mode === 'fast')
     ? postFinalizeResidualCleaned
     : finishDisplaySoftQuality(
       postFinalizeResidualCleaned,

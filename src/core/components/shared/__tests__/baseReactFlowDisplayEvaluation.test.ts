@@ -408,6 +408,52 @@ describe('baseReactFlowDisplayEvaluation', () => {
     expect(strict.quality).toBe(permissive.quality);
   });
 
+  it('reports unrelated business-node clearance below 16px without misclassifying it as a hard error', () => {
+    const nodes: Node[] = [
+      {
+        id: 'source',
+        position: { x: 0, y: 0 },
+        data: {},
+        measured: { width: 20, height: 20 },
+      },
+      {
+        id: 'target',
+        position: { x: 120, y: 0 },
+        data: {},
+        measured: { width: 20, height: 20 },
+      },
+      {
+        id: 'unrelated',
+        position: { x: 50, y: 30 },
+        data: {},
+        measured: { width: 20, height: 20 },
+      },
+    ];
+    const terminalsAreClean = () => ({ terminalsAttached: true, terminalsAnchored: true });
+    const tooClose = [edge([{ x: 20, y: 20 }, { x: 120, y: 20 }])];
+    const atBoundary = [edge([{ x: 20, y: 14 }, { x: 120, y: 14 }])];
+
+    const rejected = getDisplayHardQualityGateReport(
+      tooClose,
+      nodes,
+      'polished',
+      terminalsAreClean,
+    );
+    const accepted = getDisplayHardQualityGateReport(
+      atBoundary,
+      nodes,
+      'polished',
+      terminalsAreClean,
+    );
+
+    expect(rejected.obstacleHits).toBe(0);
+    expect(rejected.minimumClearanceViolations).toBe(1);
+    expect(rejected.minimumClearanceViolationEdgeIds).toEqual(['edge']);
+    expect(rejected.hardClean).toBe(true);
+    expect(accepted.minimumClearanceViolations).toBe(0);
+    expect(accepted.hardClean).toBe(true);
+  });
+
   it('invalidates a same-array hard report when shared-trunk intent mutates', () => {
     const sharedOverlap: Edge[] = [
       {
