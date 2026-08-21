@@ -75,6 +75,7 @@ import type { FlowDataBridgeEntry } from '../../utils/flowDataBridge';
 import { loadMindElixirData, saveMindElixirData } from './mindElixirPersistence';
 import { scheduleMindMapInitialViewport } from './mindmapInitialViewport';
 import { setActiveMindMapSelection } from './mindMapSelectionStore';
+import { bindMindMapHyperlinkAccessibility } from './mindMapHyperlinkAccessibility';
 
 function isMindMapTextEditingTarget(target: EventTarget | null): boolean {
     if (!(target instanceof HTMLElement)) return false;
@@ -148,6 +149,11 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
         });
 
         mind.init(initialData);
+        const unbindHyperlinkAccessibility = bindMindMapHyperlinkAccessibility(
+            containerRef.current,
+            topic => i18n.t('plugins.mindmap.contextMenu.openLinkInNewTab', { topic }),
+            i18n.t('plugins.mindmap.contextMenu.untitledNode'),
+        );
         const stopHistoryAvailabilityTracking = trackMindMapHistoryAvailability(mind);
         const cancelInitialViewportFit = scheduleMindMapInitialViewport({
             measure: () => ({
@@ -376,6 +382,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
 
         return () => {
             cancelInitialViewportFit();
+            unbindHyperlinkAccessibility();
             mq.removeEventListener('change', handleColorScheme);
             unbindOperationEffects();
             mind.container.removeEventListener('paste', handleSafeMindElixirPaste, true);

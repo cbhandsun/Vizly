@@ -2698,6 +2698,8 @@
                 "shape": "节点形状",
                 "shapeOptions": "节点形状选项",
                 "openLink": "打开超链接",
+                "openLinkInNewTab": "在新标签页打开“{{topic}}”的链接",
+                "untitledNode": "未命名节点",
                 "shapes": {
                     "default": "默认",
                     "oval": "椭圆",

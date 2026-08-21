@@ -2545,6 +2545,8 @@
                 "shape": "Node shape",
                 "shapeOptions": "Node shape options",
                 "openLink": "Open link",
+                "openLinkInNewTab": "Open the link for {{topic}} in a new tab",
+                "untitledNode": "Untitled node",
                 "shapes": {
                     "default": "Default",
                     "oval": "Oval",
