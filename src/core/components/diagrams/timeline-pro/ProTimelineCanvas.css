@@ -94,6 +94,12 @@
     }
 }
 
+@media (min-width: 769px) and (max-width: 1200px) {
+    .pro-timeline-chrome--analysis {
+        bottom: 116px !important;
+    }
+}
+
 .pro-timeline-task-row button {
     appearance: none;
     border: 0;

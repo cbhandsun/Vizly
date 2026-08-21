@@ -15,6 +15,7 @@ type ProTimelineChromeProps = {
   showResourceDrawer: boolean;
   onOpenResourceDrawer: () => void;
   showCriticalPath: boolean;
+  criticalPathUnavailableReason?: string;
   onToggleCriticalPath: () => void;
   showBaseline: boolean;
   hasBaseline: boolean;
@@ -35,6 +36,7 @@ export const ProTimelineChrome: React.FC<ProTimelineChromeProps> = ({
   showResourceDrawer,
   onOpenResourceDrawer,
   showCriticalPath,
+  criticalPathUnavailableReason,
   onToggleCriticalPath,
   showBaseline,
   hasBaseline,
@@ -75,7 +77,17 @@ export const ProTimelineChrome: React.FC<ProTimelineChromeProps> = ({
       <div style={{ width: 1, height: 16, backgroundColor: borderColor }} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
         <span style={{ color: secondaryTextColor, fontWeight: 500 }}>关键路径</span>
-        <Switch aria-label="显示关键路径" size="small" checked={showCriticalPath} onChange={onToggleCriticalPath} />
+        <Tooltip title={criticalPathUnavailableReason ?? '显示或隐藏关键路径'}>
+          <span>
+            <Switch
+              aria-label="显示关键路径"
+              size="small"
+              checked={!criticalPathUnavailableReason && showCriticalPath}
+              disabled={Boolean(criticalPathUnavailableReason)}
+              onChange={onToggleCriticalPath}
+            />
+          </span>
+        </Tooltip>
       </div>
       <div style={{ width: 1, height: 16, backgroundColor: borderColor }} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>

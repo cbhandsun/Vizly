@@ -113,6 +113,7 @@ const renderTimelineChrome = (
         showResourceDrawer={false}
         onOpenResourceDrawer={vi.fn()}
         showCriticalPath={false}
+        criticalPathUnavailableReason={undefined}
         onToggleCriticalPath={vi.fn()}
         showBaseline={false}
         hasBaseline={false}
@@ -155,6 +156,22 @@ describe('ProTimelineChrome baseline availability', () => {
         expect(onToggleBaseline).toHaveBeenCalledTimes(1);
         expect(onClearBaseline).toHaveBeenCalledTimes(1);
         expect(document.activeElement).toBe(screen.getByRole('button', { name: '保存当前排期为基线' }));
+    });
+});
+
+describe('ProTimelineChrome critical path availability', () => {
+    it('disables an unavailable analysis instead of accepting an action with no result', () => {
+        const onToggleCriticalPath = vi.fn();
+        renderTimelineChrome({
+            criticalPathUnavailableReason: '请先添加至少一个排期任务',
+            onToggleCriticalPath,
+        });
+
+        const criticalPath = screen.getByRole('switch', { name: '显示关键路径' });
+        expect(criticalPath).toHaveProperty('disabled', true);
+
+        fireEvent.click(criticalPath);
+        expect(onToggleCriticalPath).not.toHaveBeenCalled();
     });
 });
 

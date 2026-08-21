@@ -31,6 +31,7 @@ import {
   clearProTimelineBaselineSnapshot,
   createProTimelineBaselineSnapshot,
 } from './proTimelineBaselineTransaction';
+import { getProTimelineCriticalPathUnavailableReason } from './proTimelineCriticalPathAvailability';
 import './ProTimelineCanvas.css';
 
 const ROW_HEIGHT = 42;
@@ -139,6 +140,12 @@ export default function ProTimelineCanvas() {
   const criticalPathTaskIds = useMemo(() => {
       return showCriticalPath ? cpmResult.criticalPathTaskIds : new Set<string>();
   }, [cpmResult, showCriticalPath]);
+
+  const criticalPathUnavailableReason = getProTimelineCriticalPathUnavailableReason({
+    taskCount: tasks.length,
+    criticalTaskCount: cpmResult.criticalPathTaskIds.size,
+    cyclicTaskCount: cpmResult.cyclicTaskIds.size,
+  });
 
   const cyclicTaskIds = useMemo(() => {
       return cpmResult.cyclicTaskIds;
@@ -673,6 +680,7 @@ export default function ProTimelineCanvas() {
             showResourceDrawer={showResourceDrawer}
             onOpenResourceDrawer={() => setShowResourceDrawer(true)}
             showCriticalPath={showCriticalPath}
+            criticalPathUnavailableReason={criticalPathUnavailableReason}
             onToggleCriticalPath={toggleCriticalPath}
             showBaseline={showBaseline}
             hasBaseline={hasBaseline}
