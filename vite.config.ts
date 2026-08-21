@@ -7,6 +7,7 @@ import { realpathSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { jspdfRasterOnlyPlugin } from './vite-plugins/jspdfRasterOnly'
 import { sharedModuleWorkersPlugin } from './vite-plugins/sharedModuleWorkers'
+import { devCspPlugin } from './vite-plugins/devCsp'
 import {
   matchesAppSafeLoggingModule,
   matchesFlowchartRuntimeModule,
@@ -315,6 +316,7 @@ const getManualChunkName = (id: string) => {
 export default defineConfig({
   root: projectRoot,
   plugins: [
+    devCspPlugin(),
     jspdfRasterOnlyPlugin(),
     sharedModuleWorkersPlugin(projectRoot),
     displayRoutingChunks.plugin,
