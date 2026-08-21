@@ -95,4 +95,31 @@ describe('useBaseReactFlowFitController', () => {
     );
     hook.unmount();
   });
+
+  it('preserves the user viewport when unpinned nodes are deleted or restored', () => {
+    const instance = createInstance();
+    const childNode = { ...node, id: 'child-node' };
+    const { rerender, unmount } = renderHook(
+      ({ renderNodes }) => useBaseReactFlowFitController({
+        ...createParams(instance),
+        renderNodes,
+        visibleNodeCount: renderNodes.length,
+        pinFit: false,
+      }),
+      { initialProps: { renderNodes: [node, childNode] } },
+    );
+
+    act(() => vi.advanceTimersByTime(200));
+    expect(instance.fitView).toHaveBeenCalledTimes(1);
+
+    rerender({ renderNodes: [node] });
+    act(() => vi.advanceTimersByTime(500));
+    expect(instance.fitView).toHaveBeenCalledTimes(1);
+
+    rerender({ renderNodes: [node, childNode] });
+    act(() => vi.advanceTimersByTime(500));
+
+    expect(instance.fitView).toHaveBeenCalledTimes(1);
+    unmount();
+  });
 });

@@ -63,7 +63,8 @@ export const useBaseReactFlowFitController = ({
     const previousSignature = previousNodeSignatureRef.current;
     let resetTimer: ReturnType<typeof setTimeout> | null = null;
 
-    if (shouldResetBaseReactFlowInitialization({
+    const shouldPreserveUserViewport = !pinFit && hasInitialized;
+    if (!shouldPreserveUserViewport && shouldResetBaseReactFlowInitialization({
       currentSignature,
       previousSignature,
       nodeCount: visibleNodeCount,
@@ -82,7 +83,7 @@ export const useBaseReactFlowFitController = ({
     return () => {
       if (resetTimer) clearTimeout(resetTimer);
     };
-  }, [renderNodes, visibleNodeCount]);
+  }, [hasInitialized, pinFit, renderNodes, visibleNodeCount]);
 
   const performFitWidthTop = useCallback((force?: boolean): boolean => {
     if (!rfInstance || containerSize.width <= 0 || containerSize.height <= 0) return false;
