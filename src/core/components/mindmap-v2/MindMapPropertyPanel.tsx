@@ -2,7 +2,7 @@
  * MindMapPropertyPanel.tsx — 节点属性面板 v3
  * 新增：Icons/Markers、Tags 彩色标签、BranchColor 连线颜色
  */
-import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useId, useState } from 'react';
 import {
     Input, InputNumber, Divider, Typography, Space, Button, Tooltip, Tag, Select,
 } from 'antd';
@@ -15,16 +15,8 @@ import { useTranslation } from 'react-i18next';
 import type { NodeObj, TagObj } from 'mind-elixir';
 import { getMindElixirInstance, subscribeMindElixir } from './mindElixirStore';
 import {
-    getTaskMeta,
     type MindMapTaskMeta,
-    type TaskPriority,
-    type TaskStatus,
 } from './mindmapTaskModel';
-import {
-    applyMindMapPropertyTaskDraftPatch,
-    createMindMapPropertyTaskDraft,
-    syncMindMapPropertyTaskDraftTags,
-} from './mindMapPropertyTaskDraft';
 import { toSafeImageUrl } from '../../utils/sanitizeHtml';
 import {
     cleanMindMapColor,
@@ -62,6 +54,7 @@ import { MindMapPropertyNoteField } from './MindMapPropertyNoteField';
 import { useMindMapNodeDeletion } from './useMindMapNodeDeletion';
 import { useMindMapPropertyAI } from './useMindMapPropertyAI';
 import { useRecoverableMindMapPropertyChoice } from './useRecoverableMindMapPropertyChoice';
+import { useRecoverableMindMapPropertyTaskTransaction } from './useRecoverableMindMapPropertyTaskTransaction';
 import styles from './MindMapPropertyPanel.module.css';
 
 const { Text } = Typography;
@@ -104,17 +97,7 @@ const NodePropertyPanel: React.FC<{
     const [fontSize, setFontSize] = useState(() => parseFontSize(node));
     const [imageUrl, setImageUrl] = useState(node.image?.url ?? '');
     const [icons, setIcons] = useState<string[]>(cleanMindMapIcons(node.icons) ?? []);
-    const [tags, setTags] = useState<TagObj[]>(() => {
-        return cleanMindMapTagObjects(node.tags) ?? [];
-    });
     const [tagInput, setTagInput] = useState('');
-    const initialTask = getTaskMeta(node);
-    const [taskStatus, setTaskStatus] = useState<TaskStatus>(initialTask.status);
-    const [taskPriority, setTaskPriority] = useState<TaskPriority>(initialTask.priority);
-    const [taskDueDate, setTaskDueDate] = useState(initialTask.dueDate ?? '');
-    const [taskAssignee, setTaskAssignee] = useState(initialTask.assignee ?? '');
-    const [taskProgress, setTaskProgress] = useState(initialTask.progress ?? 0);
-    const taskDraftRef = useRef(createMindMapPropertyTaskDraft(node));
 
     const [syncedNodeId, setSyncedNodeId] = useState(node.id);
     if (syncedNodeId !== node.id) {
@@ -123,13 +106,6 @@ const NodePropertyPanel: React.FC<{
         setFontSize(parseFontSize(node));
         setImageUrl(node.image?.url ?? '');
         setIcons(cleanMindMapIcons(node.icons) ?? []);
-        setTags(cleanMindMapTagObjects(node.tags) ?? []);
-        const task = getTaskMeta(node);
-        setTaskStatus(task.status);
-        setTaskPriority(task.priority);
-        setTaskDueDate(task.dueDate ?? '');
-        setTaskAssignee(task.assignee ?? '');
-        setTaskProgress(task.progress ?? 0);
     }
 
     const reshapeWithResult = useCallback(async (patch: MindMapNodePatch): Promise<boolean> => {
@@ -184,11 +160,31 @@ const NodePropertyPanel: React.FC<{
         onCommit: branchColor => reshapeWithResult({ branchColor: branchColor || undefined }),
         sourceKey: node.id,
     });
+    const taskTransaction = useRecoverableMindMapPropertyTaskTransaction({
+        failureMessage: t(propertyKey('taskSaveFailed')),
+        node,
+        onCommit: mutation => reshapeWithResult(mutation),
+    });
+    const tags = taskTransaction.tags;
+    const taskMeta = taskTransaction.meta;
+    const updateTags = taskTransaction.updateTags;
+    const updateTask = taskTransaction.updateTask;
+    const currentTaskAssignee = taskMeta.assignee ?? '';
+    const [taskAssigneeEdit, setTaskAssigneeEdit] = useState(() => ({
+        sourceValue: currentTaskAssignee,
+        value: currentTaskAssignee,
+    }));
+    const taskAssignee = taskAssigneeEdit.sourceValue === currentTaskAssignee
+        ? taskAssigneeEdit.value
+        : currentTaskAssignee;
+    const visibleTagInput = tags.some(tag => tag.text === tagInput.trim()) ? '' : tagInput;
     const shapeErrorId = useId();
     const branchWidthErrorId = useId();
     const textColorErrorId = useId();
     const backgroundColorErrorId = useId();
     const branchColorErrorId = useId();
+    const taskStatusId = useId();
+    const taskErrorId = useId();
 
     const applyImageUrl = useCallback((url: string) => {
         const safeUrl = toSafeImageUrl(url);
@@ -224,47 +220,24 @@ const NodePropertyPanel: React.FC<{
     const handleTagAdd = useCallback((tagObj: TagObj) => {
         if (tags.some(t => t.text === tagObj.text)) return;
         const next = cleanMindMapTagObjects([...tags, tagObj]) ?? [];
-        setTags(next);
-        const currentTaskDraft = taskDraftRef.current.id === node.id
-            ? taskDraftRef.current
-            : createMindMapPropertyTaskDraft(node);
-        taskDraftRef.current = syncMindMapPropertyTaskDraftTags(currentTaskDraft, next);
-        reshape({ tags: next });
-    }, [node, tags, reshape]);
+        updateTags(next);
+    }, [tags, updateTags]);
 
     const handleTagRemove = useCallback((text: string) => {
         const next = cleanMindMapTagObjects(tags.filter(t => t.text !== text)) ?? [];
-        setTags(next);
-        const currentTaskDraft = taskDraftRef.current.id === node.id
-            ? taskDraftRef.current
-            : createMindMapPropertyTaskDraft(node);
-        taskDraftRef.current = syncMindMapPropertyTaskDraftTags(currentTaskDraft, next);
-        reshape({ tags: next });
-    }, [node, tags, reshape]);
+        updateTags(next);
+    }, [tags, updateTags]);
 
     const handleTagInputConfirm = () => {
         const t = tagInput.trim();
         if (!t) return;
         handleTagAdd({ text: t, style: { background: '#f1f5f9', color: '#475569', borderColor: '#cbd5e1' } });
-        setTagInput('');
     };
 
-    const updateTask = (patch: Partial<MindMapTaskMeta>) => {
-        const currentTaskDraft = taskDraftRef.current.id === node.id
-            ? taskDraftRef.current
-            : createMindMapPropertyTaskDraft(node);
-        const { draft, meta: next, mutation } = applyMindMapPropertyTaskDraftPatch(
-            currentTaskDraft,
-            patch,
-        );
-        taskDraftRef.current = draft;
-        setTaskStatus(next.status ?? 'todo');
-        setTaskPriority(next.priority ?? '无');
-        setTaskDueDate(next.dueDate ?? '');
-        setTaskAssignee(next.assignee ?? '');
-        setTaskProgress(next.progress ?? 0);
-        setTags(cleanMindMapTagObjects(mutation.tags) ?? []);
-        reshape(mutation);
+    const commitTaskAssignee = () => {
+        const nextAssignee = taskAssignee.trim();
+        setTaskAssigneeEdit({ sourceValue: nextAssignee, value: nextAssignee });
+        updateTask({ assignee: nextAssignee });
     };
 
     const isRoot = !node.parent;
@@ -365,6 +338,14 @@ const NodePropertyPanel: React.FC<{
                 onImageUrlInput={setImageUrl}
             />
 
+            <div
+                aria-busy={taskTransaction.pending}
+                aria-describedby={taskTransaction.error
+                    ? taskErrorId
+                    : taskTransaction.pending ? taskStatusId : undefined}
+                aria-label={t(propertyKey('taskProperties'))}
+                role="group"
+            >
             {/* Tags */}
             <Row label={t(propertyKey('tags'))}>
                 <div className={styles.tagList}>
@@ -392,7 +373,7 @@ const NodePropertyPanel: React.FC<{
                 <Input size="small" placeholder={t(propertyKey('customTagPlaceholder'))}
                     aria-label={t(propertyKey('customTagInput'))}
                     prefix={<TagsOutlined className={styles.mutedIcon} />}
-                    value={tagInput} onChange={e => setTagInput(e.target.value)}
+                    value={visibleTagInput} onChange={e => setTagInput(e.target.value)}
                     onPressEnter={handleTagInputConfirm}
                     onBlur={handleTagInputConfirm} />
             </Row>
@@ -403,7 +384,7 @@ const NodePropertyPanel: React.FC<{
                 <Select
                     aria-label={t(propertyKey('taskStatus'))}
                     size="small"
-                    value={taskStatus}
+                    value={taskMeta.status}
                     options={panelOptions.taskStatuses}
                     onChange={value => updateTask({ status: value })}
                     className={styles.fullWidth}
@@ -414,7 +395,7 @@ const NodePropertyPanel: React.FC<{
                 <Select
                     aria-label={t(propertyKey('taskPriority'))}
                     size="small"
-                    value={taskPriority}
+                    value={taskMeta.priority}
                     options={panelOptions.taskPriorities}
                     onChange={value => updateTask({ priority: value })}
                     className={styles.fullWidth}
@@ -427,9 +408,12 @@ const NodePropertyPanel: React.FC<{
                     size="small"
                     value={taskAssignee}
                     placeholder={t(propertyKey('taskAssigneePlaceholder'))}
-                    onChange={e => setTaskAssignee(e.target.value)}
-                    onBlur={() => updateTask({ assignee: taskAssignee.trim() })}
-                    onPressEnter={() => updateTask({ assignee: taskAssignee.trim() })}
+                    onChange={e => setTaskAssigneeEdit({
+                        sourceValue: currentTaskAssignee,
+                        value: e.target.value,
+                    })}
+                    onBlur={commitTaskAssignee}
+                    onPressEnter={commitTaskAssignee}
                 />
             </Row>
 
@@ -438,11 +422,8 @@ const NodePropertyPanel: React.FC<{
                     aria-label={t(propertyKey('dueDate'))}
                     size="small"
                     type="date"
-                    value={taskDueDate}
-                    onChange={e => {
-                        setTaskDueDate(e.target.value);
-                        updateTask({ dueDate: e.target.value });
-                    }}
+                    value={taskMeta.dueDate ?? ''}
+                    onChange={e => updateTask({ dueDate: e.target.value })}
                 />
             </Row>
 
@@ -451,12 +432,22 @@ const NodePropertyPanel: React.FC<{
                     aria-label={t(propertyKey('taskProgress'))}
                     min={0}
                     max={100}
-                    value={taskProgress}
+                    value={taskMeta.progress ?? 0}
                     suffix="%"
                     className={styles.fullWidth}
                     onChange={value => updateTask({ progress: value ?? 0 })}
                 />
             </Row>
+
+            <div className={styles.transactionFeedback}>
+                {taskTransaction.pending
+                    ? <div id={taskStatusId} className={styles.transactionStatus} role="status" aria-live="polite">{t(propertyKey('taskSaving'))}</div>
+                    : null}
+                {taskTransaction.error
+                    ? <div id={taskErrorId} className={styles.choiceError} role="alert">{taskTransaction.error}</div>
+                    : null}
+            </div>
+            </div>
 
             <Divider className={styles.divider} />
 

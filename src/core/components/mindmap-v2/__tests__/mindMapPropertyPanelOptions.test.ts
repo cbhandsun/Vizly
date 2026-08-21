@@ -123,6 +123,15 @@ describe('mind map property panel localization', () => {
         expect(propertyPanelSource).toContain("failureMessage: t(propertyKey('textColorSaveFailed'))");
         expect(propertyPanelSource).toContain("failureMessage: t(propertyKey('backgroundColorSaveFailed'))");
         expect(propertyPanelSource).toContain("failureMessage: t(propertyKey('branchColorSaveFailed'))");
+        expect(propertyPanelSource).toContain('useRecoverableMindMapPropertyTaskTransaction({');
+        expect(propertyPanelSource).toContain("failureMessage: t(propertyKey('taskSaveFailed'))");
+        expect(propertyPanelSource).toContain('aria-busy={taskTransaction.pending}');
+        expect(propertyPanelSource).toContain('role="status" aria-live="polite"');
+        expect(propertyPanelSource).toContain('className={styles.choiceError} role="alert"');
+        expect(propertyPanelSource).toContain('setTaskAssigneeEdit({ sourceValue: nextAssignee, value: nextAssignee })');
+        expect(propertyPanelSource).toContain('onBlur={commitTaskAssignee}');
+        expect(propertyPanelSource).not.toContain('taskDraftRef');
+        expect(propertyPanelSource).not.toContain('reshape(mutation)');
         expect(propertyPanelSource).toContain('value={textColorChoice.value}');
         expect(propertyPanelSource).toContain('value={backgroundColorChoice.value}');
         expect(propertyPanelSource).toContain('value={branchColorChoice.value}');
