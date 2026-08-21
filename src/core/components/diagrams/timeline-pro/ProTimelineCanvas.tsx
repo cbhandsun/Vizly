@@ -27,6 +27,10 @@ import {
 } from './proTimelineViewportInteraction';
 import { useProTimelineViewportInteractions } from './useProTimelineViewportInteractions';
 import { hasProTimelineBaseline } from './proTimelineBaselineAvailability';
+import {
+  clearProTimelineBaselineSnapshot,
+  createProTimelineBaselineSnapshot,
+} from './proTimelineBaselineTransaction';
 import './ProTimelineCanvas.css';
 
 const ROW_HEIGHT = 42;
@@ -84,36 +88,31 @@ export default function ProTimelineCanvas() {
   } = useProTimelineDependencyActions();
 
   const handleSaveBaseline = useCallback(() => {
-      let count = 0;
-      setNodes(ns => ns.map(n => {
-          count++;
-          return {
-              ...n,
-              data: {
-                  ...n.data,
-                  baselineStartDate: n.data.date,
-                  baselineEndDate: n.data.endDate || n.data.date
-              }
-          };
-      }));
-      if (count > 0) {
-          appMessage.success('已成功锁定当前项目排期为基线快照');
+      const transaction = createProTimelineBaselineSnapshot(nodes);
+      if (transaction.eligibleCount === 0) {
+          appMessage.info('当前没有可保存为基线的排期任务');
+          return;
       }
-  }, [setNodes]);
+      if (!transaction.changed) {
+          appMessage.info('当前排期已与保存的基线一致');
+          return;
+      }
+
+      requestProTimelineSnapshot();
+      setNodes(transaction.nodes);
+      appMessage.success('已保存当前排期为基线，可使用撤销恢复。');
+  }, [nodes, setNodes]);
 
   const handleClearBaseline = useCallback(() => {
       if (!hasBaseline) return;
-      setNodes(ns => ns.map(n => ({
-          ...n,
-          data: {
-              ...n.data,
-              baselineStartDate: undefined,
-              baselineEndDate: undefined
-          }
-      })));
+      const transaction = clearProTimelineBaselineSnapshot(nodes);
+      if (!transaction.changed) return;
+
+      requestProTimelineSnapshot();
+      setNodes(transaction.nodes);
       if (showBaseline) toggleBaseline();
-      appMessage.success('已成功清空当前项目的基线排期');
-  }, [hasBaseline, setNodes, showBaseline, toggleBaseline]);
+      appMessage.success('已清空当前项目的基线排期，可使用撤销恢复。');
+  }, [hasBaseline, nodes, setNodes, showBaseline, toggleBaseline]);
 
     const tasks = useMemo(
         () => projectProTimelineTasks(nodes, edges),

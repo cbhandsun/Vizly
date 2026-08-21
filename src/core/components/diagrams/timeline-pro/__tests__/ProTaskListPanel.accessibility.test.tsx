@@ -154,6 +154,7 @@ describe('ProTimelineChrome baseline availability', () => {
 
         expect(onToggleBaseline).toHaveBeenCalledTimes(1);
         expect(onClearBaseline).toHaveBeenCalledTimes(1);
+        expect(document.activeElement).toBe(screen.getByRole('button', { name: '保存当前排期为基线' }));
     });
 });
 

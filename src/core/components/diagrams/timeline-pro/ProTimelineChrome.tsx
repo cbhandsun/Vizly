@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { CameraOutlined, DeleteOutlined, TeamOutlined, ZoomInOutlined, ZoomOutOutlined } from '@ant-design/icons';
 import { Button, Segmented, Switch, Tooltip } from 'antd';
 
@@ -45,8 +45,15 @@ export const ProTimelineChrome: React.FC<ProTimelineChromeProps> = ({
   onViewModeChange,
   zoomLevel,
   onZoomChange,
-}) => (
-  <>
+}) => {
+  const saveBaselineButtonRef = useRef<HTMLButtonElement | null>(null);
+  const handleClearBaseline = useCallback(() => {
+    onClearBaseline();
+    saveBaselineButtonRef.current?.focus();
+  }, [onClearBaseline]);
+
+  return (
+    <>
     <div className="pro-timeline-chrome pro-timeline-chrome--analysis" style={{
       position: 'absolute', bottom: 24, right: 335,
       background: glassBackground, backdropFilter: 'blur(12px) saturate(180%)',
@@ -87,10 +94,10 @@ export const ProTimelineChrome: React.FC<ProTimelineChromeProps> = ({
       </div>
       <div style={{ width: 1, height: 16, backgroundColor: borderColor }} />
       <Tooltip title="锁定当前排期为基线快照">
-        <Button aria-label="保存当前排期为基线" type="text" size="small" shape="circle" icon={<CameraOutlined />} onClick={onSaveBaseline} style={{ color: secondaryTextColor }} />
+        <Button ref={saveBaselineButtonRef} aria-label="保存当前排期为基线" type="text" size="small" shape="circle" icon={<CameraOutlined />} onClick={onSaveBaseline} style={{ color: secondaryTextColor }} />
       </Tooltip>
       <Tooltip title={hasBaseline ? '清空基线排期' : '当前没有可清空的基线'}>
-        <Button aria-label="清空排期基线" type="text" size="small" shape="circle" icon={<DeleteOutlined />} onClick={onClearBaseline} disabled={!hasBaseline} danger />
+        <Button aria-label="清空排期基线" type="text" size="small" shape="circle" icon={<DeleteOutlined />} onClick={handleClearBaseline} disabled={!hasBaseline} danger />
       </Tooltip>
     </div>
 
@@ -136,8 +143,9 @@ export const ProTimelineChrome: React.FC<ProTimelineChromeProps> = ({
         <Button aria-label="放大时间轴" type="text" size="small" shape="circle" icon={<ZoomInOutlined />} onClick={() => onZoomChange(stepProTimelineZoom(zoomLevel, 0.2))} />
       </Tooltip>
     </div>
-  </>
-);
+    </>
+  );
+};
 
 export const ProTimelineKeyframes: React.FC = () => {
   useEffect(() => {
