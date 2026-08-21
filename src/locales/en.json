@@ -2503,6 +2503,7 @@
         },
         "mindmap": {
             "title": "Mind Map Pro",
+            "newNode": "New node",
             "collapseAll": "Collapse All Branches",
             "expandAll": "Expand All Branches",
             "fitView": "Fit to Viewport",

@@ -1,5 +1,6 @@
 import type { NodeObj, Topic } from 'mind-elixir';
 import { describe, expect, it, vi } from 'vitest';
+import i18n from '@/i18n';
 
 import { addEditableMindMapChild } from '../mindMapNodeCreation';
 
@@ -26,7 +27,10 @@ describe('addEditableMindMapChild', () => {
         const call = addChild.mock.calls[0];
         if (!call) throw new Error('Expected addChild to be called');
         const child = call[1];
-        expect(child).toMatchObject({ topic: '新节点', children: [] });
+        expect(child).toMatchObject({
+            topic: i18n.t('plugins.mindmap.newNode'),
+            children: [],
+        });
         expect(nodeId).toBe(child.id);
         expect(findEle).toHaveBeenCalledWith(child.id);
         expect(selectNode).toHaveBeenCalledWith(createdTopic);

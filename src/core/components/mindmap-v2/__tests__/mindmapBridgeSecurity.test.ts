@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import i18n from '@/i18n';
 import {
     cleanMindMapBridgeNode,
     cleanMindMapBridgeSide,
@@ -14,6 +15,16 @@ type ExtendedNode = NodeObj & {
 };
 
 describe('mindmapBridgeSecurity', () => {
+    let originalLanguage: string;
+
+    beforeAll(() => {
+        originalLanguage = i18n.resolvedLanguage || i18n.language || 'en';
+    });
+
+    afterAll(async () => {
+        await i18n.changeLanguage(originalLanguage);
+    });
+
     it('sanitizes external bridge node creation args', () => {
         const node = cleanMindMapBridgeNode({
             label: 'x'.repeat(MINDMAP_MAX_TOPIC_LENGTH + 20),
@@ -35,13 +46,17 @@ describe('mindmapBridgeSecurity', () => {
         expect(node.side).toBe('right');
     });
 
-    it('coerces empty and invalid bridge payloads to a safe child', () => {
-        expect(cleanMindMapChildNode(null, 'node_null').topic).toBe('新节点');
-        expect(cleanMindMapChildNode('invalid', 'node_string').topic).toBe('新节点');
+    it('coerces empty and invalid bridge payloads to a localized safe child', async () => {
+        await i18n.changeLanguage('en');
+        expect(cleanMindMapChildNode(null, 'node_null').topic).toBe('New node');
+        expect(cleanMindMapChildNode('invalid', 'node_string').topic).toBe('New node');
+
+        await i18n.changeLanguage('zh');
         expect(cleanMindMapChildNode([], 'node_array').topic).toBe('新节点');
     });
 
-    it('creates a safe default child node for UI add-child actions', () => {
+    it('creates a safe default child node for UI add-child actions', async () => {
+        await i18n.changeLanguage('zh');
         const id = createSafeMindMapNodeId();
         const node = cleanMindMapChildNode({}, id);
 

@@ -1,4 +1,5 @@
 import type { NodeObj } from 'mind-elixir';
+import i18n from 'i18next';
 import { cleanAndValidateTree, cleanMindMapTopic } from './mindmapTreeSanitizer';
 
 export interface MindMapBridgeNodeArgs {
@@ -20,9 +21,13 @@ export function createSafeMindMapNodeId(prefix = 'node'): string {
 
 export function cleanMindMapChildNode(args: unknown = {}, id = createSafeMindMapNodeId()): NodeObj {
     const input: MindMapBridgeNodeArgs = isRecord(args) ? args : {};
+    const localizedDefaultTopic = cleanMindMapTopic(
+        i18n.t('plugins.mindmap.newNode'),
+        'New node',
+    );
     const node: NodeObj = {
         id,
-        topic: cleanMindMapTopic(input.label, '新节点'),
+        topic: cleanMindMapTopic(input.label, localizedDefaultTopic),
         children: [],
     };
     const clean = cleanAndValidateTree(node, false) as NodeObj & { side?: 'left' | 'right' };

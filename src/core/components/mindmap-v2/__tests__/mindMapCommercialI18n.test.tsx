@@ -104,6 +104,8 @@ const renderLocalized = async (language: 'en' | 'zh') => {
 
 describe('mind map commercial control translations', () => {
     it('ships localized single-node deletion and contextual action copy', () => {
+        expect(en.plugins.mindmap.newNode).toBe('New node');
+        expect(zh.plugins.mindmap.newNode).toBe('新节点');
         expect(en.plugins.mindmap.nodeDelete.confirm).toBe('Delete node');
         expect(en.plugins.mindmap.nodeDelete.failed).toContain('try again');
         expect(en.plugins.mindmap.actions.contextMenuLabel).toBe('Node actions');
