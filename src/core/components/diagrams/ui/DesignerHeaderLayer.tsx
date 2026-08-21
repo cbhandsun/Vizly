@@ -29,6 +29,7 @@ export interface DesignerHeaderLayerProps {
         onOpenVersionHistory?: () => void;
         onSaveToCloud?: () => Promise<void>;
         onDirectSave?: () => Promise<void>;
+        onSaveAs?: TopActionProps['onSaveAs'];
         isDirectSaveDisabled?: boolean;
         onShare?: () => void;
         rightOffset: number;
@@ -144,6 +145,7 @@ export const DesignerHeaderLayer = React.memo(
                     onOpenVersionHistory={topActions.onOpenVersionHistory}
                     onSaveToCloud={topActions.onSaveToCloud}
                     onDirectSave={topActions.onDirectSave}
+                    onSaveAs={topActions.onSaveAs}
                     isDirectSaveDisabled={topActions.isDirectSaveDisabled}
                     onShare={topActions.onShare}
                     onOpenCollaboration={topActions.onOpenCollaboration}

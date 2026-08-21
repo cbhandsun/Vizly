@@ -10,7 +10,7 @@ import {
 import { CollaborationAvatars } from './ui/CollaborationAvatars';
 import { ApiOutlined, LoadingOutlined } from '@ant-design/icons';
 import type { ReactFlowRenderSnapshot } from '../../rendering/reactFlowScene';
-import type { DiagramExportFormat } from '../../types/diagram-components';
+import type { DiagramExportFormat, DiagramSaveAsTarget } from '../../types/diagram-components';
 import { DOCUMENT_MENU_OVERLAY_CLASS } from './documentMenuKeyboard';
 import { DropdownMenuTriggerButton } from './DropdownMenuTriggerButton';
 import { useKeyboardAccessibleDropdown } from './hooks/useKeyboardAccessibleDropdown';
@@ -35,6 +35,7 @@ interface TopActionButtonsProps {
     onShowDiff?: () => void;
     onSaveToCloud?: () => Promise<void>;
     onDirectSave?: () => Promise<void>;
+    onSaveAs?: (target: DiagramSaveAsTarget) => Promise<void>;
     isDirectSaveDisabled?: boolean;
     extraActionItems?: React.ReactNode;
     onShare?: () => void;
@@ -84,7 +85,7 @@ const MOBILE_TOUCH_TARGET_STYLE: React.CSSProperties = {
 export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
     diagramId, diagramTitle, onEditJson,
     onStartPresentation, onShowDiff,
-    onSaveToCloud, onDirectSave, isDirectSaveDisabled, extraActionItems, onShare, onOpenCollaboration, onShowHistory, onOpenVersionHistory,
+    onSaveToCloud, onDirectSave, onSaveAs, isDirectSaveDisabled, extraActionItems, onShare, onOpenCollaboration, onShowHistory, onOpenVersionHistory,
     rightOffset = 0,
     children,
     extraExportItems,
@@ -216,7 +217,18 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
             disabled: pendingSaveTarget !== null,
             onClick: handleCloudSave,
         }] : []),
-    ], [handleCloudSave, handleDirectSave, isDirectSaveDisabled, onDirectSave, onSaveToCloud, pendingSaveTarget, t]);
+        ...(onSaveAs ? ([
+            ['local', 'designer.toolbar.saveAsLocal', '另存为 — 本地'],
+            ['s3', 'designer.toolbar.saveAsS3', '另存为 — S3'],
+            ['supabase', 'designer.toolbar.saveAsSupabase', '另存为 — Supabase'],
+        ] as const).map(([target, translationKey, fallback]) => ({
+            key: `save-as-${target}`,
+            label: t(translationKey, fallback),
+            icon: <FaFileExport />,
+            disabled: pendingSaveTarget !== null,
+            onClick: () => onSaveAs(target),
+        })) : []),
+    ], [handleCloudSave, handleDirectSave, isDirectSaveDisabled, onDirectSave, onSaveAs, onSaveToCloud, pendingSaveTarget, t]);
 
     const documentMenu: MenuProps['items'] = useMemo(() => {
         const viewItems: NonNullable<MenuProps['items']> = [

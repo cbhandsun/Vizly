@@ -348,7 +348,7 @@ const DiagramViewer: React.FC = () => {
             return next;
         });
     }, [setSearchParams]);
-    const { handleDirectSave } = useDiagramViewerSaveActions({
+    const { handleSaveTo, handleDirectSave } = useDiagramViewerSaveActions({
         selectedDiagramId,
         t,
         onCloudReplicaSaved: handleCloudReplicaSaved,
@@ -663,6 +663,7 @@ const DiagramViewer: React.FC = () => {
             completeCloudSaveAuthentication={completeCloudSaveAuthentication}
             restoreCloudSaveFocus={restoreCloudSaveFocus}
             handleDirectSave={handleDirectSave}
+            handleSaveTo={handleSaveTo}
             isSettingsOpen={isSettingsOpen}
             setIsSettingsOpen={setIsSettingsOpen}
             settingsPanel={settingsPanel}

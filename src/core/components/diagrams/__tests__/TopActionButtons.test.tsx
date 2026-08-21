@@ -179,6 +179,24 @@ describe('TopActionButtons document menu', () => {
         });
     });
 
+    it('offers the missing Save As destinations and forwards the selected target', async () => {
+        const onSaveAs = vi.fn().mockResolvedValue(undefined);
+        render(
+            <TopActionButtons
+                disablePortal
+                onDirectSave={vi.fn().mockResolvedValue(undefined)}
+                onSaveAs={onSaveAs}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: '保存选项' }));
+        expect(await screen.findByRole('menuitem', { name: '另存为 — S3' })).toBeTruthy();
+        expect(screen.getByRole('menuitem', { name: '另存为 — Supabase' })).toBeTruthy();
+        fireEvent.click(screen.getByRole('menuitem', { name: '另存为 — 本地' }));
+
+        await waitFor(() => expect(onSaveAs).toHaveBeenCalledWith('local'));
+    });
+
     it('shows an accessible busy state and blocks duplicate save actions until completion', async () => {
         let releaseCloudSave = () => {};
         const cloudSavePromise = new Promise<void>((resolve) => {

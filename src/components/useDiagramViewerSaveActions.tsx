@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import type { TFunction } from 'i18next';
 import Input from 'antd/es/input';
+import type { DiagramSaveAsTarget } from '@/core/types/diagram-components';
 
 import { addCustomPreset } from '@/core/utils/customPresetStorage';
 import { appMessage, appModal } from '@/core/utils/antdStaticBridge';
@@ -18,8 +19,6 @@ import {
     saveDiagramViewerDirectCloud,
 } from './diagramViewerSave';
 
-type SaveTarget = 's3' | 'supabase' | 'local';
-
 interface UseDiagramViewerSaveActionsOptions {
     selectedDiagramId: string;
     t: TFunction;
@@ -35,8 +34,8 @@ const getStorageProvider = async (providerName: 's3' | 'supabase') => {
     return unifiedStorage.getProvider(providerName);
 };
 
-const getSaveTargetLabel = (target: SaveTarget, t: TFunction): string => {
-    if (target === 'local') return t('common.local');
+const getSaveTargetLabel = (target: DiagramSaveAsTarget, t: TFunction): string => {
+    if (target === 'local') return t('workspace.local');
     return target === 's3' ? 'S3' : 'Supabase';
 };
 
@@ -45,7 +44,7 @@ export function useDiagramViewerSaveActions({
     t,
     onCloudReplicaSaved,
 }: UseDiagramViewerSaveActionsOptions) {
-    const handleSaveTo = useCallback(async (target: SaveTarget) => {
+    const handleSaveTo = useCallback(async (target: DiagramSaveAsTarget) => {
         const bridge = getFlowDataBridge(selectedDiagramId);
         if (!isDiagramViewerBridgeSavable(bridge)) {
             appMessage.error('未找到图表数据，无法保存');

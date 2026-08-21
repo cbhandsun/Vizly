@@ -7,6 +7,7 @@ import { LayoutType } from './layout';
 
 export type DiagramExportFormat = 'pdf' | 'svg';
 export type DiagramSaveResult = void | 'cancelled';
+export type DiagramSaveAsTarget = 'local' | 's3' | 'supabase';
 
 export type DiagramEnsureSavedResult =
   | { status: 'saved'; diagramId: string }
@@ -116,6 +117,8 @@ export interface DiagramComponentProps {
   onCloudSave?: () => Promise<DiagramSaveResult>;
   /** (IoC) 触发直接覆盖保存 */
   onDirectSave?: () => Promise<void>;
+  /** (IoC) 选择目标位置另存为 */
+  onSaveAs?: (target: DiagramSaveAsTarget) => Promise<void>;
   /** (IoC) 当前是否允许直接覆盖保存 */
   isDirectSaveDisabled?: boolean;
 

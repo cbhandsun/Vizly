@@ -36,7 +36,9 @@ vi.mock('../diagramViewerLogging', () => ({
 
 import { useDiagramViewerSaveActions } from '../useDiagramViewerSaveActions';
 
-const t = ((key: string) => key) as unknown as TFunction;
+const t = ((key: string, options?: { target?: string }) => (
+    options?.target ? `${key}:${options.target}` : key
+)) as unknown as TFunction;
 
 describe('useDiagramViewerSaveActions', () => {
     beforeEach(() => {
@@ -66,6 +68,7 @@ describe('useDiagramViewerSaveActions', () => {
 
         await act(async () => result.current.handleSaveTo('local'));
         const config = mocks.confirm.mock.calls[0]?.[0] as {
+            title: string;
             content: ReactNode;
             okText: string;
             cancelText: string;
@@ -76,6 +79,7 @@ describe('useDiagramViewerSaveActions', () => {
             name: 'diagramViewer.saveAs.nameLabel',
         }) as HTMLInputElement;
         expect(input.value).toBe('diagramViewer.saveAs.defaultName');
+        expect(config.title).toBe('diagramViewer.saveAs.title:workspace.local');
         expect(config.okText).toBe('common.confirm');
         expect(config.cancelText).toBe('common.cancel');
     });

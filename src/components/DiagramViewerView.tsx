@@ -93,6 +93,7 @@ interface DiagramViewerViewProps {
     completeCloudSaveAuthentication: () => void;
     restoreCloudSaveFocus: () => void;
     handleDirectSave: () => Promise<void>;
+    handleSaveTo: NonNullable<DiagramComponentProps['onSaveAs']>;
     isSettingsOpen: boolean;
     setIsSettingsOpen: (open: boolean) => void;
     settingsPanel: React.ReactNode;
@@ -165,6 +166,7 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
     completeCloudSaveAuthentication,
     restoreCloudSaveFocus,
     handleDirectSave,
+    handleSaveTo,
     isSettingsOpen,
     setIsSettingsOpen,
     settingsPanel,
@@ -325,6 +327,7 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
                                                 yAwareness={provider?.awareness}
                                                 onCloudSave={saveToCloud}
                                                 onDirectSave={handleDirectSave}
+                                                onSaveAs={handleSaveTo}
                                                 isDirectSaveDisabled={false}
                                                 onOpenShareDialog={openShareDialog}
                                                 onOpenSettings={() => setIsSettingsOpen(true)}
