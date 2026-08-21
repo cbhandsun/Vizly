@@ -3020,6 +3020,8 @@
                 "imageUrlLabel": "Image URL",
                 "imageUrlPlaceholder": "Paste an HTTPS image URL",
                 "uploadImage": "Upload an image",
+                "uploadingImage": "Reading image...",
+                "cancelUpload": "Cancel",
                 "invalidUrl": "Enter a valid HTTP or HTTPS image URL",
                 "emptyFile": "The selected image is empty",
                 "invalidFile": "Choose a PNG, JPEG, GIF, WebP, or AVIF image up to 3 MB",

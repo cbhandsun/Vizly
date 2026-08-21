@@ -3173,6 +3173,8 @@
                 "imageUrlLabel": "图片地址",
                 "imageUrlPlaceholder": "粘贴 HTTPS 图片地址",
                 "uploadImage": "上传图片",
+                "uploadingImage": "正在读取图片...",
+                "cancelUpload": "取消",
                 "invalidUrl": "请输入有效的 HTTP 或 HTTPS 图片地址",
                 "emptyFile": "所选图片为空文件",
                 "invalidFile": "请选择不超过 3 MB 的 PNG、JPEG、GIF、WebP 或 AVIF 图片",

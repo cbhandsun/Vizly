@@ -145,4 +145,32 @@ describe('readMindMapPropertyImageFile', () => {
 
         await expect(readPromise).resolves.toEqual({ ok: false, error: 'read-failed' });
     });
+
+    it('aborts the native reader and ignores late completion when the caller cancels', async () => {
+        const controller = new AbortController();
+        let readerOnLoad = (_event: ProgressEvent<FileReader>) => undefined;
+        const abort = vi.fn();
+        const readPromise = readMindMapPropertyImageFile(
+            imageFile(),
+            () => ({
+                abort,
+                get onload() {
+                    return readerOnLoad;
+                },
+                set onload(value) {
+                    readerOnLoad = event => value?.call({} as FileReader, event);
+                },
+                onerror: null,
+                readAsDataURL: vi.fn(),
+            }),
+            10_000,
+            controller.signal,
+        );
+
+        controller.abort();
+        readerOnLoad({ target: { result: 'data:image/png;base64,AAAA' } } as ProgressEvent<FileReader>);
+
+        expect(abort).toHaveBeenCalledOnce();
+        await expect(readPromise).resolves.toEqual({ ok: false, error: 'aborted' });
+    });
 });

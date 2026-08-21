@@ -101,6 +101,35 @@
     line-height: 1.5;
 }
 
+.uploadStatus {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 6px;
+    color: #475569;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.cancelUpload {
+    border: 0;
+    background: transparent;
+    color: #4338ca;
+    cursor: pointer;
+    font: inherit;
+    font-weight: 600;
+}
+
+.cancelUpload:hover {
+    text-decoration: underline;
+}
+
+.cancelUpload:focus-visible {
+    outline: 2px solid var(--vz-brand-from, #6366f1);
+    outline-offset: 2px;
+}
+
 .preview {
     position: relative;
     margin-top: 8px;

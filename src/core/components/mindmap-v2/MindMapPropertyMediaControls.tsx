@@ -24,7 +24,9 @@ const ICON_GROUPS: Readonly<Record<string, readonly string[]>> = {
     objects: ['📁', '📄', '📊', '📈', '🔗', '🔧', '⚙️', '🔍'],
 } as const;
 
-const imageErrorTranslationKey = (error: MindMapPropertyImageImportError): string => ({
+const imageErrorTranslationKey = (
+    error: Exclude<MindMapPropertyImageImportError, 'aborted'>,
+): string => ({
     'empty-file': 'plugins.mindmap.propertyMedia.emptyFile',
     'invalid-file': 'plugins.mindmap.propertyMedia.invalidFile',
     'read-failed': 'plugins.mindmap.propertyMedia.readFailed',
@@ -50,6 +52,9 @@ export const MindMapPropertyMediaControls: React.FC<MindMapPropertyMediaControls
 }) => {
     const { t } = useTranslation();
     const inputRef = useRef<HTMLInputElement>(null);
+    const uploadButtonRef = useRef<HTMLButtonElement>(null);
+    const iconPickerTriggerRef = useRef<HTMLButtonElement>(null);
+    const activeUploadRef = useRef<AbortController | null>(null);
     const [iconPickerOpen, setIconPickerOpen] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [error, setError] = useState('');
@@ -59,22 +64,52 @@ export const MindMapPropertyMediaControls: React.FC<MindMapPropertyMediaControls
 
     useEffect(() => () => {
         mountedRef.current = false;
+        activeUploadRef.current?.abort();
+        activeUploadRef.current = null;
     }, []);
+
+    const handleIconPickerOpenChange = (open: boolean) => {
+        setIconPickerOpen(open);
+        if (!open) {
+            requestAnimationFrame(() => iconPickerTriggerRef.current?.focus({ preventScroll: true }));
+        }
+    };
 
     const commitImageUrl = () => {
         setError(onImageUrlCommit() ? '' : t('plugins.mindmap.propertyMedia.invalidUrl'));
     };
 
+    const cancelImageUpload = () => {
+        const controller = activeUploadRef.current;
+        activeUploadRef.current = null;
+        controller?.abort();
+        setUploading(false);
+        setError('');
+        requestAnimationFrame(() => uploadButtonRef.current?.focus({ preventScroll: true }));
+    };
+
     const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         event.target.value = '';
-        if (!file || uploading) return;
+        if (!file || activeUploadRef.current) return;
+        const uploadController = new AbortController();
+        activeUploadRef.current = uploadController;
         setUploading(true);
         setError('');
-        const result = await readMindMapPropertyImageFile(file);
+        const result = await readMindMapPropertyImageFile(
+            file,
+            undefined,
+            undefined,
+            uploadController.signal,
+        );
+        if (activeUploadRef.current !== uploadController) return;
+        activeUploadRef.current = null;
         if (!mountedRef.current) return;
         setUploading(false);
         if (!result.ok) {
+            if (result.error === 'aborted') {
+                return;
+            }
             logMindmapPropertyImageUploadRejected(result.error);
             setError(t(imageErrorTranslationKey(result.error)));
             return;
@@ -105,7 +140,7 @@ export const MindMapPropertyMediaControls: React.FC<MindMapPropertyMediaControls
                     trigger="click"
                     placement="left"
                     open={iconPickerOpen}
-                    onOpenChange={setIconPickerOpen}
+                    onOpenChange={handleIconPickerOpenChange}
                     title={t('plugins.mindmap.propertyMedia.iconPickerTitle')}
                     content={(
                         <div id={iconPickerId} className={styles.iconPicker} role="dialog" aria-label={t('plugins.mindmap.propertyMedia.iconPickerTitle')}>
@@ -137,6 +172,7 @@ export const MindMapPropertyMediaControls: React.FC<MindMapPropertyMediaControls
                     )}
                 >
                     <Button
+                        ref={iconPickerTriggerRef}
                         size="small"
                         icon={<SmileOutlined aria-hidden="true" />}
                         className={styles.fullWidthAction}
@@ -152,7 +188,7 @@ export const MindMapPropertyMediaControls: React.FC<MindMapPropertyMediaControls
             </Row>
 
             <Row label={t('plugins.mindmap.propertyMedia.imageLabel')}>
-                <div className={styles.imageControls}>
+                <div className={styles.imageControls} aria-busy={uploading}>
                     <Input
                         prefix={<PictureOutlined aria-hidden="true" />}
                         aria-label={t('plugins.mindmap.propertyMedia.imageUrlLabel')}
@@ -164,11 +200,14 @@ export const MindMapPropertyMediaControls: React.FC<MindMapPropertyMediaControls
                         onPressEnter={commitImageUrl}
                     />
                     <button
+                        ref={uploadButtonRef}
                         type="button"
                         className={styles.uploadButton}
                         onClick={() => inputRef.current?.click()}
                         disabled={uploading}
-                        aria-label={t('plugins.mindmap.propertyMedia.uploadImage')}
+                        aria-label={t(uploading
+                            ? 'plugins.mindmap.propertyMedia.uploadingImage'
+                            : 'plugins.mindmap.propertyMedia.uploadImage')}
                     >
                         <UploadOutlined aria-hidden="true" />
                     </button>
@@ -181,6 +220,19 @@ export const MindMapPropertyMediaControls: React.FC<MindMapPropertyMediaControls
                         onChange={event => { void handleFileChange(event); }}
                     />
                 </div>
+                {uploading && (
+                    <div className={styles.uploadStatus} role="status" aria-live="polite">
+                        <span>{t('plugins.mindmap.propertyMedia.uploadingImage')}</span>
+                        <button
+                            type="button"
+                            className={styles.cancelUpload}
+                            onClick={cancelImageUpload}
+                            aria-label={t('plugins.mindmap.propertyMedia.cancelUpload')}
+                        >
+                            {t('plugins.mindmap.propertyMedia.cancelUpload')}
+                        </button>
+                    </div>
+                )}
                 {error && <div className={styles.error} role="alert">{error}</div>}
                 {safePreviewUrl && (
                     <div className={styles.preview}>

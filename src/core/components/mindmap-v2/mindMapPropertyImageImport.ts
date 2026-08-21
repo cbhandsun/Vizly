@@ -5,6 +5,7 @@ import {
 import { toSafeImageUrl } from '../../utils/sanitizeHtml';
 
 export type MindMapPropertyImageImportError =
+    | 'aborted'
     | 'empty-file'
     | 'invalid-file'
     | 'read-failed'
@@ -15,7 +16,9 @@ export type MindMapPropertyImageImportResult =
     | { ok: false; error: MindMapPropertyImageImportError };
 
 type BrowserDataUrlReader = {
+    abort?: FileReader['abort'];
     readAsDataURL: FileReader['readAsDataURL'];
+    onabort?: FileReader['onabort'];
     onload: FileReader['onload'];
     onerror: FileReader['onerror'];
 };
@@ -24,6 +27,7 @@ export const readMindMapPropertyImageFile = (
     file: File,
     createFileReader: () => BrowserDataUrlReader = () => new FileReader(),
     timeoutMs = 10_000,
+    signal?: AbortSignal,
 ): Promise<MindMapPropertyImageImportResult> => {
     if (file.size === 0) {
         return Promise.resolve({ ok: false, error: 'empty-file' });
@@ -33,6 +37,9 @@ export const readMindMapPropertyImageFile = (
     }
     if (getImageFileImportError(file, IMAGE_DATA_URL_IMPORT_MAX_BYTES)) {
         return Promise.resolve({ ok: false, error: 'invalid-file' });
+    }
+    if (signal?.aborted) {
+        return Promise.resolve({ ok: false, error: 'aborted' });
     }
 
     return new Promise(resolve => {
@@ -48,13 +55,32 @@ export const readMindMapPropertyImageFile = (
             if (settled) return;
             settled = true;
             clearTimeout(timeoutId);
+            signal?.removeEventListener('abort', abortRead);
             resolve(result);
         };
+        const abortRead = () => {
+            try {
+                reader.abort?.();
+            } finally {
+                finish({ ok: false, error: 'aborted' });
+            }
+        };
         const timeoutId = setTimeout(
-            () => finish({ ok: false, error: 'read-failed' }),
+            () => {
+                try {
+                    reader.abort?.();
+                } finally {
+                    finish({ ok: false, error: 'read-failed' });
+                }
+            },
             timeoutMs,
         );
 
+        signal?.addEventListener('abort', abortRead, { once: true });
+        reader.onabort = () => finish({
+            ok: false,
+            error: signal?.aborted ? 'aborted' : 'read-failed',
+        });
         reader.onload = event => {
             const value = event.target?.result;
             if (typeof value !== 'string') {
