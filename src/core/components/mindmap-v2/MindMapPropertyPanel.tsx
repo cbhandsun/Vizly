@@ -2,7 +2,7 @@
  * MindMapPropertyPanel.tsx — 节点属性面板 v3
  * 新增：Icons/Markers、Tags 彩色标签、BranchColor 连线颜色
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import {
     Input, InputNumber, Divider, Typography, Space, Button, Tooltip, Tag, Select,
 } from 'antd';
@@ -46,7 +46,10 @@ import {
     PropertyRow as Row,
 } from './MindMapPropertyPanelControls';
 import {
+    coerceMindMapPropertyBranchWidth,
+    coerceMindMapPropertyShape,
     createMindMapPropertyPanelOptions,
+    MIND_MAP_PROPERTY_BRANCH_WIDTHS,
     MIND_MAP_PROPERTY_SHAPES,
     MIND_MAP_PROPERTY_SHORTCUTS,
 } from './mindMapPropertyPanelOptions';
@@ -58,6 +61,7 @@ import { MindMapPropertyLinkField } from './MindMapPropertyLinkField';
 import { MindMapPropertyNoteField } from './MindMapPropertyNoteField';
 import { useMindMapNodeDeletion } from './useMindMapNodeDeletion';
 import { useMindMapPropertyAI } from './useMindMapPropertyAI';
+import { useRecoverableMindMapPropertyChoice } from './useRecoverableMindMapPropertyChoice';
 import styles from './MindMapPropertyPanel.module.css';
 
 const { Text } = Typography;
@@ -107,9 +111,6 @@ const NodePropertyPanel: React.FC<{
         return cleanMindMapTagObjects(node.tags) ?? [];
     });
     const [tagInput, setTagInput] = useState('');
-    // ─ Shape & Line width ──────────────────────────────────────────────────────────
-    const [shapeClass, setShapeClass] = useState<string>(extendedNode.shapeClass ?? '');
-    const [branchWidth, setBranchWidth] = useState<number>(extendedNode.branchWidth ?? 0);
     const initialTask = getTaskMeta(node);
     const [taskStatus, setTaskStatus] = useState<TaskStatus>(initialTask.status);
     const [taskPriority, setTaskPriority] = useState<TaskPriority>(initialTask.priority);
@@ -129,8 +130,6 @@ const NodePropertyPanel: React.FC<{
         setImageUrl(node.image?.url ?? '');
         setIcons(cleanMindMapIcons(node.icons) ?? []);
         setTags(cleanMindMapTagObjects(node.tags) ?? []);
-        setShapeClass(extendedNode.shapeClass ?? '');
-        setBranchWidth(extendedNode.branchWidth ?? 0);
         const task = getTaskMeta(node);
         setTaskStatus(task.status);
         setTaskPriority(task.priority);
@@ -160,6 +159,21 @@ const NodePropertyPanel: React.FC<{
     const reshape = useCallback((patch: MindMapNodePatch) => {
         void reshapeWithResult(patch);
     }, [reshapeWithResult]);
+
+    const shapeChoice = useRecoverableMindMapPropertyChoice({
+        failureMessage: t(propertyKey('shapeSaveFailed')),
+        initialValue: coerceMindMapPropertyShape(extendedNode.shapeClass),
+        onCommit: shapeClass => reshapeWithResult({ shapeClass: shapeClass || undefined }),
+        sourceKey: node.id,
+    });
+    const branchWidthChoice = useRecoverableMindMapPropertyChoice({
+        failureMessage: t(propertyKey('branchWidthSaveFailed')),
+        initialValue: coerceMindMapPropertyBranchWidth(extendedNode.branchWidth),
+        onCommit: branchWidth => reshapeWithResult({ branchWidth: branchWidth || undefined }),
+        sourceKey: node.id,
+    });
+    const shapeErrorId = useId();
+    const branchWidthErrorId = useId();
 
     const applyImageUrl = useCallback((url: string) => {
         const safeUrl = toSafeImageUrl(url);
@@ -456,7 +470,13 @@ const NodePropertyPanel: React.FC<{
 
             {/* Node shape */}
             <Row label={t(propertyKey('nodeShape'))}>
-                <div className={styles.shapeList}>
+                <div
+                    aria-busy={shapeChoice.pending}
+                    aria-describedby={shapeChoice.error ? shapeErrorId : undefined}
+                    aria-label={t(propertyKey('nodeShape'))}
+                    className={styles.shapeList}
+                    role="group"
+                >
                     {MIND_MAP_PROPERTY_SHAPES.map(({ key, translationKey, icon }) => {
                         const label = t(propertyKey(`shapes.${translationKey}`));
                         return (
@@ -464,29 +484,35 @@ const NodePropertyPanel: React.FC<{
                             title={label}
                             type="button"
                             aria-label={label}
-                            aria-pressed={shapeClass === key}
-                            onClick={() => {
-                                setShapeClass(key);
-                                reshape({ shapeClass: key || undefined });
-                            }}
+                            aria-pressed={shapeChoice.value === key}
+                            disabled={shapeChoice.pending}
+                            onClick={() => shapeChoice.select(key)}
                             className={styles.shapeButton}>
                             <div aria-hidden="true" className={styles.shapeIcon}><PropertyShapeIcon icon={icon} /></div>
                             <div className={styles.shapeLabel}>{label}</div>
                         </button>
                     );})}
                 </div>
+                {shapeChoice.error && <div id={shapeErrorId} className={styles.choiceError} role="alert">{shapeChoice.error}</div>}
             </Row>
 
             {/* Branch line width */}
             <Row label={t(propertyKey('branchWidth'))}>
-                <div className={styles.branchList}>
-                    {[0, 1, 2, 4, 6].map(w => (
+                <div
+                    aria-busy={branchWidthChoice.pending}
+                    aria-describedby={branchWidthChoice.error ? branchWidthErrorId : undefined}
+                    aria-label={t(propertyKey('branchWidth'))}
+                    className={styles.branchList}
+                    role="group"
+                >
+                    {MIND_MAP_PROPERTY_BRANCH_WIDTHS.map(w => (
                         <button key={w}
                             type="button"
                             title={w === 0 ? t(propertyKey('defaultValue')) : `${w}px`}
                             aria-label={t(propertyKey('branchWidthValue'), { value: w === 0 ? t(propertyKey('defaultValue')) : `${w}px` })}
-                            aria-pressed={branchWidth === w}
-                            onClick={() => { setBranchWidth(w); reshape({ branchWidth: w || undefined }); }}
+                            aria-pressed={branchWidthChoice.value === w}
+                            disabled={branchWidthChoice.pending}
+                            onClick={() => branchWidthChoice.select(w)}
                             className={styles.branchButton}>
                             <div style={{
                                 height: w === 0 ? 1.5 : Math.min(w, 6),
@@ -494,6 +520,7 @@ const NodePropertyPanel: React.FC<{
                         </button>
                     ))}
                 </div>
+                {branchWidthChoice.error && <div id={branchWidthErrorId} className={styles.choiceError} role="alert">{branchWidthChoice.error}</div>}
             </Row>
 
             <Divider className={styles.divider} />

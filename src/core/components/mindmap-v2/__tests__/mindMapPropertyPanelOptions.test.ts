@@ -4,7 +4,10 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import {
+    coerceMindMapPropertyBranchWidth,
+    coerceMindMapPropertyShape,
     createMindMapPropertyPanelOptions,
+    MIND_MAP_PROPERTY_BRANCH_WIDTHS,
     MIND_MAP_PROPERTY_SHAPES,
     MIND_MAP_PROPERTY_SHORTCUTS,
 } from '../mindMapPropertyPanelOptions';
@@ -49,6 +52,16 @@ describe('mind map property panel localization', () => {
             label: 'High',
             value: '高',
         });
+    });
+
+    it('coerces shape and branch-width inputs to supported commercial choices', () => {
+        expect(coerceMindMapPropertyShape('diamond')).toBe('diamond');
+        expect(coerceMindMapPropertyShape('url(javascript:alert(1))')).toBe('');
+        expect(coerceMindMapPropertyShape(null)).toBe('');
+        expect(coerceMindMapPropertyBranchWidth(4)).toBe(4);
+        expect(coerceMindMapPropertyBranchWidth(12)).toBe(0);
+        expect(coerceMindMapPropertyBranchWidth(Number.NaN)).toBe(0);
+        expect(MIND_MAP_PROPERTY_BRANCH_WIDTHS).toEqual([0, 1, 2, 4, 6]);
     });
 
     it('keeps every generated option key present in both supported locales', () => {
@@ -101,8 +114,10 @@ describe('mind map property panel localization', () => {
     it('names interactive fields and keeps presentation and link validation in focused modules', () => {
         expect(propertyPanelSource).toContain("aria-label={t(propertyKey('nodeTextInput'))}");
         expect(propertyPanelSource).toContain("aria-label={t(propertyKey('taskStatus'))}");
-        expect(propertyPanelSource).toContain('aria-pressed={shapeClass === key}');
-        expect(propertyPanelSource).toContain('aria-pressed={branchWidth === w}');
+        expect(propertyPanelSource).toContain('aria-pressed={shapeChoice.value === key}');
+        expect(propertyPanelSource).toContain('aria-pressed={branchWidthChoice.value === w}');
+        expect(propertyPanelSource).toContain('disabled={shapeChoice.pending}');
+        expect(propertyPanelSource).toContain('disabled={branchWidthChoice.pending}');
         expect(propertyPanelSource).not.toContain('style: { ...node.style');
         expect(propertyPanelSource).toContain("reshape({ style: { fontSize: `${v}px` } })");
         expect(propertyPanelSource).toContain('reshape({ style: { color: c || undefined } })');

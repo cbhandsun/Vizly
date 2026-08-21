@@ -34,6 +34,23 @@ export const MIND_MAP_PROPERTY_SHAPES = [
     { key: 'diamond', translationKey: 'diamond', icon: 'diamond' },
 ] as const;
 
+export type MindMapPropertyShape = typeof MIND_MAP_PROPERTY_SHAPES[number]['key'];
+
+export const MIND_MAP_PROPERTY_BRANCH_WIDTHS = [0, 1, 2, 4, 6] as const;
+export type MindMapPropertyBranchWidth = typeof MIND_MAP_PROPERTY_BRANCH_WIDTHS[number];
+
+export function coerceMindMapPropertyShape(value: unknown): MindMapPropertyShape {
+    return MIND_MAP_PROPERTY_SHAPES.some(option => option.key === value)
+        ? value as MindMapPropertyShape
+        : '';
+}
+
+export function coerceMindMapPropertyBranchWidth(value: unknown): MindMapPropertyBranchWidth {
+    return MIND_MAP_PROPERTY_BRANCH_WIDTHS.some(width => width === value)
+        ? value as MindMapPropertyBranchWidth
+        : 0;
+}
+
 export const MIND_MAP_PROPERTY_SHORTCUTS = [
     { key: 'Tab', translationKey: 'addChild' },
     { key: 'Enter', translationKey: 'addSibling' },
