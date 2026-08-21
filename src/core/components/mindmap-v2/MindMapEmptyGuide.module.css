@@ -3,7 +3,7 @@
     bottom: calc(50% + 48px);
     right: var(--right-sidebar-offset, 0px);
     left: var(--left-sidebar-offset, 0px);
-    z-index: 100;
+    z-index: 1100;
     display: flex;
     width: auto;
     flex-direction: column;
@@ -193,7 +193,8 @@
 
 @media (max-height: 640px) {
     .guide {
-        bottom: calc(50% + 40px);
+        top: calc(112px + env(safe-area-inset-top, 0px));
+        bottom: auto;
     }
 
     .tips {

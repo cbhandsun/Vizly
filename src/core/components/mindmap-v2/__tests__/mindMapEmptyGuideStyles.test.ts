@@ -9,6 +9,7 @@ describe('mind map empty guide commercial styling', () => {
         expect(css).toContain('bottom: calc(50% + 48px)');
         expect(css).toContain('right: var(--right-sidebar-offset, 0px)');
         expect(css).toContain('left: var(--left-sidebar-offset, 0px)');
+        expect(css).toContain('z-index: 1100');
         expect(css).not.toContain('left: 50%');
         expect(css).toContain('width: auto');
         expect(css).toContain('color: var(--main-color, #1f2937)');
@@ -22,5 +23,10 @@ describe('mind map empty guide commercial styling', () => {
         expect(css).toContain('animation: none');
         expect(css).toContain('env(safe-area-inset-right, 0px)');
         expect(css).toContain('env(safe-area-inset-left, 0px)');
+    });
+
+    it('keeps the guide below the application toolbar on short viewports', () => {
+        expect(css).toMatch(/@media \(max-height: 640px\)[\s\S]*?\.guide\s*\{[\s\S]*?top: calc\(112px \+ env\(safe-area-inset-top, 0px\)\);[\s\S]*?bottom: auto;/);
+        expect(css).toMatch(/@media \(max-height: 640px\)[\s\S]*?\.tips\s*\{[\s\S]*?display: none;/);
     });
 });
