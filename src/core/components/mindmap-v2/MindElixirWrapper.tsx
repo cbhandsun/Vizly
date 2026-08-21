@@ -398,7 +398,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
             clearMindElixirPalette(themeStyle);
             stopHistoryAvailabilityTracking();
             // mind-elixir doesn't have a formal destroy() — unmounting the div is enough
-            unregisterMindElixirInstance();
+            unregisterMindElixirInstance(mind);
             mindRef.current = null;
             setInstance(null);
             setSelectedNode(null);

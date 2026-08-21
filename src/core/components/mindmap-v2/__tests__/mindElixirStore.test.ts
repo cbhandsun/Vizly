@@ -16,11 +16,11 @@ describe('mindElixirStore', () => {
 
         registerMindElixirInstance(instance);
         expect(getMindElixirInstance()).toBe(instance);
-        expect(seen).toEqual([instance]);
+        expect(seen).toEqual([null, instance]);
 
-        unregisterMindElixirInstance();
+        unregisterMindElixirInstance(instance);
         expect(getMindElixirInstance()).toBeNull();
-        expect(seen).toEqual([instance, null]);
+        expect(seen).toEqual([null, instance, null]);
 
         unsubscribe();
     });
@@ -35,6 +35,37 @@ describe('mindElixirStore', () => {
         unsubscribe();
         registerMindElixirInstance(nextInstance);
 
+        expect(seen).toEqual([null, instance]);
+        unregisterMindElixirInstance(nextInstance);
+    });
+
+    it('immediately supplies the current instance to late subscribers', () => {
+        const instance = { id: 'current' } as unknown as MindElixirInstance;
+        const seen: Array<MindElixirInstance | null> = [];
+
+        registerMindElixirInstance(instance);
+        const unsubscribe = subscribeMindElixir(next => seen.push(next));
+
         expect(seen).toEqual([instance]);
+        unsubscribe();
+        unregisterMindElixirInstance(instance);
+    });
+
+    it('does not let stale cleanup unregister a replacement instance', () => {
+        const staleInstance = { id: 'stale' } as unknown as MindElixirInstance;
+        const replacement = { id: 'replacement' } as unknown as MindElixirInstance;
+        const seen: Array<MindElixirInstance | null> = [];
+
+        registerMindElixirInstance(staleInstance);
+        const unsubscribe = subscribeMindElixir(next => seen.push(next));
+        registerMindElixirInstance(replacement);
+        unregisterMindElixirInstance(staleInstance);
+
+        expect(getMindElixirInstance()).toBe(replacement);
+        expect(seen).toEqual([staleInstance, replacement]);
+
+        unregisterMindElixirInstance(replacement);
+        expect(seen).toEqual([staleInstance, replacement, null]);
+        unsubscribe();
     });
 });

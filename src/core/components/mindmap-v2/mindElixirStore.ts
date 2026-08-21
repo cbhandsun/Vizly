@@ -19,12 +19,15 @@ const _listeners = new Set<MindElixirListener>();
 
 /** Called by MindElixirWrapper when a new instance is initialized */
 export function registerMindElixirInstance(instance: MindElixirInstance): void {
+    if (_activeInstance === instance) return;
     _activeInstance = instance;
     _listeners.forEach(fn => fn(_activeInstance));
 }
 
 /** Called by MindElixirWrapper on cleanup */
-export function unregisterMindElixirInstance(): void {
+export function unregisterMindElixirInstance(instance?: MindElixirInstance): void {
+    if (instance && _activeInstance !== instance) return;
+    if (_activeInstance === null) return;
     _activeInstance = null;
     _listeners.forEach(fn => fn(_activeInstance));
 }
@@ -37,6 +40,7 @@ export function getMindElixirInstance(): MindElixirInstance | null {
 /** Subscribe to instance changes (returns unsubscribe fn) */
 export function subscribeMindElixir(fn: MindElixirListener): () => void {
     _listeners.add(fn);
+    fn(_activeInstance);
     return () => _listeners.delete(fn);
 }
 
