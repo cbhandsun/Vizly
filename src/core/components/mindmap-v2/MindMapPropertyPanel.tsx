@@ -54,6 +54,11 @@ import { MindMapPropertyNoteField } from './MindMapPropertyNoteField';
 import { useMindMapNodeDeletion } from './useMindMapNodeDeletion';
 import { useMindMapPropertyAI } from './useMindMapPropertyAI';
 import { useRecoverableMindMapPropertyChoice } from './useRecoverableMindMapPropertyChoice';
+import {
+    MIND_MAP_PROPERTY_FONT_SIZE_MAX,
+    MIND_MAP_PROPERTY_FONT_SIZE_MIN,
+    useRecoverableMindMapPropertyFontSize,
+} from './useRecoverableMindMapPropertyFontSize';
 import { useRecoverableMindMapPropertyTaskTransaction } from './useRecoverableMindMapPropertyTaskTransaction';
 import styles from './MindMapPropertyPanel.module.css';
 
@@ -93,8 +98,6 @@ const NodePropertyPanel: React.FC<{
     const mind = getMindElixirInstance();
     const extendedNode = node as ExtendedMindMapNode;
     const [topic, setTopic] = useState(cleanMindMapTopic(node.topic, ''));
-    const parseFontSize = (n: NodeObj) => parseInt(n.style?.fontSize ?? '14', 10) || 14;
-    const [fontSize, setFontSize] = useState(() => parseFontSize(node));
     const [imageUrl, setImageUrl] = useState(node.image?.url ?? '');
     const [icons, setIcons] = useState<string[]>(cleanMindMapIcons(node.icons) ?? []);
     const [tagInput, setTagInput] = useState('');
@@ -103,7 +106,6 @@ const NodePropertyPanel: React.FC<{
     if (syncedNodeId !== node.id) {
         setSyncedNodeId(node.id);
         setTopic(cleanMindMapTopic(node.topic, ''));
-        setFontSize(parseFontSize(node));
         setImageUrl(node.image?.url ?? '');
         setIcons(cleanMindMapIcons(node.icons) ?? []);
     }
@@ -160,6 +162,12 @@ const NodePropertyPanel: React.FC<{
         onCommit: branchColor => reshapeWithResult({ branchColor: branchColor || undefined }),
         sourceKey: node.id,
     });
+    const fontSizeTransaction = useRecoverableMindMapPropertyFontSize({
+        failureMessage: t(propertyKey('fontSizeSaveFailed')),
+        initialValue: node.style?.fontSize,
+        onCommit: value => reshapeWithResult({ style: { fontSize: `${value}px` } }),
+        sourceKey: node.id,
+    });
     const taskTransaction = useRecoverableMindMapPropertyTaskTransaction({
         failureMessage: t(propertyKey('taskSaveFailed')),
         node,
@@ -183,6 +191,8 @@ const NodePropertyPanel: React.FC<{
     const textColorErrorId = useId();
     const backgroundColorErrorId = useId();
     const branchColorErrorId = useId();
+    const fontSizeStatusId = useId();
+    const fontSizeErrorId = useId();
     const taskStatusId = useId();
     const taskErrorId = useId();
 
@@ -453,10 +463,37 @@ const NodePropertyPanel: React.FC<{
 
             {/* Font size */}
             <Row label={t(propertyKey('fontSize'))}>
-                <InputNumber min={10} max={48} value={fontSize}
+                <div
+                    aria-busy={fontSizeTransaction.pending}
+                    aria-describedby={fontSizeTransaction.error
+                        ? fontSizeErrorId
+                        : fontSizeTransaction.pending ? fontSizeStatusId : undefined}
                     aria-label={t(propertyKey('fontSize'))}
-                    onChange={v => { if (!v) return; setFontSize(v); reshape({ style: { fontSize: `${v}px` } }); }}
-                    suffix="px" className={styles.fullWidth} prefix={<FontSizeOutlined />} />
+                    role="group"
+                >
+                    <InputNumber
+                        min={MIND_MAP_PROPERTY_FONT_SIZE_MIN}
+                        max={MIND_MAP_PROPERTY_FONT_SIZE_MAX}
+                        value={fontSizeTransaction.value}
+                        aria-label={t(propertyKey('fontSize'))}
+                        aria-describedby={fontSizeTransaction.error
+                            ? fontSizeErrorId
+                            : fontSizeTransaction.pending ? fontSizeStatusId : undefined}
+                        aria-invalid={Boolean(fontSizeTransaction.error)}
+                        disabled={fontSizeTransaction.pending}
+                        onBlur={fontSizeTransaction.commit}
+                        onChange={fontSizeTransaction.setValue}
+                        onPressEnter={fontSizeTransaction.commit}
+                        suffix="px" className={styles.fullWidth} prefix={<FontSizeOutlined />} />
+                    <div className={styles.transactionFeedback}>
+                        {fontSizeTransaction.pending
+                            ? <div id={fontSizeStatusId} className={styles.transactionStatus} role="status" aria-live="polite">{t(propertyKey('fontSizeSaving'))}</div>
+                            : null}
+                        {fontSizeTransaction.error
+                            ? <div id={fontSizeErrorId} className={styles.choiceError} role="alert">{fontSizeTransaction.error}</div>
+                            : null}
+                    </div>
+                </div>
             </Row>
 
             {/* Text color */}

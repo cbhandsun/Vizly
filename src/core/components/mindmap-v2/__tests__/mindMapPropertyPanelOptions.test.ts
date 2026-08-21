@@ -119,7 +119,13 @@ describe('mind map property panel localization', () => {
         expect(propertyPanelSource).toContain('disabled={shapeChoice.pending}');
         expect(propertyPanelSource).toContain('disabled={branchWidthChoice.pending}');
         expect(propertyPanelSource).not.toContain('style: { ...node.style');
-        expect(propertyPanelSource).toContain("reshape({ style: { fontSize: `${v}px` } })");
+        expect(propertyPanelSource).toContain('useRecoverableMindMapPropertyFontSize({');
+        expect(propertyPanelSource).toContain("failureMessage: t(propertyKey('fontSizeSaveFailed'))");
+        expect(propertyPanelSource).toContain('onBlur={fontSizeTransaction.commit}');
+        expect(propertyPanelSource).toContain('onPressEnter={fontSizeTransaction.commit}');
+        expect(propertyPanelSource).toContain('disabled={fontSizeTransaction.pending}');
+        expect(propertyPanelSource).toContain('aria-busy={fontSizeTransaction.pending}');
+        expect(propertyPanelSource).toContain('aria-invalid={Boolean(fontSizeTransaction.error)}');
         expect(propertyPanelSource).toContain("failureMessage: t(propertyKey('textColorSaveFailed'))");
         expect(propertyPanelSource).toContain("failureMessage: t(propertyKey('backgroundColorSaveFailed'))");
         expect(propertyPanelSource).toContain("failureMessage: t(propertyKey('branchColorSaveFailed'))");

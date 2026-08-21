@@ -3092,6 +3092,8 @@
                 "dueDate": "截止日期",
                 "taskProgress": "任务进度",
                 "fontSize": "字体大小",
+                "fontSizeSaving": "正在保存字号…",
+                "fontSizeSaveFailed": "字号保存失败，已恢复最新确认值，请重试。",
                 "textColor": "文字颜色",
                 "backgroundColor": "节点背景色",
                 "branchColor": "连线颜色",

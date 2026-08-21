@@ -2939,6 +2939,8 @@
                 "dueDate": "Due date",
                 "taskProgress": "Task progress",
                 "fontSize": "Font size",
+                "fontSizeSaving": "Saving font size…",
+                "fontSizeSaveFailed": "The font size could not be saved. The latest confirmed value was restored; try again.",
                 "textColor": "Text color",
                 "backgroundColor": "Node background",
                 "branchColor": "Branch color",
