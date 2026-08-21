@@ -29,6 +29,10 @@ const linkFieldSource = readFileSync(
     resolve(process.cwd(), 'src/core/components/mindmap-v2/MindMapPropertyLinkField.tsx'),
     'utf8',
 );
+const topicFieldSource = readFileSync(
+    resolve(process.cwd(), 'src/core/components/mindmap-v2/MindMapPropertyTopicField.tsx'),
+    'utf8',
+);
 
 const collectStringPaths = (value: unknown, prefix = ''): string[] => {
     if (typeof value === 'string') return [prefix];
@@ -112,7 +116,16 @@ describe('mind map property panel localization', () => {
     });
 
     it('names interactive fields and keeps presentation and link validation in focused modules', () => {
-        expect(propertyPanelSource).toContain("aria-label={t(propertyKey('nodeTextInput'))}");
+        expect(propertyPanelSource).toContain("label={t(propertyKey('nodeTextInput'))}");
+        expect(propertyPanelSource).toContain('<MindMapPropertyTopicField');
+        expect(propertyPanelSource).toContain('onCommit={setTopicWithResult}');
+        expect(propertyPanelSource).toContain('await mind.setNodeTopic(tpcEl, topic)');
+        expect(propertyPanelSource).not.toContain('handleTopicBlur');
+        expect(topicFieldSource).toContain('aria-label={label}');
+        expect(topicFieldSource).toContain('aria-busy={transaction.saving}');
+        expect(topicFieldSource).toContain('maxLength={MINDMAP_MAX_TOPIC_LENGTH}');
+        expect(topicFieldSource).toContain('role="status" aria-live="polite"');
+        expect(topicFieldSource).toContain('role="alert"');
         expect(propertyPanelSource).toContain("aria-label={t(propertyKey('taskStatus'))}");
         expect(propertyPanelSource).toContain('aria-pressed={shapeChoice.value === key}');
         expect(propertyPanelSource).toContain('aria-pressed={branchWidthChoice.value === w}');

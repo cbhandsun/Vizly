@@ -3,7 +3,6 @@
 .title { font-size: 13px; }
 .fullWidth { width: 100%; }
 .editAction { width: 100%; margin-bottom: 8px; }
-.topicInput { font-size: 13px; }
 .tagList { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
 .tag { margin: 0; }
 .presetTagButton {

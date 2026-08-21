@@ -24,7 +24,6 @@ import {
 } from './mindmapNodePatchSecurity';
 import {
     cleanMindMapIcons,
-    cleanMindMapTopic,
 } from './mindmapTreeSanitizer';
 import { cleanMindMapChildNode } from './mindmapBridgeSecurity';
 import {
@@ -51,6 +50,7 @@ import { MindMapPropertyAISection } from './MindMapPropertyAISection';
 import { MindMapPropertyMediaControls } from './MindMapPropertyMediaControls';
 import { MindMapPropertyLinkField } from './MindMapPropertyLinkField';
 import { MindMapPropertyNoteField } from './MindMapPropertyNoteField';
+import { MindMapPropertyTopicField } from './MindMapPropertyTopicField';
 import { useMindMapNodeDeletion } from './useMindMapNodeDeletion';
 import { useMindMapPropertyAI } from './useMindMapPropertyAI';
 import { useRecoverableMindMapPropertyChoice } from './useRecoverableMindMapPropertyChoice';
@@ -63,7 +63,6 @@ import { useRecoverableMindMapPropertyTaskTransaction } from './useRecoverableMi
 import styles from './MindMapPropertyPanel.module.css';
 
 const { Text } = Typography;
-const { TextArea } = Input;
 type ExtendedMindMapNode = NodeObj & {
     shapeClass?: string;
     branchWidth?: number;
@@ -97,7 +96,6 @@ const NodePropertyPanel: React.FC<{
     const panelOptions = createMindMapPropertyPanelOptions(t);
     const mind = getMindElixirInstance();
     const extendedNode = node as ExtendedMindMapNode;
-    const [topic, setTopic] = useState(cleanMindMapTopic(node.topic, ''));
     const [imageUrl, setImageUrl] = useState(node.image?.url ?? '');
     const [icons, setIcons] = useState<string[]>(cleanMindMapIcons(node.icons) ?? []);
     const [tagInput, setTagInput] = useState('');
@@ -105,7 +103,6 @@ const NodePropertyPanel: React.FC<{
     const [syncedNodeId, setSyncedNodeId] = useState(node.id);
     if (syncedNodeId !== node.id) {
         setSyncedNodeId(node.id);
-        setTopic(cleanMindMapTopic(node.topic, ''));
         setImageUrl(node.image?.url ?? '');
         setIcons(cleanMindMapIcons(node.icons) ?? []);
     }
@@ -131,6 +128,19 @@ const NodePropertyPanel: React.FC<{
     const reshape = useCallback((patch: MindMapNodePatch) => {
         void reshapeWithResult(patch);
     }, [reshapeWithResult]);
+
+    const setTopicWithResult = useCallback(async (topic: string): Promise<boolean> => {
+        if (!mind) return false;
+        try {
+            const tpcEl = mind.findEle(node.id);
+            if (!tpcEl) return false;
+            await mind.setNodeTopic(tpcEl, topic);
+            return true;
+        } catch (error) {
+            logMindmapPropertySetTopicFailure(error);
+            return false;
+        }
+    }, [mind, node.id]);
 
     const shapeChoice = useRecoverableMindMapPropertyChoice({
         failureMessage: t(propertyKey('shapeSaveFailed')),
@@ -208,16 +218,6 @@ const NodePropertyPanel: React.FC<{
         applyImageUrl(safeUrl ?? '');
         return true;
     }, [applyImageUrl, imageUrl]);
-
-    const handleTopicBlur = useCallback(() => {
-        if (!mind || !topic.trim()) return;
-        const cleanTopic = cleanMindMapTopic(topic);
-        setTopic(cleanTopic);
-        try {
-            const tpcEl = mind.findEle(node.id);
-            if (tpcEl) mind.setNodeTopic(tpcEl, cleanTopic);
-        } catch (e) { logMindmapPropertySetTopicFailure(e); }
-    }, [mind, node.id, topic]);
 
     const handleIconToggle = useCallback((emoji: string) => {
         const next = cleanMindMapIcons(icons.includes(emoji)
@@ -331,11 +331,15 @@ const NodePropertyPanel: React.FC<{
 
             {/* Topic */}
             <Row label={t(propertyKey('nodeText'))}>
-                <TextArea value={topic} onChange={e => setTopic(e.target.value)}
-                    aria-label={t(propertyKey('nodeTextInput'))}
-                    onBlur={handleTopicBlur}
-                    onPressEnter={e => { e.preventDefault(); handleTopicBlur(); }}
-                    autoSize={{ minRows: 1, maxRows: 4 }} className={styles.topicInput} />
+                <MindMapPropertyTopicField
+                    failureMessage={t(propertyKey('nodeTextSaveFailed'))}
+                    initialValue={node.topic}
+                    label={t(propertyKey('nodeTextInput'))}
+                    onCommit={setTopicWithResult}
+                    requiredMessage={t(propertyKey('nodeTextRequired'))}
+                    savingMessage={t(propertyKey('nodeTextSaving'))}
+                    sourceKey={node.id}
+                />
             </Row>
 
             <MindMapPropertyMediaControls
