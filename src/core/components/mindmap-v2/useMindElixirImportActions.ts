@@ -1,4 +1,4 @@
-import { useCallback, useRef, type ChangeEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
 import type { MindElixirInstance, NodeObj } from 'mind-elixir';
 
 import { getFileSizeLimitError, MINDMAP_TEXT_IMPORT_MAX_BYTES } from '../../utils/fileImportGuards';
@@ -18,10 +18,13 @@ export type MindMapImportFailureReason =
     | 'aborted'
     | 'invalid'
     | 'read'
+    | 'scope-changed'
     | 'too-large';
 
 export type MindMapImportStatus =
+    | { format: MindMapImportKind; kind: 'started' }
     | { format: MindMapImportKind; kind: 'success' }
+    | { activeFormat: MindMapImportKind; format: MindMapImportKind; kind: 'busy' }
     | { format: MindMapImportKind; kind: 'error'; reason: MindMapImportFailureReason };
 
 export interface MindMapImportActionOptions {
@@ -63,9 +66,33 @@ export const useMindElixirImportActions = (
     options: MindMapImportActionOptions = {},
 ) => {
     const { onStatus } = options;
+    const [activeFormat, setActiveFormat] = useState<MindMapImportKind | null>(null);
+    const activeFormatRef = useRef<MindMapImportKind | null>(null);
+    const activeReaderRef = useRef<FileReader | null>(null);
+    const currentMindRef = useRef(mind);
+    const mountedRef = useRef(true);
     const markdownInputRef = useRef<HTMLInputElement>(null);
     const opmlInputRef = useRef<HTMLInputElement>(null);
     const jsonInputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        currentMindRef.current = mind;
+    }, [mind]);
+
+    useEffect(() => {
+        mountedRef.current = true;
+        return () => {
+            mountedRef.current = false;
+            const reader = activeReaderRef.current;
+            activeReaderRef.current = null;
+            activeFormatRef.current = null;
+            reader?.abort();
+        };
+    }, []);
+
+    const emitStatus = useCallback((status: MindMapImportStatus) => {
+        if (mountedRef.current) onStatus?.(status);
+    }, [onStatus]);
 
     const openMarkdownImport = useCallback(() => markdownInputRef.current?.click(), []);
     const openOpmlImport = useCallback(() => opmlInputRef.current?.click(), []);
@@ -77,10 +104,11 @@ export const useMindElixirImportActions = (
         const input = event.currentTarget;
         const file = input.files?.[0];
         input.value = '';
-        if (!file || !mind) return;
+        const targetMind = currentMindRef.current;
+        if (!file || !targetMind) return;
         const fail = (reason: MindMapImportFailureReason, error: unknown, rejected = false) => {
             (rejected ? logMindmapToolbarImportRejected : logMindmapToolbarImportFailure)(kind, error);
-            onStatus?.({ format: kind, kind: 'error', reason });
+            emitStatus({ format: kind, kind: 'error', reason });
         };
         if (!isSupportedMindMapToolbarImport(kind, file) || !Number.isFinite(file.size) || file.size <= 0) {
             fail('invalid', new Error('Import file rejected.'), true);
@@ -92,33 +120,68 @@ export const useMindElixirImportActions = (
             return;
         }
 
+        const currentFormat = activeFormatRef.current;
+        if (currentFormat) {
+            emitStatus({ activeFormat: currentFormat, format: kind, kind: 'busy' });
+            return;
+        }
+
         const reader = new FileReader();
+        activeReaderRef.current = reader;
+        activeFormatRef.current = kind;
+        if (mountedRef.current) setActiveFormat(kind);
+        emitStatus({ format: kind, kind: 'started' });
+        const finishRead = () => {
+            if (activeReaderRef.current !== reader) return;
+            activeReaderRef.current = null;
+            activeFormatRef.current = null;
+            if (mountedRef.current) setActiveFormat(null);
+        };
         reader.onload = loadEvent => {
+            if (activeReaderRef.current !== reader) return;
             try {
+                if (currentMindRef.current !== targetMind) {
+                    finishRead();
+                    emitStatus({ format: kind, kind: 'error', reason: 'scope-changed' });
+                    return;
+                }
                 const parsed = parseMindMapToolbarImport(kind, loadEvent.target?.result);
                 if (parsed.kind === 'diagram') {
-                    applyMindMapImportTransaction(mind, {
+                    applyMindMapImportTransaction(targetMind, {
                         ...parsed.data,
                         direction: coerceMindElixirDirection(parsed.data.direction),
                     });
                 } else {
-                    applyMindMapImportTransaction(mind, { nodeData: parsed.nodeData });
+                    applyMindMapImportTransaction(targetMind, { nodeData: parsed.nodeData });
                 }
-                onStatus?.({ format: kind, kind: 'success' });
+                finishRead();
+                emitStatus({ format: kind, kind: 'success' });
             } catch (error) {
+                finishRead();
                 fail('invalid', error);
             }
         };
         reader.onerror = () => {
+            if (activeReaderRef.current !== reader) return;
+            finishRead();
             fail('read', reader.error ?? new Error('Import read failed.'));
         };
         reader.onabort = () => {
+            if (activeReaderRef.current !== reader) return;
+            finishRead();
+            if (!mountedRef.current) return;
             fail('aborted', new Error('Import read aborted.'));
         };
-        reader.readAsText(file);
-    }, [mind, onStatus]);
+        try {
+            reader.readAsText(file);
+        } catch (error) {
+            finishRead();
+            fail('read', error);
+        }
+    }, [emitStatus]);
 
     return {
+        activeFormat,
         markdownInputRef,
         opmlInputRef,
         jsonInputRef,

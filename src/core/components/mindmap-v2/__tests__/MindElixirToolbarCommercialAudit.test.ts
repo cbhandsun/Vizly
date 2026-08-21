@@ -16,6 +16,7 @@ const summaryButtonSource = readFileSync(resolve(process.cwd(), 'src/core/compon
 const treeExpansionButtonsSource = readFileSync(resolve(process.cwd(), 'src/core/components/mindmap-v2/MindMapTreeExpansionButtons.tsx'), 'utf8');
 const historyCommandSource = readFileSync(resolve(process.cwd(), 'src/core/components/mindmap-v2/mindmapToolbarHistoryCommand.ts'), 'utf8');
 const exportFeedbackSource = readFileSync(resolve(process.cwd(), 'src/core/components/mindmap-v2/mindMapExportFeedback.ts'), 'utf8');
+const importFeedbackSource = readFileSync(resolve(process.cwd(), 'src/core/components/mindmap-v2/mindMapImportFeedback.ts'), 'utf8');
 
 describe('MindElixirToolbar commercial interaction contract', () => {
     it('uses one accessible toolbar button contract and semantic toolbar boundaries', () => {
@@ -50,6 +51,11 @@ describe('MindElixirToolbar commercial interaction contract', () => {
         expect(source).toContain('onOpenChange={handleImportMenuOpenChange}');
         expect(source).toContain('restoreImportTriggerFocus()');
         expect(source).toContain('useMindElixirImportActions(mind, { onStatus: handleImportStatus })');
+        expect(source).toContain('showMindMapImportFeedback(status, t)');
+        expect(source).toContain('disabled: activeImportFormat !== null');
+        expect(importFeedbackSource).toContain("t('mindmapImport.progress', { format: status.format })");
+        expect(importFeedbackSource).toContain("t('mindmapImport.inProgress', { format: status.activeFormat })");
+        expect(importFeedbackSource).toContain("'scope-changed': 'mindmapImport.scopeChanged'");
         expect(source).toContain("aria-expanded={openMenu === 'background'}");
         expect(source.match(/suppressTooltip=\{openMenu !== null\}/g)).toHaveLength(4);
         expect(iconButtonSource).toContain('open={suppressTooltip ? false : undefined}');

@@ -69,6 +69,7 @@ import { createMindElixirArrowModeController } from './mindElixirArrowModeContro
 import { type MindMapImportStatus, useMindElixirImportActions } from './useMindElixirImportActions';
 import { type MindMapExportStatus, useMindElixirExportActions } from './useMindElixirExportActions';
 import { showMindMapExportFeedback } from './mindMapExportFeedback';
+import { showMindMapImportFeedback } from './mindMapImportFeedback';
 import { useMindElixirCanvasPreferences } from './useMindElixirCanvasPreferences';
 import MindMapToolbarIconButton from './MindMapToolbarIconButton';
 import MindMapAuxiliaryPanelButtons from './MindMapAuxiliaryPanelButtons';
@@ -77,7 +78,6 @@ import MindMapSummaryButton from './MindMapSummaryButton';
 import MindMapTreeExpansionButtons from './MindMapTreeExpansionButtons';
 import { MindMapThemeSelector } from './MindMapThemeSelector';
 import { MindMapDirectionSelector } from './MindMapDirectionSelector';
-import { appMessage } from '../../utils/antdStaticBridge';
 import { getViewportPopupContainer } from '../ui/viewportOverlayPortal';
 import {
     applyMindMapZoomCommand,
@@ -288,10 +288,8 @@ const MindElixirToolbar: React.FC = () => {
         requestAnimationFrame(() => importTriggerRef.current?.focus({ preventScroll: true }));
     }, []);
     const handleImportStatus = useCallback((status: MindMapImportStatus) => {
-        appMessage[status.kind === 'error' ? 'error' : 'success'](
-            `${status.format}: ${t(status.kind === 'success' ? 'common.success' : 'theme.selector.importStatus.failed')}`,
-        );
-        restoreImportTriggerFocus();
+        showMindMapImportFeedback(status, t);
+        if (status.kind !== 'started') restoreImportTriggerFocus();
     }, [restoreImportTriggerFocus, t]);
     const handleImportMenuOpenChange = useCallback((open: boolean) => {
         setOpenMenu(open ? 'import' : null);
@@ -410,6 +408,7 @@ const MindElixirToolbar: React.FC = () => {
     }, []);
 
     const {
+        activeFormat: activeImportFormat,
         markdownInputRef: fileInputRef,
         opmlInputRef,
         jsonInputRef,
@@ -579,9 +578,9 @@ const MindElixirToolbar: React.FC = () => {
                 onOpenChange={handleImportMenuOpenChange}
                 menu={{
                     items: [
-                        { key: 'md',   label: t('plugins.mindmap.toolbar.importMarkdown'), icon: <UploadOutlined />, onClick: handleImportMarkdown },
-                        { key: 'opml', label: t('plugins.mindmap.toolbar.importOpml'),     icon: <UploadOutlined />, onClick: handleImportOpml },
-                        { key: 'json', label: t('plugins.mindmap.toolbar.importJson'),     icon: <UploadOutlined />, onClick: handleImportJson },
+                        { key: 'md',   label: t('plugins.mindmap.toolbar.importMarkdown'), icon: <UploadOutlined />, onClick: handleImportMarkdown, disabled: activeImportFormat !== null },
+                        { key: 'opml', label: t('plugins.mindmap.toolbar.importOpml'),     icon: <UploadOutlined />, onClick: handleImportOpml, disabled: activeImportFormat !== null },
+                        { key: 'json', label: t('plugins.mindmap.toolbar.importJson'),     icon: <UploadOutlined />, onClick: handleImportJson, disabled: activeImportFormat !== null },
                     ]
                 }}
                 placement="bottomRight"

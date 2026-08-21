@@ -1678,6 +1678,16 @@
         "exporting": "Exporting",
         "wait": "Please wait, file will download automatically."
     },
+    "mindmapImport": {
+        "success": "{{format}} import completed",
+        "progress": "Importing {{format}}...",
+        "inProgress": "{{format}} import is already in progress. Wait for it to finish.",
+        "invalid": "The {{format}} file content or format is invalid. Check it and try again.",
+        "tooLarge": "The {{format}} file is too large to import.",
+        "readFailed": "The {{format}} file could not be read. Choose the file again.",
+        "aborted": "Reading the {{format}} file was interrupted. Try again.",
+        "scopeChanged": "The canvas changed, so the {{format}} file was not imported."
+    },
     "share": {
         "title": "Share Diagram",
         "closeDialog": "Close Share Diagram",

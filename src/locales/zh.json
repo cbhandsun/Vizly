@@ -1831,6 +1831,16 @@
         "exporting": "正在导出",
         "wait": "请稍候，导出完成后将自动下载文件"
     },
+    "mindmapImport": {
+        "success": "{{format}} 导入完成",
+        "progress": "正在导入 {{format}}...",
+        "inProgress": "{{format}} 正在导入，请等待完成。",
+        "invalid": "{{format}} 文件内容或格式无效，请检查后重试。",
+        "tooLarge": "{{format}} 文件过大，无法导入。",
+        "readFailed": "无法读取 {{format}} 文件，请重新选择文件。",
+        "aborted": "{{format}} 文件读取已中止，请重试。",
+        "scopeChanged": "画布已切换，{{format}} 文件未导入。"
+    },
     "share": {
         "title": "分享图表",
         "closeDialog": "关闭分享图表",
