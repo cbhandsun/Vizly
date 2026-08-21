@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { StandardDiagramData } from '../../core/models/DiagramModels';
 import {
     coerceFilterView,
+    coerceWorkspaceMindMapRootTopic,
     createTemplateSeed,
     detectDiagramType,
     filterAndSortItems,
@@ -155,5 +156,20 @@ describe('diagramManagementPage helpers', () => {
             id: 'root',
             domain: 'timeline',
         });
+
+        const mindMap = createTemplateSeed('mindmap', { mindMapRootTopic: '中心主题' });
+        expect(mindMap?.nodes[0]).toMatchObject({
+            description: '中心主题',
+            data: expect.objectContaining({ label: '中心主题' }),
+        });
+    });
+
+    it('sanitizes localized mind-map root topics at the creation boundary', () => {
+        expect(coerceWorkspaceMindMapRootTopic('  Quarterly\n plan  ')).toBe('Quarterly plan');
+        expect(coerceWorkspaceMindMapRootTopic('<img src=x onerror=alert(1)> 中心\u0000\u202E主题'))
+            .toBe('中心 主题');
+        expect(coerceWorkspaceMindMapRootTopic('x'.repeat(400))).toHaveLength(200);
+        expect(coerceWorkspaceMindMapRootTopic(null)).toBe('Central Topic');
+        expect(coerceWorkspaceMindMapRootTopic('   ')).toBe('Central Topic');
     });
 });

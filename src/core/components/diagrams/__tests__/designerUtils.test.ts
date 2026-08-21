@@ -51,6 +51,36 @@ const makeDiagram = (): StandardDiagramData => ({
 });
 
 describe('standardDataToCanvas', () => {
+    it('preserves the hidden mind-map persistence payload produced by plugin migration', async () => {
+        const mindMapV2 = {
+            _version: 'mindmap-v2' as const,
+            nodeData: { id: 'root', topic: '中心主题', children: [] },
+            direction: 2,
+        };
+        const diagram: StandardDiagramData = {
+            ...makeDiagram(),
+            type: 'mindmap',
+            version: '2.1',
+            nodes: [{
+                id: '__mindmap_meta__',
+                type: 'mindmap',
+                domain: 'mindmap',
+                description: '',
+                position: { x: -9999, y: -9999 },
+                hidden: true,
+                data: { mindmapV2: mindMapV2 },
+            } as StandardDiagramData['nodes'][number]],
+        };
+
+        const result = await standardDataToCanvas(diagram);
+
+        expect(result.nodes).toEqual([expect.objectContaining({
+            id: '__mindmap_meta__',
+            hidden: true,
+            data: { mindmapV2: mindMapV2 },
+        })]);
+    });
+
     it('restores finite positions and rejects malformed metadata fields', async () => {
         const result = await standardDataToCanvas(makeDiagram());
 

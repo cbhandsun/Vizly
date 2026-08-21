@@ -48,6 +48,24 @@ const resolveRestorableThemeId = (themeId?: string): string | undefined => {
     return availableThemeIds.has(themeId) ? themeId : undefined;
 };
 
+const MIND_MAP_META_NODE_ID = '__mindmap_meta__';
+
+const coerceMindMapPersistenceNode = (value: unknown): Node | null => {
+    if (!isRecord(value) || value.id !== MIND_MAP_META_NODE_ID || value.type !== 'mindmap' || value.hidden !== true) {
+        return null;
+    }
+    const data = isRecord(value.data) ? value.data : null;
+    const payload = data && isRecord(data.mindmapV2) ? data.mindmapV2 : null;
+    if (!data || payload?._version !== 'mindmap-v2') return null;
+    return {
+        id: MIND_MAP_META_NODE_ID,
+        type: 'mindmap',
+        position: resolveCanvasPosition(value.position, { x: -9999, y: -9999 }),
+        hidden: true,
+        data,
+    };
+};
+
 const resolveGeneratedGroupLayoutOptions = (layout: StandardDiagramData['layout'] | undefined) => {
     return {
         generateDomainGroups: layout?.generateDomainGroups !== false,
@@ -82,7 +100,10 @@ export type StandardDataToCanvasOptions = {
 };
 
 const stripHiddenCanvasNodes = (nodes: Node[]): Node[] => (
-    nodes.filter(node => !(node.hidden === true || (isRecord(node.data) && node.data.hidden === true)))
+    nodes.filter(node => (
+        coerceMindMapPersistenceNode(node) !== null
+        || !(node.hidden === true || (isRecord(node.data) && node.data.hidden === true))
+    ))
 );
 
 /**
@@ -359,6 +380,11 @@ export const standardDataToCanvas = async (
     const pendingGroupIds = new Set<string>();
 
     data.nodes.forEach((n, idx) => {
+        const mindMapPersistenceNode = coerceMindMapPersistenceNode(n);
+        if (mindMapPersistenceNode) {
+            nodes.push(mindMapPersistenceNode);
+            return;
+        }
         const metadata = n.metadata || {};
         const metadataStyle = resolveCanvasStyle(metadata.style);
         const shape = optionalString(metadata.shape) || 'rectangle';

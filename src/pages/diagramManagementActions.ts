@@ -197,8 +197,12 @@ export const createWorkspaceDiagramActions = (
       return 'deleted';
     },
 
-    async createDiagram(templateKey: TemplateKey, requestedName?: unknown): Promise<string | null> {
-      const templateData = dependencies.createTemplateSeed(templateKey);
+    async createDiagram(
+      templateKey: TemplateKey,
+      requestedName?: unknown,
+      mindMapRootTopic?: unknown,
+    ): Promise<string | null> {
+      const templateData = dependencies.createTemplateSeed(templateKey, { mindMapRootTopic });
       if (!templateData) return null;
 
       const dataRegistry = await dependencies.loadDataRegistry();

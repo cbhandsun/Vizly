@@ -315,7 +315,11 @@ const WorkspaceDashboardPage: React.FC = () => {
                 translate: t,
                 existingTitles: unifiedItems.map(item => item.title),
             });
-            const diagramId = await workspaceDiagramActions.createDiagram(templateKey, requestedName);
+            const diagramId = await workspaceDiagramActions.createDiagram(
+                templateKey,
+                requestedName,
+                t('workspace.mindMapRootTopic'),
+            );
             keepLockUntilNavigation = navigateToCreatedWorkspaceDiagram(diagramId, navigateToDiagram);
         } catch (error: unknown) {
             safeLog.error('Failed to create workspace diagram', redactSensitiveLogValue(error));

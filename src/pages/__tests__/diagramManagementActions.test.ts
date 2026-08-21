@@ -219,14 +219,16 @@ describe('workspace diagram actions', () => {
     };
     const registerDiagram = vi.fn();
     const registry = createRegistry({ registerDiagram });
+    const createTemplateSeed = vi.fn(() => seed);
     const actions = createWorkspaceDiagramActions({
-      createTemplateSeed: dependency<'createTemplateSeed'>(vi.fn(() => seed)),
+      createTemplateSeed: dependency<'createTemplateSeed'>(createTemplateSeed),
       loadDataRegistry: dependency<'loadDataRegistry'>(vi.fn().mockResolvedValue(registry)),
       createId: () => 'created-id',
       getStorage: () => null,
     });
 
     await expect(actions.createDiagram('blank', '  未命名流程图  ')).resolves.toBe('created-id');
+    expect(createTemplateSeed).toHaveBeenCalledWith('blank', { mindMapRootTopic: undefined });
     expect(registerDiagram).toHaveBeenCalledWith(expect.objectContaining({
       id: 'created-id',
       type: 'flowchart',
@@ -237,6 +239,9 @@ describe('workspace diagram actions', () => {
 
     await actions.createDiagram('blank', 'x'.repeat(400));
     expect(registerDiagram.mock.calls.at(-1)?.[0].name).toHaveLength(240);
+
+    await actions.createDiagram('mindmap', '新建思维导图', '中心主题');
+    expect(createTemplateSeed).toHaveBeenLastCalledWith('mindmap', { mindMapRootTopic: '中心主题' });
 
     const invalid = createWorkspaceDiagramActions({
       createTemplateSeed: dependency<'createTemplateSeed'>(vi.fn(() => seed)),

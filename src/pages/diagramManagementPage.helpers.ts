@@ -18,6 +18,10 @@ export type ViewMode = 'grid' | 'list';
 export type SortKey = 'updated' | 'name' | 'type';
 export type TemplateKey = 'flowchart' | 'architecture' | 'mindmap' | 'timeline' | 'blank';
 
+export interface TemplateSeedOptions {
+    mindMapRootTopic?: unknown;
+}
+
 export interface UnifiedDiagramItem {
     id: string;
     title: string;
@@ -147,7 +151,34 @@ export const filterAndSortItems = (
     return sorted;
 };
 
-export const createTemplateSeed = (templateKey: TemplateKey): StandardDiagramData | null => {
+const MIND_MAP_TOPIC_MAX_LENGTH = 200;
+
+const replaceUnsafeMindMapTopicCharacters = (value: string): string => (
+    Array.from(value, (character) => {
+        const codePoint = character.codePointAt(0) ?? 0;
+        const isControl = codePoint <= 0x1f || (codePoint >= 0x7f && codePoint <= 0x9f);
+        const isBidiOverride = codePoint >= 0x202a && codePoint <= 0x202e;
+        const isBidiIsolate = codePoint >= 0x2066 && codePoint <= 0x2069;
+        return isControl || isBidiOverride || isBidiIsolate ? ' ' : character;
+    }).join('')
+);
+
+export const coerceWorkspaceMindMapRootTopic = (value: unknown): string => {
+    if (typeof value !== 'string') return 'Central Topic';
+    const normalized = replaceUnsafeMindMapTopicCharacters(value
+        .normalize('NFKC')
+        .replace(/<[^>]*>/g, ' '));
+    const topic = normalized
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, MIND_MAP_TOPIC_MAX_LENGTH);
+    return topic || 'Central Topic';
+};
+
+export const createTemplateSeed = (
+    templateKey: TemplateKey,
+    options: TemplateSeedOptions = {},
+): StandardDiagramData | null => {
     switch (templateKey) {
         case 'flowchart':
             return {
@@ -171,7 +202,8 @@ export const createTemplateSeed = (templateKey: TemplateKey): StandardDiagramDat
                 layout: { type: 'custom', direction: 'LR', spacing: { horizontal: 120, vertical: 80 }, padding: { horizontal: 24, vertical: 16 } },
                 theme: { name: 'light', displayName: 'Light Theme', domains: {} }
             };
-        case 'mindmap':
+        case 'mindmap': {
+            const rootTopic = coerceWorkspaceMindMapRootTopic(options.mindMapRootTopic);
             return {
                 id: crypto.randomUUID(),
                 name: 'Mind Map Pro',
@@ -181,14 +213,15 @@ export const createTemplateSeed = (templateKey: TemplateKey): StandardDiagramDat
                     id: 'root',
                     type: 'mindmap',
                     domain: 'mindmap',
-                    description: 'Central Idea',
+                    description: rootTopic,
                     position: { x: 0, y: 0 },
-                    data: { label: 'Central Idea', direction: 'LR' }
+                    data: { label: rootTopic, direction: 'LR' }
                 }],
                 edges: [],
                 layout: { type: 'custom', direction: 'LR', spacing: { horizontal: 50, vertical: 20 }, padding: { horizontal: 20, vertical: 20 } },
                 theme: { name: 'light', displayName: 'Light Theme', domains: {} }
             };
+        }
         case 'timeline':
             return {
                 id: crypto.randomUUID(),
