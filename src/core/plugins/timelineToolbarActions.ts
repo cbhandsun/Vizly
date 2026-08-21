@@ -1,6 +1,6 @@
 import type { Edge, Node } from '@xyflow/react';
 
-import { addDaysToDateOnly, parseDateOnlyTime } from '../utils/dateOnly';
+import { addDaysToDateOnly, formatDateOnly, parseDateOnlyTime } from '../utils/dateOnly';
 
 export type TimelineAppendType = 'event' | 'phase' | 'milestone';
 
@@ -47,6 +47,18 @@ const findLatestTimelineNode = (nodes: Node[]): { node: Node; endDate: string } 
     return latest ? { node: latest.node, endDate: latest.endDate } : null;
 };
 
+const adjustForwardToWeekday = (value: unknown, fallbackDate: string): string => {
+    const normalized = addDaysToDateOnly(value, 0, fallbackDate);
+    const time = parseDateOnlyTime(normalized);
+    const date = new Date(time ?? Date.now());
+
+    while (date.getDay() === 0 || date.getDay() === 6) {
+        date.setDate(date.getDate() + 1);
+    }
+
+    return formatDateOnly(date);
+};
+
 export const buildTimelineAppendPlan = ({
     nodes,
     type,
@@ -56,7 +68,10 @@ export const buildTimelineAppendPlan = ({
     fallbackDate,
 }: TimelineAppendPlanOptions): TimelineAppendPlan => {
     const latest = findLatestTimelineNode(nodes);
-    const startDate = latest ? addDaysToDateOnly(latest.endDate, 2) : fallbackDate;
+    const proposedStartDate = latest
+        ? addDaysToDateOnly(latest.endDate, 2, fallbackDate)
+        : fallbackDate;
+    const startDate = adjustForwardToWeekday(proposedStartDate, fallbackDate);
     const node: Node = {
         id: nodeId,
         type: 'timelineNode',
@@ -67,6 +82,7 @@ export const buildTimelineAppendPlan = ({
             label,
             status: 'pending',
             date: startDate,
+            ...(type === 'event' ? { endDate: startDate } : {}),
             ...(type === 'phase' ? {
                 progress: 0,
                 endDate: addDaysToDateOnly(startDate, 14),

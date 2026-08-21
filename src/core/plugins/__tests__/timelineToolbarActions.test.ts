@@ -15,7 +15,7 @@ const timelineNode = (
 });
 
 describe('buildTimelineAppendPlan', () => {
-    it('creates a selected standalone event on an empty timeline', () => {
+    it('creates a selected one-workday event and moves a weekend fallback forward', () => {
         const plan = buildTimelineAppendPlan({
             nodes: [],
             type: 'event',
@@ -33,10 +33,28 @@ describe('buildTimelineAppendPlan', () => {
             data: {
                 type: 'event',
                 label: 'New event',
-                date: '2026-08-08',
+                date: '2026-08-10',
+                endDate: '2026-08-10',
                 status: 'pending',
             },
         });
+    });
+
+    it('moves a weekend append date to the next workday', () => {
+        const plan = buildTimelineAppendPlan({
+            nodes: [timelineNode('friday', '2026-08-28')],
+            type: 'event',
+            nodeId: 'event-1',
+            edgeId: 'edge-1',
+            label: 'New event',
+            fallbackDate: '2026-08-21',
+        });
+
+        expect(plan.node.data).toMatchObject({
+            date: '2026-08-31',
+            endDate: '2026-08-31',
+        });
+        expect(plan.edge?.source).toBe('friday');
     });
 
     it('appends after the latest valid end date and connects from that task', () => {
@@ -83,8 +101,8 @@ describe('buildTimelineAppendPlan', () => {
 
         expect(plan.edge).toBeNull();
         expect(plan.node.data).toMatchObject({
-            date: '2026-08-08',
-            endDate: '2026-08-22',
+            date: '2026-08-10',
+            endDate: '2026-08-24',
             progress: 0,
         });
     });
