@@ -1,4 +1,9 @@
 import type { ProTimelineViewMode } from '../../../hooks/useProTimelineEngine';
+import {
+  normalizeProTimelineZoom,
+  PRO_TIMELINE_MAX_ZOOM,
+  PRO_TIMELINE_MIN_ZOOM,
+} from './proTimelineViewportInteraction';
 
 const VIEW_MODES = new Set<ProTimelineViewMode>(['day', 'week', 'month', 'quarter']);
 
@@ -12,7 +17,26 @@ export const coerceProTimelineViewMode = (
 );
 
 export const stepProTimelineZoom = (current: number, delta: number): number => {
-  const safeCurrent = Number.isFinite(current) ? current : 1;
+  const safeCurrent = normalizeProTimelineZoom(current);
   const safeDelta = Number.isFinite(delta) ? delta : 0;
-  return Math.min(5, Math.max(0.15, safeCurrent + safeDelta));
+  return normalizeProTimelineZoom(safeCurrent + safeDelta);
+};
+
+export type ProTimelineZoomControlState = {
+  zoom: number;
+  percentage: number;
+  canZoomOut: boolean;
+  canReset: boolean;
+  canZoomIn: boolean;
+};
+
+export const getProTimelineZoomControlState = (value: unknown): ProTimelineZoomControlState => {
+  const zoom = normalizeProTimelineZoom(value);
+  return {
+    zoom,
+    percentage: Math.round(zoom * 100),
+    canZoomOut: zoom > PRO_TIMELINE_MIN_ZOOM,
+    canReset: zoom !== 1,
+    canZoomIn: zoom < PRO_TIMELINE_MAX_ZOOM,
+  };
 };

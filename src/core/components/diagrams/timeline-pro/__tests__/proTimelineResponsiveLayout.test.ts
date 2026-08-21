@@ -36,8 +36,9 @@ describe('professional timeline responsive layout', () => {
         expect(css).toMatch(/\.pro-timeline-chrome--scale\s*\{[\s\S]*?bottom:\s*64px !important;/);
     });
 
-    it('keeps the analysis chrome above page management on medium desktop widths', () => {
-        expect(css).toMatch(/@media \(min-width: 769px\) and \(max-width: 1200px\)[\s\S]*?\.pro-timeline-chrome--analysis\s*\{[\s\S]*?bottom:\s*116px !important;/);
+    it('keeps both navigation groups clear of the docked property panel and page management', () => {
+        expect(css).toMatch(/@media \(min-width: 769px\)\s*\{[\s\S]*?\.pro-timeline-chrome--analysis\s*\{[\s\S]*?right:\s*335px !important;[\s\S]*?bottom:\s*168px !important;/);
+        expect(css).toMatch(/@media \(min-width: 769px\)\s*\{[\s\S]*?\.pro-timeline-chrome--scale\s*\{[\s\S]*?right:\s*335px !important;[\s\S]*?bottom:\s*116px !important;/);
     });
 
     it('preserves a usable task-name column on medium desktop widths', () => {

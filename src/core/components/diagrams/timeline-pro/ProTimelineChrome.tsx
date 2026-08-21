@@ -1,9 +1,13 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import { CameraOutlined, DeleteOutlined, TeamOutlined, ZoomInOutlined, ZoomOutOutlined } from '@ant-design/icons';
-import { Button, Segmented, Switch, Tooltip } from 'antd';
+import { Button, Switch, Tooltip } from 'antd';
 
 import type { ProTimelineViewMode } from '../../../hooks/useProTimelineEngine';
-import { coerceProTimelineViewMode, stepProTimelineZoom } from './proTimelineChromeBoundary';
+import {
+  getProTimelineZoomControlState,
+  stepProTimelineZoom,
+} from './proTimelineChromeBoundary';
+import { ProTimelineViewModeControl } from './ProTimelineViewModeControl';
 
 const KEYFRAMES_ID = 'pro-timeline-keyframes';
 
@@ -49,6 +53,8 @@ export const ProTimelineChrome: React.FC<ProTimelineChromeProps> = ({
   onZoomChange,
 }) => {
   const saveBaselineButtonRef = useRef<HTMLButtonElement | null>(null);
+  const zoomControlState = getProTimelineZoomControlState(zoomLevel);
+  const viewModeLabel = ({ day: '天', week: '周', month: '月', quarter: '季' } as const)[viewMode];
   const handleClearBaseline = useCallback(() => {
     onClearBaseline();
     saveBaselineButtonRef.current?.focus();
@@ -120,40 +126,64 @@ export const ProTimelineChrome: React.FC<ProTimelineChromeProps> = ({
       boxShadow: `0 6px 16px ${shadowColor}`, padding: '4px 12px 4px 8px', zIndex: 100,
       display: 'flex', alignItems: 'center', gap: 8,
     }}>
-      <Segmented
-        aria-label="时间轴视图粒度"
-        size="small"
+      <ProTimelineViewModeControl
         value={viewMode}
-        onChange={value => onViewModeChange(coerceProTimelineViewMode(value, viewMode))}
-        options={[
-          { label: '天', value: 'day' },
-          { label: '周', value: 'week' },
-          { label: '月', value: 'month' },
-          { label: '季', value: 'quarter' },
-        ]}
-        style={{ background: 'transparent', fontSize: 12 }}
+        onChange={onViewModeChange}
       />
       <div style={{ width: 1, height: 16, backgroundColor: borderColor }} />
-      <Tooltip title="缩小时间轴区域">
-        <Button aria-label="缩小时间轴" type="text" size="small" shape="circle" icon={<ZoomOutOutlined />} onClick={() => onZoomChange(stepProTimelineZoom(zoomLevel, -0.2))} />
+      <Tooltip title={zoomControlState.canZoomOut ? '缩小时间轴区域' : '已达到最小缩放比例 15%'}>
+        <span>
+          <Button
+            aria-label="缩小时间轴"
+            aria-keyshortcuts="-"
+            type="text"
+            size="small"
+            shape="circle"
+            icon={<ZoomOutOutlined />}
+            disabled={!zoomControlState.canZoomOut}
+            onClick={() => onZoomChange(stepProTimelineZoom(zoomControlState.zoom, -0.2))}
+          />
+        </span>
       </Tooltip>
-      <Tooltip title="点击恢复默认 100% 比例">
+      <Tooltip title={zoomControlState.canReset ? '点击恢复默认 100% 比例' : '当前已是默认 100% 比例'}>
         <button
           type="button"
           aria-label="恢复时间轴到 100%"
+          aria-keyshortcuts="0"
+          disabled={!zoomControlState.canReset}
           onClick={() => onZoomChange(1)}
           style={{
             fontSize: 12, minWidth: 42, textAlign: 'center', fontFamily: 'monospace',
-            cursor: 'pointer', fontWeight: 600, color: secondaryTextColor, userSelect: 'none',
+            cursor: zoomControlState.canReset ? 'pointer' : 'default', fontWeight: 600,
+            color: secondaryTextColor, opacity: zoomControlState.canReset ? 1 : 0.55, userSelect: 'none',
             border: 0, padding: 0, background: 'transparent',
           }}
         >
-          {Math.round(zoomLevel * 100)}%
+          {zoomControlState.percentage}%
         </button>
       </Tooltip>
-      <Tooltip title="放大时间轴区域">
-        <Button aria-label="放大时间轴" type="text" size="small" shape="circle" icon={<ZoomInOutlined />} onClick={() => onZoomChange(stepProTimelineZoom(zoomLevel, 0.2))} />
+      <Tooltip title={zoomControlState.canZoomIn ? '放大时间轴区域' : '已达到最大缩放比例 500%'}>
+        <span>
+          <Button
+            aria-label="放大时间轴"
+            aria-keyshortcuts="+"
+            type="text"
+            size="small"
+            shape="circle"
+            icon={<ZoomInOutlined />}
+            disabled={!zoomControlState.canZoomIn}
+            onClick={() => onZoomChange(stepProTimelineZoom(zoomControlState.zoom, 0.2))}
+          />
+        </span>
       </Tooltip>
+      <span
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0, 0, 0, 0)', whiteSpace: 'nowrap', border: 0 }}
+      >
+        当前视图：{viewModeLabel}，缩放 {zoomControlState.percentage}%
+      </span>
     </div>
     </>
   );
