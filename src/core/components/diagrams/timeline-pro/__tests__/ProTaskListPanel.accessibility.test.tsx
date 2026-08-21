@@ -287,14 +287,19 @@ describe('ProTaskListPanel accessibility', () => {
         expect(onWidthChange).toHaveBeenCalledWith(400);
     });
 
-    it('requires confirmation before deleting a task', () => {
+    it('uses an accessible recoverable confirmation before deleting a task', async () => {
         const onTaskDelete = vi.fn();
         renderPanel({ onTaskDelete });
         fireEvent.focus(screen.getByRole('option', { name: /Project launch/ }));
 
         fireEvent.click(screen.getByRole('button', { name: '删除 Project launch 及其所有子任务' }));
         expect(onTaskDelete).not.toHaveBeenCalled();
-        fireEvent.click(screen.getByText('删 除'));
+        const dialog = await screen.findByRole('dialog');
+        expect(dialog.textContent).toContain('删除后可使用撤销恢复');
+        const confirmButton = screen.getByRole('button', { name: /^删\s*除$/ });
+        expect(confirmButton.classList.contains('ant-btn-primary')).toBe(true);
+        expect(confirmButton.classList.contains('ant-btn-dangerous')).toBe(true);
+        fireEvent.click(confirmButton);
         expect(onTaskDelete).toHaveBeenCalledWith('launch');
     });
 });

@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react';
-import { useNodes, useEdges, useReactFlow, type Node } from '@xyflow/react';
+import { useNodes, useEdges, useReactFlow } from '@xyflow/react';
 import { 
   useProTimelineEngine, 
   calculateSwimlanes, 
@@ -32,6 +32,10 @@ import {
   createProTimelineBaselineSnapshot,
 } from './proTimelineBaselineTransaction';
 import { getProTimelineCriticalPathUnavailableReason } from './proTimelineCriticalPathAvailability';
+import {
+  createProTimelineTaskAddition,
+  createProTimelineTaskDeletion,
+} from './proTimelineTaskTransactions';
 import './ProTimelineCanvas.css';
 
 const ROW_HEIGHT = 42;
@@ -213,31 +217,21 @@ export default function ProTimelineCanvas() {
          const realX = (offsetX - panX) / zoomLevel;
          const startD = xToDate(realX);
          
-         const endD = addDaysToDateOnly(startD, 1);
-
          const newId = `tl-event-${Date.now()}`;
-         const newNode: Node = {
-             id: newId,
-             type: 'timelineNode',
-             position: { x: 0, y: 0 },
-             data: {
-                 label: '新建事件',
-                 type: 'event',
-                 date: startD,
-                 endDate: endD,
-                 status: 'pending',
-                 progress: 0,
-             }
-         };
+         const transaction = createProTimelineTaskAddition(nodes, {
+           id: newId,
+           label: '新建事件',
+           parentId: null,
+           startDate: startD,
+           type: 'event',
+         });
+         if (!transaction.changed) return;
 
-         setNodes(ns => [...ns, newNode]);
-         
-         // 自动选中新创建的节点以呼出属性面板
-         setTimeout(() => {
-             setNodes(ns => ns.map(n => ({ ...n, selected: n.id === newId })));
-         }, 50);
+         requestProTimelineSnapshot();
+         setNodes(transaction.nodes);
+         appMessage.success('已添加事件“新建事件”，可使用撤销恢复。');
      }
-  }, [panX, zoomLevel, xToDate, setNodes]);
+  }, [nodes, panX, zoomLevel, xToDate, setNodes]);
 
   // 前置驱动智能级联自动避让排期核心算法
   const applyAutoScheduling = useCallback((taskId: string, targetStartDate: string, targetEndDate: string) => {
@@ -391,28 +385,16 @@ export default function ProTimelineCanvas() {
   }, [nodes, updateNodeData, applyAutoScheduling]);
 
     const handleTaskDelete = useCallback((taskId: string) => {
-        // 1. 递归收集要删除的节点ID及其后代ID
-        const toDeleteIds = new Set<string>();
-        toDeleteIds.add(taskId);
+        const transaction = createProTimelineTaskDeletion(nodes, edges, taskId);
+        if (!transaction.changed) return;
 
-        const collectDescendants = (parentId: string) => {
-            nodes.forEach(n => {
-                if (n.data?.parentId === parentId) {
-                    if (!toDeleteIds.has(n.id)) {
-                        toDeleteIds.add(n.id);
-                        collectDescendants(n.id);
-                    }
-                }
-            });
-        };
-        collectDescendants(taskId);
-
-        // 2. 更新 nodes 和 edges 状态
-        setNodes(ns => ns.filter(n => !toDeleteIds.has(n.id)));
-        setEdges(eds => eds.filter(e => !toDeleteIds.has(e.source) && !toDeleteIds.has(e.target)));
-        
-        appMessage.success('任务及子任务删除成功！');
-    }, [nodes, setNodes, setEdges]);
+        requestProTimelineSnapshot();
+        setNodes(transaction.nodes);
+        setEdges(transaction.edges);
+        const childCount = Math.max(0, transaction.deletedNodeCount - 1);
+        const childSummary = childCount > 0 ? `及 ${childCount} 个子任务` : '';
+        appMessage.success(`已删除任务${childSummary}，可使用撤销恢复。`);
+    }, [edges, nodes, setNodes, setEdges]);
 
     const onTaskExpandToggle = useCallback((taskId: string) => {
         const node = nodes.find(n => n.id === taskId);
@@ -430,34 +412,20 @@ export default function ProTimelineCanvas() {
             startD = parentTask.data.date as string;
         }
         
-        const isMilestone = type === 'milestone';
-        let endD = startD;
-        if (!isMilestone) {
-            endD = addDaysToDateOnly(startD, 1);
-        }
+        const label = type === 'milestone' ? '新建里程碑' : '新建子阶段';
+        const transaction = createProTimelineTaskAddition(nodes, {
+          id: newId,
+          label,
+          parentId,
+          startDate: startD,
+          type,
+        });
+        if (!transaction.changed) return;
 
-        const newNode: Node = {
-            id: newId,
-            type: 'timelineNode',
-            position: { x: 0, y: 0 },
-            data: {
-                label: isMilestone ? '新建里程碑' : '新建子阶段',
-                type: type,
-                date: startD,
-                endDate: endD,
-                parentId: parentId || undefined,
-                status: 'pending',
-                progress: 0,
-            }
-        };
-
-        setNodes(ns => [...ns, newNode]);
-        
-        // Auto-expand parent
-        if (parentId) {
-            updateNodeData(parentId, { isExpanded: true });
-        }
-    }, [nodes, setNodes, updateNodeData]);
+        requestProTimelineSnapshot();
+        setNodes(transaction.nodes);
+        appMessage.success(`已添加${type === 'milestone' ? '里程碑' : '子阶段'}“${label}”，可使用撤销恢复。`);
+    }, [nodes, setNodes]);
 
   const initPanRef = useRef(false);
   useEffect(() => {

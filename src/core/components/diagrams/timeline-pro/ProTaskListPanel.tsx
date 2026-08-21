@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { ProGanttTask, getWorkDays, addWorkDays, getWorkDaysSigned, useProTimelineEngine } from '../../../hooks/useProTimelineEngine';
-import { Dropdown, Popconfirm, Select, Tooltip } from 'antd';
+import { Dropdown, Select, Tooltip } from 'antd';
 import { CaretRightOutlined, CaretDownOutlined, CalendarOutlined, FlagFilled, ClockCircleOutlined, FolderOpenOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useTheme } from '../../../themes/useCoreTheme';
 import { todayDateOnly } from '../../../utils/dateOnly';
@@ -13,6 +13,8 @@ import {
     PRO_TASK_LIST_MIN_WIDTH,
 } from './proTaskListInteraction';
 import { isProTimelineAdditiveSelection } from './proTimelineViewportInteraction';
+import { getProTimelineDeletionFallbackId } from './proTimelineTaskTransactions';
+import { ProTaskDeleteDialog } from './ProTaskDeleteDialog';
 
 export interface ProTaskListPanelProps {
     tasks: ProGanttTask[];
@@ -43,6 +45,11 @@ interface EditingCellState {
     value: string;
 }
 
+interface PendingTaskDeletion {
+    id: string;
+    name: string;
+}
+
 const getTypeIcons = (theme: Theme | null): Record<string, React.ReactNode> => ({
     phase:     <CalendarOutlined style={{ fontSize: 13, color: theme?.palette?.success?.main || '#52c41a' }} />,
     event:     <ClockCircleOutlined style={{ fontSize: 13, color: theme?.palette?.primary?.main || '#1890ff' }} />,
@@ -57,7 +64,10 @@ export default function ProTaskListPanel({
     const [isResizing, setIsResizing] = useState(false);
     const [editingCell, setEditingCell] = useState<EditingCellState | null>(null);
     const [focusedTaskId, setFocusedTaskId] = useState<string | null>(null);
+    const [pendingTaskDeletion, setPendingTaskDeletion] = useState<PendingTaskDeletion | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+    const taskRowRefs = useRef(new Map<string, HTMLDivElement>());
+    const deletionFocusTargetRef = useRef<string | null>(null);
     const editingOriginRef = useRef<HTMLDivElement | null>(null);
     const restoreEditingOriginFocusRef = useRef(false);
     const [theme] = useTheme();
@@ -96,6 +106,13 @@ export default function ProTaskListPanel({
         restoreEditingOriginFocusRef.current = false;
         editingOriginRef.current?.focus({ preventScroll: true });
     }, [editingCell]);
+
+    useEffect(() => {
+        const focusTargetId = deletionFocusTargetRef.current;
+        if (!focusTargetId || !tasks.some(task => task.id === focusTargetId)) return;
+        deletionFocusTargetRef.current = null;
+        taskRowRefs.current.get(focusTargetId)?.focus({ preventScroll: true });
+    }, [tasks]);
 
     const getAvatarColor = useCallback((name: string) => {
         const colors = [
@@ -269,6 +286,10 @@ export default function ProTaskListPanel({
                     return (
                         <div
                             key={task.id}
+                            ref={(element) => {
+                                if (element) taskRowRefs.current.set(task.id, element);
+                                else taskRowRefs.current.delete(task.id);
+                            }}
                             aria-label={`${accessibleTaskName}，开始 ${task.startDate || '未设置'}，工期 ${duration ?? '未设置'} 天`}
                             aria-selected={isSelected}
                             aria-keyshortcuts="Enter Space Control+Enter Meta+Enter F2 ArrowLeft ArrowRight"
@@ -423,25 +444,18 @@ export default function ProTaskListPanel({
                                         </button>
                                     </Dropdown>
 
-                                    <Popconfirm
-                                        title={`删除“${accessibleTaskName}”？`}
-                                        description="将同时删除其所有子任务和相关依赖关系。"
-                                        okText="删除"
-                                        cancelText="取消"
-                                        okButtonProps={{ danger: true }}
-                                        onConfirm={() => onTaskDelete?.(task.id)}
+                                    <button
+                                        type="button"
+                                        aria-haspopup="dialog"
+                                        aria-label={`删除 ${accessibleTaskName} 及其所有子任务`}
+                                        style={{ width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', borderRadius: 4, color: theme?.palette?.error?.main || '#ff4d4f', opacity: 0.8 }}
+                                        onClick={() => setPendingTaskDeletion({ id: task.id, name: accessibleTaskName })}
+                                        onMouseEnter={e => e.currentTarget.style.background = isDark ? 'rgba(255,77,79,0.15)' : '#fff1f0'}
+                                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                                        title="删除该任务及其所有子任务"
                                     >
-                                        <button
-                                            type="button"
-                                            aria-label={`删除 ${accessibleTaskName} 及其所有子任务`}
-                                            style={{ width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', borderRadius: 4, color: theme?.palette?.error?.main || '#ff4d4f', opacity: 0.8 }}
-                                            onMouseEnter={e => e.currentTarget.style.background = isDark ? 'rgba(255,77,79,0.15)' : '#fff1f0'}
-                                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                                            title="删除该任务及其所有子任务"
-                                        >
-                                            <DeleteOutlined aria-hidden style={{ fontSize: 12 }} />
-                                        </button>
-                                    </Popconfirm>
+                                        <DeleteOutlined aria-hidden style={{ fontSize: 12 }} />
+                                    </button>
                                 </div>
                             )}
 
@@ -640,6 +654,19 @@ export default function ProTaskListPanel({
                     );
                 })}
             </div>
+
+            <ProTaskDeleteDialog
+                open={Boolean(pendingTaskDeletion)}
+                taskName={pendingTaskDeletion?.name ?? ''}
+                onCancel={() => setPendingTaskDeletion(null)}
+                onConfirm={() => {
+                    if (!pendingTaskDeletion) return;
+                    deletionFocusTargetRef.current = getProTimelineDeletionFallbackId(tasks, pendingTaskDeletion.id);
+                    const taskId = pendingTaskDeletion.id;
+                    setPendingTaskDeletion(null);
+                    onTaskDelete?.(taskId);
+                }}
+            />
 
             {/* 拖拽调整宽度的分隔条 */}
             <div
