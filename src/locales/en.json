@@ -81,7 +81,8 @@
             "flowchart": "Flowchart",
             "mindmap": "Mind map",
             "timeline": "Timeline",
-            "architecture": "Architecture"
+            "architecture": "Architecture",
+            "default": "Diagram"
         },
         "diagramTypeDescriptions": {
             "mindmap": "Explore ideas and relationships",

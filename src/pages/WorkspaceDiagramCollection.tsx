@@ -146,6 +146,13 @@ export const WorkspaceDiagramCollection = ({
     templates: t('workspace.industryTemplates'),
     general_templates: t('workspace.generalTemplates'),
   } satisfies Record<FilterViewType, string>;
+  const diagramTypeLabel: Readonly<Record<string, string>> = {
+    flowchart: t('workspace.diagramTypes.flowchart'),
+    mindmap: t('workspace.diagramTypes.mindmap'),
+    timeline: t('workspace.diagramTypes.timeline'),
+    architecture: t('workspace.diagramTypes.architecture'),
+    default: t('workspace.diagramTypes.default'),
+  };
 
   const getCardMenuKey = (item: UnifiedDiagramItem): string => `${item.source}:${item.id}`;
 
@@ -354,6 +361,7 @@ export const WorkspaceDiagramCollection = ({
                         <div className={viewMode === 'grid' ? 'diagram-grid' : 'diagram-list'}>
                             {filteredItems.map(item => {
                                 const diagramType = detectDiagramType(item);
+                                const localizedDiagramType = diagramTypeLabel[diagramType] ?? diagramTypeLabel.default;
                                 const nodeCount = getNodeCount(item);
                                 const cardMenuKey = getCardMenuKey(item);
                                 const openKey = getWorkspaceDiagramOpenKey(item);
@@ -387,7 +395,7 @@ export const WorkspaceDiagramCollection = ({
                                                 {TYPE_ICON_MAP[diagramType] || TYPE_ICON_MAP.default}
                                             </div>
                                             <div className="list-row-title">{item.title}</div>
-                                            <span className={`type-badge ${diagramType}`}>{diagramType}</span>
+                                            <span className={`type-badge ${diagramType}`}>{localizedDiagramType}</span>
                                             <span className="list-row-time">{formatTimeAgo(item.updatedAt, locale, unknownTime)}</span>
                                             {nodeCount != null && (
                                                 <span className="node-count-chip"><Boxes size={14} strokeWidth={2} /> {nodeCount}</span>
@@ -559,7 +567,7 @@ export const WorkspaceDiagramCollection = ({
                                             <div className="diagram-card-meta">
                                                 <div className="diagram-card-meta-left">
                                                     <span className={`type-badge ${diagramType}`}>
-                                                        {diagramType}
+                                                        {localizedDiagramType}
                                                     </span>
                                                     <span>{formatTimeAgo(item.updatedAt, locale, unknownTime)}</span>
                                                 </div>

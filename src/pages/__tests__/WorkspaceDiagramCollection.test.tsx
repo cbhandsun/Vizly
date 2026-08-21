@@ -25,6 +25,7 @@ const renderCollection = (
   filteredItems: UnifiedDiagramItem[] = [item],
   searchQuery = '',
   activeView: FilterViewType = 'templates',
+  viewMode: ViewMode = 'grid',
 ): string => renderToStaticMarkup(
   <WorkspaceDiagramCollection
     activeView={activeView}
@@ -33,7 +34,7 @@ const renderCollection = (
     filteredItems={filteredItems}
     sortKey="updated"
     onSortKeyChange={() => undefined}
-    viewMode="grid"
+    viewMode={viewMode}
     onViewModeChange={() => undefined}
     loading={false}
     openingDiagramKeys={new Set()}
@@ -157,6 +158,30 @@ describe('WorkspaceDiagramCollection', () => {
     };
 
     expect(renderCollection(item)).not.toContain('remote-diagram-cover');
+  });
+
+  it('localizes diagram type badges in grid and list views with a safe fallback', () => {
+    const mindMap: UnifiedDiagramItem = {
+      id: 'mindmap-localized',
+      title: 'Mind map',
+      updatedAt: 1,
+      source: 'local',
+      role: 'owner',
+      raw: { id: 'mindmap-localized', type: 'mindmap' } as never,
+    };
+    const remoteTemplate: UnifiedDiagramItem = {
+      id: 'template-default-type',
+      title: 'Template',
+      updatedAt: 1,
+      source: 'template',
+      role: 'template',
+      raw: { id: 'template-default-type' } as never,
+    };
+
+    expect(renderCollection(mindMap)).toContain('workspace.diagramTypes.mindmap');
+    expect(renderCollection(mindMap, [mindMap], '', 'recent', 'list'))
+      .toContain('workspace.diagramTypes.mindmap');
+    expect(renderCollection(remoteTemplate)).toContain('workspace.diagramTypes.default');
   });
 
   it('exposes the active filter and current sort mode without relying on color', () => {

@@ -80,7 +80,8 @@
             "flowchart": "流程图",
             "mindmap": "思维导图",
             "timeline": "时间线",
-            "architecture": "架构图"
+            "architecture": "架构图",
+            "default": "图表"
         },
         "diagramTypeDescriptions": {
             "mindmap": "梳理想法与关联关系",
