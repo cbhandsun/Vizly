@@ -657,7 +657,10 @@ export default function ProTaskListPanel({
 
             <ProTaskDeleteDialog
                 open={Boolean(pendingTaskDeletion)}
-                taskName={pendingTaskDeletion?.name ?? ''}
+                title={pendingTaskDeletion?.name ? `删除“${pendingTaskDeletion.name}”？` : '删除任务？'}
+                description="将同时删除其所有子任务和相关依赖关系；删除后可使用撤销恢复。"
+                confirmText="删除"
+                cancelText="取消"
                 onCancel={() => setPendingTaskDeletion(null)}
                 onConfirm={() => {
                     if (!pendingTaskDeletion) return;

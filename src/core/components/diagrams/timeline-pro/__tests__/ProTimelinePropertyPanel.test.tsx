@@ -164,7 +164,7 @@ describe('ProTimelinePropertyPanel', () => {
             .toBe('timeline-property-date-validation');
     });
 
-    it('snapshots cascade deletion and keeps unrelated tasks and connectors', () => {
+    it('uses an accessible dialog and snapshots cascade deletion', async () => {
         const root = phaseNode('root');
         const child = phaseNode('child', 'root');
         const other = phaseNode('other');
@@ -178,8 +178,13 @@ describe('ProTimelinePropertyPanel', () => {
         render(<ProTimelinePropertyPanel ctx={context} selectedNodes={[root]} selectedEdges={[]} />);
 
         fireEvent.click(screen.getByRole('button', { name: 'Delete task' }));
-        expect(screen.getByText('This also removes its subtasks and related connectors. You can undo this action.')).toBeTruthy();
-        fireEvent.click(screen.getByRole('button', { name: 'Confirm deletion' }));
+        const dialog = await screen.findByRole('dialog');
+        expect(dialog.textContent).toContain('This also removes its subtasks and related connectors. You can undo this action.');
+        expect(context.takeSnapshot).not.toHaveBeenCalled();
+        const confirmButton = screen.getByRole('button', { name: 'Confirm deletion' });
+        expect(confirmButton.classList.contains('ant-btn-primary')).toBe(true);
+        expect(confirmButton.classList.contains('ant-btn-dangerous')).toBe(true);
+        fireEvent.click(confirmButton);
 
         expect(context.takeSnapshot).toHaveBeenCalledTimes(1);
         expect(getNodes().map(node => node.id)).toEqual(['other']);

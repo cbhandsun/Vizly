@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { Edge, Node } from '@xyflow/react';
-import { Collapse, Typography, Empty, Input, DatePicker, Slider, Select, Divider, Button, Popconfirm } from 'antd';
+import { Collapse, Typography, Empty, Input, DatePicker, Slider, Select, Divider, Button } from 'antd';
 import { SettingOutlined, DeleteOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useTranslation } from 'react-i18next';
@@ -15,6 +15,7 @@ import {
     type TimelineDateField,
 } from './timelinePropertyActions';
 import { createTimelineDateValidationMessage } from './timelineDateValidationFeedback';
+import { ProTaskDeleteDialog } from './ProTaskDeleteDialog';
 
 const { Text } = Typography;
 
@@ -28,6 +29,7 @@ export const ProTimelinePropertyPanel: React.FC<ProTimelinePropertyPanelProps> =
     ctx, selectedNodes
 }) => {
     const { t } = useTranslation();
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [theme] = useTheme();
     const continuousEditRef = useRef<string | null>(null);
     const isDark = theme?.mode === 'dark';
@@ -343,26 +345,31 @@ export const ProTimelinePropertyPanel: React.FC<ProTimelinePropertyPanelProps> =
                 />
             </div>
             <div style={{ padding: '16px', borderTop: `1px solid ${borderColor}`, display: 'flex', justifyContent: 'center' }}>
-                <Popconfirm
-                    title={t('plugins.timeline.propertyPanel.deleteConfirmTitle')}
-                    description={t('plugins.timeline.propertyPanel.deleteConfirmDescription')}
-                    onConfirm={handleDelete}
-                    okText={t('plugins.timeline.propertyPanel.deleteConfirm')}
-                    cancelText={t('common.cancel')}
-                    okButtonProps={{ danger: true }}
+                <Button
+                    aria-haspopup="dialog"
+                    aria-label={t('plugins.timeline.propertyPanel.deleteTask')}
+                    type="primary"
+                    danger
+                    ghost
+                    icon={<DeleteOutlined />}
+                    style={{ width: '100%', borderRadius: 8 }}
+                    onClick={() => setDeleteDialogOpen(true)}
                 >
-                    <Button 
-                        aria-label={t('plugins.timeline.propertyPanel.deleteTask')}
-                        type="primary" 
-                        danger 
-                        ghost 
-                        icon={<DeleteOutlined />}
-                        style={{ width: '100%', borderRadius: 8 }}
-                    >
-                        {t('plugins.timeline.propertyPanel.deleteTask')}
-                    </Button>
-                </Popconfirm>
+                    {t('plugins.timeline.propertyPanel.deleteTask')}
+                </Button>
             </div>
+            <ProTaskDeleteDialog
+                open={deleteDialogOpen}
+                title={t('plugins.timeline.propertyPanel.deleteConfirmTitle')}
+                description={t('plugins.timeline.propertyPanel.deleteConfirmDescription')}
+                confirmText={t('plugins.timeline.propertyPanel.deleteConfirm')}
+                cancelText={t('common.cancel')}
+                onCancel={() => setDeleteDialogOpen(false)}
+                onConfirm={() => {
+                    setDeleteDialogOpen(false);
+                    handleDelete();
+                }}
+            />
         </div>
     );
 };
