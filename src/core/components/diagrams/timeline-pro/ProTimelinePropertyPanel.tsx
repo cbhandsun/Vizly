@@ -11,6 +11,8 @@ import { getWorkDaysSigned } from '../../../hooks/useProTimelineEngine';
 import {
     buildTimelineDateUpdate,
     buildTimelineDeletionPlan,
+    buildTimelineProgressUpdate,
+    buildTimelineStatusUpdate,
     readTimelineProgress,
     readTimelineTaskPriority,
     readTimelineTaskStatus,
@@ -58,26 +60,38 @@ const ProTimelinePropertyPanelContent: React.FC<ProTimelinePropertyPanelProps> =
         typeof rawTaskType === 'string' ? rawTaskType : '',
     );
 
-    const updateNodeData = useCallback((key: string, value: unknown, continuous = false) => {
+    const updateNodeDataPatch = useCallback((
+        updates: Record<string, unknown>,
+        editKey: string,
+        continuous = false,
+    ) => {
         if (!selectedNodes || !selectedNodes[0]) return;
         const nodeId = selectedNodes[0].id;
         const setNodes = ctx?.setNodes;
         if (!setNodes) return;
         const currentNode = ctx.getNodes().find(node => node.id === nodeId);
-        if (!currentNode || Object.is(currentNode.data?.[key], value)) return;
+        if (!currentNode) return;
+        const changedUpdates = Object.fromEntries(
+            Object.entries(updates).filter(([key, value]) => !Object.is(currentNode.data?.[key], value)),
+        );
+        if (Object.keys(changedUpdates).length === 0) return;
 
-        const editToken = `${nodeId}:${key}`;
+        const editToken = `${nodeId}:${editKey}`;
         if (!continuous || continuousEditRef.current !== editToken) {
             ctx.takeSnapshot();
             if (continuous) continuousEditRef.current = editToken;
         }
         setNodes((nds: Node[]) => nds.map((n: Node) => {
             if (n.id === nodeId) {
-                return { ...n, data: { ...n.data, [key]: value } };
+                return { ...n, data: { ...n.data, ...changedUpdates } };
             }
             return n;
         }));
     }, [selectedNodes, ctx]);
+
+    const updateNodeData = useCallback((key: string, value: unknown, continuous = false) => {
+        updateNodeDataPatch({ [key]: value }, key, continuous);
+    }, [updateNodeDataPatch]);
 
     const finishContinuousEdit = useCallback((key: string) => {
         if (!activeNodeId) return;
@@ -210,7 +224,10 @@ const ProTimelinePropertyPanelContent: React.FC<ProTimelinePropertyPanelProps> =
                                 aria-label={t('plugins.timeline.propertyPanel.fields.status')}
                                 value={taskStatus}
                                 style={{ width: '100%' }}
-                                onChange={val => updateNodeData('status', val)}
+                                onChange={val => updateNodeDataPatch(
+                                    buildTimelineStatusUpdate(nodeData, val),
+                                    'status',
+                                )}
                                 options={[
                                     { value: 'pending', label: t('plugins.timeline.propertyPanel.statuses.pending') },
                                     { value: 'active', label: t('plugins.timeline.propertyPanel.statuses.active') },
@@ -313,7 +330,11 @@ const ProTimelinePropertyPanelContent: React.FC<ProTimelinePropertyPanelProps> =
                                 disabled={taskType === 'summary'}
                                 min={0} max={100} 
                                 value={taskProgress}
-                                onChange={val => updateNodeData('progress', val, true)}
+                                onChange={val => updateNodeDataPatch(
+                                    buildTimelineProgressUpdate(val),
+                                    'progress',
+                                    true,
+                                )}
                                 onChangeComplete={() => finishContinuousEdit('progress')}
                             />
                         </div>

@@ -48,6 +48,33 @@ export const readTimelineProgress = (value: unknown): number => {
     return Math.min(100, Math.max(0, numeric));
 };
 
+export interface TimelineStatusProgressPatch {
+    [key: string]: unknown;
+    status: TimelineTaskStatus;
+    progress?: number;
+}
+
+export const buildTimelineStatusUpdate = (
+    data: Record<string, unknown>,
+    value: unknown,
+): TimelineStatusProgressPatch => {
+    const status = readTimelineTaskStatus(value);
+    if (readTimelineTaskType(data.type) !== 'phase') return { status };
+    if (status === 'done') return { status, progress: 100 };
+    if (status === 'pending') return { status, progress: 0 };
+
+    const progress = readTimelineProgress(data.progress);
+    return progress >= 100 ? { status, progress: 99 } : { status };
+};
+
+export const buildTimelineProgressUpdate = (value: unknown): TimelineStatusProgressPatch & {
+    progress: number;
+} => {
+    const progress = readTimelineProgress(value);
+    const status = progress <= 0 ? 'pending' : progress >= 100 ? 'done' : 'active';
+    return { progress, status };
+};
+
 export const sanitizeTimelineText = (value: unknown, maxLength: number): string => {
     if (typeof value !== 'string' || maxLength <= 0) return '';
     const sanitized = Array.from(value, character => {

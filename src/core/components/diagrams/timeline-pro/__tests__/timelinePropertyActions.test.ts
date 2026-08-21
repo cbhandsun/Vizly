@@ -4,6 +4,8 @@ import { describe, expect, it } from 'vitest';
 import {
     buildTimelineDateUpdate,
     buildTimelineDeletionPlan,
+    buildTimelineProgressUpdate,
+    buildTimelineStatusUpdate,
     readTimelineDate,
     readTimelineProgress,
     readTimelineTaskPriority,
@@ -45,6 +47,34 @@ describe('timelinePropertyActions', () => {
         expect(sanitizeTimelineText('😀😀😀', 2)).toBe('😀😀');
         expect(sanitizeTimelineText({ unsafe: true }, 20)).toBe('');
         expect(sanitizeTimelineText('unchanged', 0)).toBe('');
+    });
+
+    it('keeps phase status and progress aligned at lifecycle boundaries', () => {
+        expect(buildTimelineStatusUpdate({ type: 'phase', progress: 35 }, 'done')).toEqual({
+            status: 'done',
+            progress: 100,
+        });
+        expect(buildTimelineStatusUpdate({ type: 'phase', progress: 35 }, 'pending')).toEqual({
+            status: 'pending',
+            progress: 0,
+        });
+        expect(buildTimelineStatusUpdate({ type: 'phase', progress: 100 }, 'active')).toEqual({
+            status: 'active',
+            progress: 99,
+        });
+        expect(buildTimelineStatusUpdate({ type: 'event', progress: 35 }, 'done')).toEqual({
+            status: 'done',
+        });
+    });
+
+    it('derives task lifecycle status from normalized progress', () => {
+        expect(buildTimelineProgressUpdate(-10)).toEqual({ progress: 0, status: 'pending' });
+        expect(buildTimelineProgressUpdate(42)).toEqual({ progress: 42, status: 'active' });
+        expect(buildTimelineProgressUpdate('100')).toEqual({ progress: 100, status: 'done' });
+        expect(buildTimelineProgressUpdate(Number.POSITIVE_INFINITY)).toEqual({
+            progress: 0,
+            status: 'pending',
+        });
     });
 
     it('rejects reversed ranges without mutating the task data', () => {
