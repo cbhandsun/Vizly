@@ -81,12 +81,16 @@ export const MindMapTaskKanban: React.FC = () => {
     if (!mind) return;
     try {
       const data = mind.getData();
-      const leafTasks = extractKanbanTasks(data.nodeData);
+      const leafTasks = extractKanbanTasks(
+        data.nodeData,
+        [],
+        t('plugins.mindmap.untitledNode'),
+      );
       setTasks(leafTasks);
     } catch (err) {
       logMindmapKanbanRefreshFailure(err);
     }
-  }, [mind]);
+  }, [mind, t]);
 
   // 监听脑图变化，同步刷新看板
   useEffect(() => {

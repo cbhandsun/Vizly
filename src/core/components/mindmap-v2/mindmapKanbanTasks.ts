@@ -18,8 +18,9 @@ type TaskNode = NodeObj & { task?: MindMapTaskMeta };
 export const extractKanbanTasks = (
     node: NodeObj,
     ancestors: string[] = [],
+    untitledTopic = 'Untitled node',
 ): KanbanTask[] => {
-    const currentAncestors = [...ancestors, node.topic];
+    const currentAncestors = [...ancestors, node.topic || untitledTopic];
     const hasTaskMeta = Boolean((node as TaskNode).task);
     const isLeaf = !node.children || node.children.length === 0;
 
@@ -27,7 +28,7 @@ export const extractKanbanTasks = (
         const task = getTaskMeta(node);
         return [{
             id: node.id,
-            topic: node.topic || '(无标题)',
+            topic: node.topic || untitledTopic,
             note: node.note,
             status: task.status,
             priority: task.priority,
@@ -38,5 +39,7 @@ export const extractKanbanTasks = (
         }];
     }
 
-    return (node.children ?? []).flatMap(child => extractKanbanTasks(child, currentAncestors));
+    return (node.children ?? []).flatMap(child => (
+        extractKanbanTasks(child, currentAncestors, untitledTopic)
+    ));
 };

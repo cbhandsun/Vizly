@@ -116,7 +116,7 @@ describe('mindElixirPersistence', () => {
 
     expect(data.nodeData.children?.[0]).toMatchObject({
       id: 'child',
-      topic: '(无标题)',
+      topic: 'Untitled node',
     });
   });
 

@@ -58,10 +58,10 @@ describe('extractKanbanTasks', () => {
     it('returns the root as a task when the tree has no children', () => {
         const root = { id: 'root', topic: '', children: [] } as NodeObj;
 
-        expect(extractKanbanTasks(root)).toEqual([
+        expect(extractKanbanTasks(root, [], '未命名节点')).toEqual([
             expect.objectContaining({
                 id: 'root',
-                topic: '(无标题)',
+                topic: '未命名节点',
                 ancestors: [],
             }),
         ]);

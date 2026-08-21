@@ -2657,6 +2657,7 @@
         "mindmap": {
             "title": "专业脑图",
             "newNode": "新节点",
+            "untitledNode": "未命名节点",
             "collapseAll": "折叠所有分支",
             "expandAll": "展开所有分支",
             "fitView": "适应视口",

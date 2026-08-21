@@ -1,4 +1,5 @@
 import type { MindElixirData, MindElixirInstance, NodeObj } from 'mind-elixir';
+import i18n from 'i18next';
 import { toSafeExternalUrl, toSafeImageUrl } from '../../utils/sanitizeHtml';
 
 export const MINDMAP_MAX_NODES = 500;
@@ -15,6 +16,9 @@ const DEFAULT_BOUNDARY_COLOR = '#818cf8';
 const DEFAULT_BOUNDARY_TITLE = '分组';
 const MIN_IMAGE_DIMENSION = 1;
 const MAX_IMAGE_DIMENSION = 2048;
+const FALLBACK_UNTITLED_TOPIC = 'Untitled node';
+const LEGACY_UNTITLED_TOPIC = '(无标题)';
+const UNTITLED_TOPIC_KEY = 'plugins.mindmap.untitledNode';
 
 interface CleanContext {
     count: number;
@@ -51,8 +55,14 @@ const boundedStringArray = (value: unknown, maxItems: number, maxLength: number)
     return cleaned.length > 0 ? cleaned : undefined;
 };
 
-export const cleanMindMapTopic = (value: unknown, fallback = '(无标题)'): string => (
-    boundedText(value, fallback, MINDMAP_MAX_TOPIC_LENGTH)
+export const resolveMindMapUntitledTopic = (): string => {
+    const localized = i18n.isInitialized ? i18n.t(UNTITLED_TOPIC_KEY) : '';
+    const safeLocalized = localized === UNTITLED_TOPIC_KEY ? '' : localized;
+    return boundedText(safeLocalized, FALLBACK_UNTITLED_TOPIC, MINDMAP_MAX_TOPIC_LENGTH);
+};
+
+export const cleanMindMapTopic = (value: unknown, fallback?: string): string => (
+    boundedText(value, fallback ?? resolveMindMapUntitledTopic(), MINDMAP_MAX_TOPIC_LENGTH)
 );
 
 export const cleanMindMapNote = (value: unknown): string | undefined => {
@@ -160,7 +170,7 @@ export function cleanAndValidateTree(
     const children = Array.isArray(input.children) ? input.children : [];
     const clean: VizlyNodeObj = {
         id,
-        topic: cleanMindMapTopic(input.topic),
+        topic: cleanMindMapTopic(input.topic === LEGACY_UNTITLED_TOPIC ? undefined : input.topic),
         expanded: isRoot ? true : (input.expanded !== false),
         children: children
             .slice(0, MINDMAP_MAX_CHILDREN_PER_NODE)

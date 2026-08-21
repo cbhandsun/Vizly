@@ -4,6 +4,7 @@
  */
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import type { MindElixirData, NodeObj } from 'mind-elixir';
+import { useTranslation } from 'react-i18next';
 import {
     CloseOutlined,
     DeleteOutlined,
@@ -44,16 +45,21 @@ interface FlatNode {
     icons: string[];
 }
 
-function flattenTree(node: NodeObj, depth = 0, result: FlatNode[] = []): FlatNode[] {
+function flattenTree(
+    node: NodeObj,
+    untitledTopic: string,
+    depth = 0,
+    result: FlatNode[] = [],
+): FlatNode[] {
     result.push({
         id: node.id,
-        topic: node.topic || '(无标题)',
+        topic: node.topic || untitledTopic,
         depth,
         hasNote: !!node.note,
         hasLink: !!node.hyperLink,
         icons: ((node.icons as string[]) ?? []).slice(0, 2),
     });
-    (node.children ?? []).forEach(c => flattenTree(c, depth + 1, result));
+    (node.children ?? []).forEach(c => flattenTree(c, untitledTopic, depth + 1, result));
     return result;
 }
 
@@ -80,6 +86,7 @@ function findNodeAndParent(
 
 // ─── Component ────────────────────────────────────────────────────────────────
 const MindMapOutlinePanel: React.FC = () => {
+    const { t } = useTranslation();
     const [open, setOpen] = useState(false);
     const [nodes, setNodes] = useState<FlatNode[]>([]);
     const [query, setQuery] = useState('');
@@ -103,11 +110,11 @@ const MindMapOutlinePanel: React.FC = () => {
         try {
             const data = mind?.getData();
             if (!data) return;
-            setNodes(flattenTree(data.nodeData));
+            setNodes(flattenTree(data.nodeData, t('plugins.mindmap.untitledNode')));
         } catch (error) {
             logMindmapOutlineRefreshFailure(error);
         }
-    }, [mind]);
+    }, [mind, t]);
 
     const handleDeleted = useCallback(() => {
         window.setTimeout(refresh, 100);

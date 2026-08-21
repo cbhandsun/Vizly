@@ -32,9 +32,19 @@ describe('mind map auxiliary panel commercial audit contract', () => {
         expect(source).toContain('requestDelete(node)');
         expect(source).toContain('{deleteDialog}');
         expect(source).toContain('onClick={() => setOutlineOpen(false)}');
+        expect(source).toContain("t('plugins.mindmap.untitledNode')");
+        expect(source).not.toContain("node.topic || '(无标题)'");
         expect(deletionSource).toContain('mask={{ closable: !pending }}');
         expect(deletionSource).not.toContain('maskClosable=');
         expect(source).not.toContain('placeholder="🔍');
+    });
+
+    it('uses the active locale for blank task topics', () => {
+        const source = readSource('MindMapTaskKanban.tsx');
+        const model = readSource('mindmapKanbanTasks.ts');
+
+        expect(source).toContain("t('plugins.mindmap.untitledNode')");
+        expect(model).not.toContain("node.topic || '(无标题)'");
     });
 
     it('uses a named, confirmed, top-layer restore action for each history snapshot', () => {
