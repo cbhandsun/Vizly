@@ -1,0 +1,57 @@
+.backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgb(99 102 241 / 8%);
+    pointer-events: none;
+}
+
+.message {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    max-width: min(520px, calc(100% - 48px));
+    padding: 16px 22px;
+    color: #4f46e5;
+    background: rgb(255 255 255 / 92%);
+    border: 2px dashed rgb(99 102 241 / 55%);
+    border-radius: 14px;
+    box-shadow: 0 16px 44px rgb(15 23 42 / 18%);
+    backdrop-filter: blur(12px);
+}
+
+.icon {
+    flex: 0 0 auto;
+    font-size: 24px;
+}
+
+.copy {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+}
+
+.copy strong {
+    font-size: 15px;
+    line-height: 1.4;
+}
+
+.copy span {
+    color: #475569;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.45;
+}
+
+:global([data-theme='dark']) .message {
+    color: #c7d2fe;
+    background: rgb(15 23 42 / 92%);
+    box-shadow: 0 16px 44px rgb(2 6 23 / 42%);
+}
+
+:global([data-theme='dark']) .copy span {
+    color: #cbd5e1;
+}

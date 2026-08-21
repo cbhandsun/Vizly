@@ -2505,6 +2505,18 @@
             "title": "Mind Map Pro",
             "newNode": "New node",
             "untitledNode": "Untitled node",
+            "fileDrop": {
+                "title": "Drop to import your mind map",
+                "description": "Supports Markdown and OPML. The current map is replaced and can be restored with Undo.",
+                "file": "file",
+                "success": "{{format}} imported. Use Undo to restore the previous map.",
+                "inProgress": "Another mind map file is still being read. Wait for it to finish and try again.",
+                "invalid": "This file is not supported or is invalid. Choose a valid Markdown or OPML file.",
+                "tooLarge": "{{format}} is too large to import. Choose a smaller file.",
+                "readFailed": "{{format}} could not be read. Check the file and try again.",
+                "aborted": "{{format}} import was canceled.",
+                "scopeChanged": "The active mind map changed, so the file was not imported. Drop it again on the current map."
+            },
             "collapseAll": "Collapse All Branches",
             "expandAll": "Expand All Branches",
             "fitView": "Fit to Viewport",

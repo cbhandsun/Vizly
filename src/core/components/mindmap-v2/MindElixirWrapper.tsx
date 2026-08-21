@@ -74,12 +74,18 @@ import { coerceMindElixirDirection } from './mindElixirDirection';
 import { projectMindMapTreeToBridge } from './mindmapBridgeProjection';
 import { bindMindElixirOperationEffects } from './mindElixirOperationEffects';
 import { applyMindElixirPalette, clearMindElixirPalette } from './mindElixirThemeDom';
-import { useMindElixirFileDrop } from './useMindElixirFileDrop';
+import {
+    isMindMapFileDropLeavingContainer,
+    type MindMapFileDropStatus,
+    useMindElixirFileDrop,
+} from './useMindElixirFileDrop';
 import type { FlowDataBridgeEntry } from '../../utils/flowDataBridge';
 import { loadMindElixirData, saveMindElixirData } from './mindElixirPersistence';
 import { scheduleMindMapInitialViewport } from './mindmapInitialViewport';
 import { setActiveMindMapSelection } from './mindMapSelectionStore';
 import { bindMindMapHyperlinkAccessibility } from './mindMapHyperlinkAccessibility';
+import { appMessage } from '@/core/utils/antdStaticBridge';
+import { MindMapFileDropOverlay } from './MindMapFileDropOverlay';
 
 function isMindMapTextEditingTarget(target: EventTarget | null): boolean {
     if (!(target instanceof HTMLElement)) return false;
@@ -542,15 +548,44 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
         };
     }, [ctx, instance]);
 
-    const { handleDragOver, handleDrop } = useMindElixirFileDrop(mindRef);
+    const handleFileDropStatus = useCallback((status: MindMapFileDropStatus) => {
+        if (status.kind === 'success') {
+            appMessage.success(i18n.t('plugins.mindmap.fileDrop.success', { format: status.format }));
+            return;
+        }
+        const failureKey = {
+            aborted: 'aborted',
+            'in-progress': 'inProgress',
+            invalid: 'invalid',
+            read: 'readFailed',
+            'scope-changed': 'scopeChanged',
+            'too-large': 'tooLarge',
+        }[status.reason];
+        appMessage.warning(i18n.t(`plugins.mindmap.fileDrop.${failureKey}`, {
+            format: status.format ?? i18n.t('plugins.mindmap.fileDrop.file'),
+        }));
+    }, []);
+
+    const { handleDragOver, handleDrop } = useMindElixirFileDrop(mindRef, {
+        onStatus: handleFileDropStatus,
+    });
 
     const [isDragOver, setIsDragOver] = useState(false);
 
     return (
         <MindElixirContext.Provider value={{ instance, selectedNode }}>
             <div
-                onDragOver={(e) => { handleDragOver(e); setIsDragOver(true); }}
-                onDragLeave={() => setIsDragOver(false)}
+                onDragEnter={(event) => {
+                    if (handleDragOver(event)) setIsDragOver(true);
+                }}
+                onDragOver={(event) => {
+                    if (handleDragOver(event)) setIsDragOver(true);
+                }}
+                onDragLeave={(event) => {
+                    if (isMindMapFileDropLeavingContainer(event.currentTarget, event.relatedTarget)) {
+                        setIsDragOver(false);
+                    }
+                }}
                 onDrop={(e) => { handleDrop(e); setIsDragOver(false); }}
                 style={{
                     position: 'absolute',
@@ -571,27 +606,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
                 >
                     <MindMapSpeakerNotes />
                 </div>
-                {isDragOver && (
-                    <div style={{
-                        position: 'absolute', inset: 0, zIndex: 100,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        background: 'rgba(99,102,241,0.08)',
-                        pointerEvents: 'none',
-                    }}>
-                        <div style={{
-                            padding: '16px 28px',
-                            background: 'rgba(99,102,241,0.15)',
-                            backdropFilter: 'blur(12px)',
-                            border: '2px dashed rgba(99,102,241,0.5)',
-                            borderRadius: 16,
-                            fontSize: 15,
-                            fontWeight: 600,
-                            color: '#6366f1',
-                        }}>
-                            📥 释放以导入 Markdown / OPML
-                        </div>
-                    </div>
-                )}
+                <MindMapFileDropOverlay visible={isDragOver} />
 
                 {/* Empty state guide — shown only when map has just the root node */}
                 {instance && <MindMapEmptyGuide />}

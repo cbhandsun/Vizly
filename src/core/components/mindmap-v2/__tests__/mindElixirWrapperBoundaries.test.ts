@@ -10,6 +10,8 @@ import {
     coerceMindElixirPalette,
 } from '../mindElixirThemeDom';
 import {
+    hasSupportedMindMapImportTransfer,
+    isMindMapFileDropLeavingContainer,
     isSupportedMindMapImportFile,
     parseMindMapImportText,
 } from '../useMindElixirFileDrop';
@@ -71,9 +73,57 @@ describe('mind elixir wrapper boundaries', () => {
         expect(parseMindMapImportText('ideas.opml', `<?xml version="1.0"?>
             <opml version="2.0"><body><outline text="Root"><outline text="Child" /></outline></body></opml>`))
             .toMatchObject({ topic: 'Root' });
+        expect(parseMindMapImportText('ideas', `<?xml version="1.0"?>
+            <opml version="2.0"><body><outline text="Typed OPML" /></body></opml>`, 'application/xml'))
+            .toMatchObject({ topic: 'Typed OPML' });
         expect(() => parseMindMapImportText('ideas.md', new ArrayBuffer(8))).toThrow(
             'Mind map import did not contain text.',
         );
+    });
+
+    it('only activates the file-drop affordance for supported file payloads', () => {
+        const transfer = (items: DataTransferItem[], files: File[] = []) => ({
+            files: files as unknown as FileList,
+            items: items as unknown as DataTransferItemList,
+        });
+        const supportedFile = new File(['# Root'], 'ideas.md', { type: 'text/markdown' });
+        const unsupportedFile = new File(['binary'], 'archive.zip', { type: 'application/zip' });
+        const fileItem = (file: File): DataTransferItem => ({
+            getAsFile: () => file,
+            getAsString: () => undefined,
+            kind: 'file',
+            type: file.type,
+            webkitGetAsEntry: () => null,
+        });
+
+        expect(hasSupportedMindMapImportTransfer(transfer([], [supportedFile]))).toBe(true);
+        expect(hasSupportedMindMapImportTransfer(transfer([fileItem(supportedFile)]))).toBe(true);
+        expect(hasSupportedMindMapImportTransfer(transfer([fileItem(unsupportedFile)]))).toBe(false);
+        expect(hasSupportedMindMapImportTransfer(transfer([{
+            ...fileItem(supportedFile),
+            getAsFile: () => { throw new Error('blocked'); },
+        }]))).toBe(false);
+        expect(hasSupportedMindMapImportTransfer(transfer([{
+            ...fileItem(supportedFile),
+            getAsFile: () => null,
+        }]))).toBe(true);
+        expect(hasSupportedMindMapImportTransfer(transfer([{
+            ...fileItem(supportedFile),
+            kind: 'string',
+            type: 'text/plain',
+        }]))).toBe(false);
+        expect(hasSupportedMindMapImportTransfer(transfer([]))).toBe(false);
+    });
+
+    it('keeps the drop affordance stable while crossing descendants', () => {
+        const container = document.createElement('div');
+        const child = document.createElement('span');
+        const outside = document.createElement('button');
+        container.appendChild(child);
+
+        expect(isMindMapFileDropLeavingContainer(container, child)).toBe(false);
+        expect(isMindMapFileDropLeavingContainer(container, outside)).toBe(true);
+        expect(isMindMapFileDropLeavingContainer(container, null)).toBe(true);
     });
 
     it('validates toolbar import identities and rejects non-text reader results', () => {

@@ -2658,6 +2658,18 @@
             "title": "专业脑图",
             "newNode": "新节点",
             "untitledNode": "未命名节点",
+            "fileDrop": {
+                "title": "松开以导入思维导图",
+                "description": "支持 Markdown 和 OPML；将替换当前导图，可通过撤销恢复。",
+                "file": "文件",
+                "success": "已导入 {{format}}，可通过撤销恢复之前的导图。",
+                "inProgress": "另一个思维导图文件仍在读取，请等待完成后重试。",
+                "invalid": "不支持此文件或文件内容无效，请选择有效的 Markdown 或 OPML 文件。",
+                "tooLarge": "{{format}} 文件过大，请选择更小的文件。",
+                "readFailed": "无法读取 {{format}}，请检查文件后重试。",
+                "aborted": "已取消导入 {{format}}。",
+                "scopeChanged": "当前思维导图已切换，因此没有导入该文件。请在当前导图上重新拖入。"
+            },
             "collapseAll": "折叠所有分支",
             "expandAll": "展开所有分支",
             "fitView": "适应视口",
