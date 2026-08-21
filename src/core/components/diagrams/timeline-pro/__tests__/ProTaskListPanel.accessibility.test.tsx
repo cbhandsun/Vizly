@@ -113,6 +113,7 @@ const renderTimelineChrome = (
         showResourceDrawer={false}
         onOpenResourceDrawer={vi.fn()}
         showCriticalPath={false}
+        criticalTaskCount={0}
         criticalPathUnavailableReason={undefined}
         onToggleCriticalPath={vi.fn()}
         showBaseline={false}
@@ -169,6 +170,15 @@ describe('ProTimelineChrome baseline availability', () => {
 });
 
 describe('ProTimelineChrome critical path availability', () => {
+    it('shows and announces the number of critical tasks when analysis is active', () => {
+        renderTimelineChrome({ showCriticalPath: true, criticalTaskCount: 3 });
+
+        const summary = screen.getByText('关键路径 · 3 项');
+        expect(summary.getAttribute('role')).toBe('status');
+        expect(summary.getAttribute('aria-live')).toBe('polite');
+        expect(screen.getByRole('switch', { name: '显示关键路径' }).getAttribute('aria-checked')).toBe('true');
+    });
+
     it('disables an unavailable analysis instead of accepting an action with no result', () => {
         const onToggleCriticalPath = vi.fn();
         renderTimelineChrome({
@@ -178,6 +188,7 @@ describe('ProTimelineChrome critical path availability', () => {
 
         const criticalPath = screen.getByRole('switch', { name: '显示关键路径' });
         expect(criticalPath).toHaveProperty('disabled', true);
+        expect(screen.getByText('关键路径 · 不可用')).toBeTruthy();
 
         fireEvent.click(criticalPath);
         expect(onToggleCriticalPath).not.toHaveBeenCalled();

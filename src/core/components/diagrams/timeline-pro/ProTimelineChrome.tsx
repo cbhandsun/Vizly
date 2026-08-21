@@ -19,6 +19,7 @@ type ProTimelineChromeProps = {
   showResourceDrawer: boolean;
   onOpenResourceDrawer: () => void;
   showCriticalPath: boolean;
+  criticalTaskCount: number;
   criticalPathUnavailableReason?: string;
   onToggleCriticalPath: () => void;
   showBaseline: boolean;
@@ -40,6 +41,7 @@ export const ProTimelineChrome: React.FC<ProTimelineChromeProps> = ({
   showResourceDrawer,
   onOpenResourceDrawer,
   showCriticalPath,
+  criticalTaskCount,
   criticalPathUnavailableReason,
   onToggleCriticalPath,
   showBaseline,
@@ -56,6 +58,11 @@ export const ProTimelineChrome: React.FC<ProTimelineChromeProps> = ({
   const [clearBaselineConfirmOpen, setClearBaselineConfirmOpen] = useState(false);
   const zoomControlState = getProTimelineZoomControlState(zoomLevel);
   const viewModeLabel = ({ day: '天', week: '周', month: '月', quarter: '季' } as const)[viewMode];
+  const criticalPathLabel = criticalPathUnavailableReason
+    ? '关键路径 · 不可用'
+    : showCriticalPath
+      ? `关键路径 · ${criticalTaskCount} 项`
+      : '关键路径';
   const handleClearBaseline = useCallback(() => {
     onClearBaseline();
     saveBaselineButtonRef.current?.focus();
@@ -83,7 +90,14 @@ export const ProTimelineChrome: React.FC<ProTimelineChromeProps> = ({
       </Tooltip>
       <div style={{ width: 1, height: 16, backgroundColor: borderColor }} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
-        <span style={{ color: secondaryTextColor, fontWeight: 500 }}>关键路径</span>
+        <span
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          style={{ color: secondaryTextColor, fontWeight: 500 }}
+        >
+          {criticalPathLabel}
+        </span>
         <Tooltip title={criticalPathUnavailableReason ?? '显示或隐藏关键路径'}>
           <span>
             <Switch
@@ -138,7 +152,7 @@ export const ProTimelineChrome: React.FC<ProTimelineChromeProps> = ({
       okText="清空基线"
       cancelText="取消"
       okButtonProps={{ danger: true }}
-      focusTriggerAfterClose={false}
+      focusable={{ focusTriggerAfterClose: false }}
       onCancel={() => setClearBaselineConfirmOpen(false)}
       onOk={() => {
         setClearBaselineConfirmOpen(false);

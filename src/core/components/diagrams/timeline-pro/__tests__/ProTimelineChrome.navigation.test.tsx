@@ -22,6 +22,7 @@ const renderChrome = (
     showResourceDrawer={false}
     onOpenResourceDrawer={vi.fn()}
     showCriticalPath={false}
+    criticalTaskCount={0}
     onToggleCriticalPath={vi.fn()}
     showBaseline={false}
     hasBaseline={false}
@@ -82,12 +83,12 @@ describe('timeline navigation boundaries', () => {
     const { rerender } = renderChrome({ onZoomChange });
 
     expect(screen.getByRole('button', { name: '恢复时间轴到 100%' })).toHaveProperty('disabled', true);
-    expect(screen.getByRole('status').textContent).toContain('当前视图：天，缩放 100%');
+    expect(screen.getByText('当前视图：天，缩放 100%').getAttribute('role')).toBe('status');
 
     rerender(renderChromeElement({ zoomLevel: 0.15, viewMode: 'month', onZoomChange }));
     const zoomOut = screen.getByRole('button', { name: '缩小时间轴' });
     expect(zoomOut).toHaveProperty('disabled', true);
-    expect(screen.getByRole('status').textContent).toContain('当前视图：月，缩放 15%');
+    expect(screen.getByText('当前视图：月，缩放 15%').getAttribute('role')).toBe('status');
     fireEvent.click(zoomOut);
     expect(onZoomChange).not.toHaveBeenCalled();
   });
@@ -117,6 +118,7 @@ const renderChromeElement = (
     showResourceDrawer={false}
     onOpenResourceDrawer={vi.fn()}
     showCriticalPath={false}
+    criticalTaskCount={0}
     onToggleCriticalPath={vi.fn()}
     showBaseline={false}
     hasBaseline={false}

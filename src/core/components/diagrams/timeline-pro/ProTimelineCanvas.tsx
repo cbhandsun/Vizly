@@ -649,6 +649,7 @@ export default function ProTimelineCanvas() {
             showResourceDrawer={showResourceDrawer}
             onOpenResourceDrawer={() => setShowResourceDrawer(true)}
             showCriticalPath={showCriticalPath}
+            criticalTaskCount={cpmResult.criticalPathTaskIds.size}
             criticalPathUnavailableReason={criticalPathUnavailableReason}
             onToggleCriticalPath={toggleCriticalPath}
             showBaseline={showBaseline}
