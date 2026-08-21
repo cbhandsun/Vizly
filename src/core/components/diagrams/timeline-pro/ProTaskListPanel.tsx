@@ -35,6 +35,14 @@ export interface ProTaskListPanelProps {
 const ROW_HEIGHT = 42;
 const HEADER_HEIGHT = 52;
 
+type EditingField = 'name' | 'startDate' | 'duration' | 'assignee' | 'priority';
+
+interface EditingCellState {
+    id: string;
+    field: EditingField;
+    value: string;
+}
+
 const getTypeIcons = (theme: Theme | null): Record<string, React.ReactNode> => ({
     phase:     <CalendarOutlined style={{ fontSize: 13, color: theme?.palette?.success?.main || '#52c41a' }} />,
     event:     <ClockCircleOutlined style={{ fontSize: 13, color: theme?.palette?.primary?.main || '#1890ff' }} />,
@@ -47,10 +55,11 @@ export default function ProTaskListPanel({
     onTaskExpandToggle, onTaskUpdate, onTaskAdd, onTaskDelete, cyclicTaskIds
 }: ProTaskListPanelProps) {
     const [isResizing, setIsResizing] = useState(false);
-    const [editingCell, setEditingCell] = useState<{ id: string, field: 'name' | 'startDate' | 'duration' | 'assignee' | 'priority' } | null>(null);
-    const [editValue, setEditValue] = useState('');
+    const [editingCell, setEditingCell] = useState<EditingCellState | null>(null);
     const [focusedTaskId, setFocusedTaskId] = useState<string | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+    const editingOriginRef = useRef<HTMLDivElement | null>(null);
+    const restoreEditingOriginFocusRef = useRef(false);
     const [theme] = useTheme();
     const { showBaseline } = useProTimelineEngine();
     const normalizedWidth = normalizeProTaskListWidth(width);
@@ -67,15 +76,25 @@ export default function ProTaskListPanel({
     const disabledTextColor = isDark ? 'rgba(255,255,255,0.25)' : '#bfbfbf';
     const primaryColor = theme?.palette?.primary?.main || '#1890ff';
     const typeIcons = getTypeIcons(theme);
+    const editValue = editingCell?.value ?? '';
+    const setEditValue = useCallback((value: string) => {
+        setEditingCell(current => current ? { ...current, value } : current);
+    }, []);
 
     // Focus input on edit start
     useEffect(() => {
         if (editingCell && inputRef.current) {
             inputRef.current.focus();
             if (editingCell.field === 'name' || editingCell.field === 'assignee') {
-                inputRef.current.select();
+                inputRef.current.setSelectionRange(0, editingCell.value.length);
             }
         }
+    }, [editingCell]);
+
+    useEffect(() => {
+        if (editingCell || !restoreEditingOriginFocusRef.current) return;
+        restoreEditingOriginFocusRef.current = false;
+        editingOriginRef.current?.focus({ preventScroll: true });
     }, [editingCell]);
 
     const getAvatarColor = useCallback((name: string) => {
@@ -156,8 +175,17 @@ export default function ProTaskListPanel({
     }, [editingCell, editValue, onTaskUpdate, tasks, getDuration]);
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter') commitEdit();
-        if (e.key === 'Escape') setEditingCell(null);
+        e.stopPropagation();
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            restoreEditingOriginFocusRef.current = Boolean(editingOriginRef.current);
+            commitEdit();
+        }
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            restoreEditingOriginFocusRef.current = Boolean(editingOriginRef.current);
+            setEditingCell(null);
+        }
     };
 
     // --- 拖拽调整宽度 ---
@@ -281,8 +309,9 @@ export default function ProTaskListPanel({
                                     );
                                 } else if (event.key === 'F2') {
                                     event.preventDefault();
-                                    setEditingCell({ id: task.id, field: 'name' });
-                                    setEditValue(task.name);
+                                    event.stopPropagation();
+                                    editingOriginRef.current = event.currentTarget;
+                                    setEditingCell({ id: task.id, field: 'name', value: accessibleTaskName === '未命名任务' ? '' : accessibleTaskName });
                                 } else if (event.key === 'ArrowRight' && hasChildren && !isExpanded) {
                                     event.preventDefault();
                                     onTaskExpandToggle?.(task.id);
@@ -330,8 +359,8 @@ export default function ProTaskListPanel({
                                 }}
                                 onDoubleClick={(e) => {
                                     e.stopPropagation();
-                                    setEditingCell({ id: task.id, field: 'name' });
-                                    setEditValue(task.name);
+                                    editingOriginRef.current = null;
+                                    setEditingCell({ id: task.id, field: 'name', value: accessibleTaskName === '未命名任务' ? '' : accessibleTaskName });
                                 }}
                                 title="双击编辑任务名称，或聚焦任务后按 F2"
                             >
@@ -358,7 +387,7 @@ export default function ProTaskListPanel({
                                     />
                                 ) : (
                                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>
-                                        {task.name}
+                                        {accessibleTaskName}
                                     </span>
                                 )}
                             </div>
@@ -448,8 +477,7 @@ export default function ProTaskListPanel({
                                         }}
                                         onDoubleClick={(e) => {
                                             e.stopPropagation();
-                                            setEditingCell({ id: task.id, field: 'assignee' });
-                                            setEditValue(task.assignee || '');
+                                            setEditingCell({ id: task.id, field: 'assignee', value: task.assignee || '' });
                                         }}
                                     >
                                         {task.assignee ? (
@@ -515,8 +543,7 @@ export default function ProTaskListPanel({
                                         }}
                                         onDoubleClick={(e) => {
                                             e.stopPropagation();
-                                            setEditingCell({ id: task.id, field: 'priority' });
-                                            setEditValue(task.priority || '');
+                                            setEditingCell({ id: task.id, field: 'priority', value: task.priority || '' });
                                         }}
                                     >
                                         {priorityTag(task.priority)}
@@ -537,8 +564,7 @@ export default function ProTaskListPanel({
                                 onDoubleClick={(e) => {
                                     e.stopPropagation();
                                     if (!hasChildren) {
-                                        setEditingCell({ id: task.id, field: 'startDate' });
-                                        setEditValue(task.startDate || todayDateOnly());
+                                        setEditingCell({ id: task.id, field: 'startDate', value: task.startDate || todayDateOnly() });
                                     }
                                 }}
                             >
@@ -585,8 +611,7 @@ export default function ProTaskListPanel({
                                 onDoubleClick={(e) => {
                                     e.stopPropagation();
                                     if (!hasChildren) {
-                                        setEditingCell({ id: task.id, field: 'duration' });
-                                        setEditValue(String(duration ?? 1));
+                                        setEditingCell({ id: task.id, field: 'duration', value: String(duration ?? 1) });
                                     }
                                 }}
                             >

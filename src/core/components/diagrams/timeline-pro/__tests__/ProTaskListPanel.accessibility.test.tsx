@@ -242,12 +242,22 @@ describe('ProTaskListPanel accessibility', () => {
         expect(screen.getByRole('button', { name: '删除 Project launch 及其所有子任务' })).toBeTruthy();
     });
 
-    it('edits the task name with F2 and labels the editor', () => {
+    it('preserves the task name and keyboard focus through an F2 edit cancellation', () => {
         renderPanel();
 
-        fireEvent.keyDown(screen.getByRole('option', { name: /Project launch/ }), { key: 'F2' });
+        const option = screen.getByRole('option', { name: /Project launch/ });
+        option.focus();
+        fireEvent.keyDown(option, { key: 'F2' });
 
-        expect(screen.getByRole('textbox', { name: '编辑 Project launch 的任务名称' })).toBeTruthy();
+        const editor = screen.getByRole('textbox', { name: '编辑 Project launch 的任务名称' });
+        expect(editor).toHaveProperty('value', 'Project launch');
+        expect(editor).toHaveProperty('selectionStart', 0);
+        expect(editor).toHaveProperty('selectionEnd', 'Project launch'.length);
+
+        fireEvent.keyDown(editor, { key: 'Escape' });
+
+        expect(document.activeElement).toBe(option);
+        expect(screen.queryByRole('textbox', { name: '编辑 Project launch 的任务名称' })).toBeNull();
     });
 
     it.each([

@@ -40,6 +40,11 @@ describe('professional timeline responsive layout', () => {
         expect(css).toMatch(/@media \(min-width: 769px\) and \(max-width: 1200px\)[\s\S]*?\.pro-timeline-chrome--analysis\s*\{[\s\S]*?bottom:\s*116px !important;/);
     });
 
+    it('preserves a usable task-name column on medium desktop widths', () => {
+        expect(css).toMatch(/@media \(min-width: 769px\) and \(max-width: 1200px\)[\s\S]*?\.pro-timeline-task-column--secondary\s*\{[\s\S]*?display:\s*none !important;/);
+        expect(css).toMatch(/@media \(min-width: 769px\) and \(max-width: 1200px\)[\s\S]*?\.pro-timeline-task-column--name\s*\{[\s\S]*?min-width:\s*0 !important;/);
+    });
+
     it('provides visible keyboard focus for task actions and the desktop resize separator', () => {
         expect(css).toMatch(/\.pro-timeline-task-row button:focus-visible,[\s\S]*?\.pro-timeline-task-resize-handle:focus-visible[\s\S]*?outline:\s*2px solid/);
         expect(css).toMatch(/\.pro-timeline-task-resize-handle:focus-visible\s*\{[\s\S]*?background:\s*color-mix\(/);

@@ -98,6 +98,14 @@
     .pro-timeline-chrome--analysis {
         bottom: 116px !important;
     }
+
+    .pro-timeline-task-column--secondary {
+        display: none !important;
+    }
+
+    .pro-timeline-task-column--name {
+        min-width: 0 !important;
+    }
 }
 
 .pro-timeline-task-row button {
