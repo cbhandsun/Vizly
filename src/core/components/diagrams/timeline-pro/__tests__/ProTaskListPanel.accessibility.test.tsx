@@ -499,6 +499,24 @@ describe('ProTaskLayer accessibility and recovery', () => {
         expect(screen.getByRole('status').textContent).toContain('已创建从 Launch phase 到 Release gate');
     });
 
+    it('opens guided dependency creation when the pointer clicks without dragging', () => {
+        const onTaskConnect = vi.fn().mockReturnValue({ ok: true as const });
+        const { container } = renderTaskLayer({
+            tasks: [phaseLayerTask, eventLayerTask],
+            onTaskConnect,
+        });
+        const control = screen.getByRole('button', { name: '从 Launch phase 创建依赖' });
+        const interactionRoot = container.firstElementChild;
+        expect(interactionRoot).not.toBeNull();
+
+        fireEvent.pointerDown(control, { pointerId: 1, clientX: 200, clientY: 80 });
+        fireEvent.pointerUp(interactionRoot as Element, { pointerId: 1, clientX: 202, clientY: 81 });
+
+        expect(screen.getByRole('button', { name: '取消从 Launch phase 创建依赖' })).toBeTruthy();
+        expect(screen.getByRole('status').textContent).toContain('当前后置任务 Design review');
+        expect(onTaskConnect).not.toHaveBeenCalled();
+    });
+
     it('does not advertise dependency controls without a connection handler', () => {
         renderTaskLayer({ tasks: [phaseLayerTask, eventLayerTask] });
 

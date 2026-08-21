@@ -19,6 +19,7 @@ import {
     PRO_TASK_BAR_TOP_MARGIN as BAR_TOP_MARGIN,
     PRO_TASK_HEADER_HEIGHT as HEADER_HEIGHT,
     PRO_TASK_ROW_HEIGHT as ROW_HEIGHT,
+    resolveProTaskConnectionPointerRelease,
     type ProTaskDragState as DragState,
 } from './proTaskLayerGeometry';
 
@@ -141,15 +142,17 @@ export default function ProTaskLayer({
             onTaskDragEnd?.(dragState.taskId, newStart, newEnd);
         } else if (dragState.mode === 'progress') {
             onTaskUpdate?.(dragState.taskId, { progress: dragProgress });
-        } else if (dragState.mode === 'connect' && dragState.targetTaskId && dragState.targetTaskId !== dragState.taskId) {
-            connectTasks(dragState.taskId, dragState.targetTaskId);
+        } else if (dragState.mode === 'connect') {
+            const release = resolveProTaskConnectionPointerRelease(dragState, e.clientX, e.clientY);
+            if (release.kind === 'connect') connectTasks(dragState.taskId, release.targetTaskId);
+            else if (release.kind === 'guide') toggleConnection(dragState.taskId);
         }
 
         setDragState(null);
         setDragDeltaX(0);
         setDragDeltaY(0);
         setDragDeltaW(0);
-    }, [connectTasks, dragState, dragDeltaX, dragDeltaW, dragProgress, snapX, xToDate, pixelsPerDay, onTaskDragEnd, onTaskUpdate]);
+    }, [connectTasks, dragState, dragDeltaX, dragDeltaW, dragProgress, snapX, toggleConnection, xToDate, pixelsPerDay, onTaskDragEnd, onTaskUpdate]);
 
     const cancelDragInteraction = useCallback(() => {
         setDragState(null);

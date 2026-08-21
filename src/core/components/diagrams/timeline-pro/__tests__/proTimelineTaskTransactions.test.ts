@@ -10,6 +10,10 @@ import {
   getProTimelineAvailableParentIds,
   getProTimelineDeletionFallbackId,
 } from '../proTimelineTaskTransactions';
+import {
+  isProTaskConnectionClickGesture,
+  resolveProTaskConnectionPointerRelease,
+} from '../proTaskLayerGeometry';
 
 const node = (
   id: string,
@@ -210,5 +214,31 @@ describe('pro timeline task transactions', () => {
 
     expect(result).toMatchObject({ changed: false, reason });
     expect(result.nodes).toEqual(nodes);
+  });
+});
+
+describe('pro timeline task connection gestures', () => {
+  it('distinguishes click guidance, target drops, and deliberate drag cancellation', () => {
+    const base = { startMouseX: 100, startMouseY: 100, taskId: 'source' };
+    expect(resolveProTaskConnectionPointerRelease(base, 103, 104)).toEqual({ kind: 'guide' });
+    expect(resolveProTaskConnectionPointerRelease(
+      { ...base, targetTaskId: 'target' }, 180, 100,
+    )).toEqual({ kind: 'connect', targetTaskId: 'target' });
+    expect(resolveProTaskConnectionPointerRelease(base, 108, 100)).toEqual({ kind: 'cancel' });
+  });
+
+  it.each([
+    [Number.NaN, 0, 0, 0],
+    [0, Number.POSITIVE_INFINITY, 0, 0],
+    [0, 0, undefined, 0],
+    [0, 0, 0, '0'],
+  ])('rejects malformed pointer coordinates %#', (startX, startY, endX, endY) => {
+    expect(isProTaskConnectionClickGesture(startX, startY, endX, endY)).toBe(false);
+  });
+
+  it('normalizes invalid and extreme click thresholds', () => {
+    expect(isProTaskConnectionClickGesture(0, 0, 6, 0, Number.NaN)).toBe(true);
+    expect(isProTaskConnectionClickGesture(0, 0, 1, 0, -1)).toBe(false);
+    expect(isProTaskConnectionClickGesture(0, 0, 33, 0, 1000)).toBe(false);
   });
 });
