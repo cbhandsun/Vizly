@@ -1,6 +1,10 @@
 import type { NodeObj } from 'mind-elixir';
 import i18n from 'i18next';
 import { cleanAndValidateTree, cleanMindMapTopic } from './mindmapTreeSanitizer';
+import {
+    markMindMapTopicAsGenerated,
+    MINDMAP_GENERATED_TOPIC_KEYS,
+} from './mindMapGeneratedTopicLocalization';
 
 export interface MindMapBridgeNodeArgs {
     label?: unknown;
@@ -21,6 +25,10 @@ export function createSafeMindMapNodeId(prefix = 'node'): string {
 
 export function cleanMindMapChildNode(args: unknown = {}, id = createSafeMindMapNodeId()): NodeObj {
     const input: MindMapBridgeNodeArgs = isRecord(args) ? args : {};
+    const hasAuthoredLabel = (
+        (typeof input.label === 'string' || typeof input.label === 'number')
+        && String(input.label).trim().length > 0
+    );
     const localizedDefaultTopic = cleanMindMapTopic(
         i18n.t('plugins.mindmap.newNode'),
         'New node',
@@ -30,6 +38,9 @@ export function cleanMindMapChildNode(args: unknown = {}, id = createSafeMindMap
         topic: cleanMindMapTopic(input.label, localizedDefaultTopic),
         children: [],
     };
+    if (!hasAuthoredLabel) {
+        markMindMapTopicAsGenerated(node, MINDMAP_GENERATED_TOPIC_KEYS.newNode);
+    }
     const clean = cleanAndValidateTree(node, false) as NodeObj & { side?: 'left' | 'right' };
     const side = cleanMindMapBridgeSide(input.side);
     if (side) clean.side = side;

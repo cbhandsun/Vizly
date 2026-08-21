@@ -34,6 +34,7 @@ import {
 import { cleanMindMapData, cleanMindMapTopic, refreshMindElixirWithSanitizedData } from './mindmapTreeSanitizer';
 import { cleanMindMapNodePatch } from './mindmapNodePatchSecurity';
 import { createMindMapAIRequestLifecycle } from './mindMapAIPanelRequestLifecycle';
+import { assignMindMapAuthoredTopic } from './mindMapGeneratedTopicLocalization';
 import { readMindMapEmptyState } from './mindMapEmptyState';
 import { getMindMapAIPanelErrorKey } from './mindMapAIPanelError';
 import { appMessage, appModal } from '@/core/utils/antdStaticBridge';
@@ -307,7 +308,7 @@ export function MindMapAIPanel() {
             }
             const node = findNodeById(mind.getData().nodeData, targetNode.id);
             if (!node) return;
-            node.topic = cleanMindMapTopic(result.topic);
+            assignMindMapAuthoredTopic(node, cleanMindMapTopic(result.topic));
             refreshCleanMindMap(mind);
             applyOperation('ai_summarize_node', node);
             appMessage.success(t('plugins.mindmap.aiPanel.summarizeSuccess'));
@@ -345,7 +346,7 @@ export function MindMapAIPanel() {
                 tags: result.tags,
                 icons: result.icons,
             });
-            if (cleanPatch.topic !== undefined) node.topic = cleanPatch.topic;
+            if (cleanPatch.topic !== undefined) assignMindMapAuthoredTopic(node, cleanPatch.topic);
             if (result.note !== undefined) node.note = cleanPatch.note;
             if (result.tags !== undefined) node.tags = cleanPatch.tags;
             if (result.icons !== undefined) node.icons = cleanPatch.icons;

@@ -1,6 +1,14 @@
 import type { MindElixirData, MindElixirInstance, NodeObj } from 'mind-elixir';
 import i18n from 'i18next';
 import { toSafeExternalUrl, toSafeImageUrl } from '../../utils/sanitizeHtml';
+import {
+    coerceMindMapGeneratedTopicKey,
+    markMindMapTopicAsGenerated,
+    MINDMAP_GENERATED_TOPIC_FIELD,
+    MINDMAP_GENERATED_TOPIC_KEYS,
+    resolveMindMapGeneratedTopic,
+    type MindMapGeneratedTopicKey,
+} from './mindMapGeneratedTopicLocalization';
 
 export const MINDMAP_MAX_NODES = 500;
 export const MINDMAP_MAX_DEPTH = 12;
@@ -29,6 +37,7 @@ type VizlyNodeObj = NodeObj & {
     branchWidth?: number;
     boundary?: { color: string; title: string };
     shapeClass?: string;
+    [MINDMAP_GENERATED_TOPIC_FIELD]?: MindMapGeneratedTopicKey;
 };
 
 export type SanitizedMindMapData = Omit<MindElixirData, 'direction'> & {
@@ -168,14 +177,27 @@ export function cleanAndValidateTree(
     const input = isRecord(node) ? node : {};
     const id = makeNodeId(input.id, isRoot);
     const children = Array.isArray(input.children) ? input.children : [];
+    const generatedTopicKey = coerceMindMapGeneratedTopicKey(
+        input[MINDMAP_GENERATED_TOPIC_FIELD],
+    ) ?? (
+        input.topic === LEGACY_UNTITLED_TOPIC
+        || input.topic === undefined
+        || input.topic === null
+        || (typeof input.topic === 'string' && input.topic.trim() === '')
+            ? MINDMAP_GENERATED_TOPIC_KEYS.untitled
+            : undefined
+    );
     const clean: VizlyNodeObj = {
         id,
-        topic: cleanMindMapTopic(input.topic === LEGACY_UNTITLED_TOPIC ? undefined : input.topic),
+        topic: generatedTopicKey
+            ? cleanMindMapTopic(resolveMindMapGeneratedTopic(generatedTopicKey))
+            : cleanMindMapTopic(input.topic),
         expanded: isRoot ? true : (input.expanded !== false),
         children: children
             .slice(0, MINDMAP_MAX_CHILDREN_PER_NODE)
             .map((child) => cleanAndValidateTree(child, false, depth + 1, ctx)),
     };
+    if (generatedTopicKey) markMindMapTopicAsGenerated(clean, generatedTopicKey);
     if (input.direction === 0 || input.direction === 1) {
         clean.direction = input.direction;
     }

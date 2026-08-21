@@ -49,6 +49,10 @@ import { MindMapSpeakerNotes } from './MindMapSpeakerNotes';
 import { marked } from 'marked';
 import { sanitizeMarkdownHtml, toSafeExternalUrl } from '../../utils/sanitizeHtml';
 import { cleanMindMapData } from './mindmapTreeSanitizer';
+import {
+    applyGeneratedTopicLocaleToMindMap,
+    bindMindMapGeneratedTopicAuthorship,
+} from './mindMapGeneratedTopicLocalization';
 import { cleanMindMapBridgeNode, cleanMindMapChildNode } from './mindmapBridgeSecurity';
 import { parseMindElixirClipboardNodes } from './mindmapClipboardSecurity';
 import { getSafeMindMapShortcutAction } from './mindmapKeyboardSecurity';
@@ -149,6 +153,24 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
         });
 
         mind.init(initialData);
+        const unbindGeneratedTopicAuthorship = bindMindMapGeneratedTopicAuthorship(mind);
+
+        const handleLanguageChanged = () => {
+            const data = mind.getData();
+            const selectedNodeIds = Array.from(new Set([
+                ...(mind.currentNodes ?? []).map(topic => topic.nodeObj.id),
+                mind.currentNode?.nodeObj.id,
+            ].filter((nodeId): nodeId is string => Boolean(nodeId))));
+            const changed = applyGeneratedTopicLocaleToMindMap({
+                data,
+                selectedNodeIds,
+                refresh: localizedData => mind.refresh(localizedData),
+                findTopic: nodeId => mind.findEle(nodeId),
+                selectTopics: topics => mind.selectNodes(topics),
+            });
+            if (changed) saveRef.current();
+        };
+        i18n.on('languageChanged', handleLanguageChanged);
         const unbindHyperlinkAccessibility = bindMindMapHyperlinkAccessibility(
             containerRef.current,
             topic => i18n.t('plugins.mindmap.contextMenu.openLinkInNewTab', { topic }),
@@ -384,6 +406,8 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
             cancelInitialViewportFit();
             unbindHyperlinkAccessibility();
             mq.removeEventListener('change', handleColorScheme);
+            i18n.off('languageChanged', handleLanguageChanged);
+            unbindGeneratedTopicAuthorship();
             unbindOperationEffects();
             mind.container.removeEventListener('paste', handleSafeMindElixirPaste, true);
             mind.container.removeEventListener('keydown', handleSafeNodeShortcut, true);

@@ -20,6 +20,7 @@ import { setOutlineOpen, subscribeOutline } from './mindmapOutlineStore';
 import { nodeObjToMarkdown, downloadText, findNodeById } from './migrate';
 import { cleanMindMapData, cleanMindMapTopic } from './mindmapTreeSanitizer';
 import { cleanMindMapChildNode } from './mindmapBridgeSecurity';
+import { assignMindMapAuthoredTopic } from './mindMapGeneratedTopicLocalization';
 import { emitVizlyMindMapOperation, refreshVizlyMindMapData } from './mindmapOperationBridge';
 import {
     getMindMapOutlineNavigationTarget,
@@ -202,7 +203,7 @@ const MindMapOutlinePanel: React.FC = () => {
             const prevSibling = result.parent.children?.[result.index - 1];
             if (!prevSibling) return false;
             
-            result.node.topic = currentText;
+            assignMindMapAuthoredTopic(result.node, currentText);
             result.parent.children?.splice(result.index, 1);
             
             if (!prevSibling.children) prevSibling.children = [];
@@ -228,7 +229,7 @@ const MindMapOutlinePanel: React.FC = () => {
             const gpResult = findNodeAndParent(data.nodeData, result.parent.id);
             if (!gpResult) return false;
             
-            result.node.topic = currentText;
+            assignMindMapAuthoredTopic(result.node, currentText);
             result.parent.children?.splice(result.index, 1);
             
             const parentIndex = gpResult.node.children?.findIndex(c => c.id === result.parent!.id) ?? -1;
