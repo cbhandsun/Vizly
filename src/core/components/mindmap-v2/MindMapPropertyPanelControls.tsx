@@ -17,29 +17,41 @@ const QUICK_COLORS = [
 ];
 
 export const ColorSwatch: React.FC<{
+    ariaLabel?: string;
+    busy?: boolean;
+    describedBy?: string;
+    disabled?: boolean;
     value?: string;
     onChange: (color: string) => void;
     withTransparent?: boolean;
-}> = ({ value, onChange, withTransparent }) => {
+}> = ({ ariaLabel, busy = false, describedBy, disabled = false, value, onChange, withTransparent }) => {
     const { t } = useTranslation();
+    const cursor = disabled ? 'not-allowed' : 'pointer';
     return (
-    <div role="group" aria-label={t('plugins.mindmap.propertyPanel.colorChoices')} style={{ display: 'flex', flexWrap: 'wrap', gap: 5, alignItems: 'center' }}>
+    <div
+        role="group"
+        aria-busy={busy}
+        aria-describedby={describedBy}
+        aria-label={ariaLabel ?? t('plugins.mindmap.propertyPanel.colorChoices')}
+        style={{ display: 'flex', flexWrap: 'wrap', gap: 5, alignItems: 'center', opacity: disabled ? 0.58 : 1 }}
+    >
         {withTransparent && (
-            <button type="button" title={t('plugins.mindmap.propertyPanel.transparent')} aria-label={t('plugins.mindmap.propertyPanel.transparent')} aria-pressed={value === ''} onClick={() => onChange('')}
-                style={{ width: 22, height: 22, borderRadius: 5, cursor: 'pointer', flexShrink: 0,
+            <button type="button" title={t('plugins.mindmap.propertyPanel.transparent')} aria-label={t('plugins.mindmap.propertyPanel.transparent')} aria-pressed={value === ''} disabled={disabled} onClick={() => onChange('')}
+                style={{ width: 22, height: 22, borderRadius: 5, cursor, flexShrink: 0,
                     border: value === '' ? '2px solid #6366f1' : '1px solid #e2e8f0',
                     background: 'repeating-conic-gradient(#ccc 0% 25%,#fff 0% 50%) 0 0/8px 8px' }} />
         )}
         {QUICK_COLORS.map(color => (
-            <button type="button" key={color} title={color} aria-label={t('plugins.mindmap.propertyPanel.colorValue', { color })} aria-pressed={value === color} onClick={() => onChange(color)} style={{
-                width: 22, height: 22, borderRadius: 5, background: color, cursor: 'pointer', flexShrink: 0,
+            <button type="button" key={color} title={color} aria-label={t('plugins.mindmap.propertyPanel.colorValue', { color })} aria-pressed={value === color} disabled={disabled} onClick={() => onChange(color)} style={{
+                width: 22, height: 22, borderRadius: 5, background: color, cursor, flexShrink: 0,
                 border: value === color ? '2px solid #6366f1' : '1px solid rgba(0,0,0,0.1)',
             }} />
         ))}
-        <label title={t('plugins.mindmap.propertyPanel.customColor')} aria-label={t('plugins.mindmap.propertyPanel.customColor')} style={{ width: 22, height: 22, borderRadius: 5, cursor: 'pointer',
+        <label title={t('plugins.mindmap.propertyPanel.customColor')} aria-label={t('plugins.mindmap.propertyPanel.customColor')} aria-disabled={disabled} style={{ width: 22, height: 22, borderRadius: 5, cursor,
             border: '1px dashed #cbd5e1', display: 'flex', alignItems: 'center',
             justifyContent: 'center', fontSize: 12, color: '#94a3b8', overflow: 'hidden' }}>
             +<input type="color" aria-label={t('plugins.mindmap.propertyPanel.customColor')} value={value || '#6366f1'}
+                disabled={disabled}
                 onChange={event => onChange(event.target.value)}
                 style={{ opacity: 0, position: 'absolute', width: 0, height: 0 }} />
         </label>

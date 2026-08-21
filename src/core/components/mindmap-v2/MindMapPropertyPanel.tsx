@@ -102,9 +102,6 @@ const NodePropertyPanel: React.FC<{
     const [topic, setTopic] = useState(cleanMindMapTopic(node.topic, ''));
     const parseFontSize = (n: NodeObj) => parseInt(n.style?.fontSize ?? '14', 10) || 14;
     const [fontSize, setFontSize] = useState(() => parseFontSize(node));
-    const [textColor, setTextColor] = useState(cleanMindMapColor(node.style?.color) ?? '');
-    const [bgColor, setBgColor] = useState(cleanMindMapColor(node.style?.background) ?? '');
-    const [branchColor, setBranchColor] = useState(cleanMindMapColor(node.branchColor) ?? '');
     const [imageUrl, setImageUrl] = useState(node.image?.url ?? '');
     const [icons, setIcons] = useState<string[]>(cleanMindMapIcons(node.icons) ?? []);
     const [tags, setTags] = useState<TagObj[]>(() => {
@@ -124,9 +121,6 @@ const NodePropertyPanel: React.FC<{
         setSyncedNodeId(node.id);
         setTopic(cleanMindMapTopic(node.topic, ''));
         setFontSize(parseFontSize(node));
-        setTextColor(cleanMindMapColor(node.style?.color) ?? '');
-        setBgColor(cleanMindMapColor(node.style?.background) ?? '');
-        setBranchColor(cleanMindMapColor(node.branchColor) ?? '');
         setImageUrl(node.image?.url ?? '');
         setIcons(cleanMindMapIcons(node.icons) ?? []);
         setTags(cleanMindMapTagObjects(node.tags) ?? []);
@@ -172,8 +166,29 @@ const NodePropertyPanel: React.FC<{
         onCommit: branchWidth => reshapeWithResult({ branchWidth: branchWidth || undefined }),
         sourceKey: node.id,
     });
+    const textColorChoice = useRecoverableMindMapPropertyChoice({
+        failureMessage: t(propertyKey('textColorSaveFailed')),
+        initialValue: cleanMindMapColor(node.style?.color) ?? '',
+        onCommit: color => reshapeWithResult({ style: { color: color || undefined } }),
+        sourceKey: node.id,
+    });
+    const backgroundColorChoice = useRecoverableMindMapPropertyChoice({
+        failureMessage: t(propertyKey('backgroundColorSaveFailed')),
+        initialValue: cleanMindMapColor(node.style?.background) ?? '',
+        onCommit: background => reshapeWithResult({ style: { background: background || undefined } }),
+        sourceKey: node.id,
+    });
+    const branchColorChoice = useRecoverableMindMapPropertyChoice({
+        failureMessage: t(propertyKey('branchColorSaveFailed')),
+        initialValue: cleanMindMapColor(node.branchColor) ?? '',
+        onCommit: branchColor => reshapeWithResult({ branchColor: branchColor || undefined }),
+        sourceKey: node.id,
+    });
     const shapeErrorId = useId();
     const branchWidthErrorId = useId();
+    const textColorErrorId = useId();
+    const backgroundColorErrorId = useId();
+    const branchColorErrorId = useId();
 
     const applyImageUrl = useCallback((url: string) => {
         const safeUrl = toSafeImageUrl(url);
@@ -455,17 +470,44 @@ const NodePropertyPanel: React.FC<{
 
             {/* Text color */}
             <Row label={t(propertyKey('textColor'))}>
-                <ColorSwatch value={textColor} onChange={c => { setTextColor(c); reshape({ style: { color: c || undefined } }); }} withTransparent />
+                <ColorSwatch
+                    ariaLabel={t(propertyKey('textColor'))}
+                    busy={textColorChoice.pending}
+                    describedBy={textColorChoice.error ? textColorErrorId : undefined}
+                    disabled={textColorChoice.pending}
+                    value={textColorChoice.value}
+                    onChange={textColorChoice.select}
+                    withTransparent
+                />
+                {textColorChoice.error && <div id={textColorErrorId} className={styles.choiceError} role="alert">{textColorChoice.error}</div>}
             </Row>
 
             {/* Background color */}
             <Row label={t(propertyKey('backgroundColor'))}>
-                <ColorSwatch value={bgColor} onChange={c => { setBgColor(c); reshape({ style: { background: c || undefined } }); }} withTransparent />
+                <ColorSwatch
+                    ariaLabel={t(propertyKey('backgroundColor'))}
+                    busy={backgroundColorChoice.pending}
+                    describedBy={backgroundColorChoice.error ? backgroundColorErrorId : undefined}
+                    disabled={backgroundColorChoice.pending}
+                    value={backgroundColorChoice.value}
+                    onChange={backgroundColorChoice.select}
+                    withTransparent
+                />
+                {backgroundColorChoice.error && <div id={backgroundColorErrorId} className={styles.choiceError} role="alert">{backgroundColorChoice.error}</div>}
             </Row>
 
             {/* Branch color */}
             <Row label={t(propertyKey('branchColor'))}>
-                <ColorSwatch value={branchColor} onChange={c => { setBranchColor(c); reshape({ branchColor: c || undefined }); }} withTransparent />
+                <ColorSwatch
+                    ariaLabel={t(propertyKey('branchColor'))}
+                    busy={branchColorChoice.pending}
+                    describedBy={branchColorChoice.error ? branchColorErrorId : undefined}
+                    disabled={branchColorChoice.pending}
+                    value={branchColorChoice.value}
+                    onChange={branchColorChoice.select}
+                    withTransparent
+                />
+                {branchColorChoice.error && <div id={branchColorErrorId} className={styles.choiceError} role="alert">{branchColorChoice.error}</div>}
             </Row>
 
             {/* Node shape */}

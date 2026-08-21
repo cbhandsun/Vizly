@@ -120,8 +120,15 @@ describe('mind map property panel localization', () => {
         expect(propertyPanelSource).toContain('disabled={branchWidthChoice.pending}');
         expect(propertyPanelSource).not.toContain('style: { ...node.style');
         expect(propertyPanelSource).toContain("reshape({ style: { fontSize: `${v}px` } })");
-        expect(propertyPanelSource).toContain('reshape({ style: { color: c || undefined } })');
-        expect(propertyPanelSource).toContain('reshape({ style: { background: c || undefined } })');
+        expect(propertyPanelSource).toContain("failureMessage: t(propertyKey('textColorSaveFailed'))");
+        expect(propertyPanelSource).toContain("failureMessage: t(propertyKey('backgroundColorSaveFailed'))");
+        expect(propertyPanelSource).toContain("failureMessage: t(propertyKey('branchColorSaveFailed'))");
+        expect(propertyPanelSource).toContain('value={textColorChoice.value}');
+        expect(propertyPanelSource).toContain('value={backgroundColorChoice.value}');
+        expect(propertyPanelSource).toContain('value={branchColorChoice.value}');
+        expect(propertyPanelSource).toContain('disabled={textColorChoice.pending}');
+        expect(propertyPanelSource).toContain('disabled={backgroundColorChoice.pending}');
+        expect(propertyPanelSource).toContain('disabled={branchColorChoice.pending}');
         expect(propertyPanelSource).not.toContain("'📍 根节点'");
         expect(propertyPanelSource).not.toContain("'📝 节点属性'");
         expect(propertyPanelSource).not.toContain("'rgba(255,255,255,0.6)'");
@@ -140,6 +147,9 @@ describe('mind map property panel localization', () => {
         expect(linkFieldSource).toContain('className={styles.error} role="alert"');
         expect(controlsSource).not.toContain('💡 点击节点可编辑属性');
         expect(controlsSource).toContain('aria-pressed={isActive}');
+        expect(controlsSource).toContain('aria-busy={busy}');
+        expect(controlsSource).toContain('aria-describedby={describedBy}');
+        expect(controlsSource).toContain('disabled={disabled}');
         expect(controlsSource).not.toContain('option.theme.name');
     });
 });
