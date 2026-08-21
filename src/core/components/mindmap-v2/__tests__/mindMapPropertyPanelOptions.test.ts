@@ -103,6 +103,10 @@ describe('mind map property panel localization', () => {
         expect(propertyPanelSource).toContain("aria-label={t(propertyKey('taskStatus'))}");
         expect(propertyPanelSource).toContain('aria-pressed={shapeClass === key}');
         expect(propertyPanelSource).toContain('aria-pressed={branchWidth === w}');
+        expect(propertyPanelSource).not.toContain('style: { ...node.style');
+        expect(propertyPanelSource).toContain("reshape({ style: { fontSize: `${v}px` } })");
+        expect(propertyPanelSource).toContain('reshape({ style: { color: c || undefined } })');
+        expect(propertyPanelSource).toContain('reshape({ style: { background: c || undefined } })');
         expect(propertyPanelSource).not.toContain("'📍 根节点'");
         expect(propertyPanelSource).not.toContain("'📝 节点属性'");
         expect(propertyPanelSource).not.toContain("'rgba(255,255,255,0.6)'");

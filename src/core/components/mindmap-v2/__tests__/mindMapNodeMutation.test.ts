@@ -130,6 +130,48 @@ describe('updateMindMapNodePatchAndRestoreSelection', () => {
         });
     });
 
+    it('preserves a committed text color when a rapid background patch follows', async () => {
+        let releaseFirst: (() => void) | undefined;
+        const firstPending = new Promise<void>(resolve => { releaseFirst = resolve; });
+        const reshapeNode = vi.fn()
+            .mockImplementationOnce(async () => firstPending)
+            .mockResolvedValue(undefined);
+        const mind = {
+            bus: { fire: vi.fn() },
+            findEle: () => refreshedTopic,
+            reshapeNode,
+            selectNodes: vi.fn(),
+        };
+        const styledNode = {
+            ...node,
+            style: { color: '#111827', background: '#ffffff', fontSize: '14px' },
+        } as NodeObj;
+
+        const textColor = updateMindMapNodePatchAndRestoreSelection(
+            mind,
+            topic,
+            styledNode,
+            { style: { color: '#6366f1' } },
+        );
+        const background = updateMindMapNodePatchAndRestoreSelection(
+            mind,
+            topic,
+            styledNode,
+            { style: { background: '#fef3c7' } },
+        );
+
+        await Promise.resolve();
+        releaseFirst?.();
+        await textColor;
+        const result = await background;
+
+        expect(result.nextNode.style).toEqual({
+            color: '#6366f1',
+            background: '#fef3c7',
+            fontSize: '14px',
+        });
+    });
+
     it('continues the queue after a failed mutation without replaying its patch', async () => {
         const reshapeNode = vi.fn()
             .mockRejectedValueOnce(new Error('first failed'))

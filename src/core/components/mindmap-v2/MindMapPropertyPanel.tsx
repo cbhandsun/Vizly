@@ -429,18 +429,18 @@ const NodePropertyPanel: React.FC<{
             <Row label={t(propertyKey('fontSize'))}>
                 <InputNumber min={10} max={48} value={fontSize}
                     aria-label={t(propertyKey('fontSize'))}
-                    onChange={v => { if (!v) return; setFontSize(v); reshape({ style: { ...node.style, fontSize: `${v}px` } }); }}
+                    onChange={v => { if (!v) return; setFontSize(v); reshape({ style: { fontSize: `${v}px` } }); }}
                     suffix="px" className={styles.fullWidth} prefix={<FontSizeOutlined />} />
             </Row>
 
             {/* Text color */}
             <Row label={t(propertyKey('textColor'))}>
-                <ColorSwatch value={textColor} onChange={c => { setTextColor(c); reshape({ style: { ...node.style, color: c || undefined } }); }} withTransparent />
+                <ColorSwatch value={textColor} onChange={c => { setTextColor(c); reshape({ style: { color: c || undefined } }); }} withTransparent />
             </Row>
 
             {/* Background color */}
             <Row label={t(propertyKey('backgroundColor'))}>
-                <ColorSwatch value={bgColor} onChange={c => { setBgColor(c); reshape({ style: { ...node.style, background: c || undefined } }); }} withTransparent />
+                <ColorSwatch value={bgColor} onChange={c => { setBgColor(c); reshape({ style: { background: c || undefined } }); }} withTransparent />
             </Row>
 
             {/* Branch color */}
