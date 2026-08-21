@@ -14,7 +14,6 @@ import type { ProjectedProTimelineTask } from '../proTimelineTaskProjection';
 import {
     getResourceTaskAccessibleLabel,
     isResourceTaskActivationKey,
-    shouldCloseResourceDrawerAfterFocus,
 } from '../proResourceDrawerAccessibility';
 import {
     getProTaskAccessibleName,
@@ -371,7 +370,7 @@ describe('task list interaction boundaries', () => {
 });
 
 describe('ProResourceDrawer task focus', () => {
-    it('exposes resource tasks as descriptive keyboard actions', () => {
+    it('focuses and reveals a resource task after keyboard activation', () => {
         const onTaskClick = vi.fn();
         const onClose = vi.fn();
         render(<ProResourceDrawer open onClose={onClose} tasks={[task]} onTaskClick={onTaskClick} />);
@@ -380,20 +379,18 @@ describe('ProResourceDrawer task focus', () => {
         fireEvent.keyDown(action, { key: 'Enter' });
 
         expect(onTaskClick).toHaveBeenCalledWith('launch');
-        expect(onClose).not.toHaveBeenCalled();
+        expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it('closes the drawer after keyboard focus on a narrow viewport', () => {
-        Object.defineProperty(window, 'innerWidth', { configurable: true, value: 577 });
+    it('closes the modal drawer after pointer focus so the selected task is visible', () => {
         const onTaskClick = vi.fn();
         const onClose = vi.fn();
         render(<ProResourceDrawer open onClose={onClose} tasks={[task]} onTaskClick={onTaskClick} />);
 
-        fireEvent.keyDown(screen.getByRole('button', { name: '查看时间线任务 Project launch' }), { key: ' ' });
+        fireEvent.click(screen.getByRole('button', { name: '查看时间线任务 Project launch' }));
 
         expect(onTaskClick).toHaveBeenCalledWith('launch');
         expect(onClose).toHaveBeenCalledTimes(1);
-        Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1024 });
     });
 });
 
@@ -406,19 +403,6 @@ describe('resource drawer accessibility boundaries', () => {
         [null, false],
     ])('classifies activation key %j', (value, expected) => {
         expect(isResourceTaskActivationKey(value)).toBe(expected);
-    });
-
-    it.each([
-        [577, true],
-        [768, true],
-        [769, false],
-        [Number.POSITIVE_INFINITY, false],
-        [0, false],
-        [-1, false],
-        ['577', false],
-        [undefined, false],
-    ])('classifies viewport width %j', (value, expected) => {
-        expect(shouldCloseResourceDrawerAfterFocus(value)).toBe(expected);
     });
 
     it('sanitizes missing task names in accessible labels', () => {

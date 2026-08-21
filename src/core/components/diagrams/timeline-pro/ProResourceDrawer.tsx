@@ -13,7 +13,6 @@ import { useTheme } from '../../../themes/useCoreTheme';
 import {
     getResourceTaskAccessibleLabel,
     isResourceTaskActivationKey,
-    shouldCloseResourceDrawerAfterFocus,
 } from './proResourceDrawerAccessibility';
 import './ProResourceDrawer.css';
 
@@ -213,9 +212,7 @@ export const ProResourceDrawer: React.FC<ProResourceDrawerProps> = ({
             const taskX = dateToX(task.startDate);
             setPan(-taskX + 120, panY); // 水平对齐到左侧 120px 处，提供舒服的视野
         }
-        if (shouldCloseResourceDrawerAfterFocus(typeof window === 'undefined' ? undefined : window.innerWidth)) {
-            onClose();
-        }
+        onClose();
     };
 
     const handleTaskKeyDown = (event: React.KeyboardEvent<HTMLDivElement>, task: ProGanttTask) => {
