@@ -310,6 +310,7 @@ describe('TopActionButtons document menu', () => {
         expect(trigger.hasAttribute('data-version-history-focus-return')).toBe(true);
         expect(trigger.hasAttribute('data-json-editor-focus-return')).toBe(true);
         expect(trigger.hasAttribute('data-command-palette-focus-return')).toBe(true);
+        expect(trigger.hasAttribute('data-collaboration-focus-return')).toBe(true);
         expect(trigger.getAttribute('data-settings-focus-return')).toBe('fallback');
     });
 

@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 import { resolveDiagramCollaborationStatus } from '@/core/components/diagrams/collaboration/collaborationStatus';
 import { useYjsCollaboration } from './diagrams/collaboration/YjsProviderHooks';
@@ -7,6 +7,10 @@ import {
   normalizeCollaborationServerUrl,
   normalizeCollaborationToken,
 } from './diagrams/collaboration/collaborationSecurity';
+import {
+  captureCollaborationModalFocus,
+  scheduleCollaborationModalFocusRestore,
+} from './collaborationModalFocus';
 
 interface UseDiagramViewerCollaborationOptions {
   cloudSyncEnabled: boolean;
@@ -22,7 +26,8 @@ export const useDiagramViewerCollaboration = ({
   selectedDiagramId,
 }: UseDiagramViewerCollaborationOptions) => {
   const serverUrl = normalizeCollaborationServerUrl(import.meta.env.VITE_YJS_WEBSOCKET_URL || '') || '';
-  const [collabModalVisible, setCollabModalVisible] = useState(false);
+  const [collabModalVisible, setCollabModalVisibleState] = useState(false);
+  const focusReturnTargetRef = useRef<HTMLElement | null>(null);
   const roomName = normalizeCollaborationRoomName(roomFromUrl || `vizly-room-${selectedDiagramId}`);
   const wantsCollaboration = Boolean(roomFromUrl) || collabModalVisible || cloudSyncEnabled;
   const collaboration = useYjsCollaboration({
@@ -36,6 +41,18 @@ export const useDiagramViewerCollaboration = ({
     serverUrl,
     collaboration.wsStatus,
   );
+  const setCollabModalVisible = useCallback((open: boolean) => {
+    if (open) {
+      focusReturnTargetRef.current = captureCollaborationModalFocus();
+      setCollabModalVisibleState(true);
+      return;
+    }
+
+    setCollabModalVisibleState(false);
+    const capturedTarget = focusReturnTargetRef.current;
+    focusReturnTargetRef.current = null;
+    scheduleCollaborationModalFocusRestore(capturedTarget);
+  }, [setCollabModalVisibleState]);
   const openCollaborationModal = useCallback(
     () => setCollabModalVisible(true),
     [setCollabModalVisible],

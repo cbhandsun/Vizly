@@ -89,6 +89,8 @@ describe('CollaborationModal commercial copy recovery', () => {
         expect(screen.getByText('此部署未配置实时协作服务，当前无法生成有效邀请。')).toBeTruthy();
         expect(screen.queryByRole('textbox', { name: '邀请链接' })).toBeNull();
         expect(screen.queryByRole('button', { name: '复制' })).toBeNull();
+        expect(screen.queryByText('当前在线（0）')).toBeNull();
+        expect(screen.queryByText('当前房间内没有在线成员')).toBeNull();
         expect(clipboardMocks.copy).not.toHaveBeenCalled();
     });
 });

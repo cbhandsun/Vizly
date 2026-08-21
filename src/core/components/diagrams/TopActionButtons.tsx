@@ -504,6 +504,7 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
                             data-version-history-focus-return
                             data-json-editor-focus-return
                             data-command-palette-focus-return
+                            data-collaboration-focus-return
                             data-settings-focus-return="fallback"
                             type="text"
                             aria-label={t('designer.toolbar.documentActions')}

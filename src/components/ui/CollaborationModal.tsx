@@ -126,35 +126,37 @@ export const CollaborationModal: React.FC<CollaborationModalProps> = ({
                     />
                 )}
 
-                <div className="mt-2">
-                    <Typography.Text className="block mb-3 font-medium text-gray-700 dark:text-gray-300">
-                        {t('collaboration.currentOnline', { count: activeUsers.length })}
-                    </Typography.Text>
-                    <List
-                        className="bg-white dark:bg-slate-800 rounded-lg border border-gray-100 dark:border-gray-700 max-h-[200px] overflow-y-auto"
-                        size="small"
-                        dataSource={activeUsers}
-                        renderItem={item => (
-                            <List.Item className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                                <div className="flex items-center gap-3">
-                                    <Avatar 
-                                        style={{ backgroundColor: item.user?.color || '#ccc' }}
-                                        size="small"
-                                    >
-                                        {item.user?.name?.charAt(0)?.toUpperCase()}
-                                    </Avatar>
-                                    <span className="collaboration-user-name text-sm font-medium text-gray-700 dark:text-gray-300">
-                                        {item.user?.name || t('collaboration.unknownUser')}
-                                    </span>
-                                    {item.isLocal && (
-                                        <Badge count={t('collaboration.localUser')} style={{ backgroundColor: '#52c41a' }} />
-                                    )}
-                                </div>
-                            </List.Item>
-                        )}
-                        locale={{ emptyText: t('collaboration.noOnlineUsers') }}
-                    />
-                </div>
+                {status !== 'unavailable' && (
+                    <div className="mt-2">
+                        <Typography.Text className="block mb-3 font-medium text-gray-700 dark:text-gray-300">
+                            {t('collaboration.currentOnline', { count: activeUsers.length })}
+                        </Typography.Text>
+                        <List
+                            className="bg-white dark:bg-slate-800 rounded-lg border border-gray-100 dark:border-gray-700 max-h-[200px] overflow-y-auto"
+                            size="small"
+                            dataSource={activeUsers}
+                            renderItem={item => (
+                                <List.Item className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                                    <div className="flex items-center gap-3">
+                                        <Avatar
+                                            style={{ backgroundColor: item.user?.color || '#ccc' }}
+                                            size="small"
+                                        >
+                                            {item.user?.name?.charAt(0)?.toUpperCase()}
+                                        </Avatar>
+                                        <span className="collaboration-user-name text-sm font-medium text-gray-700 dark:text-gray-300">
+                                            {item.user?.name || t('collaboration.unknownUser')}
+                                        </span>
+                                        {item.isLocal && (
+                                            <Badge count={t('collaboration.localUser')} style={{ backgroundColor: '#52c41a' }} />
+                                        )}
+                                    </div>
+                                </List.Item>
+                            )}
+                            locale={{ emptyText: t('collaboration.noOnlineUsers') }}
+                        />
+                    </div>
+                )}
             </div>
         </Modal>
     );
