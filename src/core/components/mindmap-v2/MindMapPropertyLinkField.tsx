@@ -18,35 +18,49 @@ export const MindMapPropertyLinkField: React.FC<MindMapPropertyLinkFieldProps> =
     label,
     onCommit,
 }) => {
-    const [draft, setDraft] = useState(initialValue);
-    const [error, setError] = useState('');
-    const [syncedInitialValue, setSyncedInitialValue] = useState(initialValue);
+    const [state, setState] = useState(() => ({
+        committedValue: initialValue || undefined,
+        draft: initialValue,
+        error: '',
+        sourceValue: initialValue,
+    }));
     const errorId = useId();
 
-    if (syncedInitialValue !== initialValue) {
-        setSyncedInitialValue(initialValue);
-        setDraft(initialValue);
-        setError('');
+    if (state.sourceValue !== initialValue) {
+        setState({
+            committedValue: initialValue || undefined,
+            draft: initialValue,
+            error: '',
+            sourceValue: initialValue,
+        });
     }
 
     const commit = () => {
-        const trimmed = draft.trim();
+        const trimmed = state.draft.trim();
         if (!trimmed) {
-            setDraft('');
-            setError('');
-            if (initialValue) onCommit(undefined);
+            setState(current => ({
+                ...current,
+                committedValue: undefined,
+                draft: '',
+                error: '',
+            }));
+            if (state.committedValue !== undefined) onCommit(undefined);
             return;
         }
 
         const safeUrl = toSafeExternalUrl(trimmed);
         if (!safeUrl) {
-            setError(invalidMessage);
+            setState(current => ({ ...current, error: invalidMessage }));
             return;
         }
 
-        setDraft(safeUrl);
-        setError('');
-        if (safeUrl !== initialValue) onCommit(safeUrl);
+        setState(current => ({
+            ...current,
+            committedValue: safeUrl,
+            draft: safeUrl,
+            error: '',
+        }));
+        if (state.committedValue !== safeUrl) onCommit(safeUrl);
     };
 
     return (
@@ -54,14 +68,17 @@ export const MindMapPropertyLinkField: React.FC<MindMapPropertyLinkFieldProps> =
             <Input
                 prefix={<LinkOutlined aria-hidden="true" className={styles.mutedIcon} />}
                 aria-label={label}
-                aria-invalid={Boolean(error)}
-                aria-describedby={error ? errorId : undefined}
+                aria-invalid={Boolean(state.error)}
+                aria-describedby={state.error ? errorId : undefined}
                 placeholder="https://..."
-                value={draft}
+                value={state.draft}
                 size="small"
                 onChange={event => {
-                    setDraft(event.target.value);
-                    setError('');
+                    setState(current => ({
+                        ...current,
+                        draft: event.target.value,
+                        error: '',
+                    }));
                 }}
                 onBlur={commit}
                 onPressEnter={event => {
@@ -69,9 +86,9 @@ export const MindMapPropertyLinkField: React.FC<MindMapPropertyLinkFieldProps> =
                     commit();
                 }}
             />
-            {error && (
+            {state.error && (
                 <div id={errorId} className={styles.error} role="alert">
-                    {error}
+                    {state.error}
                 </div>
             )}
         </div>

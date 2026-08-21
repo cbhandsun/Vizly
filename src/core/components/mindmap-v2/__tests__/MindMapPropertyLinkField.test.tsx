@@ -85,6 +85,30 @@ describe('MindMapPropertyLinkField', () => {
         expect(screen.getByRole('alert')).not.toBeNull();
     });
 
+    it('commits once when Enter is followed by the input blur', () => {
+        const { onCommit } = renderField();
+        const input = screen.getByRole<HTMLInputElement>('textbox', { name: 'Link' });
+
+        fireEvent.change(input, { target: { value: 'example.com/release' } });
+        fireEvent.keyDown(input, { key: 'Enter', code: 'Enter', charCode: 13 });
+        fireEvent.blur(input);
+
+        expect(onCommit).toHaveBeenCalledTimes(1);
+        expect(onCommit).toHaveBeenCalledWith('https://example.com/release');
+    });
+
+    it('emits one clear when Enter and blur occur before the parent rerenders', () => {
+        const { onCommit } = renderField('https://example.com/current');
+        const input = screen.getByRole<HTMLInputElement>('textbox', { name: 'Link' });
+
+        fireEvent.change(input, { target: { value: '   ' } });
+        fireEvent.keyDown(input, { key: 'Enter', code: 'Enter', charCode: 13 });
+        fireEvent.blur(input);
+
+        expect(onCommit).toHaveBeenCalledTimes(1);
+        expect(onCommit).toHaveBeenCalledWith(undefined);
+    });
+
     it('resets the draft and error when the selected node value changes', () => {
         const { rerender } = renderField('https://example.com/first');
         const input = screen.getByRole<HTMLInputElement>('textbox', { name: 'Link' });

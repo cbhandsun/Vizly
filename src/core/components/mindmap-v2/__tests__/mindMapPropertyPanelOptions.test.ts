@@ -112,8 +112,8 @@ describe('mind map property panel localization', () => {
         expect(propertyPanelSource).toContain('className={styles.branchButton}');
         expect(propertyPanelSource).toContain('<MindMapPropertyLinkField');
         expect(linkFieldSource).toContain('toSafeExternalUrl(trimmed)');
-        expect(linkFieldSource).toContain('aria-invalid={Boolean(error)}');
-        expect(linkFieldSource).toContain('aria-describedby={error ? errorId : undefined}');
+        expect(linkFieldSource).toContain('aria-invalid={Boolean(state.error)}');
+        expect(linkFieldSource).toContain('aria-describedby={state.error ? errorId : undefined}');
         expect(linkFieldSource).toContain('className={styles.error} role="alert"');
         expect(controlsSource).not.toContain('💡 点击节点可编辑属性');
         expect(controlsSource).toContain('aria-pressed={isActive}');
