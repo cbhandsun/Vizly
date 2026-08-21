@@ -6,6 +6,7 @@ export type TimelineDateField = 'date' | 'endDate';
 export type TimelineTaskType = 'phase' | 'milestone' | 'summary' | 'event';
 export type TimelineTaskStatus = 'pending' | 'active' | 'done';
 export type TimelineTaskPriority = 'high' | 'medium' | 'low';
+export type TimelineEditableTaskType = Exclude<TimelineTaskType, 'summary'>;
 
 export const TIMELINE_TASK_NAME_MAX_LENGTH = 160;
 export const TIMELINE_TASK_ASSIGNEE_MAX_LENGTH = 120;
@@ -28,6 +29,26 @@ const isOneOf = <T extends string>(value: unknown, options: readonly T[]): value
 
 export const readTimelineTaskType = (value: unknown): TimelineTaskType => (
     isOneOf(value, ['phase', 'milestone', 'summary', 'event'] as const) ? value : 'phase'
+);
+
+const readTimelineEditableTaskType = (value: unknown): TimelineEditableTaskType | null => (
+    isOneOf(value, ['phase', 'milestone', 'event'] as const) ? value : null
+);
+
+export const hasTimelineTaskChildren = (
+    nodes: readonly Node[],
+    nodeId: unknown,
+): boolean => (
+    typeof nodeId === 'string'
+    && nodeId.length > 0
+    && nodes.some(node => node.data?.parentId === nodeId)
+);
+
+export const resolveTimelineTaskType = (
+    value: unknown,
+    hasChildren: boolean,
+): TimelineTaskType => (
+    hasChildren ? 'summary' : readTimelineTaskType(value)
 );
 
 export const readTimelineTaskStatus = (value: unknown): TimelineTaskStatus => (
@@ -73,6 +94,46 @@ export const buildTimelineProgressUpdate = (value: unknown): TimelineStatusProgr
     const progress = readTimelineProgress(value);
     const status = progress <= 0 ? 'pending' : progress >= 100 ? 'done' : 'active';
     return { progress, status };
+};
+
+export interface TimelineTypePatch {
+    [key: string]: unknown;
+    type?: TimelineEditableTaskType;
+    endDate?: string;
+    progress?: number;
+}
+
+export const buildTimelineTypeUpdate = (
+    data: Record<string, unknown>,
+    value: unknown,
+): TimelineTypePatch => {
+    const type = readTimelineEditableTaskType(value);
+    if (!type) return {};
+
+    if (type === 'milestone') {
+        return {
+            type,
+            endDate: normalizeCanonicalDate(data.date) ?? undefined,
+            progress: undefined,
+        };
+    }
+    if (type === 'event') return { type, progress: undefined };
+
+    const startDate = normalizeCanonicalDate(data.date);
+    const currentEndDate = normalizeCanonicalDate(data.endDate);
+    const startTime = startDate ? parseDateOnlyTime(startDate) : null;
+    const endTime = currentEndDate ? parseDateOnlyTime(currentEndDate) : null;
+    const endDate = startDate && (endTime === null || (startTime !== null && endTime < startTime))
+        ? startDate
+        : currentEndDate ?? undefined;
+    const status = readTimelineTaskStatus(data.status);
+    const currentProgress = readTimelineProgress(data.progress);
+    const progress = status === 'done'
+        ? 100
+        : status === 'pending'
+            ? 0
+            : Math.min(99, Math.max(1, currentProgress));
+    return { type, endDate, progress };
 };
 
 export const sanitizeTimelineText = (value: unknown, maxLength: number): string => {

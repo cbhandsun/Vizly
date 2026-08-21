@@ -2472,8 +2472,10 @@
                 "types": {
                     "phase": "Phase",
                     "milestone": "Milestone",
-                    "event": "Event"
+                    "event": "Event",
+                    "summary": "Summary (derived)"
                 },
+                "typeSummaryHint": "Tasks with subtasks are summaries. Remove or reparent subtasks before changing the type.",
                 "statuses": {
                     "pending": "Not started",
                     "active": "In progress",

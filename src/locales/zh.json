@@ -2625,8 +2625,10 @@
                 "types": {
                     "phase": "阶段",
                     "milestone": "里程碑",
-                    "event": "事件"
+                    "event": "事件",
+                    "summary": "汇总任务（由子任务生成）"
                 },
+                "typeSummaryHint": "包含子任务的任务会自动成为汇总任务。如需更改类型，请先移除或调整子任务层级。",
                 "statuses": {
                     "pending": "待开始",
                     "active": "进行中",

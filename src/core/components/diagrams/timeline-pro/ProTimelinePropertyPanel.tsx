@@ -13,10 +13,12 @@ import {
     buildTimelineDeletionPlan,
     buildTimelineProgressUpdate,
     buildTimelineStatusUpdate,
+    buildTimelineTypeUpdate,
+    hasTimelineTaskChildren,
     readTimelineProgress,
     readTimelineTaskPriority,
     readTimelineTaskStatus,
-    readTimelineTaskType,
+    resolveTimelineTaskType,
     readTimelineDate,
     sanitizeTimelineText,
     TIMELINE_TASK_ASSIGNEE_MAX_LENGTH,
@@ -169,7 +171,8 @@ const ProTimelinePropertyPanelContent: React.FC<ProTimelinePropertyPanelProps> =
     const baselineDiff = baselineStartDate && normalizedStartDate
         ? getWorkDaysSigned(baselineStartDate, normalizedStartDate)
         : null;
-    const taskType = readTimelineTaskType(nodeData?.type);
+    const hasChildren = hasTimelineTaskChildren(ctx.getNodes(), activeNodeId);
+    const taskType = resolveTimelineTaskType(nodeData?.type, hasChildren);
     const taskStatus = readTimelineTaskStatus(nodeData?.status);
     const taskPriority = readTimelineTaskPriority(nodeData?.priority);
     const taskProgress = readTimelineProgress(nodeData?.progress);
@@ -206,16 +209,30 @@ const ProTimelinePropertyPanelContent: React.FC<ProTimelinePropertyPanelProps> =
                         <div style={{ fontSize: 12, color: labelColor, marginBottom: 4 }}>{t('plugins.timeline.propertyPanel.fields.type')}</div>
                         <Select
                             aria-label={t('plugins.timeline.propertyPanel.fields.type')}
+                            aria-describedby={hasChildren ? 'timeline-derived-summary-hint' : undefined}
                             value={taskType}
                             style={{ width: '100%' }}
-                            onChange={val => updateNodeData('type', val)}
+                            onChange={val => updateNodeDataPatch(
+                                buildTimelineTypeUpdate(nodeData, val),
+                                'type',
+                            )}
                             disabled={taskType === 'summary'}
                             options={[
                                 { value: 'phase', label: t('plugins.timeline.propertyPanel.types.phase') },
                                 { value: 'milestone', label: t('plugins.timeline.propertyPanel.types.milestone') },
-                                { value: 'event', label: t('plugins.timeline.propertyPanel.types.event') }
+                                { value: 'event', label: t('plugins.timeline.propertyPanel.types.event') },
+                                { value: 'summary', label: t('plugins.timeline.propertyPanel.types.summary'), disabled: true },
                             ]}
                         />
+                        {hasChildren && (
+                            <Text
+                                id="timeline-derived-summary-hint"
+                                type="secondary"
+                                style={{ display: 'block', fontSize: 12, marginTop: 6 }}
+                            >
+                                {t('plugins.timeline.propertyPanel.typeSummaryHint')}
+                            </Text>
+                        )}
                     </div>
                     {taskType !== 'summary' && (
                         <div>

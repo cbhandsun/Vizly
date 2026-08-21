@@ -42,6 +42,8 @@ const translations: Record<string, string> = {
     'plugins.timeline.propertyPanel.types.phase': 'Phase',
     'plugins.timeline.propertyPanel.types.milestone': 'Milestone',
     'plugins.timeline.propertyPanel.types.event': 'Event',
+    'plugins.timeline.propertyPanel.types.summary': 'Summary (derived)',
+    'plugins.timeline.propertyPanel.typeSummaryHint': 'Tasks with subtasks are summaries. Remove or reparent subtasks before changing the type.',
     'plugins.timeline.propertyPanel.statuses.pending': 'Not started',
     'plugins.timeline.propertyPanel.statuses.active': 'In progress',
     'plugins.timeline.propertyPanel.statuses.done': 'Completed',
@@ -153,6 +155,23 @@ describe('ProTimelinePropertyPanel', () => {
         });
 
         expect(context.takeSnapshot).not.toHaveBeenCalled();
+    });
+
+    it('shows a derived summary type when the selected task owns subtasks', () => {
+        const parent = phaseNode('parent');
+        const child = phaseNode('child', 'parent');
+        const { context } = createHarness([parent, child]);
+
+        render(<ProTimelinePropertyPanel ctx={context} selectedNodes={[parent]} selectedEdges={[]} />);
+
+        const typeSelect = screen.getByLabelText('Task type') as HTMLInputElement;
+        expect(typeSelect.disabled).toBe(true);
+        expect(screen.getByText('Summary (derived)')).toBeTruthy();
+        expect(screen.getByText(
+            'Tasks with subtasks are summaries. Remove or reparent subtasks before changing the type.',
+        )).toBeTruthy();
+        expect(screen.queryByLabelText('Status')).toBeNull();
+        expect(screen.getByLabelText('Task progress').getAttribute('aria-disabled')).toBe('true');
     });
 
     it('renders malformed imported values through safe field boundaries', () => {

@@ -6,11 +6,14 @@ import {
     buildTimelineDeletionPlan,
     buildTimelineProgressUpdate,
     buildTimelineStatusUpdate,
+    buildTimelineTypeUpdate,
+    hasTimelineTaskChildren,
     readTimelineDate,
     readTimelineProgress,
     readTimelineTaskPriority,
     readTimelineTaskStatus,
     readTimelineTaskType,
+    resolveTimelineTaskType,
     sanitizeTimelineText,
 } from '../timelinePropertyActions';
 
@@ -75,6 +78,48 @@ describe('timelinePropertyActions', () => {
             progress: 0,
             status: 'pending',
         });
+    });
+
+    it('derives summary type from hierarchy instead of exposing a misleading editable type', () => {
+        const parent = task('parent');
+        const child = task('child', 'parent');
+
+        expect(hasTimelineTaskChildren([parent, child], 'parent')).toBe(true);
+        expect(hasTimelineTaskChildren([parent, child], 'child')).toBe(false);
+        expect(hasTimelineTaskChildren([parent, child], null)).toBe(false);
+        expect(resolveTimelineTaskType('milestone', true)).toBe('summary');
+        expect(resolveTimelineTaskType('milestone', false)).toBe('milestone');
+    });
+
+    it('migrates type-specific schedule fields as one deterministic patch', () => {
+        expect(buildTimelineTypeUpdate({
+            type: 'phase',
+            date: '2026-08-21',
+            endDate: '2026-08-28',
+            progress: 47,
+            status: 'active',
+        }, 'milestone')).toEqual({
+            type: 'milestone',
+            endDate: '2026-08-21',
+            progress: undefined,
+        });
+        expect(buildTimelineTypeUpdate({ progress: 47 }, 'event')).toEqual({
+            type: 'event',
+            progress: undefined,
+        });
+        expect(buildTimelineTypeUpdate({
+            type: 'event',
+            date: '2026-08-21',
+            endDate: '2026-08-20',
+            progress: Number.POSITIVE_INFINITY,
+            status: 'active',
+        }, 'phase')).toEqual({
+            type: 'phase',
+            endDate: '2026-08-21',
+            progress: 1,
+        });
+        expect(buildTimelineTypeUpdate({ type: 'phase' }, 'summary')).toEqual({});
+        expect(buildTimelineTypeUpdate({ type: 'phase' }, { unsafe: true })).toEqual({});
     });
 
     it('rejects reversed ranges without mutating the task data', () => {
