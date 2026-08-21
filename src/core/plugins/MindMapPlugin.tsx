@@ -225,7 +225,7 @@ export class MindMapPlugin extends BaseDiagramPlugin implements DiagramTypePlugi
         return [
             {
                 id: 'mindmap-outline',
-                title: i18n.t('plugins.mindmap.outline.title') || '大纲视图',
+                title: i18n.t('plugins.mindmap.outline.title') || 'Outline',
                 icon: <UnorderedListOutlined />,
                 content: <MindMapOutlinePanel />,
             },

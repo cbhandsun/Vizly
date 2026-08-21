@@ -3246,10 +3246,29 @@
         }
       }
     },
-    "outline": {
+            "outline": {
+                "panelLabel": "Mind map outline",
                 "title": "Outline",
+                "exportAction": "Export",
+                "exportLabel": "Export Markdown outline",
+                "closeLabel": "Close outline view",
+                "closeTitle": "Close outline view (Alt+O)",
+                "searchLabel": "Search outline nodes",
+                "searchPlaceholder": "Search nodes",
+                "treeLabel": "Outline node list",
                 "editHint": "Click to edit",
-                "noNodes": "No nodes"
+                "nodeInteractionHint": "Double-click to edit, click to locate, or drag to reorder",
+                "addChildTitle": "Add child node",
+                "addChildLabel": "Add a child node to {{topic}}",
+                "deleteNodeTitle": "Delete node",
+                "deleteNodeLabel": "Delete node {{topic}}",
+                "hasNote": "Has note",
+                "hasLink": "Has link",
+                "noMatches": "No matching nodes",
+                "noNodes": "No nodes",
+                "nodeCount_one": "{{count}} node",
+                "nodeCount_other": "{{count}} nodes",
+                "toggleHint": "Alt+O to toggle"
             },
             "shortcuts": {
                 "copyBranch": "Copy Branch",

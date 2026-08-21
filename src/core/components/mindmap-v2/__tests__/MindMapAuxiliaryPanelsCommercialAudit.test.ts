@@ -24,7 +24,7 @@ describe('mind map auxiliary panel commercial audit contract', () => {
         const source = readSource('MindMapOutlinePanel.tsx');
         const deletionSource = readSource('useMindMapNodeDeletion.tsx');
 
-        expect(source).toContain('aria-label="搜索大纲节点"');
+        expect(source).toContain("aria-label={t('plugins.mindmap.outline.searchLabel')}");
         expect(source).toContain('role="tree"');
         expect(source).toContain('role="treeitem"');
         expect(source).toContain('tabIndex={rovingId === n.id ? 0 : -1}');
@@ -33,7 +33,12 @@ describe('mind map auxiliary panel commercial audit contract', () => {
         expect(source).toContain('{deleteDialog}');
         expect(source).toContain('onClick={() => setOutlineOpen(false)}');
         expect(source).toContain("t('plugins.mindmap.untitledNode')");
+        expect(source).toContain("t('plugins.mindmap.outline.panelLabel')");
+        expect(source).toContain("t('plugins.mindmap.outline.nodeCount', { count: nodes.length })");
         expect(source).not.toContain("node.topic || '(无标题)'");
+        expect(source).not.toMatch(/aria-label="[^"{]*[\u3400-\u9fff]/u);
+        expect(source).not.toMatch(/title="[^"{]*[\u3400-\u9fff]/u);
+        expect(source).not.toContain("? '无匹配节点' : '暂无节点'");
         expect(deletionSource).toContain('mask={{ closable: !pending }}');
         expect(deletionSource).not.toContain('maskClosable=');
         expect(source).not.toContain('placeholder="🔍');

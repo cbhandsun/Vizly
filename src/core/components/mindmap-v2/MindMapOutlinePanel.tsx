@@ -442,28 +442,33 @@ const MindMapOutlinePanel: React.FC = () => {
         d === 0 ? '#a5b4fc' : d === 1 ? '#c4b5fd' : d === 2 ? '#d8b4fe' : 'rgba(255,255,255,0.5)';
 
     return (
-        <aside className={sidePanelStyles.panel} aria-label="思维导图大纲">
+        <aside
+            className={sidePanelStyles.panel}
+            aria-label={t('plugins.mindmap.outline.panelLabel')}
+        >
 
             {/* Header */}
             <div className={sidePanelStyles.header}>
                 <OrderedListOutlined className={sidePanelStyles.headerIcon} aria-hidden="true" />
-                <span className={sidePanelStyles.title}>大纲视图</span>
+                <span className={sidePanelStyles.title}>
+                    {t('plugins.mindmap.outline.title')}
+                </span>
                 <button
                     type="button"
                     className={sidePanelStyles.headerAction}
                     onClick={handleExportMarkdown}
-                    aria-label="导出 Markdown 大纲"
-                    title="导出 Markdown 大纲"
+                    aria-label={t('plugins.mindmap.outline.exportLabel')}
+                    title={t('plugins.mindmap.outline.exportLabel')}
                 >
                     <DownloadOutlined aria-hidden="true" />
-                    导出
+                    {t('plugins.mindmap.outline.exportAction')}
                 </button>
                 <button
                     type="button"
                     className={sidePanelStyles.closeButton}
                     onClick={() => setOutlineOpen(false)}
-                    aria-label="关闭大纲视图"
-                    title="关闭大纲视图 (Alt+O)"
+                    aria-label={t('plugins.mindmap.outline.closeLabel')}
+                    title={t('plugins.mindmap.outline.closeTitle')}
                 >
                     <CloseOutlined aria-hidden="true" />
                 </button>
@@ -476,14 +481,18 @@ const MindMapOutlinePanel: React.FC = () => {
                     type="search"
                     value={query}
                     onChange={e => setQuery(e.target.value)}
-                    aria-label="搜索大纲节点"
-                    placeholder="搜索节点"
+                    aria-label={t('plugins.mindmap.outline.searchLabel')}
+                    placeholder={t('plugins.mindmap.outline.searchPlaceholder')}
                     className={sidePanelStyles.searchInput}
                 />
             </div>
 
             {/* Node list */}
-            <div className={sidePanelStyles.scrollArea} role="tree" aria-label="大纲节点列表">
+            <div
+                className={sidePanelStyles.scrollArea}
+                role="tree"
+                aria-label={t('plugins.mindmap.outline.treeLabel')}
+            >
                 {filtered.map(n => (
                     <div
                         key={n.id}
@@ -523,7 +532,9 @@ const MindMapOutlinePanel: React.FC = () => {
                                 startEdit(n.id, n.topic);
                             }
                         }}
-                        title={editingId === n.id ? undefined : "双击编辑，单击定位 (拖拽排序)"}
+                        title={editingId === n.id
+                            ? undefined
+                            : t('plugins.mindmap.outline.nodeInteractionHint')}
                         style={{
                             padding: `4px 8px 4px ${8 + n.depth * INDENT}px`,
                             borderTop: dragOverId === n.id && dropPosition === 'before' ? '2px solid #6366f1' : undefined,
@@ -605,8 +616,10 @@ const MindMapOutlinePanel: React.FC = () => {
                             <button
                                 type="button"
                                 className={sidePanelStyles.rowAction}
-                                title="添加子节点"
-                                aria-label={`为“${n.topic}”添加子节点`}
+                                title={t('plugins.mindmap.outline.addChildTitle')}
+                                aria-label={t('plugins.mindmap.outline.addChildLabel', {
+                                    topic: n.topic,
+                                })}
                                 tabIndex={rovingId === n.id ? 0 : -1}
                                 onClick={(e) => handleAddChild(e, n.id)}
                             >
@@ -616,8 +629,10 @@ const MindMapOutlinePanel: React.FC = () => {
                                 <button
                                     type="button"
                                     className={`${sidePanelStyles.rowAction} ${sidePanelStyles.dangerAction}`}
-                                    title="删除节点"
-                                    aria-label={`删除节点“${n.topic}”`}
+                                    title={t('plugins.mindmap.outline.deleteNodeTitle')}
+                                    aria-label={t('plugins.mindmap.outline.deleteNodeLabel', {
+                                        topic: n.topic,
+                                    })}
                                     tabIndex={rovingId === n.id ? 0 : -1}
                                     onClick={(e) => handleDeleteNode(e, n.id)}
                                 >
@@ -628,22 +643,34 @@ const MindMapOutlinePanel: React.FC = () => {
 
                         <div className={sidePanelStyles.nodeMeta}>
                             {n.icons.map(ic => <span key={ic} style={{ fontSize: 9 }}>{ic}</span>)}
-                            {n.hasNote && <FileTextOutlined title="有备注" aria-label="有备注" />}
-                            {n.hasLink && <LinkOutlined title="有超链接" aria-label="有超链接" />}
+                            {n.hasNote && (
+                                <FileTextOutlined
+                                    title={t('plugins.mindmap.outline.hasNote')}
+                                    aria-label={t('plugins.mindmap.outline.hasNote')}
+                                />
+                            )}
+                            {n.hasLink && (
+                                <LinkOutlined
+                                    title={t('plugins.mindmap.outline.hasLink')}
+                                    aria-label={t('plugins.mindmap.outline.hasLink')}
+                                />
+                            )}
                         </div>
                     </div>
                 ))}
                 {filtered.length === 0 && (
                     <div className={sidePanelStyles.emptyState} role="status">
-                        {query ? '无匹配节点' : '暂无节点'}
+                        {query
+                            ? t('plugins.mindmap.outline.noMatches')
+                            : t('plugins.mindmap.outline.noNodes')}
                     </div>
                 )}
             </div>
 
             {/* Footer */}
             <div className={sidePanelStyles.footer}>
-                <span>共 {nodes.length} 个节点</span>
-                <span>Alt+O 切换</span>
+                <span>{t('plugins.mindmap.outline.nodeCount', { count: nodes.length })}</span>
+                <span>{t('plugins.mindmap.outline.toggleHint')}</span>
             </div>
             {deleteDialog}
         </aside>

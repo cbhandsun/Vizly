@@ -3399,10 +3399,29 @@
         }
       }
     },
-    "outline": {
+            "outline": {
+                "panelLabel": "思维导图大纲",
                 "title": "大纲视图",
-                "editHint": "💡 双击节点名称可直接编辑",
-                "noNodes": "暂无导图节点"
+                "exportAction": "导出",
+                "exportLabel": "导出 Markdown 大纲",
+                "closeLabel": "关闭大纲视图",
+                "closeTitle": "关闭大纲视图 (Alt+O)",
+                "searchLabel": "搜索大纲节点",
+                "searchPlaceholder": "搜索节点",
+                "treeLabel": "大纲节点列表",
+                "editHint": "双击节点名称可直接编辑",
+                "nodeInteractionHint": "双击编辑，单击定位，拖拽排序",
+                "addChildTitle": "添加子节点",
+                "addChildLabel": "为“{{topic}}”添加子节点",
+                "deleteNodeTitle": "删除节点",
+                "deleteNodeLabel": "删除节点“{{topic}}”",
+                "hasNote": "有备注",
+                "hasLink": "有超链接",
+                "noMatches": "无匹配节点",
+                "noNodes": "暂无节点",
+                "nodeCount_one": "共 {{count}} 个节点",
+                "nodeCount_other": "共 {{count}} 个节点",
+                "toggleHint": "Alt+O 切换"
             },
             "shortcuts": {
                 "copyBranch": "Ctrl+C 复制当前分支（含子树）",

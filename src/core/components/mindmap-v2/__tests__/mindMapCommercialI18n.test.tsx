@@ -141,6 +141,21 @@ describe('mind map commercial control translations', () => {
         expect(zh.plugins.mindmap.searchPanel.replaceAllPartial).toContain('{{failure}}');
     });
 
+    it('keeps the outline panel resource shape and interpolation aligned across locales', () => {
+        const enOutline = en.plugins.mindmap.outline;
+        const zhOutline = zh.plugins.mindmap.outline;
+
+        expect(Object.keys(enOutline).sort()).toEqual(Object.keys(zhOutline).sort());
+        expect(enOutline.addChildLabel).toContain('{{topic}}');
+        expect(zhOutline.addChildLabel).toContain('{{topic}}');
+        expect(enOutline.deleteNodeLabel).toContain('{{topic}}');
+        expect(zhOutline.deleteNodeLabel).toContain('{{topic}}');
+        expect(enOutline.nodeCount_other).toContain('{{count}}');
+        expect(zhOutline.nodeCount_other).toContain('{{count}}');
+        expect(enOutline.panelLabel).toBe('Mind map outline');
+        expect(zhOutline.panelLabel).toBe('思维导图大纲');
+    });
+
     it('keeps the node-template catalog and interpolation contract aligned across locales', () => {
         const enTemplates = en.plugins.mindmap.templates;
         const zhTemplates = zh.plugins.mindmap.templates;
