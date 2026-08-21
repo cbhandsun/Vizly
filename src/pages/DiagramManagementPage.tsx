@@ -53,6 +53,7 @@ import {
     createWorkspaceFilterSearchUpdate,
     resolveWorkspaceFilterView,
 } from './workspaceFilterRoute';
+import { createUniqueWorkspaceDiagramTitle } from './workspaceDiagramNaming';
 
 const AuthModal = React.lazy(() => import('@/components/auth/AuthModal').then(module => ({
     default: module.AuthModal,
@@ -309,9 +310,11 @@ const WorkspaceDashboardPage: React.FC = () => {
         setIsCreatingDiagram(true);
         let keepLockUntilNavigation = false;
         try {
-            const requestedName = templateKey === 'flowchart'
-                ? t('workspace.untitledFlowchart')
-                : undefined;
+            const requestedName = createUniqueWorkspaceDiagramTitle({
+                templateKey,
+                translate: t,
+                existingTitles: unifiedItems.map(item => item.title),
+            });
             const diagramId = await workspaceDiagramActions.createDiagram(templateKey, requestedName);
             keepLockUntilNavigation = navigateToCreatedWorkspaceDiagram(diagramId, navigateToDiagram);
         } catch (error: unknown) {
