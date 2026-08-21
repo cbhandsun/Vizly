@@ -33,14 +33,29 @@ const context = (
 } as unknown as PluginContext);
 
 describe('mindElixirPersistence', () => {
-  it('returns a fresh bounded tree for an empty canvas', () => {
+  it('returns a fresh localized root-only tree for an empty canvas', () => {
     const data = loadMindElixirData(context());
 
     expect(data.direction).toBe(2);
     expect(data.nodeData).toMatchObject({
       id: 'root',
-      topic: '中心主题',
+      topic: 'Central Topic',
       root: true,
+      children: [],
+    });
+  });
+
+  it('does not inject demo branches when loading a legacy single-root page', () => {
+    const data = loadMindElixirData(context([{
+      id: 'legacy-root',
+      type: 'mindmap',
+      data: { label: 'Planning' },
+    }]));
+
+    expect(data.nodeData).toMatchObject({
+      id: 'root',
+      topic: 'Planning',
+      children: [],
     });
   });
 

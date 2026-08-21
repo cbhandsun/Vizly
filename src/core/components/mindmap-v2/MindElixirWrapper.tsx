@@ -609,7 +609,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
                 <MindMapFileDropOverlay visible={isDragOver} />
 
                 {/* Empty state guide — shown only when map has just the root node */}
-                {instance && <MindMapEmptyGuide />}
+                {instance && <MindMapEmptyGuide diagramId={ctx.diagramId} />}
 
                 {/* Outline view panel — slides in from the right */}
                 <MindMapOutlinePanel />

@@ -18,6 +18,10 @@ import {
 import { logMindmapEmptyGuideCheckFailure } from './mindmapPanelLogging';
 import { bindMindMapEmptyState, readMindMapEmptyState } from './mindMapEmptyState';
 import { createMindMapAIRequestLifecycle } from './mindMapAIPanelRequestLifecycle';
+import {
+    dismissMindMapEmptyGuide,
+    isMindMapEmptyGuideDismissed,
+} from './mindMapEmptyGuidePreference';
 import styles from './MindMapEmptyGuide.module.css';
 
 const TIPS = [
@@ -28,11 +32,15 @@ const TIPS = [
     { key: 'Ctrl+Z', labelKey: 'undo' },
 ] as const;
 
-const MindMapEmptyGuide: React.FC = () => {
+interface MindMapEmptyGuideProps {
+    diagramId?: string;
+}
+
+const MindMapEmptyGuide: React.FC<MindMapEmptyGuideProps> = ({ diagramId }) => {
     const { t } = useTranslation();
     const titleId = useId();
     const [isEmpty, setIsEmpty] = useState(false);
-    const [visible, setVisible] = useState(true);
+    const [visible, setVisible] = useState(() => !isMindMapEmptyGuideDismissed(diagramId));
     const [aiPanelOpen, setAIPanelOpen] = useState(false);
     const [prompt, setPrompt] = useState('');
     const [loading, setLoading] = useState(false);
@@ -106,8 +114,9 @@ const MindMapEmptyGuide: React.FC = () => {
 
     const handleDismiss = useCallback(() => {
         invalidatePendingRequest();
+        dismissMindMapEmptyGuide(diagramId);
         setVisible(false);
-    }, [invalidatePendingRequest]);
+    }, [diagramId, invalidatePendingRequest]);
 
     useEffect(() => {
         if (!mind) return;

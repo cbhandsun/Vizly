@@ -83,8 +83,8 @@ const createMind = (): MockMind => ({
     toCenter: vi.fn(),
 });
 
-const renderGuide = async () => {
-    const result = render(<MindMapEmptyGuide />);
+const renderGuide = async (diagramId = 'diagram-one') => {
+    const result = render(<MindMapEmptyGuide diagramId={diagramId} />);
     await screen.findByRole('region', { name: 'Start your mind map' });
     return result;
 };
@@ -104,6 +104,7 @@ const startPendingGeneration = async () => {
 };
 
 beforeEach(() => {
+    localStorage.clear();
     harness.activeMind = createMind();
     harness.aiListener = null;
     harness.mindListener = null;
@@ -142,13 +143,17 @@ describe('MindMapEmptyGuide', () => {
         expect(mind?.toCenter).toHaveBeenCalledTimes(1);
     });
 
-    it('describes dismissal as temporary behavior and restores the guide on remount', async () => {
+    it('remembers dismissal across remounts for the same diagram only', async () => {
         const first = await renderGuide();
         fireEvent.click(screen.getByRole('button', { name: 'Dismiss getting-started guide' }));
         await waitFor(() => expect(screen.queryByRole('region', { name: 'Start your mind map' })).toBeNull());
 
         first.unmount();
-        await renderGuide();
+        const sameDiagram = render(<MindMapEmptyGuide diagramId="diagram-one" />);
+        await waitFor(() => expect(screen.queryByRole('region', { name: 'Start your mind map' })).toBeNull());
+        sameDiagram.unmount();
+
+        await renderGuide('diagram-two');
     });
 
     it('ignores a generated tree that resolves after the guide is dismissed', async () => {

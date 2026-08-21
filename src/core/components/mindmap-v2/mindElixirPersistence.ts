@@ -1,36 +1,43 @@
 import type { MindElixirData, MindElixirInstance, NodeObj } from 'mind-elixir';
 import type { Edge, Node } from '@xyflow/react';
+import i18n from '@/i18n';
 
 import type { PluginContext } from '../../types/plugin';
 import {
   createPageContentMetrics,
   PRESERVE_PAGE_COPY_NODE_ID,
 } from '../diagrams/pageCanvasMetadata';
-import { coerceMindElixirDirection } from './mindElixirDirection';
+import { coerceMindElixirDirection, type MindElixirDirection } from './mindElixirDirection';
 import { countNodes, directionStringToInt, migrateV1ToV2 } from './migrate';
 import { createSafeMindMapV2Payload } from './mindmapPersistenceSecurity';
 import { persistMindMapThemeKey, resolveMindMapThemeKey } from './mindmapThemeStorage';
 import { logMindmapWrapperSaveFailure } from './mindmapWrapperLogging';
 import { VIZLY_HYPER_THEME } from './theme';
 import { isMindMapV2 } from './types';
-import { cleanMindMapData } from './mindmapTreeSanitizer';
+import { cleanMindMapData, cleanMindMapTopic } from './mindmapTreeSanitizer';
 
 const DEFAULT_DIRECTION = 2 as const;
 const MINDMAP_META_NODE_ID = '__mindmap_meta__';
 
-const DEFAULT_DATA: MindElixirData = {
+const DEFAULT_ROOT_TOPIC_KEY = 'designer.mindMapCenter';
+
+const resolveDefaultRootTopic = (): string => {
+  const translated = i18n.isInitialized ? i18n.t(DEFAULT_ROOT_TOPIC_KEY) : '';
+  const localized = typeof translated === 'string' && translated !== DEFAULT_ROOT_TOPIC_KEY
+    ? translated
+    : '';
+  return cleanMindMapTopic(localized, 'Central Topic');
+};
+
+const createDefaultData = (direction: MindElixirDirection = DEFAULT_DIRECTION): MindElixirData => ({
   nodeData: {
     id: 'root',
-    topic: '中心主题',
+    topic: resolveDefaultRootTopic(),
     root: true,
-    children: [
-      { id: 'b1', topic: '分支一', children: [] },
-      { id: 'b2', topic: '分支二', children: [] },
-      { id: 'b3', topic: '分支三', children: [] },
-    ],
+    children: [],
   } as NodeObj & { root: true },
-  direction: DEFAULT_DIRECTION,
-};
+  direction,
+});
 
 export const loadMindElixirData = (ctx: PluginContext): MindElixirData => {
   try {
@@ -42,7 +49,7 @@ export const loadMindElixirData = (ctx: PluginContext): MindElixirData => {
       : null;
 
     if (nodes.length === 0) {
-      return { ...DEFAULT_DATA, direction: persistedDirection ?? DEFAULT_DATA.direction };
+      return createDefaultData(persistedDirection ?? DEFAULT_DIRECTION);
     }
 
     const canonicalMetaNode = nodes.find(node => (
@@ -67,17 +74,21 @@ export const loadMindElixirData = (ctx: PluginContext): MindElixirData => {
 
     const mindmapNodes = nodes.filter(node => node.type === 'mindmap');
     if (mindmapNodes.length === 0) {
-      return { ...DEFAULT_DATA, direction: persistedDirection ?? DEFAULT_DATA.direction };
+      return createDefaultData(persistedDirection ?? DEFAULT_DIRECTION);
     }
 
     const childEdges = edges.filter(edge => edge.type !== 'relationshipEdge');
     const realNodes = mindmapNodes.filter(node => node.id !== '__mindmap_meta__');
     if (realNodes.length === 1 && childEdges.length === 0) {
-      const rootLabel = (realNodes[0].data?.label as string) || '中心主题';
+      const rootLabel = cleanMindMapTopic(realNodes[0].data?.label, resolveDefaultRootTopic());
       return {
-        ...DEFAULT_DATA,
-        direction: persistedDirection ?? DEFAULT_DATA.direction,
-        nodeData: { ...DEFAULT_DATA.nodeData, topic: rootLabel },
+        ...createDefaultData(persistedDirection ?? DEFAULT_DIRECTION),
+        nodeData: {
+          id: 'root',
+          topic: rootLabel,
+          root: true,
+          children: [],
+        } as NodeObj & { root: true },
       };
     }
 
@@ -88,7 +99,7 @@ export const loadMindElixirData = (ctx: PluginContext): MindElixirData => {
       theme: VIZLY_HYPER_THEME,
     };
   } catch {
-    return DEFAULT_DATA;
+    return createDefaultData();
   }
 };
 
