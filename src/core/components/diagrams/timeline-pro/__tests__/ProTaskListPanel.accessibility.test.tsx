@@ -145,7 +145,7 @@ describe('ProTimelineChrome baseline availability', () => {
         expect(onClearBaseline).not.toHaveBeenCalled();
     });
 
-    it('enables baseline actions after a valid snapshot exists', () => {
+    it('requires explicit confirmation before clearing a valid project baseline', () => {
         const onToggleBaseline = vi.fn();
         const onClearBaseline = vi.fn();
         renderTimelineChrome({ hasBaseline: true, onToggleBaseline, onClearBaseline });
@@ -154,6 +154,15 @@ describe('ProTimelineChrome baseline availability', () => {
         fireEvent.click(screen.getByRole('button', { name: '清空排期基线' }));
 
         expect(onToggleBaseline).toHaveBeenCalledTimes(1);
+        expect(screen.getByText('清空整个项目的基线排期？')).toBeTruthy();
+        expect(screen.getByText('将移除所有任务的基线日期。此操作可使用撤销恢复。')).toBeTruthy();
+        expect(onClearBaseline).not.toHaveBeenCalled();
+
+        fireEvent.click(screen.getByRole('button', { name: /取\s*消/ }));
+        expect(onClearBaseline).not.toHaveBeenCalled();
+
+        fireEvent.click(screen.getByRole('button', { name: '清空排期基线' }));
+        fireEvent.click(screen.getByRole('button', { name: '清空基线' }));
         expect(onClearBaseline).toHaveBeenCalledTimes(1);
         expect(document.activeElement).toBe(screen.getByRole('button', { name: '保存当前排期为基线' }));
     });

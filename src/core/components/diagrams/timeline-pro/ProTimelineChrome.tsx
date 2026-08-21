@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { CameraOutlined, DeleteOutlined, TeamOutlined, ZoomInOutlined, ZoomOutOutlined } from '@ant-design/icons';
-import { Button, Switch, Tooltip } from 'antd';
+import { Button, Modal, Switch, Tooltip } from 'antd';
 
 import type { ProTimelineViewMode } from '../../../hooks/useProTimelineEngine';
 import {
@@ -53,6 +53,7 @@ export const ProTimelineChrome: React.FC<ProTimelineChromeProps> = ({
   onZoomChange,
 }) => {
   const saveBaselineButtonRef = useRef<HTMLButtonElement | null>(null);
+  const [clearBaselineConfirmOpen, setClearBaselineConfirmOpen] = useState(false);
   const zoomControlState = getProTimelineZoomControlState(zoomLevel);
   const viewModeLabel = ({ day: '天', week: '周', month: '月', quarter: '季' } as const)[viewMode];
   const handleClearBaseline = useCallback(() => {
@@ -114,10 +115,38 @@ export const ProTimelineChrome: React.FC<ProTimelineChromeProps> = ({
       <Tooltip title="锁定当前排期为基线快照">
         <Button ref={saveBaselineButtonRef} aria-label="保存当前排期为基线" type="text" size="small" shape="circle" icon={<CameraOutlined />} onClick={onSaveBaseline} style={{ color: secondaryTextColor }} />
       </Tooltip>
-      <Tooltip title={hasBaseline ? '清空基线排期' : '当前没有可清空的基线'}>
-        <Button aria-label="清空排期基线" type="text" size="small" shape="circle" icon={<DeleteOutlined />} onClick={handleClearBaseline} disabled={!hasBaseline} danger />
+      <Tooltip
+        title={hasBaseline ? '清空基线排期' : '当前没有可清空的基线'}
+        open={clearBaselineConfirmOpen ? false : undefined}
+      >
+        <Button
+          aria-label="清空排期基线"
+          type="text"
+          size="small"
+          shape="circle"
+          icon={<DeleteOutlined />}
+          disabled={!hasBaseline}
+          danger
+          onClick={() => setClearBaselineConfirmOpen(true)}
+        />
       </Tooltip>
     </div>
+
+    <Modal
+      title="清空整个项目的基线排期？"
+      open={clearBaselineConfirmOpen}
+      okText="清空基线"
+      cancelText="取消"
+      okButtonProps={{ danger: true }}
+      focusTriggerAfterClose={false}
+      onCancel={() => setClearBaselineConfirmOpen(false)}
+      onOk={() => {
+        setClearBaselineConfirmOpen(false);
+        handleClearBaseline();
+      }}
+    >
+      <p>将移除所有任务的基线日期。此操作可使用撤销恢复。</p>
+    </Modal>
 
     <div className="pro-timeline-chrome pro-timeline-chrome--scale" style={{
       position: 'absolute', bottom: 24, right: 24,
