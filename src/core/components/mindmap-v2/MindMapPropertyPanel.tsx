@@ -32,7 +32,6 @@ import {
 } from './mindmapNodePatchSecurity';
 import {
     cleanMindMapIcons,
-    cleanMindMapNote,
     cleanMindMapTopic,
 } from './mindmapTreeSanitizer';
 import { cleanMindMapChildNode } from './mindmapBridgeSecurity';
@@ -56,6 +55,7 @@ import { useMindMapPropertySelection } from './useMindMapPropertySelection';
 import { MindMapPropertyAISection } from './MindMapPropertyAISection';
 import { MindMapPropertyMediaControls } from './MindMapPropertyMediaControls';
 import { MindMapPropertyLinkField } from './MindMapPropertyLinkField';
+import { MindMapPropertyNoteField } from './MindMapPropertyNoteField';
 import { useMindMapNodeDeletion } from './useMindMapNodeDeletion';
 import { useMindMapPropertyAI } from './useMindMapPropertyAI';
 import styles from './MindMapPropertyPanel.module.css';
@@ -101,7 +101,6 @@ const NodePropertyPanel: React.FC<{
     const [textColor, setTextColor] = useState(cleanMindMapColor(node.style?.color) ?? '');
     const [bgColor, setBgColor] = useState(cleanMindMapColor(node.style?.background) ?? '');
     const [branchColor, setBranchColor] = useState(cleanMindMapColor(node.branchColor) ?? '');
-    const [note, setNote] = useState(cleanMindMapNote(node.note) ?? '');
     const [imageUrl, setImageUrl] = useState(node.image?.url ?? '');
     const [icons, setIcons] = useState<string[]>(cleanMindMapIcons(node.icons) ?? []);
     const [tags, setTags] = useState<TagObj[]>(() => {
@@ -127,7 +126,6 @@ const NodePropertyPanel: React.FC<{
         setTextColor(cleanMindMapColor(node.style?.color) ?? '');
         setBgColor(cleanMindMapColor(node.style?.background) ?? '');
         setBranchColor(cleanMindMapColor(node.branchColor) ?? '');
-        setNote(cleanMindMapNote(node.note) ?? '');
         setImageUrl(node.image?.url ?? '');
         setIcons(cleanMindMapIcons(node.icons) ?? []);
         setTags(cleanMindMapTagObjects(node.tags) ?? []);
@@ -141,19 +139,27 @@ const NodePropertyPanel: React.FC<{
         setTaskProgress(task.progress ?? 0);
     }
 
-    const reshape = useCallback((patch: MindMapNodePatch) => {
-        if (!mind) return;
+    const reshapeWithResult = useCallback(async (patch: MindMapNodePatch): Promise<boolean> => {
+        if (!mind) return false;
         try {
             const tpcEl = mind.findEle(node.id);
-            if (!tpcEl) return;
-            void updateMindMapNodePatchAndRestoreSelection(
+            if (!tpcEl) return false;
+            await updateMindMapNodePatchAndRestoreSelection(
                 mind,
                 tpcEl,
                 node,
                 patch as Partial<NodeObj> & Record<string, unknown>,
-            ).catch(logMindmapPropertyReshapeFailure);
-        } catch (e) { logMindmapPropertyReshapeFailure(e); }
+            );
+            return true;
+        } catch (e) {
+            logMindmapPropertyReshapeFailure(e);
+            return false;
+        }
     }, [mind, node]);
+
+    const reshape = useCallback((patch: MindMapNodePatch) => {
+        void reshapeWithResult(patch);
+    }, [reshapeWithResult]);
 
     const applyImageUrl = useCallback((url: string) => {
         const safeUrl = toSafeImageUrl(url);
@@ -504,15 +510,14 @@ const NodePropertyPanel: React.FC<{
 
             {/* Note */}
             <Row label={t(propertyKey('note'))}>
-                <TextArea placeholder={t(propertyKey('notePlaceholder'))} value={note}
-                    aria-label={t(propertyKey('note'))}
-                    onChange={e => setNote(e.target.value)}
-                    onBlur={() => {
-                        const cleanNote = cleanMindMapNote(note);
-                        setNote(cleanNote ?? '');
-                        reshape({ note: cleanNote });
-                    }}
-                    autoSize={{ minRows: 2, maxRows: 5 }} className={styles.noteInput} />
+                <MindMapPropertyNoteField
+                    initialValue={node.note}
+                    failureMessage={t(propertyKey('noteSaveFailed'))}
+                    label={t(propertyKey('note'))}
+                    placeholder={t(propertyKey('notePlaceholder'))}
+                    sourceKey={node.id}
+                    onCommit={note => reshapeWithResult({ note })}
+                />
             </Row>
 
             <Divider className={styles.divider} />

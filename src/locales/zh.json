@@ -3104,6 +3104,7 @@
                 "invalidHyperlink": "请输入有效的 HTTP 或 HTTPS 链接。",
                 "note": "备注",
                 "notePlaceholder": "添加备注…",
+                "noteSaveFailed": "备注保存失败，草稿已保留；请重新聚焦后重试。",
                 "canvasTheme": "画布主题",
                 "themeChoice": "使用{{theme}}主题",
                 "currentTheme": "当前主题",

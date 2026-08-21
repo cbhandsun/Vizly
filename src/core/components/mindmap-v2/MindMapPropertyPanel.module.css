@@ -53,7 +53,6 @@
 }
 .branchLine { width: 80%; border-radius: 3px; background: #64748b; }
 .branchButton[aria-pressed='true'] .branchLine { background: #4f46e5; }
-.noteInput { font-size: 12px; }
 .shortcuts {
     padding: 8px 12px;
     border: 1px solid rgba(99, 102, 241, 0.1);

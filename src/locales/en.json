@@ -2951,6 +2951,7 @@
                 "invalidHyperlink": "Enter a valid HTTP or HTTPS link.",
                 "note": "Note",
                 "notePlaceholder": "Add a note…",
+                "noteSaveFailed": "The note could not be saved. Your draft is preserved; focus the field and try again.",
                 "canvasTheme": "Canvas theme",
                 "themeChoice": "Use {{theme}} theme",
                 "currentTheme": "Current theme",

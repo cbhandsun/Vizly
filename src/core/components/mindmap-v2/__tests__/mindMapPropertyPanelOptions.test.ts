@@ -115,6 +115,10 @@ describe('mind map property panel localization', () => {
         expect(propertyPanelSource).toContain('className={styles.shapeButton}');
         expect(propertyPanelSource).toContain('className={styles.branchButton}');
         expect(propertyPanelSource).toContain('<MindMapPropertyLinkField');
+        expect(propertyPanelSource).toContain('<MindMapPropertyNoteField');
+        expect(propertyPanelSource).toContain('sourceKey={node.id}');
+        expect(propertyPanelSource).toContain('onCommit={note => reshapeWithResult({ note })}');
+        expect(propertyPanelSource).not.toContain('reshape({ note: cleanNote })');
         expect(linkFieldSource).toContain('toSafeExternalUrl(trimmed)');
         expect(linkFieldSource).toContain('aria-invalid={Boolean(state.error)}');
         expect(linkFieldSource).toContain('aria-describedby={state.error ? errorId : undefined}');
