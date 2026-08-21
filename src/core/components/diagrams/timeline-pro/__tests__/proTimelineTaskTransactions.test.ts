@@ -5,6 +5,8 @@ import {
   collectProTimelineDeletionIds,
   createProTimelineTaskAddition,
   createProTimelineTaskDeletion,
+  createProTimelineTaskReparenting,
+  getProTimelineAvailableParentIds,
   getProTimelineDeletionFallbackId,
 } from '../proTimelineTaskTransactions';
 
@@ -109,5 +111,65 @@ describe('pro timeline task transactions', () => {
     expect(result.changed).toBe(false);
     expect(result.nodes).toEqual(nodes);
     expect(result.deletedNodeCount).toBe(0);
+  });
+
+  it('excludes the target and its descendants from available parents', () => {
+    const nodes = [
+      node('root'),
+      node('target', 'root'),
+      node('child', 'target'),
+      node('grandchild', 'child'),
+      node('other'),
+    ];
+
+    expect([...getProTimelineAvailableParentIds(nodes, 'target')])
+      .toEqual(['root', 'other']);
+    expect([...getProTimelineAvailableParentIds(nodes, '')]).toEqual([]);
+    expect([...getProTimelineAvailableParentIds(nodes, 'missing')]).toEqual([]);
+  });
+
+  it('moves a task subtree atomically and expands the new parent', () => {
+    const collapsedParent = node('other');
+    collapsedParent.data.isExpanded = false;
+    const nodes = [
+      node('root'),
+      node('target', 'root', true),
+      node('child', 'target'),
+      collapsedParent,
+    ];
+
+    const result = createProTimelineTaskReparenting(nodes, 'target', 'other');
+
+    expect(result.changed).toBe(true);
+    expect(result.nodes.find(item => item.id === 'target')?.data.parentId).toBe('other');
+    expect(result.nodes.find(item => item.id === 'child')?.data.parentId).toBe('target');
+    expect(result.nodes.find(item => item.id === 'other')?.data.isExpanded).toBe(true);
+    expect(result.nodes.find(item => item.id === 'target')?.selected).toBe(true);
+  });
+
+  it('promotes a task to the top level without leaving a stale parent id', () => {
+    const result = createProTimelineTaskReparenting(
+      [node('root'), node('child', 'root')],
+      'child',
+      null,
+    );
+
+    expect(result.changed).toBe(true);
+    expect(result.nodes[1]?.data).not.toHaveProperty('parentId');
+  });
+
+  it.each([
+    ['self-parent', 'target', 'target'],
+    ['descendant-parent', 'target', 'child'],
+    ['missing-parent', 'target', 'missing'],
+    ['missing-target', 'missing', 'root'],
+    ['invalid-target', '', 'root'],
+    ['unchanged', 'target', 'root'],
+  ] as const)('rejects %s hierarchy updates', (reason, targetId, parentId) => {
+    const nodes = [node('root'), node('target', 'root'), node('child', 'target')];
+    const result = createProTimelineTaskReparenting(nodes, targetId, parentId);
+
+    expect(result).toMatchObject({ changed: false, reason });
+    expect(result.nodes).toEqual(nodes);
   });
 });

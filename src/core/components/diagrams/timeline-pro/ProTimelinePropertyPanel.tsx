@@ -27,6 +27,10 @@ import {
 } from './timelinePropertyActions';
 import { createTimelineDateValidationMessage } from './timelineDateValidationFeedback';
 import { ProTaskDeleteDialog } from './ProTaskDeleteDialog';
+import {
+    createProTimelineTaskReparenting,
+    getProTimelineAvailableParentIds,
+} from './proTimelineTaskTransactions';
 
 const { Text } = Typography;
 
@@ -146,6 +150,21 @@ const ProTimelinePropertyPanelContent: React.FC<ProTimelinePropertyPanelProps> =
         }));
     }, [activeNodeId, ctx, t]);
 
+    const handleReparent = useCallback((requestedParentId: unknown) => {
+        if (!activeNodeId || !ctx) return;
+        const parentId = requestedParentId === '__root__' ? null : requestedParentId;
+        const transaction = createProTimelineTaskReparenting(
+            ctx.getNodes(),
+            activeNodeId,
+            parentId,
+        );
+        if (!transaction.changed) return;
+
+        ctx.takeSnapshot();
+        ctx.setNodes(transaction.nodes);
+        appMessage.success(t('plugins.timeline.propertyPanel.reparentSuccess'));
+    }, [activeNodeId, ctx, t]);
+
     if (!ctx || !selectedNodes) {
         return (
             <div style={{ padding: 24, textAlign: 'center' }}>
@@ -178,6 +197,20 @@ const ProTimelinePropertyPanelContent: React.FC<ProTimelinePropertyPanelProps> =
     const taskProgress = readTimelineProgress(nodeData?.progress);
     const taskName = sanitizeTimelineText(nodeData?.label, TIMELINE_TASK_NAME_MAX_LENGTH);
     const taskAssignee = sanitizeTimelineText(nodeData?.assignee, TIMELINE_TASK_ASSIGNEE_MAX_LENGTH);
+    const currentParentId = typeof nodeData?.parentId === 'string' && nodeData.parentId.trim()
+        ? nodeData.parentId.trim()
+        : null;
+    const currentNodes = ctx.getNodes();
+    const availableParentIds = getProTimelineAvailableParentIds(currentNodes, activeNodeId);
+    const parentOptions = [
+        { value: '__root__', label: t('plugins.timeline.propertyPanel.parentRoot') },
+        ...currentNodes
+            .filter(node => availableParentIds.has(node.id))
+            .map(node => ({
+                value: node.id,
+                label: sanitizeTimelineText(node.data?.label, TIMELINE_TASK_NAME_MAX_LENGTH) || node.id,
+            })),
+    ];
     const dateValidationErrors = dateValidationState.nodeId === activeNodeId
         ? dateValidationState.errors
         : {};
@@ -233,6 +266,23 @@ const ProTimelinePropertyPanelContent: React.FC<ProTimelinePropertyPanelProps> =
                                 {t('plugins.timeline.propertyPanel.typeSummaryHint')}
                             </Text>
                         )}
+                    </div>
+                    <div>
+                        <div style={{ fontSize: 12, color: labelColor, marginBottom: 4 }}>
+                            {t('plugins.timeline.propertyPanel.fields.parent')}
+                        </div>
+                        <Select
+                            aria-label={t('plugins.timeline.propertyPanel.fields.parent')}
+                            value={currentParentId ?? '__root__'}
+                            style={{ width: '100%' }}
+                            showSearch
+                            optionFilterProp="label"
+                            onChange={handleReparent}
+                            options={parentOptions}
+                        />
+                        <Text type="secondary" style={{ display: 'block', fontSize: 12, marginTop: 6 }}>
+                            {t('plugins.timeline.propertyPanel.parentHint')}
+                        </Text>
                     </div>
                     {taskType !== 'summary' && (
                         <div>

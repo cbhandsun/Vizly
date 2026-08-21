@@ -2620,7 +2620,8 @@
                     "startDate": "起始日期",
                     "endDate": "结束日期",
                     "progress": "当前进度 {{value}}%",
-                    "progressLabel": "任务进度"
+                    "progressLabel": "任务进度",
+                    "parent": "父任务"
                 },
                 "types": {
                     "phase": "阶段",
@@ -2629,6 +2630,9 @@
                     "summary": "汇总任务（由子任务生成）"
                 },
                 "typeSummaryHint": "包含子任务的任务会自动成为汇总任务。如需更改类型，请先移除或调整子任务层级。",
+                "parentRoot": "无父任务（顶层）",
+                "parentHint": "将同时移动该任务及其所有子任务；为防止层级循环，不能选择自身或其后代。",
+                "reparentSuccess": "任务层级已更新，可使用撤销恢复。",
                 "statuses": {
                     "pending": "待开始",
                     "active": "进行中",

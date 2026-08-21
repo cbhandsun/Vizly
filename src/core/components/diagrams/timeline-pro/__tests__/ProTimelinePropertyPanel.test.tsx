@@ -39,11 +39,15 @@ const translations: Record<string, string> = {
     'plugins.timeline.propertyPanel.fields.endDate': 'End date',
     'plugins.timeline.propertyPanel.fields.progress': 'Current progress {{value}}%',
     'plugins.timeline.propertyPanel.fields.progressLabel': 'Task progress',
+    'plugins.timeline.propertyPanel.fields.parent': 'Parent task',
     'plugins.timeline.propertyPanel.types.phase': 'Phase',
     'plugins.timeline.propertyPanel.types.milestone': 'Milestone',
     'plugins.timeline.propertyPanel.types.event': 'Event',
     'plugins.timeline.propertyPanel.types.summary': 'Summary (derived)',
     'plugins.timeline.propertyPanel.typeSummaryHint': 'Tasks with subtasks are summaries. Remove or reparent subtasks before changing the type.',
+    'plugins.timeline.propertyPanel.parentRoot': 'No parent (top level)',
+    'plugins.timeline.propertyPanel.parentHint': 'Move this task and all of its subtasks. Descendants are excluded to prevent hierarchy cycles.',
+    'plugins.timeline.propertyPanel.reparentSuccess': 'Task hierarchy updated. Use Undo to restore it.',
     'plugins.timeline.propertyPanel.statuses.pending': 'Not started',
     'plugins.timeline.propertyPanel.statuses.active': 'In progress',
     'plugins.timeline.propertyPanel.statuses.done': 'Completed',
@@ -172,6 +176,37 @@ describe('ProTimelinePropertyPanel', () => {
         )).toBeTruthy();
         expect(screen.queryByLabelText('Status')).toBeNull();
         expect(screen.getByLabelText('Task progress').getAttribute('aria-disabled')).toBe('true');
+    });
+
+    it('exposes a cycle-safe parent selector and snapshots top-level promotion', () => {
+        const parent = phaseNode('parent');
+        parent.data.label = 'Parent';
+        const child = phaseNode('child', 'parent');
+        child.data.label = 'Child';
+        const grandchild = phaseNode('grandchild', 'child');
+        grandchild.data.label = 'Grandchild';
+        const other = phaseNode('other');
+        other.data.label = 'Other';
+        const { context, getNodes } = createHarness([parent, child, grandchild, other]);
+
+        render(<ProTimelinePropertyPanel ctx={context} selectedNodes={[child]} selectedEdges={[]} />);
+
+        const parentSelect = screen.getByLabelText('Parent task');
+        expect(parentSelect).toBeTruthy();
+        expect(screen.getByText(
+            'Move this task and all of its subtasks. Descendants are excluded to prevent hierarchy cycles.',
+        )).toBeTruthy();
+
+        fireEvent.mouseDown(parentSelect);
+        expect(screen.queryByText('Child')).toBeNull();
+        expect(screen.queryByText('Grandchild')).toBeNull();
+        expect(screen.getByText('Other')).toBeTruthy();
+        fireEvent.click(screen.getByText('No parent (top level)'));
+
+        expect(context.takeSnapshot).toHaveBeenCalledTimes(1);
+        expect(getNodes().find(node => node.id === 'child')?.data).not.toHaveProperty('parentId');
+        expect(getNodes().find(node => node.id === 'grandchild')?.data.parentId).toBe('child');
+        expect(messageMocks.success).toHaveBeenCalledWith('Task hierarchy updated. Use Undo to restore it.');
     });
 
     it('renders malformed imported values through safe field boundaries', () => {

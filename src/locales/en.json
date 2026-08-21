@@ -2467,7 +2467,8 @@
                     "startDate": "Start date",
                     "endDate": "End date",
                     "progress": "Current progress {{value}}%",
-                    "progressLabel": "Task progress"
+                    "progressLabel": "Task progress",
+                    "parent": "Parent task"
                 },
                 "types": {
                     "phase": "Phase",
@@ -2476,6 +2477,9 @@
                     "summary": "Summary (derived)"
                 },
                 "typeSummaryHint": "Tasks with subtasks are summaries. Remove or reparent subtasks before changing the type.",
+                "parentRoot": "No parent (top level)",
+                "parentHint": "Move this task and all of its subtasks. Descendants are excluded to prevent hierarchy cycles.",
+                "reparentSuccess": "Task hierarchy updated. Use Undo to restore it.",
                 "statuses": {
                     "pending": "Not started",
                     "active": "In progress",

@@ -27,6 +27,27 @@ export interface ProTimelineTaskDeletionTransaction {
   nodes: Node[];
 }
 
+export type ProTimelineTaskReparentFailureReason =
+  | 'invalid-target'
+  | 'missing-target'
+  | 'missing-parent'
+  | 'self-parent'
+  | 'descendant-parent'
+  | 'unchanged';
+
+export type ProTimelineTaskReparentTransaction =
+  | {
+    changed: true;
+    parentId: string | null;
+    nodes: Node[];
+  }
+  | {
+    changed: false;
+    parentId: string | null;
+    reason: ProTimelineTaskReparentFailureReason;
+    nodes: Node[];
+  };
+
 type TimelineHierarchyItem = {
   id: string;
   parentId?: string;
@@ -90,6 +111,73 @@ export const getProTimelineDeletionFallbackId = (
 
   const previous = items.slice(0, targetIndex).reverse().find(item => !deletionIds.has(item.id));
   return previous?.id ?? null;
+};
+
+export const getProTimelineAvailableParentIds = (
+  nodes: readonly Node[],
+  targetId: unknown,
+): Set<string> => {
+  const normalizedTargetId = normalizedText(targetId, 200);
+  if (!normalizedTargetId) return new Set<string>();
+
+  const hierarchy = nodes.map(node => ({ id: node.id, parentId: getNodeParentId(node) }));
+  const excludedIds = collectProTimelineDeletionIds(hierarchy, normalizedTargetId);
+  if (excludedIds.size === 0) return new Set<string>();
+
+  return new Set(nodes
+    .map(node => normalizedText(node.id, 200))
+    .filter(id => id && !excludedIds.has(id)));
+};
+
+export const createProTimelineTaskReparenting = (
+  nodes: readonly Node[],
+  targetId: unknown,
+  requestedParentId: unknown,
+): ProTimelineTaskReparentTransaction => {
+  const normalizedTargetId = normalizedText(targetId, 200);
+  const parentCandidate = requestedParentId === null
+    ? ''
+    : normalizedText(requestedParentId, 200);
+  const parentId = parentCandidate || null;
+  if (!normalizedTargetId) {
+    return { changed: false, parentId, reason: 'invalid-target', nodes: [...nodes] };
+  }
+
+  const target = nodes.find(node => node.id === normalizedTargetId);
+  if (!target) {
+    return { changed: false, parentId, reason: 'missing-target', nodes: [...nodes] };
+  }
+  if (parentId === normalizedTargetId) {
+    return { changed: false, parentId, reason: 'self-parent', nodes: [...nodes] };
+  }
+  if (parentId && !nodes.some(node => node.id === parentId)) {
+    return { changed: false, parentId, reason: 'missing-parent', nodes: [...nodes] };
+  }
+
+  const availableParentIds = getProTimelineAvailableParentIds(nodes, normalizedTargetId);
+  if (parentId && !availableParentIds.has(parentId)) {
+    return { changed: false, parentId, reason: 'descendant-parent', nodes: [...nodes] };
+  }
+
+  const currentParentId = getNodeParentId(target) ?? null;
+  if (currentParentId === parentId) {
+    return { changed: false, parentId, reason: 'unchanged', nodes: [...nodes] };
+  }
+
+  const nextNodes = nodes.map(node => {
+    if (node.id === normalizedTargetId) {
+      const nextData = { ...node.data };
+      if (parentId) nextData.parentId = parentId;
+      else delete nextData.parentId;
+      return { ...node, data: nextData };
+    }
+    if (parentId && node.id === parentId && node.data.isExpanded === false) {
+      return { ...node, data: { ...node.data, isExpanded: true } };
+    }
+    return node;
+  });
+
+  return { changed: true, parentId, nodes: nextNodes };
 };
 
 export const createProTimelineTaskAddition = (
