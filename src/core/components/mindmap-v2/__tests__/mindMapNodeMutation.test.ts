@@ -86,4 +86,77 @@ describe('updateMindMapNodePatchAndRestoreSelection', () => {
         )).rejects.toThrow('reshape failed');
         expect(findEle).not.toHaveBeenCalled();
     });
+
+    it('serializes rapid mutations and merges each patch over the last committed node', async () => {
+        let releaseFirst: (() => void) | undefined;
+        const firstPending = new Promise<void>(resolve => { releaseFirst = resolve; });
+        const reshapeNode = vi.fn()
+            .mockImplementationOnce(async () => firstPending)
+            .mockResolvedValue(undefined);
+        const mind = {
+            bus: { fire: vi.fn() },
+            findEle: () => refreshedTopic,
+            reshapeNode,
+            selectNodes: vi.fn(),
+        };
+
+        const first = updateMindMapNodePatchAndRestoreSelection(
+            mind,
+            topic,
+            node,
+            { note: 'First', style: { fontSize: '18px' } },
+        );
+        const second = updateMindMapNodePatchAndRestoreSelection(
+            mind,
+            topic,
+            node,
+            { branchColor: '#6366f1', style: { color: '#6366f1' } },
+        );
+
+        await Promise.resolve();
+        expect(reshapeNode).toHaveBeenCalledTimes(1);
+        releaseFirst?.();
+        await expect(first).resolves.toMatchObject({ restored: true });
+        const secondResult = await second;
+
+        expect(reshapeNode).toHaveBeenCalledTimes(2);
+        expect(secondResult.nextNode).toMatchObject({
+            note: 'First',
+            branchColor: '#6366f1',
+            style: {
+                color: '#6366f1',
+                fontSize: '18px',
+            },
+        });
+    });
+
+    it('continues the queue after a failed mutation without replaying its patch', async () => {
+        const reshapeNode = vi.fn()
+            .mockRejectedValueOnce(new Error('first failed'))
+            .mockResolvedValueOnce(undefined);
+        const mind = {
+            bus: { fire: vi.fn() },
+            findEle: () => refreshedTopic,
+            reshapeNode,
+            selectNodes: vi.fn(),
+        };
+
+        const first = updateMindMapNodePatchAndRestoreSelection(
+            mind,
+            topic,
+            node,
+            { note: 'Should not persist' },
+        );
+        const second = updateMindMapNodePatchAndRestoreSelection(
+            mind,
+            topic,
+            node,
+            { branchColor: '#6366f1' },
+        );
+
+        await expect(first).rejects.toThrow('first failed');
+        const secondResult = await second;
+        expect(secondResult.nextNode).toMatchObject({ branchColor: '#6366f1' });
+        expect(secondResult.nextNode).not.toHaveProperty('note');
+    });
 });

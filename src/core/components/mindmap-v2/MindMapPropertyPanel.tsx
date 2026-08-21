@@ -2,7 +2,7 @@
  * MindMapPropertyPanel.tsx — 节点属性面板 v3
  * 新增：Icons/Markers、Tags 彩色标签、BranchColor 连线颜色
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     Input, InputNumber, Divider, Typography, Space, Button, Tooltip, Tag, Select,
 } from 'antd';
@@ -15,12 +15,16 @@ import { useTranslation } from 'react-i18next';
 import type { NodeObj, TagObj } from 'mind-elixir';
 import { getMindElixirInstance, subscribeMindElixir } from './mindElixirStore';
 import {
-    applyTaskMeta,
     getTaskMeta,
     type MindMapTaskMeta,
     type TaskPriority,
     type TaskStatus,
 } from './mindmapTaskModel';
+import {
+    applyMindMapPropertyTaskDraftPatch,
+    createMindMapPropertyTaskDraft,
+    syncMindMapPropertyTaskDraftTags,
+} from './mindMapPropertyTaskDraft';
 import { toSafeImageUrl } from '../../utils/sanitizeHtml';
 import {
     cleanMindMapColor,
@@ -113,6 +117,7 @@ const NodePropertyPanel: React.FC<{
     const [taskDueDate, setTaskDueDate] = useState(initialTask.dueDate ?? '');
     const [taskAssignee, setTaskAssignee] = useState(initialTask.assignee ?? '');
     const [taskProgress, setTaskProgress] = useState(initialTask.progress ?? 0);
+    const taskDraftRef = useRef(createMindMapPropertyTaskDraft(node));
 
     const [syncedNodeId, setSyncedNodeId] = useState(node.id);
     if (syncedNodeId !== node.id) {
@@ -185,14 +190,22 @@ const NodePropertyPanel: React.FC<{
         if (tags.some(t => t.text === tagObj.text)) return;
         const next = cleanMindMapTagObjects([...tags, tagObj]) ?? [];
         setTags(next);
+        const currentTaskDraft = taskDraftRef.current.id === node.id
+            ? taskDraftRef.current
+            : createMindMapPropertyTaskDraft(node);
+        taskDraftRef.current = syncMindMapPropertyTaskDraftTags(currentTaskDraft, next);
         reshape({ tags: next });
-    }, [tags, reshape]);
+    }, [node, tags, reshape]);
 
     const handleTagRemove = useCallback((text: string) => {
         const next = cleanMindMapTagObjects(tags.filter(t => t.text !== text)) ?? [];
         setTags(next);
+        const currentTaskDraft = taskDraftRef.current.id === node.id
+            ? taskDraftRef.current
+            : createMindMapPropertyTaskDraft(node);
+        taskDraftRef.current = syncMindMapPropertyTaskDraftTags(currentTaskDraft, next);
         reshape({ tags: next });
-    }, [tags, reshape]);
+    }, [node, tags, reshape]);
 
     const handleTagInputConfirm = () => {
         const t = tagInput.trim();
@@ -202,18 +215,21 @@ const NodePropertyPanel: React.FC<{
     };
 
     const updateTask = (patch: Partial<MindMapTaskMeta>) => {
-        const draft = {
-            ...node,
-            tags: [...(node.tags ?? [])],
-            task: { ...(extendedNode.task ?? {}) },
-        } as ExtendedMindMapNode;
-        const next = applyTaskMeta(draft, patch);
+        const currentTaskDraft = taskDraftRef.current.id === node.id
+            ? taskDraftRef.current
+            : createMindMapPropertyTaskDraft(node);
+        const { draft, meta: next, mutation } = applyMindMapPropertyTaskDraftPatch(
+            currentTaskDraft,
+            patch,
+        );
+        taskDraftRef.current = draft;
         setTaskStatus(next.status ?? 'todo');
         setTaskPriority(next.priority ?? '无');
         setTaskDueDate(next.dueDate ?? '');
         setTaskAssignee(next.assignee ?? '');
         setTaskProgress(next.progress ?? 0);
-        reshape({ task: draft.task, tags: draft.tags });
+        setTags(cleanMindMapTagObjects(mutation.tags) ?? []);
+        reshape(mutation);
     };
 
     const isRoot = !node.parent;
