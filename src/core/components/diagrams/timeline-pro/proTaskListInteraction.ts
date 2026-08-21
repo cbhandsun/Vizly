@@ -3,6 +3,14 @@ export const PRO_TASK_LIST_MAX_WIDTH = 650;
 export const PRO_TASK_LIST_DEFAULT_WIDTH = 380;
 export const PRO_TASK_LIST_WIDTH_STEP = 20;
 
+export type ProTaskEditingField = 'name' | 'startDate' | 'duration' | 'assignee' | 'priority';
+
+export interface ProTaskEditingCellState {
+    id: string;
+    field: ProTaskEditingField;
+    value: string;
+}
+
 export const normalizeProTaskListWidth = (value: unknown): number => {
     const candidate = typeof value === 'number' && Number.isFinite(value)
         ? value

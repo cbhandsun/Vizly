@@ -27,6 +27,13 @@ export interface ProTimelineTaskDeletionTransaction {
   nodes: Node[];
 }
 
+export interface ProTimelineDeletionImpact {
+  childTaskNames: string[];
+  dependencyCount: number;
+  hiddenChildTaskCount: number;
+  taskCount: number;
+}
+
 export type ProTimelineTaskReparentFailureReason =
   | 'invalid-target'
   | 'missing-target'
@@ -50,12 +57,23 @@ export type ProTimelineTaskReparentTransaction =
 
 type TimelineHierarchyItem = {
   id: string;
+  label?: unknown;
+  name?: unknown;
   parentId?: string;
 };
 
 const normalizedText = (value: unknown, maxLength: number): string => (
   typeof value === 'string' ? value.trim().slice(0, maxLength) : ''
 );
+
+const normalizedImpactLabel = (value: unknown): string => Array.from(normalizedText(value, 80))
+  .map(character => {
+    const code = character.charCodeAt(0);
+    return code <= 31 || (code >= 127 && code <= 159) ? ' ' : character;
+  })
+  .join('')
+  .replace(/\s+/g, ' ')
+  .trim();
 
 const normalizedDateOnly = (value: unknown): string => {
   const candidate = normalizedText(value, 32);
@@ -111,6 +129,37 @@ export const getProTimelineDeletionFallbackId = (
 
   const previous = items.slice(0, targetIndex).reverse().find(item => !deletionIds.has(item.id));
   return previous?.id ?? null;
+};
+
+export const buildProTimelineDeletionImpact = (
+  items: readonly TimelineHierarchyItem[],
+  edges: readonly Pick<Edge, 'source' | 'target'>[],
+  targetId: string,
+  maximumVisibleNames = 4,
+): ProTimelineDeletionImpact => {
+  const deletionIds = collectProTimelineDeletionIds(items, targetId);
+  if (deletionIds.size === 0) {
+    return { childTaskNames: [], dependencyCount: 0, hiddenChildTaskCount: 0, taskCount: 0 };
+  }
+
+  const visibleNameLimit = Number.isFinite(maximumVisibleNames)
+    ? Math.min(8, Math.max(0, Math.trunc(maximumVisibleNames)))
+    : 4;
+  const childTaskNames = items
+    .filter(item => item.id !== targetId && deletionIds.has(item.id))
+    .map(item => normalizedImpactLabel(item.name ?? item.label))
+    .filter(Boolean);
+  const dependencyCount = edges.filter(edge => (
+    deletionIds.has(edge.source) || deletionIds.has(edge.target)
+  )).length;
+  const visibleChildTaskNames = childTaskNames.slice(0, visibleNameLimit);
+
+  return {
+    childTaskNames: visibleChildTaskNames,
+    dependencyCount,
+    hiddenChildTaskCount: Math.max(0, deletionIds.size - 1 - visibleChildTaskNames.length),
+    taskCount: deletionIds.size,
+  };
 };
 
 export const getProTimelineAvailableParentIds = (

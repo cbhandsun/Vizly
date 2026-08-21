@@ -59,6 +59,11 @@ const translations: Record<string, string> = {
     'plugins.timeline.propertyPanel.deleteTask': 'Delete task',
     'plugins.timeline.propertyPanel.deleteConfirmTitle': 'Delete this task?',
     'plugins.timeline.propertyPanel.deleteConfirmDescription': 'This also removes its subtasks and related connectors. You can undo this action.',
+    'plugins.timeline.propertyPanel.deleteImpact.heading': 'Deletion impact',
+    'plugins.timeline.propertyPanel.deleteImpact.taskCount': 'Tasks to delete',
+    'plugins.timeline.propertyPanel.deleteImpact.dependencyCount': 'Dependencies to remove',
+    'plugins.timeline.propertyPanel.deleteImpact.affectedSubtasks': 'Affected subtasks',
+    'plugins.timeline.propertyPanel.deleteImpact.hiddenSubtasks': '{{count}} more subtasks',
     'plugins.timeline.propertyPanel.deleteConfirm': 'Confirm deletion',
     'plugins.timeline.propertyPanel.deleteSuccess': 'Deleted {{count}} task(s). Use Undo to restore them.',
     'common.cancel': 'Cancel',
@@ -279,6 +284,11 @@ describe('ProTimelinePropertyPanel', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Delete task' }));
         const dialog = await screen.findByRole('dialog');
         expect(dialog.textContent).toContain('This also removes its subtasks and related connectors. You can undo this action.');
+        expect(dialog.textContent).toContain('Deletion impact');
+        expect(dialog.textContent).toContain('Tasks to delete2');
+        expect(dialog.textContent).toContain('Dependencies to remove1');
+        expect(dialog.textContent).toContain('Affected subtasks');
+        expect(dialog.textContent).toContain('Launch readiness');
         expect(context.takeSnapshot).not.toHaveBeenCalled();
         const confirmButton = screen.getByRole('button', { name: 'Confirm deletion' });
         expect(confirmButton.classList.contains('ant-btn-primary')).toBe(true);

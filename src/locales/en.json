@@ -2509,6 +2509,13 @@
                 "deleteTask": "Delete task",
                 "deleteConfirmTitle": "Delete this task?",
                 "deleteConfirmDescription": "This also removes its subtasks and related connectors. You can undo this action.",
+                "deleteImpact": {
+                    "heading": "Deletion impact",
+                    "taskCount": "Tasks to delete",
+                    "dependencyCount": "Dependencies to remove",
+                    "affectedSubtasks": "Affected subtasks",
+                    "hiddenSubtasks": "{{count}} more subtasks"
+                },
                 "deleteConfirm": "Delete task",
                 "deleteSuccess": "Deleted {{count}} task(s). Use Undo to restore them."
             }

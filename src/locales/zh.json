@@ -2662,6 +2662,13 @@
                 "deleteTask": "删除任务",
                 "deleteConfirmTitle": "删除该任务？",
                 "deleteConfirmDescription": "这也会删除其所有子任务和相关连线；可使用撤销恢复。",
+                "deleteImpact": {
+                    "heading": "本次删除影响",
+                    "taskCount": "将删除的任务",
+                    "dependencyCount": "将删除的依赖关系",
+                    "affectedSubtasks": "受影响的子任务",
+                    "hiddenSubtasks": "另有 {{count}} 个子任务"
+                },
                 "deleteConfirm": "删除任务",
                 "deleteSuccess": "已删除 {{count}} 个任务，可使用撤销恢复。"
             }

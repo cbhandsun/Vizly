@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
+import type { Edge } from '@xyflow/react';
 import { ProGanttTask, getWorkDays, addWorkDays, getWorkDaysSigned, useProTimelineEngine } from '../../../hooks/useProTimelineEngine';
 import { Dropdown, Select, Tooltip } from 'antd';
 import { CaretRightOutlined, CaretDownOutlined, CalendarOutlined, FlagFilled, ClockCircleOutlined, FolderOpenOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
@@ -11,13 +12,20 @@ import {
     normalizeProTaskListWidth,
     PRO_TASK_LIST_MAX_WIDTH,
     PRO_TASK_LIST_MIN_WIDTH,
+    type ProTaskEditingCellState,
 } from './proTaskListInteraction';
 import { isProTimelineAdditiveSelection } from './proTimelineViewportInteraction';
 import { getProTimelineDeletionFallbackId } from './proTimelineTaskTransactions';
 import { ProTaskDeleteDialog } from './ProTaskDeleteDialog';
+import {
+    createPendingProTaskDeletion,
+    PRO_TASK_DELETE_IMPACT_LABELS_ZH,
+    type PendingProTaskDeletion,
+} from './proTaskDeletionDialogModel';
 
 export interface ProTaskListPanelProps {
     tasks: ProGanttTask[];
+    edges?: readonly Edge[];
     width: number;
     onWidthChange: (w: number) => void;
     hoveredTaskId: string | null;
@@ -37,19 +45,6 @@ export interface ProTaskListPanelProps {
 const ROW_HEIGHT = 42;
 const HEADER_HEIGHT = 52;
 
-type EditingField = 'name' | 'startDate' | 'duration' | 'assignee' | 'priority';
-
-interface EditingCellState {
-    id: string;
-    field: EditingField;
-    value: string;
-}
-
-interface PendingTaskDeletion {
-    id: string;
-    name: string;
-}
-
 const getTypeIcons = (theme: Theme | null): Record<string, React.ReactNode> => ({
     phase:     <CalendarOutlined style={{ fontSize: 13, color: theme?.palette?.success?.main || '#52c41a' }} />,
     event:     <ClockCircleOutlined style={{ fontSize: 13, color: theme?.palette?.primary?.main || '#1890ff' }} />,
@@ -58,13 +53,13 @@ const getTypeIcons = (theme: Theme | null): Record<string, React.ReactNode> => (
 });
 
 export default function ProTaskListPanel({
-    tasks, width, onWidthChange, hoveredTaskId, onHoverTask, onClickTask, selectedTaskId, selectedTaskIds, onScrollTopChange,
+    tasks, edges = [], width, onWidthChange, hoveredTaskId, onHoverTask, onClickTask, selectedTaskId, selectedTaskIds, onScrollTopChange,
     onTaskExpandToggle, onTaskUpdate, onTaskAdd, onTaskDelete, cyclicTaskIds
 }: ProTaskListPanelProps) {
     const [isResizing, setIsResizing] = useState(false);
-    const [editingCell, setEditingCell] = useState<EditingCellState | null>(null);
+    const [editingCell, setEditingCell] = useState<ProTaskEditingCellState | null>(null);
     const [focusedTaskId, setFocusedTaskId] = useState<string | null>(null);
-    const [pendingTaskDeletion, setPendingTaskDeletion] = useState<PendingTaskDeletion | null>(null);
+    const [pendingTaskDeletion, setPendingTaskDeletion] = useState<PendingProTaskDeletion | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const taskRowRefs = useRef(new Map<string, HTMLDivElement>());
     const deletionFocusTargetRef = useRef<string | null>(null);
@@ -449,7 +444,9 @@ export default function ProTaskListPanel({
                                         aria-haspopup="dialog"
                                         aria-label={`删除 ${accessibleTaskName} 及其所有子任务`}
                                         style={{ width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', borderRadius: 4, color: theme?.palette?.error?.main || '#ff4d4f', opacity: 0.8 }}
-                                        onClick={() => setPendingTaskDeletion({ id: task.id, name: accessibleTaskName })}
+                                        onClick={() => setPendingTaskDeletion(
+                                            createPendingProTaskDeletion(tasks, edges, task.id, accessibleTaskName),
+                                        )}
                                         onMouseEnter={e => e.currentTarget.style.background = isDark ? 'rgba(255,77,79,0.15)' : '#fff1f0'}
                                         onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                                         title="删除该任务及其所有子任务"
@@ -659,6 +656,8 @@ export default function ProTaskListPanel({
                 open={Boolean(pendingTaskDeletion)}
                 title={pendingTaskDeletion?.name ? `删除“${pendingTaskDeletion.name}”？` : '删除任务？'}
                 description="将同时删除其所有子任务和相关依赖关系；删除后可使用撤销恢复。"
+                impact={pendingTaskDeletion?.impact}
+                impactLabels={PRO_TASK_DELETE_IMPACT_LABELS_ZH}
                 confirmText="删除"
                 cancelText="取消"
                 onCancel={() => setPendingTaskDeletion(null)}

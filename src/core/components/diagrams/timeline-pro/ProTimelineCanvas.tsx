@@ -450,6 +450,7 @@ export default function ProTimelineCanvas() {
         {/* ===== 左侧任务列表 ===== */}
         <ProTaskListPanel
             tasks={packedTasks}
+            edges={edges}
             width={panelWidth}
             onWidthChange={setPanelWidth}
             hoveredTaskId={hoveredTaskId}

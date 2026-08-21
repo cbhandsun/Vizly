@@ -28,6 +28,7 @@ import {
 import { createTimelineDateValidationMessage } from './timelineDateValidationFeedback';
 import { ProTaskDeleteDialog } from './ProTaskDeleteDialog';
 import {
+    buildProTimelineDeletionImpact,
     createProTimelineTaskReparenting,
     getProTimelineAvailableParentIds,
 } from './proTimelineTaskTransactions';
@@ -61,6 +62,17 @@ const ProTimelinePropertyPanelContent: React.FC<ProTimelinePropertyPanelProps> =
     const activeNodeId = selectedNodes && selectedNodes.length === 1 ? selectedNodes[0].id : null;
     const freshNode = selectedNodes && selectedNodes.length === 1 ? selectedNodes[0] : null;
     const nodeData = freshNode ? freshNode.data : null;
+    const deletionImpact = activeNodeId
+        ? buildProTimelineDeletionImpact(
+            ctx.getNodes().map(node => ({
+                id: node.id,
+                label: node.data.label,
+                parentId: typeof node.data.parentId === 'string' ? node.data.parentId : undefined,
+            })),
+            ctx.getEdges(),
+            activeNodeId,
+        )
+        : undefined;
     const rawTaskType = nodeData?.type;
     const isGanttTask = nodeData && ['phase', 'milestone', 'summary', 'event'].includes(
         typeof rawTaskType === 'string' ? rawTaskType : '',
@@ -511,6 +523,14 @@ const ProTimelinePropertyPanelContent: React.FC<ProTimelinePropertyPanelProps> =
                 open={deleteDialogOpen}
                 title={t('plugins.timeline.propertyPanel.deleteConfirmTitle')}
                 description={t('plugins.timeline.propertyPanel.deleteConfirmDescription')}
+                impact={deletionImpact}
+                impactLabels={{
+                    affectedSubtasks: t('plugins.timeline.propertyPanel.deleteImpact.affectedSubtasks'),
+                    dependencyCount: t('plugins.timeline.propertyPanel.deleteImpact.dependencyCount'),
+                    heading: t('plugins.timeline.propertyPanel.deleteImpact.heading'),
+                    hiddenSubtasks: count => t('plugins.timeline.propertyPanel.deleteImpact.hiddenSubtasks', { count }),
+                    taskCount: t('plugins.timeline.propertyPanel.deleteImpact.taskCount'),
+                }}
                 confirmText={t('plugins.timeline.propertyPanel.deleteConfirm')}
                 cancelText={t('common.cancel')}
                 onCancel={() => setDeleteDialogOpen(false)}

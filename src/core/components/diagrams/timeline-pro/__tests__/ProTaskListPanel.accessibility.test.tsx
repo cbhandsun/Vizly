@@ -289,13 +289,26 @@ describe('ProTaskListPanel accessibility', () => {
 
     it('uses an accessible recoverable confirmation before deleting a task', async () => {
         const onTaskDelete = vi.fn();
-        renderPanel({ onTaskDelete });
+        const childTask: ProGanttTask = {
+            ...task,
+            id: 'child',
+            name: 'Release gate',
+            parentId: 'launch',
+        };
+        renderPanel({
+            edges: [{ id: 'launch-child', source: 'launch', target: 'child' }],
+            onTaskDelete,
+            tasks: [task, childTask],
+        });
         fireEvent.focus(screen.getByRole('option', { name: /Project launch/ }));
 
         fireEvent.click(screen.getByRole('button', { name: '删除 Project launch 及其所有子任务' }));
         expect(onTaskDelete).not.toHaveBeenCalled();
         const dialog = await screen.findByRole('dialog');
         expect(dialog.textContent).toContain('删除后可使用撤销恢复');
+        expect(dialog.textContent).toContain('将删除的任务2');
+        expect(dialog.textContent).toContain('将删除的依赖关系1');
+        expect(dialog.textContent).toContain('Release gate');
         const confirmButton = screen.getByRole('button', { name: /^删\s*除$/ });
         expect(confirmButton.classList.contains('ant-btn-primary')).toBe(true);
         expect(confirmButton.classList.contains('ant-btn-dangerous')).toBe(true);

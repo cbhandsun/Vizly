@@ -2,6 +2,7 @@ import type { Edge, Node } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
 
 import {
+  buildProTimelineDeletionImpact,
   collectProTimelineDeletionIds,
   createProTimelineTaskAddition,
   createProTimelineTaskDeletion,
@@ -29,6 +30,44 @@ const node = (
 });
 
 describe('pro timeline task transactions', () => {
+  it('previews bounded cascade and dependency impact with sanitized task names', () => {
+    const impact = buildProTimelineDeletionImpact([
+      { id: 'root', label: 'Root' },
+      { id: 'child-a', label: ' Child\u0000 A ', parentId: 'root' },
+      { id: 'child-b', name: 'Child B', parentId: 'root' },
+      { id: 'grandchild', name: 'Grandchild', parentId: 'child-a' },
+      { id: 'outside', name: 'Outside' },
+    ], [
+      { source: 'root', target: 'child-a' },
+      { source: 'outside', target: 'grandchild' },
+      { source: 'outside', target: 'outside' },
+    ], 'root', 2);
+
+    expect(impact).toEqual({
+      childTaskNames: ['Child A', 'Child B'],
+      dependencyCount: 2,
+      hiddenChildTaskCount: 1,
+      taskCount: 4,
+    });
+  });
+
+  it('returns an empty impact for invalid targets and clamps unsafe name limits', () => {
+    const items = [
+      { id: 'root' },
+      { id: 'child', name: 'Child', parentId: 'root' },
+      { id: 'unnamed', name: { unsafe: true }, parentId: 'root' },
+    ];
+    expect(buildProTimelineDeletionImpact(items, [], 'missing')).toEqual({
+      childTaskNames: [], dependencyCount: 0, hiddenChildTaskCount: 0, taskCount: 0,
+    });
+    expect(buildProTimelineDeletionImpact(items, [], 'root', Number.POSITIVE_INFINITY)).toMatchObject({
+      childTaskNames: ['Child'], hiddenChildTaskCount: 1,
+    });
+    expect(buildProTimelineDeletionImpact(items, [], 'root', -10)).toMatchObject({
+      childTaskNames: [], hiddenChildTaskCount: 2,
+    });
+  });
+
   it('adds and selects a child atomically while expanding its parent', () => {
     const result = createProTimelineTaskAddition([node('parent', undefined, true)], {
       id: 'child',
