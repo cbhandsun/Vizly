@@ -43,6 +43,7 @@ import {
     logAIConfigRequestFailure,
 } from './aiLogging';
 import { filterAIModels, filterAIProviders, groupAIModels } from './aiConfigModelCollections';
+import { validateAIConfigModelDraft } from './aiConfigModelDraft';
 import { createCustomAIProvider, resolveAIConfigInitialProviderId } from './aiConfigProviderMutations';
 import { getAIProviderConnectionReadiness } from './aiProviderConnectionReadiness';
 import {
@@ -55,6 +56,7 @@ import {
 import { AIConfigConnectionStatusAlert } from './AIConfigConnectionStatusAlert';
 import { AIConfigProviderSidebar } from './AIConfigProviderSidebar';
 import { AIConfigModelDiscoveryModal } from './AIConfigModelDiscoveryModal';
+import { AIConfigNewModelForm } from './AIConfigNewModelForm';
 import { AIConfigDeletionConfirmModal } from './AIConfigDeletionConfirmModal';
 import { AIConfigModelDeleteButton, AIConfigProviderHeader } from './AIConfigDeletionTriggers';
 import { useAIConfigDeletion } from './useAIConfigDeletion';
@@ -207,29 +209,26 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
 
     // --- Model Actions ---
     const addModel = (providerId: string) => {
-        if (!newModelData.id) {
-            appMessage.error(t('aiConfig.noModelId'));
+        const provider = config.providers.find(item => item.id === providerId);
+        const validation = validateAIConfigModelDraft(newModelData, provider?.models ?? []);
+        if (!validation.ok) {
+            appMessage.error(t('aiConfig.modelDraftInvalid'));
             return;
         }
+        const model = validation.model;
         setConfig(prev => ({
             ...prev,
             providers: prev.providers.map(p => {
                 if (p.id !== providerId) return p;
                 return {
                     ...p,
-                    models: [...p.models, {
-                        id: newModelData.id,
-                        name: newModelData.name || newModelData.id,
-                        group: newModelData.group || 'Custom',
-                        enabled: true,
-                        isCustom: true
-                    }]
+                    models: [...p.models, model]
                 };
             })
         }));
         setNewModelFormVisible(false);
         setNewModelData({ id: '', name: '', group: '' });
-        appMessage.success(t('aiConfig.modelAdded'));
+        appMessage.success(t('aiConfig.modelAdded', { id: model.id }));
     };
 
     const toggleModel = (providerId: string, modelId: string, checked: boolean) => {
@@ -274,6 +273,9 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
     const groupedModels = useMemo(() => {
         return groupAIModels(selectedProvider?.models ?? []);
     }, [selectedProvider]);
+    const newModelValidation = useMemo(() => (
+        validateAIConfigModelDraft(newModelData, selectedProvider?.models ?? [])
+    ), [newModelData, selectedProvider?.models]);
 
     // --- Test Connection ---
     const [isTesting, setIsTesting] = useState(false);
@@ -574,35 +576,13 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
                                     </div>
 
                                     {newModelFormVisible && (
-                                        <div style={{ marginBottom: 16, padding: 12, border: '1px dashed #1890ff', borderRadius: 6, background: '#e6f7ff' }}>
-                                            <div style={{ width: '100%', marginBottom: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                                <Input
-                                                    aria-label={t('aiConfig.modelIdLabel')}
-                                                    placeholder={t('aiConfig.modelIdPlaceholder')}
-                                                    value={newModelData.id}
-                                                    onChange={e => setNewModelData({ ...newModelData, id: e.target.value })}
-                                                    prefix={<span style={{ color: '#999', marginRight: 4 }}>ID:</span>}
-                                                />
-                                                <Input
-                                                    aria-label={t('aiConfig.displayNameLabel')}
-                                                    placeholder={t('aiConfig.displayNamePlaceholder')}
-                                                    value={newModelData.name}
-                                                    onChange={e => setNewModelData({ ...newModelData, name: e.target.value })}
-                                                    prefix={<span style={{ color: '#999', marginRight: 4 }}>Name:</span>}
-                                                />
-                                                <Input
-                                                    aria-label={t('aiConfig.groupLabel')}
-                                                    placeholder={t('aiConfig.groupPlaceholder')}
-                                                    value={newModelData.group}
-                                                    onChange={e => setNewModelData({ ...newModelData, group: e.target.value })}
-                                                    prefix={<span style={{ color: '#999', marginRight: 4 }}>Group:</span>}
-                                                />
-                                            </div>
-                                            <Space>
-                                                <Button size="small" type="primary" onClick={() => addModel(selectedProvider.id)}>{t('aiConfig.confirmAdd')}</Button>
-                                                <Button size="small" onClick={() => setNewModelFormVisible(false)}>{t('aiConfig.cancel')}</Button>
-                                            </Space>
-                                        </div>
+                                        <AIConfigNewModelForm
+                                            draft={newModelData}
+                                            validation={newModelValidation}
+                                            onChange={setNewModelData}
+                                            onConfirm={() => addModel(selectedProvider.id)}
+                                            onCancel={() => setNewModelFormVisible(false)}
+                                        />
                                     )}
 
                                     {Object.keys(groupedModels).map(groupName => (

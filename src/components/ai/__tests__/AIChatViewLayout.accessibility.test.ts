@@ -65,6 +65,7 @@ describe('AIChatViewLayout accessibility contract', () => {
         const statusAlertSource = readFileSync('src/components/ai/AIConfigConnectionStatusAlert.tsx', 'utf8');
         const sidebarSource = readFileSync('src/components/ai/AIConfigProviderSidebar.tsx', 'utf8');
         const discoverySource = readFileSync('src/components/ai/AIConfigModelDiscoveryModal.tsx', 'utf8');
+        const newModelSource = readFileSync('src/components/ai/AIConfigNewModelForm.tsx', 'utf8');
         const css = readFileSync('src/components/ai/AIConfigModal.css', 'utf8');
 
         expect(modalSource).toContain('closable={false}');
@@ -78,6 +79,10 @@ describe('AIChatViewLayout accessibility contract', () => {
         expect(modalSource).toContain("appMessage.warning(t('aiConfig.invalidProviderBaseUrl', { name: invalidProvider.name }))");
         expect(modalSource).not.toContain('formatAIProviderRequestError');
         expect(modalSource).not.toContain('的 Base URL 必须使用');
+        expect(modalSource).toContain("t('aiConfig.modelAdded', { id: model.id })");
+        expect(newModelSource).toContain('disabled={!validation.ok}');
+        expect(newModelSource).toContain("'aria-invalid': issueField === field");
+        expect(newModelSource).toContain('role="alert"');
         expect(modalSource).toContain('disabled={!selectedProviderReadiness?.ready || isFetchingModels}');
         expect(modalSource).toContain('disabled={!selectedProviderReadiness?.ready || isTesting}');
         expect(statusAlertSource).toContain('className="ai-config-readiness-alert"');

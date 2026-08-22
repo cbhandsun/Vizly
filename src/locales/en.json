@@ -3526,7 +3526,16 @@
         "cloudSyncFail": "Cloud sync failed, saved locally",
         "switchedTo": "Switched to: {{name}}",
         "noModelId": "Model ID required",
+        "modelDraftInvalid": "Fix the model details before adding it.",
         "modelAdded": "Model added: {{id}}",
+        "modelValidation": {
+            "missing-model-id": "Enter a model ID.",
+            "invalid-model-id": "Use only letters, numbers, _, -, :, ., /, or @.",
+            "duplicate-model-id": "This model ID already exists for the provider.",
+            "model-id-too-long": "Model ID must be {{idMax}} characters or fewer.",
+            "model-name-too-long": "Display name must be {{labelMax}} characters or fewer.",
+            "model-group-too-long": "Group must be {{labelMax}} characters or fewer."
+        },
         "testFillRequired": "Fill API Key and Base URL first",
         "testFailHtml": "Connection failed",
         "testFail": "Connection failed: {{message}}",

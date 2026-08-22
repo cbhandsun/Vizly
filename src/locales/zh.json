@@ -1658,7 +1658,16 @@
         "cloudSyncFail": "已保存到本地，但云端同步失败",
         "switchedTo": "已切换到: {{model}}",
         "noModelId": "请输入模型ID",
-        "modelAdded": "模型已添加",
+        "modelDraftInvalid": "请先修正模型信息，再添加模型。",
+        "modelAdded": "已添加模型：{{id}}",
+        "modelValidation": {
+            "missing-model-id": "请输入模型 ID。",
+            "invalid-model-id": "仅可使用字母、数字、_、-、:、.、/ 或 @。",
+            "duplicate-model-id": "当前平台已存在此模型 ID。",
+            "model-id-too-long": "模型 ID 不能超过 {{idMax}} 个字符。",
+            "model-name-too-long": "显示名称不能超过 {{labelMax}} 个字符。",
+            "model-group-too-long": "模型分组不能超过 {{labelMax}} 个字符。"
+        },
         "testFillRequired": "请先填写 API Key 和 Base URL",
         "testSuccess": "连接成功！API 配置有效。",
         "testFailHtml": "连接失败: 返回了 HTML 错误页 ({{status}})。请检查 Base URL (通常应以 /v1 结尾)。",

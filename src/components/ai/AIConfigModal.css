@@ -108,6 +108,29 @@
     outline-offset: 2px;
 }
 
+.ai-config-new-model-form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 16px;
+    padding: 12px;
+    border: 1px dashed var(--color-primary-500, #1677ff);
+    border-radius: 8px;
+    background: var(--color-primary-50, #e6f4ff);
+}
+
+.ai-config-new-model-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+}
+
+.ai-config-new-model-prefix {
+    margin-right: 4px;
+    color: var(--text-secondary, #667085);
+}
+
 .ai-config-global-select {
     width: 100%;
     border: 1px solid transparent;
