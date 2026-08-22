@@ -6,7 +6,7 @@ export const CUSTOM_PRESETS_STORAGE_KEY = 'diagram-custom-presets';
 
 const MAX_PRESETS = 100;
 const MAX_PRESET_SCAN = MAX_PRESETS * 2;
-const MAX_NAME_LENGTH = 120;
+export const CUSTOM_PRESET_NAME_MAX_LENGTH = 120;
 const MAX_STRING_LENGTH = 4_000;
 const MAX_OBJECT_KEYS = 120;
 const MAX_ARRAY_ITEMS = 2_000;
@@ -27,7 +27,7 @@ export const normalizeCustomPresetName = (value: unknown): string | null => {
         })
         .join('')
         .trim()
-        .slice(0, MAX_NAME_LENGTH);
+        .slice(0, CUSTOM_PRESET_NAME_MAX_LENGTH);
     return normalized || null;
 };
 
@@ -55,7 +55,7 @@ const sanitizeJsonValue = (value: unknown, depth = 0): unknown => {
 
         const sanitized: Record<string, unknown> = {};
         for (const [key, nestedValue] of Object.entries(value).slice(0, MAX_OBJECT_KEYS)) {
-            if (!key || key.length > MAX_NAME_LENGTH || BLOCKED_KEYS.has(key)) continue;
+            if (!key || key.length > CUSTOM_PRESET_NAME_MAX_LENGTH || BLOCKED_KEYS.has(key)) continue;
             const sanitizedValue = sanitizeJsonValue(nestedValue, depth + 1);
             if (sanitizedValue !== undefined) sanitized[key] = sanitizedValue;
         }

@@ -4,7 +4,11 @@ import type { InputRef } from 'antd';
 import Input from 'antd/es/input';
 import type { DiagramSaveAsTarget } from '@/core/types/diagram-components';
 
-import { addCustomPreset } from '@/core/utils/customPresetStorage';
+import {
+    addCustomPreset,
+    CUSTOM_PRESET_NAME_MAX_LENGTH,
+    getCustomPreset,
+} from '@/core/utils/customPresetStorage';
 import { appMessage, appModal } from '@/core/utils/antdStaticBridge';
 import { tryAttachDiagramSnapshot } from '@/core/utils/diagramSnapshot';
 import { getFlowDataBridge } from '@/core/utils/flowDataBridge';
@@ -55,25 +59,17 @@ export function useDiagramViewerSaveActions({
 
         const defaultName = bridge.metadata?.title || bridge.name || t('diagramViewer.saveAs.defaultName');
         const targetLabel = getSaveTargetLabel(target, t);
+        const nameMaxLength = target === 'local'
+            ? CUSTOM_PRESET_NAME_MAX_LENGTH
+            : DIAGRAM_SAVE_AS_NAME_MAX_LENGTH;
         const nameInputRef = createRef<InputRef>();
         let newName = String(defaultName);
         let isSaving = false;
+        let isOverwriteConfirmOpen = false;
+        let shouldRestoreInputAfterOverwriteClose = false;
 
-        const handleConfirm = async () => {
+        const saveValidatedName = async (normalizedName: string) => {
             if (isSaving) return;
-
-            const validation = validateDiagramSaveAsName(newName);
-            if (!validation.ok) {
-                appMessage.error(t(
-                    validation.error === 'tooLong'
-                        ? 'diagramViewer.saveAs.nameTooLong'
-                        : 'diagramViewer.saveAs.nameRequired',
-                    { max: DIAGRAM_SAVE_AS_NAME_MAX_LENGTH },
-                ));
-                window.requestAnimationFrame(() => nameInputRef.current?.focus());
-                return;
-            }
-            const normalizedName = validation.value;
 
             isSaving = true;
             modalHandle?.update({
@@ -129,6 +125,54 @@ export function useDiagramViewerSaveActions({
             }
         };
 
+        const markNameInputForFocusRestore = () => {
+            isOverwriteConfirmOpen = false;
+            shouldRestoreInputAfterOverwriteClose = true;
+        };
+
+        const restoreNameInputFocusAfterClose = () => {
+            if (!shouldRestoreInputAfterOverwriteClose) return;
+            shouldRestoreInputAfterOverwriteClose = false;
+            window.requestAnimationFrame(() => nameInputRef.current?.focus());
+        };
+
+        const handleConfirm = async () => {
+            if (isSaving || isOverwriteConfirmOpen) return;
+
+            const validation = validateDiagramSaveAsName(newName, nameMaxLength);
+            if (!validation.ok) {
+                appMessage.error(t(
+                    validation.error === 'tooLong'
+                        ? 'diagramViewer.saveAs.nameTooLong'
+                        : 'diagramViewer.saveAs.nameRequired',
+                    { max: nameMaxLength },
+                ));
+                window.requestAnimationFrame(() => nameInputRef.current?.focus());
+                return;
+            }
+            const normalizedName = validation.value;
+
+            if (target === 'local' && getCustomPreset(normalizedName)) {
+                isOverwriteConfirmOpen = true;
+                appModal.confirm({
+                    title: t('diagramViewer.saveAs.overwriteTitle'),
+                    content: t('diagramViewer.saveAs.overwriteDescription', { name: normalizedName }),
+                    okText: t('diagramViewer.saveAs.replace'),
+                    cancelText: t('diagramViewer.saveAs.keepEditing'),
+                    okButtonProps: { danger: true },
+                    onOk: async () => {
+                        isOverwriteConfirmOpen = false;
+                        await saveValidatedName(normalizedName);
+                    },
+                    onCancel: markNameInputForFocusRestore,
+                    afterClose: restoreNameInputFocusAfterClose,
+                });
+                return;
+            }
+
+            await saveValidatedName(normalizedName);
+        };
+
         const modalHandle = appModal.confirm({
             title: t('diagramViewer.saveAs.title', { target: targetLabel }),
             content: (
@@ -138,7 +182,7 @@ export function useDiagramViewerSaveActions({
                         ref={nameInputRef}
                         aria-label={t('diagramViewer.saveAs.nameLabel')}
                         defaultValue={newName}
-                        maxLength={DIAGRAM_SAVE_AS_NAME_MAX_LENGTH}
+                        maxLength={nameMaxLength}
                         showCount
                         onChange={event => { newName = event.target.value; }}
                     />

@@ -29,6 +29,7 @@ describe('diagramViewerSave', () => {
     expect(validateDiagramSaveAsName('   ')).toEqual({ ok: false, error: 'required' });
     expect(validateDiagramSaveAsName(null)).toEqual({ ok: false, error: 'required' });
     expect(validateDiagramSaveAsName('x'.repeat(501))).toEqual({ ok: false, error: 'tooLong' });
+    expect(validateDiagramSaveAsName('x'.repeat(121), 120)).toEqual({ ok: false, error: 'tooLong' });
   });
 
   it('checks whether a bridge has savable diagram data', () => {

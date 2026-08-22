@@ -46,12 +46,15 @@ export type DiagramSaveAsNameValidation =
   | { ok: true; value: string }
   | { ok: false; error: 'required' | 'tooLong' };
 
-export const validateDiagramSaveAsName = (value: unknown): DiagramSaveAsNameValidation => {
+export const validateDiagramSaveAsName = (
+  value: unknown,
+  maxLength = DIAGRAM_SAVE_AS_NAME_MAX_LENGTH,
+): DiagramSaveAsNameValidation => {
   if (typeof value !== 'string' || !value.trim()) {
     return { ok: false, error: 'required' };
   }
 
-  const normalizedName = parseRequiredText(value, DIAGRAM_SAVE_AS_NAME_MAX_LENGTH);
+  const normalizedName = parseRequiredText(value, maxLength);
   return normalizedName
     ? { ok: true, value: normalizedName }
     : { ok: false, error: 'tooLong' };

@@ -3,6 +3,7 @@ import type { StandardDiagramData } from '../../models/DiagramModels';
 import {
     addCustomPreset,
     coerceCustomPresetMap,
+    CUSTOM_PRESET_NAME_MAX_LENGTH,
     CUSTOM_PRESETS_STORAGE_KEY,
     getCustomPreset,
     normalizeCustomPresetLookupKey,
@@ -46,6 +47,7 @@ describe('customPresetStorage', () => {
     });
 
     it('normalizes custom-prefixed lookup keys', () => {
+        expect(CUSTOM_PRESET_NAME_MAX_LENGTH).toBe(120);
         expect(normalizeCustomPresetLookupKey('custom: 工作区 A ')).toBe('工作区 A');
         expect(normalizeCustomPresetLookupKey('')).toBeNull();
         expect(normalizeCustomPresetLookupKey('custom:\u0000bad')).toBe('bad');
