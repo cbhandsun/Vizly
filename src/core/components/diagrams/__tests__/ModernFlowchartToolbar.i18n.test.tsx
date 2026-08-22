@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { readFileSync } from 'node:fs';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -148,5 +149,22 @@ describe('ModernFlowchartToolbar localized workflows', () => {
         vi.runAllTimers();
 
         expect(document.activeElement).toBe(trigger);
+    });
+
+    it('keeps the mobile More Actions menu above and clear of the bottom dock', () => {
+        const css = readFileSync('src/core/components/diagrams/ModernFlowchartToolbar.css', 'utf8');
+
+        expect(css).toMatch(
+            /body \.flowchart-mobile-more-menu\s*\{[\s\S]*?--flowchart-mobile-dock-clearance:\s*calc\(88px \+ env\(safe-area-inset-bottom, 0px\)\);/,
+        );
+        expect(css).toMatch(
+            /body \.flowchart-mobile-more-menu\s*\{[\s\S]*?inset:\s*var\(--flowchart-mobile-menu-top-clearance\) auto var\(--flowchart-mobile-dock-clearance\) 8px !important;/,
+        );
+        expect(css).toMatch(
+            /body \.flowchart-mobile-more-menu\s*\{[\s\S]*?z-index:\s*1200 !important;/,
+        );
+        expect(css).toMatch(
+            /body \.flowchart-mobile-more-menu\s*\{[\s\S]*?overflow-y:\s*auto;[\s\S]*?scrollbar-gutter:\s*stable;/,
+        );
     });
 });

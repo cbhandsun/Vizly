@@ -33,13 +33,18 @@ html[data-theme='dark'] body .flowchart-layout-menu .ant-dropdown-menu {
 }
 
 body .flowchart-mobile-more-menu {
+    --flowchart-mobile-menu-top-clearance: 80px;
+    --flowchart-mobile-dock-clearance: calc(88px + env(safe-area-inset-bottom, 0px));
     position: fixed !important;
-    inset: 80px auto auto 8px !important;
+    inset: var(--flowchart-mobile-menu-top-clearance) auto var(--flowchart-mobile-dock-clearance) 8px !important;
+    z-index: 1200 !important;
     width: min(304px, calc(100vw - 16px));
     max-width: calc(100vw - 16px);
-    max-height: calc(100dvh - 96px);
+    height: auto;
+    max-height: none;
     overflow-y: auto;
     overscroll-behavior: contain;
+    scrollbar-gutter: stable;
 }
 
 body .flowchart-mobile-more-menu .ant-dropdown-menu {
