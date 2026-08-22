@@ -27,7 +27,7 @@ export const useDiagramControls = (
     requestAnimationFrame(() => resolve());
   }), []);
 
-  const runExportAction = useCallback(async (actionName: ExportActionName) => {
+  const runExportAction = useCallback(async (actionName: ExportActionName, signal?: AbortSignal) => {
     const actions = await import('./diagramExportActions');
     await actions[actionName]({
       diagramId,
@@ -35,6 +35,7 @@ export const useDiagramControls = (
       dispatchExportEvent,
       yieldToPaint,
       getReactFlowSnapshot: options.getReactFlowSnapshot,
+      signal,
     });
   }, [diagramId, dispatchExportEvent, enableMainFlowAnimation, options.getReactFlowSnapshot, yieldToPaint]);
 
@@ -50,10 +51,10 @@ export const useDiagramControls = (
     dispatchDiagramControl('fullscreen', diagramId);
   }, [diagramId]);
 
-  const exportToPNG = useCallback(() => runExportAction('exportDiagramToPNG'), [runExportAction]);
-  const exportToPDF = useCallback(() => runExportAction('exportDiagramToPDF'), [runExportAction]);
-  const exportToSVG = useCallback(() => runExportAction('exportDiagramToSVG'), [runExportAction]);
-  const exportToGIF = useCallback(() => runExportAction('exportDiagramToGIF'), [runExportAction]);
+  const exportToPNG = useCallback((signal?: AbortSignal) => runExportAction('exportDiagramToPNG', signal), [runExportAction]);
+  const exportToPDF = useCallback((signal?: AbortSignal) => runExportAction('exportDiagramToPDF', signal), [runExportAction]);
+  const exportToSVG = useCallback((signal?: AbortSignal) => runExportAction('exportDiagramToSVG', signal), [runExportAction]);
+  const exportToGIF = useCallback((signal?: AbortSignal) => runExportAction('exportDiagramToGIF', signal), [runExportAction]);
 
   return { handleFitDiagram, handleBackToTop, handleToggleFullscreen, exportToPNG, exportToPDF, exportToSVG, exportToGIF };
 };

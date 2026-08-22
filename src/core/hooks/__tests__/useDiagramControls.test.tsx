@@ -57,14 +57,16 @@ describe('useDiagramControls', () => {
       viewport: { x: 1, y: 2, zoom: 1.5 },
     }));
     const { result } = renderHook(() => useDiagramControls('diagram-2', true, { getReactFlowSnapshot }));
+    const controller = new AbortController();
 
     await act(async () => {
-      await result.current.exportToPNG();
+      await result.current.exportToPNG(controller.signal);
     });
 
     expect(exportActionSpy).toHaveBeenCalledWith(expect.objectContaining({
       diagramId: 'diagram-2',
       getReactFlowSnapshot,
+      signal: controller.signal,
     }));
   });
 });

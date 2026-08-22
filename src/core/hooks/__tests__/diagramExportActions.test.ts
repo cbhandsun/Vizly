@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { isSafeExportDataUrl, serializeExportError } from '../diagramExportActions';
+import {
+  createExportAbortError,
+  isExportAbortError,
+  isSafeExportDataUrl,
+  serializeExportError,
+  throwIfExportAborted,
+} from '../diagramExportActions';
 
 describe('diagram export action guards', () => {
   it('allows only supported image data URLs for downloads', () => {
@@ -15,5 +21,15 @@ describe('diagram export action guards', () => {
     expect(serializeExportError(new Error('failed'))).toBe('failed');
     expect(serializeExportError('plain')).toBe('plain');
     expect(serializeExportError({ code: 'bad' })).toBe('{"code":"bad"}');
+  });
+
+  it('uses a stable abort boundary for cancelled exports', () => {
+    const controller = new AbortController();
+    expect(() => throwIfExportAborted(controller.signal)).not.toThrow();
+
+    controller.abort();
+    expect(() => throwIfExportAborted(controller.signal)).toThrow('Export cancelled');
+    expect(isExportAbortError(createExportAbortError())).toBe(true);
+    expect(isExportAbortError(new Error('failed'))).toBe(false);
   });
 });

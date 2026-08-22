@@ -6,9 +6,10 @@ import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { exportToPNG, appMessageMocks, subscriptionMocks } = vi.hoisted(() => ({
-  exportToPNG: vi.fn<() => Promise<void>>(async () => undefined),
+  exportToPNG: vi.fn<(signal?: AbortSignal) => Promise<void>>(async () => undefined),
   appMessageMocks: {
     error: vi.fn(),
+    info: vi.fn(),
     loading: vi.fn(() => vi.fn()),
     success: vi.fn(),
   },
@@ -40,7 +41,8 @@ vi.mock('@/core/hooks/useDiagramControls', () => ({
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, fallback?: string) => fallback ?? ({
+    t: (key: string, options?: string | { format?: string }) => {
+      const template = typeof options === 'string' ? options : ({
       'common.export': '导出',
       'export.png': 'PNG 图片',
       'export.pdf': 'PDF 文档',
@@ -56,7 +58,17 @@ vi.mock('react-i18next', () => ({
       'export.options': '导出选项',
       'diagramViewer.export.pdf': '多页无缝 PDF 导出',
       'diagramViewer.export.svg': '超高清矢量 SVG',
-    }[key] ?? key),
+      'export.progress': '正在导出 {{format}}...',
+      'export.wait': '导出完成后将自动下载',
+      'export.cancel': '取消导出',
+      'export.cancelled': '已取消 {{format}} 导出',
+      'export.cancelling': '正在取消 {{format}} 导出...',
+      'export.cancellingWait': '正在恢复画布',
+      }[key] ?? key);
+      return typeof options === 'object' && options.format
+        ? template.replace('{{format}}', options.format)
+        : template;
+    },
   }),
 }));
 
@@ -88,6 +100,7 @@ describe('ExportTools keyboard menu', () => {
     exportToPNG.mockClear();
     exportToPNG.mockResolvedValue(undefined);
     appMessageMocks.error.mockClear();
+    appMessageMocks.info.mockClear();
     appMessageMocks.success.mockClear();
     subscriptionMocks.hasFeature.mockReset();
     subscriptionMocks.hasFeature.mockReturnValue(true);
@@ -226,6 +239,7 @@ describe('ExportTools keyboard menu', () => {
     expect(status.getAttribute('aria-live')).toBe('polite');
     expect(status.getAttribute('aria-atomic')).toBe('true');
     expect(status.getAttribute('aria-busy')).toBe('true');
+    expect(screen.getByRole('dialog').getAttribute('aria-modal')).toBe('true');
 
     act(() => {
       window.dispatchEvent(new CustomEvent('diagramExportComplete', {
@@ -281,6 +295,35 @@ describe('ExportTools keyboard menu', () => {
     await waitFor(() => expect(exportToPNG).toHaveBeenCalledTimes(1));
     resolveExport?.();
     await waitFor(() => expect(appMessageMocks.success).toHaveBeenCalledTimes(1));
+  });
+
+  it('moves focus into the export task and cancels without announcing success', async () => {
+    let receivedSignal: AbortSignal | undefined;
+    exportToPNG.mockImplementation(signal => new Promise<void>((_resolve, reject) => {
+      receivedSignal = signal;
+      signal?.addEventListener('abort', () => reject(signal.reason), { once: true });
+    }));
+
+    render(
+      <ExportTools
+        diagramId="diagram-1"
+        diagramName="Diagram"
+        showControls={false}
+        variant="compact"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '导出' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'PNG 图片' }));
+
+    const cancelButton = await screen.findByRole('button', { name: '取消导出' });
+    await waitFor(() => expect(document.activeElement).toBe(cancelButton));
+    fireEvent.click(cancelButton);
+
+    await waitFor(() => expect(receivedSignal?.aborted).toBe(true));
+    await waitFor(() => expect(appMessageMocks.info).toHaveBeenCalledTimes(1));
+    expect(appMessageMocks.success).not.toHaveBeenCalled();
+    expect(appMessageMocks.error).not.toHaveBeenCalled();
   });
 
   it('uses the commercial touch target inside the mobile system menu', () => {

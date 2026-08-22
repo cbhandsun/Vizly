@@ -33,6 +33,7 @@ export {
 export {
   exportGifFrameWithAnimationClone,
   exportGifFramesWithAnimationCloneBatch,
+  throwIfGifExportAborted,
 } from './exportUtilsGif';
 export {
   exportFullDiagramByAdjustingViewportToPngDataUrl,

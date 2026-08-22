@@ -7,6 +7,7 @@ import {
   normalizeGifFrameCount,
   normalizeRasterExportBounds,
   temporarilyHideElements,
+  throwIfGifExportAborted,
   triggerDownload,
 } from '../exportUtils';
 
@@ -18,6 +19,19 @@ const htmlToImageMock = vi.hoisted(() => ({
 vi.mock('html-to-image', () => htmlToImageMock);
 
 describe('exportUtils', () => {
+  it('stops GIF frame work at an aborted boundary', () => {
+    const controller = new AbortController();
+    expect(() => throwIfGifExportAborted(controller.signal)).not.toThrow();
+    controller.abort();
+    let thrown: unknown;
+    try {
+      throwIfGifExportAborted(controller.signal);
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toMatchObject({ name: 'AbortError' });
+  });
+
   it('builds sanitized export filenames from diagram ids', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-06-13T12:34:56.789Z'));

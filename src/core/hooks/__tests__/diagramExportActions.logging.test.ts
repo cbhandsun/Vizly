@@ -118,4 +118,32 @@ describe('diagramExportActions logging', () => {
     expect(svg).not.toContain('Global node');
     delete (window as any).reactFlowInstance;
   });
+
+  it('suppresses the download and emits cancellation when aborted after capture', async () => {
+    const controller = new AbortController();
+    const dispatchExportEvent = vi.fn();
+    const exportUtils = await import('../../components/shared/exportUtils');
+    const capture = vi.mocked(exportUtils.exportFullDiagramByAdjustingViewportToPngDataUrl);
+    const download = vi.mocked(exportUtils.triggerDownload);
+    capture.mockImplementationOnce(async () => {
+      controller.abort();
+      return 'data:image/png;base64,aGVsbG8=';
+    });
+    download.mockClear();
+
+    const { exportDiagramToPNG } = await import('../diagramExportActions');
+
+    await expect(exportDiagramToPNG({
+      diagramId: 'diagram-1',
+      dispatchExportEvent,
+      yieldToPaint: async () => undefined,
+      signal: controller.signal,
+    })).rejects.toMatchObject({ name: 'AbortError' });
+
+    expect(download).not.toHaveBeenCalled();
+    expect(dispatchExportEvent).toHaveBeenCalledWith('diagramExportCancelled', {
+      diagramId: 'diagram-1',
+      type: 'png',
+    });
+  });
 });

@@ -1,10 +1,10 @@
 import React, { useCallback, memo, useState, useEffect, useRef } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import { createPortal } from 'react-dom';
-import { FaHome, FaRuler, FaExpand, FaCompress, FaFileImage, FaFilePdf, FaFileCode, FaFileVideo, FaDownload, FaSpinner, FaCloudUploadAlt, FaShareAlt, FaFolderOpen } from 'react-icons/fa';
+import { FaHome, FaRuler, FaExpand, FaCompress, FaFileImage, FaFilePdf, FaFileCode, FaFileVideo, FaDownload, FaCloudUploadAlt, FaShareAlt, FaFolderOpen } from 'react-icons/fa';
 import { useDiagramControls } from '@/core/hooks/useDiagramControls';
 import { useTranslation } from 'react-i18next';
-import { Button, Dropdown, Tooltip, theme, Progress } from 'antd';
+import { Button, Dropdown, Tooltip, theme } from 'antd';
 import type { MenuProps } from 'antd';
 import { useAuth } from '@/context/useAuth';
 import { useSubscription } from '@/context/useSubscription';
@@ -25,6 +25,7 @@ import {
 import { resolveExportPopupContainer } from './exportPopupContainer';
 import { resolveExportableNodeCount, resolveExportMenuAvailability } from './exportMenuAvailability';
 import { useKeyboardAccessibleDropdown } from '@/core/components/diagrams/hooks/useKeyboardAccessibleDropdown';
+import { ExportProgressOverlay } from './ExportProgressOverlay';
 import './ExportTools.css';
 
 const ShareDialog = React.lazy(() => import('@/components/diagrams/ShareDialog'));
@@ -95,12 +96,14 @@ const ExportTools: React.FC<ExportToolsProps> = ({
     { getReactFlowSnapshot },
   );
   const [isExporting, setIsExporting] = useState(false);
+  const [isCancellingExport, setIsCancellingExport] = useState(false);
   const [exportType, setExportType] = useState<'png' | 'pdf' | 'svg' | 'gif' | null>(null);
   const [exportProgress, setExportProgress] = useState<number>(0);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [cloudManagerOpen, setCloudManagerOpen] = useState(false);
   const [exportableNodeCount, setExportableNodeCount] = useState(0);
   const exportInFlightRef = useRef(false);
+  const exportAbortControllerRef = useRef<AbortController | null>(null);
   const canExportPdf = hasFeature('export-pdf');
   const canExportSvg = hasFeature('export-hd-svg');
   const readExportableNodeCount = useCallback(() => resolveExportableNodeCount(
@@ -121,6 +124,8 @@ const ExportTools: React.FC<ExportToolsProps> = ({
     onBeforeOpen: refreshExportableNodeCount,
   });
   const exportMenuAvailability = resolveExportMenuAvailability(exportableNodeCount, isExporting);
+
+  useEffect(() => () => exportAbortControllerRef.current?.abort(), []);
 
   /**
    * 等待浏览器完成一次绘制（使用 requestAnimationFrame）。
@@ -144,6 +149,7 @@ const ExportTools: React.FC<ExportToolsProps> = ({
       setIsExporting(true);
       setExportType(detail.type);
       setExportProgress(0);
+      setIsCancellingExport(false);
     };
 
     const handleProgress = (e: Event) => {
@@ -158,6 +164,7 @@ const ExportTools: React.FC<ExportToolsProps> = ({
       setIsExporting(false);
       setExportType(null);
       setExportProgress(0);
+      setIsCancellingExport(false);
     };
 
     const handleError = (e: Event) => {
@@ -166,24 +173,41 @@ const ExportTools: React.FC<ExportToolsProps> = ({
       setIsExporting(false);
       setExportType(null);
       setExportProgress(0);
+      setIsCancellingExport(false);
+    };
+
+    const handleCancelled = (e: Event) => {
+      const detail = parseDiagramExportEventDetail(readDiagramExportEventDetail(e));
+      if (!detail || !matchesEvent(detail.diagramId)) return;
+      setIsExporting(false);
+      setExportType(null);
+      setExportProgress(0);
+      setIsCancellingExport(false);
     };
 
     window.addEventListener('diagramExportStart', handleStart as EventListener);
     window.addEventListener('diagramExportProgress', handleProgress as EventListener);
     window.addEventListener('diagramExportComplete', handleComplete as EventListener);
     window.addEventListener('diagramExportError', handleError as EventListener);
+    window.addEventListener('diagramExportCancelled', handleCancelled as EventListener);
     return () => {
       window.removeEventListener('diagramExportStart', handleStart as EventListener);
       window.removeEventListener('diagramExportProgress', handleProgress as EventListener);
       window.removeEventListener('diagramExportComplete', handleComplete as EventListener);
       window.removeEventListener('diagramExportError', handleError as EventListener);
+      window.removeEventListener('diagramExportCancelled', handleCancelled as EventListener);
     };
   }, [diagramId, variant]);
 
   // 导出操作包装
-  const wrapExport = async (type: 'png' | 'pdf' | 'svg' | 'gif', fn: () => Promise<void>) => {
+  const wrapExport = async (
+    type: 'png' | 'pdf' | 'svg' | 'gif',
+    fn: (signal?: AbortSignal) => Promise<void>,
+  ) => {
     if (exportInFlightRef.current) return;
     exportInFlightRef.current = true;
+    const abortController = new AbortController();
+    exportAbortControllerRef.current = abortController;
     let exportFailed = false;
     const handleExportError = (event: Event) => {
       const detail = parseDiagramExportEventDetail(readDiagramExportEventDetail(event));
@@ -195,23 +219,42 @@ const ExportTools: React.FC<ExportToolsProps> = ({
     try {
       setIsExporting(true);
       setExportType(type);
+      setIsCancellingExport(false);
       await waitForNextPaint();
-      await fn();
-      if (exportFailed) {
+      await fn(abortController.signal);
+      if (abortController.signal.aborted) {
+        appMessage.info(t('export.cancelled', { format: type.toUpperCase() }));
+      } else if (exportFailed) {
         appMessage.error(t('export.failed', { format: type.toUpperCase() }));
       } else {
         appMessage.success(t('export.success', { format: type.toUpperCase() }));
       }
     } catch {
-      appMessage.error(t('export.failed', { format: type.toUpperCase() }));
+      if (abortController.signal.aborted) {
+        appMessage.info(t('export.cancelled', { format: type.toUpperCase() }));
+      } else {
+        appMessage.error(t('export.failed', { format: type.toUpperCase() }));
+      }
     } finally {
       window.removeEventListener('diagramExportError', handleExportError as EventListener);
       exportInFlightRef.current = false;
+      if (exportAbortControllerRef.current === abortController) {
+        exportAbortControllerRef.current = null;
+      }
       setIsExporting(false);
+      setIsCancellingExport(false);
       setExportType(null);
       setExportProgress(0);
+      window.requestAnimationFrame(() => exportMenuButtonRef.current?.focus());
     }
   };
+
+  const handleCancelExport = useCallback(() => {
+    const controller = exportAbortControllerRef.current;
+    if (!controller || controller.signal.aborted) return;
+    setIsCancellingExport(true);
+    controller.abort(new DOMException('Export cancelled', 'AbortError'));
+  }, []);
 
   const handleExportPNG = () => wrapExport('png', exportToPNG);
   const handleExportPDF = () => {
@@ -484,53 +527,12 @@ ${mermaid}
     <>
       {/* 导出遮罩 */}
       {isExporting && createPortal(
-        <div
-          role="status"
-          aria-live="polite"
-          aria-atomic="true"
-          aria-busy="true"
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: token.colorBgMask,
-            backdropFilter: 'blur(4px)',
-            zIndex: 2147483647,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            pointerEvents: 'auto'
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '16px',
-              padding: '24px',
-              borderRadius: '12px',
-              boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
-              background: token.colorBgElevated,
-              border: `1px solid ${token.colorBorder}`
-            }}
-          >
-            <FaSpinner className="animate-spin" size={32} style={{ color: token.colorPrimary }} />
-            <div style={{ color: token.colorText, fontWeight: 600 }}>
-              {t('export.exporting')}{exportType ? exportType.toUpperCase() : ''}...
-            </div>
-            {exportType === 'gif' && (
-              <div style={{ width: '256px' }}>
-                <Progress percent={Math.round((exportProgress ?? 0) * 100)} size="small" status="active" />
-              </div>
-            )}
-            <div style={{ fontSize: '12px', color: token.colorTextSecondary }}>
-              {t('export.wait')}
-            </div>
-          </div>
-        </div>,
+        <ExportProgressOverlay
+          exportType={exportType}
+          progress={exportProgress}
+          cancelling={isCancellingExport}
+          onCancel={handleCancelExport}
+        />,
         (document.fullscreenElement as HTMLElement | null) || document.body
       )}
 

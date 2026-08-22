@@ -12,6 +12,13 @@ import {
 } from './exportUtilsDom';
 import { exportElementToPngDataUrl } from './exportUtilsElement';
 
+export const throwIfGifExportAborted = (signal?: AbortSignal): void => {
+  if (!signal?.aborted) return;
+  const error = new Error('Export cancelled');
+  error.name = 'AbortError';
+  throw error;
+};
+
 /**
  * 专门用于 GIF 导出的帧捕获函数，强制应用 CSS 动画状态
  * 通过修改 SVG 路径的 stroke-dashoffset 来模拟动画效果
@@ -36,8 +43,10 @@ export async function exportGifFrameWithAnimationClone(
   paddingPx: number = 40,
   pixelRatio: number = 2,
   frameIndex: number = 0,
-  totalFrames: number = 10
+  totalFrames: number = 10,
+  signal?: AbortSignal,
 ): Promise<string> {
+  throwIfGifExportAborted(signal);
   const diagramElement = getTargetDiagramElement(diagramId);
   if (!diagramElement) throw new Error('未找到架构图容器');
 
@@ -166,7 +175,7 @@ export async function exportGifFrameWithAnimationClone(
 
   try {
     const target = clone;
-    return await (await import('html-to-image')).toPng(target, {
+    const dataUrl = await (await import('html-to-image')).toPng(target, {
       backgroundColor: '#ffffff',
       quality: 1.0,
       pixelRatio: bounds.pixelRatio,
@@ -175,6 +184,8 @@ export async function exportGifFrameWithAnimationClone(
       height: exportHeight,
       style: { backgroundColor: '#ffffff', overflow: 'visible', padding: '0' }
     });
+    throwIfGifExportAborted(signal);
+    return dataUrl;
   } finally {
     offscreen.remove();
   }
@@ -192,8 +203,10 @@ export async function exportGifFramesWithAnimationCloneBatch(
   paddingPx: number = 40,
   pixelRatio: number = 3,
   totalFrames: number = 24,
-  onProgress?: (frameIndex: number, totalFrames: number) => void
+  onProgress?: (frameIndex: number, totalFrames: number) => void,
+  signal?: AbortSignal,
 ): Promise<string[]> {
+  throwIfGifExportAborted(signal);
   const diagramElement = getTargetDiagramElement(diagramId);
   if (!diagramElement) throw new Error('未找到架构图容器');
 
@@ -307,6 +320,7 @@ export async function exportGifFramesWithAnimationCloneBatch(
     const cycles = 6;
 
     for (let frameIndex = 0; frameIndex < safeTotalFrames; frameIndex++) {
+      throwIfGifExportAborted(signal);
       const progress = frameIndex / framesDenom;
       // 更新每条路径偏移与基础样式
       pathMeta.forEach(({ path, stroke, strokeWidth, dashArray, dashPeriod }) => {
@@ -331,6 +345,7 @@ export async function exportGifFramesWithAnimationCloneBatch(
         height: exportHeight,
         style: { backgroundColor: '#ffffff', overflow: 'visible', padding: '0' }
       });
+      throwIfGifExportAborted(signal);
       frames.push(dataUrl);
       // 逐帧进度回调，便于外部更新进度条
       if (onProgress) {

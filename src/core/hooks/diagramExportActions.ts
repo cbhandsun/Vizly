@@ -26,7 +26,8 @@ export type DiagramExportEventName =
   | 'diagramExportStart'
   | 'diagramExportProgress'
   | 'diagramExportComplete'
-  | 'diagramExportError';
+  | 'diagramExportError'
+  | 'diagramExportCancelled';
 
 export type DiagramExportEventDetail =
   | { diagramId: string; type: DiagramExportType }
@@ -41,6 +42,7 @@ interface ExportActionContext {
   dispatchExportEvent: DispatchExportEvent;
   yieldToPaint: () => Promise<void>;
   getReactFlowSnapshot?: () => ReactFlowRenderSnapshot | null | undefined;
+  signal?: AbortSignal;
 }
 
 interface GifCreateResult {
@@ -85,6 +87,38 @@ export const serializeExportError = (error: unknown): string => {
   }
 };
 
+export const createExportAbortError = (): Error => {
+  const error = new Error('Export cancelled');
+  error.name = 'AbortError';
+  return error;
+};
+
+export const isExportAbortError = (error: unknown): boolean => (
+  error instanceof Error && error.name === 'AbortError'
+);
+
+export const throwIfExportAborted = (signal?: AbortSignal): void => {
+  if (signal?.aborted) throw createExportAbortError();
+};
+
+const handleExportActionFailure = (
+  error: unknown,
+  diagramId: string,
+  type: DiagramExportType,
+  dispatchExportEvent: DispatchExportEvent,
+  logMessage: string,
+  userMessage: string,
+): void => {
+  if (isExportAbortError(error)) {
+    dispatchExportEvent('diagramExportCancelled', { diagramId, type });
+    dispatchExportEvent('diagramExportError', { diagramId, type, error: 'export_cancelled' });
+    throw error;
+  }
+  safeLog.error(logMessage, redactSensitiveLogValue(error));
+  dispatchExportEvent('diagramExportError', { diagramId, type, error: serializeExportError(error) });
+  alert(userMessage);
+};
+
 const downloadDataUrl = (href: string, fileName: string) => {
   if (!isSafeExportDataUrl(href)) {
     throw new Error('Unsafe export data URL');
@@ -104,10 +138,12 @@ export const exportDiagramToPNG = async ({
   diagramId,
   dispatchExportEvent,
   yieldToPaint,
+  signal,
 }: ExportActionContext) => {
   try {
     dispatchExportEvent('diagramExportStart', { diagramId, type: 'png' });
     await yieldToPaint();
+    throwIfExportAborted(signal);
     const diagramElement = getTargetDiagramElement(diagramId);
     if (!diagramElement) {
       alert('无法找到要导出的架构图');
@@ -119,12 +155,13 @@ export const exportDiagramToPNG = async ({
       exportFullDiagramByAdjustingViewportToPngDataUrl(diagramId, 40, 3)
     );
 
+    throwIfExportAborted(signal);
     downloadDataUrl(dataUrl, buildExportFileName(diagramId, 'png'));
     dispatchExportEvent('diagramExportComplete', { diagramId, type: 'png' });
   } catch (error) {
-    safeLog.error('导出PNG失败:', redactSensitiveLogValue(error));
-    dispatchExportEvent('diagramExportError', { diagramId, type: 'png', error: serializeExportError(error) });
-    alert('导出PNG失败，请稍后重试');
+    handleExportActionFailure(
+      error, diagramId, 'png', dispatchExportEvent, '导出PNG失败:', '导出PNG失败，请稍后重试',
+    );
   }
 };
 
@@ -132,10 +169,12 @@ export const exportDiagramToPDF = async ({
   diagramId,
   dispatchExportEvent,
   yieldToPaint,
+  signal,
 }: ExportActionContext) => {
   try {
     dispatchExportEvent('diagramExportStart', { diagramId, type: 'pdf' });
     await yieldToPaint();
+    throwIfExportAborted(signal);
     const diagramElement = getTargetDiagramElement(diagramId);
     if (!diagramElement) {
       alert('无法找到要导出的架构图');
@@ -146,13 +185,16 @@ export const exportDiagramToPDF = async ({
     const dataUrl = await temporarilyHideElements(CONTROLS_TO_HIDE, async () =>
       exportFullDiagramByAdjustingViewportToPngDataUrl(diagramId, 40, 3)
     );
+    throwIfExportAborted(signal);
     if (!isSafeExportDataUrl(dataUrl)) throw new Error('Unsafe export data URL');
 
     const img = await waitForImageLoad(dataUrl);
+    throwIfExportAborted(signal);
     const paddedWidth = img.naturalWidth;
     const paddedHeight = img.naturalHeight;
     const isPortrait = paddedHeight > paddedWidth;
     const { jsPDF } = await import('jspdf');
+    throwIfExportAborted(signal);
     const pdf = new jsPDF({
       orientation: isPortrait ? 'portrait' : 'landscape',
       unit: 'px',
@@ -174,12 +216,13 @@ export const exportDiagramToPDF = async ({
       scaledHeight
     );
 
+    throwIfExportAborted(signal);
     pdf.save(buildExportFileName(diagramId, 'pdf'));
     dispatchExportEvent('diagramExportComplete', { diagramId, type: 'pdf' });
   } catch (error) {
-    safeLog.error('导出PDF失败:', redactSensitiveLogValue(error));
-    dispatchExportEvent('diagramExportError', { diagramId, type: 'pdf', error: serializeExportError(error) });
-    alert('导出PDF失败，请稍后重试');
+    handleExportActionFailure(
+      error, diagramId, 'pdf', dispatchExportEvent, '导出PDF失败:', '导出PDF失败，请稍后重试',
+    );
   }
 };
 
@@ -188,10 +231,12 @@ export const exportDiagramToSVG = async ({
   dispatchExportEvent,
   yieldToPaint,
   getReactFlowSnapshot,
+  signal,
 }: ExportActionContext) => {
   try {
     dispatchExportEvent('diagramExportStart', { diagramId, type: 'svg' });
     await yieldToPaint();
+    throwIfExportAborted(signal);
     const diagramElement = getTargetDiagramElement(diagramId);
     if (!diagramElement) {
       alert('无法找到要导出的架构图');
@@ -207,12 +252,13 @@ export const exportDiagramToSVG = async ({
       return exportRenderSceneToSvgDataUrl(scene, { title: diagramId });
     });
 
+    throwIfExportAborted(signal);
     downloadDataUrl(svgDataUrl, buildExportFileName(diagramId, 'svg'));
     dispatchExportEvent('diagramExportComplete', { diagramId, type: 'svg' });
   } catch (error) {
-    safeLog.error('导出SVG失败:', redactSensitiveLogValue(error));
-    dispatchExportEvent('diagramExportError', { diagramId, type: 'svg', error: serializeExportError(error) });
-    alert('导出SVG失败，请稍后重试');
+    handleExportActionFailure(
+      error, diagramId, 'svg', dispatchExportEvent, '导出SVG失败:', '导出SVG失败，请稍后重试',
+    );
   }
 };
 
@@ -248,10 +294,12 @@ export const exportDiagramToGIF = async ({
   enableMainFlowAnimation = true,
   dispatchExportEvent,
   yieldToPaint,
+  signal,
 }: ExportActionContext) => {
   try {
     dispatchExportEvent('diagramExportStart', { diagramId, type: 'gif' });
     await yieldToPaint();
+    throwIfExportAborted(signal);
     const diagramElement = getTargetDiagramElement(diagramId);
     if (!diagramElement) {
       alert('无法找到要导出的架构图');
@@ -265,6 +313,7 @@ export const exportDiagramToGIF = async ({
     const paddingPx = 32;
 
     const originalSizeFrame = await exportFullDiagramToPngDataUrl(diagramId, paddingPx, 1);
+    throwIfExportAborted(signal);
     if (!isSafeExportDataUrl(originalSizeFrame)) throw new Error('Unsafe GIF source frame');
     const tempImg = await waitForImageLoad(originalSizeFrame);
     const originalWidth = tempImg.naturalWidth || tempImg.width;
@@ -275,6 +324,7 @@ export const exportDiagramToGIF = async ({
     const targetHeight = Math.round(originalHeight * scale);
 
     await waitForExportFonts(diagramId);
+    throwIfExportAborted(signal);
 
     const frames: string[] = await temporarilyHideElements(GIF_CONTROLS_TO_HIDE, async () => {
       try {
@@ -293,15 +343,19 @@ export const exportDiagramToGIF = async ({
               frameCount: tf,
               stage: 'capturing',
             });
-          }
+          },
+          signal,
         );
       } catch (e) {
         safeLog.warn('批量离屏克隆方案失败，回退到逐帧克隆方案：', redactSensitiveLogValue(e));
         const capturedFrames: string[] = [];
         for (let frameIndex = 0; frameIndex < totalFrames; frameIndex++) {
+          throwIfExportAborted(signal);
           let frame: string;
           try {
-            frame = await exportGifFrameWithAnimationClone(diagramId, paddingPx, 2.25, frameIndex, totalFrames);
+            frame = await exportGifFrameWithAnimationClone(
+              diagramId, paddingPx, 2.25, frameIndex, totalFrames, signal,
+            );
           } catch (_) {
             frame = await exportElementToPngDataUrl(diagramElement, paddingPx, 2.25);
           }
@@ -319,16 +373,32 @@ export const exportDiagramToGIF = async ({
         return capturedFrames;
       }
     });
+    throwIfExportAborted(signal);
     const safeFrames = frames.filter(isSafeExportDataUrl);
     if (safeFrames.length === 0) {
       throw new Error('No safe GIF frames captured');
     }
 
-    await new Promise<void>((resolve) => {
+    await new Promise<void>((resolve, reject) => {
       const loadedImages: HTMLImageElement[] = [];
       let imagesLoaded = 0;
+      let settled = false;
+      const handleAbort = () => {
+        if (settled) return;
+        settled = true;
+        reject(createExportAbortError());
+      };
+      const settleResolve = () => {
+        if (settled) return;
+        settled = true;
+        signal?.removeEventListener('abort', handleAbort);
+        resolve();
+      };
+      signal?.addEventListener('abort', handleAbort, { once: true });
+      if (signal?.aborted) handleAbort();
 
       const encodeGif = (width: number, height: number, attempt: number, fallbackMaxSide: number) => {
+        if (settled) return;
         createGIF({
           images: loadedImages,
           interval: 1 / fps,
@@ -341,6 +411,7 @@ export const exportDiagramToGIF = async ({
           transparent: false,
           crossOrigin: 'Anonymous',
           progressCallback: (captureProgress: number) => {
+            if (settled) return;
             dispatchExportEvent('diagramExportProgress', {
               diagramId,
               type: 'gif',
@@ -349,6 +420,7 @@ export const exportDiagramToGIF = async ({
             });
           },
         }, (obj: GifCreateResult) => {
+          if (settled) return;
           if (obj.error || !obj.image) {
             safeLog.warn(`GIF 创建失败（第${attempt}次）：`, obj.errorMsg || obj.errorCode);
             if (attempt === 1) {
@@ -364,18 +436,19 @@ export const exportDiagramToGIF = async ({
               error: obj.errorMsg || obj.errorCode || 'gif_create_failed',
             });
             alert('导出GIF失败，请稍后重试');
-            resolve();
+            settleResolve();
             return;
           }
           downloadDataUrl(obj.image, buildExportFileName(diagramId, 'gif'));
           dispatchExportEvent('diagramExportComplete', { diagramId, type: 'gif' });
-          resolve();
+          settleResolve();
         });
       };
 
       safeFrames.forEach((frameDataUrl, index) => {
         const img = new Image();
         img.onload = () => {
+          if (settled) return;
           loadedImages[index] = img;
           imagesLoaded++;
           if (imagesLoaded === safeFrames.length) {
@@ -383,6 +456,7 @@ export const exportDiagramToGIF = async ({
           }
         };
         img.onerror = () => {
+          if (settled) return;
           safeLog.warn(`帧 ${index} 加载失败`);
           imagesLoaded++;
           if (imagesLoaded === safeFrames.length && loadedImages.length > 0) {
@@ -393,8 +467,8 @@ export const exportDiagramToGIF = async ({
       });
     });
   } catch (error) {
-    safeLog.error('导出GIF失败:', redactSensitiveLogValue(error));
-    dispatchExportEvent('diagramExportError', { diagramId, type: 'gif', error: serializeExportError(error) });
-    alert('导出GIF失败，请稍后重试');
+    handleExportActionFailure(
+      error, diagramId, 'gif', dispatchExportEvent, '导出GIF失败:', '导出GIF失败，请稍后重试',
+    );
   }
 };
