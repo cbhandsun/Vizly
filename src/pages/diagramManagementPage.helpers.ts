@@ -4,6 +4,7 @@ import type { ManageStorageProvider } from '@/components/ui/ManageTopToolbar';
 import { safeLog } from '@/core/utils/consoleCleanup';
 import { redactSensitiveLogValue } from '@/core/utils/logSecurity';
 import { coerceRemoteTemplateMetadata, type RemoteTemplateMetadata } from '@/core/utils/remoteTemplateMetadata';
+import { resolveWorkspaceLocalModifiedAt } from './workspaceModifiedAt';
 
 let supabaseModulePromise: Promise<typeof import('@/services/supabase')> | null = null;
 let shareServiceModulePromise: Promise<typeof import('../services/ShareService')> | null = null;
@@ -269,11 +270,12 @@ export const loadWorkspaceItems = async (activeView: FilterViewType, cloudProvid
         await dataRegistry.initialize();
         const localService = dataRegistry.getDataService();
         const localResult = localService.queryDiagrams({});
+        const localStorageProvider = typeof localStorage === 'undefined' ? null : localStorage;
         localResult.data.forEach((diagram) => {
             items.push({
                 id: `local_${diagram.id}`,
                 title: diagram.name || diagram.metadata?.title || 'Untitled',
-                updatedAt: new Date(diagram.metadata?.updatedAt || Date.now()).getTime(),
+                updatedAt: resolveWorkspaceLocalModifiedAt(diagram, localStorageProvider),
                 source: 'local',
                 role: 'owner',
                 raw: diagram

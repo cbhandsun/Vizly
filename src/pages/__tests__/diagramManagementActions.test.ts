@@ -76,6 +76,7 @@ describe('workspace diagram actions', () => {
       getStorage: () => ({ getItem: vi.fn(), setItem: vi.fn(), removeItem }),
       upsertDiagramConfigIndex: dependency<'upsertDiagramConfigIndex'>(upsertDiagramConfigIndex),
       now: () => 123,
+      nowIso: () => '2026-08-21T12:00:00.000Z',
     });
 
     await expect(actions.openDiagram(createItem({
@@ -88,7 +89,15 @@ describe('workspace diagram actions', () => {
       { nodes: [], edges: [] },
       { id: 'fresh-template-id', title: 'T'.repeat(240) },
       true,
-      expect.objectContaining({ id: 'fresh-template-id', name: 'T'.repeat(240) }),
+      expect.objectContaining({
+        id: 'fresh-template-id',
+        name: 'T'.repeat(240),
+        metadata: {
+          title: 'T'.repeat(240),
+          createdAt: '2026-08-21T12:00:00.000Z',
+          updatedAt: '2026-08-21T12:00:00.000Z',
+        },
+      }),
     );
     expect(upsertDiagramConfigIndex).toHaveBeenCalledWith(expect.anything(), {
       id: 'fresh-template-id',
@@ -225,6 +234,7 @@ describe('workspace diagram actions', () => {
       loadDataRegistry: dependency<'loadDataRegistry'>(vi.fn().mockResolvedValue(registry)),
       createId: () => 'created-id',
       getStorage: () => null,
+      nowIso: () => '2026-08-21T12:00:00.000Z',
     });
 
     await expect(actions.createDiagram('blank', '  未命名流程图  ')).resolves.toBe('created-id');
@@ -233,7 +243,11 @@ describe('workspace diagram actions', () => {
       id: 'created-id',
       type: 'flowchart',
       name: '未命名流程图',
-      metadata: expect.objectContaining({ title: '未命名流程图' }),
+      metadata: expect.objectContaining({
+        title: '未命名流程图',
+        createdAt: '2026-08-21T12:00:00.000Z',
+        updatedAt: '2026-08-21T12:00:00.000Z',
+      }),
     }));
     expect(seed).toMatchObject({ id: 'seed-id', type: '' });
 

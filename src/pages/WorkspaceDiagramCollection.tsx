@@ -40,6 +40,7 @@ import { WorkspaceEmptyState } from './WorkspaceEmptyState';
 import { resolveNextWorkspaceFilterView } from './workspaceFilterRoute';
 import { focusWorkspaceTarget } from './workspaceMenuInteraction';
 import { getWorkspaceDiagramOpenKey } from './workspaceDiagramOpenState';
+import { formatWorkspaceTimeAgo } from './workspaceModifiedAt';
 
 const RemoteDiagramCover = React.lazy(() => import('@/components/shared/RemoteDiagramCover'));
 const LocalDiagramCover = React.lazy(() => import('./LocalDiagramCover'));
@@ -82,23 +83,6 @@ interface WorkspaceDiagramCollectionProps {
   onClearSearch: () => void;
   resultsRef?: React.Ref<HTMLDivElement>;
 }
-
-const formatTimeAgo = (
-  timestamp: number,
-  locale: string,
-  unknownLabel: string,
-): string => {
-  if (!Number.isFinite(timestamp) || timestamp < 0) return unknownLabel;
-  const minutes = Math.max(0, Math.floor((Date.now() - timestamp) / 60_000));
-  const relative = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
-  if (minutes < 1) return relative.format(0, 'minute');
-  if (minutes < 60) return relative.format(-minutes, 'minute');
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return relative.format(-hours, 'hour');
-  const days = Math.floor(hours / 24);
-  if (days < 30) return relative.format(-days, 'day');
-  return new Date(timestamp).toLocaleDateString(locale);
-};
 
 export const WorkspaceDiagramCollection = ({
   activeView,
@@ -396,7 +380,7 @@ export const WorkspaceDiagramCollection = ({
                                             </div>
                                             <div className="list-row-title">{item.title}</div>
                                             <span className={`type-badge ${diagramType}`}>{localizedDiagramType}</span>
-                                            <span className="list-row-time">{formatTimeAgo(item.updatedAt, locale, unknownTime)}</span>
+                                            <span className="list-row-time">{formatWorkspaceTimeAgo(item.updatedAt, locale, unknownTime)}</span>
                                             {nodeCount != null && (
                                                 <span className="node-count-chip"><Boxes size={14} strokeWidth={2} /> {nodeCount}</span>
                                             )}
@@ -569,7 +553,7 @@ export const WorkspaceDiagramCollection = ({
                                                     <span className={`type-badge ${diagramType}`}>
                                                         {localizedDiagramType}
                                                     </span>
-                                                    <span>{formatTimeAgo(item.updatedAt, locale, unknownTime)}</span>
+                                                    <span>{formatWorkspaceTimeAgo(item.updatedAt, locale, unknownTime)}</span>
                                                 </div>
                                                 {nodeCount != null && (
                                                     <span className="node-count-chip">

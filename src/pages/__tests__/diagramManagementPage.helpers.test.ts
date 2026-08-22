@@ -9,6 +9,14 @@ import {
     getNodeCount,
     type UnifiedDiagramItem,
 } from '../diagramManagementPage.helpers';
+import {
+    formatWorkspaceTimeAgo,
+    resolveWorkspaceLocalModifiedAt,
+    WORKSPACE_UNKNOWN_TIMESTAMP,
+} from '../workspaceModifiedAt';
+
+const NOW = Date.parse('2026-08-21T12:00:00.000Z');
+const storageWith = (raw: string | null): Pick<Storage, 'getItem'> => ({ getItem: () => raw });
 
 const createItem = (overrides: Partial<UnifiedDiagramItem> = {}): UnifiedDiagramItem => ({
     id: 'local-diagram-1',
@@ -172,5 +180,61 @@ describe('diagramManagementPage helpers', () => {
         expect(coerceWorkspaceMindMapRootTopic('x'.repeat(400))).toHaveLength(200);
         expect(coerceWorkspaceMindMapRootTopic(null)).toBe('Central Topic');
         expect(coerceWorkspaceMindMapRootTopic('   ')).toBe('Central Topic');
+    });
+
+    it('resolves the newest trusted local modification timestamp', () => {
+        const autosaveTime = NOW - 60_000;
+        const storage = storageWith(JSON.stringify({
+            diagramId: 'diagram-1', nodes: [], edges: [], timestamp: autosaveTime, version: '1.0',
+        }));
+        expect(resolveWorkspaceLocalModifiedAt({
+            id: 'diagram-1',
+            metadata: {
+                createdAt: new Date(NOW - 180_000).toISOString(),
+                updatedAt: new Date(NOW - 120_000).toISOString(),
+            },
+        }, storage, NOW)).toBe(autosaveTime);
+    });
+
+    it('falls back through metadata without inventing the current time', () => {
+        const createdAt = NOW - 86_400_000;
+        expect(resolveWorkspaceLocalModifiedAt({
+            id: 'diagram-1',
+            metadata: { updatedAt: 'invalid', createdAt: new Date(createdAt).toISOString() },
+        }, null, NOW)).toBe(createdAt);
+        expect(resolveWorkspaceLocalModifiedAt({ id: 'diagram-1', metadata: {} }, null, NOW))
+            .toBe(WORKSPACE_UNKNOWN_TIMESTAMP);
+    });
+
+    it('rejects malformed, mismatched, extreme, and future timestamp inputs', () => {
+        const invalidAutosaves = [
+            '{',
+            JSON.stringify({ diagramId: 'other', nodes: [], edges: [], timestamp: NOW - 1, version: '1.0' }),
+            JSON.stringify({ diagramId: 'diagram-1', nodes: [], edges: [], timestamp: null, version: '1.0' }),
+            'x'.repeat(2 * 1024 * 1024 + 1),
+        ];
+        for (const raw of invalidAutosaves) {
+            expect(resolveWorkspaceLocalModifiedAt({
+                id: 'diagram-1',
+                metadata: { updatedAt: new Date(NOW + 10 * 60_000).toISOString(), createdAt: 0 },
+            }, storageWith(raw), NOW)).toBe(WORKSPACE_UNKNOWN_TIMESTAMP);
+        }
+        expect(resolveWorkspaceLocalModifiedAt(null, null, NOW)).toBe(WORKSPACE_UNKNOWN_TIMESTAMP);
+        expect(resolveWorkspaceLocalModifiedAt({ id: '@@@' }, storageWith(null), NOW))
+            .toBe(WORKSPACE_UNKNOWN_TIMESTAMP);
+    });
+
+    it('survives unavailable storage and formats unknown times honestly', () => {
+        const updatedAt = NOW - 5_000;
+        const storage: Pick<Storage, 'getItem'> = {
+            getItem: () => { throw new Error('blocked'); },
+        };
+        expect(resolveWorkspaceLocalModifiedAt({ id: 'diagram-1', metadata: { updatedAt } }, storage, NOW))
+            .toBe(updatedAt);
+        expect(formatWorkspaceTimeAgo(0, 'en', 'Unknown', NOW)).toBe('Unknown');
+        expect(formatWorkspaceTimeAgo(-1, 'en', 'Unknown', NOW)).toBe('Unknown');
+        expect(formatWorkspaceTimeAgo(Number.NaN, 'en', 'Unknown', NOW)).toBe('Unknown');
+        expect(formatWorkspaceTimeAgo(NOW + 10 * 60_000, 'en', 'Unknown', NOW)).toBe('Unknown');
+        expect(formatWorkspaceTimeAgo(NOW - 120_000, 'en', 'Unknown', NOW)).toBe('2 minutes ago');
     });
 });

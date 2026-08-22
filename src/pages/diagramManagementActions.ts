@@ -110,13 +110,14 @@ export const createWorkspaceDiagramActions = (
     const localService = dataRegistry.getDataService();
     const clonedId = createValidId(dependencies);
     const title = boundedTitle(data.title, item.title || 'Untitled');
+    const createdAt = dependencies.nowIso();
     const cloned = localService.registerRemoteDiagram(data.content, {
       id: clonedId,
       title,
     }, true, {
       id: clonedId,
       name: title,
-      metadata: { title },
+      metadata: { title, createdAt, updatedAt: createdAt },
     });
     const registeredId = coerceDiagramId(cloned.id);
     if (!registeredId) return { kind: 'invalid-id' };
@@ -212,9 +213,12 @@ export const createWorkspaceDiagramActions = (
       cloned.id = createValidId(dependencies);
       cloned.type ||= templateKey === 'blank' ? 'flowchart' : templateKey;
       cloned.name = boundedTitle(requestedName, cloned.name || 'Untitled');
+      const createdAt = dependencies.nowIso();
       cloned.metadata = {
         ...cloned.metadata,
         title: cloned.name,
+        createdAt,
+        updatedAt: createdAt,
       };
       localService.registerDiagram(cloned);
       persistDiagramIndex(dependencies, cloned);
