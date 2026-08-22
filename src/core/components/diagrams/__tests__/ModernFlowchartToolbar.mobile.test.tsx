@@ -56,7 +56,7 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
             'getPopupContainer={(triggerNode) => triggerNode.ownerDocument.body}',
         );
         expect(toolbarCss).toMatch(
-            /body \.flowchart-mobile-more-menu\s*\{[\s\S]*?inset: 80px auto auto 8px !important;[\s\S]*?width: min\(304px, calc\(100vw - 16px\)\);[\s\S]*?max-height: calc\(100dvh - 96px\);/,
+            /body \.flowchart-mobile-more-menu\s*\{[\s\S]*?--flowchart-mobile-menu-top-clearance: 80px;[\s\S]*?--flowchart-mobile-dock-clearance: calc\(88px \+ env\(safe-area-inset-bottom, 0px\)\);[\s\S]*?inset: var\(--flowchart-mobile-menu-top-clearance\) auto var\(--flowchart-mobile-dock-clearance\) 8px !important;[\s\S]*?width: min\(304px, calc\(100vw - 16px\)\);[\s\S]*?max-height: none;[\s\S]*?overflow-y: auto;/,
         );
         expect(toolbarCss).toMatch(
             /body \.flowchart-mobile-more-menu \.ant-dropdown-menu\s*\{[\s\S]*?background-color: rgba\(255, 255, 255, 0\.98\) !important;/,

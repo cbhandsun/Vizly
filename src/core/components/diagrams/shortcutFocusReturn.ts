@@ -24,9 +24,7 @@ const canRestoreShortcutFocus = (target: HTMLElement | null): target is HTMLElem
 
 const hasExternallyRestoredFocus = (): boolean => (
     document.activeElement instanceof HTMLElement
-    && document.activeElement !== document.body
-    && document.activeElement.isConnected
-    && document.activeElement.closest('[role="dialog"]') === null
+    && canRestoreShortcutFocus(document.activeElement)
 );
 
 export const restoreShortcutFocus = (previousOwner: HTMLElement | null): boolean => {
