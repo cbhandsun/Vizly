@@ -149,6 +149,27 @@ describe('KeyboardShortcutPanel', () => {
         await waitFor(() => expect(document.activeElement).toBe(trigger));
     });
 
+    it('returns focus to a marked programmatic document heading after the help shortcut closes', async () => {
+        const heading = document.createElement('h1');
+        heading.tabIndex = -1;
+        heading.dataset.shortcutFocusReturn = 'true';
+        document.body.appendChild(heading);
+        heading.focus();
+
+        const onClose = vi.fn();
+        render(<KeyboardShortcutPanel visible onClose={onClose} />);
+
+        await act(async () => {
+            await Promise.resolve();
+        });
+        fireEvent.keyDown(screen.getByRole('textbox', { name: '搜索快捷键或动作' }), { key: '?' });
+
+        await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+        await waitFor(() => expect(document.activeElement).toBe(heading));
+
+        heading.remove();
+    });
+
     it('falls back to the command entry when the prior modal focus owner is not interactive', async () => {
         const trigger = document.createElement('button');
         trigger.type = 'button';

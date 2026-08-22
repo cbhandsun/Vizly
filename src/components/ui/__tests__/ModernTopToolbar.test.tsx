@@ -206,6 +206,7 @@ describe('ModernTopToolbar responsive layout', () => {
 
     const heading = screen.getByRole('heading', { level: 1, name: 'Untitled flowchart' });
     expect(heading.getAttribute('tabindex')).toBe('-1');
+    expect(heading.getAttribute('data-shortcut-focus-return')).toBe('true');
     await waitFor(() => expect(document.activeElement).toBe(heading));
   });
 

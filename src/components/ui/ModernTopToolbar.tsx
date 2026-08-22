@@ -297,7 +297,12 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
 
           {title && (
             <div className="flex items-center min-w-0">
-              <h1 ref={diagramEntryHeadingRef} className="sr-only" tabIndex={-1}>
+              <h1
+                ref={diagramEntryHeadingRef}
+                className="sr-only"
+                tabIndex={-1}
+                data-shortcut-focus-return="true"
+              >
                 {title}
               </h1>
               <RightOutlined className="text-[10px] text-slate-300 dark:text-slate-600 mx-1.5 flex-shrink-0" />

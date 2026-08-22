@@ -5,6 +5,7 @@ const FOCUSABLE_RETURN_TARGET = [
     'select:not([disabled])',
     'textarea:not([disabled])',
     '[tabindex]:not([tabindex="-1"])',
+    '[data-shortcut-focus-return="true"]',
 ].join(',');
 
 export const captureShortcutFocusOwner = (): HTMLElement | null => (
