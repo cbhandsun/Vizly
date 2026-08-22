@@ -213,14 +213,26 @@ describe('DesignerRightSidebar mobile dialog accessibility', () => {
         expect(scrollRegion.style.overflowY).toBe('auto');
         expect(scrollRegion.style.overscrollBehavior).toBe('contain');
 
-        const tabsBody = document.querySelector<HTMLElement>('.ant-tabs-body');
-        const tabsContent = document.querySelector<HTMLElement>('.ant-tabs-content-active');
-        expect(tabsBody?.style.height).toBe('100%');
-        expect(tabsBody?.style.maxHeight).toBe('100%');
-        expect(tabsBody?.style.overflow).toBe('hidden');
-        expect(tabsContent?.style.display).toBe('flex');
-        expect(tabsContent?.style.height).toBe('100%');
-        expect(tabsContent?.style.maxHeight).toBe('100%');
-        expect(tabsContent?.style.overflow).toBe('hidden');
+        const tabPanel = screen.getByRole('tabpanel');
+        expect(tabPanel.style.flex).toBe('1 1 0%');
+        expect(tabPanel.style.minHeight).toBe('0px');
+        expect(tabPanel.style.overflow).toBe('hidden');
+        expect(screen.getByRole('tab', { name: '属性设置' }).getAttribute('aria-selected'))
+            .toBe('true');
+    });
+
+    it('supports arrow-key navigation without a layout-measuring tab dependency', async () => {
+        render(<SwitchingHarness />);
+        fireEvent.click(screen.getByRole('button', { name: '打开属性抽屉' }));
+        const propertyTab = await screen.findByRole('tab', { name: '属性设置' });
+        propertyTab.focus();
+        fireEvent.keyDown(propertyTab, { key: 'ArrowRight' });
+
+        const aiTab = screen.getByRole('tab', { name: 'AI 架构助手' });
+        await waitFor(() => {
+            expect(aiTab.getAttribute('aria-selected')).toBe('true');
+            expect(document.activeElement).toBe(aiTab);
+        });
+        expect(screen.getByRole('tabpanel').getAttribute('aria-labelledby')).toBe(aiTab.id);
     });
 });

@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Tabs, Tooltip, Button, theme } from 'antd';
+import { Tooltip, Button, theme } from 'antd';
 import { Node, Edge } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import { FaCog, FaRobot, FaChevronRight, FaChevronLeft } from 'react-icons/fa';
@@ -13,10 +13,11 @@ import {
 } from '../../utils/layoutStorage';
 import {
     createDesignerRightSidebarLayout,
+    createDesignerRightSidebarOffsetVariables,
     MOBILE_DESIGNER_PANEL_WIDTH,
     shouldActivateDesignerPropertyTab,
     shouldExpandDesignerRightSidebar,
-    shouldFreezeDesignerRightSidebarDuringDrag,
+    shouldReuseDesignerRightSidebar,
 } from './designerRightSidebarState';
 import {
     bindDialogEscapeClose,
@@ -26,8 +27,8 @@ import {
 } from './dialogFocus';
 import { hasMutationLockedNode } from './nodeLockPolicy';
 import { hasMutationLockedEdge } from './edgeMutationPolicy';
+import { DesignerRightSidebarContent } from './DesignerRightSidebarContent';
 
-const PropertyPanel = React.lazy(() => import('./PropertyPanel'));
 const COMMERCIAL_TOUCH_TARGET = 'var(--commercial-touch-target, 44px)';
 
 export interface DesignerRightSidebarProps {
@@ -72,7 +73,6 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
     updateNodesBatch,
     updateEdgesBatch,
     onBeforeUpdate,
-    isDraggingNode,
     renderAIChatPanel,
     onWidthChange,
     showAiCrown,
@@ -146,23 +146,29 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
     });
 
     useEffect(() => {
-        if (isMobile || !visible) {
-            document.documentElement.style.setProperty('--right-sidebar-offset', '0px');
-            // Re-sync max offset when closed
-            const leftOffset = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--left-sidebar-offset')) || 0;
-            document.documentElement.style.setProperty('--max-sidebar-offset', `${leftOffset}px`);
-            return;
-        }
-        const effectiveWidth = (isCollapsed ? RAIL_WIDTH : panelWidth) + 16;
-        document.documentElement.style.setProperty('--right-sidebar-offset', `${effectiveWidth}px`);
-        
-        // Sync Max Offset
-        const leftOffset = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--left-sidebar-offset')) || 0;
-        const maxOffset = Math.max(leftOffset, effectiveWidth);
-        document.documentElement.style.setProperty('--max-sidebar-offset', `${maxOffset}px`);
+        const effectiveWidth = isMobile || !visible
+            ? null
+            : (isCollapsed ? RAIL_WIDTH : panelWidth) + 16;
+        const offsets = createDesignerRightSidebarOffsetVariables(effectiveWidth);
+        document.documentElement.style.setProperty(
+            '--right-sidebar-offset',
+            offsets.rightSidebarOffset,
+        );
+        document.documentElement.style.setProperty(
+            '--max-sidebar-offset',
+            offsets.maxSidebarOffset,
+        );
 
         return () => {
-            document.documentElement.style.setProperty('--right-sidebar-offset', '0px');
+            const hiddenOffsets = createDesignerRightSidebarOffsetVariables(null);
+            document.documentElement.style.setProperty(
+                '--right-sidebar-offset',
+                hiddenOffsets.rightSidebarOffset,
+            );
+            document.documentElement.style.setProperty(
+                '--max-sidebar-offset',
+                hiddenOffsets.maxSidebarOffset,
+            );
         };
     }, [visible, isCollapsed, panelWidth, isMobile]);
 
@@ -512,109 +518,32 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
                     paddingBottom: isMobile ? 'env(safe-area-inset-bottom, 20px)' : 0,
                     marginRight: isMobile ? COMMERCIAL_TOUCH_TARGET : 0,
                 }}>
-                    <Tabs
-                        activeKey={activeTab}
-                        onChange={(key: string) => {
-                            if (key === 'ai' && onAiTabIntercept && !onAiTabIntercept()) {
-                                return;
-                            }
-                            onTabChange(key as 'property' | 'ai');
-                            if (key === 'ai' && !aiChatVisible) {
-                                setAiChatVisible(true);
-                            }
-                        }}
-                        centered
-                        size="small"
-                        items={[
-                            {
-                                key: 'property',
-                                label: t('propertyPanel.title'),
-                                children: (
-                                    <div
-                                        data-testid="designer-property-scroll-region"
-                                        style={{
-                                            height: '100%',
-                                            width: '100%',
-                                            flex: '1 1 100%',
-                                            minHeight: 0,
-                                            minWidth: 0,
-                                            overflowY: 'auto',
-                                            overscrollBehavior: 'contain',
-                                            padding: '0 8px',
-                                        }}
-                                    >
-                                {(() => {
-                                    const CustomPanel = activePlugin?.renderCustomPropertyPanel && pluginCtx 
-                                        ? activePlugin.renderCustomPropertyPanel(pluginCtx, selectedNodes, selectedEdges) 
-                                        : null;
-                                        
-                                    if (CustomPanel) return CustomPanel;
-                                    if (activeTab !== 'property') return null;
-                                    return (
-                                        <React.Suspense fallback={null}>
-                                            <PropertyPanel
-                                                selectedNodes={selectedNodes}
-                                                selectedEdges={selectedEdges}
-                                                onUpdateNodes={(ids, data) => updateNodesBatch(ids, data, { snapshot: false })}
-                                                onUpdateEdges={updateEdgesBatch}
-                                                onBeforeUpdate={onBeforeUpdate}
-                                                disabled={isDraggingNode || hasLockedSelection}
-                                                disabledReason={hasLockedSelection ? lockedSelectionReason : undefined}
-                                                docked={true}
-                                            />
-                                        </React.Suspense>
-                                    );
-                                })()}
-                                    </div>
-                                )
-                            },
-                            ...(renderAIChatPanel ? [{
-                                key: 'ai',
-                                label: <span style={{ display: 'flex', alignItems: 'center' }}>{t('aiChat.title')} {showAiCrown && <span style={{ marginLeft: 4, fontSize: '13px' }} title="Pro 功能">👑</span>}</span>,
-                                children: (
-                                    <div style={{ height: '100%', minWidth: 0, overflow: 'hidden', padding: '0 8px' }}>
-                                        {activeTab === 'ai'
-                                            ? renderAIChatPanel({ onClose: closeAiPanel })
-                                            : null}
-                                    </div>
-                                )
-                            }] : [])
-                        ]}
-                        style={{
-                            height: '100%',
-                            minWidth: 0,
-                            minHeight: 0,
-                            display: 'flex',
-                            flexDirection: 'column',
-                        }}
-                        styles={{
-                            body: {
-                                flex: 1,
-                                height: '100%',
-                                maxHeight: '100%',
-                                minHeight: 0,
-                                overflow: 'hidden',
-                            },
-                            content: {
-                                display: 'flex',
-                                height: '100%',
-                                maxHeight: '100%',
-                                minHeight: 0,
-                                overflow: 'hidden',
-                            },
-                        }}
-                        tabBarStyle={{
-                            margin: 0,
-                            padding: '0 16px',
-                            background: 'transparent',
-                            borderBottom: `1px solid ${token.colorBorderSecondary}`,
-                            minHeight: COMMERCIAL_TOUCH_TARGET,
-                        }}
+                    <DesignerRightSidebarContent
+                        activePlugin={activePlugin}
+                        activeTab={activeTab}
+                        aiChatVisible={aiChatVisible}
+                        aiLabel={t('aiChat.title')}
+                        closeAiPanel={closeAiPanel}
+                        hasLockedSelection={hasLockedSelection}
+                        lockedSelectionReason={hasLockedSelection ? lockedSelectionReason : undefined}
+                        onAiTabIntercept={onAiTabIntercept}
+                        onBeforeUpdate={onBeforeUpdate}
+                        onTabChange={onTabChange}
+                        pluginCtx={pluginCtx}
+                        propertyLabel={t('propertyPanel.title')}
+                        renderAIChatPanel={renderAIChatPanel}
+                        selectedEdges={selectedEdges}
+                        selectedNodes={selectedNodes}
+                        setAiChatVisible={setAiChatVisible}
+                        showAiCrown={showAiCrown}
+                        token={token}
+                        updateEdgesBatch={updateEdgesBatch}
+                        updateNodesBatch={updateNodesBatch}
                     />
                 </div>
             )}
         </div>
     );
-}, (previous, next) => shouldFreezeDesignerRightSidebarDuringDrag(previous, next));
+}, shouldReuseDesignerRightSidebar);
 
 DesignerRightSidebar.displayName = 'DesignerRightSidebar';

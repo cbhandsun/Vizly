@@ -2,12 +2,14 @@ import { describe, expect, it } from 'vitest';
 
 import {
     createDesignerRightSidebarLayout,
+    createDesignerRightSidebarOffsetVariables,
     MOBILE_DESIGNER_PANEL_DOCK_CLEARANCE,
     MOBILE_DESIGNER_PANEL_WIDTH,
     shouldActivateDesignerPropertyTab,
     shouldExpandDesignerRightSidebar,
     shouldFreezeDesignerRightSidebarDuringDrag,
     shouldOpenDesignerAiSidebar,
+    shouldReuseDesignerRightSidebar,
 } from '../designerRightSidebarState';
 
 describe('createDesignerRightSidebarLayout', () => {
@@ -49,6 +51,27 @@ describe('createDesignerRightSidebarLayout', () => {
             isMobile: false,
             panelWidth: 360,
         }).width).toBe('var(--commercial-touch-target, 44px)');
+    });
+});
+
+describe('createDesignerRightSidebarOffsetVariables', () => {
+    it('combines sidebar offsets without a computed-style layout read', () => {
+        expect(createDesignerRightSidebarOffsetVariables(60)).toEqual({
+            rightSidebarOffset: '60px',
+            maxSidebarOffset: 'max(var(--left-sidebar-offset, 0px), 60px)',
+        });
+    });
+
+    it('fails closed for hidden, non-finite, negative, and excessive widths', () => {
+        const hidden = {
+            rightSidebarOffset: '0px',
+            maxSidebarOffset: 'var(--left-sidebar-offset, 0px)',
+        };
+        expect(createDesignerRightSidebarOffsetVariables(null)).toEqual(hidden);
+        expect(createDesignerRightSidebarOffsetVariables(Number.NaN)).toEqual(hidden);
+        expect(createDesignerRightSidebarOffsetVariables(Number.POSITIVE_INFINITY)).toEqual(hidden);
+        expect(createDesignerRightSidebarOffsetVariables(-1)).toEqual(hidden);
+        expect(createDesignerRightSidebarOffsetVariables(10_001)).toEqual(hidden);
     });
 });
 
@@ -185,5 +208,92 @@ describe('shouldFreezeDesignerRightSidebarDuringDrag', () => {
             { isDraggingNode: true },
             { isDraggingNode: false },
         )).toBe(false);
+    });
+});
+
+describe('shouldReuseDesignerRightSidebar', () => {
+    const selectedNode = { id: 'node-a' };
+    const createProps = (overrides: Record<string, unknown> = {}): {
+        isDraggingNode: boolean;
+        selectedNodes: readonly unknown[];
+        selectedEdges: readonly unknown[];
+    } & Record<string, unknown> => ({
+        isDraggingNode: false,
+        selectedNodes: [selectedNode],
+        selectedEdges: [],
+        activeTab: 'property',
+        onUpdate: () => undefined,
+        ...overrides,
+    });
+
+    it('reuses a sidebar when only selection array containers were recreated', () => {
+        const previous = createProps();
+        const next = { ...previous, selectedNodes: [selectedNode], selectedEdges: [] };
+        expect(shouldReuseDesignerRightSidebar(previous, next)).toBe(true);
+    });
+
+    it('freezes drag entry and renders after business selection or callback changes', () => {
+        const previous = createProps();
+        expect(shouldReuseDesignerRightSidebar(
+            previous,
+            { ...previous, isDraggingNode: true },
+        )).toBe(true);
+        expect(shouldReuseDesignerRightSidebar(
+            previous,
+            { ...previous, selectedNodes: [{ id: 'node-b' }] },
+        )).toBe(false);
+        expect(shouldReuseDesignerRightSidebar(
+            previous,
+            { ...previous, onUpdate: () => undefined },
+        )).toBe(false);
+    });
+
+    it('ignores routing geometry while preserving business and style updates', () => {
+        const previous = createProps();
+        expect(shouldReuseDesignerRightSidebar(previous, {
+            ...previous,
+            selectedNodes: [{
+                ...selectedNode,
+                position: { x: 40, y: 12 },
+                measured: { width: 180, height: 72 },
+            }],
+        })).toBe(true);
+        expect(shouldReuseDesignerRightSidebar(previous, {
+            ...previous,
+            selectedNodes: [{ ...selectedNode, data: { label: 'changed' } }],
+        })).toBe(false);
+    });
+
+    it('preserves complete node updates for custom plugin property panels', () => {
+        const activePlugin = { renderCustomPropertyPanel: () => null };
+        const previous = createProps({ activePlugin });
+        expect(shouldReuseDesignerRightSidebar(previous, {
+            ...previous,
+            selectedNodes: [{ ...selectedNode, position: { x: 40, y: 12 } }],
+        })).toBe(false);
+    });
+
+    it('ignores standard plugin context churn but preserves it for a custom panel', () => {
+        const previous = createProps({ pluginCtx: { nodes: [] } });
+        expect(shouldReuseDesignerRightSidebar(previous, {
+            ...previous,
+            pluginCtx: { nodes: [{ id: 'geometry-only' }] },
+        })).toBe(true);
+
+        const customPrevious = createProps({
+            activePlugin: { renderCustomPropertyPanel: () => null },
+            pluginCtx: { nodes: [] },
+        });
+        expect(shouldReuseDesignerRightSidebar(customPrevious, {
+            ...customPrevious,
+            pluginCtx: { nodes: [{ id: 'custom-panel-input' }] },
+        })).toBe(false);
+    });
+
+    it('freezes changing form data between active drag frames', () => {
+        expect(shouldReuseDesignerRightSidebar(
+            createProps({ isDraggingNode: true }),
+            createProps({ isDraggingNode: true, selectedNodes: [{ id: 'changed' }] }),
+        )).toBe(true);
     });
 });
