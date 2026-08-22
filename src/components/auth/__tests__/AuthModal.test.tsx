@@ -112,31 +112,35 @@ describe('AuthModal', () => {
         expect(screen.getByRole('button', { name: 'auth.modal.backToLogin' })).toBeTruthy();
     });
 
-    it('focuses the first invalid field after each authentication form fails validation', async () => {
+    const expectActiveEmailField = async () => {
+        await waitFor(() => {
+            expect(document.activeElement).toBe(
+                within(screen.getByRole('tabpanel')).getByLabelText('auth.modal.emailPlaceholder'),
+            );
+        });
+    };
+
+    it('focuses the email field after password login validation fails', async () => {
         render(<AuthModal open onCancel={vi.fn()} />);
 
         fireEvent.click(screen.getByRole('button', { name: /auth\.modal\.loginButton$/ }));
-        await waitFor(() => {
-            expect(document.activeElement).toBe(
-                within(screen.getByRole('tabpanel')).getByLabelText('auth.modal.emailPlaceholder'),
-            );
-        });
+        await expectActiveEmailField();
+    });
+
+    it('focuses the email field after magic-link validation fails', async () => {
+        render(<AuthModal open onCancel={vi.fn()} />);
 
         fireEvent.click(screen.getByRole('tab', { name: 'auth.modal.tabs.magiclink' }));
         fireEvent.click(screen.getByRole('button', { name: /auth\.modal\.sendMagicLink$/ }));
-        await waitFor(() => {
-            expect(document.activeElement).toBe(
-                within(screen.getByRole('tabpanel')).getByLabelText('auth.modal.emailPlaceholder'),
-            );
-        });
+        await expectActiveEmailField();
+    });
+
+    it('focuses the email field after registration validation fails', async () => {
+        render(<AuthModal open onCancel={vi.fn()} />);
 
         fireEvent.click(screen.getByRole('tab', { name: 'auth.modal.tabs.register' }));
         fireEvent.click(screen.getByRole('button', { name: 'auth.modal.register.button' }));
-        await waitFor(() => {
-            expect(document.activeElement).toBe(
-                within(screen.getByRole('tabpanel')).getByLabelText('auth.modal.emailPlaceholder'),
-            );
-        });
+        await expectActiveEmailField();
     });
 
     it('clears stale validation when switching methods without discarding entered values', async () => {
