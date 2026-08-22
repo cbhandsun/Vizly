@@ -103,7 +103,7 @@
             "filterTitle": "No diagrams in {{view}}",
             "filterDescription": "The {{view}} view is empty. View recent diagrams to continue.",
             "loadErrorTitle": "Workspace data could not be loaded",
-            "loadTimeoutDescription": "Loading took longer than expected. Check your connection, then try again.",
+            "loadTimeoutDescription": "Loading took longer than expected. Vizly will keep trying, or you can retry now.",
             "loadErrorDescription": "Vizly could not load this view. Try again without leaving your current workspace."
         }
     },

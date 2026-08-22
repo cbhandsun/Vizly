@@ -102,7 +102,7 @@
             "filterTitle": "“{{view}}”中暂无图表",
             "filterDescription": "“{{view}}”筛选下暂无图表。查看最近图表可继续工作。",
             "loadErrorTitle": "工作区数据加载失败",
-            "loadTimeoutDescription": "加载时间超过预期。请检查网络连接后重试。",
+            "loadTimeoutDescription": "加载时间超过预期。Vizly 会继续尝试，你也可以立即重试。",
             "loadErrorDescription": "Vizly 暂时无法加载当前视图。你可以直接重试，无需离开工作区。"
         }
     },

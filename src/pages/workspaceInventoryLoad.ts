@@ -4,9 +4,17 @@ const MAX_WORKSPACE_INVENTORY_LOAD_TIMEOUT_MS = 60_000;
 
 export type WorkspaceInventoryLoadFailureReason = 'timeout' | 'failed';
 
-export type WorkspaceInventoryLoadResult<T> =
+export type WorkspaceInventoryCompletedLoadResult<T> =
   | { kind: 'success'; value: T }
-  | { kind: 'failure'; reason: WorkspaceInventoryLoadFailureReason; error?: unknown };
+  | { kind: 'failure'; reason: 'failed'; error: unknown };
+
+export type WorkspaceInventoryLoadResult<T> =
+  | WorkspaceInventoryCompletedLoadResult<T>
+  | {
+      kind: 'failure';
+      reason: 'timeout';
+      completion: Promise<WorkspaceInventoryCompletedLoadResult<T>>;
+    };
 
 const normalizeTimeout = (timeoutMs: number): number => {
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
@@ -20,24 +28,20 @@ export const loadWorkspaceInventoryWithDeadline = async <T>(
   timeoutMs = WORKSPACE_INVENTORY_LOAD_TIMEOUT_MS,
 ): Promise<WorkspaceInventoryLoadResult<T>> => {
   const deadlineMs = normalizeTimeout(timeoutMs);
-
-  return await new Promise<WorkspaceInventoryLoadResult<T>>((resolve) => {
-    let settled = false;
-    const settle = (result: WorkspaceInventoryLoadResult<T>) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timeoutId);
-      resolve(result);
-    };
-    const timeoutId = setTimeout(() => {
-      settle({ kind: 'failure', reason: 'timeout' });
+  const completion = Promise.resolve()
+    .then(load)
+    .then<WorkspaceInventoryCompletedLoadResult<T>, WorkspaceInventoryCompletedLoadResult<T>>(
+      value => ({ kind: 'success', value }),
+      (error: unknown) => ({ kind: 'failure', reason: 'failed', error }),
+    );
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<WorkspaceInventoryLoadResult<T>>((resolve) => {
+    timeoutId = setTimeout(() => {
+      resolve({ kind: 'failure', reason: 'timeout', completion });
     }, deadlineMs);
-
-    Promise.resolve()
-      .then(load)
-      .then(
-        value => settle({ kind: 'success', value }),
-        (error: unknown) => settle({ kind: 'failure', reason: 'failed', error }),
-      );
   });
+
+  const result = await Promise.race([completion, timeout]);
+  if (timeoutId !== undefined) clearTimeout(timeoutId);
+  return result;
 };

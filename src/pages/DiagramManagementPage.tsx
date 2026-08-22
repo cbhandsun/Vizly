@@ -60,6 +60,7 @@ import {
 import { createUniqueWorkspaceDiagramTitle } from './workspaceDiagramNaming';
 import {
     loadWorkspaceInventoryWithDeadline,
+    type WorkspaceInventoryCompletedLoadResult,
     type WorkspaceInventoryLoadFailureReason,
 } from './workspaceInventoryLoad';
 
@@ -216,19 +217,30 @@ const WorkspaceDashboardPage: React.FC = () => {
         );
         if (requestId !== inventoryRequestIdRef.current) return;
 
-        if (result.kind === 'success') {
-            setUnifiedItems(currentItems => mergeWorkspaceItemsByScope(
-                currentItems,
-                result.value,
-                inventoryScope,
-            ));
-            setLoadedInventoryScopes(currentScopes => new Set(currentScopes).add(inventoryScope));
-        } else {
-            setLoadFailure(result.reason);
-            if (result.reason === 'failed') {
-                safeLog.error('Failed to load dashboard data', redactSensitiveLogValue(result.error));
+        const applyCompletedResult = (completed: WorkspaceInventoryCompletedLoadResult<UnifiedDiagramItem[]>) => {
+            if (requestId !== inventoryRequestIdRef.current) return;
+            if (completed.kind === 'success') {
+                setUnifiedItems(currentItems => mergeWorkspaceItemsByScope(
+                    currentItems,
+                    completed.value,
+                    inventoryScope,
+                ));
+                setLoadedInventoryScopes(currentScopes => new Set(currentScopes).add(inventoryScope));
+                setLoadFailure(null);
+                return;
             }
+            setLoadFailure('failed');
+            safeLog.error('Failed to load dashboard data', redactSensitiveLogValue(completed.error));
+        };
+
+        if (result.kind === 'failure' && result.reason === 'timeout') {
+            setLoadFailure('timeout');
+            setLoading(false);
+            void result.completion.then(applyCompletedResult);
+            return;
         }
+
+        applyCompletedResult(result);
         setLoading(false);
     }, [activeView, cloudProvider, user]);
 

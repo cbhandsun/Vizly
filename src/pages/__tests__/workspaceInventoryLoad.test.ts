@@ -43,7 +43,8 @@ describe('loadWorkspaceInventoryWithDeadline', () => {
     expect(settled).toBe(false);
 
     await vi.advanceTimersByTimeAsync(1);
-    await expect(result).resolves.toEqual({ kind: 'failure', reason: 'timeout' });
+    const timeout = await result;
+    expect(timeout).toMatchObject({ kind: 'failure', reason: 'timeout' });
   });
 
   it('normalizes invalid and extreme timeout values', async () => {
@@ -53,7 +54,7 @@ describe('loadWorkspaceInventoryWithDeadline', () => {
       Number.NaN,
     );
     await vi.advanceTimersByTimeAsync(WORKSPACE_INVENTORY_LOAD_TIMEOUT_MS);
-    await expect(invalid).resolves.toEqual({ kind: 'failure', reason: 'timeout' });
+    await expect(invalid).resolves.toMatchObject({ kind: 'failure', reason: 'timeout' });
 
     const extreme = loadWorkspaceInventoryWithDeadline(
       () => new Promise<never>(() => undefined),
@@ -65,20 +66,43 @@ describe('loadWorkspaceInventoryWithDeadline', () => {
     await Promise.resolve();
     expect(settled).toBe(false);
     await vi.advanceTimersByTimeAsync(1);
-    await expect(extreme).resolves.toEqual({ kind: 'failure', reason: 'timeout' });
+    await expect(extreme).resolves.toMatchObject({ kind: 'failure', reason: 'timeout' });
   });
 
-  it('ignores a late completion after the timeout result is settled', async () => {
+  it('exposes a late empty inventory as success after the timeout result is settled', async () => {
     vi.useFakeTimers();
-    let finish: ((value: string) => void) | undefined;
+    let finish: ((value: string[]) => void) | undefined;
     const result = loadWorkspaceInventoryWithDeadline(
-      () => new Promise<string>(resolve => { finish = resolve; }),
+      () => new Promise<string[]>(resolve => { finish = resolve; }),
       10,
     );
 
     await vi.advanceTimersByTimeAsync(10);
-    await expect(result).resolves.toEqual({ kind: 'failure', reason: 'timeout' });
-    finish?.('late result');
-    await expect(result).resolves.toEqual({ kind: 'failure', reason: 'timeout' });
+    const timeout = await result;
+    expect(timeout).toMatchObject({ kind: 'failure', reason: 'timeout' });
+    if (timeout.kind !== 'failure' || timeout.reason !== 'timeout') {
+      throw new Error('Expected timeout result');
+    }
+    finish?.([]);
+    await expect(timeout.completion).resolves.toEqual({ kind: 'success', value: [] });
+  });
+
+  it('exposes a late failure without rejecting the completion channel', async () => {
+    vi.useFakeTimers();
+    let fail: ((error: unknown) => void) | undefined;
+    const result = loadWorkspaceInventoryWithDeadline(
+      () => new Promise<never>((_resolve, reject) => { fail = reject; }),
+      10,
+    );
+
+    await vi.advanceTimersByTimeAsync(10);
+    const timeout = await result;
+    expect(timeout).toMatchObject({ kind: 'failure', reason: 'timeout' });
+    if (timeout.kind !== 'failure' || timeout.reason !== 'timeout') {
+      throw new Error('Expected timeout result');
+    }
+    const error = new Error('late failure');
+    fail?.(error);
+    await expect(timeout.completion).resolves.toEqual({ kind: 'failure', reason: 'failed', error });
   });
 });

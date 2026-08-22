@@ -11,7 +11,7 @@ vi.mock('react-i18next', () => ({
         'workspace.empty.description': 'Create a diagram to get started.',
         'workspace.empty.title': 'No diagrams yet',
         'workspace.empty.loadErrorTitle': 'Workspace data could not be loaded',
-        'workspace.empty.loadTimeoutDescription': 'Loading took longer than expected.',
+        'workspace.empty.loadTimeoutDescription': 'Loading took longer than expected. Vizly will keep trying.',
         'workspace.goHome': 'Go to workspace',
         'workspace.newDiagram': 'New diagram',
         'workspace.newFlowchart': 'New flowchart',
@@ -130,7 +130,7 @@ describe('WorkspaceDashboardChrome', () => {
 
     expect(html).toContain('role="alert"');
     expect(html).toContain('Workspace data could not be loaded');
-    expect(html).toContain('Loading took longer than expected.');
+    expect(html).toContain('Loading took longer than expected. Vizly will keep trying.');
     expect(html).toContain('Try again');
   });
 });
