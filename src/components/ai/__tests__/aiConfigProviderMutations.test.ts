@@ -6,6 +6,7 @@ import {
     removeAIModel,
     removeAIProvider,
     resolveAIConfigInitialProviderId,
+    selectAIActiveModelDraft,
 } from '../aiConfigProviderMutations';
 
 const config: AIConfigState = {
@@ -108,5 +109,33 @@ describe('resolveAIConfigInitialProviderId', () => {
         42,
     ])('falls back to global settings for invalid input: %s', (input) => {
         expect(resolveAIConfigInitialProviderId(input, config.providers)).toBe('global_settings');
+    });
+});
+
+describe('selectAIActiveModelDraft', () => {
+    it('stages an enabled model selection without mutating the source config', () => {
+        const next = selectAIActiveModelDraft(config, 'custom-one', 'next-model');
+        expect(next).not.toBe(config);
+        expect(next.activeModelKey).toBe('custom-one:next-model');
+        expect(config.activeModelKey).toBe('custom-one:active-model');
+    });
+
+    it('rejects unknown and disabled provider or model selections', () => {
+        const disabledProvider = {
+            ...config,
+            providers: config.providers.map(provider => provider.id === 'custom-one'
+                ? { ...provider, enabled: false }
+                : provider),
+        };
+        const disabledModel = {
+            ...config,
+            providers: config.providers.map(provider => provider.id === 'custom-one'
+                ? { ...provider, models: provider.models.map(model => ({ ...model, enabled: false })) }
+                : provider),
+        };
+
+        expect(selectAIActiveModelDraft(config, 'missing', 'model')).toBe(config);
+        expect(selectAIActiveModelDraft(disabledProvider, 'custom-one', 'next-model')).toBe(disabledProvider);
+        expect(selectAIActiveModelDraft(disabledModel, 'custom-one', 'next-model')).toBe(disabledModel);
     });
 });

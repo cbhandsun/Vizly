@@ -66,10 +66,12 @@ describe('AIChatViewLayout accessibility contract', () => {
         const sidebarSource = readFileSync('src/components/ai/AIConfigProviderSidebar.tsx', 'utf8');
         const discoverySource = readFileSync('src/components/ai/AIConfigModelDiscoveryModal.tsx', 'utf8');
         const newModelSource = readFileSync('src/components/ai/AIConfigNewModelForm.tsx', 'utf8');
+        const modalTitleSource = readFileSync('src/components/ai/AIConfigModalTitle.tsx', 'utf8');
         const css = readFileSync('src/components/ai/AIConfigModal.css', 'utf8');
 
         expect(modalSource).toContain('closable={false}');
-        expect(modalSource).toContain("aria-label={t('aiConfig.close')}");
+        expect(modalSource).toContain("closeLabel={t('aiConfig.close')}");
+        expect(modalTitleSource).toContain('aria-label={closeLabel}');
         expect(modalSource).toContain("aria-label={t('aiConfig.baseUrlLabel')}");
         expect(modalSource).toContain("aria-label={t('aiConfig.apiKeyLabel')}");
         expect(modalSource).toContain("t('aiConfig.currentActive', { name: model.name || model.id })");

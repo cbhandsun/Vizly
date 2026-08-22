@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import Modal from 'antd/es/modal';
 import Form from 'antd/es/form';
@@ -15,7 +15,6 @@ import {
     RocketOutlined,
     CheckCircleFilled,
     SyncOutlined,
-    CloseOutlined,
     EyeInvisibleOutlined,
     EyeOutlined,
 } from '@ant-design/icons';
@@ -30,21 +29,23 @@ import {
     resolveAIProviderEndpoint,
 } from '@/services/ai/aiProviderClient';
 import {
-    loadCloudAIConfig,
+    AI_CONFIG_NAME_MAX_LENGTH,
     persistAIConfig,
-    setRuntimeAIConfig,
     type AIModel,
     type AIProviderConfig,
 } from './aiConfigStorage';
 import {
     logAIConfigCloudSaveFailure,
     logAIConfigEndpointValidationFailure,
-    logAIConfigModalCloudLoadFailure,
     logAIConfigRequestFailure,
 } from './aiLogging';
 import { filterAIModels, filterAIProviders, groupAIModels } from './aiConfigModelCollections';
 import { validateAIConfigModelDraft } from './aiConfigModelDraft';
-import { createCustomAIProvider, resolveAIConfigInitialProviderId } from './aiConfigProviderMutations';
+import {
+    createCustomAIProvider,
+    resolveAIConfigInitialProviderId,
+    selectAIActiveModelDraft,
+} from './aiConfigProviderMutations';
 import { getAIProviderConnectionReadiness } from './aiProviderConnectionReadiness';
 import {
     createAIProviderConnectionFailure,
@@ -57,10 +58,15 @@ import { AIConfigConnectionStatusAlert } from './AIConfigConnectionStatusAlert';
 import { AIConfigProviderSidebar } from './AIConfigProviderSidebar';
 import { AIConfigModelDiscoveryModal } from './AIConfigModelDiscoveryModal';
 import { AIConfigNewModelForm } from './AIConfigNewModelForm';
+import { AIConfigGlobalSettingsForm } from './AIConfigGlobalSettingsForm';
+import { AIConfigUnsavedChangesDialog } from './AIConfigUnsavedChangesDialog';
+import { AIConfigModalTitle } from './AIConfigModalTitle';
 import { AIConfigDeletionConfirmModal } from './AIConfigDeletionConfirmModal';
 import { AIConfigModelDeleteButton, AIConfigProviderHeader } from './AIConfigDeletionTriggers';
 import { useAIConfigDeletion } from './useAIConfigDeletion';
 import { useAIConfigModalConfig } from './useAIConfigModalConfig';
+import { useAIConfigNewModelDraft } from './useAIConfigNewModelDraft';
+import { useAIConfigCloudDraftSync } from './useAIConfigCloudDraftSync';
 import {
     COMMERCIAL_VIEWPORT_MODAL_CLASS,
     COMMERCIAL_VIEWPORT_MODAL_Z_INDEX,
@@ -68,7 +74,7 @@ import {
 } from '@/core/components/ui/viewportOverlayPortal';
 import './AIConfigModal.css';
 
-const { Text, Paragraph } = Typography;
+const { Text } = Typography;
 const loadStorageService = async () => (await import('@/services/SupabaseStorage')).storageService;
 
 interface AIConfigModalProps {
@@ -81,7 +87,7 @@ interface AIConfigModalProps {
 const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, onCancel, onSave }) => {
     const { t } = useTranslation();
     const { user } = useAuth();
-    const [config, setConfig] = useAIConfigModalConfig(open, user?.id);
+    const [config, setConfig, { isDirty, markSaved, replaceConfigIfPristine }] = useAIConfigModalConfig(open, user?.id);
     const [selectedProviderId, setSelectedProviderId] = useState<string>(() => (
         resolveAIConfigInitialProviderId(initialProviderId, config.providers)
     ));
@@ -102,40 +108,31 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
     });
 
     // For adding new models
-    const [newModelFormVisible, setNewModelFormVisible] = useState(false);
-    const [newModelData, setNewModelData] = useState({ id: '', name: '', group: '' });
-
-    useEffect(() => {
-        if (open) {
-            // Try to load from cloud if logged in
-            if (user) {
-                loadCloudAIConfig(user.id).then((mergedConfig) => {
-                    if (mergedConfig) {
-                        setRuntimeAIConfig(user.id, mergedConfig);
-                        setConfig(mergedConfig);
-                        window.dispatchEvent(new Event('aiConfigChanged'));
-                    }
-                }).catch(err => {
-                    logAIConfigModalCloudLoadFailure(err);
-                });
-            }
-        }
-    }, [open, setConfig, user]);
+    const {
+        visible: newModelFormVisible,
+        draft: newModelData,
+        setDraft: setNewModelData,
+        show: showNewModelDraft,
+        reset: resetNewModelDraft,
+    } = useAIConfigNewModelDraft();
+    const [discardConfirmationOpen, setDiscardConfirmationOpen] = useState(false);
+    useAIConfigCloudDraftSync(open, user?.id, replaceConfigIfPristine);
 
     const handleSave = async () => {
-        const invalidProvider = config.providers.find(p => p.enabled && p.baseUrl && !normalizeProviderBaseUrl(p.baseUrl));
+        const savedConfig = config;
+        const invalidProvider = savedConfig.providers.find(p => p.enabled && p.baseUrl && !normalizeProviderBaseUrl(p.baseUrl));
         if (invalidProvider) {
             appMessage.warning(t('aiConfig.invalidProviderBaseUrl', { name: invalidProvider.name }));
             return;
         }
 
         // Keep logged-in secrets in memory and encrypted cloud storage only.
-        persistAIConfig(user?.id, config);
+        persistAIConfig(user?.id, savedConfig);
 
         if (user) {
             try {
                 // Clone and encrypt keys
-                const encryptedProviders = await Promise.all(config.providers.map(async (p) => {
+                const encryptedProviders = await Promise.all(savedConfig.providers.map(async (p) => {
                     if (p.apiKey) {
                         const encryptedKey = await CryptoService.encrypt(p.apiKey, user.id);
                         return { ...p, apiKey: encryptedKey };
@@ -143,7 +140,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
                     return p;
                 }));
 
-                const cloudConfig = { ...config, providers: encryptedProviders };
+                const cloudConfig = { ...savedConfig, providers: encryptedProviders };
 
                 const storageService = await loadStorageService();
                 await storageService.saveConfig('ai_config', cloudConfig, user.id);
@@ -157,15 +154,30 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
         }
 
         window.dispatchEvent(new Event('aiConfigChanged'));
+        if (!markSaved(savedConfig)) {
+            appMessage.info(t('aiConfig.saveAgainForLatestChanges'));
+            return;
+        }
         setConnectionStatuses({});
         cancelDeletion();
+        resetNewModelDraft();
         onSave();
     };
 
-    const handleCancel = () => {
+    const closeWithoutSaving = () => {
         setConnectionStatuses({});
         cancelDeletion();
+        resetNewModelDraft();
+        setDiscardConfirmationOpen(false);
         onCancel();
+    };
+
+    const handleCancel = () => {
+        if (isDirty) {
+            setDiscardConfirmationOpen(true);
+            return;
+        }
+        closeWithoutSaving();
     };
 
     // --- Provider Actions ---
@@ -201,6 +213,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
     };
 
     const addCustomProvider = () => {
+        resetNewModelDraft();
         const newId = `custom_${Date.now()}`;
         const newProvider = createCustomAIProvider(newId, t('aiConfig.newProviderName'));
         setConfig(prev => ({ ...prev, providers: [...prev.providers, newProvider] }));
@@ -226,8 +239,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
                 };
             })
         }));
-        setNewModelFormVisible(false);
-        setNewModelData({ id: '', name: '', group: '' });
+        resetNewModelDraft();
         appMessage.success(t('aiConfig.modelAdded', { id: model.id }));
     };
 
@@ -246,16 +258,13 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
 
     // --- Selection ---
     const setActiveModel = (providerId: string, modelId: string) => {
-        const newActiveModelKey = `${providerId}:${modelId}`;
-        setConfig(prev => {
-            const newConfig = {
-                ...prev,
-                activeModelKey: newActiveModelKey
-            };
-            persistAIConfig(user?.id, newConfig);
-            return newConfig;
-        });
-        appMessage.success(t('aiConfig.switchedTo', { model: modelId }));
+        setConfig(prev => selectAIActiveModelDraft(prev, providerId, modelId));
+        appMessage.info(t('aiConfig.activeModelDrafted', { model: modelId }));
+    };
+
+    const handleProviderSelection = (providerId: string) => {
+        resetNewModelDraft();
+        setSelectedProviderId(providerId);
     };
 
     const selectedProvider = config.providers.find(p => p.id === selectedProviderId);
@@ -429,19 +438,12 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
 
     return (
         <Modal
-            title={(
-                <div className="ai-config-modal-title">
-                    <span>{t('aiConfig.title')}</span>
-                    <Button
-                        ref={modalCloseButtonRef}
-                        type="text"
-                        className="ai-config-modal-close"
-                        icon={<CloseOutlined />}
-                        aria-label={t('aiConfig.close')}
-                        onClick={handleCancel}
-                    />
-                </div>
-            )}
+            title={<AIConfigModalTitle
+                ref={modalCloseButtonRef}
+                title={t('aiConfig.title')}
+                closeLabel={t('aiConfig.close')}
+                onClose={handleCancel}
+            />}
             open={open}
             onOk={handleSave}
             onCancel={handleCancel}
@@ -461,7 +463,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
                     selectedProviderId={selectedProviderId}
                     searchText={searchText}
                     onSearchTextChange={setSearchText}
-                    onSelectProvider={setSelectedProviderId}
+                    onSelectProvider={handleProviderSelection}
                     onToggleProvider={toggleProvider}
                     onAddCustomProvider={addCustomProvider}
                 />
@@ -478,18 +480,11 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
 
                     <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--glass-padding-md, 24px) var(--glass-padding-lg, 32px)' }}>
                         {selectedProviderId === 'global_settings' ? (
-                            <Form layout="vertical">
-                                <Form.Item label={t('aiConfig.systemPromptLabel')}>
-                                    <Paragraph type="secondary">{t('aiConfig.systemPromptDesc')}</Paragraph>
-                                        <Input.TextArea
-                                        aria-label={t('aiConfig.systemPromptLabel')}
-                                        rows={12}
-                                        value={config.systemPrompt}
-                                        onChange={e => setConfig({ ...config, systemPrompt: e.target.value })}
-                                        style={{ fontFamily: 'monospace', fontSize: 13, backgroundColor: 'rgba(0,0,0,0.02)', border: '1px solid rgba(0,0,0,0.08)' }}
-                                    />
-                                </Form.Item>
-                            </Form>
+                            <AIConfigGlobalSettingsForm
+                                systemPrompt={config.systemPrompt}
+                                t={t}
+                                onChange={systemPrompt => setConfig({ ...config, systemPrompt })}
+                            />
                         ) : selectedProvider ? (
                             <Form layout="vertical">
                                 {/* Platform Config */}
@@ -551,6 +546,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
                                             <Input
                                                 aria-label={t('aiConfig.platformName')}
                                                 value={selectedProvider.name}
+                                                maxLength={AI_CONFIG_NAME_MAX_LENGTH}
                                                 onChange={e => updateProvider(selectedProvider.id, { name: e.target.value })}
                                             />
                                         </Form.Item>
@@ -571,7 +567,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
                                             >
                                                 {t('aiConfig.fetchModels')}
                                             </Button>
-                                            <Button className="ai-config-primary-action" type="primary" icon={<PlusOutlined />} onClick={() => setNewModelFormVisible(true)}>{t('aiConfig.addModel')}</Button>
+                                            <Button className="ai-config-primary-action" type="primary" icon={<PlusOutlined />} onClick={showNewModelDraft}>{t('aiConfig.addModel')}</Button>
                                         </Space>
                                     </div>
 
@@ -581,7 +577,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
                                             validation={newModelValidation}
                                             onChange={setNewModelData}
                                             onConfirm={() => addModel(selectedProvider.id)}
-                                            onCancel={() => setNewModelFormVisible(false)}
+                                            onCancel={resetNewModelDraft}
                                         />
                                     )}
 
@@ -669,6 +665,12 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
                 t={t}
                 onCancel={cancelDeletion}
                 onConfirm={confirmDeletion}
+            />
+            <AIConfigUnsavedChangesDialog
+                open={discardConfirmationOpen}
+                t={t}
+                onKeepEditing={() => setDiscardConfirmationOpen(false)}
+                onDiscard={closeWithoutSaving}
             />
         </Modal>
     );

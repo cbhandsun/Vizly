@@ -100,15 +100,15 @@ const runtimeAIConfigs = new Map<string, AIConfigState>();
 const MAX_PROVIDERS = 20;
 const MAX_MODELS_PER_PROVIDER = 200;
 const MAX_ID_LENGTH = 160;
-const MAX_NAME_LENGTH = 160;
+export const AI_CONFIG_NAME_MAX_LENGTH = 160;
 const MAX_SECRET_LENGTH = 8_000;
-const MAX_SYSTEM_PROMPT_LENGTH = 20_000;
+export const AI_SYSTEM_PROMPT_MAX_LENGTH = 20_000;
 const SAFE_ID = /^[\w:./@-]+$/u;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
     !!value && typeof value === 'object' && !Array.isArray(value);
 
-const normalizeAIText = (value: unknown, fallback: string, maxLength = MAX_NAME_LENGTH): string => {
+const normalizeAIText = (value: unknown, fallback: string, maxLength = AI_CONFIG_NAME_MAX_LENGTH): string => {
     if (typeof value !== 'string') return fallback;
     const trimmed = value.trim().slice(0, maxLength);
     return trimmed || fallback;
@@ -192,7 +192,7 @@ export const coerceAIConfig = (value: unknown): AIConfigState => {
     return {
         activeModelKey: modelKeys.has(requestedActiveModelKey) ? requestedActiveModelKey : fallbackActiveModelKey,
         systemPrompt: typeof value.systemPrompt === 'string'
-            ? value.systemPrompt.slice(0, MAX_SYSTEM_PROMPT_LENGTH)
+            ? value.systemPrompt.slice(0, AI_SYSTEM_PROMPT_MAX_LENGTH)
             : DEFAULT_SYSTEM_PROMPT,
         providers: normalizedProviders,
     };

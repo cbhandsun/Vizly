@@ -22,6 +22,21 @@ export const resolveAIConfigInitialProviderId = (
         : 'global_settings';
 };
 
+export const selectAIActiveModelDraft = (
+    config: AIConfigState,
+    providerId: string,
+    modelId: string,
+): AIConfigState => {
+    const provider = config.providers.find(candidate => candidate.id === providerId);
+    const model = provider?.models.find(candidate => candidate.id === modelId);
+    if (!provider?.enabled || !model?.enabled) return config;
+
+    const activeModelKey = `${providerId}:${modelId}`;
+    return config.activeModelKey === activeModelKey
+        ? config
+        : { ...config, activeModelKey };
+};
+
 const findFallbackActiveModelKey = (providers: AIProviderConfig[]): string => {
     for (const provider of providers) {
         if (!provider.enabled) continue;

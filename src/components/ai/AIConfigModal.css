@@ -131,6 +131,13 @@
     color: var(--text-secondary, #667085);
 }
 
+.ai-config-system-prompt {
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    background: rgba(0, 0, 0, 0.02);
+    font-family: monospace;
+    font-size: 13px;
+}
+
 .ai-config-global-select {
     width: 100%;
     border: 1px solid transparent;
@@ -230,6 +237,10 @@
     margin-top: 3px;
     color: var(--color-error-500, #dc2626);
     font-size: 18px;
+}
+
+.ai-config-unsaved-dialog-heading > .anticon {
+    color: var(--color-warning-600, #d97706);
 }
 
 .ai-config-delete-dialog-heading .ant-typography,
