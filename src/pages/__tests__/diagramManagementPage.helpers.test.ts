@@ -145,6 +145,38 @@ describe('diagramManagementPage helpers', () => {
         ]);
     });
 
+    it('selects the newest 30 recent documents before applying presentation sorting', () => {
+        const items = Array.from({ length: 35 }, (_, index) => createItem({
+            id: `local-${index}`,
+            title: index === 34 ? 'A newest document' : `Document ${String(index).padStart(2, '0')}`,
+            updatedAt: index === 34 ? 10_000 : index,
+            raw: {
+                ...createItem().raw,
+                id: `diagram-${index}`,
+            },
+        }));
+
+        const recentByUpdated = filterAndSortItems(items, 'recent', '', 'updated');
+        expect(recentByUpdated).toHaveLength(30);
+        expect(recentByUpdated[0]?.id).toBe('local-34');
+        expect(recentByUpdated.map(item => item.id)).not.toContain('local-0');
+
+        const recentByName = filterAndSortItems(items, 'recent', '', 'name');
+        expect(recentByName).toHaveLength(30);
+        expect(recentByName[0]?.id).toBe('local-34');
+        expect(recentByName.map(item => item.id)).not.toContain('local-0');
+    });
+
+    it('keeps equal modification times deterministic', () => {
+        const items = [
+            createItem({ id: 'local-b', title: 'Same', updatedAt: 100 }),
+            createItem({ id: 'local-a', title: 'Same', updatedAt: 100 }),
+            createItem({ id: 'local-invalid', title: 'Unknown', updatedAt: Number.NaN }),
+        ];
+        expect(filterAndSortItems(items, 'recent', '', 'updated').map(item => item.id))
+            .toEqual(['local-a', 'local-b', 'local-invalid']);
+    });
+
     it('creates stable starter seeds for each local template type', () => {
         const blank = createTemplateSeed('blank');
         expect(blank).toMatchObject({

@@ -74,6 +74,40 @@ const renderOpeningCollection = (
 );
 
 describe('WorkspaceDiagramCollection', () => {
+  it('reports the bounded number of documents actually available in Recent', () => {
+    const items: UnifiedDiagramItem[] = Array.from({ length: 35 }, (_, index) => ({
+      id: `diagram-${index}`,
+      title: `Diagram ${index}`,
+      updatedAt: index + 1,
+      source: 'local',
+      role: 'owner',
+      raw: { id: `diagram-${index}` } as never,
+    }));
+    const html = renderToStaticMarkup(
+      <WorkspaceDiagramCollection
+        activeView="recent"
+        onActiveViewChange={() => undefined}
+        unifiedItems={items}
+        filteredItems={items.slice(0, 30)}
+        sortKey="updated"
+        onSortKeyChange={() => undefined}
+        viewMode="list"
+        onViewModeChange={() => undefined}
+        loading={false}
+        openingDiagramKeys={new Set()}
+        onOpenDiagram={() => undefined}
+        onOpenDiagramInNewTab={() => undefined}
+        onContextMenu={() => undefined}
+        onDeleteDiagram={() => undefined}
+        onCreateBlank={() => undefined}
+        searchQuery=""
+        onClearSearch={() => undefined}
+      />,
+    );
+
+    expect(html).toMatch(/workspace\.recent<span class="filter-tab-count">30<\/span>/);
+  });
+
   it('makes the empty-workspace create action non-repeatable while creation is pending', () => {
     const html = renderToStaticMarkup(
       <WorkspaceDiagramCollection

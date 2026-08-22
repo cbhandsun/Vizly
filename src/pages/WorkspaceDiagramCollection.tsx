@@ -29,6 +29,7 @@ import {
   detectDiagramType,
   getNodeCount,
   isTemplateItem,
+  RECENT_WORKSPACE_LIMIT,
   type FilterViewType,
   type SortKey,
   type UnifiedDiagramItem,
@@ -108,6 +109,10 @@ export const WorkspaceDiagramCollection = ({
   const { t, i18n } = useTranslation();
   const locale = i18n.resolvedLanguage || i18n.language || 'en';
   const unknownTime = t('workspace.unknownTime');
+  const recentCount = Math.min(
+    unifiedItems.filter(item => !isTemplateItem(item)).length,
+    RECENT_WORKSPACE_LIMIT,
+  );
   const localCount = unifiedItems.filter(item => item.source === 'local').length;
   const cloudCount = unifiedItems.filter(item => item.source === 's3' || item.source === 'supabase').length;
   const sharedCount = unifiedItems.filter(item => item.role === 'viewer').length;
@@ -236,7 +241,7 @@ export const WorkspaceDiagramCollection = ({
                         <div className="workspace-filter-tabs" role="group" aria-label={t('workspace.filterBy')} onKeyDown={handleFilterGroupKeyDown}>
                             <button ref={recentFilterRef} type="button" className={`filter-tab ${activeView === 'recent' ? 'active' : ''}`} aria-pressed={activeView === 'recent'} data-workspace-filter-view="recent" tabIndex={activeView === 'recent' ? 0 : -1} onClick={() => onActiveViewChange('recent')}>
                                 <Clock size={14} strokeWidth={2} /> {t('workspace.recent')}
-                                <span className="filter-tab-count">{unifiedItems.filter(i => i.source !== 'template' && i.source !== 'general_template').length}</span>
+                                <span className="filter-tab-count">{recentCount}</span>
                             </button>
                             <button type="button" className={`filter-tab ${activeView === 'local' ? 'active' : ''}`} aria-pressed={activeView === 'local'} data-workspace-filter-view="local" tabIndex={activeView === 'local' ? 0 : -1} onClick={() => onActiveViewChange('local')}>
                                 <Laptop size={14} strokeWidth={2} /> {t('workspace.local')}

@@ -19,6 +19,8 @@ export type ViewMode = 'grid' | 'list';
 export type SortKey = 'updated' | 'name' | 'type';
 export type TemplateKey = 'flowchart' | 'architecture' | 'mindmap' | 'timeline' | 'blank';
 
+export const RECENT_WORKSPACE_LIMIT = 30;
+
 export interface TemplateSeedOptions {
     mindMapRootTopic?: unknown;
 }
@@ -102,6 +104,17 @@ export function getNodeCount(item: UnifiedDiagramItem): number | null {
 export const isTemplateItem = (item: UnifiedDiagramItem) =>
     item.source === 'template' || item.source === 'general_template';
 
+const compareWorkspaceItemsByUpdated = (
+    left: UnifiedDiagramItem,
+    right: UnifiedDiagramItem,
+): number => {
+    const leftUpdatedAt = Number.isFinite(left.updatedAt) && left.updatedAt > 0 ? left.updatedAt : -1;
+    const rightUpdatedAt = Number.isFinite(right.updatedAt) && right.updatedAt > 0 ? right.updatedAt : -1;
+    return rightUpdatedAt - leftUpdatedAt
+        || left.title.localeCompare(right.title)
+        || left.id.localeCompare(right.id);
+};
+
 export const filterAndSortItems = (
     unifiedItems: UnifiedDiagramItem[],
     activeView: FilterViewType,
@@ -111,7 +124,10 @@ export const filterAndSortItems = (
     let viewFiltered = unifiedItems;
     switch (activeView) {
         case 'recent':
-            viewFiltered = unifiedItems.filter(item => !isTemplateItem(item)).slice(0, 30);
+            viewFiltered = unifiedItems
+                .filter(item => !isTemplateItem(item))
+                .sort(compareWorkspaceItemsByUpdated)
+                .slice(0, RECENT_WORKSPACE_LIMIT);
             break;
         case 'local':
             viewFiltered = unifiedItems.filter(item => item.source === 'local');
@@ -138,14 +154,20 @@ export const filterAndSortItems = (
     const sorted = [...viewFiltered];
     switch (sortKey) {
         case 'name':
-            sorted.sort((left, right) => left.title.localeCompare(right.title));
+            sorted.sort((left, right) => (
+                left.title.localeCompare(right.title)
+                || compareWorkspaceItemsByUpdated(left, right)
+            ));
             break;
         case 'type':
-            sorted.sort((left, right) => detectDiagramType(left).localeCompare(detectDiagramType(right)));
+            sorted.sort((left, right) => (
+                detectDiagramType(left).localeCompare(detectDiagramType(right))
+                || compareWorkspaceItemsByUpdated(left, right)
+            ));
             break;
         case 'updated':
         default:
-            sorted.sort((left, right) => right.updatedAt - left.updatedAt);
+            sorted.sort(compareWorkspaceItemsByUpdated);
             break;
     }
 
