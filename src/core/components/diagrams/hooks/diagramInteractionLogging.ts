@@ -1,6 +1,10 @@
 import { safeLog } from '@/core/utils/consoleCleanup';
 import { redactSensitiveLogValue } from '@/core/utils/logSecurity';
 
+const isRecord = (value: unknown): value is Record<string, unknown> => (
+  value !== null && typeof value === 'object' && !Array.isArray(value)
+);
+
 export const logConnectionMicrointeractionFailure = (operation: string, error: unknown): void => {
   safeLog.warn(`[useConnectionMicrointeractions] ${operation} failed:`, redactSensitiveLogValue(error));
 };
@@ -30,7 +34,12 @@ export const logLayoutNoLayoutableNodes = (): void => {
 };
 
 export const logLayoutStrategyFailure = (strategyName: string, error: unknown): void => {
-  safeLog.error(`[useLayoutStrategy] Layout failed (${strategyName}):`, redactSensitiveLogValue(error));
+  const redacted = redactSensitiveLogValue(error);
+  const detail = isRecord(redacted)
+    && typeof redacted.message === 'string'
+    ? redacted.message
+    : redacted;
+  safeLog.error(`[useLayoutStrategy] Layout failed (${strategyName}):`, detail);
 };
 
 export const logLayoutStrategySafetyFallback = (strategyName: string): void => {

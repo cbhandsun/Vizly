@@ -14,6 +14,7 @@ import type { Node as ReactFlowNode, Edge } from '@xyflow/react';
 import { parseHandleDirection } from '../algorithms/simpleFallbackPath';
 import { safeLog } from './consoleCleanup';
 import { redactSensitiveLogValue } from './logSecurity';
+import { runElkLayout } from '../workers/elkLayoutClient';
 
 interface Point {
     x: number;
@@ -45,9 +46,6 @@ export async function routeEdgesWithELK(
         edgeNodeSpacing = 20,
         edgeEdgeSpacing = 15
     } = options;
-
-    const { default: ELK } = await import('elkjs');
-    const elk = new ELK();
 
     // 构建节点 ID 到节点信息的映射
     const nodeMap = new Map<string, ReactFlowNode>(nodes.map(n => [n.id, n]));
@@ -196,14 +194,8 @@ export async function routeEdgesWithELK(
         })),
     };
 
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
     try {
-        const timeoutPromise = new Promise<never>((_, reject) => {
-            timeoutId = setTimeout(() => {
-                reject(new Error(`ELK edge routing exceeded ${ELK_EDGE_ROUTING_TIMEOUT_MS}ms`));
-            }, ELK_EDGE_ROUTING_TIMEOUT_MS);
-        });
-        const result = await Promise.race([elk.layout(graph), timeoutPromise]);
+        const result = await runElkLayout(graph, { timeoutMs: ELK_EDGE_ROUTING_TIMEOUT_MS });
 
         // 提取边路径
         const edgePaths = new Map<string, Point[]>();
@@ -232,9 +224,6 @@ export async function routeEdgesWithELK(
     } catch (error) {
         safeLog.error('[ELK Edge Router] Layout failed:', redactSensitiveLogValue(error));
         return new Map();
-    } finally {
-        if (timeoutId !== null) clearTimeout(timeoutId);
-        elk.terminateWorker();
     }
 }
 

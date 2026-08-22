@@ -13,8 +13,8 @@ import {
   recomputeSubGroupContainersBasic,
   enforceSubGroupTitleClearance,
 } from '../utils/layoutUtils';
-import ElkWorker from '../workers/elkLayout.worker?worker';
 import { logLayoutWorkerTimeout, logWorkerLayoutFailure } from './layoutLogging';
+import { runElkLayout } from '../workers/elkLayoutClient';
 import {
   applyDomainElkLayoutRoutes,
   collectDomainElkLayoutRoutes,
@@ -23,12 +23,6 @@ import {
 export interface ElkLayoutResult {
   nodes: ReactFlowNode[];
   edges: Edge[];
-}
-
-interface ElkWorkerResponse {
-  id?: unknown;
-  result?: ElkNode;
-  error?: unknown;
 }
 
 const finiteNumber = (value: unknown, fallback: number): number =>
@@ -91,21 +85,12 @@ export const applyElkResultNodeGeometry = (
 };
 
 export abstract class AbstractElkLayoutStrategy implements ILayoutStrategy {
-  private worker: Worker | null = null;
-
   abstract getName(): string;
   abstract getCategory(): 'hierarchy' | 'node';
   abstract getDescription(): string;
 
   isApplicable(nodes: ReactFlowNode[], _edges: Edge[]): boolean {
     return Array.isArray(nodes) && nodes.length > 0;
-  }
-
-  protected getWorker(): Worker {
-    if (!this.worker) {
-      this.worker = new ElkWorker();
-    }
-    return this.worker;
   }
 
   /**
@@ -175,56 +160,26 @@ export abstract class AbstractElkLayoutStrategy implements ILayoutStrategy {
   ): Promise<ElkLayoutResult> {
     // 构建 ID 映射表，用于快速回填
     const idMap = new Map<string, ReactFlowNode>(updatedNodes.map(n => [n.id, n] as const));
-    return new Promise((resolve) => {
-      const worker = this.getWorker();
-      const layoutId = `${this.getName()}-${Date.now()}-${Math.random()}`;
-      let settled = false;
+    try {
+      const result = await runElkLayout(elkGraph, { timeoutMs: 30_000 });
+      applyElkResultNodeGeometry(result.children, idMap, padding);
 
-      const settle = (result: ElkLayoutResult) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timeoutId);
-        worker.removeEventListener('message', handleMessage);
-        resolve(result);
+      const routes = collectDomainElkLayoutRoutes(
+        result.edges,
+        { x: padding.x, y: padding.y },
+      );
+      return {
+        nodes: updatedNodes,
+        edges: applyDomainElkLayoutRoutes(edges, routes),
       };
-
-      const handleMessage = (event: MessageEvent<ElkWorkerResponse>) => {
-        const { id, result, error } = event.data;
-        if (id === layoutId) {
-          if (error) {
-            logWorkerLayoutFailure(this.getName(), error);
-            settle({ nodes: updatedNodes, edges });
-          } else {
-
-
-            applyElkResultNodeGeometry(result?.children, idMap, padding);
-
-            const routes = collectDomainElkLayoutRoutes(
-              result?.edges,
-              { x: padding.x, y: padding.y },
-            );
-            settle({
-              nodes: updatedNodes,
-              edges: applyDomainElkLayoutRoutes(edges, routes),
-            });
-          }
-        }
-      };
-
-      worker.addEventListener('message', handleMessage);
-
-      worker.postMessage({
-        id: layoutId,
-        graph: elkGraph,
-        options: {}
-      });
-
-      // 超时保护 (30秒)
-      const timeoutId = setTimeout(() => {
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('timed out')) {
         logLayoutWorkerTimeout(this.getName());
-        settle({ nodes: updatedNodes, edges });
-      }, 30000);
-    });
+      } else {
+        logWorkerLayoutFailure(this.getName(), error instanceof Error ? error.message : error);
+      }
+      return { nodes: updatedNodes, edges };
+    }
   }
 
   /**

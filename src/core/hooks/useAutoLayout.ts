@@ -4,6 +4,7 @@ import { animateLayoutTransition } from '../utils/animateLayoutTransition';
 import { safeLog } from '../utils/consoleCleanup';
 import { redactSensitiveLogValue } from '../utils/logSecurity';
 import type { LayoutOptions } from '../types/layout';
+import type { ElkNode } from 'elkjs';
 
 export type LayoutDirection = 'TB' | 'LR';
 export type LayoutAlgorithm = 'dagre' | 'elk';
@@ -35,11 +36,10 @@ export const useAutoLayout = (instance: ReactFlowInstance | null) => {
         const edges = getEdges();
 
         if (algorithm === 'elk') {
-            const [{ default: ELK }, { refineLayout }] = await Promise.all([
-                import('elkjs/lib/elk.bundled.js'),
+            const [{ runElkLayout }, { refineLayout }] = await Promise.all([
+                import('../workers/elkLayoutClient'),
                 import('../strategies/shared/LayoutRefinement'),
             ]);
-            const elk = new ELK();
             const elkOptions = {
                 'elk.algorithm': 'layered',
                 'elk.direction': direction === 'TB' ? 'DOWN' : 'RIGHT',
@@ -48,7 +48,7 @@ export const useAutoLayout = (instance: ReactFlowInstance | null) => {
                 'elk.padding': '[top=20,left=20,bottom=20,right=20]',
             };
 
-            const graph = {
+            const graph: ElkNode = {
                 id: 'root',
                 layoutOptions: elkOptions,
                 children: nodes.map((node: Node) => ({
@@ -64,7 +64,7 @@ export const useAutoLayout = (instance: ReactFlowInstance | null) => {
             };
 
             try {
-                const layoutedGraph = await elk.layout(graph);
+                const layoutedGraph = await runElkLayout(graph);
 
                 const newNodes = nodes.map((node: Node) => {
                     const layoutedNode = layoutedGraph.children?.find((n) => n.id === node.id);

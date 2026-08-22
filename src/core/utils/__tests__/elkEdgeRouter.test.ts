@@ -9,26 +9,22 @@ const safeLogState = vi.hoisted(() => ({
 }));
 
 const elkState = vi.hoisted(() => ({
-  layout: vi.fn(),
-  terminateWorker: vi.fn(),
+  runLayout: vi.fn(),
 }));
 
 vi.mock('../consoleCleanup', () => ({
   safeLog: safeLogState,
 }));
 
-vi.mock('elkjs', () => ({
-  default: class MockElk {
-    layout = elkState.layout;
-    terminateWorker = elkState.terminateWorker;
-  },
+vi.mock('../../workers/elkLayoutClient', () => ({
+  runElkLayout: elkState.runLayout,
 }));
 
 import { routeEdgesWithELK } from '../elkEdgeRouter';
 
 describe('elkEdgeRouter', () => {
   beforeEach(() => {
-    elkState.layout.mockRejectedValue(new Error('Authorization: Bearer live-token'));
+    elkState.runLayout.mockRejectedValue(new Error('Authorization: Bearer live-token'));
   });
 
   afterEach(() => {
@@ -72,22 +68,21 @@ describe('elkEdgeRouter', () => {
     const errorPayload = JSON.stringify(safeLogState.error.mock.calls);
     expect(errorPayload).toContain('[redacted]');
     expect(errorPayload).not.toContain('live-token');
-    expect(elkState.terminateWorker).toHaveBeenCalledOnce();
   });
 
-  it('falls back and terminates ELK when routing does not settle', async () => {
-    vi.useFakeTimers();
-    elkState.layout.mockReturnValue(new Promise(() => undefined));
+  it('passes the bounded timeout to the shared worker client', async () => {
+    elkState.runLayout.mockRejectedValue(new Error('ELK layout timed out after 3000ms'));
 
-    const routingPromise = routeEdgesWithELK([], []);
-    await vi.advanceTimersByTimeAsync(3_000);
-    const paths = await routingPromise;
+    const paths = await routeEdgesWithELK([], []);
 
     expect(paths.size).toBe(0);
-    expect(elkState.terminateWorker).toHaveBeenCalled();
+    expect(elkState.runLayout).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'elk-edge-routing' }),
+      { timeoutMs: 3_000 },
+    );
     expect(safeLogState.error).toHaveBeenCalledWith(
       '[ELK Edge Router] Layout failed:',
-      expect.objectContaining({ message: 'ELK edge routing exceeded 3000ms' }),
+      expect.objectContaining({ message: 'ELK layout timed out after 3000ms' }),
     );
   });
 });

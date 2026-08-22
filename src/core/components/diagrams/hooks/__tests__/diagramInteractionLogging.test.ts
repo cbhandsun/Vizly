@@ -41,6 +41,10 @@ describe('diagramInteractionLogging', () => {
     expect(warnPayload).toContain('[useLayoutStrategy] Dropping orphan edge after layout sanitation:');
     expect(warnPayload).toContain('[useLayoutStrategy] No layoutable nodes available; skipping layout.');
     expect(errorPayload).toContain('[useLayoutStrategy] Layout failed (domain-dagre):');
+    expect(safeLogState.error).toHaveBeenCalledWith(
+      '[useLayoutStrategy] Layout failed (domain-dagre):',
+      'password=[redacted]',
+    );
     expect(warnPayload).toContain('[useSmartRoutingConfig] Layered config sync failed:');
     expect(warnPayload).toContain('[useSmartRoutingConfig] Config sync failed:');
     expect(errorPayload).toContain('[redacted]');

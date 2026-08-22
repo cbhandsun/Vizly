@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url'
 import { jspdfRasterOnlyPlugin } from './vite-plugins/jspdfRasterOnly'
 import { sharedModuleWorkersPlugin } from './vite-plugins/sharedModuleWorkers'
 import { devCspPlugin } from './vite-plugins/devCsp'
+import { elkWorkerAssetPlugin } from './vite-plugins/elkWorkerAsset'
 import {
   matchesAppSafeLoggingModule,
   matchesFlowchartRuntimeModule,
@@ -318,11 +319,16 @@ export default defineConfig({
   plugins: [
     devCspPlugin(),
     jspdfRasterOnlyPlugin(),
+    elkWorkerAssetPlugin(projectRoot),
     sharedModuleWorkersPlugin(projectRoot),
     displayRoutingChunks.plugin,
     react(),
     tailwindcss(),
   ],
+  worker: {
+    format: 'es',
+    plugins: () => [elkWorkerAssetPlugin(projectRoot)],
+  },
   server: {
     fs: {
       allow: [projectRoot, projectRealRoot],

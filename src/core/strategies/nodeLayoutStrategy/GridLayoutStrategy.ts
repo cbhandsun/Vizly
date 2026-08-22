@@ -5,6 +5,7 @@ import { diagramConfigManager } from '../../config/DiagramConfig';
 import type { LayoutOptions } from '../../types/layout';
 import { ILayoutStrategy } from '../LayoutStrategyManager';
 import { calculateGridLayout, applySubGrouping, assignChildrenToSubGroupsBySemantic, applyDomainGrouping, resolveSubGroupOverlaps, enforceDomainContainerStrictContainment, resolveDomainContainerOverlaps } from '../../utils/layoutUtils';
+import { runElkLayout } from '../../workers/elkLayoutClient';
 
 type LayoutNode = ReactFlowNode<Record<string, unknown>>;
 const asRecord = (value: unknown): Record<string, unknown> =>
@@ -96,8 +97,6 @@ export class GridLayoutStrategy implements ILayoutStrategy {
       const getH = (n: LayoutNode) => nodeHeight(n, finiteNumber(nodeConfig.height, 80));
       const scopedEdges = (edges || []).filter(e => layoutCandidates.some(n => n.id === e.source) && layoutCandidates.some(n => n.id === e.target));
       try {
-        const { default: ELK } = await import('elkjs');
-        const elk = new ELK();
         const dirRaw = String(options.direction ?? '').toUpperCase();
         const elkDir = dirRaw === 'LR' ? 'RIGHT' : 'DOWN';
         const graph: ElkNode = {
@@ -112,7 +111,7 @@ export class GridLayoutStrategy implements ILayoutStrategy {
           children: layoutCandidates.map(n => ({ id: n.id, width: getW(n), height: getH(n) })),
           edges: scopedEdges.map(e => ({ id: e.id || `${e.source}->${e.target}`, sources: [e.source], targets: [e.target] })),
         };
-        const res = await elk.layout(graph);
+        const res = await runElkLayout(graph);
         const idToPos: Record<string, { x: number; y: number }> = {};
         for (const c of (res.children || [])) idToPos[c.id] = { x: Math.round((c.x || 0) + left), y: Math.round((c.y || 0) + top) };
         positions = layoutCandidates.map(n => idToPos[n.id] || { x: left, y: top });

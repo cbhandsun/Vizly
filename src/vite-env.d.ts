@@ -15,6 +15,11 @@ declare module '*?worker' {
     export default workerConstructor;
 }
 
+declare module 'virtual:vizly-elk-engine-worker-url' {
+    const workerUrl: string;
+    export default workerUrl;
+}
+
 interface ImportMetaEnv {
     readonly VITE_SUPABASE_URL: string
     readonly VITE_SUPABASE_ANON_KEY: string

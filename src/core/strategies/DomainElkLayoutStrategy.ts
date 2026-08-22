@@ -23,6 +23,7 @@ import {
   applyDomainElkLayoutRoutes,
   collectDomainElkLayoutRoutes,
 } from './domainElkLayoutRoutes';
+import { runElkLayout } from '../workers/elkLayoutClient';
 
 type LayoutNode = ReactFlowNode<Record<string, unknown>> & {
   positionAbsolute?: XYPosition;
@@ -79,8 +80,6 @@ export class DomainElkLayoutStrategy implements ILayoutStrategy {
     const getW = (n: LayoutNode) => nodeSize(n, Math.max(120, layoutConfig.NODE_MIN_WIDTH), fullConfig.node.height).width
     const getH = (n: LayoutNode) => nodeSize(n, Math.max(120, layoutConfig.NODE_MIN_WIDTH), fullConfig.node.height).height
 
-        const { default: ELK } = await import('elkjs')
-        const elk = new ELK()
         const elkDirOverride = String(layeredConfig.get<string>('diagram.layout.ELK_DIRECTION', '') || '').toUpperCase()
         const elkDir = elkDirOverride && ['RIGHT', 'DOWN', 'LEFT', 'UP'].includes(elkDirOverride)
           ? elkDirOverride
@@ -130,7 +129,7 @@ export class DomainElkLayoutStrategy implements ILayoutStrategy {
           children: layoutCandidates.map(n => ({ id: n.id, width: getW(n), height: getH(n) })),
           edges: scopedEdges.map(e => ({ id: e.id || `${e.source}->${e.target}`, sources: [e.source], targets: [e.target] })),
         }
-        const res = await elk.layout(graph)
+        const res = await runElkLayout(graph)
         const routedPaths = collectDomainElkLayoutRoutes(res.edges, { x: left, y: top })
         const idToPos: Record<string, { x: number; y: number }> = {}
         for (const c of (res.children || [])) idToPos[c.id] = { x: Math.round((c.x || 0) + left), y: Math.round((c.y || 0) + top) }
