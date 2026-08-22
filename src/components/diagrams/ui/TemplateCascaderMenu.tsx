@@ -1,10 +1,14 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useSyncExternalStore } from 'react';
 import Cascader from 'antd/es/cascader';
 import type { DefaultOptionType } from 'antd/es/cascader';
-import { AppstoreOutlined, SearchOutlined, ApartmentOutlined, CloudOutlined, DatabaseOutlined, FolderOpenOutlined } from '@ant-design/icons';
+import { AppstoreOutlined, SearchOutlined, ApartmentOutlined, CloudOutlined, DatabaseOutlined, FolderOpenOutlined, SettingOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { useDiagramStorage } from '../hooks/useDiagramStorage';
-import { readCustomPresetMap } from '@/core/utils/customPresetStorage';
+import {
+  getCustomPresetRevision,
+  readCustomPresetMap,
+  subscribeToCustomPresetChanges,
+} from '@/core/utils/customPresetStorage';
 import {
   STANDARD_PRESET_CATALOG,
   resolvePresetKey,
@@ -20,6 +24,9 @@ import {
   normalizeTemplateSearchInput,
 } from './templateCascaderOptions';
 import { getTemplateCascaderPopupContainer } from './templateCascaderPopupContainer';
+import { openLocalWorkspaceManager } from './openLocalWorkspaceManager';
+
+export const LOCAL_WORKSPACE_MANAGER_KEY = 'manage:local-workspace';
 
 export interface TemplateCascaderMenuProps {
   value?: string[];
@@ -71,6 +78,11 @@ export const TemplateCascaderMenu: React.FC<TemplateCascaderMenuProps> = ({
   const { s3Diagrams, supabaseDiagrams, systemTemplates, fetchCloudList } = useDiagramStorage();
   const hasFetchedCloudListRef = React.useRef(false);
   const [searchValue, setSearchValue] = React.useState('');
+  const customPresetRevision = useSyncExternalStore(
+    subscribeToCustomPresetChanges,
+    getCustomPresetRevision,
+    getCustomPresetRevision,
+  );
   const currentPresetKey = resolvePresetKey(currentDiagramId);
   const effectivePlaceholder = placeholder ?? t('diagramViewer.switcher.placeholder', 'Search diagrams or templates...');
   const effectiveAriaLabel = ariaLabel ?? t('diagramViewer.switcher.open', 'Open diagrams and templates');
@@ -180,6 +192,7 @@ export const TemplateCascaderMenu: React.FC<TemplateCascaderMenuProps> = ({
     }
 
     // --- 5. 本地自定义 (Custom saved presets in localStorage) ---
+    void customPresetRevision;
     let customKeys: string[] = [];
     try {
       customKeys = Object.keys(readCustomPresetMap());
@@ -188,14 +201,21 @@ export const TemplateCascaderMenu: React.FC<TemplateCascaderMenuProps> = ({
     if (customOptions.length > 0) {
       options.push({
         value: 'local-workspace',
-        label: <span><FolderOpenOutlined style={{ marginRight: 8, color: '#8c8c8c' }} />{t('diagramViewer.switcher.localWorkspace', 'Local workspace')}</span>,
+        label: <span><FolderOpenOutlined style={{ marginRight: 8, color: '#8c8c8c' }} />{t('diagramViewer.switcher.localWorkspace', 'Local workspace')} ({customKeys.length})</span>,
         searchText: t('diagramViewer.switcher.localWorkspace', 'Local workspace'),
-        children: customOptions
+        children: [
+          {
+            value: LOCAL_WORKSPACE_MANAGER_KEY,
+            label: <span><SettingOutlined style={{ marginRight: 8 }} />{t('diagramViewer.switcher.localManager.manage', 'Manage local templates')}</span>,
+            searchText: t('diagramViewer.switcher.localManager.manage', 'Manage local templates'),
+          },
+          ...customOptions,
+        ],
       });
     }
 
     return options;
-  }, [currentPresetKey, s3Diagrams, supabaseDiagrams, systemTemplates, t, templatesOnly]);
+  }, [currentPresetKey, customPresetRevision, s3Diagrams, supabaseDiagrams, systemTemplates, t, templatesOnly]);
 
   return (
     <Cascader
@@ -216,6 +236,10 @@ export const TemplateCascaderMenu: React.FC<TemplateCascaderMenuProps> = ({
         const path = coerceCascaderPath(val);
         const rootGroup = getRootGroupFromPath(path);
         const leafKey = path[path.length - 1] || '';
+        if (leafKey === LOCAL_WORKSPACE_MANAGER_KEY) {
+          openLocalWorkspaceManager(t);
+          return;
+        }
         if (path.length > 0 && rootGroup) {
           onChange?.(path, leafKey, rootGroup);
         } else {

@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
     loading: vi.fn(() => vi.fn()),
     modalDestroy: vi.fn(),
     modalUpdate: vi.fn(),
+    openLocalWorkspaceManager: vi.fn(),
     getCustomPreset: vi.fn(),
     saveCustomPreset: vi.fn(),
     success: vi.fn(),
@@ -38,6 +39,9 @@ vi.mock('@/core/utils/flowDataBridge', () => ({
     getFlowDataBridge: () => mocks.bridge,
 }));
 vi.mock('@/services/remoteDiagramPreview', () => ({ invalidateRemoteDiagramPreview: vi.fn() }));
+vi.mock('../diagrams/ui/openLocalWorkspaceManager', () => ({
+    openLocalWorkspaceManager: mocks.openLocalWorkspaceManager,
+}));
 vi.mock('../diagramViewerLogging', () => ({
     logDiagramViewerDirectSaveFailure: vi.fn(),
     logDiagramViewerSaveAsFailure: vi.fn(),
@@ -218,5 +222,9 @@ describe('useDiagramViewerSaveActions', () => {
         }));
         render(<>{lastUpdate.content}</>);
         expect(screen.getByRole('alert').textContent).toContain('capacity:100');
+        fireEvent.click(screen.getByRole('button', {
+            name: 'diagramViewer.switcher.localManager.manage',
+        }));
+        expect(mocks.openLocalWorkspaceManager).toHaveBeenCalledWith(translate);
     });
 });

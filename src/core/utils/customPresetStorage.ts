@@ -14,6 +14,23 @@ const MAX_DEPTH = 8;
 const MAX_CUSTOM_PRESETS_JSON_LENGTH = 2 * 1024 * 1024;
 const BLOCKED_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
 
+type CustomPresetChangeListener = () => void;
+
+const customPresetChangeListeners = new Set<CustomPresetChangeListener>();
+let customPresetRevision = 0;
+
+export const getCustomPresetRevision = (): number => customPresetRevision;
+
+export const subscribeToCustomPresetChanges = (listener: CustomPresetChangeListener): (() => void) => {
+    customPresetChangeListeners.add(listener);
+    return () => customPresetChangeListeners.delete(listener);
+};
+
+const notifyCustomPresetChanges = (): void => {
+    customPresetRevision += 1;
+    customPresetChangeListeners.forEach(listener => listener());
+};
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
     !!value && typeof value === 'object' && !Array.isArray(value);
 
@@ -138,6 +155,7 @@ export const writeCustomPresetMap = (
     const normalized = coerceCustomPresetMap(presets);
     try {
         storage.setItem(CUSTOM_PRESETS_STORAGE_KEY, JSON.stringify(normalized));
+        notifyCustomPresetChanges();
     } catch (error) {
         logUiStorageWriteFailure('customPresetStorage', CUSTOM_PRESETS_STORAGE_KEY, error);
     }
@@ -145,6 +163,8 @@ export const writeCustomPresetMap = (
 };
 
 export type CustomPresetSaveError = 'invalid' | 'capacity' | 'readFailed' | 'writeFailed';
+
+export type CustomPresetDeleteError = 'invalid' | 'notFound' | 'readFailed' | 'writeFailed';
 
 export type CustomPresetSaveResult =
     | { ok: true; preset: StandardDiagramData }
@@ -214,7 +234,40 @@ export const saveCustomPreset = (
         return { ok: false, error: 'writeFailed' };
     }
 
+    notifyCustomPresetChanges();
+
     return { ok: true, preset: persistedPreset };
+};
+
+export type CustomPresetDeleteResult =
+    | { ok: true; remainingCount: number }
+    | { ok: false; error: CustomPresetDeleteError };
+
+export const deleteCustomPreset = (
+    name: string,
+    storage: CustomPresetStorage = localStorage,
+): CustomPresetDeleteResult => {
+    const normalizedName = normalizeCustomPresetName(name);
+    if (!normalizedName) return { ok: false, error: 'invalid' };
+
+    const stored = readCustomPresetMapForWrite(storage);
+    if (!stored.ok) return { ok: false, error: 'readFailed' };
+    if (!Object.hasOwn(stored.presets, normalizedName)) {
+        return { ok: false, error: 'notFound' };
+    }
+
+    const nextPresets = { ...stored.presets };
+    delete nextPresets[normalizedName];
+
+    try {
+        storage.setItem(CUSTOM_PRESETS_STORAGE_KEY, JSON.stringify(nextPresets));
+    } catch (error) {
+        logUiStorageWriteFailure('customPresetStorage', CUSTOM_PRESETS_STORAGE_KEY, error);
+        return { ok: false, error: 'writeFailed' };
+    }
+
+    notifyCustomPresetChanges();
+    return { ok: true, remainingCount: Object.keys(nextPresets).length };
 };
 
 export const addCustomPreset = (

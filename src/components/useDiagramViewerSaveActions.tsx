@@ -2,6 +2,7 @@ import { createRef, useCallback } from 'react';
 import type { TFunction } from 'i18next';
 import type { InputRef } from 'antd';
 import Alert from 'antd/es/alert';
+import Button from 'antd/es/button';
 import Input from 'antd/es/input';
 import type { DiagramSaveAsTarget } from '@/core/types/diagram-components';
 
@@ -10,6 +11,7 @@ import {
     CUSTOM_PRESETS_LIMIT,
     getCustomPreset,
     saveCustomPreset,
+    type CustomPresetSaveError,
 } from '@/core/utils/customPresetStorage';
 import { appMessage, appModal } from '@/core/utils/antdStaticBridge';
 import { tryAttachDiagramSnapshot } from '@/core/utils/diagramSnapshot';
@@ -26,6 +28,7 @@ import {
     saveDiagramViewerDirectCloud,
     validateDiagramSaveAsName,
 } from './diagramViewerSave';
+import { openLocalWorkspaceManager } from './diagrams/ui/openLocalWorkspaceManager';
 
 interface UseDiagramViewerSaveActionsOptions {
     selectedDiagramId: string;
@@ -70,6 +73,7 @@ export function useDiagramViewerSaveActions({
         let isOverwriteConfirmOpen = false;
         let shouldRestoreInputAfterOverwriteClose = false;
         let inlineSaveError: string | null = null;
+        let inlineLocalSaveError: CustomPresetSaveError | null = null;
 
         const renderNameContent = () => (
             <div style={{ marginTop: 16 }}>
@@ -86,7 +90,16 @@ export function useDiagramViewerSaveActions({
                     <Alert
                         type="error"
                         showIcon
-                        message={inlineSaveError}
+                        message={(
+                            <div className="flex flex-col items-start gap-3">
+                                <span>{inlineSaveError}</span>
+                                {inlineLocalSaveError === 'capacity' ? (
+                                    <Button size="small" onClick={() => openLocalWorkspaceManager(t)}>
+                                        {t('diagramViewer.switcher.localManager.manage')}
+                                    </Button>
+                                ) : null}
+                            </div>
+                        )}
                         style={{ marginTop: 12 }}
                     />
                 )}
@@ -97,6 +110,7 @@ export function useDiagramViewerSaveActions({
             if (isSaving) return;
 
             inlineSaveError = null;
+            inlineLocalSaveError = null;
             isSaving = true;
             modalHandle?.update({
                 content: renderNameContent(),
@@ -116,6 +130,7 @@ export function useDiagramViewerSaveActions({
                 if (target === 'local') {
                     const localSaveResult = saveCustomPreset(normalizedName, dataToSave);
                     if (!localSaveResult.ok) {
+                        inlineLocalSaveError = localSaveResult.error;
                         const errorKey = localSaveResult.error === 'capacity'
                             ? 'diagramViewer.saveAs.localCapacityError'
                             : localSaveResult.error === 'readFailed'

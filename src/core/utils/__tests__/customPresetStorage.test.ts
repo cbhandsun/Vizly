@@ -6,10 +6,13 @@ import {
     CUSTOM_PRESET_NAME_MAX_LENGTH,
     CUSTOM_PRESETS_LIMIT,
     CUSTOM_PRESETS_STORAGE_KEY,
+    deleteCustomPreset,
+    getCustomPresetRevision,
     getCustomPreset,
     normalizeCustomPresetLookupKey,
     readCustomPresetMap,
     saveCustomPreset,
+    subscribeToCustomPresetChanges,
     writeCustomPresetMap,
 } from '../customPresetStorage';
 
@@ -189,5 +192,47 @@ describe('customPresetStorage', () => {
             ok: false,
             error: 'writeFailed',
         });
+    });
+
+    it('deletes an existing preset, persists the remaining map, and notifies subscribers', () => {
+        const storage = {
+            getItem: vi.fn(() => JSON.stringify({
+                Keep: makePreset('keep'),
+                Remove: makePreset('remove'),
+            })),
+            setItem: vi.fn(),
+        };
+        const listener = vi.fn();
+        const revisionBeforeDelete = getCustomPresetRevision();
+        const unsubscribe = subscribeToCustomPresetChanges(listener);
+
+        expect(deleteCustomPreset(' Remove ', storage)).toEqual({
+            ok: true,
+            remainingCount: 1,
+        });
+        expect(JSON.parse(storage.setItem.mock.calls[0]?.[1] ?? '{}')).toEqual({
+            Keep: expect.objectContaining({ id: 'keep' }),
+        });
+        expect(getCustomPresetRevision()).toBe(revisionBeforeDelete + 1);
+        expect(listener).toHaveBeenCalledTimes(1);
+
+        unsubscribe();
+    });
+
+    it('fails closed when a deletion target is invalid, missing, unreadable, or cannot be persisted', () => {
+        const existing = JSON.stringify({ Keep: makePreset('keep') });
+        const validStorage = { getItem: vi.fn(() => existing), setItem: vi.fn() };
+        const unreadableStorage = { getItem: vi.fn(() => '{broken'), setItem: vi.fn() };
+        const unwritableStorage = {
+            getItem: vi.fn(() => existing),
+            setItem: vi.fn(() => { throw new Error('write denied'); }),
+        };
+
+        expect(deleteCustomPreset('', validStorage)).toEqual({ ok: false, error: 'invalid' });
+        expect(deleteCustomPreset('Missing', validStorage)).toEqual({ ok: false, error: 'notFound' });
+        expect(deleteCustomPreset('Keep', unreadableStorage)).toEqual({ ok: false, error: 'readFailed' });
+        expect(deleteCustomPreset('Keep', unwritableStorage)).toEqual({ ok: false, error: 'writeFailed' });
+        expect(validStorage.setItem).not.toHaveBeenCalled();
+        expect(unreadableStorage.setItem).not.toHaveBeenCalled();
     });
 });

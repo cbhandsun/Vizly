@@ -4,7 +4,13 @@ import '@testing-library/jest-dom/vitest';
 import React from 'react';
 import { readFileSync } from 'node:fs';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const localWorkspaceState = vi.hoisted(() => ({
+  presets: {} as Record<string, { id: string }>,
+  revision: 0,
+  openManager: vi.fn(),
+}));
 
 vi.mock('antd/es/cascader', () => ({
   default: (props: {
@@ -67,6 +73,12 @@ vi.mock('antd/es/cascader', () => ({
         >
           choose built-in
         </button>
+        <button
+          type="button"
+          onClick={() => props.onChange?.(['local-workspace', 'manage:local-workspace'])}
+        >
+          choose local manager
+        </button>
       </div>
     );
   },
@@ -79,6 +91,7 @@ vi.mock('@ant-design/icons', () => ({
   CloudOutlined: () => <span />,
   DatabaseOutlined: () => <span />,
   FolderOpenOutlined: () => <span />,
+  SettingOutlined: () => <span />,
 }));
 
 vi.mock('../../hooks/useDiagramStorage', () => ({
@@ -91,7 +104,13 @@ vi.mock('../../hooks/useDiagramStorage', () => ({
 }));
 
 vi.mock('@/core/utils/customPresetStorage', () => ({
-  readCustomPresetMap: () => ({}),
+  readCustomPresetMap: () => localWorkspaceState.presets,
+  getCustomPresetRevision: () => localWorkspaceState.revision,
+  subscribeToCustomPresetChanges: () => () => undefined,
+}));
+
+vi.mock('../openLocalWorkspaceManager', () => ({
+  openLocalWorkspaceManager: localWorkspaceState.openManager,
 }));
 
 vi.mock('react-i18next', () => ({
@@ -104,6 +123,10 @@ import { TemplateCascaderMenu } from '../TemplateCascaderMenu';
 import { getTemplateCascaderPopupContainer } from '../templateCascaderPopupContainer';
 
 describe('TemplateCascaderMenu accessibility', () => {
+  beforeEach(() => {
+    localWorkspaceState.presets = {};
+    localWorkspaceState.openManager.mockReset();
+  });
   it('provides a stable accessible name for the diagram combobox', () => {
     render(<TemplateCascaderMenu ariaLabel="切换图表" />);
 
@@ -148,6 +171,23 @@ describe('TemplateCascaderMenu accessibility', () => {
       'logistics-planning-v1',
       'built-in',
     );
+  });
+
+  it('exposes local capacity and routes the management action without opening a diagram', () => {
+    localWorkspaceState.presets = {
+      Alpha: { id: 'alpha' },
+      Beta: { id: 'beta' },
+    };
+    const onChange = vi.fn();
+    render(<TemplateCascaderMenu onChange={onChange} />);
+
+    expect(screen.getByText(/Local workspace \(2\)/)).toBeInTheDocument();
+    expect(screen.getByText('Manage local templates')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'choose local manager' }));
+
+    expect(localWorkspaceState.openManager).toHaveBeenCalledTimes(1);
+    expect(onChange).not.toHaveBeenCalled();
   });
 
   it('keeps all three menu levels reachable and touch-safe on narrow screens', () => {
