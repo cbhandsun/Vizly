@@ -628,7 +628,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
                                                                             <Text type="secondary" style={{ fontSize: 12 }}>({model.id})</Text>
                                                                             {isGlobalActive && (
                                                                                 <Tag color="processing" style={{ margin: '0 0 0 8px', borderRadius: 12, border: '1px solid rgba(99, 102, 241, 0.3)', background: 'var(--pulse-glow-gradient)', color: 'var(--color-primary-600, #4f46e5)', padding: '0 8px', fontWeight: 600 }}>
-                                                                                    <CheckCircleFilled style={{ marginRight: 4 }} /> {t('aiConfig.currentActive', 'Active')}
+                                                                                    <CheckCircleFilled style={{ marginRight: 4 }} /> {t('aiConfig.currentActive', { name: model.name || model.id })}
                                                                                 </Tag>
                                                                             )}
                                                                         </Space>

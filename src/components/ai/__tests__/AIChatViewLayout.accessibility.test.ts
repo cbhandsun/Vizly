@@ -71,6 +71,8 @@ describe('AIChatViewLayout accessibility contract', () => {
         expect(modalSource).toContain("aria-label={t('aiConfig.close')}");
         expect(modalSource).toContain("aria-label={t('aiConfig.baseUrlLabel')}");
         expect(modalSource).toContain("aria-label={t('aiConfig.apiKeyLabel')}");
+        expect(modalSource).toContain("t('aiConfig.currentActive', { name: model.name || model.id })");
+        expect(modalSource).not.toContain("t('aiConfig.currentActive', 'Active')");
         expect(modalSource).toContain('disabled={!selectedProviderReadiness?.ready || isFetchingModels}');
         expect(modalSource).toContain('disabled={!selectedProviderReadiness?.ready || isTesting}');
         expect(statusAlertSource).toContain('className="ai-config-readiness-alert"');
