@@ -4,6 +4,8 @@ import { useLocation } from 'react-router';
 import { coerceSafeStringParam, getQueryOrHashParamFromLocation, type LocationLike, coerceDiagramId } from '@/core/utils/inputBoundary';
 import { loadDiagramViewerRoute } from './diagramViewerRouteLoader';
 import Warehouse3DShell from '@/components/warehouse-3d/Warehouse3DShell';
+import AppRouteNotFound from './AppRouteNotFound';
+import { resolveAppRouteTarget } from './appRouteResolver';
 
 type LazyPageModule = { default: React.ComponentType };
 
@@ -77,43 +79,50 @@ const AppRoutes = () => {
     }
   }
 
-  // 如果URL参数包含test=colors，显示主题颜色对比测试页面
-  if (testMode === 'colors' && ThemeColorComparison) {
+  const routeTarget = resolveAppRouteTarget({
+    path,
+    diagramId: diagramFromRoute,
+    testMode,
+    enableDevRoutes: import.meta.env.DEV,
+  });
+
+  if (routeTarget === 'theme-colors' && ThemeColorComparison) {
     return renderRoute('加载主题对比页面...', ThemeColorComparison);
   }
 
-  if (testMode === 'sidebyside' && ThemeSideBySideComparison) {
+  if (routeTarget === 'theme-side-by-side' && ThemeSideBySideComparison) {
     return renderRoute('加载并排对比页面...', ThemeSideBySideComparison);
   }
 
-  if (path.startsWith('/docs') || testMode === 'docs') {
+  if (routeTarget === 'docs') {
     return renderRoute('加载文档预览页面...', DocsPreview);
   }
 
-  if (path.startsWith('/warehouse-3d') || testMode === '3d') {
+  if (routeTarget === 'warehouse-3d') {
     return renderRoute(<Warehouse3DShell loading />, Warehouse3DPage);
   }
 
-  if (path.startsWith('/storage-config')) {
+  if (routeTarget === 'storage-config') {
     return renderRoute('加载存储配置...', StorageConfigPage);
   }
 
-  if (path.startsWith('/shared')) {
+  if (routeTarget === 'shared') {
     return renderRoute('加载分享页面...', ShareViewPage);
   }
 
-  const isHomeEmpty = (path === '/' || path === '') && !diagramFromRoute && !testMode;
-
-  if (path.startsWith('/manage') || isHomeEmpty) {
+  if (routeTarget === 'manage') {
     return renderRoute('加载图表管理...', DiagramManagementPage);
   }
 
-  if (UnifiedDesignerTestPage && (path.startsWith('/unified-test') || testMode === 'unified')) {
+  if (UnifiedDesignerTestPage && routeTarget === 'unified-test') {
     return renderRoute('加载统一外壳测试页...', UnifiedDesignerTestPage);
   }
 
-  // 默认显示正常的图表查看器
-  return renderRoute('加载图表...', DiagramViewerRoute);
+  if (routeTarget === 'diagram') {
+    return renderRoute('加载图表...', DiagramViewerRoute);
+  }
+
+  return <AppRouteNotFound />;
 };
 
 export default AppRoutes;
