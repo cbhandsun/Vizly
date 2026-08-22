@@ -158,6 +158,41 @@ describe('flowchartImportHandler', () => {
         expect(event.target.value).toBe('');
     });
 
+    it('fits imported Mermaid content into view after canvas state settles', async () => {
+        importFileState.validateFlowchartImportFile.mockReturnValue({
+            ok: true,
+            importKind: 'mermaid',
+        });
+        importFileState.readFlowchartImportFileText.mockResolvedValue('flowchart LR\nA --> B');
+        importPipelineState.runFlowchartImportPipeline.mockImplementation(async (options) => {
+            options.onMermaidSuccess();
+            return true;
+        });
+        const fitView = vi.fn();
+        const scheduleDelay = vi.fn();
+        const handler = createFlowchartImportHandler({
+            t: (key) => key,
+            messageApi: makeMessageApi(),
+            setNodes: vi.fn(),
+            setEdges: vi.fn(),
+            onBeforeCanvasReplace: vi.fn(),
+            fitView,
+            scheduleDelay,
+            registerStandardReload: vi.fn(async () => undefined),
+        });
+
+        await handler(makeEvent(new File(['flowchart LR\nA --> B'], 'diagram.mmd', {
+            type: 'text/plain',
+        })));
+
+        expect(scheduleDelay).toHaveBeenCalledWith(expect.any(Function), 500);
+        expect(fitView).not.toHaveBeenCalled();
+        const scheduledFitView = scheduleDelay.mock.calls[0]?.[0];
+        expect(scheduledFitView).toBeTypeOf('function');
+        scheduledFitView?.();
+        expect(fitView).toHaveBeenCalledTimes(1);
+    });
+
     it('rejects whitespace-only files before the canvas replacement pipeline', async () => {
         importFileState.validateFlowchartImportFile.mockReturnValue({ ok: true, importKind: 'json' });
         importFileState.readFlowchartImportFileText.mockResolvedValue('\uFEFF  \n\t');

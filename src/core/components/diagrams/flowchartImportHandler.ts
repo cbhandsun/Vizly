@@ -55,6 +55,8 @@ const DEFAULT_DELAY_SCHEDULER = (callback: () => void, delayMs: number): void =>
     setTimeout(callback, delayMs);
 };
 
+const IMPORT_FIT_VIEW_DELAY_MS = 500;
+
 export const createFlowchartImportHandler = ({
     t,
     messageApi,
@@ -174,6 +176,7 @@ export const createFlowchartImportHandler = ({
             onMermaidSuccess: () => {
                 if (!isOperationCurrent()) return;
                 messageApi.info(t('designer.flowchart.import.mermaidSuccess'));
+                scheduleIfCurrent(fitView, IMPORT_FIT_VIEW_DELAY_MS);
             },
             onMermaidLayoutHint: (delayMs) => {
                 scheduleIfCurrent(() => {
