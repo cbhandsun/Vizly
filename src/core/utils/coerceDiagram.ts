@@ -90,7 +90,11 @@ const coerceSafeIdentifier = (value: unknown, fallback: string): string => {
   return BLOCKED_IDENTIFIER_VALUES.has(identifier) ? fallback : identifier;
 };
 
-const coerceNode = (node: unknown, index: number): StandardNodeData | null => {
+const coerceNode = (
+  node: unknown,
+  index: number,
+  diagramType: StandardDiagramData['type'],
+): StandardNodeData | null => {
   const safeNode = sanitizeRecord(node);
   if (!safeNode) return null;
 
@@ -102,7 +106,13 @@ const coerceNode = (node: unknown, index: number): StandardNodeData | null => {
     nodeData.description ?? nodeData.label ?? nodeData.text
   ).slice(0, MAX_STANDARD_DIAGRAM_TEXT_CHARS);
   const domain = coerceBoundedString(safeNode.domain ?? nodeData.domain, 'default');
-  const type = coerceBoundedString(safeNode.type, 'flowchart');
+  const rawType = coerceBoundedString(safeNode.type, 'flowchart');
+  // Early workspace timeline seeds used the diagram-level `timeline` type for
+  // React Flow nodes. The registered renderer and timeline editor use
+  // `timelineNode`, so migrate that bounded legacy shape at the input boundary.
+  const type = diagramType === 'timeline' && rawType === 'timeline'
+    ? 'timelineNode'
+    : rawType;
   return { ...safeNode, id, description: desc, domain, type, data: nodeData } as StandardNodeData;
 };
 
@@ -200,7 +210,9 @@ export const coerceToStandardDiagramDataWithReport = (
   const edgesRaw = Array.isArray(raw.edges) ? raw.edges.slice(0, MAX_STANDARD_DIAGRAM_EDGES) : [];
   const groupsRaw = Array.isArray(raw.groups) ? raw.groups.slice(0, MAX_STANDARD_DIAGRAM_GROUPS) : [];
 
-  const nodes = nodesRaw.map(coerceNode).filter(Boolean) as StandardNodeData[];
+  const nodes = nodesRaw
+    .map((node, index) => coerceNode(node, index, type))
+    .filter(Boolean) as StandardNodeData[];
   const nodeIds = new Set(nodes.map(node => node.id));
   const edges = edgesRaw.map((edge, index) => coerceEdge(edge, index, nodeIds)).filter(Boolean) as StandardEdgeData[];
   const groups = groupsRaw.map(coerceGroup).filter(Boolean) as GroupNodeData[];

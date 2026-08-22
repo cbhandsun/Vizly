@@ -74,6 +74,26 @@ describe('coerceDiagram', () => {
     expect(diagram.nodes[0].domain).toHaveLength(256);
   });
 
+  it('migrates legacy timeline node types only inside timeline diagrams', () => {
+    const timeline = coerceToStandardDiagramData({
+      id: 'timeline-1',
+      name: 'Timeline',
+      type: 'timeline',
+      nodes: [{ id: 'root', type: 'timeline', description: 'Launch', domain: 'timeline' }],
+      edges: [],
+    }, { id: 'fallback' });
+    const flowchart = coerceToStandardDiagramData({
+      id: 'flowchart-1',
+      name: 'Flowchart',
+      type: 'flowchart',
+      nodes: [{ id: 'root', type: 'timeline', description: 'Legacy label', domain: 'default' }],
+      edges: [],
+    }, { id: 'fallback' });
+
+    expect(timeline.nodes[0].type).toBe('timelineNode');
+    expect(flowchart.nodes[0].type).toBe('timeline');
+  });
+
   it('rejects prototype-pollution sentinel values as diagram, node, and edge ids', () => {
     const diagram = coerceToStandardDiagramData({
       id: '__proto__',

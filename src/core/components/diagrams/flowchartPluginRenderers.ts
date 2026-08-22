@@ -33,6 +33,7 @@ const DEFAULT_NODE_TYPES: NodeTypes = {
     'mindmap-boundary': MindMapBoundaryNode,
     'sticky-note': StickyNoteNode,
     arrowTimeline: ArrowTimelineNode,
+    timeline: ArrowTimelineNode,
     timelineNode: ArrowTimelineNode,
     iconNode: IconNode,
     erNode: ERDatabaseNode,

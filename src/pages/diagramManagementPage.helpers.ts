@@ -230,7 +230,7 @@ export const createTemplateSeed = (
                 version: '2.0',
                 nodes: [{
                     id: 'root',
-                    type: 'timeline',
+                    type: 'timelineNode',
                     domain: 'timeline',
                     description: 'Project Launch',
                     position: { x: 0, y: 0 },

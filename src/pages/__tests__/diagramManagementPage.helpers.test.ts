@@ -154,6 +154,7 @@ describe('diagramManagementPage helpers', () => {
         });
         expect(timeline?.nodes[0]).toMatchObject({
             id: 'root',
+            type: 'timelineNode',
             domain: 'timeline',
         });
 
