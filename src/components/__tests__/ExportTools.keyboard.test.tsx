@@ -287,7 +287,8 @@ describe('ExportTools keyboard menu', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '导出' }));
+    const trigger = screen.getByRole('button', { name: '导出' });
+    fireEvent.click(trigger);
     const pngItem = await screen.findByRole('menuitem', { name: 'PNG 图片' });
     fireEvent.click(pngItem);
     fireEvent.click(pngItem);
@@ -295,6 +296,7 @@ describe('ExportTools keyboard menu', () => {
     await waitFor(() => expect(exportToPNG).toHaveBeenCalledTimes(1));
     resolveExport?.();
     await waitFor(() => expect(appMessageMocks.success).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(document.activeElement).toBe(trigger));
   });
 
   it('moves focus into the export task and cancels without announcing success', async () => {
@@ -313,7 +315,8 @@ describe('ExportTools keyboard menu', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '导出' }));
+    const trigger = screen.getByRole('button', { name: '导出' });
+    fireEvent.click(trigger);
     fireEvent.click(await screen.findByRole('menuitem', { name: 'PNG 图片' }));
 
     const cancelButton = await screen.findByRole('button', { name: '取消导出' });
@@ -324,6 +327,7 @@ describe('ExportTools keyboard menu', () => {
     await waitFor(() => expect(appMessageMocks.info).toHaveBeenCalledTimes(1));
     expect(appMessageMocks.success).not.toHaveBeenCalled();
     expect(appMessageMocks.error).not.toHaveBeenCalled();
+    await waitFor(() => expect(document.activeElement).toBe(trigger));
   });
 
   it('uses the commercial touch target inside the mobile system menu', () => {

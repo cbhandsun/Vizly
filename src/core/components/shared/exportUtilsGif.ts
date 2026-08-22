@@ -11,6 +11,7 @@ import {
   getTargetDiagramElement,
 } from './exportUtilsDom';
 import { exportElementToPngDataUrl } from './exportUtilsElement';
+import { markExportCaptureElementHidden } from '../../export/exportAccessibility';
 
 export const throwIfGifExportAborted = (signal?: AbortSignal): void => {
   if (!signal?.aborted) return;
@@ -73,6 +74,7 @@ export async function exportGifFrameWithAnimationClone(
   offscreen.style.background = '#ffffff';
   offscreen.style.zIndex = '0';
   offscreen.style.overflow = 'visible';
+  markExportCaptureElementHidden(offscreen);
   document.body.appendChild(offscreen);
 
   // 克隆容器
@@ -234,6 +236,7 @@ export async function exportGifFramesWithAnimationCloneBatch(
   offscreen.style.background = '#ffffff';
   offscreen.style.zIndex = '0';
   offscreen.style.overflow = 'visible';
+  markExportCaptureElementHidden(offscreen);
   document.body.appendChild(offscreen);
 
   try {

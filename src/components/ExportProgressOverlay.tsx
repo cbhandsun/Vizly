@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { Button, Progress, theme } from 'antd';
 import { FaSpinner } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
+import { isolateExportOverlaySiblings } from '@/core/export/exportAccessibility';
 
 import type { DiagramExportType } from '@/core/hooks/diagramExportActions';
 
@@ -23,6 +24,12 @@ export const ExportProgressOverlay: React.FC<ExportProgressOverlayProps> = ({
   const dialogRef = useRef<HTMLDivElement>(null);
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
   const format = exportType?.toUpperCase() ?? '';
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return undefined;
+    return isolateExportOverlaySiblings(dialog);
+  }, []);
 
   useEffect(() => {
     const focusFrame = window.requestAnimationFrame(() => {

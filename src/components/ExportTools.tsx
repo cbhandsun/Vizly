@@ -26,6 +26,7 @@ import { resolveExportPopupContainer } from './exportPopupContainer';
 import { resolveExportableNodeCount, resolveExportMenuAvailability } from './exportMenuAvailability';
 import { useKeyboardAccessibleDropdown } from '@/core/components/diagrams/hooks/useKeyboardAccessibleDropdown';
 import { ExportProgressOverlay } from './ExportProgressOverlay';
+import { focusAvailableExportTrigger } from '@/core/export/exportAccessibility';
 import './ExportTools.css';
 
 const ShareDialog = React.lazy(() => import('@/components/diagrams/ShareDialog'));
@@ -104,6 +105,7 @@ const ExportTools: React.FC<ExportToolsProps> = ({
   const [exportableNodeCount, setExportableNodeCount] = useState(0);
   const exportInFlightRef = useRef(false);
   const exportAbortControllerRef = useRef<AbortController | null>(null);
+  const pendingExportFocusRestoreRef = useRef(false);
   const canExportPdf = hasFeature('export-pdf');
   const canExportSvg = hasFeature('export-hd-svg');
   const readExportableNodeCount = useCallback(() => resolveExportableNodeCount(
@@ -126,6 +128,16 @@ const ExportTools: React.FC<ExportToolsProps> = ({
   const exportMenuAvailability = resolveExportMenuAvailability(exportableNodeCount, isExporting);
 
   useEffect(() => () => exportAbortControllerRef.current?.abort(), []);
+
+  useEffect(() => {
+    if (isExporting || !pendingExportFocusRestoreRef.current) return undefined;
+    const frame = window.requestAnimationFrame(() => {
+      if (focusAvailableExportTrigger(exportMenuButtonRef.current)) {
+        pendingExportFocusRestoreRef.current = false;
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [exportMenuButtonRef, isExporting]);
 
   /**
    * 等待浏览器完成一次绘制（使用 requestAnimationFrame）。
@@ -245,7 +257,7 @@ const ExportTools: React.FC<ExportToolsProps> = ({
       setIsCancellingExport(false);
       setExportType(null);
       setExportProgress(0);
-      window.requestAnimationFrame(() => exportMenuButtonRef.current?.focus());
+      pendingExportFocusRestoreRef.current = true;
     }
   };
 
