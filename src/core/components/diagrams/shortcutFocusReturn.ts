@@ -21,7 +21,17 @@ const canRestoreShortcutFocus = (target: HTMLElement | null): target is HTMLElem
     && target.closest('[role="dialog"]') === null
 );
 
+const hasExternallyRestoredFocus = (): boolean => (
+    document.activeElement instanceof HTMLElement
+    && document.activeElement !== document.body
+    && document.activeElement.isConnected
+    && document.activeElement.closest('[role="dialog"]') === null
+);
+
 export const restoreShortcutFocus = (previousOwner: HTMLElement | null): boolean => {
+    if (!canRestoreShortcutFocus(previousOwner) && hasExternallyRestoredFocus()) {
+        return true;
+    }
     const target = canRestoreShortcutFocus(previousOwner)
         ? previousOwner
         : document.querySelector<HTMLElement>('[data-command-palette-focus-return]');

@@ -187,4 +187,36 @@ describe('KeyboardShortcutPanel', () => {
 
         await waitFor(() => expect(document.activeElement).toBe(trigger));
     });
+
+    it('does not override focus already restored by the parent workflow', async () => {
+        const fallback = document.createElement('button');
+        fallback.type = 'button';
+        fallback.dataset.commandPaletteFocusReturn = '';
+        document.body.appendChild(fallback);
+
+        const parentTarget = document.createElement('h1');
+        parentTarget.tabIndex = -1;
+        document.body.appendChild(parentTarget);
+
+        const priorDialog = document.createElement('div');
+        priorDialog.setAttribute('role', 'dialog');
+        const priorOption = document.createElement('button');
+        priorDialog.appendChild(priorOption);
+        document.body.appendChild(priorDialog);
+        priorOption.focus();
+
+        render(
+            <KeyboardShortcutPanel
+                visible
+                onClose={() => parentTarget.focus()}
+            />,
+        );
+        fireEvent.keyDown(screen.getByRole('button', { name: 'Close' }), { key: 'Escape' });
+
+        await waitFor(() => expect(document.activeElement).toBe(parentTarget));
+
+        fallback.remove();
+        parentTarget.remove();
+        priorDialog.remove();
+    });
 });

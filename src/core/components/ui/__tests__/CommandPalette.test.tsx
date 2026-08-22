@@ -165,6 +165,34 @@ describe('CommandPalette commercial interaction contract', () => {
     expect(search.getAttribute('aria-activedescendant')).toBe('command-palette-option-op:first');
   });
 
+  it('keeps the first keyboard option active until the pointer actually moves', async () => {
+    const firstAction = vi.fn();
+    const secondAction = vi.fn();
+    render(
+      <CommandPalette
+        open
+        onClose={vi.fn()}
+        items={[
+          { id: 'op:first', group: 'actions', title: 'First action', onSelect: firstAction },
+          { id: 'op:second', group: 'actions', title: 'Second action', onSelect: secondAction },
+        ]}
+      />,
+    );
+
+    const search = await screen.findByRole('combobox', { name: 'Search commands or diagrams' });
+    const second = screen.getByRole('option', { name: 'Second action' });
+
+    fireEvent.mouseEnter(second);
+    expect(search.getAttribute('aria-activedescendant')).toBe('command-palette-option-op:first');
+
+    fireEvent.pointerMove(second);
+    expect(search.getAttribute('aria-activedescendant')).toBe('command-palette-option-op:second');
+
+    fireEvent.keyDown(search, { key: 'Enter' });
+    expect(firstAction).not.toHaveBeenCalled();
+    expect(secondAction).toHaveBeenCalledTimes(1);
+  });
+
   it('announces result changes and clears an empty search without moving focus', async () => {
     render(
       <CommandPalette

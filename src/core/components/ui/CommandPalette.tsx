@@ -415,7 +415,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, o
                           }
                           itemRefs.current.set(idx, el);
                         }}
-                        onMouseEnter={() => {
+                        onPointerMove={() => {
                           if (!disabled) setActiveIndex(idx);
                         }}
                         onClick={(e) => {
