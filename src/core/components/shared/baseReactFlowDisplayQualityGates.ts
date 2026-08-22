@@ -12,10 +12,13 @@ import {
   displayHardQualityGatesAreClean as evaluateDisplayHardQualityGatesAreClean,
   getDisplayHardQualityGateReport as evaluateDisplayHardQualityGateReport,
   type BaseDisplayBoundedCandidateReport,
+  displayHardQualityReportGeometryIsClean,
 } from './baseReactFlowDisplayEvaluation';
 import { displayTerminalRoleNeedsDeclaredAxisRepair } from './baseReactFlowDisplayTerminalPortCandidates';
 import {
   createDisplayTerminalValidationSnapshot,
+  displayEdgesHaveNodeAnchoredTerminals,
+  displayEdgesHaveNodeAttachedTerminals,
   getDisplayTerminalValidationReport,
   type DisplayTerminalValidationSnapshot,
 } from './baseReactFlowTerminalAxisRepair';
@@ -77,6 +80,14 @@ export const displayHardQualityGatesAreClean = (edges: Edge[], nodes: Node[]): b
     nodes,
     evaluateDisplayTerminalHardGates,
   );
+};
+
+/** Exact hard contract for geometry after renderer handles have been materialized. */
+export const displayRenderedHardQualityGatesAreClean = (edges: Edge[], nodes: Node[]): boolean => {
+  const report = getDisplayHardQualityGateReport(edges, nodes, 'polished');
+  return displayHardQualityReportGeometryIsClean(report)
+    && displayEdgesHaveNodeAttachedTerminals(edges, nodes)
+    && displayEdgesHaveNodeAnchoredTerminals(edges, nodes);
 };
 
 export const baseReactFlowDisplayHardQualityIsClean = (

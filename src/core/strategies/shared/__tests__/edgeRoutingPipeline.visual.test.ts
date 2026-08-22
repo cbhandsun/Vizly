@@ -64,6 +64,45 @@ describe('global waypoint path input boundary', () => {
 });
 
 describe('reduceEdgeCrossingsWithWaypoints visual soft constraints', () => {
+  it('keeps conflict-free parallel routes on the lazy evaluation path', () => {
+    let endpointReads = 0;
+    const edges: Edge[] = Array.from({ length: 10 }, (_, index) => {
+      const route: Edge = {
+        id: `parallel-${index}`,
+        source: `source-${index}`,
+        target: `target-${index}`,
+        data: {
+          computedPath: [
+            { x: 0, y: index * 96 },
+            { x: 240, y: index * 96 },
+          ],
+        },
+      };
+      const source = route.source;
+      const target = route.target;
+      Object.defineProperties(route, {
+        source: {
+          enumerable: true,
+          get: () => {
+            endpointReads += 1;
+            return source;
+          },
+        },
+        target: {
+          enumerable: true,
+          get: () => {
+            endpointReads += 1;
+            return target;
+          },
+        },
+      });
+      return route;
+    });
+
+    expect(refineGlobalEdgeWaypoints(edges, [])).toBe(edges);
+    expect(endpointReads).toBeLessThan(1_000);
+  });
+
   it('repairs strict in/out crossings even when the two edges share a node', () => {
     const edges: Edge[] = [
       {

@@ -94,3 +94,14 @@ export const repairBaseReactFlowDisplayBusinessNodeClearance = (
     ? commercialMinimumClosedEdges
     : minimumEdges;
 };
+
+/** Worker transaction wrapper: a temporary peer crossing must be closed before commit. */
+export const repairBaseReactFlowMinimumBusinessNodeClearance = (
+  edges: Edge[],
+  nodes: Node[],
+  eligibleEdgeIds?: ReadonlySet<string>,
+  allowTransientStrictCrossing = true,
+): Edge[] => repairBaseReactFlowDisplayBusinessNodeClearance(edges, nodes, {
+  eligibleEdgeIds,
+  allowTransientStrictCrossing,
+});

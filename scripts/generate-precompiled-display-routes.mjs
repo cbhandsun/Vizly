@@ -245,7 +245,7 @@ const captureTarget = async (session, target, source, routingVersion) => {
     `Captured ${preset.id}: ${workerResolution}, workerStart=${routing.workerStartCount}, routeMs=${routing.routeMs}.`,
   );
   const slowestPhases = Array.isArray(routing.phaseTrace)
-    ? routing.phaseTrace.slice().sort((left, right) => right.durationMs - left.durationMs).slice(0, 5)
+    ? routing.phaseTrace.slice().sort((left, right) => right.durationMs - left.durationMs).slice(0, 10)
     : [];
   console.log(`Slowest phases for ${preset.id}: ${JSON.stringify(slowestPhases)}`);
   return {

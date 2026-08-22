@@ -50,6 +50,7 @@ import { repairBaseReactFlowConnectedSourceMicroArtifacts } from './baseReactFlo
 export { finalSameSideTrueTrunksDoNotRegress } from './baseReactFlowDisplayTrueTrunkContract';
 export {
   repairBaseReactFlowFinalCommercialDetours,
+  traceSkippedFinalCommercialDetours,
 } from './baseReactFlowDisplayCommercialDetourRepair';
 export type { BaseReactFlowFinalEndpointOrderOptions } from './baseReactFlowDisplayFinalEndpointGate';
 
@@ -63,15 +64,17 @@ const exactTrueTrunkSignature = (
   Math.round(trunk.commonStemLength * 1_000) / 1_000,
 ]).sort((first, second) => JSON.stringify(first).localeCompare(JSON.stringify(second))));
 
-const traceSkippedFinalEndpointPhases = (
+export const traceSkippedFinalEndpointPhases = (
   candidateCount: number,
   onPhaseTrace?: (trace: DisplayRoutingPhaseTrace) => void,
+  includeSeed = false,
 ): void => {
-  for (const phase of [
+  const phases = [
     'final-endpoint-topology',
     'final-endpoint-order',
     'final-endpoint-closure',
-  ] as const) {
+  ] as const;
+  for (const phase of includeSeed ? ['final-endpoint-seed', ...phases] as const : phases) {
     startDisplayRoutingPhaseTrace({ phase, candidateCount, onTrace: onPhaseTrace }).finish('skip');
   }
 };

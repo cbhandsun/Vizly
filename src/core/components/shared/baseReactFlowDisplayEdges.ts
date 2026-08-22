@@ -19,7 +19,9 @@ import {
   chooseFinalObstacleAwarePolishCandidate,
   type BaseDisplayBoundedCandidateReport,
 } from './baseReactFlowDisplayEvaluation';
-import { getDisplayHardQualityGateReport } from './baseReactFlowDisplayQualityGates';
+import {
+  getDisplayHardQualityGateReport,
+} from './baseReactFlowDisplayQualityGates';
 import { countRenderUnsafeEndpointStubs } from './baseReactFlowDisplayEndpointStubRepair';
 import {
   repairBaseReactFlowFinalCommercialDetours,
@@ -35,6 +37,12 @@ import { repairResidualOppositeInteriorLaneOverlaps } from './baseReactFlowDispl
 import { separateDetachedParallelOverlaps } from '../../strategies/shared/edgeDetachedOverlapRepair';
 import { DISPLAY_BOUNDED_DETACHED_OVERLAP_REPAIR_OPTIONS } from './baseReactFlowDisplayOverlapRepair';
 import { createBaseReactFlowFinalEndpointEvaluation } from './baseReactFlowDisplayFinalEndpointEvaluation';
+import { closeBaseReactFlowDisplayFinalHardContract } from './baseReactFlowDisplayFinalHardContract';
+import { buildBaseReactFlowEmergencyObstacleCandidate } from './baseReactFlowDisplayEmergencyHardClosure';
+import {
+  buildBaseReactFlowAlternateHardClosureCandidate,
+  displayAlternateHardClosureCandidateIsReady,
+} from './baseReactFlowDisplayAlternateHardClosure';
 
 export type { BaseDisplayBoundedCandidateReport } from './baseReactFlowDisplayEvaluation';
 export { repairBoundedReverseParallelOverlaps } from './baseReactFlowDisplayReverseParallelOverlapClosure';
@@ -199,12 +207,7 @@ export const createBaseReactFlowDisplayEdges = (
         skipLoopShortcut: true,
       },
     );
-  safetyClosureTimer.finish(
-    commercialClosureReady ? 'skip' : 'accepted',
-    postSafetyCommercialEdges === commercialEdges ? 0 : postSafetyCommercialEdges.length,
-  );
-  finalOrderTimer.finish('accepted', postSafetyCommercialEdges.length);
-  return commitDisplayEdgesForRenderMode({
+  const committedRenderCandidate = commitDisplayEdgesForRenderMode({
     finalQualityEdges: postSafetyCommercialEdges,
     rawEdges: args.edges,
     enableSmartEdges: args.enableSmartEdges,
@@ -213,4 +216,30 @@ export const createBaseReactFlowDisplayEdges = (
     inputSignature,
     nodes: repairNodes,
   });
+  const emergencyObstacleCandidate = buildBaseReactFlowEmergencyObstacleCandidate(
+    committedRenderCandidate,
+    repairNodes,
+  );
+  const finalHardOutcome = closeBaseReactFlowDisplayFinalHardContract(
+    emergencyObstacleCandidate,
+    repairNodes,
+    args.onPhaseTrace,
+  );
+  let renderReadyEdges = [
+    finalHardOutcome.edges,
+    committedRenderCandidate,
+  ].find(candidate => displayAlternateHardClosureCandidateIsReady(candidate, repairNodes));
+  if (!renderReadyEdges) {
+    renderReadyEdges = buildBaseReactFlowAlternateHardClosureCandidate({
+      args,
+      repairNodes,
+      primaryCandidate: finalHardOutcome.edges,
+    }) ?? committedRenderCandidate;
+  }
+  safetyClosureTimer.finish(
+    commercialClosureReady ? 'skip' : 'accepted',
+    renderReadyEdges === commercialEdges ? 0 : renderReadyEdges.length,
+  );
+  finalOrderTimer.finish('accepted', renderReadyEdges.length);
+  return renderReadyEdges;
 };

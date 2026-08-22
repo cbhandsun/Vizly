@@ -1,35 +1,35 @@
 {
   "schema": "vizly-precompiled-display-route-manifest-v3",
-  "routingVersion": "9",
+  "routingVersion": "13",
   "identitySourceHash": "source-v1:cfaa2450d3809ba2c686379d46c2603773ac472175eeac70cdfe7ece51347781",
-  "routingSourceHash": "source-v1:861685b2c8c888f315f4daedd28e0bee966c992fb20be6361dfef6370c8b080d",
+  "routingSourceHash": "source-v1:cfd6960b68de1f526db259bd3374dcc589b8d0361ea1a8a0a37d885a15f116ee",
   "entries": [
     {
       "presetId": "wms-demand-allocation-strategy-v2",
       "sourcePath": "src/data/standardized/DeamndAllocation.json",
-      "artifactFile": "route-1128202745.json",
+      "artifactFile": "route-1915352870.json",
       "sourceHash": "source-v1:ea82c502ab6535b5c8f8367c591861e540396a41955a15c6b5f94f922264b7de",
-      "inputSignature": "1128202745",
-      "inputGeometryDigest": "geometry-v1:33c0469ded248c5966bf7967bda21635",
+      "inputSignature": "1915352870",
+      "inputGeometryDigest": "geometry-v1:b518d38b3224c773e3730d3326b008af",
       "outputRouteSignature": "route-v2:26:164:d5d329ce2707b4c4"
-    },
-    {
-      "presetId": "logistics-architecture-v1",
-      "sourcePath": "src/data/standardized/LogisticsStandardData.json",
-      "artifactFile": "route-2377177811.json",
-      "sourceHash": "source-v1:da286fbefa1a0d0a3ba3bf5a6589d2edba849af0f477ddb910ecad4d91649986",
-      "inputSignature": "2377177811",
-      "inputGeometryDigest": "geometry-v1:ebc450b10058ac19f7765871baed1505",
-      "outputRouteSignature": "route-v2:14:61:8e8bdf697cad3bb7"
     },
     {
       "presetId": "wms-process-flow-v1",
       "sourcePath": "src/data/standardized/WmsProcessFlowStandardData.json",
-      "artifactFile": "route-401264928.json",
+      "artifactFile": "route-2019561471.json",
       "sourceHash": "source-v1:2a580f110590a416ff1aeb9fb5a3cd21536428e26368841fd160f87243cc25d3",
-      "inputSignature": "401264928",
-      "inputGeometryDigest": "geometry-v1:88a231b54675f045e0ee857191999849",
-      "outputRouteSignature": "route-v2:44:195:22dd064a56dcd838"
+      "inputSignature": "2019561471",
+      "inputGeometryDigest": "geometry-v1:e508e10f10f21b8b6b8c84bdf1c94a4f",
+      "outputRouteSignature": "route-v2:44:205:757c10d9e7fa2c67"
+    },
+    {
+      "presetId": "logistics-architecture-v1",
+      "sourcePath": "src/data/standardized/LogisticsStandardData.json",
+      "artifactFile": "route-725175520.json",
+      "sourceHash": "source-v1:da286fbefa1a0d0a3ba3bf5a6589d2edba849af0f477ddb910ecad4d91649986",
+      "inputSignature": "725175520",
+      "inputGeometryDigest": "geometry-v1:81e1068f210e2be3e197b08d7cc1336f",
+      "outputRouteSignature": "route-v2:14:61:8e8bdf697cad3bb7"
     }
   ]
 }

@@ -126,6 +126,7 @@ const createHarmfulParallelOverlapContext = (paths: Point[][], edges: Edge[]) =>
   const edgeCount = paths.length;
   const segmentsByEdge = paths.map(segments);
   const pairScores = new Map<number, number>();
+  const involvedIndexes = new Set<number>();
   let baseline = 0;
   for (let first = 0; first < edgeCount; first += 1) {
     for (let second = first + 1; second < edgeCount; second += 1) {
@@ -138,10 +139,15 @@ const createHarmfulParallelOverlapContext = (paths: Point[][], edges: Edge[]) =>
       );
       pairScores.set(key, score);
       baseline += score;
+      if (score > EPS) {
+        involvedIndexes.add(first);
+        involvedIndexes.add(second);
+      }
     }
   }
   return {
     baseline,
+    involvedIndexes,
     evaluate(edgeIndex: number, candidatePath: Point[]): number {
       const candidateSegments = segments(candidatePath);
       let score = baseline;
@@ -167,32 +173,6 @@ const createHarmfulParallelOverlapContext = (paths: Point[][], edges: Edge[]) =>
       return score;
     },
   };
-};
-
-const harmfulOverlapEdgeIndexes = (paths: Point[][], edges: Edge[]): Set<number> => {
-  const indexes = new Set<number>();
-  for (let first = 0; first < paths.length; first += 1) {
-    const firstSegments = segments(paths[first]);
-    for (let second = first + 1; second < paths.length; second += 1) {
-      const secondSegments = segments(paths[second]);
-      const related = edges[first]?.source === edges[second]?.source
-        || edges[first]?.source === edges[second]?.target
-        || edges[first]?.target === edges[second]?.source
-        || edges[first]?.target === edges[second]?.target;
-      const harmful = firstSegments.some(a => secondSegments.some(b => {
-        const overlap = parallelOverlapLength(a, b);
-        if (overlap <= EPS) return false;
-        const firstDirection = a.axis === 'v' ? Math.sign(a.b.y - a.a.y) : Math.sign(a.b.x - a.a.x);
-        const secondDirection = b.axis === 'v' ? Math.sign(b.b.y - b.a.y) : Math.sign(b.b.x - b.a.x);
-        return !related || firstDirection === -secondDirection;
-      }));
-      if (harmful) {
-        indexes.add(first);
-        indexes.add(second);
-      }
-    }
-  }
-  return indexes;
 };
 
 const crossingEdgeIndexes = (paths: Point[][]): Set<number> => {
@@ -632,7 +612,7 @@ export const repairTerminalHandleAxisCrossings = (edges: Edge[], nodes: Node[]):
     if (baselineCrossings === 0 && baselineOverlap <= EPS) break;
     const involvedIndexes = baselineCrossings > 0
       ? crossingEdgeIndexes(paths)
-      : harmfulOverlapEdgeIndexes(paths, current);
+      : overlapContext.involvedIndexes;
     const involved = [...involvedIndexes]
       .sort((first, second) => (
         Number(terminalAxisMismatch(current[second], paths[second], nodeRects))

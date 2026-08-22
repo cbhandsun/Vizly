@@ -83,6 +83,9 @@ export const createBaseReactFlowRoutingChangeSet = ({
   let hasNodeRemoval = false;
   let hasEdgeAddition = false;
   let hasEdgeRemoval = false;
+  let hasNodeResize = false;
+  let hasContainerChange = false;
+  let hasPortPolicyChange = false;
 
   for (const [nodeId, previous] of previousNodesById) {
     const next = nextNodesById.get(nodeId);
@@ -92,7 +95,17 @@ export const createBaseReactFlowRoutingChangeSet = ({
       hasNodeRemoval = true;
       continue;
     }
-    if (!nodeTopologyMatches(previous, next)) topologyChanged = true;
+    if (!nodeTopologyMatches(previous, next)) {
+      topologyChanged = true;
+      if (previous.parentId !== next.parentId) hasContainerChange = true;
+    }
+    const previousRect = getDisplayNodeRect(previous);
+    const nextRect = getDisplayNodeRect(next);
+    if (
+      previousRect
+      && nextRect
+      && (previousRect.width !== nextRect.width || previousRect.height !== nextRect.height)
+    ) hasNodeResize = true;
     if (
       !nodeTopologyMatches(previous, next)
       || fingerprintRoutingItem([previous], []) !== fingerprintRoutingItem([next], [])
@@ -113,7 +126,18 @@ export const createBaseReactFlowRoutingChangeSet = ({
       hasEdgeRemoval = true;
       continue;
     }
-    if (!edgeTopologyMatches(previous, next)) topologyChanged = true;
+    if (!edgeTopologyMatches(previous, next)) {
+      topologyChanged = true;
+      if (
+        previous.source === next.source
+        && previous.target === next.target
+        && (
+          previous.sourceHandle !== next.sourceHandle
+          || previous.targetHandle !== next.targetHandle
+          || previous.type !== next.type
+        )
+      ) hasPortPolicyChange = true;
+    }
     if (
       !edgeTopologyMatches(previous, next)
       || fingerprintRoutingItem([], [previous]) !== fingerprintRoutingItem([], [next])
@@ -131,6 +155,9 @@ export const createBaseReactFlowRoutingChangeSet = ({
   else if (hasNodeRemoval) reason = 'node-remove';
   else if (hasEdgeAddition) reason = 'edge-add';
   else if (hasEdgeRemoval) reason = 'edge-remove';
+  else if (hasContainerChange) reason = 'container-change';
+  else if (hasPortPolicyChange) reason = 'port-policy';
+  else if (hasNodeResize && reasonHint === 'unknown') reason = 'node-resize';
 
   return {
     reason,

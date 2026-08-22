@@ -34,6 +34,7 @@ type EndpointEntry = {
   terminal: Point;
   stub: Point;
   movable: boolean;
+  direct: boolean;
 };
 
 type EndpointBlock = {
@@ -43,6 +44,7 @@ type EndpointBlock = {
   remoteMinimum: number;
   remoteMaximum: number;
   movable: boolean;
+  direct: boolean;
 };
 
 export type SameSideEndpointTrunkIdentity = Readonly<{
@@ -213,6 +215,7 @@ function collectEndpointGroups(
         terminal: { ...terminal },
         stub: { ...stub },
         movable: terminalIsMovable(edge, role, path),
+        direct: path.length === 2,
       });
       groups.set(key, group);
     }
@@ -287,6 +290,7 @@ function buildEndpointBlocks(group: EndpointGroup): EndpointBlock[] {
     remoteMinimum: Math.min(...entries.map(entry => entry.remoteCoordinate)),
     remoteMaximum: Math.max(...entries.map(entry => entry.remoteCoordinate)),
     movable: entries.every(entry => entry.movable),
+    direct: entries.every(entry => entry.direct),
   })).sort((first, second) => (
     first.endpointCoordinate - second.endpointCoordinate
     || (first.entries[0]?.edgeId ?? '').localeCompare(second.entries[0]?.edgeId ?? '')
@@ -367,7 +371,10 @@ function metricsForGroup(group: EndpointGroup): SameSideEndpointOrderGroupMetric
       if (desiredTie) desiredOrderTies += 1;
       if (endpointTie && !desiredTie) ambiguousLaneTies += 1;
       if (Math.abs(endpointDelta) < MIN_DISTINCT_PORT_GAP - EPS) collapsedLanePairs += 1;
-      if (desiredTie || endpointTie) continue;
+      // A direct two-point leg terminates before either sibling can pass it, so
+      // its remote position cannot create port weaving. Keep gap auditing, but
+      // exclude this non-passage pair from the ordering contract.
+      if (desiredTie || endpointTie || first.direct || second.direct) continue;
       comparablePairs += 1;
       if (desiredOrder * endpointDelta < 0) inversions += 1;
     }

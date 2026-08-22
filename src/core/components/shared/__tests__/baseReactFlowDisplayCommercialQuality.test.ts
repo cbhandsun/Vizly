@@ -5,6 +5,7 @@ import {
   auditBaseReactFlowDisplayCommercialQuality,
   baseReactFlowDisplayCommercialQualityIsClean,
 } from '../baseReactFlowDisplayCommercialQuality';
+import { canReuseBaseReactFlowFinalCommercialSafety } from '../baseReactFlowDisplayCommercialSafety';
 
 const edgeWithPath = (id: string, computedPath: Array<{ x: number; y: number }>): Edge => ({
   id,
@@ -14,6 +15,46 @@ const edgeWithPath = (id: string, computedPath: Array<{ x: number; y: number }>)
 });
 
 describe('baseReactFlowDisplayCommercialQuality', () => {
+  it('reuses an unchanged route whose only endpoint defect was delegated by incremental routing', () => {
+    const orderedEdges = [edgeWithPath('delegated', [
+      { x: 0, y: 0 },
+      { x: 0, y: 80 },
+      { x: 120, y: 80 },
+    ])];
+    const exactClone = [edgeWithPath('delegated', [
+      { x: 0, y: 0 },
+      { x: 0, y: 80 },
+      { x: 120, y: 80 },
+    ])];
+    expect(canReuseBaseReactFlowFinalCommercialSafety({
+      commercialClosureReady: false,
+      commercialEvaluationEdges: null,
+      endpointDefectDelegated: true,
+      finalEdges: exactClone,
+      orderedEdges,
+    })).toBe(true);
+  });
+
+  it('does not reuse a delegated endpoint route after its geometry changes', () => {
+    const orderedEdges = [edgeWithPath('delegated', [
+      { x: 0, y: 0 },
+      { x: 0, y: 80 },
+      { x: 120, y: 80 },
+    ])];
+    const changedEdges = [edgeWithPath('delegated', [
+      { x: 0, y: 0 },
+      { x: 0, y: 96 },
+      { x: 120, y: 96 },
+    ])];
+    expect(canReuseBaseReactFlowFinalCommercialSafety({
+      commercialClosureReady: false,
+      commercialEvaluationEdges: null,
+      endpointDefectDelegated: true,
+      finalEdges: changedEdges,
+      orderedEdges,
+    })).toBe(false);
+  });
+
   it('accepts a compact orthogonal route and short endpoint stubs', () => {
     const edges = [edgeWithPath('compact', [
       { x: 0, y: 0 },
@@ -33,7 +74,10 @@ describe('baseReactFlowDisplayCommercialQuality', () => {
       { x: 120, y: 120 }, { x: 120, y: 140 }, { x: 140, y: 140 },
     ])]);
 
-    expect(issues.map(issue => issue.kind)).toEqual(['excessive-bends']);
+    expect(issues.map(issue => issue.kind)).toEqual(expect.arrayContaining([
+      'excessive-bends',
+      'tiny-interior-segment',
+    ]));
   });
 
   it('allows an outer lane when graph topology may require it', () => {
@@ -57,6 +101,21 @@ describe('baseReactFlowDisplayCommercialQuality', () => {
 
     expect(issues).toEqual([
       expect.objectContaining({ edgeId: 'micro', kind: 'tiny-interior-segment', value: 7 }),
+    ]);
+  });
+
+  it('uses the 24px commercial interior-segment boundary exactly', () => {
+    const issues = auditBaseReactFlowDisplayCommercialQuality([
+      edgeWithPath('below', [
+        { x: 0, y: 0 }, { x: 0, y: 80 }, { x: 23.99, y: 80 }, { x: 23.99, y: 160 },
+      ]),
+      edgeWithPath('at-limit', [
+        { x: 0, y: 0 }, { x: 0, y: 80 }, { x: 24, y: 80 }, { x: 24, y: 160 },
+      ]),
+    ]);
+
+    expect(issues).toEqual([
+      expect.objectContaining({ edgeId: 'below', kind: 'tiny-interior-segment' }),
     ]);
   });
 

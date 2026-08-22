@@ -69,6 +69,18 @@ export type DisplayTerminalGateEvaluator = (
   nodes: Node[],
 ) => DisplayTerminalGateEvaluation;
 
+export const displayHardQualityReportGeometryIsClean = (
+  report: BaseDisplayBoundedCandidateReport,
+): boolean => report.quality.nonOrthogonalSegments === 0
+  && report.quality.strictCrossings === 0
+  && report.quality.reverseOverlap === 0
+  && report.quality.unrelatedOverlap === 0
+  && report.quality.unexplainedRelatedOverlap === 0
+  && report.quality.shortEndpointStubs === 0
+  && report.quality.tinyInteriorDoglegs === 0
+  && report.quality.hairpins === 0
+  && report.obstacleHits === 0;
+
 export const resolveDisplayQualityBudget = (
   edges: Edge[],
   nodes: Node[],
@@ -196,11 +208,19 @@ export const chooseFinalVisualPolishCandidate = <T extends Edge[]>(baseline: T, 
   const uniqueCandidates = uniqueDisplayCandidateReferences(baseline, candidates);
   if (uniqueCandidates.length === 0) return baseline;
   const qualityContext = createEdgePathQualityEvaluationContext(baseline);
-  const baselineQuality = qualityContext.evaluate(baseline);
+  let previousCandidate: T = baseline;
+  let previousState = qualityContext.createState(baseline);
+  const baselineQuality = previousState.score;
   let best = baseline;
   let bestScore = finalVisualPolishScoreFromQuality(baselineQuality);
   for (const candidate of uniqueCandidates) {
-    const candidateQuality = evaluateDisplayQualityCandidate(qualityContext, baseline, candidate);
+    const changedIndexes = changedDisplayEdgeIndexesByReference(previousCandidate, candidate);
+    const candidateState = changedIndexes
+      ? qualityContext.evaluateStateChanged(previousState, candidate, changedIndexes)
+      : qualityContext.createState(candidate);
+    const candidateQuality = candidateState.score;
+    previousCandidate = candidate;
+    previousState = candidateState;
     if (!visualPolishHardQualityDoesNotRegress(baselineQuality, candidateQuality)) continue;
     const candidateScore = finalVisualPolishScoreFromQuality(candidateQuality);
     if (candidateScore < bestScore - 1) {
@@ -506,19 +526,9 @@ export const getDisplayHardQualityGateReport = (
     metrics.renderNormalizedEdges,
     nodes,
   );
-  const hardClean = quality.nonOrthogonalSegments === 0
-    && quality.strictCrossings === 0
-    && quality.reverseOverlap === 0
-    && quality.unrelatedOverlap === 0
-    && quality.unexplainedRelatedOverlap === 0
-    && quality.shortEndpointStubs === 0
-    && quality.tinyInteriorDoglegs === 0
-    && quality.hairpins === 0
-    && obstacleHits === 0
-    && terminalsAnchored;
-  return {
+  const report: BaseDisplayBoundedCandidateReport = {
     candidate,
-    hardClean,
+    hardClean: false,
     obstacleHits,
     terminalsAttached,
     terminalsAnchored,
@@ -526,6 +536,8 @@ export const getDisplayHardQualityGateReport = (
     minimumClearanceViolations: minimumClearanceViolationEdgeIds.length,
     minimumClearanceViolationEdgeIds: minimumClearanceViolationEdgeIds.slice(0, 32),
   };
+  report.hardClean = displayHardQualityReportGeometryIsClean(report) && terminalsAnchored;
+  return report;
 };
 
 export const displayHardQualityGatesAreClean = (

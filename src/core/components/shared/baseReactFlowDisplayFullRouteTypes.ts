@@ -32,6 +32,7 @@ export type BaseReactFlowPreDisplayFinalEdgesArgs = {
   preparedInteractiveEdges?: Edge[];
   skipFullRouteFallback?: boolean;
   onBoundedCandidate?: (report: BaseDisplayBoundedCandidateReport) => void;
+  onPhaseTrace?: (trace: DisplayRoutingPhaseTrace) => void;
 };
 
 export type BaseReactFlowPreDisplayFinalEdgesFactory = (

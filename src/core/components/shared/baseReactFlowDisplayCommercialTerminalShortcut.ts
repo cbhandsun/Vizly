@@ -22,6 +22,8 @@ import {
 
 const MAX_TERMINAL_SHORTCUT_CANDIDATES = 32;
 const MAX_SOURCE_CORRIDOR_LANES_PER_ANCHOR = 8;
+const MIN_FACING_TERMINAL_SHORTCUT_SAVINGS = MIN_RENDER_SAFE_ENDPOINT_STUB * 2;
+const MAX_FACING_TERMINAL_SHORTCUT_RATIO = 0.7;
 const CONTAINER_NODE_TYPES = new Set([
   'titleGroup',
   'subGroup',
@@ -57,6 +59,111 @@ const pathSignature = (path: Array<{ x: number; y: number }>): string => (
 const isStrictlyBetween = (value: number, first: number, second: number): boolean => (
   value > Math.min(first, second) && value < Math.max(first, second)
 );
+
+/**
+ * Replaces a materially overlong layout route with the shortest facing-port
+ * route. Geometry normalization may leave automatic terminals on mixed sides,
+ * so eligibility depends on savings rather than the current side pair. The
+ * graph-wide caller still owns obstacle, crossing, trunk, order, and
+ * commercial-clearance acceptance.
+ */
+const buildFacingTerminalShortcutCandidates = (
+  edge: Edge,
+  nodes: Node[],
+): Edge[] => {
+  const path = getDisplayComputedPath(edge);
+  if (path.length < 2) return [];
+
+  const nodeById = new Map(nodes.map(node => [node.id, node] as const));
+  const sourceRect = getNodeRect(nodeById.get(edge.source), nodeById);
+  const targetRect = getNodeRect(nodeById.get(edge.target), nodeById);
+  if (!sourceRect || !targetRect) return [];
+
+  const sourceCenter = {
+    x: sourceRect.x + sourceRect.width / 2,
+    y: sourceRect.y + sourceRect.height / 2,
+  };
+  const targetCenter = {
+    x: targetRect.x + targetRect.width / 2,
+    y: targetRect.y + targetRect.height / 2,
+  };
+  const dx = targetCenter.x - sourceCenter.x;
+  const dy = targetCenter.y - sourceCenter.y;
+  const horizontal = Math.abs(dx) >= Math.abs(dy);
+  const sourceSide: DisplayTerminalSide = horizontal
+    ? (dx >= 0 ? 'right' : 'left')
+    : (dy >= 0 ? 'bottom' : 'top');
+  const targetSide: DisplayTerminalSide = horizontal
+    ? (dx >= 0 ? 'left' : 'right')
+    : (dy >= 0 ? 'top' : 'bottom');
+  if (
+    !displayTerminalSideCanSwitch(edge, 'source', sourceSide)
+    || !displayTerminalSideCanSwitch(edge, 'target', targetSide)
+  ) return [];
+
+  const sourceHandle = resolveDisplayTerminalHandleForSide(edge, 'source', sourceSide);
+  const targetHandle = resolveDisplayTerminalHandleForSide(edge, 'target', targetSide);
+  const sourceAnchor = anchorForHandle(sourceRect, sourceHandle);
+  const targetAnchor = anchorForHandle(targetRect, targetHandle);
+  const axisGap = horizontal
+    ? Math.abs(targetAnchor.x - sourceAnchor.x)
+    : Math.abs(targetAnchor.y - sourceAnchor.y);
+  const crossAxisGap = horizontal
+    ? Math.abs(targetAnchor.y - sourceAnchor.y)
+    : Math.abs(targetAnchor.x - sourceAnchor.x);
+  if (axisGap <= 0.5) return [];
+
+  const candidatePath = compactOrthogonalPath(crossAxisGap <= 0.5
+    ? [sourceAnchor, targetAnchor]
+    : horizontal
+      ? [
+        sourceAnchor,
+        { x: (sourceAnchor.x + targetAnchor.x) / 2, y: sourceAnchor.y },
+        { x: (sourceAnchor.x + targetAnchor.x) / 2, y: targetAnchor.y },
+        targetAnchor,
+      ]
+      : [
+        sourceAnchor,
+        { x: sourceAnchor.x, y: (sourceAnchor.y + targetAnchor.y) / 2 },
+        { x: targetAnchor.x, y: (sourceAnchor.y + targetAnchor.y) / 2 },
+        targetAnchor,
+      ]);
+  if (candidatePath.length < 2) return [];
+  if (
+    candidatePath.length > 2
+    && (
+      segmentDisplayLength(candidatePath[0], candidatePath[1])
+        < MIN_RENDER_SAFE_ENDPOINT_STUB
+      || segmentDisplayLength(candidatePath.at(-2)!, candidatePath.at(-1)!)
+        < MIN_RENDER_SAFE_ENDPOINT_STUB
+    )
+  ) return [];
+
+  const baselineLength = displayPathLength(path);
+  const candidateLength = displayPathLength(candidatePath);
+  if (
+    baselineLength - candidateLength <= MIN_FACING_TERMINAL_SHORTCUT_SAVINGS
+    || candidateLength > baselineLength * MAX_FACING_TERMINAL_SHORTCUT_RATIO
+  ) return [];
+
+  return [withDisplayPortBridge(
+    edge,
+    candidatePath,
+    sourceSide,
+    targetSide,
+  )];
+};
+
+/**
+ * Negotiates automatic ELK terminal roles before graph topology is locked.
+ * Hidden layout candidates can still contain redundant ELK bends, so this
+ * variant relies on material savings plus the authoritative Worker gates
+ * instead of requiring an already compact four-point rectangle.
+ */
+export const buildLayoutFacingTerminalShortcutCandidates = (
+  edge: Edge,
+  nodes: Node[],
+): Edge[] => buildFacingTerminalShortcutCandidates(edge, nodes);
 
 const sourceCorridorLaneCoordinates = (
   edge: Edge,

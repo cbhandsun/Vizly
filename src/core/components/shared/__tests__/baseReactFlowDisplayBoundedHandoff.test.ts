@@ -56,6 +56,7 @@ describe('bounded pre-display handoff', () => {
     }));
     let skipFullRouteFallback: boolean | undefined;
     let calls = 0;
+    const phaseNames: string[] = [];
 
     const result = createBaseReactFlowFullRouteEdges({
       edges,
@@ -67,13 +68,22 @@ describe('bounded pre-display handoff', () => {
       createPreDisplayFinalEdges: (args) => {
         calls += 1;
         skipFullRouteFallback = args.skipFullRouteFallback;
+        args.onPhaseTrace?.({
+          phase: 'seed-hard-safety',
+          durationMs: 1,
+          candidateCount: edges.length,
+          changedEdgeCount: 0,
+          resolution: 'skip',
+        });
         args.onBoundedCandidate?.(hardCleanReport);
         return [];
       },
+      onPhaseTrace: (trace) => phaseNames.push(trace.phase),
     });
 
     expect(calls).toBe(1);
     expect(skipFullRouteFallback).toBe(true);
+    expect(phaseNames).toEqual(['seed', 'seed-hard-safety']);
     expect(result).toEqual([]);
   });
 

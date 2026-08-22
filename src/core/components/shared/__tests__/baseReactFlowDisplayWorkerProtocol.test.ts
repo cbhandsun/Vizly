@@ -1,9 +1,16 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   parseDisplayEdgesWorkerRequest,
   parseDisplayEdgesWorkerResponse,
 } from '../baseReactFlowDisplayWorkerProtocol';
+import {
+  DISPLAY_ROUTING_PHASE_TRACE_LIMIT,
+  finalizeDisplayRoutingPhaseTrace,
+  type DisplayRoutingPhaseTrace,
+} from '../baseReactFlowDisplayRoutingTrace';
+import { createDisplayRoutingIdentity } from '../baseReactFlowDisplayRoutingSession';
+import { createDisplayRoutingPhaseRecorder } from '../baseReactFlowDisplayWorkerTraceRecorder';
 
 const nodes = [
   { id: 'source', position: { x: 0, y: 0 }, data: {} },
@@ -24,6 +31,82 @@ const validRepairRequest = {
 } as const;
 
 describe('baseReactFlowDisplayWorkerProtocol', () => {
+  it('buffers incremental phase trace without publishing progress messages', () => {
+    const phaseTrace: DisplayRoutingPhaseTrace[] = [];
+    const publish = vi.fn();
+    const record = createDisplayRoutingPhaseRecorder({
+      requestId: 'incremental-1',
+      phaseTrace,
+      publish,
+      publishProgress: false,
+    });
+    const trace: DisplayRoutingPhaseTrace = {
+      phase: 'local-route',
+      durationMs: 12,
+      candidateCount: 4,
+      changedEdgeCount: 4,
+      resolution: 'accepted',
+    };
+    record(trace);
+    expect(phaseTrace).toEqual([trace]);
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  const boundedPhaseTrace = Array.from(
+    { length: DISPLAY_ROUTING_PHASE_TRACE_LIMIT },
+    () => ({
+      phase: 'quality-crossing-global-refine',
+      durationMs: 1,
+      candidateCount: 1,
+      changedEdgeCount: 0,
+      resolution: 'skip',
+    } as const),
+  );
+
+  it('derives bounded parent and exclusive phase metrics without graph data', () => {
+    const traces = finalizeDisplayRoutingPhaseTrace([{
+      phase: 'quality',
+      durationMs: 100,
+      candidateCount: 14,
+      changedEdgeCount: 14,
+      resolution: 'accepted',
+    }, {
+      phase: 'quality-polish',
+      durationMs: 60,
+      candidateCount: 14,
+      changedEdgeCount: 3,
+      evaluationCount: 8,
+      cacheHitCount: 2,
+      scannedNodeCount: 12,
+      scannedEdgePairCount: 91,
+      resolution: 'accepted',
+    }]);
+    expect(traces).toEqual([expect.objectContaining({
+      phase: 'quality',
+      exclusiveDurationMs: 40,
+    }), expect.objectContaining({
+      phase: 'quality-polish',
+      parentPhase: 'quality',
+      exclusiveDurationMs: 60,
+      evaluationCount: 8,
+      cacheHitCount: 2,
+    })]);
+    expect(parseDisplayEdgesWorkerResponse({
+      requestId: 'route-trace',
+      edges: validRepairRequest.edges,
+      hardClean: true,
+      routeResolution: 'full-route',
+      phaseTrace: traces,
+    }, 'route-trace')).not.toBeNull();
+    expect(parseDisplayEdgesWorkerResponse({
+      requestId: 'route-trace',
+      edges: validRepairRequest.edges,
+      hardClean: true,
+      routeResolution: 'full-route',
+      phaseTrace: [{ ...traces[0], exclusiveDurationMs: 101 }],
+    }, 'route-trace')).toBeNull();
+  });
+
   it('parses validate-or-route candidates and degrades malformed candidates to a reroute', () => {
     const valid = parseDisplayEdgesWorkerRequest({
       ...validRepairRequest,
@@ -152,6 +235,32 @@ describe('baseReactFlowDisplayWorkerProtocol', () => {
     expect(parseDisplayEdgesWorkerRequest({
       ...incrementalRequest,
       baselineInputGeometryDigest: 'invalid',
+    })).toBeNull();
+    const sessionOnlyRequest = {
+      ...incrementalRequest,
+      baselineNodes: undefined,
+      baselineSourceEdges: undefined,
+      baselinePatches: undefined,
+    };
+    const baselineSessionRef = {
+      sessionId: 'display-session-v1:1',
+      identity: createDisplayRoutingIdentity(
+        incrementalRequest.baselineInputSignature,
+        incrementalRequest.baselineInputGeometryDigest,
+      ),
+      outputRouteSignature: incrementalRequest.baselineOutputRouteSignature,
+    };
+    expect(parseDisplayEdgesWorkerRequest({
+      ...sessionOnlyRequest,
+      baselineSessionRef,
+    })).toMatchObject({
+      operation: 'incremental-route',
+      baselineSessionRef,
+    });
+    expect(parseDisplayEdgesWorkerRequest(sessionOnlyRequest)).toBeNull();
+    expect(parseDisplayEdgesWorkerRequest({
+      ...sessionOnlyRequest,
+      baselineSessionRef: { ...baselineSessionRef, sessionId: '../escape' },
     })).toBeNull();
   });
 
@@ -320,7 +429,18 @@ describe('baseReactFlowDisplayWorkerProtocol', () => {
       hardClean: true,
       hardReport,
       routeResolution: 'repair',
-    }, 'repair-1')).toMatchObject({ hardReport });
+      workerDurationMs: 12.5,
+    }, 'repair-1')).toMatchObject({ hardReport, workerDurationMs: 12.5 });
+    for (const workerDurationMs of [Number.NaN, -1, 600_001, '12']) {
+      expect(parseDisplayEdgesWorkerResponse({
+        requestId: 'repair-1',
+        edges: validEdges,
+        hardClean: true,
+        hardReport,
+        routeResolution: 'repair',
+        workerDurationMs,
+      }, 'repair-1')).toBeNull();
+    }
     expect(parseDisplayEdgesWorkerResponse({
       requestId: 'repair-1',
       edges: validEdges,
@@ -342,8 +462,70 @@ describe('baseReactFlowDisplayWorkerProtocol', () => {
         candidateCount: 1,
         changedEdgeCount: 1,
         resolution: 'accepted',
+      }, {
+        phase: 'seed-interactive-route',
+        durationMs: 8.5,
+        candidateCount: 1,
+        changedEdgeCount: 1,
+        resolution: 'accepted',
+      }, {
+        phase: 'seed-interactive-terminal-cleanup',
+        durationMs: 1.25,
+        candidateCount: 1,
+        changedEdgeCount: 0,
+        resolution: 'skip',
+      }, {
+        phase: 'quality-polish-candidates',
+        durationMs: 4,
+        candidateCount: 1,
+        changedEdgeCount: 1,
+        resolution: 'accepted',
+      }, {
+        phase: 'quality-polish-selection',
+        durationMs: 3,
+        candidateCount: 2,
+        changedEdgeCount: 1,
+        resolution: 'accepted',
+      }, {
+        phase: 'quality-polish-local',
+        durationMs: 1,
+        candidateCount: 1,
+        changedEdgeCount: 0,
+        resolution: 'skip',
+      }, {
+        phase: 'quality-polish-detached',
+        durationMs: 1,
+        candidateCount: 1,
+        changedEdgeCount: 0,
+        resolution: 'skip',
+      }, {
+        phase: 'quality-polish-endpoint',
+        durationMs: 1,
+        candidateCount: 1,
+        changedEdgeCount: 1,
+        resolution: 'accepted',
+      }, {
+        phase: 'quality-polish-micro',
+        durationMs: 1,
+        candidateCount: 1,
+        changedEdgeCount: 0,
+        resolution: 'skip',
       }],
     }, 'route-1')).not.toBeNull();
+    expect(parseDisplayEdgesWorkerResponse({
+      requestId: 'route-1',
+      edges: validEdges,
+      hardClean: true,
+      routeResolution: 'full-route',
+      phaseTrace: boundedPhaseTrace,
+    }, 'route-1')).not.toBeNull();
+    expect(parseDisplayEdgesWorkerResponse({
+      requestId: 'route-1',
+      edges: validEdges,
+      hardClean: true,
+      routeResolution: 'full-route',
+      phaseTrace: [...boundedPhaseTrace, boundedPhaseTrace[0]],
+    }, 'route-1')).toBeNull();
     expect(parseDisplayEdgesWorkerResponse({
       requestId: 'candidate-1',
       edges: validEdges,

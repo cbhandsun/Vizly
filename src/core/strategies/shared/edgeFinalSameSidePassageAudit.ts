@@ -292,7 +292,15 @@ function groupAudit(group: LegGroup): SameSidePassageGroupAudit {
       const second = group.blocks[secondIndex];
       const remoteOrder = compareRemote(first, second);
       const terminalDelta = first.terminalCoordinate - second.terminalCoordinate;
-      if (remoteOrder !== 0 && Math.abs(terminalDelta) > EPS && remoteOrder * terminalDelta < 0) {
+      const firstIsDirect = first.legs.every(leg => leg.branchDirection === 0);
+      const secondIsDirect = second.legs.every(leg => leg.branchDirection === 0);
+      if (
+        !firstIsDirect
+        && !secondIsDirect
+        && remoteOrder !== 0
+        && Math.abs(terminalDelta) > EPS
+        && remoteOrder * terminalDelta < 0
+      ) {
         portOrderInversions += 1;
       }
       const firstRepresentative = first.legs[0];

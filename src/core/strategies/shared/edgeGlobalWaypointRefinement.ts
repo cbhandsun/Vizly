@@ -553,23 +553,32 @@ function findBestInteriorCrossingShiftCandidate(
   obstacles: Map<string, Rect>,
   nodeById: Map<string, ReactFlowNode>,
 ): Point[] | null {
-  const evaluationContext = createPathCandidateEvaluationContext(
-    edge,
-    key,
-    workingPaths,
-    edgeByKey,
-    obstacles,
-  );
+  let evaluationContext: PathCandidateEvaluationContext | null = null;
+  let baselineScore: number | null = null;
+  const getEvaluationContext = (): PathCandidateEvaluationContext => {
+    evaluationContext ??= createPathCandidateEvaluationContext(
+      edge,
+      key,
+      workingPaths,
+      edgeByKey,
+      obstacles,
+    );
+    return evaluationContext;
+  };
+  const getBaselineScore = (): number => {
+    baselineScore ??= pathQualityScore(
+      edge,
+      key,
+      path,
+      workingPaths,
+      edgeByKey,
+      obstacles,
+      getEvaluationContext(),
+    );
+    return baselineScore;
+  };
   let best: Point[] | null = null;
-  let bestScore = pathQualityScore(
-    edge,
-    key,
-    path,
-    workingPaths,
-    edgeByKey,
-    obstacles,
-    evaluationContext,
-  );
+  let bestScore: number | null = null;
   const seenCandidates = new Set<string>();
   const laneBandCandidates = new Map<number, Point[][]>();
 
@@ -609,6 +618,7 @@ function findBestInteriorCrossingShiftCandidate(
           const candidateKey = candidate.map(point => `${point.x},${point.y}`).join(';');
           if (seenCandidates.has(candidateKey)) continue;
           seenCandidates.add(candidateKey);
+          const context = getEvaluationContext();
           if (!safeToAcceptCandidate(
             edge,
             key,
@@ -617,7 +627,7 @@ function findBestInteriorCrossingShiftCandidate(
             workingPaths,
             edgeByKey,
             obstacles,
-            evaluationContext,
+            context,
           )) continue;
           const score = pathQualityScore(
             edge,
@@ -626,9 +636,10 @@ function findBestInteriorCrossingShiftCandidate(
             workingPaths,
             edgeByKey,
             obstacles,
-            evaluationContext,
+            context,
           );
-          if (score < bestScore) {
+          const comparisonScore = bestScore ?? getBaselineScore();
+          if (score < comparisonScore) {
             best = candidate;
             bestScore = score;
           }
@@ -638,6 +649,7 @@ function findBestInteriorCrossingShiftCandidate(
             const candidateKey = endpointCandidate.path.map(point => `${point.x},${point.y}`).join(';');
             if (seenCandidates.has(candidateKey)) continue;
             seenCandidates.add(candidateKey);
+            const context = getEvaluationContext();
             if (!safeToAcceptEndpointSlideCandidate(
               edge,
               key,
@@ -647,7 +659,7 @@ function findBestInteriorCrossingShiftCandidate(
               workingPaths,
               edgeByKey,
               obstacles,
-              evaluationContext,
+              context,
             )) {
               continue;
             }
@@ -658,9 +670,10 @@ function findBestInteriorCrossingShiftCandidate(
               workingPaths,
               edgeByKey,
               obstacles,
-              evaluationContext,
+              context,
             );
-            if (score < bestScore) {
+            const comparisonScore = bestScore ?? getBaselineScore();
+            if (score < comparisonScore) {
               best = endpointCandidate.path;
               bestScore = score;
             }

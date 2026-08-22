@@ -2,23 +2,19 @@ import type { Edge } from "@xyflow/react";
 
 import { repairDetachedStrictCrossingBypasses } from "../../strategies/shared/edgeDetachedStrictCrossingRepair";
 import { repairDisplayMicroArtifacts } from "../../strategies/shared/edgeDisplayMicroCleanup";
-import { repairResidualHairpinBridges } from "../../strategies/shared/edgeHairpinBridgeWidenRepair";
 import { repairLocalDoglegArtifacts } from "../../strategies/shared/edgeLocalDoglegRepair";
 import { calculateEdgePathQualityScore } from "../../strategies/shared/edgeStrictCrossingGuard";
-import { repairTerminalBoundaryStairs } from "../../strategies/shared/edgeTerminalBoundaryStairRepair";
 import { repairBoundedPortAndInternalStrictCrossings } from "./baseReactFlowDisplayBoundedStrictRepair";
 import { shouldStopAfterBoundedTerminalLaneSeed } from "./baseReactFlowDisplayBoundedSeedPolicy";
 import {
   anchorComputedDisplayEdgeEndpoints,
-  withDisplayAbsolutePositions,
 } from "./baseReactFlowDisplayEdgeCore";
 import {
   chooseDisplayStrictPolishCandidate,
   chooseFinalObstacleAwarePolishCandidate,
   hasHardDisplayOverlapRisk,
 } from "./baseReactFlowDisplayEvaluation";
-import { compactDisplayEdgePaths } from "./baseReactFlowDisplayGeometry";
-import { createBaseDisplayHardGateMemo } from "./baseReactFlowDisplayHardGateMemo";
+import { compactDisplayEdgePaths } from './baseReactFlowDisplayGeometry';
 import { repairDisplayObstacleHits } from "./baseReactFlowDisplayObstacleRepair";
 import {
   DISPLAY_BOUNDED_DETACHED_OVERLAP_REPAIR_OPTIONS,
@@ -27,7 +23,6 @@ import {
   repairNearParallelResidualOverlaps,
   repairResidualDisplayOverlaps,
 } from "./baseReactFlowDisplayOverlapRepair";
-import { createBaseReactFlowInteractiveDisplayEdges } from "./baseReactFlowDisplayQualitySeedPipeline";
 import { DISPLAY_FINAL_OVERLAP_OBSTACLE_REPAIR_OPTIONS } from "./baseReactFlowDisplayRenderPipeline";
 import { repairFinalResidualStrictCrossings } from "./baseReactFlowDisplayStrictResidualRepair";
 import { finalStrictDisplaySweep } from "./baseReactFlowDisplayStrictSweepRepair";
@@ -43,8 +38,6 @@ import {
 import { repairBoundedReverseParallelOverlaps } from './baseReactFlowDisplayReverseParallelOverlapClosure';
 import { repairFastDisplayHardSafety } from "./baseReactFlowFastEdgeSafety";
 import {
-  createDisplayTerminalValidationSnapshot,
-  getDisplayTerminalValidationReport,
   keepNodeAnchoredTerminalCandidates,
   repairTerminalHandleAxisCrossings,
 } from "./baseReactFlowTerminalAxisRepair";
@@ -57,74 +50,52 @@ import {
 import { readDisplayLayoutDirection } from './baseReactFlowDisplayDirection';
 import { repairBaseReactFlowResidualOverlapAxisClosure } from './baseReactFlowDisplayResidualOverlapClosure';
 import type { BaseReactFlowPreDisplayFinalEdgesArgs } from './baseReactFlowDisplayFullRouteTypes';
+import { startDisplayRoutingPhaseTrace } from './baseReactFlowDisplayRoutingTrace';
+import { createBaseReactFlowInteractiveSeedResult } from './baseReactFlowDisplayInteractiveSeed';
+import { createBaseReactFlowPreDisplayContext } from './baseReactFlowDisplayPreDisplayContext';
+import { repairBaseReactFlowTerminalAxisSeed } from './baseReactFlowDisplayTerminalAxisSeed';
 
 export const createBaseReactFlowPreDisplayFinalEdges = (
   args: BaseReactFlowPreDisplayFinalEdgesArgs,
 ): Edge[] => {
-  const nodeById = new Map(args.nodes.map((node) => [node.id, node]));
-  const repairNodes = withDisplayAbsolutePositions(args.nodes, nodeById);
-  const terminalValidationSnapshot =
-    createDisplayTerminalValidationSnapshot(repairNodes);
-  const { getReport: getRouteHardQualityGateReport } =
-    createBaseDisplayHardGateMemo(repairNodes, terminalValidationSnapshot);
-  const routeTerminalsAreAttached = (edges: Edge[]): boolean =>
-    getDisplayTerminalValidationReport(edges, terminalValidationSnapshot)
-      .allAttached;
-  const interactiveSeed =
-    args.preparedInteractiveEdges ??
-    createBaseReactFlowInteractiveDisplayEdges({
-      edges: args.edges,
-      nodes: args.nodes,
-      enableSmartEdges: args.enableSmartEdges,
-      smartEdgePadding: args.smartEdgePadding,
-      isLargeGraph: args.isLargeGraph,
-      displayEdgeEpoch: args.displayEdgeEpoch,
-      deferOuterObstacleRepair: true,
-    });
-  const interactive = repairResidualHairpinBridges(
-    compactDisplayEdgePaths(
-      repairTerminalBoundaryStairs(interactiveSeed, repairNodes),
-    ),
+  const {
     repairNodes,
-  );
-  const interactiveReport = getRouteHardQualityGateReport(
-    interactive,
+    getRouteHardQualityGateReport,
+    routeTerminalsAreAttached,
+  } = createBaseReactFlowPreDisplayContext(args.nodes);
+  const interactiveResult = createBaseReactFlowInteractiveSeedResult({
+    args,
     repairNodes,
-    "polished",
-  );
+    getRouteHardQualityGateReport,
+  });
+  const interactive = interactiveResult.edges;
+  const interactiveReport = interactiveResult.report;
   if (interactiveReport.hardClean) {
     args.onBoundedCandidate?.(interactiveReport);
     return interactive;
   }
-  const interactiveOnlyNeedsHemisphereHairpinRepair =
-    interactiveReport.obstacleHits === 0 &&
-    interactiveReport.quality.nonOrthogonalSegments === 0 &&
-    interactiveReport.quality.strictCrossings === 0 &&
-    interactiveReport.quality.reverseOverlap === 0 &&
-    interactiveReport.quality.unrelatedOverlap === 0 &&
-    interactiveReport.quality.unexplainedRelatedOverlap === 0 &&
-    interactiveReport.quality.shortEndpointStubs === 0 &&
-    interactiveReport.quality.tinyInteriorDoglegs === 0 &&
-    interactiveReport.quality.hairpins > 0;
-  if (interactiveOnlyNeedsHemisphereHairpinRepair) {
-    const hemisphereOnlyRepaired = repairTerminalHandleHemisphereHairpins(
-      interactive,
-      repairNodes,
-    );
-    const hemisphereOnlyReport = getRouteHardQualityGateReport(
-      hemisphereOnlyRepaired,
-      repairNodes,
-      "terminal-lane",
-    );
-    if (hemisphereOnlyReport.hardClean) {
-      args.onBoundedCandidate?.(hemisphereOnlyReport);
-      return hemisphereOnlyRepaired;
-    }
-  }
+  const hardSafetyTimer = args.onPhaseTrace
+    ? startDisplayRoutingPhaseTrace({
+        phase: 'seed-hard-safety',
+        candidateCount: interactive.length,
+        onTrace: args.onPhaseTrace,
+      })
+    : null;
   const hardSafeRepaired = repairFastDisplayHardSafety(
     interactive,
     repairNodes,
   );
+  hardSafetyTimer?.finish(
+    hardSafeRepaired === interactive ? 'skip' : 'accepted',
+    hardSafeRepaired === interactive ? 0 : hardSafeRepaired.length,
+  );
+  const localCleanupTimer = args.onPhaseTrace
+    ? startDisplayRoutingPhaseTrace({
+        phase: 'seed-local-cleanup',
+        candidateCount: hardSafeRepaired.length,
+        onTrace: args.onPhaseTrace,
+      })
+    : null;
   const hemisphereRepaired = repairTerminalHandleHemisphereHairpins(
     hardSafeRepaired,
     repairNodes,
@@ -133,6 +104,17 @@ export const createBaseReactFlowPreDisplayFinalEdges = (
     hemisphereRepaired,
   ) as Edge[];
   const localRepaired = repairLocalDoglegArtifacts(microRepaired, repairNodes);
+  localCleanupTimer?.finish(
+    localRepaired === hardSafeRepaired ? 'skip' : 'accepted',
+    localRepaired === hardSafeRepaired ? 0 : localRepaired.length,
+  );
+  const strictTimer = args.onPhaseTrace
+    ? startDisplayRoutingPhaseTrace({
+        phase: 'seed-strict',
+        candidateCount: localRepaired.length,
+        onTrace: args.onPhaseTrace,
+      })
+    : null;
   const strictRepaired = repairFinalResidualStrictCrossings(
     localRepaired,
     repairNodes,
@@ -141,21 +123,28 @@ export const createBaseReactFlowPreDisplayFinalEdges = (
     strictRepaired,
     repairNodes,
   );
-  const terminalStrictQuality = calculateEdgePathQualityScore(
-    terminalStrictRepaired,
+  strictTimer?.finish(
+    terminalStrictRepaired === localRepaired ? 'skip' : 'accepted',
+    terminalStrictRepaired === localRepaired ? 0 : terminalStrictRepaired.length,
   );
-  const terminalLaneRepaired =
-    terminalStrictQuality.strictCrossings > 0 ||
-    terminalStrictQuality.reverseOverlap > 0 ||
-    terminalStrictQuality.unrelatedOverlap > 0 ||
-    terminalStrictQuality.unexplainedRelatedOverlap > 0
-      ? repairTerminalHandleAxisCrossings(terminalStrictRepaired, repairNodes)
-      : terminalStrictRepaired;
+  const terminalLaneRepaired = repairBaseReactFlowTerminalAxisSeed({
+    edges: terminalStrictRepaired,
+    nodes: repairNodes,
+    onPhaseTrace: args.onPhaseTrace,
+  });
+  const terminalGateTimer = args.onPhaseTrace
+    ? startDisplayRoutingPhaseTrace({
+        phase: 'seed-terminal-gate',
+        candidateCount: terminalLaneRepaired.length,
+        onTrace: args.onPhaseTrace,
+      })
+    : null;
   const terminalLaneReport = getRouteHardQualityGateReport(
     terminalLaneRepaired,
     repairNodes,
     "terminal-lane",
   );
+  terminalGateTimer?.finish(terminalLaneReport.hardClean ? 'accepted' : 'rejected');
   if (terminalLaneReport.hardClean) {
     args.onBoundedCandidate?.(terminalLaneReport);
     return terminalLaneRepaired;

@@ -12,6 +12,7 @@ import {
   createBaseReactFlowPreDisplayFinalEdges,
   repairBoundedReverseParallelOverlaps,
 } from '../baseReactFlowDisplayEdges';
+import { getInteractiveGlobalCandidateEdgeBudget } from '../baseReactFlowDisplayQualitySeedPipeline';
 import {
   countHairpins,
   edgeNodeObstacleHits,
@@ -26,6 +27,13 @@ import {
 } from './baseReactFlowDisplayEdges.testUtils';
 
 describe('baseReactFlowDisplayEdges local repairs', () => {
+  it('bounds deferred global seed work without reducing direct interactive quality', () => {
+    expect(getInteractiveGlobalCandidateEdgeBudget(24, true)).toBeUndefined();
+    expect(getInteractiveGlobalCandidateEdgeBudget(25, true)).toBe(12);
+    expect(getInteractiveGlobalCandidateEdgeBudget(10_000, true)).toBe(12);
+    expect(getInteractiveGlobalCandidateEdgeBudget(25, false)).toBeUndefined();
+  });
+
   it('keeps related same-target trunks free of forbidden overlap after final display routing', () => {
     const nodes: Node[] = [
       { id: 'master-data', position: { x: 300, y: 2800 }, data: {}, measured: { width: 90, height: 60 } },
@@ -430,7 +438,6 @@ describe('baseReactFlowDisplayEdges local repairs', () => {
       path: (edge.data as any).computedPath as Array<{ x: number; y: number }>,
     }));
     const quality = calculateEdgePathQualityScore(result);
-
     expect(
       strictPathCrossings(paths),
       JSON.stringify({

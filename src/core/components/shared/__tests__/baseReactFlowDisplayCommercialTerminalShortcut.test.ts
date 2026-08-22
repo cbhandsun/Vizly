@@ -7,6 +7,7 @@ import {
   buildCommercialSameSideRectangularShortcutPaths,
   buildCommercialSourceTerminalShortcutCandidates,
   buildCommercialTerminalShortcutCandidates,
+  buildLayoutFacingTerminalShortcutCandidates,
 } from '../baseReactFlowDisplayCommercialTerminalShortcut';
 import {
   displayPathLength,
@@ -41,6 +42,134 @@ const edge = (data: Record<string, unknown> = {}): Edge => ({
 });
 
 describe('commercial terminal shortcuts', () => {
+  it('switches both automatic sides for a materially shorter same-row route', () => {
+    const sameRowNodes: Node[] = [
+      { id: 'source', position: { x: 0, y: 0 }, measured: { width: 200, height: 80 }, data: {} },
+      { id: 'target', position: { x: 310, y: 0 }, measured: { width: 200, height: 80 }, data: {} },
+    ];
+    const baseline: Edge = {
+      id: 'same-row-u',
+      source: 'source',
+      target: 'target',
+      sourceHandle: 'bottom',
+      targetHandle: 'bottom',
+      data: { computedPath: [
+        { x: 100, y: 80 }, { x: 100, y: 180 },
+        { x: 410, y: 180 }, { x: 410, y: 80 },
+      ] },
+    };
+
+    const candidates = buildLayoutFacingTerminalShortcutCandidates(
+      baseline,
+      sameRowNodes,
+    );
+
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0]).toMatchObject({
+      sourceHandle: 'right',
+      targetHandle: 'left',
+    });
+    expect(getDisplayComputedPath(candidates[0])).toEqual([
+      { x: 200, y: 40 },
+      { x: 310, y: 40 },
+    ]);
+  });
+
+  it('negotiates an un-compacted ELK U route before topology is locked', () => {
+    const sameRowNodes: Node[] = [
+      { id: 'source', position: { x: 0, y: 0 }, measured: { width: 200, height: 80 }, data: {} },
+      { id: 'target', position: { x: 310, y: 0 }, measured: { width: 200, height: 80 }, data: {} },
+    ];
+    const baseline: Edge = {
+      id: 'same-row-elk-u',
+      source: 'source',
+      target: 'target',
+      sourceHandle: 'bottom',
+      targetHandle: 'bottom',
+      data: { computedPath: [
+        { x: 100, y: 80 }, { x: 100, y: 120 },
+        { x: 100, y: 180 }, { x: 255, y: 180 },
+        { x: 410, y: 180 }, { x: 410, y: 80 },
+      ] },
+    };
+
+    const [candidate] = buildLayoutFacingTerminalShortcutCandidates(
+      baseline,
+      sameRowNodes,
+    );
+
+    expect(candidate).toMatchObject({
+      sourceHandle: 'right',
+      targetHandle: 'left',
+    });
+    expect(getDisplayComputedPath(candidate)).toEqual([
+      { x: 200, y: 40 },
+      { x: 310, y: 40 },
+    ]);
+  });
+
+  it('replaces normalized mixed terminal sides when the facing corridor is materially shorter', () => {
+    const mixedNodes: Node[] = [
+      { id: 'source', position: { x: 2232, y: 479 }, measured: { width: 249, height: 96 }, data: {} },
+      { id: 'target', position: { x: 2601, y: 695 }, measured: { width: 217, height: 96 }, data: {} },
+    ];
+    const baseline: Edge = {
+      id: 'check-limit-pool-a',
+      source: 'source',
+      target: 'target',
+      sourceHandle: 'left',
+      targetHandle: 'bottom',
+      data: { computedPath: [
+        { x: 2232, y: 527 }, { x: 2184, y: 527 },
+        { x: 2184, y: 839 }, { x: 2709.5, y: 839 },
+        { x: 2709.5, y: 791 },
+      ] },
+    };
+
+    const [candidate] = buildLayoutFacingTerminalShortcutCandidates(
+      baseline,
+      mixedNodes,
+    );
+
+    expect(candidate).toMatchObject({
+      sourceHandle: 'right',
+      targetHandle: 'left',
+    });
+    expect(getDisplayComputedPath(candidate)).toEqual([
+      { x: 2481, y: 527 },
+      { x: 2541, y: 527 },
+      { x: 2541, y: 743 },
+      { x: 2601, y: 743 },
+    ]);
+  });
+
+  it('does not switch authored sides or marginal same-side routes', () => {
+    const sameRowNodes: Node[] = [
+      { id: 'source', position: { x: 0, y: 0 }, measured: { width: 100, height: 60 }, data: {} },
+      { id: 'target', position: { x: 1000, y: 0 }, measured: { width: 100, height: 60 }, data: {} },
+    ];
+    const baseline: Edge = {
+      id: 'same-row-u',
+      source: 'source',
+      target: 'target',
+      sourceHandle: 'bottom',
+      targetHandle: 'bottom',
+      data: { computedPath: [
+        { x: 50, y: 60 }, { x: 50, y: 116 },
+        { x: 1050, y: 116 }, { x: 1050, y: 60 },
+      ] },
+    };
+
+    expect(buildLayoutFacingTerminalShortcutCandidates({
+      ...baseline,
+      data: { ...baseline.data, manualHandleSides: ['source'] },
+    }, sameRowNodes)).toEqual([]);
+    expect(buildLayoutFacingTerminalShortcutCandidates(
+      baseline,
+      sameRowNodes,
+    )).toEqual([]);
+  });
+
   it('shortens an outer corridor by landing on a nearer legal target side', () => {
     const baseline = edge();
     const candidates = buildCommercialTerminalShortcutCandidates(baseline, nodes);

@@ -12,6 +12,12 @@ import {
 } from './baseReactFlowDisplayWorkerProtocol';
 import type { DisplayRoutingPhaseTrace } from './baseReactFlowDisplayRoutingTrace';
 import {
+  createDisplayRoutingIdentity,
+  type RoutingIdentity,
+  type RoutingWorkerSessionRef,
+} from './baseReactFlowDisplayRoutingSession';
+import { rememberDisplayWorkerSession } from './baseReactFlowDisplayWorkerSessionClient';
+import {
   appendDisplayRoutingBoundedCandidate,
   appendDisplayRoutingPhaseProgress,
   updateDisplayRoutingDebugState,
@@ -22,7 +28,6 @@ import {
   doBaseReactFlowDisplayRoutesMatchExactly,
   mergeBaseReactFlowDisplayEdgePatches,
   sanitizeBaseReactFlowDisplayCachePatches,
-  sanitizeBaseReactFlowTrustedDisplayPatches,
 } from './baseReactFlowDisplayRoutingTransaction';
 import { createDisplayWorkerFinalQualityError } from './baseReactFlowDisplayWorkerFailure';
 import { projectBaseReactFlowDisplayWorkerInput } from './baseReactFlowDisplayWorkerProjection';
@@ -61,8 +66,14 @@ export type BaseReactFlowDisplayWorkerResult = {
   phaseTrace: DisplayRoutingPhaseTrace[];
   affectedEdgeCount?: number;
   fallbackLevel?: DisplayRoutingFallbackLevel;
+  nextIdentity?: RoutingIdentity;
+  outputRouteSignature?: string;
+  sessionRef?: RoutingWorkerSessionRef;
 };
-type BaseReactFlowDisplayWorkerResponseResult = Omit<BaseReactFlowDisplayWorkerResult, 'projectedEdges'>;
+export type BaseReactFlowDisplayWorkerResponseResult = Omit<
+  BaseReactFlowDisplayWorkerResult,
+  'projectedEdges'
+>;
 
 export type DisplayRoutingInput = {
   cacheSignature: string;
@@ -291,7 +302,7 @@ export const doesBaseReactFlowDisplayWorkerResolutionMatchOperation = (
     || routeResolution === 'full-route-repaired';
 };
 
-const requestBaseReactFlowDisplayEdgesWorker = ({
+export const requestBaseReactFlowDisplayEdgesWorker = ({
   workerRef,
   request,
   qualityMode = 'full',
@@ -446,6 +457,9 @@ const requestBaseReactFlowDisplayEdgesWorker = ({
           phaseTrace: response.phaseTrace ?? [],
           affectedEdgeCount: response.affectedEdgeCount,
           fallbackLevel: response.fallbackLevel,
+          nextIdentity: response.nextIdentity,
+          outputRouteSignature: response.outputRouteSignature,
+          sessionRef: response.sessionRef,
         });
       });
     };
@@ -501,6 +515,8 @@ export const computeBaseReactFlowDisplayEdgesInWorker = async ({
   smartEdgePadding,
   isLargeGraph,
   displayEdgeEpoch,
+  inputSignature,
+  inputGeometryDigest,
   cachedCandidateEdges = null,
   candidateSource,
   qualityMode = 'full',
@@ -515,6 +531,8 @@ export const computeBaseReactFlowDisplayEdgesInWorker = async ({
   smartEdgePadding: number;
   isLargeGraph: boolean;
   displayEdgeEpoch: number;
+  inputSignature?: string;
+  inputGeometryDigest?: string;
   cachedCandidateEdges?: Edge[] | null;
   candidateSource?: DisplayEdgesWorkerCandidateSource;
   qualityMode?: DisplayQualityMode;
@@ -539,6 +557,9 @@ export const computeBaseReactFlowDisplayEdgesInWorker = async ({
     isLargeGraph,
     displayEdgeEpoch,
     qualityMode,
+    ...(inputSignature && inputGeometryDigest
+      ? { inputIdentity: createDisplayRoutingIdentity(inputSignature, inputGeometryDigest) }
+      : {}),
   };
   const result = await requestBaseReactFlowDisplayEdgesWorker({
     workerRef,
@@ -554,94 +575,7 @@ export const computeBaseReactFlowDisplayEdgesInWorker = async ({
     timeoutMs,
     signal,
   });
-  return { ...result, projectedEdges: projectedInput.edges };
-};
-
-export const computeBaseReactFlowDisplayEdgesIncrementallyInWorker = async ({
-  workerRef,
-  requestId,
-  edges,
-  nodes,
-  enableSmartEdges,
-  smartEdgePadding,
-  isLargeGraph,
-  displayEdgeEpoch,
-  baselineInputSignature,
-  baselineInputGeometryDigest,
-  baselineNodes,
-  baselineSourceEdges,
-  baselinePatches,
-  baselineOutputRouteSignature,
-  nextInputSignature,
-  nextInputGeometryDigest,
-  changeSet,
-  mutableEdgeIds,
-  contextEdgeIds,
-  timeoutMs = DISPLAY_WORKER_TIMEOUT_MS,
-  signal,
-}: {
-  workerRef: MutableRefObject<Worker | null>;
-  requestId: string;
-  edges: Edge[];
-  nodes: Node[];
-  enableSmartEdges: boolean;
-  smartEdgePadding: number;
-  isLargeGraph: boolean;
-  displayEdgeEpoch: number;
-  baselineInputSignature: string;
-  baselineInputGeometryDigest: string;
-  baselineNodes: Node[];
-  baselineSourceEdges: Edge[];
-  baselinePatches: Edge[];
-  baselineOutputRouteSignature: string;
-  nextInputSignature: string;
-  nextInputGeometryDigest: string;
-  changeSet: import('./baseReactFlowDisplayRoutingChangeSet').BaseReactFlowRoutingChangeSet;
-  mutableEdgeIds: string[];
-  contextEdgeIds: string[];
-  timeoutMs?: number;
-  signal?: AbortSignal;
-}): Promise<BaseReactFlowDisplayWorkerResult> => {
-  const projectedInput = projectBaseReactFlowDisplayWorkerInput({ edges, nodes });
-  const projectedBaseline = projectBaseReactFlowDisplayWorkerInput({
-    edges: baselineSourceEdges,
-    nodes: baselineNodes,
-  });
-  const safeBaselinePatches = sanitizeBaseReactFlowTrustedDisplayPatches(
-    projectedBaseline.edges,
-    baselinePatches,
-  );
-  if (!safeBaselinePatches) {
-    throw new Error('display-edge-worker-invalid-incremental-baseline');
-  }
-  const result = await requestBaseReactFlowDisplayEdgesWorker({
-    workerRef,
-    request: {
-      operation: 'incremental-route',
-      requestId,
-      edges: projectedInput.edges,
-      nodes: projectedInput.nodes,
-      enableSmartEdges,
-      smartEdgePadding,
-      isLargeGraph,
-      displayEdgeEpoch,
-      qualityMode: 'full',
-      baselineInputSignature,
-      baselineInputGeometryDigest,
-      baselineNodes: projectedBaseline.nodes,
-      baselineSourceEdges: projectedBaseline.edges,
-      baselinePatches: safeBaselinePatches,
-      baselineOutputRouteSignature,
-      nextInputSignature,
-      nextInputGeometryDigest,
-      changeSet,
-      mutableEdgeIds,
-      contextEdgeIds,
-    },
-    qualityMode: 'full',
-    timeoutMs,
-    signal,
-  });
+  rememberDisplayWorkerSession(workerRef.current, result.sessionRef);
   return { ...result, projectedEdges: projectedInput.edges };
 };
 

@@ -21,11 +21,15 @@ import {
   edgeRoutingQualityIntentToken,
 } from '../../../strategies/shared/edgeRoutingQualityIntent';
 import {
+  boundedQualityPolishNeedsMicroRepair,
   canSkipLargeDetachedOverlapRepair,
   hasSharedTargetEntryStrictCrossing,
   repairSharedTargetEntryStrictCrossingsIfNeeded,
   separateLargeDetachedParallelOverlapsIfNeeded,
 } from '../baseReactFlowDisplayFullRouteQualityPhase';
+import { shouldUseBoundedPostRenderResidualRepair } from '../baseReactFlowDisplayFullRoutePostRenderPhase';
+import { createDisplayRoutingDefectPlan } from '../baseReactFlowDisplayRoutingDefectPlan';
+import { createDisplayRoutingTopologyPlan } from '../baseReactFlowDisplayRoutingTopologyPlan';
 
 const edge = (path: Array<{ x: number; y: number }>): Edge => ({
   id: 'edge',
@@ -35,6 +39,108 @@ const edge = (path: Array<{ x: number; y: number }>): Edge => ({
 });
 
 describe('baseReactFlowDisplayEvaluation', () => {
+  it('builds bounded O2M/M2O groups, candidate axes, and usable corridors', () => {
+    const topologyNodes: Node[] = [
+      { id: 's', position: { x: 0, y: 100 }, measured: { width: 100, height: 60 }, data: {} },
+      { id: 'm', position: { x: 300, y: 0 }, measured: { width: 100, height: 60 }, data: {} },
+      { id: 't', position: { x: 600, y: 100 }, measured: { width: 100, height: 60 }, data: {} },
+    ];
+    const topologyEdges: Edge[] = [
+      {
+        id: 's-m-a', source: 's', target: 'm', sourceHandle: 'right', targetHandle: 'left',
+        data: { flowRole: 'main', computedPath: [{ x: 100, y: 130 }, { x: 300, y: 30 }] },
+      },
+      {
+        id: 's-m-b', source: 's', target: 'm', sourceHandle: 'right', targetHandle: 'left',
+        data: { flowRole: 'main', computedPath: [{ x: 100, y: 130 }, { x: 300, y: 30 }] },
+      },
+      {
+        id: 'm-t-a', source: 'm', target: 't', sourceHandle: 'right', targetHandle: 'left',
+        data: { flowRole: 'main', computedPath: [{ x: 400, y: 30 }, { x: 600, y: 130 }] },
+      },
+      {
+        id: 'm-t-b', source: 'm', target: 't', sourceHandle: 'right', targetHandle: 'left',
+        data: { flowRole: 'main', computedPath: [{ x: 400, y: 30 }, { x: 600, y: 130 }] },
+      },
+    ];
+    const plan = createDisplayRoutingTopologyPlan(topologyNodes, topologyEdges);
+    expect(plan).toMatchObject({ nodeCount: 3, edgeCount: 4 });
+    expect(plan.groups.some(group => group.kind === 'source' && group.memberEdgeIndexes.length === 2))
+      .toBe(true);
+    expect(plan.groups.some(group => group.kind === 'target' && group.memberEdgeIndexes.length === 2))
+      .toBe(true);
+    expect(plan.candidateAxes.x).toEqual(expect.arrayContaining([0, 100, 300, 400, 600, 700]));
+    expect(plan.corridors.some(corridor => corridor.axis === 'vertical' && corridor.capacity > 0))
+      .toBe(true);
+  });
+
+  it('keeps empty and non-finite topology inputs bounded', () => {
+    expect(createDisplayRoutingTopologyPlan([], [])).toEqual({
+      nodeCount: 0,
+      edgeCount: 0,
+      groups: [],
+      candidateAxes: { x: [], y: [] },
+      corridors: [],
+    });
+    const plan = createDisplayRoutingTopologyPlan([{
+      id: 'bad', position: { x: Number.POSITIVE_INFINITY, y: Number.NaN },
+      measured: { width: 100, height: 60 }, data: {},
+    }], []);
+    expect(plan.candidateAxes).toEqual({ x: [], y: [] });
+    expect(plan.corridors).toEqual([]);
+  });
+
+  it('builds a defect-directed stage plan without allowing metric compensation', () => {
+    const quality = {
+      nonOrthogonalSegments: 0,
+      strictCrossings: 0,
+      reverseOverlap: 0,
+      unrelatedOverlap: 0,
+      relatedOverlap: 0,
+      unexplainedRelatedOverlap: 0,
+      shortEndpointStubs: 0,
+      tinyInteriorDoglegs: 0,
+      hairpins: 0,
+      backtrackPenalty: 0,
+      detourPenalty: 0,
+      bends: 0,
+      totalLength: 100,
+    };
+    expect(createDisplayRoutingDefectPlan({
+      candidate: 'polished',
+      hardClean: false,
+      terminalsAttached: true,
+      terminalsAnchored: false,
+      obstacleHits: 0,
+      quality,
+    })).toMatchObject({
+      onlyTerminalAxisDefects: true,
+      needsTerminalRepair: true,
+      needsStrictCrossingRepair: false,
+      needsOverlapRepair: false,
+    });
+    expect(createDisplayRoutingDefectPlan({
+      candidate: 'polished',
+      hardClean: false,
+      terminalsAttached: true,
+      terminalsAnchored: true,
+      obstacleHits: 1,
+      quality: { ...quality, strictCrossings: 1, reverseOverlap: 1, hairpins: 1 },
+    })).toMatchObject({
+      needsObstacleRepair: true,
+      needsStrictCrossingRepair: true,
+      needsOverlapRepair: true,
+      needsMicroRepair: true,
+      onlyTerminalAxisDefects: false,
+    });
+  });
+  it('bounds post-render residual repair for large routes or hard-overlap handoff', () => {
+    expect(shouldUseBoundedPostRenderResidualRepair(false, false)).toBe(false);
+    expect(shouldUseBoundedPostRenderResidualRepair(true, false)).toBe(true);
+    expect(shouldUseBoundedPostRenderResidualRepair(false, true)).toBe(true);
+    expect(shouldUseBoundedPostRenderResidualRepair(true, true)).toBe(true);
+  });
+
   it('tokenizes only explicit routing-quality intent flags', () => {
     const intentEdge = edge([{ x: 0, y: 0 }, { x: 100, y: 0 }]);
     expect(edgeRoutingQualityIntentToken(intentEdge)).toBe('0000');
@@ -94,6 +200,7 @@ describe('baseReactFlowDisplayEvaluation', () => {
     expect(targetRepair).not.toHaveBeenCalled();
     expect(canSkipLargeDetachedOverlapRepair(24, cleanQuality)).toBe(false);
     expect(canSkipLargeDetachedOverlapRepair(25, cleanQuality)).toBe(true);
+    expect(boundedQualityPolishNeedsMicroRepair(cleanQuality)).toBe(false);
     expect(separateLargeDetachedParallelOverlapsIfNeeded(
       cleanEdges,
       [],
@@ -102,6 +209,16 @@ describe('baseReactFlowDisplayEvaluation', () => {
       detachedRepair,
     )).toBe(cleanEdges);
     expect(detachedRepair).not.toHaveBeenCalled();
+
+    const tinyDoglegQuality = calculateEdgePathQualityScore([
+      edge([
+        { x: 0, y: 0 },
+        { x: 0, y: 80 },
+        { x: 8, y: 80 },
+        { x: 8, y: 160 },
+      ]),
+    ]);
+    expect(boundedQualityPolishNeedsMicroRepair(tinyDoglegQuality)).toBe(true);
 
     const unrelatedStrictEdges: Edge[] = [
       {

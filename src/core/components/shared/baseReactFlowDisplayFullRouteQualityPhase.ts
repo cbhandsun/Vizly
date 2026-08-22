@@ -18,7 +18,6 @@ import {
   type EdgePathQualityScore,
 } from '../../strategies/shared/edgeStrictCrossingGuard';
 import {
-  repairSharedTargetEntryCrossings,
   synthesizeSharedEndpointTrunks,
   synthesizeSharedTargetTrunks,
 } from '../../strategies/shared/edgeSharedTrunkSynthesis';
@@ -41,8 +40,17 @@ import {
   keepPerEdgeObstacleNonRegressingCandidates,
 } from './baseReactFlowDisplayEvaluation';
 import { finalSameSideTrueTrunksDoNotRegress } from './baseReactFlowDisplayFinalEndpointOrder';
-import { startDisplayRoutingPhaseTrace } from './baseReactFlowDisplayRoutingTrace';
+import {
+  startDisplayRoutingPhaseTrace,
+  type DisplayRoutingPhaseTrace,
+} from './baseReactFlowDisplayRoutingTrace';
 import type { BaseReactFlowFullRouteContext } from './baseReactFlowDisplayFullRouteTypes';
+import { repairSharedTargetEntryStrictCrossingsIfNeeded } from './baseReactFlowDisplaySharedTargetEntry';
+
+export {
+  hasSharedTargetEntryStrictCrossing,
+  repairSharedTargetEntryStrictCrossingsIfNeeded,
+} from './baseReactFlowDisplaySharedTargetEntry';
 
 const repairEndpointOrthogonalPathsTwice = <T extends Edge[]>(
   edges: T,
@@ -52,110 +60,27 @@ const repairEndpointOrthogonalPathsTwice = <T extends Edge[]>(
   return first === edges ? first : repairEndpointOrthogonalPaths(first, nodes) as T;
 };
 
-type SharedTargetEntryPoint = { x: number; y: number };
-type SharedTargetEntrySegment = {
-  a: SharedTargetEntryPoint;
-  b: SharedTargetEntryPoint;
-  axis: 'h' | 'v';
-};
-
-const SHARED_TARGET_ENTRY_EPS = 0.5;
-
-const getSharedTargetEntryPath = (edge: Edge): SharedTargetEntryPoint[] => {
-  const data = edge.data;
-  const treeRouting = data?.treeRouting;
-  const raw = data?.computedPath
-    || (treeRouting && typeof treeRouting === 'object' && 'points' in treeRouting
-      ? treeRouting.points
-      : []);
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .map((point: unknown) => {
-      if (!point || typeof point !== 'object') return { x: Number.NaN, y: Number.NaN };
-      const candidate = point as Record<string, unknown>;
-      return { x: Number(candidate.x), y: Number(candidate.y) };
-    })
-    .filter((point: SharedTargetEntryPoint) => (
-      Number.isFinite(point.x) && Number.isFinite(point.y)
-    ));
-};
-
-const getSharedTargetEntrySegments = (edge: Edge): SharedTargetEntrySegment[] => {
-  const path = getSharedTargetEntryPath(edge);
-  const segments: SharedTargetEntrySegment[] = [];
-  for (let index = 0; index < path.length - 1; index += 1) {
-    const a = path[index];
-    const b = path[index + 1];
-    const horizontal = Math.abs(a.y - b.y) <= SHARED_TARGET_ENTRY_EPS
-      && Math.abs(a.x - b.x) > SHARED_TARGET_ENTRY_EPS;
-    const vertical = Math.abs(a.x - b.x) <= SHARED_TARGET_ENTRY_EPS
-      && Math.abs(a.y - b.y) > SHARED_TARGET_ENTRY_EPS;
-    if (horizontal || vertical) {
-      segments.push({ a, b, axis: horizontal ? 'h' : 'v' });
-    }
-  }
-  return segments;
-};
-
-const sharedTargetEntrySegmentsStrictlyCross = (
-  first: SharedTargetEntrySegment,
-  second: SharedTargetEntrySegment,
-): boolean => {
-  if (first.axis === second.axis) return false;
-  const horizontal = first.axis === 'h' ? first : second;
-  const vertical = first.axis === 'v' ? first : second;
-  const x = vertical.a.x;
-  const y = horizontal.a.y;
-  return x > Math.min(horizontal.a.x, horizontal.b.x) + SHARED_TARGET_ENTRY_EPS
-    && x < Math.max(horizontal.a.x, horizontal.b.x) - SHARED_TARGET_ENTRY_EPS
-    && y > Math.min(vertical.a.y, vertical.b.y) + SHARED_TARGET_ENTRY_EPS
-    && y < Math.max(vertical.a.y, vertical.b.y) - SHARED_TARGET_ENTRY_EPS;
-};
-
-/**
- * Mirrors the shared-target repair's raw path and strict-crossing geometry.
- * A false result is therefore an exact proof that the repair cannot act.
- */
-export const hasSharedTargetEntryStrictCrossing = (edges: Edge[]): boolean => {
-  const targetSegments = new Map<string, SharedTargetEntrySegment[][]>();
-  for (const edge of edges) {
-    if (!edge.target) continue;
-    const segments = getSharedTargetEntrySegments(edge);
-    if (segments.length === 0) continue;
-    const relatedPaths = targetSegments.get(edge.target);
-    if (relatedPaths) {
-      for (const relatedSegments of relatedPaths) {
-        for (const first of segments) {
-          for (const second of relatedSegments) {
-            if (sharedTargetEntrySegmentsStrictlyCross(first, second)) return true;
-          }
-        }
-      }
-      relatedPaths.push(segments);
-    } else {
-      targetSegments.set(edge.target, [segments]);
-    }
-  }
-  return false;
-};
-
-/**
- * Avoid the repair's repeated whole-graph scoring when its own strict-crossing
- * geometry proves that no shared-target pair can produce a candidate.
- */
-export const repairSharedTargetEntryStrictCrossingsIfNeeded = <T extends Edge[]>(
-  edges: T,
-  repair: (candidate: Edge[]) => Edge[] = repairSharedTargetEntryCrossings,
-): T => (
-  hasSharedTargetEntryStrictCrossing(edges)
-    ? repair(edges) as T
-    : edges
-);
-
 export const canSkipLargeDetachedOverlapRepair = (
   edgeCount: number,
   quality: EdgePathQualityScore,
 ): boolean => edgeCount > 24 && !hasHardDisplayOverlapRisk(quality);
+
+export const boundedQualityPolishNeedsMicroRepair = (
+  quality: EdgePathQualityScore,
+): boolean => quality.strictCrossings > 0
+  || quality.shortEndpointStubs > 0
+  || quality.tinyInteriorDoglegs > 0
+  || quality.hairpins > 0;
+
+const repairBoundedQualityPolishMicroArtifacts = (
+  edges: Edge[],
+  useBoundedLargeRepair: boolean,
+): Edge[] => (
+  useBoundedLargeRepair
+  && !boundedQualityPolishNeedsMicroRepair(calculateEdgePathQualityScore(edges))
+    ? edges
+    : repairDisplayMicroArtifacts(edges)
+);
 
 /**
  * For graphs above the detached repair's related-overlap search limit, a
@@ -247,6 +172,15 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
     candidateCount: sameNodeRoleRepairedEdges.length,
     onTrace: onPhaseTrace,
   });
+  const crossingPhaseTrace: DisplayRoutingPhaseTrace[] = [];
+  const recordCrossingPhaseTrace = onPhaseTrace
+    ? (trace: DisplayRoutingPhaseTrace) => crossingPhaseTrace.push(trace)
+    : undefined;
+  const structuralCrossingTimer = startDisplayRoutingPhaseTrace({
+    phase: 'quality-crossing-structural',
+    candidateCount: sameNodeRoleRepairedEdges.length,
+    onTrace: recordCrossingPhaseTrace,
+  });
   const reverseFlowBypassEdges = repairEndpointOrthogonalPaths(
     repairReverseFlowBypassCrossings(sameNodeRoleRepairedEdges, repairNodes),
     repairNodes,
@@ -267,6 +201,15 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
     finalDisplayCrossingRepairedEdges,
     repairNodes,
   );
+  structuralCrossingTimer.finish(
+    endpointLaneNudgedEdges === sameNodeRoleRepairedEdges ? 'skip' : 'accepted',
+    endpointLaneNudgedEdges === sameNodeRoleRepairedEdges ? 0 : endpointLaneNudgedEdges.length,
+  );
+  const globalRefineTimer = startDisplayRoutingPhaseTrace({
+    phase: 'quality-crossing-global-refine',
+    candidateCount: endpointLaneNudgedEdges.length,
+    onTrace: recordCrossingPhaseTrace,
+  });
   const globallyRefinedEdges = repairEndpointOrthogonalPaths(
     refineGlobalEdgeWaypoints(endpointLaneNudgedEdges, repairNodes),
     repairNodes,
@@ -279,6 +222,15 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
     synthesizeSharedTargetTrunks(repairedEdges, { nodes: repairNodes }),
     repairNodes,
   );
+  globalRefineTimer.finish(
+    finalTargetQualityEdges === endpointLaneNudgedEdges ? 'skip' : 'accepted',
+    finalTargetQualityEdges === endpointLaneNudgedEdges ? 0 : finalTargetQualityEdges.length,
+  );
+  const finalCrossingCandidatesTimer = startDisplayRoutingPhaseTrace({
+    phase: 'quality-crossing-final-candidates',
+    candidateCount: finalTargetQualityEdges.length,
+    onTrace: recordCrossingPhaseTrace,
+  });
   const finalDetachedQualityEdges = repairEndpointOrthogonalPaths(
     separateLargeDetachedParallelOverlapsIfNeeded(
       repairSharedTargetEntryStrictCrossingsIfNeeded(finalTargetQualityEdges),
@@ -362,12 +314,17 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
     finalPreOverlapRepairCandidate,
     finalCrossingRepairCandidate,
   );
+  finalCrossingCandidatesTimer.finish(
+    finalQualityCandidateEdges === finalTargetQualityEdges ? 'skip' : 'accepted',
+    finalQualityCandidateEdges === finalTargetQualityEdges ? 0 : finalQualityCandidateEdges.length,
+  );
   crossingSweepTimer.finish(
     finalQualityCandidateEdges === sameNodeRoleRepairedEdges ? 'skip' : 'accepted',
     finalQualityCandidateEdges === sameNodeRoleRepairedEdges
       ? 0
       : finalQualityCandidateEdges.length,
   );
+  crossingPhaseTrace.forEach(trace => onPhaseTrace?.(trace));
   const strictClosureTimer = startDisplayRoutingPhaseTrace({
     phase: 'quality-strict-closure',
     candidateCount: finalQualityCandidateEdges.length,
@@ -438,7 +395,36 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
     candidateCount: finalQualityEdges.length,
     onTrace: onPhaseTrace,
   });
+  const polishPhaseTrace: DisplayRoutingPhaseTrace[] = [];
+  const recordPolishPhaseTrace = onPhaseTrace
+    ? (trace: DisplayRoutingPhaseTrace) => polishPhaseTrace.push(trace)
+    : undefined;
+  const polishCandidateTimer = recordPolishPhaseTrace
+    ? startDisplayRoutingPhaseTrace({
+        phase: 'quality-polish-candidates',
+        candidateCount: finalQualityEdges.length,
+        onTrace: recordPolishPhaseTrace,
+      })
+    : null;
+  const localPolishTimer = recordPolishPhaseTrace
+    ? startDisplayRoutingPhaseTrace({
+        phase: 'quality-polish-local',
+        candidateCount: finalQualityEdges.length,
+        onTrace: recordPolishPhaseTrace,
+      })
+    : null;
   const finalLocalPolishCandidate = repairLocalDoglegArtifacts(finalQualityEdges, repairNodes);
+  localPolishTimer?.finish(
+    finalLocalPolishCandidate === finalQualityEdges ? 'skip' : 'accepted',
+    finalLocalPolishCandidate === finalQualityEdges ? 0 : finalQualityEdges.length,
+  );
+  const detachedPolishTimer = recordPolishPhaseTrace
+    ? startDisplayRoutingPhaseTrace({
+        phase: 'quality-polish-detached',
+        candidateCount: finalLocalPolishCandidate.length,
+        onTrace: recordPolishPhaseTrace,
+      })
+    : null;
   const finalDetachedPolishCandidate = separateLargeDetachedParallelOverlapsIfNeeded(
     finalLocalPolishCandidate,
     repairNodes,
@@ -447,23 +433,62 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
       ? DISPLAY_BOUNDED_DETACHED_OVERLAP_REPAIR_OPTIONS
       : DISPLAY_DETACHED_OVERLAP_REPAIR_OPTIONS,
   );
-  const finalDetachedMicroPolishCandidate = repairDisplayMicroArtifacts(finalDetachedPolishCandidate);
-  const finalDetachedLocalPolishCandidate = repairLocalDoglegArtifacts(
+  const finalDetachedMicroPolishCandidate = repairBoundedQualityPolishMicroArtifacts(
     finalDetachedPolishCandidate,
-    repairNodes,
+    useBoundedLargeRepair,
   );
+  const finalDetachedLocalPolishCandidate = useBoundedLargeRepair
+    ? finalDetachedPolishCandidate
+    : repairLocalDoglegArtifacts(finalDetachedPolishCandidate, repairNodes);
+  detachedPolishTimer?.finish(
+    finalDetachedLocalPolishCandidate === finalLocalPolishCandidate ? 'skip' : 'accepted',
+    finalDetachedLocalPolishCandidate === finalLocalPolishCandidate
+      ? 0
+      : finalDetachedLocalPolishCandidate.length,
+  );
+  const endpointPolishTimer = recordPolishPhaseTrace
+    ? startDisplayRoutingPhaseTrace({
+        phase: 'quality-polish-endpoint',
+        candidateCount: finalDetachedPolishCandidate.length,
+        onTrace: recordPolishPhaseTrace,
+      })
+    : null;
   const finalEndpointPolishCandidate = repairEndpointOrthogonalPaths(
     finalDetachedPolishCandidate,
     repairNodes,
+    { detectExistingBridgeCrossings: !useBoundedLargeRepair },
   );
-  const finalMicroPolishCandidate = repairDisplayMicroArtifacts(finalEndpointPolishCandidate);
-  const finalLocalAfterDetachedCandidate = repairLocalDoglegArtifacts(
-    finalEndpointPolishCandidate,
-    repairNodes,
+  endpointPolishTimer?.finish(
+    finalEndpointPolishCandidate === finalDetachedPolishCandidate ? 'skip' : 'accepted',
+    finalEndpointPolishCandidate === finalDetachedPolishCandidate
+      ? 0
+      : finalEndpointPolishCandidate.length,
   );
-  const finalEndpointAfterLocalCandidate = repairEndpointOrthogonalPaths(
-    finalLocalAfterDetachedCandidate,
-    repairNodes,
+  const microPolishTimer = recordPolishPhaseTrace
+    ? startDisplayRoutingPhaseTrace({
+        phase: 'quality-polish-micro',
+        candidateCount: finalEndpointPolishCandidate.length,
+        onTrace: recordPolishPhaseTrace,
+      })
+    : null;
+  // Bounded polish already retains the detached-micro candidate above. Keep
+  // the endpoint candidate separately and avoid repeating the same global
+  // micro search after endpoint normalization; candidate selection can still
+  // choose either repair family independently.
+  const finalMicroPolishCandidate = useBoundedLargeRepair
+    ? finalEndpointPolishCandidate
+    : repairDisplayMicroArtifacts(finalEndpointPolishCandidate);
+  const finalLocalAfterDetachedCandidate = useBoundedLargeRepair
+    ? finalEndpointPolishCandidate
+    : repairLocalDoglegArtifacts(finalEndpointPolishCandidate, repairNodes);
+  const finalEndpointAfterLocalCandidate = useBoundedLargeRepair
+    ? finalLocalAfterDetachedCandidate
+    : repairEndpointOrthogonalPaths(finalLocalAfterDetachedCandidate, repairNodes);
+  microPolishTimer?.finish(
+    finalEndpointAfterLocalCandidate === finalEndpointPolishCandidate ? 'skip' : 'accepted',
+    finalEndpointAfterLocalCandidate === finalEndpointPolishCandidate
+      ? 0
+      : finalEndpointAfterLocalCandidate.length,
   );
   const finalPolishCandidates: [Edge[], ...Edge[][]] = [
     finalQualityEdges,
@@ -476,6 +501,19 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
     finalLocalAfterDetachedCandidate,
     finalEndpointAfterLocalCandidate,
   ];
+  polishCandidateTimer?.finish(
+    finalPolishCandidates.every(candidate => candidate === finalQualityEdges)
+      ? 'skip'
+      : 'accepted',
+  );
+  const polishSelectionTimer = recordPolishPhaseTrace
+    ? startDisplayRoutingPhaseTrace({
+        phase: 'quality-polish-selection',
+        candidateCount: finalPolishCandidates.length,
+        onTrace: recordPolishPhaseTrace,
+      })
+    : null;
+  const prePolishSelectionEdges = finalQualityEdges;
   if (finalPolishCandidates.some(
     candidate => calculateEdgePathQualityScore(candidate).strictCrossings === 0,
   )) {
@@ -503,6 +541,17 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
       finalStrictPolishCandidate,
     );
   }
+  polishSelectionTimer?.finish(
+    finalQualityEdges === prePolishSelectionEdges ? 'skip' : 'accepted',
+    finalQualityEdges === prePolishSelectionEdges ? 0 : finalQualityEdges.length,
+  );
+  const residualPolishTimer = recordPolishPhaseTrace
+    ? startDisplayRoutingPhaseTrace({
+        phase: 'quality-polish-residual',
+        candidateCount: finalQualityEdges.length,
+        onTrace: recordPolishPhaseTrace,
+      })
+    : null;
   const preFinalizeResidualQuality = calculateEdgePathQualityScore(finalQualityEdges);
   const residualQualityEdges = hasHardDisplayOverlapRisk(preFinalizeResidualQuality)
     ? repairResidualDisplayOverlaps(
@@ -516,6 +565,17 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
         : DISPLAY_EXTENDED_RESIDUAL_OVERLAP_REPAIR_OPTIONS,
     )
     : finalQualityEdges;
+  residualPolishTimer?.finish(
+    residualQualityEdges === finalQualityEdges ? 'skip' : 'accepted',
+    residualQualityEdges === finalQualityEdges ? 0 : residualQualityEdges.length,
+  );
+  const obstacleSelectionTimer = recordPolishPhaseTrace
+    ? startDisplayRoutingPhaseTrace({
+        phase: 'quality-polish-obstacle-selection',
+        candidateCount: residualQualityEdges.length,
+        onTrace: recordPolishPhaseTrace,
+      })
+    : null;
   const obstacleSafeQualityEdges = keepPerEdgeObstacleNonRegressingCandidates(
     normalizedEdges,
     residualQualityEdges,
@@ -534,9 +594,14 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
   )
     ? selectedQualityEdges
     : normalizedEdges;
+  obstacleSelectionTimer?.finish(
+    result === residualQualityEdges ? 'skip' : 'accepted',
+    result === residualQualityEdges ? 0 : result.length,
+  );
   polishTimer.finish(
     result === finalQualityEdges ? 'skip' : 'accepted',
     result === finalQualityEdges ? 0 : result.length,
   );
+  polishPhaseTrace.forEach(trace => onPhaseTrace?.(trace));
   return result;
 };

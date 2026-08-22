@@ -1,9 +1,18 @@
 import { setTimeout as delay } from 'node:timers/promises';
+import { readFile } from 'node:fs/promises';
 
 import { DISPLAY_ROUTING_BROWSER_CAPTURE_SCRIPT } from './lib/display-routing-browser-capture.mjs';
-import { readRenderedDisplayEdgeNodeIntersections } from './lib/display-routing-browser-geometry.mjs';
+import { summarizeSlowestDisplayRoutingPhases } from './lib/display-routing-browser-performance.mjs';
+import {
+  readDisplayRoutingVisualScaleAudit,
+  readRenderedDisplayEdgeNodeIntersections,
+} from './lib/display-routing-browser-geometry.mjs';
 import { withPrecompiledRouteBrowser } from './lib/precompiled-display-route-cdp.mjs';
 import { PRECOMPILED_DISPLAY_ROUTE_TARGETS } from './lib/precompiled-display-route-targets.mjs';
+import {
+  parseCanonicalPresetIdentity,
+  verifyCanonicalPresetMount,
+} from './lib/display-routing-canonical-preset.mjs';
 
 const BASE_URL = String(process.env.PRECOMPILED_ROUTE_BASE_URL || '').trim().replace(/\/$/, '');
 const WAIT_TIMEOUT_MS = 120_000;
@@ -89,6 +98,21 @@ const auditFinalSvg = async (session, route, label) => {
   const commercialAudit = await session.evaluate(
     `(${readRenderedDisplayEdgeNodeIntersections.toString()})(${JSON.stringify(route.response.edges)}, 48)`,
   );
+  const visualAudit = await session.evaluate(
+    `(${readDisplayRoutingVisualScaleAudit.toString()})()`,
+  );
+  if (
+    !visualAudit
+    || visualAudit.invalidNonScalingPathCount !== 0
+    || visualAudit.invalidStrokeWidthCount !== 0
+    || visualAudit.lowContrastPathCount !== 0
+    || visualAudit.invalidVisibleLabelFontSizeCount !== 0
+    || visualAudit.labelNodeOverlapCount !== 0
+    || visualAudit.markerCount < 1
+    || visualAudit.edgeAccessibleNameMissingCount !== 0
+    || (visualAudit.zoom < 0.4 && !visualAudit.zoomedOut)
+    || (visualAudit.zoom >= 0.4 && visualAudit.zoomedOut)
+  ) throw new Error(`Final SVG visual quality failed for ${label}:\n${JSON.stringify(visualAudit, null, 2)}`);
   const riskNodeIds = [...new Set([
     ...audit.clearanceRisks.map(risk => risk.nodeId),
     ...commercialAudit.clearanceRisks.map(risk => risk.nodeId),
@@ -124,12 +148,18 @@ const auditFinalSvg = async (session, route, label) => {
     minimumClearanceRiskDetails,
     commercialClearanceRisks: commercialAudit.clearanceRisks.length,
     commercialClearanceRiskDetails,
+    visualAudit,
   };
 };
 
 const verifyPreset = target => withPrecompiledRouteBrowser(async session => {
   await prepareSession(session);
-  const url = `${BASE_URL}/?routingMatrix=${Date.now()}`
+  const identity = parseCanonicalPresetIdentity(
+    JSON.parse(await readFile(target.sourcePath, 'utf8')),
+    target.presetId,
+  );
+  const url = `${BASE_URL}/?canonicalPreset=${encodeURIComponent(target.presetId)}`
+    + `&routingMatrix=${Date.now()}`
     + `#/?diagram=${encodeURIComponent(target.presetId)}`;
   await session.send('Page.navigate', { url });
   const route = await waitForValue(session, readFinalRouteExpression(''), target.presetId);
@@ -146,6 +176,17 @@ const verifyPreset = target => withPrecompiledRouteBrowser(async session => {
       requestInputGeometryDigest: route.request?.inputGeometryDigest,
     }, null, 2)}`);
   }
+  const mounted = await session.evaluate(`(() => ({
+    nodes: window.reactFlowInstance?.getNodes?.().map(node => ({ id: node.id })) || [],
+    edges: window.reactFlowInstance?.getEdges?.().map(edge => ({ id: edge.id })) || [],
+  }))()`);
+  const canonicalMount = verifyCanonicalPresetMount({
+    identity,
+    requestNodes: route.request?.nodes,
+    requestEdges: route.request?.edges,
+    mountedNodes: mounted.nodes,
+    mountedEdges: mounted.edges,
+  });
   return {
     id: target.presetId,
     resolution: route.response.routeResolution,
@@ -154,6 +195,8 @@ const verifyPreset = target => withPrecompiledRouteBrowser(async session => {
       ? route.response.__browserCapturedAt - route.request.__browserCapturedAt
       : route.routing.routeMs,
     totalRouteMs: route.routing.totalRouteMs,
+    slowestPhases: summarizeSlowestDisplayRoutingPhases(route.response.phaseTrace),
+    canonicalMount,
     ...(await auditFinalSvg(session, route, target.presetId)),
   };
 });
@@ -181,8 +224,15 @@ const clickLayout = async (session, layoutCase) => {
 const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => {
   await prepareSession(session);
   const presetId = 'wms-demand-allocation-strategy-v2';
+  const target = PRECOMPILED_DISPLAY_ROUTE_TARGETS.find(candidate => candidate.presetId === presetId);
+  if (!target) throw new Error(`Canonical layout preset target is missing: ${presetId}`);
+  const identity = parseCanonicalPresetIdentity(
+    JSON.parse(await readFile(target.sourcePath, 'utf8')),
+    presetId,
+  );
   await session.send('Page.navigate', {
-    url: `${BASE_URL}/?routingMatrix=${layoutCase.id}-${Date.now()}`
+    url: `${BASE_URL}/?canonicalPreset=${encodeURIComponent(presetId)}`
+      + `&routingMatrix=${layoutCase.id}-${Date.now()}`
       + `#/?diagram=${encodeURIComponent(presetId)}`,
   });
   await waitForValue(session, readFinalRouteExpression(''), `${layoutCase.id} initial route`);
@@ -199,6 +249,17 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
   if (!Number.isFinite(totalRouteMs) || totalRouteMs > MAX_LAYOUT_ROUTE_MS) {
     throw new Error(`${layoutCase.id} exceeded ${MAX_LAYOUT_ROUTE_MS}ms: ${totalRouteMs}`);
   }
+  const mounted = await session.evaluate(`(() => ({
+    nodes: window.reactFlowInstance?.getNodes?.().map(node => ({ id: node.id })) || [],
+    edges: window.reactFlowInstance?.getEdges?.().map(edge => ({ id: edge.id })) || [],
+  }))()`);
+  const canonicalMount = verifyCanonicalPresetMount({
+    identity,
+    requestNodes: route.request?.nodes,
+    requestEdges: route.request?.edges,
+    mountedNodes: mounted.nodes,
+    mountedEdges: mounted.edges,
+  });
   return {
     id: layoutCase.id,
     resolution: route.response.routeResolution,
@@ -207,6 +268,8 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
       ? route.response.__browserCapturedAt - route.request.__browserCapturedAt
       : route.routing.routeMs,
     totalRouteMs,
+    slowestPhases: summarizeSlowestDisplayRoutingPhases(route.response.phaseTrace),
+    canonicalMount,
     ...(await auditFinalSvg(session, route, layoutCase.id)),
   };
 });

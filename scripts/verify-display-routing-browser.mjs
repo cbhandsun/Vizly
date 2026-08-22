@@ -7,8 +7,26 @@ import {
   readRenderedDisplayEdgeNodeIntersections,
   readVisibleDisplayRoutingNodeRect,
 } from './lib/display-routing-browser-geometry.mjs';
-import { assertDisplayRoutingPerformanceBudget } from './lib/display-routing-browser-performance.mjs';
+import {
+  assertDisplayRoutingPerformanceBudget,
+  EXPECTED_INCREMENTAL_DISPLAY_ROUTING_PHASES,
+} from './lib/display-routing-browser-performance.mjs';
+import {
+  buildDisplayRoutingMachineResult,
+  formatDisplayRoutingDragResult,
+} from './lib/display-routing-browser-result.mjs';
 import { DISPLAY_ROUTING_BROWSER_CAPTURE_SCRIPT } from './lib/display-routing-browser-capture.mjs';
+import {
+  prepareDisplayRoutingIncrementalCapture,
+  readDisplayRoutingIncrementalFailureStatus,
+  readDisplayRoutingViewportZoomFromSession,
+} from './lib/display-routing-browser-diagnostics.mjs';
+import {
+  formatDisplayRoutingCpuProfile,
+  startDisplayRoutingCpuProfile,
+  stopDisplayRoutingCpuProfile,
+} from './lib/display-routing-cpu-profile.mjs';
+import { assertDisplayRoutingVisualScaleAudit } from './lib/display-routing-browser-visual-audit.mjs';
 
 const BASE_URL = String(process.env.PRECOMPILED_ROUTE_BASE_URL || '')
   .trim()
@@ -23,22 +41,8 @@ const DRAG_CASES = Object.freeze([
 const FIXED_VISUAL_ZOOMS = Object.freeze([0.5, 1, 2]);
 const INCLUDE_INCREMENTAL_REQUEST_DIAGNOSTICS = process.env
   .DISPLAY_ROUTING_BROWSER_DEBUG_REQUEST === '1';
-const EXPECTED_INCREMENTAL_PHASES = Object.freeze([
-  'incremental-closure',
-  'local-route',
-  'hard-gate',
-  'final-clearance',
-  'final-hard-safety',
-  'final-endpoint-seed',
-  'final-endpoint-topology',
-  'final-endpoint-order',
-  'final-endpoint-closure',
-  'final-safety-closure',
-  'final-endpoint-seed',
-  'final-endpoint-topology',
-  'final-endpoint-order',
-  'final-endpoint-closure',
-]);
+const EMIT_MACHINE_RESULT = process.env.DISPLAY_ROUTING_BROWSER_JSON === '1';
+const INCLUDE_CPU_PROFILE = process.env.DISPLAY_ROUTING_BROWSER_CPU_PROFILE === '1';
 
 const assertProductionPreview = async () => {
   if (!BASE_URL) {
@@ -113,7 +117,7 @@ const initialReadyExpression = `(() => {
     : null;
 })()`;
 
-const dragNode = async (session, nodeId) => {
+const dragNode = async (session, nodeId, beforeRelease = null) => {
   const visibleRectExpression = `(() => {
     const readVisibleNodeRect = ${readVisibleDisplayRoutingNodeRect.toString()};
     return readVisibleNodeRect(${JSON.stringify(nodeId)});
@@ -166,10 +170,11 @@ const dragNode = async (session, nodeId) => {
     rect = await session.evaluate(visibleRectExpression);
   }
   rect ??= await waitForValue(session, visibleRectExpression);
+  const viewportZoom = await readDisplayRoutingViewportZoomFromSession(session);
   const startX = rect.x + rect.width / 2;
   const startY = rect.y + rect.height / 2;
-  const endX = startX + 24;
-  const endY = startY + 8;
+  const endX = startX + 40 * viewportZoom;
+  const endY = startY + 12 * viewportZoom;
   const hitStack = await session.evaluate(`(() => (
     document.elementsFromPoint(${startX}, ${startY})
       .slice(0, 8)
@@ -203,6 +208,7 @@ const dragNode = async (session, nodeId) => {
     });
     await delay(20);
   }
+  if (beforeRelease) await beforeRelease();
   await session.send('Input.dispatchMouseEvent', {
     type: 'mouseReleased',
     x: endX,
@@ -217,6 +223,7 @@ const dragNode = async (session, nodeId) => {
     endX,
     endY,
     releasedAt: Date.now(),
+    viewportZoom,
     hitStack,
   };
 };
@@ -228,6 +235,12 @@ const finalIncrementalExpression = nodeId => `(() => {
   const request = [...requests].reverse().find(item => item?.operation === 'incremental-route');
   if (!request) return null;
   const response = [...responses].reverse().find(item => item?.requestId === request.requestId);
+  const longTasks = (window.__vizlyLongTasks || []).filter(task => (
+    Number.isFinite(task?.startedAt)
+    && Number.isFinite(task?.durationMs)
+    && task.startedAt <= response?.__browserCapturedAt
+    && task.startedAt + task.durationMs >= request.__browserCapturedAt
+  ));
   const routing = window.__vizlyBaseReactFlowDisplayRouting || {};
   if (
     !response
@@ -281,6 +294,11 @@ const finalIncrementalExpression = nodeId => `(() => {
     requestOperation: request.operation,
     workerRequestAt: request.__browserCapturedAt,
     workerResponseAt: response.__browserCapturedAt,
+    workerRequestCloneMs: request.__browserCloneMs,
+    workerResponseCloneMs: response.__browserCloneMs,
+    workerLongTaskCount: longTasks.length,
+    workerLongTaskTotalMs: longTasks.reduce((total, task) => total + task.durationMs, 0),
+    workerLongTaskMaxMs: Math.max(0, ...longTasks.map(task => task.durationMs)),
     mutableEdgeCount: Array.isArray(request.mutableEdgeIds)
       ? request.mutableEdgeIds.length
       : null,
@@ -294,6 +312,7 @@ const finalIncrementalExpression = nodeId => `(() => {
       fallbackLevel: response.fallbackLevel,
       phaseTrace: response.phaseTrace,
       edgeCount: Array.isArray(response.edges) ? response.edges.length : null,
+      workerDurationMs: response.workerDurationMs,
     },
     boundedCandidates: boundedResponses
       .filter(item => item?.requestId === request.requestId && item?.boundedCandidate)
@@ -495,43 +514,24 @@ const setCenteredViewportZoom = async (session, targetZoom) => {
   }
 };
 
-const assertVisualScaleAudit = (name, audit, expectedSignature, expectedZoom = null) => {
-  const expectsOverviewLod = audit?.zoom < 0.4;
-  const invalid = !audit
-    || (expectedZoom !== null && Math.abs(audit.zoom - expectedZoom) > 0.01)
-    || audit.routeSignature !== expectedSignature
-    || audit.pathCount < 14
-    || audit.paintedPathCount < 14
-    || audit.invalidNonScalingPathCount !== 0
-    || audit.invalidStrokeWidthCount !== 0
-    || audit.markerCount < 1
-    || audit.labelCount !== 14
-    || audit.labelNodeOverlapCount !== 0
-    || (expectsOverviewLod
-      ? (!audit.zoomedOut
-        || audit.visiblePrimaryLabelCount < 1
-        || audit.visibleDetailLabelCount !== 0)
-      : (audit.zoomedOut || audit.visibleLabelCount !== audit.labelCount))
-    || (audit.visibleLabelCount > 0 && (
-      !Number.isFinite(audit.minimumVisibleLabelHeight)
-      || audit.minimumVisibleLabelHeight < 6
-      || !Number.isFinite(audit.maximumVisibleLabelHeight)
-      || audit.maximumVisibleLabelHeight > 120
-    ));
-  if (invalid) {
-    throw new Error(`Fixed visual scale audit failed at ${name}:\n${JSON.stringify(audit, null, 2)}`);
-  }
-};
-
 const verifyFixedVisualScales = async (session, expectedSignature) => {
   const results = [];
   const fitAudit = await readVisualScaleAudit(session);
-  assertVisualScaleAudit('fit-all', fitAudit, expectedSignature);
+  assertDisplayRoutingVisualScaleAudit({
+    name: 'fit-all',
+    audit: fitAudit,
+    expectedSignature,
+  });
   results.push({ name: 'fit-all', ...fitAudit });
   for (const zoom of FIXED_VISUAL_ZOOMS) {
     await setCenteredViewportZoom(session, zoom);
     const audit = await readVisualScaleAudit(session);
-    assertVisualScaleAudit(`${zoom * 100}%`, audit, expectedSignature, zoom);
+    assertDisplayRoutingVisualScaleAudit({
+      name: `${zoom * 100}%`,
+      audit,
+      expectedSignature,
+      expectedZoom: zoom,
+    });
     assertRenderedObstacleAudit(
       `${zoom * 100}% visual scale`,
       await waitForRenderedObstacleAudit(session, `${zoom * 100}% visual scale`),
@@ -576,7 +576,7 @@ const assertDragResult = (dragCase, result) => {
   if (
     !Array.isArray(result.response.phaseTrace)
     || result.response.phaseTrace.map(trace => trace.phase).join('|')
-      !== EXPECTED_INCREMENTAL_PHASES.join('|')
+      !== EXPECTED_INCREMENTAL_DISPLAY_ROUTING_PHASES.join('|')
     || !result.response.phaseTrace.slice(0, 3)
       .every(trace => trace.resolution === 'accepted')
   ) {
@@ -670,42 +670,32 @@ const main = async () => {
         session,
         'initial route',
       );
-      await session.evaluate(`(() => {
-        window.__vizlyRoutingRequests = [];
-        window.__vizlyRoutingResponses = [];
-        for (const minimap of document.querySelectorAll('.fixed-minimap-container')) {
-          minimap.style.display = 'none';
-        }
-        return true;
-      })()`);
-      const drag = await dragNode(session, dragCase.nodeId);
+      await prepareDisplayRoutingIncrementalCapture(session);
+      let cpuProfileStarted = false;
+      const drag = await dragNode(session, dragCase.nodeId, async () => {
+        cpuProfileStarted = await startDisplayRoutingCpuProfile(
+          session,
+          INCLUDE_CPU_PROFILE,
+        );
+      });
       let incremental;
+      let cpuProfile = null;
       try {
         incremental = await waitForValue(
           session,
           finalIncrementalExpression(dragCase.nodeId),
         );
       } catch (error) {
-        const status = await session.evaluate(`(() => ({
-          routing: window.__vizlyBaseReactFlowDisplayRouting || {},
-          requests: (window.__vizlyRoutingRequests || []).map(item => ({
-            requestId: item?.requestId,
-            operation: item?.operation,
-            mutableEdgeCount: item?.mutableEdgeIds?.length,
-          })),
-          responses: (window.__vizlyRoutingResponses || []).map(item => ({
-            requestId: item?.requestId,
-            routeResolution: item?.routeResolution,
-            hardClean: item?.hardClean,
-          })),
-          nodeTransform: document.querySelector(
-            '.react-flow__node[data-id=${JSON.stringify(dragCase.nodeId)}]',
-          )?.getAttribute('transform') || null,
-        }))()`);
+        const status = await readDisplayRoutingIncrementalFailureStatus(
+          session,
+          dragCase.nodeId,
+        );
         throw new Error(
           `${error instanceof Error ? error.message : 'Incremental wait failed'}\n`
           + JSON.stringify({ dragCase, drag, status }, null, 2),
         );
+      } finally {
+        cpuProfile = await stopDisplayRoutingCpuProfile(session, cpuProfileStarted);
       }
       const observedAt = Date.now();
       incremental.releaseToObservedMs = observedAt - drag.releasedAt;
@@ -722,6 +712,18 @@ const main = async () => {
         : Number.isFinite(incremental.routing.workerStartedAt)
         && Number.isFinite(incremental.routing.finalAppliedAt)
         ? incremental.routing.finalAppliedAt - incremental.routing.workerStartedAt
+        : null;
+      incremental.workerRoundTripMs = Number.isFinite(incremental.workerRequestAt)
+        && Number.isFinite(incremental.workerResponseAt)
+        ? incremental.workerResponseAt - incremental.workerRequestAt
+        : null;
+      incremental.workerDeliveryWaitMs = Number.isFinite(incremental.workerRoundTripMs)
+        && Number.isFinite(incremental.response.workerDurationMs)
+        ? Math.max(0, incremental.workerRoundTripMs - incremental.response.workerDurationMs)
+        : null;
+      incremental.responseToFinalMs = Number.isFinite(incremental.workerResponseAt)
+        && Number.isFinite(incremental.routing.finalAppliedAt)
+        ? incremental.routing.finalAppliedAt - incremental.workerResponseAt
         : null;
       incremental.finalToObservedMs = Number.isFinite(incremental.routing.finalAppliedAt)
         ? observedAt - incremental.routing.finalAppliedAt
@@ -740,39 +742,23 @@ const main = async () => {
         incremental,
         initialRenderedObstacleAudit,
         incrementalRenderedObstacleAudit,
+        cpuProfile,
       };
     });
     results.push(captured);
   }
   for (const result of results) {
-    const localRoute = result.incremental.response.phaseTrace
-      .find(trace => trace.phase === 'local-route');
-    const commercialClearanceRisks = result.incrementalRenderedObstacleAudit
-      .commercialClearanceRisks ?? [];
-    const commercialClearanceSummary = commercialClearanceRisks.length === 0
-      ? 'none'
-      : commercialClearanceRisks.map(risk => (
-        `${risk.edgeId}->${risk.nodeId}:${Number(risk.clearance).toFixed(1)}px`
-      )).join(',');
-    console.log(
-      `${result.nodeId}: initial=${result.initial.routeMs}ms, `
-      + `releaseToFinal=${result.incremental.releaseToFinalMs}ms, `
-      + `scheduleToWorker=${result.incremental.scheduledToWorkerMs}ms, `
-      + `workerToFinal=${result.incremental.workerToFinalMs}ms, `
-      + `finalToObserved<=${result.incremental.finalToObservedMs}ms, `
-      + `local=${localRoute?.durationMs}ms, `
-      + `mutable=${result.incremental.mutableEdgeCount}, `
-      + `affected=${result.incremental.response.affectedEdgeCount}, `
-      + `commercialClearanceDegrades=${commercialClearanceRisks.length}`
-      + ` (${commercialClearanceSummary}).`,
-    );
-    if (commercialClearanceRisks.length > 0) {
+    const formatted = formatDisplayRoutingDragResult(result);
+    console.log(formatted.line);
+    if (formatted.clearanceRisks.length > 0) {
       console.log(JSON.stringify(
         result.incrementalRenderedObstacleAudit.commercialClearanceDiagnostics ?? [],
         null,
         2,
       ));
     }
+    const cpuProfileLine = formatDisplayRoutingCpuProfile(result.cpuProfile);
+    if (cpuProfileLine) console.log(`${result.nodeId} ${cpuProfileLine}`);
   }
   console.log(
     `normal: resolution=${normal.route.routeResolution}, `
@@ -783,6 +769,11 @@ const main = async () => {
   console.log(`visual-scales: ${normal.visualScales.map(audit => (
     `${audit.name}=${audit.zoom.toFixed(3)}x/${audit.visibleLabelCount}labels`
   )).join(', ')}.`);
+  const machineResult = buildDisplayRoutingMachineResult(results);
+  if (EMIT_MACHINE_RESULT) {
+    console.log(`DISPLAY_ROUTING_BROWSER_RESULT=${JSON.stringify(machineResult)}`);
+  }
+  return machineResult;
 };
 
 await main();

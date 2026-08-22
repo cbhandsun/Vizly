@@ -22,6 +22,7 @@ import type {
   BaseReactFlowFullRouteSeedResult,
   BaseReactFlowPreDisplayFinalEdgesFactory,
 } from './baseReactFlowDisplayFullRouteTypes';
+import type { DisplayRoutingPhaseTrace } from './baseReactFlowDisplayRoutingTrace';
 
 export const selectBaseReactFlowFullRouteSeedEdges = (
   rawEdges: Edge[],
@@ -40,9 +41,11 @@ export const prepareBaseReactFlowFullRouteSeed = ({
   skipBoundedAttempt = false,
   skipFinalizedReuse = false,
   onPhaseTrace,
+  onSeedPhaseTrace,
   createPreDisplayFinalEdges,
 }: BaseReactFlowDisplayEdgesArgs & {
   createPreDisplayFinalEdges?: BaseReactFlowPreDisplayFinalEdgesFactory;
+  onSeedPhaseTrace?: (trace: DisplayRoutingPhaseTrace) => void;
 }): BaseReactFlowFullRouteSeedResult => {
   const inputSignature = computeBaseDisplayInputSignature({
     nodes,
@@ -75,6 +78,7 @@ export const prepareBaseReactFlowFullRouteSeed = ({
       onBoundedCandidate: (report) => {
         boundedReport = report;
       },
+      onPhaseTrace: onSeedPhaseTrace,
     });
     const boundedHardClean = boundedReport?.hardClean ?? displayHardQualityGatesAreClean(
       boundedFinal,

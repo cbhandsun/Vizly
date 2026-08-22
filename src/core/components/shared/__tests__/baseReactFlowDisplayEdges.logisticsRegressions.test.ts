@@ -862,6 +862,15 @@ describe('baseReactFlowDisplayEdges logistics regressions', () => {
           'polished',
         )
         : null;
+      const endpointOrder = incrementalResponse.edges
+        ? auditFinalSameSideEndpointOrder(incrementalResponse.edges, movedAbsoluteNodes)
+        : null;
+      const passageOrder = incrementalResponse.edges
+        ? auditFinalSameSidePassageOrder(incrementalResponse.edges, movedAbsoluteNodes)
+        : null;
+      const unsafeEndpointStubs = incrementalResponse.edges
+        ? countRenderUnsafeEndpointStubs(incrementalResponse.edges)
+        : null;
       const diagnostics = JSON.stringify({
         nodeId: dragCase.nodeId,
         routeResolution: incrementalResponse.routeResolution,
@@ -869,6 +878,9 @@ describe('baseReactFlowDisplayEdges logistics regressions', () => {
         fallbackLevel: incrementalResponse.fallbackLevel,
         phaseTrace: incrementalResponse.phaseTrace,
         report: hardReport,
+        endpointOrder,
+        passageOrder,
+        unsafeEndpointStubs,
       }, null, 2);
 
       expect(
@@ -905,6 +917,21 @@ describe('baseReactFlowDisplayEdges logistics regressions', () => {
           hairpins: 0,
         },
       });
+      expect({
+        inversions: endpointOrder?.inversions,
+        ambiguousLaneTies: endpointOrder?.ambiguousLaneTies,
+        collapsedLanePairs: endpointOrder?.collapsedLanePairs,
+        passageDefects: passageOrder?.passageDefects,
+        nearTrunkOpportunities: passageOrder?.nearTrunkOpportunities,
+        unsafeEndpointStubs,
+      }, diagnostics).toEqual({
+        inversions: 0,
+        ambiguousLaneTies: 0,
+        collapsedLanePairs: 0,
+        passageDefects: 0,
+        nearTrunkOpportunities: 0,
+        unsafeEndpointStubs: 0,
+      });
       expect(incrementalResponse.phaseTrace?.map(trace => trace.phase), diagnostics)
         .toEqual([
           'incremental-closure',
@@ -916,11 +943,23 @@ describe('baseReactFlowDisplayEdges logistics regressions', () => {
           'final-endpoint-topology',
           'final-endpoint-order',
           'final-endpoint-closure',
+          'final-safety-hard-gate',
+          'final-safety-stubs',
+          'final-safety-endpoint-order',
+          'final-safety-passage-order',
           'final-safety-closure',
           'final-endpoint-seed',
           'final-endpoint-topology',
           'final-endpoint-order',
           'final-endpoint-closure',
+          'final-commercial-clearance',
+          'final-commercial-terminal-preserving',
+          'final-commercial-terminal-changing',
+          'final-commercial-source-stairs',
+          'final-commercial-evaluation',
+          'final-commercial-safety-closure',
+          'finalizer',
+          'session-commit',
         ]);
       expect(incrementalResponse.phaseTrace?.slice(0, 3).every(
         trace => trace.resolution === 'accepted',

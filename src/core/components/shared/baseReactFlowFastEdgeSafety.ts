@@ -1,31 +1,20 @@
-import type { Edge, Node, XYPosition } from '@xyflow/react';
+import type { Edge, Node } from '@xyflow/react';
 
 import { PathFinder } from '../../routing/algorithms/PathFinder';
 import { expandHandle } from '../../routing/utils/handleUtils';
-
-type FastPoint = { x: number; y: number };
-type FastRect = { id: string; x: number; y: number; width: number; height: number };
+import {
+  asRecord,
+  finiteNumber,
+  type DisplayNode,
+  type FastPoint,
+  type FastRect,
+} from './baseReactFlowFastEdgeSafetyBoundary';
 
 const EPSILON = 0.5;
 const OBSTACLE_PADDING = 8;
 const LANE_CLEARANCE = 12;
 const GRID_FALLBACK_MAX_PEER_EDGES = 31;
 const CONTAINER_TYPES = new Set(['titleGroup', 'subGroup', 'group', 'domain', 'subDomain', 'swimlane']);
-
-const finiteNumber = (value: unknown, fallback = 0): number => (
-  typeof value === 'number' && Number.isFinite(value) ? value : fallback
-);
-
-type DisplayNode = Node & {
-  positionAbsolute?: XYPosition;
-  measured?: { width?: number; height?: number };
-};
-
-const asRecord = (value: unknown): Record<string, unknown> => (
-  value !== null && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : {}
-);
 
 const samePoint = (a: FastPoint, b: FastPoint): boolean => (
   Math.abs(a.x - b.x) <= EPSILON && Math.abs(a.y - b.y) <= EPSILON
@@ -646,13 +635,14 @@ export const repairFastDisplayHardSafety = (edges: Edge[], nodes: Node[]): Edge[
   const rects = nodeRects(nodes);
   let changed = false;
   const repairedEdges = [...edges];
+  const repairedPaths = edges.map(fastComputedPath);
   edges.forEach((edge, edgeIndex) => {
-    const path = fastComputedPath(edge);
+    const path = repairedPaths[edgeIndex];
     if (path.length < 2) return;
     const obstacles = relevantRects(edge, rects);
     const orthogonal = orthogonalizePath(edge, path, obstacles);
-    const otherPaths = repairedEdges.flatMap((otherEdge, otherIndex) => (
-      otherIndex === edgeIndex ? [] : [fastComputedPath(otherEdge)]
+    const otherPaths = repairedPaths.flatMap((otherPath, otherIndex) => (
+      otherIndex === edgeIndex ? [] : [otherPath]
     ));
     let repaired = repairObstacleHits(
       orthogonal,
@@ -692,6 +682,7 @@ export const repairFastDisplayHardSafety = (edges: Edge[], nodes: Node[]): Edge[
       }
     }
     changed = true;
+    repairedPaths[edgeIndex] = repaired;
     repairedEdges[edgeIndex] = { ...edge, data };
   });
   return changed ? repairedEdges : edges;

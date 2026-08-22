@@ -37,6 +37,11 @@ export const readVisibleDisplayRoutingNodeRect = (nodeId) => {
     : null;
 };
 
+export const readDisplayRoutingViewportZoom = () => {
+  const zoom = Number(window.reactFlowInstance?.getViewport?.()?.zoom);
+  return Number.isFinite(zoom) && zoom >= 0.05 && zoom <= 8 ? zoom : null;
+};
+
 export const readDisplayRoutingNodePanGesture = (nodeId) => {
   if (typeof nodeId !== 'string' || nodeId.length === 0 || nodeId.length > 500) return null;
   const element = [...document.querySelectorAll('.react-flow__node[data-id]')]
@@ -236,9 +241,11 @@ export const readDisplayRoutingVisualScaleAudit = () => {
   const zoom = Number(viewport?.zoom);
   if (!Number.isFinite(zoom) || zoom < 0.05 || zoom > 8) return null;
 
-  const root = document.querySelector('.diagram-root')
+  const root = document.querySelector('.diagram-preview-root')
+    ?? document.querySelector('.diagram-root')
     ?? document.querySelector('.react-flow')?.parentElement;
   const paths = [...document.querySelectorAll('.react-flow__edge path')];
+  const edgeWrappers = [...document.querySelectorAll('[data-testid^="rf__edge-"]')];
   const labels = [...document.querySelectorAll('.stable-path-edge-label')];
   const nodes = [...document.querySelectorAll(
     '.react-flow__node.react-flow__node-custom[data-id]',
@@ -258,6 +265,64 @@ export const readDisplayRoutingVisualScaleAudit = () => {
     || stroke === 'transparent'
     || /rgba\([^)]*,\s*0(?:\.0+)?\s*\)$/i.test(stroke)
   );
+  const parseColor = value => {
+    if (typeof value !== 'string' || value.length > 128) return null;
+    const normalized = value.trim().toLowerCase();
+    const hex = normalized.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+    if (hex) {
+      const digits = hex[1].length === 3
+        ? [...hex[1]].map(character => character.repeat(2)).join('')
+        : hex[1];
+      return {
+        r: Number.parseInt(digits.slice(0, 2), 16),
+        g: Number.parseInt(digits.slice(2, 4), 16),
+        b: Number.parseInt(digits.slice(4, 6), 16),
+        a: 1,
+      };
+    }
+    const rgb = normalized.match(/^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:\s*[,/]\s*([\d.]+%?))?\s*\)$/);
+    if (!rgb) return null;
+    const alpha = rgb[4]?.endsWith('%') ? Number.parseFloat(rgb[4]) / 100 : Number.parseFloat(rgb[4] || '1');
+    const channels = rgb.slice(1, 4).map(Number);
+    if (!channels.every(channel => Number.isFinite(channel) && channel >= 0 && channel <= 255)
+      || !Number.isFinite(alpha) || alpha < 0 || alpha > 1) return null;
+    return { r: channels[0], g: channels[1], b: channels[2], a: alpha };
+  };
+  const composite = (foreground, background, opacity) => {
+    const alpha = Math.max(0, Math.min(1, foreground.a * opacity));
+    return {
+      r: foreground.r * alpha + background.r * (1 - alpha),
+      g: foreground.g * alpha + background.g * (1 - alpha),
+      b: foreground.b * alpha + background.b * (1 - alpha),
+      a: 1,
+    };
+  };
+  const luminance = color => {
+    const channel = value => {
+      const normalized = value / 255;
+      return normalized <= 0.04045
+        ? normalized / 12.92
+        : ((normalized + 0.055) / 1.055) ** 2.4;
+    };
+    return channel(color.r) * 0.2126 + channel(color.g) * 0.7152 + channel(color.b) * 0.0722;
+  };
+  const contrast = (first, second) => {
+    const high = Math.max(luminance(first), luminance(second));
+    const low = Math.min(luminance(first), luminance(second));
+    return (high + 0.05) / (low + 0.05);
+  };
+  const backgroundLayers = [];
+  let backgroundElement = root;
+  for (let depth = 0; backgroundElement && depth < 8; depth += 1) {
+    const color = parseColor(getComputedStyle(backgroundElement).backgroundColor);
+    if (color && color.a > 0) backgroundLayers.push(color);
+    if (color?.a >= 0.999) break;
+    backgroundElement = backgroundElement.parentElement;
+  }
+  const rootBackground = backgroundLayers.reverse().reduce(
+    (background, foreground) => composite(foreground, background, 1),
+    { r: 255, g: 255, b: 255, a: 1 },
+  );
 
   const paintedPaths = paths.flatMap(path => {
     const style = getComputedStyle(path);
@@ -271,20 +336,123 @@ export const readDisplayRoutingVisualScaleAudit = () => {
       || !Number.isFinite(strokeOpacity)
       || strokeOpacity <= 0.001
     ) return [];
-    return [{ path, style, strokeWidth }];
+    const elementOpacity = Number.parseFloat(style.opacity || '1');
+    const strokeColor = parseColor(style.stroke);
+    const effectiveOpacity = strokeOpacity * (Number.isFinite(elementOpacity) ? elementOpacity : 1);
+    const strokeContrast = strokeColor
+      ? contrast(composite(strokeColor, rootBackground, effectiveOpacity), rootBackground)
+      : 0;
+    const contrastMode = path.getAttribute?.('data-edge-contrast');
+    const previous = path.previousElementSibling;
+    const boundaryMatches = contrastMode === 'underlay'
+      && previous?.classList?.contains?.('vizly-edge-contrast-underlay')
+      && previous.getAttribute?.('d') === path.getAttribute?.('d');
+    const boundaryStyle = boundaryMatches ? getComputedStyle(previous) : null;
+    const boundaryColor = parseColor(boundaryStyle?.stroke);
+    const boundaryOpacity = Number.parseFloat(boundaryStyle?.opacity || '1')
+      * Number.parseFloat(boundaryStyle?.strokeOpacity || '1');
+    const boundaryContrast = boundaryColor && Number.isFinite(boundaryOpacity)
+      ? contrast(composite(boundaryColor, rootBackground, boundaryOpacity), rootBackground)
+      : 0;
+    const effectiveContrast = contrastMode === 'underlay'
+      ? boundaryContrast
+      : strokeContrast;
+    return [{ path, style, strokeWidth, strokeContrast, effectiveContrast, boundaryContrast }];
   });
   const invalidNonScalingPathCount = paintedPaths.filter(({ path, style }) => (
     path.getAttribute('vector-effect') !== 'non-scaling-stroke'
     && style.vectorEffect !== 'non-scaling-stroke'
   )).length;
   const invalidStrokeWidthCount = paintedPaths.filter(({ strokeWidth }) => (
-    strokeWidth < 0.5 || strokeWidth > 12
+    strokeWidth < 1.25 || strokeWidth > 12
   )).length;
-  const markerCount = paths.filter(path => {
+  const lowContrastPathCount = paintedPaths.filter(({ effectiveContrast }) => effectiveContrast < 3).length;
+  const lowContrastPaths = paintedPaths.filter(({ effectiveContrast }) => effectiveContrast < 3)
+    .slice(0, 32)
+    .map(({ path, style, strokeContrast, effectiveContrast, boundaryContrast }) => ({
+      edgeId: String(path.closest?.('[data-testid^="rf__edge-"]')?.getAttribute?.('data-testid') || '')
+        .replace(/^rf__edge-/, '').slice(0, 500),
+      className: String(path.getAttribute?.('class') || '').slice(0, 200),
+      contrastMode: String(path.getAttribute?.('data-edge-contrast') || '').slice(0, 32),
+      stroke: String(style.stroke || '').slice(0, 128),
+      opacity: Number.parseFloat(style.opacity || '1') * Number.parseFloat(style.strokeOpacity || '1'),
+      semanticContrast: Math.round(strokeContrast * 100) / 100,
+      boundaryContrast: Math.round(boundaryContrast * 100) / 100,
+      effectiveContrast: Math.round(effectiveContrast * 100) / 100,
+    }));
+  const markerPaths = paths.filter(path => {
     const style = getComputedStyle(path);
     const marker = path.getAttribute('marker-end') || style.markerEnd;
     return visibleStyle(style) && typeof marker === 'string' && marker !== 'none' && marker !== '';
-  }).length;
+  });
+  const markerAudits = markerPaths.map(path => {
+    const pathStyle = getComputedStyle(path);
+    const markerValue = path.getAttribute('marker-end') || pathStyle.markerEnd;
+    const markerId = typeof markerValue === 'string'
+      ? markerValue.match(/#([^)'"\s]+)/)?.[1] ?? ''
+      : '';
+    const marker = markerId && markerId.length <= 500
+      ? document.getElementById?.(markerId)
+      : null;
+    const glyph = marker?.querySelector?.('path, polygon, polyline') ?? null;
+    const glyphStyle = glyph ? getComputedStyle(glyph) : null;
+    const glyphOpacity = Number.parseFloat(glyphStyle?.opacity || '1');
+    const fillOpacity = Number.parseFloat(glyphStyle?.fillOpacity || '1');
+    const strokeOpacity = Number.parseFloat(glyphStyle?.strokeOpacity || '1');
+    const fill = parseColor(glyphStyle?.fill);
+    const stroke = parseColor(glyphStyle?.stroke);
+    const opacity = Number.isFinite(glyphOpacity) ? glyphOpacity : 1;
+    const fillContrast = fill && Number.isFinite(fillOpacity)
+      ? contrast(composite(fill, rootBackground, opacity * fillOpacity), rootBackground)
+      : 0;
+    const strokeContrast = stroke && Number.isFinite(strokeOpacity)
+      ? contrast(composite(stroke, rootBackground, opacity * strokeOpacity), rootBackground)
+      : 0;
+    const hasOutlineClass = path.classList?.contains?.('vizly-edge-contrast-marker-outline--dark')
+      || path.classList?.contains?.('vizly-edge-contrast-marker-outline--light');
+    const outlineColor = hasOutlineClass
+      ? parseColor(pathStyle.getPropertyValue?.('--vizly-edge-marker-outline-color'))
+      : null;
+    const hasRenderedOutline = Boolean(
+      outlineColor
+      && typeof pathStyle.filter === 'string'
+      && pathStyle.filter !== ''
+      && pathStyle.filter !== 'none',
+    );
+    const outlineContrast = hasRenderedOutline
+      ? contrast(composite(outlineColor, rootBackground, 1), rootBackground)
+      : 0;
+    return {
+      edgeId: String(path.closest?.('[data-testid^="rf__edge-"]')?.getAttribute?.('data-testid') || '')
+        .replace(/^rf__edge-/, '').slice(0, 500),
+      markerId,
+      contrast: Math.max(fillContrast, strokeContrast, outlineContrast),
+      semanticContrast: Math.max(fillContrast, strokeContrast),
+      outlineContrast,
+      outlined: hasRenderedOutline,
+      resolved: Boolean(glyph),
+    };
+  });
+  const lowContrastMarkers = markerAudits.filter(audit => !audit.resolved || audit.contrast < 3);
+  const interactionCounts = edgeWrappers.map(wrapper => ({
+    edgeId: String(wrapper.getAttribute?.('data-testid') || '')
+      .replace(/^rf__edge-/, '').slice(0, 500),
+    count: wrapper.querySelectorAll?.('.react-flow__edge-interaction')?.length ?? 0,
+  }));
+  const duplicateMarkerEdges = edgeWrappers.flatMap(wrapper => {
+    const markerCarrierCount = [...(wrapper.querySelectorAll?.('path') ?? [])].filter(path => {
+      const pathStyle = getComputedStyle(path);
+      const marker = path.getAttribute?.('marker-end') || pathStyle.markerEnd;
+      return visibleStyle(pathStyle) && typeof marker === 'string' && marker !== 'none' && marker !== '';
+    }).length;
+    return markerCarrierCount > 1
+      ? [{
+        edgeId: String(wrapper.getAttribute?.('data-testid') || '')
+          .replace(/^rf__edge-/, '').slice(0, 500),
+        markerCarrierCount,
+      }]
+      : [];
+  });
 
   const nodeRects = nodes.flatMap(node => {
     const rect = node.getBoundingClientRect();
@@ -302,12 +470,14 @@ export const readDisplayRoutingVisualScaleAudit = () => {
   let labelNodeOverlapCount = 0;
   const labelNodeOverlaps = [];
   const visibleLabelHeights = [];
+  const visibleLabelFontSizes = [];
   for (const label of labels) {
     const style = getComputedStyle(label);
     if (!visibleStyle(style)) continue;
     const rect = label.getBoundingClientRect();
     if (!finiteRect(rect) || rect.width <= 1 || rect.height <= 1) continue;
     visibleLabelHeights.push(rect.height);
+    visibleLabelFontSizes.push(Number.parseFloat(style.fontSize));
     if (label.getAttribute('data-edge-label-priority') === 'primary') {
       visiblePrimaryLabelCount += 1;
     } else {
@@ -335,7 +505,29 @@ export const readDisplayRoutingVisualScaleAudit = () => {
     paintedPathCount: paintedPaths.length,
     invalidNonScalingPathCount,
     invalidStrokeWidthCount,
-    markerCount,
+    lowContrastPathCount,
+    lowContrastPaths,
+    markerCount: markerPaths.length,
+    markerContrastAuditedCount: markerAudits.filter(audit => audit.resolved).length,
+    lowContrastMarkerCount: lowContrastMarkers.length,
+    lowContrastMarkers: lowContrastMarkers.slice(0, 32).map(audit => ({
+      ...audit,
+      contrast: Math.round(audit.contrast * 100) / 100,
+      semanticContrast: Math.round(audit.semanticContrast * 100) / 100,
+      outlineContrast: Math.round(audit.outlineContrast * 100) / 100,
+    })),
+    interactionEdgeCount: interactionCounts.length,
+    interactionPathCount: interactionCounts.reduce((total, audit) => total + audit.count, 0),
+    missingInteractionPathCount: interactionCounts.filter(audit => audit.count === 0).length,
+    duplicateInteractionPathCount: interactionCounts.filter(audit => audit.count > 1).length,
+    duplicateMarkerEdgeCount: duplicateMarkerEdges.length,
+    duplicateMarkerEdges,
+    edgeAccessibleNameMissingCount: edgeWrappers.filter(wrapper => {
+      const ownName = wrapper.getAttribute?.('aria-label');
+      const childName = wrapper.querySelector?.('[aria-label]')?.getAttribute?.('aria-label');
+      return !(typeof ownName === 'string' && ownName.trim())
+        && !(typeof childName === 'string' && childName.trim());
+    }).length,
     labelCount: labels.length,
     visibleLabelCount: visibleLabelHeights.length,
     visiblePrimaryLabelCount,
@@ -346,6 +538,9 @@ export const readDisplayRoutingVisualScaleAudit = () => {
     maximumVisibleLabelHeight: visibleLabelHeights.length
       ? Math.max(...visibleLabelHeights)
       : null,
+    invalidVisibleLabelFontSizeCount: visibleLabelFontSizes.filter(fontSize => (
+      !Number.isFinite(fontSize) || fontSize < 11
+    )).length,
     labelNodeOverlapCount,
     labelNodeOverlaps,
   };

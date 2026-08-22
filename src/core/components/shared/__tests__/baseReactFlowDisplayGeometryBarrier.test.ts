@@ -2,7 +2,10 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { scheduleBaseReactFlowStableGeometry } from '../baseReactFlowDisplayGeometryBarrier';
+import {
+  resolveDisplayGeometryBarrierPolicy,
+  scheduleBaseReactFlowStableGeometry,
+} from '../baseReactFlowDisplayGeometryBarrier';
 
 afterEach(() => {
   vi.useRealTimers();
@@ -10,7 +13,15 @@ afterEach(() => {
 });
 
 describe('baseReactFlowDisplayGeometryBarrier', () => {
-  it('starts at the stable two-frame barrier and reports bounded evidence', () => {
+  it('waits for fonts only for initial or non-drag geometry', () => {
+    expect(resolveDisplayGeometryBarrierPolicy(false)).toEqual({ waitForFonts: true });
+    expect(resolveDisplayGeometryBarrierPolicy(true)).toEqual({
+      minimumStableMs: 0,
+      waitForFonts: false,
+    });
+  });
+
+  it('starts after two stable observations and reports bounded evidence', () => {
     vi.useFakeTimers();
     const callbacks: FrameRequestCallback[] = [];
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
@@ -26,12 +37,10 @@ describe('baseReactFlowDisplayGeometryBarrier', () => {
       readGeometryIdentity: () => identity,
       minimumStableMs: 0,
     });
+    identity = 'signature-a\0geometry-b';
     callbacks.shift()?.(16);
     expect(run).not.toHaveBeenCalled();
-    identity = 'signature-a\0geometry-b';
     callbacks.shift()?.(32);
-    expect(run).not.toHaveBeenCalled();
-    callbacks.shift()?.(48);
 
     expect(run).toHaveBeenCalledTimes(1);
     expect(run).toHaveBeenCalledWith(expect.objectContaining({
@@ -56,7 +65,6 @@ describe('baseReactFlowDisplayGeometryBarrier', () => {
       minimumStableMs: 96,
     });
     callbacks.shift()?.(16);
-    callbacks.shift()?.(32);
     expect(run).not.toHaveBeenCalled();
     vi.advanceTimersByTime(96);
     callbacks.shift()?.(112);
@@ -82,7 +90,7 @@ describe('baseReactFlowDisplayGeometryBarrier', () => {
     vi.advanceTimersByTime(1);
     expect(timedOutRun).toHaveBeenCalledWith(expect.objectContaining({
       resolution: 'timed-out',
-      sampleCount: 0,
+      sampleCount: 1,
     }));
     expect(cancelAnimationFrame).toHaveBeenCalledWith(41);
 
@@ -95,5 +103,32 @@ describe('baseReactFlowDisplayGeometryBarrier', () => {
     cancel();
     vi.advanceTimersByTime(1_000);
     expect(cancelledRun).not.toHaveBeenCalled();
+  });
+
+  it('does not touch the font loading boundary for an incremental drag route', () => {
+    vi.useFakeTimers();
+    const callbacks: FrameRequestCallback[] = [];
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      callbacks.push(callback);
+      return callbacks.length;
+    });
+    const fontsGetter = vi.fn(() => ({ ready: Promise.resolve() }));
+    Object.defineProperty(document, 'fonts', {
+      configurable: true,
+      get: fontsGetter,
+    });
+    const run = vi.fn();
+
+    scheduleBaseReactFlowStableGeometry({
+      run,
+      readGeometryIdentity: () => 'incremental-stable',
+      minimumStableMs: 0,
+      waitForFonts: false,
+    });
+    callbacks.shift()?.(16);
+
+    expect(fontsGetter).not.toHaveBeenCalled();
+    expect(run).toHaveBeenCalledWith(expect.objectContaining({ resolution: 'stable' }));
+    Reflect.deleteProperty(document, 'fonts');
   });
 });

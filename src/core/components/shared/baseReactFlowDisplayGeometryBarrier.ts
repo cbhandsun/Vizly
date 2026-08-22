@@ -11,6 +11,12 @@ type CancelDisplayGeometryBarrier = () => void;
 const DEFAULT_MAXIMUM_WAIT_MS = 320;
 const DEFAULT_MINIMUM_STABLE_MS = 96;
 
+export const resolveDisplayGeometryBarrierPolicy = (
+  incremental: boolean,
+): Readonly<{ minimumStableMs?: number; waitForFonts: boolean }> => incremental
+  ? { minimumStableMs: 0, waitForFonts: false }
+  : { waitForFonts: true };
+
 const readSafeIdentity = (readGeometryIdentity: () => string | null): string | null => {
   try {
     const identity = readGeometryIdentity();
@@ -23,8 +29,8 @@ const readSafeIdentity = (readGeometryIdentity: () => string | null): string | n
 };
 
 /**
- * Starts routing as soon as measured geometry is identical on two consecutive
- * animation frames after fonts settle. A bounded timeout preserves liveness
+ * Starts routing as soon as measured geometry is identical when sampled after
+ * fonts settle and again on the next animation frame. A bounded timeout preserves liveness
  * when fonts, ResizeObserver, or layout never become perfectly stable.
  */
 export const scheduleBaseReactFlowStableGeometry = ({
@@ -32,11 +38,13 @@ export const scheduleBaseReactFlowStableGeometry = ({
   readGeometryIdentity,
   maximumWaitMs = DEFAULT_MAXIMUM_WAIT_MS,
   minimumStableMs = DEFAULT_MINIMUM_STABLE_MS,
+  waitForFonts = true,
 }: {
   run: (result: DisplayGeometryBarrierResult) => void;
   readGeometryIdentity: () => string | null;
   maximumWaitMs?: number;
   minimumStableMs?: number;
+  waitForFonts?: boolean;
 }): CancelDisplayGeometryBarrier => {
   if (typeof window === 'undefined') return () => {};
   const safeMaximumWaitMs = Number.isFinite(maximumWaitMs)
@@ -95,11 +103,14 @@ export const scheduleBaseReactFlowStableGeometry = ({
     () => finish('timed-out'),
     safeMaximumWaitMs,
   );
-  const fontSet = typeof document === 'undefined'
+  const fontSet = !waitForFonts || typeof document === 'undefined'
     ? null
     : (document as Document & { fonts?: { ready?: Promise<unknown> } }).fonts;
   const beginSampling = (): void => {
-    if (!cancelled && !completed) sampleNextFrame();
+    if (cancelled || completed) return;
+    previousIdentity = readSafeIdentity(readGeometryIdentity);
+    sampleCount += 1;
+    sampleNextFrame();
   };
   if (fontSet?.ready && typeof fontSet.ready.then === 'function') {
     void fontSet.ready.then(beginSampling, beginSampling);

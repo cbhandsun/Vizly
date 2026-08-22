@@ -548,6 +548,43 @@ describe('edgeStrictCrossingGuard', () => {
     );
   });
 
+  it('revalidates broad reference changes before using the full pair scorer', () => {
+    const baseline = createIncrementalParityBaseline();
+    const context = createEdgePathQualityEvaluationContext(baseline);
+    let endpointReads = 0;
+    const candidate = baseline.map((current, index) => {
+      const clone = cloneEdges([current])[0];
+      const source = clone.source;
+      const target = clone.target;
+      Object.defineProperties(clone, {
+        source: {
+          enumerable: true,
+          get: () => {
+            endpointReads += 1;
+            return source;
+          },
+        },
+        target: {
+          enumerable: true,
+          get: () => {
+            endpointReads += 1;
+            return target;
+          },
+        },
+      });
+      if (index === 3) {
+        const data = clone.data as Record<string, unknown>;
+        data.computedPath = [{ x: 280, y: -80 }, { x: 280, y: 240 }];
+      }
+      return clone;
+    });
+
+    const score = context.evaluateChanged(candidate, candidate.map((_, index) => index));
+
+    expect(score).toEqual(calculateEdgePathQualityScore(cloneEdges(candidate)));
+    expect(endpointReads).toBeLessThan(80);
+  });
+
   it('seeds the exact full-score cache from changed-index evaluation and invalidates later mutations', () => {
     const baseline = createIncrementalParityBaseline();
     const context = createEdgePathQualityEvaluationContext(baseline);
@@ -769,6 +806,48 @@ describe('edgeStrictCrossingGuard', () => {
       state = context.evaluateStateChanged(state, candidate, [3]);
       expect(state.score).toEqual(calculateEdgePathQualityScore(cloneEdges(candidate)));
     }
+  });
+
+  it('revalidates broad parent-child reference changes before full pair scoring', () => {
+    const baseline = createIncrementalParityBaseline();
+    const context = createEdgePathQualityEvaluationContext(baseline);
+    const rootState = context.createState(baseline);
+    let endpointReads = 0;
+    const candidate = baseline.map((current, index) => {
+      const clone = cloneEdges([current])[0];
+      const source = clone.source;
+      const target = clone.target;
+      Object.defineProperties(clone, {
+        source: {
+          enumerable: true,
+          get: () => {
+            endpointReads += 1;
+            return source;
+          },
+        },
+        target: {
+          enumerable: true,
+          get: () => {
+            endpointReads += 1;
+            return target;
+          },
+        },
+      });
+      if (index === 3) {
+        const data = clone.data as Record<string, unknown>;
+        data.computedPath = [{ x: 296, y: -80 }, { x: 296, y: 240 }];
+      }
+      return clone;
+    });
+
+    const state = context.evaluateStateChanged(
+      rootState,
+      candidate,
+      candidate.map((_, index) => index),
+    );
+
+    expect(state.score).toEqual(calculateEdgePathQualityScore(cloneEdges(candidate)));
+    expect(endpointReads).toBeLessThan(200);
   });
 
   it('uses child edge metadata for related and permitted overlap contributions', () => {

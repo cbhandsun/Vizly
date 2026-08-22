@@ -52,6 +52,10 @@ export const repairResidualDisplayOverlaps = <T extends Edge[]>(
   options = DISPLAY_DETACHED_OVERLAP_REPAIR_OPTIONS,
   extendedOptions = DISPLAY_EXTENDED_RESIDUAL_OVERLAP_REPAIR_OPTIONS,
 ): T => {
+  const useBoundedResidualRepair = extendedOptions === DISPLAY_BOUNDED_RESIDUAL_OVERLAP_REPAIR_OPTIONS;
+  const endpointRepairOptions = useBoundedResidualRepair
+    ? { detectExistingBridgeCrossings: false }
+    : undefined;
   const terminalValidation = createDisplayTerminalValidationSnapshot(nodes);
   const rawLoopShortened = repairDisplayLoopShortcuts(edges, nodes, 32) as T;
   const loopShortened = displayTerminalValidationDoesNotRegress(
@@ -120,14 +124,22 @@ export const repairResidualDisplayOverlaps = <T extends Edge[]>(
     ? separateDetachedParallelOverlaps(exactFirstSelected, nodes, 16) as T
     : overlapRepaired;
   const overlapMicroRepaired = repairDisplayMicroArtifacts(overlapRepaired) as T;
-  const endpointRepaired = repairEndpointOrthogonalPaths(overlapRepaired, nodes) as T;
+  // Crossing sweeps run before bounded residual overlap repair, and the final
+  // hard closure validates crossings afterwards. Avoid repeating the endpoint
+  // repairer's all-peer bridge scan while retaining its endpoint, anchor, and
+  // obstacle corrections.
+  const endpointRepaired = repairEndpointOrthogonalPaths(
+    overlapRepaired,
+    nodes,
+    endpointRepairOptions,
+  ) as T;
   const microRepaired = repairDisplayMicroArtifacts(endpointRepaired) as T;
   const defaultOverlapMicroRepaired = defaultOverlapRepaired === overlapRepaired
     ? overlapMicroRepaired
     : repairDisplayMicroArtifacts(defaultOverlapRepaired) as T;
   const defaultEndpointRepaired = defaultOverlapRepaired === overlapRepaired
     ? endpointRepaired
-    : repairEndpointOrthogonalPaths(defaultOverlapRepaired, nodes) as T;
+    : repairEndpointOrthogonalPaths(defaultOverlapRepaired, nodes, endpointRepairOptions) as T;
   let selected = chooseFinalObstacleAwarePolishCandidate(
     nodes,
     exactFirstSelected,
@@ -158,7 +170,11 @@ export const repairResidualDisplayOverlaps = <T extends Edge[]>(
       extendedOptions,
     ) as T;
     const extendedOverlapMicroRepaired = repairDisplayMicroArtifacts(extendedOverlapRepaired) as T;
-    const extendedEndpointRepaired = repairEndpointOrthogonalPaths(extendedOverlapRepaired, nodes) as T;
+    const extendedEndpointRepaired = repairEndpointOrthogonalPaths(
+      extendedOverlapRepaired,
+      nodes,
+      endpointRepairOptions,
+    ) as T;
     const extendedMicroRepaired = repairDisplayMicroArtifacts(extendedEndpointRepaired) as T;
     selected = chooseFinalObstacleAwarePolishCandidate(
       nodes,
@@ -183,7 +199,7 @@ export const repairResidualDisplayOverlaps = <T extends Edge[]>(
     exactQualityBudget,
   );
   selected = chooseExactThresholdResidualCandidate(nodes, selected, exactShiftCleaned);
-  if (extendedOptions === DISPLAY_BOUNDED_RESIDUAL_OVERLAP_REPAIR_OPTIONS) return selected;
+  if (useBoundedResidualRepair) return selected;
   const residualCleaned = repairNearParallelResidualOverlaps(
     selected,
     nodes,

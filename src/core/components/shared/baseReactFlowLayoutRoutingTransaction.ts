@@ -27,6 +27,7 @@ import {
 import { LAYOUT_DISPLAY_WORKER_TIMEOUT_MS } from './baseReactFlowDisplayWorkerTimeout';
 import { recordBaseReactFlowRejectedDisplayDiagnostics } from './baseReactFlowDisplayRejectedDiagnostics';
 import { repairAxisMismatchedTerminalsWithBoundedPortRoles } from './baseReactFlowDisplayTerminalPortRepair';
+import { buildLayoutFacingTerminalShortcutCandidates } from './baseReactFlowDisplayCommercialTerminalShortcut';
 import { repairResidualHairpinBridges } from '../../strategies/shared/edgeHairpinBridgeWidenRepair';
 
 export type BaseReactFlowLayoutRoutingCommit = Readonly<{
@@ -120,7 +121,22 @@ export const seedBaseReactFlowStagedLayoutEdges = ({
     projected.nodes,
     Math.min(128, Math.max(32, anchoredEdges.length * 4)),
   );
-  return repairResidualHairpinBridges(axisRepairedEdges, projected.nodes);
+  const geometryNormalizedEdges = repairResidualHairpinBridges(
+    axisRepairedEdges,
+    projected.nodes,
+  );
+  // ELK owns node placement, but its terminal choice is only a candidate.
+  // Normalize attachment/axis defects first because those repairs can expose a
+  // compact same-side U that was not present in raw ELK waypoints. Negotiating
+  // after normalization but before the Worker lets the whole graph assess the
+  // new port role atomically, before topology/trunk ownership is established.
+  return geometryNormalizedEdges.map((edge) => {
+    const data = edge.data && typeof edge.data === 'object'
+      ? edge.data as Record<string, unknown>
+      : {};
+    if (data.algorithm !== 'elk-layout-candidate') return edge;
+    return buildLayoutFacingTerminalShortcutCandidates(edge, projected.nodes)[0] ?? edge;
+  });
 };
 
 /**

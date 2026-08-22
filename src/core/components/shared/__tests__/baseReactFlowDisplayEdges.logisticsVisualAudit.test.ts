@@ -506,6 +506,17 @@ describe('baseReactFlowDisplayEdges logistics visual audit', () => {
     expect(response.hardClean, diagnostics).toBe(true);
     expect(hardReport.hardClean, diagnostics).toBe(true);
     expect(renderedRoutingAudit(result, absoluteNodes).errors, diagnostics).toEqual([]);
+    expect(response.phaseTrace, diagnostics).toContainEqual(expect.objectContaining({
+      phase: 'post-render-finalize',
+      resolution: 'fallback',
+    }));
+    expect(response.phaseTrace?.map(trace => trace.phase), diagnostics).toEqual(expect.arrayContaining([
+      'post-render-soft-closure',
+      'post-render-micro',
+      'post-render-soft-quality',
+      'post-render-residual',
+      'post-render-terminal-gate',
+    ]));
   }, 120_000);
 
   it('eliminates both historical one-pixel near-bend crossings without breaking dual-role trunks', async () => {

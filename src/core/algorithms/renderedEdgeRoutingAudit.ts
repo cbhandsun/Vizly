@@ -4,88 +4,18 @@ import {
     simplifyOrthogonalPointChain,
     type OrthogonalPoint,
 } from './localDoglegQuality';
+import { aggregateEdgeRoutingCommercialGate } from './edgeRoutingCommercialGate';
+import type {
+    RenderedAuditEdge,
+    RenderedAuditFinding,
+    RenderedAuditNode,
+    RenderedAuditPresentationField,
+    RenderedAuditRect,
+    RenderedRoutingAuditOptions,
+    RenderedRoutingAuditResult,
+} from './renderedEdgeRoutingAuditTypes';
 
-export type RenderedAuditSeverity = 'error' | 'warning' | 'info';
-
-export interface RenderedAuditNode {
-    id: string;
-    type?: string;
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-}
-
-export interface RenderedAuditEdge {
-    id: string;
-    source: string;
-    target: string;
-    path: string;
-    labelRect?: RenderedAuditRect;
-    /** Resolved values from the rendered SVG/CSS, not source-edge metadata. */
-    stroke?: unknown;
-    strokeWidth?: unknown;
-    strokeDasharray?: unknown;
-    opacity?: unknown;
-    markerStart?: unknown;
-    markerEnd?: unknown;
-    zoom?: unknown;
-    selected?: unknown;
-    labelVisible?: unknown;
-    /** Optional edge-specific contract used only when presentation auditing is enabled. */
-    expectedPresentation?: unknown;
-}
-
-export type RenderedAuditPresentationField =
-    | 'stroke'
-    | 'strokeWidth'
-    | 'strokeDasharray'
-    | 'opacity'
-    | 'markerStart'
-    | 'markerEnd'
-    | 'zoom'
-    | 'selected'
-    | 'labelVisible';
-
-export interface RenderedAuditPresentationPolicy {
-    requiredFields?: unknown;
-    lowZoomThreshold?: unknown;
-    minimumVisibleOpacity?: unknown;
-    minimumSelectedOpacity?: unknown;
-    minimumSelectedStrokeWidth?: unknown;
-}
-
-export interface RenderedRoutingAuditOptions {
-    /** Disabled by default so existing callers retain the geometry-only audit. */
-    presentation?: boolean | RenderedAuditPresentationPolicy;
-}
-
-export interface RenderedAuditRect {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-}
-
-export interface RenderedAuditFinding {
-    edgeId?: string;
-    rule: string;
-    severity: RenderedAuditSeverity;
-    reason: string;
-    measuredValue?: number;
-    relatedNodeIds?: string[];
-    relatedEdgeIds?: string[];
-    presentationField?: RenderedAuditPresentationField;
-    actualValue?: string | number | boolean;
-    expectedValue?: string | number | boolean;
-    isHardConstraint: boolean;
-}
-
-export interface RenderedRoutingAuditResult {
-    errors: RenderedAuditFinding[];
-    warnings: RenderedAuditFinding[];
-    infos: RenderedAuditFinding[];
-}
+export type * from './renderedEdgeRoutingAuditTypes';
 
 interface ParsedPathPoint {
     x: number;
@@ -595,10 +525,15 @@ export function auditRenderedEdgeRouting(
     const infos: RenderedAuditFinding[] = [];
 
     const pushError = (finding: Omit<RenderedAuditFinding, 'severity' | 'isHardConstraint'>) => {
-        errors.push({ ...finding, severity: 'error', isHardConstraint: true });
+        errors.push({ ...finding, severity: 'error', isHardConstraint: true, blockingFor: ['geometry'] });
     };
     const pushWarning = (finding: Omit<RenderedAuditFinding, 'severity' | 'isHardConstraint'>) => {
-        warnings.push({ ...finding, severity: 'warning', isHardConstraint: false });
+        const blockingFor = finding.rule.startsWith('selected-')
+            ? ['interaction'] as const
+            : finding.rule === 'low-zoom-label-visible'
+                ? ['multiScale'] as const
+                : ['perceptual'] as const;
+        warnings.push({ ...finding, severity: 'warning', isHardConstraint: false, blockingFor });
     };
     const presentationPolicy = resolvePresentationPolicy(options.presentation);
     for (const field of presentationPolicy.invalidFields) {
@@ -795,5 +730,9 @@ export function auditRenderedEdgeRouting(
         }
     }
 
-    return { errors, warnings, infos };
+    const commercialGate = aggregateEdgeRoutingCommercialGate({
+        hardClean: errors.length === 0,
+        findings: [...errors, ...warnings, ...infos],
+    });
+    return { errors, warnings, infos, commercialGate };
 }

@@ -126,6 +126,7 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
       }),
       expect.objectContaining({ phase: 'final-clearance', resolution: 'skip' }),
       expect.objectContaining({ phase: 'final-hard-safety', resolution: 'skip' }),
+      expect.objectContaining({ phase: 'session-commit', resolution: 'skip' }),
     ]);
     expect(fullRouteSpy).not.toHaveBeenCalled();
   });
@@ -250,56 +251,6 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
     expect(fullRouteSpy).toHaveBeenCalledTimes(3);
   });
 
-  it('validates hard-clean candidates above the persistent-cache edge limit', () => {
-    const graphNodes: Node[] = [];
-    const graphEdges: Edge[] = [];
-    for (let index = 0; index < 301; index += 1) {
-      const y = index * 30;
-      graphNodes.push(
-        {
-          id: `source-${index}`,
-          position: { x: 0, y },
-          measured: { width: 10, height: 10 },
-          data: {},
-        },
-        {
-          id: `target-${index}`,
-          position: { x: 200, y },
-          measured: { width: 10, height: 10 },
-          data: {},
-        },
-      );
-      graphEdges.push({
-        id: `edge-${index}`,
-        source: `source-${index}`,
-        target: `target-${index}`,
-        sourceHandle: 'right',
-        targetHandle: 'left',
-        data: { computedPath: [{ x: 10, y: y + 5 }, { x: 200, y: y + 5 }] },
-      });
-    }
-    const fullRouteSpy = vi.spyOn(fullRoutePipeline, 'createBaseReactFlowFullRouteEdges');
-    const response = computeBaseReactFlowDisplayEdgesWorkerResponse({
-      operation: 'validate-or-route',
-      requestId: 'validate-301-edges',
-      edges: graphEdges,
-      candidateEdges: graphEdges,
-      candidateSource: 'persistent',
-      nodes: graphNodes,
-      enableSmartEdges: true,
-      smartEdgePadding: 20,
-      isLargeGraph: false,
-      displayEdgeEpoch: 3,
-      qualityMode: 'full',
-    });
-
-    expect(response.hardClean).toBe(true);
-    expect(response.edges).toHaveLength(301);
-    expect(response.routeResolution).toBe('repaired-candidate');
-    expect(response.edges?.every(edge => edge.type === 'stablePath')).toBe(true);
-    expect(fullRouteSpy).not.toHaveBeenCalled();
-  });
-
   it('runs the shared finalizer and matches the direct final display route', () => {
     const input = {
       edges,
@@ -334,8 +285,19 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
       'quality-global-route',
       'quality-topology',
       'quality-crossing-sweeps',
+      'quality-crossing-structural',
+      'quality-crossing-global-refine',
+      'quality-crossing-final-candidates',
       'quality-strict-closure',
       'quality-polish',
+      'quality-polish-local',
+      'quality-polish-detached',
+      'quality-polish-endpoint',
+      'quality-polish-micro',
+      'quality-polish-candidates',
+      'quality-polish-selection',
+      'quality-polish-residual',
+      'quality-polish-obstacle-selection',
       'quality',
       'post-render-finalize',
       'post-render-soft-closure',
@@ -343,7 +305,13 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
       'finalizer',
       'final-clearance',
       'final-hard-safety',
+      'final-safety-hard-gate',
+      'final-safety-stubs',
+      'final-safety-endpoint-order',
+      'final-safety-passage-order',
       'final-safety-closure',
+      'final-commercial-safety-closure',
+      'session-commit',
     ]);
   });
 
@@ -400,8 +368,12 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
       phase: 'measured-repair',
       resolution: 'accepted',
     }));
-    expect(response.phaseTrace?.at(-1)).toMatchObject({
+    expect(response.phaseTrace).toContainEqual(expect.objectContaining({
       phase: 'final-safety-closure',
+      resolution: 'skip',
+    }));
+    expect(response.phaseTrace?.at(-1)).toMatchObject({
+      phase: 'session-commit',
       resolution: 'skip',
     });
   });

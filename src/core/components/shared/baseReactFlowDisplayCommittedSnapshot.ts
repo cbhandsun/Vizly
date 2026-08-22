@@ -10,6 +10,12 @@ import {
   sanitizeBaseReactFlowTrustedDisplayPatches,
 } from './baseReactFlowDisplayRoutingTransaction';
 import { projectBaseReactFlowDisplayWorkerInput } from './baseReactFlowDisplayWorkerProjection';
+import {
+  displayRoutingIdentitiesMatch,
+  createDisplayRoutingIdentity,
+  isDisplayRoutingWorkerSessionRef,
+  type RoutingWorkerSessionRef,
+} from './baseReactFlowDisplayRoutingSession';
 
 const MAX_COMMITTED_DISPLAY_SNAPSHOTS = 16;
 const INPUT_SIGNATURE_PATTERN = /^\d{1,10}$/;
@@ -21,6 +27,7 @@ export type BaseReactFlowDisplayCommittedSnapshotBaseline = Readonly<{
   sourceEdges: Edge[];
   displayPatches: Edge[];
   outputRouteSignature: string;
+  workerSessionRef?: RoutingWorkerSessionRef;
 }>;
 
 export type BaseReactFlowDisplayCommittedSnapshotHit = Readonly<{
@@ -74,6 +81,7 @@ export const writeBaseReactFlowDisplayCommittedSnapshot = ({
   sourceNodes,
   displayPatches,
   outputRouteSignature,
+  workerSessionRef,
 }: {
   inputSignature: string;
   inputGeometryDigest: string;
@@ -81,6 +89,7 @@ export const writeBaseReactFlowDisplayCommittedSnapshot = ({
   sourceNodes: Node[];
   displayPatches: Edge[];
   outputRouteSignature: string | null;
+  workerSessionRef?: RoutingWorkerSessionRef;
 }): boolean => {
   if (
     !hasValidIdentity(inputSignature, inputGeometryDigest)
@@ -97,6 +106,12 @@ export const writeBaseReactFlowDisplayCommittedSnapshot = ({
     edges: sourceEdges,
     nodes: sourceNodes,
   });
+  const expectedIdentity = createDisplayRoutingIdentity(inputSignature, inputGeometryDigest);
+  const safeWorkerSessionRef = isDisplayRoutingWorkerSessionRef(workerSessionRef)
+    && displayRoutingIdentitiesMatch(workerSessionRef.identity, expectedIdentity)
+    && workerSessionRef.outputRouteSignature === outputRouteSignature
+    ? workerSessionRef
+    : undefined;
   rememberSnapshot(snapshotKey(inputSignature, inputGeometryDigest), {
     inputSignature,
     inputGeometryDigest,
@@ -104,6 +119,7 @@ export const writeBaseReactFlowDisplayCommittedSnapshot = ({
     sourceEdges: projectedInput.edges,
     displayPatches: safePatches,
     outputRouteSignature,
+    ...(safeWorkerSessionRef ? { workerSessionRef: safeWorkerSessionRef } : {}),
   });
   return true;
 };
@@ -152,8 +168,26 @@ export const readBaseReactFlowDisplayCommittedSnapshot = ({
         snapshot.displayPatches,
       ) ?? [],
       outputRouteSignature: snapshot.outputRouteSignature,
+      ...(snapshot.workerSessionRef ? { workerSessionRef: snapshot.workerSessionRef } : {}),
     },
   };
+};
+
+export const commitBaseReactFlowDisplaySnapshot = (options: {
+  inputSignature: string;
+  inputGeometryDigest: string;
+  sourceEdges: Edge[];
+  sourceNodes: Node[];
+  displayPatches: Edge[];
+  outputRouteSignature: string | null;
+  workerSessionRef?: RoutingWorkerSessionRef;
+}): BaseReactFlowDisplayCommittedSnapshotBaseline | null => {
+  if (!writeBaseReactFlowDisplayCommittedSnapshot(options)) return null;
+  return readBaseReactFlowDisplayCommittedSnapshot({
+    inputSignature: options.inputSignature,
+    inputGeometryDigest: options.inputGeometryDigest,
+    sourceEdges: options.sourceEdges,
+  })?.baseline ?? null;
 };
 
 export const clearBaseReactFlowDisplayCommittedSnapshots = (): void => {

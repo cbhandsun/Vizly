@@ -472,8 +472,8 @@ const routesHaveExactPath = (
 
 /** Checks routing-owned geometry directly, independently of cache size limits. */
 export const doBaseReactFlowDisplayRoutesMatchExactly = (
-  workerEdges: Edge[],
-  mergedEdges: Edge[],
+  workerEdges: readonly Edge[],
+  mergedEdges: readonly Edge[],
 ): boolean => {
   if (
     !Array.isArray(workerEdges)

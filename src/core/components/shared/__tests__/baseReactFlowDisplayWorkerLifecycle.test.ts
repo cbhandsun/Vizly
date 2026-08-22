@@ -342,6 +342,42 @@ describe('baseReactFlowDisplayWorker lifecycle', () => {
     expect(closure.contextEdgeIds).toEqual(siblingEdges.map(edge => edge.id).sort());
   });
 
+  it('classifies resize, port policy, container, and topology changes deterministically', () => {
+    const baselineNodes = [
+      { id: 'source', position: { x: 0, y: 0 }, measured: { width: 100, height: 60 }, data: {} },
+      { id: 'target', position: { x: 300, y: 0 }, measured: { width: 100, height: 60 }, data: {} },
+    ];
+    const baselineEdges: Edge[] = [{ id: 'edge', source: 'source', target: 'target' }];
+    expect(createBaseReactFlowRoutingChangeSet({
+      previousNodes: baselineNodes,
+      previousEdges: baselineEdges,
+      nextNodes: baselineNodes.map(node => node.id === 'source'
+        ? { ...node, measured: { width: 140, height: 60 } }
+        : node),
+      nextEdges: baselineEdges,
+    })).toMatchObject({ reason: 'node-resize', topologyChanged: false });
+    expect(createBaseReactFlowRoutingChangeSet({
+      previousNodes: baselineNodes,
+      previousEdges: baselineEdges,
+      nextNodes: baselineNodes,
+      nextEdges: [{ ...baselineEdges[0], sourceHandle: 'right' }],
+    })).toMatchObject({ reason: 'port-policy', topologyChanged: true });
+    expect(createBaseReactFlowRoutingChangeSet({
+      previousNodes: baselineNodes,
+      previousEdges: baselineEdges,
+      nextNodes: baselineNodes.map(node => node.id === 'target'
+        ? { ...node, parentId: 'container' }
+        : node),
+      nextEdges: baselineEdges,
+    })).toMatchObject({ reason: 'container-change', topologyChanged: true });
+    expect(createBaseReactFlowRoutingChangeSet({
+      previousNodes: baselineNodes,
+      previousEdges: baselineEdges,
+      nextNodes: [...baselineNodes, { id: 'new', position: { x: 0, y: 100 }, data: {} }],
+      nextEdges: baselineEdges,
+    })).toMatchObject({ reason: 'node-add', topologyChanged: true });
+  });
+
   it.each(['error', 'messageerror'] as const)(
     'terminates and clears a worker after a %s event',
     async (eventType) => {

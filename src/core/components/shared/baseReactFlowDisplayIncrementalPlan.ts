@@ -34,7 +34,6 @@ export const createBaseReactFlowDisplayIncrementalPlan = ({
 }): BaseReactFlowDisplayIncrementalPlan | null => {
   if (
     !baseline
-    || draggedNodeIds.length === 0
     || (
       baseline.inputSignature === nextInputSignature
       && baseline.inputGeometryDigest === nextInputGeometryDigest
@@ -50,12 +49,14 @@ export const createBaseReactFlowDisplayIncrementalPlan = ({
     previousEdges: baseline.sourceEdges,
     nextNodes,
     nextEdges,
-    reasonHint: 'node-drag',
+    reasonHint: draggedNodeIds.length > 0 ? 'node-drag' : 'unknown',
   });
   if (
-    changeSet.topologyChanged
-    || !changeSet.geometryChanged
-    || !changeSet.changedNodeIds.some(nodeId => draggedNodeIds.includes(nodeId))
+    !changeSet.geometryChanged
+    || (
+      draggedNodeIds.length > 0
+      && !changeSet.changedNodeIds.some(nodeId => draggedNodeIds.includes(nodeId))
+    )
   ) return null;
   const affectedClosure = createBaseReactFlowRoutingAffectedClosure({
     changeSet,

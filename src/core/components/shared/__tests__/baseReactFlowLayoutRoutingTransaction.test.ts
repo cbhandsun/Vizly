@@ -132,6 +132,97 @@ describe('baseReactFlowLayoutRoutingTransaction', () => {
     expect(sourceEdges[0].data).toEqual({});
   });
 
+  it('negotiates an automatic same-row ELK U route to facing terminals before Worker routing', () => {
+    const elkPath = [
+      { x: 50, y: 60 },
+      { x: 50, y: 130 },
+      { x: 290, y: 130 },
+      { x: 290, y: 60 },
+    ];
+    const [seed] = seedBaseReactFlowStagedLayoutEdges({
+      sourceNodes: nodes,
+      sourceEdges: [{
+        ...sourceEdges[0],
+        sourceHandle: 'bottom',
+        targetHandle: 'bottom',
+        data: { elkPath, useElkRouting: true, layoutRoutingCandidate: true },
+      }],
+    });
+
+    expect(seed).toMatchObject({
+      sourceHandle: 'right',
+      targetHandle: 'left',
+      data: {
+        computedPath: [{ x: 100, y: 30 }, { x: 240, y: 30 }],
+        terminalPortBridgeRepaired: true,
+      },
+    });
+  });
+
+  it('preserves source-authored terminal sides while seeding an ELK U route', () => {
+    const elkPath = [
+      { x: 50, y: 60 },
+      { x: 50, y: 130 },
+      { x: 290, y: 130 },
+      { x: 290, y: 60 },
+    ];
+    const [seed] = seedBaseReactFlowStagedLayoutEdges({
+      sourceNodes: nodes,
+      sourceEdges: [{
+        ...sourceEdges[0],
+        sourceHandle: 'bottom',
+        targetHandle: 'bottom',
+        data: {
+          elkPath,
+          useElkRouting: true,
+          layoutRoutingCandidate: true,
+          manualHandleSides: ['source', 'target'],
+        },
+      }],
+    });
+
+    expect(seed).toMatchObject({
+      sourceHandle: 'bottom',
+      targetHandle: 'bottom',
+      data: { computedPath: elkPath },
+    });
+  });
+
+  it('negotiates the production mixed-side Pool A detour after geometry normalization', () => {
+    const productionNodes: Node[] = [
+      {
+        id: 'check-limit', position: { x: 2232, y: 479 },
+        measured: { width: 249, height: 96 }, data: {},
+      },
+      {
+        id: 'pool-a-entry', position: { x: 2601, y: 695 },
+        measured: { width: 217, height: 96 }, data: {},
+      },
+    ];
+    const elkPath = [
+      { x: 2232, y: 527 }, { x: 2184, y: 527 },
+      { x: 2184, y: 839 }, { x: 2709.5, y: 839 },
+      { x: 2709.5, y: 791 },
+    ];
+    const [seed] = seedBaseReactFlowStagedLayoutEdges({
+      sourceNodes: productionNodes,
+      sourceEdges: [{
+        id: 'e5', source: 'check-limit', target: 'pool-a-entry',
+        sourceHandle: 'left', targetHandle: 'bottom',
+        data: { elkPath, layoutRoutingCandidate: true },
+      }],
+    });
+
+    expect(seed).toMatchObject({
+      sourceHandle: 'right',
+      targetHandle: 'left',
+      data: { computedPath: [
+        { x: 2481, y: 527 }, { x: 2541, y: 527 },
+        { x: 2541, y: 743 }, { x: 2601, y: 743 },
+      ] },
+    });
+  });
+
   it('does not record a staged layout route that failed the hard gate', () => {
     expect(commitBaseReactFlowStagedLayoutRoutingResult({
       sourceEdges,

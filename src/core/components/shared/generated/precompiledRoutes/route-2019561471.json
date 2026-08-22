@@ -1,10 +1,10 @@
 {
   "schema": "vizly-precompiled-display-route-v1",
-  "routingVersion": "9",
+  "routingVersion": "13",
   "sourceHash": "source-v1:2a580f110590a416ff1aeb9fb5a3cd21536428e26368841fd160f87243cc25d3",
-  "inputSignature": "401264928",
-  "inputGeometryDigest": "geometry-v1:88a231b54675f045e0ee857191999849",
-  "outputRouteSignature": "route-v2:44:195:22dd064a56dcd838",
+  "inputSignature": "2019561471",
+  "inputGeometryDigest": "geometry-v1:e508e10f10f21b8b6b8c84bdf1c94a4f",
+  "outputRouteSignature": "route-v2:44:205:757c10d9e7fa2c67",
   "hardClean": true,
   "patches": [
     {
@@ -162,19 +162,19 @@
             "y": 1466
           },
           {
-            "x": 1390,
+            "x": 1565.8,
             "y": 1466
           },
           {
-            "x": 1390,
-            "y": 1317
+            "x": 1565.8,
+            "y": 1381
           },
           {
-            "x": 1955,
-            "y": 1317
+            "x": 1844.8,
+            "y": 1381
           },
           {
-            "x": 1955,
+            "x": 1844.8,
             "y": 1246
           },
           {
@@ -182,6 +182,7 @@
             "y": 1246
           }
         ],
+        "sharedTrunkAware": true,
         "sharedTrunkSynthesized": true
       }
     },
@@ -256,16 +257,28 @@
       "target": "labor-schedule-feedback",
       "type": "stablePath",
       "sourceHandle": "right",
-      "targetHandle": "left",
+      "targetHandle": "top",
       "data": {
         "computedPath": [
           {
-            "x": 5825,
+            "x": 5824.849999999999,
             "y": 1582
           },
           {
-            "x": 6144.849999999999,
+            "x": 5880.849999999999,
             "y": 1582
+          },
+          {
+            "x": 5880.849999999999,
+            "y": 1496
+          },
+          {
+            "x": 6245.849999999999,
+            "y": 1496
+          },
+          {
+            "x": 6245.849999999999,
+            "y": 1552
           }
         ]
       }
@@ -275,16 +288,20 @@
       "source": "labor-schedule-feedback",
       "target": "allocation",
       "type": "stablePath",
-      "sourceHandle": "bottom",
+      "sourceHandle": "left",
       "targetHandle": "right",
       "data": {
         "computedPath": [
           {
             "x": 6145,
-            "y": 1612
+            "y": 1582
           },
           {
-            "x": 6145,
+            "x": 6089,
+            "y": 1582
+          },
+          {
+            "x": 6089,
             "y": 2081
           },
           {
@@ -328,7 +345,7 @@
             "y": 1498
           },
           {
-            "x": 1285.8,
+            "x": 1286,
             "y": 1498
           }
         ],
@@ -341,20 +358,20 @@
       "source": "labor-schedule-feedback",
       "target": "task-group",
       "type": "stablePath",
-      "sourceHandle": "right",
-      "targetHandle": "left",
+      "sourceHandle": "left",
+      "targetHandle": "right",
       "data": {
         "computedPath": [
           {
-            "x": 6347,
+            "x": 6145,
             "y": 1582
           },
           {
-            "x": 6403,
+            "x": 5872.849999999999,
             "y": 1582
           },
           {
-            "x": 6403,
+            "x": 5872.849999999999,
             "y": 205
           },
           {
@@ -366,16 +383,16 @@
             "y": 36
           },
           {
-            "x": 2917,
+            "x": 3283.1499999999996,
             "y": 36
           },
           {
-            "x": 2917,
-            "y": 1253
+            "x": 3283.1499999999996,
+            "y": 1221
           },
           {
-            "x": 3029,
-            "y": 1253
+            "x": 3235,
+            "y": 1221
           }
         ],
         "sharedTrunkAware": true
@@ -386,24 +403,32 @@
       "source": "operation",
       "target": "exception-alert",
       "type": "stablePath",
-      "sourceHandle": "left",
+      "sourceHandle": "right",
       "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 3997.65,
-            "y": 813
+            "x": 4317,
+            "y": 850
           },
           {
-            "x": 3941.65,
-            "y": 813
+            "x": 4373,
+            "y": 850
           },
           {
-            "x": 3941.65,
+            "x": 4373,
+            "y": 1534
+          },
+          {
+            "x": 4348,
+            "y": 1534
+          },
+          {
+            "x": 4348,
             "y": 2035
           },
           {
-            "x": 5099.849999999999,
+            "x": 5100,
             "y": 2035
           }
         ],
@@ -469,7 +494,7 @@
             "y": 1253
           },
           {
-            "x": 4651.65,
+            "x": 4652,
             "y": 1253
           }
         ],
@@ -510,25 +535,25 @@
       "source": "operation",
       "target": "path-heatmap",
       "type": "stablePath",
-      "sourceHandle": "left",
+      "sourceHandle": "right",
       "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 3997.65,
-            "y": 813
+            "x": 4317,
+            "y": 850
           },
           {
-            "x": 3941.65,
-            "y": 813
+            "x": 4373,
+            "y": 850
           },
           {
-            "x": 3941.65,
-            "y": 1808.5
+            "x": 4373,
+            "y": 1809
           },
           {
-            "x": 5101.849999999999,
-            "y": 1808.5
+            "x": 5102,
+            "y": 1809
           }
         ],
         "sharedTrunkAware": true,
@@ -550,6 +575,14 @@
           },
           {
             "x": 4317,
+            "y": 721
+          },
+          {
+            "x": 4360,
+            "y": 721
+          },
+          {
+            "x": 4360,
             "y": 121
           },
           {
@@ -701,6 +734,14 @@
           },
           {
             "x": 4373,
+            "y": 1355
+          },
+          {
+            "x": 4988,
+            "y": 1355
+          },
+          {
+            "x": 4988,
             "y": 1582
           },
           {
@@ -738,7 +779,6 @@
             "y": 1480
           }
         ],
-        "sharedTrunkAware": true,
         "sharedTrunkSynthesized": true
       }
     },
@@ -819,11 +859,11 @@
       "data": {
         "computedPath": [
           {
-            "x": 292,
+            "x": 280,
             "y": 1534
           },
           {
-            "x": 292,
+            "x": 280,
             "y": 1116
           },
           {
@@ -1140,27 +1180,27 @@
           },
           {
             "x": 2347,
-            "y": 1285
+            "y": 1301
           },
           {
             "x": 2553.2,
-            "y": 1285
+            "y": 1301
           },
           {
             "x": 2553.2,
-            "y": 1324
+            "y": 1325
           },
           {
             "x": 2819.2,
-            "y": 1324
+            "y": 1325
           },
           {
             "x": 2819.2,
-            "y": 1285
+            "y": 1301
           },
           {
             "x": 2917,
-            "y": 1285
+            "y": 1301
           },
           {
             "x": 2917,
@@ -1234,26 +1274,27 @@
             "y": 1253
           },
           {
-            "x": 3315,
+            "x": 3515.1499999999996,
             "y": 1253
           },
           {
-            "x": 3315,
-            "y": 871
+            "x": 3515.1499999999996,
+            "y": 1104
           },
           {
             "x": 3886,
-            "y": 871
+            "y": 1104
           },
           {
             "x": 3886,
-            "y": 781
+            "y": 813
           },
           {
             "x": 3998,
-            "y": 781
+            "y": 813
           }
         ],
+        "sharedTrunkAware": true,
         "sharedTrunkSynthesized": true
       }
     },
@@ -1283,7 +1324,6 @@
             "y": 1479
           }
         ],
-        "sharedTrunkAware": true,
         "sharedTrunkSynthesized": true
       }
     },
@@ -1301,11 +1341,11 @@
             "y": 1253
           },
           {
-            "x": 3307,
+            "x": 3295,
             "y": 1253
           },
           {
-            "x": 3307.1499999999996,
+            "x": 3295,
             "y": 787
           },
           {

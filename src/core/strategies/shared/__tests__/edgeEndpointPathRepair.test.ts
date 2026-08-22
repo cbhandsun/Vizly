@@ -253,17 +253,27 @@ describe('repairEndpointOrthogonalPaths', () => {
       },
     ];
 
-    const [repaired] = repairEndpointOrthogonalPaths(edges, [
+    const repairNodes = [
       node('tms', 1113, 962, 420, 236),
       node('downstream', 2250, 119, 336, 119),
       node('loms', 1120, 605, 406, 197),
       node('customs', 1853, 981, 420, 197),
       node('visibility', 1579, 1922, 420, 236),
-    ]);
+    ];
+    const [repaired] = repairEndpointOrthogonalPaths(edges, repairNodes);
     const path = ((repaired.data as any)?.computedPath ?? []) as Array<{ x: number; y: number }>;
 
     expect(path[1].y).toBeLessThanOrEqual(858);
     expect(path.some(point => point.x === 2362 && point.y === 914)).toBe(false);
+
+    const crossingSweepResult = repairEndpointOrthogonalPaths(edges, repairNodes, {
+      detectExistingBridgeCrossings: false,
+    });
+    const crossingSweepPath = (
+      (crossingSweepResult[0].data as any)?.computedPath ?? []
+    ) as Array<{ x: number; y: number }>;
+    expect(crossingSweepPath[1].y).toBeGreaterThan(path[1].y);
+    expect(crossingSweepPath[1].y).toBe(866);
   });
 
   it('shortens only the stub that would share a same-axis endpoint lane', () => {
@@ -422,6 +432,7 @@ describe('repairEndpointOrthogonalPaths', () => {
       { x: 252, y: 1357 },
     ]);
     expect((repaired.data as any)?.endpointOrthogonalRepaired).toBe(true);
+
   });
 
   it('uses node-size-aware alignment to remove a visible endpoint dogleg on large nodes', () => {

@@ -18,8 +18,6 @@ import {
 import {
   DISPLAY_BOUNDED_DETACHED_OVERLAP_REPAIR_OPTIONS,
   DISPLAY_BOUNDED_RESIDUAL_OVERLAP_REPAIR_OPTIONS,
-  DISPLAY_DETACHED_OVERLAP_REPAIR_OPTIONS,
-  DISPLAY_EXTENDED_RESIDUAL_OVERLAP_REPAIR_OPTIONS,
   repairExactThresholdResidualOverlaps,
   repairNearParallelResidualOverlaps,
   repairResidualDisplayOverlaps,
@@ -46,7 +44,10 @@ import { repairFinalResidualStrictCrossingsFromKnownAnalysis } from './baseReact
 import { repairTerminalEndpointStrictCrossingStubs } from './baseReactFlowDisplayStrictTerminalRepair';
 import { getDisplayHardQualityGateReport } from './baseReactFlowDisplayQualityGates';
 import { markBaseDisplayFinalized } from './baseReactFlowDisplayEdgeCore';
-import { startDisplayRoutingPhaseTrace } from './baseReactFlowDisplayRoutingTrace';
+import {
+  startDisplayRoutingPhaseTrace,
+  type DisplayRoutingPhaseTrace,
+} from './baseReactFlowDisplayRoutingTrace';
 import {
   createDisplayTerminalValidationSnapshot,
   displayTerminalValidationDoesNotRegress,
@@ -62,6 +63,7 @@ export const runBaseReactFlowFullRouteStrictPhase = (
   context: BaseReactFlowFullRouteContext,
   postSoftEdges: Edge[],
   postSoftQuality: EdgePathQualityScore,
+  skipInitialOverlapRepair = false,
 ): BaseReactFlowFullRouteStrictResult => {
   const {
     repairNodes,
@@ -75,13 +77,23 @@ export const runBaseReactFlowFullRouteStrictPhase = (
     candidateCount: postSoftEdges.length,
     onTrace: onPhaseTrace,
   });
+  const primaryPhaseTrace: DisplayRoutingPhaseTrace[] = [];
+  const recordPrimaryPhaseTrace = onPhaseTrace
+    ? (trace: DisplayRoutingPhaseTrace) => primaryPhaseTrace.push(trace)
+    : undefined;
   const terminalSnapshot = createDisplayTerminalValidationSnapshot(repairNodes);
   const keepTerminalSafe = (baseline: Edge[], candidate: Edge[]): Edge[] => (
     displayTerminalValidationDoesNotRegress(baseline, candidate, terminalSnapshot)
       ? candidate
       : baseline
   );
+  const overlapTimer = startDisplayRoutingPhaseTrace({
+    phase: 'strict-primary-overlap',
+    candidateCount: postSoftEdges.length,
+    onTrace: recordPrimaryPhaseTrace,
+  });
   const finalDetachedObstacleCandidate = hasHardDisplayOverlapRisk(postSoftQuality)
+    && !skipInitialOverlapRepair
     ? (() => {
       const detachedCandidate = separateDetachedParallelOverlaps(
         postSoftEdges,
@@ -97,12 +109,12 @@ export const runBaseReactFlowFullRouteStrictPhase = (
       const residualObstacleCandidate = repairResidualDisplayOverlaps(
         obstacleCandidate,
         repairNodes,
-        useBoundedLargeRepair
-          ? DISPLAY_BOUNDED_DETACHED_OVERLAP_REPAIR_OPTIONS
-          : DISPLAY_DETACHED_OVERLAP_REPAIR_OPTIONS,
-        useBoundedLargeRepair
-          ? DISPLAY_BOUNDED_RESIDUAL_OVERLAP_REPAIR_OPTIONS
-          : DISPLAY_EXTENDED_RESIDUAL_OVERLAP_REPAIR_OPTIONS,
+        // Quality already ran the exhaustive residual search, and post-render
+        // ran a bounded retry after its micro/soft edits. Strict primary gets
+        // one final independent attempt, but keeps it bounded before the exact
+        // strict closure and terminal hard gates.
+        DISPLAY_BOUNDED_DETACHED_OVERLAP_REPAIR_OPTIONS,
+        DISPLAY_BOUNDED_RESIDUAL_OVERLAP_REPAIR_OPTIONS,
       );
       return chooseFinalObstacleAwarePolishCandidate(
         repairNodes,
@@ -113,6 +125,15 @@ export const runBaseReactFlowFullRouteStrictPhase = (
       );
     })()
     : postSoftEdges;
+  overlapTimer.finish(
+    finalDetachedObstacleCandidate === postSoftEdges ? 'skip' : 'accepted',
+    finalDetachedObstacleCandidate === postSoftEdges ? 0 : finalDetachedObstacleCandidate.length,
+  );
+  const endpointTargetTimer = startDisplayRoutingPhaseTrace({
+    phase: 'strict-primary-endpoint-target',
+    candidateCount: finalDetachedObstacleCandidate.length,
+    onTrace: recordPrimaryPhaseTrace,
+  });
   const finalEndpointStubCandidate = keepTerminalSafe(
     finalDetachedObstacleCandidate,
     repairFinalShortEndpointStubs(finalDetachedObstacleCandidate, repairNodes),
@@ -144,6 +165,17 @@ export const runBaseReactFlowFullRouteStrictPhase = (
       ),
     )
     : finalPostTargetStrictCandidate;
+  endpointTargetTimer.finish(
+    finalPostTargetObstacleCandidate === finalDetachedObstacleCandidate ? 'skip' : 'accepted',
+    finalPostTargetObstacleCandidate === finalDetachedObstacleCandidate
+      ? 0
+      : finalPostTargetObstacleCandidate.length,
+  );
+  const crossingTimer = startDisplayRoutingPhaseTrace({
+    phase: 'strict-primary-crossing',
+    candidateCount: finalPostTargetObstacleCandidate.length,
+    onTrace: recordPrimaryPhaseTrace,
+  });
   const finalDirectionalStrictCandidate = chooseFinalObstacleAwarePolishCandidate(
     repairNodes,
     finalPostTargetObstacleCandidate,
@@ -186,6 +218,17 @@ export const runBaseReactFlowFullRouteStrictPhase = (
       ),
     ),
   );
+  crossingTimer.finish(
+    finalDirectionalAfterResidualCandidate === finalPostTargetObstacleCandidate ? 'skip' : 'accepted',
+    finalDirectionalAfterResidualCandidate === finalPostTargetObstacleCandidate
+      ? 0
+      : finalDirectionalAfterResidualCandidate.length,
+  );
+  const cleanupSelectionTimer = startDisplayRoutingPhaseTrace({
+    phase: 'strict-primary-cleanup-selection',
+    candidateCount: finalDirectionalAfterResidualCandidate.length,
+    onTrace: recordPrimaryPhaseTrace,
+  });
   const finalMicroCleanupCandidate = repairDisplayMicroArtifacts(finalDirectionalAfterResidualCandidate);
   const finalLocalCleanupCandidate = repairLocalDoglegArtifacts(
     finalMicroCleanupCandidate,
@@ -224,10 +267,15 @@ export const runBaseReactFlowFullRouteStrictPhase = (
   )
     ? finalTerminalStrictCandidate
     : finalBaseReturnCandidate;
+  cleanupSelectionTimer.finish(
+    finalReturnCandidate === finalDirectionalAfterResidualCandidate ? 'skip' : 'accepted',
+    finalReturnCandidate === finalDirectionalAfterResidualCandidate ? 0 : finalReturnCandidate.length,
+  );
   primaryTimer.finish(
     finalReturnCandidate === postSoftEdges ? 'skip' : 'accepted',
     finalReturnCandidate === postSoftEdges ? 0 : finalReturnCandidate.length,
   );
+  primaryPhaseTrace.forEach(trace => onPhaseTrace?.(trace));
   const closureTimer = startDisplayRoutingPhaseTrace({
     phase: 'strict-closure',
     candidateCount: finalReturnCandidate.length,

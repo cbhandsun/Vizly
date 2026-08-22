@@ -67,10 +67,23 @@ const INTERACTIVE_DETACHED_OVERLAP_REPAIR_OPTIONS = {
   qualityOnly: true,
 };
 
+const DEFERRED_GLOBAL_CANDIDATE_EDGE_THRESHOLD = 24;
+const DEFERRED_GLOBAL_CANDIDATE_EDGE_BUDGET = 12;
+
+export const getInteractiveGlobalCandidateEdgeBudget = (
+  edgeCount: number,
+  deferOuterObstacleRepair: boolean,
+): number | undefined => (
+  deferOuterObstacleRepair && edgeCount > DEFERRED_GLOBAL_CANDIDATE_EDGE_THRESHOLD
+    ? DEFERRED_GLOBAL_CANDIDATE_EDGE_BUDGET
+    : undefined
+);
+
 const createInteractiveDisplayQualityEdges = (
   normalizedEdges: Edge[],
   repairNodes: Node[],
   layoutDirection: string,
+  maxGlobalCandidateEdges?: number,
 ): Edge[] => {
   const endpointEdges = repairEndpointOrthogonalPaths(normalizedEdges, repairNodes);
   const sharedTargetEdges = synthesizeSharedEndpointTrunks(endpointEdges, { nodes: repairNodes });
@@ -83,6 +96,7 @@ const createInteractiveDisplayQualityEdges = (
   const globalEdges = repairEndpointOrthogonalPaths(
     reduceEdgeCrossingsWithWaypoints(endpointLaneEdges, repairNodes, layoutDirection, {
       onlyNodeRiskEdges: true,
+      maxCandidateEdges: maxGlobalCandidateEdges,
     }),
     repairNodes,
   );
@@ -151,6 +165,10 @@ export const createBaseReactFlowInteractiveDisplayEdges = ({
     normalizedEdges,
     repairNodes,
     layoutDirection,
+    getInteractiveGlobalCandidateEdgeBudget(
+      normalizedEdges.length,
+      deferOuterObstacleRepair,
+    ),
   );
 
   return finishInteractiveDisplayEdgesForRenderMode({

@@ -8,9 +8,27 @@ export const DISPLAY_ROUTING_BROWSER_CAPTURE_SCRIPT = `(() => {
   window.__vizlyRoutingRequests = [];
   window.__vizlyRoutingResponses = [];
   window.__vizlyBoundedCandidates = [];
+  window.__vizlyLongTasks = [];
   window.__vizlyRenderedRouteSamples = [];
+  window.__vizlyRouteSamplingEnabled = true;
   let previousRenderedRouteFingerprint = '';
+  try {
+    const longTaskObserver = new PerformanceObserver((list) => {
+      for (const entry of list.getEntries()) {
+        window.__vizlyLongTasks.push({
+          startedAt: performance.timeOrigin + entry.startTime,
+          durationMs: entry.duration,
+        });
+      }
+      window.__vizlyLongTasks = window.__vizlyLongTasks.slice(-64);
+    });
+    longTaskObserver.observe({ type: 'longtask', buffered: true });
+  } catch {}
   const sampleRenderedRoutes = () => {
+    if (!window.__vizlyRouteSamplingEnabled) {
+      requestAnimationFrame(sampleRenderedRoutes);
+      return;
+    }
     const wrappers = [...document.querySelectorAll('[data-testid^="rf__edge-"]')];
     const paths = wrappers.map(wrapper => (
       wrapper.querySelector('.shared-trunk-edge-interaction')
@@ -38,13 +56,16 @@ export const DISPLAY_ROUTING_BROWSER_CAPTURE_SCRIPT = `(() => {
       this.addEventListener('message', event => {
         const response = event?.data;
         if (!response || typeof response.requestId !== 'string') return;
+        const receivedAt = Date.now();
+        const cloneStartedAt = performance.now();
         try {
           if (response.boundedCandidate) {
             window.__vizlyBoundedCandidates.push(structuredClone(response));
             window.__vizlyBoundedCandidates = window.__vizlyBoundedCandidates.slice(-16);
           }
           const capturedResponse = structuredClone(response);
-          capturedResponse.__browserCapturedAt = Date.now();
+          capturedResponse.__browserCapturedAt = receivedAt;
+          capturedResponse.__browserCloneMs = performance.now() - cloneStartedAt;
           window.__vizlyRoutingResponses.push(capturedResponse);
           window.__vizlyRoutingResponses = window.__vizlyRoutingResponses.slice(-16);
         } catch {}
@@ -53,7 +74,9 @@ export const DISPLAY_ROUTING_BROWSER_CAPTURE_SCRIPT = `(() => {
     postMessage(message, transfer) {
       if (message && typeof message.requestId === 'string') {
         try {
+          const cloneStartedAt = performance.now();
           const capturedRequest = structuredClone(message);
+          capturedRequest.__browserCloneMs = performance.now() - cloneStartedAt;
           capturedRequest.__browserCapturedAt = Date.now();
           window.__vizlyRoutingRequests.push(capturedRequest);
           window.__vizlyRoutingRequests = window.__vizlyRoutingRequests.slice(-16);

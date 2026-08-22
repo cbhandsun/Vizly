@@ -42,6 +42,7 @@ import { repairFinalResidualStrictCrossings } from './baseReactFlowDisplayStrict
 import { withDisplayLocalShortcutSoftCrossingBridge } from './baseReactFlowDisplaySoftCrossingBridge';
 import { repairAxisMismatchedTerminalsWithBoundedPortRoles } from './baseReactFlowDisplayTerminalPortRepair';
 import { preservesCommercialTrueTrunkMembership } from './baseReactFlowDisplayTrueTrunkContract';
+import { startDisplayRoutingPhaseTrace } from './baseReactFlowDisplayRoutingTrace';
 
 const FINAL_COMMERCIAL_DETOUR_QUALITY_BUDGET = 128;
 const FINAL_COMMERCIAL_DETOUR_PASSES = 1;
@@ -53,6 +54,25 @@ const COMMERCIAL_REPAIR_FLAGS = [
   'displayNodeClearanceRepaired',
   'overextendedTargetTrunkCorridorReclaimed',
 ] as const;
+
+const FINAL_COMMERCIAL_PHASES = [
+  'final-commercial-clearance',
+  'final-commercial-terminal-preserving',
+  'final-commercial-terminal-changing',
+  'final-commercial-source-stairs',
+  'final-commercial-evaluation',
+  'final-commercial-safety-closure',
+] as const;
+
+export const traceSkippedFinalCommercialDetours = (
+  candidateCount: number,
+  onPhaseTrace: BaseReactFlowFinalEndpointOrderOptions['onPhaseTrace'],
+): void => {
+  for (const phase of FINAL_COMMERCIAL_PHASES) {
+    startDisplayRoutingPhaseTrace({ phase, candidateCount, onTrace: onPhaseTrace })
+      .finish('skip');
+  }
+};
 
 const commercialRepairOutputIsEquivalent = (
   baseline: Edge[],
@@ -517,23 +537,59 @@ export const repairBaseReactFlowFinalCommercialDetours = <T extends Edge[]>(
     return current;
   };
   if (options.skipLoopShortcut) {
+    const clearanceTimer = startDisplayRoutingPhaseTrace({
+      phase: 'final-commercial-clearance',
+      candidateCount: baseline.length,
+      onTrace: options.onPhaseTrace,
+    });
     const clearanceCandidate = repairClearanceToBoundedFixedPoint(baseline);
-    return finish(repairSourceTerminalOuterStairs(
-      repairTerminalChangingOuterStairs(
-        repairTerminalPreservingOuterStairs(
-          clearanceCandidate,
-          nodes,
-          options,
-          evaluation,
-        ),
-        nodes,
-        options,
-        evaluation,
-      ),
+    clearanceTimer.finish(clearanceCandidate === baseline ? 'skip' : 'accepted');
+    const preservingTimer = startDisplayRoutingPhaseTrace({
+      phase: 'final-commercial-terminal-preserving',
+      candidateCount: baseline.length,
+      onTrace: options.onPhaseTrace,
+    });
+    const preservingCandidate = repairTerminalPreservingOuterStairs(
+      clearanceCandidate,
       nodes,
       options,
       evaluation,
-    ));
+    );
+    preservingTimer.finish(
+      preservingCandidate === clearanceCandidate ? 'skip' : 'accepted',
+    );
+    const changingTimer = startDisplayRoutingPhaseTrace({
+      phase: 'final-commercial-terminal-changing',
+      candidateCount: baseline.length,
+      onTrace: options.onPhaseTrace,
+    });
+    const changingCandidate = repairTerminalChangingOuterStairs(
+      preservingCandidate,
+      nodes,
+      options,
+      evaluation,
+    );
+    changingTimer.finish(changingCandidate === preservingCandidate ? 'skip' : 'accepted');
+    const sourceTimer = startDisplayRoutingPhaseTrace({
+      phase: 'final-commercial-source-stairs',
+      candidateCount: baseline.length,
+      onTrace: options.onPhaseTrace,
+    });
+    const sourceCandidate = repairSourceTerminalOuterStairs(
+      changingCandidate,
+      nodes,
+      options,
+      evaluation,
+    );
+    sourceTimer.finish(sourceCandidate === changingCandidate ? 'skip' : 'accepted');
+    const evaluationTimer = startDisplayRoutingPhaseTrace({
+      phase: 'final-commercial-evaluation',
+      candidateCount: baseline.length,
+      onTrace: options.onPhaseTrace,
+    });
+    const result = finish(sourceCandidate);
+    evaluationTimer.finish(result === baseline ? 'skip' : 'accepted');
+    return result;
   }
   baseline = repairTerminalPreservingOuterStairs(
     baseline,

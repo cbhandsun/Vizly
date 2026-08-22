@@ -627,7 +627,20 @@ function straightenNearlyAlignedEndpointPath(
   return candidate;
 }
 
-export function repairEndpointOrthogonalPaths(edges: Edge[], nodes: ReactFlowNode[]): Edge[] {
+export type EndpointOrthogonalPathRepairOptions = Readonly<{
+  /**
+   * Detect already-orthogonal endpoint bridges that cross peer lanes. Full
+   * endpoint repair keeps this enabled; callers immediately following an
+   * exact crossing sweep may disable the quadratic peer-lane scan.
+   */
+  detectExistingBridgeCrossings?: boolean;
+}>;
+
+export function repairEndpointOrthogonalPaths(
+  edges: Edge[],
+  nodes: ReactFlowNode[],
+  options: EndpointOrthogonalPathRepairOptions = {},
+): Edge[] {
   const nodeById = new Map(nodes.map(node => [node.id, node] as const));
   const edgePaths = edges.map((edge, index) => {
     const normalized = normalizeEndpointAnchors(edge, getEdgePath(edge), nodeById);
@@ -655,7 +668,8 @@ export function repairEndpointOrthogonalPaths(edges: Edge[], nodes: ReactFlowNod
       const sourceBridgeTarget = sourceSide && detachedSourceEndpoint && endpointDirectionOk(path[0], path[1], sourceSide)
         ? path[2]
         : (detachedSourceEndpoint ? path[1] : path[2]);
-      const sourceBridgeCrosses = !!sourceSide
+      const sourceBridgeCrosses = options.detectExistingBridgeCrossings !== false
+        && !!sourceSide
         && !!sourceBridgeTarget
         && scoreBridgeLength({
           edgeKey,
@@ -700,7 +714,8 @@ export function repairEndpointOrthogonalPaths(edges: Edge[], nodes: ReactFlowNod
       const targetBridgeTarget = targetSide && detachedTargetEndpoint && endpointDirectionOk(end, previous, targetSide)
         ? path[path.length - 3]
         : (detachedTargetEndpoint ? previous : path[path.length - 3]);
-      const targetBridgeCrosses = !!targetSide
+      const targetBridgeCrosses = options.detectExistingBridgeCrossings !== false
+        && !!targetSide
         && !!targetBridgeTarget
         && scoreBridgeLength({
           edgeKey,

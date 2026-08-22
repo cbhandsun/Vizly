@@ -8,6 +8,41 @@ import {
 } from '../baseReactFlowFastEdgeSafety';
 
 describe('baseReactFlowFastEdgeSafety', () => {
+  it('parses each peer path once while repairing a route set', () => {
+    let computedPathReads = 0;
+    const nodes: Node[] = Array.from({ length: 6 }, (_, index) => ({
+      id: `node-${index}`,
+      position: { x: index * 160, y: index % 2 === 0 ? 0 : 240 },
+      measured: { width: 80, height: 48 },
+      data: {},
+    }));
+    const edges: Edge[] = nodes.slice(0, -1).map((node, index) => {
+      const target = nodes[index + 1];
+      const data: Record<string, unknown> = {};
+      Object.defineProperty(data, 'computedPath', {
+        enumerable: true,
+        get: () => {
+          computedPathReads += 1;
+          return [
+            { x: node.position.x + 80, y: node.position.y + 24 },
+            { x: target.position.x, y: node.position.y + 24 },
+            { x: target.position.x, y: target.position.y + 24 },
+          ];
+        },
+      });
+      return {
+        id: `edge-${index}`,
+        source: node.id,
+        target: target.id,
+        data,
+      };
+    });
+
+    repairFastDisplayHardSafety(edges, nodes);
+
+    expect(computedPathReads).toBe(edges.length);
+  });
+
   it('prefers a crossing-free obstacle lane over the shorter feeder fan', () => {
     const nodes: Node[] = [
       { id: 'source', position: { x: 300, y: 0 }, measured: { width: 100, height: 60 }, data: {} },

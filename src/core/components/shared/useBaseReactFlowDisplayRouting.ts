@@ -6,7 +6,6 @@ import {
 } from './baseReactFlowDisplayEdgeCore';
 import {
   computeBaseReactFlowDisplayEdgesInWorker,
-  computeBaseReactFlowDisplayEdgesIncrementallyInWorker,
   disposeBaseReactFlowDisplayWorker,
   prewarmBaseReactFlowDisplayWorker,
   resolveBaseReactFlowDisplayQualityPolicy,
@@ -14,6 +13,9 @@ import {
   type DeferredDisplayEdges,
   type DisplayRoutingInput,
 } from './baseReactFlowDisplayWorkerClient';
+import {
+  computeBaseReactFlowDisplayEdgesIncrementallyInWorker,
+} from './baseReactFlowDisplayIncrementalWorkerClient';
 import { resolveBaseReactFlowPrecompiledCapturePresetId } from './baseReactFlowPrecompiledCaptureMode';
 import {
   readDisplayRoutingDebugState,
@@ -32,12 +34,12 @@ import { resolveBaseReactFlowDisplayCandidate } from './baseReactFlowDisplayCand
 import type { BaseReactFlowDisplayCandidateResolution } from './baseReactFlowDisplayCandidateResolver';
 import { canCommitBaseReactFlowDisplayResult } from './baseReactFlowDisplayCommitPolicy';
 import {
+  commitBaseReactFlowDisplaySnapshot,
   doesBaseReactFlowDisplayCommittedBaselineMatchIdentity,
   readBaseReactFlowDisplayCommittedSnapshot,
-  writeBaseReactFlowDisplayCommittedSnapshot,
   type BaseReactFlowDisplayCommittedSnapshotBaseline,
 } from './baseReactFlowDisplayCommittedSnapshot';
-import { scheduleBaseReactFlowStableGeometry } from './baseReactFlowDisplayGeometryBarrier';
+import { resolveDisplayGeometryBarrierPolicy, scheduleBaseReactFlowStableGeometry } from './baseReactFlowDisplayGeometryBarrier';
 import { createBaseReactFlowDisplayIncrementalPlan } from './baseReactFlowDisplayIncrementalPlan';
 import {
   resolveBaseReactFlowDragAwareDisplayEpoch,
@@ -328,6 +330,7 @@ export const useBaseReactFlowDisplayRouting = ({
       workerAbortCount: displayEdgeWorkerAbortCountRef.current,
     });
     const cancelSchedule = scheduleBaseReactFlowStableGeometry({
+      ...resolveDisplayGeometryBarrierPolicy(Boolean(nodeDragFallbackKey)),
       readGeometryIdentity: () => {
         const current = displayRoutingInputRef.current;
         return current
@@ -453,6 +456,7 @@ export const useBaseReactFlowDisplayRouting = ({
           baselineSourceEdges: incrementalPlan.baseline.sourceEdges,
           baselinePatches: incrementalPlan.baseline.displayPatches,
           baselineOutputRouteSignature: incrementalPlan.baseline.outputRouteSignature,
+          baselineSessionRef: incrementalPlan.baseline.workerSessionRef,
           nextInputSignature: displayEdgeCacheSignature,
           nextInputGeometryDigest: inputGeometryDigest,
           changeSet: incrementalPlan.changeSet,
@@ -470,6 +474,8 @@ export const useBaseReactFlowDisplayRouting = ({
           smartEdgePadding: activeRoutingInput.smartEdgePadding,
           isLargeGraph: activeRoutingInput.isLargeGraph,
           displayEdgeEpoch: activeRoutingInput.displayEdgeEpoch,
+          inputSignature: displayEdgeCacheSignature,
+          inputGeometryDigest,
           cachedCandidateEdges: candidateResolution.candidateEdges,
           candidateSource: candidateResolution.source === 'miss'
             ? undefined
@@ -562,22 +568,16 @@ export const useBaseReactFlowDisplayRouting = ({
           : null;
         const finalAppliedAt = Date.now();
         if (workerResult.hardClean === true) {
-          writeBaseReactFlowDisplayCommittedSnapshot({
+          const committedBaseline = commitBaseReactFlowDisplaySnapshot({
             inputSignature: displayEdgeCacheSignature,
             inputGeometryDigest,
             sourceEdges: latestSourceEdges,
             sourceNodes: latestRoutingInput.nodes,
             displayPatches: mergedTransactions.displayPatches,
             outputRouteSignature: mergedOutputRouteSignature,
+            workerSessionRef: workerResult.sessionRef,
           });
-          const committedSnapshot = readBaseReactFlowDisplayCommittedSnapshot({
-            inputSignature: displayEdgeCacheSignature,
-            inputGeometryDigest,
-            sourceEdges: latestSourceEdges,
-          });
-          if (committedSnapshot) {
-            committedSnapshotBaselineRef.current = committedSnapshot.baseline;
-          }
+          if (committedBaseline) committedSnapshotBaselineRef.current = committedBaseline;
         }
         updateDisplayRoutingFinalAppliedState({
           signature: displayEdgeCacheSignature,

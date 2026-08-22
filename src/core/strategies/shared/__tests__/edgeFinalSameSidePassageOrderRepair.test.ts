@@ -48,6 +48,27 @@ const pathOf = (item: Edge | undefined): Point[] => {
 };
 
 describe('final same-side passage order repair', () => {
+  it('does not report port weaving against a direct leg that ends before the sibling passage', () => {
+    const nodes = [
+      node('hub', 0, 0, 300, 100),
+      node('left', 0, 300, 60, 60),
+      node('right', 210, 300, 60, 60),
+    ];
+    const edges = [
+      edge('direct-right', 'hub', 'right', [
+        { x: 240, y: 100 }, { x: 240, y: 300 },
+      ]),
+      edge('detour-left', 'hub', 'left', [
+        { x: 270, y: 100 }, { x: 270, y: 200 },
+        { x: 30, y: 200 }, { x: 30, y: 300 },
+      ]),
+    ];
+
+    expect(auditFinalSameSideEndpointOrder(edges, nodes).inversions).toBe(0);
+    expect(auditFinalSameSidePassageOrder(edges, nodes).portOrderInversions).toBe(0);
+    expect(repairFinalSameSidePassageOrder(edges, nodes)).toBe(edges);
+  });
+
   it('recognizes half-pixel endpoint rounding as one rendered true trunk', () => {
     const nodes = [
       node('hub', 0, 0, 200, 100),

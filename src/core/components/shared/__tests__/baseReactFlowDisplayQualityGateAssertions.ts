@@ -10,6 +10,11 @@ import {
   getDisplayTerminalValidationReport,
 } from '../baseReactFlowTerminalAxisRepair';
 import { createBaseReactFlowDisplayEdges } from '../baseReactFlowDisplayEdges';
+import { countDisplayObstacleHits } from '../baseReactFlowDisplayEvaluation';
+import {
+  displayRenderedHardQualityGatesAreClean,
+  getDisplayHardQualityGateReport,
+} from '../baseReactFlowDisplayQualityGates';
 import { computeBaseReactFlowDisplayEdgeEpoch } from '../baseReactFlowDisplayEdgeCore';
 import {
   detachedDisplayEndpoints,
@@ -41,6 +46,8 @@ export const assertBaseReactFlowDisplayQualityGates = async (dataset: unknown) =
   const absoluteNodes = withAbsoluteNodePositions(canvas.nodes as any);
   const terminalValidationSnapshot = createDisplayTerminalValidationSnapshot(absoluteNodes);
   const nodeObstacleHits = edgeNodeObstacleHits(result, absoluteNodes);
+  const hardGateObstacleHits = countDisplayObstacleHits(result, absoluteNodes);
+  const renderedHardReport = getDisplayHardQualityGateReport(result, absoluteNodes, 'polished');
   const computedPaths = result.map(edge => ({
     id: edge.id,
     path: ((edge.data as any).computedPath || []) as Array<{ x: number; y: number }>,
@@ -71,6 +78,7 @@ export const assertBaseReactFlowDisplayQualityGates = async (dataset: unknown) =
     computedStrictCrossings,
     JSON.stringify({
       name: (dataset as any).name,
+      hardGateObstacleHits,
       quality,
       computedStrictCrossings,
       crossingEdges,
@@ -90,6 +98,7 @@ export const assertBaseReactFlowDisplayQualityGates = async (dataset: unknown) =
     nodeObstacleHits,
     JSON.stringify({
       name: (dataset as any).name,
+      hardGateObstacleHits,
       nodeObstacleHits,
       affectedPaths: computedPaths.filter(path => (
         nodeObstacleHits.some(hit => hit.edgeId === path.id)
@@ -117,6 +126,10 @@ export const assertBaseReactFlowDisplayQualityGates = async (dataset: unknown) =
           path: (result[index]?.data as any)?.computedPath,
         })),
     }, null, 2),
+  ).toBe(true);
+  expect(
+    displayRenderedHardQualityGatesAreClean(result, absoluteNodes),
+    JSON.stringify({ name: (dataset as any).name, renderedHardReport }, null, 2),
   ).toBe(true);
   const overlapProblems = edgeOverlapProblems(result);
   expect(

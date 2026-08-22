@@ -13,3 +13,13 @@ export const displayEdgesWorkerScope = typeof self !== 'undefined'
 export const postDisplayEdgesResponse = (response: DisplayEdgesWorkerResponse): void => {
   displayEdgesWorkerScope?.postMessage(response);
 };
+
+export const postTimedDisplayEdgesResponse = (
+  response: DisplayEdgesWorkerResponse,
+  startedAt: number,
+): void => postDisplayEdgesResponse({
+  ...response,
+  ...(response.edges
+    ? { workerDurationMs: Math.max(0, performance.now() - startedAt) }
+    : {}),
+});

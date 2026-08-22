@@ -89,12 +89,13 @@ const finalSafetyCandidateIsAccepted = (
   getInitialTrueTrunks: () => readonly SameSideEndpointTrunkIdentity[],
 ): boolean => {
   if (!changedEdgesStayEligible(baseline, candidate, options.eligibleEdgeIds)) return false;
-  const report = options.evaluation?.hardReport(candidate)
-    ?? getDisplayHardQualityGateReport(candidate, nodes, 'polished');
-  if (!report.hardClean || countRenderUnsafeEndpointStubs(candidate) !== 0) return false;
+  if (countRenderUnsafeEndpointStubs(candidate) !== 0) return false;
   const endpointOrder = options.evaluation?.endpointOrder(candidate)
     ?? auditFinalSameSideEndpointOrder(candidate, nodes);
   if (!finalCommercialOrderIsClean(candidate, nodes, endpointOrder, options.evaluation)) return false;
+  const report = options.evaluation?.hardReport(candidate)
+    ?? getDisplayHardQualityGateReport(candidate, nodes, 'polished');
+  if (!report.hardClean) return false;
   const initialTrueTrunks = sameEdgeReferences(baseline, candidate)
     ? endpointOrder.legalSharedTrunks
     : getInitialTrueTrunks();
@@ -472,6 +473,35 @@ export const repairBaseReactFlowFinalSafetyClosure = <T extends Edge[]>(
     )
   );
   if (candidateIsAccepted(edges)) return edges;
+
+  const baselineReport = options.evaluation?.hardReport(edges)
+    ?? getDisplayHardQualityGateReport(edges, nodes, 'polished');
+  const baselineEndpointOrder = options.evaluation?.endpointOrder(edges)
+    ?? auditFinalSameSideEndpointOrder(edges, nodes);
+  const baselinePassageOrder = options.evaluation?.passageOrder(edges)
+    ?? auditFinalSameSidePassageOrder(edges, nodes);
+  const onlyNearTrunkOpportunityRemains = baselineReport.hardClean
+    && countRenderUnsafeEndpointStubs(edges) === 0
+    && baselineEndpointOrder.inversions === 0
+    && baselineEndpointOrder.ambiguousLaneTies === 0
+    && baselineEndpointOrder.collapsedLanePairs === 0
+    && baselinePassageOrder.passageDefects === 0
+    && baselinePassageOrder.nearTrunkOpportunities > 0;
+  if (onlyNearTrunkOpportunityRemains) {
+    const nearTrunkCandidate = repairFinalSameSidePassageOrder(edges, nodes, {
+      validateCandidate: ({ candidateEdges, changedEdgeIndexes }) => (
+        changedEdgeIndexes.every(index => (
+          !options.eligibleEdgeIds || options.eligibleEdgeIds.has(candidateEdges[index]?.id ?? '')
+        ))
+        && (
+          options.evaluation?.hardReport(candidateEdges).hardClean
+          ?? getDisplayHardQualityGateReport([...candidateEdges], nodes, 'polished').hardClean
+        )
+      ),
+    });
+    if (sameEdgeReferences(edges, nearTrunkCandidate)) return edges;
+    if (candidateIsAccepted(nearTrunkCandidate)) return nearTrunkCandidate as T;
+  }
 
   const businessNodeSafe = repairBusinessNodeClearanceRisks(edges, nodes);
   if (

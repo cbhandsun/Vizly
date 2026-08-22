@@ -8,6 +8,7 @@ import { runBaseReactFlowFullRouteTerminalPhase } from './baseReactFlowDisplayFu
 import { getDisplayHardQualityGateReport } from './baseReactFlowDisplayQualityGates';
 import { countRenderUnsafeEndpointStubs } from './baseReactFlowDisplayEndpointStubRepair';
 import { repairCrossedSpineWithOuterSkirt } from './baseReactFlowDisplayCrossedSpineSkirtRepair';
+import { createDisplayRoutingDefectPlan } from './baseReactFlowDisplayRoutingDefectPlan';
 import type {
   BaseReactFlowDisplayEdgesArgs,
   BaseReactFlowPreDisplayFinalEdgesFactory,
@@ -33,8 +34,13 @@ export const createBaseReactFlowFullRouteEdges = (args: BaseReactFlowDisplayEdge
     candidateCount,
     onTrace: args.onPhaseTrace,
   });
-  const seedResult = prepareBaseReactFlowFullRouteSeed(args);
+  const seedPhaseTrace: DisplayRoutingPhaseTrace[] = [];
+  const seedResult = prepareBaseReactFlowFullRouteSeed({
+    ...args,
+    onSeedPhaseTrace: trace => seedPhaseTrace.push(trace),
+  });
   seedTimer.finish(seedResult.kind === 'finalized' ? 'accepted' : 'skip');
+  seedPhaseTrace.forEach(trace => args.onPhaseTrace?.(trace));
   if (seedResult.kind === 'finalized') return seedResult.edges;
 
   const { context } = seedResult;
@@ -50,7 +56,8 @@ export const createBaseReactFlowFullRouteEdges = (args: BaseReactFlowDisplayEdge
     context.repairNodes,
     'polished',
   );
-  if (qualityReport.quality.strictCrossings > 0) {
+  const defectPlan = createDisplayRoutingDefectPlan(qualityReport);
+  if (defectPlan.needsStrictCrossingRepair) {
     const earlyClosureTimer = startDisplayRoutingPhaseTrace({
       phase: 'final-safety-closure',
       candidateCount,
@@ -72,18 +79,7 @@ export const createBaseReactFlowFullRouteEdges = (args: BaseReactFlowDisplayEdge
     earlyClosureTimer.finish(earlyClosed ? 'accepted' : 'fallback', earlyClosed ? earlyClosedEdges.length : 0);
     if (earlyClosed) return earlyClosedEdges;
   }
-  const qualityHasOnlyTerminalAxisDefects = qualityReport.terminalsAttached
-    && !qualityReport.terminalsAnchored
-    && qualityReport.obstacleHits === 0
-    && qualityReport.quality.nonOrthogonalSegments === 0
-    && qualityReport.quality.strictCrossings === 0
-    && qualityReport.quality.reverseOverlap === 0
-    && qualityReport.quality.unrelatedOverlap === 0
-    && qualityReport.quality.unexplainedRelatedOverlap === 0
-    && qualityReport.quality.shortEndpointStubs === 0
-    && qualityReport.quality.tinyInteriorDoglegs === 0
-    && qualityReport.quality.hairpins === 0;
-  if (qualityHasOnlyTerminalAxisDefects) {
+  if (defectPlan.onlyTerminalAxisDefects) {
     const terminalTimer = startDisplayRoutingPhaseTrace({
       phase: 'terminal',
       candidateCount,
@@ -138,6 +134,7 @@ export const createBaseReactFlowFullRouteEdges = (args: BaseReactFlowDisplayEdge
     context,
     postRenderResult.edges,
     postRenderResult.quality,
+    postRenderResult.skipInitialStrictOverlapRepair,
   );
   strictTimer.finish(strictResult.kind === 'finalized' ? 'accepted' : 'fallback');
   if (strictResult.kind === 'finalized') return strictResult.edges;

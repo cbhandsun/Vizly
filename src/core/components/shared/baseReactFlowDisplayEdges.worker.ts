@@ -17,12 +17,12 @@ import {
 import { baseReactFlowDisplayCommercialQualityIsClean } from './baseReactFlowDisplayCommercialQuality';
 import { createBaseReactFlowInteractiveDisplayEdges } from './baseReactFlowDisplayQualitySeedPipeline';
 import { createBaseReactFlowPreDisplayFinalEdges } from './baseReactFlowDisplayPreDisplayPipeline';
-import { sanitizeBaseReactFlowPrecompiledRoutePatches } from './baseReactFlowPrecompiledRouteArtifact';
+import { resolveDisplayWorkerCandidate } from './baseReactFlowDisplayWorkerCandidate';
+import { doBaseReactFlowDisplayRoutesMatchExactly } from './baseReactFlowDisplayRoutingTransaction';
 import {
-  doBaseReactFlowDisplayRoutesMatchExactly,
-  mergeBaseReactFlowDisplayEdgePatches,
-  sanitizeBaseReactFlowDisplayCachePatches,
-} from './baseReactFlowDisplayRoutingTransaction';
+  createDisplayWorkerResponseCompleter,
+  runDisplayWorkerIncrementalRequest,
+} from './baseReactFlowDisplayWorkerSessionResponse';
 import {
   parseDisplayEdgesWorkerRequest,
   readDisplayEdgesWorkerRequestId,
@@ -33,63 +33,46 @@ import {
   startDisplayRoutingPhaseTrace,
   type DisplayRoutingPhaseTrace,
 } from './baseReactFlowDisplayRoutingTrace';
-import { createBaseReactFlowIncrementalDisplayEdges } from './baseReactFlowDisplayIncrementalRoute';
+import {
+  createDisplayRoutingFallbackMetadata,
+  createDisplayRoutingPhaseRecorder,
+} from './baseReactFlowDisplayWorkerTraceRecorder';
 import { repairDisplayContainerBoundaryClearanceRisks } from '../../strategies/shared/edgeDisplaySoftQualityRepair';
 import {
   repairBaseReactFlowFinalCommercialDetours,
   repairBaseReactFlowFinalEndpointOrder,
+  traceSkippedFinalCommercialDetours,
+  traceSkippedFinalEndpointPhases,
 } from './baseReactFlowDisplayFinalEndpointOrder';
 import { repairBaseReactFlowFinalSafetyClosure } from './baseReactFlowDisplayFinalSafetyClosure';
-import { closeBaseReactFlowDisplayFinalHardContract } from './baseReactFlowDisplayFinalHardContract';
+import { auditBaseReactFlowFinalSafetyClosure } from './baseReactFlowDisplayFinalSafetyAudit';
 import {
-  fastDisplayHardSafetyIsClean,
-  repairFastDisplayHardSafety,
-} from './baseReactFlowFastEdgeSafety';
+  canReuseBaseReactFlowFinalCommercialSafety,
+  closeBaseReactFlowFinalCommercialSafety,
+  commitBaseReactFlowFinalCommercialSafety,
+} from './baseReactFlowDisplayCommercialSafety';
+import { createBaseReactFlowFinalEndpointEvaluation } from './baseReactFlowDisplayFinalEndpointEvaluation';
+import { fastDisplayHardSafetyIsClean, repairFastDisplayHardSafety } from './baseReactFlowFastEdgeSafety';
 import { commercialEdgeDetoursDoNotRegress } from './baseReactFlowDisplayCommercialDetourGuard';
 import {
-  eligibleCommercialClearanceDoesNotRegress,
   displayBusinessNodeCommercialClearanceIsClean,
-  repairBaseReactFlowDisplayBusinessNodeClearance,
+  repairBaseReactFlowMinimumBusinessNodeClearance as repairMinimumBusinessNodeClearance,
 } from './baseReactFlowDisplayBusinessNodeClearance';
 import {
+  analyzeFinalDisplayRenderContract,
   doesDisplayCandidateMatchSourceGraph,
   finalDisplayRenderContractIsLocked,
+  selectHardCleanDisplayCandidate,
 } from './baseReactFlowDisplayCandidateValidation';
 import {
   displayEdgesWorkerScope,
   postDisplayEdgesResponse,
+  postTimedDisplayEdgesResponse,
 } from './baseReactFlowDisplayWorkerScope';
-
-const withExactDisplayHardReport = (
-  response: DisplayEdgesWorkerResponse,
-  repairNodes: DisplayEdgesWorkerRequest['nodes'],
-): DisplayEdgesWorkerResponse => {
-  if (!response.edges) return response;
-  const hardReport = getDisplayHardQualityGateReport(
-    response.edges,
-    repairNodes,
-    'polished',
-  );
-  return {
-    ...response,
-    hardClean: hardReport.hardClean,
-    hardReport,
-  };
-};
-
-const repairMinimumBusinessNodeClearance = (
-  edges: NonNullable<DisplayEdgesWorkerResponse['edges']>,
-  repairNodes: DisplayEdgesWorkerRequest['nodes'],
-  eligibleEdgeIds?: ReadonlySet<string>,
-  allowTransientStrictCrossing = true,
-): NonNullable<DisplayEdgesWorkerResponse['edges']> => (
-  repairBaseReactFlowDisplayBusinessNodeClearance(edges, repairNodes, {
-    eligibleEdgeIds,
-    // The owning final hard-safety transaction closes a temporary peer-edge
-    // crossing atomically; the intermediate candidate is never rendered.
-    allowTransientStrictCrossing,
-  })
-);
+import {
+  finalizeStableIncrementalDisplayResponse,
+  withExactDisplayHardReport,
+} from './baseReactFlowDisplayWorkerResponse';
 
 const finalizeContainerClearanceResponse = (
   response: DisplayEdgesWorkerResponse,
@@ -107,6 +90,10 @@ const finalizeContainerClearanceResponse = (
     nodes,
     new Map(nodes.map(node => [node.id, node] as const)),
   );
+  const finalEvaluation = createBaseReactFlowFinalEndpointEvaluation(repairNodes);
+  const finalHardQualityIsClean = (
+    edges: NonNullable<DisplayEdgesWorkerResponse['edges']>,
+  ): boolean => finalEvaluation.hardReport(edges).hardClean;
   const clearanceTimer = startDisplayRoutingPhaseTrace({
     phase: 'final-clearance',
     candidateCount: response.edges.length,
@@ -172,33 +159,40 @@ const finalizeContainerClearanceResponse = (
       eligibleEdgeIds: options.eligibleEdgeIds,
       onPhaseTrace: options.onPhaseTrace,
       preferredEdges: options.preferredEdges,
+      evaluation: finalEvaluation,
     },
   );
-  const orderedEdges = baseReactFlowDisplayHardQualityIsClean(
+  const orderedEdges = selectHardCleanDisplayCandidate(
     safeClearanceEdges,
-    repairNodes,
-  ) && !baseReactFlowDisplayHardQualityIsClean(endpointOrderedCandidate, repairNodes)
-    ? safeClearanceEdges
-    : endpointOrderedCandidate;
+    endpointOrderedCandidate,
+    finalHardQualityIsClean,
+  );
   const closureTimer = startDisplayRoutingPhaseTrace({
     phase: 'final-safety-closure',
     candidateCount: orderedEdges.length,
     onTrace: options.onPhaseTrace,
   });
-  const safetyClosedEdges = repairBaseReactFlowFinalSafetyClosure(
+  const safetyAudit = auditBaseReactFlowFinalSafetyClosure(
     orderedEdges,
     repairNodes,
-    { eligibleEdgeIds: options.eligibleEdgeIds },
+    finalEvaluation,
+    options.onPhaseTrace,
   );
+  const endpointDefectDelegated = response.routeResolution === 'incremental-route'
+    && safetyAudit.endpointDefectOnly;
+  const safetyClosedEdges = safetyAudit.canSkip || endpointDefectDelegated
+    ? orderedEdges
+    : repairBaseReactFlowFinalSafetyClosure(
+      orderedEdges,
+      repairNodes,
+      {
+        eligibleEdgeIds: options.eligibleEdgeIds,
+        evaluation: finalEvaluation,
+      },
+    );
   closureTimer.finish(safetyClosedEdges === orderedEdges ? 'skip' : 'accepted');
-  const safetyClosedHardClean = baseReactFlowDisplayHardQualityIsClean(
-    safetyClosedEdges,
-    repairNodes,
-  );
-  // The safety closure may discover a hard-clean candidate whose automatic
-  // side choices no longer reflect the source-authored bundle. Re-apply only
-  // the fully gated preferred-trunk transaction after closure, when it can no
-  // longer be overwritten by another repair stage.
+  const safetyClosedHardClean = finalHardQualityIsClean(safetyClosedEdges);
+  // Re-apply a changed preferred trunk only after hard closure.
   const closureChangedRoutes = safetyClosedEdges !== orderedEdges
     && !doBaseReactFlowDisplayRoutesMatchExactly(orderedEdges, safetyClosedEdges);
   const shouldReapplyPreferredOrder = safetyClosedHardClean
@@ -210,18 +204,19 @@ const finalizeContainerClearanceResponse = (
     && options.preferredEdges
     && !shouldReapplyPreferredOrder
   ) {
-    for (const phase of [
-      'final-endpoint-seed',
-      'final-endpoint-topology',
-      'final-endpoint-order',
-      'final-endpoint-closure',
-    ] as const) {
-      startDisplayRoutingPhaseTrace({
-        phase,
-        candidateCount: safetyClosedEdges.length,
-        onTrace: options.onPhaseTrace,
-      }).finish('skip');
-    }
+    traceSkippedFinalEndpointPhases(
+      safetyClosedEdges.length,
+      options.onPhaseTrace,
+      true,
+    );
+  }
+  const stableIncrementalResponse = safetyAudit.canSkip
+    ? finalizeStableIncrementalDisplayResponse(response, safetyClosedEdges, repairNodes,
+      finalEvaluation.hardReport(safetyClosedEdges))
+    : null;
+  if (stableIncrementalResponse) {
+    traceSkippedFinalCommercialDetours(safetyClosedEdges.length, options.onPhaseTrace);
+    return stableIncrementalResponse;
   }
   const preferredOrderCandidate = shouldReapplyPreferredOrder
     ? repairBaseReactFlowFinalEndpointOrder(
@@ -231,24 +226,31 @@ const finalizeContainerClearanceResponse = (
         eligibleEdgeIds: options.eligibleEdgeIds,
         onPhaseTrace: options.onPhaseTrace,
         preferredEdges: options.preferredEdges,
+        evaluation: finalEvaluation,
       },
     )
     : safetyClosedEdges;
-  const orderedAfterClosure = safetyClosedHardClean
-    && !baseReactFlowDisplayHardQualityIsClean(preferredOrderCandidate, repairNodes)
-    ? safetyClosedEdges
-    : preferredOrderCandidate;
-  const latePolishBaseline = baseReactFlowDisplayHardQualityIsClean(
-    orderedAfterClosure,
-    repairNodes,
-  )
+  const orderedAfterClosure = selectHardCleanDisplayCandidate(
+    safetyClosedEdges,
+    preferredOrderCandidate,
+    finalHardQualityIsClean,
+  );
+  const latePolishBaseline = finalHardQualityIsClean(orderedAfterClosure)
     ? orderedAfterClosure
     : safetyClosedEdges;
+  let commercialEvaluationEdges: readonly DisplayEdgesWorkerRequest['edges'][number][] | null = null;
+  let commercialClosureReady = false;
   const commercialCandidate = repairBaseReactFlowFinalCommercialDetours(
     orderedAfterClosure,
     repairNodes,
     {
       eligibleEdgeIds: options.eligibleEdgeIds,
+      evaluation: finalEvaluation,
+      onPhaseTrace: options.onPhaseTrace,
+      onFinalEvaluation: result => {
+        commercialEvaluationEdges = result.edges;
+        commercialClosureReady = result.closureReady;
+      },
       // Hard-clean only proves collision/crossing safety. A freshly computed
       // full route still needs the bounded commercial shortcut pass before it
       // can become a reusable precompiled candidate. Cache hits and
@@ -266,10 +268,7 @@ const finalizeContainerClearanceResponse = (
   // Commercial shortening is soft quality. If it reopens a strict crossing
   // after the atomic endpoint/trunk closure, retain the last hard-clean route
   // instead of asking a later local repair to break that newly restored trunk.
-  const commercialEdges = baseReactFlowDisplayHardQualityIsClean(
-    commercialCandidate,
-    repairNodes,
-  )
+  const commercialEdges = finalHardQualityIsClean(commercialCandidate)
     ? commercialCandidate
     : latePolishBaseline;
   // Endpoint/trunk restoration and commercial detour shortening are allowed
@@ -284,10 +283,7 @@ const finalizeContainerClearanceResponse = (
       options.eligibleEdgeIds,
     )
     : commercialEdges;
-  const lateMinimumClearanceEdges = baseReactFlowDisplayHardQualityIsClean(
-    lateMinimumClearanceCandidate,
-    repairNodes,
-  )
+  const lateMinimumClearanceEdges = finalHardQualityIsClean(lateMinimumClearanceCandidate)
     ? lateMinimumClearanceCandidate
     : commercialEdges;
   if (lateMinimumClearanceEdges !== commercialEdges) {
@@ -297,49 +293,30 @@ const finalizeContainerClearanceResponse = (
       onTrace: options.onPhaseTrace,
     }).finish('accepted', lateMinimumClearanceEdges.length);
   }
-  const finalCommercialSafetyClosedEdges = repairBaseReactFlowFinalSafetyClosure(
-    lateMinimumClearanceEdges,
-    repairNodes,
-    { eligibleEdgeIds: options.eligibleEdgeIds },
-  );
-  const finalHardOutcome = closeBaseReactFlowDisplayFinalHardContract(
-    finalCommercialSafetyClosedEdges,
+  const canReuseCommercialClosure = canReuseBaseReactFlowFinalCommercialSafety({
+    commercialClosureReady: commercialClosureReady
+      && lateMinimumClearanceEdges === commercialEdges,
+    commercialEvaluationEdges,
+    endpointDefectDelegated,
+    finalEdges: lateMinimumClearanceEdges,
+    orderedEdges,
+  });
+  const finalCommercialSafetyClosedEdges = closeBaseReactFlowFinalCommercialSafety({
+    canReuseClosure: canReuseCommercialClosure,
+    edges: lateMinimumClearanceEdges,
+    eligibleEdgeIds: options.eligibleEdgeIds,
+    evaluation: finalEvaluation,
+    nodes: repairNodes,
+    onPhaseTrace: options.onPhaseTrace,
+  });
+  const finalizedResponse = commitBaseReactFlowFinalCommercialSafety({
+    closedEdges: finalCommercialSafetyClosedEdges,
+    eligibleEdgeIds: options.eligibleEdgeIds,
     nodes,
-    options.onPhaseTrace,
-  );
-  const finalHardContractEdges = finalHardOutcome.report.hardClean
-    && eligibleCommercialClearanceDoesNotRegress(
-      response.edges,
-      finalHardOutcome.edges,
-      repairNodes,
-      options.eligibleEdgeIds,
-    )
-    ? finalHardOutcome.edges
-    : response.edges;
-  const finalHardClean = finalHardContractEdges === finalHardOutcome.edges
-    ? finalHardOutcome.report.hardClean
-    : response.hardClean;
-  const edges = lockFinalDisplayComputedPaths(finalHardContractEdges, repairNodes);
-  const renderContractWasAlreadyLocked = finalDisplayRenderContractIsLocked(
-    finalHardContractEdges,
-    edges,
-  );
-  const finalizedResponse: DisplayEdgesWorkerResponse = (
-    renderContractWasAlreadyLocked
-    && (
-      finalHardContractEdges === response.edges
-      || doBaseReactFlowDisplayRoutesMatchExactly(response.edges, finalHardContractEdges)
-    )
-  )
-    ? response
-    : {
-      ...response,
-      edges,
-      hardClean: finalHardClean,
-      routeResolution: response.routeResolution === 'validated-candidate'
-        ? 'repaired-candidate'
-        : response.routeResolution,
-    };
+    onPhaseTrace: options.onPhaseTrace,
+    repairNodes,
+    response,
+  });
   if (
     (options.commercialStabilizationPass ?? 0) < 2
     && finalizedResponse !== response
@@ -374,13 +351,15 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
   onBoundedCandidate?: (report: BaseDisplayBoundedCandidateReport) => void,
 ): DisplayEdgesWorkerResponse => {
   const phaseTrace: DisplayRoutingPhaseTrace[] = [];
-  const recordPhaseTrace = (trace: DisplayRoutingPhaseTrace): void => {
-    if (phaseTrace.length < 32) phaseTrace.push(trace);
-    postDisplayEdgesResponse({
-      requestId: request.requestId,
-      phaseProgress: trace,
-    });
-  };
+  const recordPhaseTrace = createDisplayRoutingPhaseRecorder({
+    requestId: request.requestId,
+    phaseTrace,
+    publish: postDisplayEdgesResponse,
+    // Incremental routing is latency-sensitive and completes in one bounded
+    // transaction. Its aggregate trace travels with the single final response.
+    publishProgress: request.operation !== 'incremental-route',
+  });
+  const completeResponse = createDisplayWorkerResponseCompleter(request, phaseTrace);
   if (request.operation === 'repair') {
     const repairTimer = startDisplayRoutingPhaseTrace({
       phase: 'measured-repair',
@@ -413,24 +392,31 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
       const safeEdges = baseReactFlowDisplayHardQualityIsClean(clearanceEdges, repairNodes)
         ? clearanceEdges
         : repaired.edges;
-      return withExactDisplayHardReport({ ...repairResponse, edges: safeEdges }, repairNodes);
+      return completeResponse(
+        withExactDisplayHardReport({ ...repairResponse, edges: safeEdges }, repairNodes),
+      );
     }
-    return finalizeContainerClearanceResponse(repairResponse, request.nodes, {
+    return completeResponse(finalizeContainerClearanceResponse(repairResponse, request.nodes, {
       isLargeGraph: request.nodes.length > 36 || request.edges.length > 36,
       onPhaseTrace: recordPhaseTrace,
       preferredEdges: request.edges,
-    });
+    }));
   }
   let incrementalAffectedEdgeCount: number | undefined;
   if (request.operation === 'incremental-route') {
-    const incremental = createBaseReactFlowIncrementalDisplayEdges({
+    const incremental = runDisplayWorkerIncrementalRequest({
       request,
       onPhaseTrace: recordPhaseTrace,
       onBoundedCandidate,
     });
     incrementalAffectedEdgeCount = incremental.affectedEdgeCount;
     if (incremental.edges) {
-      return finalizeContainerClearanceResponse({
+      const incrementalFinalizerTimer = startDisplayRoutingPhaseTrace({
+        phase: 'finalizer',
+        candidateCount: incremental.edges.length,
+        onTrace: recordPhaseTrace,
+      });
+      const incrementalResponse = finalizeContainerClearanceResponse({
         requestId: request.requestId,
         edges: incremental.edges,
         hardClean: true,
@@ -444,38 +430,39 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
         onPhaseTrace: recordPhaseTrace,
         preferredEdges: request.edges,
       });
+      incrementalFinalizerTimer.finish(
+        incrementalResponse.hardClean === true ? 'accepted' : 'fallback',
+      );
+      return completeResponse(incrementalResponse);
     }
   }
-  const incrementalFallbackMetadata = request.operation === 'incremental-route'
-    ? {
-      affectedEdgeCount: incrementalAffectedEdgeCount ?? 0,
-      fallbackLevel: 'full' as const,
-    }
-    : {};
-  const safeCandidatePatches = request.operation === 'validate-or-route'
-    && request.candidatePatches
-    ? (request.candidateSource === 'precompiled'
-      ? sanitizeBaseReactFlowPrecompiledRoutePatches(request.edges, request.candidatePatches)
-      : sanitizeBaseReactFlowDisplayCachePatches(request.edges, request.candidatePatches))
-    : null;
-  const candidateEdges = request.operation === 'validate-or-route'
-    ? (request.candidateEdges
-      ?? (safeCandidatePatches
-        ? mergeBaseReactFlowDisplayEdgePatches(request.edges, safeCandidatePatches)
-        : null))
-    : null;
-  const candidateSource = request.operation === 'validate-or-route'
-    ? request.candidateSource
-    : null;
+  const incrementalFallbackMetadata = createDisplayRoutingFallbackMetadata(
+    request,
+    incrementalAffectedEdgeCount,
+  );
+  const { edges: candidateEdges, source: candidateSource } = resolveDisplayWorkerCandidate(request);
   const candidateTimer = startDisplayRoutingPhaseTrace({
     phase: 'candidate-validation',
     candidateCount: candidateEdges?.length ?? 0,
     onTrace: recordPhaseTrace,
   });
+  const candidateMatchesSource = candidateEdges
+    ? doesDisplayCandidateMatchSourceGraph(request.edges, candidateEdges)
+    : false;
+  const candidateRepairNodes = candidateEdges && candidateMatchesSource
+    ? withDisplayAbsolutePositions(
+      request.nodes,
+      new Map(request.nodes.map(node => [node.id, node] as const)),
+    )
+    : null;
+  const candidateHardReport = candidateEdges && candidateRepairNodes
+    ? getDisplayHardQualityGateReport(candidateEdges, candidateRepairNodes, 'polished')
+    : null;
   if (
     candidateEdges
-    && doesDisplayCandidateMatchSourceGraph(request.edges, candidateEdges)
-    && baseReactFlowDisplayHardQualityIsClean(candidateEdges, request.nodes)
+    && candidateMatchesSource
+    && candidateRepairNodes
+    && candidateHardReport?.hardClean === true
     && baseReactFlowDisplayCommercialQualityIsClean(candidateEdges)
   ) {
     candidateTimer.finish('hit');
@@ -487,11 +474,11 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
       phaseTrace,
     };
     const lockedCandidateEdges = lockFinalDisplayComputedPaths(candidateEdges, request.nodes);
-    const candidateRepairNodes = withDisplayAbsolutePositions(
-      request.nodes,
-      new Map(request.nodes.map(node => [node.id, node] as const)),
-    );
-    const renderContractIsLocked = finalDisplayRenderContractIsLocked(
+    const {
+      renderContractIsLocked,
+      lockedRouteMatches,
+      lockedHardGateInputsMatch,
+    } = analyzeFinalDisplayRenderContract(
       candidateEdges,
       lockedCandidateEdges,
     );
@@ -511,10 +498,7 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
         || displayBusinessNodeCommercialClearanceIsClean(candidateEdges, candidateRepairNodes)
       )
       && persistentBoundaryIsClean
-      && (
-        renderContractIsLocked
-        || doBaseReactFlowDisplayRoutesMatchExactly(candidateEdges, lockedCandidateEdges)
-      )
+      && lockedRouteMatches
     ) {
       if (candidateSource !== 'precompiled') {
         for (const phase of ['final-clearance', 'final-hard-safety'] as const) {
@@ -525,7 +509,7 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
           }).finish('skip');
         }
       }
-      return withExactDisplayHardReport(
+      return completeResponse(withExactDisplayHardReport(
         candidateSource === 'precompiled' || renderContractIsLocked
         ? validatedCandidateResponse
         : {
@@ -534,16 +518,19 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
           routeResolution: 'repaired-candidate',
         },
         candidateRepairNodes,
-      );
+        candidateSource === 'precompiled' || lockedHardGateInputsMatch
+          ? candidateHardReport
+          : undefined,
+      ));
     }
-    return finalizeContainerClearanceResponse(validatedCandidateResponse, request.nodes, {
+    return completeResponse(finalizeContainerClearanceResponse(validatedCandidateResponse, request.nodes, {
       isLargeGraph: request.isLargeGraph,
       onPhaseTrace: recordPhaseTrace,
       // The candidate already passed exact hard/commercial validation.  Using
       // the source graph as the terminal preference can resurrect a stale
       // preset-computed path after a precompiled artifact was regenerated.
       preferredEdges: candidateEdges,
-    });
+    }));
   }
   candidateTimer.finish(candidateEdges ? 'rejected' : 'skip');
   const commonInput = {
@@ -563,7 +550,7 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
     });
     const edges = createBaseReactFlowInteractiveDisplayEdges(commonInput);
     interactiveTimer.finish('accepted', edges.length);
-    return finalizeContainerClearanceResponse({
+    return completeResponse(finalizeContainerClearanceResponse({
       requestId: request.requestId,
       edges,
       hardClean: baseReactFlowDisplayHardQualityIsClean(edges, request.nodes),
@@ -574,7 +561,7 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
       isLargeGraph: request.isLargeGraph,
       onPhaseTrace: recordPhaseTrace,
       preferredEdges: request.edges,
-    });
+    }));
   }
 
   const repairNodes = withDisplayAbsolutePositions(
@@ -628,7 +615,7 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
       request.nodes,
     );
     repairTimer.finish(repaired.report.hardClean ? 'accepted' : 'rejected', repaired.edges.length);
-    return finalizeContainerClearanceResponse({
+    return completeResponse(finalizeContainerClearanceResponse({
       requestId: request.requestId,
       edges: repaired.edges,
       hardClean: repaired.report.hardClean,
@@ -639,9 +626,9 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
       isLargeGraph: request.isLargeGraph,
       onPhaseTrace: recordPhaseTrace,
       preferredEdges: request.edges,
-    });
+    }));
   }
-  return finalizeContainerClearanceResponse({
+  return completeResponse(finalizeContainerClearanceResponse({
     requestId: request.requestId,
     edges: finalized.edges,
     hardClean: finalized.report.hardClean,
@@ -652,7 +639,7 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
     isLargeGraph: request.isLargeGraph,
     onPhaseTrace: recordPhaseTrace,
     preferredEdges: request.edges,
-  });
+  }));
 };
 
 export const handleBaseReactFlowDisplayWorkerMessage = (
@@ -671,6 +658,7 @@ export const handleBaseReactFlowDisplayWorkerMessage = (
 
 if (displayEdgesWorkerScope) {
   displayEdgesWorkerScope.onmessage = (event: MessageEvent<unknown>) => {
+    const workerStartedAt = performance.now();
     const requestId = readDisplayEdgesWorkerRequestId(event.data) ?? 'invalid-request';
     try {
       const response = handleBaseReactFlowDisplayWorkerMessage(
@@ -681,7 +669,7 @@ if (displayEdgesWorkerScope) {
           }
         },
       );
-      postDisplayEdgesResponse(response);
+      postTimedDisplayEdgesResponse(response, workerStartedAt);
     } catch {
       postDisplayEdgesResponse({
         requestId,

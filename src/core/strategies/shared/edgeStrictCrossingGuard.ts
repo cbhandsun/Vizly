@@ -106,6 +106,7 @@ const EDGE_PATH_QUALITY_STATE = Symbol('edge-path-quality-state');
 type EdgePathQualityNumericState = {
   edgeCount: number;
   edgeReferences: Edge[];
+  edgeSignatures: string[];
   edgeSegments: Segment[][];
   edgeScores: EdgePathQualityScore[];
   owner: object;
@@ -294,6 +295,7 @@ export function createEdgePathQualityEvaluationContext(
     return publicState({
       edgeCount: candidate.length,
       edgeReferences: candidate.slice(),
+      edgeSignatures: snapshot.edgeSignatures,
       edgeSegments: decomposition.edgeSegments,
       edgeScores: decomposition.edgeScores,
       owner: stateOwner,
@@ -308,6 +310,7 @@ export function createEdgePathQualityEvaluationContext(
       baselineState = publicState({
         edgeCount,
         edgeReferences: baseline.slice(),
+        edgeSignatures: baselineSnapshot.edgeSignatures,
         edgeSegments: baselineSegments,
         edgeScores: baselineEdgeScores,
         owner: stateOwner,
@@ -351,28 +354,59 @@ export function createEdgePathQualityEvaluationContext(
   ): EdgePathQualityEvaluationState => {
     const parent = readNumericState(parentState);
     if (!parent || candidate.length !== parent.edgeCount) return fullState(candidate);
-    const uniqueIndexes = [...new Set(changedIndexes)]
+    let uniqueIndexes = [...new Set(changedIndexes)]
       .filter(index => Number.isInteger(index) && index >= 0 && index < parent.edgeCount)
       .sort((first, second) => first - second);
-    if (
-      uniqueIndexes.length !== changedIndexes.length
-      || uniqueIndexes.length > MAX_INCREMENTAL_QUALITY_EDGE_CHANGES
-    ) return fullState(candidate);
+    if (uniqueIndexes.length !== changedIndexes.length) return fullState(candidate);
+
+    const edgeSignatures = parent.edgeSignatures.slice();
+    const changedSnapshots = new Map<number, QualityEdgeInputSnapshot>();
+    if (uniqueIndexes.length > MAX_INCREMENTAL_QUALITY_EDGE_CHANGES) {
+      uniqueIndexes = [];
+      for (let index = 0; index < parent.edgeCount; index += 1) {
+        const snapshot = buildQualityEdgeInputSnapshot(candidate[index]);
+        edgeSignatures[index] = snapshot.signature;
+        if (snapshot.signature === parent.edgeSignatures[index]) continue;
+        uniqueIndexes.push(index);
+        changedSnapshots.set(index, snapshot);
+        if (uniqueIndexes.length > MAX_INCREMENTAL_QUALITY_EDGE_CHANGES) {
+          return fullState(candidate);
+        }
+      }
+    }
 
     const changedSet = new Set(uniqueIndexes);
     for (let index = 0; index < parent.edgeCount; index += 1) {
       if (!changedSet.has(index) && candidate[index] !== parent.edgeReferences[index]) {
-        return fullState(candidate);
+        const snapshot = changedSnapshots.get(index) ?? buildQualityEdgeInputSnapshot(candidate[index]);
+        edgeSignatures[index] = snapshot.signature;
+        if (snapshot.signature !== parent.edgeSignatures[index]) return fullState(candidate);
       }
     }
-    if (uniqueIndexes.length === 0) return parentState;
+    if (uniqueIndexes.length === 0) {
+      if (candidate.every((edge, index) => edge === parent.edgeReferences[index])) return parentState;
+      return publicState({
+        edgeCount: parent.edgeCount,
+        edgeReferences: candidate.slice(),
+        edgeSignatures,
+        edgeSegments: parent.edgeSegments,
+        edgeScores: parent.edgeScores,
+        owner: stateOwner,
+        pairOverlay: new Map(),
+        parent,
+        score: parent.score,
+      });
+    }
 
     const score = { ...parent.score };
     const edgeSegments = parent.edgeSegments.slice();
     const edgeScores = parent.edgeScores.slice();
     for (const index of uniqueIndexes) {
       addScore(score, parent.edgeScores[index], -1);
-      const path = getEdgePath(candidate[index]);
+      const snapshot = changedSnapshots.get(index) ?? buildQualityEdgeInputSnapshot(candidate[index]);
+      changedSnapshots.set(index, snapshot);
+      edgeSignatures[index] = snapshot.signature;
+      const path = snapshot.path;
       const edgeScore = calculateSingleEdgeQuality(path);
       const segments = buildEdgeSegments(path, index);
       edgeScores[index] = edgeScore;
@@ -408,6 +442,7 @@ export function createEdgePathQualityEvaluationContext(
     return publicState({
       edgeCount: parent.edgeCount,
       edgeReferences: candidate.slice(),
+      edgeSignatures,
       edgeSegments,
       edgeScores,
       owner: stateOwner,
@@ -540,7 +575,10 @@ export function createEdgePathQualityEvaluationContext(
         uniqueIndexes.length !== changedIndexes.length
         || uniqueIndexes.length > MAX_INCREMENTAL_QUALITY_EDGE_CHANGES
       ) {
-        return calculateEdgePathQualityScore(candidate);
+        // Repair stages sometimes recreate every Edge object even when only a
+        // few routing inputs changed. Revalidate the broad reference-based hint
+        // against exact signatures before falling back to the O(E^2) scorer.
+        return context.evaluate(candidate);
       }
       const changedSnapshots = new Map<number, QualityEdgeInputSnapshot>();
       for (const index of uniqueIndexes) {

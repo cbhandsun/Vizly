@@ -169,6 +169,7 @@ describe('Logistics incremental display routing', () => {
       affectedClosure.mutableEdgeIds.length,
     );
     expect(report?.hardClean, diagnostics).toBe(true);
+    expect(response.hardReport, diagnostics).toEqual(report);
   }, 120_000);
 
   it('keeps every mutable WMS branch at commercial clearance after a small drag', async () => {

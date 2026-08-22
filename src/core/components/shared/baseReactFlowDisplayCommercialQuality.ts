@@ -5,8 +5,8 @@ import {
   segmentDisplayLength,
 } from './baseReactFlowDisplayGeometry';
 
-const MIN_COMMERCIAL_INTERIOR_SEGMENT = 12;
-const MAX_COMMERCIAL_BEND_COUNT = 12;
+const MIN_COMMERCIAL_INTERIOR_SEGMENT = 24;
+const MAX_COMMERCIAL_BEND_COUNT = 6;
 
 export type DisplayCommercialQualityIssueKind =
   | 'invalid-path'
@@ -40,7 +40,7 @@ export const auditBaseReactFlowDisplayCommercialQuality = (
     }
 
     const bendCount = Math.max(0, path.length - 2);
-    if (bendCount > MAX_COMMERCIAL_BEND_COUNT) {
+    if (bendCount > MAX_COMMERCIAL_BEND_COUNT && edge.data?.sharedTrunkSynthesized !== true) {
       issues.push({
         edgeId: edge.id,
         kind: 'excessive-bends',

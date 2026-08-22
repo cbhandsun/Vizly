@@ -46,14 +46,34 @@ describe('createBaseReactFlowFinalEndpointEvaluation', () => {
     expect(evaluation.unsafeEndpointStubs(edges)).toBe(evaluation.unsafeEndpointStubs(edges));
   });
 
-  it('does not reuse identity-bound order evidence for a distinct candidate array', () => {
+  it('does not reuse metadata-sensitive order evidence for a copied candidate', () => {
     const evaluation = createBaseReactFlowFinalEndpointEvaluation(nodes);
-    const candidate = edges.map(edge => ({ ...edge }));
+    const candidate = edges.map(edge => ({
+      ...edge,
+      data: edge.data ? { ...edge.data } : undefined,
+    }));
 
     expect(evaluation.endpointOrder(candidate)).not.toBe(evaluation.endpointOrder(edges));
     expect(evaluation.passageOrder(candidate)).not.toBe(evaluation.passageOrder(edges));
     expect(evaluation.endpointOrder(candidate)).toEqual(evaluation.endpointOrder(edges));
     expect(evaluation.passageOrder(candidate)).toEqual(evaluation.passageOrder(edges));
+    expect(evaluation.hardReport(candidate)).toBe(evaluation.hardReport(edges));
+  });
+
+  it('does not reuse route-bound evidence after endpoint geometry changes', () => {
+    const evaluation = createBaseReactFlowFinalEndpointEvaluation(nodes);
+    const candidate: Edge[] = edges.map((edge, index) => index === 0 ? {
+      ...edge,
+      targetHandle: 'left',
+      data: {
+        ...edge.data,
+        computedPath: [{ x: 50, y: 60 }, { x: -40, y: 60 }, { x: -40, y: 250 }],
+      },
+    } : edge);
+
+    expect(evaluation.endpointOrder(candidate)).not.toBe(evaluation.endpointOrder(edges));
+    expect(evaluation.passageOrder(candidate)).not.toBe(evaluation.passageOrder(edges));
+    expect(evaluation.hardReport(candidate)).not.toBe(evaluation.hardReport(edges));
   });
 });
 

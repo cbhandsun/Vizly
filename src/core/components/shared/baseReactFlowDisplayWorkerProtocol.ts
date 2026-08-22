@@ -2,11 +2,24 @@ import type { Edge, Node } from '@xyflow/react';
 
 import type { BaseDisplayBoundedCandidateReport } from './baseReactFlowDisplayEvaluation';
 import {
-  DISPLAY_ROUTING_PHASE_NAMES,
-  DISPLAY_ROUTING_PHASE_RESOLUTIONS,
   type DisplayRoutingPhaseTrace,
 } from './baseReactFlowDisplayRoutingTrace';
+import {
+  isDisplayRoutingPhaseTrace,
+  parseDisplayRoutingPhaseTrace,
+} from './baseReactFlowDisplayWorkerTraceProtocol';
 import type { BaseReactFlowRoutingChangeSet } from './baseReactFlowDisplayRoutingChangeSet';
+import {
+  parseDisplayRoutingChangeSet,
+  parseDisplayRoutingIdentifierList,
+} from './baseReactFlowDisplayRoutingChangeProtocol';
+import {
+  displayRoutingIdentitiesMatch,
+  isDisplayRoutingIdentity,
+  isDisplayRoutingWorkerSessionRef,
+  type RoutingIdentity,
+  type RoutingWorkerSessionRef,
+} from './baseReactFlowDisplayRoutingSession';
 
 const MAX_REQUEST_ID_LENGTH = 4_096;
 export const DISPLAY_WORKER_MAX_GRAPH_ITEMS = 10_000;
@@ -24,18 +37,6 @@ const MAX_QUALITY_METRIC = 1_000_000_000_000_000;
 const INPUT_SIGNATURE_PATTERN = /^\d{1,10}$/;
 const GEOMETRY_DIGEST_PATTERN = /^geometry-v1:[0-9a-f]{32}$/;
 const OUTPUT_ROUTE_SIGNATURE_PATTERN = /^route-v2:\d{1,3}:\d{1,6}:[0-9a-f]{16}$/;
-const ROUTING_CHANGE_REASONS = new Set([
-  'node-drag',
-  'node-resize',
-  'node-add',
-  'node-remove',
-  'edge-add',
-  'edge-remove',
-  'port-policy',
-  'container-change',
-  'layout',
-  'unknown',
-]);
 
 const DISPLAY_EDGE_KEYS = new Set([
   'id',
@@ -101,6 +102,7 @@ export type DisplayEdgesWorkerRouteRequest = {
   isLargeGraph: boolean;
   displayEdgeEpoch: number;
   qualityMode: DisplayQualityMode;
+  inputIdentity?: RoutingIdentity;
 };
 
 export type DisplayEdgesWorkerValidateOrRouteRequest = Omit<
@@ -133,11 +135,12 @@ export type DisplayEdgesWorkerIncrementalRouteRequest = Omit<
   'operation'
 > & {
   operation: 'incremental-route';
+  baselineSessionRef?: RoutingWorkerSessionRef;
   baselineInputSignature: string;
   baselineInputGeometryDigest: string;
-  baselineNodes: Node[];
-  baselineSourceEdges: Edge[];
-  baselinePatches: Edge[];
+  baselineNodes?: Node[];
+  baselineSourceEdges?: Edge[];
+  baselinePatches?: Edge[];
   baselineOutputRouteSignature: string;
   nextInputSignature: string;
   nextInputGeometryDigest: string;
@@ -145,6 +148,12 @@ export type DisplayEdgesWorkerIncrementalRouteRequest = Omit<
   mutableEdgeIds: string[];
   contextEdgeIds: string[];
 };
+
+export type DisplayEdgesWorkerResolvedIncrementalRouteRequest =
+  DisplayEdgesWorkerIncrementalRouteRequest & Required<Pick<
+    DisplayEdgesWorkerIncrementalRouteRequest,
+    'baselineNodes' | 'baselineSourceEdges' | 'baselinePatches'
+  >>;
 
 export type DisplayEdgesWorkerRequest =
   | DisplayEdgesWorkerRouteRequest
@@ -166,6 +175,10 @@ export type DisplayEdgesWorkerResponse = {
   phaseProgress?: DisplayRoutingPhaseTrace;
   affectedEdgeCount?: number;
   fallbackLevel?: DisplayRoutingFallbackLevel;
+  nextIdentity?: RoutingIdentity;
+  outputRouteSignature?: string;
+  sessionRef?: RoutingWorkerSessionRef;
+  workerDurationMs?: number;
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
@@ -360,45 +373,6 @@ export const readDisplayEdgesWorkerRequestId = (value: unknown): string | null =
   return isBoundedString(value.requestId, MAX_REQUEST_ID_LENGTH) ? value.requestId : null;
 };
 
-const parseBoundedIdentifierList = (value: unknown): string[] | null => {
-  if (!Array.isArray(value) || value.length > DISPLAY_WORKER_MAX_GRAPH_ITEMS) return null;
-  const identifiers = new Set<string>();
-  for (const item of value) {
-    if (!isBoundedString(item, MAX_IDENTIFIER_LENGTH) || identifiers.has(item)) return null;
-    identifiers.add(item);
-  }
-  return [...identifiers];
-};
-
-const parseRoutingChangeSet = (value: unknown): BaseReactFlowRoutingChangeSet | null => {
-  if (!isRecord(value)) return null;
-  const keys = Object.keys(value);
-  if (
-    keys.length !== 5
-    || !keys.every(key => (
-      key === 'reason'
-      || key === 'changedNodeIds'
-      || key === 'changedEdgeIds'
-      || key === 'topologyChanged'
-      || key === 'geometryChanged'
-    ))
-    || typeof value.reason !== 'string'
-    || !ROUTING_CHANGE_REASONS.has(value.reason)
-    || typeof value.topologyChanged !== 'boolean'
-    || typeof value.geometryChanged !== 'boolean'
-  ) return null;
-  const changedNodeIds = parseBoundedIdentifierList(value.changedNodeIds);
-  const changedEdgeIds = parseBoundedIdentifierList(value.changedEdgeIds);
-  if (!changedNodeIds || !changedEdgeIds) return null;
-  return {
-    reason: value.reason as BaseReactFlowRoutingChangeSet['reason'],
-    changedNodeIds,
-    changedEdgeIds,
-    topologyChanged: value.topologyChanged,
-    geometryChanged: value.geometryChanged,
-  };
-};
-
 /**
  * Treats worker messages as an external boundary. The main thread already
  * projects graph values before posting; this parser rejects malformed roots,
@@ -440,6 +414,10 @@ export const parseDisplayEdgesWorkerRequest = (
     || (value.displayEdgeEpoch as number) < 0
   ) return null;
   if (value.qualityMode !== 'full' && value.qualityMode !== 'interactive') return null;
+  if (
+    typeof value.inputIdentity !== 'undefined'
+    && !isDisplayRoutingIdentity(value.inputIdentity)
+  ) return null;
   const routeRequest: Omit<DisplayEdgesWorkerRouteRequest, 'operation'> = {
     requestId,
     edges,
@@ -449,19 +427,38 @@ export const parseDisplayEdgesWorkerRequest = (
     isLargeGraph: value.isLargeGraph,
     displayEdgeEpoch: value.displayEdgeEpoch as number,
     qualityMode: value.qualityMode,
+    ...(isDisplayRoutingIdentity(value.inputIdentity)
+      ? { inputIdentity: value.inputIdentity }
+      : {}),
   };
   if (value.operation === 'incremental-route') {
-    const changeSet = parseRoutingChangeSet(value.changeSet);
-    const mutableEdgeIds = parseBoundedIdentifierList(value.mutableEdgeIds);
-    const contextEdgeIds = parseBoundedIdentifierList(value.contextEdgeIds);
+    const changeSet = parseDisplayRoutingChangeSet(value.changeSet);
+    const mutableEdgeIds = parseDisplayRoutingIdentifierList(value.mutableEdgeIds);
+    const contextEdgeIds = parseDisplayRoutingIdentifierList(value.contextEdgeIds);
+    const baselineSessionRef = typeof value.baselineSessionRef === 'undefined'
+      ? undefined
+      : (isDisplayRoutingWorkerSessionRef(value.baselineSessionRef)
+        ? value.baselineSessionRef
+        : null);
+    const baselineFieldPresence = [
+      value.baselineNodes,
+      value.baselineSourceEdges,
+      value.baselinePatches,
+    ].map(field => typeof field !== 'undefined');
+    const hasCompleteBootstrap = baselineFieldPresence.every(Boolean)
+      && isDisplayGraph(value.baselineSourceEdges, value.baselineNodes)
+      && isDisplayEdgesWorkerEdgeList(value.baselinePatches);
+    const hasPartialBootstrap = baselineFieldPresence.some(Boolean)
+      && !baselineFieldPresence.every(Boolean);
     if (
       !INPUT_SIGNATURE_PATTERN.test(String(value.baselineInputSignature ?? ''))
       || !GEOMETRY_DIGEST_PATTERN.test(String(value.baselineInputGeometryDigest ?? ''))
       || !OUTPUT_ROUTE_SIGNATURE_PATTERN.test(String(value.baselineOutputRouteSignature ?? ''))
       || !INPUT_SIGNATURE_PATTERN.test(String(value.nextInputSignature ?? ''))
       || !GEOMETRY_DIGEST_PATTERN.test(String(value.nextInputGeometryDigest ?? ''))
-      || !isDisplayGraph(value.baselineSourceEdges, value.baselineNodes)
-      || !isDisplayEdgesWorkerEdgeList(value.baselinePatches)
+      || baselineSessionRef === null
+      || hasPartialBootstrap
+      || (!baselineSessionRef && !hasCompleteBootstrap)
       || !changeSet
       || !mutableEdgeIds
       || !contextEdgeIds
@@ -469,11 +466,14 @@ export const parseDisplayEdgesWorkerRequest = (
     return {
       ...routeRequest,
       operation: 'incremental-route',
+      ...(baselineSessionRef ? { baselineSessionRef } : {}),
       baselineInputSignature: value.baselineInputSignature as string,
       baselineInputGeometryDigest: value.baselineInputGeometryDigest as string,
-      baselineNodes: value.baselineNodes as Node[],
-      baselineSourceEdges: value.baselineSourceEdges as Edge[],
-      baselinePatches: value.baselinePatches,
+      ...(hasCompleteBootstrap ? {
+        baselineNodes: value.baselineNodes as Node[],
+        baselineSourceEdges: value.baselineSourceEdges as Edge[],
+        baselinePatches: value.baselinePatches as Edge[],
+      } : {}),
       baselineOutputRouteSignature: value.baselineOutputRouteSignature as string,
       nextInputSignature: value.nextInputSignature as string,
       nextInputGeometryDigest: value.nextInputGeometryDigest as string,
@@ -557,40 +557,6 @@ const isBoundedCandidate = (value: unknown): value is BaseDisplayBoundedCandidat
     ));
 };
 
-const isDisplayRoutingPhaseTrace = (value: unknown): value is DisplayRoutingPhaseTrace => {
-  if (!isRecord(value)) return false;
-  const keys = Object.keys(value);
-  return keys.length === 5
-    && keys.every(key => (
-      key === 'phase'
-      || key === 'durationMs'
-      || key === 'candidateCount'
-      || key === 'changedEdgeCount'
-      || key === 'resolution'
-    ))
-    && (DISPLAY_ROUTING_PHASE_NAMES as readonly unknown[]).includes(value.phase)
-    && (DISPLAY_ROUTING_PHASE_RESOLUTIONS as readonly unknown[]).includes(value.resolution)
-    && isFiniteNumber(value.durationMs)
-    && value.durationMs >= 0
-    && value.durationMs <= 600_000
-    && Number.isSafeInteger(value.candidateCount)
-    && (value.candidateCount as number) >= 0
-    && (value.candidateCount as number) <= 1_000_000
-    && Number.isSafeInteger(value.changedEdgeCount)
-    && (value.changedEdgeCount as number) >= 0
-    && (value.changedEdgeCount as number) <= 1_000_000;
-};
-
-const parseDisplayRoutingPhaseTrace = (
-  value: unknown,
-): DisplayRoutingPhaseTrace[] | null => (
-  Array.isArray(value)
-  && value.length <= 32
-  && value.every(isDisplayRoutingPhaseTrace)
-    ? value
-    : null
-);
-
 /** Validates a response before the main thread merges worker-owned geometry. */
 export const parseDisplayEdgesWorkerResponse = (
   value: unknown,
@@ -615,6 +581,10 @@ export const parseDisplayEdgesWorkerResponse = (
       || typeof value.phaseProgress !== 'undefined'
       || typeof value.affectedEdgeCount !== 'undefined'
       || typeof value.fallbackLevel !== 'undefined'
+      || typeof value.nextIdentity !== 'undefined'
+      || typeof value.outputRouteSignature !== 'undefined'
+      || typeof value.sessionRef !== 'undefined'
+      || typeof value.workerDurationMs !== 'undefined'
     ) return null;
     if (typeof value.error !== 'string') return null;
     return value.error.length > 0 && value.error.length <= 256
@@ -630,6 +600,10 @@ export const parseDisplayEdgesWorkerResponse = (
       || typeof value.phaseProgress !== 'undefined'
       || typeof value.affectedEdgeCount !== 'undefined'
       || typeof value.fallbackLevel !== 'undefined'
+      || typeof value.nextIdentity !== 'undefined'
+      || typeof value.outputRouteSignature !== 'undefined'
+      || typeof value.sessionRef !== 'undefined'
+      || typeof value.workerDurationMs !== 'undefined'
     ) return null;
     return isBoundedCandidate(value.boundedCandidate)
       ? { requestId: expectedRequestId, boundedCandidate: value.boundedCandidate }
@@ -643,6 +617,10 @@ export const parseDisplayEdgesWorkerResponse = (
       || typeof value.phaseTrace !== 'undefined'
       || typeof value.affectedEdgeCount !== 'undefined'
       || typeof value.fallbackLevel !== 'undefined'
+      || typeof value.nextIdentity !== 'undefined'
+      || typeof value.outputRouteSignature !== 'undefined'
+      || typeof value.sessionRef !== 'undefined'
+      || typeof value.workerDurationMs !== 'undefined'
     ) return null;
     return isDisplayRoutingPhaseTrace(value.phaseProgress)
       ? { requestId: expectedRequestId, phaseProgress: value.phaseProgress }
@@ -654,6 +632,9 @@ export const parseDisplayEdgesWorkerResponse = (
   const hardReport = typeof value.hardReport === 'undefined'
     ? undefined
     : (isBoundedCandidate(value.hardReport) ? value.hardReport : null);
+  const workerDurationMs = typeof value.workerDurationMs === 'undefined'
+    ? undefined
+    : value.workerDurationMs;
   const hasIncrementalMetadata = typeof value.affectedEdgeCount !== 'undefined'
     || typeof value.fallbackLevel !== 'undefined';
   const incrementalMetadataIsValid = !hasIncrementalMetadata || (
@@ -662,11 +643,27 @@ export const parseDisplayEdgesWorkerResponse = (
     && (value.affectedEdgeCount as number) <= DISPLAY_WORKER_MAX_GRAPH_ITEMS
     && (value.fallbackLevel === 'none' || value.fallbackLevel === 'full')
   );
+  const hasSessionMetadata = typeof value.nextIdentity !== 'undefined'
+    || typeof value.outputRouteSignature !== 'undefined'
+    || typeof value.sessionRef !== 'undefined';
+  const sessionMetadataIsValid = !hasSessionMetadata || (
+    isDisplayRoutingIdentity(value.nextIdentity)
+    && OUTPUT_ROUTE_SIGNATURE_PATTERN.test(String(value.outputRouteSignature ?? ''))
+    && isDisplayRoutingWorkerSessionRef(value.sessionRef)
+    && displayRoutingIdentitiesMatch(value.sessionRef.identity, value.nextIdentity)
+    && value.sessionRef.outputRouteSignature === value.outputRouteSignature
+  );
   if (
     !isDisplayEdgesWorkerEdgeList(value.edges)
     || !phaseTrace
     || hardReport === null
+    || (workerDurationMs !== undefined && (
+      !isFiniteNumber(workerDurationMs)
+      || workerDurationMs < 0
+      || workerDurationMs > 600_000
+    ))
     || !incrementalMetadataIsValid
+    || !sessionMetadataIsValid
     || typeof value.hardClean !== 'boolean'
     || (hardReport !== undefined && hardReport.hardClean !== value.hardClean)
     || (
@@ -691,5 +688,9 @@ export const parseDisplayEdgesWorkerResponse = (
     fallbackLevel: hasIncrementalMetadata
       ? value.fallbackLevel as DisplayRoutingFallbackLevel
       : undefined,
+    nextIdentity: hasSessionMetadata ? value.nextIdentity as RoutingIdentity : undefined,
+    outputRouteSignature: hasSessionMetadata ? value.outputRouteSignature as string : undefined,
+    sessionRef: hasSessionMetadata ? value.sessionRef as RoutingWorkerSessionRef : undefined,
+    workerDurationMs,
   };
 };
