@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import React from 'react';
-import { act, render } from '@testing-library/react';
+import { act, render, waitFor } from '@testing-library/react';
 import { applyNodeChanges, type Edge, type Node, type NodeChange } from '@xyflow/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -10,11 +10,20 @@ const baseReactFlowProps = vi.fn();
 vi.mock('../../shared/BaseReactFlow', () => ({
   default: (props: Record<string, unknown>) => {
     baseReactFlowProps(props);
-    return <div data-testid="base-react-flow">{props.children as React.ReactNode}</div>;
+    return (
+      <div data-testid="base-react-flow">
+        <div className="react-flow__renderer" />
+        {props.children as React.ReactNode}
+      </div>
+    );
   },
 }));
 
 import { FlowchartCanvasShell } from '../FlowchartCanvasShell';
+import {
+  bindBaseReactFlowRendererAssistiveVisibility,
+  syncBaseReactFlowRendererAssistiveVisibility,
+} from '../../shared/baseReactFlowAssistiveVisibility';
 import {
   createFinalPositionChanges,
   createSnappedPositionChange,
@@ -78,6 +87,85 @@ describe('FlowchartCanvasShell', () => {
       multiSelectionKeyCode: null,
     });
     expect(props).not.toHaveProperty('fitView');
+  });
+
+  it('removes a plugin-replaced default canvas from keyboard and assistive navigation', () => {
+    const noop = vi.fn();
+
+    const { getByTestId } = render(
+      <FlowchartCanvasShell
+        nodes={[]}
+        displayEdges={[]}
+        nodeTypes={{}}
+        onInit={noop}
+        onNodesChange={noop}
+        onEdgesChange={noop}
+        onConnect={noop}
+        onConnectStart={noop}
+        onConnectEnd={noop}
+        autoRoutingEnabled
+        enableSmartEdges
+        showMinimap={false}
+        showGrid
+        gridVariant={'dots' as never}
+        onNodeDrag={noop}
+        onNodeDragStart={noop}
+        onSelectionChange={noop}
+        onPaneClick={noop}
+        onPaneDoubleClick={noop}
+        selectionMode={'partial' as never}
+        onNodeContextMenu={noop}
+        onEdgeContextMenu={noop}
+        onPaneContextMenu={noop}
+        isSpacePressed={false}
+        isConnecting={false}
+        connectPreview={null}
+        connectionMode={'loose' as never}
+        isDragging={false}
+        defaultCanvasHiddenFromAssistiveTech
+      />,
+    );
+
+    expect(baseReactFlowProps.mock.calls.at(-1)?.[0]).toMatchObject({
+      nodesFocusable: false,
+      edgesFocusable: false,
+    });
+    expect(getByTestId('base-react-flow').querySelector('.react-flow__renderer')?.getAttribute('aria-hidden'))
+      .toBe('true');
+  });
+
+  it('hides only the replaced renderer while preserving plugin-owned canvas content', () => {
+    const container = document.createElement('div');
+    container.innerHTML = [
+      '<div class="react-flow__renderer"><button>legacy node</button></div>',
+      '<section class="plugin-canvas" aria-label="Timeline"><button>timeline task</button></section>',
+    ].join('');
+
+    const renderer = syncBaseReactFlowRendererAssistiveVisibility(container, true);
+
+    expect(renderer?.getAttribute('aria-hidden')).toBe('true');
+    expect(container.querySelector('.plugin-canvas')?.hasAttribute('aria-hidden')).toBe(false);
+
+    syncBaseReactFlowRendererAssistiveVisibility(container, false);
+    expect(renderer?.hasAttribute('aria-hidden')).toBe(false);
+  });
+
+  it('safely handles the interval before the React Flow renderer mounts', () => {
+    expect(syncBaseReactFlowRendererAssistiveVisibility(document.createElement('div'), true)).toBeNull();
+    expect(syncBaseReactFlowRendererAssistiveVisibility(null, true)).toBeNull();
+  });
+
+  it('hides a renderer that mounts after the plugin boundary effect', async () => {
+    const container = document.createElement('div');
+    const unbind = bindBaseReactFlowRendererAssistiveVisibility(container, true);
+    const renderer = document.createElement('div');
+    renderer.className = 'react-flow__renderer';
+
+    container.appendChild(renderer);
+
+    await waitFor(() => expect(renderer.getAttribute('aria-hidden')).toBe('true'));
+    unbind();
+    expect(renderer.hasAttribute('aria-hidden')).toBe(false);
   });
 
   it('removes every canvas mutation entry point when editing is disabled', () => {

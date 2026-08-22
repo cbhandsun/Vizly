@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { Node, Edge, BackgroundVariant, ReactFlowInstance, SelectionMode, NodeTypes, EdgeTypes, NodeChange, EdgeChange, Connection, OnConnectStart, OnConnectEnd, ConnectionMode, ConnectionLineType, type IsValidConnection, type OnNodeDrag, type OnReconnect } from '@xyflow/react';
 import BaseReactFlow from '../shared/BaseReactFlow';
 import { useConnectionMicrointeractions } from './hooks/useConnectionMicrointeractions';
@@ -13,6 +13,7 @@ import {
     buildShiftMultiSelectionChanges,
 } from './flowchartMultiSelection';
 import { getFlowchartMarqueeEdges } from './flowchartMarqueeInteraction';
+import { bindBaseReactFlowRendererAssistiveVisibility } from '../shared/baseReactFlowAssistiveVisibility';
 
 export interface FlowchartCanvasShellProps {
     nodes: Node[];
@@ -66,6 +67,7 @@ export interface FlowchartCanvasShellProps {
     onReconnectEnd?: (event: MouseEvent | React.MouseEvent | TouchEvent | React.TouchEvent, edge: Edge) => void;
     backgroundGridColor?: string;
     viewportPersistenceKey?: string;
+    defaultCanvasHiddenFromAssistiveTech?: boolean;
     children?: React.ReactNode;
 }
 
@@ -120,6 +122,7 @@ export const FlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> = React.m
     onReconnectEnd,
     backgroundGridColor,
     viewportPersistenceKey,
+    defaultCanvasHiddenFromAssistiveTech = false,
     children
 }) => {
     const {
@@ -153,6 +156,11 @@ export const FlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> = React.m
         [renderedEdges, renderedNodes],
     );
     const shiftSelectionFrameRef = useRef<number | null>(null);
+    const canvasRootRef = useRef<HTMLDivElement>(null);
+    useLayoutEffect(() => bindBaseReactFlowRendererAssistiveVisibility(
+            canvasRootRef.current,
+            defaultCanvasHiddenFromAssistiveTech,
+        ), [defaultCanvasHiddenFromAssistiveTech]);
     useEffect(() => () => {
         if (shiftSelectionFrameRef.current !== null) {
             cancelAnimationFrame(shiftSelectionFrameRef.current);
@@ -196,6 +204,7 @@ export const FlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> = React.m
         onEdgeClick?.(event, edge);
     }, [displayEdges, editingEnabled, onEdgeClick, onEdgesChange]);
     return (
+      <div ref={canvasRootRef} style={{ width: '100%', height: '100%' }}>
         <BaseReactFlow
             onInit={onInit}
             nodes={accessibleElements.nodes}
@@ -251,8 +260,8 @@ export const FlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> = React.m
             nodesDraggable={editingEnabled ? nodesDraggable : false}
             nodesConnectable={editingEnabled ? nodesConnectable : false}
             elementsSelectable={editingEnabled}
-            nodesFocusable={editingEnabled}
-            edgesFocusable={editingEnabled}
+            nodesFocusable={editingEnabled && !defaultCanvasHiddenFromAssistiveTech}
+            edgesFocusable={editingEnabled && !defaultCanvasHiddenFromAssistiveTech}
             multiSelectionKeyCode={null}
             edgesReconnectable={editingEnabled ? edgesReconnectable : false}
             onReconnect={editingEnabled ? onReconnect : undefined}
@@ -261,6 +270,7 @@ export const FlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> = React.m
         >
             {children}
         </BaseReactFlow>
+      </div>
     );
 });
 

@@ -49,6 +49,7 @@ export class TimelinePlugin implements DiagramTypePlugin {
   tags = ['Gantt', 'Project', 'Timeline'];
   brandColor = '#52c41a';
 
+  replacesDefaultCanvas = true;
   hideDefaultSidebar = true;
   
   async migrate<T>(data: T, fromVersion: string | undefined): Promise<T> {

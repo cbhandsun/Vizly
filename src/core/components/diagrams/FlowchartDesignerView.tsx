@@ -33,6 +33,7 @@ import {
 } from './FlowchartDesignerShellRegions';
 import { filterCommentsForPage } from './commentPageScope';
 import { useFlowchartDesignerViewSetup } from './useFlowchartDesignerViewSetup';
+import { FLOWCHART_LOADING_OVERLAY_STYLE } from './flowchartDesignerViewStyles';
 
 export type { FlowchartDesignerViewModel } from './flowchartDesignerViewModel';
 
@@ -312,17 +313,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                     />}
                     {isInitialDiagramLoading && (
                         <div
-                            style={{
-                                position: 'absolute',
-                                inset: 0,
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                color: 'var(--text-secondary, #64748b)',
-                                fontSize: 14,
-                                pointerEvents: 'none',
-                                zIndex: 5,
-                            }}
+                            style={FLOWCHART_LOADING_OVERLAY_STYLE}
                         >
                             {t('common.loadingDiagram', '加载图表...')}
                         </div>
@@ -569,6 +560,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                     snapEnabled={snapEnabled}
                                     isDragging={isDragging}
                                     editingEnabled={editingEnabled}
+                                    defaultCanvasHiddenFromAssistiveTech={activePlugin?.replacesDefaultCanvas === true}
                                 >
                                     <RemoteCursors />
                                     {editingEnabled && <DesignerCanvasFeaturesLayer

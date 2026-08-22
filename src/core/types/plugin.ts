@@ -145,6 +145,11 @@ export interface DiagramTypePlugin {
 
   /** 画布内的覆盖层组件（如时间线标尺） */
   contributeCanvasComponents?(ctx: PluginContext): React.ReactNode;
+  /**
+   * 插件画布完整替代 React Flow 的默认视觉与交互表面。
+   * 默认画布仍保留为状态容器，但必须退出可访问性树，避免重复朗读。
+   */
+  replacesDefaultCanvas?: boolean;
   /** 属性面板扩展（内部按需） */
   contributePropertyEditors?(ctx: PluginContext): PropertyEditorExtension[];
   // ====== 右键与悬浮工具栏 ======

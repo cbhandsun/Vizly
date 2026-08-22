@@ -180,6 +180,7 @@ export class MindMapPlugin extends BaseDiagramPlugin implements DiagramTypePlugi
     }
 
     // ── Plugin Flags ─────────────────────────────────────────────────────────
+    replacesDefaultCanvas = true;
     hideDefaultSidebar = true;
     hideContextToolbar = true;
     hideMiniMap = true;
