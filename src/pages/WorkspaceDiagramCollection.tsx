@@ -74,6 +74,8 @@ interface WorkspaceDiagramCollectionProps {
   loading: boolean;
   loadFailure: WorkspaceInventoryLoadFailureReason | null;
   onRetryLoad: () => void;
+  isAuthenticated: boolean;
+  onRequestAuth: () => void;
   isCreatingDiagram?: boolean;
   openingDiagramKeys: ReadonlySet<string>;
   onOpenDiagram: (item: UnifiedDiagramItem) => void | Promise<void>;
@@ -103,6 +105,8 @@ export const WorkspaceDiagramCollection = ({
   loading,
   loadFailure,
   onRetryLoad,
+  isAuthenticated,
+  onRequestAuth,
   isCreatingDiagram = false,
   openingDiagramKeys,
   onOpenDiagram,
@@ -126,6 +130,8 @@ export const WorkspaceDiagramCollection = ({
   const sharedCount = unifiedItems.filter(item => item.role === 'viewer').length;
   const documentCountsKnown = loadedInventoryScopes.has('documents');
   const templateCountsKnown = loadedInventoryScopes.has('templates');
+  const protectedViewRequiresAuth = !isAuthenticated
+    && (activeView === 'cloud' || activeView === 'shared');
   const renderFilterCount = (count: number, known: boolean) => (
     known ? <span className="filter-tab-count">{count}</span> : null
   );
@@ -355,6 +361,11 @@ export const WorkspaceDiagramCollection = ({
                             mode="error"
                             reason={loadFailure}
                             onRetry={onRetryLoad}
+                        />
+                    ) : protectedViewRequiresAuth ? (
+                        <WorkspaceEmptyState
+                            mode="auth"
+                            onSignIn={onRequestAuth}
                         />
                     ) : filteredItems.length === 0 ? (
                         searchQuery ? (

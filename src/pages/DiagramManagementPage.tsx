@@ -445,6 +445,8 @@ const WorkspaceDashboardPage: React.FC = () => {
                     loading={loading}
                     loadFailure={loadFailure}
                     onRetryLoad={loadAllData}
+                    isAuthenticated={Boolean(user)}
+                    onRequestAuth={openAuthModal}
                     isCreatingDiagram={isCreatingDiagram}
                     openingDiagramKeys={openingDiagramKeys}
                     onOpenDiagram={handleOpenDiagram}

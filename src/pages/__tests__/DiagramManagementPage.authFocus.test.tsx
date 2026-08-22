@@ -53,7 +53,9 @@ vi.mock('../WorkspaceCompactHeader', () => ({
 }));
 
 vi.mock('../WorkspaceDiagramCollection', () => ({
-  WorkspaceDiagramCollection: () => null,
+  WorkspaceDiagramCollection: ({ onRequestAuth }: { onRequestAuth: () => void }) => (
+    <button type="button" onClick={onRequestAuth}>cloud sign in</button>
+  ),
 }));
 
 vi.mock('../WorkspaceContextMenu', () => ({
@@ -152,5 +154,17 @@ describe('DiagramManagementPage authentication focus lifecycle', () => {
     await waitFor(() => expect(screen.queryByRole('button', { name: 'open sign in' })).toBeNull());
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'authentication' })).toBeNull());
     await waitFor(() => expect(document.activeElement).toBe(settingsTrigger));
+  });
+
+  it('returns focus to the cloud sign-in recovery action when authentication is cancelled', async () => {
+    render(<DiagramManagementPage />);
+
+    const cloudSignIn = screen.getByRole('button', { name: 'cloud sign in' });
+    cloudSignIn.focus();
+    fireEvent.click(cloudSignIn);
+    fireEvent.click(await screen.findByRole('button', { name: 'close authentication' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'authentication' })).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(cloudSignIn));
   });
 });

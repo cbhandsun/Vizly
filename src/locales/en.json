@@ -100,6 +100,8 @@
             "description": "Create a diagram or use the command menu to get started.",
             "searchTitle": "No matching diagrams",
             "searchDescription": "No diagrams match “{{query}}”. Clear search to see all diagrams.",
+            "authTitle": "Sign in to view cloud and shared diagrams",
+            "authDescription": "Cloud and shared diagrams are connected to your account. Sign in to access them without leaving this workspace.",
             "filterTitle": "No diagrams in {{view}}",
             "filterDescription": "The {{view}} view is empty. View recent diagrams to continue.",
             "loadErrorTitle": "Workspace data could not be loaded",

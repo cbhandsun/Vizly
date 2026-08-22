@@ -49,6 +49,8 @@ const renderCollection = (
     loading={false}
     loadFailure={loadFailure}
     onRetryLoad={onRetryLoad}
+    isAuthenticated
+    onRequestAuth={() => undefined}
     openingDiagramKeys={new Set()}
     onOpenDiagram={() => undefined}
     onOpenDiagramInNewTab={() => undefined}
@@ -77,6 +79,8 @@ const renderOpeningCollection = (
     loading={false}
     loadFailure={null}
     onRetryLoad={() => undefined}
+    isAuthenticated
+    onRequestAuth={() => undefined}
     openingDiagramKeys={new Set([`${item.source}:${item.id}`])}
     onOpenDiagram={() => undefined}
     onOpenDiagramInNewTab={() => undefined}
@@ -102,6 +106,8 @@ const renderLoadingCollection = (): string => renderToStaticMarkup(
     loading
     loadFailure={null}
     onRetryLoad={() => undefined}
+    isAuthenticated
+    onRequestAuth={() => undefined}
     openingDiagramKeys={new Set()}
     onOpenDiagram={() => undefined}
     onOpenDiagramInNewTab={() => undefined}
@@ -195,6 +201,8 @@ describe('WorkspaceDiagramCollection', () => {
         loading={false}
         loadFailure={null}
         onRetryLoad={() => undefined}
+        isAuthenticated
+        onRequestAuth={() => undefined}
         openingDiagramKeys={new Set()}
         onOpenDiagram={() => undefined}
         onOpenDiagramInNewTab={() => undefined}
@@ -224,6 +232,8 @@ describe('WorkspaceDiagramCollection', () => {
         loading={false}
         loadFailure={null}
         onRetryLoad={() => undefined}
+        isAuthenticated
+        onRequestAuth={() => undefined}
         isCreatingDiagram
         openingDiagramKeys={new Set()}
         onOpenDiagram={() => undefined}

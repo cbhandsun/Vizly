@@ -58,6 +58,9 @@ vi.mock('react-i18next', () => ({
         'workspace.gridView': 'Grid view',
         'workspace.listView': 'List view',
         'workspace.viewRecent': 'View recent diagrams',
+        'workspace.signIn': 'Sign in',
+        'workspace.empty.authTitle': 'Sign in to view cloud and shared diagrams',
+        'workspace.empty.authDescription': 'Cloud and shared diagrams are connected to your account.',
         'workspace.empty.filterTitle': `No diagrams in ${options?.view ?? ''}`,
         'workspace.empty.filterDescription': `The ${options?.view ?? ''} view is empty.`,
         'workspace.openInNewTab': 'Open in new tab',
@@ -127,6 +130,8 @@ const WorkspaceControlsHarness = () => {
       loading={false}
       loadFailure={null}
       onRetryLoad={() => undefined}
+      isAuthenticated
+      onRequestAuth={vi.fn()}
       openingDiagramKeys={new Set()}
       onOpenDiagram={vi.fn()}
       onOpenDiagramInNewTab={vi.fn()}
@@ -159,6 +164,8 @@ const WorkspaceCardMenuHarness = ({
     loading={false}
     loadFailure={null}
     onRetryLoad={() => undefined}
+    isAuthenticated
+    onRequestAuth={vi.fn()}
     openingDiagramKeys={new Set()}
     onOpenDiagram={vi.fn()}
     onOpenDiagramInNewTab={vi.fn()}
@@ -277,6 +284,42 @@ describe('WorkspaceDiagramCollection controls', () => {
     const recent = screen.getByRole('button', { name: /Recent/ });
     expect(recent).toHaveAttribute('aria-pressed', 'true');
     await waitFor(() => expect(document.activeElement).toBe(recent));
+  });
+
+  it('explains the account boundary before showing an unauthenticated cloud view as empty', () => {
+    const onRequestAuth = vi.fn();
+
+    render(
+      <WorkspaceDiagramCollection
+        activeView="cloud"
+        onActiveViewChange={vi.fn()}
+        unifiedItems={[item]}
+        loadedInventoryScopes={new Set(['documents', 'templates'])}
+        filteredItems={[]}
+        sortKey="updated"
+        onSortKeyChange={vi.fn()}
+        viewMode="grid"
+        onViewModeChange={vi.fn()}
+        loading={false}
+        loadFailure={null}
+        onRetryLoad={vi.fn()}
+        isAuthenticated={false}
+        onRequestAuth={onRequestAuth}
+        openingDiagramKeys={new Set()}
+        onOpenDiagram={vi.fn()}
+        onOpenDiagramInNewTab={vi.fn()}
+        onContextMenu={vi.fn()}
+        onDeleteDiagram={vi.fn()}
+        onCreateBlank={vi.fn()}
+        searchQuery=""
+        onClearSearch={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('heading', { name: 'Sign in to view cloud and shared diagrams' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'No diagrams in Cloud' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+    expect(onRequestAuth).toHaveBeenCalledTimes(1);
   });
 
   it.each(['Enter', ' ', 'ArrowDown'])('opens the named sort menu with %j and moves focus into it', async key => {
