@@ -3490,6 +3490,7 @@
         "testConnection": "Test Connection",
         "baseUrlLabel": "API Base URL",
         "baseUrlHint": "Use HTTPS, or HTTP for localhost/127.0.0.1 only",
+        "invalidProviderBaseUrl": "{{name}}: Base URL must use HTTPS or local HTTP (localhost/127.0.0.1).",
         "apiKeyLabel": "API Key",
         "showApiKey": "Show API Key",
         "hideApiKey": "Hide API Key",

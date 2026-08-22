@@ -1633,6 +1633,7 @@
         "testConnection": "测试连接",
         "baseUrlLabel": "API Base URL",
         "baseUrlHint": "仅允许 HTTPS，或本机 localhost/127.0.0.1 HTTP",
+        "invalidProviderBaseUrl": "{{name}}：Base URL 必须使用 HTTPS，或本机 HTTP（localhost/127.0.0.1）。",
         "apiKeyLabel": "API Key",
         "showApiKey": "显示 API Key",
         "hideApiKey": "隐藏 API Key",

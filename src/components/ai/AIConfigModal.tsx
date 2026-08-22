@@ -24,7 +24,6 @@ import { CryptoService } from '@/core/utils/CryptoService';
 import { appMessage } from '@/core/utils/antdStaticBridge';
 import { normalizeProviderBaseUrl } from '@/services/ai/providerSecurity';
 import {
-    formatAIProviderRequestError,
     normalizeAIModelsResponse,
     requestAIChatCompletion,
     requestAIModels,
@@ -124,7 +123,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
     const handleSave = async () => {
         const invalidProvider = config.providers.find(p => p.enabled && p.baseUrl && !normalizeProviderBaseUrl(p.baseUrl));
         if (invalidProvider) {
-            appMessage.warning(`${invalidProvider.name} 的 Base URL 必须使用 HTTPS，或本机 HTTP localhost/127.0.0.1。`);
+            appMessage.warning(t('aiConfig.invalidProviderBaseUrl', { name: invalidProvider.name }));
             return;
         }
 
@@ -291,9 +290,9 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
             logAIConfigEndpointValidationFailure(provider.name, 'testConnection', error);
             updateConnectionStatus(provider.id, createAIProviderConnectionFailure(
                 'test-connection',
-                formatAIProviderRequestError(error, 100),
+                t('aiConfig.connection.invalid-base-url'),
             ));
-            appMessage.warning(`${provider.name} 的 Base URL 必须使用 HTTPS，或本机 HTTP localhost/127.0.0.1。`);
+            appMessage.warning(t('aiConfig.invalidProviderBaseUrl', { name: provider.name }));
             return;
         }
         updateConnectionStatus(provider.id, { kind: 'testing', operation: 'test-connection' });
@@ -307,7 +306,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
             appMessage.success(t('aiConfig.testSuccess'));
         } catch (error) {
             logAIConfigRequestFailure('testConnection', provider.name, error);
-            const message = formatAIProviderRequestError(error, 100);
+            const message = t('aiConfig.connection.failureNotice');
             updateConnectionStatus(provider.id, createAIProviderConnectionFailure('test-connection', message));
             appMessage.error(t('aiConfig.testError', { message }));
         } finally {
@@ -371,9 +370,9 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
             logAIConfigEndpointValidationFailure(provider.name, 'fetchModels', error);
             updateConnectionStatus(provider.id, createAIProviderConnectionFailure(
                 'model-sync',
-                formatAIProviderRequestError(error, 100),
+                t('aiConfig.connection.invalid-base-url'),
             ));
-            appMessage.warning(`${provider.name} 的 Base URL 必须使用 HTTPS，或本机 HTTP localhost/127.0.0.1。`);
+            appMessage.warning(t('aiConfig.invalidProviderBaseUrl', { name: provider.name }));
             return;
         }
         updateConnectionStatus(provider.id, { kind: 'testing', operation: 'model-sync' });
@@ -418,7 +417,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
             }
         } catch (error) {
             logAIConfigRequestFailure('fetchModels', provider.name, error);
-            const message = formatAIProviderRequestError(error, 100);
+            const message = t('aiConfig.connection.failureNotice');
             updateConnectionStatus(provider.id, createAIProviderConnectionFailure('model-sync', message));
             appMessage.error(t('aiConfig.testError', { message }));
         } finally {

@@ -73,6 +73,11 @@ describe('AIChatViewLayout accessibility contract', () => {
         expect(modalSource).toContain("aria-label={t('aiConfig.apiKeyLabel')}");
         expect(modalSource).toContain("t('aiConfig.currentActive', { name: model.name || model.id })");
         expect(modalSource).not.toContain("t('aiConfig.currentActive', 'Active')");
+        expect(modalSource).toContain("const message = t('aiConfig.connection.failureNotice');");
+        expect(modalSource).toContain("appMessage.warning(t('aiConfig.invalidProviderBaseUrl', { name: provider.name }))");
+        expect(modalSource).toContain("appMessage.warning(t('aiConfig.invalidProviderBaseUrl', { name: invalidProvider.name }))");
+        expect(modalSource).not.toContain('formatAIProviderRequestError');
+        expect(modalSource).not.toContain('的 Base URL 必须使用');
         expect(modalSource).toContain('disabled={!selectedProviderReadiness?.ready || isFetchingModels}');
         expect(modalSource).toContain('disabled={!selectedProviderReadiness?.ready || isTesting}');
         expect(statusAlertSource).toContain('className="ai-config-readiness-alert"');
