@@ -151,7 +151,11 @@ describe('BaseReactFlow precompiled route stability', () => {
     expect(response.routeResolution, diagnostics).toBe('validated-candidate');
     expect(routeSnapshot(response.edges ?? []), diagnostics).toEqual(routeSnapshot(candidateEdges));
     expect(response.phaseTrace?.map(trace => trace.phase), diagnostics)
-      .toEqual(['candidate-validation']);
+      .toEqual(['candidate-validation', 'session-commit']);
+    expect(response.phaseTrace?.at(-1), diagnostics).toMatchObject({
+      phase: 'session-commit',
+      resolution: 'skip',
+    });
   });
 
   it('does not restore an older WMS detour after accepting a fresh precompiled candidate', async () => {
