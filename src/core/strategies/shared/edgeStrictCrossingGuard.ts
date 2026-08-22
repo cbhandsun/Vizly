@@ -677,12 +677,25 @@ export function chooseFewestStrictCrossings<T extends Edge[]>(...candidates: T[]
   );
   if (orthogonalFinalists.length === 1) return orthogonalFinalists[0].candidate;
 
-  const baseline = orthogonalFinalists[0].candidate;
+  const strictFinalists = orthogonalFinalists.map(metric => ({
+    candidate: metric.candidate,
+    strictCrossings: countStrictEdgeCrossings(metric.candidate),
+  }));
+  let bestStrict = strictFinalists[0].strictCrossings;
+  for (let index = 1; index < strictFinalists.length; index += 1) {
+    bestStrict = Math.min(bestStrict, strictFinalists[index].strictCrossings);
+  }
+  const qualityFinalists = strictFinalists.filter(
+    metric => metric.strictCrossings === bestStrict,
+  );
+  if (qualityFinalists.length === 1) return qualityFinalists[0].candidate;
+
+  const baseline = qualityFinalists[0].candidate;
   const qualityContext = createEdgePathQualityEvaluationContext(baseline);
   let best = baseline;
   let bestScore = qualityContext.evaluate(baseline);
-  for (let index = 1; index < orthogonalFinalists.length; index += 1) {
-    const candidate = orthogonalFinalists[index].candidate;
+  for (let index = 1; index < qualityFinalists.length; index += 1) {
+    const candidate = qualityFinalists[index].candidate;
     const candidateScore = qualityContext.evaluate(candidate);
     if (
       candidateScore.strictCrossings < bestScore.strictCrossings

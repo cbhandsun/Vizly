@@ -57,7 +57,10 @@ import {
   toSegments,
   withComputedPath,
 } from './edgeLocalDoglegGeometry';
-import { createEdgePathQualityEvaluationContext } from './edgeStrictCrossingGuard';
+import {
+  createEdgePathQualityEvaluationContext,
+  type EdgePathQualityEvaluationContext,
+} from './edgeStrictCrossingGuard';
 
 function findBestLocalDoglegCandidate(
   path: Point[],
@@ -71,6 +74,7 @@ function findBestLocalDoglegCandidate(
   sourceRect: Rect | null,
   targetRect: Rect | null,
   obstacleContext: EdgeObstacleInteractionContext,
+  qualityContext: EdgePathQualityEvaluationContext,
   interactionContext = createEdgePathInteractionContext(edgeKey, pathByEdgeKey),
 ): Point[] | null {
   const currentLength = pathLength(path);
@@ -81,8 +85,7 @@ function findBestLocalDoglegCandidate(
   const currentObstacleHits = obstacleContext.countPathHits(path);
   const currentEdges = edgesWithCurrentPaths(edges, edgeKeys, pathByEdgeKey, { index: edgeIndex, path });
   const candidateBuffer = createChangedEdgePathEvaluationBuffer(currentEdges, edgeIndex);
-  const qualityContext = createEdgePathQualityEvaluationContext(currentEdges);
-  const currentQuality = qualityContext.evaluate(currentEdges);
+  const currentQuality = qualityContext.evaluateChanged(currentEdges, [edgeIndex]);
   let bestPath: Point[] | null = null;
   let bestLength = currentLength;
   let bestBends = currentBends;
@@ -253,6 +256,7 @@ function repairPath(
   sourceRect: Rect | null,
   targetRect: Rect | null,
   obstacleContext: EdgeObstacleInteractionContext,
+  qualityContext: EdgePathQualityEvaluationContext,
 ): Point[] {
   let current = compactPath(path);
   const interactionContext = createEdgePathInteractionContext(edgeKey, pathByEdgeKey);
@@ -269,6 +273,7 @@ function repairPath(
       sourceRect,
       targetRect,
       obstacleContext,
+      qualityContext,
       interactionContext,
     );
     if (!candidate || pathEquals(candidate, current)) break;
@@ -340,6 +345,7 @@ function repairRemainingTinyArtifactsWithMaze(
   sourceRect: Rect | null,
   targetRect: Rect | null,
   obstacleContext: EdgeObstacleInteractionContext,
+  qualityContext: EdgePathQualityEvaluationContext,
 ): Point[] {
   const currentNoise = localVisualNoise(path);
   if (currentNoise <= 0) return path;
@@ -365,8 +371,7 @@ function repairRemainingTinyArtifactsWithMaze(
   if (snapshot.length > pathLength(path) + MAX_TINY_CLEANUP_LENGTH_PENALTY) return path;
   const baselineEdges = edgesWithCurrentPaths(edges, edgeKeys, pathByEdgeKey);
   const candidateBuffer = createChangedEdgePathEvaluationBuffer(baselineEdges, edgeIndex);
-  const qualityContext = createEdgePathQualityEvaluationContext(baselineEdges);
-  const baselineQuality = qualityContext.evaluate(baselineEdges);
+  const baselineQuality = qualityContext.evaluateChanged(baselineEdges, [edgeIndex]);
   const candidateEdges = candidateBuffer.withPath(normalized);
   const candidateQuality = qualityContext.evaluateChanged(candidateEdges, [edgeIndex]);
   if (candidateQuality.nonOrthogonalSegments > baselineQuality.nonOrthogonalSegments) return path;
@@ -479,6 +484,8 @@ export function repairLocalDoglegArtifacts(edges: Edge[], nodes: ReactFlowNode[]
     const sourceRect = nodeRect(nodeById.get(edge.source));
     const targetRect = nodeRect(nodeById.get(edge.target));
     const obstacleContext = createEdgeObstacleInteractionContext(edge, obstacles);
+    const qualityBaselineEdges = edgesWithCurrentPaths(edges, edgeKeys, pathByEdgeKey);
+    const qualityContext = createEdgePathQualityEvaluationContext(qualityBaselineEdges);
     const repaired = repairPath(
       path,
       edge,
@@ -491,6 +498,7 @@ export function repairLocalDoglegArtifacts(edges: Edge[], nodes: ReactFlowNode[]
       sourceRect,
       targetRect,
       obstacleContext,
+      qualityContext,
     );
     let finalRepaired = repairRemainingTinyArtifactsWithMaze(
       repaired,
@@ -504,6 +512,7 @@ export function repairLocalDoglegArtifacts(edges: Edge[], nodes: ReactFlowNode[]
       sourceRect,
       targetRect,
       obstacleContext,
+      qualityContext,
     );
     if (!pathEquals(repaired, finalRepaired)) {
       pathByEdgeKey.set(edgeKey, finalRepaired);
@@ -519,6 +528,7 @@ export function repairLocalDoglegArtifacts(edges: Edge[], nodes: ReactFlowNode[]
         sourceRect,
         targetRect,
         obstacleContext,
+        qualityContext,
       );
     }
     if (pathEquals(path, finalRepaired)) return edge;

@@ -57,7 +57,7 @@ export const OUTER_DETOUR_COLLAPSE_OFFSETS = [
 ];
 export const MAX_HAIRPIN_COLLAPSE_BRIDGE = 104;
 export const MAX_MICRO_CANDIDATES_PER_EDGE = 72;
-export const LARGE_GRAPH_MICRO_CANDIDATES_PER_EDGE = 16;
+export const LARGE_GRAPH_MICRO_CANDIDATES_PER_EDGE = 14;
 
 export const resolveMicroCandidateBudget = (edgeCount: number): number => (
   Number.isSafeInteger(edgeCount) && edgeCount > 32
