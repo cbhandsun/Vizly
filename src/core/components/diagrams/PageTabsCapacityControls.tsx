@@ -1,6 +1,7 @@
 import React from 'react';
 import { PlusOutlined, UndoOutlined } from '@ant-design/icons';
 import { Tooltip } from 'antd';
+import { useTranslation } from 'react-i18next';
 
 import { getPageTabsCapacityControlState, runPageTabsCapacityAction } from './pageTabsLimitFeedback';
 
@@ -13,7 +14,7 @@ interface PageTabsCapacityControlsProps {
     onAddPage: () => void;
     onRestoreDeletedPage?: () => void;
     pageLimitReached: boolean;
-    restoreActionLabel: string;
+    restorableDeletedPageName: string | null;
     restoreButtonRef?: React.Ref<HTMLButtonElement>;
 }
 
@@ -26,10 +27,17 @@ export const PageTabsCapacityControls: React.FC<PageTabsCapacityControlsProps> =
     onAddPage,
     onRestoreDeletedPage,
     pageLimitReached,
-    restoreActionLabel,
+    restorableDeletedPageName,
     restoreButtonRef,
 }) => {
+    const { t } = useTranslation();
     const controlState = getPageTabsCapacityControlState(pageLimitReached, disabled);
+    const restoreActionLabel = restorableDeletedPageName
+        ? t('designer.pages.restoreNamedAction', {
+            name: restorableDeletedPageName,
+            defaultValue: '恢复页面“{{name}}”',
+        })
+        : t('designer.pages.restoreAction', { defaultValue: '恢复删除的页面' });
 
     return (
         <>

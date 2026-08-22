@@ -17,6 +17,10 @@ import { resolvePageTabTargetIndex } from './pageTabKeyboard';
 import { schedulePageTabsDeleteFocus } from './pageTabsDeleteFocus';
 import { runPageTabsCapacityAction } from './pageTabsLimitFeedback';
 import { PageTabsCapacityControls } from './PageTabsCapacityControls';
+import {
+    PageTabsDeleteConfirmationDescription,
+    PageTabsDeleteConfirmationTitle,
+} from './PageTabsDeleteConfirmation';
 import { PageTabsStatus } from './PageTabsStatus';
 import { getPageTabsMutationFailure } from './pageTabsMutationFeedback';
 import { usePageTabsPendingRename } from './usePageTabsPendingRename';
@@ -365,25 +369,10 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
         : null;
     const deletePageNodeCount = activePageContentMetrics?.nodeCount ?? activePage?.nodes.length ?? 0;
     const deletePageConnectionCount = activePageContentMetrics?.edgeCount ?? activePage?.edges.length ?? 0;
-    const deletePageNodeCountLabel = t('designer.pages.deleteNodeCount', {
-        count: deletePageNodeCount,
-        defaultValue: '{{count}} nodes',
-    });
-    const deletePageConnectionCountLabel = t('designer.pages.deleteConnectionCount', {
-        count: deletePageConnectionCount,
-        defaultValue: '{{count}} connections',
-    });
     const pageLimitMessage = t('designer.pages.limitReached', {
         count: MAX_DIAGRAM_PAGES,
         defaultValue: '最多可创建 {{count}} 个页面',
     });
-    const restoreActionLabel = restorableDeletedPageName
-        ? t('designer.pages.restoreNamedAction', {
-            name: restorableDeletedPageName,
-            defaultValue: '恢复页面“{{name}}”',
-        })
-        : t('designer.pages.restoreAction', { defaultValue: '恢复删除的页面' });
-
     return (
         <div
             role="group"
@@ -572,21 +561,17 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                                 <Popconfirm
                                     id={deleteDialogId}
                                     title={(
-                                        <span id={deleteDialogTitleId}>
-                                            {t('designer.pages.deleteConfirm', {
-                                                name: activePage.name,
-                                                defaultValue: '删除「{{name}}」？',
-                                            })}
-                                        </span>
+                                        <PageTabsDeleteConfirmationTitle
+                                            id={deleteDialogTitleId}
+                                            pageName={activePage.name}
+                                        />
                                     )}
                                     description={(
-                                        <span id={deleteDialogDescriptionId}>
-                                            {t('designer.pages.deleteDescription', {
-                                                nodeCountLabel: deletePageNodeCountLabel,
-                                                connectionCountLabel: deletePageConnectionCountLabel,
-                                                defaultValue: 'This deletes {{nodeCountLabel}} and {{connectionCountLabel}} from this page. You can restore the latest deleted page before closing or reloading this diagram.',
-                                            })}
-                                        </span>
+                                        <PageTabsDeleteConfirmationDescription
+                                            connectionCount={deletePageConnectionCount}
+                                            id={deleteDialogDescriptionId}
+                                            nodeCount={deletePageNodeCount}
+                                        />
                                     )}
                                     getPopupContainer={getViewportOverlayContainer}
                                     placement="top"
@@ -701,7 +686,7 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                 onAddPage={handleAddPage}
                 onRestoreDeletedPage={onRestoreDeletedPage ? handleRestoreDeletedPage : undefined}
                 pageLimitReached={pageLimitReached}
-                restoreActionLabel={restoreActionLabel}
+                restorableDeletedPageName={restorableDeletedPageName}
                 restoreButtonRef={restoreButtonRef}
             />
         </div>
