@@ -6,7 +6,9 @@ import {
     createTemplateSeed,
     detectDiagramType,
     filterAndSortItems,
+    getWorkspaceInventoryScope,
     getNodeCount,
+    mergeWorkspaceItemsByScope,
     type UnifiedDiagramItem,
 } from '../diagramManagementPage.helpers';
 import {
@@ -175,6 +177,34 @@ describe('diagramManagementPage helpers', () => {
         ];
         expect(filterAndSortItems(items, 'recent', '', 'updated').map(item => item.id))
             .toEqual(['local-a', 'local-b', 'local-invalid']);
+    });
+
+    it('preserves the other inventory scope when one scope refreshes', () => {
+        const local = createItem({ id: 'local-kept' });
+        const oldTemplate = createItem({
+            id: 'template-old',
+            source: 'template',
+            role: 'template',
+        });
+        const newTemplate = createItem({
+            id: 'template-new',
+            source: 'general_template',
+            role: 'template',
+        });
+        const wrongScopeItem = createItem({ id: 'local-must-not-leak' });
+
+        expect(getWorkspaceInventoryScope('recent')).toBe('documents');
+        expect(getWorkspaceInventoryScope('templates')).toBe('templates');
+        expect(mergeWorkspaceItemsByScope(
+            [local, oldTemplate],
+            [newTemplate, wrongScopeItem],
+            'templates',
+        ).map(item => item.id)).toEqual(['local-kept', 'template-new']);
+        expect(mergeWorkspaceItemsByScope(
+            [local, oldTemplate],
+            [],
+            'documents',
+        ).map(item => item.id)).toEqual(['template-old']);
     });
 
     it('creates stable starter seeds for each local template type', () => {

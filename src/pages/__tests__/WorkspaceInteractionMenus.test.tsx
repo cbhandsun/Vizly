@@ -118,6 +118,7 @@ const WorkspaceControlsHarness = () => {
       activeView={activeView}
       onActiveViewChange={setActiveView}
       unifiedItems={[item]}
+      loadedInventoryScopes={new Set(['documents', 'templates'])}
       filteredItems={[]}
       sortKey={sortKey}
       onSortKeyChange={setSortKey}
@@ -147,6 +148,7 @@ const WorkspaceCardMenuHarness = ({
     activeView="recent"
     onActiveViewChange={vi.fn()}
     unifiedItems={items}
+    loadedInventoryScopes={new Set(['documents', 'templates'])}
     filteredItems={items}
     sortKey="updated"
     onSortKeyChange={vi.fn()}

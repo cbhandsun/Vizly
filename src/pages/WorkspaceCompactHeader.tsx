@@ -8,7 +8,7 @@ import type { TemplateKey } from './diagramManagementPage.helpers';
 import { focusWorkspaceTarget } from './workspaceMenuInteraction';
 
 interface WorkspaceCompactHeaderProps {
-  documentCount: number;
+  documentCount: number | null;
   isCreating?: boolean;
   onCreateTemplate: (templateKey: TemplateKey) => void;
 }
@@ -99,7 +99,9 @@ export const WorkspaceCompactHeader = ({
     <div className="workspace-header-compact">
       <h1 className="workspace-title">
         {t('workspace.title')}
-        <span className="workspace-count">{t('workspace.documentCount', { count: documentCount })}</span>
+        {documentCount == null ? null : (
+          <span className="workspace-count">{t('workspace.documentCount', { count: documentCount })}</span>
+        )}
       </h1>
       <div className="workspace-actions-compact">
         <div className="create-split-button">

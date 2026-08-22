@@ -5,7 +5,12 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
 import { WorkspaceDiagramCollection } from '../WorkspaceDiagramCollection';
-import type { FilterViewType, UnifiedDiagramItem, ViewMode } from '../diagramManagementPage.helpers';
+import type {
+  FilterViewType,
+  UnifiedDiagramItem,
+  ViewMode,
+  WorkspaceInventoryScope,
+} from '../diagramManagementPage.helpers';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -26,11 +31,13 @@ const renderCollection = (
   searchQuery = '',
   activeView: FilterViewType = 'templates',
   viewMode: ViewMode = 'grid',
+  loadedInventoryScopes: ReadonlySet<WorkspaceInventoryScope> = new Set(['documents', 'templates']),
 ): string => renderToStaticMarkup(
   <WorkspaceDiagramCollection
     activeView={activeView}
     onActiveViewChange={() => undefined}
     unifiedItems={[item]}
+    loadedInventoryScopes={loadedInventoryScopes}
     filteredItems={filteredItems}
     sortKey="updated"
     onSortKeyChange={() => undefined}
@@ -56,6 +63,7 @@ const renderOpeningCollection = (
     activeView="recent"
     onActiveViewChange={() => undefined}
     unifiedItems={[item]}
+    loadedInventoryScopes={new Set(['documents', 'templates'])}
     filteredItems={[item]}
     sortKey="updated"
     onSortKeyChange={() => undefined}
@@ -74,6 +82,29 @@ const renderOpeningCollection = (
 );
 
 describe('WorkspaceDiagramCollection', () => {
+  it('omits counts for inventory scopes that have not been loaded', () => {
+    const item: UnifiedDiagramItem = {
+      id: 'local-known',
+      title: 'Known local diagram',
+      updatedAt: 1,
+      source: 'local',
+      role: 'owner',
+      raw: { id: 'local-known' } as never,
+    };
+    const html = renderCollection(
+      item,
+      [item],
+      '',
+      'recent',
+      'list',
+      new Set(['documents']),
+    );
+
+    expect(html).toMatch(/workspace\.local<span class="filter-tab-count">1<\/span>/);
+    expect(html).not.toMatch(/workspace\.industryTemplates<span class="filter-tab-count">/);
+    expect(html).not.toMatch(/workspace\.generalTemplates<span class="filter-tab-count">/);
+  });
+
   it('reports the bounded number of documents actually available in Recent', () => {
     const items: UnifiedDiagramItem[] = Array.from({ length: 35 }, (_, index) => ({
       id: `diagram-${index}`,
@@ -88,6 +119,7 @@ describe('WorkspaceDiagramCollection', () => {
         activeView="recent"
         onActiveViewChange={() => undefined}
         unifiedItems={items}
+        loadedInventoryScopes={new Set(['documents', 'templates'])}
         filteredItems={items.slice(0, 30)}
         sortKey="updated"
         onSortKeyChange={() => undefined}
@@ -114,6 +146,7 @@ describe('WorkspaceDiagramCollection', () => {
         activeView="recent"
         onActiveViewChange={() => undefined}
         unifiedItems={[]}
+        loadedInventoryScopes={new Set(['documents', 'templates'])}
         filteredItems={[]}
         sortKey="updated"
         onSortKeyChange={() => undefined}

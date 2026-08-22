@@ -18,6 +18,7 @@ export type FilterViewType = 'recent' | 'local' | 'cloud' | 'shared' | 'template
 export type ViewMode = 'grid' | 'list';
 export type SortKey = 'updated' | 'name' | 'type';
 export type TemplateKey = 'flowchart' | 'architecture' | 'mindmap' | 'timeline' | 'blank';
+export type WorkspaceInventoryScope = 'documents' | 'templates';
 
 export const RECENT_WORKSPACE_LIMIT = 30;
 
@@ -64,6 +65,23 @@ export const loadUnifiedStorage = async () => {
 };
 
 export const isTemplateLibraryView = (view: FilterViewType) => view === 'templates' || view === 'general_templates';
+
+export const getWorkspaceInventoryScope = (view: FilterViewType): WorkspaceInventoryScope => (
+    isTemplateLibraryView(view) ? 'templates' : 'documents'
+);
+
+const getWorkspaceItemScope = (item: UnifiedDiagramItem): WorkspaceInventoryScope => (
+    item.source === 'template' || item.source === 'general_template' ? 'templates' : 'documents'
+);
+
+export const mergeWorkspaceItemsByScope = (
+    currentItems: readonly UnifiedDiagramItem[],
+    incomingItems: readonly UnifiedDiagramItem[],
+    scope: WorkspaceInventoryScope,
+): UnifiedDiagramItem[] => [
+    ...currentItems.filter(item => getWorkspaceItemScope(item) !== scope),
+    ...incomingItems.filter(item => getWorkspaceItemScope(item) === scope),
+];
 
 export const readStoredCloudProvider = (): ManageStorageProvider => {
     try {

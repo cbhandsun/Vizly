@@ -74,6 +74,16 @@ describe('WorkspaceDashboardChrome', () => {
     expect(PRIMARY_WORKSPACE_TEMPLATE).toBe('flowchart');
   });
 
+  it('does not claim there are zero documents before the document inventory is loaded', () => {
+    const html = renderToStaticMarkup(
+      <WorkspaceCompactHeader documentCount={null} onCreateTemplate={() => undefined} />,
+    );
+
+    expect(html).toContain('<h1');
+    expect(html).not.toContain('workspace-count');
+    expect(html).not.toContain('0 documents');
+  });
+
   it('does not render an unsafe avatar URL', () => {
     const html = renderToStaticMarkup(
       <WorkspaceGlobalHeader

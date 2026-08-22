@@ -9,13 +9,17 @@ import { openDiagramViewerInNewTab } from '@/components/diagramViewerNavigation'
 import { useAuth } from '@/context/useAuth';
 import {
     filterAndSortItems,
+    getWorkspaceInventoryScope,
+    isTemplateItem,
     loadWorkspaceItems,
+    mergeWorkspaceItemsByScope,
     readStoredCloudProvider,
     type FilterViewType,
     type SortKey,
     type TemplateKey,
     type UnifiedDiagramItem,
     type ViewMode,
+    type WorkspaceInventoryScope,
 } from './diagramManagementPage.helpers';
 import './WorkspaceDashboard.css';
 import './WorkspaceDashboard.mobile.css';
@@ -83,6 +87,9 @@ const WorkspaceDashboardPage: React.FC = () => {
     const workspaceResultsRef = useRef<HTMLDivElement>(null);
     
     const [unifiedItems, setUnifiedItems] = useState<UnifiedDiagramItem[]>([]);
+    const [loadedInventoryScopes, setLoadedInventoryScopes] = useState<ReadonlySet<WorkspaceInventoryScope>>(
+        () => new Set(),
+    );
     const [cloudProvider] = useState<ManageStorageProvider>(() => {
         const p = searchParams.get('provider');
         if (p === 's3' || p === 'supabase') return p;
@@ -194,10 +201,16 @@ const WorkspaceDashboardPage: React.FC = () => {
     }, [navigate]);
 
     const loadAllData = useCallback(async () => {
+        const inventoryScope = getWorkspaceInventoryScope(activeView);
         setLoading(true);
         try {
             const nextItems = await loadWorkspaceItems(activeView, cloudProvider, user);
-            setUnifiedItems(nextItems);
+            setUnifiedItems(currentItems => mergeWorkspaceItemsByScope(
+                currentItems,
+                nextItems,
+                inventoryScope,
+            ));
+            setLoadedInventoryScopes(currentScopes => new Set(currentScopes).add(inventoryScope));
         } catch (error) {
             safeLog.error('Failed to load dashboard data', redactSensitiveLogValue(error));
             appMessage.error("Failed to load workspace data");
@@ -336,6 +349,9 @@ const WorkspaceDashboardPage: React.FC = () => {
         () => filterAndSortItems(unifiedItems, activeView, searchQuery, sortKey),
         [unifiedItems, activeView, searchQuery, sortKey]
     );
+    const documentCount = loadedInventoryScopes.has('documents')
+        ? unifiedItems.filter(item => !isTemplateItem(item)).length
+        : null;
 
     // --- Settings Menu ---
     const settingsMenu: MenuProps['items'] = useMemo(
@@ -383,7 +399,7 @@ const WorkspaceDashboardPage: React.FC = () => {
                 
                 {!searchQuery && (
                     <WorkspaceCompactHeader
-                        documentCount={unifiedItems.length}
+                        documentCount={documentCount}
                         isCreating={isCreatingDiagram}
                         onCreateTemplate={handleCreateTemplate}
                     />
@@ -392,6 +408,7 @@ const WorkspaceDashboardPage: React.FC = () => {
                     activeView={activeView}
                     onActiveViewChange={handleActiveViewChange}
                     unifiedItems={unifiedItems}
+                    loadedInventoryScopes={loadedInventoryScopes}
                     filteredItems={filteredItems}
                     sortKey={sortKey}
                     onSortKeyChange={handleSortKeyChange}

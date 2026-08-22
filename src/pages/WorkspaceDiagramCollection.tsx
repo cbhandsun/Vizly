@@ -34,6 +34,7 @@ import {
   type SortKey,
   type UnifiedDiagramItem,
   type ViewMode,
+  type WorkspaceInventoryScope,
 } from './diagramManagementPage.helpers';
 import { DiagramCardSkeleton } from './DiagramCardSkeleton';
 import { WorkspaceCardActionsMenu } from './WorkspaceCardActionsMenu';
@@ -63,6 +64,7 @@ interface WorkspaceDiagramCollectionProps {
   activeView: FilterViewType;
   onActiveViewChange: (view: FilterViewType) => void;
   unifiedItems: UnifiedDiagramItem[];
+  loadedInventoryScopes: ReadonlySet<WorkspaceInventoryScope>;
   filteredItems: UnifiedDiagramItem[];
   sortKey: SortKey;
   onSortKeyChange: (sortKey: SortKey) => void;
@@ -89,6 +91,7 @@ export const WorkspaceDiagramCollection = ({
   activeView,
   onActiveViewChange,
   unifiedItems,
+  loadedInventoryScopes,
   filteredItems,
   sortKey,
   onSortKeyChange,
@@ -116,6 +119,11 @@ export const WorkspaceDiagramCollection = ({
   const localCount = unifiedItems.filter(item => item.source === 'local').length;
   const cloudCount = unifiedItems.filter(item => item.source === 's3' || item.source === 'supabase').length;
   const sharedCount = unifiedItems.filter(item => item.role === 'viewer').length;
+  const documentCountsKnown = loadedInventoryScopes.has('documents');
+  const templateCountsKnown = loadedInventoryScopes.has('templates');
+  const renderFilterCount = (count: number, known: boolean) => (
+    known ? <span className="filter-tab-count">{count}</span> : null
+  );
   const [openCardMenuKey, setOpenCardMenuKey] = React.useState<string | null>(null);
   const [sortMenuOpen, setSortMenuOpen] = React.useState(false);
   const cardMenuTriggerRefs = React.useRef(new Map<string, HTMLButtonElement>());
@@ -241,27 +249,33 @@ export const WorkspaceDiagramCollection = ({
                         <div className="workspace-filter-tabs" role="group" aria-label={t('workspace.filterBy')} onKeyDown={handleFilterGroupKeyDown}>
                             <button ref={recentFilterRef} type="button" className={`filter-tab ${activeView === 'recent' ? 'active' : ''}`} aria-pressed={activeView === 'recent'} data-workspace-filter-view="recent" tabIndex={activeView === 'recent' ? 0 : -1} onClick={() => onActiveViewChange('recent')}>
                                 <Clock size={14} strokeWidth={2} /> {t('workspace.recent')}
-                                <span className="filter-tab-count">{recentCount}</span>
+                                {renderFilterCount(recentCount, documentCountsKnown)}
                             </button>
                             <button type="button" className={`filter-tab ${activeView === 'local' ? 'active' : ''}`} aria-pressed={activeView === 'local'} data-workspace-filter-view="local" tabIndex={activeView === 'local' ? 0 : -1} onClick={() => onActiveViewChange('local')}>
                                 <Laptop size={14} strokeWidth={2} /> {t('workspace.local')}
-                                <span className="filter-tab-count">{localCount}</span>
+                                {renderFilterCount(localCount, documentCountsKnown)}
                             </button>
                             <button type="button" className={`filter-tab ${activeView === 'cloud' ? 'active' : ''}`} aria-pressed={activeView === 'cloud'} data-workspace-filter-view="cloud" tabIndex={activeView === 'cloud' ? 0 : -1} onClick={() => onActiveViewChange('cloud')}>
                                 <Cloud size={14} strokeWidth={2} /> {t('workspace.cloud')}
-                                <span className="filter-tab-count">{cloudCount}</span>
+                                {renderFilterCount(cloudCount, documentCountsKnown)}
                             </button>
                             <button type="button" className={`filter-tab ${activeView === 'shared' ? 'active' : ''}`} aria-pressed={activeView === 'shared'} data-workspace-filter-view="shared" tabIndex={activeView === 'shared' ? 0 : -1} onClick={() => onActiveViewChange('shared')}>
                                 <Share2 size={14} strokeWidth={2} /> {t('workspace.shared')}
-                                <span className="filter-tab-count">{sharedCount}</span>
+                                {renderFilterCount(sharedCount, documentCountsKnown)}
                             </button>
                             <button type="button" className={`filter-tab ${activeView === 'templates' ? 'active' : ''}`} aria-pressed={activeView === 'templates'} data-workspace-filter-view="templates" tabIndex={activeView === 'templates' ? 0 : -1} onClick={() => onActiveViewChange('templates')}>
                                 <LayoutGrid size={14} strokeWidth={2} /> {t('workspace.industryTemplates')}
-                                <span className="filter-tab-count">{unifiedItems.filter(i => i.source === 'template').length}</span>
+                                {renderFilterCount(
+                                    unifiedItems.filter(item => item.source === 'template').length,
+                                    templateCountsKnown,
+                                )}
                             </button>
                             <button type="button" className={`filter-tab ${activeView === 'general_templates' ? 'active' : ''}`} aria-pressed={activeView === 'general_templates'} data-workspace-filter-view="general_templates" tabIndex={activeView === 'general_templates' ? 0 : -1} onClick={() => onActiveViewChange('general_templates')}>
                                 <Blocks size={14} strokeWidth={2} /> {t('workspace.generalTemplates')}
-                                <span className="filter-tab-count">{unifiedItems.filter(i => i.source === 'general_template').length}</span>
+                                {renderFilterCount(
+                                    unifiedItems.filter(item => item.source === 'general_template').length,
+                                    templateCountsKnown,
+                                )}
                             </button>
                         </div>
 
