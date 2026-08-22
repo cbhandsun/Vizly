@@ -7,7 +7,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
     bridge: { nodes: [], metadata: {} } as Record<string, unknown> | null,
-    addCustomPreset: vi.fn(),
     confirm: vi.fn(),
     error: vi.fn(),
     info: vi.fn(),
@@ -15,13 +14,15 @@ const mocks = vi.hoisted(() => ({
     modalDestroy: vi.fn(),
     modalUpdate: vi.fn(),
     getCustomPreset: vi.fn(),
+    saveCustomPreset: vi.fn(),
     success: vi.fn(),
 }));
 
 vi.mock('@/core/utils/customPresetStorage', () => ({
-    addCustomPreset: mocks.addCustomPreset,
     CUSTOM_PRESET_NAME_MAX_LENGTH: 120,
+    CUSTOM_PRESETS_LIMIT: 100,
     getCustomPreset: mocks.getCustomPreset,
+    saveCustomPreset: mocks.saveCustomPreset,
 }));
 vi.mock('@/core/utils/antdStaticBridge', () => ({
     appMessage: {
@@ -52,8 +53,8 @@ describe('useDiagramViewerSaveActions', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mocks.bridge = { nodes: [], metadata: {} };
-        mocks.addCustomPreset.mockReturnValue({ nodes: [] });
         mocks.getCustomPreset.mockReturnValue(null);
+        mocks.saveCustomPreset.mockReturnValue({ ok: true, preset: { nodes: [] } });
         mocks.confirm.mockReturnValue({
             destroy: mocks.modalDestroy,
             update: mocks.modalUpdate,
@@ -146,7 +147,7 @@ describe('useDiagramViewerSaveActions', () => {
 
         saveAsConfig.okButtonProps.onClick();
 
-        expect(mocks.addCustomPreset).not.toHaveBeenCalled();
+        expect(mocks.saveCustomPreset).not.toHaveBeenCalled();
         const overwriteConfig = mocks.confirm.mock.calls[1]?.[0] as {
             title: string;
             content: string;
@@ -176,11 +177,46 @@ describe('useDiagramViewerSaveActions', () => {
         };
         await act(async () => confirmedOverwriteConfig.onOk());
 
-        expect(mocks.addCustomPreset).toHaveBeenCalledWith(
+        expect(mocks.saveCustomPreset).toHaveBeenCalledWith(
             'Existing local copy',
             expect.objectContaining({ name: 'Existing local copy' }),
         );
         expect(mocks.modalDestroy).toHaveBeenCalledTimes(1);
         expect(mocks.success).toHaveBeenCalledWith('diagramViewer.saveAs.localSuccess');
+    });
+
+    it('keeps the dialog open and reports a full local template library without false success', async () => {
+        mocks.saveCustomPreset.mockReturnValue({ ok: false, error: 'capacity' });
+        const translate = vi.fn((key: string, options?: Record<string, unknown>) => {
+            if (key === 'diagramViewer.saveAs.localCapacityError') return `capacity:${String(options?.max)}`;
+            if (key === 'diagramViewer.saveAs.error') return `error:${String(options?.message)}`;
+            return options?.target ? `${key}:${String(options.target)}` : key;
+        }) as unknown as TFunction;
+        const { result } = renderHook(() => useDiagramViewerSaveActions({
+            selectedDiagramId: 'diagram-1',
+            t: translate,
+            onCloudReplicaSaved: vi.fn(),
+        }));
+
+        await act(async () => result.current.handleSaveTo('local'));
+        const config = mocks.confirm.mock.calls[0]?.[0] as {
+            okButtonProps: { onClick: () => void };
+        };
+        config.okButtonProps.onClick();
+
+        await waitFor(() => expect(mocks.error).toHaveBeenCalledWith('error:capacity:100'));
+        expect(mocks.success).not.toHaveBeenCalled();
+        expect(mocks.modalDestroy).not.toHaveBeenCalled();
+        const lastUpdate = mocks.modalUpdate.mock.calls.at(-1)?.[0] as {
+            content: ReactNode;
+            okButtonProps: { loading: boolean };
+            cancelButtonProps: { disabled: boolean };
+        };
+        expect(lastUpdate).toEqual(expect.objectContaining({
+            okButtonProps: expect.objectContaining({ loading: false }),
+            cancelButtonProps: { disabled: false },
+        }));
+        render(<>{lastUpdate.content}</>);
+        expect(screen.getByRole('alert').textContent).toContain('capacity:100');
     });
 });

@@ -4,8 +4,8 @@ import { logUiStorageReadFailure, logUiStorageWriteFailure } from './uiStorageLo
 
 export const CUSTOM_PRESETS_STORAGE_KEY = 'diagram-custom-presets';
 
-const MAX_PRESETS = 100;
-const MAX_PRESET_SCAN = MAX_PRESETS * 2;
+export const CUSTOM_PRESETS_LIMIT = 100;
+const MAX_PRESET_SCAN = CUSTOM_PRESETS_LIMIT * 2;
 export const CUSTOM_PRESET_NAME_MAX_LENGTH = 120;
 const MAX_STRING_LENGTH = 4_000;
 const MAX_OBJECT_KEYS = 120;
@@ -91,7 +91,7 @@ export const coerceCustomPresetMap = (value: unknown): Record<string, StandardDi
     const result: Record<string, StandardDiagramData> = {};
     let count = 0;
     for (const [rawName, rawPreset] of Object.entries(value).slice(0, MAX_PRESET_SCAN)) {
-        if (count >= MAX_PRESETS) break;
+        if (count >= CUSTOM_PRESETS_LIMIT) break;
         if (BLOCKED_KEYS.has(rawName)) continue;
 
         const name = normalizeCustomPresetName(rawName);
@@ -144,23 +144,86 @@ export const writeCustomPresetMap = (
     return normalized;
 };
 
+export type CustomPresetSaveError = 'invalid' | 'capacity' | 'readFailed' | 'writeFailed';
+
+export type CustomPresetSaveResult =
+    | { ok: true; preset: StandardDiagramData }
+    | { ok: false; error: CustomPresetSaveError };
+
+type CustomPresetStorage = Pick<Storage, 'getItem' | 'setItem'>;
+
+const readCustomPresetMapForWrite = (
+    storage: Pick<Storage, 'getItem'>,
+): { ok: true; presets: Record<string, StandardDiagramData> } | { ok: false } => {
+    let raw: string | null;
+    try {
+        raw = storage.getItem(CUSTOM_PRESETS_STORAGE_KEY);
+    } catch (error) {
+        logUiStorageReadFailure('customPresetStorage', CUSTOM_PRESETS_STORAGE_KEY, error);
+        return { ok: false };
+    }
+
+    if (!raw) return { ok: true, presets: {} };
+    if (raw.length > MAX_CUSTOM_PRESETS_JSON_LENGTH) {
+        logUiStorageReadFailure('customPresetStorage', CUSTOM_PRESETS_STORAGE_KEY, new Error('Custom presets JSON is too large.'));
+        return { ok: false };
+    }
+
+    try {
+        const parsed = JSON.parse(raw) as unknown;
+        if (!isRecord(parsed)) {
+            logUiStorageReadFailure('customPresetStorage', CUSTOM_PRESETS_STORAGE_KEY, new Error('Custom presets JSON must be an object.'));
+            return { ok: false };
+        }
+        return { ok: true, presets: coerceCustomPresetMap(parsed) };
+    } catch (error) {
+        logUiStorageReadFailure('customPresetStorage', CUSTOM_PRESETS_STORAGE_KEY, error);
+        return { ok: false };
+    }
+};
+
+export const saveCustomPreset = (
+    name: string,
+    preset: unknown,
+    storage: CustomPresetStorage = localStorage,
+): CustomPresetSaveResult => {
+    const normalizedName = normalizeCustomPresetName(name);
+    if (!normalizedName) return { ok: false, error: 'invalid' };
+
+    const normalizedPreset = coerceCustomPreset(preset, { id: normalizedName, title: normalizedName });
+    if (!normalizedPreset) return { ok: false, error: 'invalid' };
+
+    const stored = readCustomPresetMapForWrite(storage);
+    if (!stored.ok) return { ok: false, error: 'readFailed' };
+    if (!Object.hasOwn(stored.presets, normalizedName)
+        && Object.keys(stored.presets).length >= CUSTOM_PRESETS_LIMIT) {
+        return { ok: false, error: 'capacity' };
+    }
+
+    const nextPresets = coerceCustomPresetMap({
+        ...stored.presets,
+        [normalizedName]: normalizedPreset,
+    });
+    const persistedPreset = nextPresets[normalizedName];
+    if (!persistedPreset) return { ok: false, error: 'capacity' };
+
+    try {
+        storage.setItem(CUSTOM_PRESETS_STORAGE_KEY, JSON.stringify(nextPresets));
+    } catch (error) {
+        logUiStorageWriteFailure('customPresetStorage', CUSTOM_PRESETS_STORAGE_KEY, error);
+        return { ok: false, error: 'writeFailed' };
+    }
+
+    return { ok: true, preset: persistedPreset };
+};
+
 export const addCustomPreset = (
     name: string,
     preset: unknown,
     storage: Pick<Storage, 'getItem' | 'setItem'> = localStorage,
 ): StandardDiagramData | null => {
-    const normalizedName = normalizeCustomPresetName(name);
-    if (!normalizedName) return null;
-
-    const normalizedPreset = coerceCustomPreset(preset, { id: normalizedName, title: normalizedName });
-    if (!normalizedPreset) return null;
-
-    writeCustomPresetMap({
-        ...readCustomPresetMap(storage),
-        [normalizedName]: normalizedPreset,
-    }, storage);
-
-    return normalizedPreset;
+    const result = saveCustomPreset(name, preset, storage);
+    return result.ok ? result.preset : null;
 };
 
 export const getCustomPreset = (

@@ -4,10 +4,12 @@ import {
     addCustomPreset,
     coerceCustomPresetMap,
     CUSTOM_PRESET_NAME_MAX_LENGTH,
+    CUSTOM_PRESETS_LIMIT,
     CUSTOM_PRESETS_STORAGE_KEY,
     getCustomPreset,
     normalizeCustomPresetLookupKey,
     readCustomPresetMap,
+    saveCustomPreset,
     writeCustomPresetMap,
 } from '../customPresetStorage';
 
@@ -48,6 +50,7 @@ describe('customPresetStorage', () => {
 
     it('normalizes custom-prefixed lookup keys', () => {
         expect(CUSTOM_PRESET_NAME_MAX_LENGTH).toBe(120);
+        expect(CUSTOM_PRESETS_LIMIT).toBe(100);
         expect(normalizeCustomPresetLookupKey('custom: 工作区 A ')).toBe('工作区 A');
         expect(normalizeCustomPresetLookupKey('')).toBeNull();
         expect(normalizeCustomPresetLookupKey('custom:\u0000bad')).toBe('bad');
@@ -119,5 +122,72 @@ describe('customPresetStorage', () => {
         expect(map['Preset 0']).toBeDefined();
         expect(map['Preset 99']).toBeDefined();
         expect(map['Preset 100']).toBeUndefined();
+    });
+
+    it('rejects a new preset at capacity without claiming or attempting a write', () => {
+        const presets = Object.fromEntries(Array.from(
+            { length: CUSTOM_PRESETS_LIMIT },
+            (_, index) => [`Preset ${index}`, makePreset(`preset-${index}`)],
+        ));
+        const storage = {
+            getItem: vi.fn(() => JSON.stringify(presets)),
+            setItem: vi.fn(),
+        };
+
+        expect(saveCustomPreset('Overflow', makePreset('overflow'), storage)).toEqual({
+            ok: false,
+            error: 'capacity',
+        });
+        expect(storage.setItem).not.toHaveBeenCalled();
+    });
+
+    it('still permits an explicit overwrite when the library is at capacity', () => {
+        const presets = Object.fromEntries(Array.from(
+            { length: CUSTOM_PRESETS_LIMIT },
+            (_, index) => [`Preset ${index}`, makePreset(`preset-${index}`)],
+        ));
+        const storage = {
+            getItem: vi.fn(() => JSON.stringify(presets)),
+            setItem: vi.fn(),
+        };
+
+        const result = saveCustomPreset('Preset 0', makePreset('updated'), storage);
+
+        expect(result).toMatchObject({ ok: true, preset: { id: 'updated' } });
+        expect(storage.setItem).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not replace unreadable storage and reports the read failure', () => {
+        const malformedStorage = {
+            getItem: vi.fn(() => '{broken'),
+            setItem: vi.fn(),
+        };
+        const throwingStorage = {
+            getItem: vi.fn(() => { throw new Error('read denied'); }),
+            setItem: vi.fn(),
+        };
+
+        expect(saveCustomPreset('Safe', makePreset('safe'), malformedStorage)).toEqual({
+            ok: false,
+            error: 'readFailed',
+        });
+        expect(saveCustomPreset('Safe', makePreset('safe'), throwingStorage)).toEqual({
+            ok: false,
+            error: 'readFailed',
+        });
+        expect(malformedStorage.setItem).not.toHaveBeenCalled();
+        expect(throwingStorage.setItem).not.toHaveBeenCalled();
+    });
+
+    it('reports a rejected write instead of returning a false success', () => {
+        const storage = {
+            getItem: vi.fn(() => null),
+            setItem: vi.fn(() => { throw new Error('quota exceeded'); }),
+        };
+
+        expect(saveCustomPreset('Safe', makePreset('safe'), storage)).toEqual({
+            ok: false,
+            error: 'writeFailed',
+        });
     });
 });

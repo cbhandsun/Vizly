@@ -1,13 +1,15 @@
 import { createRef, useCallback } from 'react';
 import type { TFunction } from 'i18next';
 import type { InputRef } from 'antd';
+import Alert from 'antd/es/alert';
 import Input from 'antd/es/input';
 import type { DiagramSaveAsTarget } from '@/core/types/diagram-components';
 
 import {
-    addCustomPreset,
     CUSTOM_PRESET_NAME_MAX_LENGTH,
+    CUSTOM_PRESETS_LIMIT,
     getCustomPreset,
+    saveCustomPreset,
 } from '@/core/utils/customPresetStorage';
 import { appMessage, appModal } from '@/core/utils/antdStaticBridge';
 import { tryAttachDiagramSnapshot } from '@/core/utils/diagramSnapshot';
@@ -67,12 +69,37 @@ export function useDiagramViewerSaveActions({
         let isSaving = false;
         let isOverwriteConfirmOpen = false;
         let shouldRestoreInputAfterOverwriteClose = false;
+        let inlineSaveError: string | null = null;
+
+        const renderNameContent = () => (
+            <div style={{ marginTop: 16 }}>
+                <p style={{ marginBottom: 8, color: '#666' }}>{t('diagramViewer.saveAs.namePlaceholder')}</p>
+                <Input
+                    ref={nameInputRef}
+                    aria-label={t('diagramViewer.saveAs.nameLabel')}
+                    defaultValue={newName}
+                    maxLength={nameMaxLength}
+                    showCount
+                    onChange={event => { newName = event.target.value; }}
+                />
+                {inlineSaveError && (
+                    <Alert
+                        type="error"
+                        showIcon
+                        message={inlineSaveError}
+                        style={{ marginTop: 12 }}
+                    />
+                )}
+            </div>
+        );
 
         const saveValidatedName = async (normalizedName: string) => {
             if (isSaving) return;
 
+            inlineSaveError = null;
             isSaving = true;
             modalHandle?.update({
+                content: renderNameContent(),
                 okButtonProps: { loading: true, onClick: () => { void handleConfirm(); } },
                 cancelButtonProps: { disabled: true },
             });
@@ -87,8 +114,16 @@ export function useDiagramViewerSaveActions({
                 };
 
                 if (target === 'local') {
-                    if (!addCustomPreset(normalizedName, dataToSave)) {
-                        throw new Error('本地模板数据无效');
+                    const localSaveResult = saveCustomPreset(normalizedName, dataToSave);
+                    if (!localSaveResult.ok) {
+                        const errorKey = localSaveResult.error === 'capacity'
+                            ? 'diagramViewer.saveAs.localCapacityError'
+                            : localSaveResult.error === 'readFailed'
+                                ? 'diagramViewer.saveAs.localReadError'
+                                : localSaveResult.error === 'writeFailed'
+                                    ? 'diagramViewer.saveAs.localWriteError'
+                                    : 'diagramViewer.saveAs.localInvalidError';
+                        throw new Error(t(errorKey, { max: CUSTOM_PRESETS_LIMIT }));
                     }
                     appMessage.success(t('diagramViewer.saveAs.localSuccess'));
                     saveSucceeded = true;
@@ -108,8 +143,9 @@ export function useDiagramViewerSaveActions({
                     saveSucceeded = true;
                 }
             } catch (error) {
+                inlineSaveError = getErrorMessage(error);
                 logDiagramViewerSaveAsFailure(target, error);
-                appMessage.error(t('diagramViewer.saveAs.error', { message: getErrorMessage(error) }));
+                appMessage.error(t('diagramViewer.saveAs.error', { message: inlineSaveError }));
             } finally {
                 hideLoading();
                 isSaving = false;
@@ -119,9 +155,11 @@ export function useDiagramViewerSaveActions({
                 modalHandle?.destroy();
             } else {
                 modalHandle?.update({
+                    content: renderNameContent(),
                     okButtonProps: { loading: false, onClick: () => { void handleConfirm(); } },
                     cancelButtonProps: { disabled: false },
                 });
+                window.requestAnimationFrame(() => nameInputRef.current?.focus());
             }
         };
 
@@ -175,19 +213,7 @@ export function useDiagramViewerSaveActions({
 
         const modalHandle = appModal.confirm({
             title: t('diagramViewer.saveAs.title', { target: targetLabel }),
-            content: (
-                <div style={{ marginTop: 16 }}>
-                    <p style={{ marginBottom: 8, color: '#666' }}>{t('diagramViewer.saveAs.namePlaceholder')}</p>
-                    <Input
-                        ref={nameInputRef}
-                        aria-label={t('diagramViewer.saveAs.nameLabel')}
-                        defaultValue={newName}
-                        maxLength={nameMaxLength}
-                        showCount
-                        onChange={event => { newName = event.target.value; }}
-                    />
-                </div>
-            ),
+            content: renderNameContent(),
             okText: t('common.confirm'),
             cancelText: t('common.cancel'),
             okButtonProps: { onClick: () => { void handleConfirm(); } },
