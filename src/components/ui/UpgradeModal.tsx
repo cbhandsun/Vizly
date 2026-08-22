@@ -32,8 +32,20 @@ export const UpgradeModal: React.FC = () => {
   const [isAuthModalVisible, setIsAuthModalVisible] = useState(false);
   const [recoveryState, setRecoveryState] = useState<UpgradeRecoveryState>({ kind: 'idle' });
   const checkoutControllerRef = useRef<AbortController | null>(null);
+  const subscribeButtonRef = useRef<HTMLButtonElement>(null);
+  const restoreUpgradeFocusRef = useRef(false);
 
   useEffect(() => () => checkoutControllerRef.current?.abort(), []);
+
+  useEffect(() => {
+    if (!isUpgradeModalVisible || isAuthModalVisible || !restoreUpgradeFocusRef.current) return;
+
+    const focusFrame = window.requestAnimationFrame(() => {
+      subscribeButtonRef.current?.focus();
+      restoreUpgradeFocusRef.current = false;
+    });
+    return () => window.cancelAnimationFrame(focusFrame);
+  }, [isAuthModalVisible, isUpgradeModalVisible]);
 
   const resetTransientState = () => {
     checkoutControllerRef.current?.abort();
@@ -41,6 +53,7 @@ export const UpgradeModal: React.FC = () => {
     setLoading(false);
     setIsAuthModalVisible(false);
     setRecoveryState({ kind: 'idle' });
+    restoreUpgradeFocusRef.current = false;
   };
 
   const handleClose = () => {
@@ -53,6 +66,7 @@ export const UpgradeModal: React.FC = () => {
     if (!jwtToken || jwtToken === 'guest') {
       appMessage.warning(t('upgrade.loginFirst'));
       setRecoveryState({ kind: 'auth-required' });
+      restoreUpgradeFocusRef.current = true;
       setIsAuthModalVisible(true);
       return;
     }
@@ -87,6 +101,10 @@ export const UpgradeModal: React.FC = () => {
   const handleAuthenticated = () => {
     setIsAuthModalVisible(false);
     setRecoveryState({ kind: 'auth-complete' });
+  };
+
+  const handleUpgradeAfterClose = () => {
+    if (!isUpgradeModalVisible) resetTransientState();
   };
 
   const recoveryAlert = recoveryState.kind === 'auth-required' ? (
@@ -124,59 +142,62 @@ export const UpgradeModal: React.FC = () => {
 
   return (
     <>
-      <Modal
-        open={isUpgradeModalVisible}
-        onCancel={handleClose}
-        afterClose={resetTransientState}
-        getContainer={getViewportOverlayContainer}
-        rootClassName={`${COMMERCIAL_VIEWPORT_MODAL_CLASS} upgrade-viewport-modal`}
-        zIndex={COMMERCIAL_VIEWPORT_MODAL_Z_INDEX}
-        footer={null}
-        centered
-        width={480}
-        title={<span id="upgrade-modal-title">{t('upgrade.title')}</span>}
-      >
-        <div className="upgrade-modal__hero">
-          <CrownOutlined className="upgrade-modal__crown" aria-hidden="true" />
-          {upgradeFeatureContext && (
-            <Text type="secondary" className="upgrade-modal__feature-context">
-              {featureContextPrefix}{featureContextSeparator}<Text strong>{upgradeFeatureContext}</Text>
-            </Text>
-          )}
-        </div>
+      {!isAuthModalVisible && (
+        <Modal
+          open={isUpgradeModalVisible}
+          onCancel={handleClose}
+          afterClose={handleUpgradeAfterClose}
+          getContainer={getViewportOverlayContainer}
+          rootClassName={`${COMMERCIAL_VIEWPORT_MODAL_CLASS} upgrade-viewport-modal`}
+          zIndex={COMMERCIAL_VIEWPORT_MODAL_Z_INDEX}
+          footer={null}
+          centered
+          width={480}
+          title={<span id="upgrade-modal-title">{t('upgrade.title')}</span>}
+        >
+          <div className="upgrade-modal__hero">
+            <CrownOutlined className="upgrade-modal__crown" aria-hidden="true" />
+            {upgradeFeatureContext && (
+              <Text type="secondary" className="upgrade-modal__feature-context">
+                {featureContextPrefix}{featureContextSeparator}<Text strong>{upgradeFeatureContext}</Text>
+              </Text>
+            )}
+          </div>
 
-        <Paragraph className="upgrade-modal__subtitle">
-          {t('upgrade.subtitle')}
-        </Paragraph>
+          <Paragraph className="upgrade-modal__subtitle">
+            {t('upgrade.subtitle')}
+          </Paragraph>
 
-        <div className="upgrade-modal__features">
-          <Space orientation="vertical" size="small" style={{ width: '100%' }}>
-            <Text><CheckCircleFilled className="upgrade-modal__feature-icon" aria-hidden="true" /> {t('upgrade.features.pdf')}</Text>
-            <Text><CheckCircleFilled className="upgrade-modal__feature-icon" aria-hidden="true" /> {t('upgrade.features.collab')}</Text>
-            <Text><CheckCircleFilled className="upgrade-modal__feature-icon" aria-hidden="true" /> {t('upgrade.features.history')}</Text>
-            <Text><CheckCircleFilled className="upgrade-modal__feature-icon" aria-hidden="true" /> {t('upgrade.features.ai')}</Text>
-          </Space>
-        </div>
+          <div className="upgrade-modal__features">
+            <Space orientation="vertical" size="small" style={{ width: '100%' }}>
+              <Text><CheckCircleFilled className="upgrade-modal__feature-icon" aria-hidden="true" /> {t('upgrade.features.pdf')}</Text>
+              <Text><CheckCircleFilled className="upgrade-modal__feature-icon" aria-hidden="true" /> {t('upgrade.features.collab')}</Text>
+              <Text><CheckCircleFilled className="upgrade-modal__feature-icon" aria-hidden="true" /> {t('upgrade.features.history')}</Text>
+              <Text><CheckCircleFilled className="upgrade-modal__feature-icon" aria-hidden="true" /> {t('upgrade.features.ai')}</Text>
+            </Space>
+          </div>
 
-        {recoveryAlert}
+          {recoveryAlert}
 
-        <Divider />
+          <Divider />
 
-        <div className="upgrade-modal__actions">
-          <Button size="large" onClick={handleClose}>{t('upgrade.later')}</Button>
-          <Button
-            type="primary"
-            size="large"
-            className="upgrade-modal__subscribe"
-            onClick={handleUpgradeClick}
-            loading={loading}
-          >
-            {recoveryState.kind === 'checkout-failed'
-              ? t('upgrade.retryCheckout')
-              : t('upgrade.subscribe')}
-          </Button>
-        </div>
-      </Modal>
+          <div className="upgrade-modal__actions">
+            <Button size="large" onClick={handleClose}>{t('upgrade.later')}</Button>
+            <Button
+              ref={subscribeButtonRef}
+              type="primary"
+              size="large"
+              className="upgrade-modal__subscribe"
+              onClick={handleUpgradeClick}
+              loading={loading}
+            >
+              {recoveryState.kind === 'checkout-failed'
+                ? t('upgrade.retryCheckout')
+                : t('upgrade.subscribe')}
+            </Button>
+          </div>
+        </Modal>
+      )}
 
       {isAuthModalVisible && (
         <Suspense fallback={null}>

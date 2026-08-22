@@ -111,11 +111,33 @@ describe('UpgradeModal', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'upgrade.subscribe' }));
     expect(await screen.findByRole('dialog', { name: 'mock-auth-modal' })).toBeTruthy();
-    expect(screen.getByText('upgrade.authRequiredTitle')).toBeTruthy();
+    expect(screen.queryByRole('dialog', { name: 'upgrade.title' })).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'authenticate' }));
     await waitFor(() => expect(screen.getByText('upgrade.authCompleteTitle')).toBeTruthy());
     expect(screen.queryByRole('dialog', { name: 'mock-auth-modal' })).toBeNull();
+    expect(screen.getByRole('dialog', { name: 'upgrade.title' })).toBeTruthy();
+    await waitFor(() => expect(document.activeElement).toBe(
+      screen.getByRole('button', { name: 'upgrade.subscribe' }),
+    ));
+  });
+
+  it('restores the single upgrade task and subscription focus after cancelling authentication', async () => {
+    mocks.subscription.jwtToken = 'guest';
+    render(<UpgradeModal />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'upgrade.subscribe' }));
+    expect(await screen.findByRole('dialog', { name: 'mock-auth-modal' })).toBeTruthy();
+    expect(screen.queryByRole('dialog', { name: 'upgrade.title' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'cancel-auth' }));
+
+    expect(await screen.findByRole('dialog', { name: 'upgrade.title' })).toBeTruthy();
+    expect(screen.queryByRole('dialog', { name: 'mock-auth-modal' })).toBeNull();
+    expect(screen.getByText('upgrade.authRequiredTitle')).toBeTruthy();
+    await waitFor(() => expect(document.activeElement).toBe(
+      screen.getByRole('button', { name: 'upgrade.subscribe' }),
+    ));
   });
 
   it('keeps checkout failure visible, redacted, and retryable', async () => {
