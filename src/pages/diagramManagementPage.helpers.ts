@@ -366,29 +366,26 @@ export const loadWorkspaceItems = async (activeView: FilterViewType, cloudProvid
     if (templateView) {
         const supabase = await loadSupabaseClient();
         if (supabase) {
-            try {
-                const { data } = await supabase
-                    .from('system_templates')
-                    .select('id, title, category, tags, sort_order, thumbnail_url')
-                    .eq('is_active', true)
-                    .order('sort_order', { ascending: true })
-                    .order('created_at', { ascending: false });
+            const { data, error } = await supabase
+                .from('system_templates')
+                .select('id, title, category, tags, sort_order, thumbnail_url')
+                .eq('is_active', true)
+                .order('sort_order', { ascending: true })
+                .order('created_at', { ascending: false });
 
-                if (data) {
-                    data.forEach((template) => {
-                        const isGeneral = template.category === 'general';
-                        items.push({
-                            id: `template_${template.id}`,
-                            title: template.title,
-                            updatedAt: 0,
-                            source: isGeneral ? 'general_template' : 'template',
-                            role: 'template',
-                            raw: coerceRemoteTemplateMetadata(template)
-                        });
+            if (error) throw error;
+            if (data) {
+                data.forEach((template) => {
+                    const isGeneral = template.category === 'general';
+                    items.push({
+                        id: `template_${template.id}`,
+                        title: template.title,
+                        updatedAt: 0,
+                        source: isGeneral ? 'general_template' : 'template',
+                        role: 'template',
+                        raw: coerceRemoteTemplateMetadata(template)
                     });
-                }
-            } catch (error) {
-                safeLog.error('Templates fetch failed', redactSensitiveLogValue(error));
+                });
             }
         }
     }

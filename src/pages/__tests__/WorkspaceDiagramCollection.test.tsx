@@ -11,6 +11,7 @@ import type {
   ViewMode,
   WorkspaceInventoryScope,
 } from '../diagramManagementPage.helpers';
+import type { WorkspaceInventoryLoadFailureReason } from '../workspaceInventoryLoad';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -32,6 +33,8 @@ const renderCollection = (
   activeView: FilterViewType = 'templates',
   viewMode: ViewMode = 'grid',
   loadedInventoryScopes: ReadonlySet<WorkspaceInventoryScope> = new Set(['documents', 'templates']),
+  loadFailure: WorkspaceInventoryLoadFailureReason | null = null,
+  onRetryLoad: () => void = () => undefined,
 ): string => renderToStaticMarkup(
   <WorkspaceDiagramCollection
     activeView={activeView}
@@ -44,6 +47,8 @@ const renderCollection = (
     viewMode={viewMode}
     onViewModeChange={() => undefined}
     loading={false}
+    loadFailure={loadFailure}
+    onRetryLoad={onRetryLoad}
     openingDiagramKeys={new Set()}
     onOpenDiagram={() => undefined}
     onOpenDiagramInNewTab={() => undefined}
@@ -70,6 +75,8 @@ const renderOpeningCollection = (
     viewMode={viewMode}
     onViewModeChange={() => undefined}
     loading={false}
+    loadFailure={null}
+    onRetryLoad={() => undefined}
     openingDiagramKeys={new Set([`${item.source}:${item.id}`])}
     onOpenDiagram={() => undefined}
     onOpenDiagramInNewTab={() => undefined}
@@ -81,7 +88,67 @@ const renderOpeningCollection = (
   />,
 );
 
+const renderLoadingCollection = (): string => renderToStaticMarkup(
+  <WorkspaceDiagramCollection
+    activeView="templates"
+    onActiveViewChange={() => undefined}
+    unifiedItems={[]}
+    loadedInventoryScopes={new Set(['documents'])}
+    filteredItems={[]}
+    sortKey="updated"
+    onSortKeyChange={() => undefined}
+    viewMode="grid"
+    onViewModeChange={() => undefined}
+    loading
+    loadFailure={null}
+    onRetryLoad={() => undefined}
+    openingDiagramKeys={new Set()}
+    onOpenDiagram={() => undefined}
+    onOpenDiagramInNewTab={() => undefined}
+    onContextMenu={() => undefined}
+    onDeleteDiagram={() => undefined}
+    onCreateBlank={() => undefined}
+    searchQuery=""
+    onClearSearch={() => undefined}
+  />,
+);
+
 describe('WorkspaceDiagramCollection', () => {
+  it('announces the loading state instead of exposing an unexplained blank region', () => {
+    const html = renderLoadingCollection();
+
+    expect(html).toContain('role="status"');
+    expect(html).toContain('aria-label="workspace.loadingData"');
+    expect(html).toContain('skeleton-card');
+  });
+
+  it('replaces an unbounded loading state with a recoverable timeout result', () => {
+    const retry = vi.fn();
+    const html = renderCollection(
+      {
+        id: 'template-placeholder',
+        title: 'Template placeholder',
+        updatedAt: 0,
+        source: 'template',
+        role: 'template',
+        raw: {} as never,
+      },
+      [],
+      '',
+      'templates',
+      'grid',
+      new Set(['documents']),
+      'timeout',
+      retry,
+    );
+
+    expect(html).toContain('role="alert"');
+    expect(html).toContain('workspace.empty.loadErrorTitle');
+    expect(html).toContain('workspace.empty.loadTimeoutDescription');
+    expect(html).toContain('workspace.retryLoad');
+    expect(html).not.toContain('skeleton-card');
+  });
+
   it('omits counts for inventory scopes that have not been loaded', () => {
     const item: UnifiedDiagramItem = {
       id: 'local-known',
@@ -126,6 +193,8 @@ describe('WorkspaceDiagramCollection', () => {
         viewMode="list"
         onViewModeChange={() => undefined}
         loading={false}
+        loadFailure={null}
+        onRetryLoad={() => undefined}
         openingDiagramKeys={new Set()}
         onOpenDiagram={() => undefined}
         onOpenDiagramInNewTab={() => undefined}
@@ -153,6 +222,8 @@ describe('WorkspaceDiagramCollection', () => {
         viewMode="grid"
         onViewModeChange={() => undefined}
         loading={false}
+        loadFailure={null}
+        onRetryLoad={() => undefined}
         isCreatingDiagram
         openingDiagramKeys={new Set()}
         onOpenDiagram={() => undefined}

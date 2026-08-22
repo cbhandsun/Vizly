@@ -39,6 +39,7 @@ import {
 import { DiagramCardSkeleton } from './DiagramCardSkeleton';
 import { WorkspaceCardActionsMenu } from './WorkspaceCardActionsMenu';
 import { WorkspaceEmptyState } from './WorkspaceEmptyState';
+import type { WorkspaceInventoryLoadFailureReason } from './workspaceInventoryLoad';
 import { resolveNextWorkspaceFilterView } from './workspaceFilterRoute';
 import { focusWorkspaceTarget } from './workspaceMenuInteraction';
 import { getWorkspaceDiagramOpenKey } from './workspaceDiagramOpenState';
@@ -71,6 +72,8 @@ interface WorkspaceDiagramCollectionProps {
   viewMode: ViewMode;
   onViewModeChange: (viewMode: ViewMode) => void;
   loading: boolean;
+  loadFailure: WorkspaceInventoryLoadFailureReason | null;
+  onRetryLoad: () => void;
   isCreatingDiagram?: boolean;
   openingDiagramKeys: ReadonlySet<string>;
   onOpenDiagram: (item: UnifiedDiagramItem) => void | Promise<void>;
@@ -98,6 +101,8 @@ export const WorkspaceDiagramCollection = ({
   viewMode,
   onViewModeChange,
   loading,
+  loadFailure,
+  onRetryLoad,
   isCreatingDiagram = false,
   openingDiagramKeys,
   onOpenDiagram,
@@ -338,9 +343,19 @@ export const WorkspaceDiagramCollection = ({
 
                     {/* Grid */}
                     {loading ? (
-                        <div className="diagram-grid">
+                        <div
+                            className="diagram-grid"
+                            role="status"
+                            aria-label={t('workspace.loadingData')}
+                        >
                             {Array(8).fill(0).map((_, i) => <DiagramCardSkeleton key={i} />)}
                         </div>
+                    ) : loadFailure ? (
+                        <WorkspaceEmptyState
+                            mode="error"
+                            reason={loadFailure}
+                            onRetry={onRetryLoad}
+                        />
                     ) : filteredItems.length === 0 ? (
                         searchQuery ? (
                             <WorkspaceEmptyState

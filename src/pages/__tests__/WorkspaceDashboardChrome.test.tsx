@@ -10,9 +10,12 @@ vi.mock('react-i18next', () => ({
         'workspace.documentCount': `${options?.count ?? 0} documents`,
         'workspace.empty.description': 'Create a diagram to get started.',
         'workspace.empty.title': 'No diagrams yet',
+        'workspace.empty.loadErrorTitle': 'Workspace data could not be loaded',
+        'workspace.empty.loadTimeoutDescription': 'Loading took longer than expected.',
         'workspace.goHome': 'Go to workspace',
         'workspace.newDiagram': 'New diagram',
         'workspace.newFlowchart': 'New flowchart',
+        'workspace.retryLoad': 'Try again',
         'workspace.diagramTypes.architecture': 'Architecture',
         'workspace.diagramTypes.mindmap': 'Mind map',
         'workspace.diagramTypes.timeline': 'Timeline',
@@ -117,5 +120,17 @@ describe('WorkspaceDashboardChrome', () => {
     expect(html).toContain('Clear search');
     expect(html).toContain('&lt;img src=x&gt;');
     expect(html).not.toContain('New diagram');
+  });
+
+  it('renders a visible and actionable loading failure', () => {
+    const retry = vi.fn();
+    const html = renderToStaticMarkup(
+      <WorkspaceEmptyState mode="error" reason="timeout" onRetry={retry} />,
+    );
+
+    expect(html).toContain('role="alert"');
+    expect(html).toContain('Workspace data could not be loaded');
+    expect(html).toContain('Loading took longer than expected.');
+    expect(html).toContain('Try again');
   });
 });

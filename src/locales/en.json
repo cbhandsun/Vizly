@@ -74,6 +74,8 @@
         "searchPlaceholder": "Find your diagrams...",
         "clearSearch": "Clear search",
         "viewRecent": "View recent diagrams",
+        "retryLoad": "Try again",
+        "loadingData": "Loading workspace data",
         "searchResultsStatus": "{{count}} matching diagrams",
         "searchNoResultsStatus": "No diagrams match {{query}}",
         "toggleTheme": "Toggle theme",
@@ -99,7 +101,10 @@
             "searchTitle": "No matching diagrams",
             "searchDescription": "No diagrams match “{{query}}”. Clear search to see all diagrams.",
             "filterTitle": "No diagrams in {{view}}",
-            "filterDescription": "The {{view}} view is empty. View recent diagrams to continue."
+            "filterDescription": "The {{view}} view is empty. View recent diagrams to continue.",
+            "loadErrorTitle": "Workspace data could not be loaded",
+            "loadTimeoutDescription": "Loading took longer than expected. Check your connection, then try again.",
+            "loadErrorDescription": "Vizly could not load this view. Try again without leaving your current workspace."
         }
     },
     "templates": {

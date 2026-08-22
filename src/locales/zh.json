@@ -73,6 +73,8 @@
         "searchPlaceholder": "搜索你的图表...",
         "clearSearch": "清除搜索",
         "viewRecent": "查看最近图表",
+        "retryLoad": "重试",
+        "loadingData": "正在加载工作区数据",
         "searchResultsStatus": "找到 {{count}} 个匹配图表",
         "searchNoResultsStatus": "没有匹配“{{query}}”的图表",
         "toggleTheme": "切换主题",
@@ -98,7 +100,10 @@
             "searchTitle": "未找到匹配图表",
             "searchDescription": "没有图表匹配“{{query}}”。清除搜索可查看全部图表。",
             "filterTitle": "“{{view}}”中暂无图表",
-            "filterDescription": "“{{view}}”筛选下暂无图表。查看最近图表可继续工作。"
+            "filterDescription": "“{{view}}”筛选下暂无图表。查看最近图表可继续工作。",
+            "loadErrorTitle": "工作区数据加载失败",
+            "loadTimeoutDescription": "加载时间超过预期。请检查网络连接后重试。",
+            "loadErrorDescription": "Vizly 暂时无法加载当前视图。你可以直接重试，无需离开工作区。"
         }
     },
     "templates": {

@@ -58,6 +58,10 @@ import {
     resolveWorkspaceFilterView,
 } from './workspaceFilterRoute';
 import { createUniqueWorkspaceDiagramTitle } from './workspaceDiagramNaming';
+import {
+    loadWorkspaceInventoryWithDeadline,
+    type WorkspaceInventoryLoadFailureReason,
+} from './workspaceInventoryLoad';
 
 const AuthModal = React.lazy(() => import('@/components/auth/AuthModal').then(module => ({
     default: module.AuthModal,
@@ -77,6 +81,7 @@ const WorkspaceDashboardPage: React.FC = () => {
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
     const [isAuthModalMounted, setIsAuthModalMounted] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [loadFailure, setLoadFailure] = useState<WorkspaceInventoryLoadFailureReason | null>(null);
     const { searchTerm, searchQuery, searchInputRef, updateSearchTerm, clearSearch } = useWorkspaceSearch();
     const [displayPreferences, setDisplayPreferences] = useState<WorkspaceDisplayPreferences>(
         readWorkspaceDisplayPreferences,
@@ -106,6 +111,7 @@ const WorkspaceDashboardPage: React.FC = () => {
     const settingsTriggerRef = useRef<HTMLButtonElement>(null);
     const authReturnFocusTargetRef = useRef<HTMLElement | null>(null);
     const openingDiagramKeysRef = useRef(new Set<string>());
+    const inventoryRequestIdRef = useRef(0);
     const diagramCreateLockRef = useRef({ active: false });
     const deleteDialogLockRef = useRef({ active: false });
 
@@ -201,22 +207,29 @@ const WorkspaceDashboardPage: React.FC = () => {
     }, [navigate]);
 
     const loadAllData = useCallback(async () => {
+        const requestId = ++inventoryRequestIdRef.current;
         const inventoryScope = getWorkspaceInventoryScope(activeView);
         setLoading(true);
-        try {
-            const nextItems = await loadWorkspaceItems(activeView, cloudProvider, user);
+        setLoadFailure(null);
+        const result = await loadWorkspaceInventoryWithDeadline(
+            () => loadWorkspaceItems(activeView, cloudProvider, user),
+        );
+        if (requestId !== inventoryRequestIdRef.current) return;
+
+        if (result.kind === 'success') {
             setUnifiedItems(currentItems => mergeWorkspaceItemsByScope(
                 currentItems,
-                nextItems,
+                result.value,
                 inventoryScope,
             ));
             setLoadedInventoryScopes(currentScopes => new Set(currentScopes).add(inventoryScope));
-        } catch (error) {
-            safeLog.error('Failed to load dashboard data', redactSensitiveLogValue(error));
-            appMessage.error("Failed to load workspace data");
-        } finally {
-            setLoading(false);
+        } else {
+            setLoadFailure(result.reason);
+            if (result.reason === 'failed') {
+                safeLog.error('Failed to load dashboard data', redactSensitiveLogValue(result.error));
+            }
         }
+        setLoading(false);
     }, [activeView, cloudProvider, user]);
 
     useEffect(() => {
@@ -224,7 +237,10 @@ const WorkspaceDashboardPage: React.FC = () => {
         queueMicrotask(() => {
             if (!cancelled) void loadAllData();
         });
-        return () => { cancelled = true; };
+        return () => {
+            cancelled = true;
+            inventoryRequestIdRef.current += 1;
+        };
     }, [loadAllData]);
 
     // --- Actions ---
@@ -415,6 +431,8 @@ const WorkspaceDashboardPage: React.FC = () => {
                     viewMode={viewMode}
                     onViewModeChange={handleViewModeChange}
                     loading={loading}
+                    loadFailure={loadFailure}
+                    onRetryLoad={loadAllData}
                     isCreatingDiagram={isCreatingDiagram}
                     openingDiagramKeys={openingDiagramKeys}
                     onOpenDiagram={handleOpenDiagram}

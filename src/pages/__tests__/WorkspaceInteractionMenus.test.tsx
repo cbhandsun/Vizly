@@ -125,6 +125,8 @@ const WorkspaceControlsHarness = () => {
       viewMode={viewMode}
       onViewModeChange={setViewMode}
       loading={false}
+      loadFailure={null}
+      onRetryLoad={() => undefined}
       openingDiagramKeys={new Set()}
       onOpenDiagram={vi.fn()}
       onOpenDiagramInNewTab={vi.fn()}
@@ -155,6 +157,8 @@ const WorkspaceCardMenuHarness = ({
     viewMode={viewMode}
     onViewModeChange={vi.fn()}
     loading={false}
+    loadFailure={null}
+    onRetryLoad={() => undefined}
     openingDiagramKeys={new Set()}
     onOpenDiagram={vi.fn()}
     onOpenDiagramInNewTab={vi.fn()}

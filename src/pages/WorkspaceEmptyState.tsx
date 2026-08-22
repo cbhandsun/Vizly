@@ -1,22 +1,30 @@
-import { FilterX, LoaderCircle, Plus, SearchX } from 'lucide-react';
+import { CircleAlert, FilterX, LoaderCircle, Plus, SearchX } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import type { WorkspaceInventoryLoadFailureReason } from './workspaceInventoryLoad';
 
 type WorkspaceEmptyStateProps =
   | { mode?: 'empty'; isCreating?: boolean; onCreate: () => void }
   | { mode: 'search'; query: string; onClearSearch: () => void }
-  | { mode: 'filter'; viewLabel: string; onClearFilter: () => void };
+  | { mode: 'filter'; viewLabel: string; onClearFilter: () => void }
+  | { mode: 'error'; reason: WorkspaceInventoryLoadFailureReason; onRetry: () => void };
 
 export const WorkspaceEmptyState = (props: WorkspaceEmptyStateProps) => {
   const { t } = useTranslation();
   const isSearch = props.mode === 'search';
   const isFilter = props.mode === 'filter';
-  const isRecoverable = isSearch || isFilter;
+  const isError = props.mode === 'error';
+  const isRecoverable = isSearch || isFilter || isError;
 
   return (
-  <div className={`workspace-empty-state${isRecoverable ? ' is-recoverable-result' : ''}`}>
+  <div
+    className={`workspace-empty-state${isRecoverable ? ' is-recoverable-result' : ''}`}
+    role={isError ? 'alert' : undefined}
+  >
     <div className="workspace-empty-art" aria-hidden="true">
       {isSearch
         ? <SearchX size={28} strokeWidth={1.8} />
+        : isError
+          ? <CircleAlert size={28} strokeWidth={1.8} />
         : isFilter
           ? <FilterX size={28} strokeWidth={1.8} />
           : <Plus size={28} strokeWidth={1.8} />}
@@ -24,6 +32,8 @@ export const WorkspaceEmptyState = (props: WorkspaceEmptyStateProps) => {
     <h2 className="workspace-empty-title">
       {isSearch
         ? t('workspace.empty.searchTitle')
+        : isError
+          ? t('workspace.empty.loadErrorTitle')
         : isFilter
           ? t('workspace.empty.filterTitle', { view: props.viewLabel })
           : t('workspace.empty.title')}
@@ -31,6 +41,10 @@ export const WorkspaceEmptyState = (props: WorkspaceEmptyStateProps) => {
     <p className="workspace-empty-desc">
       {isSearch
         ? t('workspace.empty.searchDescription', { query: props.query })
+        : isError
+          ? t(props.reason === 'timeout'
+            ? 'workspace.empty.loadTimeoutDescription'
+            : 'workspace.empty.loadErrorDescription')
         : isFilter
           ? t('workspace.empty.filterDescription', { view: props.viewLabel })
           : t('workspace.empty.description')}
@@ -38,6 +52,10 @@ export const WorkspaceEmptyState = (props: WorkspaceEmptyStateProps) => {
     {isSearch ? (
       <button type="button" className="workspace-search-reset-cta" onClick={props.onClearSearch}>
         {t('workspace.clearSearch')}
+      </button>
+    ) : isError ? (
+      <button type="button" className="workspace-search-reset-cta" onClick={props.onRetry}>
+        {t('workspace.retryLoad')}
       </button>
     ) : isFilter ? (
       <button type="button" className="workspace-search-reset-cta" onClick={props.onClearFilter}>
