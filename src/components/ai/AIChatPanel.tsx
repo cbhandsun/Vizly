@@ -184,7 +184,7 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
         const newConfig = { ...aiConfig, activeModelKey: val };
         setAiConfig(newConfig);
         persistAIConfig(user?.id, newConfig);
-        appMessage.success(t('aiChat.autoSwitched', { name: availableModels.find(m => m.value === val)?.label || val }));
+        appMessage.success(t('aiChat.modelSwitched', { name: availableModels.find(m => m.value === val)?.label || val }));
     };
 
     const messagesEndRef = useRef<HTMLDivElement>(null);

@@ -25,6 +25,7 @@ import {
     buildAIChatConversationUpdate,
     createAIChatPendingMessageState,
 } from './aiChatConversationState';
+import { persistAIChatAssistantSnapshot } from './aiChatConversationPersistence';
 import {
     resolveAIChatActiveModelSelection,
     validateAIChatRequestSelection,
@@ -197,31 +198,23 @@ export function useAIChatRequestLifecycle({
 
             await processCommands(accumulatedContent);
             if (activeId) {
-                const conversation = aiConversationService.getConversations().find(item => item.id === activeId);
-                if (conversation) {
-                    aiConversationService.updateConversation(activeId, buildAIChatConversationUpdate(
-                        conversation,
-                        assistantMessageId,
-                        { content: accumulatedContent, reasoningContent: accumulatedReasoning },
-                    ));
-                }
-                setConversations(aiConversationService.getConversations());
+                setConversations(persistAIChatAssistantSnapshot(
+                    aiConversationService,
+                    activeId,
+                    assistantMessageId,
+                    { content: accumulatedContent, reasoningContent: accumulatedReasoning },
+                ));
             }
         } catch (error) {
             if (isAbortError(error)) {
                 if (activeId) {
-                    const current = [...aiConversationService.getConversations()];
-                    const index = current.findIndex(conversation => conversation.id === activeId);
-                    if (index !== -1) {
-                        current[index].messages = buildAIChatConversationUpdate(
-                            current[index],
-                            assistantMessageId,
-                            { content: accumulatedContent, reasoningContent: accumulatedReasoning },
-                            { fallbackContent: '已停止生成' },
-                        ).messages || current[index].messages;
-                        aiConversationService.updateConversation(activeId, { messages: current[index].messages });
-                        setConversations(current);
-                    }
+                    setConversations(persistAIChatAssistantSnapshot(
+                        aiConversationService,
+                        activeId,
+                        assistantMessageId,
+                        { content: accumulatedContent, reasoningContent: accumulatedReasoning },
+                        { fallbackContent: '已停止生成' },
+                    ));
                 }
                 return;
             }
@@ -229,17 +222,13 @@ export function useAIChatRequestLifecycle({
             const safeError = formatAIProviderRequestError(error);
             appMessage.error(t('aiChat.requestFailed', { error: safeError }));
             if (activeId) {
-                const current = [...aiConversationService.getConversations()];
-                const index = current.findIndex(conversation => conversation.id === activeId);
-                if (index !== -1) {
-                    current[index].messages = buildAIChatConversationUpdate(
-                        current[index],
-                        assistantMessageId,
-                        { content: '', reasoningContent: '' },
-                        { fallbackContent: t('aiChat.requestError', { error: safeError }) },
-                    ).messages || current[index].messages;
-                    setConversations(current);
-                }
+                setConversations(persistAIChatAssistantSnapshot(
+                    aiConversationService,
+                    activeId,
+                    assistantMessageId,
+                    { content: '', reasoningContent: '' },
+                    { fallbackContent: t('aiChat.requestError', { error: safeError }) },
+                ));
             }
         } finally {
             if (activeRequestControllerRef.current === requestController) {

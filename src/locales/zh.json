@@ -1764,6 +1764,7 @@
         "requestFailed": "请求失败: {{error}}",
         "requestError": "❌ 请求出错: {{error}}",
         "autoSwitched": "已自动切换到: {{name}}",
+        "modelSwitched": "已切换到: {{name}}",
         "configStatusTitle": "AI 连接尚未就绪",
         "configureNow": "立即配置",
         "configReason": {

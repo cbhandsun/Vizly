@@ -1568,6 +1568,7 @@
         "requestFailed": "Request failed: {{error}}",
         "requestError": "❌ Request error: {{error}}",
         "autoSwitched": "Auto-switched to: {{name}}",
+        "modelSwitched": "Switched to: {{name}}",
         "configStatusTitle": "AI connection is not ready",
         "configureNow": "Configure now",
         "configReason": {

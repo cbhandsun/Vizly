@@ -33,6 +33,14 @@ describe('AIChatViewLayout accessibility contract', () => {
         expect(css).toMatch(/\.ai-chat-configuration-status[\s\S]*?min-height: var\(--commercial-touch-target, 44px\)/);
     });
 
+    it('distinguishes a deliberate model change from an automatic fallback', () => {
+        const source = readFileSync('src/components/ai/AIChatPanel.tsx', 'utf8');
+        const lifecycleSource = readFileSync('src/components/ai/useAIChatRequestLifecycle.ts', 'utf8');
+
+        expect(source).toContain("t('aiChat.modelSwitched'");
+        expect(lifecycleSource).toContain("t('aiChat.autoSwitched'");
+    });
+
     it('uses keyboard-native history actions and exposes them on touch devices', () => {
         const source = readFileSync('src/components/ai/AIChatViewLayout.tsx', 'utf8');
         const css = readAIChatStyles();
