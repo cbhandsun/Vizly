@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import i18n from '@/i18n';
 
 import type { PluginContext } from '../../../types/plugin';
 import {
@@ -9,8 +10,14 @@ import {
 } from '../mindElixirPersistence';
 
 const storage = new Map<string, string>();
+let originalLanguage: string;
 
-beforeEach(() => {
+beforeAll(() => {
+  originalLanguage = i18n.resolvedLanguage || i18n.language || 'en';
+});
+
+beforeEach(async () => {
+  await i18n.changeLanguage('en');
   storage.clear();
   vi.stubGlobal('localStorage', {
     getItem: (key: string) => storage.get(key) ?? null,
@@ -20,6 +27,10 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+afterAll(async () => {
+  await i18n.changeLanguage(originalLanguage);
 });
 
 const context = (
