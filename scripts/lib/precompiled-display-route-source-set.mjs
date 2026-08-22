@@ -53,7 +53,10 @@ export const hashPrecompiledDisplayRoutingSourceEntries = entries => {
     ) {
       throw new TypeError('Precompiled routing source entry is malformed');
     }
-    return { path: entry.path.replaceAll('\\', '/'), source: entry.source };
+    return {
+      path: entry.path.replaceAll('\\', '/'),
+      source: entry.source.replace(/\r\n?/g, '\n'),
+    };
   }).sort((first, second) => first.path.localeCompare(second.path));
   if (new Set(normalized.map(entry => entry.path)).size !== normalized.length) {
     throw new TypeError('Precompiled routing source entries contain duplicate paths');

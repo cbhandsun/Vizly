@@ -24,6 +24,23 @@ describe('precompiled display routing source set', () => {
     ])).not.toBe(baseline);
   });
 
+  it('is stable across LF, CRLF, and legacy CR checkouts', () => {
+    const entries = [{
+      path: 'src/core/routing/a.ts',
+      source: 'export const a = 1;\nexport const b = 2;\n',
+    }];
+    const baseline = hashPrecompiledDisplayRoutingSourceEntries(entries);
+
+    expect(hashPrecompiledDisplayRoutingSourceEntries(entries.map(entry => ({
+      ...entry,
+      source: entry.source.replace(/\n/g, '\r\n'),
+    })))).toBe(baseline);
+    expect(hashPrecompiledDisplayRoutingSourceEntries(entries.map(entry => ({
+      ...entry,
+      source: entry.source.replace(/\n/g, '\r'),
+    })))).toBe(baseline);
+  });
+
   it('rejects empty, duplicate, and unsafe entries', () => {
     expect(() => hashPrecompiledDisplayRoutingSourceEntries([])).toThrow(TypeError);
     expect(() => hashPrecompiledDisplayRoutingSourceEntries([
