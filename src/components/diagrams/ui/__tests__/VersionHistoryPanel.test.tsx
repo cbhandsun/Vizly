@@ -249,6 +249,18 @@ describe('VersionHistoryPanel commercial preview safeguards', () => {
         fireEvent.click(screen.getByLabelText('Restore version: Release candidate'));
 
         expect(await screen.findByText('The current canvas will be backed up first. If the backup fails, restore will be cancelled. Restore this version?')).toBeTruthy();
+        const confirmation = document.querySelector<HTMLElement>('.ant-popover');
+        expect(confirmation?.className).toContain('ant-popover-placement-bottomRight');
+        expect(confirmation?.parentElement).toBe(document.body);
+        expect(confirmation?.style.maxWidth).toBe('min(360px, calc(100vw - 32px))');
+        expect(confirmation?.style.zIndex).toBe('2210');
+    });
+
+    it('uses a wider desktop drawer while retaining the viewport mobile cap', () => {
+        const css = readFileSync(resolve('src/components/diagrams/ui/VersionHistoryPanel.css'), 'utf8');
+
+        expect(css).toMatch(/width:\s*min\(480px,\s*calc\(100vw - 16px\)\)\s*!important/);
+        expect(css).toMatch(/max-width:\s*calc\(100vw - 16px\)/);
     });
 
     it('distinguishes a load failure from an empty history and offers an inline retry', () => {

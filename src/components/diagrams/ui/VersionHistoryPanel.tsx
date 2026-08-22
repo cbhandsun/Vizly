@@ -9,6 +9,10 @@ import {
     normalizeVersionMessage,
     VERSION_MESSAGE_MAX_LENGTH,
 } from './versionHistoryInput';
+import {
+    COMMERCIAL_VIEWPORT_MODAL_Z_INDEX,
+    getViewportPopupContainer,
+} from '@/core/components/ui/viewportOverlayPortal';
 import './VersionHistoryPanel.css';
 
 const { Text, Title } = Typography;
@@ -331,6 +335,11 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
                                     onConfirm={() => void handleRestore(item.id)}
                                     okText={t('designer.versionHistoryPanel.restore')}
                                     cancelText={t('designer.versionHistoryPanel.cancel')}
+                                    placement="bottomRight"
+                                    autoAdjustOverflow
+                                    styles={{ root: { maxWidth: 'min(360px, calc(100vw - 32px))' } }}
+                                    zIndex={COMMERCIAL_VIEWPORT_MODAL_Z_INDEX + 10}
+                                    getPopupContainer={getViewportPopupContainer}
                                 >
                                     <Tooltip title={t('designer.versionHistoryPanel.restoreTooltip')}>
                                         <Button
