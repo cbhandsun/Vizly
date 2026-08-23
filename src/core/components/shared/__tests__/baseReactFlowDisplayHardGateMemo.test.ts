@@ -8,6 +8,7 @@ import {
 } from '../baseReactFlowDisplayDiagnostics';
 import type { BaseDisplayBoundedCandidateReport } from '../baseReactFlowDisplayEvaluation';
 import type { DisplayTerminalValidationSnapshot } from '../baseReactFlowTerminalAxisRepair';
+import { createDisplayTerminalValidationSnapshot } from '../baseReactFlowTerminalValidation';
 
 const quality = {
   nonOrthogonalSegments: 0,
@@ -67,6 +68,12 @@ describe('baseReactFlowDisplayHardGateMemo', () => {
     const polished = memo.getReport(equivalentEdges, nodes, 'polished');
 
     expect(evaluate).toHaveBeenCalledTimes(1);
+    expect(memo.readMetrics()).toEqual({
+      evaluationCount: 1,
+      cacheHitCount: 1,
+      scannedNodeCount: 0,
+      scannedEdgePairCount: 0,
+    });
     expect(terminalLane.candidate).toBe('terminal-lane');
     expect(polished).toEqual({ ...terminalLane, candidate: 'polished' });
   });
@@ -79,6 +86,12 @@ describe('baseReactFlowDisplayHardGateMemo', () => {
     memo.getReport([routedEdge(120)], nodes, 'polished');
 
     expect(evaluate).toHaveBeenCalledTimes(2);
+    expect(memo.readMetrics()).toEqual({
+      evaluationCount: 2,
+      cacheHitCount: 0,
+      scannedNodeCount: 0,
+      scannedEdgePairCount: 0,
+    });
   });
 
   it('does not cache unsupported empty routes', () => {
@@ -89,6 +102,71 @@ describe('baseReactFlowDisplayHardGateMemo', () => {
     memo.getReport([], nodes, 'polished');
 
     expect(evaluate).toHaveBeenCalledTimes(2);
+    expect(memo.readMetrics()).toEqual({
+      evaluationCount: 2,
+      cacheHitCount: 0,
+      scannedNodeCount: 0,
+      scannedEdgePairCount: 0,
+    });
+  });
+
+  it('accepts Worker-private signed evidence without repeating its evaluation', () => {
+    const evaluate = createEvaluator();
+    const memo = createBaseDisplayHardGateMemo(nodes, terminalSnapshot, evaluate);
+    const route = [routedEdge()];
+    const report: BaseDisplayBoundedCandidateReport = {
+      candidate: 'polished',
+      hardClean: true,
+      obstacleHits: 0,
+      terminalsAttached: true,
+      terminalsAnchored: true,
+      quality,
+    };
+
+    expect(memo.rememberReport(route, report)).toBe(true);
+    expect(memo.getReport([routedEdge()], nodes, 'polished')).toBe(report);
+    expect(evaluate).not.toHaveBeenCalled();
+    expect(memo.readMetrics()).toEqual({
+      evaluationCount: 0,
+      cacheHitCount: 1,
+      scannedNodeCount: 0,
+      scannedEdgePairCount: 0,
+    });
+
+    memo.getReport([routedEdge(120)], nodes, 'polished');
+    expect(evaluate).toHaveBeenCalledTimes(1);
+    expect(memo.rememberReport([], report)).toBe(false);
+  });
+
+  it('reports actual scans while a route cache hit adds no scan work', () => {
+    const routingNodes: Node[] = [
+      { id: 'source', position: { x: 0, y: 0 }, width: 40, height: 40, data: {} },
+      { id: 'target-a', position: { x: 240, y: 0 }, width: 40, height: 40, data: {} },
+      { id: 'target-b', position: { x: 240, y: 200 }, width: 40, height: 40, data: {} },
+      { id: 'blocker', position: { x: 100, y: 100 }, width: 40, height: 40, data: {} },
+    ];
+    const routedEdges: Edge[] = [{
+      id: 'scan-a', source: 'source', target: 'target-a',
+      data: { computedPath: [{ x: 40, y: 20 }, { x: 240, y: 20 }] },
+    }, {
+      id: 'scan-b', source: 'source', target: 'target-b',
+      data: { computedPath: [{ x: 20, y: 40 }, { x: 20, y: 220 }, { x: 240, y: 220 }] },
+    }];
+    const memo = createBaseDisplayHardGateMemo(
+      routingNodes,
+      createDisplayTerminalValidationSnapshot(routingNodes),
+    );
+    memo.getReport(routedEdges, routingNodes, 'polished');
+    const evaluated = memo.readMetrics();
+    expect(evaluated).toMatchObject({
+      evaluationCount: 1,
+      cacheHitCount: 0,
+      scannedEdgePairCount: 1,
+    });
+    expect(evaluated.scannedNodeCount).toBeGreaterThan(0);
+
+    memo.getReport(routedEdges.map(edge => ({ ...edge })), routingNodes, 'polished');
+    expect(memo.readMetrics()).toEqual({ ...evaluated, cacheHitCount: 1 });
   });
 });
 

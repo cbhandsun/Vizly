@@ -178,6 +178,7 @@ const buildDisplayBoundaryTerminalBreakoutCandidates = (
   edges: Edge[],
   segment: DisplaySegment,
   nodes: Node[],
+  maxCandidates = Number.POSITIVE_INFINITY,
 ): DisplayPoint[][] => {
   const edge = edges[segment.edgeIndex];
   const path = getDisplayComputedPath(edge);
@@ -266,6 +267,7 @@ const buildDisplayBoundaryTerminalBreakoutCandidates = (
       ]);
       const candidate = sourceTerminal ? orientedCandidate : orientedCandidate.toReversed();
       if (candidate.length >= 2 && candidate.every(isFinitePoint)) candidates.push(candidate);
+      if (candidates.length >= maxCandidates) return candidates;
     }
   }
   return candidates;
@@ -281,6 +283,7 @@ const buildDisplayAlternateTerminalSideCandidates = (
   segment: DisplaySegment,
   other: DisplaySegment,
   nodes: Node[],
+  maxCandidates = Number.POSITIVE_INFINITY,
 ): DisplayAlternateTerminalSideCandidate[] => {
   const edge = edges[segment.edgeIndex];
   const path = getDisplayComputedPath(edge);
@@ -379,6 +382,7 @@ const buildDisplayAlternateTerminalSideCandidates = (
   const candidates: DisplayAlternateTerminalSideCandidate[] = [];
 
   for (const side of candidateSides) {
+    if (candidates.length >= maxCandidates) break;
     if (side[0] === currentSide || !displayTerminalSideCanSwitch(edge, role, side)) continue;
     const sideCandidates: DisplayAlternateTerminalSideCandidate[] = [];
     const sideCandidateSignatures = new Set<string>();
@@ -415,6 +419,7 @@ const buildDisplayAlternateTerminalSideCandidates = (
       )),
     ];
 
+    sideCandidateSearch:
     for (const safeCoordinate of safeCoordinates) {
       if (segment.axis === 'v') {
         if (side === 'top' && safeCoordinate >= rect.y) continue;
@@ -453,12 +458,16 @@ const buildDisplayAlternateTerminalSideCandidates = (
             if (!sideCandidateSignatures.has(signature)) {
               sideCandidateSignatures.add(signature);
               sideCandidates.push({ path: candidatePath, side });
+              if (
+                sideCandidates.length >= 12
+                || candidates.length + sideCandidates.length >= maxCandidates
+              ) break sideCandidateSearch;
             }
           }
         }
       }
     }
-    candidates.push(...sideCandidates.slice(0, 12));
+    candidates.push(...sideCandidates);
   }
   return candidates;
 };
@@ -515,6 +524,7 @@ export const repairExactThresholdResidualOverlaps = <T extends Edge[]>(
   let qualityEvaluations = 0;
 
   for (const pair of exactPairs) {
+    if (qualityEvaluations >= maxQualityEvaluations) return bestEdges;
     const segmentsByTerminalRisk = [pair.first, pair.second].toSorted((first, second) => {
       const firstPathLength = getDisplayComputedPath(bestEdges[first.edgeIndex]).length;
       const secondPathLength = getDisplayComputedPath(bestEdges[second.edgeIndex]).length;
@@ -525,6 +535,11 @@ export const repairExactThresholdResidualOverlaps = <T extends Edge[]>(
       return Number(firstTouchesTerminal) - Number(secondTouchesTerminal);
     });
     for (const segment of segmentsByTerminalRisk) {
+      const candidateLimit = Math.min(
+        64,
+        Math.max(0, maxQualityEvaluations - qualityEvaluations),
+      );
+      if (candidateLimit === 0) return bestEdges;
       const other = segment === pair.second ? pair.first : pair.second;
       const path = getDisplayComputedPath(bestEdges[segment.edgeIndex]);
       const otherPath = getDisplayComputedPath(bestEdges[other.edgeIndex]);
@@ -548,13 +563,20 @@ export const repairExactThresholdResidualOverlaps = <T extends Edge[]>(
       ], currentLane);
 
       const candidateEdges: T[] = [];
-      candidateEdges.push(
-        ...buildDisplayAlternateTerminalSideCandidates(
+      const appendCandidate = (candidate: T): boolean => {
+        if (candidateEdges.length >= candidateLimit) return true;
+        candidateEdges.push(candidate);
+        return candidateEdges.length >= candidateLimit;
+      };
+      const alternateTerminalCandidates = buildDisplayAlternateTerminalSideCandidates(
           bestEdges,
           segment,
           other,
           nodes,
-        ).slice(0, 36).map(candidate => bestEdges.map((edge, edgeIndex) => {
+          Math.min(36, candidateLimit),
+        );
+      for (const candidate of alternateTerminalCandidates) {
+        if (appendCandidate(bestEdges.map((edge, edgeIndex) => {
           if (edgeIndex !== segment.edgeIndex) return edge;
           const withPath = withDisplayComputedPath(edge, candidate.path);
           return segment.segmentIndex === path.length - 2
@@ -566,30 +588,38 @@ export const repairExactThresholdResidualOverlaps = <T extends Edge[]>(
                 ...withPath,
                 sourceHandle: resolveDisplayTerminalHandleForSide(edge, 'source', candidate.side),
               };
-        }) as T),
-      );
-      candidateEdges.push(
-        ...buildDisplayBoundaryTerminalBreakoutCandidates(
+        }) as T)) break;
+      }
+      const boundaryCandidateSlots = candidateLimit - candidateEdges.length;
+      if (boundaryCandidateSlots > 0) {
+        for (const candidatePath of buildDisplayBoundaryTerminalBreakoutCandidates(
           bestEdges,
           segment,
           nodes,
-        ).map(candidatePath => bestEdges.map((edge, edgeIndex) => (
-          edgeIndex === segment.edgeIndex ? withDisplayComputedPath(edge, candidatePath) : edge
-        )) as T),
-      );
-      candidateEdges.push(
-        ...buildOppositeOverlapOuterBridgeCandidates(
+          boundaryCandidateSlots,
+        )) {
+          if (appendCandidate(bestEdges.map((edge, edgeIndex) => (
+            edgeIndex === segment.edgeIndex ? withDisplayComputedPath(edge, candidatePath) : edge
+          )) as T)) break;
+        }
+      }
+      const outerBridgeCandidateSlots = candidateLimit - candidateEdges.length;
+      if (outerBridgeCandidateSlots > 0) {
+        for (const candidatePath of buildOppositeOverlapOuterBridgeCandidates(
           path,
           segment,
           other,
           otherPath,
           nodes,
           bestEdges[segment.edgeIndex],
-        ).map(candidatePath => bestEdges.map((edge, edgeIndex) => (
-          edgeIndex === segment.edgeIndex ? withDisplayComputedPath(edge, candidatePath) : edge
-        )) as T),
-      );
+        ).slice(0, outerBridgeCandidateSlots)) {
+          if (appendCandidate(bestEdges.map((edge, edgeIndex) => (
+            edgeIndex === segment.edgeIndex ? withDisplayComputedPath(edge, candidatePath) : edge
+          )) as T)) break;
+        }
+      }
       for (const lane of laneValues) {
+        if (candidateEdges.length >= candidateLimit) break;
         const internalCandidatePath = shiftDisplayInternalSegment(
           path,
           segment.segmentIndex,
@@ -597,7 +627,7 @@ export const repairExactThresholdResidualOverlaps = <T extends Edge[]>(
           lane,
         );
         if (internalCandidatePath) {
-          candidateEdges.push(bestEdges.map((edge, edgeIndex) => (
+          appendCandidate(bestEdges.map((edge, edgeIndex) => (
             edgeIndex === segment.edgeIndex
               ? withDisplayComputedPath(edge, internalCandidatePath)
               : edge
@@ -609,10 +639,11 @@ export const repairExactThresholdResidualOverlaps = <T extends Edge[]>(
           segment,
           lane,
         );
-        if (terminalCandidate) candidateEdges.push(terminalCandidate);
+        if (terminalCandidate) appendCandidate(terminalCandidate);
       }
-      candidateEdges.push(
-        ...buildNearParallelLaneNudgePaths(
+      const nearParallelCandidateSlots = candidateLimit - candidateEdges.length;
+      if (nearParallelCandidateSlots > 0) {
+        for (const candidatePath of buildNearParallelLaneNudgePaths(
           path,
           segment,
           other,
@@ -620,15 +651,15 @@ export const repairExactThresholdResidualOverlaps = <T extends Edge[]>(
           nodes,
           bestEdges[segment.edgeIndex],
           bestEdges,
-        ).slice(0, 24).map(candidatePath => bestEdges.map((edge, edgeIndex) => (
-          edgeIndex === segment.edgeIndex ? withDisplayComputedPath(edge, candidatePath) : edge
-        )) as T),
-      );
+          Math.min(24, nearParallelCandidateSlots),
+        )) {
+          if (appendCandidate(bestEdges.map((edge, edgeIndex) => (
+            edgeIndex === segment.edgeIndex ? withDisplayComputedPath(edge, candidatePath) : edge
+          )) as T)) break;
+        }
+      }
 
-      for (const candidateEdgesForRepair of candidateEdges.slice(
-        0,
-        Math.max(8, Math.min(64, maxQualityEvaluations)),
-      )) {
+      for (const candidateEdgesForRepair of candidateEdges) {
         if (qualityEvaluations >= maxQualityEvaluations) return bestEdges;
         qualityEvaluations += 1;
         const candidateQuality = evaluateDisplayQualityCandidate(

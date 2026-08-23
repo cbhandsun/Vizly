@@ -14,6 +14,9 @@ const ROUTING_CHANGE_REASONS = new Set<BaseReactFlowRoutingChangeSet['reason']>(
   'layout',
   'unknown',
 ]);
+const ROUTING_CHANGE_CLASSIFICATIONS = new Set<
+  BaseReactFlowRoutingChangeSet['classification']
+>(['none', 'style-only', 'geometry', 'topology']);
 
 const isRecord = (value: unknown): value is Record<string, unknown> => (
   typeof value === 'object'
@@ -46,9 +49,10 @@ export const parseDisplayRoutingChangeSet = (
   if (!isRecord(value)) return null;
   const keys = Object.keys(value);
   if (
-    keys.length !== 5
+    keys.length !== 6
     || !keys.every(key => (
       key === 'reason'
+      || key === 'classification'
       || key === 'changedNodeIds'
       || key === 'changedEdgeIds'
       || key === 'topologyChanged'
@@ -56,20 +60,32 @@ export const parseDisplayRoutingChangeSet = (
     ))
     || typeof value.reason !== 'string'
     || !ROUTING_CHANGE_REASONS.has(value.reason as BaseReactFlowRoutingChangeSet['reason'])
+    || typeof value.classification !== 'string'
+    || !ROUTING_CHANGE_CLASSIFICATIONS.has(
+      value.classification as BaseReactFlowRoutingChangeSet['classification'],
+    )
     || typeof value.topologyChanged !== 'boolean'
     || typeof value.geometryChanged !== 'boolean'
   ) return null;
   const changedNodeIds = parseIdentifierList(value.changedNodeIds);
   const changedEdgeIds = parseIdentifierList(value.changedEdgeIds);
-  return changedNodeIds && changedEdgeIds
-    ? {
-      reason: value.reason as BaseReactFlowRoutingChangeSet['reason'],
-      changedNodeIds,
-      changedEdgeIds,
-      topologyChanged: value.topologyChanged,
-      geometryChanged: value.geometryChanged,
-    }
-    : null;
+  if (!changedNodeIds || !changedEdgeIds) return null;
+  const classification = value.classification as BaseReactFlowRoutingChangeSet['classification'];
+  const hasChangedItems = changedNodeIds.length > 0 || changedEdgeIds.length > 0;
+  const consistent = classification === 'topology'
+    ? value.topologyChanged && value.geometryChanged && hasChangedItems
+    : classification === 'geometry'
+      ? !value.topologyChanged && value.geometryChanged && hasChangedItems
+      : !value.topologyChanged && !value.geometryChanged && !hasChangedItems;
+  if (!consistent) return null;
+  return {
+    reason: value.reason as BaseReactFlowRoutingChangeSet['reason'],
+    classification,
+    changedNodeIds,
+    changedEdgeIds,
+    topologyChanged: value.topologyChanged,
+    geometryChanged: value.geometryChanged,
+  };
 };
 
 export const parseDisplayRoutingIdentifierList = parseIdentifierList;

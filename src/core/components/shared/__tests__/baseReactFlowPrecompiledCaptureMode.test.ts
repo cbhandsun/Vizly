@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  publishBaseReactFlowPrecompiledCommittedRoute,
   resolveBaseReactFlowPrecompiledCapturePresetId,
   resolveBaseReactFlowPrecompiledRegenerationPresetId,
+  resolveBaseReactFlowPrecompiledRegenerationPresetIdFromWindow,
 } from '../baseReactFlowPrecompiledCaptureMode';
 
 describe('baseReactFlowPrecompiledCaptureMode', () => {
@@ -52,5 +54,34 @@ describe('baseReactFlowPrecompiledCaptureMode', () => {
     { search: '?precompiledCapture=wms-process-flow-v1', hash: null },
   ])('rejects absent, mismatched, duplicate, malformed, or oversized input', (input) => {
     expect(resolveBaseReactFlowPrecompiledCapturePresetId(input)).toBeNull();
+  });
+
+  it('publishes a clone only for the explicit matching localhost regeneration route', () => {
+    window.history.replaceState(
+      null,
+      '',
+      '/?precompiledRegenerate=wms-process-flow-v1#/?diagram=wms-process-flow-v1',
+    );
+    expect(resolveBaseReactFlowPrecompiledRegenerationPresetIdFromWindow())
+      .toBe('wms-process-flow-v1');
+    const capture = {
+      presetId: 'wms-process-flow-v1',
+      inputSignature: '123',
+      inputGeometryDigest: `geometry-v1:${'a'.repeat(32)}`,
+      outputRouteSignature: 'route-v2:1:2:0123456789abcdef',
+      sourceEdges: [{ id: 'edge', source: 'a', target: 'b' }],
+      displayPatches: [{ id: 'edge', source: 'a', target: 'b', data: { computedPath: [] } }],
+    };
+    expect(publishBaseReactFlowPrecompiledCommittedRoute(capture)).toBe(true);
+    const published = (window as Window & {
+      __vizlyPrecompiledCommittedRoute?: typeof capture;
+    }).__vizlyPrecompiledCommittedRoute;
+    expect(published).toEqual(capture);
+    expect(published).not.toBe(capture);
+
+    expect(publishBaseReactFlowPrecompiledCommittedRoute({
+      ...capture,
+      presetId: 'logistics-architecture-v1',
+    })).toBe(false);
   });
 });

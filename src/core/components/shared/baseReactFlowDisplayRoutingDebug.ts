@@ -16,6 +16,7 @@ export type DisplayRoutingDebugState = {
   updatedAt?: number;
   scheduledAt?: number;
   workerStartedAt?: number;
+  workerResponseParsedAt?: number;
   finalAppliedAt?: number;
   cacheHitAt?: number;
   routeMs?: number;
@@ -107,6 +108,7 @@ export const resolveDisplayRoutingCommittedReuseTiming = ({
 }): Pick<DisplayRoutingDebugState,
   | 'scheduledAt'
   | 'workerStartedAt'
+  | 'workerResponseParsedAt'
   | 'finalAppliedAt'
   | 'routeMs'
   | 'totalRouteMs'
@@ -122,6 +124,7 @@ export const resolveDisplayRoutingCommittedReuseTiming = ({
     return {
       scheduledAt: current.scheduledAt,
       workerStartedAt: current.workerStartedAt,
+      workerResponseParsedAt: current.workerResponseParsedAt,
       finalAppliedAt: current.finalAppliedAt,
       routeMs: current.routeMs,
       totalRouteMs: current.totalRouteMs,
@@ -133,6 +136,7 @@ export const resolveDisplayRoutingCommittedReuseTiming = ({
   return {
     scheduledAt: undefined,
     workerStartedAt: undefined,
+    workerResponseParsedAt: undefined,
     finalAppliedAt: now,
     routeMs: undefined,
     totalRouteMs: undefined,

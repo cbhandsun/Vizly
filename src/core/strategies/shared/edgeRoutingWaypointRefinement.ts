@@ -31,6 +31,7 @@ import {
   pathHasNodeRoutingRisk,
   pathHasVisualComplexityRisk,
   preservesSharedTrunk,
+  type RoutingWaypointCandidateAxes,
 } from './edgeWaypointCandidateRepair';
 
 export function repairSharedTrunkAwareCrossings(
@@ -401,6 +402,7 @@ export function reduceEdgeCrossingsWithWaypoints(
     onlyNodeRiskEdges?: boolean;
     onlySoftRiskEdges?: boolean;
     maxCandidateEdges?: number;
+    preferredAxes?: RoutingWaypointCandidateAxes;
   } = {},
 ): Edge[] {
   if (edges.length < 1) return edges;
@@ -457,6 +459,7 @@ export function reduceEdgeCrossingsWithWaypoints(
     const baseLength = pathLength(path);
     const candidates = generateWaypointCandidates(path, layoutDirection, nodes, edge, {
       includeNodeAwareLanes: hasSoftRisk,
+      preferredAxes: options.preferredAxes,
     });
     let bestPath = path;
     let bestScore = scorePathCandidate(

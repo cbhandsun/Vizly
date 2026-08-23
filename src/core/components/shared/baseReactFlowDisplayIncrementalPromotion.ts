@@ -32,12 +32,14 @@ export const findBaseReactFlowBlockedContextEdgePromotions = ({
   changedNodeIds,
   contextEdgeIds,
   mutableEdgeIds = [],
+  candidateEdgeIds,
 }: {
   edges: Edge[];
   nodes: Node[];
   changedNodeIds: readonly string[];
   contextEdgeIds: readonly string[];
   mutableEdgeIds?: readonly string[];
+  candidateEdgeIds?: ReadonlySet<string>;
 }): string[] | null => {
   const hintedContextIds = new Set(contextEdgeIds);
   const mutableIds = new Set(mutableEdgeIds);
@@ -49,7 +51,10 @@ export const findBaseReactFlowBlockedContextEdgePromotions = ({
 
   const promotedIds: string[] = [];
   const frozenEdges = edges
-    .filter(edge => !mutableIds.has(edge.id))
+    .filter(edge => (
+      !mutableIds.has(edge.id)
+      && (!candidateEdgeIds || candidateEdgeIds.has(edge.id))
+    ))
     .sort((first, second) => (
       Number(hintedContextIds.has(second.id)) - Number(hintedContextIds.has(first.id))
     ));

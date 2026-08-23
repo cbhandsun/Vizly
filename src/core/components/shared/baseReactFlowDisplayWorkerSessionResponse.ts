@@ -21,6 +21,12 @@ import type {
   DisplayEdgesWorkerResolvedIncrementalRouteRequest,
   DisplayEdgesWorkerResponse,
 } from './baseReactFlowDisplayWorkerProtocol';
+import type { DisplayRoutingWorkerSpatialSnapshot } from './baseReactFlowDisplayWorkerSpatialSnapshot';
+
+type ResolvedDisplayWorkerIncrementalRequest = Readonly<{
+  request: DisplayEdgesWorkerResolvedIncrementalRouteRequest;
+  baselineSpatialSnapshot: DisplayRoutingWorkerSpatialSnapshot | null;
+}>;
 
 export const runDisplayWorkerIncrementalRequest = ({
   request,
@@ -30,11 +36,16 @@ export const runDisplayWorkerIncrementalRequest = ({
   request: DisplayEdgesWorkerIncrementalRouteRequest;
   onPhaseTrace?: (trace: DisplayRoutingPhaseTrace) => void;
   onBoundedCandidate?: (report: BaseDisplayBoundedCandidateReport) => void;
-}): Readonly<{ edges: import('@xyflow/react').Edge[] | null; affectedEdgeCount: number }> => {
-  const resolvedRequest = resolveDisplayWorkerIncrementalRequest(request);
-  return resolvedRequest
+}): Readonly<{
+  edges: import('@xyflow/react').Edge[] | null;
+  affectedEdgeCount: number;
+  hardReport?: BaseDisplayBoundedCandidateReport;
+}> => {
+  const resolved = resolveDisplayWorkerIncrementalRequest(request);
+  return resolved
     ? createBaseReactFlowIncrementalDisplayEdges({
-      request: resolvedRequest,
+      request: resolved.request,
+      baselineSpatialSnapshot: resolved.baselineSpatialSnapshot,
       onPhaseTrace,
       onBoundedCandidate,
     })
@@ -43,7 +54,7 @@ export const runDisplayWorkerIncrementalRequest = ({
 
 export const resolveDisplayWorkerIncrementalRequest = (
   request: DisplayEdgesWorkerIncrementalRouteRequest,
-): DisplayEdgesWorkerResolvedIncrementalRouteRequest | null => {
+): ResolvedDisplayWorkerIncrementalRequest | null => {
   const baselineIdentity = createDisplayRoutingIdentity(
     request.baselineInputSignature,
     request.baselineInputGeometryDigest,
@@ -55,14 +66,20 @@ export const resolveDisplayWorkerIncrementalRequest = (
   });
   if (workerSession) {
     return {
-      ...request,
-      baselineNodes: workerSession.nodes,
-      baselineSourceEdges: workerSession.sourceEdges,
-      baselinePatches: workerSession.displayPatches,
+      request: {
+        ...request,
+        baselineNodes: workerSession.nodes,
+        baselineSourceEdges: workerSession.sourceEdges,
+        baselinePatches: workerSession.displayPatches,
+      },
+      baselineSpatialSnapshot: workerSession.spatialSnapshot,
     };
   }
   return request.baselineNodes && request.baselineSourceEdges && request.baselinePatches
-    ? request as DisplayEdgesWorkerResolvedIncrementalRouteRequest
+    ? {
+      request: request as DisplayEdgesWorkerResolvedIncrementalRouteRequest,
+      baselineSpatialSnapshot: null,
+    }
     : null;
 };
 

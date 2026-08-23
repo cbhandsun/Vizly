@@ -136,15 +136,16 @@ export const commitBaseReactFlowStagedLayoutRoutingResult = ({
   smartEdgePadding?: number;
   isLargeGraph?: boolean;
 }): BaseReactFlowLayoutRoutingCommit | null => {
-  const workerRoutingPatches = createBaseReactFlowDisplayEdgePatches(
+  if (!Array.isArray(workerResult.routingPatches)) return null;
+  const workerInputRoutingPatches = createBaseReactFlowDisplayEdgePatches(
+    sourceEdges,
     workerResult.projectedEdges,
-    workerResult.edges,
   );
-  if (!workerRoutingPatches) return null;
-
+  if (!workerInputRoutingPatches) return null;
   const merged = mergeBaseReactFlowDisplayRoutingTransactions({
     latestSourceEdges: sourceEdges,
-    workerRoutingPatches,
+    workerRoutingPatches: workerInputRoutingPatches,
+    repairRoutingPatches: workerResult.routingPatches,
   });
   if (!merged) return null;
 
@@ -293,10 +294,7 @@ export const stageBaseReactFlowLayoutRouting = async ({
     ? commitBaseReactFlowStagedLayoutRoutingResult({
       sourceEdges: unseededSourceEdges,
       sourceNodes: projectedSource.nodes,
-      workerResult: {
-        ...candidateRepairResult,
-        projectedEdges: projectedSource.edges,
-      },
+      workerResult: candidateRepairResult,
       enableSmartEdges,
       smartEdgePadding,
       isLargeGraph,
@@ -322,12 +320,7 @@ export const stageBaseReactFlowLayoutRouting = async ({
     timeoutMs: LAYOUT_DISPLAY_WORKER_TIMEOUT_MS,
     signal,
   });
-  const workerResult = {
-    ...initialResult,
-    // Route patches must be calculated against the unseeded business graph;
-    // otherwise an unchanged successful seed would disappear during merge.
-    projectedEdges: projectedSource.edges,
-  };
+  const workerResult = initialResult;
   const committed = commitBaseReactFlowStagedLayoutRoutingResult({
     sourceEdges: unseededSourceEdges,
     sourceNodes: projectedSource.nodes,

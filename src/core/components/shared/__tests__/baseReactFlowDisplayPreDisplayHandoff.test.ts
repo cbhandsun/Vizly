@@ -9,40 +9,11 @@ vi.mock('../baseReactFlowDisplayFullRoutePipeline', () => ({
   createBaseReactFlowFullRouteEdges,
 }));
 
-vi.mock('../baseReactFlowDisplayQualityGates', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../baseReactFlowDisplayQualityGates')>();
-  return {
-    ...actual,
-    getDisplayHardQualityGateReport: vi.fn((
-      _edges: Edge[],
-      _nodes: Node[],
-      candidate: 'terminal-lane' | 'polished',
-    ) => ({
-      candidate,
-      hardClean: false,
-      obstacleHits: 0,
-      terminalsAttached: false,
-      terminalsAnchored: false,
-      quality: {
-        nonOrthogonalSegments: 0,
-        strictCrossings: 0,
-        reverseOverlap: 0,
-        unrelatedOverlap: 0,
-        relatedOverlap: 0,
-        unexplainedRelatedOverlap: 0,
-        shortEndpointStubs: 0,
-        tinyInteriorDoglegs: 0,
-        hairpins: 0,
-        backtrackPenalty: 0,
-        detourPenalty: 0,
-        bends: 0,
-        totalLength: 140,
-      },
-    })),
-  };
-});
-
 import { createBaseReactFlowPreDisplayFinalEdges } from '../baseReactFlowDisplayPreDisplayPipeline';
+import {
+  createBaseReactFlowFinalEndpointEvaluation,
+  type BaseReactFlowFinalEndpointEvaluation,
+} from '../baseReactFlowDisplayFinalEndpointEvaluation';
 
 const nodes: Node[] = [
   {
@@ -74,8 +45,31 @@ const edges: Edge[] = [{
   },
 }];
 
-const route = (skipFullRouteFallback = false): Edge[] => (
-  createBaseReactFlowPreDisplayFinalEdges({
+const route = (skipFullRouteFallback = false): Edge[] => {
+  const evaluation = createBaseReactFlowFinalEndpointEvaluation(nodes);
+  const hardReport: BaseReactFlowFinalEndpointEvaluation['hardReport'] = () => ({
+    candidate: 'polished',
+    hardClean: false,
+    obstacleHits: 0,
+    terminalsAttached: false,
+    terminalsAnchored: false,
+    quality: {
+      nonOrthogonalSegments: 0,
+      strictCrossings: 0,
+      reverseOverlap: 0,
+      unrelatedOverlap: 0,
+      relatedOverlap: 0,
+      unexplainedRelatedOverlap: 0,
+      shortEndpointStubs: 0,
+      tinyInteriorDoglegs: 0,
+      hairpins: 0,
+      backtrackPenalty: 0,
+      detourPenalty: 0,
+      bends: 0,
+      totalLength: 140,
+    },
+  });
+  return createBaseReactFlowPreDisplayFinalEdges({
     edges,
     nodes,
     enableSmartEdges: true,
@@ -83,8 +77,12 @@ const route = (skipFullRouteFallback = false): Edge[] => (
     isLargeGraph: false,
     displayEdgeEpoch: 1,
     skipFullRouteFallback,
-  })
-);
+    evaluationSession: {
+      ...evaluation,
+      hardReport,
+    },
+  });
+};
 
 describe('pre-display full-route handoff', () => {
   beforeEach(() => {

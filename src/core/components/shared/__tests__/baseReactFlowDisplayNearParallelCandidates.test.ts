@@ -95,4 +95,77 @@ describe('buildNearParallelLaneNudgePaths', () => {
       { x: 2292, y: 1473 },
     ]);
   });
+
+  it('materializes only the requested prefix without changing candidate order', () => {
+    const path = [
+      { x: 0, y: 0 },
+      { x: 40, y: 0 },
+      { x: 40, y: 80 },
+      { x: 180, y: 80 },
+      { x: 180, y: 160 },
+      { x: 220, y: 160 },
+    ];
+    const siblingPath = [
+      { x: 0, y: 84 },
+      { x: 220, y: 84 },
+    ];
+    const segment: DisplaySegment = {
+      edgeIndex: 0,
+      segmentIndex: 2,
+      axis: 'h',
+      direction: 1,
+      a: path[2],
+      b: path[3],
+    };
+    const siblingSegment: DisplaySegment = {
+      edgeIndex: 1,
+      segmentIndex: 0,
+      axis: 'h',
+      direction: 1,
+      a: siblingPath[0],
+      b: siblingPath[1],
+    };
+    const allCandidates = buildNearParallelLaneNudgePaths(
+      path,
+      segment,
+      siblingSegment,
+      siblingPath,
+      [],
+      edge,
+      [edge],
+    );
+    const boundedCandidates = buildNearParallelLaneNudgePaths(
+      path,
+      segment,
+      siblingSegment,
+      siblingPath,
+      [],
+      edge,
+      [edge],
+      5,
+    );
+
+    expect(allCandidates.length).toBeGreaterThan(5);
+    expect(boundedCandidates).toEqual(allCandidates.slice(0, 5));
+    expect(buildNearParallelLaneNudgePaths(
+      path,
+      segment,
+      siblingSegment,
+      siblingPath,
+      [],
+      edge,
+      [edge],
+      Number.NaN,
+    )).toEqual([]);
+    expect(buildNearParallelLaneNudgePaths(
+      path,
+      segment,
+      siblingSegment,
+      siblingPath,
+      [],
+      edge,
+      [edge],
+      -1,
+    )).toEqual([]);
+  });
 });

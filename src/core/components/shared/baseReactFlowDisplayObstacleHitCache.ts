@@ -1,8 +1,7 @@
 import type { Edge, Node } from '@xyflow/react';
 
 import {
-  countEndpointNodeTraversalHits,
-  countUnrelatedObstacleHits,
+  createRoutingObstacleEvaluationContext,
 } from '../../strategies/shared/edgeWaypointCandidateRepair';
 import {
   buildDisplayRoutingObstacles,
@@ -24,6 +23,7 @@ export type DisplayObstacleHitContext = {
   countUnrelated: (path: DisplayPoint[], edge: Edge) => number;
   countRouting: (path: DisplayPoint[], edge: Edge) => number;
   countEdgesUnrelated: (edges: Edge[], pathForEdge: (edge: Edge) => DisplayPoint[]) => number;
+  readMetrics: () => Readonly<{ scannedNodeCount: number }>;
 };
 
 const displayCoordinateToken = (value: number): string => {
@@ -72,6 +72,18 @@ export const createDisplayObstacleHitContext = (nodes: Node[]): DisplayObstacleH
 
   const obstacles = buildDisplayRoutingObstacles(nodes);
   const pathHits = new Map<string, CachedPathObstacleHits>();
+  const routingContextByTerminals = new Map<
+    string,
+    ReturnType<typeof createRoutingObstacleEvaluationContext>
+  >();
+  const routingContextFor = (edge: Edge) => {
+    const key = JSON.stringify([edge.source, edge.target]);
+    const cachedContext = routingContextByTerminals.get(key);
+    if (cachedContext) return cachedContext;
+    const context = createRoutingObstacleEvaluationContext(edge, obstacles);
+    routingContextByTerminals.set(key, context);
+    return context;
+  };
   const entryFor = (path: DisplayPoint[], edge: Edge): [string, CachedPathObstacleHits] => {
     const key = displayObstaclePathKey(path, edge);
     return [key, pathHits.get(key) ?? {}];
@@ -80,17 +92,18 @@ export const createDisplayObstacleHitContext = (nodes: Node[]): DisplayObstacleH
     if (path.length < 2 || obstacles.size === 0) return 0;
     const [key, entry] = entryFor(path, edge);
     if (entry.unrelated !== undefined) return entry.unrelated;
-    const unrelated = countUnrelatedObstacleHits(path, edge, obstacles);
+    const unrelated = routingContextFor(edge).countUnrelatedObstacleHits(path);
     cacheBoundedPathResult(pathHits, key, { ...entry, unrelated });
     return unrelated;
   };
   const countRouting = (path: DisplayPoint[], edge: Edge): number => {
     if (path.length < 2 || obstacles.size === 0) return 0;
     const [key, entry] = entryFor(path, edge);
+    const routingContext = routingContextFor(edge);
     const unrelated = entry.unrelated
-      ?? countUnrelatedObstacleHits(path, edge, obstacles);
+      ?? routingContext.countUnrelatedObstacleHits(path);
     const endpoint = entry.endpoint
-      ?? countEndpointNodeTraversalHits(path, edge, obstacles);
+      ?? routingContext.countEndpointNodeTraversalHits(path);
     if (entry.unrelated === undefined || entry.endpoint === undefined) {
       cacheBoundedPathResult(pathHits, key, { unrelated, endpoint });
     }
@@ -104,6 +117,11 @@ export const createDisplayObstacleHitContext = (nodes: Node[]): DisplayObstacleH
     countEdgesUnrelated: (edges, pathForEdge) => edges.reduce((total, edge) => (
       total + countUnrelated(pathForEdge(edge), edge)
     ), 0),
+    readMetrics: () => ({
+      scannedNodeCount: [...routingContextByTerminals.values()].reduce((total, item) => (
+        total + item.readMetrics().scannedNodeCount
+      ), 0),
+    }),
   };
   displayObstacleHitContextCache.set(nodes, { nodeSignature, context });
   return context;

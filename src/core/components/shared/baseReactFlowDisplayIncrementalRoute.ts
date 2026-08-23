@@ -18,14 +18,19 @@ import { computeBaseReactFlowDisplayInputIdentityBundle } from './baseReactFlowD
 import { repairTerminalHandleHemisphereHairpins } from './baseReactFlowDisplayHemisphereHairpinRepair';
 import { createBaseReactFlowMovedNodeReconnectCandidates } from './baseReactFlowDisplayLocalReconnect';
 import { repairFastDisplayHardSafety } from './baseReactFlowFastEdgeSafety';
-import { getDisplayHardQualityGateReport } from './baseReactFlowDisplayQualityGates';
 import {
   findDisplayStrictCrossingHits,
   getDisplayComputedPath,
+  getDisplayNodeRect,
+  isDisplayContainerNode,
 } from './baseReactFlowDisplayGeometry';
 import { repairRenderSafeTerminalAxes } from './baseReactFlowRenderTerminalSafety';
 import { repairFinalResidualStrictCrossings } from './baseReactFlowDisplayStrictResidualRepair';
 import type { BaseDisplayBoundedCandidateReport } from './baseReactFlowDisplayEvaluation';
+import {
+  createBaseReactFlowFinalEndpointEvaluation,
+  diffBaseReactFlowEvaluationMetrics,
+} from './baseReactFlowDisplayFinalEndpointEvaluation';
 import {
   findBaseReactFlowBlockedContextEdgePromotions,
   findBaseReactFlowStrictContextEdgePromotions,
@@ -46,10 +51,15 @@ import {
 import type {
   DisplayEdgesWorkerResolvedIncrementalRouteRequest,
 } from './baseReactFlowDisplayWorkerProtocol';
+import {
+  createDisplayRoutingSegmentSpatialIndex,
+  type DisplayRoutingWorkerSpatialSnapshot,
+} from './baseReactFlowDisplayWorkerSpatialSnapshot';
 
 export type BaseReactFlowDisplayIncrementalRouteOutcome = Readonly<{
   edges: Edge[] | null;
   affectedEdgeCount: number;
+  hardReport?: BaseDisplayBoundedCandidateReport;
 }>;
 
 const sameIdentifiers = (first: readonly string[], second: readonly string[]): boolean => (
@@ -117,10 +127,12 @@ const hasNodeClearance = (
  */
 export const createBaseReactFlowIncrementalDisplayEdges = ({
   request,
+  baselineSpatialSnapshot,
   onPhaseTrace,
   onBoundedCandidate,
 }: {
   request: DisplayEdgesWorkerResolvedIncrementalRouteRequest;
+  baselineSpatialSnapshot?: DisplayRoutingWorkerSpatialSnapshot | null;
   onPhaseTrace?: (trace: DisplayRoutingPhaseTrace) => void;
   onBoundedCandidate?: (report: BaseDisplayBoundedCandidateReport) => void;
 }): BaseReactFlowDisplayIncrementalRouteOutcome => {
@@ -205,23 +217,48 @@ export const createBaseReactFlowIncrementalDisplayEdges = ({
     closureTimer.finish('fallback', affectedEdgeCount);
     return { edges: null, affectedEdgeCount };
   }
-  closureTimer.finish('accepted', affectedEdgeCount);
-
   const mutableIds = new Set(affectedClosure.mutableEdgeIds);
   const repairNodes = withDisplayAbsolutePositions(
     request.nodes,
     new Map(request.nodes.map(node => [node.id, node] as const)),
   );
+  const evaluationSession = createBaseReactFlowFinalEndpointEvaluation(repairNodes);
+  const sessionSpatialSnapshot = baselineSpatialSnapshot?.outputRouteSignature
+    === request.baselineOutputRouteSignature
+    ? baselineSpatialSnapshot
+    : null;
+  const segmentIndex = sessionSpatialSnapshot?.segmentIndex
+    ?? createDisplayRoutingSegmentSpatialIndex(
+      baselineEdges,
+      request.baselineOutputRouteSignature,
+    );
+  const changedNodeIds = new Set(verifiedChangeSet.changedNodeIds);
+  const changedBusinessNodeRects = repairNodes.flatMap(node => {
+    if (!changedNodeIds.has(node.id) || isDisplayContainerNode(node)) return [];
+    const rect = getDisplayNodeRect(node);
+    return rect ? [rect] : [];
+  });
+  const spatialCandidateEdgeIds = segmentIndex?.queryEdgeIds(
+    changedBusinessNodeRects,
+    COMMERCIAL_BUSINESS_NODE_CLEARANCE,
+  ) ?? undefined;
   const promotedIds = findBaseReactFlowBlockedContextEdgePromotions({
     edges: baselineEdges,
     nodes: repairNodes,
     changedNodeIds: verifiedChangeSet.changedNodeIds,
     contextEdgeIds: affectedClosure.contextEdgeIds,
     mutableEdgeIds: affectedClosure.mutableEdgeIds,
+    candidateEdgeIds: spatialCandidateEdgeIds,
   });
   if (promotedIds === null) {
+    closureTimer.finish('fallback', affectedEdgeCount, {
+      cacheHitCount: sessionSpatialSnapshot ? 1 : 0,
+    });
     return { edges: null, affectedEdgeCount };
   }
+  closureTimer.finish('accepted', affectedEdgeCount, {
+    cacheHitCount: sessionSpatialSnapshot ? 1 : 0,
+  });
   const transactionMutableIds = new Set([
     ...affectedClosure.mutableEdgeIds,
     ...promotedIds,
@@ -246,11 +283,7 @@ export const createBaseReactFlowIncrementalDisplayEdges = ({
           transactionMutableIds,
         )
         && (() => {
-          const nextReport = getDisplayHardQualityGateReport(
-            nextEdges,
-            repairNodes,
-            'polished',
-          );
+          const nextReport = evaluationSession.hardReport(nextEdges);
           return nextReport.hardClean || reportHasOnlyStrictDefects(nextReport);
         })()
       ),
@@ -265,23 +298,44 @@ export const createBaseReactFlowIncrementalDisplayEdges = ({
     onTrace: onPhaseTrace,
   });
   let lastReconnectReport: BaseDisplayBoundedCandidateReport | undefined;
+  let reconnectGeneratedPathCount = 0;
+  let reconnectEvaluatedPathCount = 0;
+  const reconnectSeedTimer = startDisplayRoutingPhaseTrace({
+    phase: 'local-reconnect-seed',
+    candidateCount: transactionSourceEdges.length,
+    onTrace: onPhaseTrace,
+  });
   const reconnectCandidates = createBaseReactFlowMovedNodeReconnectCandidates({
     baselineEdges,
     nodes: repairNodes,
     changedNodeIds: verifiedChangeSet.changedNodeIds,
     mutableEdgeIds: affectedClosure.mutableEdgeIds,
     beamWidth: 1,
+    onDiagnostics: (diagnostics) => {
+      reconnectGeneratedPathCount = diagnostics.generatedPathCount;
+      reconnectEvaluatedPathCount = diagnostics.evaluatedPathCount;
+    },
   });
+  reconnectSeedTimer.finish(
+    reconnectCandidates.length > 0 ? 'accepted' : 'fallback',
+    reconnectCandidates.length,
+    {
+      candidateCount: reconnectGeneratedPathCount,
+      evaluationCount: reconnectEvaluatedPathCount,
+    },
+  );
+  const reconnectCandidatesTimer = startDisplayRoutingPhaseTrace({
+    phase: 'local-reconnect-candidates',
+    candidateCount: reconnectCandidates.length,
+    onTrace: onPhaseTrace,
+  });
+  const reconnectEvaluationMetricsBefore = evaluationSession.readMetrics();
   const commitReconnectCandidate = (
     candidateEdges: Edge[],
     minimumClearance = COMMERCIAL_BUSINESS_NODE_CLEARANCE,
   ): BaseReactFlowDisplayIncrementalRouteOutcome | null => {
     const lockedCandidateEdges = lockFinalDisplayComputedPaths(candidateEdges, repairNodes);
-    const report = getDisplayHardQualityGateReport(
-      lockedCandidateEdges,
-      repairNodes,
-      'polished',
-    );
+    const report = evaluationSession.hardReport(lockedCandidateEdges);
     if (
       !report.hardClean
       || !preservesIncrementalBoundary(
@@ -299,6 +353,14 @@ export const createBaseReactFlowIncrementalDisplayEdges = ({
     const changedEdgeCount = lockedCandidateEdges.filter((edge, index) => (
       edge !== baselineEdges[index]
     )).length;
+    reconnectCandidatesTimer.finish(
+      'accepted',
+      changedEdgeCount,
+      diffBaseReactFlowEvaluationMetrics(
+        reconnectEvaluationMetricsBefore,
+        evaluationSession.readMetrics(),
+      ),
+    );
     localRouteTimer.finish('accepted', changedEdgeCount);
     const hardGateTimer = startDisplayRoutingPhaseTrace({
       phase: 'hard-gate',
@@ -306,14 +368,14 @@ export const createBaseReactFlowIncrementalDisplayEdges = ({
       onTrace: onPhaseTrace,
     });
     hardGateTimer.finish('accepted', changedEdgeCount);
-    return { edges: lockedCandidateEdges, affectedEdgeCount: changedEdgeCount };
+    return {
+      edges: lockedCandidateEdges,
+      affectedEdgeCount: changedEdgeCount,
+      hardReport: report,
+    };
   };
   for (const reconnectedEdges of reconnectCandidates) {
-    const reconnectSeedReport = getDisplayHardQualityGateReport(
-      reconnectedEdges,
-      repairNodes,
-      'polished',
-    );
+    const reconnectSeedReport = evaluationSession.hardReport(reconnectedEdges);
     const committedSeed = commitReconnectCandidate(reconnectedEdges);
     if (committedSeed) return committedSeed;
     onBoundedCandidate?.(reconnectSeedReport);
@@ -369,11 +431,7 @@ export const createBaseReactFlowIncrementalDisplayEdges = ({
     let candidateEdges = reconnectedEdges.map(edge => (
       hairpinRepairedById.get(edge.id) ?? edge
     ));
-    let reconnectReport = getDisplayHardQualityGateReport(
-      candidateEdges,
-      repairNodes,
-      'polished',
-    );
+    let reconnectReport = evaluationSession.hardReport(candidateEdges);
     if (reportHasOnlyObstacleDefects(reconnectReport)) {
       const obstacleRepairIds = new Set(
         promotedIds.length > 0
@@ -399,11 +457,7 @@ export const createBaseReactFlowIncrementalDisplayEdges = ({
       candidateEdges = candidateEdges.map(edge => (
         terminalSafeById.get(edge.id) ?? edge
       ));
-      reconnectReport = getDisplayHardQualityGateReport(
-        candidateEdges,
-        repairNodes,
-        'polished',
-      );
+      reconnectReport = evaluationSession.hardReport(candidateEdges);
     }
     if (reportHasOnlyStrictDefects(reconnectReport) && promotedIds.length > 0) {
       const strictIncidentIds = [...new Set(
@@ -422,11 +476,7 @@ export const createBaseReactFlowIncrementalDisplayEdges = ({
         beamWidth: 8,
       });
       for (const refinedCandidate of refinedCandidates) {
-        const refinedReport = getDisplayHardQualityGateReport(
-          refinedCandidate,
-          repairNodes,
-          'polished',
-        );
+        const refinedReport = evaluationSession.hardReport(refinedCandidate);
         if (
           refinedReport.hardClean
           && preservesIncrementalBoundary(
@@ -441,11 +491,7 @@ export const createBaseReactFlowIncrementalDisplayEdges = ({
       }
     }
     candidateEdges = repairIncrementalClearance(candidateEdges);
-    reconnectReport = getDisplayHardQualityGateReport(
-      candidateEdges,
-      repairNodes,
-      'polished',
-    );
+    reconnectReport = evaluationSession.hardReport(candidateEdges);
     if (reportHasOnlyStrictDefects(reconnectReport)) {
       const strictContextPromotions = findBaseReactFlowStrictContextEdgePromotions({
         edges: candidateEdges,
@@ -471,11 +517,7 @@ export const createBaseReactFlowIncrementalDisplayEdges = ({
           transactionMutableIds,
         )
       ) {
-        const strictRepairedReport = getDisplayHardQualityGateReport(
-          strictRepaired,
-          repairNodes,
-          'polished',
-        );
+        const strictRepairedReport = evaluationSession.hardReport(strictRepaired);
         if (
           strictRepairedReport.hardClean
           && hasNodeClearance(
@@ -489,11 +531,7 @@ export const createBaseReactFlowIncrementalDisplayEdges = ({
       }
     }
     candidateEdges = repairIncrementalClearance(candidateEdges);
-    reconnectReport = getDisplayHardQualityGateReport(
-      candidateEdges,
-      repairNodes,
-      'polished',
-    );
+    reconnectReport = evaluationSession.hardReport(candidateEdges);
     const preservesClosureBoundary = preservesIncrementalBoundary(
       baselineEdges,
       candidateEdges,
@@ -517,6 +555,14 @@ export const createBaseReactFlowIncrementalDisplayEdges = ({
       && reconnectReport.hardClean
       && commercialClearanceClean
     ) {
+      reconnectCandidatesTimer.finish(
+        'accepted',
+        changedEdgeCount,
+        diffBaseReactFlowEvaluationMetrics(
+          reconnectEvaluationMetricsBefore,
+          evaluationSession.readMetrics(),
+        ),
+      );
       localRouteTimer.finish('accepted', changedEdgeCount);
       const hardGateTimer = startDisplayRoutingPhaseTrace({
         phase: 'hard-gate',
@@ -524,7 +570,11 @@ export const createBaseReactFlowIncrementalDisplayEdges = ({
         onTrace: onPhaseTrace,
       });
       hardGateTimer.finish('accepted', changedEdgeCount);
-      return { edges: candidateEdges, affectedEdgeCount: changedEdgeCount };
+      return {
+        edges: candidateEdges,
+        affectedEdgeCount: changedEdgeCount,
+        hardReport: reconnectReport,
+      };
     }
     const strictExpansion = preservesClosureBoundary
       ? expandBaseReactFlowStrictCrossingClosure({
@@ -549,7 +599,7 @@ export const createBaseReactFlowIncrementalDisplayEdges = ({
       )
       : false;
     const expandedReport = lockedExpandedCandidate
-      ? getDisplayHardQualityGateReport(lockedExpandedCandidate, repairNodes, 'polished')
+      ? evaluationSession.hardReport(lockedExpandedCandidate)
       : null;
     if (
       lockedExpandedCandidate
@@ -564,6 +614,14 @@ export const createBaseReactFlowIncrementalDisplayEdges = ({
       const expandedChangedEdgeCount = lockedExpandedCandidate.filter((edge, index) => (
         edge !== baselineEdges[index]
       )).length;
+      reconnectCandidatesTimer.finish(
+        'accepted',
+        expandedChangedEdgeCount,
+        diffBaseReactFlowEvaluationMetrics(
+          reconnectEvaluationMetricsBefore,
+          evaluationSession.readMetrics(),
+        ),
+      );
       localRouteTimer.finish('accepted', expandedChangedEdgeCount);
       const hardGateTimer = startDisplayRoutingPhaseTrace({
         phase: 'hard-gate',
@@ -574,11 +632,25 @@ export const createBaseReactFlowIncrementalDisplayEdges = ({
       return {
         edges: lockedExpandedCandidate,
         affectedEdgeCount: expandedChangedEdgeCount,
+        hardReport: expandedReport,
       };
     }
   }
+  reconnectCandidatesTimer.finish(
+    'rejected',
+    undefined,
+    diffBaseReactFlowEvaluationMetrics(
+      reconnectEvaluationMetricsBefore,
+      evaluationSession.readMetrics(),
+    ),
+  );
   if (lastReconnectReport) onBoundedCandidate?.(lastReconnectReport);
 
+  const fastFallbackTimer = startDisplayRoutingPhaseTrace({
+    phase: 'local-fast-fallback',
+    candidateCount: transactionSourceEdges.length,
+    onTrace: onPhaseTrace,
+  });
   const locallyRouted = createBaseReactFlowFastDisplayEdges({
     edges: transactionSourceEdges,
     nodes: repairNodes,
@@ -590,6 +662,7 @@ export const createBaseReactFlowIncrementalDisplayEdges = ({
   const locallyRoutedById = new Map(
     locallyRouted.map(edge => [edge.id, edge] as const),
   );
+  fastFallbackTimer.finish('accepted', locallyRoutedById.size);
   localRouteTimer.finish('accepted', locallyRoutedById.size);
   const candidateEdges = lockFinalDisplayComputedPaths(repairIncrementalClearance(
     baselineEdges.map(edge => locallyRoutedById.get(edge.id) ?? edge),
@@ -599,11 +672,8 @@ export const createBaseReactFlowIncrementalDisplayEdges = ({
     candidateCount: candidateEdges.length,
     onTrace: onPhaseTrace,
   });
-  const hardReport = getDisplayHardQualityGateReport(
-    candidateEdges,
-    repairNodes,
-    'polished',
-  );
+  const hardGateMetricsBefore = evaluationSession.readMetrics();
+  const hardReport = evaluationSession.hardReport(candidateEdges);
   const candidateClearanceClean = hasNodeClearance(
     candidateEdges,
     repairNodes,
@@ -613,9 +683,14 @@ export const createBaseReactFlowIncrementalDisplayEdges = ({
   hardGateTimer.finish(
     hardReport.hardClean && candidateClearanceClean ? 'accepted' : 'fallback',
     affectedEdgeCount,
+    diffBaseReactFlowEvaluationMetrics(
+      hardGateMetricsBefore,
+      evaluationSession.readMetrics(),
+    ),
   );
   return {
     edges: hardReport.hardClean && candidateClearanceClean ? candidateEdges : null,
     affectedEdgeCount,
+    ...(hardReport.hardClean && candidateClearanceClean ? { hardReport } : {}),
   };
 };

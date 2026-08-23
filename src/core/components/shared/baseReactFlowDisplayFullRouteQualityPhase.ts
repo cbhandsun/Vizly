@@ -3,7 +3,11 @@ import type { Edge, Node } from '@xyflow/react';
 import {
   separateDetachedParallelOverlaps,
 } from '../../strategies/shared/edgeDetachedOverlapRepair';
-import { repairDisplayMicroArtifacts } from '../../strategies/shared/edgeDisplayMicroCleanup';
+import {
+  createDisplayMicroCleanupDiagnostics,
+  repairDisplayMicroArtifacts,
+  type DisplayMicroCleanupDiagnostics,
+} from '../../strategies/shared/edgeDisplayMicroCleanup';
 import { repairEndpointLaneCrossings } from '../../strategies/shared/edgeEndpointLaneNudgeRepair';
 import { repairEndpointOrthogonalPaths } from '../../strategies/shared/edgeEndpointPathRepair';
 import { refineGlobalEdgeWaypoints } from '../../strategies/shared/edgeGlobalWaypointRefinement';
@@ -45,20 +49,19 @@ import {
   type DisplayRoutingPhaseTrace,
 } from './baseReactFlowDisplayRoutingTrace';
 import type { BaseReactFlowFullRouteContext } from './baseReactFlowDisplayFullRouteTypes';
+import { createDisplayRoutingTopologyWaypointAxes } from './baseReactFlowDisplayRoutingTopologyPlan';
 import { repairSharedTargetEntryStrictCrossingsIfNeeded } from './baseReactFlowDisplaySharedTargetEntry';
+import { computeBaseReactFlowDisplayOutputRouteSignature } from './baseReactFlowDisplayCache';
+import { displayRoutingObstaclesSignature } from './baseReactFlowDisplayGeometry';
+import {
+  createDisplayTopologyFirstSeed,
+  repairDisplayEndpointOrthogonalPathsTwice,
+} from './baseReactFlowDisplayTopologyFirstSeed';
 
 export {
   hasSharedTargetEntryStrictCrossing,
   repairSharedTargetEntryStrictCrossingsIfNeeded,
 } from './baseReactFlowDisplaySharedTargetEntry';
-
-const repairEndpointOrthogonalPathsTwice = <T extends Edge[]>(
-  edges: T,
-  nodes: Node[],
-): T => {
-  const first = repairEndpointOrthogonalPaths(edges, nodes) as T;
-  return first === edges ? first : repairEndpointOrthogonalPaths(first, nodes) as T;
-};
 
 export const canSkipLargeDetachedOverlapRepair = (
   edgeCount: number,
@@ -72,14 +75,79 @@ export const boundedQualityPolishNeedsMicroRepair = (
   || quality.tinyInteriorDoglegs > 0
   || quality.hairpins > 0;
 
+export const shouldMaterializeDetachedMicroAlternative = (
+  useBoundedLargeRepair: boolean,
+): boolean => useBoundedLargeRepair;
+
+const DETACHED_NOOP_CACHE_LIMIT = 128;
+const detachedNoopCacheByRepair = new WeakMap<
+  typeof separateDetachedParallelOverlaps,
+  Map<string, true>
+>();
+
+const detachedRepairNoopCacheKey = (
+  edges: Edge[],
+  nodes: Node[],
+  minOverlap: number,
+  options: NonNullable<Parameters<typeof separateDetachedParallelOverlaps>[3]>,
+): string | null => {
+  const routeSignature = computeBaseReactFlowDisplayOutputRouteSignature(edges);
+  if (!routeSignature) return null;
+  return JSON.stringify([
+    routeSignature,
+    displayRoutingObstaclesSignature(nodes),
+    minOverlap,
+    options.maxIterations ?? null,
+    options.maxHitBudget ?? null,
+    options.maxQualityEvaluations ?? null,
+    options.maxResidualPasses ?? null,
+    options.qualityOnly === true,
+  ]);
+};
+
+const readDetachedRepairNoop = (
+  repair: typeof separateDetachedParallelOverlaps,
+  cacheKey: string,
+): boolean => {
+  const cache = detachedNoopCacheByRepair.get(repair);
+  if (!cache?.has(cacheKey)) return false;
+  cache.delete(cacheKey);
+  cache.set(cacheKey, true);
+  return true;
+};
+
+const rememberDetachedRepairNoop = (
+  repair: typeof separateDetachedParallelOverlaps,
+  cacheKey: string,
+): void => {
+  let cache = detachedNoopCacheByRepair.get(repair);
+  if (!cache) {
+    cache = new Map<string, true>();
+    detachedNoopCacheByRepair.set(repair, cache);
+  }
+  if (cache.has(cacheKey)) cache.delete(cacheKey);
+  cache.set(cacheKey, true);
+  while (cache.size > DETACHED_NOOP_CACHE_LIMIT) {
+    const oldest = cache.keys().next().value;
+    if (typeof oldest !== 'string') break;
+    cache.delete(oldest);
+  }
+};
+
+export const shouldUseBoundedQualityResidualRepair = (
+  useBoundedLargeRepair: boolean,
+  edgeCount: number,
+): boolean => useBoundedLargeRepair || edgeCount >= 12;
+
 const repairBoundedQualityPolishMicroArtifacts = (
   edges: Edge[],
   useBoundedLargeRepair: boolean,
+  diagnostics?: DisplayMicroCleanupDiagnostics,
 ): Edge[] => (
   useBoundedLargeRepair
   && !boundedQualityPolishNeedsMicroRepair(calculateEdgePathQualityScore(edges))
     ? edges
-    : repairDisplayMicroArtifacts(edges)
+    : repairDisplayMicroArtifacts(edges, undefined, diagnostics)
 );
 
 /**
@@ -101,7 +169,11 @@ export const separateLargeDetachedParallelOverlapsIfNeeded = <T extends Edge[]>(
   )) {
     return edges;
   }
-  return repair(edges, nodes, minOverlap, options) as T;
+  const cacheKey = detachedRepairNoopCacheKey(edges, nodes, minOverlap, options);
+  if (cacheKey && readDetachedRepairNoop(repair, cacheKey)) return edges;
+  const repaired = repair(edges, nodes, minOverlap, options) as T;
+  if (cacheKey && repaired === edges) rememberDetachedRepairNoop(repair, cacheKey);
+  return repaired;
 };
 
 export const createBaseReactFlowFullRouteQualityEdges = ({
@@ -112,19 +184,40 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
   canReusePreparedGlobalRouting,
   reusePreparedGlobalRouting,
   onPhaseTrace,
+  topologyPlan,
 }: BaseReactFlowFullRouteContext): Edge[] => {
+  const topologySeedTimer = startDisplayRoutingPhaseTrace({
+    phase: 'quality-topology-seed',
+    candidateCount: normalizedEdges.length,
+    onTrace: onPhaseTrace,
+  });
+  const topologySeed = createDisplayTopologyFirstSeed(
+    normalizedEdges,
+    repairNodes,
+    topologyPlan,
+  );
+  topologySeedTimer.finish(
+    topologySeed.applied ? 'accepted' : 'skip',
+    topologySeed.applied ? topologySeed.edges.length : 0,
+  );
   const globalRouteTimer = startDisplayRoutingPhaseTrace({
     phase: 'quality-global-route',
     candidateCount: normalizedEdges.length,
     onTrace: onPhaseTrace,
   });
   const globallyRoutedEdges = canReusePreparedGlobalRouting
-    ? normalizedEdges
+    ? topologySeed.edges
     : reduceEdgeCrossingsWithWaypoints(
-      normalizedEdges,
+      topologySeed.edges,
       repairNodes,
       layoutDirection,
-      { onlyNodeRiskEdges: true },
+      {
+        onlyNodeRiskEdges: true,
+        preferredAxes: createDisplayRoutingTopologyWaypointAxes(
+          topologyPlan,
+          useBoundedLargeRepair,
+        ),
+      },
     );
   const detachedRoutedEdges = reusePreparedGlobalRouting
     ? globallyRoutedEdges
@@ -143,26 +236,38 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
     candidateCount: detachedRoutedEdges.length,
     onTrace: onPhaseTrace,
   });
-  const routedEndpointEdges = repairEndpointOrthogonalPathsTwice(detachedRoutedEdges, repairNodes);
-  const initialTrunkEdges = synthesizeSharedEndpointTrunks(routedEndpointEdges, { nodes: repairNodes });
-  const localTrunkEdges = repairLocalDoglegArtifacts(initialTrunkEdges, repairNodes);
-  const secondaryTrunkEdges = synthesizeSharedEndpointTrunks(localTrunkEdges, { nodes: repairNodes });
-  const secondaryDetachedEdges = reusePreparedGlobalRouting
-    ? secondaryTrunkEdges
-    : separateLargeDetachedParallelOverlapsIfNeeded(
-      secondaryTrunkEdges,
-      repairNodes,
-      24,
-      DISPLAY_DETACHED_OVERLAP_REPAIR_OPTIONS,
-    );
-  const trunkAwareEdges = synthesizeSharedEndpointTrunks(secondaryDetachedEdges, { nodes: repairNodes });
-  const endpointRepairedEdges = repairEndpointOrthogonalPathsTwice(trunkAwareEdges, repairNodes);
-  const targetTrunkEdges = synthesizeSharedTargetTrunks(endpointRepairedEdges, { nodes: repairNodes });
-  const finalEndpointRepairedEdges = repairEndpointOrthogonalPathsTwice(targetTrunkEdges, repairNodes);
-  const sameNodeRoleRepairedEdges = repairEndpointOrthogonalPaths(
-    repairSameNodeInOutCrossings(finalEndpointRepairedEdges, repairNodes),
-    repairNodes,
-  );
+  const topologySeedRemainsCurrent = topologySeed.applied
+    && globallyRoutedEdges === topologySeed.edges
+    && detachedRoutedEdges === globallyRoutedEdges;
+  const topologySeedIsCleanFixedPoint = topologySeedRemainsCurrent
+    && topologySeed.quality !== undefined
+    && !hasHardDisplayOverlapRisk(topologySeed.quality);
+  const sameNodeRoleRepairedEdges = topologySeedIsCleanFixedPoint
+    ? detachedRoutedEdges
+    : (() => {
+      const routedEndpointEdges = topologySeedRemainsCurrent
+        ? detachedRoutedEdges
+        : repairDisplayEndpointOrthogonalPathsTwice(detachedRoutedEdges, repairNodes);
+      const initialTrunkEdges = synthesizeSharedEndpointTrunks(routedEndpointEdges, { nodes: repairNodes });
+      const localTrunkEdges = repairLocalDoglegArtifacts(initialTrunkEdges, repairNodes);
+      const secondaryTrunkEdges = synthesizeSharedEndpointTrunks(localTrunkEdges, { nodes: repairNodes });
+      const secondaryDetachedEdges = reusePreparedGlobalRouting
+        ? secondaryTrunkEdges
+        : separateLargeDetachedParallelOverlapsIfNeeded(
+          secondaryTrunkEdges,
+          repairNodes,
+          24,
+          DISPLAY_DETACHED_OVERLAP_REPAIR_OPTIONS,
+        );
+      const trunkAwareEdges = synthesizeSharedEndpointTrunks(secondaryDetachedEdges, { nodes: repairNodes });
+      const endpointRepairedEdges = repairDisplayEndpointOrthogonalPathsTwice(trunkAwareEdges, repairNodes);
+      const targetTrunkEdges = synthesizeSharedTargetTrunks(endpointRepairedEdges, { nodes: repairNodes });
+      const finalEndpointRepairedEdges = repairDisplayEndpointOrthogonalPathsTwice(targetTrunkEdges, repairNodes);
+      return repairEndpointOrthogonalPaths(
+        repairSameNodeInOutCrossings(finalEndpointRepairedEdges, repairNodes),
+        repairNodes,
+      );
+    })();
   topologyTimer.finish(
     sameNodeRoleRepairedEdges === detachedRoutedEdges ? 'skip' : 'accepted',
     sameNodeRoleRepairedEdges === detachedRoutedEdges ? 0 : sameNodeRoleRepairedEdges.length,
@@ -433,16 +538,25 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
       ? DISPLAY_BOUNDED_DETACHED_OVERLAP_REPAIR_OPTIONS
       : DISPLAY_DETACHED_OVERLAP_REPAIR_OPTIONS,
   );
-  const finalDetachedMicroPolishCandidate = repairBoundedQualityPolishMicroArtifacts(
-    finalDetachedPolishCandidate,
-    useBoundedLargeRepair,
+  detachedPolishTimer?.finish(
+    finalDetachedPolishCandidate === finalLocalPolishCandidate ? 'skip' : 'accepted',
+    finalDetachedPolishCandidate === finalLocalPolishCandidate
+      ? 0
+      : finalDetachedPolishCandidate.length,
   );
+  const detachedLocalPolishTimer = recordPolishPhaseTrace
+    ? startDisplayRoutingPhaseTrace({
+        phase: 'quality-polish-detached-local',
+        candidateCount: finalDetachedPolishCandidate.length,
+        onTrace: recordPolishPhaseTrace,
+      })
+    : null;
   const finalDetachedLocalPolishCandidate = useBoundedLargeRepair
     ? finalDetachedPolishCandidate
     : repairLocalDoglegArtifacts(finalDetachedPolishCandidate, repairNodes);
-  detachedPolishTimer?.finish(
-    finalDetachedLocalPolishCandidate === finalLocalPolishCandidate ? 'skip' : 'accepted',
-    finalDetachedLocalPolishCandidate === finalLocalPolishCandidate
+  detachedLocalPolishTimer?.finish(
+    finalDetachedLocalPolishCandidate === finalDetachedPolishCandidate ? 'skip' : 'accepted',
+    finalDetachedLocalPolishCandidate === finalDetachedPolishCandidate
       ? 0
       : finalDetachedLocalPolishCandidate.length,
   );
@@ -475,9 +589,14 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
   // the endpoint candidate separately and avoid repeating the same global
   // micro search after endpoint normalization; candidate selection can still
   // choose either repair family independently.
+  const microPolishDiagnostics = createDisplayMicroCleanupDiagnostics();
   const finalMicroPolishCandidate = useBoundedLargeRepair
     ? finalEndpointPolishCandidate
-    : repairDisplayMicroArtifacts(finalEndpointPolishCandidate);
+    : repairDisplayMicroArtifacts(
+      finalEndpointPolishCandidate,
+      undefined,
+      microPolishDiagnostics,
+    );
   const finalLocalAfterDetachedCandidate = useBoundedLargeRepair
     ? finalEndpointPolishCandidate
     : repairLocalDoglegArtifacts(finalEndpointPolishCandidate, repairNodes);
@@ -489,6 +608,49 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
     finalEndpointAfterLocalCandidate === finalEndpointPolishCandidate
       ? 0
       : finalEndpointAfterLocalCandidate.length,
+    {
+      candidateCount: microPolishDiagnostics.generatedCandidateCount,
+      evaluationCount: microPolishDiagnostics.evaluatedCandidateCount,
+      cacheHitCount: microPolishDiagnostics.cacheHitCount
+        + microPolishDiagnostics.pairCacheHitCount,
+      scannedEdgePairCount: microPolishDiagnostics.scannedEdgePairCount,
+      scannedSegmentCount: microPolishDiagnostics.scannedSegmentCount,
+    },
+  );
+  const detachedMicroDiagnostics = createDisplayMicroCleanupDiagnostics();
+  const detachedMicroPolishTimer = recordPolishPhaseTrace
+    ? startDisplayRoutingPhaseTrace({
+        phase: 'quality-polish-detached-micro',
+        candidateCount: finalDetachedPolishCandidate.length,
+        onTrace: recordPolishPhaseTrace,
+      })
+    : null;
+  // Endpoint normalization is the stronger non-bounded seed for this micro
+  // defect family. Bounded routing keeps the detached branch because it is its
+  // sole micro candidate; the non-bounded path avoids the redundant search.
+  const needsDetachedMicroAlternative = shouldMaterializeDetachedMicroAlternative(
+    useBoundedLargeRepair,
+  );
+  const finalDetachedMicroPolishCandidate = needsDetachedMicroAlternative
+    ? repairBoundedQualityPolishMicroArtifacts(
+      finalDetachedPolishCandidate,
+      useBoundedLargeRepair,
+      detachedMicroDiagnostics,
+    )
+    : finalDetachedPolishCandidate;
+  detachedMicroPolishTimer?.finish(
+    finalDetachedMicroPolishCandidate === finalDetachedPolishCandidate ? 'skip' : 'accepted',
+    finalDetachedMicroPolishCandidate === finalDetachedPolishCandidate
+      ? 0
+      : finalDetachedMicroPolishCandidate.length,
+    {
+      candidateCount: detachedMicroDiagnostics.generatedCandidateCount,
+      evaluationCount: detachedMicroDiagnostics.evaluatedCandidateCount,
+      cacheHitCount: detachedMicroDiagnostics.cacheHitCount
+        + detachedMicroDiagnostics.pairCacheHitCount,
+      scannedEdgePairCount: detachedMicroDiagnostics.scannedEdgePairCount,
+      scannedSegmentCount: detachedMicroDiagnostics.scannedSegmentCount,
+    },
   );
   const finalPolishCandidates: [Edge[], ...Edge[][]] = [
     finalQualityEdges,
@@ -553,16 +715,24 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
       })
     : null;
   const preFinalizeResidualQuality = calculateEdgePathQualityScore(finalQualityEdges);
+  const useBoundedQualityResidualRepair = shouldUseBoundedQualityResidualRepair(
+    useBoundedLargeRepair,
+    finalQualityEdges.length,
+  );
   const residualQualityEdges = hasHardDisplayOverlapRisk(preFinalizeResidualQuality)
     ? repairResidualDisplayOverlaps(
       finalQualityEdges,
       repairNodes,
-      useBoundedLargeRepair
+      useBoundedQualityResidualRepair
         ? DISPLAY_BOUNDED_DETACHED_OVERLAP_REPAIR_OPTIONS
         : DISPLAY_DETACHED_OVERLAP_REPAIR_OPTIONS,
-      useBoundedLargeRepair
+      useBoundedQualityResidualRepair
         ? DISPLAY_BOUNDED_RESIDUAL_OVERLAP_REPAIR_OPTIONS
         : DISPLAY_EXTENDED_RESIDUAL_OVERLAP_REPAIR_OPTIONS,
+      {
+        parentPhase: 'quality-polish-residual',
+        onPhaseTrace: recordPolishPhaseTrace,
+      },
     )
     : finalQualityEdges;
   residualPolishTimer?.finish(

@@ -23,6 +23,7 @@ import {
   displayObstacleEdgeSignature,
   evaluateDisplayObstacleCandidate,
   evaluateDisplayQualityCandidate,
+  uniqueDisplayRoutingCandidates,
   visualPolishHardQualityDoesNotRegress,
 } from './baseReactFlowDisplayEvaluation';
 import { collectExactThresholdResidualPairs } from './baseReactFlowDisplayReverseParallelRepair';
@@ -275,6 +276,8 @@ export const chooseExactThresholdResidualCandidate = <T extends Edge[]>(
   baseline: T,
   ...candidates: T[]
 ): T => {
+  const uniqueCandidates = uniqueDisplayRoutingCandidates(baseline, candidates);
+  if (uniqueCandidates.length === 0) return baseline;
   const qualityContext = createEdgePathQualityEvaluationContext(baseline);
   const obstacleContext = createDisplayObstacleEvaluationContext(baseline, nodes);
   const exactResidualContext = createDisplayExactResidualEvaluationContext(baseline);
@@ -284,10 +287,7 @@ export const chooseExactThresholdResidualCandidate = <T extends Edge[]>(
   let bestQuality = baselineQuality;
   let bestExactScore = exactResidualContext.evaluate(baseline);
   let bestObstacleHits = obstacleContext.evaluate(baseline);
-  const seen = new Set<T>([baseline]);
-  for (const candidate of candidates) {
-    if (seen.has(candidate)) continue;
-    seen.add(candidate);
+  for (const candidate of uniqueCandidates) {
     if (!displayTerminalValidationDoesNotRegress(baseline, candidate, terminalValidation)) continue;
     const candidateExactScore = exactResidualContext.evaluate(candidate);
     if (candidateExactScore >= bestExactScore) continue;

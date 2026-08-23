@@ -112,7 +112,7 @@ export const mergeBaseReactFlowDisplayEdgePatches = (
   sourceEdges: Edge[],
   patches: Edge[],
 ): Edge[] | null => {
-  if (sourceEdges.length !== patches.length) return null;
+  if (!Array.isArray(patches) || sourceEdges.length !== patches.length) return null;
   const merged: Edge[] = [];
   for (let index = 0; index < sourceEdges.length; index += 1) {
     const sourceEdge = sourceEdges[index];

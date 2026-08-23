@@ -2,10 +2,32 @@ import { lockFinalDisplayComputedPaths } from './baseReactFlowDisplayEdgeCore';
 import { analyzeFinalDisplayRenderContract } from './baseReactFlowDisplayCandidateValidation';
 import { getDisplayHardQualityGateReport } from './baseReactFlowDisplayQualityGates';
 import type { BaseDisplayBoundedCandidateReport } from './baseReactFlowDisplayEvaluation';
+import { countDisplayBusinessNodeCommercialClearanceViolations } from './baseReactFlowDisplayBusinessNodeClearance';
 import type {
   DisplayEdgesWorkerRequest,
   DisplayEdgesWorkerResponse,
 } from './baseReactFlowDisplayWorkerProtocol';
+
+export const getExactDisplayHardReport = (
+  edges: NonNullable<DisplayEdgesWorkerResponse['edges']>,
+  repairNodes: DisplayEdgesWorkerRequest['nodes'],
+  existingReport?: BaseDisplayBoundedCandidateReport,
+): BaseDisplayBoundedCandidateReport => {
+  const baseHardReport = existingReport ?? getDisplayHardQualityGateReport(
+    edges,
+    repairNodes,
+    'polished',
+  );
+  const commercialClearanceViolations = countDisplayBusinessNodeCommercialClearanceViolations(
+    edges,
+    repairNodes,
+  );
+  return {
+    ...baseHardReport,
+    hardClean: baseHardReport.hardClean && commercialClearanceViolations === 0,
+    commercialClearanceViolations,
+  };
+};
 
 export const withExactDisplayHardReport = (
   response: DisplayEdgesWorkerResponse,
@@ -13,10 +35,10 @@ export const withExactDisplayHardReport = (
   existingReport?: BaseDisplayBoundedCandidateReport,
 ): DisplayEdgesWorkerResponse => {
   if (!response.edges) return response;
-  const hardReport = existingReport ?? getDisplayHardQualityGateReport(
+  const hardReport = getExactDisplayHardReport(
     response.edges,
     repairNodes,
-    'polished',
+    existingReport,
   );
   return {
     ...response,

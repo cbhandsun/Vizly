@@ -21,6 +21,7 @@ import * as declaredRoleRepair from '../baseReactFlowDeclaredTerminalRoleRepair'
 import * as endpointStubRepair from '../baseReactFlowDisplayEndpointStubRepair';
 import * as displayFinalizer from '../baseReactFlowDisplayFinalizer';
 import * as fullRoutePipeline from '../baseReactFlowDisplayFullRoutePipeline';
+import * as finalEndpointOrder from '../baseReactFlowDisplayFinalEndpointOrder';
 import * as finalSafetyClosure from '../baseReactFlowDisplayFinalSafetyClosure';
 import * as measuredDisplayRepair from '../baseReactFlowDisplayMeasuredRepair';
 import * as outerPortTransaction from '../baseReactFlowDisplayOuterPortTransaction';
@@ -37,6 +38,7 @@ import {
   mergeTrustedBaseReactFlowDisplayCacheEntry,
   resolveBaseReactFlowDisplayedEdges,
 } from '../baseReactFlowDisplayWorkerClient';
+import { shouldEscalateInteractiveDisplayRoute } from '../baseReactFlowDisplayWorkerFallback';
 
 const nodes: Node[] = [
   {
@@ -282,26 +284,7 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
     expect(workerResponse.phaseTrace?.map(trace => trace.phase)).toEqual([
       'candidate-validation',
       'seed',
-      'quality-global-route',
-      'quality-topology',
-      'quality-crossing-sweeps',
-      'quality-crossing-structural',
-      'quality-crossing-global-refine',
-      'quality-crossing-final-candidates',
-      'quality-strict-closure',
-      'quality-polish',
-      'quality-polish-local',
-      'quality-polish-detached',
-      'quality-polish-endpoint',
-      'quality-polish-micro',
-      'quality-polish-candidates',
-      'quality-polish-selection',
-      'quality-polish-residual',
-      'quality-polish-obstacle-selection',
-      'quality',
-      'post-render-finalize',
-      'post-render-soft-closure',
-      'post-render',
+      'seed-initial-gate',
       'finalizer',
       'final-clearance',
       'final-hard-safety',
@@ -379,6 +362,10 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
   });
 
   it('routes only incident edges from a verified committed baseline', () => {
+    const endpointOrderRepairSpy = vi.spyOn(
+      finalEndpointOrder,
+      'repairBaseReactFlowFinalEndpointOrder',
+    );
     const baselineSourceEdges: Edge[] = edges.map(edge => ({
       ...edge,
       data: { ...(edge.data || {}) },
@@ -472,6 +459,19 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
       'local-route',
       'hard-gate',
     ]));
+    expect(response.phaseTrace?.find(trace => trace.phase === 'incremental-closure'))
+      .toMatchObject({ cacheHitCount: 0 });
+    expect(response.phaseTrace?.find(trace => trace.phase === 'final-safety-hard-gate'))
+      .toMatchObject({
+        evaluationCount: 0,
+        cacheHitCount: 1,
+        scannedNodeCount: 0,
+        scannedEdgePairCount: 0,
+      });
+    const phaseOrder = response.phaseTrace?.map(trace => trace.phase) ?? [];
+    expect(phaseOrder.indexOf('final-safety-hard-gate'))
+      .toBeLessThan(phaseOrder.indexOf('final-endpoint-seed'));
+    expect(endpointOrderRepairSpy).not.toHaveBeenCalled();
   });
 
   it('falls back to the full route in the same job when incremental hints are stale', () => {
@@ -507,6 +507,7 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
       nextInputGeometryDigest: baselineIdentity.geometryDigest,
       changeSet: {
         reason: 'node-drag',
+        classification: 'geometry',
         changedNodeIds: ['source'],
         changedEdgeIds: [],
         topologyChanged: false,
@@ -747,6 +748,12 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
     expect(baseReactFlowDisplayHardQualityIsClean(workerResponse.edges ?? [], nodes)).toBe(true);
   });
 
+  it('escalates an interactive route unless its exact final report is hard clean', () => {
+    expect(shouldEscalateInteractiveDisplayRoute({ hardClean: true })).toBe(false);
+    expect(shouldEscalateInteractiveDisplayRoute({ hardClean: false })).toBe(true);
+    expect(shouldEscalateInteractiveDisplayRoute({})).toBe(true);
+  });
+
   it('enforces declared terminal axes on both sides of the former 24-edge boundary', () => {
     const buildGraph = (edgeCount: number, wrongTerminalAxis: boolean) => {
       const graphNodes: Node[] = [];
@@ -837,9 +844,13 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
       expect(outputRouteSignature).not.toBeNull();
       writeBaseReactFlowDisplayEdgesCache(signature, patches, {
         hardClean: true,
+        inputGeometryDigest: `geometry-v1:${'a'.repeat(32)}`,
         outputRouteSignature: outputRouteSignature!,
       });
-      const cachedEntry = readBaseReactFlowDisplayEdgesCacheEntry(signature);
+      const cachedEntry = readBaseReactFlowDisplayEdgesCacheEntry(
+        signature,
+        `geometry-v1:${'a'.repeat(32)}`,
+      );
       expect(cachedEntry?.hardClean).toBe(true);
       const candidate = cachedEntry
         ? mergeTrustedBaseReactFlowDisplayCacheEntry([sourceEdge], cachedEntry)

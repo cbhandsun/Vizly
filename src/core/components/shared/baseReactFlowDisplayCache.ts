@@ -2,6 +2,10 @@ import type { Edge, Node, XYPosition } from '@xyflow/react';
 import { EDGE_ROUTING_CACHE_VERSION } from '../../routing/routingVersion';
 import { edgeRoutingQualityIntentToken } from '../../strategies/shared/edgeRoutingQualityIntent';
 import { visitBaseReactFlowDisplayInputIdentity } from './baseReactFlowDisplayInputIdentity';
+import {
+  createBaseReactFlowPersistedRoutingCandidate,
+  parseBaseReactFlowPersistedRoutingCandidate,
+} from './baseReactFlowPersistedRoutingCandidate';
 
 const BASE_DISPLAY_FINALIZED_SIGNATURE = '__baseDisplayFinalizedSignature';
 export const BASE_DISPLAY_ROUTING_VERSION = EDGE_ROUTING_CACHE_VERSION;
@@ -10,7 +14,6 @@ const BASE_DISPLAY_CACHE_NAMESPACE = 'vizly:baseReactFlowDisplayEdges:';
 const BASE_DISPLAY_CACHE_PREFIX = `${BASE_DISPLAY_CACHE_NAMESPACE}${BASE_DISPLAY_CACHE_VERSION}:`;
 const BASE_DISPLAY_CACHE_MAX_EDGES = 300;
 const BASE_DISPLAY_CACHE_MAX_CHARS = 2_000_000;
-const BASE_DISPLAY_CACHE_MAX_OBJECT_KEYS = 120;
 const BASE_DISPLAY_CACHE_MAX_ARRAY_ITEMS = 2_000;
 const BASE_DISPLAY_MEMORY_CACHE_MAX_ENTRIES = 16;
 const BASE_DISPLAY_STORAGE_CACHE_MAX_ENTRIES = 12;
@@ -22,6 +25,7 @@ const BASE_DISPLAY_ROUTE_SIGNATURE_VERSION = 'route-v2';
 export type BaseReactFlowDisplayEdgesCacheEntry = {
   edges: Edge[];
   hardClean: boolean;
+  inputGeometryDigest?: string;
   /** Exact path/handle geometry to which hardClean applies. */
   outputRouteSignature: string;
 };
@@ -413,58 +417,6 @@ const cloneDisplayEdges = (edges: Edge[]): Edge[] => (
   }))
 );
 
-const isSafeObjectKey = (key: string): boolean => (
-  key !== '__proto__'
-  && key !== 'prototype'
-  && key !== 'constructor'
-);
-
-const sanitizeCachedJsonValue = (
-  value: unknown,
-  depth = 0,
-): unknown => {
-  if (value == null) return value;
-  if (typeof value === 'boolean') return value;
-  if (typeof value === 'number') return Number.isFinite(value) ? value : undefined;
-  if (typeof value === 'string') return value.length <= 20_000 ? value : value.slice(0, 20_000);
-  if (Array.isArray(value)) {
-    if (depth >= 8 || value.length > BASE_DISPLAY_CACHE_MAX_ARRAY_ITEMS) return undefined;
-    const next: unknown[] = [];
-    for (const item of value) {
-      const sanitized = sanitizeCachedJsonValue(item, depth + 1);
-      if (typeof sanitized !== 'undefined') next.push(sanitized);
-    }
-    return next;
-  }
-  if (typeof value !== 'object' || depth >= 8) return undefined;
-  const entries = Object.entries(value as Record<string, unknown>);
-  if (entries.length > BASE_DISPLAY_CACHE_MAX_OBJECT_KEYS) return undefined;
-  const next: Record<string, unknown> = {};
-  for (const [key, item] of entries) {
-    if (!isSafeObjectKey(key)) continue;
-    const sanitized = sanitizeCachedJsonValue(item, depth + 1);
-    if (typeof sanitized !== 'undefined') next[key] = sanitized;
-  }
-  return next;
-};
-
-const sanitizeCachedDisplayEdge = (value: unknown): Edge | null => {
-  const sanitized = sanitizeCachedJsonValue(value);
-  if (!sanitized || typeof sanitized !== 'object' || Array.isArray(sanitized)) return null;
-  const edge = sanitized as Record<string, unknown>;
-  if (typeof edge.id !== 'string' || edge.id.length === 0 || edge.id.length > 500) return null;
-  if (typeof edge.source !== 'string' || edge.source.length === 0 || edge.source.length > 500) return null;
-  if (typeof edge.target !== 'string' || edge.target.length === 0 || edge.target.length > 500) return null;
-  const data = edge.data;
-  if (data && typeof data === 'object' && !Array.isArray(data)) {
-    const path = (data as Record<string, unknown>).computedPath;
-    if (typeof path !== 'undefined') {
-      if (!Array.isArray(path) || path.length < 2 || !path.every(isFinitePoint)) return null;
-    }
-  }
-  return edge as unknown as Edge;
-};
-
 const readDisplayCacheStorage = (): Storage | null => {
   if (typeof window === 'undefined') return null;
   try {
@@ -537,11 +489,19 @@ const removeOldestCurrentDisplayCacheEntry = (storage: Storage, incomingKey: str
 
 export const readBaseReactFlowDisplayEdgesCacheEntry = (
   signature: string,
+  inputGeometryDigest?: string,
 ): BaseReactFlowDisplayEdgesCacheEntry | null => {
   if (!isValidDisplayCacheInputSignature(signature)) return null;
   const memoryHit = displayEdgesMemoryCache.get(signature);
   if (memoryHit) {
-    if (!memoryHit.hardClean || !isBaseReactFlowDisplayOutputRouteSignature(memoryHit.outputRouteSignature)) {
+    if (
+      !memoryHit.hardClean
+      || !isBaseReactFlowDisplayOutputRouteSignature(memoryHit.outputRouteSignature)
+      || (
+        inputGeometryDigest !== undefined
+        && memoryHit.inputGeometryDigest !== inputGeometryDigest
+      )
+    ) {
       displayEdgesMemoryCache.delete(signature);
       return null;
     }
@@ -549,6 +509,7 @@ export const readBaseReactFlowDisplayEdgesCacheEntry = (
     return {
       edges: cloneDisplayEdges(memoryHit.edges),
       hardClean: memoryHit.hardClean,
+      inputGeometryDigest: memoryHit.inputGeometryDigest,
       outputRouteSignature: memoryHit.outputRouteSignature,
     };
   }
@@ -560,29 +521,23 @@ export const readBaseReactFlowDisplayEdgesCacheEntry = (
     if (!raw || raw.length > BASE_DISPLAY_CACHE_MAX_CHARS) return null;
     const parsed = JSON.parse(raw) as unknown;
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('Invalid edge display cache');
-    const record = parsed as Record<string, unknown>;
-    if (record.version !== BASE_DISPLAY_CACHE_VERSION || record.signature !== signature) {
-      throw new Error('Stale edge display cache');
-    }
-    if (record.hardClean !== true) throw new Error('Unverified edge display cache');
-    if (!isBaseReactFlowDisplayOutputRouteSignature(record.outputRouteSignature)) {
-      throw new Error('Unsigned edge display cache');
-    }
-    if (!Array.isArray(record.edges) || record.edges.length > BASE_DISPLAY_CACHE_MAX_EDGES) {
-      throw new Error('Invalid edge display cache edges');
-    }
-    const edges = record.edges.map(sanitizeCachedDisplayEdge);
-    if (edges.some((edge) => edge == null)) throw new Error('Invalid cached edge payload');
-    const safeEdges = edges as Edge[];
+    const candidate = parseBaseReactFlowPersistedRoutingCandidate(parsed, {
+      routingVersion: BASE_DISPLAY_CACHE_VERSION,
+      inputSignature: signature,
+      inputGeometryDigest,
+    });
+    if (!candidate) throw new Error('Invalid persisted routing candidate');
     const entry = {
-      edges: cloneDisplayEdges(safeEdges),
-      hardClean: record.hardClean === true,
-      outputRouteSignature: record.outputRouteSignature,
+      edges: cloneDisplayEdges(candidate.patches),
+      hardClean: true,
+      inputGeometryDigest: candidate.inputGeometryDigest,
+      outputRouteSignature: candidate.outputRouteSignature,
     };
     rememberDisplayEdgesInMemory(signature, entry);
     return {
       edges: cloneDisplayEdges(entry.edges),
       hardClean: entry.hardClean,
+      inputGeometryDigest: entry.inputGeometryDigest,
       outputRouteSignature: entry.outputRouteSignature,
     };
   } catch {
@@ -595,14 +550,21 @@ export const readBaseReactFlowDisplayEdgesCacheEntry = (
   }
 };
 
-export const readBaseReactFlowDisplayEdgesCache = (signature: string): Edge[] | null => (
-  readBaseReactFlowDisplayEdgesCacheEntry(signature)?.edges ?? null
+export const readBaseReactFlowDisplayEdgesCache = (
+  signature: string,
+  inputGeometryDigest?: string,
+): Edge[] | null => (
+  readBaseReactFlowDisplayEdgesCacheEntry(signature, inputGeometryDigest)?.edges ?? null
 );
 
 export const writeBaseReactFlowDisplayEdgesCache = (
   signature: string,
   edges: Edge[],
-  options: { hardClean?: boolean; outputRouteSignature?: string } = {},
+  options: {
+    hardClean?: boolean;
+    inputGeometryDigest?: string;
+    outputRouteSignature?: string;
+  } = {},
 ): void => {
   // This cache is a final-render accelerator. Persisting a failed bounded candidate makes a
   // transient routing miss sticky across reloads and prevents the worker from retrying it.
@@ -613,22 +575,22 @@ export const writeBaseReactFlowDisplayEdgesCache = (
     || edges.length === 0
     || edges.length > BASE_DISPLAY_CACHE_MAX_EDGES
   ) return;
-  const safeEdges = edges.map(sanitizeCachedDisplayEdge);
-  if (safeEdges.some((edge) => edge == null)) return;
   const outputRouteSignature = options.outputRouteSignature;
   if (!isBaseReactFlowDisplayOutputRouteSignature(outputRouteSignature)) return;
-  const payload = JSON.stringify({
-    version: BASE_DISPLAY_CACHE_VERSION,
-    signature,
-    writtenAt: Date.now(),
-    hardClean: options.hardClean === true,
+  const candidate = createBaseReactFlowPersistedRoutingCandidate({
+    routingVersion: BASE_DISPLAY_CACHE_VERSION,
+    inputSignature: signature,
+    inputGeometryDigest: options.inputGeometryDigest ?? '',
     outputRouteSignature,
-    edges: safeEdges,
+    patches: edges,
   });
+  if (!candidate) return;
+  const payload = JSON.stringify(candidate);
   if (payload.length > BASE_DISPLAY_CACHE_MAX_CHARS) return;
   rememberDisplayEdgesInMemory(signature, {
-    edges: cloneDisplayEdges(safeEdges as Edge[]),
-    hardClean: options.hardClean === true,
+    edges: cloneDisplayEdges(candidate.patches),
+    hardClean: true,
+    inputGeometryDigest: candidate.inputGeometryDigest,
     outputRouteSignature,
   });
   const storage = readDisplayCacheStorage();

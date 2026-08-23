@@ -45,6 +45,15 @@ const projectedNodes = projectBaseReactFlowDisplayWorkerInput({ edges: [], nodes
 
 const createWorkerResult = (hardClean: boolean) => {
   const projected = projectBaseReactFlowDisplayWorkerInput({ edges: sourceEdges, nodes });
+  const routingPatches: Edge[] = [{
+    id: 'source-target',
+    source: 'source',
+    target: 'target',
+    type: 'stablePath',
+    data: {
+      computedPath: [{ x: 100, y: 30 }, { x: 240, y: 30 }],
+    },
+  }];
   return {
     edges: [{
       ...projected.edges[0],
@@ -53,6 +62,7 @@ const createWorkerResult = (hardClean: boolean) => {
         computedPath: [{ x: 100, y: 30 }, { x: 240, y: 30 }],
       },
     }],
+    routingPatches,
     projectedEdges: projected.edges,
     hardClean,
     routeResolution: 'full-route' as const,
@@ -245,6 +255,17 @@ describe('baseReactFlowLayoutRoutingTransaction', () => {
     })).toBeNull();
   });
 
+  it('fails closed when a Worker result omits its routing-only patch transaction', () => {
+    expect(commitBaseReactFlowStagedLayoutRoutingResult({
+      sourceEdges,
+      sourceNodes: projectedNodes,
+      workerResult: {
+        ...createWorkerResult(true),
+        routingPatches: undefined as never,
+      },
+    })).toBeNull();
+  });
+
   it('returns an exact hard-clean route for the hidden layout transaction', () => {
     const committed = commitBaseReactFlowStagedLayoutRoutingResult({
       sourceEdges,
@@ -349,6 +370,15 @@ describe('baseReactFlowLayoutRoutingTransaction', () => {
         projectedEdges: projected.edges,
         edges: [{
           ...projected.edges[0],
+          type: 'stablePath',
+          data: {
+            computedPath: [{ x: 540, y: 390 }, { x: 660, y: 390 }],
+          },
+        }],
+        routingPatches: [{
+          id: 'nested-edge',
+          source: 'nested-source',
+          target: 'nested-target',
           type: 'stablePath',
           data: {
             computedPath: [{ x: 540, y: 390 }, { x: 660, y: 390 }],

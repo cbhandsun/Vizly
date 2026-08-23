@@ -13,9 +13,9 @@ export type UseBaseReactFlowDisplayRoutingOptions = {
   isNodeDragFallbackPending: boolean;
   nodeDragFallbackIds: readonly string[];
   onNodeDragFallbackResolved: () => void;
+  onDisplayRoutingFinalApplied?: () => void;
 };
 
 export type UseBaseReactFlowDisplayRoutingResult = {
   edges: Edge[];
-  routingOwner: 'edge' | 'canvas';
 };

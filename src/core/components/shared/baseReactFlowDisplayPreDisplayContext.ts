@@ -2,6 +2,7 @@ import type { Edge, Node } from '@xyflow/react';
 
 import { withDisplayAbsolutePositions } from './baseReactFlowDisplayEdgeCore';
 import { createBaseDisplayHardGateMemo, type BaseDisplayHardGateMemo } from './baseReactFlowDisplayHardGateMemo';
+import type { BaseReactFlowFinalEndpointEvaluation } from './baseReactFlowDisplayFinalEndpointEvaluation';
 import {
   createDisplayTerminalValidationSnapshot,
   getDisplayTerminalValidationReport,
@@ -15,16 +16,19 @@ export type BaseReactFlowPreDisplayContext = Readonly<{
 
 export const createBaseReactFlowPreDisplayContext = (
   nodes: Node[],
+  evaluationSession?: BaseReactFlowFinalEndpointEvaluation,
 ): BaseReactFlowPreDisplayContext => {
   const nodeById = new Map(nodes.map(node => [node.id, node]));
-  const repairNodes = withDisplayAbsolutePositions(nodes, nodeById);
+  const repairNodes = evaluationSession?.nodes
+    ?? withDisplayAbsolutePositions(nodes, nodeById);
   const terminalSnapshot = createDisplayTerminalValidationSnapshot(repairNodes);
   const { getReport } = createBaseDisplayHardGateMemo(repairNodes, terminalSnapshot);
   return {
     repairNodes,
-    getRouteHardQualityGateReport: getReport,
+    getRouteHardQualityGateReport: evaluationSession?.hardReport ?? getReport,
     routeTerminalsAreAttached: edges => (
-      getDisplayTerminalValidationReport(edges, terminalSnapshot).allAttached
+      evaluationSession?.terminalReport(edges).allAttached
+      ?? getDisplayTerminalValidationReport(edges, terminalSnapshot).allAttached
     ),
   };
 };

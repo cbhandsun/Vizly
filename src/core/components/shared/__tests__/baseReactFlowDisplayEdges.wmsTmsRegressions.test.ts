@@ -240,6 +240,12 @@ describe('baseReactFlowDisplayEdges WMS and TMS regressions', () => {
       JSON.stringify({ durationMs, phaseTrace }, null, 2),
     ).toBe(true);
     expect(
+      phaseTrace.some(trace => (
+        (trace.evaluationCount ?? 0) > 0 || (trace.cacheHitCount ?? 0) > 0
+      )),
+      JSON.stringify({ durationMs, phaseTrace }, null, 2),
+    ).toBe(true);
+    expect(
       durationMs,
       JSON.stringify({ durationMs, phaseTrace, quality }, null, 2),
     ).toBeLessThan(25_000);
@@ -274,6 +280,7 @@ describe('baseReactFlowDisplayEdges WMS and TMS regressions', () => {
       routeResolution: response.routeResolution,
       quality,
       hardReport,
+      responseHardReport: response.hardReport,
       obstacleHits: edgeNodeObstacleHits(result, absoluteNodes),
       terminalsAttached: displayEdgesHaveNodeAttachedTerminals(result, absoluteNodes),
       terminalsAnchored: displayEdgesHaveNodeAnchoredTerminals(result, absoluteNodes),

@@ -55,6 +55,22 @@ describe('display obstacle candidates', () => {
       { x: 204, y: 3661 },
       { x: 204, y: 3789 },
     ]);
+    expect(buildObstacleSkirtCandidates(
+      getDisplayComputedPath(edge),
+      nodes,
+      edge,
+      [edge],
+      undefined,
+      3,
+    )).toEqual(candidates.slice(0, 3));
+    expect(buildObstacleSkirtCandidates(
+      getDisplayComputedPath(edge),
+      nodes,
+      edge,
+      [edge],
+      undefined,
+      Number.NaN,
+    )).toEqual([]);
   });
 
   it('routes a two-point orthogonal path around an unrelated node', () => {

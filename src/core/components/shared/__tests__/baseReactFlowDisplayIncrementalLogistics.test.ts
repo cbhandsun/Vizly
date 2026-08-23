@@ -15,6 +15,7 @@ import {
 import { computeBaseReactFlowDisplayEdgesWorkerResponse } from '../baseReactFlowDisplayEdges.worker';
 import { computeBaseReactFlowDisplayInputIdentityBundle } from '../baseReactFlowDisplayInputIdentity';
 import { getDisplayHardQualityGateReport } from '../baseReactFlowDisplayQualityGates';
+import { getExactDisplayHardReport } from '../baseReactFlowDisplayWorkerResponse';
 import { getDisplayComputedPath } from '../baseReactFlowDisplayGeometry';
 import {
   createBaseReactFlowRoutingAffectedClosure,
@@ -148,7 +149,7 @@ describe('Logistics incremental display routing', () => {
       contextEdgeIds: affectedClosure.contextEdgeIds,
     }, report => boundedReports.push(report));
     const report = response.edges
-      ? getDisplayHardQualityGateReport(response.edges, nextNodes, 'polished')
+      ? getExactDisplayHardReport(response.edges, nextNodes)
       : null;
     const diagnostics = JSON.stringify({
       affectedClosure,
@@ -170,6 +171,12 @@ describe('Logistics incremental display routing', () => {
     );
     expect(report?.hardClean, diagnostics).toBe(true);
     expect(response.hardReport, diagnostics).toEqual(report);
+    const reconnectCandidateTrace = response.phaseTrace?.find(
+      trace => trace.phase === 'local-reconnect-candidates',
+    );
+    expect(reconnectCandidateTrace?.evaluationCount, diagnostics).toBeGreaterThan(0);
+    expect(reconnectCandidateTrace?.cacheHitCount, diagnostics).toBeGreaterThan(0);
+    expect(reconnectCandidateTrace?.scannedNodeCount, diagnostics).toBeGreaterThan(0);
   }, 120_000);
 
   it('keeps every mutable WMS branch at commercial clearance after a small drag', async () => {

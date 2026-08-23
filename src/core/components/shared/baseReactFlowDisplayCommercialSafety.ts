@@ -59,12 +59,23 @@ export const closeBaseReactFlowFinalCommercialSafety = <T extends Edge[]>({
     candidateCount: edges.length,
     onTrace: onPhaseTrace,
   });
-  const closedEdges = canReuseClosure
+  const repairedEdges = canReuseClosure
     ? edges
     : repairBaseReactFlowFinalSafetyClosure(edges, nodes, {
       eligibleEdgeIds,
       evaluation,
     });
+  const closedEdges = canReuseClosure || (
+    evaluation.hardReport(repairedEdges).hardClean
+    && eligibleCommercialClearanceDoesNotRegress(
+      edges,
+      repairedEdges,
+      nodes,
+      eligibleEdgeIds,
+    )
+  )
+    ? repairedEdges
+    : edges;
   timer.finish(
     canReuseClosure
       ? 'hit'
@@ -76,6 +87,7 @@ export const closeBaseReactFlowFinalCommercialSafety = <T extends Edge[]>({
 export const commitBaseReactFlowFinalCommercialSafety = ({
   closedEdges,
   eligibleEdgeIds,
+  evaluation,
   nodes,
   onPhaseTrace,
   repairNodes,
@@ -83,16 +95,22 @@ export const commitBaseReactFlowFinalCommercialSafety = ({
 }: Readonly<{
   closedEdges: Edge[];
   eligibleEdgeIds?: ReadonlySet<string>;
+  evaluation?: BaseReactFlowFinalEndpointEvaluation;
   nodes: DisplayEdgesWorkerRequest['nodes'];
   onPhaseTrace?: (trace: DisplayRoutingPhaseTrace) => void;
   repairNodes: Node[];
   response: DisplayEdgesWorkerResponse;
 }>): DisplayEdgesWorkerResponse => {
   if (!response.edges) return response;
-  const outcome = closeBaseReactFlowDisplayFinalHardContract(closedEdges, nodes, onPhaseTrace);
+  const outcome = closeBaseReactFlowDisplayFinalHardContract(
+    closedEdges,
+    nodes,
+    onPhaseTrace,
+    evaluation,
+  );
   const contractEdges = outcome.report.hardClean
     && eligibleCommercialClearanceDoesNotRegress(
-      response.edges,
+      closedEdges,
       outcome.edges,
       repairNodes,
       eligibleEdgeIds,
@@ -111,6 +129,7 @@ export const commitBaseReactFlowFinalCommercialSafety = ({
     ...response,
     edges,
     hardClean: contractEdges === outcome.edges ? outcome.report.hardClean : response.hardClean,
+    hardReport: contractEdges === outcome.edges ? outcome.report : response.hardReport,
     routeResolution: response.routeResolution === 'validated-candidate'
       ? 'repaired-candidate'
       : response.routeResolution,

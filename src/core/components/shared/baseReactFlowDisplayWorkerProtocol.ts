@@ -2,9 +2,6 @@ import type { Edge, Node } from '@xyflow/react';
 
 import type { BaseDisplayBoundedCandidateReport } from './baseReactFlowDisplayEvaluation';
 import {
-  type DisplayRoutingPhaseTrace,
-} from './baseReactFlowDisplayRoutingTrace';
-import {
   isDisplayRoutingPhaseTrace,
   parseDisplayRoutingPhaseTrace,
 } from './baseReactFlowDisplayWorkerTraceProtocol';
@@ -20,6 +17,16 @@ import {
   type RoutingIdentity,
   type RoutingWorkerSessionRef,
 } from './baseReactFlowDisplayRoutingSession';
+import type {
+  DisplayEdgesWorkerResponse,
+  DisplayRoutingFallbackLevel,
+} from './baseReactFlowDisplayWorkerResponseProtocol';
+
+export type {
+  DisplayEdgesWorkerResponse,
+  DisplayEdgesWorkerRouteResolution,
+  DisplayRoutingFallbackLevel,
+} from './baseReactFlowDisplayWorkerResponseProtocol';
 
 const MAX_REQUEST_ID_LENGTH = 4_096;
 export const DISPLAY_WORKER_MAX_GRAPH_ITEMS = 10_000;
@@ -84,14 +91,6 @@ const QUALITY_KEYS = [
 
 export type DisplayQualityMode = 'full' | 'interactive';
 export type DisplayEdgesWorkerCandidateSource = 'persistent' | 'precompiled';
-export type DisplayEdgesWorkerRouteResolution =
-  | 'validated-candidate'
-  | 'repaired-candidate'
-  | 'incremental-route'
-  | 'full-route'
-  | 'full-route-repaired'
-  | 'repair';
-
 export type DisplayEdgesWorkerRouteRequest = {
   operation: 'route';
   requestId: string;
@@ -160,26 +159,6 @@ export type DisplayEdgesWorkerRequest =
   | DisplayEdgesWorkerValidateOrRouteRequest
   | DisplayEdgesWorkerIncrementalRouteRequest
   | DisplayEdgesWorkerRepairRequest;
-
-export type DisplayRoutingFallbackLevel = 'none' | 'full';
-
-export type DisplayEdgesWorkerResponse = {
-  requestId: string;
-  edges?: Edge[];
-  hardClean?: boolean;
-  hardReport?: BaseDisplayBoundedCandidateReport;
-  routeResolution?: DisplayEdgesWorkerRouteResolution;
-  error?: string;
-  boundedCandidate?: BaseDisplayBoundedCandidateReport;
-  phaseTrace?: DisplayRoutingPhaseTrace[];
-  phaseProgress?: DisplayRoutingPhaseTrace;
-  affectedEdgeCount?: number;
-  fallbackLevel?: DisplayRoutingFallbackLevel;
-  nextIdentity?: RoutingIdentity;
-  outputRouteSignature?: string;
-  sessionRef?: RoutingWorkerSessionRef;
-  workerDurationMs?: number;
-};
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
@@ -534,6 +513,18 @@ const isBoundedCandidate = (value: unknown): value is BaseDisplayBoundedCandidat
       || (clearanceViolations as number) > DISPLAY_WORKER_MAX_GRAPH_ITEMS
     )
   ) return false;
+  const commercialClearanceViolations = value.commercialClearanceViolations;
+  if (
+    typeof commercialClearanceViolations !== 'undefined'
+    && (
+      !Number.isSafeInteger(commercialClearanceViolations)
+      || (commercialClearanceViolations as number) < 0
+      || (commercialClearanceViolations as number) > DISPLAY_WORKER_MAX_GRAPH_ITEMS
+    )
+  ) return false;
+  if ((commercialClearanceViolations as number | undefined) !== undefined
+    && (commercialClearanceViolations as number) > 0
+    && value.hardClean === true) return false;
   const clearanceEdgeIds = value.minimumClearanceViolationEdgeIds;
   if (
     typeof clearanceEdgeIds !== 'undefined'
@@ -566,11 +557,13 @@ export const parseDisplayEdgesWorkerResponse = (
   const hasError = typeof value.error !== 'undefined';
   const hasBoundedCandidate = typeof value.boundedCandidate !== 'undefined';
   const hasEdges = typeof value.edges !== 'undefined';
+  const hasRoutingPatches = typeof value.routingPatches !== 'undefined';
   const hasPhaseProgress = typeof value.phaseProgress !== 'undefined';
   if (
     Number(hasError)
     + Number(hasBoundedCandidate)
     + Number(hasEdges)
+    + Number(hasRoutingPatches)
     + Number(hasPhaseProgress) !== 1
   ) return null;
   if (hasError) {
@@ -654,7 +647,9 @@ export const parseDisplayEdgesWorkerResponse = (
     && value.sessionRef.outputRouteSignature === value.outputRouteSignature
   );
   if (
-    !isDisplayEdgesWorkerEdgeList(value.edges)
+    !(hasEdges
+      ? isDisplayEdgesWorkerEdgeList(value.edges)
+      : isDisplayEdgesWorkerEdgeList(value.routingPatches))
     || !phaseTrace
     || hardReport === null
     || (workerDurationMs !== undefined && (
@@ -677,7 +672,8 @@ export const parseDisplayEdgesWorkerResponse = (
   ) return null;
   return {
     requestId: expectedRequestId,
-    edges: value.edges,
+    edges: hasEdges ? value.edges as Edge[] : undefined,
+    routingPatches: hasRoutingPatches ? value.routingPatches as Edge[] : undefined,
     hardClean: value.hardClean,
     hardReport,
     routeResolution: value.routeResolution,

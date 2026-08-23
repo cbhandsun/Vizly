@@ -2,6 +2,9 @@ export const DISPLAY_ROUTING_PHASE_NAMES = [
   'candidate-validation',
   'incremental-closure',
   'local-route',
+  'local-reconnect-seed',
+  'local-reconnect-candidates',
+  'local-fast-fallback',
   'hard-gate',
   'seed',
   'seed-interactive',
@@ -15,6 +18,7 @@ export const DISPLAY_ROUTING_PHASE_NAMES = [
   'seed-terminal-gate',
   'quality',
   'quality-global-route',
+  'quality-topology-seed',
   'quality-topology',
   'quality-crossing-sweeps',
   'quality-crossing-structural',
@@ -25,10 +29,23 @@ export const DISPLAY_ROUTING_PHASE_NAMES = [
   'quality-polish-candidates',
   'quality-polish-local',
   'quality-polish-detached',
+  'quality-polish-detached-micro',
+  'quality-polish-detached-local',
   'quality-polish-endpoint',
   'quality-polish-micro',
   'quality-polish-selection',
   'quality-polish-residual',
+  'residual-exact',
+  'residual-loop-shortcut',
+  'residual-exact-selection',
+  'residual-polish-selection',
+  'residual-micro-derivative',
+  'residual-endpoint-derivative',
+  'residual-obstacle-selection',
+  'residual-detached-primary',
+  'residual-detached-default',
+  'residual-detached-extended',
+  'residual-near-parallel',
   'quality-polish-obstacle-selection',
   'post-render',
   'post-render-finalize',
@@ -82,9 +99,11 @@ export type DisplayRoutingPhaseResolution =
   typeof DISPLAY_ROUTING_PHASE_RESOLUTIONS[number];
 
 export type DisplayRoutingPhaseMetrics = Readonly<{
+  candidateCount?: number;
   evaluationCount?: number;
   cacheHitCount?: number;
   scannedNodeCount?: number;
+  scannedSegmentCount?: number;
   scannedEdgePairCount?: number;
 }>;
 
@@ -98,6 +117,7 @@ export type DisplayRoutingPhaseTrace = Readonly<{
   evaluationCount?: number;
   cacheHitCount?: number;
   scannedNodeCount?: number;
+  scannedSegmentCount?: number;
   scannedEdgePairCount?: number;
   resolution: DisplayRoutingPhaseResolution;
 }>;
@@ -113,6 +133,9 @@ type DisplayRoutingPhaseTimer = Readonly<{
 const DISPLAY_ROUTING_PHASE_PARENTS: Readonly<
   Partial<Record<DisplayRoutingPhaseName, DisplayRoutingPhaseName>>
 > = Object.freeze({
+  'local-reconnect-seed': 'local-route',
+  'local-reconnect-candidates': 'local-route',
+  'local-fast-fallback': 'local-route',
   'seed-interactive': 'seed',
   'seed-interactive-route': 'seed-interactive',
   'seed-interactive-terminal-cleanup': 'seed-interactive',
@@ -123,6 +146,7 @@ const DISPLAY_ROUTING_PHASE_PARENTS: Readonly<
   'seed-terminal-axis': 'seed',
   'seed-terminal-gate': 'seed',
   'quality-global-route': 'quality',
+  'quality-topology-seed': 'quality',
   'quality-topology': 'quality',
   'quality-crossing-sweeps': 'quality',
   'quality-crossing-structural': 'quality-crossing-sweeps',
@@ -133,6 +157,8 @@ const DISPLAY_ROUTING_PHASE_PARENTS: Readonly<
   'quality-polish-candidates': 'quality-polish',
   'quality-polish-local': 'quality-polish-candidates',
   'quality-polish-detached': 'quality-polish-candidates',
+  'quality-polish-detached-micro': 'quality-polish-candidates',
+  'quality-polish-detached-local': 'quality-polish-candidates',
   'quality-polish-endpoint': 'quality-polish-candidates',
   'quality-polish-micro': 'quality-polish-candidates',
   'quality-polish-selection': 'quality-polish',
@@ -260,11 +286,12 @@ export const startDisplayRoutingPhaseTrace = ({
         phase,
         ...(parentPhase ? { parentPhase } : {}),
         durationMs: toBoundedDuration(readMonotonicTime() - startedAt),
-        candidateCount: toBoundedCount(candidateCount),
+        candidateCount: toBoundedCount(metrics.candidateCount ?? candidateCount),
         changedEdgeCount: toBoundedCount(changedEdgeCount),
         evaluationCount: toBoundedCount(metrics.evaluationCount ?? 0),
         cacheHitCount: toBoundedCount(metrics.cacheHitCount ?? 0),
         scannedNodeCount: toBoundedCount(metrics.scannedNodeCount ?? 0),
+        scannedSegmentCount: toBoundedCount(metrics.scannedSegmentCount ?? 0),
         scannedEdgePairCount: toBoundedCount(metrics.scannedEdgePairCount ?? 0),
         resolution,
       });

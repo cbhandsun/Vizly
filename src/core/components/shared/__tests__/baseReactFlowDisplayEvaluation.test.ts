@@ -15,6 +15,7 @@ import {
   createDisplayObstacleEvaluationContext,
   evaluateDisplayObstacleCandidate,
   getDisplayHardQualityGateReport,
+  uniqueDisplayRoutingCandidates,
 } from '../baseReactFlowDisplayEvaluation';
 import { findDisplayStrictCrossingHits } from '../baseReactFlowDisplayGeometry';
 import {
@@ -26,10 +27,22 @@ import {
   hasSharedTargetEntryStrictCrossing,
   repairSharedTargetEntryStrictCrossingsIfNeeded,
   separateLargeDetachedParallelOverlapsIfNeeded,
+  shouldUseBoundedQualityResidualRepair,
 } from '../baseReactFlowDisplayFullRouteQualityPhase';
-import { shouldUseBoundedPostRenderResidualRepair } from '../baseReactFlowDisplayFullRoutePostRenderPhase';
-import { createDisplayRoutingDefectPlan } from '../baseReactFlowDisplayRoutingDefectPlan';
-import { createDisplayRoutingTopologyPlan } from '../baseReactFlowDisplayRoutingTopologyPlan';
+import {
+  shouldUseBoundedPostRenderResidualRepair,
+} from '../baseReactFlowDisplayFullRoutePostRenderPhase';
+import {
+  createDisplayRoutingDefectPlan,
+  displayRoutingQualityNeedsMicroRepair,
+  displayRoutingQualityNeedsTerminalRepair,
+} from '../baseReactFlowDisplayRoutingDefectPlan';
+import {
+  createDisplayRoutingTopologyPlan,
+  createDisplayRoutingTopologyWaypointAxes,
+} from '../baseReactFlowDisplayRoutingTopologyPlan';
+import { resolveReconnectCandidateBudgetPerEdge } from '../baseReactFlowDisplayLocalReconnect';
+import { chooseExactThresholdResidualCandidate } from '../baseReactFlowDisplayOverlapEvaluation';
 
 const edge = (path: Array<{ x: number; y: number }>): Edge => ({
   id: 'edge',
@@ -69,9 +82,26 @@ describe('baseReactFlowDisplayEvaluation', () => {
       .toBe(true);
     expect(plan.groups.some(group => group.kind === 'target' && group.memberEdgeIndexes.length === 2))
       .toBe(true);
+    expect(plan.groups).toEqual(expect.arrayContaining([
+      expect.objectContaining({ topologyPattern: 'o2m', trunkMode: 'dual', laneDemand: 2 }),
+      expect.objectContaining({ topologyPattern: 'm2o', trunkMode: 'dual', laneDemand: 2 }),
+    ]));
     expect(plan.candidateAxes.x).toEqual(expect.arrayContaining([0, 100, 300, 400, 600, 700]));
     expect(plan.corridors.some(corridor => corridor.axis === 'vertical' && corridor.capacity > 0))
       .toBe(true);
+    expect(plan.corridors.every(corridor => (
+      corridor.laneCenters.length === corridor.capacity
+      && corridor.laneCenters.every(lane => lane > corridor.start && lane < corridor.end)
+    ))).toBe(true);
+    expect(createDisplayRoutingTopologyWaypointAxes(plan, false)).toEqual({
+      x: plan.corridors
+        .filter(corridor => corridor.axis === 'vertical')
+        .map(corridor => corridor.center),
+      y: plan.corridors
+        .filter(corridor => corridor.axis === 'horizontal')
+        .map(corridor => corridor.center),
+    });
+    expect(createDisplayRoutingTopologyWaypointAxes(plan, true)).toBeUndefined();
   });
 
   it('keeps empty and non-finite topology inputs bounded', () => {
@@ -88,6 +118,20 @@ describe('baseReactFlowDisplayEvaluation', () => {
     }], []);
     expect(plan.candidateAxes).toEqual({ x: [], y: [] });
     expect(plan.corridors).toEqual([]);
+    expect(createDisplayRoutingTopologyWaypointAxes(plan, false)).toBeUndefined();
+
+    const extremePlan = createDisplayRoutingTopologyPlan([
+      {
+        id: 'left', position: { x: -1_000_000_000, y: 0 },
+        measured: { width: 100, height: 60 }, data: {},
+      },
+      {
+        id: 'right', position: { x: 999_999_900, y: 0 },
+        measured: { width: 100, height: 60 }, data: {},
+      },
+    ], []);
+    expect(Math.max(0, ...extremePlan.corridors.map(corridor => corridor.capacity)))
+      .toBeLessThanOrEqual(256);
   });
 
   it('builds a defect-directed stage plan without allowing metric compensation', () => {
@@ -133,12 +177,35 @@ describe('baseReactFlowDisplayEvaluation', () => {
       needsMicroRepair: true,
       onlyTerminalAxisDefects: false,
     });
+    expect(displayRoutingQualityNeedsMicroRepair(quality)).toBe(false);
+    expect(displayRoutingQualityNeedsMicroRepair({ ...quality, hairpins: 1 })).toBe(true);
+    expect(displayRoutingQualityNeedsTerminalRepair(quality)).toBe(false);
+    expect(displayRoutingQualityNeedsTerminalRepair({
+      ...quality,
+      shortEndpointStubs: 1,
+    })).toBe(true);
   });
   it('bounds post-render residual repair for large routes or hard-overlap handoff', () => {
     expect(shouldUseBoundedPostRenderResidualRepair(false, false)).toBe(false);
     expect(shouldUseBoundedPostRenderResidualRepair(true, false)).toBe(true);
     expect(shouldUseBoundedPostRenderResidualRepair(false, true)).toBe(true);
     expect(shouldUseBoundedPostRenderResidualRepair(true, true)).toBe(true);
+  });
+
+  it('bounds residual candidate materialization for medium and large routes', () => {
+    expect(shouldUseBoundedQualityResidualRepair(false, 11)).toBe(false);
+    expect(shouldUseBoundedQualityResidualRepair(false, 12)).toBe(true);
+    expect(shouldUseBoundedQualityResidualRepair(true, 1)).toBe(true);
+  });
+
+  it('bounds reconnect candidates before materializing multi-edge transactions', () => {
+    expect(resolveReconnectCandidateBudgetPerEdge(1)).toBe(256);
+    expect(resolveReconnectCandidateBudgetPerEdge(2)).toBe(256);
+    expect(resolveReconnectCandidateBudgetPerEdge(4)).toBe(64);
+    expect(resolveReconnectCandidateBudgetPerEdge(5)).toBe(128);
+    expect(resolveReconnectCandidateBudgetPerEdge(100)).toBe(256);
+    expect(resolveReconnectCandidateBudgetPerEdge(0)).toBe(0);
+    expect(resolveReconnectCandidateBudgetPerEdge(Number.NaN)).toBe(0);
   });
 
   it('tokenizes only explicit routing-quality intent flags', () => {
@@ -178,6 +245,19 @@ describe('baseReactFlowDisplayEvaluation', () => {
     expect(chooseFinalObstacleAwarePolishCandidate([], baseline, baseline, baseline)).toBe(baseline);
     expect(chooseFinalTerminalTransactionCandidate([], baseline, baseline, baseline)).toBe(baseline);
     expect(chooseDisplayStrictPolishCandidate([], baseline, baseline, baseline)).toBe(baseline);
+  });
+
+  it('deduplicates candidate arrays by routing signature while preserving the first route', () => {
+    const baseline = [edge([{ x: 0, y: 0 }, { x: 100, y: 0 }])];
+    const styleOnlyClone = [{ ...baseline[0], style: { strokeWidth: 4 } }];
+    const changed = [edge([{ x: 0, y: 0 }, { x: 100, y: 20 }, { x: 120, y: 20 }])];
+    const changedClone = changed.map(candidate => ({ ...candidate }));
+
+    expect(uniqueDisplayRoutingCandidates(
+      baseline,
+      [styleOnlyClone, changed, changedClone],
+    )).toEqual([changed]);
+    expect(chooseExactThresholdResidualCandidate([], baseline, styleOnlyClone)).toBe(baseline);
   });
 
   it('short-circuits only exact no-op full-route quality repair families', () => {
@@ -302,6 +382,46 @@ describe('baseReactFlowDisplayEvaluation', () => {
       detachedRepair,
     )).toBe(delegatedDetached);
     expect(detachedRepair).toHaveBeenCalledOnce();
+  });
+
+  it('reuses a proven detached no-op for routing-equivalent immutable inputs', () => {
+    const baseline: Edge[] = [
+      {
+        ...edge([{ x: 0, y: 0 }, { x: 100, y: 0 }]),
+        id: 'detached-noop-forward',
+        source: 'detached-noop-source-a',
+        target: 'detached-noop-target-a',
+      },
+      {
+        ...edge([{ x: 100, y: 0 }, { x: 0, y: 0 }]),
+        id: 'detached-noop-reverse',
+        source: 'detached-noop-source-b',
+        target: 'detached-noop-target-b',
+      },
+    ];
+    const repair = vi.fn((candidate: Edge[]) => candidate);
+    const options = { maxQualityEvaluations: 1 };
+
+    expect(separateLargeDetachedParallelOverlapsIfNeeded(
+      baseline,
+      [],
+      16,
+      options,
+      repair,
+    )).toBe(baseline);
+    const equivalent = baseline.map(candidate => ({
+      ...candidate,
+      style: { strokeWidth: 4 },
+      data: { ...candidate.data },
+    }));
+    expect(separateLargeDetachedParallelOverlapsIfNeeded(
+      equivalent,
+      [],
+      16,
+      options,
+      repair,
+    )).toBe(equivalent);
+    expect(repair).toHaveBeenCalledOnce();
   });
 
   it('reuses baseline obstacle hits while preserving in-place mutation invalidation', () => {

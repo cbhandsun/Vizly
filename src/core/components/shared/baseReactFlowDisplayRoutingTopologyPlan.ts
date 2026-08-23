@@ -5,6 +5,8 @@ import { getDisplayComputedPath, getDisplayNodeRect } from './baseReactFlowDispl
 export type RoutingTerminalSide = 'top' | 'right' | 'bottom' | 'left' | 'unknown';
 export type RoutingSector = 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw' | 'same';
 export type RoutingFlowRole = 'main' | 'data' | 'dependency' | 'status' | 'neutral';
+export type RoutingTopologyPattern = 'o2m' | 'm2o';
+export type RoutingTrunkMode = 'single' | 'dual';
 
 export type RoutingTopologyGroup = Readonly<{
   kind: 'source' | 'target';
@@ -12,6 +14,9 @@ export type RoutingTopologyGroup = Readonly<{
   side: RoutingTerminalSide;
   sector: RoutingSector;
   flowRole: RoutingFlowRole;
+  topologyPattern: RoutingTopologyPattern;
+  trunkMode: RoutingTrunkMode;
+  laneDemand: number;
   memberEdgeIndexes: number[];
   dualRoleMemberIndexes: number[];
 }>;
@@ -22,6 +27,7 @@ export type RoutingCorridorPlan = Readonly<{
   end: number;
   center: number;
   capacity: number;
+  laneCenters: number[];
 }>;
 
 export type RoutingTopologyPlan = Readonly<{
@@ -31,6 +37,30 @@ export type RoutingTopologyPlan = Readonly<{
   candidateAxes: Readonly<{ x: number[]; y: number[] }>;
   corridors: RoutingCorridorPlan[];
 }>;
+
+export type RoutingTopologyWaypointAxes = Readonly<{
+  x: readonly number[];
+  y: readonly number[];
+}>;
+
+/**
+ * Projects topology into the narrow waypoint boundary consumed by the routing
+ * strategy. Bounded large graphs stay on their frozen baseline until their
+ * dedicated candidate/performance budget is proven by the 30-sample gate.
+ */
+export const createDisplayRoutingTopologyWaypointAxes = (
+  plan: RoutingTopologyPlan,
+  useBoundedLargeRepair: boolean,
+): RoutingTopologyWaypointAxes | undefined => {
+  if (useBoundedLargeRepair) return undefined;
+  const x = plan.corridors
+    .filter(corridor => corridor.axis === 'vertical')
+    .map(corridor => corridor.center);
+  const y = plan.corridors
+    .filter(corridor => corridor.axis === 'horizontal')
+    .map(corridor => corridor.center);
+  return x.length > 0 || y.length > 0 ? { x, y } : undefined;
+};
 
 const readSide = (handle: unknown): RoutingTerminalSide => {
   if (typeof handle !== 'string') return 'unknown';
@@ -106,12 +136,18 @@ const createCorridors = (
     const end = merged[index].start;
     const gap = end - start;
     if (gap < 48) continue;
+    const capacity = Math.min(256, Math.max(1, Math.floor((gap - 32) / 16)));
+    const laneStep = gap / (capacity + 1);
     corridors.push({
       axis,
       start,
       end,
       center: (start + end) / 2,
-      capacity: Math.max(1, Math.floor((gap - 32) / 16)),
+      capacity,
+      laneCenters: Array.from(
+        { length: capacity },
+        (_, laneIndex) => start + laneStep * (laneIndex + 1),
+      ),
     });
   }
   return corridors;
@@ -125,7 +161,14 @@ export const createDisplayRoutingTopologyPlan = (
   const sourceMembership = new Map<number, string>();
   const targetMembership = new Map<number, string>();
   const groupMembers = new Map<string, number[]>();
-  const groupMetadata = new Map<string, Omit<RoutingTopologyGroup, 'memberEdgeIndexes' | 'dualRoleMemberIndexes'>>();
+  const groupMetadata = new Map<string, Omit<
+    RoutingTopologyGroup,
+    | 'topologyPattern'
+    | 'trunkMode'
+    | 'laneDemand'
+    | 'memberEdgeIndexes'
+    | 'dualRoleMemberIndexes'
+  >>();
   const xAxes: number[] = [];
   const yAxes: number[] = [];
   edges.slice(0, 10_000).forEach((edge, edgeIndex) => {
@@ -162,11 +205,19 @@ export const createDisplayRoutingTopologyPlan = (
     const targetGroup = groupMembers.get(targetMembership.get(edgeIndex) ?? '');
     if ((sourceGroup?.length ?? 0) > 1 && (targetGroup?.length ?? 0) > 1) dualIndexes.add(edgeIndex);
   }
-  const groups = [...groupMembers.entries()].flatMap(([key, memberEdgeIndexes]) => {
+  const groups = [...groupMembers.entries()].flatMap<RoutingTopologyGroup>(([
+    key,
+    memberEdgeIndexes,
+  ]) => {
     const metadata = groupMetadata.get(key);
     if (!metadata || memberEdgeIndexes.length <= 1) return [];
     return [{
       ...metadata,
+      topologyPattern: metadata.kind === 'source' ? 'o2m' : 'm2o',
+      trunkMode: memberEdgeIndexes.some(index => dualIndexes.has(index))
+        ? 'dual'
+        : 'single',
+      laneDemand: memberEdgeIndexes.length,
       memberEdgeIndexes,
       dualRoleMemberIndexes: memberEdgeIndexes.filter(index => dualIndexes.has(index)),
     }];

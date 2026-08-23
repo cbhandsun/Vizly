@@ -18,10 +18,21 @@ export type RoutingObstacleEvaluationContext = Readonly<{
   countPathHits: (path: Point[]) => number;
   countUnrelatedObstacleHits: (path: Point[]) => number;
   evaluate: (path: Point[]) => RoutingObstacleHitEvaluation;
+  readMetrics: () => Readonly<{ scannedNodeCount: number }>;
 }>;
 
 export type NodeClearanceEvaluationContext = Readonly<{
   score: (path: Point[], minimumClearance?: number) => number;
+}>;
+
+export type NodeClearanceGraphEvaluationContext = Readonly<{
+  score: (path: Point[], edge: Edge, minimumClearance?: number) => number;
+  readMetrics: () => Readonly<{ scannedNodeCount: number }>;
+}>;
+
+export type RoutingWaypointCandidateAxes = Readonly<{
+  x: readonly number[];
+  y: readonly number[];
 }>;
 
 const ENDPOINT_INTERIOR_TOLERANCE = 0.51;
@@ -124,7 +135,11 @@ const paddedRectBounds = (rect: Rect, padding: number): PaddedRectBounds => ({
   y2: rect.y + rect.height + padding,
 });
 
-const countPathRectHits = (path: Point[], rects: readonly PaddedRectBounds[]): number => {
+const countPathRectHits = (
+  path: Point[],
+  rects: readonly PaddedRectBounds[],
+  onNodeScan?: (count: number) => void,
+): number => {
   let hits = 0;
   for (let index = 0; index < path.length - 1; index += 1) {
     const a = path[index];
@@ -137,6 +152,7 @@ const countPathRectHits = (path: Point[], rects: readonly PaddedRectBounds[]): n
       const y = a.y;
       const segmentStart = Math.min(a.x, b.x);
       const segmentEnd = Math.max(a.x, b.x);
+      onNodeScan?.(rects.length);
       for (const rect of rects) {
         if (y <= rect.y1 || y >= rect.y2) continue;
         if (Math.max(segmentStart, rect.x1) < Math.min(segmentEnd, rect.x2)) hits += 1;
@@ -148,6 +164,7 @@ const countPathRectHits = (path: Point[], rects: readonly PaddedRectBounds[]): n
       const x = a.x;
       const segmentStart = Math.min(a.y, b.y);
       const segmentEnd = Math.max(a.y, b.y);
+      onNodeScan?.(rects.length);
       for (const rect of rects) {
         if (x <= rect.x1 || x >= rect.x2) continue;
         if (Math.max(segmentStart, rect.y1) < Math.min(segmentEnd, rect.y2)) hits += 1;
@@ -231,7 +248,7 @@ export function createNodeClearanceEvaluationContext(
 /** Builds business-node geometry once for whole-graph clearance audits. */
 export function createNodeClearanceGraphEvaluationContext(
   nodes: ReactFlowNode[],
-): { score: (path: Point[], edge: Edge, minimumClearance?: number) => number } {
+): NodeClearanceGraphEvaluationContext {
   const nodeRects = businessRects(nodes);
   const cellSize = 128;
   const grid = new Map<string, typeof nodeRects>();
@@ -264,6 +281,7 @@ export function createNodeClearanceGraphEvaluationContext(
     }
     return [...candidates];
   };
+  let scannedNodeCount = 0;
   return Object.freeze({
     score(path: Point[], edge: Edge, minimumClearance = BUSINESS_NODE_CLEARANCE): number {
       if (nodeRects.length === 0) return 0;
@@ -271,12 +289,14 @@ export function createNodeClearanceGraphEvaluationContext(
       let risk = 0;
       for (const segment of toSegments(path)) {
         for (const node of nearbyNodes(segment, requiredClearance)) {
+          scannedNodeCount += 1;
           if (node.id === edge.source || node.id === edge.target) continue;
           risk += Math.max(0, requiredClearance - segmentToRectDistance(segment, node.rect));
         }
       }
       return risk;
     },
+    readMetrics: () => ({ scannedNodeCount }),
   });
 }
 
@@ -291,6 +311,22 @@ function businessRects(nodes: ReactFlowNode[]): Array<{ id: string; rect: Rect }
 function addLaneValue(values: Set<number>, value: number): void {
   if (Number.isFinite(value)) values.add(Math.round(value));
 }
+
+const selectPreferredAxisValues = (
+  values: readonly number[] | undefined,
+  minimum: number,
+  maximum: number,
+): number[] => {
+  if (!values || values.length === 0) return [];
+  const center = (minimum + maximum) / 2;
+  const lowerBound = minimum - 320;
+  const upperBound = maximum + 320;
+  return [...new Set(values
+    .filter(value => Number.isFinite(value) && value >= lowerBound && value <= upperBound)
+    .map(value => Math.round(value)))]
+    .sort((left, right) => Math.abs(left - center) - Math.abs(right - center) || left - right)
+    .slice(0, 8);
+};
 
 function rectIntersectsExpandedBounds(rect: Rect, bounds: Rect, padding: number): boolean {
   return rect.x + rect.width >= bounds.x - padding
@@ -415,6 +451,7 @@ export function createRoutingObstacleEvaluationContext(
   edge: Edge,
   obstacles: Map<string, Rect>,
 ): RoutingObstacleEvaluationContext {
+  let scannedNodeCount = 0;
   const sourceId = edge.source;
   const targetId = edge.target;
   const unrelatedRects: PaddedRectBounds[] = [];
@@ -428,13 +465,21 @@ export function createRoutingObstacleEvaluationContext(
     if (rect) endpointRects.push(paddedRectBounds(rect, -ENDPOINT_INTERIOR_TOLERANCE));
   }
   const routingRects = [...unrelatedRects, ...endpointRects];
-  const countUnrelatedPathHits = (path: Point[]): number => countPathRectHits(path, unrelatedRects);
-  const countEndpointPathHits = (path: Point[]): number => countPathRectHits(path, endpointRects);
+  const recordNodeScans = (count: number) => {
+    scannedNodeCount += count;
+  };
+  const countUnrelatedPathHits = (path: Point[]): number => (
+    countPathRectHits(path, unrelatedRects, recordNodeScans)
+  );
+  const countEndpointPathHits = (path: Point[]): number => (
+    countPathRectHits(path, endpointRects, recordNodeScans)
+  );
 
   return Object.freeze({
     countEndpointNodeTraversalHits: countEndpointPathHits,
     countPathHits: (path: Point[]): number => countPathRectHits(path, routingRects),
     countUnrelatedObstacleHits: countUnrelatedPathHits,
+    readMetrics: () => ({ scannedNodeCount }),
     evaluate: (path: Point[]): RoutingObstacleHitEvaluation => {
       const unrelatedObstacleHits = countUnrelatedPathHits(path);
       const endpointNodeTraversalHits = countEndpointPathHits(path);
@@ -476,7 +521,10 @@ export function generateWaypointCandidates(
   layoutDirection: string,
   nodes?: ReactFlowNode[],
   edge?: Edge,
-  options: { includeNodeAwareLanes?: boolean } = {},
+  options: {
+    includeNodeAwareLanes?: boolean;
+    preferredAxes?: RoutingWaypointCandidateAxes;
+  } = {},
 ): Point[][] {
   const base = compactPath(basePath);
   if (base.length < 2) return [base];
@@ -499,6 +547,19 @@ export function generateWaypointCandidates(
     ...offsets.map(o => Math.round(start.y + o)),
     ...offsets.map(o => Math.round(end.y + o)),
   ]);
+  const bounds = pathBounds(base);
+  const preferredX = selectPreferredAxisValues(
+    options.preferredAxes?.x,
+    bounds.x,
+    bounds.x + bounds.width,
+  );
+  const preferredY = selectPreferredAxisValues(
+    options.preferredAxes?.y,
+    bounds.y,
+    bounds.y + bounds.height,
+  );
+  for (const x of preferredX) xLanes.add(x);
+  for (const y of preferredY) yLanes.add(y);
   if (pathHasNodeRoutingRisk(base, nodes, edge) || options.includeNodeAwareLanes) {
     const nodeAwareLanes = buildNodeAwareWaypointLanes(base, nodes, edge);
     for (const x of nodeAwareLanes.x) xLanes.add(x);

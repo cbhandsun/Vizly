@@ -2,7 +2,6 @@ import type { Edge, Node } from '@xyflow/react';
 
 import { normalizeHandle } from '../../routing/utils/handleUtils';
 import {
-  calculateEdgePathQualityScore,
   createEdgePathQualityEvaluationContext,
   type EdgePathQualityScore,
 } from '../../strategies/shared/edgeStrictCrossingGuard';
@@ -26,7 +25,27 @@ type DisplayTerminalRole = 'source' | 'target';
 type DisplayTerminalSide = 'left' | 'right' | 'top' | 'bottom';
 
 const MAX_RECONNECT_CANDIDATES_PER_EDGE = 256;
+const TARGET_RECONNECT_CANDIDATES_PER_TRANSACTION = 256;
 const STRICT_BOUNDARY_TANGENT_EPSILON = 1;
+
+export const resolveReconnectCandidateBudgetPerEdge = (
+  mutableEdgeCount: number,
+): number => {
+  if (!Number.isSafeInteger(mutableEdgeCount) || mutableEdgeCount < 1) return 0;
+  if (mutableEdgeCount <= 2) return MAX_RECONNECT_CANDIDATES_PER_EDGE;
+  // High-fanout moved nodes need the complete per-edge terminal set to keep
+  // their shared source/target trunks atomic. Only low-fanout multi-edge edits
+  // share the transaction target; the full-fallback matrix proves this split.
+  if (mutableEdgeCount >= 6) return MAX_RECONNECT_CANDIDATES_PER_EDGE;
+  if (mutableEdgeCount === 5) return 128;
+  return Math.max(
+    32,
+    Math.min(
+      MAX_RECONNECT_CANDIDATES_PER_EDGE,
+      Math.floor(TARGET_RECONNECT_CANDIDATES_PER_TRANSACTION / mutableEdgeCount),
+    ),
+  );
+};
 
 const terminalSide = (
   edge: Edge,
@@ -84,13 +103,17 @@ const reconnectPathsForRoles = ({
   edgeIndex,
   nodesById,
   roles,
+  maxCandidates,
 }: {
   edge: Edge;
   edges: Edge[];
   edgeIndex: number;
   nodesById: ReadonlyMap<string, Node>;
   roles: readonly DisplayTerminalRole[];
+  maxCandidates: number;
 }): DisplayPoint[][] => {
+  if (!Number.isSafeInteger(maxCandidates) || maxCandidates < 1) return [];
+  const candidateLimit = Math.min(MAX_RECONNECT_CANDIDATES_PER_EDGE, maxCandidates);
   let paths = [getDisplayComputedPath(edge)];
   for (const role of roles) {
     const node = nodesById.get(role === 'source' ? edge.source : edge.target);
@@ -112,9 +135,9 @@ const reconnectPathsForRoles = ({
         priorityTangents,
       )) {
         expanded.push(candidate);
-        if (expanded.length >= MAX_RECONNECT_CANDIDATES_PER_EDGE) break;
+        if (expanded.length >= candidateLimit) break;
       }
-      if (expanded.length >= MAX_RECONNECT_CANDIDATES_PER_EDGE) break;
+      if (expanded.length >= candidateLimit) break;
     }
     paths = expanded;
     if (paths.length === 0) return [];
@@ -128,25 +151,42 @@ type RankedReconnectCandidate = Readonly<{
   hardDefects: number;
 }>;
 
+type ReconnectTerminalEvaluationContext = Readonly<{
+  terminalValidation: ReturnType<typeof createDisplayTerminalValidationSnapshot>;
+  nodesById: ReadonlyMap<string, Node>;
+}>;
+
+export type BaseReactFlowReconnectDiagnostics = Readonly<{
+  generatedPathCount: number;
+  evaluatedPathCount: number;
+}>;
+
+type MutableReconnectDiagnostics = {
+  generatedPathCount: number;
+  evaluatedPathCount: number;
+};
+
 const rankReconnectCandidates = ({
   edges,
   edgeIndex,
   candidatePaths,
   nodes,
+  terminalContext,
+  diagnostics,
   limit,
 }: {
   edges: Edge[];
   edgeIndex: number;
   candidatePaths: readonly DisplayPoint[][];
   nodes: Node[];
+  terminalContext: ReconnectTerminalEvaluationContext;
+  diagnostics: MutableReconnectDiagnostics;
   limit: number;
 }): RankedReconnectCandidate[] => {
   const edge = edges[edgeIndex];
   if (!edge) return [];
-  const terminalValidation = createDisplayTerminalValidationSnapshot(nodes);
-  const nodesById = new Map(nodes.map(node => [node.id, node] as const));
-  const sourceNode = nodesById.get(edge.source);
-  const targetNode = nodesById.get(edge.target);
+  const sourceNode = terminalContext.nodesById.get(edge.source);
+  const targetNode = terminalContext.nodesById.get(edge.target);
   if (!sourceNode || !targetNode) return [];
   const sourceRect = getDisplayNodeRect(sourceNode);
   const targetRect = getDisplayNodeRect(targetNode);
@@ -156,9 +196,9 @@ const rankReconnectCandidates = ({
   const ranked: RankedReconnectCandidate[] = [];
 
   for (const path of candidatePaths) {
+    diagnostics.evaluatedPathCount += 1;
     const candidateEdge = withDisplayComputedPath(edge, path);
-    if (calculateEdgePathQualityScore([candidateEdge]).hairpins > 0) continue;
-    if (!terminalValidation.validateEdge(candidateEdge).anchored) continue;
+    if (!terminalContext.terminalValidation.validateEdge(candidateEdge).anchored) continue;
     if (
       displayTerminalRoleNeedsDeclaredAxisRepair(
         candidateEdge,
@@ -177,6 +217,7 @@ const rankReconnectCandidates = ({
       index === edgeIndex ? candidateEdge : item
     ));
     const quality = qualityContext.evaluateChanged(candidateEdges, [edgeIndex]);
+    if (quality.hairpins > 0) continue;
     const obstacleHits = obstacleContext.evaluateKnownChanges(candidateEdges, [edgeIndex]);
     const hardDefects = hardDefectCount(quality) + obstacleHits;
     const score = obstacleRepairScore(quality, obstacleHits);
@@ -201,20 +242,33 @@ export const createBaseReactFlowMovedNodeReconnectCandidates = ({
   changedNodeIds,
   mutableEdgeIds,
   beamWidth = 4,
+  onDiagnostics,
 }: {
   baselineEdges: Edge[];
   nodes: Node[];
   changedNodeIds: readonly string[];
   mutableEdgeIds: readonly string[];
   beamWidth?: number;
+  onDiagnostics?: (diagnostics: BaseReactFlowReconnectDiagnostics) => void;
 }): Edge[][] => {
   if (!Number.isSafeInteger(beamWidth) || beamWidth < 1 || beamWidth > 8) return [];
+  const diagnostics: MutableReconnectDiagnostics = {
+    generatedPathCount: 0,
+    evaluatedPathCount: 0,
+  };
+  try {
   const changedNodes = new Set(changedNodeIds);
   const mutableEdges = new Set(mutableEdgeIds);
   const nodesById = new Map(nodes.map(node => [node.id, node] as const));
+  const terminalContext: ReconnectTerminalEvaluationContext = {
+    terminalValidation: createDisplayTerminalValidationSnapshot(nodes),
+    nodesById,
+  };
   const mutableIndexes = baselineEdges
     .map((edge, edgeIndex) => (mutableEdges.has(edge.id) ? edgeIndex : -1))
     .filter(edgeIndex => edgeIndex >= 0);
+  const candidateBudgetPerEdge = resolveReconnectCandidateBudgetPerEdge(mutableIndexes.length);
+  if (candidateBudgetPerEdge === 0) return [];
   let states: RankedReconnectCandidate[] = [{
     edges: baselineEdges,
     score: Number.POSITIVE_INFINITY,
@@ -236,12 +290,16 @@ export const createBaseReactFlowMovedNodeReconnectCandidates = ({
         edgeIndex,
         nodesById,
         roles,
+        maxCandidates: candidateBudgetPerEdge,
       });
+      diagnostics.generatedPathCount += paths.length;
       expanded.push(...rankReconnectCandidates({
         edges: state.edges,
         edgeIndex,
         candidatePaths: paths,
         nodes,
+        terminalContext,
+        diagnostics,
         limit: beamWidth,
       }));
     }
@@ -279,12 +337,16 @@ export const createBaseReactFlowMovedNodeReconnectCandidates = ({
           edgeIndex,
           nodesById,
           roles,
+          maxCandidates: candidateBudgetPerEdge,
         });
+        diagnostics.generatedPathCount += paths.length;
         refined.push(...rankReconnectCandidates({
           edges: state.edges,
           edgeIndex,
           candidatePaths: paths,
           nodes,
+          terminalContext,
+          diagnostics,
           limit: beamWidth,
         }));
       }
@@ -299,4 +361,7 @@ export const createBaseReactFlowMovedNodeReconnectCandidates = ({
     if (states[0]?.hardDefects === 0) break;
   }
   return states.map(state => state.edges);
+  } finally {
+    onDiagnostics?.({ ...diagnostics });
+  }
 };

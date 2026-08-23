@@ -5,7 +5,10 @@ import {
   MINIMUM_BUSINESS_NODE_CLEARANCE,
   repairBusinessNodeClearanceRisks,
 } from '../../strategies/shared/edgeBusinessNodeClearanceRepair';
-import { scoreNodeClearanceRisk } from '../../strategies/shared/edgeWaypointCandidateRepair';
+import {
+  createNodeClearanceGraphEvaluationContext,
+  scoreNodeClearanceRisk,
+} from '../../strategies/shared/edgeWaypointCandidateRepair';
 import { getDisplayComputedPath } from './baseReactFlowDisplayGeometry';
 
 export interface DisplayBusinessNodeClearanceOptions {
@@ -16,12 +19,24 @@ export interface DisplayBusinessNodeClearanceOptions {
 export const displayBusinessNodeCommercialClearanceIsClean = (
   edges: Edge[],
   nodes: Node[],
-): boolean => edges.every(edge => scoreNodeClearanceRisk(
-  getDisplayComputedPath(edge),
-  nodes,
-  edge,
-  COMMERCIAL_BUSINESS_NODE_CLEARANCE,
-) <= 0.5);
+): boolean => countDisplayBusinessNodeCommercialClearanceViolations(edges, nodes) === 0;
+
+/** Final response metric; indexed pruning is parity-tested against the full scorer. */
+export const countDisplayBusinessNodeCommercialClearanceViolations = (
+  edges: Edge[],
+  nodes: Node[],
+): number => {
+  const evaluation = createNodeClearanceGraphEvaluationContext(nodes);
+  let violations = 0;
+  for (const edge of edges) {
+    if (evaluation.score(
+      getDisplayComputedPath(edge),
+      edge,
+      COMMERCIAL_BUSINESS_NODE_CLEARANCE,
+    ) > 0.5) violations += 1;
+  }
+  return violations;
+};
 
 export const eligibleCommercialClearanceDoesNotRegress = (
   baselineEdges: Edge[],
@@ -29,20 +44,19 @@ export const eligibleCommercialClearanceDoesNotRegress = (
   nodes: Node[],
   eligibleEdgeIds: ReadonlySet<string> | undefined,
 ): boolean => {
-  if (!eligibleEdgeIds || eligibleEdgeIds.size === 0) return true;
+  if (eligibleEdgeIds?.size === 0) return true;
   const candidateById = new Map(candidateEdges.map(edge => [edge.id, edge] as const));
+  const evaluation = createNodeClearanceGraphEvaluationContext(nodes);
   return baselineEdges.every((edge) => {
-    if (!eligibleEdgeIds.has(edge.id)) return true;
+    if (eligibleEdgeIds && !eligibleEdgeIds.has(edge.id)) return true;
     const candidate = candidateById.get(edge.id);
     if (!candidate) return false;
-    return scoreNodeClearanceRisk(
+    return evaluation.score(
       getDisplayComputedPath(candidate),
-      nodes,
       candidate,
       COMMERCIAL_BUSINESS_NODE_CLEARANCE,
-    ) <= scoreNodeClearanceRisk(
+    ) <= evaluation.score(
       getDisplayComputedPath(edge),
-      nodes,
       edge,
       COMMERCIAL_BUSINESS_NODE_CLEARANCE,
     ) + 0.5;

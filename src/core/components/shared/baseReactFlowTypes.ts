@@ -103,4 +103,5 @@ export interface BaseReactFlowProps {
     handleType: 'source' | 'target',
   ) => void;
   onReconnectEnd?: (event: MouseEvent | TouchEvent, edge: Edge) => void;
+  onDisplayRoutingFinalApplied?: () => void;
 }

@@ -17,6 +17,7 @@ describe('baseReactFlowDisplayGeometryBarrier', () => {
     expect(resolveDisplayGeometryBarrierPolicy(false)).toEqual({ waitForFonts: true });
     expect(resolveDisplayGeometryBarrierPolicy(true)).toEqual({
       minimumStableMs: 0,
+      sampleIncrementalMicrotask: true,
       waitForFonts: false,
     });
   });
@@ -105,13 +106,9 @@ describe('baseReactFlowDisplayGeometryBarrier', () => {
     expect(cancelledRun).not.toHaveBeenCalled();
   });
 
-  it('does not touch the font loading boundary for an incremental drag route', () => {
+  it('uses committed-state microtask evidence for an incremental drag route', async () => {
     vi.useFakeTimers();
-    const callbacks: FrameRequestCallback[] = [];
-    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
-      callbacks.push(callback);
-      return callbacks.length;
-    });
+    const requestFrame = vi.spyOn(window, 'requestAnimationFrame');
     const fontsGetter = vi.fn(() => ({ ready: Promise.resolve() }));
     Object.defineProperty(document, 'fonts', {
       configurable: true,
@@ -123,12 +120,44 @@ describe('baseReactFlowDisplayGeometryBarrier', () => {
       run,
       readGeometryIdentity: () => 'incremental-stable',
       minimumStableMs: 0,
+      sampleIncrementalMicrotask: true,
       waitForFonts: false,
     });
-    callbacks.shift()?.(16);
+    await Promise.resolve();
 
     expect(fontsGetter).not.toHaveBeenCalled();
-    expect(run).toHaveBeenCalledWith(expect.objectContaining({ resolution: 'stable' }));
+    expect(requestFrame).not.toHaveBeenCalled();
+    expect(run).toHaveBeenCalledWith(expect.objectContaining({
+      resolution: 'stable',
+      sampleCount: 2,
+    }));
     Reflect.deleteProperty(document, 'fonts');
+  });
+
+  it('falls back to a frame when incremental geometry changes in the microtask', async () => {
+    vi.useFakeTimers();
+    const callbacks: FrameRequestCallback[] = [];
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      callbacks.push(callback);
+      return callbacks.length;
+    });
+    const run = vi.fn();
+    let identity = 'geometry-a';
+
+    scheduleBaseReactFlowStableGeometry({
+      run,
+      readGeometryIdentity: () => identity,
+      minimumStableMs: 0,
+      sampleIncrementalMicrotask: true,
+      waitForFonts: false,
+    });
+    identity = 'geometry-b';
+    await Promise.resolve();
+    expect(run).not.toHaveBeenCalled();
+    callbacks.shift()?.(16);
+    expect(run).toHaveBeenCalledWith(expect.objectContaining({
+      resolution: 'stable',
+      sampleCount: 3,
+    }));
   });
 });

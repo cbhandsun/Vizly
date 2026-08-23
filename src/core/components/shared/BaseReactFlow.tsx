@@ -72,7 +72,10 @@ import {
 } from './baseReactFlowOverlayRenderers';
 import type { BaseReactFlowProps } from './baseReactFlowTypes';
 import { useBaseReactFlowFitController } from './useBaseReactFlowFitController';
-import { SmartEdgeRoutingOwnerContext } from '../custom-edges/smartEdgeRoutingOwnership';
+import {
+  ROUTING_SESSION_EDGE_RENDER_ADAPTER,
+  SmartEdgeRoutingRenderAdapterContext,
+} from '../custom-edges/smartEdgeRoutingRenderAdapter';
 import { resolveBaseReactFlowRoutingComputation } from './baseReactFlowDragRoutingFreeze';
 import { BaseReactFlowInitializationOverlay } from './BaseReactFlowInitializationOverlay';
 import { applySharedTrunkPaintPlan } from '../../rendering/sharedTrunkPaint';
@@ -171,6 +174,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
   onReconnect,
   onReconnectStart,
   onReconnectEnd,
+  onDisplayRoutingFinalApplied,
 }: BaseReactFlowProps) => {
   const rfInstance = useReactFlow();
   const rfStore = useStoreApi();
@@ -396,10 +400,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
     });
   }, [edgeTypes]);
 
-  const {
-    edges: displayEdges,
-    routingOwner: smartEdgeRoutingOwner,
-  } = useBaseReactFlowDisplayRouting({
+  const { edges: displayEdges } = useBaseReactFlowDisplayRouting({
     edges,
     routingNodes,
     routingGeometryReady,
@@ -412,6 +413,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
     isNodeDragFallbackPending,
     nodeDragFallbackIds,
     onNodeDragFallbackResolved: handleNodeDragFallbackResolved,
+    onDisplayRoutingFinalApplied,
   });
   const commercialDisplayEdges = useMemo(
     () => applyBaseReactFlowEdgePresentation(displayEdges, edges),
@@ -577,7 +579,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
         position: 'relative',
       } : { width: '100%', height: '100%', position: 'relative' }}>
         <EdgeLabelObstacleContext.Provider value={edgeLabelObstacles}>
-        <SmartEdgeRoutingOwnerContext.Provider value={smartEdgeRoutingOwner}>
+        <SmartEdgeRoutingRenderAdapterContext.Provider value={ROUTING_SESSION_EDGE_RENDER_ADAPTER}>
         <ReactFlow
           proOptions={proOptions}
           onlyRenderVisibleElements={isLargeGraph}
@@ -676,7 +678,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
           <BaseReactFlowRightEdgeGuides />
           {children}
         </ReactFlow>
-        </SmartEdgeRoutingOwnerContext.Provider>
+        </SmartEdgeRoutingRenderAdapterContext.Provider>
         </EdgeLabelObstacleContext.Provider>
       </div>
       {!isContainerReady && <BaseReactFlowInitializationOverlay />}

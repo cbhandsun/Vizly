@@ -21,6 +21,15 @@ import {
   strictlyCrosses,
 } from './edgePathQualityGeometry';
 import { edgeRoutingQualityIntentToken } from './edgeRoutingQualityIntent';
+import {
+  calculateMemoizedEdgePairQuality,
+  EdgePathQualityGenerationalPairMemo,
+  readSharedEdgePairQualityMemoMetrics,
+} from './edgePathQualityPairMemo';
+import {
+  collectPotentialChangedEdgePairKeys,
+  createEdgePathQualitySegmentIndex,
+} from './edgePathQualitySegmentIndex';
 
 export { MIN_EDGE_PATH_PENALIZED_OVERLAP } from './edgePathQualityGeometry';
 export type { EdgePathQualityScore } from './edgePathQualityGeometry';
@@ -47,6 +56,7 @@ const strictCrossingCache = new WeakMap<Edge[], {
 const QUALITY_SIGNATURE_CACHE_LIMIT = 512;
 const qualityScoreSignatureCache = new Map<string, EdgePathQualityScore>();
 const strictCrossingSignatureCache = new Map<string, number>();
+export const readEdgePairQualityMemoMetrics = readSharedEdgePairQualityMemoMetrics;
 
 function rememberSignatureValue<T>(cache: Map<string, T>, signature: string, value: T): void {
   if (cache.has(signature)) cache.delete(signature);
@@ -109,6 +119,7 @@ type EdgePathQualityNumericState = {
   edgeSignatures: string[];
   edgeSegments: Segment[][];
   edgeScores: EdgePathQualityScore[];
+  changedFromBaselineIndexes: ReadonlySet<number>;
   owner: object;
   pairOverlay: ReadonlyMap<number, PairQualityContribution | null>;
   parent: EdgePathQualityNumericState | null;
@@ -136,6 +147,7 @@ const qualityDecompositionCache = new BoundedEvaluationLruCache<EdgePathQualityD
 function getEdgePathQualityDecomposition(
   edges: Edge[],
   snapshot: QualityInputSnapshot,
+  scanMetrics?: { scannedEdgePairCount: number },
 ): EdgePathQualityDecomposition {
   const cached = qualityDecompositionCache.get(snapshot.signature);
   if (cached) return cached;
@@ -149,6 +161,7 @@ function getEdgePathQualityDecomposition(
   for (const edgeScore of edgeScores) addScore(score, edgeScore);
   for (let firstIndex = 0; firstIndex < edgeCount; firstIndex += 1) {
     for (let secondIndex = firstIndex + 1; secondIndex < edgeCount; secondIndex += 1) {
+      if (scanMetrics) scanMetrics.scannedEdgePairCount += 1;
       const pairScore = calculateEdgePairQuality(
         edges[firstIndex],
         edges[secondIndex],
@@ -232,11 +245,14 @@ export function countStrictEdgeCrossings(edges: Edge[]): number {
   return total;
 }
 
-export function calculateEdgePathQualityScore(edges: Edge[]): EdgePathQualityScore {
+export function calculateEdgePathQualityScore(
+  edges: Edge[],
+  scanMetrics?: { scannedEdgePairCount: number },
+): EdgePathQualityScore {
   const snapshot = buildQualityInputSnapshot(edges);
   const cached = readQualityScore(edges, snapshot);
   if (cached) return cached;
-  const score = { ...getEdgePathQualityDecomposition(edges, snapshot).score };
+  const score = { ...getEdgePathQualityDecomposition(edges, snapshot, scanMetrics).score };
 
   rememberQualityScore(edges, snapshot, score);
   return score;
@@ -246,6 +262,12 @@ export type EdgePathQualityEvaluationContext = {
   createState: (candidate: Edge[]) => EdgePathQualityEvaluationState;
   evaluate: (candidate: Edge[]) => EdgePathQualityScore;
   evaluateChanged: (candidate: Edge[], changedIndexes: readonly number[]) => EdgePathQualityScore;
+  edgeHasPairRepairOpportunity?: (edgeIndex: number) => boolean;
+  readMetrics?: () => Readonly<{
+    pairCacheHitCount: number;
+    scannedEdgePairCount: number;
+    scannedSegmentCount: number;
+  }>;
   evaluateStateChanged: (
     parentState: EdgePathQualityEvaluationState,
     candidate: Edge[],
@@ -271,12 +293,40 @@ export function createEdgePathQualityEvaluationContext(
   const cached = qualityEvaluationContextCache.get(baseline);
   if (cached?.signature === baselineSnapshot.signature) return cached.context;
 
-  const baselineDecomposition = getEdgePathQualityDecomposition(baseline, baselineSnapshot);
+  const metrics = {
+    pairCacheHitCount: 0,
+    scannedEdgePairCount: 0,
+    scannedSegmentCount: 0,
+  };
+  const baselineDecomposition = getEdgePathQualityDecomposition(baseline, baselineSnapshot, metrics);
   const baselineSegments = baselineDecomposition.edgeSegments;
+  const baselineSegmentIndex = createEdgePathQualitySegmentIndex(baselineSegments);
   const baselineEdgeScores = baselineDecomposition.edgeScores;
   const baselinePairScores = baselineDecomposition.pairScores;
+  const derivedPairMemo = new EdgePathQualityGenerationalPairMemo();
   const baselineScore = { ...baselineDecomposition.score };
   const edgeCount = baseline.length;
+  const baselinePairScoresByEdge = Array.from(
+    { length: edgeCount },
+    () => [] as Array<readonly [number, PairQualityContribution]>,
+  );
+  for (const [pairKey, contribution] of baselinePairScores) {
+    const firstIndex = Math.floor(pairKey / edgeCount);
+    const secondIndex = pairKey % edgeCount;
+    baselinePairScoresByEdge[firstIndex].push([pairKey, contribution]);
+    baselinePairScoresByEdge[secondIndex].push([pairKey, contribution]);
+  }
+  const pairRepairEdgeIndexes = new Set<number>();
+  for (const [pairKey, contribution] of baselinePairScores) {
+    if (
+      contribution.strictCrossings <= 0
+      && contribution.reverseOverlap <= 0
+      && contribution.unrelatedOverlap <= 0
+      && contribution.unexplainedRelatedOverlap <= 0
+    ) continue;
+    pairRepairEdgeIndexes.add(Math.floor(pairKey / edgeCount));
+    pairRepairEdgeIndexes.add(pairKey % edgeCount);
+  }
   rememberQualityScore(baseline, baselineSnapshot, baselineScore);
   const stateOwner = {};
   let baselineState: EdgePathQualityEvaluationState | null = null;
@@ -289,15 +339,17 @@ export function createEdgePathQualityEvaluationContext(
   });
 
   const fullState = (candidate: Edge[]): EdgePathQualityEvaluationState => {
-    const score = { ...calculateEdgePathQualityScore(candidate) };
     const snapshot = buildQualityInputSnapshot(candidate);
-    const decomposition = getEdgePathQualityDecomposition(candidate, snapshot);
+    const decomposition = getEdgePathQualityDecomposition(candidate, snapshot, metrics);
+    const score = { ...decomposition.score };
+    rememberQualityScore(candidate, snapshot, score);
     return publicState({
       edgeCount: candidate.length,
       edgeReferences: candidate.slice(),
       edgeSignatures: snapshot.edgeSignatures,
       edgeSegments: decomposition.edgeSegments,
       edgeScores: decomposition.edgeScores,
+      changedFromBaselineIndexes: new Set(candidate.map((_, index) => index)),
       owner: stateOwner,
       pairOverlay: decomposition.pairScores,
       parent: null,
@@ -313,6 +365,7 @@ export function createEdgePathQualityEvaluationContext(
         edgeSignatures: baselineSnapshot.edgeSignatures,
         edgeSegments: baselineSegments,
         edgeScores: baselineEdgeScores,
+        changedFromBaselineIndexes: new Set(),
         owner: stateOwner,
         pairOverlay: baselinePairScores,
         parent: null,
@@ -391,6 +444,7 @@ export function createEdgePathQualityEvaluationContext(
         edgeSignatures,
         edgeSegments: parent.edgeSegments,
         edgeScores: parent.edgeScores,
+        changedFromBaselineIndexes: parent.changedFromBaselineIndexes,
         owner: stateOwner,
         pairOverlay: new Map(),
         parent,
@@ -426,15 +480,35 @@ export function createEdgePathQualityEvaluationContext(
 
     const pairOverlay = new Map<number, PairQualityContribution | null>();
     for (const pairKey of affectedPairKeys) {
+      addPairContribution(score, pairContributionAt(parent, pairKey), -1);
+      pairOverlay.set(pairKey, null);
+    }
+    const candidatePairQuery = collectPotentialChangedEdgePairKeys({
+      additionalPeerIndexes: [...parent.changedFromBaselineIndexes],
+      changedIndexes: uniqueIndexes,
+      edgeCount: parent.edgeCount,
+      edgeSegments,
+      segmentIndex: baselineSegmentIndex,
+    });
+    metrics.scannedSegmentCount += candidatePairQuery.scannedSegmentCount;
+    for (const pairKey of candidatePairQuery.pairKeys) {
       const firstIndex = Math.floor(pairKey / parent.edgeCount);
       const secondIndex = pairKey % parent.edgeCount;
-      addPairContribution(score, pairContributionAt(parent, pairKey), -1);
-      const pairContribution = calculateEdgePairQuality(
-        candidate[firstIndex],
-        candidate[secondIndex],
-        edgeSegments[firstIndex],
-        edgeSegments[secondIndex],
-      );
+      const firstSignature = edgeSignatures[firstIndex];
+      const secondSignature = edgeSignatures[secondIndex];
+      let pairContribution = derivedPairMemo.get(firstSignature, secondSignature);
+      if (pairContribution) {
+        metrics.pairCacheHitCount += 1;
+      } else {
+        metrics.scannedEdgePairCount += 1;
+        pairContribution = calculateEdgePairQuality(
+          candidate[firstIndex],
+          candidate[secondIndex],
+          edgeSegments[firstIndex],
+          edgeSegments[secondIndex],
+        );
+        derivedPairMemo.set(firstSignature, secondSignature, pairContribution);
+      }
       addPairContribution(score, pairContribution);
       pairOverlay.set(pairKey, hasPairContribution(pairContribution) ? pairContribution : null);
     }
@@ -445,6 +519,10 @@ export function createEdgePathQualityEvaluationContext(
       edgeSignatures,
       edgeSegments,
       edgeScores,
+      changedFromBaselineIndexes: new Set([
+        ...parent.changedFromBaselineIndexes,
+        ...uniqueIndexes,
+      ]),
       owner: stateOwner,
       pairOverlay,
       parent,
@@ -466,6 +544,7 @@ export function createEdgePathQualityEvaluationContext(
     candidate: Edge[],
     changedIndexes: readonly number[],
     pathAt: (index: number) => Point[],
+    signatureAt: (index: number) => string,
   ): EdgePathQualityScore => {
     const score = { ...baselineScore };
     if (changedIndexes.length === 0) return score;
@@ -476,18 +555,27 @@ export function createEdgePathQualityEvaluationContext(
       const candidatePath = pathAt(changedIndex);
       addScore(score, calculateSingleEdgeQuality(candidatePath));
       const changedSegments = buildEdgeSegments(candidatePath, changedIndex);
+      for (const [, contribution] of baselinePairScoresByEdge[changedIndex]) {
+        addPairContribution(score, contribution, -1);
+      }
+      const excluded = new Set([changedIndex]);
+      const segmentQuery = baselineSegmentIndex.queryPotentialEdgeIndexes(
+        changedSegments,
+        excluded,
+      );
+      metrics.scannedSegmentCount += segmentQuery.scannedSegmentCount;
 
-      for (let otherIndex = 0; otherIndex < edgeCount; otherIndex += 1) {
-        if (changedIndex === otherIndex) continue;
+      for (const otherIndex of segmentQuery.edgeIndexes) {
         const firstIndex = Math.min(changedIndex, otherIndex);
         const secondIndex = Math.max(changedIndex, otherIndex);
-        const pairKey = firstIndex * edgeCount + secondIndex;
-        addPairContribution(score, baselinePairScores.get(pairKey), -1);
-        addPairContribution(score, calculateEdgePairQuality(
+        metrics.scannedEdgePairCount += 1;
+        addPairContribution(score, calculateMemoizedEdgePairQuality(
           candidate[firstIndex],
           candidate[secondIndex],
           firstIndex === changedIndex ? changedSegments : baselineSegments[firstIndex],
           secondIndex === changedIndex ? changedSegments : baselineSegments[secondIndex],
+          signatureAt(firstIndex),
+          signatureAt(secondIndex),
         ));
       }
       return score;
@@ -501,31 +589,48 @@ export function createEdgePathQualityEvaluationContext(
       candidateSegments[index] = buildEdgeSegments(candidatePath, index);
     }
 
+    const changedSet = new Set(changedIndexes);
     const affectedPairKeys = new Set<number>();
-    for (const changedIndex of changedIndexes) {
-      for (let otherIndex = 0; otherIndex < edgeCount; otherIndex += 1) {
-        if (changedIndex === otherIndex) continue;
-        const firstIndex = Math.min(changedIndex, otherIndex);
-        const secondIndex = Math.max(changedIndex, otherIndex);
-        affectedPairKeys.add(firstIndex * edgeCount + secondIndex);
+    for (const [pairKey, contribution] of baselinePairScores) {
+      const firstIndex = Math.floor(pairKey / edgeCount);
+      const secondIndex = pairKey % edgeCount;
+      if (changedSet.has(firstIndex) || changedSet.has(secondIndex)) {
+        addPairContribution(score, contribution, -1);
       }
     }
+    const candidatePairQuery = collectPotentialChangedEdgePairKeys({
+      changedIndexes,
+      edgeCount,
+      edgeSegments: candidateSegments,
+      segmentIndex: baselineSegmentIndex,
+    });
+    metrics.scannedSegmentCount += candidatePairQuery.scannedSegmentCount;
+    candidatePairQuery.pairKeys.forEach(pairKey => affectedPairKeys.add(pairKey));
 
     for (const pairKey of affectedPairKeys) {
       const firstIndex = Math.floor(pairKey / edgeCount);
       const secondIndex = pairKey % edgeCount;
-      addPairContribution(score, baselinePairScores.get(pairKey), -1);
-      addPairContribution(score, calculateEdgePairQuality(
+      metrics.scannedEdgePairCount += 1;
+      addPairContribution(score, calculateMemoizedEdgePairQuality(
         candidate[firstIndex],
         candidate[secondIndex],
         candidateSegments[firstIndex],
         candidateSegments[secondIndex],
+        signatureAt(firstIndex),
+        signatureAt(secondIndex),
       ));
     }
     return score;
   };
 
   const context: EdgePathQualityEvaluationContext = {
+    readMetrics: () => ({ ...metrics }),
+    edgeHasPairRepairOpportunity(edgeIndex: number): boolean {
+      return Number.isSafeInteger(edgeIndex)
+        && edgeIndex >= 0
+        && edgeIndex < edgeCount
+        && pairRepairEdgeIndexes.has(edgeIndex);
+    },
     createState(candidate: Edge[]): EdgePathQualityEvaluationState {
       if (candidate === baseline && baselineInputIsCurrent()) return baselineNumericState();
       return fullState(candidate);
@@ -556,6 +661,7 @@ export function createEdgePathQualityEvaluationContext(
         candidate,
         changedIndexes,
         index => candidateSnapshot.paths[index],
+        index => candidateSnapshot.edgeSignatures[index],
       );
 
       rememberQualityScore(candidate, candidateSnapshot, score);
@@ -601,6 +707,7 @@ export function createEdgePathQualityEvaluationContext(
         candidate,
         uniqueIndexes,
         index => changedSnapshots.get(index)?.path ?? baselineSnapshot.paths[index],
+        index => candidateSnapshot.edgeSignatures[index],
       );
       // The incremental result is the exact full-graph score for the declared
       // immutable changes. Seed the normal scorer caches as well: final gates

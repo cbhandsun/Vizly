@@ -9,6 +9,7 @@ import {
   keepIfNoNewStrictCrossings,
   type EdgePathQualityScore,
 } from '../edgeStrictCrossingGuard';
+import { qualitySegmentBoundsMayContribute } from '../edgePathQualitySegmentIndex';
 
 const edge = (id: string, path: Array<{ x: number; y: number }>): Edge => ({
   id,
@@ -949,5 +950,38 @@ describe('edgeStrictCrossingGuard', () => {
       { x: 40, y: 240 },
     ];
     expectIncrementalParity(baseline, malformed);
+  });
+
+  it('identifies only edges participating in hard pair defects', () => {
+    const baseline = [
+      edge('horizontal', [{ x: 0, y: 50 }, { x: 100, y: 50 }]),
+      edge('vertical', [{ x: 50, y: 0 }, { x: 50, y: 100 }]),
+      edge('detached', [{ x: 200, y: 0 }, { x: 200, y: 100 }]),
+    ];
+    const context = createEdgePathQualityEvaluationContext(baseline);
+
+    expect(context.edgeHasPairRepairOpportunity?.(0)).toBe(true);
+    expect(context.edgeHasPairRepairOpportunity?.(1)).toBe(true);
+    expect(context.edgeHasPairRepairOpportunity?.(2)).toBe(false);
+    expect(context.edgeHasPairRepairOpportunity?.(-1)).toBe(false);
+    expect(context.edgeHasPairRepairOpportunity?.(3)).toBe(false);
+  });
+
+  it('uses conservative finite bounds for changed-edge pair scans', () => {
+    const baseline = { minX: 0, maxX: 100, minY: 0, maxY: 100 };
+
+    expect(qualitySegmentBoundsMayContribute(baseline, null)).toBe(false);
+    expect(qualitySegmentBoundsMayContribute(
+      baseline,
+      { minX: 50, maxX: 150, minY: 50, maxY: 150 },
+    )).toBe(true);
+    expect(qualitySegmentBoundsMayContribute(
+      baseline,
+      { minX: 104, maxX: 200, minY: 0, maxY: 100 },
+    )).toBe(true);
+    expect(qualitySegmentBoundsMayContribute(
+      baseline,
+      { minX: 105, maxX: 200, minY: 0, maxY: 100 },
+    )).toBe(false);
   });
 });

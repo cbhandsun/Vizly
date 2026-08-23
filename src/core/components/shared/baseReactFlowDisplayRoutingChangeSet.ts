@@ -17,6 +17,7 @@ export type BaseReactFlowRoutingChangeReason =
 
 export type BaseReactFlowRoutingChangeSet = Readonly<{
   reason: BaseReactFlowRoutingChangeReason;
+  classification: 'none' | 'style-only' | 'geometry' | 'topology';
   changedNodeIds: string[];
   changedEdgeIds: string[];
   topologyChanged: boolean;
@@ -46,17 +47,62 @@ const fingerprintRoutingItem = (nodes: Node[], edges: Edge[]): string => {
   return String(hash >>> 0);
 };
 
+const asRoutingRecord = (value: unknown): Record<string, unknown> => (
+  value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
+);
+
+const compactPolicyValue = (value: unknown): string => {
+  if (Array.isArray(value)) return `array:${value.map(item => String(item)).join(',')}`;
+  if (value !== null && typeof value === 'object') {
+    const record = asRoutingRecord(value);
+    return `record:${String(record.source ?? '')}:${String(record.target ?? '')}`;
+  }
+  return `${typeof value}:${String(value ?? '')}`;
+};
+
+const edgePortPolicyFingerprint = (edge: Edge): string => {
+  const data = asRoutingRecord(edge.data);
+  return [
+    edge.sourceHandle,
+    edge.targetHandle,
+    edge.type,
+    data.autoSource,
+    data.autoTarget,
+    data.auto,
+    data.manualHandleSides,
+    data.manualHandlePositions,
+    data.manualHandles,
+    data._manualHandles,
+    data.sourceHandleLocked,
+    data.targetHandleLocked,
+    data.sourceHandlePositionLocked,
+    data.targetHandlePositionLocked,
+    data.sourcePortPolicy,
+    data.targetPortPolicy,
+    data.sourcePortConstraint,
+    data.targetPortConstraint,
+    data.runtimeHandleLock,
+    data._runtimeHandleLock,
+  ].map(compactPolicyValue).join('|');
+};
+
 const edgeTopologyMatches = (previous: Edge, next: Edge): boolean => (
   previous.source === next.source
   && previous.target === next.target
-  && previous.sourceHandle === next.sourceHandle
-  && previous.targetHandle === next.targetHandle
-  && previous.type === next.type
+  && edgePortPolicyFingerprint(previous) === edgePortPolicyFingerprint(next)
 );
+
+const nodeVisibilityFingerprint = (node: Node): string => {
+  const data = asRoutingRecord(node.data);
+  return `${Boolean(node.hidden)}:${String(data.collapsed ?? '')}`;
+};
 
 const nodeTopologyMatches = (previous: Node, next: Node): boolean => (
   previous.parentId === next.parentId
   && previous.type === next.type
+  && nodeVisibilityFingerprint(previous) === nodeVisibilityFingerprint(next)
 );
 
 export const createBaseReactFlowRoutingChangeSet = ({
@@ -97,7 +143,10 @@ export const createBaseReactFlowRoutingChangeSet = ({
     }
     if (!nodeTopologyMatches(previous, next)) {
       topologyChanged = true;
-      if (previous.parentId !== next.parentId) hasContainerChange = true;
+      if (
+        previous.parentId !== next.parentId
+        || nodeVisibilityFingerprint(previous) !== nodeVisibilityFingerprint(next)
+      ) hasContainerChange = true;
     }
     const previousRect = getDisplayNodeRect(previous);
     const nextRect = getDisplayNodeRect(next);
@@ -131,11 +180,7 @@ export const createBaseReactFlowRoutingChangeSet = ({
       if (
         previous.source === next.source
         && previous.target === next.target
-        && (
-          previous.sourceHandle !== next.sourceHandle
-          || previous.targetHandle !== next.targetHandle
-          || previous.type !== next.type
-        )
+        && edgePortPolicyFingerprint(previous) !== edgePortPolicyFingerprint(next)
       ) hasPortPolicyChange = true;
     }
     if (
@@ -159,12 +204,28 @@ export const createBaseReactFlowRoutingChangeSet = ({
   else if (hasPortPolicyChange) reason = 'port-policy';
   else if (hasNodeResize && reasonHint === 'unknown') reason = 'node-resize';
 
+  const geometryChanged = changedNodeIds.size > 0 || changedEdgeIds.size > 0;
+  const hasReferenceOnlyChange = !geometryChanged && !topologyChanged && (
+    previousNodes.length !== nextNodes.length
+    || previousEdges.length !== nextEdges.length
+    || previousNodes.some(node => nextNodesById.get(node.id) !== node)
+    || previousEdges.some(edge => nextEdgesById.get(edge.id) !== edge)
+  );
+  const classification: BaseReactFlowRoutingChangeSet['classification'] = topologyChanged
+    ? 'topology'
+    : geometryChanged
+      ? 'geometry'
+      : hasReferenceOnlyChange
+        ? 'style-only'
+        : 'none';
+
   return {
     reason,
+    classification,
     changedNodeIds: [...changedNodeIds].sort(),
     changedEdgeIds: [...changedEdgeIds].sort(),
     topologyChanged,
-    geometryChanged: changedNodeIds.size > 0 || changedEdgeIds.size > 0,
+    geometryChanged,
   };
 };
 
@@ -232,6 +293,31 @@ const edgePathIntersectsRectangles = (
   return false;
 };
 
+const expandChangedNodeDescendants = (
+  changedNodeIds: readonly string[],
+  previousNodes: readonly Node[],
+  nextNodes: readonly Node[],
+): Set<string> => {
+  const affectedNodeIds = new Set(changedNodeIds);
+  const allNodesById = new Map<string, Node>();
+  for (const node of previousNodes) allNodesById.set(node.id, node);
+  for (const node of nextNodes) allNodesById.set(node.id, node);
+  let expanded = true;
+  while (expanded) {
+    expanded = false;
+    for (const node of allNodesById.values()) {
+      if (
+        affectedNodeIds.has(node.id)
+        || !node.parentId
+        || !affectedNodeIds.has(node.parentId)
+      ) continue;
+      affectedNodeIds.add(node.id);
+      expanded = true;
+    }
+  }
+  return affectedNodeIds;
+};
+
 /**
  * Incident edges are the only initially mutable edges. Siblings and swept-area
  * paths are frozen context, so broad source/target groups cannot silently turn
@@ -250,7 +336,11 @@ export const createBaseReactFlowRoutingAffectedClosure = ({
   baselineEdges: readonly Edge[];
   nextEdges: readonly Edge[];
 }): BaseReactFlowRoutingAffectedClosure => {
-  const changedNodeIds = new Set(changeSet.changedNodeIds);
+  const changedNodeIds = expandChangedNodeDescendants(
+    changeSet.changedNodeIds,
+    previousNodes,
+    nextNodes,
+  );
   const mutableEdgeIds = new Set(changeSet.changedEdgeIds);
   for (const edge of nextEdges) {
     if (changedNodeIds.has(edge.source) || changedNodeIds.has(edge.target)) {
@@ -262,7 +352,7 @@ export const createBaseReactFlowRoutingAffectedClosure = ({
   const mutableSources = new Set(mutableEdges.map(edge => edge.source));
   const mutableTargets = new Set(mutableEdges.map(edge => edge.target));
   const sweptRectangles = createSweptNodeRectangles(
-    changeSet.changedNodeIds,
+    [...changedNodeIds],
     previousNodes,
     nextNodes,
   );

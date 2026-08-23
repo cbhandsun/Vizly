@@ -30,8 +30,15 @@ export const buildObstacleSkirtCandidates = (
   edge: Edge,
   allEdges: Edge[],
   allSegments: DisplaySegment[] = extractDisplaySegments(allEdges),
+  maxCandidates = Number.POSITIVE_INFINITY,
 ): DisplayPoint[][] => {
   if (path.length < 2) return [];
+  const candidateLimit = maxCandidates === Number.POSITIVE_INFINITY
+    ? Number.POSITIVE_INFINITY
+    : Number.isFinite(maxCandidates)
+      ? Math.max(0, Math.floor(maxCandidates))
+      : 0;
+  if (candidateLimit === 0) return [];
   const obstacles = [...buildDisplayRoutingObstacles(nodes)]
     .filter(([nodeId]) => nodeId !== edge.source && nodeId !== edge.target)
     .map(([, rect]) => rect);
@@ -40,9 +47,11 @@ export const buildObstacleSkirtCandidates = (
   const otherSegments = allSegments
     .filter(segment => allEdges[segment.edgeIndex]?.id !== edge.id);
   const candidates: DisplayPoint[][] = [];
-  const appendCandidate = (candidate: DisplayPoint[]) => {
+  const appendCandidate = (candidate: DisplayPoint[]): boolean => {
     const compacted = compactOrthogonalPath(candidate);
-    if (compacted.length >= 2 && compacted.every(isFinitePoint)) candidates.push(compacted);
+    if (compacted.length < 2 || !compacted.every(isFinitePoint)) return false;
+    candidates.push(compacted);
+    return candidates.length >= candidateLimit;
   };
 
   for (let segmentIndex = 0; segmentIndex < path.length - 1; segmentIndex += 1) {
@@ -97,34 +106,34 @@ export const buildObstacleSkirtCandidates = (
         ], start.y);
 
         if (nextAfterSegment) {
-          appendCandidate([
+          if (appendCandidate([
             ...path.slice(0, segmentIndex + 1),
             { x: nearX, y: start.y },
             { x: nearX, y: nextAfterSegment.y },
             ...path.slice(segmentIndex + 2),
-          ]);
+          ])) return candidates;
           const outerTopY = Math.round(Math.min(...obstacles.map(obstacle => obstacle.y)) - OBSTACLE_REPAIR_NODE_PADDING - RESIDUAL_PARALLEL_LANE_GAP);
           const outerBottomY = Math.round(Math.max(...obstacles.map(obstacle => obstacle.y + obstacle.height)) + OBSTACLE_REPAIR_NODE_PADDING + RESIDUAL_PARALLEL_LANE_GAP);
           for (const outerY of sortedUniqueNumbers([outerTopY, outerBottomY], start.y)) {
-            appendCandidate([
+            if (appendCandidate([
               ...path.slice(0, segmentIndex + 1),
               { x: nearX, y: start.y },
               { x: nearX, y: outerY },
               { x: nextAfterSegment.x, y: outerY },
               ...path.slice(segmentIndex + 2),
-            ]);
+            ])) return candidates;
           }
         }
 
         for (const detourY of localBoxY.slice(0, 8)) {
-          appendCandidate([
+          if (appendCandidate([
             ...path.slice(0, segmentIndex + 1),
             { x: nearX, y: start.y },
             { x: nearX, y: detourY },
             { x: farX, y: detourY },
             { x: farX, y: start.y },
             ...path.slice(segmentIndex + 1),
-          ]);
+          ])) return candidates;
           if (Math.abs(farX - end.x) < OBSTACLE_REPAIR_TINY_SEGMENT) {
             const extendedFarX = farX + horizontalDirection * OBSTACLE_REPAIR_TINY_SEGMENT;
             const suffix = path.slice(segmentIndex + 2);
@@ -133,7 +142,7 @@ export const buildObstacleSkirtCandidates = (
             const skipTinySuffix = firstSuffix && secondSuffix
               && Math.abs(firstSuffix.x - extendedFarX) < OBSTACLE_REPAIR_TINY_SEGMENT
               && Math.abs(firstSuffix.y - secondSuffix.y) <= 1;
-            appendCandidate([
+            if (appendCandidate([
               ...path.slice(0, segmentIndex + 1),
               { x: nearX, y: start.y },
               { x: nearX, y: detourY },
@@ -142,17 +151,17 @@ export const buildObstacleSkirtCandidates = (
               { x: extendedFarX, y: start.y },
               ...(firstSuffix ? [{ x: extendedFarX, y: firstSuffix.y }] : []),
               ...(skipTinySuffix ? suffix.slice(1) : suffix),
-            ]);
+            ])) return candidates;
           }
         }
 
         for (const detourY of fullSpanDetourLanes) {
-          appendCandidate([
+          if (appendCandidate([
             ...path.slice(0, segmentIndex + 1),
             { x: start.x, y: detourY },
             { x: end.x, y: detourY },
             ...path.slice(segmentIndex + 1),
-          ]);
+          ])) return candidates;
 
           const blockers = otherSegments
             .filter(segment => displayStrictCrossesHorizontal(
@@ -186,14 +195,14 @@ export const buildObstacleSkirtCandidates = (
 
             for (const bypassY of bypassLanes.slice(0, 4)) {
               for (const splitX of splitLanes.slice(0, 4)) {
-                appendCandidate([
+                if (appendCandidate([
                   ...path.slice(0, segmentIndex + 1),
                   { x: start.x, y: bypassY },
                   { x: splitX, y: bypassY },
                   { x: splitX, y: detourY },
                   { x: end.x, y: detourY },
                   ...path.slice(segmentIndex + 1),
-                ]);
+                ])) return candidates;
               }
             }
           }
@@ -241,33 +250,33 @@ export const buildObstacleSkirtCandidates = (
         ], start.x);
 
         if (nextAfterSegment) {
-          appendCandidate([
+          if (appendCandidate([
             ...path.slice(0, segmentIndex + 1),
             { x: start.x, y: nearY },
             { x: nextAfterSegment.x, y: nearY },
             ...path.slice(segmentIndex + 2),
-          ]);
+          ])) return candidates;
           const outerLeftX = Math.round(Math.min(...obstacles.map(obstacle => obstacle.x)) - OBSTACLE_REPAIR_NODE_PADDING - RESIDUAL_PARALLEL_LANE_GAP);
           const outerRightX = Math.round(Math.max(...obstacles.map(obstacle => obstacle.x + obstacle.width)) + OBSTACLE_REPAIR_NODE_PADDING + RESIDUAL_PARALLEL_LANE_GAP);
           for (const outerX of sortedUniqueNumbers([outerLeftX, outerRightX], start.x)) {
-            appendCandidate([
+            if (appendCandidate([
               ...path.slice(0, segmentIndex + 1),
               { x: outerX, y: start.y },
               { x: outerX, y: nextAfterSegment.y },
               ...path.slice(segmentIndex + 2),
-            ]);
+            ])) return candidates;
           }
         }
 
         for (const detourX of localBoxX.slice(0, 8)) {
-          appendCandidate([
+          if (appendCandidate([
             ...path.slice(0, segmentIndex + 1),
             { x: start.x, y: nearY },
             { x: detourX, y: nearY },
             { x: detourX, y: farY },
             { x: start.x, y: farY },
             ...path.slice(segmentIndex + 1),
-          ]);
+          ])) return candidates;
           if (Math.abs(farY - end.y) < OBSTACLE_REPAIR_TINY_SEGMENT) {
             const extendedFarY = farY + verticalDirection * OBSTACLE_REPAIR_TINY_SEGMENT;
             const suffix = path.slice(segmentIndex + 2);
@@ -276,7 +285,7 @@ export const buildObstacleSkirtCandidates = (
             const skipTinySuffix = firstSuffix && secondSuffix
               && Math.abs(firstSuffix.y - extendedFarY) < OBSTACLE_REPAIR_TINY_SEGMENT
               && Math.abs(firstSuffix.x - secondSuffix.x) <= 1;
-            appendCandidate([
+            if (appendCandidate([
               ...path.slice(0, segmentIndex + 1),
               { x: start.x, y: nearY },
               { x: detourX, y: nearY },
@@ -285,17 +294,17 @@ export const buildObstacleSkirtCandidates = (
               { x: start.x, y: extendedFarY },
               ...(firstSuffix ? [{ x: firstSuffix.x, y: extendedFarY }] : []),
               ...(skipTinySuffix ? suffix.slice(1) : suffix),
-            ]);
+            ])) return candidates;
           }
         }
 
         for (const detourX of fullSpanDetourLanes) {
-          appendCandidate([
+          if (appendCandidate([
             ...path.slice(0, segmentIndex + 1),
             { x: detourX, y: start.y },
             { x: detourX, y: end.y },
             ...path.slice(segmentIndex + 1),
-          ]);
+          ])) return candidates;
 
           const blockers = otherSegments
             .filter(segment => displayStrictCrossesVertical(
@@ -329,14 +338,14 @@ export const buildObstacleSkirtCandidates = (
 
             for (const bypassX of bypassLanes.slice(0, 4)) {
               for (const splitY of splitLanes.slice(0, 4)) {
-                appendCandidate([
+                if (appendCandidate([
                   ...path.slice(0, segmentIndex + 1),
                   { x: bypassX, y: start.y },
                   { x: bypassX, y: splitY },
                   { x: detourX, y: splitY },
                   { x: detourX, y: end.y },
                   ...path.slice(segmentIndex + 1),
-                ]);
+                ])) return candidates;
               }
             }
           }

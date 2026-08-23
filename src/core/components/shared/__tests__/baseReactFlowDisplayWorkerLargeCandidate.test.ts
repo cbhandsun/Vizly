@@ -11,7 +11,9 @@ describe('display routing Worker large candidate boundary', () => {
     const nodes: Node[] = [];
     const edges: Edge[] = [];
     for (let index = 0; index < 301; index += 1) {
-      const y = index * 30;
+      // Keep adjacent rows outside the 48px commercial-clearance envelope so
+      // this fixture remains a genuinely hard-clean large candidate.
+      const y = index * 120;
       nodes.push(
         { id: `source-${index}`, position: { x: 0, y }, measured: { width: 10, height: 10 }, data: {} },
         { id: `target-${index}`, position: { x: 200, y }, measured: { width: 10, height: 10 }, data: {} },

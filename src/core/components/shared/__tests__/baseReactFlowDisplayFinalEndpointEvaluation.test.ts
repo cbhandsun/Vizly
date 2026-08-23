@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { createBaseReactFlowFinalEndpointEvaluation } from '../baseReactFlowDisplayFinalEndpointEvaluation';
 import { commercialEdgeDetoursDoNotRegress } from '../baseReactFlowDisplayCommercialDetourGuard';
+import { createDisplayWorkerFinalEvaluation } from '../baseReactFlowDisplayWorkerFinalEvaluation';
 
 const nodes: Node[] = [
   { id: 'source', position: { x: 0, y: 0 }, width: 100, height: 60, data: {} },
@@ -43,7 +44,12 @@ describe('createBaseReactFlowFinalEndpointEvaluation', () => {
     expect(evaluation.endpointOrder(edges)).toBe(evaluation.endpointOrder(edges));
     expect(evaluation.passageOrder(edges)).toBe(evaluation.passageOrder(edges));
     expect(evaluation.hardReport(edges)).toBe(evaluation.hardReport(edges));
+    expect(evaluation.terminalReport(edges)).toBe(evaluation.terminalReport(edges));
     expect(evaluation.unsafeEndpointStubs(edges)).toBe(evaluation.unsafeEndpointStubs(edges));
+    expect(evaluation.readMetrics()).toMatchObject({
+      evaluationCount: 5,
+      cacheHitCount: 5,
+    });
   });
 
   it('does not reuse metadata-sensitive order evidence for a copied candidate', () => {
@@ -74,6 +80,53 @@ describe('createBaseReactFlowFinalEndpointEvaluation', () => {
     expect(evaluation.endpointOrder(candidate)).not.toBe(evaluation.endpointOrder(edges));
     expect(evaluation.passageOrder(candidate)).not.toBe(evaluation.passageOrder(edges));
     expect(evaluation.hardReport(candidate)).not.toBe(evaluation.hardReport(edges));
+  });
+
+  it('primes only the exact route signature with existing hard-gate evidence', () => {
+    const sourceEvaluation = createBaseReactFlowFinalEndpointEvaluation(nodes);
+    const report = sourceEvaluation.hardReport(edges);
+    const evaluation = createBaseReactFlowFinalEndpointEvaluation(nodes);
+
+    expect(evaluation.rememberHardReport(edges, report)).toBe(true);
+    expect(evaluation.hardReport(edges.map(edge => ({ ...edge })))).toBe(report);
+    expect(evaluation.readMetrics()).toMatchObject({
+      evaluationCount: 0,
+      cacheHitCount: 1,
+      scannedNodeCount: 0,
+      scannedEdgePairCount: 0,
+    });
+
+    const changed = edges.map((edge, index) => index === 0 ? {
+      ...edge,
+      data: { ...edge.data, computedPath: [{ x: 50, y: 60 }, { x: 60, y: 220 }] },
+    } : edge);
+    expect(evaluation.hardReport(changed)).not.toBe(report);
+  });
+
+  it('reuses an incremental report only when it accompanies the same Worker edge array', () => {
+    const report = createBaseReactFlowFinalEndpointEvaluation(nodes).hardReport(edges);
+    const primed = createDisplayWorkerFinalEvaluation({
+      nodes,
+      responseEdges: edges,
+      initialHardReport: report,
+      initialHardReportEdges: edges,
+    });
+    expect(primed.hardQualityIsClean(edges)).toBe(report.hardClean);
+    expect(primed.evaluation.readMetrics()).toMatchObject({
+      evaluationCount: 0,
+      cacheHitCount: 1,
+      scannedNodeCount: 0,
+      scannedEdgePairCount: 0,
+    });
+
+    const unprimed = createDisplayWorkerFinalEvaluation({
+      nodes,
+      responseEdges: edges,
+      initialHardReport: report,
+      initialHardReportEdges: [...edges],
+    });
+    unprimed.hardQualityIsClean(edges);
+    expect(unprimed.evaluation.readMetrics().evaluationCount).toBe(1);
   });
 });
 

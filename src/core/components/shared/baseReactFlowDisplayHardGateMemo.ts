@@ -2,7 +2,7 @@ import type { Edge, Node } from '@xyflow/react';
 
 import { computeBaseReactFlowDisplayOutputRouteSignature } from './baseReactFlowDisplayCache';
 import {
-  getDisplayHardQualityGateReport,
+  getDisplayHardQualityGateReportWithMetrics,
 } from './baseReactFlowDisplayQualityGates';
 import type { BaseDisplayBoundedCandidateReport } from './baseReactFlowDisplayEvaluation';
 import type { DisplayTerminalValidationSnapshot } from './baseReactFlowTerminalAxisRepair';
@@ -16,6 +16,16 @@ type HardGateEvaluator = (
 
 export type BaseDisplayHardGateMemo = {
   getReport: HardGateEvaluator;
+  rememberReport: (
+    edges: readonly Edge[],
+    report: BaseDisplayBoundedCandidateReport,
+  ) => boolean;
+  readMetrics: () => Readonly<{
+    evaluationCount: number;
+    cacheHitCount: number;
+    scannedNodeCount: number;
+    scannedEdgePairCount: number;
+  }>;
 };
 
 /**
@@ -27,23 +37,51 @@ export type BaseDisplayHardGateMemo = {
 export const createBaseDisplayHardGateMemo = (
   nodes: Node[],
   terminalSnapshot: DisplayTerminalValidationSnapshot,
-  evaluateReport: HardGateEvaluator = getDisplayHardQualityGateReport,
+  evaluateReport?: HardGateEvaluator,
 ): BaseDisplayHardGateMemo => {
   const reportByRoute = new Map<string, BaseDisplayBoundedCandidateReport>();
+  let evaluationCount = 0;
+  let cacheHitCount = 0;
+  let scannedNodeCount = 0;
+  let scannedEdgePairCount = 0;
 
   return {
+    rememberReport(edges, report) {
+      const routeSignature = computeBaseReactFlowDisplayOutputRouteSignature([...edges]);
+      if (!routeSignature) return false;
+      reportByRoute.set(routeSignature, report);
+      return true;
+    },
     getReport(edges, _nodes, candidate) {
       const routeSignature = computeBaseReactFlowDisplayOutputRouteSignature(edges);
       if (routeSignature) {
         const cached = reportByRoute.get(routeSignature);
         if (cached) {
+          cacheHitCount += 1;
           return cached.candidate === candidate ? cached : { ...cached, candidate };
         }
       }
 
-      const report = evaluateReport(edges, nodes, candidate, terminalSnapshot);
+      evaluationCount += 1;
+      const evaluated = evaluateReport
+        ? { report: evaluateReport(edges, nodes, candidate, terminalSnapshot), scanMetrics: null }
+        : getDisplayHardQualityGateReportWithMetrics(
+          edges,
+          nodes,
+          candidate,
+          terminalSnapshot,
+        );
+      const report = evaluated.report;
+      scannedNodeCount += evaluated.scanMetrics?.scannedNodeCount ?? 0;
+      scannedEdgePairCount += evaluated.scanMetrics?.scannedEdgePairCount ?? 0;
       if (routeSignature) reportByRoute.set(routeSignature, report);
       return report;
     },
+    readMetrics: () => ({
+      evaluationCount,
+      cacheHitCount,
+      scannedNodeCount,
+      scannedEdgePairCount,
+    }),
   };
 };

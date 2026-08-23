@@ -19,9 +19,6 @@ import {
   chooseFinalObstacleAwarePolishCandidate,
   type BaseDisplayBoundedCandidateReport,
 } from './baseReactFlowDisplayEvaluation';
-import {
-  getDisplayHardQualityGateReport,
-} from './baseReactFlowDisplayQualityGates';
 import { countRenderUnsafeEndpointStubs } from './baseReactFlowDisplayEndpointStubRepair';
 import {
   repairBaseReactFlowFinalCommercialDetours,
@@ -36,13 +33,16 @@ import { repairBoundedReverseParallelOverlaps } from './baseReactFlowDisplayReve
 import { repairResidualOppositeInteriorLaneOverlaps } from './baseReactFlowDisplayReverseParallelRepair';
 import { separateDetachedParallelOverlaps } from '../../strategies/shared/edgeDetachedOverlapRepair';
 import { DISPLAY_BOUNDED_DETACHED_OVERLAP_REPAIR_OPTIONS } from './baseReactFlowDisplayOverlapRepair';
-import { createBaseReactFlowFinalEndpointEvaluation } from './baseReactFlowDisplayFinalEndpointEvaluation';
 import { closeBaseReactFlowDisplayFinalHardContract } from './baseReactFlowDisplayFinalHardContract';
 import { buildBaseReactFlowEmergencyObstacleCandidate } from './baseReactFlowDisplayEmergencyHardClosure';
 import {
   buildBaseReactFlowAlternateHardClosureCandidate,
   displayAlternateHardClosureCandidateIsReady,
 } from './baseReactFlowDisplayAlternateHardClosure';
+import {
+  createBaseReactFlowFinalEndpointEvaluation,
+  diffBaseReactFlowEvaluationMetrics,
+} from './baseReactFlowDisplayFinalEndpointEvaluation';
 
 export type { BaseDisplayBoundedCandidateReport } from './baseReactFlowDisplayEvaluation';
 export { repairBoundedReverseParallelOverlaps } from './baseReactFlowDisplayReverseParallelOverlapClosure';
@@ -74,9 +74,12 @@ export const createBaseReactFlowDisplayEdges = (
     args.nodes,
     new Map(args.nodes.map(node => [node.id, node] as const)),
   );
+  const evaluationSession = args.evaluationSession
+    ?? createBaseReactFlowFinalEndpointEvaluation(repairNodes);
   let exactReport: BaseReactFlowDisplayExactReport | undefined;
   const routedEdges = createBaseReactFlowFullRouteEdges({
     ...args,
+    evaluationSession,
     createPreDisplayFinalEdges: (preDisplayArgs) => {
       let boundedReport: BaseDisplayBoundedCandidateReport | undefined;
       const boundedEdges = createBaseReactFlowPreDisplayFinalEdges({
@@ -102,12 +105,9 @@ export const createBaseReactFlowDisplayEdges = (
     candidateCount: routedEdges.length,
     onTrace: args.onPhaseTrace,
   });
+  const finalizerMetricsBefore = evaluationSession.readMetrics();
   const preFinalizerEdges = repairCrossedSpineWithOuterSkirt(routedEdges, repairNodes);
-  const preFinalizerReport = getDisplayHardQualityGateReport(
-    preFinalizerEdges,
-    repairNodes,
-    'polished',
-  );
+  const preFinalizerReport = evaluationSession.hardReport(preFinalizerEdges);
   const canReusePreFinalizer = preFinalizerReport.hardClean
     && countRenderUnsafeEndpointStubs(preFinalizerEdges) === 0;
   const finalizedEdges = isBaseDisplayFinalized(preFinalizerEdges, inputSignature)
@@ -119,12 +119,20 @@ export const createBaseReactFlowDisplayEdges = (
         preFinalizerEdges === routedEdges ? exactReport : undefined,
         args.onPhaseTrace,
       );
-  finalizerTimer.finish('accepted', finalizedEdges.length);
+  finalizerTimer.finish(
+    'accepted',
+    finalizedEdges.length,
+    diffBaseReactFlowEvaluationMetrics(
+      finalizerMetricsBefore,
+      evaluationSession.readMetrics(),
+    ),
+  );
   const finalOrderTimer = startDisplayRoutingPhaseTrace({
     phase: 'hard-gate',
     candidateCount: finalizedEdges.length,
     onTrace: args.onPhaseTrace,
   });
+  const finalOrderMetricsBefore = evaluationSession.readMetrics();
   const hemisphereRawEdges = repairOppositeHemisphereTerminalBacktracks(
     finalizedEdges,
     repairNodes,
@@ -134,7 +142,7 @@ export const createBaseReactFlowDisplayEdges = (
     finalizedEdges,
     hemisphereRawEdges,
   );
-  const finalEvaluation = createBaseReactFlowFinalEndpointEvaluation(repairNodes);
+  const finalEvaluation = evaluationSession;
   const finalOrderEdges = hemisphereSafeEdges.length < 2
     ? hemisphereSafeEdges
     : repairBaseReactFlowFinalEndpointOrder(
@@ -240,6 +248,13 @@ export const createBaseReactFlowDisplayEdges = (
     commercialClosureReady ? 'skip' : 'accepted',
     renderReadyEdges === commercialEdges ? 0 : renderReadyEdges.length,
   );
-  finalOrderTimer.finish('accepted', renderReadyEdges.length);
+  finalOrderTimer.finish(
+    'accepted',
+    renderReadyEdges.length,
+    diffBaseReactFlowEvaluationMetrics(
+      finalOrderMetricsBefore,
+      evaluationSession.readMetrics(),
+    ),
+  );
   return renderReadyEdges;
 };

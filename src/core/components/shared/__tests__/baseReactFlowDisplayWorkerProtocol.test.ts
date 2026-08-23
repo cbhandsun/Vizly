@@ -7,10 +7,12 @@ import {
 import {
   DISPLAY_ROUTING_PHASE_TRACE_LIMIT,
   finalizeDisplayRoutingPhaseTrace,
+  startDisplayRoutingPhaseTrace,
   type DisplayRoutingPhaseTrace,
 } from '../baseReactFlowDisplayRoutingTrace';
 import { createDisplayRoutingIdentity } from '../baseReactFlowDisplayRoutingSession';
 import { createDisplayRoutingPhaseRecorder } from '../baseReactFlowDisplayWorkerTraceRecorder';
+import { createDisplayEdgesTransportResponse } from '../baseReactFlowDisplayWorkerScope';
 
 const nodes = [
   { id: 'source', position: { x: 0, y: 0 }, data: {} },
@@ -31,6 +33,41 @@ const validRepairRequest = {
 } as const;
 
 describe('baseReactFlowDisplayWorkerProtocol', () => {
+  it('compacts incremental transport to routing patches and rejects ambiguous carriers', () => {
+    const sourceEdges = validRepairRequest.edges.map(edge => ({
+      ...edge,
+      data: { ...edge.data },
+    }));
+    const routedEdges = [{
+      ...sourceEdges[0],
+      data: { computedPath: [{ x: 0, y: 0 }, { x: 50, y: 20 }, { x: 100, y: 0 }] },
+    }];
+    const compact = createDisplayEdgesTransportResponse({
+      requestId: 'incremental-transport',
+      edges: routedEdges,
+      hardClean: true,
+      routeResolution: 'incremental-route',
+      affectedEdgeCount: 1,
+      fallbackLevel: 'none',
+    }, sourceEdges);
+    expect(compact.edges).toBeUndefined();
+    expect(compact.routingPatches).toEqual([expect.objectContaining({
+      id: 'edge',
+      data: { computedPath: routedEdges[0].data.computedPath },
+    })]);
+    expect(parseDisplayEdgesWorkerResponse(compact, 'incremental-transport')).toMatchObject(compact);
+    expect(parseDisplayEdgesWorkerResponse({
+      ...compact,
+      edges: routedEdges,
+    }, 'incremental-transport')).toBeNull();
+    expect(createDisplayEdgesTransportResponse({
+      requestId: 'mismatch',
+      edges: routedEdges,
+      hardClean: true,
+      routeResolution: 'incremental-route',
+    }, [])).toHaveProperty('edges', routedEdges);
+  });
+
   it('buffers incremental phase trace without publishing progress messages', () => {
     const phaseTrace: DisplayRoutingPhaseTrace[] = [];
     const publish = vi.fn();
@@ -105,6 +142,27 @@ describe('baseReactFlowDisplayWorkerProtocol', () => {
       routeResolution: 'full-route',
       phaseTrace: [{ ...traces[0], exclusiveDurationMs: 101 }],
     }, 'route-trace')).toBeNull();
+  });
+
+  it('records the bounded materialized candidate count discovered at phase completion', () => {
+    const traces: DisplayRoutingPhaseTrace[] = [];
+    startDisplayRoutingPhaseTrace({
+      phase: 'local-reconnect-seed',
+      candidateCount: 4,
+      onTrace: trace => traces.push(trace),
+    }).finish('accepted', 1, {
+      candidateCount: 180,
+      evaluationCount: 96,
+      cacheHitCount: 84,
+    });
+
+    expect(traces).toEqual([expect.objectContaining({
+      phase: 'local-reconnect-seed',
+      parentPhase: 'local-route',
+      candidateCount: 180,
+      evaluationCount: 96,
+      cacheHitCount: 84,
+    })]);
   });
 
   it('parses validate-or-route candidates and degrades malformed candidates to a reroute', () => {
@@ -209,6 +267,7 @@ describe('baseReactFlowDisplayWorkerProtocol', () => {
       nextInputGeometryDigest: `geometry-v1:${'c'.repeat(32)}`,
       changeSet: {
         reason: 'node-drag',
+        classification: 'geometry',
         changedNodeIds: ['source'],
         changedEdgeIds: [],
         topologyChanged: false,
@@ -231,6 +290,25 @@ describe('baseReactFlowDisplayWorkerProtocol', () => {
         ...incrementalRequest.changeSet,
         changedNodeIds: ['source', 'source'],
       },
+    })).toBeNull();
+    expect(parseDisplayEdgesWorkerRequest({
+      ...incrementalRequest,
+      changeSet: {
+        ...incrementalRequest.changeSet,
+        classification: 'style-only',
+      },
+    })).toBeNull();
+    expect(parseDisplayEdgesWorkerRequest({
+      ...incrementalRequest,
+      changeSet: {
+        ...incrementalRequest.changeSet,
+        classification: 'topology',
+      },
+    })).toBeNull();
+    const { classification: _classification, ...legacyChangeSet } = incrementalRequest.changeSet;
+    expect(parseDisplayEdgesWorkerRequest({
+      ...incrementalRequest,
+      changeSet: legacyChangeSet,
     })).toBeNull();
     expect(parseDisplayEdgesWorkerRequest({
       ...incrementalRequest,
@@ -407,6 +485,7 @@ describe('baseReactFlowDisplayWorkerProtocol', () => {
       terminalsAnchored: true,
       minimumClearanceViolations: 0,
       minimumClearanceViolationEdgeIds: [],
+      commercialClearanceViolations: 0,
       quality: {
         nonOrthogonalSegments: 0,
         strictCrossings: 0,
@@ -448,6 +527,26 @@ describe('baseReactFlowDisplayWorkerProtocol', () => {
       hardReport: {
         ...hardReport,
         minimumClearanceViolationEdgeIds: ['x'.repeat(20_001)],
+      },
+      routeResolution: 'repair',
+    }, 'repair-1')).toBeNull();
+    expect(parseDisplayEdgesWorkerResponse({
+      requestId: 'repair-1',
+      edges: validEdges,
+      hardClean: true,
+      hardReport: {
+        ...hardReport,
+        commercialClearanceViolations: 1,
+      },
+      routeResolution: 'repair',
+    }, 'repair-1')).toBeNull();
+    expect(parseDisplayEdgesWorkerResponse({
+      requestId: 'repair-1',
+      edges: validEdges,
+      hardClean: true,
+      hardReport: {
+        ...hardReport,
+        commercialClearanceViolations: Number.POSITIVE_INFINITY,
       },
       routeResolution: 'repair',
     }, 'repair-1')).toBeNull();

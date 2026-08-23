@@ -1,13 +1,18 @@
 import type { Edge, Node } from '@xyflow/react';
 
 import { separateDetachedParallelOverlaps } from '../../strategies/shared/edgeDetachedOverlapRepair';
-import { repairDisplayMicroArtifacts } from '../../strategies/shared/edgeDisplayMicroCleanup';
+import {
+  createDisplayMicroCleanupDiagnostics,
+  repairDisplayMicroArtifacts,
+} from '../../strategies/shared/edgeDisplayMicroCleanup';
 import { repairEndpointOrthogonalPaths } from '../../strategies/shared/edgeEndpointPathRepair';
 import {
   calculateEdgePathQualityScore,
   createEdgePathQualityEvaluationContext,
   type EdgePathQualityScore,
 } from '../../strategies/shared/edgeStrictCrossingGuard';
+import { getSegments } from '../../strategies/shared/edgePathQualityGeometry';
+import { createEdgePathQualitySegmentIndex } from '../../strategies/shared/edgePathQualitySegmentIndex';
 import {
   displayEdgesRelated,
   displaySegmentOverlap,
@@ -41,23 +46,179 @@ import {
   createDisplayTerminalValidationSnapshot,
   displayTerminalValidationDoesNotRegress,
 } from './baseReactFlowTerminalValidation';
+import {
+  startDisplayRoutingPhaseTrace,
+  type DisplayRoutingPhaseMetrics,
+  type DisplayRoutingPhaseName,
+  type DisplayRoutingPhaseTrace,
+} from './baseReactFlowDisplayRoutingTrace';
 
 export { repairBoundedReverseParallelOverlapsWithCandidates } from './baseReactFlowDisplayReverseParallelRepair';
 
 const RESIDUAL_PARALLEL_OVERLAP = 16;
+
+type DisplayResidualRepairTraceOptions = Readonly<{
+  parentPhase: DisplayRoutingPhaseName;
+  onPhaseTrace?: (trace: DisplayRoutingPhaseTrace) => void;
+}>;
+
+const displayPathsEqual = (first: Edge, second: Edge): boolean => {
+  const firstPath = getDisplayComputedPath(first);
+  const secondPath = getDisplayComputedPath(second);
+  return firstPath.length === secondPath.length
+    && firstPath.every((point, index) => (
+      point.x === secondPath[index]?.x
+      && point.y === secondPath[index]?.y
+    ));
+};
+
+export const changedDisplayPathIndexes = (
+  baseline: Edge[],
+  candidate: Edge[],
+): number[] => {
+  if (
+    baseline.length !== candidate.length
+    || baseline.some((edge, index) => edge.id !== candidate[index]?.id)
+  ) {
+    return candidate.map((_, index) => index);
+  }
+  return candidate.flatMap((edge, index) => (
+    displayPathsEqual(baseline[index], edge) ? [] : [index]
+  ));
+};
+
+export const collectResidualMicroCandidateEdgeIndexes = (
+  baseline: Edge[],
+  derivative: Edge[],
+): number[] => {
+  const changedIndexes = changedDisplayPathIndexes(baseline, derivative);
+  if (changedIndexes.length === 0) return [];
+  if (baseline.length !== derivative.length) return changedIndexes;
+
+  const paths = derivative.map(getDisplayComputedPath);
+  const allSegments = getSegments(paths);
+  const edgeSegments = derivative.map((_, edgeIndex) => (
+    allSegments.filter(segment => segment.edgeIndex === edgeIndex)
+  ));
+  const segmentIndex = createEdgePathQualitySegmentIndex(edgeSegments);
+  const candidateIndexes = new Set(changedIndexes);
+  const changedSet = new Set(changedIndexes);
+  for (const changedIndex of changedIndexes) {
+    const changedEdge = derivative[changedIndex];
+    const query = segmentIndex.queryPotentialEdgeIndexes(
+      edgeSegments[changedIndex] ?? [],
+      changedSet,
+    );
+    query.edgeIndexes.forEach(index => candidateIndexes.add(index));
+    derivative.forEach((edge, index) => {
+      if (
+        index !== changedIndex
+        && (
+          edge.source === changedEdge.source
+          || edge.target === changedEdge.target
+        )
+      ) candidateIndexes.add(index);
+    });
+  }
+  return [...candidateIndexes].sort((first, second) => first - second);
+};
 
 export const repairResidualDisplayOverlaps = <T extends Edge[]>(
   edges: T,
   nodes: Node[],
   options = DISPLAY_DETACHED_OVERLAP_REPAIR_OPTIONS,
   extendedOptions = DISPLAY_EXTENDED_RESIDUAL_OVERLAP_REPAIR_OPTIONS,
+  traceOptions?: DisplayResidualRepairTraceOptions,
 ): T => {
+  const runTracedRepair = (
+    phase: Extract<
+      DisplayRoutingPhaseName,
+      | 'residual-exact'
+      | 'residual-loop-shortcut'
+      | 'residual-exact-selection'
+      | 'residual-polish-selection'
+      | 'residual-micro-derivative'
+      | 'residual-endpoint-derivative'
+      | 'residual-obstacle-selection'
+      | 'residual-detached-primary'
+      | 'residual-detached-default'
+      | 'residual-detached-extended'
+      | 'residual-near-parallel'
+    >,
+    baseline: T,
+    repair: () => T,
+    parentPhase = traceOptions?.parentPhase,
+    readMetrics?: () => DisplayRoutingPhaseMetrics,
+  ): T => {
+    const timer = startDisplayRoutingPhaseTrace({
+      phase,
+      parentPhase,
+      candidateCount: baseline.length,
+      onTrace: traceOptions?.onPhaseTrace,
+    });
+    const result = repair();
+    timer.finish(
+      result === baseline ? 'skip' : 'accepted',
+      result === baseline ? 0 : result.length,
+      readMetrics?.(),
+    );
+    return result;
+  };
+  const runTracedMicroDerivative = (
+    parent: T,
+    derivative: T,
+    parentPhase: DisplayRoutingPhaseName,
+  ): T => {
+    const diagnostics = createDisplayMicroCleanupDiagnostics();
+    const candidateEdgeIndexes = collectResidualMicroCandidateEdgeIndexes(parent, derivative);
+    return runTracedRepair(
+      'residual-micro-derivative',
+      derivative,
+      () => repairDisplayMicroArtifacts(
+        derivative,
+        undefined,
+        diagnostics,
+        { candidateEdgeIndexes },
+      ) as T,
+      parentPhase,
+      () => ({
+        candidateCount: diagnostics.generatedCandidateCount,
+        evaluationCount: diagnostics.evaluatedCandidateCount,
+        cacheHitCount: diagnostics.cacheHitCount + diagnostics.pairCacheHitCount,
+        scannedEdgePairCount: diagnostics.scannedEdgePairCount,
+        scannedSegmentCount: diagnostics.scannedSegmentCount,
+      }),
+    );
+  };
+  const runTracedMicroRepair = (
+    baseline: T,
+    parentPhase: DisplayRoutingPhaseName,
+  ): T => {
+    const diagnostics = createDisplayMicroCleanupDiagnostics();
+    return runTracedRepair(
+      'residual-micro-derivative',
+      baseline,
+      () => repairDisplayMicroArtifacts(baseline, undefined, diagnostics) as T,
+      parentPhase,
+      () => ({
+        candidateCount: diagnostics.generatedCandidateCount,
+        evaluationCount: diagnostics.evaluatedCandidateCount,
+        cacheHitCount: diagnostics.cacheHitCount + diagnostics.pairCacheHitCount,
+        scannedEdgePairCount: diagnostics.scannedEdgePairCount,
+        scannedSegmentCount: diagnostics.scannedSegmentCount,
+      }),
+    );
+  };
   const useBoundedResidualRepair = extendedOptions === DISPLAY_BOUNDED_RESIDUAL_OVERLAP_REPAIR_OPTIONS;
   const endpointRepairOptions = useBoundedResidualRepair
     ? { detectExistingBridgeCrossings: false }
     : undefined;
   const terminalValidation = createDisplayTerminalValidationSnapshot(nodes);
-  const rawLoopShortened = repairDisplayLoopShortcuts(edges, nodes, 32) as T;
+  const rawLoopShortened = runTracedRepair(
+    'residual-loop-shortcut',
+    edges,
+    () => repairDisplayLoopShortcuts(edges, nodes, 32) as T,
+  );
   const loopShortened = displayTerminalValidationDoesNotRegress(
     edges,
     rawLoopShortened,
@@ -80,130 +241,244 @@ export const repairResidualDisplayOverlaps = <T extends Edge[]>(
   // Exact lane shifts are bounded and use the same full quality/obstacle gates. Run them before
   // the combinatorial near-parallel search so a small terminal or interior lane conflict does not
   // force thousands of outer-bridge candidates.
-  const exactFirstRepaired = repairExactThresholdResidualOverlaps(
+  const exactFirstRepaired = runTracedRepair(
+    'residual-exact',
     loopShortened,
-    nodes,
-    exactQualityBudget,
+    () => repairExactThresholdResidualOverlaps(
+      loopShortened,
+      nodes,
+      exactQualityBudget,
+    ),
   );
-  const exactFirstSelected = chooseExactThresholdResidualCandidate(
-    nodes,
+  const exactFirstSelected = runTracedRepair(
+    'residual-exact-selection',
     loopShortened,
-    exactFirstRepaired,
+    () => chooseExactThresholdResidualCandidate(
+      nodes,
+      loopShortened,
+      exactFirstRepaired,
+    ),
   );
   const quality = calculateEdgePathQualityScore(exactFirstSelected);
   const exactResidualPairs = collectExactThresholdResidualPairs(exactFirstSelected);
   const hardOverlapRisk = hasHardDisplayOverlapRisk(quality);
   if (!hardOverlapRisk && exactResidualPairs.length === 0) return exactFirstSelected;
   if (!hardOverlapRisk) {
-    const nearParallelCleaned = repairNearParallelResidualOverlaps(
+    const nearParallelCleaned = runTracedRepair(
+      'residual-near-parallel',
       exactFirstSelected,
-      nodes,
-      nearParallelQualityBudget,
+      () => repairNearParallelResidualOverlaps(
+        exactFirstSelected,
+        nodes,
+        nearParallelQualityBudget,
+      ),
     );
-    const exactCleaned = repairExactThresholdResidualOverlaps(
+    const exactCleaned = runTracedRepair(
+      'residual-exact',
       nearParallelCleaned,
-      nodes,
-      exactQualityBudget,
+      () => repairExactThresholdResidualOverlaps(
+        nearParallelCleaned,
+        nodes,
+        exactQualityBudget,
+      ),
     );
-    return chooseExactThresholdResidualCandidate(
-      nodes,
+    return runTracedRepair(
+      'residual-exact-selection',
       exactFirstSelected,
-      nearParallelCleaned,
-      exactCleaned,
+      () => chooseExactThresholdResidualCandidate(
+        nodes,
+        exactFirstSelected,
+        nearParallelCleaned,
+        exactCleaned,
+      ),
     );
   }
 
-  const overlapRepaired = separateDetachedParallelOverlaps(
+  const overlapRepaired = runTracedRepair(
+    'residual-detached-primary',
     exactFirstSelected,
-    nodes,
-    16,
-    options,
-  ) as T;
-  const shouldRunDefaultOverlapCandidate = options === DISPLAY_DETACHED_OVERLAP_REPAIR_OPTIONS;
-  const defaultOverlapRepaired = shouldRunDefaultOverlapCandidate
-    ? separateDetachedParallelOverlaps(exactFirstSelected, nodes, 16) as T
-    : overlapRepaired;
-  const overlapMicroRepaired = repairDisplayMicroArtifacts(overlapRepaired) as T;
-  // Crossing sweeps run before bounded residual overlap repair, and the final
-  // hard closure validates crossings afterwards. Avoid repeating the endpoint
-  // repairer's all-peer bridge scan while retaining its endpoint, anchor, and
-  // obstacle corrections.
-  const endpointRepaired = repairEndpointOrthogonalPaths(
-    overlapRepaired,
-    nodes,
-    endpointRepairOptions,
-  ) as T;
-  const microRepaired = repairDisplayMicroArtifacts(endpointRepaired) as T;
-  const defaultOverlapMicroRepaired = defaultOverlapRepaired === overlapRepaired
-    ? overlapMicroRepaired
-    : repairDisplayMicroArtifacts(defaultOverlapRepaired) as T;
-  const defaultEndpointRepaired = defaultOverlapRepaired === overlapRepaired
-    ? endpointRepaired
-    : repairEndpointOrthogonalPaths(defaultOverlapRepaired, nodes, endpointRepairOptions) as T;
-  let selected = chooseFinalObstacleAwarePolishCandidate(
-    nodes,
-    exactFirstSelected,
-    overlapRepaired,
-    overlapMicroRepaired,
-    endpointRepaired,
-    microRepaired,
-    defaultOverlapRepaired,
-    defaultOverlapMicroRepaired,
-    defaultEndpointRepaired,
-  );
-  selected = chooseExactThresholdResidualCandidate(
-    nodes,
-    selected,
-    overlapRepaired,
-    overlapMicroRepaired,
-    endpointRepaired,
-    microRepaired,
-    defaultOverlapRepaired,
-    defaultOverlapMicroRepaired,
-    defaultEndpointRepaired,
-  );
-  if (hasHardDisplayOverlapRisk(calculateEdgePathQualityScore(selected))) {
-    const extendedOverlapRepaired = separateDetachedParallelOverlaps(
-      selected,
+    () => separateDetachedParallelOverlaps(
+      exactFirstSelected,
       nodes,
       16,
-      extendedOptions,
-    ) as T;
-    const extendedOverlapMicroRepaired = repairDisplayMicroArtifacts(extendedOverlapRepaired) as T;
-    const extendedEndpointRepaired = repairEndpointOrthogonalPaths(
-      extendedOverlapRepaired,
-      nodes,
-      endpointRepairOptions,
-    ) as T;
-    const extendedMicroRepaired = repairDisplayMicroArtifacts(extendedEndpointRepaired) as T;
-    selected = chooseFinalObstacleAwarePolishCandidate(
-      nodes,
+      options,
+    ) as T,
+  );
+  const shouldRunDefaultOverlapCandidate = options === DISPLAY_DETACHED_OVERLAP_REPAIR_OPTIONS;
+  const defaultOverlapRepaired = shouldRunDefaultOverlapCandidate
+    ? runTracedRepair(
+      'residual-detached-default',
+      exactFirstSelected,
+      () => separateDetachedParallelOverlaps(exactFirstSelected, nodes, 16) as T,
+    )
+    : overlapRepaired;
+  let selected = runTracedRepair(
+    'residual-polish-selection',
+    exactFirstSelected,
+    () => {
+      const overlapMicroRepaired = runTracedMicroRepair(
+        overlapRepaired,
+        'residual-polish-selection',
+      );
+      // Crossing sweeps run before bounded residual overlap repair, and the final
+      // hard closure validates crossings afterwards. Avoid repeating the endpoint
+      // repairer's all-peer bridge scan while retaining its endpoint, anchor, and
+      // obstacle corrections.
+      const endpointRepaired = runTracedRepair(
+        'residual-endpoint-derivative',
+        overlapRepaired,
+        () => repairEndpointOrthogonalPaths(
+          overlapRepaired,
+          nodes,
+          endpointRepairOptions,
+        ) as T,
+        'residual-polish-selection',
+      );
+      const microRepaired = runTracedMicroDerivative(
+        overlapRepaired,
+        endpointRepaired,
+        'residual-polish-selection',
+      );
+      const defaultOverlapMicroRepaired = defaultOverlapRepaired === overlapRepaired
+        ? overlapMicroRepaired
+        : runTracedMicroRepair(
+          defaultOverlapRepaired,
+          'residual-polish-selection',
+        );
+      const defaultEndpointRepaired = defaultOverlapRepaired === overlapRepaired
+        ? endpointRepaired
+        : runTracedRepair(
+          'residual-endpoint-derivative',
+          defaultOverlapRepaired,
+          () => repairEndpointOrthogonalPaths(
+            defaultOverlapRepaired,
+            nodes,
+            endpointRepairOptions,
+          ) as T,
+          'residual-polish-selection',
+        );
+      const obstacleAware = runTracedRepair(
+        'residual-obstacle-selection',
+        exactFirstSelected,
+        () => chooseFinalObstacleAwarePolishCandidate(
+          nodes,
+          exactFirstSelected,
+          overlapRepaired,
+          overlapMicroRepaired,
+          endpointRepaired,
+          microRepaired,
+          defaultOverlapRepaired,
+          defaultOverlapMicroRepaired,
+          defaultEndpointRepaired,
+        ),
+        'residual-polish-selection',
+      );
+      return runTracedRepair(
+        'residual-exact-selection',
+        obstacleAware,
+        () => chooseExactThresholdResidualCandidate(
+          nodes,
+          obstacleAware,
+          overlapRepaired,
+          overlapMicroRepaired,
+          endpointRepaired,
+          microRepaired,
+          defaultOverlapRepaired,
+          defaultOverlapMicroRepaired,
+          defaultEndpointRepaired,
+        ),
+        'residual-polish-selection',
+      );
+    },
+  );
+  if (hasHardDisplayOverlapRisk(calculateEdgePathQualityScore(selected))) {
+    const extendedOverlapRepaired = runTracedRepair(
+      'residual-detached-extended',
       selected,
-      extendedOverlapRepaired,
-      extendedOverlapMicroRepaired,
-      extendedEndpointRepaired,
-      extendedMicroRepaired,
+      () => separateDetachedParallelOverlaps(
+        selected,
+        nodes,
+        16,
+        extendedOptions,
+      ) as T,
     );
-    selected = chooseExactThresholdResidualCandidate(
-      nodes,
-      selected,
-      extendedOverlapRepaired,
-      extendedOverlapMicroRepaired,
-      extendedEndpointRepaired,
-      extendedMicroRepaired,
+    const extendedBaseline = selected;
+    selected = runTracedRepair(
+      'residual-polish-selection',
+      extendedBaseline,
+      () => {
+        const extendedOverlapMicroRepaired = runTracedMicroRepair(
+          extendedOverlapRepaired,
+          'residual-polish-selection',
+        );
+        const extendedEndpointRepaired = runTracedRepair(
+          'residual-endpoint-derivative',
+          extendedOverlapRepaired,
+          () => repairEndpointOrthogonalPaths(
+            extendedOverlapRepaired,
+            nodes,
+            endpointRepairOptions,
+          ) as T,
+          'residual-polish-selection',
+        );
+        const extendedMicroRepaired = runTracedMicroDerivative(
+          extendedOverlapRepaired,
+          extendedEndpointRepaired,
+          'residual-polish-selection',
+        );
+        const obstacleAware = runTracedRepair(
+          'residual-obstacle-selection',
+          extendedBaseline,
+          () => chooseFinalObstacleAwarePolishCandidate(
+            nodes,
+            extendedBaseline,
+            extendedOverlapRepaired,
+            extendedOverlapMicroRepaired,
+            extendedEndpointRepaired,
+            extendedMicroRepaired,
+          ),
+          'residual-polish-selection',
+        );
+        return runTracedRepair(
+          'residual-exact-selection',
+          obstacleAware,
+          () => chooseExactThresholdResidualCandidate(
+            nodes,
+            obstacleAware,
+            extendedOverlapRepaired,
+            extendedOverlapMicroRepaired,
+            extendedEndpointRepaired,
+            extendedMicroRepaired,
+          ),
+          'residual-polish-selection',
+        );
+      },
     );
   }
-  const exactShiftCleaned = repairExactThresholdResidualOverlaps(
+  const exactShiftCleaned = runTracedRepair(
+    'residual-exact',
     selected,
-    nodes,
-    exactQualityBudget,
+    () => repairExactThresholdResidualOverlaps(
+      selected,
+      nodes,
+      exactQualityBudget,
+    ),
   );
-  selected = chooseExactThresholdResidualCandidate(nodes, selected, exactShiftCleaned);
+  const preExactSelection = selected;
+  selected = runTracedRepair(
+    'residual-exact-selection',
+    preExactSelection,
+    () => chooseExactThresholdResidualCandidate(nodes, preExactSelection, exactShiftCleaned),
+  );
   if (useBoundedResidualRepair) return selected;
-  const residualCleaned = repairNearParallelResidualOverlaps(
+  const residualCleaned = runTracedRepair(
+    'residual-near-parallel',
     selected,
-    nodes,
-    nearParallelQualityBudget,
+    () => repairNearParallelResidualOverlaps(
+      selected,
+      nodes,
+      nearParallelQualityBudget,
+    ),
   );
   const residualMicroCleaned = repairDisplayMicroArtifacts(residualCleaned) as T;
   return chooseFinalObstacleAwarePolishCandidate(nodes, selected, residualCleaned, residualMicroCleaned);
@@ -274,11 +549,18 @@ export const repairNearParallelResidualOverlaps = <T extends Edge[]>(
   ));
 
   for (const pair of overlapPairs) {
+    if (qualityEvaluations >= maxQualityEvaluations) return bestEdges;
     for (const segment of [pair.second, pair.first]) {
+        if (qualityEvaluations >= maxQualityEvaluations) return bestEdges;
         const other = segment === pair.second ? pair.first : pair.second;
         const path = getDisplayComputedPath(edges[segment.edgeIndex]);
         const otherPath = getDisplayComputedPath(edges[other.edgeIndex]);
-        for (const candidatePath of buildNearParallelLaneNudgePaths(
+        const remainingQualityEvaluations = Math.max(
+          0,
+          maxQualityEvaluations - qualityEvaluations,
+        );
+        const maxPathsForSegment = Math.min(64, remainingQualityEvaluations);
+        const nearParallelCandidates = buildNearParallelLaneNudgePaths(
           path,
           segment,
           other,
@@ -286,14 +568,23 @@ export const repairNearParallelResidualOverlaps = <T extends Edge[]>(
           nodes,
           edges[segment.edgeIndex],
           edges,
-        ).concat(buildOppositeOverlapOuterBridgeCandidates(
-          path,
-          segment,
-          other,
-          otherPath,
-          nodes,
-          edges[segment.edgeIndex],
-        )).slice(0, Math.max(8, Math.min(64, maxQualityEvaluations)))) {
+          maxPathsForSegment,
+        );
+        const remainingPathSlots = Math.max(
+          0,
+          maxPathsForSegment - nearParallelCandidates.length,
+        );
+        const candidatePaths = remainingPathSlots === 0
+          ? nearParallelCandidates
+          : nearParallelCandidates.concat(buildOppositeOverlapOuterBridgeCandidates(
+            path,
+            segment,
+            other,
+            otherPath,
+            nodes,
+            edges[segment.edgeIndex],
+          ).slice(0, remainingPathSlots));
+        for (const candidatePath of candidatePaths) {
           if (qualityEvaluations >= maxQualityEvaluations) return bestEdges;
           const candidateEdges = edges.map((edge, edgeIndex) => (
             edgeIndex === segment.edgeIndex ? withDisplayComputedPath(edge, candidatePath) : edge
@@ -305,6 +596,8 @@ export const repairNearParallelResidualOverlaps = <T extends Edge[]>(
               nodes,
               edges[segment.edgeIndex],
               candidateEdges,
+              undefined,
+              Math.max(0, maxQualityEvaluations - qualityEvaluations - 1),
             ),
           ];
           for (const candidateVariant of candidateVariants) {

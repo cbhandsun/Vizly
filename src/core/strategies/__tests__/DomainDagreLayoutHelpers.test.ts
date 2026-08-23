@@ -15,6 +15,27 @@ const node = (id: string, x = 0, y = 0): Node => ({
 });
 
 describe('DomainDagreLayoutHelpers', () => {
+  it.each([
+    ['TB', 'y', 1],
+    ['BT', 'y', -1],
+    ['LR', 'x', 1],
+    ['RL', 'x', -1],
+  ] as const)('honors the %s ranking direction', (direction, axis, sign) => {
+    const result = layoutWithDagre(
+      [node('source'), node('target')],
+      [{ id: 'edge', source: 'source', target: 'target' }],
+      direction,
+      30,
+      40,
+    );
+    const source = result.find(position => position.id === 'source');
+    const target = result.find(position => position.id === 'target');
+
+    expect(source).toBeTruthy();
+    expect(target).toBeTruthy();
+    expect(Math.sign((target?.[axis] ?? 0) - (source?.[axis] ?? 0))).toBe(sign);
+  });
+
   it('uses bounded default dimensions when no resolver is provided', () => {
     const result = layoutWithDagre(
       [node('source'), node('target')],

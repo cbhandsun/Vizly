@@ -63,12 +63,46 @@ export const mergeTrustedBaseReactFlowPrecompiledRouteArtifact = (
   if (entry.hardClean !== true) return null;
   const safePatches = sanitizeBaseReactFlowPrecompiledRoutePatches(sourceEdges, entry.edges);
   if (!safePatches) return null;
-  const merged = mergeBaseReactFlowDisplayEdgePatches(sourceEdges, safePatches);
+  const merged = mergeBaseReactFlowPrecompiledRoutePatches(sourceEdges, safePatches);
   if (!merged) return null;
   return baseReactFlowDisplayOutputRouteSignatureMatches(
     merged,
     entry.outputRouteSignature,
   ) ? merged : null;
+};
+
+/**
+ * Generated route artifacts carry a complete `treeRouting` contract. The
+ * ordinary Worker/cache patch merger is intentionally recursive because those
+ * patches are incremental. Reusing it without this replacement step can retain
+ * stale source points or effective handles that are absent from the generated
+ * route and invalidate the artifact's output signature.
+ */
+export const mergeBaseReactFlowPrecompiledRoutePatches = (
+  sourceEdges: Edge[],
+  patches: Edge[],
+): Edge[] | null => {
+  const merged = mergeBaseReactFlowDisplayEdgePatches(sourceEdges, patches);
+  if (!merged) return null;
+  return merged.map((edge, index) => {
+    const patchData = patches[index]?.data;
+    if (
+      !patchData
+      || typeof patchData !== 'object'
+      || Array.isArray(patchData)
+      || !Object.prototype.hasOwnProperty.call(patchData, 'treeRouting')
+    ) return edge;
+    const edgeData = edge.data && typeof edge.data === 'object' && !Array.isArray(edge.data)
+      ? edge.data
+      : {};
+    return {
+      ...edge,
+      data: {
+        ...edgeData,
+        treeRouting: patchData.treeRouting,
+      },
+    };
+  });
 };
 
 export const loadBaseReactFlowPrecompiledRouteCandidateFromRegistry = async (

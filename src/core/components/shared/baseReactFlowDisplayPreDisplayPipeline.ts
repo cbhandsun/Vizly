@@ -62,7 +62,7 @@ export const createBaseReactFlowPreDisplayFinalEdges = (
     repairNodes,
     getRouteHardQualityGateReport,
     routeTerminalsAreAttached,
-  } = createBaseReactFlowPreDisplayContext(args.nodes);
+  } = createBaseReactFlowPreDisplayContext(args.nodes, args.evaluationSession);
   const interactiveResult = createBaseReactFlowInteractiveSeedResult({
     args,
     repairNodes,

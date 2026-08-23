@@ -13,8 +13,12 @@ const DEFAULT_MINIMUM_STABLE_MS = 96;
 
 export const resolveDisplayGeometryBarrierPolicy = (
   incremental: boolean,
-): Readonly<{ minimumStableMs?: number; waitForFonts: boolean }> => incremental
-  ? { minimumStableMs: 0, waitForFonts: false }
+): Readonly<{
+  minimumStableMs?: number;
+  sampleIncrementalMicrotask?: boolean;
+  waitForFonts: boolean;
+}> => incremental
+  ? { minimumStableMs: 0, sampleIncrementalMicrotask: true, waitForFonts: false }
   : { waitForFonts: true };
 
 const readSafeIdentity = (readGeometryIdentity: () => string | null): string | null => {
@@ -30,20 +34,25 @@ const readSafeIdentity = (readGeometryIdentity: () => string | null): string | n
 
 /**
  * Starts routing as soon as measured geometry is identical when sampled after
- * fonts settle and again on the next animation frame. A bounded timeout preserves liveness
- * when fonts, ResizeObserver, or layout never become perfectly stable.
+ * fonts settle and again on the next observation. Released node drags may use
+ * one microtask observation because their position/digest belongs to the
+ * already committed React state; a mismatch falls back to frame sampling. A
+ * bounded timeout preserves liveness when fonts, ResizeObserver, or layout
+ * never become perfectly stable.
  */
 export const scheduleBaseReactFlowStableGeometry = ({
   run,
   readGeometryIdentity,
   maximumWaitMs = DEFAULT_MAXIMUM_WAIT_MS,
   minimumStableMs = DEFAULT_MINIMUM_STABLE_MS,
+  sampleIncrementalMicrotask = false,
   waitForFonts = true,
 }: {
   run: (result: DisplayGeometryBarrierResult) => void;
   readGeometryIdentity: () => string | null;
   maximumWaitMs?: number;
   minimumStableMs?: number;
+  sampleIncrementalMicrotask?: boolean;
   waitForFonts?: boolean;
 }): CancelDisplayGeometryBarrier => {
   if (typeof window === 'undefined') return () => {};
@@ -59,6 +68,7 @@ export const scheduleBaseReactFlowStableGeometry = ({
   let frameHandle: number | null = null;
   let previousIdentity: string | null = null;
   let sampleCount = 0;
+  let microtaskSampleUsed = false;
   const requestFrame = typeof window.requestAnimationFrame === 'function'
     ? window.requestAnimationFrame.bind(window)
     : null;
@@ -78,24 +88,33 @@ export const scheduleBaseReactFlowStableGeometry = ({
     });
   };
 
-  const sampleNextFrame = (): void => {
+  const observeIdentity = (): void => {
     if (cancelled || completed) return;
+    const currentIdentity = readSafeIdentity(readGeometryIdentity);
+    sampleCount += 1;
+    if (
+      currentIdentity
+      && currentIdentity === previousIdentity
+      && Date.now() - startedAt >= safeMinimumStableMs
+    ) {
+      finish('stable');
+      return;
+    }
+    previousIdentity = currentIdentity;
+    sampleNextObservation();
+  };
+
+  const sampleNextObservation = (): void => {
+    if (cancelled || completed) return;
+    if (sampleIncrementalMicrotask && !microtaskSampleUsed) {
+      microtaskSampleUsed = true;
+      queueMicrotask(observeIdentity);
+      return;
+    }
     if (!requestFrame) return;
     frameHandle = requestFrame(() => {
       frameHandle = null;
-      if (cancelled || completed) return;
-      const currentIdentity = readSafeIdentity(readGeometryIdentity);
-      sampleCount += 1;
-      if (
-        currentIdentity
-        && currentIdentity === previousIdentity
-        && Date.now() - startedAt >= safeMinimumStableMs
-      ) {
-        finish('stable');
-        return;
-      }
-      previousIdentity = currentIdentity;
-      sampleNextFrame();
+      observeIdentity();
     });
   };
 
@@ -110,7 +129,7 @@ export const scheduleBaseReactFlowStableGeometry = ({
     if (cancelled || completed) return;
     previousIdentity = readSafeIdentity(readGeometryIdentity);
     sampleCount += 1;
-    sampleNextFrame();
+    sampleNextObservation();
   };
   if (fontSet?.ready && typeof fontSet.ready.then === 'function') {
     void fontSet.ready.then(beginSampling, beginSampling);

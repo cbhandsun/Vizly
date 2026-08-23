@@ -39,6 +39,7 @@ const baseNodes: Node[] = [
     measured: { width: 100, height: 60 },
   },
 ];
+const cacheGeometryDigest = `geometry-v1:${'a'.repeat(32)}`;
 
 afterEach(() => {
   vi.useRealTimers();
@@ -799,16 +800,22 @@ describe('baseReactFlowDisplayEdgeCore', () => {
     expect(outputRouteSignature).toMatch(/^route-v2:/);
     writeBaseReactFlowDisplayEdgesCache(signature, edges, {
       hardClean: true,
+      inputGeometryDigest: cacheGeometryDigest,
       outputRouteSignature: outputRouteSignature!,
     });
-    const cached = readBaseReactFlowDisplayEdgesCache(signature);
+    const cached = readBaseReactFlowDisplayEdgesCache(signature, cacheGeometryDigest);
     expect(cached).toEqual(edges);
     expect(cached).not.toBe(edges);
-    expect(readBaseReactFlowDisplayEdgesCacheEntry(signature)).toEqual({
+    expect(readBaseReactFlowDisplayEdgesCacheEntry(signature, cacheGeometryDigest)).toEqual({
       edges,
       hardClean: true,
+      inputGeometryDigest: cacheGeometryDigest,
       outputRouteSignature,
     });
+    expect(readBaseReactFlowDisplayEdgesCacheEntry(
+      signature,
+      `geometry-v1:${'b'.repeat(32)}`,
+    )).toBeNull();
 
     const uncleanSignature = 'display-cache-unclean-test';
     writeBaseReactFlowDisplayEdgesCache(uncleanSignature, edges, { hardClean: false });
@@ -825,9 +832,9 @@ describe('baseReactFlowDisplayEdgeCore', () => {
     const invalidSignature = 'display-cache-invalid-test';
     const invalidKey = `${validKey!.slice(0, -signature.length)}${invalidSignature}`;
     window.localStorage.setItem(invalidKey, JSON.stringify({
-      version: validPayload.version,
-      signature: invalidSignature,
-      edges: [
+      ...validPayload,
+      inputSignature: invalidSignature,
+      patches: [
         {
           id: 'bad',
           source: 'source',
@@ -849,7 +856,7 @@ describe('baseReactFlowDisplayEdgeCore', () => {
     const unverifiedKey = `${validKey!.slice(0, -signature.length)}${unverifiedSignature}`;
     window.localStorage.setItem(unverifiedKey, JSON.stringify({
       ...validPayload,
-      signature: unverifiedSignature,
+      inputSignature: unverifiedSignature,
       hardClean: false,
     }));
     expect(readBaseReactFlowDisplayEdgesCacheEntry(unverifiedSignature)).toBeNull();
@@ -860,11 +867,21 @@ describe('baseReactFlowDisplayEdgeCore', () => {
     const { outputRouteSignature: _removedOutputRouteSignature, ...unsignedPayload } = validPayload;
     window.localStorage.setItem(unsignedKey, JSON.stringify({
       ...unsignedPayload,
-      signature: unsignedSignature,
+      inputSignature: unsignedSignature,
       hardClean: true,
     }));
     expect(readBaseReactFlowDisplayEdgesCacheEntry(unsignedSignature)).toBeNull();
     expect(window.localStorage.getItem(unsignedKey)).toBeNull();
+
+    const metadataSignature = 'display-cache-business-metadata-test';
+    const metadataKey = `${validKey!.slice(0, -signature.length)}${metadataSignature}`;
+    window.localStorage.setItem(metadataKey, JSON.stringify({
+      ...validPayload,
+      inputSignature: metadataSignature,
+      patches: [{ ...validPayload.patches[0], label: 'must-not-cross-routing-boundary' }],
+    }));
+    expect(readBaseReactFlowDisplayEdgesCacheEntry(metadataSignature)).toBeNull();
+    expect(window.localStorage.getItem(metadataKey)).toBeNull();
   });
 
   it('bounds exact cached output route signatures and rejects invalid routing geometry', () => {
@@ -949,6 +966,7 @@ describe('baseReactFlowDisplayEdgeCore', () => {
       vi.setSystemTime(new Date(1_000 + index));
       writeBaseReactFlowDisplayEdgesCache(`cache-life-${index}`, edges, {
         hardClean: true,
+        inputGeometryDigest: cacheGeometryDigest,
         outputRouteSignature: outputRouteSignature!,
       });
     }
@@ -962,6 +980,6 @@ describe('baseReactFlowDisplayEdgeCore', () => {
     expect(window.localStorage.getItem('vizly:baseReactFlowDisplayEdges:old-version:stale')).toBeNull();
     expect(displayKeys).toHaveLength(12);
     expect(displayKeys.some(key => key.endsWith(':cache-life-0'))).toBe(false);
-    expect(readBaseReactFlowDisplayEdgesCache('cache-life-12')).toEqual(edges);
+    expect(readBaseReactFlowDisplayEdgesCache('cache-life-12', cacheGeometryDigest)).toEqual(edges);
   });
 });

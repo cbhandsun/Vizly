@@ -329,6 +329,7 @@ export function separateDetachedParallelOverlaps(
     const wideDeltas = [-160, -128, -96, -64, -48, -32, 32, 48, 64, 96, 128, 160];
 
     for (const hit of hits.slice(0, hitBudget)) {
+      if (qualityBudget.exhausted()) break;
       const unrelated = !sharesAnyEndpoint(hit.a, hit.b, edges);
       const narrowSmallOverlapSearch = minOverlap <= 24 && hit.overlap < 96;
       const allowDetachedEndpointLaneShift = segmentsRunOppositeDirections(hit.a, hit.b)
@@ -361,6 +362,7 @@ export function separateDetachedParallelOverlaps(
           ...pairClearances.flatMap(clearance => endpointBypassCoordinates(hit.b, hit.a, clearance)),
         ])].slice(0, narrowSmallOverlapSearch ? 4 : 18);
         for (const firstCoordinate of firstCoordinates) {
+          if (qualityBudget.exhausted()) break;
           const firstBypass = bypassEndpointParallelOverlapAtCoordinate(
             paths[hit.a.edgeIndex],
             hit.a,
@@ -368,6 +370,7 @@ export function separateDetachedParallelOverlaps(
           );
           if (!firstBypass) continue;
           for (const secondCoordinate of secondCoordinates) {
+            if (qualityBudget.exhausted()) break;
             const secondBypass = bypassEndpointParallelOverlapAtCoordinate(
               paths[hit.b.edgeIndex],
               hit.b,
@@ -445,6 +448,7 @@ export function separateDetachedParallelOverlaps(
         }
       }
       for (const segment of [hit.a, hit.b]) {
+        if (qualityBudget.exhausted()) break;
         const activeDeltas = narrowSmallOverlapSearch ? narrowDeltas : wideDeltas;
         const edge = edges[segment.edgeIndex];
         const otherSegment = segment === hit.a ? hit.b : hit.a;
@@ -464,6 +468,7 @@ export function separateDetachedParallelOverlaps(
         const endpointBypassByClearance = new Map<number, Point[] | null>();
         const terminalLaneCandidatesByClearance = new Map<number, Point[][]>();
         for (const delta of activeDeltas) {
+          if (qualityBudget.exhausted()) break;
           const includeDeltaIndependentCandidates = delta === activeDeltas[0];
           const endpointClearance = Math.max(16, Math.abs(delta));
           let endpointBypass: Point[] | null = null;
@@ -520,6 +525,7 @@ export function separateDetachedParallelOverlaps(
           ].filter((candidate): candidate is Point[] => candidate !== null);
 
           for (const candidatePath of candidatePathsForSegment) {
+            if (qualityBudget.exhausted()) break;
             const candidatePaths = paths.map((path, index) => (index === segment.edgeIndex ? candidatePath : path));
             if (!routingObstacleGate(paths, candidatePaths, [segment.edgeIndex])) continue;
             const candidateEdgeCrossings = strictCrossingsForEdgeSegments(
@@ -660,8 +666,10 @@ function repairResidualReverseOrUnrelatedOverlap(
   const deltas = [-224, 224, -160, 160, -128, 128, -96, 96, -64, 64, -48, 48, -32, 32];
 
   for (const hit of hits.slice(0, 8)) {
+    if (qualityBudget.exhausted()) break;
     const segments = [hit.a, hit.b].sort((first, second) => first.fromStart + first.fromEnd - second.fromStart - second.fromEnd);
     for (const segment of segments) {
+      if (qualityBudget.exhausted()) break;
       const other = segment === hit.a ? hit.b : hit.a;
       const edgePath = paths[segment.edgeIndex];
       const fixedTrimCandidate = trimSegmentEndpointOverlap(edgePath, segment, other);
@@ -693,6 +701,7 @@ function repairResidualReverseOrUnrelatedOverlap(
         strictCrossingSegmentIndex,
       );
       for (const delta of deltas) {
+        if (qualityBudget.exhausted()) break;
         const includeDeltaIndependentCandidates = delta === deltas[0];
         const terminalLaneClearance = Math.max(32, Math.abs(delta));
         let terminalLaneCandidates = terminalLaneCandidatesByClearance.get(terminalLaneClearance);
@@ -717,6 +726,7 @@ function repairResidualReverseOrUnrelatedOverlap(
         ].filter((candidate): candidate is Point[] => candidate !== null);
 
         for (const candidatePath of candidatePathsForSegment) {
+          if (qualityBudget.exhausted()) break;
           const candidateSegments = extractPathSegmentRefsForPath(candidatePath, segment.edgeIndex, edges);
           if (strictCrossingsForEdgeSegments(
             candidateSegments,

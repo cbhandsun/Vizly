@@ -23,6 +23,7 @@ import {
   stageBaseReactFlowLayoutRouting,
 } from '../baseReactFlowLayoutRoutingTransaction';
 import { getDisplayHardQualityGateReport } from '../baseReactFlowDisplayQualityGates';
+import { createBaseReactFlowDisplayEdgePatches } from '../baseReactFlowDisplayWorkerClient';
 
 const nodes: Node[] = [
   {
@@ -51,6 +52,7 @@ const edges: Edge[] = [{
 
 const successfulResult = (candidateEdges: Edge[]) => ({
   edges: candidateEdges,
+  routingPatches: createBaseReactFlowDisplayEdgePatches(candidateEdges, candidateEdges),
   projectedEdges: candidateEdges,
   hardClean: true,
   routeResolution: 'repair' as const,

@@ -11,8 +11,10 @@ import {
   parseBaseReactFlowPrecompiledRouteArtifact,
   sanitizeBaseReactFlowPrecompiledRoutePatches,
 } from '../baseReactFlowPrecompiledRouteArtifact';
-import { mergeTrustedBaseReactFlowPrecompiledRouteArtifact } from '../baseReactFlowPrecompiledRouteRegistry';
-import { mergeBaseReactFlowDisplayEdgePatches } from '../baseReactFlowDisplayRoutingTransaction';
+import {
+  mergeBaseReactFlowPrecompiledRoutePatches,
+  mergeTrustedBaseReactFlowPrecompiledRouteArtifact,
+} from '../baseReactFlowPrecompiledRouteRegistry';
 import { projectBaseReactFlowDisplayWorkerInput } from '../baseReactFlowDisplayWorkerClient';
 import { parseDisplayEdgesWorkerRequest } from '../baseReactFlowDisplayWorkerProtocol';
 import demandAllocationProductionRequest from './fixtures/demandAllocationProductionWorkerRequest.json';
@@ -65,7 +67,7 @@ describe('BaseReactFlow precompiled route stability', () => {
     const safePatches = sanitizeBaseReactFlowPrecompiledRoutePatches(request.edges, entry.edges);
     expect(safePatches).not.toBeNull();
     if (!safePatches) return;
-    const merged = mergeBaseReactFlowDisplayEdgePatches(request.edges, safePatches);
+    const merged = mergeBaseReactFlowPrecompiledRoutePatches(request.edges, safePatches);
     expect(merged).not.toBeNull();
     if (!merged) return;
     const mergedSignature = computeBaseReactFlowDisplayOutputRouteSignature(merged);

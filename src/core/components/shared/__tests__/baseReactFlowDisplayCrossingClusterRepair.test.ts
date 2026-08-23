@@ -11,6 +11,10 @@ import {
 } from '../baseReactFlowDisplayCrossingClusterRepair';
 import { countDisplayObstacleHits } from '../baseReactFlowDisplayEvaluation';
 import {
+  buildBaseReactFlowAlternateHardClosureCandidate,
+  displayAlternateHardClosureCandidateIsReady,
+} from '../baseReactFlowDisplayAlternateHardClosure';
+import {
   candidateStrictCrossingsForEdge,
   candidateUnrelatedOverlapForEdge,
   createDisplayCandidateInteractionContext,
@@ -179,6 +183,58 @@ describe('bounded display crossing cluster repair', () => {
     ));
 
     expect(repairBoundedMultiEdgeResidualStrictCrossings(edges, nodes)).toBe(edges);
+  });
+});
+
+describe('alternate display hard closure', () => {
+  it('requires the 48px commercial clearance contract in addition to the hard report', () => {
+    const candidate: Edge = {
+      id: 'source-target',
+      source: 'source',
+      target: 'target',
+      sourceHandle: 'bottom',
+      targetHandle: 'top',
+      data: {
+        computedPath: [{ x: 50, y: 60 }, { x: 50, y: 240 }],
+        layoutPathLocked: true,
+        layoutDirection: 'TB',
+      },
+    };
+    const endpointNodes = [node('source', 0, 0, 100, 60), node('target', 0, 240, 100, 60)];
+    const closeObstacle = node('unrelated', 76, 100, 80, 80);
+
+    expect(displayAlternateHardClosureCandidateIsReady([candidate], endpointNodes)).toBe(true);
+    expect(displayAlternateHardClosureCandidateIsReady(
+      [candidate],
+      [...endpointNodes, closeObstacle],
+    )).toBe(false);
+  });
+
+  it('fails closed before candidate generation for empty and over-limit graphs', () => {
+    const baseArgs = {
+      nodes: [] as Node[],
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: false,
+      displayEdgeEpoch: 1,
+    };
+    expect(buildBaseReactFlowAlternateHardClosureCandidate({
+      args: { ...baseArgs, edges: [] },
+      repairNodes: [],
+      primaryCandidate: [],
+    })).toBeNull();
+
+    const oversizedEdges = Array.from({ length: 25 }, (_, index): Edge => ({
+      id: `edge-${index}`,
+      source: `source-${index}`,
+      target: `target-${index}`,
+      data: {},
+    }));
+    expect(buildBaseReactFlowAlternateHardClosureCandidate({
+      args: { ...baseArgs, edges: oversizedEdges },
+      repairNodes: [],
+      primaryCandidate: oversizedEdges,
+    })).toBeNull();
   });
 });
 

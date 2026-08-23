@@ -80,6 +80,8 @@ export const visitBaseReactFlowDisplayInputIdentity = (
     feed(node.id);
     feed(node.type);
     feed(node.parentId);
+    feed(Boolean(node.hidden));
+    feed(data.collapsed);
     feed(Boolean(displayNode.positionAbsolute));
     feed(data.layoutDirection);
     feedGeometry(pos.x ?? 0);

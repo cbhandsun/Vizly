@@ -4,6 +4,7 @@ import logisticsStandardData from '../../../../data/standardized/LogisticsStanda
 import { standardDataToCanvas } from '../../diagrams/designerUtils';
 import { auditFinalSameSideEndpointOrder } from '../../../strategies/shared/edgeFinalSameSideEndpointOrderRepair';
 import { auditFinalSameSidePassageOrder } from '../../../strategies/shared/edgeFinalSameSidePassageOrderRepair';
+import { expectCompleteLogisticsIncrementalPhaseTrace } from './baseReactFlowDisplayLogisticsPhaseTrace.testUtils';
 import { calculateEdgePathQualityScore } from '../../../strategies/shared/edgeStrictCrossingGuard';
 import { displayEdgesHaveNodeAnchoredTerminals } from '../baseReactFlowTerminalAxisRepair';
 import {
@@ -27,6 +28,7 @@ import {
   createBaseReactFlowRoutingAffectedClosure,
   createBaseReactFlowRoutingChangeSet,
 } from '../baseReactFlowDisplayRoutingChangeSet';
+import type { DisplayRoutingPhaseTrace } from '../baseReactFlowDisplayRoutingTrace';
 import {
   createBaseReactFlowDisplayEdgePatches,
   mergeBaseReactFlowDisplayEdgePatches,
@@ -323,7 +325,7 @@ describe('baseReactFlowDisplayEdges logistics regressions', () => {
   it('builds a final-quality logistics candidate within the interactive budget', async () => {
     const canvas = await standardDataToCanvas(logisticsStandardData as any);
     const projected = projectBaseReactFlowDisplayWorkerInput(canvas);
-    const phaseTraces: Array<{ phase: string; durationMs: number; resolution: string }> = [];
+    const phaseTraces: DisplayRoutingPhaseTrace[] = [];
     const startedAt = performance.now();
     const result = createBaseReactFlowDisplayEdges({
       edges: projected.edges,
@@ -374,6 +376,10 @@ describe('baseReactFlowDisplayEdges logistics regressions', () => {
     ).toBe(0);
     expect(edgeNodeObstacleHits(result, absoluteNodes), JSON.stringify(paths, null, 2)).toEqual([]);
     expect(displayEdgesHaveNodeAnchoredTerminals(result, absoluteNodes)).toBe(true);
+    expect(
+      phaseTraces.find(trace => trace.phase === 'post-render-residual'),
+      JSON.stringify({ quality, phaseTraces }, null, 2),
+    ).toMatchObject({ resolution: 'skip' });
     expect(durationMs, JSON.stringify({ quality, phaseTraces, paths }, null, 2)).toBeLessThan(3_000);
   }, 30_000);
 
@@ -932,35 +938,10 @@ describe('baseReactFlowDisplayEdges logistics regressions', () => {
         nearTrunkOpportunities: 0,
         unsafeEndpointStubs: 0,
       });
-      expect(incrementalResponse.phaseTrace?.map(trace => trace.phase), diagnostics)
-        .toEqual([
-          'incremental-closure',
-          'local-route',
-          'hard-gate',
-          'final-clearance',
-          'final-hard-safety',
-          'final-endpoint-seed',
-          'final-endpoint-topology',
-          'final-endpoint-order',
-          'final-endpoint-closure',
-          'final-safety-hard-gate',
-          'final-safety-stubs',
-          'final-safety-endpoint-order',
-          'final-safety-passage-order',
-          'final-safety-closure',
-          'final-endpoint-seed',
-          'final-endpoint-topology',
-          'final-endpoint-order',
-          'final-endpoint-closure',
-          'final-commercial-clearance',
-          'final-commercial-terminal-preserving',
-          'final-commercial-terminal-changing',
-          'final-commercial-source-stairs',
-          'final-commercial-evaluation',
-          'final-commercial-safety-closure',
-          'finalizer',
-          'session-commit',
-        ]);
+      expectCompleteLogisticsIncrementalPhaseTrace(
+        incrementalResponse.phaseTrace,
+        diagnostics,
+      );
       expect(incrementalResponse.phaseTrace?.slice(0, 3).every(
         trace => trace.resolution === 'accepted',
       ), diagnostics).toBe(true);

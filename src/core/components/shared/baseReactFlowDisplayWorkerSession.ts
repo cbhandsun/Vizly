@@ -13,6 +13,11 @@ import {
   type RoutingTopologyPlan,
 } from './baseReactFlowDisplayRoutingTopologyPlan';
 import type { BaseDisplayBoundedCandidateReport } from './baseReactFlowDisplayEvaluation';
+import { withDisplayAbsolutePositions } from './baseReactFlowDisplayEdgeCore';
+import {
+  createDisplayRoutingWorkerSpatialSnapshot,
+  type DisplayRoutingWorkerSpatialSnapshot,
+} from './baseReactFlowDisplayWorkerSpatialSnapshot';
 
 const MAX_WORKER_ROUTING_SESSIONS = 8;
 
@@ -22,6 +27,7 @@ export type DisplayRoutingWorkerSessionState = Readonly<{
   sourceEdges: Edge[];
   displayPatches: Edge[];
   topologyPlan: RoutingTopologyPlan;
+  spatialSnapshot: DisplayRoutingWorkerSpatialSnapshot | null;
   hardReport?: BaseDisplayBoundedCandidateReport;
 }>;
 
@@ -67,6 +73,14 @@ export const writeDisplayRoutingWorkerSession = ({
     sourceEdges,
     displayPatches,
     topologyPlan: createDisplayRoutingTopologyPlan(nodes, finalEdges),
+    spatialSnapshot: createDisplayRoutingWorkerSpatialSnapshot({
+      nodes: withDisplayAbsolutePositions(
+        nodes,
+        new Map(nodes.map(node => [node.id, node] as const)),
+      ),
+      edges: finalEdges,
+      outputRouteSignature,
+    }),
     hardReport,
   });
   return ref;

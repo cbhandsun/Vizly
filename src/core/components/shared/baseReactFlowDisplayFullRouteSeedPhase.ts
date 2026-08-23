@@ -16,13 +16,25 @@ import {
   type BaseDisplayBoundedCandidateReport,
 } from './baseReactFlowDisplayEvaluation';
 import { createFastDisplayQualityEdges } from './baseReactFlowDisplayQualitySeedPipeline';
-import { finalizeDisplayEdgesForRenderMode } from './baseReactFlowDisplayRenderPipeline';
+import {
+  commitDisplayEdgesForRenderMode,
+  finalizeDisplayEdgesForRenderMode,
+} from './baseReactFlowDisplayRenderPipeline';
 import type {
   BaseReactFlowDisplayEdgesArgs,
   BaseReactFlowFullRouteSeedResult,
   BaseReactFlowPreDisplayFinalEdgesFactory,
 } from './baseReactFlowDisplayFullRouteTypes';
-import type { DisplayRoutingPhaseTrace } from './baseReactFlowDisplayRoutingTrace';
+import {
+  createBaseReactFlowFinalEndpointEvaluation,
+  diffBaseReactFlowEvaluationMetrics,
+} from './baseReactFlowDisplayFinalEndpointEvaluation';
+import { auditBaseReactFlowFinalSafetyClosure } from './baseReactFlowDisplayFinalSafetyAudit';
+import {
+  startDisplayRoutingPhaseTrace,
+  type DisplayRoutingPhaseTrace,
+} from './baseReactFlowDisplayRoutingTrace';
+import { createDisplayRoutingTopologyPlan } from './baseReactFlowDisplayRoutingTopologyPlan';
 
 export const selectBaseReactFlowFullRouteSeedEdges = (
   rawEdges: Edge[],
@@ -43,6 +55,7 @@ export const prepareBaseReactFlowFullRouteSeed = ({
   onPhaseTrace,
   onSeedPhaseTrace,
   createPreDisplayFinalEdges,
+  evaluationSession: providedEvaluationSession,
 }: BaseReactFlowDisplayEdgesArgs & {
   createPreDisplayFinalEdges?: BaseReactFlowPreDisplayFinalEdgesFactory;
   onSeedPhaseTrace?: (trace: DisplayRoutingPhaseTrace) => void;
@@ -79,6 +92,7 @@ export const prepareBaseReactFlowFullRouteSeed = ({
         boundedReport = report;
       },
       onPhaseTrace: onSeedPhaseTrace,
+      evaluationSession: providedEvaluationSession,
     });
     const boundedHardClean = boundedReport?.hardClean ?? displayHardQualityGatesAreClean(
       boundedFinal,
@@ -95,9 +109,44 @@ export const prepareBaseReactFlowFullRouteSeed = ({
 
   const nodeById = new Map(nodes.map((node) => [node.id, node]));
   const repairNodes = withDisplayAbsolutePositions(nodes, nodeById);
+  const evaluationSession = providedEvaluationSession
+    ?? createBaseReactFlowFinalEndpointEvaluation(repairNodes);
   // Keep the prepared seed paired with normalized routes through render finalization;
   // otherwise raw locked paths can overwrite obstacle-safe pre-display output.
   const routeSeedEdges = selectBaseReactFlowFullRouteSeedEdges(edges, preparedBoundedEdges);
+  const initialGateTimer = startDisplayRoutingPhaseTrace({
+    phase: 'seed-initial-gate',
+    candidateCount: routeSeedEdges.length,
+    onTrace: onSeedPhaseTrace,
+  });
+  const initialGateMetricsBefore = evaluationSession.readMetrics();
+  const committedInitialRoute = commitDisplayEdgesForRenderMode({
+    finalQualityEdges: routeSeedEdges,
+    rawEdges: routeSeedEdges,
+    enableSmartEdges,
+    smartEdgePadding,
+    isLargeGraph,
+    inputSignature,
+    nodes,
+  });
+  const initialSafetyAudit = auditBaseReactFlowFinalSafetyClosure(
+    committedInitialRoute,
+    repairNodes,
+    evaluationSession,
+  );
+  initialGateTimer.finish(
+    initialSafetyAudit.canSkip
+      ? 'accepted'
+      : initialSafetyAudit.endpointDefectOnly ? 'rejected' : 'fallback',
+    initialSafetyAudit.canSkip ? committedInitialRoute.length : 0,
+    diffBaseReactFlowEvaluationMetrics(
+      initialGateMetricsBefore,
+      evaluationSession.readMetrics(),
+    ),
+  );
+  if (initialSafetyAudit.canSkip) {
+    return { kind: 'finalized', edges: committedInitialRoute };
+  }
   const normalizedEdges = routeSeedEdges
     .map((rawEdge) => normalizeBaseEdge({ edge: rawEdge, nodeById, displayEdgeEpoch }))
     .map((edge) => synthesizeStableFallbackPath({ edge, nodeById }));
@@ -152,6 +201,8 @@ export const prepareBaseReactFlowFullRouteSeed = ({
       canReusePreparedGlobalRouting,
       reusePreparedGlobalRouting,
       onPhaseTrace,
+      evaluationSession,
+      topologyPlan: createDisplayRoutingTopologyPlan(repairNodes, normalizedEdges),
     },
   };
 };

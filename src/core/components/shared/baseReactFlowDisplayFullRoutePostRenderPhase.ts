@@ -33,12 +33,17 @@ import {
   commitDisplayEdgesForRenderMode,
   finalizeDisplayEdgesForRenderMode,
 } from './baseReactFlowDisplayRenderPipeline';
-import { displayHardQualityGatesAreClean } from './baseReactFlowDisplayQualityGates';
 import { createBaseReactFlowDisplayMicroSafetyContext } from './baseReactFlowDisplayMicroSafety';
+import {
+  createDisplayRoutingDefectPlan,
+  displayRoutingQualityNeedsMicroRepair,
+  displayRoutingQualityNeedsTerminalRepair,
+} from './baseReactFlowDisplayRoutingDefectPlan';
 import {
   startDisplayRoutingPhaseTrace,
   type DisplayRoutingPhaseTrace,
 } from './baseReactFlowDisplayRoutingTrace';
+import { computeBaseReactFlowDisplayOutputRouteSignature } from './baseReactFlowDisplayCache';
 import { repairTerminalEndpointStrictCrossingStubs } from './baseReactFlowDisplayStrictTerminalRepair';
 import type { BaseReactFlowFullRouteContext } from './baseReactFlowDisplayFullRouteTypes';
 
@@ -176,22 +181,32 @@ export const runBaseReactFlowFullRoutePostRenderPhase = (
     candidateCount: finalizedEdges.length,
     onTrace: recordSoftClosurePhaseTrace,
   });
-  const microSafetyContext = createBaseReactFlowDisplayMicroSafetyContext(
-    finalizedEdges,
-    repairNodes,
-  );
-  const postFinalizeMicroCandidate = repairDisplayMicroArtifacts(
-    finalizedEdges,
-    microSafetyContext,
-  );
-  const postFinalizeMicroCleaned = displayMicroCleanupSafetyDoesNotRegress(
-    microSafetyContext.baseline,
-    microSafetyContext.evaluate(postFinalizeMicroCandidate),
-  )
-    ? postFinalizeMicroCandidate
+  const finalizedQuality = calculateEdgePathQualityScore(finalizedEdges);
+  const needsPostFinalizeMicroRepair = displayRoutingQualityNeedsMicroRepair(
+    finalizedQuality,
+  ) || displayRoutingQualityNeedsTerminalRepair(finalizedQuality);
+  const postFinalizeMicroCleaned = needsPostFinalizeMicroRepair
+    ? (() => {
+      const microSafetyContext = createBaseReactFlowDisplayMicroSafetyContext(
+        finalizedEdges,
+        repairNodes,
+      );
+      const candidate = repairDisplayMicroArtifacts(
+        finalizedEdges,
+        microSafetyContext,
+      );
+      return displayMicroCleanupSafetyDoesNotRegress(
+        microSafetyContext.baseline,
+        microSafetyContext.evaluate(candidate),
+      )
+        ? candidate
+        : finalizedEdges;
+    })()
     : finalizedEdges;
   const postFinalizeResidualCleaned = postFinalizeMicroCleaned;
-  const postFinalizeQuality = calculateEdgePathQualityScore(postFinalizeResidualCleaned);
+  const postFinalizeQuality = postFinalizeResidualCleaned === finalizedEdges
+    ? finalizedQuality
+    : calculateEdgePathQualityScore(postFinalizeResidualCleaned);
   microTimer.finish(
     postFinalizeResidualCleaned === finalizedEdges ? 'skip' : 'accepted',
     postFinalizeResidualCleaned === finalizedEdges ? 0 : postFinalizeResidualCleaned.length,
@@ -231,6 +246,9 @@ export const runBaseReactFlowFullRoutePostRenderPhase = (
     useBoundedLargeRepair,
     mustCloseHardOverlapFirst,
   );
+  const preResidualOutputSignature = recordSoftClosurePhaseTrace
+    ? computeBaseReactFlowDisplayOutputRouteSignature(postFinalizeObstacleCleaned)
+    : null;
   const finalPostSoftResidualCleaned = hasHardDisplayOverlapRisk(postFinalizeObstacleQuality)
     ? repairResidualDisplayOverlaps(
       postFinalizeObstacleCleaned,
@@ -241,13 +259,24 @@ export const runBaseReactFlowFullRoutePostRenderPhase = (
       useBoundedPostRenderResidualRepair
         ? DISPLAY_BOUNDED_RESIDUAL_OVERLAP_REPAIR_OPTIONS
         : DISPLAY_EXTENDED_RESIDUAL_OVERLAP_REPAIR_OPTIONS,
+      {
+        parentPhase: 'post-render-residual',
+        onPhaseTrace: recordSoftClosurePhaseTrace,
+      },
     )
     : postFinalizeObstacleCleaned;
+  const postResidualOutputSignature = recordSoftClosurePhaseTrace
+    ? computeBaseReactFlowDisplayOutputRouteSignature(finalPostSoftResidualCleaned)
+    : null;
+  const residualGeometryChanged = finalPostSoftResidualCleaned !== postFinalizeObstacleCleaned
+    || (
+      preResidualOutputSignature !== null
+      && postResidualOutputSignature !== null
+      && preResidualOutputSignature !== postResidualOutputSignature
+    );
   residualTimer.finish(
-    finalPostSoftResidualCleaned === postFinalizeObstacleCleaned ? 'skip' : 'accepted',
-    finalPostSoftResidualCleaned === postFinalizeObstacleCleaned
-      ? 0
-      : finalPostSoftResidualCleaned.length,
+    residualGeometryChanged ? 'accepted' : 'skip',
+    residualGeometryChanged ? finalPostSoftResidualCleaned.length : 0,
   );
   const terminalGateTimer = startDisplayRoutingPhaseTrace({
     phase: 'post-render-terminal-gate',
@@ -255,18 +284,19 @@ export const runBaseReactFlowFullRoutePostRenderPhase = (
     onTrace: recordSoftClosurePhaseTrace,
   });
   const finalPostSoftQuality = calculateEdgePathQualityScore(finalPostSoftResidualCleaned);
-  const earlyTerminalStrictCandidate = finalPostSoftQuality.strictCrossings > 0
+  const terminalDefectPlan = createDisplayRoutingDefectPlan(
+    context.evaluationSession.hardReport(finalPostSoftResidualCleaned),
+  );
+  const earlyTerminalStrictCandidate = terminalDefectPlan.needsStrictCrossingRepair
     ? repairTerminalEndpointStrictCrossingStubs(finalPostSoftResidualCleaned, repairNodes)
     : finalPostSoftResidualCleaned;
-  const earlyTerminalReadableCandidate = repairTerminalBoundaryStairs(
-    earlyTerminalStrictCandidate,
-    repairNodes,
-  );
-  const earlyTerminalHairpinCandidate = repairResidualHairpinBridges(
-    earlyTerminalReadableCandidate,
-    repairNodes,
-  );
-  if (displayHardQualityGatesAreClean(earlyTerminalHairpinCandidate, repairNodes)) {
+  const earlyTerminalReadableCandidate = terminalDefectPlan.needsTerminalRepair
+    ? repairTerminalBoundaryStairs(earlyTerminalStrictCandidate, repairNodes)
+    : earlyTerminalStrictCandidate;
+  const earlyTerminalHairpinCandidate = terminalDefectPlan.needsMicroRepair
+    ? repairResidualHairpinBridges(earlyTerminalReadableCandidate, repairNodes)
+    : earlyTerminalReadableCandidate;
+  if (context.evaluationSession.hardReport(earlyTerminalHairpinCandidate).hardClean) {
     terminalGateTimer.finish('accepted', earlyTerminalHairpinCandidate.length);
     softClosureTimer.finish('accepted', earlyTerminalHairpinCandidate.length);
     softClosurePhaseTrace.forEach(trace => onPhaseTrace?.(trace));

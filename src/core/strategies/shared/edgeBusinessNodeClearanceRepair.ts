@@ -37,6 +37,7 @@ const CONTAINER_CLEARANCE_OVERFLOW = (
 );
 const LEGACY_LANE_CLEARANCES = [20, 40, COMMERCIAL_BUSINESS_NODE_CLEARANCE] as const;
 const MIN_CLEARANCE_DETOUR_LEG = COMMERCIAL_BUSINESS_NODE_CLEARANCE / 2;
+const TERMINAL_BRANCH_STEM_LENGTHS = [48, 96, 192] as const;
 const CONTAINER_TYPES = new Set(['titleGroup', 'subGroup', 'group', 'domain', 'subDomain', 'swimlane']);
 
 const finiteNumber = (value: unknown, fallback = 0): number => (
@@ -152,6 +153,77 @@ const cornerDetourCandidates = (
   }
   return candidates;
 };
+
+const sourceBranchCornerDetourCandidates = (
+  path: Point[],
+  rects: Rect[],
+  clearance: number,
+): Point[][] => {
+  if (path.length < 4) return [];
+  const start = path[0];
+  const corner = path[1];
+  const previousAxis = axisOf(start, corner);
+  const nextAxis = axisOf(corner, path[2]);
+  if (!previousAxis || !nextAxis || previousAxis === nextAxis) return [];
+
+  const candidates: Point[][] = [];
+  const direction = previousAxis === 'h'
+    ? Math.sign(corner.x - start.x)
+    : Math.sign(corner.y - start.y);
+  const availableStem = previousAxis === 'h'
+    ? Math.abs(corner.x - start.x)
+    : Math.abs(corner.y - start.y);
+  if (direction === 0) return candidates;
+
+  for (const rect of rects) {
+    if (!isDiagonalToRect(corner, rect)
+      || pointToRectDistance(corner, rect) >= clearance - EPS) continue;
+    const allDetourLanes = previousAxis === 'h'
+      ? [rect.y - clearance, rect.y + rect.height + clearance]
+      : [rect.x - clearance, rect.x + rect.width + clearance];
+    const nextDirection = previousAxis === 'h'
+      ? Math.sign(path[2].y - corner.y)
+      : Math.sign(path[2].x - corner.x);
+    const directionalDetourLanes = allDetourLanes.filter(lane => (
+      (previousAxis === 'h' ? lane - corner.y : lane - corner.x) * nextDirection > EPS
+    ));
+    const detourLanes = directionalDetourLanes.length > 0
+      ? directionalDetourLanes
+      : allDetourLanes;
+    for (const stemLength of TERMINAL_BRANCH_STEM_LENGTHS) {
+      if (stemLength >= availableStem - EPS) continue;
+      const branch = previousAxis === 'h'
+        ? { x: start.x + direction * stemLength, y: start.y }
+        : { x: start.x, y: start.y + direction * stemLength };
+      for (const lane of detourLanes) {
+        const branchOnLane = previousAxis === 'h'
+          ? { x: branch.x, y: lane }
+          : { x: lane, y: branch.y };
+        const cornerOnLane = previousAxis === 'h'
+          ? { x: corner.x, y: lane }
+          : { x: lane, y: corner.y };
+        candidates.push(compactPath([
+          start,
+          branch,
+          branchOnLane,
+          cornerOnLane,
+          ...path.slice(2),
+        ]));
+      }
+    }
+  }
+  return candidates;
+};
+
+const terminalBranchCornerDetourCandidates = (
+  path: Point[],
+  rects: Rect[],
+  clearance: number,
+): Point[][] => [
+  ...sourceBranchCornerDetourCandidates(path, rects, clearance),
+  ...sourceBranchCornerDetourCandidates([...path].reverse(), rects, clearance)
+    .map(candidate => candidate.reverse()),
+];
 
 const laneLeavesContainingContainer = (
   containerRects: Rect[],
@@ -407,6 +479,7 @@ const clearanceCandidates = (
     minimumClearance,
   ])].sort((left, right) => left - right);
   candidates.push(...cornerDetourCandidates(path, rects, laneClearances));
+  candidates.push(...terminalBranchCornerDetourCandidates(path, rects, minimumClearance));
   for (let index = 0; index < path.length - 1; index += 1) {
     const start = path[index];
     const end = path[index + 1];

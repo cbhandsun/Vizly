@@ -3,8 +3,10 @@ import type { Edge } from '@xyflow/react';
 import {
   calculateEdgePathQualityScore,
   createEdgePathQualityEvaluationContext,
+  readEdgePairQualityMemoMetrics,
   type EdgePathQualityEvaluationState,
 } from './edgeStrictCrossingGuard';
+import { calculateSingleEdgeQuality } from './edgePathQualityGeometry';
 
 import {
   EPS,
@@ -43,8 +45,35 @@ import type {
   Point,
 } from './edgeDisplayMicroCleanupGeometry';
 import { buildOuterPerimeterMicroCandidates } from './edgeDisplayMicroCleanupPerimeter';
+import {
+  createDisplayMicroCleanupInputSignature,
+  createDisplayMicroCleanupNoopCache,
+} from './edgeDisplayMicroCleanupNoopCache';
 
 const VISUAL_SMALL_INTERIOR_SEGMENT = 40;
+const displayMicroCleanupNoopCache = createDisplayMicroCleanupNoopCache();
+
+export type DisplayMicroCleanupDiagnostics = {
+  generatedCandidateCount: number;
+  evaluatedCandidateCount: number;
+  locallyRejectedCandidateCount: number;
+  pairOpportunityEdgeCount: number;
+  cacheHitCount: number;
+  pairCacheHitCount: number;
+  scannedEdgePairCount: number;
+  scannedSegmentCount: number;
+};
+
+export const createDisplayMicroCleanupDiagnostics = (): DisplayMicroCleanupDiagnostics => ({
+  generatedCandidateCount: 0,
+  evaluatedCandidateCount: 0,
+  locallyRejectedCandidateCount: 0,
+  pairOpportunityEdgeCount: 0,
+  cacheHitCount: 0,
+  pairCacheHitCount: 0,
+  scannedEdgePairCount: 0,
+  scannedSegmentCount: 0,
+});
 
 const hasVisualSmallInteriorSegment = (points: Point[]): boolean => {
   for (let index = 1; index < points.length - 2; index += 1) {
@@ -53,6 +82,15 @@ const hasVisualSmallInteriorSegment = (points: Point[]): boolean => {
   }
   return false;
 };
+
+export const displayMicroCleanupNeedsRepair = (
+  edges: Edge[],
+  quality = calculateEdgePathQualityScore(edges),
+): boolean => quality.shortEndpointStubs > 0
+  || quality.tinyInteriorDoglegs > 0
+  || quality.hairpins > 0
+  || quality.detourPenalty > 0
+  || edges.some(edge => hasVisualSmallInteriorSegment(compactPath(getEdgePath(edge))));
 
 export type DisplayMicroCleanupSafetyScore = Readonly<{
   obstacleHits: number;
@@ -72,6 +110,15 @@ export type DisplayMicroCleanupSafetyContext = Readonly<{
     candidateEdges: Edge[],
     changedIndexes?: readonly number[],
   ) => DisplayMicroCleanupSafetyScore;
+}>;
+
+export type DisplayMicroCleanupOptions = Readonly<{
+  /**
+   * Restricts a derivative cleanup to edges whose displayed geometry changed
+   * in the preceding repair. Newly changed compound peers are included on the
+   * next pass. An omitted value keeps the full fixed-point search.
+   */
+  candidateEdgeIndexes?: readonly number[];
 }>;
 
 export const displayMicroCleanupSafetyDoesNotRegress = (
@@ -343,6 +390,38 @@ function qualityAllowsMicroCleanup(
     );
 }
 
+export function localMicroCandidateCanImproveQuality(
+  baselinePath: Point[],
+  candidatePath: Point[],
+): boolean {
+  const baseline = calculateSingleEdgeQuality(baselinePath);
+  const candidate = calculateSingleEdgeQuality(candidatePath);
+  if (candidate.nonOrthogonalSegments > baseline.nonOrthogonalSegments) return false;
+  if (candidate.shortEndpointStubs > baseline.shortEndpointStubs) return false;
+  if (candidate.tinyInteriorDoglegs > baseline.tinyInteriorDoglegs) return false;
+  if (candidate.hairpins > baseline.hairpins) return false;
+  return candidate.shortEndpointStubs < baseline.shortEndpointStubs
+    || candidate.tinyInteriorDoglegs < baseline.tinyInteriorDoglegs
+    || candidate.hairpins < baseline.hairpins
+    || (
+      candidate.bends < baseline.bends
+      && candidate.totalLength <= baseline.totalLength + EPS
+      && candidate.detourPenalty <= baseline.detourPenalty
+    )
+    || (
+      candidate.bends <= baseline.bends
+      && candidate.detourPenalty < baseline.detourPenalty
+      && candidate.totalLength <= baseline.totalLength - 80
+    );
+}
+
+const qualityHasPairRepairOpportunity = (
+  quality: ReturnType<typeof calculateEdgePathQualityScore>,
+): boolean => quality.strictCrossings > 0
+  || quality.reverseOverlap > 0
+  || quality.unrelatedOverlap > 0
+  || quality.unexplainedRelatedOverlap > 0;
+
 function qualityAllowsCompoundMicroCleanup(
   baseline: ReturnType<typeof calculateEdgePathQualityScore>,
   candidate: ReturnType<typeof calculateEdgePathQualityScore>,
@@ -370,6 +449,23 @@ function qualityAllowsCompoundMicroCleanup(
       && candidate.totalLength <= baseline.totalLength - 80
   );
 }
+
+export const compoundShiftCanMeetLocalQualityBounds = (
+  baseline: ReturnType<typeof calculateEdgePathQualityScore>,
+  current: ReturnType<typeof calculateEdgePathQualityScore>,
+  currentPeerPath: Point[],
+  shiftedPeerPath: Point[],
+): boolean => {
+  const before = calculateSingleEdgeQuality(currentPeerPath);
+  const after = calculateSingleEdgeQuality(shiftedPeerPath);
+  const boundedKeys = [
+    'nonOrthogonalSegments',
+    'shortEndpointStubs',
+    'tinyInteriorDoglegs',
+    'hairpins',
+  ] as const;
+  return boundedKeys.every(key => current[key] - before[key] + after[key] <= baseline[key]);
+};
 
 const selectMicroCandidateLaneExtrema = (
   candidates: readonly Point[][],
@@ -502,6 +598,12 @@ function buildCompoundStrictCrossingCleanup(
       for (const lane of lanes) {
         const shiftedPath = buildShiftedSegmentPath(otherPath, otherSegment.segmentIndex, lane);
         if (!shiftedPath || !hasSameEndpoints(otherPath, shiftedPath)) continue;
+        if (!compoundShiftCanMeetLocalQualityBounds(
+          baselineQuality,
+          state.quality,
+          otherPath,
+          shiftedPath,
+        )) continue;
         const shiftedEdges = state.edges.map((edge, edgeIndex) => (
           edgeIndex === otherSegment.edgeIndex ? withComputedPath(edge, shiftedPath) : edge
         ));
@@ -562,26 +664,66 @@ function buildCompoundStrictCrossingCleanup(
 export function repairDisplayMicroArtifacts(
   edges: Edge[],
   safetyContext?: DisplayMicroCleanupSafetyContext,
+  diagnostics?: DisplayMicroCleanupDiagnostics,
+  options?: DisplayMicroCleanupOptions,
 ): Edge[] {
+  const initialPairMemoMetrics = diagnostics
+    ? readEdgePairQualityMemoMetrics()
+    : null;
+  const finishDiagnostics = <T extends Edge[]>(result: T): T => {
+    if (diagnostics && initialPairMemoMetrics) {
+      const finalPairMemoMetrics = readEdgePairQualityMemoMetrics();
+      diagnostics.pairCacheHitCount += Math.max(
+        0,
+        finalPairMemoMetrics.hitCount - initialPairMemoMetrics.hitCount,
+      );
+    }
+    return result;
+  };
+  const requestedCandidateEdgeIndexes = options?.candidateEdgeIndexes !== undefined
+    ? [...new Set(options.candidateEdgeIndexes)]
+      .filter(index => Number.isInteger(index) && index >= 0 && index < edges.length)
+      .sort((first, second) => first - second)
+    : null;
+  if (requestedCandidateEdgeIndexes?.length === 0) return finishDiagnostics(edges);
+  const restrictCandidateEdges = requestedCandidateEdgeIndexes !== null
+    && requestedCandidateEdgeIndexes.length < edges.length;
+  const initialCandidateEdgeIndexes = restrictCandidateEdges
+    ? requestedCandidateEdgeIndexes
+    : null;
+  // A derivative-only search cannot prove that every edge is at a fixed point,
+  // so it must neither read nor populate the full-route no-op cache.
+  const noOpInputSignature = restrictCandidateEdges
+    ? null
+    : createDisplayMicroCleanupInputSignature(edges);
+  if (noOpInputSignature && displayMicroCleanupNoopCache.has(noOpInputSignature)) {
+    if (diagnostics) diagnostics.cacheHitCount += 1;
+    return finishDiagnostics(edges);
+  }
+  const rememberNoOp = (): Edge[] => {
+    // A safety-constrained no-op cannot prove that the unconstrained search is
+    // also a no-op. The reverse is safe: constraints only reject candidates,
+    // so an unconstrained fixed point may be reused by a safety-aware caller.
+    if (noOpInputSignature && !safetyContext) {
+      displayMicroCleanupNoopCache.remember(noOpInputSignature);
+    }
+    return finishDiagnostics(edges);
+  };
   const initialQuality = calculateEdgePathQualityScore(edges);
-  const hasVisualSmallSegment = edges.some(edge => (
-    hasVisualSmallInteriorSegment(compactPath(getEdgePath(edge)))
-  ));
-  if (
-    initialQuality.shortEndpointStubs === 0
-    && initialQuality.tinyInteriorDoglegs === 0
-    && initialQuality.hairpins === 0
-    && initialQuality.detourPenalty === 0
-    && !hasVisualSmallSegment
-  ) return edges;
+  if (!displayMicroCleanupNeedsRepair(edges, initialQuality)) return rememberNoOp();
 
   let currentEdges = edges;
   const candidateBudget = resolveMicroCandidateBudget(edges.length);
   let currentSafety = safetyContext?.baseline;
   const cumulativeChangedIndexes = new Set<number>();
+  let convergedToFixedPoint = false;
   for (let cleanupPass = 0; cleanupPass < 2; cleanupPass += 1) {
     let changedThisPass = false;
-    for (let edgeIndex = 0; edgeIndex < currentEdges.length; edgeIndex += 1) {
+    const passCandidateEdgeIndexes = initialCandidateEdgeIndexes
+      ? [...new Set([...initialCandidateEdgeIndexes, ...cumulativeChangedIndexes])]
+        .sort((first, second) => first - second)
+      : currentEdges.map((_, index) => index);
+    for (const edgeIndex of passCandidateEdgeIndexes) {
       const edge = currentEdges[edgeIndex];
       const path = compactPath(getEdgePath(edge));
       if (path.length < 3) continue;
@@ -662,6 +804,7 @@ export function repairDisplayMicroArtifacts(
 
       let bestPath = path;
       const qualityContext = createEdgePathQualityEvaluationContext(currentEdges);
+      const initialQualityMetrics = qualityContext.readMetrics?.();
       let bestQuality = qualityContext.evaluate(currentEdges);
       let bestEdges: Edge[] | null = null;
       let bestSafety = currentSafety;
@@ -706,11 +849,30 @@ export function repairDisplayMicroArtifacts(
       ].filter((candidate, index, selected) => selected.indexOf(candidate) === index)
         .slice(0, candidateBudget);
 
+      if (diagnostics) diagnostics.generatedCandidateCount += rankedCandidates.length;
+      const edgeHasPairRepairOpportunity = qualityContext.edgeHasPairRepairOpportunity?.(edgeIndex)
+        ?? qualityHasPairRepairOpportunity(bestQuality);
+      if (diagnostics && edgeHasPairRepairOpportunity) {
+        diagnostics.pairOpportunityEdgeCount += 1;
+      }
+
       for (const normalized of rankedCandidates) {
         const candidatePathMetrics = pathMicroMetrics(normalized);
         if (candidatePathMetrics.shortEndpointStubs > pathMetrics.shortEndpointStubs) continue;
         if (candidatePathMetrics.tinyInteriorDoglegs > pathMetrics.tinyInteriorDoglegs) continue;
         if (candidatePathMetrics.hairpins > pathMetrics.hairpins) continue;
+        // With no pair-level defect left, the global selector can only accept a
+        // candidate that improves this edge's local quality. Proving that
+        // necessary condition here avoids an exact changed-index scan for
+        // candidates that cannot possibly win. Pair-defect repairs retain the
+        // original exhaustive evaluation path.
+        if (
+          !edgeHasPairRepairOpportunity
+          && !localMicroCandidateCanImproveQuality(bestPath, normalized)
+        ) {
+          if (diagnostics) diagnostics.locallyRejectedCandidateCount += 1;
+          continue;
+        }
         const candidateEdges = currentEdges.map((candidateEdge, candidateIndex) => (
           candidateIndex === edgeIndex ? withComputedPath(candidateEdge, normalized) : candidateEdge
         ));
@@ -729,6 +891,7 @@ export function repairDisplayMicroArtifacts(
             || !displayMicroCleanupSafetyDoesNotRegress(currentSafety, candidateSafety)
           )
         ) continue;
+        if (diagnostics) diagnostics.evaluatedCandidateCount += 1;
         const candidateQuality = qualityContext.evaluateChanged(candidateEdges, [edgeIndex]);
         if (!qualityAllowsMicroCleanup(bestQuality, candidateQuality)) {
           const compound = buildCompoundStrictCrossingCleanup(
@@ -756,6 +919,21 @@ export function repairDisplayMicroArtifacts(
         bestSafety = candidateSafety;
         bestChangedIndexes = candidateChangedIndexes;
       }
+      if (diagnostics && initialQualityMetrics && qualityContext.readMetrics) {
+        const finalQualityMetrics = qualityContext.readMetrics();
+        diagnostics.scannedEdgePairCount += Math.max(
+          0,
+          finalQualityMetrics.scannedEdgePairCount - initialQualityMetrics.scannedEdgePairCount,
+        );
+        diagnostics.scannedSegmentCount += Math.max(
+          0,
+          finalQualityMetrics.scannedSegmentCount - initialQualityMetrics.scannedSegmentCount,
+        );
+        diagnostics.pairCacheHitCount += Math.max(
+          0,
+          finalQualityMetrics.pairCacheHitCount - initialQualityMetrics.pairCacheHitCount,
+        );
+      }
 
       if (!hasCompatibleDisplayEndpoints(path, bestPath) || bestPath.length === path.length && bestPath.every((point, index) => (
         Math.abs(point.x - path[index]?.x) <= EPS && Math.abs(point.y - path[index]?.y) <= EPS
@@ -771,6 +949,9 @@ export function repairDisplayMicroArtifacts(
     }
 
     const passQuality = calculateEdgePathQualityScore(currentEdges);
+    const passHasVisualSmallSegment = currentEdges.some(edge => (
+      hasVisualSmallInteriorSegment(compactPath(getEdgePath(edge)))
+    ));
     if (
       !changedThisPass
       || (
@@ -778,10 +959,17 @@ export function repairDisplayMicroArtifacts(
         && passQuality.tinyInteriorDoglegs === 0
         && passQuality.hairpins === 0
         && passQuality.detourPenalty === 0
+        && !passHasVisualSmallSegment
       )
     ) {
+      convergedToFixedPoint = true;
       break;
     }
   }
-  return currentEdges;
+  if (currentEdges === edges) return rememberNoOp();
+  if (convergedToFixedPoint && !safetyContext) {
+    const fixedPointSignature = createDisplayMicroCleanupInputSignature(currentEdges);
+    if (fixedPointSignature) displayMicroCleanupNoopCache.remember(fixedPointSignature);
+  }
+  return finishDiagnostics(currentEdges);
 }

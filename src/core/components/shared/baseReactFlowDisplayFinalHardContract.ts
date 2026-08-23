@@ -7,6 +7,7 @@ import {
 } from './baseReactFlowDisplayFinalizer';
 import { getDisplayHardQualityGateReport } from './baseReactFlowDisplayQualityGates';
 import type { DisplayRoutingPhaseTrace } from './baseReactFlowDisplayRoutingTrace';
+import type { BaseReactFlowFinalEndpointEvaluation } from './baseReactFlowDisplayFinalEndpointEvaluation';
 
 /**
  * Closes the exact route that is about to be rendered. Strict-crossing repair
@@ -17,14 +18,17 @@ export const closeBaseReactFlowDisplayFinalHardContract = <T extends Edge[]>(
   edges: T,
   nodes: Node[],
   onPhaseTrace?: (trace: DisplayRoutingPhaseTrace) => void,
+  evaluation?: BaseReactFlowFinalEndpointEvaluation,
 ): BaseReactFlowDisplayFinalizerOutcome<T> => {
-  const baselineReport = getDisplayHardQualityGateReport(edges, nodes, 'polished');
+  const baselineReport = evaluation?.hardReport(edges)
+    ?? getDisplayHardQualityGateReport(edges, nodes, 'polished');
   if (baselineReport.hardClean) return { edges, report: baselineReport };
 
   const strictClosedEdges = repairCrossedSpineWithOuterSkirt(edges, nodes) as T;
   const strictClosedReport = strictClosedEdges === edges
     ? baselineReport
-    : getDisplayHardQualityGateReport(strictClosedEdges, nodes, 'polished');
+    : evaluation?.hardReport(strictClosedEdges)
+      ?? getDisplayHardQualityGateReport(strictClosedEdges, nodes, 'polished');
   if (strictClosedReport.hardClean) {
     return { edges: strictClosedEdges, report: strictClosedReport };
   }

@@ -28,6 +28,7 @@ import {
   doBaseReactFlowDisplayRoutesMatchExactly,
   mergeBaseReactFlowDisplayEdgePatches,
   sanitizeBaseReactFlowDisplayCachePatches,
+  sanitizeBaseReactFlowTrustedDisplayPatches,
 } from './baseReactFlowDisplayRoutingTransaction';
 import { createDisplayWorkerFinalQualityError } from './baseReactFlowDisplayWorkerFailure';
 import { projectBaseReactFlowDisplayWorkerInput } from './baseReactFlowDisplayWorkerProjection';
@@ -48,6 +49,7 @@ export {
   mergeBaseReactFlowDisplayRoutingTransactions,
   mergeTrustedBaseReactFlowDisplayCacheEntry,
   resolveBaseReactFlowDisplayCacheReplaySignature,
+  sanitizeBaseReactFlowTrustedDisplayPatches,
 } from './baseReactFlowDisplayRoutingTransaction';
 
 export type DeferredDisplayEdges = {
@@ -58,6 +60,8 @@ export type DeferredDisplayEdges = {
 };
 export type BaseReactFlowDisplayWorkerResult = {
   edges: Edge[];
+  /** Sanitized routing-only transaction produced at the Worker trust boundary. */
+  routingPatches: Edge[];
   hardClean: boolean;
   hardReport?: DisplayEdgesWorkerResponse['hardReport'];
   routeResolution: DisplayEdgesWorkerRouteResolution;
@@ -69,6 +73,8 @@ export type BaseReactFlowDisplayWorkerResult = {
   nextIdentity?: RoutingIdentity;
   outputRouteSignature?: string;
   sessionRef?: RoutingWorkerSessionRef;
+  /** Aggregate timestamp after protocol validation and routing-only sanitization. */
+  workerResponseParsedAt?: number;
 };
 export type BaseReactFlowDisplayWorkerResponseResult = Omit<
   BaseReactFlowDisplayWorkerResult,
@@ -371,7 +377,16 @@ export const requestBaseReactFlowDisplayEdgesWorker = ({
         appendDisplayRoutingPhaseProgress(response.phaseProgress);
         return;
       }
-      const responseEdges = Array.isArray(response.edges) ? response.edges : null;
+      const rawRoutingPatches = response.routingPatches
+        ?? (Array.isArray(response.edges)
+          ? createBaseReactFlowDisplayEdgePatches(request.edges, response.edges)
+          : null);
+      const safeRoutingPatches = rawRoutingPatches
+        ? sanitizeBaseReactFlowTrustedDisplayPatches(request.edges, rawRoutingPatches)
+        : null;
+      const responseEdges = safeRoutingPatches
+        ? mergeBaseReactFlowDisplayEdgePatches(request.edges, safeRoutingPatches)
+        : null;
       const routeResolution = response.routeResolution;
       if (responseEdges) {
         if (
@@ -435,7 +450,7 @@ export const requestBaseReactFlowDisplayEdgesWorker = ({
         }
       }
       finish(() => {
-        if (response.error || !responseEdges || !routeResolution) {
+        if (response.error || !safeRoutingPatches || !responseEdges || !routeResolution) {
           updateDisplayRoutingDebugState({
             stage: 'worker-response-error',
             requestId: request.requestId,
@@ -451,6 +466,7 @@ export const requestBaseReactFlowDisplayEdgesWorker = ({
         });
         resolve({
           edges: responseEdges,
+          routingPatches: safeRoutingPatches,
           hardClean: response.hardClean === true,
           hardReport: response.hardReport,
           routeResolution,
@@ -460,6 +476,7 @@ export const requestBaseReactFlowDisplayEdgesWorker = ({
           nextIdentity: response.nextIdentity,
           outputRouteSignature: response.outputRouteSignature,
           sessionRef: response.sessionRef,
+          workerResponseParsedAt: Date.now(),
         });
       });
     };

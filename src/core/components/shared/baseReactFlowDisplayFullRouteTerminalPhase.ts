@@ -19,11 +19,6 @@ import {
   countDisplayObstacleHits,
   visualPolishHardQualityDoesNotRegress,
 } from './baseReactFlowDisplayEvaluation';
-import {
-  createDisplayTerminalValidationSnapshot,
-  getDisplayTerminalValidationReport,
-} from './baseReactFlowTerminalAxisRepair';
-import { getDisplayHardQualityGateReport } from './baseReactFlowDisplayQualityGates';
 import { runFinalAxisTransaction } from './baseReactFlowDisplayFinalAxisTransaction';
 import { finalizeFailClosedDisplayTransaction } from './baseReactFlowDisplayFinalTransaction';
 import { repairResidualOuterPortTransactionWithHardGate } from './baseReactFlowDisplayOuterPortTransaction';
@@ -34,11 +29,7 @@ export const runBaseReactFlowFullRouteTerminalPhase = (
   strictCandidate: Edge[],
 ): Edge[] => {
   const { repairNodes, inputSignature } = context;
-  const terminalValidationSnapshot = createDisplayTerminalValidationSnapshot(repairNodes);
-  const finalBoundedTerminalReport = getDisplayTerminalValidationReport(
-    strictCandidate,
-    terminalValidationSnapshot,
-  );
+  const finalBoundedTerminalReport = context.evaluationSession.terminalReport(strictCandidate);
   const finalAttachedCandidate = finalBoundedTerminalReport.allAttached
     ? strictCandidate
     : repairDetachedTerminalsWithBoundedPortRoles(strictCandidate, repairNodes, 24);
@@ -49,18 +40,10 @@ export const runBaseReactFlowFullRouteTerminalPhase = (
       Math.min(128, Math.max(32, finalAttachedCandidate.length * 4)),
     ),
   );
-  const finalAttachedReport = getDisplayHardQualityGateReport(
-    finalAttachedCandidate,
-    repairNodes,
-    'polished',
-  );
+  const finalAttachedReport = context.evaluationSession.hardReport(finalAttachedCandidate);
   const directAxisReport = directAxisCandidate === finalAttachedCandidate
     ? finalAttachedReport
-    : getDisplayHardQualityGateReport(
-      directAxisCandidate,
-      repairNodes,
-      'polished',
-    );
+    : context.evaluationSession.hardReport(directAxisCandidate);
   if (
     directAxisCandidate !== finalAttachedCandidate
     && directAxisReport.hardClean
@@ -83,14 +66,10 @@ export const runBaseReactFlowFullRouteTerminalPhase = (
   );
   const finalAttachedQuality = calculateEdgePathQualityScore(finalTerminalBaselineCandidate);
   const finalAxisAnchoredQuality = calculateEdgePathQualityScore(finalAxisAnchoredCandidate);
-  const baselineTerminalReport = getDisplayTerminalValidationReport(
+  const baselineTerminalReport = context.evaluationSession.terminalReport(
     finalTerminalBaselineCandidate,
-    terminalValidationSnapshot,
   );
-  const candidateTerminalReport = getDisplayTerminalValidationReport(
-    finalAxisAnchoredCandidate,
-    terminalValidationSnapshot,
-  );
+  const candidateTerminalReport = context.evaluationSession.terminalReport(finalAxisAnchoredCandidate);
   const baselineAxisMismatchCount = baselineTerminalReport.unanchoredEdgeIndexes.length;
   const candidateAxisMismatchCount = candidateTerminalReport.unanchoredEdgeIndexes.length;
   const finalAxisCandidate = (
@@ -126,9 +105,8 @@ export const runBaseReactFlowFullRouteTerminalPhase = (
     finalPostTerminalCandidate,
     finalHairpinBridgeCandidate,
   );
-  const finalTerminalTransactionReport = getDisplayTerminalValidationReport(
+  const finalTerminalTransactionReport = context.evaluationSession.terminalReport(
     finalTerminalTransactionCandidate,
-    terminalValidationSnapshot,
   );
   const finalAttachedTransactionCandidate = finalTerminalTransactionReport.allAttached
     ? finalTerminalTransactionCandidate
@@ -137,10 +115,8 @@ export const runBaseReactFlowFullRouteTerminalPhase = (
       repairNodes,
       12,
     );
-  const finalAttachedTransactionReport = getDisplayHardQualityGateReport(
+  const finalAttachedTransactionReport = context.evaluationSession.hardReport(
     finalAttachedTransactionCandidate,
-    repairNodes,
-    'polished',
   );
   if (finalAttachedTransactionReport.hardClean) {
     return markBaseDisplayFinalized(finalAttachedTransactionCandidate, inputSignature);
@@ -149,10 +125,8 @@ export const runBaseReactFlowFullRouteTerminalPhase = (
     repairEndpointOrthogonalPaths(finalAttachedTransactionCandidate, repairNodes),
   );
   if (finalOrthogonalTransactionCandidate !== finalAttachedTransactionCandidate) {
-    const finalOrthogonalTransactionReport = getDisplayHardQualityGateReport(
+    const finalOrthogonalTransactionReport = context.evaluationSession.hardReport(
       finalOrthogonalTransactionCandidate,
-      repairNodes,
-      'polished',
     );
     if (finalOrthogonalTransactionReport.hardClean) {
       return markBaseDisplayFinalized(finalOrthogonalTransactionCandidate, inputSignature);

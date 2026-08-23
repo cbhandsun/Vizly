@@ -46,5 +46,4 @@ export { PluginRegistry } from './services/PluginRegistry';
 export { ensureBuiltInPlugins } from './plugins/builtInPlugins';
 
 // Runtime coordinators that do not expose UI implementation details.
-export { EdgeRoutingCoordinator } from './services/EdgeRoutingCoordinator';
 export { LayoutStrategyManager } from './strategies/LayoutStrategyManager';

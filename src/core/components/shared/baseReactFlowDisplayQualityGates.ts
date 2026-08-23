@@ -11,6 +11,7 @@ import {
 import {
   displayHardQualityGatesAreClean as evaluateDisplayHardQualityGatesAreClean,
   getDisplayHardQualityGateReport as evaluateDisplayHardQualityGateReport,
+  getDisplayHardQualityGateReportWithMetrics as evaluateDisplayHardQualityGateReportWithMetrics,
   type BaseDisplayBoundedCandidateReport,
   displayHardQualityReportGeometryIsClean,
 } from './baseReactFlowDisplayEvaluation';
@@ -64,6 +65,22 @@ export const getDisplayHardQualityGateReport = (
   candidate: BaseDisplayBoundedCandidateReport['candidate'],
   terminalSnapshot?: DisplayTerminalValidationSnapshot,
 ): BaseDisplayBoundedCandidateReport => evaluateDisplayHardQualityGateReport(
+  edges,
+  nodes,
+  candidate,
+  (candidateEdges, candidateNodes) => evaluateDisplayTerminalHardGates(
+    candidateEdges,
+    candidateNodes,
+    terminalSnapshot,
+  ),
+);
+
+export const getDisplayHardQualityGateReportWithMetrics = (
+  edges: Edge[],
+  nodes: Node[],
+  candidate: BaseDisplayBoundedCandidateReport['candidate'],
+  terminalSnapshot?: DisplayTerminalValidationSnapshot,
+) => evaluateDisplayHardQualityGateReportWithMetrics(
   edges,
   nodes,
   candidate,

@@ -1,27 +1,31 @@
 import type { Edge, Node } from '@xyflow/react';
 
+import { computeBaseReactFlowDisplayOutputRouteSignature } from './baseReactFlowDisplayCache';
+
 import {
-  calculateEdgePathQualityScore,
   countStrictEdgeCrossings,
   createEdgePathQualityEvaluationContext,
   type EdgePathQualityEvaluationContext,
   type EdgePathQualityScore,
 } from '../../strategies/shared/edgeStrictCrossingGuard';
-import { edgeRoutingQualityIntentToken } from '../../strategies/shared/edgeRoutingQualityIntent';
-import { MINIMUM_BUSINESS_NODE_CLEARANCE } from '../../strategies/shared/edgeBusinessNodeClearanceRepair';
-import { createNodeClearanceGraphEvaluationContext } from '../../strategies/shared/edgeWaypointCandidateRepair';
 import {
   compactDisplayEdgePaths,
   displayRoutingObstaclesSignature,
   findDisplayStrictCrossingHits,
   getDisplayComputedPath,
-  getDisplayNodeRect,
 } from './baseReactFlowDisplayGeometry';
 import { createDisplayObstacleHitContext } from './baseReactFlowDisplayObstacleHitCache';
 import {
   createDisplayTerminalValidationSnapshot,
   displayTerminalValidationDoesNotRegress,
 } from './baseReactFlowTerminalValidation';
+import {
+  displayObstacleEdgeSignature,
+  getDisplayHardGateMetricsEvaluation,
+  type DisplayHardGateScanMetrics,
+} from './baseReactFlowDisplayHardGateMetrics';
+
+export { displayObstacleEdgeSignature } from './baseReactFlowDisplayHardGateMetrics';
 
 export type DisplaySoftQualityOptions = {
   maxEdges: number;
@@ -57,6 +61,8 @@ export type BaseDisplayBoundedCandidateReport = {
   /** Visual-risk diagnostics for unrelated business-node clearance below 16px. */
   minimumClearanceViolations?: number;
   minimumClearanceViolationEdgeIds?: string[];
+  /** Final-only commercial contract; internal candidate gates continue to use 16px. */
+  commercialClearanceViolations?: number;
 };
 
 export type DisplayTerminalGateEvaluation = {
@@ -192,20 +198,30 @@ export const evaluateDisplayQualityCandidate = (
     : context.evaluate(candidate);
 };
 
-const uniqueDisplayCandidateReferences = <T extends Edge[]>(
+export const uniqueDisplayRoutingCandidates = <T extends Edge[]>(
   baseline: T,
   candidates: readonly T[],
 ): T[] => {
   const seen = new Set<T>([baseline]);
-  return candidates.filter((candidate) => {
+  const referenceUniqueCandidates = candidates.filter((candidate) => {
     if (seen.has(candidate)) return false;
     seen.add(candidate);
+    return true;
+  });
+  if (referenceUniqueCandidates.length === 0) return [];
+  const seenRoutingSignatures = new Set<string>();
+  const baselineSignature = computeBaseReactFlowDisplayOutputRouteSignature(baseline);
+  if (baselineSignature) seenRoutingSignatures.add(baselineSignature);
+  return referenceUniqueCandidates.filter((candidate) => {
+    const routingSignature = computeBaseReactFlowDisplayOutputRouteSignature(candidate);
+    if (routingSignature && seenRoutingSignatures.has(routingSignature)) return false;
+    if (routingSignature) seenRoutingSignatures.add(routingSignature);
     return true;
   });
 };
 
 export const chooseFinalVisualPolishCandidate = <T extends Edge[]>(baseline: T, ...candidates: T[]): T => {
-  const uniqueCandidates = uniqueDisplayCandidateReferences(baseline, candidates);
+  const uniqueCandidates = uniqueDisplayRoutingCandidates(baseline, candidates);
   if (uniqueCandidates.length === 0) return baseline;
   const qualityContext = createEdgePathQualityEvaluationContext(baseline);
   let previousCandidate: T = baseline;
@@ -229,15 +245,6 @@ export const chooseFinalVisualPolishCandidate = <T extends Edge[]>(baseline: T, 
     }
   }
   return best;
-};
-
-export const displayObstacleEdgeSignature = (edge: Edge): string => {
-  const path = getDisplayComputedPath(edge);
-  return JSON.stringify([
-    edge.source,
-    edge.target,
-    path.map(point => [point.x, point.y]),
-  ]);
 };
 
 const countDisplayEdgeObstacleHits = (
@@ -449,62 +456,8 @@ export const obstacleRepairHardQualityIsAcceptable = (
   && candidate.hairpins <= baseline.hairpins + 2
 );
 
-type DisplayHardGateMetrics = {
-  signature: string;
-  renderNormalizedEdges: Edge[];
-  quality: EdgePathQualityScore;
-  obstacleHits: number;
-  minimumClearanceViolationEdgeIds: string[];
-};
-
-const displayHardGateMetricsCache = new WeakMap<Edge[], WeakMap<Node[], DisplayHardGateMetrics>>();
-
-const displayHardGateSignature = (edges: Edge[], nodes: Node[]): string => {
-  const edgeSignature = edges.map(edge => (
-    `${displayObstacleEdgeSignature(edge)}\u001f${String(edge.sourceHandle ?? '')}\u001f${String(edge.targetHandle ?? '')}\u001f${edgeRoutingQualityIntentToken(edge)}`
-  )).join('\u001e');
-  const nodeSignature = nodes.map((node) => {
-    const rect = getDisplayNodeRect(node);
-    return rect
-      ? `${node.id}:${String(node.type ?? '')}:${rect.x},${rect.y},${rect.width},${rect.height}`
-      : `${node.id}:${String(node.type ?? '')}:none`;
-  }).join('\u001e');
-  return `${edgeSignature}\u001d${nodeSignature}`;
-};
-
-const getDisplayHardGateMetrics = (edges: Edge[], nodes: Node[]): DisplayHardGateMetrics => {
-  const signature = displayHardGateSignature(edges, nodes);
-  const byNodes = displayHardGateMetricsCache.get(edges);
-  const cached = byNodes?.get(nodes);
-  if (cached?.signature === signature) return cached;
-  // The renderer removes redundant collinear waypoints before drawing. Score
-  // that same normalized geometry so a crossing cannot hide at a split point.
-  const renderNormalizedEdges = compactDisplayEdgePaths(edges);
-  const nodeClearanceContext = createNodeClearanceGraphEvaluationContext(nodes);
-  const minimumClearanceViolationEdgeIds = renderNormalizedEdges.flatMap(edge => (
-    nodeClearanceContext.score(
-      getDisplayComputedPath(edge),
-      edge,
-      MINIMUM_BUSINESS_NODE_CLEARANCE,
-    ) > 0.5
-      ? [edge.id]
-      : []
-  ));
-  const metrics: DisplayHardGateMetrics = {
-    signature,
-    renderNormalizedEdges,
-    quality: calculateEdgePathQualityScore(renderNormalizedEdges),
-    obstacleHits: countDisplayObstacleHits(renderNormalizedEdges, nodes),
-    minimumClearanceViolationEdgeIds,
-  };
-  const nextByNodes = byNodes ?? new WeakMap<Node[], DisplayHardGateMetrics>();
-  nextByNodes.set(nodes, metrics);
-  if (!byNodes) displayHardGateMetricsCache.set(edges, nextByNodes);
-  return metrics;
-};
-
 export const displayHardSafetyIsClean = (edges: Edge[], nodes: Node[]): boolean => {
-  const { quality, obstacleHits } = getDisplayHardGateMetrics(edges, nodes);
+  const { quality, obstacleHits } = getDisplayHardGateMetricsEvaluation(edges, nodes).metrics;
   return quality.nonOrthogonalSegments === 0
     && quality.strictCrossings === 0
     && quality.reverseOverlap === 0
@@ -514,13 +467,17 @@ export const displayHardSafetyIsClean = (edges: Edge[], nodes: Node[]): boolean 
     && obstacleHits === 0;
 };
 
-export const getDisplayHardQualityGateReport = (
+export const getDisplayHardQualityGateReportWithMetrics = (
   edges: Edge[],
   nodes: Node[],
   candidate: BaseDisplayBoundedCandidateReport['candidate'],
   evaluateTerminals: DisplayTerminalGateEvaluator,
-): BaseDisplayBoundedCandidateReport => {
-  const metrics = getDisplayHardGateMetrics(edges, nodes);
+): Readonly<{
+  report: BaseDisplayBoundedCandidateReport;
+  scanMetrics: DisplayHardGateScanMetrics;
+}> => {
+  const evaluation = getDisplayHardGateMetricsEvaluation(edges, nodes);
+  const { metrics, scanMetrics } = evaluation;
   const { quality, obstacleHits, minimumClearanceViolationEdgeIds } = metrics;
   const { terminalsAttached, terminalsAnchored } = evaluateTerminals(
     metrics.renderNormalizedEdges,
@@ -537,8 +494,20 @@ export const getDisplayHardQualityGateReport = (
     minimumClearanceViolationEdgeIds: minimumClearanceViolationEdgeIds.slice(0, 32),
   };
   report.hardClean = displayHardQualityReportGeometryIsClean(report) && terminalsAnchored;
-  return report;
+  return { report, scanMetrics };
 };
+
+export const getDisplayHardQualityGateReport = (
+  edges: Edge[],
+  nodes: Node[],
+  candidate: BaseDisplayBoundedCandidateReport['candidate'],
+  evaluateTerminals: DisplayTerminalGateEvaluator,
+): BaseDisplayBoundedCandidateReport => getDisplayHardQualityGateReportWithMetrics(
+  edges,
+  nodes,
+  candidate,
+  evaluateTerminals,
+).report;
 
 export const displayHardQualityGatesAreClean = (
   edges: Edge[],
@@ -562,7 +531,7 @@ export const chooseFinalObstacleAwarePolishCandidate = <T extends Edge[]>(
   baseline: T,
   ...candidates: T[]
 ): T => {
-  const uniqueCandidates = uniqueDisplayCandidateReferences(baseline, candidates);
+  const uniqueCandidates = uniqueDisplayRoutingCandidates(baseline, candidates);
   if (uniqueCandidates.length === 0) return baseline;
   const qualityContext = createEdgePathQualityEvaluationContext(baseline);
   const obstacleContext = createDisplayObstacleEvaluationContext(baseline, nodes);
@@ -600,7 +569,7 @@ export const chooseFinalTerminalTransactionCandidate = <T extends Edge[]>(
   baseline: T,
   ...candidates: T[]
 ): T => {
-  const uniqueCandidates = uniqueDisplayCandidateReferences(baseline, candidates);
+  const uniqueCandidates = uniqueDisplayRoutingCandidates(baseline, candidates);
   if (uniqueCandidates.length === 0) return baseline;
   const qualityContext = createEdgePathQualityEvaluationContext(baseline);
   const obstacleContext = createDisplayObstacleEvaluationContext(baseline, nodes);
@@ -641,7 +610,7 @@ export const chooseDisplayStrictPolishCandidate = <T extends Edge[]>(
   baseline: T,
   ...candidates: T[]
 ): T => {
-  const uniqueCandidates = uniqueDisplayCandidateReferences(baseline, candidates);
+  const uniqueCandidates = uniqueDisplayRoutingCandidates(baseline, candidates);
   if (uniqueCandidates.length === 0) return baseline;
   const qualityContext = createEdgePathQualityEvaluationContext(baseline);
   const obstacleContext = createDisplayObstacleEvaluationContext(baseline, nodes);

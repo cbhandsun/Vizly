@@ -5,6 +5,8 @@ import type {
   DisplayQualityBudget,
 } from './baseReactFlowDisplayEvaluation';
 import type { DisplayRoutingPhaseTrace } from './baseReactFlowDisplayRoutingTrace';
+import type { BaseReactFlowFinalEndpointEvaluation } from './baseReactFlowDisplayFinalEndpointEvaluation';
+import type { RoutingTopologyPlan } from './baseReactFlowDisplayRoutingTopologyPlan';
 
 export type BaseReactFlowDisplayEdgesArgs = {
   edges: Edge[];
@@ -19,6 +21,7 @@ export type BaseReactFlowDisplayEdgesArgs = {
   skipBoundedAttempt?: boolean;
   skipFinalizedReuse?: boolean;
   onPhaseTrace?: (trace: DisplayRoutingPhaseTrace) => void;
+  evaluationSession?: BaseReactFlowFinalEndpointEvaluation;
 };
 
 export type BaseReactFlowPreDisplayFinalEdgesArgs = {
@@ -33,6 +36,7 @@ export type BaseReactFlowPreDisplayFinalEdgesArgs = {
   skipFullRouteFallback?: boolean;
   onBoundedCandidate?: (report: BaseDisplayBoundedCandidateReport) => void;
   onPhaseTrace?: (trace: DisplayRoutingPhaseTrace) => void;
+  evaluationSession?: BaseReactFlowFinalEndpointEvaluation;
 };
 
 export type BaseReactFlowPreDisplayFinalEdgesFactory = (
@@ -54,6 +58,8 @@ export type BaseReactFlowFullRouteContext = {
   canReusePreparedGlobalRouting: boolean;
   reusePreparedGlobalRouting: boolean;
   onPhaseTrace?: (trace: DisplayRoutingPhaseTrace) => void;
+  evaluationSession: BaseReactFlowFinalEndpointEvaluation;
+  topologyPlan: RoutingTopologyPlan;
 };
 
 export type BaseReactFlowFullRouteSeedResult =

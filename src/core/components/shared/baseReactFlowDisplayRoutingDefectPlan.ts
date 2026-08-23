@@ -1,5 +1,7 @@
 import type { BaseDisplayBoundedCandidateReport } from './baseReactFlowDisplayEvaluation';
 
+type DisplayRoutingDefectQuality = BaseDisplayBoundedCandidateReport['quality'];
+
 export type RoutingDefectPlan = Readonly<{
   hardClean: boolean;
   needsObstacleRepair: boolean;
@@ -10,6 +12,16 @@ export type RoutingDefectPlan = Readonly<{
   onlyTerminalAxisDefects: boolean;
 }>;
 
+export const displayRoutingQualityNeedsMicroRepair = (
+  quality: DisplayRoutingDefectQuality,
+): boolean => quality.nonOrthogonalSegments > 0
+  || quality.tinyInteriorDoglegs > 0
+  || quality.hairpins > 0;
+
+export const displayRoutingQualityNeedsTerminalRepair = (
+  quality: DisplayRoutingDefectQuality,
+): boolean => quality.shortEndpointStubs > 0;
+
 export const createDisplayRoutingDefectPlan = (
   report: BaseDisplayBoundedCandidateReport,
 ): RoutingDefectPlan => {
@@ -19,10 +31,8 @@ export const createDisplayRoutingDefectPlan = (
     || quality.unexplainedRelatedOverlap > 0;
   const needsTerminalRepair = !report.terminalsAttached
     || !report.terminalsAnchored
-    || quality.shortEndpointStubs > 0;
-  const needsMicroRepair = quality.nonOrthogonalSegments > 0
-    || quality.tinyInteriorDoglegs > 0
-    || quality.hairpins > 0;
+    || displayRoutingQualityNeedsTerminalRepair(quality);
+  const needsMicroRepair = displayRoutingQualityNeedsMicroRepair(quality);
   const onlyTerminalAxisDefects = report.terminalsAttached
     && !report.terminalsAnchored
     && report.obstacleHits === 0

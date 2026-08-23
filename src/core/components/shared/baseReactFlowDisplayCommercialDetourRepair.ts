@@ -37,7 +37,7 @@ import {
   withDisplayComputedPath,
 } from './baseReactFlowDisplayGeometry';
 import { getDisplayHardQualityGateReport } from './baseReactFlowDisplayQualityGates';
-import { doBaseReactFlowDisplayRoutesMatchExactly } from './baseReactFlowDisplayRoutingTransaction';
+import { commercialRepairOutputIsEquivalent } from './baseReactFlowDisplayCommercialRepairContract';
 import { repairFinalResidualStrictCrossings } from './baseReactFlowDisplayStrictResidualRepair';
 import { withDisplayLocalShortcutSoftCrossingBridge } from './baseReactFlowDisplaySoftCrossingBridge';
 import { repairAxisMismatchedTerminalsWithBoundedPortRoles } from './baseReactFlowDisplayTerminalPortRepair';
@@ -50,11 +50,6 @@ const FINAL_COMMERCIAL_OUTER_STAIR_EVALUATIONS = 16;
 const FINAL_COMMERCIAL_TERMINAL_SHORTCUT_EVALUATIONS = 24;
 const FINAL_COMMERCIAL_SOURCE_SHORTCUT_EVALUATIONS = 32;
 const FINAL_COMMERCIAL_SOURCE_SHORTCUT_EVALUATIONS_PER_EDGE = 8;
-const COMMERCIAL_REPAIR_FLAGS = [
-  'displayNodeClearanceRepaired',
-  'overextendedTargetTrunkCorridorReclaimed',
-] as const;
-
 const FINAL_COMMERCIAL_PHASES = [
   'final-commercial-clearance',
   'final-commercial-terminal-preserving',
@@ -73,14 +68,6 @@ export const traceSkippedFinalCommercialDetours = (
       .finish('skip');
   }
 };
-
-const commercialRepairOutputIsEquivalent = (
-  baseline: Edge[],
-  candidate: Edge[],
-): boolean => doBaseReactFlowDisplayRoutesMatchExactly(baseline, candidate)
-  && baseline.every((edge, index) => COMMERCIAL_REPAIR_FLAGS.every(flag => (
- edge.data?.[flag] === candidate[index]?.data?.[flag]
-)));
 
 const withTerminalPreservingOuterStairPath = (
   edge: Edge,
@@ -603,6 +590,7 @@ export const repairBaseReactFlowFinalCommercialDetours = <T extends Edge[]>(
     options,
     evaluation,
   );
+  const beforeSourceStairs = baseline;
   baseline = repairSourceTerminalOuterStairs(
     baseline,
     nodes,
@@ -612,18 +600,20 @@ export const repairBaseReactFlowFinalCommercialDetours = <T extends Edge[]>(
   // A hard-defect source reroute can establish the first clean baseline. Give
   // the cheaper terminal-preserving/changing shortcuts one bounded pass over
   // that clean graph so unrelated outer rectangles are not stranded.
-  baseline = repairTerminalPreservingOuterStairs(
-    baseline,
-    nodes,
-    options,
-    evaluation,
-  );
-  baseline = repairTerminalChangingOuterStairs(
-    baseline,
-    nodes,
-    options,
-    evaluation,
-  );
+  if (baseline !== beforeSourceStairs) {
+    baseline = repairTerminalPreservingOuterStairs(
+      baseline,
+      nodes,
+      options,
+      evaluation,
+    );
+    baseline = repairTerminalChangingOuterStairs(
+      baseline,
+      nodes,
+      options,
+      evaluation,
+    );
+  }
   // Clearance and detour shortening are independent soft-quality dimensions.
   // Establish the commercial node gap before ranking loop shortcuts so a
   // successful shortcut cannot make the clearance pass conditional.

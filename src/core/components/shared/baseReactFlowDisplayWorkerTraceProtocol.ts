@@ -9,6 +9,7 @@ const OPTIONAL_COUNT_KEYS = [
   'evaluationCount',
   'cacheHitCount',
   'scannedNodeCount',
+  'scannedSegmentCount',
   'scannedEdgePairCount',
 ] as const;
 
@@ -38,7 +39,7 @@ export const isDisplayRoutingPhaseTrace = (
   if (!isRecord(value)) return false;
   const keys = Object.keys(value);
   return keys.length >= 5
-    && keys.length <= 11
+    && keys.length <= 12
     && keys.every(key => (
       key === 'phase'
       || key === 'parentPhase'

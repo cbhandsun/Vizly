@@ -67,3 +67,51 @@ export const resolveBaseReactFlowPrecompiledRegenerationPresetId = ({
   const activePresetId = readSingleParameter(hash.slice(queryIndex + 1), 'diagram');
   return activePresetId === regenerationPresetId ? regenerationPresetId : null;
 };
+
+export const resolveBaseReactFlowPrecompiledRegenerationPresetIdFromWindow = (): string | null => (
+  typeof window === 'undefined'
+    ? null
+    : resolveBaseReactFlowPrecompiledRegenerationPresetId({
+      search: window.location.search,
+      hash: window.location.hash,
+    })
+);
+
+export type BaseReactFlowPrecompiledCommittedRouteCapture = Readonly<{
+  presetId: string;
+  inputSignature: string;
+  inputGeometryDigest: string;
+  outputRouteSignature: string;
+  sourceEdges: Edge[];
+  displayPatches: Edge[];
+}>;
+
+type PrecompiledCaptureWindow = Window & {
+  __vizlyPrecompiledCommittedRoute?: BaseReactFlowPrecompiledCommittedRouteCapture;
+};
+
+/**
+ * Publishes the already signature-verified committed snapshot only for the
+ * explicit localhost regeneration path. The bridge is intentionally separate
+ * from phase trace/DOM diagnostics so route geometry is never logged or
+ * serialized into ordinary diagnostics.
+ */
+export const publishBaseReactFlowPrecompiledCommittedRoute = (
+  capture: BaseReactFlowPrecompiledCommittedRouteCapture,
+): boolean => {
+  if (typeof window === 'undefined') return false;
+  const host = window.location.hostname;
+  if (host !== 'localhost' && host !== '127.0.0.1' && host !== '::1') return false;
+  const activePresetId = resolveBaseReactFlowPrecompiledRegenerationPresetId({
+    search: window.location.search,
+    hash: window.location.hash,
+  });
+  if (activePresetId !== capture.presetId) return false;
+  try {
+    (window as PrecompiledCaptureWindow).__vizlyPrecompiledCommittedRoute = structuredClone(capture);
+    return true;
+  } catch {
+    return false;
+  }
+};
+import type { Edge } from '@xyflow/react';

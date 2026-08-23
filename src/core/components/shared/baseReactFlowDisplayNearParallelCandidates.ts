@@ -28,8 +28,15 @@ export const buildNearParallelLaneNudgePaths = (
   nodes: Node[],
   edge: Edge,
   allEdges: Edge[],
+  maxCandidates = Number.POSITIVE_INFINITY,
 ): DisplayPoint[][] => {
   if (segment.segmentIndex < 0 || segment.segmentIndex >= path.length - 1) return [];
+  const candidateLimit = maxCandidates === Number.POSITIVE_INFINITY
+    ? Number.POSITIVE_INFINITY
+    : Number.isFinite(maxCandidates)
+    ? Math.max(0, Math.floor(maxCandidates))
+    : 0;
+  if (candidateLimit === 0) return [];
   const laneCandidates = new Set<number>();
   const addLane = (lane: number) => {
     if (Number.isFinite(lane)) laneCandidates.add(Math.round(lane));
@@ -103,59 +110,57 @@ export const buildNearParallelLaneNudgePaths = (
   }
 
   const candidatePaths: DisplayPoint[][] = [];
-  const appendCandidate = (candidate: DisplayPoint[]) => {
+  const seenCandidateSignatures = new Set<string>();
+  const appendCandidate = (candidate: DisplayPoint[]): boolean => {
     const compacted = compactOrthogonalPath(candidate);
-    if (compacted.length >= 2 && compacted.every(isFinitePoint)) candidatePaths.push(compacted);
+    if (compacted.length < 2 || !compacted.every(isFinitePoint)) return false;
+    const signature = candidateSignature(compacted);
+    if (seenCandidateSignatures.has(signature)) return false;
+    seenCandidateSignatures.add(signature);
+    candidatePaths.push(compacted);
+    return candidatePaths.length >= candidateLimit;
   };
 
   if (isEndpointSegment) {
     const start = path[segment.segmentIndex];
     const end = path[segment.segmentIndex + 1];
     if (start && end) {
-      [...laneCandidates].forEach((lane) => {
+      for (const lane of laneCandidates) {
         if (segment.axis === 'v') {
-          if (Math.abs(lane - segment.a.x) <= NEAR_PARALLEL_LANE_TOLERANCE) return;
-          appendCandidate([
+          if (Math.abs(lane - segment.a.x) <= NEAR_PARALLEL_LANE_TOLERANCE) continue;
+          if (appendCandidate([
             ...path.slice(0, segment.segmentIndex + 1),
             { x: lane, y: start.y },
             { x: lane, y: end.y },
             ...path.slice(segment.segmentIndex + 1),
-          ]);
+          ])) return candidatePaths;
         } else {
-          if (Math.abs(lane - segment.a.y) <= NEAR_PARALLEL_LANE_TOLERANCE) return;
-          appendCandidate([
+          if (Math.abs(lane - segment.a.y) <= NEAR_PARALLEL_LANE_TOLERANCE) continue;
+          if (appendCandidate([
             ...path.slice(0, segment.segmentIndex + 1),
             { x: start.x, y: lane },
             { x: end.x, y: lane },
             ...path.slice(segment.segmentIndex + 1),
-          ]);
+          ])) return candidatePaths;
         }
-      });
+      }
     }
   }
 
-  if (isEndpointSegment) {
-    const seen = new Set<string>();
-    return candidatePaths.filter((candidate) => {
-      const key = candidateSignature(candidate);
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-  }
+  if (isEndpointSegment) return candidatePaths;
 
-  [...laneCandidates].forEach((lane) => {
+  for (const lane of laneCandidates) {
     const next = path.map(point => ({ ...point }));
     if (segment.axis === 'v') {
-      if (Math.abs(lane - segment.a.x) <= NEAR_PARALLEL_LANE_TOLERANCE) return;
+      if (Math.abs(lane - segment.a.x) <= NEAR_PARALLEL_LANE_TOLERANCE) continue;
       next[segment.segmentIndex].x = lane;
       next[segment.segmentIndex + 1].x = lane;
     } else {
-      if (Math.abs(lane - segment.a.y) <= NEAR_PARALLEL_LANE_TOLERANCE) return;
+      if (Math.abs(lane - segment.a.y) <= NEAR_PARALLEL_LANE_TOLERANCE) continue;
       next[segment.segmentIndex].y = lane;
       next[segment.segmentIndex + 1].y = lane;
     }
-    appendCandidate(next);
+    if (appendCandidate(next)) return candidatePaths;
 
     const firstAnchor = Math.max(0, segment.segmentIndex - 3);
     const segmentDirection = segment.direction || 1;
@@ -168,7 +173,7 @@ export const buildNearParallelLaneNudgePaths = (
     for (let anchorIndex = firstAnchor; anchorIndex < segment.segmentIndex; anchorIndex += 1) {
       const anchor = path[anchorIndex];
       if (!anchor) continue;
-      appendCandidate(segment.axis === 'v'
+      if (appendCandidate(segment.axis === 'v'
         ? [
           ...path.slice(0, anchorIndex + 1),
           { x: lane, y: anchor.y },
@@ -180,11 +185,11 @@ export const buildNearParallelLaneNudgePaths = (
           { x: anchor.x, y: lane },
           { x: segment.b.x, y: lane },
           ...path.slice(segment.segmentIndex + 2),
-        ]);
+        ])) return candidatePaths;
       const exitContinuation = path[segment.segmentIndex + 2];
       if (!exitContinuation) continue;
       for (const exitMain of exitMainCandidates) {
-        appendCandidate(segment.axis === 'v'
+        if (appendCandidate(segment.axis === 'v'
           ? [
             ...path.slice(0, anchorIndex + 1),
             { x: lane, y: anchor.y },
@@ -198,13 +203,13 @@ export const buildNearParallelLaneNudgePaths = (
             { x: exitMain, y: lane },
             { x: exitMain, y: exitContinuation.y },
             ...path.slice(segment.segmentIndex + 3),
-          ]);
+          ])) return candidatePaths;
       }
     }
-  });
+  }
 
   for (const candidatePath of buildObstacleSkirtCandidates(path, nodes, edge, allEdges)) {
-    appendCandidate(candidatePath);
+    if (appendCandidate(candidatePath)) return candidatePaths;
   }
 
   const obstacles = [...buildDisplayRoutingObstacles(nodes)]
@@ -241,13 +246,13 @@ export const buildNearParallelLaneNudgePaths = (
           for (let exitIndex = suffixStart; exitIndex < path.length; exitIndex += 1) {
             const exit = path[exitIndex];
             if (!entry || !exit) continue;
-            appendCandidate([
+            if (appendCandidate([
               ...path.slice(0, segment.segmentIndex),
               { x: laneX, y: entry.y },
               { x: laneX, y: bypassY },
               { x: exit.x, y: bypassY },
               ...path.slice(exitIndex + 1),
-            ]);
+            ])) return candidatePaths;
           }
         }
       }
@@ -269,24 +274,18 @@ export const buildNearParallelLaneNudgePaths = (
           for (let exitIndex = suffixStart; exitIndex < path.length; exitIndex += 1) {
             const exit = path[exitIndex];
             if (!entry || !exit) continue;
-            appendCandidate([
+            if (appendCandidate([
               ...path.slice(0, segment.segmentIndex),
               { x: entry.x, y: laneY },
               { x: bypassX, y: laneY },
               { x: bypassX, y: exit.y },
               ...path.slice(exitIndex + 1),
-            ]);
+            ])) return candidatePaths;
           }
         }
       }
     }
   }
 
-  const seen = new Set<string>();
-  return candidatePaths.filter((candidate) => {
-    const key = candidateSignature(candidate);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+  return candidatePaths;
 };

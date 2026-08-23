@@ -20,6 +20,7 @@ import { parseDisplayEdgesWorkerResponse } from '../baseReactFlowDisplayWorkerPr
 import { completeDisplayWorkerResponse } from '../baseReactFlowDisplayWorkerSessionResponse';
 import {
   clearDisplayRoutingWorkerSessions,
+  readDisplayRoutingWorkerSession,
   writeDisplayRoutingWorkerSession,
 } from '../baseReactFlowDisplayWorkerSession';
 
@@ -124,6 +125,15 @@ describe('display routing Worker-private session', () => {
       displayPatches: baselinePatches,
       finalEdges: edges,
     });
+    const privateSession = readDisplayRoutingWorkerSession({
+      ref: baselineSessionRef,
+      expectedIdentity: baselineSessionRef.identity,
+      expectedOutputRouteSignature: baselineOutputRouteSignature,
+    });
+    expect(privateSession?.spatialSnapshot).toMatchObject({
+      outputRouteSignature: baselineOutputRouteSignature,
+      segmentIndex: { edgeCount: edges.length },
+    });
     const nextNodes: Node[] = [nodes[0], { ...nodes[1], position: { x: 320, y: 0 } }];
     const nextIdentity = computeBaseReactFlowDisplayInputIdentityBundle({
       nodes: nextNodes,
@@ -183,6 +193,8 @@ describe('display routing Worker-private session', () => {
       outputRouteSignature: expect.stringMatching(/^route-v2:/),
       sessionRef: { sessionId: expect.stringMatching(/^display-session-v1:/) },
     });
+    expect(response.phaseTrace?.find(trace => trace.phase === 'incremental-closure'))
+      .toMatchObject({ cacheHitCount: 1 });
   });
 
   it('falls back safely when a private session is stale and no bootstrap is present', () => {
@@ -218,6 +230,7 @@ describe('display routing Worker-private session', () => {
       nextInputGeometryDigest: identity.geometryDigest,
       changeSet: {
         reason: 'node-drag',
+        classification: 'geometry',
         changedNodeIds: ['source'],
         changedEdgeIds: [],
         topologyChanged: false,
