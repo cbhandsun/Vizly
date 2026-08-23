@@ -10,7 +10,10 @@ import {
 import {
   calculateEdgePathQualityScore,
 } from '../edgeStrictCrossingGuard';
-import { repairDisplayMicroArtifacts } from '../edgeDisplayMicroCleanup';
+import {
+  createDisplayMicroCleanupDiagnostics,
+  repairDisplayMicroArtifacts,
+} from '../edgeDisplayMicroCleanup';
 
 type Point = { x: number; y: number };
 
@@ -156,7 +159,8 @@ describe('edgeDisplayMicroCleanup node safety', () => {
     const baseline = compoundCleanupFixture();
     const terminalSnapshot = createDisplayTerminalValidationSnapshot(measuredNodes);
     const baselineTerminals = getDisplayTerminalValidationReport(baseline, terminalSnapshot);
-    const unguarded = repairDisplayMicroArtifacts(baseline);
+    const compoundDiagnostics = createDisplayMicroCleanupDiagnostics();
+    const unguarded = repairDisplayMicroArtifacts(baseline, undefined, compoundDiagnostics);
 
     expect(countDisplayObstacleHits(baseline, measuredNodes)).toBe(0);
     expect(baselineTerminals.allAttached).toBe(true);
@@ -164,6 +168,16 @@ describe('edgeDisplayMicroCleanup node safety', () => {
     expect(countDisplayObstacleHits(unguarded, measuredNodes)).toBeGreaterThan(0);
     expect(calculateEdgePathQualityScore(unguarded).tinyInteriorDoglegs)
       .toBeLessThan(calculateEdgePathQualityScore(baseline).tinyInteriorDoglegs);
+
+    const singleEdgeDiagnostics = createDisplayMicroCleanupDiagnostics();
+    repairDisplayMicroArtifacts(
+      baseline,
+      undefined,
+      singleEdgeDiagnostics,
+      { allowCompoundRepairs: false },
+    );
+    expect(singleEdgeDiagnostics.generatedCandidateCount)
+      .toBeLessThan(compoundDiagnostics.generatedCandidateCount);
 
     const safetyContext = createBaseReactFlowDisplayMicroSafetyContext(
       baseline,

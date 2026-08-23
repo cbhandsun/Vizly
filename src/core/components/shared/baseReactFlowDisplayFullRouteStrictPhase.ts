@@ -229,7 +229,12 @@ export const runBaseReactFlowFullRouteStrictPhase = (
     candidateCount: finalDirectionalAfterResidualCandidate.length,
     onTrace: recordPrimaryPhaseTrace,
   });
-  const finalMicroCleanupCandidate = repairDisplayMicroArtifacts(finalDirectionalAfterResidualCandidate);
+  const finalMicroCleanupCandidate = repairDisplayMicroArtifacts(
+    finalDirectionalAfterResidualCandidate,
+    undefined,
+    undefined,
+    { allowCompoundRepairs: false },
+  );
   const finalLocalCleanupCandidate = repairLocalDoglegArtifacts(
     finalMicroCleanupCandidate,
     repairNodes,
