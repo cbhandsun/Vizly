@@ -28,6 +28,16 @@ const OBSTACLE_PADDING = 4;
 const SIDE_EDGE_INSET = 16;
 const OUTER_BYPASS_EDGE_CLEARANCE = 24;
 
+export type EndpointLaneRepairMetrics = Readonly<{
+  candidateCount: number;
+  evaluationCount: number;
+  scannedSegmentCount: number;
+}>;
+
+export type EndpointLaneRepairOptions = Readonly<{
+  onMetrics?: (metrics: EndpointLaneRepairMetrics) => void;
+}>;
+
 const num = (value: unknown, fallback: number): number => (
   typeof value === 'number' && Number.isFinite(value) ? value : fallback
 );
@@ -562,15 +572,43 @@ function withComputedPath(edge: Edge, path: Point[]): Edge {
   return { ...edge, data };
 }
 
-export function repairEndpointLaneCrossings(edges: Edge[], nodes: ReactFlowNode[]): Edge[] {
-  if (edges.length < 2) return edges;
+function uniqueEndpointLaneCandidates(candidates: readonly Point[][]): Point[][] {
+  const seen = new Set<string>();
+  return candidates.filter(candidate => {
+    const key = candidate.map(point => `${point.x},${point.y}`).join(';');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+export function repairEndpointLaneCrossings(
+  edges: Edge[],
+  nodes: ReactFlowNode[],
+  options: EndpointLaneRepairOptions = {},
+): Edge[] {
+  let candidateCount = 0;
+  let evaluationCount = 0;
+  let scannedSegmentCount = 0;
+  const reportMetrics = (): void => options.onMetrics?.({
+    candidateCount,
+    evaluationCount,
+    scannedSegmentCount,
+  });
+  if (edges.length < 2) {
+    reportMetrics();
+    return edges;
+  }
 
   const paths = new Map<string, Point[]>();
   for (const edge of [...edges].reverse()) {
     const path = compactPath(getEdgePath(edge));
     if (edge.id && path.length >= 2) paths.set(edge.id, path);
   }
-  if (paths.size < 2) return edges;
+  if (paths.size < 2) {
+    reportMetrics();
+    return edges;
+  }
 
   const nodeRects = new Map<string, Rect>();
   for (const node of nodes) {
@@ -591,33 +629,41 @@ export function repairEndpointLaneCrossings(edges: Edge[], nodes: ReactFlowNode[
     const currentCrossings = currentInteractions.crossings;
     const currentTotalStrictCrossings = currentInteractions.totalCrossings;
     const currentOppositeOverlap = currentInteractions.oppositeOverlap;
-    if (currentCrossings <= 0 && currentOppositeOverlap <= OUTER_BYPASS_EDGE_CLEARANCE) continue;
+    if (currentCrossings <= 0 && currentOppositeOverlap <= OUTER_BYPASS_EDGE_CLEARANCE) {
+      const interactionMetrics = interactionContext.readMetrics();
+      evaluationCount += interactionMetrics.evaluationCount;
+      scannedSegmentCount += interactionMetrics.scannedSegmentCount;
+      continue;
+    }
 
     const currentLength = pathLength(path);
     const maxExtraLength = currentCrossings > 0
       ? Math.max(240, currentCrossings * 560)
       : 160;
-    const candidates = [
+    const candidatePaths = uniqueEndpointLaneCandidates([
       ...sourceNudgeCandidates(path, sourceRect),
       ...outerBypassCandidates(path, edge, repaired, edgesById, obstacles),
       ...outerBypassOverlapCandidates(path, edge, repaired, edgesById, obstacles),
-    ]
+    ])
       .filter(candidate => !pathHitsObstacle(candidate, edge, obstacles))
+      .map(candidate => ({ path: candidate, length: pathLength(candidate) }))
+      .filter(candidate => candidate.length <= currentLength + maxExtraLength);
+    candidateCount += candidatePaths.length;
+    const candidates = candidatePaths
       .map((candidate) => {
-        const { crossings, totalCrossings, oppositeOverlap } = interactionContext.evaluate(candidate);
-        const length = pathLength(candidate);
+        const { crossings, totalCrossings, oppositeOverlap } = interactionContext.evaluate(candidate.path);
         return {
-          path: candidate,
+          path: candidate.path,
           crossings,
           totalCrossings,
           oppositeOverlap,
-          length,
+          length: candidate.length,
           score: totalCrossings * 140000
             + crossings * 100000
             + oppositeOverlap * 500
-            + length * 0.05
-            + Math.abs(candidate[0].x - path[0].x)
-            + Math.abs(candidate[0].y - path[0].y),
+            + candidate.length * 0.05
+            + Math.abs(candidate.path[0].x - path[0].x)
+            + Math.abs(candidate.path[0].y - path[0].y),
         };
       })
       .filter(candidate => (
@@ -632,16 +678,20 @@ export function repairEndpointLaneCrossings(edges: Edge[], nodes: ReactFlowNode[
           && candidate.oppositeOverlap + OUTER_BYPASS_EDGE_CLEARANCE < currentOppositeOverlap
         )
       ))
-      .filter(candidate => candidate.length <= currentLength + maxExtraLength)
       .sort((a, b) => a.score - b.score);
 
     if (candidates[0]) repaired.set(edge.id, candidates[0].path);
+    const interactionMetrics = interactionContext.readMetrics();
+    evaluationCount += interactionMetrics.evaluationCount;
+    scannedSegmentCount += interactionMetrics.scannedSegmentCount;
   }
 
-  return edges.map(edge => {
+  const result = edges.map(edge => {
     const original = paths.get(edge.id);
     const path = repaired.get(edge.id);
     if (!original || !path || pathEquals(original, path)) return edge;
     return withComputedPath(edge, path);
   });
+  reportMetrics();
+  return result;
 }

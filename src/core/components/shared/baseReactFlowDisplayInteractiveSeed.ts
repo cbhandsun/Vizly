@@ -65,6 +65,7 @@ export const createBaseReactFlowInteractiveSeedResult = ({
     isLargeGraph: args.isLargeGraph,
     displayEdgeEpoch: args.displayEdgeEpoch,
     deferOuterObstacleRepair: true,
+    onPhaseTrace: recordPhaseTrace,
   });
   routeTimer?.finish(
     args.preparedInteractiveEdges ? 'hit' : 'accepted',

@@ -1,7 +1,10 @@
 import type { Edge, Node } from '@xyflow/react';
 
 import { separateDetachedParallelOverlaps } from '../../strategies/shared/edgeDetachedOverlapRepair';
-import { repairEndpointLaneCrossings } from '../../strategies/shared/edgeEndpointLaneNudgeRepair';
+import {
+  repairEndpointLaneCrossings,
+  type EndpointLaneRepairMetrics,
+} from '../../strategies/shared/edgeEndpointLaneNudgeRepair';
 import { repairEndpointOrthogonalPaths } from '../../strategies/shared/edgeEndpointPathRepair';
 import { repairLocalDoglegArtifacts } from '../../strategies/shared/edgeLocalDoglegRepair';
 import {
@@ -27,6 +30,13 @@ import { compactDisplayEdgePaths } from './baseReactFlowDisplayGeometry';
 import { repairStrictBypassesIfNeeded } from './baseReactFlowDisplayObstacleRepair';
 import { DISPLAY_DETACHED_OVERLAP_REPAIR_OPTIONS } from './baseReactFlowDisplayOverlapRepair';
 import { finishInteractiveDisplayEdgesForRenderMode } from './baseReactFlowDisplayRenderPipeline';
+import {
+  countChangedRoutingItems,
+  startDisplayRoutingPhaseTrace,
+  type DisplayRoutingPhaseName,
+  type DisplayRoutingPhaseMetrics,
+  type DisplayRoutingPhaseTrace,
+} from './baseReactFlowDisplayRoutingTrace';
 
 export const createFastDisplayQualityEdges = (
   normalizedEdges: Edge[],
@@ -70,6 +80,30 @@ const INTERACTIVE_DETACHED_OVERLAP_REPAIR_OPTIONS = {
 const DEFERRED_GLOBAL_CANDIDATE_EDGE_THRESHOLD = 24;
 const DEFERRED_GLOBAL_CANDIDATE_EDGE_BUDGET = 12;
 
+const runInteractiveSeedPhase = (
+  phase: DisplayRoutingPhaseName,
+  edges: Edge[],
+  transform: (candidate: Edge[]) => Edge[],
+  onPhaseTrace?: (trace: DisplayRoutingPhaseTrace) => void,
+  readMetrics?: () => DisplayRoutingPhaseMetrics,
+): Edge[] => {
+  const timer = onPhaseTrace
+    ? startDisplayRoutingPhaseTrace({
+        phase,
+        candidateCount: edges.length,
+        onTrace: onPhaseTrace,
+      })
+    : null;
+  const result = transform(edges);
+  const changedEdgeCount = countChangedRoutingItems(edges, result);
+  timer?.finish(
+    changedEdgeCount === 0 ? 'skip' : 'accepted',
+    changedEdgeCount,
+    readMetrics?.(),
+  );
+  return result;
+};
+
 export const getInteractiveGlobalCandidateEdgeBudget = (
   edgeCount: number,
   deferOuterObstacleRepair: boolean,
@@ -84,30 +118,84 @@ const createInteractiveDisplayQualityEdges = (
   repairNodes: Node[],
   layoutDirection: string,
   maxGlobalCandidateEdges?: number,
+  onPhaseTrace?: (trace: DisplayRoutingPhaseTrace) => void,
 ): Edge[] => {
-  const endpointEdges = repairEndpointOrthogonalPaths(normalizedEdges, repairNodes);
-  const sharedTargetEdges = synthesizeSharedEndpointTrunks(endpointEdges, { nodes: repairNodes });
-  const localEdges = repairLocalDoglegArtifacts(sharedTargetEdges, repairNodes);
-  const strictAwareEdges = repairEndpointOrthogonalPaths(
-    repairSharedTrunkAwareCrossings(localEdges, repairNodes),
-    repairNodes,
+  const endpointEdges = runInteractiveSeedPhase(
+    'seed-interactive-endpoint-seed',
+    normalizedEdges,
+    candidate => repairEndpointOrthogonalPaths(candidate, repairNodes),
+    onPhaseTrace,
   );
-  const endpointLaneEdges = repairEndpointLaneCrossings(strictAwareEdges, repairNodes);
-  const globalEdges = repairEndpointOrthogonalPaths(
-    reduceEdgeCrossingsWithWaypoints(endpointLaneEdges, repairNodes, layoutDirection, {
-      onlyNodeRiskEdges: true,
-      maxCandidateEdges: maxGlobalCandidateEdges,
+  const sharedTargetEdges = runInteractiveSeedPhase(
+    'seed-interactive-trunk-seed',
+    endpointEdges,
+    candidate => synthesizeSharedEndpointTrunks(candidate, { nodes: repairNodes }),
+    onPhaseTrace,
+  );
+  const localEdges = runInteractiveSeedPhase(
+    'seed-interactive-local-seed',
+    sharedTargetEdges,
+    candidate => repairLocalDoglegArtifacts(candidate, repairNodes),
+    onPhaseTrace,
+  );
+  const strictAwareEdges = runInteractiveSeedPhase(
+    'seed-interactive-crossing-repair',
+    localEdges,
+    candidate => repairEndpointOrthogonalPaths(
+      repairSharedTrunkAwareCrossings(candidate, repairNodes),
+      repairNodes,
+    ),
+    onPhaseTrace,
+  );
+  let endpointLaneMetrics: EndpointLaneRepairMetrics = {
+    candidateCount: 0,
+    evaluationCount: 0,
+    scannedSegmentCount: 0,
+  };
+  const endpointLaneEdges = runInteractiveSeedPhase(
+    'seed-interactive-lane-repair',
+    strictAwareEdges,
+    candidate => repairEndpointLaneCrossings(candidate, repairNodes, {
+      onMetrics: metrics => { endpointLaneMetrics = metrics; },
     }),
-    repairNodes,
+    onPhaseTrace,
+    () => endpointLaneMetrics,
   );
-  const localPolishedEdges = repairLocalDoglegArtifacts(globalEdges, repairNodes);
-  const detachedEdges = separateDetachedParallelOverlaps(
+  const globalEdges = runInteractiveSeedPhase(
+    'seed-interactive-global-route',
+    endpointLaneEdges,
+    candidate => repairEndpointOrthogonalPaths(
+      reduceEdgeCrossingsWithWaypoints(candidate, repairNodes, layoutDirection, {
+        onlyNodeRiskEdges: true,
+        maxCandidateEdges: maxGlobalCandidateEdges,
+      }),
+      repairNodes,
+    ),
+    onPhaseTrace,
+  );
+  const localPolishedEdges = runInteractiveSeedPhase(
+    'seed-interactive-local-polish',
+    globalEdges,
+    candidate => repairLocalDoglegArtifacts(candidate, repairNodes),
+    onPhaseTrace,
+  );
+  const detachedEdges = runInteractiveSeedPhase(
+    'seed-interactive-detached-repair',
     localPolishedEdges,
-    repairNodes,
-    16,
-    INTERACTIVE_DETACHED_OVERLAP_REPAIR_OPTIONS,
+    candidate => separateDetachedParallelOverlaps(
+      candidate,
+      repairNodes,
+      16,
+      INTERACTIVE_DETACHED_OVERLAP_REPAIR_OPTIONS,
+    ),
+    onPhaseTrace,
   );
-  const endpointDetachedEdges = repairEndpointOrthogonalPaths(detachedEdges, repairNodes);
+  const endpointDetachedEdges = runInteractiveSeedPhase(
+    'seed-interactive-endpoint-final',
+    detachedEdges,
+    candidate => repairEndpointOrthogonalPaths(candidate, repairNodes),
+    onPhaseTrace,
+  );
 
   return chooseFewestStrictCrossings(
     normalizedEdges,
@@ -131,6 +219,7 @@ export const createBaseReactFlowInteractiveDisplayEdges = ({
   isLargeGraph,
   displayEdgeEpoch,
   deferOuterObstacleRepair = false,
+  onPhaseTrace,
 }: {
   edges: Edge[];
   nodes: Node[];
@@ -139,6 +228,7 @@ export const createBaseReactFlowInteractiveDisplayEdges = ({
   isLargeGraph: boolean;
   displayEdgeEpoch: number;
   deferOuterObstacleRepair?: boolean;
+  onPhaseTrace?: (trace: DisplayRoutingPhaseTrace) => void;
 }): Edge[] => {
   const inputSignature = computeBaseDisplayInputSignature({
     nodes,
@@ -149,6 +239,13 @@ export const createBaseReactFlowInteractiveDisplayEdges = ({
   });
   if (isBaseDisplayFinalized(edges, inputSignature)) return edges;
 
+  const normalizeTimer = onPhaseTrace
+    ? startDisplayRoutingPhaseTrace({
+        phase: 'seed-interactive-normalize',
+        candidateCount: edges.length,
+        onTrace: onPhaseTrace,
+      })
+    : null;
   const nodeById = new Map(nodes.map((node) => [node.id, node]));
   const repairNodes = withDisplayAbsolutePositions(nodes, nodeById);
   const normalizedEdges = compactDisplayEdgePaths(
@@ -161,6 +258,11 @@ export const createBaseReactFlowInteractiveDisplayEdges = ({
   const layoutDirection = typeof normalizedEdges[0]?.data?.layoutDirection === 'string'
     ? normalizedEdges[0].data.layoutDirection
     : 'TB';
+  normalizeTimer?.finish(
+    normalizedEdges === edges ? 'skip' : 'accepted',
+    countChangedRoutingItems(edges, normalizedEdges),
+    { scannedNodeCount: nodes.length },
+  );
   const interactiveEdges = createInteractiveDisplayQualityEdges(
     normalizedEdges,
     repairNodes,
@@ -169,9 +271,17 @@ export const createBaseReactFlowInteractiveDisplayEdges = ({
       normalizedEdges.length,
       deferOuterObstacleRepair,
     ),
+    onPhaseTrace,
   );
 
-  return finishInteractiveDisplayEdgesForRenderMode({
+  const finishTimer = onPhaseTrace
+    ? startDisplayRoutingPhaseTrace({
+        phase: 'seed-interactive-finish',
+        candidateCount: interactiveEdges.length,
+        onTrace: onPhaseTrace,
+      })
+    : null;
+  const finishedEdges = finishInteractiveDisplayEdgesForRenderMode({
     finalQualityEdges: interactiveEdges,
     rawEdges: edges,
     enableSmartEdges,
@@ -180,5 +290,12 @@ export const createBaseReactFlowInteractiveDisplayEdges = ({
     repairNodes,
     inputSignature,
     deferOuterObstacleRepair,
+    onPhaseTrace,
   });
+  const finishChangedEdgeCount = countChangedRoutingItems(interactiveEdges, finishedEdges);
+  finishTimer?.finish(
+    finishChangedEdgeCount === 0 ? 'skip' : 'accepted',
+    finishChangedEdgeCount,
+  );
+  return finishedEdges;
 };

@@ -9,6 +9,23 @@ export const DISPLAY_ROUTING_PHASE_NAMES = [
   'seed',
   'seed-interactive',
   'seed-interactive-route',
+  'seed-interactive-normalize',
+  'seed-interactive-endpoint-seed',
+  'seed-interactive-trunk-seed',
+  'seed-interactive-local-seed',
+  'seed-interactive-crossing-repair',
+  'seed-interactive-lane-repair',
+  'seed-interactive-global-route',
+  'seed-interactive-local-polish',
+  'seed-interactive-detached-repair',
+  'seed-interactive-endpoint-final',
+  'seed-interactive-finish',
+  'seed-interactive-finish-projection',
+  'seed-interactive-finish-hard-gate',
+  'seed-interactive-finish-micro',
+  'seed-interactive-finish-local',
+  'seed-interactive-finish-obstacle',
+  'seed-interactive-finish-commit',
   'seed-interactive-terminal-cleanup',
   'seed-initial-gate',
   'seed-hard-safety',
@@ -87,7 +104,7 @@ export const DISPLAY_ROUTING_PHASE_NAMES = [
 // One aggregate entry per declared phase plus headroom for the small number of
 // phases that can run under two explicit parents. Repeated work is folded by
 // the Worker recorder, so the bound no longer truncates late final-gate phases.
-export const DISPLAY_ROUTING_PHASE_TRACE_LIMIT = 96;
+export const DISPLAY_ROUTING_PHASE_TRACE_LIMIT = 112;
 
 export const DISPLAY_ROUTING_PHASE_RESOLUTIONS = [
   'hit',
@@ -125,6 +142,18 @@ export type DisplayRoutingPhaseTrace = Readonly<{
   resolution: DisplayRoutingPhaseResolution;
 }>;
 
+export const countChangedRoutingItems = <T>(
+  before: readonly T[],
+  after: readonly T[],
+): number => {
+  const sharedLength = Math.min(before.length, after.length);
+  let changed = Math.abs(before.length - after.length);
+  for (let index = 0; index < sharedLength; index += 1) {
+    if (before[index] !== after[index]) changed += 1;
+  }
+  return changed;
+};
+
 type DisplayRoutingPhaseTimer = Readonly<{
   finish: (
     resolution: DisplayRoutingPhaseResolution,
@@ -141,6 +170,23 @@ const DISPLAY_ROUTING_PHASE_PARENTS: Readonly<
   'local-fast-fallback': 'local-route',
   'seed-interactive': 'seed',
   'seed-interactive-route': 'seed-interactive',
+  'seed-interactive-normalize': 'seed-interactive-route',
+  'seed-interactive-endpoint-seed': 'seed-interactive-route',
+  'seed-interactive-trunk-seed': 'seed-interactive-route',
+  'seed-interactive-local-seed': 'seed-interactive-route',
+  'seed-interactive-crossing-repair': 'seed-interactive-route',
+  'seed-interactive-lane-repair': 'seed-interactive-route',
+  'seed-interactive-global-route': 'seed-interactive-route',
+  'seed-interactive-local-polish': 'seed-interactive-route',
+  'seed-interactive-detached-repair': 'seed-interactive-route',
+  'seed-interactive-endpoint-final': 'seed-interactive-route',
+  'seed-interactive-finish': 'seed-interactive-route',
+  'seed-interactive-finish-projection': 'seed-interactive-finish',
+  'seed-interactive-finish-hard-gate': 'seed-interactive-finish',
+  'seed-interactive-finish-micro': 'seed-interactive-finish',
+  'seed-interactive-finish-local': 'seed-interactive-finish',
+  'seed-interactive-finish-obstacle': 'seed-interactive-finish',
+  'seed-interactive-finish-commit': 'seed-interactive-finish',
   'seed-interactive-terminal-cleanup': 'seed-interactive',
   'seed-initial-gate': 'seed',
   'seed-hard-safety': 'seed',

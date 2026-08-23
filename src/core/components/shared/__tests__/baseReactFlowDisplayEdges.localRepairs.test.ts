@@ -13,6 +13,7 @@ import {
   repairBoundedReverseParallelOverlaps,
 } from '../baseReactFlowDisplayEdges';
 import { getInteractiveGlobalCandidateEdgeBudget } from '../baseReactFlowDisplayQualitySeedPipeline';
+import type { DisplayRoutingPhaseTrace } from '../baseReactFlowDisplayRoutingTrace';
 import {
   countHairpins,
   edgeNodeObstacleHits,
@@ -486,6 +487,7 @@ describe('baseReactFlowDisplayEdges local repairs', () => {
       node('customer', 234.266, 3911, 180.998, 67.995),
     ];
     const edges = renderedSystemsInteractionDisplayEdges();
+    const phaseTrace: DisplayRoutingPhaseTrace[] = [];
 
     const result = createBaseReactFlowInteractiveDisplayEdges({
       edges,
@@ -494,6 +496,8 @@ describe('baseReactFlowDisplayEdges local repairs', () => {
       smartEdgePadding: 20,
       isLargeGraph: false,
       displayEdgeEpoch: 801,
+      deferOuterObstacleRepair: true,
+      onPhaseTrace: trace => phaseTrace.push(trace),
     });
     const paths = result.map((edge) => ({
       id: edge.id,
@@ -506,6 +510,40 @@ describe('baseReactFlowDisplayEdges local repairs', () => {
     expect(tinyInteriorSegments(returnPath)).toEqual([]);
     expect(shortEndpointSegments(returnPath)).toEqual([]);
     expect(Math.min(...returnPath.map(point => point.x))).toBeLessThanOrEqual(120);
+    expect(phaseTrace.map(trace => trace.phase)).toEqual([
+      'seed-interactive-normalize',
+      'seed-interactive-endpoint-seed',
+      'seed-interactive-trunk-seed',
+      'seed-interactive-local-seed',
+      'seed-interactive-crossing-repair',
+      'seed-interactive-lane-repair',
+      'seed-interactive-global-route',
+      'seed-interactive-local-polish',
+      'seed-interactive-detached-repair',
+      'seed-interactive-endpoint-final',
+      'seed-interactive-finish-projection',
+      'seed-interactive-finish-hard-gate',
+      'seed-interactive-finish-micro',
+      'seed-interactive-finish-local',
+      'seed-interactive-finish-obstacle',
+      'seed-interactive-finish-commit',
+      'seed-interactive-finish',
+    ]);
+    const endpointLaneTrace = phaseTrace.find(
+      trace => trace.phase === 'seed-interactive-lane-repair',
+    );
+    expect(endpointLaneTrace).toMatchObject({
+      evaluationCount: expect.any(Number),
+      scannedSegmentCount: expect.any(Number),
+    });
+    expect(endpointLaneTrace?.candidateCount).toBeGreaterThan(0);
+    expect(phaseTrace.filter(trace => trace !== endpointLaneTrace).every(
+      trace => trace.candidateCount === edges.length,
+    )).toBe(true);
+    expect(phaseTrace.every(trace => trace.changedEdgeCount <= edges.length)).toBe(true);
+    expect(phaseTrace.filter(trace => trace.phase.startsWith('seed-interactive-finish-')).every(
+      trace => trace.parentPhase === 'seed-interactive-finish',
+    )).toBe(true);
   }, 45_000);
 
   it('separates unrelated BMS and YMS middle lanes in the pre-display final path', () => {

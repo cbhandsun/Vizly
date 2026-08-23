@@ -25,6 +25,11 @@ import {
 import { compactDisplayEdgePaths } from './baseReactFlowDisplayGeometry';
 import { materializeDisplayTerminalHandles } from './baseReactFlowDisplayTerminalCommit';
 import {
+  countChangedRoutingItems,
+  startDisplayRoutingPhaseTrace,
+  type DisplayRoutingPhaseTrace,
+} from './baseReactFlowDisplayRoutingTrace';
+import {
   chooseDisplayStrictPolishCandidate,
   chooseFinalObstacleAwarePolishCandidate,
   chooseFinalVisualPolishCandidate,
@@ -265,6 +270,7 @@ export const finishInteractiveDisplayEdgesForRenderMode = ({
   smartEdgePadding,
   inputSignature,
   deferOuterObstacleRepair = false,
+  onPhaseTrace,
 }: {
   finalQualityEdges: Edge[];
   rawEdges: Edge[];
@@ -274,7 +280,15 @@ export const finishInteractiveDisplayEdgesForRenderMode = ({
   smartEdgePadding: number;
   inputSignature: string;
   deferOuterObstacleRepair?: boolean;
+  onPhaseTrace?: (trace: DisplayRoutingPhaseTrace) => void;
 }): Edge[] => {
+  const projectionTimer = onPhaseTrace
+    ? startDisplayRoutingPhaseTrace({
+        phase: 'seed-interactive-finish-projection',
+        candidateCount: finalQualityEdges.length,
+        onTrace: onPhaseTrace,
+      })
+    : null;
   const displayEdges = enableSmartEdges && Number.isFinite(smartEdgePadding)
     ? finalQualityEdges.map((edge, index) => toSmartDisplayEdge({
       edge,
@@ -285,13 +299,73 @@ export const finishInteractiveDisplayEdgesForRenderMode = ({
       edge,
       rawEdge: rawEdges[index],
     }));
-  const readableEdges = restoreReadableRawLockedPaths(displayEdges, rawEdges, repairNodes);
+  const readableEdges = deferOuterObstacleRepair
+    ? displayEdges
+    : restoreReadableRawLockedPaths(displayEdges, rawEdges, repairNodes);
   const terminalReadableEdges = repairTerminalBoundaryStairs(readableEdges, repairNodes);
-  if (deferOuterObstacleRepair && displayHardSafetyIsClean(terminalReadableEdges, repairNodes)) {
-    return markBaseDisplayFinalized(compactDisplayEdgePaths(terminalReadableEdges), inputSignature);
+  projectionTimer?.finish(
+    terminalReadableEdges === finalQualityEdges ? 'skip' : 'accepted',
+    countChangedRoutingItems(finalQualityEdges, terminalReadableEdges),
+  );
+  const hardGateTimer = onPhaseTrace
+    ? startDisplayRoutingPhaseTrace({
+        phase: 'seed-interactive-finish-hard-gate',
+        candidateCount: terminalReadableEdges.length,
+        onTrace: onPhaseTrace,
+      })
+    : null;
+  const hardClean = deferOuterObstacleRepair
+    && displayHardSafetyIsClean(terminalReadableEdges, repairNodes);
+  hardGateTimer?.finish(hardClean ? 'accepted' : 'fallback', 0, {
+    evaluationCount: deferOuterObstacleRepair ? 1 : 0,
+    scannedNodeCount: deferOuterObstacleRepair ? repairNodes.length : 0,
+  });
+  if (hardClean) {
+    const commitTimer = onPhaseTrace
+      ? startDisplayRoutingPhaseTrace({
+          phase: 'seed-interactive-finish-commit',
+          candidateCount: terminalReadableEdges.length,
+          onTrace: onPhaseTrace,
+        })
+      : null;
+    const committed = markBaseDisplayFinalized(
+      compactDisplayEdgePaths(terminalReadableEdges),
+      inputSignature,
+    );
+    commitTimer?.finish('accepted', countChangedRoutingItems(terminalReadableEdges, committed));
+    return committed;
   }
+  const microTimer = onPhaseTrace
+    ? startDisplayRoutingPhaseTrace({
+        phase: 'seed-interactive-finish-micro',
+        candidateCount: terminalReadableEdges.length,
+        onTrace: onPhaseTrace,
+      })
+    : null;
   const microCleaned = repairDisplayMicroArtifacts(terminalReadableEdges) as Edge[];
+  microTimer?.finish(
+    microCleaned === terminalReadableEdges ? 'skip' : 'accepted',
+    countChangedRoutingItems(terminalReadableEdges, microCleaned),
+  );
+  const localTimer = onPhaseTrace
+    ? startDisplayRoutingPhaseTrace({
+        phase: 'seed-interactive-finish-local',
+        candidateCount: microCleaned.length,
+        onTrace: onPhaseTrace,
+      })
+    : null;
   const localCleaned = repairLocalDoglegArtifacts(microCleaned, repairNodes);
+  localTimer?.finish(
+    localCleaned === microCleaned ? 'skip' : 'accepted',
+    countChangedRoutingItems(microCleaned, localCleaned),
+  );
+  const obstacleTimer = onPhaseTrace
+    ? startDisplayRoutingPhaseTrace({
+        phase: 'seed-interactive-finish-obstacle',
+        candidateCount: localCleaned.length,
+        onTrace: onPhaseTrace,
+      })
+    : null;
   const obstacleCleaned = repairDisplayObstacleHits(
     localCleaned,
     repairNodes,
@@ -300,8 +374,24 @@ export const finishInteractiveDisplayEdgesForRenderMode = ({
       ? { ...DISPLAY_FINAL_OVERLAP_OBSTACLE_REPAIR_OPTIONS, skipOuterFallback: true }
       : DISPLAY_FINAL_OVERLAP_OBSTACLE_REPAIR_OPTIONS,
   );
+  obstacleTimer?.finish(
+    obstacleCleaned === localCleaned ? 'skip' : 'accepted',
+    countChangedRoutingItems(localCleaned, obstacleCleaned),
+  );
   if (deferOuterObstacleRepair) {
-    return markBaseDisplayFinalized(compactDisplayEdgePaths(obstacleCleaned), inputSignature);
+    const commitTimer = onPhaseTrace
+      ? startDisplayRoutingPhaseTrace({
+          phase: 'seed-interactive-finish-commit',
+          candidateCount: obstacleCleaned.length,
+          onTrace: onPhaseTrace,
+        })
+      : null;
+    const committed = markBaseDisplayFinalized(
+      compactDisplayEdgePaths(obstacleCleaned),
+      inputSignature,
+    );
+    commitTimer?.finish('accepted', countChangedRoutingItems(obstacleCleaned, committed));
+    return committed;
   }
   const residualCleaned = hasHardDisplayOverlapRisk(calculateEdgePathQualityScore(obstacleCleaned))
     ? repairResidualDisplayOverlaps(

@@ -1,7 +1,10 @@
 import type { Edge, Node } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
 
-import { repairEndpointLaneCrossings } from '../edgeEndpointLaneNudgeRepair';
+import {
+  repairEndpointLaneCrossings,
+  type EndpointLaneRepairMetrics,
+} from '../edgeEndpointLaneNudgeRepair';
 
 const node = (
   id: string, x: number, y: number, width: number, height: number,
@@ -14,6 +17,18 @@ const node = (
 });
 
 describe('repairEndpointLaneCrossings', () => {
+  it('reports bounded zero work for empty input', () => {
+    let metrics: EndpointLaneRepairMetrics | undefined;
+    expect(repairEndpointLaneCrossings([], [], {
+      onMetrics: value => { metrics = value; },
+    })).toEqual([]);
+    expect(metrics).toEqual({
+      candidateCount: 0,
+      evaluationCount: 0,
+      scannedSegmentCount: 0,
+    });
+  });
+
   it('nudges a source point along the same node side when the first branch crosses an unrelated lane', () => {
     const tmsToBms: Edge = {
       id: 'edge-tms-bms',
@@ -48,12 +63,13 @@ describe('repairEndpointLaneCrossings', () => {
       },
     };
 
+    let metrics: EndpointLaneRepairMetrics | undefined;
     const result = repairEndpointLaneCrossings([tmsToBms, lomsToVisibility], [
       node('tms', 820, 811, 192, 120),
       node('bms', 576, 1089, 168, 118),
       node('l-oms', 827, 534, 179, 119),
       node('visibility', 1100, 1539, 232, 119),
-    ]);
+    ], { onMetrics: value => { metrics = value; } });
     const repaired = result[0];
     const path = (repaired.data as any).computedPath as Array<{ x: number; y: number }>;
 
@@ -62,6 +78,11 @@ describe('repairEndpointLaneCrossings', () => {
     expect(path[0].x).toBeLessThan(904);
     expect(segmentLength(path[0], path[1])).toBeGreaterThanOrEqual(48);
     expect(hasStrictCrossing(path, (result[1].data as any).computedPath)).toBe(false);
+    expect(metrics).toMatchObject({
+      candidateCount: expect.any(Number),
+      evaluationCount: expect.any(Number),
+      scannedSegmentCount: expect.any(Number),
+    });
   });
 
   it('repairs strict crossings between same-source logistics branches', () => {

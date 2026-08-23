@@ -153,6 +153,36 @@ describe('createEndpointLaneInteractionContext', () => {
       .toBe(60);
   });
 
+  it('matches full scans across mixed directions, fractional lanes, and shared endpoints', () => {
+    const candidateEdge = edge('candidate', 'shared-source', 'target', 'right');
+    const candidate: EndpointLanePoint[] = [
+      { x: -80.25, y: 10.25 },
+      { x: 140.75, y: 10.25 },
+      { x: 140.75, y: 220.5 },
+      { x: -40.5, y: 220.5 },
+    ];
+    const paths = new Map<string, readonly EndpointLanePoint[]>();
+    const edgesById = new Map<string, Edge>();
+    for (let index = 0; index < 96; index += 1) {
+      const id = `mixed-${index}`;
+      const x = -70 + index * 2.25;
+      const y = index % 3 === 0 ? 10.5 : 18 + index * 2.1;
+      const path = index % 2 === 0
+        ? [{ x, y: -40 }, { x, y: 260 }]
+        : [{ x: 180, y }, { x: -120, y }];
+      paths.set(id, path);
+      edgesById.set(id, edge(
+        id,
+        index % 7 === 0 ? 'shared-source' : `source-${index}`,
+        index % 11 === 0 ? 'target' : `target-${index}`,
+        index % 7 === 0 ? 'bottom' : undefined,
+      ));
+    }
+
+    expectParity(candidate, candidateEdge, paths, edgesById);
+    expectParity([...candidate].reverse(), candidateEdge, paths, edgesById);
+  });
+
   it('matches the legacy scans at a large input boundary', () => {
     const candidateEdge = edge('candidate', 'source', 'target');
     const candidate = [{ x: 0, y: 0 }, { x: 1024, y: 0 }];
