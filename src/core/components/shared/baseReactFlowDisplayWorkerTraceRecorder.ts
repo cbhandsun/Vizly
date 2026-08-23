@@ -9,6 +9,44 @@ export const appendDisplayRoutingPhaseTrace = (
   phaseTrace: DisplayRoutingPhaseTrace[],
   trace: DisplayRoutingPhaseTrace,
 ): boolean => {
+  const existingIndex = phaseTrace.findIndex(existing => (
+    existing.phase === trace.phase
+    && existing.parentPhase === trace.parentPhase
+  ));
+  if (existingIndex >= 0) {
+    const existing = phaseTrace[existingIndex];
+    const sumCount = (first: number | undefined, second: number | undefined): number => (
+      Math.min(1_000_000, Math.max(0, first ?? 0) + Math.max(0, second ?? 0))
+    );
+    const resolutionRank = {
+      skip: 0,
+      hit: 1,
+      accepted: 2,
+      rejected: 3,
+      fallback: 4,
+    } as const;
+    phaseTrace[existingIndex] = {
+      ...existing,
+      durationMs: Math.min(600_000, existing.durationMs + trace.durationMs),
+      candidateCount: sumCount(existing.candidateCount, trace.candidateCount),
+      changedEdgeCount: sumCount(existing.changedEdgeCount, trace.changedEdgeCount),
+      evaluationCount: sumCount(existing.evaluationCount, trace.evaluationCount),
+      cacheHitCount: sumCount(existing.cacheHitCount, trace.cacheHitCount),
+      scannedNodeCount: sumCount(existing.scannedNodeCount, trace.scannedNodeCount),
+      scannedSegmentCount: sumCount(
+        existing.scannedSegmentCount,
+        trace.scannedSegmentCount,
+      ),
+      scannedEdgePairCount: sumCount(
+        existing.scannedEdgePairCount,
+        trace.scannedEdgePairCount,
+      ),
+      resolution: resolutionRank[trace.resolution] > resolutionRank[existing.resolution]
+        ? trace.resolution
+        : existing.resolution,
+    };
+    return true;
+  }
   if (phaseTrace.length >= DISPLAY_ROUTING_PHASE_TRACE_LIMIT) return false;
   phaseTrace.push(trace);
   return true;

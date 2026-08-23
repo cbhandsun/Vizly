@@ -54,7 +54,10 @@ export const expectCompleteLogisticsIncrementalPhaseTrace = (
     [initialEndpointAudit?.resolution, initialPassageAudit?.resolution],
     diagnostics,
   ).toContain('rejected');
-  expect(endpointSeeds, diagnostics).toHaveLength(2);
+  expect(endpointSeeds, diagnostics).toHaveLength(1);
   expect(endpointSeeds[0]?.resolution, diagnostics).not.toBe('skip');
-  expect(endpointSeeds[1]?.resolution, diagnostics).toBe('skip');
+  const finalizerCandidateCount = traces.find(trace => trace.phase === 'finalizer')
+    ?.candidateCount ?? 0;
+  expect(endpointSeeds[0]?.candidateCount, diagnostics)
+    .toBeGreaterThan(finalizerCandidateCount);
 };

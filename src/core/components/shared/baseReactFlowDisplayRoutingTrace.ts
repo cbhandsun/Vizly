@@ -84,7 +84,10 @@ export const DISPLAY_ROUTING_PHASE_NAMES = [
   'session-commit',
 ] as const;
 
-export const DISPLAY_ROUTING_PHASE_TRACE_LIMIT = 56;
+// One aggregate entry per declared phase plus headroom for the small number of
+// phases that can run under two explicit parents. Repeated work is folded by
+// the Worker recorder, so the bound no longer truncates late final-gate phases.
+export const DISPLAY_ROUTING_PHASE_TRACE_LIMIT = 96;
 
 export const DISPLAY_ROUTING_PHASE_RESOLUTIONS = [
   'hit',

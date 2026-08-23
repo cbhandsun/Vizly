@@ -89,6 +89,45 @@ describe('baseReactFlowDisplayWorkerProtocol', () => {
     expect(publish).not.toHaveBeenCalled();
   });
 
+  it('aggregates repeated phase work before applying the bounded trace limit', () => {
+    const phaseTrace: DisplayRoutingPhaseTrace[] = [];
+    const record = createDisplayRoutingPhaseRecorder({
+      requestId: 'aggregate-trace',
+      phaseTrace,
+      publish: vi.fn(),
+      publishProgress: false,
+    });
+    record({
+      phase: 'residual-micro-derivative',
+      parentPhase: 'quality-polish-residual',
+      durationMs: 20,
+      candidateCount: 12,
+      changedEdgeCount: 1,
+      cacheHitCount: 5,
+      scannedSegmentCount: 80,
+      resolution: 'skip',
+    });
+    record({
+      phase: 'residual-micro-derivative',
+      parentPhase: 'quality-polish-residual',
+      durationMs: 30,
+      candidateCount: 8,
+      changedEdgeCount: 2,
+      cacheHitCount: 7,
+      scannedSegmentCount: 40,
+      resolution: 'accepted',
+    });
+
+    expect(phaseTrace).toEqual([expect.objectContaining({
+      durationMs: 50,
+      candidateCount: 20,
+      changedEdgeCount: 3,
+      cacheHitCount: 12,
+      scannedSegmentCount: 120,
+      resolution: 'accepted',
+    })]);
+  });
+
   const boundedPhaseTrace = Array.from(
     { length: DISPLAY_ROUTING_PHASE_TRACE_LIMIT },
     () => ({
