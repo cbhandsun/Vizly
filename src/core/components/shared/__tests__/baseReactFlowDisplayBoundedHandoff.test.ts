@@ -44,7 +44,7 @@ describe('bounded pre-display handoff', () => {
       data: {
         computedPath: [
           { x: 100, y: 230 },
-          { x: 200, y: 230 },
+          { x: 200, y: 200 },
           { x: 200, y: 30 },
           { x: 300, y: 30 },
         ],

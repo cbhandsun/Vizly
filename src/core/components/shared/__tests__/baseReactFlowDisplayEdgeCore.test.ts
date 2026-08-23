@@ -780,7 +780,7 @@ describe('baseReactFlowDisplayEdgeCore', () => {
 
   it('round-trips cached final display edges and rejects invalid cached paths', () => {
     window.localStorage.clear();
-    const signature = 'display-cache-roundtrip-test';
+    const signature = '910000001';
     const edges: Edge[] = [
       {
         id: 'e1',
@@ -817,7 +817,7 @@ describe('baseReactFlowDisplayEdgeCore', () => {
       `geometry-v1:${'b'.repeat(32)}`,
     )).toBeNull();
 
-    const uncleanSignature = 'display-cache-unclean-test';
+    const uncleanSignature = '910000002';
     writeBaseReactFlowDisplayEdgesCache(uncleanSignature, edges, { hardClean: false });
     expect(readBaseReactFlowDisplayEdgesCacheEntry(uncleanSignature)).toBeNull();
     expect(Array.from({ length: window.localStorage.length }, (_, index) => (
@@ -829,7 +829,7 @@ describe('baseReactFlowDisplayEdgeCore', () => {
     )).find(key => key?.endsWith(`:${signature}`));
     expect(validKey).toBeTruthy();
     const validPayload = JSON.parse(window.localStorage.getItem(validKey!) || '{}');
-    const invalidSignature = 'display-cache-invalid-test';
+    const invalidSignature = '910000003';
     const invalidKey = `${validKey!.slice(0, -signature.length)}${invalidSignature}`;
     window.localStorage.setItem(invalidKey, JSON.stringify({
       ...validPayload,
@@ -852,7 +852,7 @@ describe('baseReactFlowDisplayEdgeCore', () => {
     expect(readBaseReactFlowDisplayEdgesCache(invalidSignature)).toBeNull();
     expect(window.localStorage.getItem(invalidKey)).toBeNull();
 
-    const unverifiedSignature = 'display-cache-unverified-payload-test';
+    const unverifiedSignature = '910000004';
     const unverifiedKey = `${validKey!.slice(0, -signature.length)}${unverifiedSignature}`;
     window.localStorage.setItem(unverifiedKey, JSON.stringify({
       ...validPayload,
@@ -862,7 +862,7 @@ describe('baseReactFlowDisplayEdgeCore', () => {
     expect(readBaseReactFlowDisplayEdgesCacheEntry(unverifiedSignature)).toBeNull();
     expect(window.localStorage.getItem(unverifiedKey)).toBeNull();
 
-    const unsignedSignature = 'display-cache-unsigned-payload-test';
+    const unsignedSignature = '910000005';
     const unsignedKey = `${validKey!.slice(0, -signature.length)}${unsignedSignature}`;
     const { outputRouteSignature: _removedOutputRouteSignature, ...unsignedPayload } = validPayload;
     window.localStorage.setItem(unsignedKey, JSON.stringify({
@@ -873,7 +873,7 @@ describe('baseReactFlowDisplayEdgeCore', () => {
     expect(readBaseReactFlowDisplayEdgesCacheEntry(unsignedSignature)).toBeNull();
     expect(window.localStorage.getItem(unsignedKey)).toBeNull();
 
-    const metadataSignature = 'display-cache-business-metadata-test';
+    const metadataSignature = '910000006';
     const metadataKey = `${validKey!.slice(0, -signature.length)}${metadataSignature}`;
     window.localStorage.setItem(metadataKey, JSON.stringify({
       ...validPayload,
@@ -964,7 +964,7 @@ describe('baseReactFlowDisplayEdgeCore', () => {
 
     for (let index = 0; index < 13; index += 1) {
       vi.setSystemTime(new Date(1_000 + index));
-      writeBaseReactFlowDisplayEdgesCache(`cache-life-${index}`, edges, {
+      writeBaseReactFlowDisplayEdgesCache(String(920000000 + index), edges, {
         hardClean: true,
         inputGeometryDigest: cacheGeometryDigest,
         outputRouteSignature: outputRouteSignature!,
@@ -979,7 +979,7 @@ describe('baseReactFlowDisplayEdgeCore', () => {
     expect(window.localStorage.getItem('unrelated:setting')).toBe('keep');
     expect(window.localStorage.getItem('vizly:baseReactFlowDisplayEdges:old-version:stale')).toBeNull();
     expect(displayKeys).toHaveLength(12);
-    expect(displayKeys.some(key => key.endsWith(':cache-life-0'))).toBe(false);
-    expect(readBaseReactFlowDisplayEdgesCache('cache-life-12', cacheGeometryDigest)).toEqual(edges);
+    expect(displayKeys.some(key => key.endsWith(':920000000'))).toBe(false);
+    expect(readBaseReactFlowDisplayEdgesCache('920000012', cacheGeometryDigest)).toEqual(edges);
   });
 });

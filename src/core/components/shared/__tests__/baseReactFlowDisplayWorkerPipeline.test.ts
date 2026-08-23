@@ -875,7 +875,7 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
     };
 
     const good = await evaluateCachedPath(
-      'cache-quality-good',
+      '930000001',
       [
         { x: 100, y: 30 },
         { x: 300, y: 30 },
@@ -883,7 +883,7 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
       nodes,
     );
     expect(good.response).toMatchObject({
-      requestId: 'cache-quality-good',
+      requestId: '930000001',
       edges: good.candidate,
       hardClean: true,
       routeResolution: 'repaired-candidate',
@@ -893,7 +893,7 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
       _layoutPathLocked: true,
     });
     expect(resolveBaseReactFlowDisplayedEdges({
-      signature: 'cache-quality-good',
+      signature: '930000001',
       geometryDigest: 'digest-good',
       policyMode: 'full',
       deferred: null,
@@ -901,11 +901,11 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
       immediate: [sourceEdge],
     })).toEqual([sourceEdge]);
     expect(resolveBaseReactFlowDisplayedEdges({
-      signature: 'cache-quality-good',
+      signature: '930000001',
       geometryDigest: 'digest-good',
       policyMode: 'full',
       deferred: {
-        signature: 'cache-quality-good',
+        signature: '930000001',
         geometryDigest: 'digest-good',
         displayPatches: createBaseReactFlowDisplayEdgePatches(
           [sourceEdge],
@@ -928,7 +928,7 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
       nodes[1],
     ];
     const obstacleHit = await evaluateCachedPath(
-      'cache-quality-obstacle',
+      '930000002',
       [
         { x: 100, y: 30 },
         { x: 300, y: 30 },
@@ -936,7 +936,7 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
       obstacleNodes,
     );
     const wrongHandleAxis = await evaluateCachedPath(
-      'cache-quality-wrong-handle',
+      '930000003',
       [
         { x: 100, y: 30 },
         { x: 100, y: 90 },
@@ -946,7 +946,7 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
       nodes,
     );
     const detached = await evaluateCachedPath(
-      'cache-quality-detached',
+      '930000004',
       [
         { x: 120, y: 30 },
         { x: 280, y: 30 },
