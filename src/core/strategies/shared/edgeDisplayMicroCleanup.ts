@@ -43,8 +43,8 @@ import type {
 } from './edgeDisplayMicroCleanupGeometry';
 import { buildOuterPerimeterMicroCandidates } from './edgeDisplayMicroCleanupPerimeter';
 import {
-  createDisplayMicroCleanupInputSignature,
   createDisplayMicroCleanupNoopCache,
+  createDisplayMicroCleanupNoopCacheKey,
 } from './edgeDisplayMicroCleanupNoopCache';
 import {
   buildCompoundStrictCrossingCleanup,
@@ -446,14 +446,17 @@ export function repairDisplayMicroArtifacts(
   if (requestedCandidateEdgeIndexes?.length === 0) return finishDiagnostics(edges);
   const restrictCandidateEdges = requestedCandidateEdgeIndexes !== null
     && requestedCandidateEdgeIndexes.length < edges.length;
+  const allowCompoundRepairs = options?.allowCompoundRepairs !== false;
   const initialCandidateEdgeIndexes = restrictCandidateEdges
     ? requestedCandidateEdgeIndexes
     : null;
-  // A derivative-only search cannot prove that every edge is at a fixed point,
-  // so it must neither read nor populate the full-route no-op cache.
-  const noOpInputSignature = restrictCandidateEdges
-    ? null
-    : createDisplayMicroCleanupInputSignature(edges);
+  // Search scope and enabled repair families are part of the proof identity:
+  // a derivative or compound-disabled no-op must never satisfy a broader call.
+  const noOpInputSignature = createDisplayMicroCleanupNoopCacheKey(
+    edges,
+    restrictCandidateEdges ? requestedCandidateEdgeIndexes : null,
+    allowCompoundRepairs,
+  );
   if (noOpInputSignature && displayMicroCleanupNoopCache.has(noOpInputSignature)) {
     if (diagnostics) diagnostics.cacheHitCount += 1;
     return finishDiagnostics(edges);
@@ -658,6 +661,7 @@ export function repairDisplayMicroArtifacts(
         );
         const candidateQuality = candidateQualityState.score;
         if (!qualityAllowsMicroCleanup(bestQuality, candidateQuality)) {
+          if (!allowCompoundRepairs) continue;
           const compound = buildCompoundStrictCrossingCleanup({
             baselineQuality: bestQuality,
             baselineSafety: currentSafety,
@@ -738,7 +742,11 @@ export function repairDisplayMicroArtifacts(
   }
   if (currentEdges === edges) return rememberNoOp();
   if (convergedToFixedPoint && !safetyContext) {
-    const fixedPointSignature = createDisplayMicroCleanupInputSignature(currentEdges);
+    const fixedPointSignature = createDisplayMicroCleanupNoopCacheKey(
+      currentEdges,
+      restrictCandidateEdges ? requestedCandidateEdgeIndexes : null,
+      allowCompoundRepairs,
+    );
     if (fixedPointSignature) displayMicroCleanupNoopCache.remember(fixedPointSignature);
   }
   return finishDiagnostics(currentEdges);

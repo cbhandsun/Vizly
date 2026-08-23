@@ -490,6 +490,7 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
       finalEndpointPolishCandidate,
       undefined,
       microPolishDiagnostics,
+      { allowCompoundRepairs: false },
     );
   const finalLocalAfterDetachedCandidate = useBoundedLargeRepair
     ? finalEndpointPolishCandidate
@@ -498,10 +499,10 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
     ? finalLocalAfterDetachedCandidate
     : repairEndpointOrthogonalPaths(finalLocalAfterDetachedCandidate, repairNodes);
   microPolishTimer?.finish(
-    finalEndpointAfterLocalCandidate === finalEndpointPolishCandidate ? 'skip' : 'accepted',
-    finalEndpointAfterLocalCandidate === finalEndpointPolishCandidate
+    finalMicroPolishCandidate === finalEndpointPolishCandidate ? 'skip' : 'accepted',
+    finalMicroPolishCandidate === finalEndpointPolishCandidate
       ? 0
-      : finalEndpointAfterLocalCandidate.length,
+      : finalMicroPolishCandidate.length,
     {
       candidateCount: microPolishDiagnostics.generatedCandidateCount,
       evaluationCount: microPolishDiagnostics.evaluatedCandidateCount,

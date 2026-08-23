@@ -1,6 +1,7 @@
 import type { Edge } from '@xyflow/react';
 
 import {
+  createDisplayMicroCleanupDiagnostics,
   displayMicroCleanupSafetyDoesNotRegress,
   repairDisplayMicroArtifacts,
 } from '../../strategies/shared/edgeDisplayMicroCleanup';
@@ -185,6 +186,7 @@ export const runBaseReactFlowFullRoutePostRenderPhase = (
   const needsPostFinalizeMicroRepair = displayRoutingQualityNeedsMicroRepair(
     finalizedQuality,
   ) || displayRoutingQualityNeedsTerminalRepair(finalizedQuality);
+  const postFinalizeMicroDiagnostics = createDisplayMicroCleanupDiagnostics();
   const postFinalizeMicroCleaned = needsPostFinalizeMicroRepair
     ? (() => {
       const microSafetyContext = createBaseReactFlowDisplayMicroSafetyContext(
@@ -194,6 +196,8 @@ export const runBaseReactFlowFullRoutePostRenderPhase = (
       const candidate = repairDisplayMicroArtifacts(
         finalizedEdges,
         microSafetyContext,
+        postFinalizeMicroDiagnostics,
+        { allowCompoundRepairs: false },
       );
       return displayMicroCleanupSafetyDoesNotRegress(
         microSafetyContext.baseline,
@@ -210,6 +214,14 @@ export const runBaseReactFlowFullRoutePostRenderPhase = (
   microTimer.finish(
     postFinalizeResidualCleaned === finalizedEdges ? 'skip' : 'accepted',
     postFinalizeResidualCleaned === finalizedEdges ? 0 : postFinalizeResidualCleaned.length,
+    {
+      candidateCount: postFinalizeMicroDiagnostics.generatedCandidateCount,
+      evaluationCount: postFinalizeMicroDiagnostics.evaluatedCandidateCount,
+      cacheHitCount: postFinalizeMicroDiagnostics.cacheHitCount
+        + postFinalizeMicroDiagnostics.pairCacheHitCount,
+      scannedEdgePairCount: postFinalizeMicroDiagnostics.scannedEdgePairCount,
+      scannedSegmentCount: postFinalizeMicroDiagnostics.scannedSegmentCount,
+    },
   );
   // Soft obstacle/visual search is costly and cannot close strict overlap
   // defects atomically. Let the dedicated bounded overlap/strict phases close

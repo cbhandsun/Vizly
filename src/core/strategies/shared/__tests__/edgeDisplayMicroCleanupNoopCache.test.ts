@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createDisplayMicroCleanupInputSignature,
   createDisplayMicroCleanupNoopCache,
+  createDisplayMicroCleanupNoopCacheKey,
 } from '../edgeDisplayMicroCleanupNoopCache';
 
 const route = (id: string, y = 0): Edge => ({
@@ -51,6 +52,18 @@ describe('display micro-cleanup no-op cache', () => {
       ...route('oversized'),
       id: 'x'.repeat(501),
     }])).toBeNull();
+  });
+
+  it('binds no-op proofs to candidate scope and compound repair policy', () => {
+    const edges = [route('first'), route('second', 20)];
+    const full = createDisplayMicroCleanupNoopCacheKey(edges, null, true);
+
+    expect(full).not.toBeNull();
+    expect(createDisplayMicroCleanupNoopCacheKey(edges, [0, 1], true)).toBe(full);
+    expect(createDisplayMicroCleanupNoopCacheKey(edges, [0], true)).not.toBe(full);
+    expect(createDisplayMicroCleanupNoopCacheKey(edges, [0], false))
+      .not.toBe(createDisplayMicroCleanupNoopCacheKey(edges, [0], true));
+    expect(createDisplayMicroCleanupNoopCacheKey([], null, true)).toBeNull();
   });
 
   it('evicts least-recently-used signatures at the configured bound', () => {

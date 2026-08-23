@@ -179,7 +179,7 @@ export const repairResidualDisplayOverlaps = <T extends Edge[]>(
         derivative,
         undefined,
         diagnostics,
-        { candidateEdgeIndexes },
+        { allowCompoundRepairs: false, candidateEdgeIndexes },
       ) as T,
       parentPhase,
       () => ({
@@ -199,7 +199,12 @@ export const repairResidualDisplayOverlaps = <T extends Edge[]>(
     return runTracedRepair(
       'residual-micro-baseline',
       baseline,
-      () => repairDisplayMicroArtifacts(baseline, undefined, diagnostics) as T,
+      () => repairDisplayMicroArtifacts(
+        baseline,
+        undefined,
+        diagnostics,
+        { allowCompoundRepairs: false },
+      ) as T,
       parentPhase,
       () => ({
         candidateCount: diagnostics.generatedCandidateCount,

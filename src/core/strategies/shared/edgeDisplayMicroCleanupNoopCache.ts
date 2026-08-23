@@ -50,6 +50,28 @@ export const createDisplayMicroCleanupInputSignature = (
   return parts.join('\u001e');
 };
 
+export const createDisplayMicroCleanupNoopCacheKey = (
+  edges: readonly Edge[],
+  candidateEdgeIndexes: readonly number[] | null,
+  allowCompoundRepairs: boolean,
+): string | null => {
+  const inputSignature = createDisplayMicroCleanupInputSignature(edges);
+  if (!inputSignature) return null;
+  const normalizedIndexes = candidateEdgeIndexes === null
+    ? null
+    : [...new Set(candidateEdgeIndexes)]
+      .filter(index => Number.isSafeInteger(index) && index >= 0 && index < edges.length)
+      .sort((first, second) => first - second);
+  const scope = normalizedIndexes && normalizedIndexes.length < edges.length
+    ? normalizedIndexes
+    : null;
+  return JSON.stringify([
+    allowCompoundRepairs,
+    scope,
+    inputSignature,
+  ]);
+};
+
 export type DisplayMicroCleanupNoopCache = Readonly<{
   has: (signature: string) => boolean;
   remember: (signature: string) => void;

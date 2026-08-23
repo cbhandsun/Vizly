@@ -49,6 +49,12 @@ export type DisplayMicroCleanupOptions = Readonly<{
    * next pass. An omitted value keeps the full fixed-point search.
    */
   candidateEdgeIndexes?: readonly number[];
+  /**
+   * Compound peer shifts are an optional strict-crossing repair family. A
+   * caller with a later dedicated strict phase may disable that family while
+   * retaining every single-edge micro candidate and the same hard gate.
+   */
+  allowCompoundRepairs?: boolean;
 }>;
 
 export const displayMicroCleanupSafetyDoesNotRegress = (
