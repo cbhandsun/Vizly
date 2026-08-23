@@ -13,6 +13,7 @@ const projectPhaseTrace = value => Array.isArray(value) ? value.slice(0, 128).fl
     evaluationCount: finiteMetric(trace.evaluationCount),
     cacheHitCount: finiteMetric(trace.cacheHitCount),
     scannedNodeCount: finiteMetric(trace.scannedNodeCount),
+    scannedSegmentCount: finiteMetric(trace.scannedSegmentCount),
     scannedEdgePairCount: finiteMetric(trace.scannedEdgePairCount),
     candidateCount: finiteMetric(trace.candidateCount),
   }];
@@ -36,6 +37,8 @@ export const buildDisplayRoutingMachineResult = (results) => ({
       workerLongTaskTotalMs: finiteMetric(result?.incremental?.workerLongTaskTotalMs),
       workerLongTaskMaxMs: finiteMetric(result?.incremental?.workerLongTaskMaxMs),
       responseToFinalMs: finiteMetric(result?.incremental?.responseToFinalMs),
+      workerBoundaryParseMs: finiteMetric(result?.incremental?.workerBoundaryParseMs),
+      parsedToFinalMs: finiteMetric(result?.incremental?.parsedToFinalMs),
       localRouteMs: finiteMetric(localRoute?.durationMs),
       mutableEdgeCount: finiteMetric(result?.incremental?.mutableEdgeCount),
       affectedEdgeCount: finiteMetric(result?.incremental?.response?.affectedEdgeCount),
@@ -61,6 +64,10 @@ export const formatDisplayRoutingDragResult = (result) => {
       && trace.phase !== 'final-safety-closure')
     .map(trace => `${trace.phase.replace('final-safety-', '')}=${trace.durationMs}ms/${trace.resolution}`)
     .join(',');
+  const localDetail = result.incremental.response.phaseTrace
+    .filter(trace => trace.parentPhase === 'local-route')
+    .map(trace => `${trace.phase.replace('local-', '')}=${trace.durationMs}ms/${trace.resolution}`)
+    .join(',');
   return {
     clearanceRisks,
     line: `${result.nodeId}: initial=${result.initial.routeMs}ms, `
@@ -73,7 +80,9 @@ export const formatDisplayRoutingDragResult = (result) => {
       + `${Number(result.incremental.workerLongTaskTotalMs ?? 0).toFixed(1)}ms/`
       + `${Number(result.incremental.workerLongTaskMaxMs ?? 0).toFixed(1)}ms, `
       + `responseToFinal=${result.incremental.responseToFinalMs}ms, `
-      + `local=${phase('local-route')?.durationMs}ms, `
+      + `boundaryParse=${result.incremental.workerBoundaryParseMs}ms, `
+      + `parsedToFinal=${result.incremental.parsedToFinalMs}ms, `
+      + `local=${phase('local-route')?.durationMs}ms[${localDetail}], `
       + `finalizer=${phase('finalizer')?.durationMs}ms, `
       + `closure=${phase('final-safety-closure')?.durationMs}ms, safety=[${safety}], `
       + `mutable=${result.incremental.mutableEdgeCount}, `

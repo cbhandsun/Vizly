@@ -5,25 +5,28 @@ export const DISPLAY_ROUTING_PERFORMANCE_BUDGET_MS = Object.freeze({
   localRoute: 250,
 });
 
-export const EXPECTED_INCREMENTAL_DISPLAY_ROUTING_PHASES = Object.freeze([
+export const DISPLAY_ROUTING_P95_BUDGET_MS = Object.freeze({
+  initialRoute: 750,
+  releaseToFinal: 300,
+  workerToFinal: 300,
+  localRoute: 150,
+});
+
+const FAST_INCREMENTAL_DISPLAY_ROUTING_PHASES = Object.freeze([
   'incremental-closure',
   'local-route',
   'hard-gate',
   'final-clearance',
   'final-hard-safety',
-  'final-endpoint-seed',
-  'final-endpoint-topology',
-  'final-endpoint-order',
-  'final-endpoint-closure',
   'final-safety-hard-gate',
   'final-safety-stubs',
   'final-safety-endpoint-order',
   'final-safety-passage-order',
-  'final-safety-closure',
   'final-endpoint-seed',
   'final-endpoint-topology',
   'final-endpoint-order',
   'final-endpoint-closure',
+  'final-safety-closure',
   'final-commercial-clearance',
   'final-commercial-terminal-preserving',
   'final-commercial-terminal-changing',
@@ -33,6 +36,42 @@ export const EXPECTED_INCREMENTAL_DISPLAY_ROUTING_PHASES = Object.freeze([
   'finalizer',
   'session-commit',
 ]);
+
+const REPAIRED_INCREMENTAL_DISPLAY_ROUTING_PHASES = Object.freeze([
+  ...FAST_INCREMENTAL_DISPLAY_ROUTING_PHASES.slice(0, 13),
+  'final-safety-hard-gate',
+  'final-safety-stubs',
+  'final-safety-endpoint-order',
+  'final-safety-passage-order',
+  'final-safety-closure',
+  'final-endpoint-seed',
+  'final-endpoint-topology',
+  'final-endpoint-order',
+  'final-endpoint-closure',
+  ...FAST_INCREMENTAL_DISPLAY_ROUTING_PHASES.slice(14),
+]);
+
+export const EXPECTED_INCREMENTAL_DISPLAY_ROUTING_PHASE_SEQUENCES = Object.freeze([
+  FAST_INCREMENTAL_DISPLAY_ROUTING_PHASES,
+  REPAIRED_INCREMENTAL_DISPLAY_ROUTING_PHASES,
+]);
+
+const INCREMENTAL_DIAGNOSTIC_PHASES = new Set([
+  'local-reconnect-seed',
+  'local-reconnect-candidates',
+  'local-fast-fallback',
+]);
+
+export const displayRoutingIncrementalPhaseTraceIsComplete = phaseTrace => {
+  if (!Array.isArray(phaseTrace)) return false;
+  const phases = phaseTrace
+    .map(trace => trace?.phase)
+    .filter(phase => !INCREMENTAL_DIAGNOSTIC_PHASES.has(phase));
+  return EXPECTED_INCREMENTAL_DISPLAY_ROUTING_PHASE_SEQUENCES.some(expected => (
+    phases.length === expected.length
+    && expected.every((phase, index) => phases[index] === phase)
+  ));
+};
 
 export const summarizeSlowestDisplayRoutingPhases = (phaseTrace, limit = 5) => {
   if (!Array.isArray(phaseTrace) || !Number.isInteger(limit) || limit <= 0) return [];
@@ -110,6 +149,30 @@ export const assertDisplayRoutingPerformanceBudget = (
     initialPhaseTrace: initial?.phaseTrace ?? [],
     incrementalPhaseTrace: incremental?.response?.phaseTrace ?? [],
     budgets: DISPLAY_ROUTING_PERFORMANCE_BUDGET_MS,
+    exceeded,
+  }, null, 2)}`);
+};
+
+export const assertDisplayRoutingPerformanceSummaryBudget = summary => {
+  const measurements = [
+    ['initialRoute', summary?.initialRoute?.p95Ms, DISPLAY_ROUTING_P95_BUDGET_MS.initialRoute],
+  ];
+  for (const [nodeId, dragCase] of Object.entries(summary?.dragCases ?? {})) {
+    for (const name of ['releaseToFinal', 'workerToFinal', 'localRoute']) {
+      measurements.push([
+        `${nodeId}.${name}`,
+        dragCase?.[name]?.p95Ms,
+        DISPLAY_ROUTING_P95_BUDGET_MS[name],
+      ]);
+    }
+  }
+  const exceeded = measurements.filter(([, value, budget]) => (
+    !Number.isFinite(value) || value > budget
+  ));
+  if (exceeded.length === 0) return measurements;
+  throw new Error(`Routing p95 performance budget exceeded:\n${JSON.stringify({
+    sampleCount: summary?.sampleCount ?? null,
+    budgets: DISPLAY_ROUTING_P95_BUDGET_MS,
     exceeded,
   }, null, 2)}`);
 };

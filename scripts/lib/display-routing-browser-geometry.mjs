@@ -1,3 +1,59 @@
+export const replayDisplayRoutingResponseEdges = (response, request) => {
+  if (Array.isArray(response?.edges)) return response.edges;
+  if (
+    !Array.isArray(response?.routingPatches)
+    || !Array.isArray(request?.edges)
+    || response.routingPatches.length !== request.edges.length
+  ) return null;
+  const applyPatch = (baseline, patch) => {
+    if (Array.isArray(patch)) return patch;
+    if (!patch || typeof patch !== 'object') return patch;
+    const source = baseline && typeof baseline === 'object' && !Array.isArray(baseline)
+      ? baseline
+      : {};
+    return Object.fromEntries(Object.entries({ ...source, ...patch }).map(([key, value]) => (
+      [key, Object.prototype.hasOwnProperty.call(patch, key)
+        ? applyPatch(source[key], value)
+        : value]
+    )));
+  };
+  return request.edges.map((edge, index) => {
+    const patch = response.routingPatches[index];
+    return patch?.id === edge?.id
+      && patch.source === edge.source
+      && patch.target === edge.target
+      ? applyPatch(edge, patch)
+      : null;
+  }).every(Boolean)
+    ? request.edges.map((edge, index) => applyPatch(edge, response.routingPatches[index]))
+    : null;
+};
+
+export const displayRoutingFinalSvgGeometryIsClean = ({
+  audit,
+  commercialAudit,
+  expectedPathCount,
+}) => Boolean(
+  audit
+  && commercialAudit
+  && Number.isSafeInteger(expectedPathCount)
+  && expectedPathCount >= 0
+  && audit.auditedPathCount === expectedPathCount
+  && Array.isArray(audit.invalidEdgeIds)
+  && audit.invalidEdgeIds.length === 0
+  && Array.isArray(audit.intersections)
+  && audit.intersections.length === 0
+  && Array.isArray(audit.clearanceRisks)
+  && audit.clearanceRisks.length === 0
+  && commercialAudit.auditedPathCount === expectedPathCount
+  && Array.isArray(commercialAudit.invalidEdgeIds)
+  && commercialAudit.invalidEdgeIds.length === 0
+  && Array.isArray(commercialAudit.intersections)
+  && commercialAudit.intersections.length === 0
+  && Array.isArray(commercialAudit.clearanceRisks)
+  && commercialAudit.clearanceRisks.length === 0
+);
+
 export const readVisibleDisplayRoutingNodeRect = (nodeId) => {
   if (typeof nodeId !== 'string' || nodeId.length === 0 || nodeId.length > 500) return null;
   const element = [...document.querySelectorAll('.react-flow__node[data-id]')]
@@ -233,6 +289,89 @@ export const readRenderedDisplayEdgeNodeIntersections = (
   };
 };
 
+export const readDisplayRoutingNodeGeometryParity = rawNodes => {
+  const nodes = Array.isArray(rawNodes) ? rawNodes.slice(0, 5_000) : [];
+  const finiteNumber = value => typeof value === 'number' && Number.isFinite(value)
+    ? value
+    : null;
+  const nodeById = new Map(nodes.flatMap(node => (
+    node && typeof node === 'object'
+      && typeof node.id === 'string'
+      && node.id.length > 0
+      && node.id.length <= 500
+      ? [[node.id, node]]
+      : []
+  )));
+  const resolvePosition = (node, seen = new Set()) => {
+    const absoluteX = finiteNumber(node?.positionAbsolute?.x);
+    const absoluteY = finiteNumber(node?.positionAbsolute?.y);
+    if (absoluteX !== null && absoluteY !== null) return { x: absoluteX, y: absoluteY };
+    const localX = finiteNumber(node?.position?.x) ?? 0;
+    const localY = finiteNumber(node?.position?.y) ?? 0;
+    const parentId = typeof node?.parentId === 'string' ? node.parentId : '';
+    if (!parentId || seen.has(parentId) || seen.size >= 100) return { x: localX, y: localY };
+    const parent = nodeById.get(parentId);
+    if (!parent) return { x: localX, y: localY };
+    seen.add(parentId);
+    const parentPosition = resolvePosition(parent, seen);
+    return { x: parentPosition.x + localX, y: parentPosition.y + localY };
+  };
+  const readDimension = (node, dimension) => (
+    finiteNumber(node?.measured?.[dimension])
+      ?? finiteNumber(node?.[dimension])
+      ?? finiteNumber(node?.style?.[dimension])
+  );
+  const path = document.querySelector('.shared-trunk-edge-interaction')
+    ?? document.querySelector('.react-flow__edge path');
+  const matrix = path?.getScreenCTM?.();
+  if (!matrix || ![matrix.a, matrix.b, matrix.c, matrix.d, matrix.e, matrix.f].every(Number.isFinite)) {
+    return null;
+  }
+  const project = point => ({
+    x: matrix.a * point.x + matrix.c * point.y + matrix.e,
+    y: matrix.b * point.x + matrix.d * point.y + matrix.f,
+  });
+  let comparedNodeCount = 0;
+  let positionMismatchCount = 0;
+  let sizeMismatchCount = 0;
+  let maxPositionDelta = 0;
+  let maxSizeDelta = 0;
+  for (const [id, node] of nodeById) {
+    const element = [...document.querySelectorAll(
+      '.react-flow__node.react-flow__node-custom[data-id]',
+    )].find(candidate => candidate.getAttribute('data-id') === id);
+    const width = readDimension(node, 'width');
+    const height = readDimension(node, 'height');
+    const rect = element?.getBoundingClientRect?.();
+    if (
+      !element || width === null || height === null || width <= 1 || height <= 1
+      || !rect || ![rect.left, rect.top, rect.width, rect.height].every(Number.isFinite)
+    ) continue;
+    const position = resolvePosition(node);
+    const projectedStart = project(position);
+    const projectedEnd = project({ x: position.x + width, y: position.y + height });
+    const expectedLeft = Math.min(projectedStart.x, projectedEnd.x);
+    const expectedTop = Math.min(projectedStart.y, projectedEnd.y);
+    const expectedWidth = Math.abs(projectedEnd.x - projectedStart.x);
+    const expectedHeight = Math.abs(projectedEnd.y - projectedStart.y);
+    const positionDelta = Math.hypot(rect.left - expectedLeft, rect.top - expectedTop);
+    const sizeDelta = Math.hypot(rect.width - expectedWidth, rect.height - expectedHeight);
+    comparedNodeCount += 1;
+    maxPositionDelta = Math.max(maxPositionDelta, positionDelta);
+    maxSizeDelta = Math.max(maxSizeDelta, sizeDelta);
+    if (positionDelta > 1.5) positionMismatchCount += 1;
+    if (sizeDelta > 1.5) sizeMismatchCount += 1;
+  }
+  return {
+    inputNodeCount: nodes.length,
+    comparedNodeCount,
+    positionMismatchCount,
+    sizeMismatchCount,
+    maxPositionDelta: Math.round(maxPositionDelta * 100) / 100,
+    maxSizeDelta: Math.round(maxSizeDelta * 100) / 100,
+  };
+};
+
 export const readDisplayRoutingVisualScaleAudit = () => {
   const instance = window.reactFlowInstance;
   const viewport = typeof instance?.getViewport === 'function'
@@ -439,6 +578,15 @@ export const readDisplayRoutingVisualScaleAudit = () => {
       .replace(/^rf__edge-/, '').slice(0, 500),
     count: wrapper.querySelectorAll?.('.react-flow__edge-interaction')?.length ?? 0,
   }));
+  const activeTraceEdgeCount = edgeWrappers.filter(wrapper => (
+    wrapper.classList?.contains?.('selected')
+    || wrapper.matches?.(':hover')
+    || wrapper.matches?.(':focus-visible')
+  )).length;
+  const renderPathSources = edgeWrappers.map(wrapper => {
+    const graphics = wrapper.querySelector?.('.stable-path-edge-graphics');
+    return graphics?.getAttribute?.('data-render-path-source') ?? 'missing';
+  });
   const duplicateMarkerEdges = edgeWrappers.flatMap(wrapper => {
     const markerCarrierCount = [...(wrapper.querySelectorAll?.('path') ?? [])].filter(path => {
       const pathStyle = getComputedStyle(path);
@@ -499,6 +647,11 @@ export const readDisplayRoutingVisualScaleAudit = () => {
 
   return {
     zoom,
+    rootBackground: {
+      r: Math.round(rootBackground.r),
+      g: Math.round(rootBackground.g),
+      b: Math.round(rootBackground.b),
+    },
     routeSignature: window.__vizlyBaseReactFlowDisplayRouting?.outputRouteSignature ?? null,
     zoomedOut: Boolean(root?.classList?.contains('diagram-zoomed-out')),
     pathCount: paths.length,
@@ -517,9 +670,15 @@ export const readDisplayRoutingVisualScaleAudit = () => {
       outlineContrast: Math.round(audit.outlineContrast * 100) / 100,
     })),
     interactionEdgeCount: interactionCounts.length,
+    activeTraceEdgeCount,
     interactionPathCount: interactionCounts.reduce((total, audit) => total + audit.count, 0),
     missingInteractionPathCount: interactionCounts.filter(audit => audit.count === 0).length,
     duplicateInteractionPathCount: interactionCounts.filter(audit => audit.count > 1).length,
+    computedRenderPathCount: renderPathSources.filter(source => source === 'computed').length,
+    fallbackRenderPathCount: renderPathSources.filter(source => source === 'fallback').length,
+    missingRenderPathSourceCount: renderPathSources.filter(source => (
+      source !== 'computed' && source !== 'fallback'
+    )).length,
     duplicateMarkerEdgeCount: duplicateMarkerEdges.length,
     duplicateMarkerEdges,
     edgeAccessibleNameMissingCount: edgeWrappers.filter(wrapper => {

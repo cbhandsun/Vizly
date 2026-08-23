@@ -4,6 +4,8 @@ import { readFile } from 'node:fs/promises';
 import { DISPLAY_ROUTING_BROWSER_CAPTURE_SCRIPT } from './lib/display-routing-browser-capture.mjs';
 import { summarizeSlowestDisplayRoutingPhases } from './lib/display-routing-browser-performance.mjs';
 import {
+  displayRoutingFinalSvgGeometryIsClean,
+  readDisplayRoutingNodeGeometryParity,
   readDisplayRoutingVisualScaleAudit,
   readRenderedDisplayEdgeNodeIntersections,
 } from './lib/display-routing-browser-geometry.mjs';
@@ -13,23 +15,24 @@ import {
   parseCanonicalPresetIdentity,
   verifyCanonicalPresetMount,
 } from './lib/display-routing-canonical-preset.mjs';
+import {
+  createDisplayRoutingMatrixCaseIds,
+  DISPLAY_ROUTING_LAYOUT_CASES,
+  parseDisplayRoutingMatrixCase,
+} from './lib/display-routing-matrix-cases.mjs';
+import { summarizeDisplayRoutingWaitState } from './lib/display-routing-matrix-wait-state.mjs';
+import { assertDisplayRoutingVisualScaleAudit } from './lib/display-routing-browser-visual-audit.mjs';
 
 const BASE_URL = String(process.env.PRECOMPILED_ROUTE_BASE_URL || '').trim().replace(/\/$/, '');
 const WAIT_TIMEOUT_MS = 120_000;
 const MAX_LAYOUT_ROUTE_MS = 30_000;
-const LAYOUT_CASES = Object.freeze([
-  { id: 'domain-compound-elk-tb', label: '复杂流程（保留域·上→下）' },
-  { id: 'domain-compound-elk-lr', label: '复杂流程（保留域·左→右）' },
-  { id: 'domain-lanes-lr', label: '循环流程泳道（左→右）' },
-]);
-const REQUESTED_CASE = String(process.env.DISPLAY_ROUTING_MATRIX_CASE || '').trim();
-const MATRIX_CASE_IDS = new Set([
-  ...PRECOMPILED_DISPLAY_ROUTE_TARGETS.map(target => target.presetId),
-  ...LAYOUT_CASES.map(layoutCase => layoutCase.id),
-]);
-if (REQUESTED_CASE && !MATRIX_CASE_IDS.has(REQUESTED_CASE)) {
-  throw new Error(`Unknown DISPLAY_ROUTING_MATRIX_CASE: ${REQUESTED_CASE.slice(0, 128)}`);
-}
+const MATRIX_CASE_IDS = createDisplayRoutingMatrixCaseIds(
+  PRECOMPILED_DISPLAY_ROUTE_TARGETS.map(target => target.presetId),
+);
+const REQUESTED_CASE = parseDisplayRoutingMatrixCase(
+  process.env.DISPLAY_ROUTING_MATRIX_CASE,
+  MATRIX_CASE_IDS,
+);
 
 const assertProductionPreview = async () => {
   if (!BASE_URL) throw new Error('PRECOMPILED_ROUTE_BASE_URL must point to a production preview');
@@ -49,11 +52,14 @@ const waitForValue = async (session, expression, label) => {
     if (value) return value;
     await delay(100);
   }
-  const state = await session.evaluate(`(() => ({
-    routing: window.__vizlyBaseReactFlowDisplayRouting || {},
-    responses: window.__vizlyRoutingResponses || [],
-    edgeCount: document.querySelectorAll('.react-flow__edge').length,
-  }))()`);
+  const state = await session.evaluate(`(() => {
+    const summarize = ${summarizeDisplayRoutingWaitState.toString()};
+    return summarize(
+      window.__vizlyBaseReactFlowDisplayRouting || {},
+      window.__vizlyRoutingResponses || [],
+      document.querySelectorAll('.react-flow__edge').length,
+    );
+  })()`);
   throw new Error(`Timed out waiting for ${label}:\n${JSON.stringify(state, null, 2)}`);
 };
 
@@ -90,64 +96,50 @@ const auditFinalSvg = async (session, route, label) => {
   const audit = await session.evaluate(
     `(${readRenderedDisplayEdgeNodeIntersections.toString()})(${JSON.stringify(route.response.edges)}, 16)`,
   );
-  if (
-    audit.invalidEdgeIds?.length !== 0
-    || audit.intersections?.length !== 0
-    || audit.auditedPathCount !== route.response.edges.length
-  ) throw new Error(`Final SVG geometry failed for ${label}:\n${JSON.stringify(audit, null, 2)}`);
   const commercialAudit = await session.evaluate(
     `(${readRenderedDisplayEdgeNodeIntersections.toString()})(${JSON.stringify(route.response.edges)}, 48)`,
   );
+  const nodeGeometryParity = await session.evaluate(
+    `(${readDisplayRoutingNodeGeometryParity.toString()})(${JSON.stringify(route.request?.nodes)})`,
+  );
+  if (
+    !nodeGeometryParity
+    || nodeGeometryParity.comparedNodeCount < 1
+    || nodeGeometryParity.positionMismatchCount !== 0
+    || nodeGeometryParity.sizeMismatchCount !== 0
+  ) {
+    throw new Error(`Worker/DOM node geometry parity failed for ${label}: ${JSON.stringify(nodeGeometryParity)}`);
+  }
+  if (!displayRoutingFinalSvgGeometryIsClean({
+    audit,
+    commercialAudit,
+    expectedPathCount: route.response.edges.length,
+  })) {
+    throw new Error(`Final SVG geometry failed for ${label}: ${JSON.stringify({
+      expectedPathCount: route.response.edges.length,
+      auditedPathCount: audit?.auditedPathCount,
+      invalidPathCount: audit?.invalidEdgeIds?.length,
+      obstacleHitCount: audit?.intersections?.length,
+      minimumClearanceRiskCount: audit?.clearanceRisks?.length,
+      commercialClearanceRiskCount: commercialAudit?.clearanceRisks?.length,
+    })}`);
+  }
   const visualAudit = await session.evaluate(
     `(${readDisplayRoutingVisualScaleAudit.toString()})()`,
   );
-  if (
-    !visualAudit
-    || visualAudit.invalidNonScalingPathCount !== 0
-    || visualAudit.invalidStrokeWidthCount !== 0
-    || visualAudit.lowContrastPathCount !== 0
-    || visualAudit.invalidVisibleLabelFontSizeCount !== 0
-    || visualAudit.labelNodeOverlapCount !== 0
-    || visualAudit.markerCount < 1
-    || visualAudit.edgeAccessibleNameMissingCount !== 0
-    || (visualAudit.zoom < 0.4 && !visualAudit.zoomedOut)
-    || (visualAudit.zoom >= 0.4 && visualAudit.zoomedOut)
-  ) throw new Error(`Final SVG visual quality failed for ${label}:\n${JSON.stringify(visualAudit, null, 2)}`);
-  const riskNodeIds = [...new Set([
-    ...audit.clearanceRisks.map(risk => risk.nodeId),
-    ...commercialAudit.clearanceRisks.map(risk => risk.nodeId),
-  ])].slice(0, 16);
-  const riskNodeGeometry = await session.evaluate(`(() => {
-    const instance = window.reactFlowInstance;
-    return ${JSON.stringify(riskNodeIds)}.map(id => {
-      const node = instance?.getNode?.(id);
-      const internal = instance?.getInternalNode?.(id);
-      return {
-        id,
-        position: internal?.internals?.positionAbsolute ?? node?.position ?? null,
-        width: node?.measured?.width ?? node?.width ?? null,
-        height: node?.measured?.height ?? node?.height ?? null,
-      };
-    });
-  })()`);
-  const nodeGeometryById = new Map(riskNodeGeometry.map(node => [node.id, node]));
-  const edgeById = new Map(route.response.edges.map(edge => [edge.id, edge]));
-  const minimumClearanceRiskDetails = audit.clearanceRisks.slice(0, 8).map(risk => ({
-    ...risk,
-    node: nodeGeometryById.get(risk.nodeId) ?? null,
-    path: edgeById.get(risk.edgeId)?.data?.computedPath?.slice(0, 64) ?? [],
-  }));
-  const commercialClearanceRiskDetails = commercialAudit.clearanceRisks.slice(0, 8).map(risk => ({
-    ...risk,
-    node: nodeGeometryById.get(risk.nodeId) ?? null,
-    path: edgeById.get(risk.edgeId)?.data?.computedPath?.slice(0, 64) ?? [],
-  }));
+  assertDisplayRoutingVisualScaleAudit({
+    name: label,
+    audit: visualAudit,
+    expectedSignature: route.routing.outputRouteSignature,
+    expectedEdgeCount: route.response.edges.length,
+    expectedLabelCount: null,
+    requireOverviewPrimaryLabel: false,
+  });
   return {
     obstacleHits: audit.intersections.length,
     minimumClearanceRisks: audit.clearanceRisks.length,
-    minimumClearanceRiskDetails,
     commercialClearanceRisks: commercialAudit.clearanceRisks.length,
-    commercialClearanceRiskDetails,
+    nodeGeometryParity,
     visualAudit,
   };
 };
@@ -210,13 +202,33 @@ const clickLayout = async (session, layoutCase) => {
   })()`);
   if (!opened) throw new Error('Layout menu trigger was not found');
   await delay(300);
-  const clicked = await session.evaluate(`(() => {
+  const clickVisibleItem = () => session.evaluate(`(() => {
     const expected = ${JSON.stringify(layoutCase.label)};
-    const item = Array.from(document.querySelectorAll('.flowchart-layout-menu .ant-dropdown-menu-item'))
+    const item = Array.from(document.querySelectorAll('.ant-dropdown-menu-item'))
       .find(candidate => candidate.textContent?.trim() === expected);
     item?.click();
     return item ? Date.now() : null;
   })()`);
+  let clicked = await clickVisibleItem();
+  if (!clicked) {
+    const submenuCenter = await session.evaluate(`(() => {
+      const item = Array.from(document.querySelectorAll(
+        '.flowchart-layout-menu .ant-dropdown-menu-submenu-title',
+      )).find(candidate => candidate.textContent?.includes('更多布局引擎'));
+      if (!item) return null;
+      const rect = item.getBoundingClientRect();
+      return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+    })()`);
+    if (submenuCenter) {
+      await session.send('Input.dispatchMouseEvent', {
+        type: 'mouseMoved',
+        x: submenuCenter.x,
+        y: submenuCenter.y,
+      });
+      await delay(500);
+      clicked = await clickVisibleItem();
+    }
+  }
   if (!clicked) throw new Error(`Layout menu item was not found: ${layoutCase.label}`);
   return clicked;
 };
@@ -282,7 +294,7 @@ for (const target of PRECOMPILED_DISPLAY_ROUTE_TARGETS) {
   }
 }
 const layoutResults = [];
-for (const layoutCase of LAYOUT_CASES) {
+for (const layoutCase of DISPLAY_ROUTING_LAYOUT_CASES) {
   if (!REQUESTED_CASE || REQUESTED_CASE === layoutCase.id) {
     layoutResults.push(await verifyLayout(layoutCase));
   }

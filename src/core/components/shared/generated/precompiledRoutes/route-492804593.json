@@ -1,10 +1,10 @@
 {
   "schema": "vizly-precompiled-display-route-v1",
-  "routingVersion": "13",
+  "routingVersion": "14",
   "sourceHash": "source-v1:ea82c502ab6535b5c8f8367c591861e540396a41955a15c6b5f94f922264b7de",
-  "inputSignature": "1915352870",
-  "inputGeometryDigest": "geometry-v1:b518d38b3224c773e3730d3326b008af",
-  "outputRouteSignature": "route-v2:26:164:d5d329ce2707b4c4",
+  "inputSignature": "492804593",
+  "inputGeometryDigest": "geometry-v1:7a13cc646ccb02ac24b4c114becf6930",
+  "outputRouteSignature": "route-v2:26:164:43c08ceff106b289",
   "hardClean": true,
   "patches": [
     {
@@ -102,11 +102,11 @@
             "y": 2164
           },
           {
-            "x": 395,
+            "x": 427,
             "y": 2164
           },
           {
-            "x": 395,
+            "x": 427,
             "y": 2356
           },
           {
@@ -131,11 +131,11 @@
               "y": 2164
             },
             {
-              "x": 395,
+              "x": 427,
               "y": 2164
             },
             {
-              "x": 395,
+              "x": 427,
               "y": 2356
             },
             {
@@ -284,11 +284,11 @@
             "y": 1908
           },
           {
-            "x": 623,
+            "x": 584,
             "y": 1908
           },
           {
-            "x": 623,
+            "x": 584,
             "y": 2140
           },
           {
@@ -313,11 +313,11 @@
               "y": 1908
             },
             {
-              "x": 623,
+              "x": 584,
               "y": 1908
             },
             {
-              "x": 623,
+              "x": 584,
               "y": 2140
             },
             {
@@ -520,7 +520,6 @@
             "y": 2884
           }
         ],
-        "h": ";1032,2293;664,2828;",
         "treeRouting": {
           "effectiveSourceHandle": "left",
           "effectiveTargetHandle": "top",
@@ -1018,11 +1017,11 @@
             "y": 4241
           },
           {
-            "x": 84,
+            "x": 68,
             "y": 4241
           },
           {
-            "x": 84,
+            "x": 68,
             "y": 4445
           },
           {
@@ -1047,11 +1046,11 @@
               "y": 4241
             },
             {
-              "x": 84,
+              "x": 68,
               "y": 4241
             },
             {
-              "x": 84,
+              "x": 68,
               "y": 4445
             },
             {

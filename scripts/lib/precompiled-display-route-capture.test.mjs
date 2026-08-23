@@ -5,6 +5,9 @@ import {
   isFreshFullRouteResolution,
   isFreshFullRouteRequestResponse,
   isMatchingHardCleanDisplayWorkerResponse,
+  precompiledDisplayRouteContractsMatch,
+  replayPrecompiledDisplayRoutePatches,
+  replayTrustedDisplayRoutePatches,
 } from './precompiled-display-route-capture.mjs';
 
 const source = [{
@@ -158,5 +161,85 @@ describe('precompiled display route capture', () => {
     const missingHandle = { ...routed[0] };
     delete missingHandle.sourceHandle;
     expect(createPrecompiledDisplayRoutePatches(source, [missingHandle])).toBeNull();
+  });
+
+  it('replaces the complete tree-routing contract instead of retaining stale source fields', () => {
+    const sourceWithStaleTree = [{
+      ...source[0],
+      data: {
+        ...source[0].data,
+        businessLabel: 'preserved',
+        treeRouting: {
+          effectiveSourceHandle: 'right',
+          effectiveTargetHandle: 'left',
+          points: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
+        },
+      },
+    }];
+    const routedWithoutTreeFields = [{
+      ...routed[0],
+      data: {
+        ...routed[0].data,
+        businessLabel: 'preserved',
+        treeRouting: {},
+      },
+    }];
+    const patches = createPrecompiledDisplayRoutePatches(
+      sourceWithStaleTree,
+      routedWithoutTreeFields,
+    );
+    expect(patches).not.toBeNull();
+    const replayed = replayPrecompiledDisplayRoutePatches(sourceWithStaleTree, patches);
+
+    expect(replayed?.[0].data).toMatchObject({
+      businessLabel: 'preserved',
+      treeRouting: {},
+    });
+    expect(replayed?.[0].data.treeRouting).toEqual({});
+    expect(precompiledDisplayRouteContractsMatch(replayed, routedWithoutTreeFields)).toBe(true);
+  });
+
+  it('fails replay proof when any route-signature field differs', () => {
+    const patches = createPrecompiledDisplayRoutePatches(source, routed);
+    const replayed = replayPrecompiledDisplayRoutePatches(source, patches);
+    expect(precompiledDisplayRouteContractsMatch(replayed, routed)).toBe(true);
+    expect(precompiledDisplayRouteContractsMatch(replayed, [{
+      ...routed[0],
+      data: {
+        ...routed[0].data,
+        computedPath: [{ x: 0, y: 0 }, { x: 101, y: 0 }],
+      },
+    }])).toBe(false);
+  });
+
+  it('replays committed display patches before projecting the generated artifact', () => {
+    const committedPatches = [{
+      id: 'edge',
+      source: 'source',
+      target: 'target',
+      type: 'stablePath',
+      data: {
+        computedPath: routed[0].data.computedPath,
+        treeRouting: {
+          effectiveSourceHandle: 'right',
+          points: [{ x: 0, y: 0 }, { x: 100, y: 50 }],
+        },
+      },
+    }];
+    const replayed = replayTrustedDisplayRoutePatches(source, committedPatches);
+    expect(replayed?.[0]).toMatchObject({
+      type: 'stablePath',
+      data: {
+        computedPath: routed[0].data.computedPath,
+        treeRouting: {
+          effectiveSourceHandle: 'right',
+          points: [{ x: 0, y: 0 }, { x: 100, y: 50 }],
+        },
+      },
+    });
+    expect(replayTrustedDisplayRoutePatches(source, [{
+      ...committedPatches[0],
+      id: 'wrong-edge',
+    }])).toBeNull();
   });
 });

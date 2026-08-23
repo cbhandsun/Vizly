@@ -1,10 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  displayRoutingFinalSvgGeometryIsClean,
   readDisplayRoutingNodePanGesture,
+  readDisplayRoutingNodeGeometryParity,
   readDisplayRoutingViewportZoom,
   readDisplayRoutingVisualScaleAudit,
   readRenderedDisplayEdgeNodeIntersections,
+  replayDisplayRoutingResponseEdges,
   readVisibleDisplayRoutingNodeRect,
 } from './display-routing-browser-geometry.mjs';
 import { assertDisplayRoutingVisualScaleAudit } from './display-routing-browser-visual-audit.mjs';
@@ -41,6 +44,49 @@ const style = (overrides = {}) => ({
 });
 
 describe('display routing browser geometry', () => {
+  it('requires both minimum and 48px commercial SVG clearance to be clean', () => {
+    const cleanAudit = {
+      auditedPathCount: 2,
+      invalidEdgeIds: [],
+      intersections: [],
+      clearanceRisks: [],
+    };
+    expect(displayRoutingFinalSvgGeometryIsClean({
+      audit: cleanAudit,
+      commercialAudit: cleanAudit,
+      expectedPathCount: 2,
+    })).toBe(true);
+    expect(displayRoutingFinalSvgGeometryIsClean({
+      audit: cleanAudit,
+      commercialAudit: { ...cleanAudit, clearanceRisks: [{ clearance: 39 }] },
+      expectedPathCount: 2,
+    })).toBe(false);
+    expect(displayRoutingFinalSvgGeometryIsClean({
+      audit: { ...cleanAudit, auditedPathCount: 1 },
+      commercialAudit: cleanAudit,
+      expectedPathCount: 2,
+    })).toBe(false);
+  });
+
+  it('replays routing-only responses and rejects mismatched patch identities', () => {
+    const edges = [{
+      id: 'edge', source: 'source', target: 'target', label: 'visual', data: {},
+    }];
+    const routingPatches = [{
+      id: 'edge', source: 'source', target: 'target',
+      data: { computedPath: [{ x: 0, y: 0 }, { x: 10, y: 0 }] },
+    }];
+    expect(replayDisplayRoutingResponseEdges({ routingPatches }, { edges })).toEqual([{
+      ...edges[0],
+      data: routingPatches[0].data,
+    }]);
+    expect(replayDisplayRoutingResponseEdges({ edges }, null)).toBe(edges);
+    expect(replayDisplayRoutingResponseEdges({
+      routingPatches: [{ ...routingPatches[0], id: 'forged' }],
+    }, { edges })).toBeNull();
+    expect(replayDisplayRoutingResponseEdges({ routingPatches: [] }, { edges })).toBeNull();
+  });
+
   it('bounds the viewport zoom used to normalize drag distance', () => {
     vi.stubGlobal('window', {
       reactFlowInstance: { getViewport: () => ({ zoom: 0.625 }) },
@@ -48,6 +94,36 @@ describe('display routing browser geometry', () => {
     expect(readDisplayRoutingViewportZoom()).toBe(0.625);
     window.reactFlowInstance.getViewport = () => ({ zoom: Number.POSITIVE_INFINITY });
     expect(readDisplayRoutingViewportZoom()).toBeNull();
+  });
+
+  it('compares worker node geometry with rendered DOM geometry without returning identifiers', () => {
+    const graphicsPath = {
+      getScreenCTM: () => ({ a: 0.5, b: 0, c: 0, d: 0.5, e: 20, f: 30 }),
+    };
+    const nodeElement = {
+      getAttribute: name => name === 'data-id' ? 'child' : null,
+      getBoundingClientRect: () => rect(80, 90, 40, 20),
+    };
+    vi.stubGlobal('document', {
+      querySelector: selector => selector === '.shared-trunk-edge-interaction' ? graphicsPath : null,
+      querySelectorAll: () => [nodeElement],
+    });
+    expect(readDisplayRoutingNodeGeometryParity([
+      { id: 'parent', position: { x: 100, y: 100 }, width: 200, height: 100 },
+      {
+        id: 'child',
+        parentId: 'parent',
+        position: { x: 20, y: 20 },
+        measured: { width: 80, height: 40 },
+      },
+    ])).toEqual({
+      inputNodeCount: 2,
+      comparedNodeCount: 1,
+      positionMismatchCount: 0,
+      sizeMismatchCount: 0,
+      maxPositionDelta: 0,
+      maxSizeDelta: 0,
+    });
   });
 
   it('rejects duplicate interaction paths and unresolved marker contrast at the final SVG gate', () => {
@@ -63,9 +139,13 @@ describe('display routing browser geometry', () => {
       markerContrastAuditedCount: 0,
       lowContrastMarkerCount: 1,
       interactionEdgeCount: 1,
+      activeTraceEdgeCount: 0,
       interactionPathCount: 2,
       missingInteractionPathCount: 0,
       duplicateInteractionPathCount: 1,
+      computedRenderPathCount: 0,
+      fallbackRenderPathCount: 1,
+      missingRenderPathSourceCount: 0,
       duplicateMarkerEdgeCount: 0,
       edgeAccessibleNameMissingCount: 0,
       labelCount: 1,
@@ -309,7 +389,11 @@ describe('display routing browser geometry', () => {
     const interactionPath = {};
     const wrapper = {
       getAttribute: name => name === 'data-testid' ? 'rf__edge-edge-1' : null,
-      querySelector: name => name === '[aria-label]' ? { getAttribute: () => 'edge 1' } : null,
+      querySelector: name => name === '[aria-label]'
+        ? { getAttribute: () => 'edge 1' }
+        : name === '.stable-path-edge-graphics'
+          ? { getAttribute: attribute => attribute === 'data-render-path-source' ? 'computed' : null }
+          : null,
       querySelectorAll: selector => selector === '.react-flow__edge-interaction'
         ? [interactionPath]
         : selector === 'path' ? [path, markerPath] : [],
@@ -351,6 +435,7 @@ describe('display routing browser geometry', () => {
 
     expect(readDisplayRoutingVisualScaleAudit()).toEqual({
       zoom: 0.5,
+      rootBackground: { r: 255, g: 255, b: 255 },
       routeSignature: 'route-v2:test',
       zoomedOut: false,
       pathCount: 2,
@@ -364,9 +449,13 @@ describe('display routing browser geometry', () => {
       lowContrastMarkerCount: 0,
       lowContrastMarkers: [],
       interactionEdgeCount: 1,
+      activeTraceEdgeCount: 0,
       interactionPathCount: 1,
       missingInteractionPathCount: 0,
       duplicateInteractionPathCount: 0,
+      computedRenderPathCount: 1,
+      fallbackRenderPathCount: 0,
+      missingRenderPathSourceCount: 0,
       duplicateMarkerEdgeCount: 0,
       duplicateMarkerEdges: [],
       edgeAccessibleNameMissingCount: 0,

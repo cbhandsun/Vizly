@@ -5,11 +5,12 @@ import {
   readDisplayRoutingNodePanGesture,
   readDisplayRoutingVisualScaleAudit,
   readRenderedDisplayEdgeNodeIntersections,
+  replayDisplayRoutingResponseEdges,
   readVisibleDisplayRoutingNodeRect,
 } from './lib/display-routing-browser-geometry.mjs';
 import {
   assertDisplayRoutingPerformanceBudget,
-  EXPECTED_INCREMENTAL_DISPLAY_ROUTING_PHASES,
+  displayRoutingIncrementalPhaseTraceIsComplete,
 } from './lib/display-routing-browser-performance.mjs';
 import {
   buildDisplayRoutingMachineResult,
@@ -43,6 +44,7 @@ const INCLUDE_INCREMENTAL_REQUEST_DIAGNOSTICS = process.env
   .DISPLAY_ROUTING_BROWSER_DEBUG_REQUEST === '1';
 const EMIT_MACHINE_RESULT = process.env.DISPLAY_ROUTING_BROWSER_JSON === '1';
 const INCLUDE_CPU_PROFILE = process.env.DISPLAY_ROUTING_BROWSER_CPU_PROFILE === '1';
+const COLLECT_PERFORMANCE_SAMPLES = process.env.DISPLAY_ROUTING_BROWSER_COLLECT_PERFORMANCE === '1';
 
 const assertProductionPreview = async () => {
   if (!BASE_URL) {
@@ -84,7 +86,9 @@ const waitForValue = async (session, expression, timeoutMs = WAIT_TIMEOUT_MS) =>
         requestId: response?.requestId,
         hardClean: response?.hardClean,
         routeResolution: response?.routeResolution,
-        edgeCount: Array.isArray(response?.edges) ? response.edges.length : null,
+        edgeCount: Array.isArray(response?.edges)
+          ? response.edges.length
+          : (Array.isArray(response?.routingPatches) ? response.routingPatches.length : null),
         error: response?.error,
       })),
       renderedEdgeCount: document.querySelectorAll('.react-flow__edge').length,
@@ -311,7 +315,9 @@ const finalIncrementalExpression = nodeId => `(() => {
       affectedEdgeCount: response.affectedEdgeCount,
       fallbackLevel: response.fallbackLevel,
       phaseTrace: response.phaseTrace,
-      edgeCount: Array.isArray(response.edges) ? response.edges.length : null,
+      edgeCount: Array.isArray(response.edges)
+        ? response.edges.length
+        : (Array.isArray(response.routingPatches) ? response.routingPatches.length : null),
       workerDurationMs: response.workerDurationMs,
     },
     boundedCandidates: boundedResponses
@@ -322,6 +328,7 @@ const finalIncrementalExpression = nodeId => `(() => {
       routeMs: routing.routeMs,
       scheduledAt: routing.scheduledAt,
       workerStartedAt: routing.workerStartedAt,
+      workerResponseParsedAt: routing.workerResponseParsedAt,
       finalAppliedAt: routing.finalAppliedAt,
       geometryBarrierMs: routing.geometryBarrierMs,
       geometryBarrierSamples: routing.geometryBarrierSamples,
@@ -363,12 +370,16 @@ const normalReadyExpression = `(() => {
 
 const renderedObstacleAuditExpression = requiredClearance => `(() => {
   const auditRenderedEdges = ${readRenderedDisplayEdgeNodeIntersections.toString()};
+  const replayResponseEdges = ${replayDisplayRoutingResponseEdges.toString()};
   const routing = window.__vizlyBaseReactFlowDisplayRouting || {};
   const responses = window.__vizlyRoutingResponses || [];
+  const requests = window.__vizlyRoutingRequests || [];
   const response = [...responses].reverse().find(item => (
     routing.requestId ? item?.requestId === routing.requestId : Array.isArray(item?.edges)
   ));
-  return auditRenderedEdges(response?.edges, ${JSON.stringify(requiredClearance)});
+  const request = [...requests].reverse().find(item => item?.requestId === response?.requestId);
+  const edges = replayResponseEdges(response, request);
+  return auditRenderedEdges(edges, ${JSON.stringify(requiredClearance)});
 })()`;
 
 const assertRenderedObstacleAudit = (stage, audit) => {
@@ -574,9 +585,7 @@ const assertDragResult = (dragCase, result) => {
     throw new Error(`Final render did not match the committed route:\n${diagnostics}`);
   }
   if (
-    !Array.isArray(result.response.phaseTrace)
-    || result.response.phaseTrace.map(trace => trace.phase).join('|')
-      !== EXPECTED_INCREMENTAL_DISPLAY_ROUTING_PHASES.join('|')
+    !displayRoutingIncrementalPhaseTraceIsComplete(result.response.phaseTrace)
     || !result.response.phaseTrace.slice(0, 3)
       .every(trace => trace.resolution === 'accepted')
   ) {
@@ -725,6 +734,14 @@ const main = async () => {
         && Number.isFinite(incremental.routing.finalAppliedAt)
         ? incremental.routing.finalAppliedAt - incremental.workerResponseAt
         : null;
+      incremental.workerBoundaryParseMs = Number.isFinite(incremental.workerResponseAt)
+        && Number.isFinite(incremental.routing.workerResponseParsedAt)
+        ? incremental.routing.workerResponseParsedAt - incremental.workerResponseAt
+        : null;
+      incremental.parsedToFinalMs = Number.isFinite(incremental.routing.workerResponseParsedAt)
+        && Number.isFinite(incremental.routing.finalAppliedAt)
+        ? incremental.routing.finalAppliedAt - incremental.routing.workerResponseParsedAt
+        : null;
       incremental.finalToObservedMs = Number.isFinite(incremental.routing.finalAppliedAt)
         ? observedAt - incremental.routing.finalAppliedAt
         : null;
@@ -735,7 +752,9 @@ const main = async () => {
         3_000,
         16,
       );
-      assertDisplayRoutingPerformanceBudget(dragCase, initial, incremental);
+      if (!COLLECT_PERFORMANCE_SAMPLES) {
+        assertDisplayRoutingPerformanceBudget(dragCase, initial, incremental);
+      }
       return {
         nodeId: dragCase.nodeId,
         initial,

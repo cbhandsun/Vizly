@@ -26,6 +26,18 @@ const policies = [{
     'src/services/',
   ],
 }, {
+  fromPrefix: 'src/core/components/custom-edges/',
+  forbiddenTargetPrefixes: [
+    'src/core/services/EdgeRoutingCoordinator.ts',
+    'src/core/routing/renderedPathCache.ts',
+    'src/core/workers/',
+  ],
+}, {
+  fromPrefix: 'src/core/components/diagrams/',
+  forbiddenTargetPrefixes: [
+    'src/core/services/EdgeRoutingCoordinator.ts',
+  ],
+}, {
   fromPrefix: 'src/core/algorithms/',
   forbiddenTargetPrefixes: [
     'src/core/components/',

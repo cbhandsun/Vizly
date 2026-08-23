@@ -20,6 +20,7 @@ import { auditPrecompiledDisplayRouteCommercialQuality } from './lib/precompiled
 const ROOT = resolve(process.cwd());
 const BASE_URL = String(process.env.PRECOMPILED_ROUTE_BASE_URL || '').trim().replace(/\/$/, '');
 const CHECK_MODE = process.argv.includes('--check');
+const TRACE_ALL = process.argv.includes('--trace-all');
 const GENERATED_DIR = resolve(ROOT, 'src/core/components/shared/generated');
 const ARTIFACT_DIR = resolve(GENERATED_DIR, 'precompiledRoutes');
 const MANIFEST_PATH = resolve(GENERATED_DIR, 'baseReactFlowPrecompiledRouteManifest.json');
@@ -62,6 +63,7 @@ const captureScript = `(() => {
   window.__vizlyDisplayRoutingDiagnosticsEnabled = true;
   window.__vizlyPrecompiledRouteRequest = null;
   window.__vizlyPrecompiledRouteResponse = null;
+  window.__vizlyPrecompiledCommittedRoute = null;
   window.__vizlyPrecompiledRouteWorkerErrors = [];
   window.__vizlyPrecompiledRoutePageErrors = [];
   const recordPageError = value => {
@@ -122,6 +124,7 @@ const captureTarget = async (session, target, source, routingVersion) => {
   await session.evaluate(`(() => {
     window.__vizlyPrecompiledRouteRequest = null;
     window.__vizlyPrecompiledRouteResponse = null;
+    window.__vizlyPrecompiledCommittedRoute = null;
     return true;
   })()`);
   const url = `${BASE_URL}/?precompiledCapture=${encodeURIComponent(preset.id)}`
@@ -248,6 +251,35 @@ const captureTarget = async (session, target, source, routingVersion) => {
     ? routing.phaseTrace.slice().sort((left, right) => right.durationMs - left.durationMs).slice(0, 10)
     : [];
   console.log(`Slowest phases for ${preset.id}: ${JSON.stringify(slowestPhases)}`);
+  if (TRACE_ALL) {
+    const allPhases = Array.isArray(routing.phaseTrace)
+      ? routing.phaseTrace.map(trace => ({
+          phase: trace.phase,
+          parentPhase: trace.parentPhase,
+          durationMs: trace.durationMs,
+          exclusiveDurationMs: trace.exclusiveDurationMs,
+          candidateCount: trace.candidateCount,
+          changedEdgeCount: trace.changedEdgeCount,
+          evaluationCount: trace.evaluationCount,
+          cacheHitCount: trace.cacheHitCount,
+          scannedNodeCount: trace.scannedNodeCount,
+          scannedSegmentCount: trace.scannedSegmentCount,
+          scannedEdgePairCount: trace.scannedEdgePairCount,
+          resolution: trace.resolution,
+        }))
+      : [];
+    console.log(`All phases for ${preset.id}: ${JSON.stringify(allPhases)}`);
+  }
+  const seedGatePhases = Array.isArray(routing.phaseTrace)
+    ? routing.phaseTrace.filter(trace => (
+      trace.phase === 'seed-initial-gate'
+    ))
+    : [];
+  console.log(`Seed gates for ${preset.id}: ${JSON.stringify(seedGatePhases)}`);
+  const residualPhases = Array.isArray(routing.phaseTrace)
+    ? routing.phaseTrace.filter(trace => trace.phase.startsWith('residual-'))
+    : [];
+  console.log(`Residual phases for ${preset.id}: ${JSON.stringify(residualPhases)}`);
   return {
     presetId: preset.id,
     artifact: {

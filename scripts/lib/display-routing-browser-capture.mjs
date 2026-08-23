@@ -57,18 +57,24 @@ export const DISPLAY_ROUTING_BROWSER_CAPTURE_SCRIPT = `(() => {
         const response = event?.data;
         if (!response || typeof response.requestId !== 'string') return;
         const receivedAt = Date.now();
-        const cloneStartedAt = performance.now();
-        try {
-          if (response.boundedCandidate) {
-            window.__vizlyBoundedCandidates.push(structuredClone(response));
-            window.__vizlyBoundedCandidates = window.__vizlyBoundedCandidates.slice(-16);
-          }
-          const capturedResponse = structuredClone(response);
-          capturedResponse.__browserCapturedAt = receivedAt;
-          capturedResponse.__browserCloneMs = performance.now() - cloneStartedAt;
-          window.__vizlyRoutingResponses.push(capturedResponse);
-          window.__vizlyRoutingResponses = window.__vizlyRoutingResponses.slice(-16);
-        } catch {}
+        // This listener is installed before the application's listener. Defer
+        // diagnostic cloning to the next task so both the other listeners and
+        // their Promise continuations can commit first. A microtask is too early:
+        // it would be queued before the application resolves its Worker promise.
+        setTimeout(() => {
+          const cloneStartedAt = performance.now();
+          try {
+            if (response.boundedCandidate) {
+              window.__vizlyBoundedCandidates.push(structuredClone(response));
+              window.__vizlyBoundedCandidates = window.__vizlyBoundedCandidates.slice(-16);
+            }
+            const capturedResponse = structuredClone(response);
+            capturedResponse.__browserCapturedAt = receivedAt;
+            capturedResponse.__browserCloneMs = performance.now() - cloneStartedAt;
+            window.__vizlyRoutingResponses.push(capturedResponse);
+            window.__vizlyRoutingResponses = window.__vizlyRoutingResponses.slice(-16);
+          } catch {}
+        }, 0);
       });
     }
     postMessage(message, transfer) {

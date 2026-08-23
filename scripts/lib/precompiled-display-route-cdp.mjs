@@ -48,6 +48,40 @@ const waitForJson = async (url, timeoutMs = 15_000) => {
   throw new Error(`Timed out waiting for ${url}`);
 };
 
+const RETRYABLE_PROFILE_CLEANUP_CODES = new Set(['EBUSY', 'EPERM', 'ENOTEMPTY']);
+
+export const retryPrecompiledRouteBrowserProfileCleanup = async (
+  remove,
+  wait = delay,
+  maxAttempts = 8,
+) => {
+  const attemptLimit = Number.isSafeInteger(maxAttempts)
+    ? Math.max(1, Math.min(20, maxAttempts))
+    : 8;
+  for (let attempt = 0; attempt < attemptLimit; attempt += 1) {
+    try {
+      await remove();
+      return;
+    } catch (error) {
+      const code = error && typeof error === 'object' && !Array.isArray(error)
+        ? error.code
+        : undefined;
+      if (!RETRYABLE_PROFILE_CLEANUP_CODES.has(code) || attempt + 1 >= attemptLimit) {
+        throw error;
+      }
+      await wait(Math.min(2_000, 150 * (attempt + 1)));
+    }
+  }
+};
+
+const waitForBrowserExit = async (browser, timeoutMs = 5_000) => {
+  if (browser.exitCode != null || browser.signalCode != null) return;
+  await Promise.race([
+    new Promise(resolve => browser.once('exit', resolve)),
+    delay(timeoutMs),
+  ]);
+};
+
 class CdpPageSession {
   constructor(webSocketUrl) {
     this.webSocketUrl = webSocketUrl;
@@ -152,7 +186,9 @@ export const withPrecompiledRouteBrowser = async (run) => {
     }
   } finally {
     if (browser.exitCode == null) browser.kill();
-    await delay(300);
-    await rm(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    await waitForBrowserExit(browser);
+    await retryPrecompiledRouteBrowserProfileCleanup(() => (
+      rm(profile, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })
+    ));
   }
 };

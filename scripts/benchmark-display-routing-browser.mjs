@@ -1,6 +1,9 @@
 import { spawn } from 'node:child_process';
 
-import { summarizeDisplayRoutingSamples } from './lib/display-routing-browser-performance.mjs';
+import {
+  assertDisplayRoutingPerformanceSummaryBudget,
+  summarizeDisplayRoutingSamples,
+} from './lib/display-routing-browser-performance.mjs';
 
 const RESULT_PREFIX = 'DISPLAY_ROUTING_BROWSER_RESULT=';
 const MAX_CHILD_OUTPUT_BYTES = 4 * 1024 * 1024;
@@ -20,6 +23,7 @@ const runOneSample = sampleIndex => new Promise((resolve, reject) => {
     env: {
       ...process.env,
       DISPLAY_ROUTING_BROWSER_JSON: '1',
+      DISPLAY_ROUTING_BROWSER_COLLECT_PERFORMANCE: '1',
       DISPLAY_ROUTING_BROWSER_SAMPLE_INDEX: String(sampleIndex),
     },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -74,7 +78,21 @@ const summary = {
       releaseToFinal: summarizeDisplayRoutingSamples(cases.map(item => item.releaseToFinalMs)),
       workerToFinal: summarizeDisplayRoutingSamples(cases.map(item => item.workerToFinalMs)),
       workerRoundTrip: summarizeDisplayRoutingSamples(cases.map(item => item.workerRoundTripMs)),
+      workerCompute: summarizeDisplayRoutingSamples(cases.map(item => item.workerDurationMs)),
+      workerDeliveryWait: summarizeDisplayRoutingSamples(
+        cases.map(item => item.workerDeliveryWaitMs),
+      ),
+      workerLongTaskTotal: summarizeDisplayRoutingSamples(
+        cases.map(item => item.workerLongTaskTotalMs),
+      ),
+      workerLongTaskMax: summarizeDisplayRoutingSamples(
+        cases.map(item => item.workerLongTaskMaxMs),
+      ),
       responseToFinal: summarizeDisplayRoutingSamples(cases.map(item => item.responseToFinalMs)),
+      workerBoundaryParse: summarizeDisplayRoutingSamples(
+        cases.map(item => item.workerBoundaryParseMs),
+      ),
+      parsedToFinal: summarizeDisplayRoutingSamples(cases.map(item => item.parsedToFinalMs)),
       localRoute: summarizeDisplayRoutingSamples(cases.map(item => item.localRouteMs)),
       fallbackCount: cases.filter(item => item.fallbackLevel !== 'none').length,
       abortCount: cases.reduce((total, item) => total + (item.workerAbortCount ?? 0), 0),
@@ -92,3 +110,4 @@ const summary = {
 };
 
 process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
+assertDisplayRoutingPerformanceSummaryBudget(summary);
