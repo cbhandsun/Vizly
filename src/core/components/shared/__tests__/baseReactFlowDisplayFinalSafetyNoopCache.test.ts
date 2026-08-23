@@ -7,6 +7,7 @@ import {
 } from '../baseReactFlowDisplayFinalSafetyNoopCache';
 import { createBaseReactFlowFinalEndpointEvaluation } from '../baseReactFlowDisplayFinalEndpointEvaluation';
 import { repairBaseReactFlowFinalSafetyClosure } from '../baseReactFlowDisplayFinalSafetyClosure';
+import type { DisplayRoutingPhaseTrace } from '../baseReactFlowDisplayRoutingTrace';
 
 const edges = (): Edge[] => [{
   id: 'edge',
@@ -81,5 +82,23 @@ describe('baseReactFlow final safety no-op cache', () => {
       },
     });
     expect(hitCount).toBe(1);
+  });
+
+  it('reports bounded repair stages under the invoking safety transaction', () => {
+    const baselineNodes = nodes();
+    const traces: DisplayRoutingPhaseTrace[] = [];
+    repairBaseReactFlowFinalSafetyClosure(edges(), baselineNodes, {
+      evaluation: createBaseReactFlowFinalEndpointEvaluation(baselineNodes),
+      onPhaseTrace: trace => traces.push(trace),
+      traceParentPhase: 'final-commercial-safety-closure',
+    });
+
+    expect(traces).toEqual([expect.objectContaining({
+      phase: 'final-safety-repair-baseline',
+      parentPhase: 'final-commercial-safety-closure',
+      candidateCount: 1,
+      changedEdgeCount: 0,
+      resolution: 'skip',
+    })]);
   });
 });

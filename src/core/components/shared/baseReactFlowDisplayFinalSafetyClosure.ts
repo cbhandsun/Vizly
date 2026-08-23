@@ -27,18 +27,31 @@ import {
 } from './baseReactFlowDisplayBundleClosureCandidates';
 import {
   findDisplayStrictCrossingHits,
-  extractDisplaySegments,
   getDisplayComputedPath,
   getDisplayNodeRect,
   isDisplayContainerNode,
-  type DisplaySegment,
   withDisplayComputedPath,
 } from './baseReactFlowDisplayGeometry';
 import { createBaseReactFlowFinalSafetyNoopCache } from './baseReactFlowDisplayFinalSafetyNoopCache';
+import {
+  finalSafetyCandidateIsAccepted,
+  finalSafetyPreservesInitialTrueTrunks as preservesInitialTrueTrunks,
+  sameFinalSafetyEdgeReferences as sameEdgeReferences,
+  type BaseReactFlowFinalSafetyCandidateOptions,
+} from './baseReactFlowDisplayFinalSafetyEvaluation';
+import {
+  startBaseReactFlowFinalSafetyRepairStage,
+  type BaseReactFlowFinalSafetyRepairPhase,
+  type BaseReactFlowFinalSafetyTraceOptions,
+} from './baseReactFlowDisplayFinalSafetyTrace';
+import { buildTrueTrunkCrossingSkirtCandidates } from './baseReactFlowDisplayTrueTrunkCrossingCandidates';
 
-export type BaseReactFlowFinalSafetyClosureOptions = Readonly<{
-  eligibleEdgeIds?: ReadonlySet<string>;
-  evaluation?: BaseReactFlowFinalEndpointEvaluation;
+export { buildTrueTrunkCrossingSkirtCandidates } from './baseReactFlowDisplayTrueTrunkCrossingCandidates';
+
+export type BaseReactFlowFinalSafetyClosureOptions =
+  BaseReactFlowFinalSafetyCandidateOptions
+  & BaseReactFlowFinalSafetyTraceOptions
+  & Readonly<{
   onNoopCacheHit?: () => void;
 }>;
 
@@ -56,73 +69,6 @@ const resolveFinalSafetyNoopCache = (
   const created = createBaseReactFlowFinalSafetyNoopCache();
   finalSafetyNoopCacheByEvaluation.set(evaluation, created);
   return created;
-};
-
-const sameEdgeReferences = (first: readonly Edge[], second: readonly Edge[]): boolean => (
-  first === second
-  || (
-    first.length === second.length
-    && first.every((edge, index) => edge === second[index])
-  )
-);
-
-const changedEdgesStayEligible = (
-  baseline: readonly Edge[],
-  candidate: readonly Edge[],
-  eligibleEdgeIds?: ReadonlySet<string>,
-): boolean => !eligibleEdgeIds || candidate.every((edge, index) => (
-  edge === baseline[index] || eligibleEdgeIds.has(edge.id)
-));
-
-const finalCommercialOrderIsClean = (
-  edges: readonly Edge[],
-  nodes: Node[],
-  endpointOrder: ReturnType<typeof auditFinalSameSideEndpointOrder>,
-  evaluation?: BaseReactFlowFinalEndpointEvaluation,
-): boolean => {
-  const passageOrder = evaluation?.passageOrder(edges)
-    ?? auditFinalSameSidePassageOrder(edges, nodes);
-  return endpointOrder.inversions === 0
-    && endpointOrder.ambiguousLaneTies === 0
-    && endpointOrder.collapsedLanePairs === 0
-    && passageOrder.passageDefects === 0
-    && passageOrder.nearTrunkOpportunities === 0;
-};
-
-const preservesInitialTrueTrunks = (
-  initial: readonly SameSideEndpointTrunkIdentity[],
-  next: readonly SameSideEndpointTrunkIdentity[],
-): boolean => initial.every(trunk => next.some(candidateTrunk => (
-    candidateTrunk.nodeId === trunk.nodeId
-    && candidateTrunk.role === trunk.role
-    && trunk.edgeIds.every(edgeId => candidateTrunk.edgeIds.includes(edgeId))
-    && candidateTrunk.commonStemLength + 1e-6 >= trunk.commonStemLength
-  )));
-
-const finalSafetyCandidateIsAccepted = (
-  baseline: readonly Edge[],
-  candidate: Edge[],
-  nodes: Node[],
-  options: BaseReactFlowFinalSafetyClosureOptions,
-  getInitialTrueTrunks: () => readonly SameSideEndpointTrunkIdentity[],
-): boolean => {
-  if (!changedEdgesStayEligible(baseline, candidate, options.eligibleEdgeIds)) return false;
-  if (countRenderUnsafeEndpointStubs(candidate) !== 0) return false;
-  const endpointOrder = options.evaluation?.endpointOrder(candidate)
-    ?? auditFinalSameSideEndpointOrder(candidate, nodes);
-  if (!finalCommercialOrderIsClean(candidate, nodes, endpointOrder, options.evaluation)) return false;
-  const report = options.evaluation?.hardReport(candidate)
-    ?? getDisplayHardQualityGateReport(candidate, nodes, 'polished');
-  if (!report.hardClean) return false;
-  const initialTrueTrunks = sameEdgeReferences(baseline, candidate)
-    ? endpointOrder.legalSharedTrunks
-    : getInitialTrueTrunks();
-  return preservesInitialTrueTrunks(initialTrueTrunks, endpointOrder.legalSharedTrunks);
-};
-
-type CrossingSegmentGroup = {
-  segment: DisplaySegment;
-  perpendicular: DisplaySegment[];
 };
 
 const displayHandleSide = (handle: Edge['sourceHandle']): string => {
@@ -305,99 +251,6 @@ export const buildBidirectionalPortBundleTransactionCandidates = (
   return candidates;
 };
 
-export const buildTrueTrunkCrossingSkirtCandidates = (
-  edges: Edge[],
-  nodes: Node[],
-  eligibleEdgeIds?: ReadonlySet<string>,
-): Edge[][] => {
-  const groups = new Map<string, CrossingSegmentGroup>();
-  const append = (segment: DisplaySegment, perpendicular: DisplaySegment): void => {
-    const key = `${segment.edgeIndex}:${segment.segmentIndex}`;
-    const group = groups.get(key);
-    if (group) group.perpendicular.push(perpendicular);
-    else groups.set(key, { segment, perpendicular: [perpendicular] });
-  };
-  for (const hit of findDisplayStrictCrossingHits(edges)) {
-    append(hit.a, hit.b);
-    append(hit.b, hit.a);
-  }
-
-  const trueTrunks = auditFinalSameSideEndpointOrder(edges, nodes).legalSharedTrunks;
-  const candidates: Edge[][] = [];
-  const gap = 12;
-  for (const group of groups.values()) {
-    if (group.perpendicular.length < 2 || candidates.length >= 8) continue;
-    const movingEdge = edges[group.segment.edgeIndex];
-    if (!movingEdge || (eligibleEdgeIds && !eligibleEdgeIds.has(movingEdge.id))) continue;
-    const otherIndexes = [...new Set(group.perpendicular.map(segment => segment.edgeIndex))];
-    const otherEdges = otherIndexes.flatMap(index => edges[index] ? [edges[index]] : []);
-    if (otherEdges.length < 2) continue;
-    const otherIds = otherEdges.map(edge => edge.id);
-    if (!trueTrunks.some(trunk => otherIds.every(edgeId => trunk.edgeIds.includes(edgeId)))) continue;
-
-    const otherPoints = otherEdges.flatMap(getDisplayComputedPath);
-    const otherSegments = extractDisplaySegments(otherEdges);
-    if (otherPoints.length === 0) continue;
-    const path = getDisplayComputedPath(movingEdge);
-    const segment = group.segment;
-    if (path.length < 3 || segment.segmentIndex < 1 || segment.segmentIndex >= path.length - 2) continue;
-    const before = path.slice(0, segment.segmentIndex + 1);
-    const reconnectIndex = segment.segmentIndex + 2;
-    const reconnect = path[reconnectIndex];
-    const after = path.slice(reconnectIndex);
-    if (!reconnect) continue;
-    const detours = segment.axis === 'h'
-      ? [
-        Math.min(...group.perpendicular.flatMap(item => [item.a.y, item.b.y])) - gap,
-        Math.max(...group.perpendicular.flatMap(item => [item.a.y, item.b.y])) + gap,
-      ].map(laneY => {
-        const lowY = Math.min(laneY, reconnect.y);
-        const highY = Math.max(laneY, reconnect.y);
-        const localHorizontal = otherSegments.filter(item => (
-          item.axis === 'h' && item.a.y >= lowY && item.a.y <= highY
-        ));
-        const localX = localHorizontal.flatMap(item => [item.a.x, item.b.x]);
-        const exitX = segment.b.x >= segment.a.x
-          ? Math.max(...localX, ...group.perpendicular.map(item => item.a.x)) + gap
-          : Math.min(...localX, ...group.perpendicular.map(item => item.a.x)) - gap;
-        return compactOrthogonalPath([
-          ...before,
-          { x: segment.a.x, y: laneY },
-          { x: exitX, y: laneY },
-          { x: exitX, y: reconnect.y },
-          ...after,
-        ]);
-      })
-      : [
-        Math.min(...group.perpendicular.flatMap(item => [item.a.x, item.b.x])) - gap,
-        Math.max(...group.perpendicular.flatMap(item => [item.a.x, item.b.x])) + gap,
-      ].map(laneX => {
-        const lowX = Math.min(laneX, reconnect.x);
-        const highX = Math.max(laneX, reconnect.x);
-        const localVertical = otherSegments.filter(item => (
-          item.axis === 'v' && item.a.x >= lowX && item.a.x <= highX
-        ));
-        const localY = localVertical.flatMap(item => [item.a.y, item.b.y]);
-        const exitY = segment.b.y >= segment.a.y
-          ? Math.max(...localY, ...group.perpendicular.map(item => item.a.y)) + gap
-          : Math.min(...localY, ...group.perpendicular.map(item => item.a.y)) - gap;
-        return compactOrthogonalPath([
-          ...before,
-          { x: laneX, y: segment.a.y },
-          { x: laneX, y: exitY },
-          { x: reconnect.x, y: exitY },
-          ...after,
-        ]);
-      });
-    for (const detour of detours) {
-      candidates.push(edges.map((edge, index) => (
-        index === segment.edgeIndex ? withDisplayComputedPath(edge, detour) : edge
-      )));
-    }
-  }
-  return candidates;
-};
-
 export const buildAlternateSourceCorridorCandidates = (
   edges: Edge[],
   eligibleEdgeIds?: ReadonlySet<string>,
@@ -499,7 +352,14 @@ export const repairBaseReactFlowFinalSafetyClosure = <T extends Edge[]>(
       getInitialTrueTrunks,
     )
   );
-  if (candidateIsAccepted(edges)) return rememberNoop();
+  const startRepairStage = (phase: BaseReactFlowFinalSafetyRepairPhase) => (
+    startBaseReactFlowFinalSafetyRepairStage(edges, options, phase)
+  );
+  const baselineStage = startRepairStage('final-safety-repair-baseline');
+  if (candidateIsAccepted(edges)) {
+    baselineStage.finish('skip', 1);
+    return rememberNoop();
+  }
 
   const baselineReport = options.evaluation?.hardReport(edges)
     ?? getDisplayHardQualityGateReport(edges, nodes, 'polished');
@@ -526,43 +386,95 @@ export const repairBaseReactFlowFinalSafetyClosure = <T extends Edge[]>(
         )
       ),
     });
-    if (sameEdgeReferences(edges, nearTrunkCandidate)) return rememberNoop();
-    if (candidateIsAccepted(nearTrunkCandidate)) return nearTrunkCandidate as T;
+    if (sameEdgeReferences(edges, nearTrunkCandidate)) {
+      baselineStage.finish('skip', 2);
+      return rememberNoop();
+    }
+    if (candidateIsAccepted(nearTrunkCandidate)) {
+      baselineStage.finish('accepted', 2, nearTrunkCandidate);
+      return nearTrunkCandidate as T;
+    }
   }
+  baselineStage.finish('fallback', onlyNearTrunkOpportunityRemains ? 2 : 1);
 
-  const businessNodeSafe = repairBusinessNodeClearanceRisks(edges, nodes);
+  const clearanceStage = startRepairStage('final-safety-repair-clearance');
+  // Commercial clearance is closed by the surrounding Worker transaction.
+  // Inside the atomic hard-safety fallback this broad candidate generator is
+  // useful only when the signed baseline proves an actual node obstacle hit.
+  const needsBusinessObstacleRepair = baselineReport.obstacleHits > 0;
+  const businessNodeSafe = needsBusinessObstacleRepair
+    ? repairBusinessNodeClearanceRisks(edges, nodes)
+    : edges;
   if (
     !sameEdgeReferences(edges, businessNodeSafe)
     && candidateIsAccepted(businessNodeSafe)
-  ) return businessNodeSafe as T;
+  ) {
+    clearanceStage.finish('accepted', 1, businessNodeSafe);
+    return businessNodeSafe as T;
+  }
+  clearanceStage.finish(
+    sameEdgeReferences(edges, businessNodeSafe) ? 'skip' : 'fallback',
+    needsBusinessObstacleRepair ? 1 : 0,
+    businessNodeSafe,
+  );
 
+  const hardStage = startRepairStage('final-safety-repair-hard');
   const hardSafe = repairFastDisplayHardSafety(edges, nodes);
   if (
     !sameEdgeReferences(edges, hardSafe)
     && candidateIsAccepted(hardSafe)
-  ) return hardSafe as T;
+  ) {
+    hardStage.finish('accepted', 1, hardSafe);
+    return hardSafe as T;
+  }
+  hardStage.finish(
+    sameEdgeReferences(edges, hardSafe) ? 'skip' : 'fallback',
+    1,
+    hardSafe,
+  );
+  const hardSafeReport = sameEdgeReferences(edges, hardSafe)
+    ? baselineReport
+    : options.evaluation?.hardReport(hardSafe)
+      ?? getDisplayHardQualityGateReport(hardSafe, nodes, 'polished');
 
+  const trunkStage = startRepairStage('final-safety-repair-trunks');
+  let trunkCandidateCount = 0;
   for (const targetTrunk of buildPerpendicularSharedTargetTrunkCandidates(
     hardSafe,
     nodes,
     options.eligibleEdgeIds,
   )) {
-    if (candidateIsAccepted(targetTrunk)) return targetTrunk as T;
+    trunkCandidateCount += 1;
+    if (candidateIsAccepted(targetTrunk)) {
+      trunkStage.finish('accepted', trunkCandidateCount, targetTrunk);
+      return targetTrunk as T;
+    }
     for (const outerPair of buildForwardReverseOuterPairCandidates(
       targetTrunk,
       nodes,
       options.eligibleEdgeIds,
     )) {
-      if (candidateIsAccepted(outerPair)) return outerPair as T;
+      trunkCandidateCount += 1;
+      if (candidateIsAccepted(outerPair)) {
+        trunkStage.finish('accepted', trunkCandidateCount, outerPair);
+        return outerPair as T;
+      }
       const orderedOuterPair = repairBaseReactFlowFinalEndpointOrder(outerPair, nodes, {
         eligibleEdgeIds: options.eligibleEdgeIds,
+        evaluation: options.evaluation,
+        onPhaseTrace: options.onPhaseTrace,
+        traceParentPhase: 'final-safety-repair-order',
       });
       for (const reversePassage of buildReversePassageTargetTrunkCandidates(
         orderedOuterPair,
         nodes,
         options.eligibleEdgeIds,
       )) {
-        if (candidateIsAccepted(reversePassage)) return reversePassage as T;
+        trunkCandidateCount += 1;
+        if (candidateIsAccepted(reversePassage)) {
+          trunkStage.finish('accepted', trunkCandidateCount, reversePassage);
+          return reversePassage as T;
+        }
       }
       const passageClosedOuterPair = repairFinalSameSidePassageOrder(
         orderedOuterPair,
@@ -575,31 +487,61 @@ export const repairBaseReactFlowFinalSafetyClosure = <T extends Edge[]>(
           ).hardClean,
         },
       );
-      if (candidateIsAccepted(passageClosedOuterPair)) return passageClosedOuterPair as T;
+      trunkCandidateCount += 1;
+      if (candidateIsAccepted(passageClosedOuterPair)) {
+        trunkStage.finish('accepted', trunkCandidateCount, passageClosedOuterPair);
+        return passageClosedOuterPair as T;
+      }
       const safeOrderedOuterPair = repairFastDisplayHardSafety(orderedOuterPair, nodes);
-      if (candidateIsAccepted(safeOrderedOuterPair)) return safeOrderedOuterPair as T;
+      trunkCandidateCount += 1;
+      if (candidateIsAccepted(safeOrderedOuterPair)) {
+        trunkStage.finish('accepted', trunkCandidateCount, safeOrderedOuterPair);
+        return safeOrderedOuterPair as T;
+      }
     }
   }
+  trunkStage.finish('skip', trunkCandidateCount);
 
+  const bundleStage = startRepairStage('final-safety-repair-bundles');
+  let bundleCandidateCount = 0;
   for (const bundle of buildBidirectionalPortBundleTransactionCandidates(
     hardSafe,
     nodes,
     options.eligibleEdgeIds,
   )) {
-    if (candidateIsAccepted(bundle)) return bundle as T;
+    bundleCandidateCount += 1;
+    if (candidateIsAccepted(bundle)) {
+      bundleStage.finish('accepted', bundleCandidateCount, bundle);
+      return bundle as T;
+    }
     const strictBundle = repairFinalResidualStrictCrossings(bundle, nodes);
-    if (candidateIsAccepted(strictBundle)) return strictBundle as T;
+    bundleCandidateCount += 1;
+    if (candidateIsAccepted(strictBundle)) {
+      bundleStage.finish('accepted', bundleCandidateCount, strictBundle);
+      return strictBundle as T;
+    }
     const orderedBundle = repairBaseReactFlowFinalEndpointOrder(strictBundle, nodes, {
       eligibleEdgeIds: options.eligibleEdgeIds,
+      evaluation: options.evaluation,
+      onPhaseTrace: options.onPhaseTrace,
+      traceParentPhase: 'final-safety-repair-order',
     });
     const safeOrderedBundle = repairFastDisplayHardSafety(orderedBundle, nodes);
-    if (candidateIsAccepted(safeOrderedBundle)) return safeOrderedBundle as T;
+    bundleCandidateCount += 1;
+    if (candidateIsAccepted(safeOrderedBundle)) {
+      bundleStage.finish('accepted', bundleCandidateCount, safeOrderedBundle);
+      return safeOrderedBundle as T;
+    }
   }
+  bundleStage.finish('skip', bundleCandidateCount);
 
+  const corridorStage = startRepairStage('final-safety-repair-corridors');
+  let corridorCandidateCount = 0;
   for (const corridor of buildAlternateSourceCorridorCandidates(
     hardSafe,
     options.eligibleEdgeIds,
   )) {
+    corridorCandidateCount += 1;
     const corridorReport = getDisplayHardQualityGateReport(corridor, nodes, 'polished');
     const corridorOrder = corridorReport.hardClean
       ? auditFinalSameSideEndpointOrder(corridor, nodes)
@@ -615,59 +557,131 @@ export const repairBaseReactFlowFinalSafetyClosure = <T extends Edge[]>(
     ) continue;
     const orderedCorridor = repairBaseReactFlowFinalEndpointOrder(corridor, nodes, {
       eligibleEdgeIds: options.eligibleEdgeIds,
+      evaluation: options.evaluation,
+      onPhaseTrace: options.onPhaseTrace,
+      traceParentPhase: 'final-safety-repair-order',
     });
     const safeOrderedCorridor = repairFastDisplayHardSafety(orderedCorridor, nodes);
     if (candidateIsAccepted(safeOrderedCorridor)) {
+      corridorStage.finish('accepted', corridorCandidateCount, safeOrderedCorridor);
       return safeOrderedCorridor as T;
     }
   }
+  corridorStage.finish('skip', corridorCandidateCount);
 
+  const skirtStage = startRepairStage('final-safety-repair-skirts');
+  let skirtCandidateCount = 0;
   for (const skirt of buildTrueTrunkCrossingSkirtCandidates(hardSafe, nodes, options.eligibleEdgeIds)) {
+    skirtCandidateCount += 1;
     const orderedSkirt = repairBaseReactFlowFinalEndpointOrder(skirt, nodes, {
       eligibleEdgeIds: options.eligibleEdgeIds,
+      evaluation: options.evaluation,
+      onPhaseTrace: options.onPhaseTrace,
+      traceParentPhase: 'final-safety-repair-order',
     });
     const safeOrderedSkirt = repairFastDisplayHardSafety(orderedSkirt, nodes);
     if (candidateIsAccepted(safeOrderedSkirt)) {
+      skirtStage.finish('accepted', skirtCandidateCount, safeOrderedSkirt);
       return safeOrderedSkirt as T;
     }
   }
+  skirtStage.finish('skip', skirtCandidateCount);
 
-  const strictClosed = repairFinalResidualStrictCrossings(hardSafe, nodes);
+  const strictStage = startRepairStage('final-safety-repair-strict');
+  const needsStrictRepair = hardSafeReport.quality.strictCrossings > 0;
+  const strictCandidateCount = needsStrictRepair ? 1 : 0;
+  const strictClosed = needsStrictRepair
+    ? repairFinalResidualStrictCrossings(hardSafe, nodes)
+    : hardSafe;
   if (
     !sameEdgeReferences(hardSafe, strictClosed)
     && candidateIsAccepted(strictClosed)
-  ) return strictClosed as T;
+  ) {
+    strictStage.finish('accepted', strictCandidateCount, strictClosed);
+    return strictClosed as T;
+  }
+  strictStage.finish('skip', strictCandidateCount);
 
+  const microStage = startRepairStage('final-safety-repair-micro');
   const microClosed = repairDisplayMicroArtifacts(strictClosed);
   if (
     !sameEdgeReferences(strictClosed, microClosed)
     && candidateIsAccepted(microClosed)
-  ) return microClosed as T;
+  ) {
+    microStage.finish('accepted', 1, microClosed);
+    return microClosed as T;
+  }
+  microStage.finish(
+    sameEdgeReferences(strictClosed, microClosed) ? 'skip' : 'fallback',
+    1,
+    microClosed,
+  );
 
+  const stubStage = startRepairStage('final-safety-repair-stubs');
   const renderSafe = repairRenderSafeEndpointStubs(microClosed, nodes, 32);
   if (
     !sameEdgeReferences(microClosed, renderSafe)
     && candidateIsAccepted(renderSafe)
-  ) return renderSafe as T;
+  ) {
+    stubStage.finish('accepted', 1, renderSafe);
+    return renderSafe as T;
+  }
+  stubStage.finish(
+    sameEdgeReferences(microClosed, renderSafe) ? 'skip' : 'fallback',
+    1,
+    renderSafe,
+  );
 
+  const orderStage = startRepairStage('final-safety-repair-order');
   const ordered = repairBaseReactFlowFinalEndpointOrder(renderSafe, nodes, {
     eligibleEdgeIds: options.eligibleEdgeIds,
+    evaluation: options.evaluation,
+    onPhaseTrace: options.onPhaseTrace,
+    traceParentPhase: 'final-safety-repair-order',
   });
+  orderStage.finish(
+    sameEdgeReferences(renderSafe, ordered) ? 'skip' : 'accepted',
+    1,
+    ordered,
+  );
+  const orderHardStage = startRepairStage('final-safety-repair-order-hard');
   const orderedHardSafe = repairFastDisplayHardSafety(ordered, nodes);
+  orderHardStage.finish(
+    sameEdgeReferences(ordered, orderedHardSafe) ? 'skip' : 'accepted',
+    1,
+    orderedHardSafe,
+  );
+  const orderStrictStage = startRepairStage('final-safety-repair-order-strict');
   const orderedStrictClosed = repairFinalResidualStrictCrossings(orderedHardSafe, nodes);
+  orderStrictStage.finish(
+    sameEdgeReferences(orderedHardSafe, orderedStrictClosed) ? 'skip' : 'accepted',
+    1,
+    orderedStrictClosed,
+  );
+  const orderFinishStage = startRepairStage('final-safety-repair-order-finish');
   const orderedRenderSafe = repairRenderSafeEndpointStubs(
     repairDisplayMicroArtifacts(orderedStrictClosed),
     nodes,
     32,
   );
+  orderFinishStage.finish(
+    sameEdgeReferences(orderedStrictClosed, orderedRenderSafe) ? 'skip' : 'accepted',
+    1,
+    orderedRenderSafe,
+  );
+  const terminalStage = startRepairStage('final-safety-repair-terminal');
+  let terminalCandidateCount = 0;
   const checkedCandidates: Edge[][] = [];
   for (const candidate of [ordered, orderedHardSafe, orderedStrictClosed, orderedRenderSafe]) {
     if (checkedCandidates.some(previous => sameEdgeReferences(previous, candidate))) continue;
     checkedCandidates.push(candidate);
+    terminalCandidateCount += 1;
     if (candidateIsAccepted(candidate)) {
+      terminalStage.finish('accepted', terminalCandidateCount, candidate);
       return candidate as T;
     }
   }
 
+  terminalStage.finish('fallback', terminalCandidateCount);
   return rememberNoop();
 };

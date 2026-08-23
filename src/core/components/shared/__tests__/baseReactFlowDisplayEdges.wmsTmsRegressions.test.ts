@@ -241,6 +241,13 @@ describe('baseReactFlowDisplayEdges WMS and TMS regressions', () => {
     ).toBe(true);
     expect(
       phaseTrace.some(trace => (
+        trace.phase === 'final-safety-closure'
+        && (trace.parentPhase === 'quality' || trace.parentPhase === 'post-render')
+      )),
+      JSON.stringify({ durationMs, phaseTrace }, null, 2),
+    ).toBe(true);
+    expect(
+      phaseTrace.some(trace => (
         (trace.evaluationCount ?? 0) > 0 || (trace.cacheHitCount ?? 0) > 0
       )),
       JSON.stringify({ durationMs, phaseTrace }, null, 2),

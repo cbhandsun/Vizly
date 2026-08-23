@@ -1,7 +1,8 @@
 import type { Edge, Node } from '@xyflow/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { createBaseReactFlowFinalEndpointEvaluation } from '../baseReactFlowDisplayFinalEndpointEvaluation';
+import { createBaseReactFlowFinalEndpointResidualRepair } from '../baseReactFlowDisplayFinalEndpointResidualRepair';
 import { commercialEdgeDetoursDoNotRegress } from '../baseReactFlowDisplayCommercialDetourGuard';
 import { createDisplayWorkerFinalEvaluation } from '../baseReactFlowDisplayWorkerFinalEvaluation';
 
@@ -38,6 +39,50 @@ const edges: Edge[] = [
 ];
 
 describe('createBaseReactFlowFinalEndpointEvaluation', () => {
+  it('uses the exact hard report to skip a clean residual strict pass', () => {
+    const evaluation = createBaseReactFlowFinalEndpointEvaluation(nodes);
+    expect(evaluation.hardReport(edges).quality.strictCrossings).toBe(0);
+    const repairStrict = vi.fn((candidate: Edge[]) => candidate.slice());
+    const residualRepair = createBaseReactFlowFinalEndpointResidualRepair({
+      nodes,
+      evaluation,
+      validate: () => true,
+      repairStrict,
+    });
+
+    expect(residualRepair.strict(edges)).toBe(edges);
+    expect(repairStrict).not.toHaveBeenCalled();
+  });
+
+  it('reuses an exact residual overlap score for the same immutable route', () => {
+    const scoreResidualOverlap = vi.fn(() => 0);
+    const residualRepair = createBaseReactFlowFinalEndpointResidualRepair({
+      nodes,
+      evaluation: createBaseReactFlowFinalEndpointEvaluation(nodes),
+      validate: () => true,
+      scoreResidualOverlap,
+    });
+
+    expect(residualRepair.overlap(edges)).toBe(edges);
+    expect(residualRepair.overlap(edges)).toBe(edges);
+    expect(scoreResidualOverlap).toHaveBeenCalledOnce();
+  });
+
+  it('reuses deterministic residual repair outcomes for the same immutable route', () => {
+    const repairOverlap = vi.fn((candidate: Edge[]) => candidate);
+    const residualRepair = createBaseReactFlowFinalEndpointResidualRepair({
+      nodes,
+      evaluation: createBaseReactFlowFinalEndpointEvaluation(nodes),
+      validate: () => true,
+      repairOverlap,
+      scoreResidualOverlap: () => 24,
+    });
+
+    expect(residualRepair.overlap(edges)).toBe(edges);
+    expect(residualRepair.overlap(edges)).toBe(edges);
+    expect(repairOverlap).toHaveBeenCalledOnce();
+  });
+
   it('reuses exact request-local evidence for the same immutable route array', () => {
     const evaluation = createBaseReactFlowFinalEndpointEvaluation(nodes);
 

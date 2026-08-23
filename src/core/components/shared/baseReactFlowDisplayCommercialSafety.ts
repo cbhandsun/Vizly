@@ -65,9 +65,11 @@ export const closeBaseReactFlowFinalCommercialSafety = <T extends Edge[]>({
     : repairBaseReactFlowFinalSafetyClosure(edges, nodes, {
       eligibleEdgeIds,
       evaluation,
+      onPhaseTrace,
       onNoopCacheHit: () => {
         noopCacheHit = true;
       },
+      traceParentPhase: 'final-commercial-safety-closure',
     });
   const closedEdges = canReuseClosure || (
     evaluation.hardReport(repairedEdges).hardClean

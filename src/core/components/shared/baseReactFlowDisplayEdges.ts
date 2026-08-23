@@ -201,7 +201,11 @@ export const createBaseReactFlowDisplayEdges = (
       return repairBaseReactFlowFinalSafetyClosure(
         finalEdgesBeforeHardClosure,
         repairNodes,
-        { evaluation: finalEvaluation },
+        {
+          evaluation: finalEvaluation,
+          onPhaseTrace: args.onPhaseTrace,
+          traceParentPhase: 'final-safety-closure',
+        },
       );
     })();
   const postSafetyCommercialEdges = commercialClosureReady

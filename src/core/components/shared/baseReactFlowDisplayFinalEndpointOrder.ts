@@ -40,6 +40,7 @@ import {
   type BaseReactFlowFinalEndpointOrderOptions,
 } from './baseReactFlowDisplayFinalEndpointGate';
 import {
+  countChangedRoutingItems,
   startDisplayRoutingPhaseTrace,
   type DisplayRoutingPhaseTrace,
 } from './baseReactFlowDisplayRoutingTrace';
@@ -68,6 +69,7 @@ export const traceSkippedFinalEndpointPhases = (
   candidateCount: number,
   onPhaseTrace?: (trace: DisplayRoutingPhaseTrace) => void,
   includeSeed = false,
+  parentPhase?: BaseReactFlowFinalEndpointOrderOptions['traceParentPhase'],
 ): void => {
   const phases = [
     'final-endpoint-topology',
@@ -75,7 +77,12 @@ export const traceSkippedFinalEndpointPhases = (
     'final-endpoint-closure',
   ] as const;
   for (const phase of includeSeed ? ['final-endpoint-seed', ...phases] as const : phases) {
-    startDisplayRoutingPhaseTrace({ phase, candidateCount, onTrace: onPhaseTrace }).finish('skip');
+    startDisplayRoutingPhaseTrace({
+      phase,
+      ...(parentPhase ? { parentPhase } : {}),
+      candidateCount,
+      onTrace: onPhaseTrace,
+    }).finish('skip');
   }
 };
 
@@ -332,6 +339,7 @@ export const repairBaseReactFlowFinalEndpointOrder = <T extends Edge[]>(
   });
   const seedTimer = startDisplayRoutingPhaseTrace({
     phase: 'final-endpoint-seed',
+    ...(options.traceParentPhase ? { parentPhase: options.traceParentPhase } : {}),
     candidateCount: edges.length,
     onTrace: options.onPhaseTrace,
   });
@@ -452,6 +460,8 @@ export const repairBaseReactFlowFinalEndpointOrder = <T extends Edge[]>(
       traceSkippedFinalEndpointPhases(
         preferredSourceTrunkCandidate.length,
         options.onPhaseTrace,
+        false,
+        options.traceParentPhase,
       );
       return preferredSourceTrunkCandidate as T;
     }
@@ -482,6 +492,7 @@ export const repairBaseReactFlowFinalEndpointOrder = <T extends Edge[]>(
   // because of an unrelated crossing elsewhere in the graph.
   const topologyTimer = startDisplayRoutingPhaseTrace({
     phase: 'final-endpoint-topology',
+    ...(options.traceParentPhase ? { parentPhase: options.traceParentPhase } : {}),
     candidateCount: preferredSourceTrunkCandidate.length,
     onTrace: options.onPhaseTrace,
   });
@@ -507,6 +518,7 @@ export const repairBaseReactFlowFinalEndpointOrder = <T extends Edge[]>(
   );
   const orderTimer = startDisplayRoutingPhaseTrace({
     phase: 'final-endpoint-order',
+    ...(options.traceParentPhase ? { parentPhase: options.traceParentPhase } : {}),
     candidateCount: repaired.length,
     onTrace: options.onPhaseTrace,
   });
@@ -544,10 +556,32 @@ export const repairBaseReactFlowFinalEndpointOrder = <T extends Edge[]>(
   );
   const closureTimer = startDisplayRoutingPhaseTrace({
     phase: 'final-endpoint-closure',
+    ...(options.traceParentPhase ? { parentPhase: options.traceParentPhase } : {}),
     candidateCount: repaired.length,
     onTrace: options.onPhaseTrace,
   });
+  const closureStage = (phase: Extract<
+    Parameters<typeof startDisplayRoutingPhaseTrace>[0]['phase'],
+    | 'final-endpoint-closure-residual'
+    | 'final-endpoint-closure-trunks'
+    | 'final-endpoint-closure-obstacles'
+    | 'final-endpoint-closure-terminal'
+    | 'final-endpoint-closure-commercial'
+  >) => startDisplayRoutingPhaseTrace({
+    phase,
+    parentPhase: 'final-endpoint-closure',
+    candidateCount: repaired.length,
+    onTrace: options.onPhaseTrace,
+  });
+  const residualClosureTimer = closureStage('final-endpoint-closure-residual');
+  const beforeResidualClosure = repaired;
   repaired = residualRepair.fixedPoint(repaired);
+  residualClosureTimer.finish(
+    repaired === beforeResidualClosure ? 'skip' : 'accepted',
+    countChangedRoutingItems(beforeResidualClosure, repaired),
+  );
+  const trunkClosureTimer = closureStage('final-endpoint-closure-trunks');
+  const beforeTrunkClosure = repaired;
   repaired = repairFinalSharedSourceTerminalTrunks(repaired, repairNodes, {
     validateCandidate: validateTopologyCandidate,
   });
@@ -555,13 +589,31 @@ export const repairBaseReactFlowFinalEndpointOrder = <T extends Edge[]>(
     validateCandidate: validateTopologyCandidate,
   });
   repaired = commitSharedEndpointTrunkCandidate(repaired, repairNodes, options, evaluation);
+  trunkClosureTimer.finish(
+    repaired === beforeTrunkClosure ? 'skip' : 'accepted',
+    countChangedRoutingItems(beforeTrunkClosure, repaired),
+  );
+  const obstacleClosureTimer = closureStage('final-endpoint-closure-obstacles');
+  const beforeObstacleClosure = repaired;
   repaired = commitPostTrunkBranchObstacleCandidate(repaired, repairNodes, options, evaluation);
   repaired = commitSiblingTerminalObstacleCandidate(repaired, repairNodes, options, evaluation);
   repaired = commitPostObstacleMicroCandidate(repaired, options, evaluation);
+  obstacleClosureTimer.finish(
+    repaired === beforeObstacleClosure ? 'skip' : 'accepted',
+    countChangedRoutingItems(beforeObstacleClosure, repaired),
+  );
+  const terminalClosureTimer = closureStage('final-endpoint-closure-terminal');
+  const beforeTerminalClosure = repaired;
   repaired = commitRenderSafeStubCandidate(repaired, repairNodes, options, evaluation);
   repaired = repairFinalTerminalMicroDoglegs(repaired, repairNodes, {
     validateCandidate: validateTopologyCandidate,
   });
+  terminalClosureTimer.finish(
+    repaired === beforeTerminalClosure ? 'skip' : 'accepted',
+    countChangedRoutingItems(beforeTerminalClosure, repaired),
+  );
+  const commercialClosureTimer = closureStage('final-endpoint-closure-commercial');
+  const beforeCommercialClosure = repaired;
   repaired = commitExcessiveDetourCandidate(repaired, repairNodes, options, evaluation);
   if (evaluation.hardReport(repaired).hardClean) {
     repaired = restorePreferredSourceTrunks(repaired);
@@ -580,6 +632,10 @@ export const repairBaseReactFlowFinalEndpointOrder = <T extends Edge[]>(
     });
     repaired = separatePreferredSourceBranches(repaired);
   }
+  commercialClosureTimer.finish(
+    repaired === beforeCommercialClosure ? 'skip' : 'accepted',
+    countChangedRoutingItems(beforeCommercialClosure, repaired),
+  );
   if (repaired === edges || repaired.every((edge, index) => edge === edges[index])) {
     closureTimer.finish('skip');
     return edges;

@@ -62,18 +62,11 @@ export const createBaseReactFlowFullRouteEdges = (args: BaseReactFlowDisplayEdge
   const qualityMetricsBefore = context.evaluationSession.readMetrics();
   const qualityEdges = createBaseReactFlowFullRouteQualityEdges(context);
   const qualityReport = context.evaluationSession.hardReport(qualityEdges);
-  qualityTimer.finish(
-    'accepted',
-    qualityEdges.length,
-    diffBaseReactFlowEvaluationMetrics(
-      qualityMetricsBefore,
-      context.evaluationSession.readMetrics(),
-    ),
-  );
   const defectPlan = createDisplayRoutingDefectPlan(qualityReport);
   if (defectPlan.needsStrictCrossingRepair) {
     const earlyClosureTimer = startDisplayRoutingPhaseTrace({
       phase: 'final-safety-closure',
+      parentPhase: 'quality',
       candidateCount,
       onTrace: args.onPhaseTrace,
     });
@@ -87,8 +80,26 @@ export const createBaseReactFlowFullRouteEdges = (args: BaseReactFlowDisplayEdge
     const earlyClosed = earlyClosedReport.hardClean
       && countRenderUnsafeEndpointStubs(earlyClosedEdges) === 0;
     earlyClosureTimer.finish(earlyClosed ? 'accepted' : 'fallback', earlyClosed ? earlyClosedEdges.length : 0);
-    if (earlyClosed) return earlyClosedEdges;
+    if (earlyClosed) {
+      qualityTimer.finish(
+        'accepted',
+        earlyClosedEdges.length,
+        diffBaseReactFlowEvaluationMetrics(
+          qualityMetricsBefore,
+          context.evaluationSession.readMetrics(),
+        ),
+      );
+      return earlyClosedEdges;
+    }
   }
+  qualityTimer.finish(
+    'accepted',
+    qualityEdges.length,
+    diffBaseReactFlowEvaluationMetrics(
+      qualityMetricsBefore,
+      context.evaluationSession.readMetrics(),
+    ),
+  );
   if (defectPlan.onlyTerminalAxisDefects) {
     const terminalTimer = startDisplayRoutingPhaseTrace({
       phase: 'terminal',
@@ -110,18 +121,21 @@ export const createBaseReactFlowFullRouteEdges = (args: BaseReactFlowDisplayEdge
     qualityEdges,
     qualityReport,
   );
-  postRenderTimer.finish(
-    postRenderResult.kind === 'finalized' ? 'accepted' : 'skip',
-    undefined,
-    diffBaseReactFlowEvaluationMetrics(
-      postRenderMetricsBefore,
-      context.evaluationSession.readMetrics(),
-    ),
-  );
-  if (postRenderResult.kind === 'finalized') return postRenderResult.edges;
+  if (postRenderResult.kind === 'finalized') {
+    postRenderTimer.finish(
+      'accepted',
+      postRenderResult.edges.length,
+      diffBaseReactFlowEvaluationMetrics(
+        postRenderMetricsBefore,
+        context.evaluationSession.readMetrics(),
+      ),
+    );
+    return postRenderResult.edges;
+  }
   if (postRenderResult.quality.strictCrossings > 0) {
     const postRenderClosureTimer = startDisplayRoutingPhaseTrace({
       phase: 'final-safety-closure',
+      parentPhase: 'post-render',
       candidateCount,
       onTrace: args.onPhaseTrace,
     });
@@ -136,8 +150,26 @@ export const createBaseReactFlowFullRouteEdges = (args: BaseReactFlowDisplayEdge
       postRenderClosed ? 'accepted' : 'fallback',
       postRenderClosed ? postRenderClosedEdges.length : 0,
     );
-    if (postRenderClosed) return postRenderClosedEdges;
+    if (postRenderClosed) {
+      postRenderTimer.finish(
+        'accepted',
+        postRenderClosedEdges.length,
+        diffBaseReactFlowEvaluationMetrics(
+          postRenderMetricsBefore,
+          context.evaluationSession.readMetrics(),
+        ),
+      );
+      return postRenderClosedEdges;
+    }
   }
+  postRenderTimer.finish(
+    'skip',
+    undefined,
+    diffBaseReactFlowEvaluationMetrics(
+      postRenderMetricsBefore,
+      context.evaluationSession.readMetrics(),
+    ),
+  );
 
   const strictTimer = startDisplayRoutingPhaseTrace({
     phase: 'strict',

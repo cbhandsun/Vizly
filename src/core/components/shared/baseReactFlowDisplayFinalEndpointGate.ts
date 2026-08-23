@@ -6,7 +6,10 @@ import {
   visualPolishHardQualityDoesNotRegress,
 } from './baseReactFlowDisplayEvaluation';
 import type { BaseReactFlowFinalEndpointEvaluation } from './baseReactFlowDisplayFinalEndpointEvaluation';
-import type { DisplayRoutingPhaseTrace } from './baseReactFlowDisplayRoutingTrace';
+import type {
+  DisplayRoutingPhaseName,
+  DisplayRoutingPhaseTrace,
+} from './baseReactFlowDisplayRoutingTrace';
 import { commercialEdgeDetoursDoNotRegress } from './baseReactFlowDisplayCommercialDetourGuard';
 import {
   preservesCommercialTrueTrunkMembership,
@@ -22,6 +25,11 @@ export type BaseReactFlowFinalEndpointOrderOptions = Readonly<{
   preferredEdges?: readonly Edge[];
   /** Aggregate-only stage diagnostics; never includes graph identifiers or geometry. */
   onPhaseTrace?: (trace: DisplayRoutingPhaseTrace) => void;
+  /** Explicit owner when endpoint repair runs inside another measured transaction. */
+  traceParentPhase?: Extract<
+    DisplayRoutingPhaseName,
+    'finalizer' | 'final-safety-repair-order'
+  >;
   /** Request-local exact evidence shared by consecutive final routing stages. */
   evaluation?: BaseReactFlowFinalEndpointEvaluation;
 }>;

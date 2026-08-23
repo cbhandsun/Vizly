@@ -47,9 +47,11 @@ export const runBaseReactFlowFinalSafetyClosure = <T extends Edge[]>({
     : repairBaseReactFlowFinalSafetyClosure(edges, nodes, {
       eligibleEdgeIds,
       evaluation,
+      onPhaseTrace,
       onNoopCacheHit: () => {
         noopCacheHit = true;
       },
+      traceParentPhase: 'final-safety-closure',
     }) as T;
   timer.finish(
     noopCacheHit ? 'hit' : closedEdges === edges ? 'skip' : 'accepted',

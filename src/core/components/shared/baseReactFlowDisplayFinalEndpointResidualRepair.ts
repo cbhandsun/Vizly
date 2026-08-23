@@ -30,38 +30,67 @@ export const createBaseReactFlowFinalEndpointResidualRepair = ({
   nodes,
   evaluation,
   validate,
+  repairOverlap = repairResidualDisplayOverlaps,
+  repairStrict = repairFinalResidualStrictCrossings,
+  scoreResidualOverlap = exactResidualOverlapScore,
 }: {
   nodes: Node[];
   evaluation: BaseReactFlowFinalEndpointEvaluation;
   validate: FinalEndpointResidualCandidateValidator;
+  repairOverlap?: (edges: Edge[], nodes: Node[]) => Edge[];
+  repairStrict?: (edges: Edge[], nodes: Node[]) => Edge[];
+  scoreResidualOverlap?: (edges: readonly Edge[]) => number;
 }): BaseReactFlowFinalEndpointResidualRepair => {
+  const residualOverlapScoreByEdges = new WeakMap<readonly Edge[], number>();
+  const strictOutcomeByEdges = new WeakMap<readonly Edge[], Edge[]>();
+  const overlapOutcomeByEdges = new WeakMap<readonly Edge[], Edge[]>();
+  const readResidualOverlapScore = (edges: readonly Edge[]): number => {
+    const cached = residualOverlapScoreByEdges.get(edges);
+    if (typeof cached === 'number') return cached;
+    const score = scoreResidualOverlap(edges);
+    residualOverlapScoreByEdges.set(edges, score);
+    return score;
+  };
   const strict = (baseline: Edge[]): Edge[] => {
+    const cached = strictOutcomeByEdges.get(baseline);
+    if (cached) return cached;
+    const remember = (outcome: Edge[]): Edge[] => {
+      strictOutcomeByEdges.set(baseline, outcome);
+      return outcome;
+    };
     const baselineReport = evaluation.hardReport(baseline);
-    const candidate = repairFinalResidualStrictCrossings(baseline, nodes);
-    if (candidate === baseline) return baseline;
+    if (baselineReport.quality.strictCrossings === 0) return remember(baseline);
+    const candidate = repairStrict(baseline, nodes);
+    if (candidate === baseline) return remember(baseline);
     const candidateReport = evaluation.hardReport(candidate);
     if (
       candidateReport.quality.strictCrossings
       >= baselineReport.quality.strictCrossings
-    ) return baseline;
+    ) return remember(baseline);
     const indexes = changedIndexes(baseline, candidate);
-    return indexes.length > 0 && validate(baseline, candidate, indexes)
+    return remember(indexes.length > 0 && validate(baseline, candidate, indexes)
       ? candidate
-      : baseline;
+      : baseline);
   };
 
   const overlap = (baseline: Edge[]): Edge[] => {
-    const baselineScore = exactResidualOverlapScore(baseline);
-    if (baselineScore === 0) return baseline;
-    const candidate = repairResidualDisplayOverlaps(baseline, nodes);
+    const cached = overlapOutcomeByEdges.get(baseline);
+    if (cached) return cached;
+    const remember = (outcome: Edge[]): Edge[] => {
+      overlapOutcomeByEdges.set(baseline, outcome);
+      return outcome;
+    };
+    const baselineScore = readResidualOverlapScore(baseline);
+    if (baselineScore === 0) return remember(baseline);
+    const candidate = repairOverlap(baseline, nodes);
     if (
       candidate === baseline
-      || exactResidualOverlapScore(candidate) >= baselineScore
-    ) return baseline;
+      || readResidualOverlapScore(candidate) >= baselineScore
+    ) return remember(baseline);
     const indexes = changedIndexes(baseline, candidate);
-    return indexes.length > 0 && validate(baseline, candidate, indexes)
+    return remember(indexes.length > 0 && validate(baseline, candidate, indexes)
       ? candidate
-      : baseline;
+      : baseline);
   };
 
   const fixedPoint = (baseline: Edge[]): Edge[] => {
