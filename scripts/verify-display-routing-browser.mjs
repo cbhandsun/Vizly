@@ -28,6 +28,7 @@ import {
   stopDisplayRoutingCpuProfile,
 } from './lib/display-routing-cpu-profile.mjs';
 import { assertDisplayRoutingVisualScaleAudit } from './lib/display-routing-browser-visual-audit.mjs';
+import { assertDisplayRoutingProductionPreview } from './lib/display-routing-production-preview.mjs';
 
 const BASE_URL = String(process.env.PRECOMPILED_ROUTE_BASE_URL || '')
   .trim()
@@ -45,23 +46,6 @@ const INCLUDE_INCREMENTAL_REQUEST_DIAGNOSTICS = process.env
 const EMIT_MACHINE_RESULT = process.env.DISPLAY_ROUTING_BROWSER_JSON === '1';
 const INCLUDE_CPU_PROFILE = process.env.DISPLAY_ROUTING_BROWSER_CPU_PROFILE === '1';
 const COLLECT_PERFORMANCE_SAMPLES = process.env.DISPLAY_ROUTING_BROWSER_COLLECT_PERFORMANCE === '1';
-
-const assertProductionPreview = async () => {
-  if (!BASE_URL) {
-    throw new Error(
-      'PRECOMPILED_ROUTE_BASE_URL must point to a production `vite preview` server',
-    );
-  }
-  const response = await fetch(`${BASE_URL}/`, { redirect: 'follow' });
-  if (!response.ok) throw new Error(`Production preview returned HTTP ${response.status}`);
-  const html = await response.text();
-  if (
-    html.includes('/@vite/client')
-    || !/<script[^>]+src=["'][^"']*\/assets\/[^"']+\.js["']/i.test(html)
-  ) {
-    throw new Error('PRECOMPILED_ROUTE_BASE_URL is not a production Vite preview');
-  }
-};
 
 const waitForValue = async (session, expression, timeoutMs = WAIT_TIMEOUT_MS) => {
   const deadline = Date.now() + timeoutMs;
@@ -667,7 +651,7 @@ const verifyNormalRenderedObstacleAudit = async () => withPrecompiledRouteBrowse
 );
 
 const main = async () => {
-  await assertProductionPreview();
+  await assertDisplayRoutingProductionPreview(BASE_URL);
   const normal = await verifyNormalRenderedObstacleAudit();
   const results = [];
   for (const dragCase of DRAG_CASES) {

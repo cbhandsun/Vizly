@@ -84,25 +84,20 @@ import { EdgeLabelObstacleContext } from '../custom-edges/edgeLabelObstacleConte
 import { applyBaseReactFlowEdgePresentation } from './baseReactFlowEdgePresentation';
 import { useLayoutStability } from '../../context/LayoutStabilityContext';
 import { useBaseReactFlowNodeDragState } from './useBaseReactFlowNodeDragState';
-
-// 模块级常量：避免在组件参数默认值中创建新引用
-const DEFAULT_VIEWPORT = { x: 0, y: 0, zoom: 1 };
-const DEFAULT_SNAP_GRID: [number, number] = [12, 12];
-const DEFAULT_STYLE: React.CSSProperties = {};
-
+import { BASE_REACT_FLOW_DEFAULT_SNAP_GRID, BASE_REACT_FLOW_DEFAULT_STYLE, BASE_REACT_FLOW_DEFAULT_VIEWPORT } from './baseReactFlowDefaults';
 
 const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
   nodes = [],
   edges = [],
   nodeTypes,
   edgeTypes,
-  style = DEFAULT_STYLE,
+  style = BASE_REACT_FLOW_DEFAULT_STYLE,
   className = 'diagram-preview-root',
   flowClassName,
   fitView = false,
   minZoom = 0.1,
   maxZoom = 4,
-  defaultViewport = DEFAULT_VIEWPORT,
+  defaultViewport = BASE_REACT_FLOW_DEFAULT_VIEWPORT,
   showMiniMap = true,
   showControls = true,
   onNodesChange,
@@ -166,7 +161,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
   onConnectStart,
   selectionMode = SelectionMode.Partial,
   snapToGrid = true,
-  snapGrid = DEFAULT_SNAP_GRID,
+  snapGrid = BASE_REACT_FLOW_DEFAULT_SNAP_GRID,
   isValidConnection,
   selectionOnDrag = false,
   edgesReconnectable,

@@ -44,10 +44,6 @@ import {
 import { resolveDisplayGeometryBarrierPolicy, scheduleBaseReactFlowStableGeometry } from './baseReactFlowDisplayGeometryBarrier';
 import { createBaseReactFlowDisplayIncrementalPlan } from './baseReactFlowDisplayIncrementalPlan';
 import {
-  resolveBaseReactFlowDragAwareDisplayEpoch,
-  resolveBaseReactFlowDragAwareInputIdentity,
-} from './baseReactFlowDragRoutingFreeze';
-import {
   logBaseReactFlowEventBindingFailure,
   logBaseReactFlowQualityFallback,
 } from './baseReactFlowLogging';
@@ -65,6 +61,7 @@ import {
   useBaseReactFlowResolvedOrDragFallbackEdges,
 } from './useBaseReactFlowDisplayCandidateBootstrap';
 import { loadBaseReactFlowDocumentRouteCandidate } from './baseReactFlowDocumentRouteCandidate';
+import { useBaseReactFlowDisplayRoutingInput } from './useBaseReactFlowDisplayRoutingInput';
 
 export type {
   UseBaseReactFlowDisplayRoutingOptions,
@@ -98,37 +95,25 @@ export const useBaseReactFlowDisplayRouting = ({
   const displayRoutingInputRef = useRef<DisplayRoutingInput | null>(null);
   const committedSnapshotBaselineRef =
     useRef<BaseReactFlowDisplayCommittedSnapshotBaseline | null>(null);
-  const nodeDragFallbackKey = useMemo(
-    () => nodeDragFallbackIds.join('\0'),
-    [nodeDragFallbackIds],
-  );
+  const {
+    nodeDragFallbackKey,
+    displayEdgeCacheSignature,
+    inputGeometryDigest,
+  } = useBaseReactFlowDisplayRoutingInput({
+    edges,
+    routingNodes,
+    enableSmartEdges,
+    smartEdgePadding,
+    isLargeGraph,
+    isNodeDragging,
+    nodeDragFallbackIds,
+    displayRoutingInputRef,
+  });
 
   useEffect(() => () => {
     disposeBaseReactFlowDisplayWorker(displayEdgeWorkerRef);
   }, []);
 
-  const displayEdgeEpoch = useMemo(() => {
-    return resolveBaseReactFlowDragAwareDisplayEpoch({
-      isNodeDragging,
-      nodes: routingNodes,
-      edges,
-    });
-  }, [routingNodes, edges, isNodeDragging]);
-
-  const displayInputIdentity = useMemo(() => {
-    return resolveBaseReactFlowDragAwareInputIdentity({
-      isNodeDragging,
-      nodes: routingNodes,
-      edges,
-      enableSmartEdges,
-      smartEdgePadding,
-      isLargeGraph,
-    });
-  }, [edges, routingNodes, enableSmartEdges, smartEdgePadding, isLargeGraph, isNodeDragging]);
-  const {
-    cacheSignature: displayEdgeCacheSignature,
-    geometryDigest: inputGeometryDigest,
-  } = displayInputIdentity;
   const precompiledRegenerationPresetId =
     resolveBaseReactFlowPrecompiledRegenerationPresetIdFromWindow();
   const forceFreshFullRoute = precompiledRegenerationPresetId !== null;
@@ -215,28 +200,6 @@ export const useBaseReactFlowDisplayRouting = ({
     isLargeGraph,
   });
   const [deferredDisplayEdges, setDeferredDisplayEdges] = useState<DeferredDisplayEdges | null>(null);
-  useEffect(() => {
-    displayRoutingInputRef.current = {
-      cacheSignature: displayEdgeCacheSignature,
-      inputGeometryDigest,
-      edges,
-      nodes: routingNodes,
-      enableSmartEdges,
-      smartEdgePadding,
-      isLargeGraph,
-      displayEdgeEpoch,
-    };
-  }, [
-    displayEdgeCacheSignature,
-    inputGeometryDigest,
-    edges,
-    routingNodes,
-    enableSmartEdges,
-    smartEdgePadding,
-    isLargeGraph,
-    displayEdgeEpoch,
-  ]);
-
   useEffect(() => {
     const routingInput = displayRoutingInputRef.current;
     const nodeCount = routingInput?.nodes.length ?? 0;
