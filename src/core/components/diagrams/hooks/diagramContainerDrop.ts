@@ -79,7 +79,7 @@ export const resolveDraggedNodeParenting = (
 };
 
 interface ContainerDropInput {
-    nodes: readonly Node[];
+    nodes: Node[];
     graphNodes: readonly Node[];
     draggedNodeIds: readonly string[];
     parentCandidate: Node;
@@ -124,9 +124,21 @@ export const applyContainerDrop = ({
         neededHeight = Math.max(neededHeight, position.y + size.height + CONTAINER_PADDING);
     }
 
-    return nodes.map(node => {
+    let changed = false;
+    const nextNodes = nodes.map((node): Node => {
         const position = relativePositions.get(node.id);
         if (position) {
+            const domain = parent.data.domain || parent.data.domainClass;
+            if (
+                node.parentId === parent.id
+                && node.extent === 'parent'
+                && node.position.x === position.x
+                && node.position.y === position.y
+                && node.data.domain === domain
+            ) {
+                return node;
+            }
+            changed = true;
             return {
                 ...node,
                 parentId: parent.id,
@@ -134,7 +146,7 @@ export const applyContainerDrop = ({
                 position,
                 data: {
                     ...node.data,
-                    domain: parent.data.domain || parent.data.domainClass,
+                    domain,
                 },
             };
         }
@@ -149,6 +161,7 @@ export const applyContainerDrop = ({
                 300,
             );
             if (neededWidth > currentWidth || neededHeight > currentHeight) {
+                changed = true;
                 return {
                     ...node,
                     style: {
@@ -162,6 +175,7 @@ export const applyContainerDrop = ({
 
         return node;
     });
+    return changed ? nextNodes : nodes;
 };
 
 interface CanvasDropInput {

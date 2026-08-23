@@ -93,3 +93,18 @@ export const resolveDomainLayoutRoutingQuality = (
 export const shouldPromoteDomainDagreRouteCandidate = (
     _strategyName?: string,
 ): boolean => true;
+
+export const shouldRetryRejectedDomainLayoutWithCompoundElk = ({
+    usedDomainElk,
+    usedDomainCompoundElk,
+    canUseFlatElkFallback,
+    hardQualityRejected,
+}: {
+    usedDomainElk: boolean;
+    usedDomainCompoundElk: boolean;
+    canUseFlatElkFallback: boolean;
+    hardQualityRejected: boolean;
+}): boolean => !usedDomainElk
+    && !usedDomainCompoundElk
+    && !canUseFlatElkFallback
+    && hardQualityRejected;

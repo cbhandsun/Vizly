@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import type { Node, Edge, XYPosition } from '@xyflow/react';
-import { EdgeRoutingCoordinator } from '../../../../services/EdgeRoutingCoordinator';
 import { LayeredConfigManager } from '../../../../config/LayeredConfigManager';
 
 type StabilityNode = Node & {
@@ -152,10 +151,7 @@ export function useDiagramStability({
                 setIsLayoutStable(true);
                 const ids = Array.from(changedNodeIdsRef.current);
                 changedNodeIdsRef.current.clear();
-                if (ids.length > 0) {
-                    EdgeRoutingCoordinator.getInstance().notifyGraphChange(ids);
-                } else {
-                    EdgeRoutingCoordinator.getInstance().notifyGraphChange();
+                if (ids.length === 0) {
                     setLayoutEpoch(e => e + 1);
                 }
             }
@@ -170,13 +166,7 @@ export function useDiagramStability({
     }, [layoutFitSignature, rfEdges.length]);
 
     useEffect(() => {
-        if (!isLayoutStable) return;
-        EdgeRoutingCoordinator.getInstance().batchRouteDirtyEdges();
-    }, [isLayoutStable]);
-
-    useEffect(() => {
         Promise.resolve().then(() => setIsLayoutStable(false));
-        EdgeRoutingCoordinator.getInstance().forceClearAllCaches();
         Promise.resolve().then(() => {
             setLayoutEpoch((prev: number) => prev + 1);
             const nextEdges = latestEdgesRef.current;
@@ -189,7 +179,6 @@ export function useDiagramStability({
                     algorithm: undefined
                 }
             })));
-            EdgeRoutingCoordinator.getInstance().initializeEdges(nextEdges);
         });
     }, [layoutStrategy, nodeLayoutStrategy, setRfEdges, latestEdgesRef]);
 

@@ -13,7 +13,10 @@ import { useEdgeTheme } from '../diagrams/useEdgeUpdate';
 import { getEdgeLabelAutoOffset } from './edgeLabelAvoidance';
 import { collectStablePathPeerPaths } from './stablePathEdgePeerPaths';
 import { useEdgeLabelObstacles } from './edgeLabelObstacleContext';
-import { useSmartEdgeRoutingOwner } from './smartEdgeRoutingOwnership';
+import {
+    smartEdgeRenderAdapterAcceptsCommittedGeometry,
+    useSmartEdgeRoutingRenderAdapter,
+} from './smartEdgeRoutingRenderAdapter';
 import { useSyncNativeEdgeUpdaterEndpoints } from './useSyncNativeEdgeUpdaterEndpoints';
 import { useLineJumps } from './hooks/useLineJumps';
 import { ContrastSafeBaseEdge } from './ContrastSafeBaseEdge';
@@ -155,7 +158,10 @@ export const StablePathEdge = memo<EdgeProps>((props) => {
         selected,
     } = props;
     const edgeData = data as StablePathEdgeData | undefined;
-    const routingOwner = useSmartEdgeRoutingOwner();
+    const routingRenderAdapter = useSmartEdgeRoutingRenderAdapter();
+    const acceptsCommittedGeometry = smartEdgeRenderAdapterAcceptsCommittedGeometry(
+        routingRenderAdapter,
+    );
     const currentTheme = useEdgeTheme();
     const canvasBackground = currentTheme?.diagram?.canvas?.background ?? '#ffffff';
     // Subscribe to the stable edge-array reference. Returning a freshly mapped
@@ -168,8 +174,10 @@ export const StablePathEdge = memo<EdgeProps>((props) => {
     const targetNode = useStore(state => state.nodeLookup.get(props.target));
     const labelObstacles = useEdgeLabelObstacles();
     const peerPaths = useMemo(
-        () => collectStablePathPeerPaths(allEdges, id, Boolean(label)),
-        [allEdges, id, label],
+        () => acceptsCommittedGeometry
+            ? collectStablePathPeerPaths(allEdges, id, Boolean(label))
+            : [],
+        [acceptsCommittedGeometry, allEdges, id, label],
     );
     const [isPointerTracing, setIsPointerTracing] = useState(false);
     const [isLabelFocused, setIsLabelFocused] = useState(false);
@@ -192,7 +200,8 @@ export const StablePathEdge = memo<EdgeProps>((props) => {
         // Layout epochs can refresh React Flow's internal absolute geometry
         // without changing the serialized path or endpoint props.
         void layoutEpoch;
-        const canUseComputedPath = computedPath
+        const canUseComputedPath = acceptsCommittedGeometry
+            && computedPath
             && computedPath.length >= 2
             && isStablePathAttachedToLiveEndpoints(
                 rawComputedPath ?? computedPath,
@@ -202,7 +211,7 @@ export const StablePathEdge = memo<EdgeProps>((props) => {
                 targetY,
                 sourcePosition,
                 targetPosition,
-                routingOwner === 'canvas',
+                true,
                 sourceNode,
                 targetNode,
             );
@@ -218,7 +227,7 @@ export const StablePathEdge = memo<EdgeProps>((props) => {
         computedPath,
         layoutEpoch,
         rawComputedPath,
-        routingOwner,
+        acceptsCommittedGeometry,
         sourceNode,
         sourcePosition,
         sourceX,

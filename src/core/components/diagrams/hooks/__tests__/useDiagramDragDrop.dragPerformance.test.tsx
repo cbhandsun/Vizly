@@ -20,7 +20,8 @@ const createProps = () => ({
   takeSnapshot: vi.fn(),
   notifyHistoryChanged: vi.fn(),
   reactFlowInstance: null,
-  setIsDragging: vi.fn(),
+  onDragInteractionStart: vi.fn(),
+  onDragInteractionRelease: vi.fn(),
   snapDeltaRef: { current: null as { x: number; y: number } | null },
   clearGuides: vi.fn(),
   enableAltDuplicate: false,
@@ -71,6 +72,18 @@ describe('useDiagramDragDrop drag performance boundary', () => {
       { notify: false, dedupe: false },
     );
     expect(props.notifyHistoryChanged).not.toHaveBeenCalled();
+    expect(props.onDragInteractionStart).toHaveBeenCalledOnce();
+  });
+
+  it('delegates release settling instead of owning the parent render state', () => {
+    const props = createProps();
+    const { result } = renderHook(() => useDiagramDragDrop(props));
+
+    act(() => {
+      result.current.onNodeDragStop(new MouseEvent('mouseup'), node, [node]);
+    });
+
+    expect(props.onDragInteractionRelease).toHaveBeenCalledWith(node);
   });
 
   it('still persists the last smart-guide offset after release', () => {

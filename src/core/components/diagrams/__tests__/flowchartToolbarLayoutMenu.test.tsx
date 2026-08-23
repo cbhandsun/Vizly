@@ -13,6 +13,7 @@ import {
   resolveDomainLayoutRoutingQuality,
   resolveLayoutDomainOrder,
   shouldPromoteDomainDagreRouteCandidate,
+  shouldRetryRejectedDomainLayoutWithCompoundElk,
   usesSelectableDomainNodeArrangement,
 } from '../flowchartLayoutStrategyMode';
 import { resolveFlowchartCustomDomainLayoutCapability } from '../flowchartLayoutCapabilities';
@@ -55,6 +56,24 @@ describe('flowchartToolbarLayoutMenu', () => {
     expect(resolveDomainLayoutRoutingQuality('domain-dagre')).toBeUndefined();
     expect(shouldPromoteDomainDagreRouteCandidate('domain-lanes')).toBe(true);
     expect(shouldPromoteDomainDagreRouteCandidate('domain-dagre')).toBe(true);
+    expect(shouldRetryRejectedDomainLayoutWithCompoundElk({
+      usedDomainElk: false,
+      usedDomainCompoundElk: false,
+      canUseFlatElkFallback: false,
+      hardQualityRejected: true,
+    })).toBe(true);
+    expect(shouldRetryRejectedDomainLayoutWithCompoundElk({
+      usedDomainElk: false,
+      usedDomainCompoundElk: false,
+      canUseFlatElkFallback: false,
+      hardQualityRejected: false,
+    })).toBe(false);
+    expect(shouldRetryRejectedDomainLayoutWithCompoundElk({
+      usedDomainElk: false,
+      usedDomainCompoundElk: true,
+      canUseFlatElkFallback: false,
+      hardQualityRejected: true,
+    })).toBe(false);
     expect(createCustomDomainLayoutCommand('TB', 'grid')).toEqual({
       direction: 'TB',
       nodeLayout: 'grid',

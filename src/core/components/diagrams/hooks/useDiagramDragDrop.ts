@@ -39,7 +39,8 @@ interface UseDiagramDragDropProps {
     ) => void;
     notifyHistoryChanged: () => void;
     reactFlowInstance: ReactFlowInstance | null;
-    setIsDragging: (dragging: boolean) => void;
+    onDragInteractionStart: () => void;
+    onDragInteractionRelease: (node: Node) => void;
     snapDeltaRef?: Readonly<{ current: SnapDelta | null }>;
     clearGuides: () => void;
     enableAltDuplicate?: boolean;
@@ -56,7 +57,8 @@ export const useDiagramDragDrop = ({
     takeSnapshot,
     notifyHistoryChanged,
     reactFlowInstance,
-    setIsDragging,
+    onDragInteractionStart,
+    onDragInteractionRelease,
     snapDeltaRef,
     clearGuides,
     enableAltDuplicate = true,
@@ -305,9 +307,9 @@ export const useDiagramDragDrop = ({
             notify: false,
             dedupe: false,
         });
-        setIsDragging(true);
+        onDragInteractionStart();
         dragTargetIdRef.current = null;
-    }, [enableAltDuplicate, isConnecting, moveHistoryLabel, takeSnapshot, setIsDragging, setNodes]);
+    }, [enableAltDuplicate, isConnecting, moveHistoryLabel, onDragInteractionStart, takeSnapshot, setNodes]);
 
     const onNodeDrag = useCallback((event: MouseEvent | TouchEvent, node: Node, draggedNodes: Node[]) => {
         // ⭐ P4: 容器预览用 RAF 节流（非关键路径）
@@ -394,7 +396,7 @@ export const useDiagramDragDrop = ({
         // causing the node to jump back to strict grid coordinates upon release.
         const finalSnapDelta = snapDeltaRef?.current ?? null;
 
-        setIsDragging(false);
+        onDragInteractionRelease(node);
         notifyHistoryChanged();
         clearGuides();
         const graphNodes = mergeDraggedNodesIntoGraph(
@@ -469,7 +471,7 @@ export const useDiagramDragDrop = ({
                 setNodes(nds => applySnapDeltaToNodes(nds, topLevelCanvasNodeIds, finalSnapDelta));
             }, 0);
         }
-    }, [setIsDragging, setNodes, clearGuides, notifyHistoryChanged, snapDeltaRef]);
+    }, [clearGuides, notifyHistoryChanged, onDragInteractionRelease, setNodes, snapDeltaRef]);
 
     return {
         onDragOver,

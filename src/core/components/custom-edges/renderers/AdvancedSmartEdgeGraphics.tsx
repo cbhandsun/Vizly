@@ -2,13 +2,12 @@
 import React, { memo, useMemo, useRef, useEffect } from 'react';
 import { EdgeLabelRenderer, EdgeProps } from '@xyflow/react';
 import { useEdgeTheme } from '../../diagrams/useEdgeUpdate';
-import { EdgeRoutingCoordinator } from '../../../services/EdgeRoutingCoordinator';
-import { UseSmartEdgeRoutingReturn } from '../hooks/useSmartEdgeRouting';
 import { UseEdgeLabelInteractionsReturn } from '../hooks/useEdgeLabelInteractions';
 import { createRenderEdgeGeometryFromEdgeProps, getPathEndpoints } from '../../../rendering/edgeGeometry';
 import type { EdgeLabelStyle } from '../../diagrams/EdgeLabelStyleMenu';
 import { useSyncNativeEdgeUpdaterEndpoints } from '../useSyncNativeEdgeUpdaterEndpoints';
 import { ContrastSafeBaseEdge } from '../ContrastSafeBaseEdge';
+import type { SmartEdgeRoutingRenderModel } from '../smartEdgeRoutingRenderModel';
 
 interface EdgeGraphicsData {
     label?: unknown;
@@ -26,18 +25,12 @@ const LazyEdgeLabelDropdown = React.lazy(() =>
 
 export interface AdvancedSmartEdgeGraphicsProps {
     props: EdgeProps;
-    router: UseSmartEdgeRoutingReturn;
+    router: SmartEdgeRoutingRenderModel;
     labelManager: UseEdgeLabelInteractionsReturn;
 }
 
 const selectDebugEdge = (id: string) => {
     window.dispatchEvent(new CustomEvent('vizly:selectDebugEdge', { detail: { edgeId: id } }));
-    const coord = EdgeRoutingCoordinator.getInstance() as unknown as {
-        setDebugEdge(id: string | null): void;
-        forceDebugReRoute(id: string | null): void;
-    };
-    coord.setDebugEdge(id);
-    coord.forceDebugReRoute(id);
 };
 
 const InnerAdvancedSmartEdgeGraphics = ({ props, router, labelManager }: AdvancedSmartEdgeGraphicsProps) => {
@@ -67,9 +60,7 @@ const InnerAdvancedSmartEdgeGraphics = ({ props, router, labelManager }: Advance
         [props, safeFinalPath, workerSmartPoints]
     );
     const visiblePathEndpoints = useMemo(() => getPathEndpoints(renderEdge.path), [renderEdge.path]);
-    // [PERF] 消除双订阅：移除第二次 useSmartEdgeContext 调用
-    // simpleNodeMap 仅在 debug heatmap 时使用，通过 router 传入
-    // 这避免了每条边对 nodeLookup 进行两次订阅，显著减少拖动时的重算量
+    // Render-only model: debug data is passed in without graph or Worker subscriptions.
     const simpleNodeMap = router.simpleNodeMap;
 
     // ---------- Bus styling ----------

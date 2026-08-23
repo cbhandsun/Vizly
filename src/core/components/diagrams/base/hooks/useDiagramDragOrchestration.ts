@@ -1,6 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
 import type { Node } from '@xyflow/react';
-import { EdgeRoutingCoordinator } from '../../../../services/EdgeRoutingCoordinator';
 
 export interface DragOrchestrationParams {
   rfNodes: Node[];
@@ -67,32 +66,20 @@ export function useDiagramDragOrchestration({ rfNodes }: DragOrchestrationParams
       addNodeAndChildren(node);
     }
 
-    // [H-10] Notify coordinator that dragging is active → 60ms debounce during drag
-    EdgeRoutingCoordinator.getInstance().setDragging(true);
-
     setDraggingNodeIds(Array.from(currentIds));
     setDragUpdateCounter(c => c + 1);
   }, [rfNodes]);
 
   const handleNodeDragStop = useCallback(() => {
-    const draggedIds = [...draggingNodeIds];
     setDraggingNodeIds([]);
 
     setDragUpdateCounter(c => c + 1);
 
     setTimeout(() => {
       livePositionsRef.current = {};
-      // [H-10] Restore 16ms debounce and trigger final route pass on drag end
-      EdgeRoutingCoordinator.getInstance().setDragging(false);
-      if (draggedIds.length > 0) {
-        EdgeRoutingCoordinator.getInstance().markNodesChanged(draggedIds);
-        EdgeRoutingCoordinator.getInstance().notifyGraphChange(draggedIds);
-      } else {
-        EdgeRoutingCoordinator.getInstance().forceClearAllCaches();
-      }
       setDragUpdateCounter(c => c + 1);
     }, 50);
-  }, [draggingNodeIds]);
+  }, []);
 
   return {
     dragUpdateCounter,

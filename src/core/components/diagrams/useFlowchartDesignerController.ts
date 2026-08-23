@@ -342,7 +342,7 @@ export const useFlowchartDesignerController = ({
         isValidConnection,
         handleReconnect, handleReconnectStart, handleReconnectEnd,
         onDragOver, onDrop, wrappedOnNodeDragStart, onNodeDrag, onNodeDragStop,
-        isDraggingNode
+        isDraggingNode, onDisplayRoutingFinalApplied,
     } = interactionsParams;
     const isCommentMode = annotationMode;
     const setStoredCommentMode = useDiagramStore(state => state.setIsCommentMode);
@@ -671,7 +671,7 @@ export const useFlowchartDesignerController = ({
         isSidebarHidden, isSpacePressed, isValidConnection, isVersionHistoryOpen, isYjsSynced, collaborationStatus, jsonEditorInitialContent, jsonEditorVisible, jumpTo, laserEnabled, viewportPersistenceKey,
         lastDomainDirection, lastDomainStrategy, lastNodeLayout, layerSyncedNodes, layers, leftDrawerOpen, leftDrawerWidth, messageContextHolder,
         mobilePropertyDrawerVisible, multiPage: { ...multiPage, ...commentAwarePageLifecycle }, nodes, nodesRef, notificationContextHolder, onAiTabIntercept, onCloudSave, onConnectStart, onDirectSave, onSaveAs,
-        onDragOver, onDrop, onEdgeContextMenu, onEdgesChangeWithLock, onNodeContextMenu, onNodeDrag, onNodeDragStop, onNodesChangeWithLock, onSmartNodeDrag,
+        onDisplayRoutingFinalApplied, onDragOver, onDrop, onEdgeContextMenu, onEdgesChangeWithLock, onNodeContextMenu, onNodeDrag, onNodeDragStop, onNodesChangeWithLock, onSmartNodeDrag,
         onExportPermissionCheck, onOpenCollaboration, onOpenSettings, onOpenShareDialog, onOpenVersionHistory, onPaneContextMenu, onPaneDoubleClick, onPaneMouseLeave, onPaneMouseMove,
         onSelectionChange, onVersionHistoryClose, onboardingDismissed, pastEntries, pasteStyle, performanceMode, pluginCtx, pluginId, pluginManagerVisible,
         presentationActive, presentationSlides, preset, quickAddMenu, reactFlowInstance, reactFlowWrapper, redo, renameLayer, renameTemplate, renderAIChatPanel,

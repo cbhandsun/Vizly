@@ -15,13 +15,7 @@ import { ILayoutStrategy } from '../../../strategies/LayoutStrategyManager';
 import { LayeredConfigManager } from '../../../config/LayeredConfigManager';
 import { diagramConfigManager } from '@/core/config/DiagramConfig';
 import { LayoutStabilityContext } from '../../../context/LayoutStabilityContext';
-import { EdgeRoutingCoordinator } from '../../../services/EdgeRoutingCoordinator';
 import { prepareBaseDiagramDisplayEdges } from './baseDiagramEdgePreparation';
-
-type NodeWithAbsolutePosition = Node & {
-  computed?: { positionAbsolute?: { x: number; y: number } };
-  positionAbsolute?: { x: number; y: number };
-};
 
 // Domain Hooks
 import { useDiagramStability, calcNodeSignature, calcEdgeSignature } from './hooks/useDiagramStability';
@@ -233,28 +227,6 @@ export const BaseDiagramComponent: React.FC<BaseDiagramProps> = memo(({
         const nextSig = calcNodeSignature(newNodes);
         if (prevSig === nextSig) return prev;
 
-        const prevMap = new Map(prev.map(n => [n.id, n]));
-        const changedIds: string[] = [];
-        for (const n of newNodes) {
-          const old = prevMap.get(n.id);
-          if (!old) { changedIds.push(n.id); continue; }
-          const positionedNode = n as NodeWithAbsolutePosition;
-          const positionedOldNode = old as NodeWithAbsolutePosition;
-          const nAbs = positionedNode.computed?.positionAbsolute ?? positionedNode.positionAbsolute ?? n.position;
-          const oAbs = positionedOldNode.computed?.positionAbsolute ?? positionedOldNode.positionAbsolute ?? old.position;
-          if (Math.round(nAbs?.x ?? 0) !== Math.round(oAbs?.x ?? 0) || Math.round(nAbs?.y ?? 0) !== Math.round(oAbs?.y ?? 0)) {
-            changedIds.push(n.id);
-          }
-        }
-        const newIdSet = new Set(newNodes.map(n => n.id));
-        for (const old of prev) {
-          if (!newIdSet.has(old.id)) changedIds.push(old.id);
-        }
-
-        const idsToNotify = changedIds.length > 0 ? changedIds : newNodes.map(n => n.id);
-        EdgeRoutingCoordinator.getInstance().notifyGraphChange(idsToNotify);
-        EdgeRoutingCoordinator.getInstance().markNodesChanged(idsToNotify);
-
         return newNodes;
       });
     });
@@ -267,7 +239,6 @@ export const BaseDiagramComponent: React.FC<BaseDiagramProps> = memo(({
         const prevSig = calcEdgeSignature(prev);
         const nextSig = calcEdgeSignature(edges);
         if (prevSig !== nextSig) {
-          EdgeRoutingCoordinator.getInstance().initializeEdges(edges);
           return edges;
         }
         return prev;
@@ -320,7 +291,6 @@ export const BaseDiagramComponent: React.FC<BaseDiagramProps> = memo(({
 
     if (changedNodeIds.length > 0) {
       for (const id of changedNodeIds) changedNodeIdsRef.current.add(id);
-      EdgeRoutingCoordinator.getInstance().markNodesChanged(changedNodeIds);
     }
     onNodesChangeProp?.(changes);
   }, [onNodesChangeProp, changedNodeIdsRef]);

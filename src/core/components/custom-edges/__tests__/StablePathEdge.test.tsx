@@ -6,9 +6,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { StablePathEdge } from '../StablePathEdge';
 import {
-  SmartEdgeRoutingOwnerContext,
-  type SmartEdgeRoutingOwner,
-} from '../smartEdgeRoutingOwnership';
+  ROUTING_SESSION_EDGE_RENDER_ADAPTER,
+  STANDALONE_EDGE_RENDER_ADAPTER,
+  SmartEdgeRoutingRenderAdapterContext,
+  type SmartEdgeRoutingRenderAdapter,
+} from '../smartEdgeRoutingRenderAdapter';
 
 const { useLineJumpsMock, reactFlowStoreMock } = vi.hoisted(() => ({
   useLineJumpsMock: vi.fn(() => ({ jumps: [], jumpPath: null })),
@@ -58,9 +60,9 @@ vi.mock('@xyflow/react', async () => {
 
 const createStablePathEdgeElement = (
   props: Record<string, unknown>,
-  routingOwner: SmartEdgeRoutingOwner = 'edge',
+  renderAdapter: SmartEdgeRoutingRenderAdapter = ROUTING_SESSION_EDGE_RENDER_ADAPTER,
 ) => (
-    <SmartEdgeRoutingOwnerContext.Provider value={routingOwner}>
+    <SmartEdgeRoutingRenderAdapterContext.Provider value={renderAdapter}>
       <svg>
         <StablePathEdge
           id="edge-test"
@@ -76,13 +78,13 @@ const createStablePathEdgeElement = (
           {...(props as any)}
         />
       </svg>
-    </SmartEdgeRoutingOwnerContext.Provider>
+    </SmartEdgeRoutingRenderAdapterContext.Provider>
 );
 
 const renderStablePathEdge = (
   props: Record<string, unknown>,
-  routingOwner: SmartEdgeRoutingOwner = 'edge',
-) => render(createStablePathEdgeElement(props, routingOwner));
+  renderAdapter: SmartEdgeRoutingRenderAdapter = ROUTING_SESSION_EDGE_RENDER_ADAPTER,
+) => render(createStablePathEdgeElement(props, renderAdapter));
 
 describe('StablePathEdge', () => {
   beforeEach(() => {
@@ -112,6 +114,25 @@ describe('StablePathEdge', () => {
     expect(path.getAttribute('data-interaction-width')).toBe('0');
     expect(path.style.pointerEvents).toBe('none');
     expect(container.querySelectorAll('.react-flow__edge-interaction')).toHaveLength(1);
+  });
+
+  it('fails closed on standalone computed paths without Routing Session authority', () => {
+    renderStablePathEdge({
+      sourceX: 0,
+      sourceY: 0,
+      targetX: 80,
+      targetY: 40,
+      data: {
+        computedPath: [
+          { x: 0, y: 0 },
+          { x: 0, y: 200 },
+          { x: 80, y: 200 },
+          { x: 80, y: 40 },
+        ],
+      },
+    }, STANDALONE_EDGE_RENDER_ADAPTER);
+
+    expect(screen.getByTestId('base-edge').getAttribute('d')).not.toContain('200');
   });
 
   it('snaps small rendered endpoint drift back onto the dominant orthogonal axis', () => {
@@ -165,7 +186,7 @@ describe('StablePathEdge', () => {
           { x: 1065, y: 812 },
         ],
       },
-    }, 'canvas');
+    }, ROUTING_SESSION_EDGE_RENDER_ADAPTER);
 
     const path = screen.getByTestId('base-edge');
     expect(path.getAttribute('d')).toBe('M 1065 652 L 1065 812');
@@ -197,7 +218,7 @@ describe('StablePathEdge', () => {
           { x: 645, y: 2212 },
         ],
       },
-    }, 'canvas');
+    });
 
     expect(screen.getByTestId('base-edge').getAttribute('d'))
       .toBe('M 741 1796 L 741 1908 L 616 1908 L 616 2140 L 645 2140 L 645 2212');
@@ -217,7 +238,7 @@ describe('StablePathEdge', () => {
       targetPosition: 'left',
       data: { computedPath, _layoutEpoch: 1 },
     };
-    const { rerender } = renderStablePathEdge(props, 'canvas');
+    const { rerender } = renderStablePathEdge(props);
 
     expect(screen.getByTestId('base-edge').getAttribute('d'))
       .toBe('M -1272 1024.5 L -1292 1024.5');
@@ -233,7 +254,7 @@ describe('StablePathEdge', () => {
     rerender(createStablePathEdgeElement({
       ...props,
       data: { computedPath, _layoutEpoch: 2 },
-    }, 'canvas'));
+    }));
 
     expect(screen.getByTestId('base-edge').getAttribute('d'))
       .toBe('M 100 96 L 260 96');
@@ -253,7 +274,7 @@ describe('StablePathEdge', () => {
           { x: 10, y: 180 },
         ],
       },
-    }, 'canvas');
+    });
 
     expect(screen.getByTestId('base-edge').getAttribute('d'))
       .toBe('M 500 600 L 500 760 L 700 760');
@@ -306,12 +327,12 @@ describe('StablePathEdge', () => {
       />
     );
     const { container } = render(
-      <SmartEdgeRoutingOwnerContext.Provider value="canvas">
+      <SmartEdgeRoutingRenderAdapterContext.Provider value={ROUTING_SESSION_EDGE_RENDER_ADAPTER}>
         <svg>
           {stableEdge('horizontal', 'left', 'right', [{ x: 0, y: 40 }, { x: 160, y: 40 }])}
           {stableEdge('vertical', 'top', 'bottom', [{ x: 80, y: 0 }, { x: 80, y: 100 }])}
         </svg>
-      </SmartEdgeRoutingOwnerContext.Provider>,
+      </SmartEdgeRoutingRenderAdapterContext.Provider>,
     );
 
     const horizontal = container.querySelector('[data-edge-id="horizontal"]');
@@ -392,7 +413,7 @@ describe('StablePathEdge', () => {
           backboneRanges: [],
         },
       },
-    }, 'canvas');
+    }, ROUTING_SESSION_EDGE_RENDER_ADAPTER);
 
     const preparedTrace = container.querySelector('.shared-trunk-accent-trace');
     expect(preparedTrace?.getAttribute('style')).toContain('opacity: 0');
@@ -443,7 +464,7 @@ describe('StablePathEdge', () => {
           }],
         },
       },
-    }, 'canvas');
+    }, ROUTING_SESSION_EDGE_RENDER_ADAPTER);
 
     const backbone = container.querySelector('.shared-trunk-canonical-backbone');
     expect(backbone?.getAttribute('d')).toBe('M 0 0 L 100 0');
@@ -518,7 +539,7 @@ describe('StablePathEdge', () => {
           }],
         },
       },
-    }, 'canvas');
+    }, ROUTING_SESSION_EDGE_RENDER_ADAPTER);
 
     const backbone = container.querySelector('.shared-trunk-canonical-backbone');
     expect(backbone?.getAttribute('d')).toBe('M 80 0 L 160 0');
@@ -571,7 +592,7 @@ describe('StablePathEdge', () => {
           }],
         },
       },
-    }, 'canvas');
+    }, ROUTING_SESSION_EDGE_RENDER_ADAPTER);
 
     const backbone = container.querySelector('.shared-trunk-canonical-backbone');
     expect(backbone?.getAttribute('style')).toContain('--vizly-shared-canonical-stroke: #64748B');
@@ -602,7 +623,7 @@ describe('StablePathEdge', () => {
         computedPath: [{ x: 0, y: 0 }, { x: 60, y: 0 }, { x: 120, y: 0 }],
         __vizlySharedTrunkPaint: sharedPlan,
       },
-    }, 'canvas');
+    }, ROUTING_SESSION_EDGE_RENDER_ADAPTER);
 
     expect(screen.queryByText('Fully canonical bridge')).toBeNull();
     expect(idle.container.querySelector('.shared-trunk-accent-trace')?.getAttribute('style'))
@@ -623,7 +644,7 @@ describe('StablePathEdge', () => {
         computedPath: [{ x: 0, y: 0 }, { x: 60, y: 0 }, { x: 120, y: 0 }],
         __vizlySharedTrunkPaint: sharedPlan,
       },
-    }, 'canvas');
+    }, ROUTING_SESSION_EDGE_RENDER_ADAPTER);
 
     const traces = active.container.querySelectorAll('.shared-trunk-accent-trace');
     expect(traces).toHaveLength(1);

@@ -34,6 +34,7 @@ import {
 import { filterCommentsForPage } from './commentPageScope';
 import { useFlowchartDesignerViewSetup } from './useFlowchartDesignerViewSetup';
 import { FLOWCHART_LOADING_OVERLAY_STYLE } from './flowchartDesignerViewStyles';
+import { resolveDesignerDragRenderPolicy } from './designerDragRenderPolicy';
 
 export type { FlowchartDesignerViewModel } from './flowchartDesignerViewModel';
 
@@ -133,6 +134,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
         isContextToolbarHidden,
         isDirectSaveDisabled,
         isDragging,
+        isDraggingNode,
         isDrawingMode,
         isInitialDiagramLoading,
         isLayoutBusy,
@@ -161,6 +163,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
         onCloudSave,
         onConnectStart,
         onDirectSave,
+        onDisplayRoutingFinalApplied,
         onSaveAs,
         onEdgeContextMenu,
         onEdgesChangeWithLock,
@@ -251,6 +254,11 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
         reactFlowMinimapSupported,
         showEditingChrome,
     } = useFlowchartDesignerViewSetup(model);
+    const dragRenderPolicy = resolveDesignerDragRenderPolicy({
+        isDragging,
+        isDraggingNode,
+        performanceMode,
+    });
 
     return (
         <UnifiedDesignerShell
@@ -515,7 +523,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                     viewportPersistenceKey={viewportPersistenceKey}
                                     nodes={isInitialDiagramLoading
                                         ? []
-                                        : performanceMode
+                                        : dragRenderPolicy.usePerformanceNodes
                                             ? nodes
                                             : layerSyncedNodes}
                                     displayEdges={isInitialDiagramLoading ? [] : visibleEdges}
@@ -544,6 +552,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                     onReconnect={handleReconnect}
                                     onReconnectStart={handleReconnectStart}
                                     onReconnectEnd={handleReconnectEnd}
+                                    onDisplayRoutingFinalApplied={onDisplayRoutingFinalApplied}
                                     autoRoutingEnabled={autoRoutingEnabled}
                                     enableSmartEdges={true}
                                     showMinimap={showEditingChrome && showMinimap && reactFlowMinimapSupported}
@@ -559,7 +568,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                     panOnDrag={marqueeCanvasInteraction.panOnDrag}
                                     isValidConnection={isValidConnection}
                                     snapEnabled={snapEnabled}
-                                    isDragging={isDragging}
+                                    isDragging={dragRenderPolicy.canvasDragActive}
                                     editingEnabled={editingEnabled}
                                     defaultCanvasHiddenFromAssistiveTech={activePlugin?.replacesDefaultCanvas === true}
                                 >

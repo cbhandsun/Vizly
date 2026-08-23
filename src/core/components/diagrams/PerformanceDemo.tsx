@@ -1,11 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
-    ReactFlow,
     useNodesState,
     useEdgesState,
-    Background,
-    Controls,
-    MiniMap,
     MarkerType,
     type Edge,
     type Node,
@@ -14,6 +10,7 @@ import '@xyflow/react/dist/style.css';
 
 import { AdvancedSmartStepEdge } from '../custom-edges/AdvancedSmartEdge';
 import WorkerPool from '../../workers/WorkerPool';
+import BaseReactFlow from '../shared/BaseReactFlow';
 
 // Node generation helper
 const generateGraph = (nodeCount: number, edgeDensity: number) => {
@@ -114,18 +111,17 @@ export const PerformanceDemo: React.FC = () => {
                 </div>
             </div>
             <div style={{ flex: 1, position: 'relative' }}>
-                <ReactFlow
+                <BaseReactFlow
                     nodes={nodes}
                     edges={edges}
                     onNodesChange={onNodesChange}
                     onEdgesChange={onEdgesChange}
                     edgeTypes={edgeTypes}
                     fitView
-                >
-                    <Background />
-                    <Controls />
-                    <MiniMap />
-                </ReactFlow>
+                    showBackgroundGrid
+                    showControls
+                    showMiniMap
+                />
             </div>
         </div>
     );

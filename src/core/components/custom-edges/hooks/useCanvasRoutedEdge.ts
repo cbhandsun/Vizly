@@ -2,10 +2,14 @@ import { getSmoothStepPath, Position, type EdgeProps } from '@xyflow/react';
 
 import { createFilletedPath, getSmartLabelPosition } from '../../../algorithms/smartEdgeUtils';
 import type { SimpleNodeData } from '../../../hooks/useNodeMap';
-import type { UseSmartEdgeRoutingReturn } from './useSmartEdgeRouting';
 import { getComputedPoints, type SmartPathPoint } from './smartPathCompatibility';
+import {
+  smartEdgeRenderAdapterAcceptsCommittedGeometry,
+  useSmartEdgeRoutingRenderAdapter,
+} from '../smartEdgeRoutingRenderAdapter';
+import type { SmartEdgeRoutingRenderModel } from '../smartEdgeRoutingRenderModel';
 
-const EMPTY_OBSTACLES: UseSmartEdgeRoutingReturn['obstacles'] = [];
+const EMPTY_OBSTACLES: SmartEdgeRoutingRenderModel['obstacles'] = [];
 const EMPTY_SIMPLE_NODE_MAP = new Map<string, SimpleNodeData>();
 
 type CanvasRoutedEdgeData = {
@@ -87,7 +91,10 @@ export type CanvasRoutedEdgeModel = {
  * Parses the bounded canvas-worker result into render-only edge geometry.
  * Malformed or stale data falls back to React Flow's lightweight smooth step.
  */
-export const createCanvasRoutedEdgeModel = (props: EdgeProps): CanvasRoutedEdgeModel => {
+export const createCanvasRoutedEdgeModel = (
+  props: EdgeProps,
+  acceptsCommittedGeometry = false,
+): CanvasRoutedEdgeModel => {
   const data = (props.data ?? {}) as CanvasRoutedEdgeData;
   const nodesDragging = isEndpointDragging(data._draggingNodeIds, props.source, props.target);
   const [fallbackPath, fallbackLabelX, fallbackLabelY] = getSmoothStepPath({
@@ -99,7 +106,9 @@ export const createCanvasRoutedEdgeModel = (props: EdgeProps): CanvasRoutedEdgeM
     targetPosition: props.targetPosition ?? Position.Left,
     borderRadius: resolveCanvasCornerRadius(data),
   });
-  const candidatePoints = nodesDragging ? null : readCanvasComputedPoints(data);
+  const candidatePoints = nodesDragging || !acceptsCommittedGeometry
+    ? null
+    : readCanvasComputedPoints(data);
   const points = candidatePoints && pointsMatchCurrentEndpoints(candidatePoints, props)
     ? candidatePoints
     : null;
@@ -127,8 +136,12 @@ export const createCanvasRoutedEdgeModel = (props: EdgeProps): CanvasRoutedEdgeM
  * Canvas-owned edges consume worker output without subscribing to the graph,
  * obstacle, coordinator, or line-jump stores.
  */
-export const useCanvasRoutedEdge = (props: EdgeProps): UseSmartEdgeRoutingReturn => {
-  const model = createCanvasRoutedEdgeModel(props);
+export const useCanvasRoutedEdge = (props: EdgeProps): SmartEdgeRoutingRenderModel => {
+  const renderAdapter = useSmartEdgeRoutingRenderAdapter();
+  const model = createCanvasRoutedEdgeModel(
+    props,
+    smartEdgeRenderAdapterAcceptsCommittedGeometry(renderAdapter),
+  );
   const data = (props.data ?? {}) as CanvasRoutedEdgeData;
 
   return {

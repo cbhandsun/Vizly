@@ -29,6 +29,7 @@ import {
     resolveDomainLayoutRoutingQuality,
     resolveLayoutDomainOrder,
     shouldPromoteDomainDagreRouteCandidate,
+    shouldRetryRejectedDomainLayoutWithCompoundElk,
 } from '../flowchartLayoutStrategyMode';
 
 
@@ -653,11 +654,12 @@ export function useLayoutStrategy({
                             legacyFallback.isLayoutRoutingHardQualityRejection(error),
                         );
                         if (usedDomainElk || usedDomainCompoundElk) throw error;
-                        const canRetryWithDomainCompoundElk = !usedDomainElk
-                            && !usedDomainCompoundElk
-                            && !canUseFlatElkFallback
-                            && !isDomainLane
-                            && hardQualityRejected;
+                        const canRetryWithDomainCompoundElk = shouldRetryRejectedDomainLayoutWithCompoundElk({
+                            usedDomainElk,
+                            usedDomainCompoundElk,
+                            canUseFlatElkFallback,
+                            hardQualityRejected,
+                        });
                         if (!canRetryWithDomainCompoundElk) throw error;
                         logLayoutStrategyDomainPreservingFallback(strategyName);
                         result = await calculateDomainCompoundElkFallback();

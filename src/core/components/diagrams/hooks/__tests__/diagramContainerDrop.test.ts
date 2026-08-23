@@ -82,6 +82,35 @@ describe('diagramContainerDrop', () => {
     expect(result.find(item => item.id === child.id)?.position).toEqual({ x: 23, y: 28 });
   });
 
+  it('preserves the graph and node references for an unchanged same-parent drop', () => {
+    const parent = node('parent', {
+      type: 'titleGroup',
+      position: { x: 100, y: 100 },
+      style: { width: 300, height: 200 },
+      data: { domainClass: 'operations' },
+    });
+    const child = node('child', {
+      parentId: parent.id,
+      extent: 'parent',
+      position: { x: 20, y: 30 },
+      measured: { width: 50, height: 40 },
+      data: { domain: 'operations' },
+    });
+    const nodes = [parent, child];
+
+    const result = applyContainerDrop({
+      nodes,
+      graphNodes: nodes,
+      draggedNodeIds: [child.id],
+      parentCandidate: parent,
+      snapDelta: null,
+    });
+
+    expect(result).toBe(nodes);
+    expect(result[0]).toBe(parent);
+    expect(result[1]).toBe(child);
+  });
+
   it('detaches every parented dragged node while preserving absolute positions', () => {
     const parent = node('parent', { position: { x: 100, y: 100 } });
     const first = node('first', {

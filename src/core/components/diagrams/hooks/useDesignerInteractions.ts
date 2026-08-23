@@ -4,6 +4,12 @@ import { Node, Edge, Connection, reconnectEdge, SelectionMode, MarkerType, type 
 import { useLayeredVirtualization } from './useLayeredVirtualization';
 import { useDesignerEdgeCallbacks } from './useDesignerEdgeCallbacks';
 import { useDiagramDragDrop } from './useDiagramDragDrop';
+import {
+    cancelDesignerNodeDragVisualSettle,
+    markDesignerNodeDragRoutingFinalApplied,
+    scheduleDesignerNodeDragVisualSettle,
+    type DesignerNodeDragVisualSettleRef,
+} from './designerNodeDragVisualSettle';
 import { useGrouping } from './useGrouping';
 import { useSmartGuides } from '../../../hooks/useSmartGuides';
 import { useAlignment } from './useAlignment';
@@ -215,35 +221,42 @@ export function useDesignerInteractions({
     const handleReconnectStart = useCallback((_event: MouseEvent | React.MouseEvent | TouchEvent | React.TouchEvent, _edge: Edge, _handleType: 'source' | 'target') => {}, []);
     const handleReconnectEnd = useCallback((_event: MouseEvent | React.MouseEvent | TouchEvent | React.TouchEvent, _edge: Edge) => {}, []);
 
-    const { onDragOver, onDrop, onNodeDragStart, onNodeDrag, onNodeDragStop: originalOnNodeDragStop } = useDiagramDragDrop({
-        nodes, edges, setNodes, setEdges, takeSnapshot, notifyHistoryChanged, reactFlowInstance, setIsDragging, snapDeltaRef, clearGuides,
+    const [isDraggingNode, setIsDraggingNode] = useState(false);
+    const nodeAnimationTimerRef = useRef<DesignerNodeDragVisualSettleRef['current']>(null);
+
+    useEffect(() => () => {
+        cancelDesignerNodeDragVisualSettle(nodeAnimationTimerRef);
+    }, []);
+
+    const beginNodeDragInteraction = useCallback(() => {
+        cancelDesignerNodeDragVisualSettle(nodeAnimationTimerRef);
+        setIsDraggingNode(true);
+        setIsDragging(true);
+    }, [setIsDragging]);
+
+    const releaseNodeDragInteraction = useCallback((node: Node) => {
+        scheduleDesignerNodeDragVisualSettle({
+            nodeId: node.id,
+            timerRef: nodeAnimationTimerRef,
+            onSettled: () => {
+                setIsDraggingNode(false);
+                setIsDragging(false);
+            },
+        });
+    }, [setIsDragging]);
+
+    const onDisplayRoutingFinalApplied = useCallback(() => {
+        markDesignerNodeDragRoutingFinalApplied(nodeAnimationTimerRef);
+    }, []);
+
+    const { onDragOver, onDrop, onNodeDragStart, onNodeDrag, onNodeDragStop } = useDiagramDragDrop({
+        nodes, edges, setNodes, setEdges, takeSnapshot, notifyHistoryChanged, reactFlowInstance,
+        onDragInteractionStart: beginNodeDragInteraction,
+        onDragInteractionRelease: releaseNodeDragInteraction,
+        snapDeltaRef, clearGuides,
         enableAltDuplicate: false, isConnecting, activeLayerId: normalizedActiveLayerId,
         moveHistoryLabel: t('designer.historyPanel.beforeMoveNode'),
     });
-
-    const [isDraggingNode, setIsDraggingNode] = useState(false);
-    const nodeAnimationTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-    const wrappedOnNodeDragStart = useCallback((event: MouseEvent | TouchEvent, node: Node) => {
-        setIsDraggingNode(true);
-        onNodeDragStart(event, node);
-    }, [onNodeDragStart]);
-
-    const onNodeDragStop = useCallback((event: MouseEvent | TouchEvent, node: Node, matchedNodes: Node[]) => {
-        originalOnNodeDragStop(event, node, matchedNodes);
-        if (nodeAnimationTimerRef.current) clearTimeout(nodeAnimationTimerRef.current);
-
-        const droppedEl = document.querySelector(`[data-id="${node.id}"]`);
-        droppedEl?.classList.add('just-dropped');
-
-        nodeAnimationTimerRef.current = setTimeout(() => {
-            const el = document.querySelector(`[data-id="${node.id}"]`);
-            if (el) el.classList.remove('just-dropped');
-            nodeAnimationTimerRef.current = null;
-        }, 300);
-
-        setIsDraggingNode(false);
-    }, [originalOnNodeDragStop]);
 
     const addAnnotation = useCallback((x: number, y: number, text: string, pageId?: string) => {
         const parsedContent = parseAnnotationContent(text);
@@ -305,7 +318,8 @@ export function useDesignerInteractions({
         isConnecting, connectPreview, onConnectStart, enhancedOnConnect, enhancedOnConnectEnd,
         isValidConnection,
         handleReconnect, handleReconnectStart, handleReconnectEnd,
-        onDragOver, onDrop, wrappedOnNodeDragStart, onNodeDrag, onNodeDragStop,
-        isDraggingNode
+        onDragOver, onDrop, wrappedOnNodeDragStart: onNodeDragStart, onNodeDrag, onNodeDragStop,
+        isDraggingNode,
+        onDisplayRoutingFinalApplied,
     };
 }

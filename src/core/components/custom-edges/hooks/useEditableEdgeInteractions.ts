@@ -303,14 +303,6 @@ export function useEditableEdgeInteractions({
             e.stopPropagation();
             try {
                 window.dispatchEvent(new CustomEvent('vizly:selectDebugEdge', { detail: { edgeId: id } }));
-                import('../../../services/EdgeRoutingCoordinator').then(({ EdgeRoutingCoordinator }) => {
-                    const coordinator = EdgeRoutingCoordinator.getInstance() as unknown as {
-                        setDebugEdge(id: string | null): void;
-                        forceDebugReRoute(id: string | null): void;
-                    };
-                    coordinator.setDebugEdge(id);
-                    coordinator.forceDebugReRoute(id);
-                }).catch(() => {/* ignore */});
             } catch {/* ignore */}
             return;
         }

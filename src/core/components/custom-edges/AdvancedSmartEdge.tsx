@@ -2,8 +2,6 @@
 import React, { memo } from 'react';
 import type { EdgeProps } from '@xyflow/react';
 import { CanvasRoutedSmartEdge } from './CanvasRoutedSmartEdge';
-import { EdgeOwnedAdvancedSmartEdge } from './EdgeOwnedAdvancedSmartEdge';
-import { useSmartEdgeRoutingOwner } from './smartEdgeRoutingOwnership';
 
 /**
  * [OPTIMIZATION] Strict props comparison to avoid unnecessary re-renders during drag
@@ -64,10 +62,7 @@ function areSmartEdgePropsEqual(prev: EdgeProps, next: EdgeProps) {
  * Delegating all logic domains into separate controllers and rendering through a pure graphic function.
  */
 const InnerAdvancedSmartStepEdge = (props: EdgeProps) => {
-    const routingOwner = useSmartEdgeRoutingOwner();
-    return routingOwner === 'canvas'
-        ? <CanvasRoutedSmartEdge {...props} />
-        : <EdgeOwnedAdvancedSmartEdge {...props} />;
+    return <CanvasRoutedSmartEdge {...props} />;
 };
 
 // Export memoized components

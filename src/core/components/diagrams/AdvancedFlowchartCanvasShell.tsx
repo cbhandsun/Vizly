@@ -65,6 +65,7 @@ export interface FlowchartCanvasShellProps {
     onReconnect?: OnReconnect;
     onReconnectStart?: (event: MouseEvent | React.MouseEvent | TouchEvent | React.TouchEvent, edge: Edge, handleType: 'source' | 'target') => void;
     onReconnectEnd?: (event: MouseEvent | React.MouseEvent | TouchEvent | React.TouchEvent, edge: Edge) => void;
+    onDisplayRoutingFinalApplied?: () => void;
     backgroundGridColor?: string;
     viewportPersistenceKey?: string;
     defaultCanvasHiddenFromAssistiveTech?: boolean;
@@ -120,6 +121,7 @@ export const AdvancedFlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> =
     onReconnect,
     onReconnectStart,
     onReconnectEnd,
+    onDisplayRoutingFinalApplied,
     backgroundGridColor,
     viewportPersistenceKey,
     defaultCanvasHiddenFromAssistiveTech = false,
@@ -267,6 +269,7 @@ export const AdvancedFlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> =
             onReconnect={editingEnabled ? onReconnect : undefined}
             onReconnectStart={editingEnabled ? onReconnectStart : undefined}
             onReconnectEnd={editingEnabled ? onReconnectEnd : undefined}
+            onDisplayRoutingFinalApplied={onDisplayRoutingFinalApplied}
         >
             {children}
         </BaseReactFlow>
