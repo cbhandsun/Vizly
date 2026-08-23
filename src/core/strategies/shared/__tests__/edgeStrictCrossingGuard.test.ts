@@ -967,6 +967,18 @@ describe('edgeStrictCrossingGuard', () => {
     expect(context.edgeHasPairRepairOpportunity?.(3)).toBe(false);
   });
 
+  it('keeps overlap-only edges behind the micro cleanup local-quality prefilter', () => {
+    const baseline = [
+      edge('parallel-a', [{ x: 0, y: 0 }, { x: 120, y: 0 }]),
+      edge('parallel-b', [{ x: 40, y: 2 }, { x: 160, y: 2 }]),
+    ];
+    const context = createEdgePathQualityEvaluationContext(baseline);
+
+    expect(calculateEdgePathQualityScore(baseline).unrelatedOverlap).toBeGreaterThan(0);
+    expect(context.edgeHasPairRepairOpportunity?.(0)).toBe(false);
+    expect(context.edgeHasPairRepairOpportunity?.(1)).toBe(false);
+  });
+
   it('uses conservative finite bounds for changed-edge pair scans', () => {
     const baseline = { minX: 0, maxX: 100, minY: 0, maxY: 100 };
 

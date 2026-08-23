@@ -4,6 +4,7 @@ import { buildEdgeSegments, type Point, type Segment } from '../edgePathQualityG
 import {
   buildQualitySegmentBounds,
   createEdgePathQualitySegmentIndex,
+  createReusableEdgePathQualitySegmentIndex,
   qualitySegmentBoundsMayContribute,
 } from '../edgePathQualitySegmentIndex';
 
@@ -81,6 +82,52 @@ describe('edgePathQualitySegmentIndex', () => {
     const result = createEdgePathQualitySegmentIndex([]).queryPotentialEdgeIndexes([]);
     expect([...result.edgeIndexes]).toEqual([]);
     expect(result.scannedSegmentCount).toBe(0);
+  });
+
+  it('reuses bounded numeric queries across equivalent baseline identities', () => {
+    const baseline = [
+      segments(0, [{ x: 10_010, y: -20 }, { x: 10_010, y: 120 }]),
+      segments(1, [{ x: 9_900, y: 4 }, { x: 10_100, y: 4 }]),
+      segments(2, [{ x: 20_000, y: 20_000 }, { x: 20_200, y: 20_000 }]),
+    ];
+    const candidate = segments(9, [{ x: 9_900, y: 0 }, { x: 10_100, y: 0 }]);
+
+    const first = createReusableEdgePathQualitySegmentIndex(baseline)
+      .queryPotentialEdgeIndexes(candidate, new Set([9]));
+    const repeated = createReusableEdgePathQualitySegmentIndex(
+      baseline.map(edgeSegments => edgeSegments.map(segment => ({
+        ...segment,
+        a: { ...segment.a },
+        b: { ...segment.b },
+      }))),
+    ).queryPotentialEdgeIndexes(
+      candidate.map(segment => ({ ...segment, a: { ...segment.a }, b: { ...segment.b } })),
+      new Set([9]),
+    );
+
+    expect(first.cacheHit).toBe(false);
+    expect(first.scannedSegmentCount).toBeGreaterThan(0);
+    expect(repeated.cacheHit).toBe(true);
+    expect(repeated.scannedSegmentCount).toBe(0);
+    expect([...repeated.edgeIndexes]).toEqual([...first.edgeIndexes]);
+  });
+
+  it('returns an isolated set on cache hits and keeps exclusion keys distinct', () => {
+    const index = createEdgePathQualitySegmentIndex([
+      segments(0, [{ x: 30_010, y: -20 }, { x: 30_010, y: 120 }]),
+      segments(1, [{ x: 30_020, y: -20 }, { x: 30_020, y: 120 }]),
+    ]);
+    const candidate = segments(9, [{ x: 29_900, y: 0 }, { x: 30_100, y: 0 }]);
+    const first = index.queryPotentialEdgeIndexes(candidate);
+    (first.edgeIndexes as Set<number>).clear();
+
+    const repeated = index.queryPotentialEdgeIndexes(candidate);
+    const excluded = index.queryPotentialEdgeIndexes(candidate, new Set([1]));
+
+    expect(repeated.cacheHit).toBe(true);
+    expect([...repeated.edgeIndexes]).toEqual([0, 1]);
+    expect(excluded.cacheHit).toBe(false);
+    expect([...excluded.edgeIndexes]).toEqual([0]);
   });
 
 });

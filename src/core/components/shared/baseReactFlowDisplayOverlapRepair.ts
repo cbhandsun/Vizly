@@ -12,7 +12,7 @@ import {
   type EdgePathQualityScore,
 } from '../../strategies/shared/edgeStrictCrossingGuard';
 import { getSegments } from '../../strategies/shared/edgePathQualityGeometry';
-import { createEdgePathQualitySegmentIndex } from '../../strategies/shared/edgePathQualitySegmentIndex';
+import { createReusableEdgePathQualitySegmentIndex } from '../../strategies/shared/edgePathQualitySegmentIndex';
 import {
   displayEdgesRelated,
   displaySegmentOverlap,
@@ -100,7 +100,7 @@ export const collectResidualMicroCandidateEdgeIndexes = (
   const edgeSegments = derivative.map((_, edgeIndex) => (
     allSegments.filter(segment => segment.edgeIndex === edgeIndex)
   ));
-  const segmentIndex = createEdgePathQualitySegmentIndex(edgeSegments);
+  const segmentIndex = createReusableEdgePathQualitySegmentIndex(edgeSegments);
   const candidateIndexes = new Set(changedIndexes);
   const changedSet = new Set(changedIndexes);
   for (const changedIndex of changedIndexes) {
@@ -402,58 +402,60 @@ export const repairResidualDisplayOverlaps = <T extends Edge[]>(
         extendedOptions,
       ) as T,
     );
-    const extendedBaseline = selected;
-    selected = runTracedRepair(
-      'residual-polish-selection',
-      extendedBaseline,
-      () => {
-        const extendedOverlapMicroRepaired = runTracedMicroRepair(
-          extendedOverlapRepaired,
-          'residual-polish-selection',
-        );
-        const extendedEndpointRepaired = runTracedRepair(
-          'residual-endpoint-derivative',
-          extendedOverlapRepaired,
-          () => repairEndpointOrthogonalPaths(
+    if (extendedOverlapRepaired !== selected) {
+      const extendedBaseline = selected;
+      selected = runTracedRepair(
+        'residual-polish-selection',
+        extendedBaseline,
+        () => {
+          const extendedOverlapMicroRepaired = runTracedMicroRepair(
             extendedOverlapRepaired,
-            nodes,
-            endpointRepairOptions,
-          ) as T,
-          'residual-polish-selection',
-        );
-        const extendedMicroRepaired = runTracedMicroDerivative(
-          extendedOverlapRepaired,
-          extendedEndpointRepaired,
-          'residual-polish-selection',
-        );
-        const obstacleAware = runTracedRepair(
-          'residual-obstacle-selection',
-          extendedBaseline,
-          () => chooseFinalObstacleAwarePolishCandidate(
-            nodes,
+            'residual-polish-selection',
+          );
+          const extendedEndpointRepaired = runTracedRepair(
+            'residual-endpoint-derivative',
+            extendedOverlapRepaired,
+            () => repairEndpointOrthogonalPaths(
+              extendedOverlapRepaired,
+              nodes,
+              endpointRepairOptions,
+            ) as T,
+            'residual-polish-selection',
+          );
+          const extendedMicroRepaired = runTracedMicroDerivative(
+            extendedOverlapRepaired,
+            extendedEndpointRepaired,
+            'residual-polish-selection',
+          );
+          const obstacleAware = runTracedRepair(
+            'residual-obstacle-selection',
             extendedBaseline,
-            extendedOverlapRepaired,
-            extendedOverlapMicroRepaired,
-            extendedEndpointRepaired,
-            extendedMicroRepaired,
-          ),
-          'residual-polish-selection',
-        );
-        return runTracedRepair(
-          'residual-exact-selection',
-          obstacleAware,
-          () => chooseExactThresholdResidualCandidate(
-            nodes,
+            () => chooseFinalObstacleAwarePolishCandidate(
+              nodes,
+              extendedBaseline,
+              extendedOverlapRepaired,
+              extendedOverlapMicroRepaired,
+              extendedEndpointRepaired,
+              extendedMicroRepaired,
+            ),
+            'residual-polish-selection',
+          );
+          return runTracedRepair(
+            'residual-exact-selection',
             obstacleAware,
-            extendedOverlapRepaired,
-            extendedOverlapMicroRepaired,
-            extendedEndpointRepaired,
-            extendedMicroRepaired,
-          ),
-          'residual-polish-selection',
-        );
-      },
-    );
+            () => chooseExactThresholdResidualCandidate(
+              nodes,
+              obstacleAware,
+              extendedOverlapRepaired,
+              extendedOverlapMicroRepaired,
+              extendedEndpointRepaired,
+              extendedMicroRepaired,
+            ),
+            'residual-polish-selection',
+          );
+        },
+      );
+    }
   }
   const exactShiftCleaned = runTracedRepair(
     'residual-exact',

@@ -20,7 +20,12 @@ import {
   hasPairContribution,
   strictlyCrosses,
 } from './edgePathQualityGeometry';
-import { edgeRoutingQualityIntentToken } from './edgeRoutingQualityIntent';
+import {
+  buildQualityEdgeInputSnapshot,
+  buildQualityInputSnapshot,
+  type QualityEdgeInputSnapshot,
+  type QualityInputSnapshot,
+} from './edgePathQualityInputSnapshot';
 import {
   calculateMemoizedEdgePairQuality,
   EdgePathQualityGenerationalPairMemo,
@@ -28,22 +33,11 @@ import {
 } from './edgePathQualityPairMemo';
 import {
   collectPotentialChangedEdgePairKeys,
-  createEdgePathQualitySegmentIndex,
+  createReusableEdgePathQualitySegmentIndex,
 } from './edgePathQualitySegmentIndex';
 
 export { MIN_EDGE_PATH_PENALIZED_OVERLAP } from './edgePathQualityGeometry';
 export type { EdgePathQualityScore } from './edgePathQualityGeometry';
-
-type QualityInputSnapshot = {
-  signature: string;
-  paths: Point[][];
-  edgeSignatures: string[];
-};
-
-type QualityEdgeInputSnapshot = {
-  path: Point[];
-  signature: string;
-};
 
 const qualityScoreCache = new WeakMap<Edge[], {
   signature: string;
@@ -74,34 +68,6 @@ function readSignatureValue<T>(cache: Map<string, T>, signature: string): T | un
   cache.delete(signature);
   cache.set(signature, value);
   return value;
-}
-
-function buildQualityEdgeInputSnapshot(edge: Edge): QualityEdgeInputSnapshot {
-  const path = getEdgePath(edge);
-  const intent = edgeRoutingQualityIntentToken(edge);
-  const pathSignature = path.map(point => `${point.x},${point.y}`).join(';');
-  return {
-    path,
-    signature: [
-      edge.source,
-      edge.target,
-      edge.sourceHandle ?? '',
-      edge.targetHandle ?? '',
-      intent,
-      pathSignature,
-    ].join('\u001f'),
-  };
-}
-
-function buildQualityInputSnapshot(edges: Edge[]): QualityInputSnapshot {
-  const edgeSnapshots = edges.map(buildQualityEdgeInputSnapshot);
-  const paths = edgeSnapshots.map(snapshot => snapshot.path);
-  const edgeSignatures = edgeSnapshots.map(snapshot => snapshot.signature);
-  return {
-    signature: edgeSignatures.join('\u001e'),
-    paths,
-    edgeSignatures,
-  };
 }
 
 type EdgePathQualityDecomposition = {
@@ -265,6 +231,7 @@ export type EdgePathQualityEvaluationContext = {
   edgeHasPairRepairOpportunity?: (edgeIndex: number) => boolean;
   readMetrics?: () => Readonly<{
     pairCacheHitCount: number;
+    segmentQueryCacheHitCount: number;
     scannedEdgePairCount: number;
     scannedSegmentCount: number;
   }>;
@@ -295,12 +262,13 @@ export function createEdgePathQualityEvaluationContext(
 
   const metrics = {
     pairCacheHitCount: 0,
+    segmentQueryCacheHitCount: 0,
     scannedEdgePairCount: 0,
     scannedSegmentCount: 0,
   };
   const baselineDecomposition = getEdgePathQualityDecomposition(baseline, baselineSnapshot, metrics);
   const baselineSegments = baselineDecomposition.edgeSegments;
-  const baselineSegmentIndex = createEdgePathQualitySegmentIndex(baselineSegments);
+  const baselineSegmentIndex = createReusableEdgePathQualitySegmentIndex(baselineSegments);
   const baselineEdgeScores = baselineDecomposition.edgeScores;
   const baselinePairScores = baselineDecomposition.pairScores;
   const derivedPairMemo = new EdgePathQualityGenerationalPairMemo();
@@ -318,12 +286,10 @@ export function createEdgePathQualityEvaluationContext(
   }
   const pairRepairEdgeIndexes = new Set<number>();
   for (const [pairKey, contribution] of baselinePairScores) {
-    if (
-      contribution.strictCrossings <= 0
-      && contribution.reverseOverlap <= 0
-      && contribution.unrelatedOverlap <= 0
-      && contribution.unexplainedRelatedOverlap <= 0
-    ) continue;
+    // Micro cleanup can accept a globally non-local improvement only when it
+    // removes a strict crossing. Parallel-overlap reductions alone are not an
+    // acceptance condition, so they must not disable the exact local prefilter.
+    if (contribution.strictCrossings <= 0) continue;
     pairRepairEdgeIndexes.add(Math.floor(pairKey / edgeCount));
     pairRepairEdgeIndexes.add(pairKey % edgeCount);
   }
@@ -490,6 +456,7 @@ export function createEdgePathQualityEvaluationContext(
       edgeSegments,
       segmentIndex: baselineSegmentIndex,
     });
+    metrics.segmentQueryCacheHitCount += candidatePairQuery.cacheHitCount;
     metrics.scannedSegmentCount += candidatePairQuery.scannedSegmentCount;
     for (const pairKey of candidatePairQuery.pairKeys) {
       const firstIndex = Math.floor(pairKey / parent.edgeCount);
@@ -563,6 +530,7 @@ export function createEdgePathQualityEvaluationContext(
         changedSegments,
         excluded,
       );
+      if (segmentQuery.cacheHit) metrics.segmentQueryCacheHitCount += 1;
       metrics.scannedSegmentCount += segmentQuery.scannedSegmentCount;
 
       for (const otherIndex of segmentQuery.edgeIndexes) {
@@ -604,6 +572,7 @@ export function createEdgePathQualityEvaluationContext(
       edgeSegments: candidateSegments,
       segmentIndex: baselineSegmentIndex,
     });
+    metrics.segmentQueryCacheHitCount += candidatePairQuery.cacheHitCount;
     metrics.scannedSegmentCount += candidatePairQuery.scannedSegmentCount;
     candidatePairQuery.pairKeys.forEach(pairKey => affectedPairKeys.add(pairKey));
 
