@@ -1,7 +1,7 @@
 import type { Edge, Node } from '@xyflow/react';
 
-import { clearBaseReactFlowLayoutEdgeRoutingData } from '../../shared/baseReactFlowLayoutRoutingTransaction';
-import { withDisplayAbsolutePositions } from '../../shared/baseReactFlowDisplayEdgeCore';
+import { withDisplayAbsolutePositions } from '../../shared/baseReactFlowAbsolutePositions';
+import { clearBaseReactFlowLayoutEdgeRoutingData } from '../../shared/baseReactFlowLayoutEdgeRoutingData';
 import { logLayoutOrphanEdgeDropped } from './diagramInteractionLogging';
 
 const asRecord = (value: unknown): Record<string, unknown> => (

@@ -17,7 +17,6 @@ import {
 import {
   loadThemePreset,
   getAvailableThemeIds,
-  preloadThemePreset,
   clearThemePresetCache,
   getCacheStats
 } from './ThemePresetLoader';
@@ -128,9 +127,6 @@ export class EnhancedThemeManager {
 
       // 加载默认主题
       await this.setTheme(defaultThemeId);
-
-      // 预加载其他主题
-      this.preloadOtherThemes();
 
     } catch (error) {
       logThemeManagerInitializationFailure(error);
@@ -505,26 +501,6 @@ export class EnhancedThemeManager {
         logThemeManagerListenerFailure(error);
       }
     });
-  }
-
-  /**
-   * 预加载其他主题
-   */
-  private preloadOtherThemes(): void {
-    if (!this.config.performance.lazyLoad) {
-      return;
-    }
-
-    const availableIds = getAvailableThemeIds();
-    const delay = this.config.performance.preloadDelay;
-
-    setTimeout(() => {
-      availableIds.forEach(themeId => {
-        if (themeId !== this.currentThemeId) {
-          preloadThemePreset(themeId);
-        }
-      });
-    }, delay);
   }
 
   /**

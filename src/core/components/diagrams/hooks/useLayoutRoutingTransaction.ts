@@ -1,21 +1,12 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { Edge, Node } from '@xyflow/react';
 
-import { diagramConfigManager } from '../../../config/DiagramConfig';
-import { EdgeRoutingCoordinator } from '../../../services/EdgeRoutingCoordinator';
 import { runAfterLayoutRenderFrames } from '../../../utils/animateLayoutTransition';
 import { flushObstacles } from '../../custom-edges/obstacleContext';
 import {
   computeBaseReactFlowIsLargeGraph,
   readBaseReactFlowPerformanceConfig,
 } from '../../shared/baseReactFlowRuntimeConfig';
-import {
-  disposeBaseReactFlowDisplayWorker,
-  prewarmBaseReactFlowDisplayWorker,
-} from '../../shared/baseReactFlowDisplayWorkerClient';
-import {
-  stageBaseReactFlowLayoutRouting,
-} from '../../shared/baseReactFlowLayoutRoutingTransaction';
 
 type LayoutRoutingTransactionRequest = Readonly<{
   nodes: Node[];
@@ -49,15 +40,14 @@ export const useLayoutRoutingTransaction = ({
   const workerRef = useRef<Worker | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const requestSequenceRef = useRef(0);
+  const disposeWorkerRef = useRef<((workerRef: React.MutableRefObject<Worker | null>) => void) | null>(null);
 
   useEffect(() => {
-    // Worker module fetching/compilation overlaps ordinary canvas use instead
-    // of becoming part of the first explicit layout interaction.
-    prewarmBaseReactFlowDisplayWorker(workerRef);
     return () => {
       abortControllerRef.current?.abort();
       abortControllerRef.current = null;
-      disposeBaseReactFlowDisplayWorker(workerRef);
+      disposeWorkerRef.current?.(workerRef);
+      disposeWorkerRef.current = null;
     };
   }, []);
 
@@ -69,6 +59,23 @@ export const useLayoutRoutingTransaction = ({
     abortControllerRef.current?.abort();
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
+
+    // Layout routing is an explicit interaction. Defer its worker, coordinator,
+    // and full-quality transaction until that interaction instead of charging
+    // every empty-canvas visit for the complete routing engine.
+    const [
+      { diagramConfigManager },
+      { EdgeRoutingCoordinator },
+      displayWorkerModule,
+      { stageBaseReactFlowLayoutRouting },
+    ] = await Promise.all([
+      import('../../../config/DiagramConfig'),
+      import('../../../services/EdgeRoutingCoordinator'),
+      import('../../shared/baseReactFlowDisplayWorkerClient'),
+      import('../../shared/baseReactFlowLayoutRoutingTransaction'),
+    ]);
+    disposeWorkerRef.current = displayWorkerModule.disposeBaseReactFlowDisplayWorker;
+    if (abortController.signal.aborted) throw new Error('layout-routing-cancelled');
 
     let committedEdges = edges;
     if (edges.length > 0) {

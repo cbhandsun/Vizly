@@ -50,6 +50,10 @@ export const logLayoutStrategyDomainPreservingFallback = (strategyName: string):
   safeLog.info(`[useLayoutStrategy] Using domain-preserving layered fallback for hard-defective ${strategyName} geometry.`);
 };
 
+export const logAutoRoutingCacheClearFailure = (error: unknown): void => {
+  safeLog.warn('[useAutoRouting] Unable to clear routing caches:', redactSensitiveLogValue(error));
+};
+
 export const logSmartRoutingConfigLayerSyncFailure = (error: unknown): void => {
   safeLog.warn('[useSmartRoutingConfig] Layered config sync failed:', redactSensitiveLogValue(error));
 };

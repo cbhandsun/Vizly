@@ -19,7 +19,7 @@ describe('test:ci shard catalog', () => {
   it('keeps every shard in exactly one non-empty CI group', () => {
     const grouped = Object.values(TEST_CI_SHARD_GROUPS).flat();
     expect(TEST_CI_GROUP_NAMES).toEqual(['foundation', 'ui', 'flow', 'core', 'routing']);
-    expect(grouped).toHaveLength(46);
+    expect(grouped).toHaveLength(47);
     expect(new Set(grouped).size).toBe(grouped.length);
     expect(TEST_CI_SHARDS).toEqual(grouped);
     expect(Object.values(TEST_CI_SHARD_GROUPS).every((shards) => shards.length > 0)).toBe(true);
@@ -54,17 +54,25 @@ describe('test:ci shard catalog', () => {
   });
 
   it('isolates the resource-sensitive diagram interactions without slowing the full shard', () => {
-    const fullShard = packageJson.scripts['test:ci:core-components-extra'];
+    const fullShards = [
+      packageJson.scripts['test:ci:core-components-extra-a'],
+      packageJson.scripts['test:ci:core-components-extra-b'],
+    ];
     const interactionShard = packageJson.scripts['test:ci:core-components-extra-interactions'];
 
-    expect(fullShard).toContain('--maxWorkers=2');
+    expect(fullShards[0]).toContain('--maxWorkers=2');
+    expect(fullShards[0]).toContain('--shard=1/2');
+    expect(fullShards[1]).toContain('--maxWorkers=2');
+    expect(fullShards[1]).toContain('--shard=2/2');
     expect(interactionShard).toContain('--maxWorkers=1');
     for (const fileName of [
       'TopActionButtons.test.tsx',
       'CommentPanel.test.tsx',
       'AnnotationLayer.accessibility.test.tsx',
     ]) {
-      expect(fullShard).toContain(`--exclude src/core/components/diagrams/__tests__/${fileName}`);
+      for (const fullShard of fullShards) {
+        expect(fullShard).toContain(`--exclude src/core/components/diagrams/__tests__/${fileName}`);
+      }
       expect(interactionShard).toContain(`src/core/components/diagrams/__tests__/${fileName}`);
     }
   });
@@ -72,7 +80,10 @@ describe('test:ci shard catalog', () => {
   it('isolates resource-sensitive auth and property panels without widening timeouts', () => {
     const primitiveShard = packageJson.scripts['test:ci:ui-components-primitives'];
     const authShard = packageJson.scripts['test:ci:ui-components-auth'];
-    const fullShard = packageJson.scripts['test:ci:core-components-extra'];
+    const fullShards = [
+      packageJson.scripts['test:ci:core-components-extra-a'],
+      packageJson.scripts['test:ci:core-components-extra-b'],
+    ];
     const propertyShard = packageJson.scripts['test:ci:core-components-extra-properties'];
 
     expect(primitiveShard).not.toContain('src/components/auth/__tests__');
@@ -85,7 +96,9 @@ describe('test:ci shard catalog', () => {
       'PropertyPanel.test.tsx',
       'EdgeEditingCommercialAudit.test.tsx',
     ]) {
-      expect(fullShard).toContain(`--exclude src/core/components/diagrams/__tests__/${fileName}`);
+      for (const fullShard of fullShards) {
+        expect(fullShard).toContain(`--exclude src/core/components/diagrams/__tests__/${fileName}`);
+      }
       expect(propertyShard).toContain(`src/core/components/diagrams/__tests__/${fileName}`);
     }
   });

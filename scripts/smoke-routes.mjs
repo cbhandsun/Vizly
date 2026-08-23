@@ -36,6 +36,7 @@ const HAS_EXPLICIT_DEBUG_PORT = Boolean(process.env.SMOKE_DEBUG_PORT);
 const BASE_URL = process.env.SMOKE_BASE_URL || `http://${HOST}:${APP_PORT}`;
 const USE_EXISTING_SERVER = Boolean(process.env.SMOKE_BASE_URL);
 const SERVER_MODE = process.env.SMOKE_SERVER || 'preview';
+const INCLUDE_DEV_ROUTES = SERVER_MODE === 'dev' || process.env.SMOKE_INCLUDE_DEV_ROUTES === '1';
 const LIFECYCLE_EVENT = process.env.npm_lifecycle_event || '';
 const IS_BUDGET_SMOKE_SCRIPT = LIFECYCLE_EVENT === 'smoke:routes:budget';
 const IS_MOBILE_SMOKE_SCRIPT = LIFECYCLE_EVENT === 'smoke:routes:mobile';
@@ -105,7 +106,7 @@ const allowedWarningPatterns = [
   /GL Driver Message .*ReadPixels/,
 ];
 
-const routes = createSmokeRouteCatalog(BASE_URL);
+const routes = createSmokeRouteCatalog(BASE_URL, { includeDevRoutes: INCLUDE_DEV_ROUTES });
 
 const knownRouteNames = new Set(routes.map((route) => route.name));
 const unknownRouteFilters = ROUTE_FILTERS.filter((routeName) => !knownRouteNames.has(routeName));

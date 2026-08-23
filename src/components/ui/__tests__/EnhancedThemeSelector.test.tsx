@@ -136,6 +136,14 @@ describe('EnhancedThemeSelector', () => {
     return screen.findByRole('dialog', { name: 'Theme Settings' });
   };
 
+  it('loads theme previews only when the selector is opened', async () => {
+    render(<EnhancedThemeSelector ariaLabel="Open theme settings" />);
+
+    expect(themeManager.preloadThemes).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Open theme settings' }));
+    await waitFor(() => expect(themeManager.preloadThemes).toHaveBeenCalledWith(['light']));
+  });
+
   it('uses native pressed buttons and serializes theme selection', async () => {
     await openSelector();
     await waitFor(() => expect(screen.getByRole('tabpanel').querySelector('button[aria-pressed]')).not.toBeNull());

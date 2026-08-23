@@ -103,7 +103,7 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
 
   // 加载预设和自定义主题
   useEffect(() => {
-    if (!state.integration) return;
+    if (!isOpen || !state.integration) return;
 
     const loadData = async () => {
       try {
@@ -135,7 +135,7 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
     if (state.isReady) {
       loadData();
     }
-  }, [state.integration, state.isReady]);
+  }, [isOpen, state.integration, state.isReady]);
 
   // 获取可用主题列表
   const availableThemes = useMemo(() => {

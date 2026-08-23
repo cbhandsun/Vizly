@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import type React from 'react';
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import type { Edge, Node } from '@xyflow/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -76,6 +76,20 @@ describe('useAutoRouting layout preference coordination', () => {
         mocks.handleStrategyLayout.mockResolvedValue(true);
         mocks.syncAutoPathSelection.mockReset();
         mocks.applyRoutingProfile.mockReset();
+    });
+
+    it('does not load or clear the advanced routing cache on initial mount', () => {
+        renderHook(() => useAutoRouting(createOptions()));
+
+        expect(mocks.forceClearAllCaches).not.toHaveBeenCalled();
+    });
+
+    it('clears the advanced routing cache after an explicit preference change', async () => {
+        const { result } = renderHook(() => useAutoRouting(createOptions()));
+
+        act(() => result.current.setAutoRoutingEnabled(false));
+
+        await waitFor(() => expect(mocks.forceClearAllCaches).toHaveBeenCalledTimes(1));
     });
 
     it('does not let a late layout completion overwrite a newer manual routing choice', async () => {

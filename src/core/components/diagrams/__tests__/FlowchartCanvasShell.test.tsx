@@ -6,6 +6,24 @@ import { applyNodeChanges, type Edge, type Node, type NodeChange } from '@xyflow
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const baseReactFlowProps = vi.fn();
+const lightweightReactFlowProps = vi.fn();
+
+vi.mock('@xyflow/react', async () => {
+  const actual = await vi.importActual<typeof import('@xyflow/react')>('@xyflow/react');
+  return {
+    ...actual,
+    Background: () => <div data-testid="lightweight-background" />,
+    ReactFlow: (props: Record<string, unknown>) => {
+      lightweightReactFlowProps(props);
+      return (
+        <div className="react-flow" data-testid="lightweight-react-flow">
+          <div className="react-flow__renderer" />
+          {props.children as React.ReactNode}
+        </div>
+      );
+    },
+  };
+});
 
 vi.mock('../../shared/BaseReactFlow', () => ({
   default: (props: Record<string, unknown>) => {
@@ -33,13 +51,14 @@ import {
 describe('FlowchartCanvasShell', () => {
   beforeEach(() => {
     baseReactFlowProps.mockClear();
+    lightweightReactFlowProps.mockClear();
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it('delegates one-time viewport restore-or-fit without pinning later rerenders', () => {
+  it('keeps an interactive lightweight pane on the empty startup path', () => {
     const noop = vi.fn();
 
     render(
@@ -76,17 +95,15 @@ describe('FlowchartCanvasShell', () => {
       />,
     );
 
-    const props = baseReactFlowProps.mock.calls.at(-1)?.[0];
+    const props = lightweightReactFlowProps.mock.calls.at(-1)?.[0];
     expect(props).toMatchObject({
-      fitMode: 'restoreOrFitAll',
-      fitPadding: 0.1,
-      pinFit: false,
-      viewportPersistenceKey: 'diagram-a:page-1',
+      elementsSelectable: false,
+      nodes: [],
+      edges: [],
       nodesFocusable: true,
       edgesFocusable: true,
-      multiSelectionKeyCode: null,
     });
-    expect(props).not.toHaveProperty('fitView');
+    expect(baseReactFlowProps).not.toHaveBeenCalled();
   });
 
   it('removes a plugin-replaced default canvas from keyboard and assistive navigation', () => {
@@ -126,11 +143,11 @@ describe('FlowchartCanvasShell', () => {
       />,
     );
 
-    expect(baseReactFlowProps.mock.calls.at(-1)?.[0]).toMatchObject({
+    expect(lightweightReactFlowProps.mock.calls.at(-1)?.[0]).toMatchObject({
       nodesFocusable: false,
       edgesFocusable: false,
     });
-    expect(getByTestId('base-react-flow').querySelector('.react-flow__renderer')?.getAttribute('aria-hidden'))
+    expect(getByTestId('lightweight-react-flow').querySelector('.react-flow__renderer')?.getAttribute('aria-hidden'))
       .toBe('true');
   });
 
@@ -168,7 +185,7 @@ describe('FlowchartCanvasShell', () => {
     expect(renderer.hasAttribute('aria-hidden')).toBe(false);
   });
 
-  it('removes every canvas mutation entry point when editing is disabled', () => {
+  it('removes every canvas mutation entry point when editing is disabled', async () => {
     const noop = vi.fn();
     render(
       <FlowchartCanvasShell
@@ -204,6 +221,7 @@ describe('FlowchartCanvasShell', () => {
       />,
     );
 
+    await waitFor(() => expect(baseReactFlowProps).toHaveBeenCalled());
     const props = baseReactFlowProps.mock.calls.at(-1)?.[0];
     expect(props).toMatchObject({
       nodesDraggable: false,
@@ -223,7 +241,7 @@ describe('FlowchartCanvasShell', () => {
     expect((props.edges as Edge[])[0].selected).toBe(false);
   });
 
-  it('keeps drag positions local and commits final multi-node positions once', () => {
+  it('keeps drag positions local and commits final multi-node positions once', async () => {
     const initialNodes = [
       { id: 'A', position: { x: 0, y: 0 }, data: {} },
       { id: 'B', position: { x: 20, y: 30 }, data: {}, selected: true },
@@ -276,6 +294,7 @@ describe('FlowchartCanvasShell', () => {
 
     render(<Harness />);
     const event = new MouseEvent('mousedown');
+    await waitFor(() => expect(baseReactFlowProps).toHaveBeenCalled());
     const startingProps = baseReactFlowProps.mock.calls.at(-1)?.[0];
     act(() => {
       (startingProps.onNodeDragStart as (
@@ -327,7 +346,7 @@ describe('FlowchartCanvasShell', () => {
     expect(onNodeDragStop).toHaveBeenCalledOnce();
   });
 
-  it('forwards position changes normally outside a drag gesture', () => {
+  it('forwards position changes normally outside a drag gesture', async () => {
     const onNodesChange = vi.fn();
     const noop = vi.fn();
     render(
@@ -363,6 +382,7 @@ describe('FlowchartCanvasShell', () => {
       />,
     );
 
+    await waitFor(() => expect(baseReactFlowProps).toHaveBeenCalled());
     const changes: NodeChange[] = [
       { id: 'A', type: 'position', position: { x: 1, y: 2 }, dragging: false },
     ];
@@ -374,7 +394,7 @@ describe('FlowchartCanvasShell', () => {
     expect(onNodesChange).toHaveBeenCalledWith(changes);
   });
 
-  it('reconciles Shift multi-selection after React Flow finishes its click update', () => {
+  it('reconciles Shift multi-selection after React Flow finishes its click update', async () => {
     const onNodesChange = vi.fn();
     const onNodeClick = vi.fn();
     const noop = vi.fn();
@@ -422,6 +442,7 @@ describe('FlowchartCanvasShell', () => {
       />,
     );
 
+    await waitFor(() => expect(baseReactFlowProps).toHaveBeenCalled());
     const props = baseReactFlowProps.mock.calls.at(-1)?.[0];
     act(() => {
       (props.onNodeClick as (event: React.MouseEvent, node: Node) => void)(
@@ -441,7 +462,7 @@ describe('FlowchartCanvasShell', () => {
     ]);
   });
 
-  it('reconciles Shift multi-selection for connectors without clearing selected edges', () => {
+  it('reconciles Shift multi-selection for connectors without clearing selected edges', async () => {
     const onEdgesChange = vi.fn();
     const onEdgeClick = vi.fn();
     const noop = vi.fn();
@@ -489,6 +510,7 @@ describe('FlowchartCanvasShell', () => {
       />,
     );
 
+    await waitFor(() => expect(baseReactFlowProps).toHaveBeenCalled());
     const props = baseReactFlowProps.mock.calls.at(-1)?.[0];
     act(() => {
       (props.onEdgeClick as (event: React.MouseEvent, edge: Edge) => void)(
@@ -506,7 +528,7 @@ describe('FlowchartCanvasShell', () => {
     ]);
   });
 
-  it('applies smart-guide snapping inside the canvas without an upstream position write', () => {
+  it('applies smart-guide snapping inside the canvas without an upstream position write', async () => {
     let scheduledFrame: FrameRequestCallback | null = null;
     vi.stubGlobal('requestAnimationFrame', vi.fn((callback: FrameRequestCallback) => {
       scheduledFrame = callback;
@@ -553,6 +575,7 @@ describe('FlowchartCanvasShell', () => {
       />,
     );
 
+    await waitFor(() => expect(baseReactFlowProps).toHaveBeenCalled());
     const event = new MouseEvent('mousemove');
     act(() => {
       (baseReactFlowProps.mock.calls.at(-1)?.[0].onNodeDragStart as (

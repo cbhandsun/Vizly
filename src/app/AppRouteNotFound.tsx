@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { ArrowLeftOutlined, HomeOutlined, QuestionCircleOutlined } from '@ant-design/icons';
+import { ArrowLeft, CircleHelp, House } from 'lucide-react';
 
 import './AppRouteError.css';
 
@@ -30,7 +30,7 @@ const AppRouteNotFound: React.FC<AppRouteNotFoundProps> = ({
     <main className="app-route-error" aria-labelledby="app-route-not-found-title">
       <section className="app-route-error__card" role="status" aria-describedby="app-route-not-found-description">
         <div className="app-route-error__icon" aria-hidden="true">
-          <QuestionCircleOutlined />
+          <CircleHelp />
         </div>
         <p className="app-route-error__eyebrow">Vizly navigation</p>
         <h1 id="app-route-not-found-title">This page doesn&apos;t exist</h1>
@@ -44,7 +44,7 @@ const AppRouteNotFound: React.FC<AppRouteNotFoundProps> = ({
             className="app-route-error__button app-route-error__button--primary"
             onClick={onReturnToProjects}
           >
-            <HomeOutlined aria-hidden="true" />
+            <House aria-hidden="true" />
             Return to Projects
           </button>
           <button
@@ -52,7 +52,7 @@ const AppRouteNotFound: React.FC<AppRouteNotFoundProps> = ({
             className="app-route-error__button app-route-error__button--secondary"
             onClick={onGoBack}
           >
-            <ArrowLeftOutlined aria-hidden="true" />
+            <ArrowLeft aria-hidden="true" />
             Go back
           </button>
         </div>

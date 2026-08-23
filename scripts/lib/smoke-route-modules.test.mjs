@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import {
   createSmokeRouteCatalog,
   isManagementTemplatesReady,
@@ -8,10 +9,35 @@ import { waitForRouteReadiness } from './smoke-route-readiness.mjs';
 import {
   aggregateRouteSamples,
   collectBudgetViolations,
+  dedupeRouteAssets,
   getUnexpectedLogs,
 } from './smoke-route-reporting.mjs';
 
 describe('smoke route modules', () => {
+  it('keeps self-contained docs and 3D routes outside the Ant Design shell', () => {
+    const routeSource = readFileSync(new URL('../../src/app/routes.tsx', import.meta.url), 'utf8');
+    const routeErrorSource = readFileSync(new URL('../../src/app/AppRouteError.tsx', import.meta.url), 'utf8');
+    const routeNotFoundSource = readFileSync(new URL('../../src/app/AppRouteNotFound.tsx', import.meta.url), 'utf8');
+
+    expect(routeSource).toContain("const DocsPreview = withoutAntdRoute(() => import('@/pages/DocsPreview'))");
+    expect(routeSource).toContain("const Warehouse3DPage = withoutAntdRoute(() => import('@/pages/Warehouse3DPage'))");
+    expect(routeSource).not.toContain("import Warehouse3DShell from '@/components/warehouse-3d/Warehouse3DShell'");
+    expect(routeSource).toContain("const DiagramManagementPage = withAntdRoute(() => import('@/pages/DiagramManagementPage'))");
+    expect(routeErrorSource).not.toContain("from '@ant-design/icons'");
+    expect(routeNotFoundSource).not.toContain("from '@ant-design/icons'");
+  });
+
+  it('keeps advanced edge routing off the empty-canvas startup path', () => {
+    const canvasShellSource = readFileSync(new URL(
+      '../../src/core/components/diagrams/FlowchartCanvasShell.tsx',
+      import.meta.url,
+    ), 'utf8');
+
+    expect(canvasShellSource).toContain("import('./AdvancedFlowchartCanvasShell')");
+    expect(canvasShellSource).toContain('props.nodes.length === 0 && props.displayEdges.length === 0');
+    expect(canvasShellSource).not.toContain("from '../shared/BaseReactFlow'");
+  });
+
   it('builds a unique route catalog against the supplied base URL', () => {
     const routes = createSmokeRouteCatalog('http://127.0.0.1:5373');
     const names = routes.map((route) => route.name);
@@ -24,12 +50,27 @@ describe('smoke route modules', () => {
       .toMatchObject({ durationMs: 15000, maxActiveWorkers: 0 });
   });
 
+  it('keeps development-only visual routes out of production preview smoke', () => {
+    const productionNames = createSmokeRouteCatalog('http://127.0.0.1:5373')
+      .map((route) => route.name);
+    const developmentNames = createSmokeRouteCatalog('http://127.0.0.1:5373', {
+      includeDevRoutes: true,
+    }).map((route) => route.name);
+
+    for (const routeName of ['theme-colors', 'theme-side-by-side', 'unified-designer']) {
+      expect(productionNames).not.toContain(routeName);
+      expect(developmentNames).toContain(routeName);
+    }
+  });
+
   it('measures the warehouse shell without blocking on the progressively loaded canvas', () => {
     const warehouseRoute = createSmokeRouteCatalog('http://127.0.0.1:5373')
       .find((route) => route.name === 'warehouse-3d');
 
     expect(warehouseRoute?.expression).toContain('data-smoke-ready="warehouse-3d"');
-    expect(warehouseRoute?.expression).toContain('Interactive 3D Simulation View');
+    expect(warehouseRoute?.expression).toContain("querySelector('[role=\"status\"]')");
+    expect(warehouseRoute?.expression).not.toContain('Large Retail Logistics Center');
+    expect(warehouseRoute?.expression).not.toContain('Interactive 3D Simulation View');
     expect(warehouseRoute?.expression).not.toContain("querySelector('canvas')");
   });
 
@@ -195,6 +236,34 @@ describe('smoke route modules', () => {
       { level: 'warn', message: 'new warning' },
       { level: 'error', message: 'known transient warning' },
     ]);
+  });
+
+  it('counts each built asset once when the browser records repeated requests', () => {
+    expect(dedupeRouteAssets([
+      {
+        file: 'display-routing-shared.js',
+        startTime: 900,
+        duration: 10,
+        transferSize: 0,
+        encodedBodySize: 0,
+        decodedBodySize: 587_000,
+      },
+      {
+        file: 'display-routing-shared.js',
+        startTime: 200,
+        duration: 40,
+        transferSize: 120_000,
+        encodedBodySize: 120_000,
+        decodedBodySize: 587_000,
+      },
+    ])).toEqual([{
+      file: 'display-routing-shared.js',
+      startTime: 200,
+      duration: 40,
+      transferSize: 120_000,
+      encodedBodySize: 120_000,
+      decodedBodySize: 587_000,
+    }]);
   });
 
   it('aggregates repeated samples with upper medians and preserves the worst report', () => {

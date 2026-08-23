@@ -3,11 +3,12 @@ import React, { Suspense } from 'react';
 import { useLocation } from 'react-router';
 import { coerceSafeStringParam, getQueryOrHashParamFromLocation, type LocationLike, coerceDiagramId } from '@/core/utils/inputBoundary';
 import { loadDiagramViewerRoute } from './diagramViewerRouteLoader';
-import Warehouse3DShell from '@/components/warehouse-3d/Warehouse3DShell';
 import AppRouteNotFound from './AppRouteNotFound';
 import { resolveAppRouteTarget } from './appRouteResolver';
 
 type LazyPageModule = { default: React.ComponentType };
+
+const withoutAntdRoute = (loadPage: () => Promise<LazyPageModule>) => React.lazy(loadPage);
 
 const withAntdRoute = (loadPage: () => Promise<LazyPageModule>) => React.lazy(async () => {
   const [{ default: AntdRouteShell }, { default: Page }] = await Promise.all([
@@ -31,8 +32,11 @@ const ThemeColorComparison = import.meta.env.DEV
 const ThemeSideBySideComparison = import.meta.env.DEV
   ? withAntdRoute(() => import('@/pages/ThemeSideBySideComparison'))
   : null;
-const DocsPreview = withAntdRoute(() => import('@/pages/DocsPreview'));
-const Warehouse3DPage = withAntdRoute(() => import('@/pages/Warehouse3DPage'));
+// These self-contained routes use native controls and their own theme styles.
+// Keeping them outside AntdRouteShell prevents the full Ant Design runtime from
+// becoming part of their critical path.
+const DocsPreview = withoutAntdRoute(() => import('@/pages/DocsPreview'));
+const Warehouse3DPage = withoutAntdRoute(() => import('@/pages/Warehouse3DPage'));
 const StorageConfigPage = withAntdRoute(() => import('@/pages/StorageConfigPage'));
 const DiagramManagementPage = withAntdRoute(() => import('@/pages/DiagramManagementPage'));
 const ShareViewPage = withAntdRoute(() => import('@/pages/ShareViewPage'));
@@ -99,7 +103,7 @@ const AppRoutes = () => {
   }
 
   if (routeTarget === 'warehouse-3d') {
-    return renderRoute(<Warehouse3DShell loading />, Warehouse3DPage);
+    return renderRoute('加载 3D 仓储场景...', Warehouse3DPage);
   }
 
   if (routeTarget === 'storage-config') {

@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, type Dispatch, type SetStateAction } from '
 import { MarkerType, type Edge, type Node, type ReactFlowInstance } from '@xyflow/react';
 import type { MessageInstance } from 'antd/es/message/interface';
 import { useAutoSave } from './useAutoSave';
-import { EdgeRoutingCoordinator } from '../../../services/EdgeRoutingCoordinator';
 import { readReactFlowCanvasSize } from '../../../utils/domViewport';
 import { useDesignerPresetInitialization } from './useDesignerPresetInitialization';
 import {
@@ -41,6 +40,15 @@ export interface UseDesignerSystemSyncProps {
     getAutoSaveMetadata?: () => unknown;
     restoreAutoSaveMetadata?: (metadata: unknown) => { nodes: Node[]; edges: Edge[] } | null;
 }
+
+const unfreezeRoutingCoordinator = async (): Promise<void> => {
+    try {
+        const { EdgeRoutingCoordinator } = await import('../../../services/EdgeRoutingCoordinator');
+        EdgeRoutingCoordinator.getInstance().unfreeze();
+    } catch (error) {
+        logDesignerSystemSyncImportDataFailure(error);
+    }
+};
 
 export function useDesignerSystemSync({
     id, diagramIdForExport, nodes, edges, setNodes, setEdges,
@@ -508,16 +516,18 @@ export function useDesignerSystemSync({
 
                 if (allMeasured) {
                     // 节点已被 RF 测量，解冻路由器 → 积压请求立即批量计算
-                    EdgeRoutingCoordinator.getInstance().unfreeze();
-                    window.dispatchEvent(new CustomEvent('diagramControl', { detail: { action: 'fit' } }));
+                    void unfreezeRoutingCoordinator().finally(() => {
+                        window.dispatchEvent(new CustomEvent('diagramControl', { detail: { action: 'fit' } }));
+                    });
                 } else {
                     // 节点尚未测量完毕，先把视口大致定到中心，稍后重试
                     const { width: cw, height: ch } = readReactFlowCanvasSize();
                     reactFlowInstance.setViewport({ x: cw / 2 - 100, y: ch / 2 - 100, zoom: 1 });
                     setTimeout(() => {
                         // 350ms 后 RF 应已完成测量，解冻并 fit
-                        EdgeRoutingCoordinator.getInstance().unfreeze();
-                        window.dispatchEvent(new CustomEvent('diagramControl', { detail: { action: 'fit' } }));
+                        void unfreezeRoutingCoordinator().finally(() => {
+                            window.dispatchEvent(new CustomEvent('diagramControl', { detail: { action: 'fit' } }));
+                        });
                     }, 350);
                 }
             };

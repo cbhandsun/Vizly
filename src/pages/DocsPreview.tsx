@@ -1,16 +1,16 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
-    ApartmentOutlined,
-    ArrowLeftOutlined,
-    CheckCircleOutlined,
-    ClearOutlined,
-    CloudServerOutlined,
-    KeyOutlined,
-    RobotOutlined,
-    RocketOutlined,
-    SearchOutlined,
-    ShareAltOutlined,
-} from '@ant-design/icons';
+    ArrowLeft,
+    Bot,
+    CircleCheck,
+    CloudCog,
+    KeyRound,
+    Network,
+    Rocket,
+    Search,
+    Share2,
+    X,
+} from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { getDocsPreviewCopy } from './docsPreviewContent';
 import {
@@ -23,12 +23,12 @@ import {
 import './DocsPreview.css';
 
 const TOPIC_ICONS = {
-    'getting-started': RocketOutlined,
-    'diagram-editing': ApartmentOutlined,
-    'ai-assistant': RobotOutlined,
-    sharing: ShareAltOutlined,
-    'storage-sync': CloudServerOutlined,
-    'keyboard-accessibility': KeyOutlined,
+    'getting-started': Rocket,
+    'diagram-editing': Network,
+    'ai-assistant': Bot,
+    sharing: Share2,
+    'storage-sync': CloudCog,
+    'keyboard-accessibility': KeyRound,
 } as const;
 
 const DocsPreview = () => {
@@ -69,12 +69,12 @@ const DocsPreview = () => {
             <header className="docs-page__header">
                 <div className="docs-page__header-inner">
                     <a className="docs-page__back" href="#/manage">
-                        <ArrowLeftOutlined aria-hidden="true" />
+                        <ArrowLeft aria-hidden="true" />
                         {copy.backToWorkspace}
                     </a>
                     <div className="docs-page__brand-row">
                         <div aria-hidden="true" className="docs-page__brand-mark">
-                            <ApartmentOutlined />
+                            <Network />
                         </div>
                         <span>{copy.productName}</span>
                     </div>
@@ -84,7 +84,7 @@ const DocsPreview = () => {
                         <span>{copy.pageDescription}</span>
                     </div>
                     <div className="docs-page__search-wrap">
-                        <SearchOutlined aria-hidden="true" className="docs-page__search-icon" />
+                        <Search aria-hidden="true" className="docs-page__search-icon" />
                         <label className="sr-only" htmlFor="docs-search">{copy.searchLabel}</label>
                         <input
                             id="docs-search"
@@ -102,7 +102,7 @@ const DocsPreview = () => {
                                 onClick={clearSearch}
                                 type="button"
                             >
-                                <ClearOutlined aria-hidden="true" />
+                                <X aria-hidden="true" />
                             </button>
                         ) : null}
                     </div>
@@ -117,7 +117,7 @@ const DocsPreview = () => {
                     </div>
                     <nav aria-label={copy.topicNavigation} className="docs-page__topic-list">
                         {filteredTopics.map((topic) => {
-                            const TopicIcon = TOPIC_ICONS[topic.id as keyof typeof TOPIC_ICONS] ?? CheckCircleOutlined;
+                            const TopicIcon = TOPIC_ICONS[topic.id as keyof typeof TOPIC_ICONS] ?? CircleCheck;
                             const isActive = activeTopic?.id === topic.id;
                             return (
                                 <button
@@ -151,20 +151,20 @@ const DocsPreview = () => {
                                     {section.bullets ? (
                                         <ul>
                                             {section.bullets.map((bullet) => (
-                                                <li key={bullet}><CheckCircleOutlined aria-hidden="true" />{bullet}</li>
+                                                <li key={bullet}><CircleCheck aria-hidden="true" />{bullet}</li>
                                             ))}
                                         </ul>
                                     ) : null}
                                 </section>
                             ))}
                             <footer className="docs-page__article-footer">
-                                <CheckCircleOutlined aria-hidden="true" />
+                                <CircleCheck aria-hidden="true" />
                                 {copy.updatedLabel} · {copy.updatedValue}
                             </footer>
                         </article>
                     ) : (
                         <section aria-labelledby="docs-empty-title" className="docs-page__empty">
-                            <SearchOutlined aria-hidden="true" />
+                            <Search aria-hidden="true" />
                             <h2 id="docs-empty-title">{copy.noResultsTitle}</h2>
                             <p>{copy.noResultsHint}</p>
                             <button onClick={clearSearch} type="button">{copy.clearSearch}</button>

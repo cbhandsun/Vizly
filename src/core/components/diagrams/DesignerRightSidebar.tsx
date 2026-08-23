@@ -442,6 +442,7 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
                                 width: COMMERCIAL_TOUCH_TARGET,
                                 minWidth: COMMERCIAL_TOUCH_TARGET,
                                 height: COMMERCIAL_TOUCH_TARGET,
+                                minHeight: COMMERCIAL_TOUCH_TARGET,
                                 borderRadius: 6,
                                 border: 'none',
                                 background: (!isCollapsed && activeTab === btn.key)
@@ -490,6 +491,7 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
                             width: COMMERCIAL_TOUCH_TARGET,
                             minWidth: COMMERCIAL_TOUCH_TARGET,
                             height: COMMERCIAL_TOUCH_TARGET,
+                            minHeight: COMMERCIAL_TOUCH_TARGET,
                             borderRadius: 6,
                             border: 'none',
                             background: 'transparent',

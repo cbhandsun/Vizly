@@ -18,16 +18,6 @@ export * from './ThemePresetLoader';
 // 导出基础常量
 export * from './constants/BaseConstants';
 
-// 导出主题预设
-export { lightThemePreset } from './presets/LightTheme';
-export { darkThemePreset } from './presets/DarkTheme';
-export { oceanThemePreset } from './presets/OceanTheme';
-export { forestThemePreset } from './presets/ForestTheme';
-export { highContrastThemePreset } from './presets/HighContrastTheme';
-export { sunsetThemePreset } from './presets/SunsetTheme';
-export { monoThemePreset } from './presets/MonoTheme';
-export { originalThemePreset } from './presets/OriginalTheme';
-
 // 导出主题管理器 - 使用重命名的导出以兼容旧代码
 export {
   EnhancedThemeManager,

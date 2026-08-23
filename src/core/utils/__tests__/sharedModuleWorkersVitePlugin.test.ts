@@ -10,8 +10,10 @@ import {
 } from '../../../../vite-plugins/sharedModuleWorkers';
 import {
   matchesAppSafeLoggingModule,
+  matchesDisplayRoutingNeutralModule,
+  matchesFlowchartDesignerStartupModule,
+  matchesFlowchartDesignerMicroModule,
   matchesFlowchartRuntimeModule,
-  matchesThemePresetModule,
 } from '../../../../vite-plugins/buildChunkGroups';
 import {
   classifyDisplayRoutingChunkGraph,
@@ -149,12 +151,23 @@ describe('sharedModuleWorkers Vite plugin', () => {
     expect(matchesAppSafeLoggingModule(id)).toBe(true);
   });
 
-  it('groups only core theme preset modules', () => {
-    expect(matchesThemePresetModule(
-      'C:\\repo\\src\\core\\themes\\presets\\DarkTheme.ts',
-    )).toBe(true);
-    expect(matchesThemePresetModule(
-      'C:/repo/src/core/themes/EnhancedThemeManager.ts',
+  it('keeps shared diagram configuration out of the heavy routing chunk', () => {
+    for (const id of [
+      'C:\\repo\\src\\core\\config\\DiagramConfig.ts?worker_file',
+      'C:/repo/src/core/config/DiagramConfigBoundary.ts',
+      'C:/repo/src/core/config/DiagramConfigDefaults.ts',
+      'C:/repo/src/core/config/DiagramConfigManager.ts',
+      'C:/repo/src/core/routing/routingVersion.ts',
+      'C:/repo/src/core/routing/utils/handleUtils.ts',
+      'C:/repo/src/core/types/flow.ts',
+      'C:/repo/src/core/components/shared/baseReactFlowAbsolutePositions.ts',
+      'C:/repo/src/core/components/shared/baseReactFlowLayoutEdgeRoutingData.ts',
+      'C:/repo/src/core/strategies/layoutLogging.ts',
+    ]) {
+      expect(matchesDisplayRoutingNeutralModule(id)).toBe(true);
+    }
+    expect(matchesDisplayRoutingNeutralModule(
+      'C:/repo/src/core/components/shared/baseReactFlowDisplayEdges.ts',
     )).toBe(false);
   });
 
@@ -252,6 +265,74 @@ const worker = new Worker(new URL('./baseReactFlowDisplayEdges.worker.ts', impor
       "from './baseReactFlowDisplayMeasuredRepair';",
     );
     expect(workerSource).toContain("request.operation === 'repair'");
+  });
+
+  it('recognizes only the measured diagram editor startup set', () => {
+    expect(matchesFlowchartDesignerStartupModule(
+      'C:/repo/src/core/components/diagrams/NodeTemplatePanel.tsx',
+    )).toBe(true);
+    expect(matchesFlowchartDesignerStartupModule(
+      'C:/repo/src/pages/DiagramManagementPage.tsx',
+    )).toBe(false);
+  });
+
+  it('recognizes the bounded diagram micro-module set', () => {
+    expect(matchesFlowchartDesignerMicroModule(
+      'C:/repo/src/core/components/diagrams/commentPageScope.ts',
+    )).toBe(true);
+    expect(matchesFlowchartDesignerMicroModule(
+      'C:/repo/src/core/components/diagrams/FlowchartDesigner.tsx',
+    )).toBe(false);
+  });
+
+  it('loads the full routing engine only after an explicit layout or measured-canvas action', () => {
+    const layoutHookSource = readFileSync(resolve(
+      process.cwd(),
+      'src/core/components/diagrams/hooks/useLayoutRoutingTransaction.ts',
+    ), 'utf8');
+    const systemSyncSource = readFileSync(resolve(
+      process.cwd(),
+      'src/core/components/diagrams/hooks/useDesignerSystemSync.ts',
+    ), 'utf8');
+    const initialLoadSource = readFileSync(resolve(
+      process.cwd(),
+      'src/core/components/diagrams/hooks/useDesignerInitialDiagramLoad.ts',
+    ), 'utf8');
+    const autoRoutingSource = readFileSync(resolve(
+      process.cwd(),
+      'src/core/components/diagrams/hooks/useAutoRouting.ts',
+    ), 'utf8');
+
+    expect(layoutHookSource).toContain("import('../../shared/baseReactFlowLayoutRoutingTransaction')");
+    expect(layoutHookSource).not.toContain("from '../../shared/baseReactFlowLayoutRoutingTransaction'");
+    expect(systemSyncSource).toContain("await import('../../../services/EdgeRoutingCoordinator')");
+    expect(systemSyncSource).not.toContain("from '../../../services/EdgeRoutingCoordinator'");
+    expect(initialLoadSource).toContain("import('../../../services/EdgeRoutingCoordinator')");
+    expect(initialLoadSource).not.toContain("from '../../../services/EdgeRoutingCoordinator'");
+    expect(autoRoutingSource).toContain("import('../../../services/EdgeRoutingCoordinator')");
+    expect(autoRoutingSource).not.toContain("from '../../../services/EdgeRoutingCoordinator'");
+  });
+
+  it('loads only the active locale on the initial application path', () => {
+    const i18nSource = readFileSync(resolve(process.cwd(), 'src/i18n.ts'), 'utf8');
+
+    expect(i18nSource).toContain("import('./locales/en.json')");
+    expect(i18nSource).toContain("import('./locales/zh.json')");
+    expect(i18nSource).not.toContain("import en from './locales/en.json'");
+    expect(i18nSource).not.toContain("import zh from './locales/zh.json'");
+    expect(i18nSource).toContain('fallbackLng: false');
+  });
+
+  it('keeps theme presets behind the asynchronous preset loader', () => {
+    const themeIndexSource = readFileSync(resolve(process.cwd(), 'src/core/themes/index.ts'), 'utf8');
+    const presetLoaderSource = readFileSync(
+      resolve(process.cwd(), 'src/core/themes/ThemePresetLoader.ts'),
+      'utf8',
+    );
+
+    expect(themeIndexSource).not.toContain("from './presets/");
+    expect(presetLoaderSource).toContain("import('./presets/LightTheme')");
+    expect(presetLoaderSource).toContain("import('./presets/DarkTheme')");
   });
 
   it('fails closed when a guarded worker source changes or is duplicated', () => {

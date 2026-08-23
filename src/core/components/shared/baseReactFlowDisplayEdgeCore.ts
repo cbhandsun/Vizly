@@ -1,4 +1,4 @@
-import type { Edge, Node, XYPosition } from '@xyflow/react';
+import type { Edge, Node } from '@xyflow/react';
 
 import { expandHandle, normalizeHandle } from '../../routing/utils/handleUtils';
 import {
@@ -23,6 +23,9 @@ import {
   toCanvasRefEdge,
   toSmartDisplayEdge,
 } from './baseReactFlowDisplayEdgeConversions';
+import { withDisplayAbsolutePositions } from './baseReactFlowAbsolutePositions';
+
+export { withDisplayAbsolutePositions } from './baseReactFlowAbsolutePositions';
 
 export {
   BASE_DISPLAY_ROUTING_VERSION,
@@ -53,7 +56,7 @@ export {
 } from './baseReactFlowDisplayEdgeGeometry';
 
 type DisplayNode = Node & {
-  positionAbsolute?: XYPosition;
+  positionAbsolute?: Node['position'];
   measured?: { width?: number; height?: number };
 };
 
@@ -340,42 +343,6 @@ export const normalizeBaseEdge = ({
     nodeById,
     displayEdgeEpoch,
   });
-};
-
-export const withDisplayAbsolutePositions = (nodes: Node[], nodeById: Map<string, Node>): Node[] => {
-  const finiteNumber = (value: unknown, fallback: number): number => (
-    typeof value === 'number' && Number.isFinite(value) ? value : fallback
-  );
-  const resolvePosition = (node: Node, seen = new Set<string>()): XYPosition => {
-    const displayNode = node as DisplayNode;
-    const measuredAbsolute = displayNode.positionAbsolute;
-    if (
-      measuredAbsolute
-      && typeof measuredAbsolute.x === 'number'
-      && Number.isFinite(measuredAbsolute.x)
-      && typeof measuredAbsolute.y === 'number'
-      && Number.isFinite(measuredAbsolute.y)
-    ) {
-      return { x: measuredAbsolute.x, y: measuredAbsolute.y };
-    }
-    const parentId = node.parentId;
-    const localPosition = node.position ?? { x: 0, y: 0 };
-    const local = {
-      x: finiteNumber(localPosition.x, 0),
-      y: finiteNumber(localPosition.y, 0),
-    };
-    if (!parentId || seen.has(parentId)) return local;
-    const parent = nodeById.get(parentId);
-    if (!parent) return local;
-    seen.add(parentId);
-    const parentPosition = resolvePosition(parent, seen);
-    return {
-      x: parentPosition.x + local.x,
-      y: parentPosition.y + local.y,
-    };
-  };
-
-  return nodes.map((node) => ({ ...node, positionAbsolute: resolvePosition(node) }) as Node);
 };
 
 export const createBaseReactFlowFastDisplayEdges = ({

@@ -1,18 +1,26 @@
-import i18n from 'i18next';
+import i18n, { type BackendModule } from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
-import { syncDocumentLanguage } from './core/utils/languagePreference';
+import {
+    coerceSupportedLanguage,
+    syncDocumentLanguage,
+    type SupportedLanguageCode,
+} from './core/utils/languagePreference';
 
-// Import translation files
-import en from './locales/en.json';
-import zh from './locales/zh.json';
+const localeLoaders: Record<SupportedLanguageCode, () => Promise<Record<string, unknown>>> = {
+    en: () => import('./locales/en.json').then(module => module.default),
+    zh: () => import('./locales/zh.json').then(module => module.default),
+};
 
-const resources = {
-    en: {
-        translation: en,
-    },
-    zh: {
-        translation: zh,
+const localeBackend: BackendModule = {
+    type: 'backend',
+    init: () => undefined,
+    read: (language, _namespace, callback) => {
+        const supportedLanguage = coerceSupportedLanguage(language);
+        void localeLoaders[supportedLanguage]().then(
+            resources => callback(null, resources),
+            error => callback(error instanceof Error ? error : new Error('locale-load-failed'), false),
+        );
     },
 };
 
@@ -20,13 +28,13 @@ i18n
     // detect user language
     // learn more: https://github.com/i18next/i18next-browser-languagedetector
     .use(LanguageDetector)
+    .use(localeBackend)
     // pass the i18n instance to react-i18next.
     .use(initReactI18next)
     // init i18next
     // for all options read: https://www.i18next.com/overview/configuration-options
     .init({
-        resources,
-        fallbackLng: 'en',
+        fallbackLng: false,
         supportedLngs: ['en', 'zh'],
         nonExplicitSupportedLngs: true,
         load: 'languageOnly',

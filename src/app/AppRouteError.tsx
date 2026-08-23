@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { HomeOutlined, ReloadOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
+import { House, RotateCw, ShieldCheck } from 'lucide-react';
 
 import './AppRouteError.css';
 
@@ -38,7 +38,7 @@ const AppRouteError: React.FC<AppRouteErrorProps> = ({
     <main className="app-route-error" aria-labelledby="app-route-error-title">
       <section className="app-route-error__card" role="alert" aria-describedby="app-route-error-description">
         <div className="app-route-error__icon" aria-hidden="true">
-          <SafetyCertificateOutlined />
+          <ShieldCheck />
         </div>
         <p className="app-route-error__eyebrow">Vizly recovery</p>
         <h1 id="app-route-error-title">We couldn&apos;t open this screen</h1>
@@ -52,7 +52,7 @@ const AppRouteError: React.FC<AppRouteErrorProps> = ({
             className="app-route-error__button app-route-error__button--primary"
             onClick={onRetry}
           >
-            <ReloadOutlined aria-hidden="true" />
+            <RotateCw aria-hidden="true" />
             Reload screen
           </button>
           <button
@@ -60,7 +60,7 @@ const AppRouteError: React.FC<AppRouteErrorProps> = ({
             className="app-route-error__button app-route-error__button--secondary"
             onClick={onReturnToProjects}
           >
-            <HomeOutlined aria-hidden="true" />
+            <House aria-hidden="true" />
             Return to Projects
           </button>
         </div>

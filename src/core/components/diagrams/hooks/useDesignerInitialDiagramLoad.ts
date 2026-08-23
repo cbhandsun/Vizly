@@ -3,7 +3,6 @@ import type { Edge, Node } from '@xyflow/react';
 import type { MessageInstance } from 'antd/es/message/interface';
 import { useTranslation } from 'react-i18next';
 import { PluginRegistry } from '../../../services/PluginRegistry';
-import { EdgeRoutingCoordinator } from '../../../services/EdgeRoutingCoordinator';
 import { cancelLayoutTransition, suspendLayoutTransitions } from '../../../utils/animateLayoutTransition';
 import { getApplicationDiagramRuntime } from '../../../ports/applicationDiagramRuntime';
 import { loadStandardPresetCanvas } from './standardPresetCanvasCache';
@@ -17,6 +16,7 @@ import {
 import {
     logDesignerSystemSyncAutosaveRecalculationFailure,
     logDesignerSystemSyncDataRegistryImportFailure,
+    logDesignerSystemSyncRoutingFreezeFailure,
     logDesignerSystemSyncStaleAutosaveDetected,
     logDesignerSystemSyncStandardDataToCanvasFailure,
 } from './designerSystemSyncLogging';
@@ -27,6 +27,8 @@ const getPluginEmptyState = (pluginId: string) => {
     const plugin = PluginRegistry.getInstance().getPlugin(pluginId);
     return plugin?.getEmptyState();
 };
+
+export const shouldFitInitialDesignerCanvas = (nodes: readonly Node[]): boolean => nodes.length > 0;
 
 interface UseDesignerInitialDiagramLoadProps {
     id?: string;
@@ -114,13 +116,19 @@ export const useDesignerInitialDiagramLoad = ({
             const restoredActivePage = restoreAutoSaveMetadata?.(saved.metadata);
             const restoredNodes = restoredActivePage?.nodes ?? saved.nodes;
             const restoredEdges = restoredActivePage?.edges ?? saved.edges;
-            void recalculateAutosaveNodeSizes(restoredNodes).then((recalculatedNodes) => {
+            void Promise.all([
+                recalculateAutosaveNodeSizes(restoredNodes),
+                import('../../../services/EdgeRoutingCoordinator').catch((error) => {
+                    logDesignerSystemSyncRoutingFreezeFailure(error);
+                    return null;
+                }),
+            ]).then(([recalculatedNodes, routingModule]) => {
                 commitInitialization(() => {
                     cancelLayoutTransition(setNodes);
                     setNodes(recalculatedNodes);
                     setEdges(restoredEdges);
                     needsInitialFitView.current = true;
-                    EdgeRoutingCoordinator.getInstance().freeze();
+                    routingModule?.EdgeRoutingCoordinator.getInstance().freeze();
 
                     if (saved.isFreshSeed) {
                         messageApi?.success(t('designer.initialLoad.templateLoaded'));
@@ -156,7 +164,7 @@ export const useDesignerInitialDiagramLoad = ({
                     if (emptyState) {
                         setNodes(emptyState.nodes);
                         setEdges(emptyState.edges);
-                        needsInitialFitView.current = true;
+                        needsInitialFitView.current = shouldFitInitialDesignerCanvas(emptyState.nodes);
                     }
                 });
             });
@@ -185,7 +193,7 @@ export const useDesignerInitialDiagramLoad = ({
                         if (emptyState) {
                             setNodes(emptyState.nodes);
                             setEdges(emptyState.edges);
-                            needsInitialFitView.current = true;
+                            needsInitialFitView.current = shouldFitInitialDesignerCanvas(emptyState.nodes);
                         }
                     });
                 }

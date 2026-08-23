@@ -17,7 +17,13 @@ export const isManagementTemplatesReady = ({ hasRoot, activeTab, body }) => {
     );
 };
 
-export const createSmokeRouteCatalog = (BASE_URL) => {
+const DEV_ONLY_ROUTE_NAMES = new Set([
+  'theme-colors',
+  'theme-side-by-side',
+  'unified-designer',
+]);
+
+export const createSmokeRouteCatalog = (BASE_URL, { includeDevRoutes = false } = {}) => {
   const routes = [
     {
       name: 'management',
@@ -353,11 +359,8 @@ export const createSmokeRouteCatalog = (BASE_URL) => {
           bodyText: body.slice(0, 240),
           rootText: (document.getElementById('root')?.textContent || '').slice(0, 240),
           ready: Boolean(readyMarker) &&
-            !body.includes('Loading 3D Warehouse') &&
-            !body.includes('Loading 3D Environment') &&
-            !body.includes('页面出现错误') &&
-            body.includes('Large Retail Logistics Center') &&
-            body.includes('Interactive 3D Simulation View'),
+            !document.querySelector('[role="status"]') &&
+            !body.includes('页面出现错误'),
         };
       })()`,
     },
@@ -388,5 +391,7 @@ export const createSmokeRouteCatalog = (BASE_URL) => {
     },
   ];
 
-  return routes;
+  return includeDevRoutes
+    ? routes
+    : routes.filter((route) => !DEV_ONLY_ROUTE_NAMES.has(route.name));
 };

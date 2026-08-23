@@ -8,9 +8,32 @@ export const getUnexpectedLogs = (logs, allowedWarningPatterns) => logs.filter((
   return !allowedWarningPatterns.some((pattern) => pattern.test(entry.message));
 });
 
+export const dedupeRouteAssets = (assets) => {
+  if (!Array.isArray(assets)) return [];
+
+  const byFile = new Map();
+  for (const asset of assets) {
+    if (!asset || typeof asset !== 'object' || typeof asset.file !== 'string' || !asset.file) continue;
+    const existing = byFile.get(asset.file);
+    if (!existing) {
+      byFile.set(asset.file, { ...asset });
+      continue;
+    }
+    byFile.set(asset.file, {
+      ...existing,
+      startTime: Math.min(existing.startTime, asset.startTime),
+      duration: Math.max(existing.duration, asset.duration),
+      transferSize: Math.max(existing.transferSize, asset.transferSize),
+      encodedBodySize: Math.max(existing.encodedBodySize, asset.encodedBodySize),
+      decodedBodySize: Math.max(existing.decodedBodySize, asset.decodedBodySize),
+    });
+  }
+  return [...byFile.values()];
+};
+
 export const getRouteAssetReport = async (session, readyAt) => session.evaluate(`(() => {
   const readyAt = ${Number.isFinite(readyAt) ? readyAt : 0};
-  const assets = performance.getEntriesByType('resource')
+  const rawAssets = performance.getEntriesByType('resource')
     .filter((entry) => entry.name.includes('/assets/'))
     .map((entry) => ({
       file: entry.name.split('/').pop(),
@@ -19,7 +42,8 @@ export const getRouteAssetReport = async (session, readyAt) => session.evaluate(
       transferSize: entry.transferSize || 0,
       encodedBodySize: entry.encodedBodySize || 0,
       decodedBodySize: entry.decodedBodySize || 0,
-    }))
+    }));
+  const assets = (${dedupeRouteAssets.toString()})(rawAssets)
     .sort((a, b) => b.decodedBodySize - a.decodedBodySize || a.file.localeCompare(b.file));
 
   const criticalCutoff = readyAt + 50;
@@ -46,6 +70,9 @@ export const getRouteAssetReport = async (session, readyAt) => session.evaluate(
       .filter((asset) => asset.file.startsWith('vendor-'))
       .sort((a, b) => b.decodedBodySize - a.decodedBodySize || a.file.localeCompare(b.file))
       .slice(0, 12),
+    criticalAppAssets: criticalAssets
+      .filter((asset) => !asset.file.startsWith('vendor-'))
+      .sort((a, b) => b.decodedBodySize - a.decodedBodySize || a.file.localeCompare(b.file)),
     backgroundVendorAssets: backgroundAssets
       .filter((asset) => asset.file.startsWith('vendor-'))
       .sort((a, b) => b.decodedBodySize - a.decodedBodySize || a.file.localeCompare(b.file))
@@ -149,6 +176,10 @@ export const printRouteReports = (results, { enabled = false, log }) => {
         ? `, initiator ${asset.initiator.type}${asset.initiator.url ? ` ${asset.initiator.url}` : ''}${asset.initiator.lineNumber ? `:${asset.initiator.lineNumber}` : ''}`
         : '';
       log(`  critical ${asset.file} (${size} KB decoded, start ${asset.startTime} ms, ${asset.duration} ms${initiator})`);
+    }
+    for (const asset of (report.criticalAppAssets || []).slice(0, 24)) {
+      const size = Math.round(asset.decodedBodySize / 102.4) / 10;
+      log(`  critical app ${asset.file} (${size} KB decoded, start ${asset.startTime} ms, ${asset.duration} ms)`);
     }
     for (const asset of report.backgroundVendorAssets.slice(0, 3)) {
       const size = Math.round(asset.decodedBodySize / 102.4) / 10;

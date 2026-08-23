@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState, useRef } from 'react';
 import { Edge, Node, ReactFlowInstance } from '@xyflow/react';
 import { diagramConfigManager, EdgeConfig } from '@/core/config/DiagramConfig';
-import { EdgeRoutingCoordinator } from '../../../services/EdgeRoutingCoordinator';
 import { useLayoutStrategy } from './useLayoutStrategy';
 import { syncAutoPathSelection, applyRoutingProfile, DESIGNER_ROUTING_PROFILE } from './useSmartRoutingConfig';
+import { logAutoRoutingCacheClearFailure } from './diagramInteractionLogging';
 
 interface UseAutoRoutingOptions {
     setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
@@ -95,19 +95,20 @@ export function useAutoRouting({
     const initialMountRef = useRef(true);
     
     useEffect(() => {
-        initialMountRef.current = false;
-    }, []);
-
-    useEffect(() => {
-        if (initialMountRef.current) return;
+        if (initialMountRef.current) {
+            initialMountRef.current = false;
+            return;
+        }
 
         if (autoRoutingEnabled) {
             applyRoutingProfile(DESIGNER_ROUTING_PROFILE);
-            EdgeRoutingCoordinator.getInstance().forceClearAllCaches();
-        } else {
-            // 当关闭时也清理缓存，确保下次开启时是净态
-            EdgeRoutingCoordinator.getInstance().forceClearAllCaches();
         }
+        // 用户显式切换后才加载高级路由器；空白画布首屏不需要其完整实现。
+        void import('../../../services/EdgeRoutingCoordinator')
+            .then(({ EdgeRoutingCoordinator }) => {
+                EdgeRoutingCoordinator.getInstance().forceClearAllCaches();
+            })
+            .catch(logAutoRoutingCacheClearFailure);
 
         // 强刷 Edge 引用，触发 React Flow 和自定义 Edge 组件的全量重绘
         // 这是必要的，因为如果不修改 edge 对象的引用，React Flow 内部可能因为

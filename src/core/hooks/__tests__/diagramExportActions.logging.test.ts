@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const safeLogState = vi.hoisted(() => ({
   debug: vi.fn(),
@@ -28,12 +28,22 @@ vi.mock('../../components/shared/exportUtils', () => ({
   triggerDownload: vi.fn(),
 }));
 
+import * as exportUtils from '../../components/shared/exportUtils';
+import { exportDiagramToPNG, exportDiagramToSVG } from '../diagramExportActions';
+
 describe('diagramExportActions logging', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    delete (window as any).reactFlowInstance;
+  });
+
   it('redacts PNG export failures before logging and dispatches a string error payload', async () => {
     const alertMock = vi.spyOn(window, 'alert').mockImplementation(() => undefined);
     const dispatchExportEvent = vi.fn();
-
-    const { exportDiagramToPNG } = await import('../diagramExportActions');
 
     await exportDiagramToPNG({
       diagramId: 'diagram-1',
@@ -59,7 +69,6 @@ describe('diagramExportActions logging', () => {
     const alertMock = vi.spyOn(window, 'alert').mockImplementation(() => undefined);
     alertMock.mockClear();
     const dispatchExportEvent = vi.fn();
-    const exportUtils = await import('../../components/shared/exportUtils');
     (window as any).reactFlowInstance = {
       getViewport: () => ({ x: 0, y: 0, zoom: 1 }),
       getNodes: () => [
@@ -70,8 +79,6 @@ describe('diagramExportActions logging', () => {
         { id: 'e1', source: 'a', target: 'b', markerEnd: { type: 'arrowclosed' }, label: 'Alpha to Beta' },
       ],
     };
-
-    const { exportDiagramToSVG } = await import('../diagramExportActions');
 
     await exportDiagramToSVG({
       diagramId: 'diagram-1',
@@ -86,20 +93,16 @@ describe('diagramExportActions logging', () => {
     );
     expect(dispatchExportEvent).toHaveBeenCalledWith('diagramExportComplete', { diagramId: 'diagram-1', type: 'svg' });
     expect(alertMock).not.toHaveBeenCalled();
-    delete (window as any).reactFlowInstance;
   });
 
   it('prefers explicit React Flow snapshots for SVG export over the global instance', async () => {
     const dispatchExportEvent = vi.fn();
-    const exportUtils = await import('../../components/shared/exportUtils');
     (exportUtils.triggerDownload as any).mockClear();
     (window as any).reactFlowInstance = {
       getViewport: () => ({ x: 0, y: 0, zoom: 1 }),
       getNodes: () => [{ id: 'global', position: { x: 0, y: 0 }, data: { label: 'Global node' } }],
       getEdges: () => [],
     };
-
-    const { exportDiagramToSVG } = await import('../diagramExportActions');
 
     await exportDiagramToSVG({
       diagramId: 'diagram-1',
@@ -116,13 +119,11 @@ describe('diagramExportActions logging', () => {
     const svg = decodeURIComponent(dataUrl.replace('data:image/svg+xml;charset=utf-8,', ''));
     expect(svg).toContain('Explicit node');
     expect(svg).not.toContain('Global node');
-    delete (window as any).reactFlowInstance;
   });
 
   it('suppresses the download and emits cancellation when aborted after capture', async () => {
     const controller = new AbortController();
     const dispatchExportEvent = vi.fn();
-    const exportUtils = await import('../../components/shared/exportUtils');
     const capture = vi.mocked(exportUtils.exportFullDiagramByAdjustingViewportToPngDataUrl);
     const download = vi.mocked(exportUtils.triggerDownload);
     capture.mockImplementationOnce(async () => {
@@ -130,8 +131,6 @@ describe('diagramExportActions logging', () => {
       return 'data:image/png;base64,aGVsbG8=';
     });
     download.mockClear();
-
-    const { exportDiagramToPNG } = await import('../diagramExportActions');
 
     await expect(exportDiagramToPNG({
       diagramId: 'diagram-1',

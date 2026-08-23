@@ -9,7 +9,7 @@ import {
     resolveLayoutSourceEdges,
 } from './layoutEdgeBoundary';
 import { useLayoutRoutingTransaction } from './useLayoutRoutingTransaction';
-import { clearBaseReactFlowLayoutEdgeRoutingData } from '../../shared/baseReactFlowLayoutRoutingTransaction';
+import { clearBaseReactFlowLayoutEdgeRoutingData } from '../../shared/baseReactFlowLayoutEdgeRoutingData';
 import { isDirectedForestLayoutGraph } from './treeLayoutTopology';
 import {
     clearLayoutEdgeRoutingType,

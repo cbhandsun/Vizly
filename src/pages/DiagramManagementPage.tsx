@@ -63,6 +63,7 @@ import {
     type WorkspaceInventoryCompletedLoadResult,
     type WorkspaceInventoryLoadFailureReason,
 } from './workspaceInventoryLoad';
+import { scheduleWorkspaceInventoryLoad } from './workspaceInventorySchedule';
 
 const AuthModal = React.lazy(() => import('@/components/auth/AuthModal').then(module => ({
     default: module.AuthModal,
@@ -246,11 +247,12 @@ const WorkspaceDashboardPage: React.FC = () => {
 
     useEffect(() => {
         let cancelled = false;
-        queueMicrotask(() => {
+        const cancelScheduledLoad = scheduleWorkspaceInventoryLoad(() => {
             if (!cancelled) void loadAllData();
         });
         return () => {
             cancelled = true;
+            cancelScheduledLoad();
             inventoryRequestIdRef.current += 1;
         };
     }, [loadAllData]);

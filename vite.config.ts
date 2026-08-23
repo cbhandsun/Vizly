@@ -11,15 +11,19 @@ import { devCspPlugin } from './vite-plugins/devCsp'
 import { elkWorkerAssetPlugin } from './vite-plugins/elkWorkerAsset'
 import {
   matchesAppSafeLoggingModule,
+  matchesDisplayRoutingNeutralModule,
+  matchesFlowchartDesignerStartupModule,
+  matchesFlowchartDesignerMicroModule,
   matchesFlowchartRuntimeModule,
-  matchesThemePresetModule,
 } from './vite-plugins/buildChunkGroups'
 import { createDisplayRoutingChunkClassifier } from './vite-plugins/displayRoutingChunkClassifier'
 import coverageThresholds from './scripts/coverage-thresholds.json'
 
 const projectRoot = dirname(fileURLToPath(import.meta.url))
 const projectRealRoot = realpathSync(projectRoot)
-const displayRoutingChunks = createDisplayRoutingChunkClassifier(matchesAppSafeLoggingModule)
+const displayRoutingChunks = createDisplayRoutingChunkClassifier(id => (
+  matchesAppSafeLoggingModule(id) || matchesDisplayRoutingNeutralModule(id)
+))
 const shardCoverageReportsDirectory = process.env.VIZLY_COVERAGE_REPORTS_DIR
 const isShardCoverage = process.env.TEST_CI_COVERAGE === '1'
 
@@ -29,7 +33,6 @@ const vendorChunkRules: Array<[string, string[]]> = [
   ['vendor-elk', ['elkjs']],
   ['vendor-three', ['three', '@react-three', 'troika-', 'webgl-sdf-generator', 'suspend-react', 'its-fine']],
   ['vendor-monaco', ['monaco-editor', '@monaco-editor']],
-  ['vendor-icons', ['react-icons', 'lucide-react', '@iconify']],
   ['vendor-i18n', ['i18next', 'react-i18next']],
   ['vendor-polyfills', ['core-js', '@babel/runtime', 'tslib', '@ungap/structured-clone']],
   ['vendor-markdown', [
@@ -385,6 +388,12 @@ export default defineConfig({
               minSize: 0,
             },
             {
+              name: 'display-routing-neutral',
+              test: matchesDisplayRoutingNeutralModule,
+              priority: 115,
+              minSize: 0,
+            },
+            {
               name: 'vendor-preload-runtime',
               test: (id) => {
                 const normalizedId = id.replace(/\\/g, '/');
@@ -406,15 +415,25 @@ export default defineConfig({
               minSize: 0,
             },
             {
+              name: 'flowchart-designer-startup',
+              test: matchesFlowchartDesignerStartupModule,
+              priority: 78,
+              minSize: 0,
+              entriesAware: false,
+              includeDependenciesRecursively: false,
+            },
+            {
+              name: 'flowchart-designer-micro',
+              test: matchesFlowchartDesignerMicroModule,
+              priority: 77,
+              minSize: 0,
+              entriesAware: false,
+              includeDependenciesRecursively: false,
+            },
+            {
               name: 'flowchart-runtime-shared',
               test: matchesFlowchartRuntimeModule,
               priority: 75,
-              minSize: 0,
-            },
-            {
-              name: 'theme-presets',
-              test: matchesThemePresetModule,
-              priority: 70,
               minSize: 0,
             },
             {
