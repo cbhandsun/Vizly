@@ -53,6 +53,7 @@ import {
   browserLogisticsNodes,
   restoreBrowserColdRequestRouteHandles,
 } from './fixtures/logisticsBrowserRoutingFixture';
+import { expectDisplayRoutingTraceChildren } from './baseReactFlowDisplayLogisticsPhaseTrace.testUtils';
 
 type Point = { x: number; y: number };
 
@@ -519,11 +520,17 @@ describe('baseReactFlowDisplayEdges logistics visual audit', () => {
       'terminal-attachment-axis',
       'terminal-anchor',
       'terminal-polish',
+      'final-endpoint-closure-obstacles-post-trunk',
+      'final-endpoint-closure-obstacles-sibling',
+      'final-endpoint-closure-obstacles-micro',
     ]));
-    expect(response.phaseTrace?.filter(trace => trace.phase.startsWith('terminal-')).every(
-      trace => trace.parentPhase === 'terminal'
-        && Number.isFinite(trace.exclusiveDurationMs),
-    ), diagnostics).toBe(true);
+    expectDisplayRoutingTraceChildren(response.phaseTrace, diagnostics, 'terminal', 'terminal-');
+    expectDisplayRoutingTraceChildren(
+      response.phaseTrace,
+      diagnostics,
+      'final-endpoint-closure-obstacles',
+      'final-endpoint-closure-obstacles-',
+    );
   }, 120_000);
 
   it('eliminates both historical one-pixel near-bend crossings without breaking dual-role trunks', async () => {

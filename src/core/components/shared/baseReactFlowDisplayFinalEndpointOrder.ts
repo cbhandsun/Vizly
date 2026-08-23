@@ -33,6 +33,7 @@ import { buildSharedEndpointTrunkSynthesisCandidates } from './baseReactFlowDisp
 import { repairDisplayLoopShortcuts } from './baseReactFlowDisplayLoopShortcutRepair';
 import {
   createBaseReactFlowFinalEndpointEvaluation,
+  diffBaseReactFlowEvaluationMetrics,
   type BaseReactFlowFinalEndpointEvaluation,
 } from './baseReactFlowDisplayFinalEndpointEvaluation';
 import {
@@ -171,6 +172,8 @@ const commitPostObstacleMicroCandidate = (
   const candidate = repairDisplayMicroArtifacts(
     baseline,
     createBaseReactFlowDisplayMicroSafetyContext(baseline, evaluation.nodes),
+    undefined,
+    { allowCompoundRepairs: false },
   );
   const connectedSourceCandidate = candidate === baseline
     ? repairBaseReactFlowConnectedSourceMicroArtifacts(baseline, evaluation.nodes)
@@ -594,10 +597,44 @@ export const repairBaseReactFlowFinalEndpointOrder = <T extends Edge[]>(
     countChangedRoutingItems(beforeTrunkClosure, repaired),
   );
   const obstacleClosureTimer = closureStage('final-endpoint-closure-obstacles');
+  const obstacleClosureStage = (phase: Extract<
+    Parameters<typeof startDisplayRoutingPhaseTrace>[0]['phase'],
+    | 'final-endpoint-closure-obstacles-post-trunk'
+    | 'final-endpoint-closure-obstacles-sibling'
+    | 'final-endpoint-closure-obstacles-micro'
+  >) => {
+    const metricsBefore = evaluation.readMetrics();
+    const timer = startDisplayRoutingPhaseTrace({
+      phase,
+      parentPhase: 'final-endpoint-closure-obstacles',
+      candidateCount: repaired.length,
+      onTrace: options.onPhaseTrace,
+    });
+    return (baseline: Edge[], candidate: Edge[]): void => timer.finish(
+      candidate === baseline ? 'skip' : 'accepted',
+      countChangedRoutingItems(baseline, candidate),
+      diffBaseReactFlowEvaluationMetrics(metricsBefore, evaluation.readMetrics()),
+    );
+  };
   const beforeObstacleClosure = repaired;
+  const beforePostTrunkObstacle = repaired;
+  const finishPostTrunkObstacle = obstacleClosureStage(
+    'final-endpoint-closure-obstacles-post-trunk',
+  );
   repaired = commitPostTrunkBranchObstacleCandidate(repaired, repairNodes, options, evaluation);
+  finishPostTrunkObstacle(beforePostTrunkObstacle, repaired);
+  const beforeSiblingObstacle = repaired;
+  const finishSiblingObstacle = obstacleClosureStage(
+    'final-endpoint-closure-obstacles-sibling',
+  );
   repaired = commitSiblingTerminalObstacleCandidate(repaired, repairNodes, options, evaluation);
+  finishSiblingObstacle(beforeSiblingObstacle, repaired);
+  const beforePostObstacleMicro = repaired;
+  const finishPostObstacleMicro = obstacleClosureStage(
+    'final-endpoint-closure-obstacles-micro',
+  );
   repaired = commitPostObstacleMicroCandidate(repaired, options, evaluation);
+  finishPostObstacleMicro(beforePostObstacleMicro, repaired);
   obstacleClosureTimer.finish(
     repaired === beforeObstacleClosure ? 'skip' : 'accepted',
     countChangedRoutingItems(beforeObstacleClosure, repaired),

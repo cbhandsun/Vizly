@@ -2,6 +2,17 @@ import { expect } from 'vitest';
 
 import type { DisplayEdgesWorkerResponse } from '../baseReactFlowDisplayWorkerProtocol';
 
+export const expectDisplayRoutingTraceChildren = (
+  phaseTrace: DisplayEdgesWorkerResponse['phaseTrace'],
+  diagnostics: string,
+  parentPhase: string,
+  childPrefix: string,
+): void => {
+  expect(phaseTrace?.filter(trace => trace.phase.startsWith(childPrefix)).every(trace => (
+    trace.parentPhase === parentPhase && Number.isFinite(trace.exclusiveDurationMs)
+  )), diagnostics).toBe(true);
+};
+
 export const expectCompleteLogisticsIncrementalPhaseTrace = (
   phaseTrace: DisplayEdgesWorkerResponse['phaseTrace'],
   diagnostics: string,
