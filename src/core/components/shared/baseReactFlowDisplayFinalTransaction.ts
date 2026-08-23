@@ -16,6 +16,7 @@ export const finalizeFailClosedDisplayTransaction = <T extends Edge[]>(
   fallbackCandidate: T,
   repairNodes: Node[],
   inputSignature: string,
+  options?: Readonly<{ deferCompoundRepair?: boolean }>,
 ): T => {
   // Collinear waypoints can conceal a continuous overlap from segment-based repair. Normalize the
   // transaction baseline first so every repair and the final hard gate inspect the rendered shape.
@@ -47,6 +48,8 @@ export const finalizeFailClosedDisplayTransaction = <T extends Edge[]>(
   const microCandidate = repairDisplayMicroArtifacts(
     selectedCandidate,
     createBaseReactFlowDisplayMicroSafetyContext(selectedCandidate, repairNodes),
+    undefined,
+    { allowCompoundRepairs: options?.deferCompoundRepair !== true },
   ) as T;
   const selectedMicroCandidate = chooseFinalTerminalTransactionCandidate(
     repairNodes,

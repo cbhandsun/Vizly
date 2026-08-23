@@ -23,12 +23,49 @@ import { runFinalAxisTransaction } from './baseReactFlowDisplayFinalAxisTransact
 import { finalizeFailClosedDisplayTransaction } from './baseReactFlowDisplayFinalTransaction';
 import { repairResidualOuterPortTransactionWithHardGate } from './baseReactFlowDisplayOuterPortTransaction';
 import type { BaseReactFlowFullRouteContext } from './baseReactFlowDisplayFullRouteTypes';
+import { diffBaseReactFlowEvaluationMetrics } from './baseReactFlowDisplayFinalEndpointEvaluation';
+import { startDisplayRoutingPhaseTrace } from './baseReactFlowDisplayRoutingTrace';
 
 export const runBaseReactFlowFullRouteTerminalPhase = (
   context: BaseReactFlowFullRouteContext,
   strictCandidate: Edge[],
 ): Edge[] => {
-  const { repairNodes, inputSignature } = context;
+  const {
+    repairNodes,
+    inputSignature,
+    evaluationSession,
+    onPhaseTrace,
+  } = context;
+  const startTerminalStage = (
+    phase: Extract<
+      Parameters<typeof startDisplayRoutingPhaseTrace>[0]['phase'],
+      | 'terminal-attachment-axis'
+      | 'terminal-anchor'
+      | 'terminal-polish'
+      | 'terminal-finalize'
+    >,
+    candidateCount: number,
+  ) => {
+    const metricsBefore = evaluationSession.readMetrics();
+    const timer = startDisplayRoutingPhaseTrace({
+      phase,
+      parentPhase: 'terminal',
+      candidateCount,
+      onTrace: onPhaseTrace,
+    });
+    return (
+      resolution: 'accepted' | 'skip' | 'fallback',
+      changedEdgeCount = 0,
+    ): void => timer.finish(
+      resolution,
+      changedEdgeCount,
+      diffBaseReactFlowEvaluationMetrics(metricsBefore, evaluationSession.readMetrics()),
+    );
+  };
+  const finishAttachmentAxis = startTerminalStage(
+    'terminal-attachment-axis',
+    strictCandidate.length,
+  );
   const finalBoundedTerminalReport = context.evaluationSession.terminalReport(strictCandidate);
   const finalAttachedCandidate = finalBoundedTerminalReport.allAttached
     ? strictCandidate
@@ -48,8 +85,14 @@ export const runBaseReactFlowFullRouteTerminalPhase = (
     directAxisCandidate !== finalAttachedCandidate
     && directAxisReport.hardClean
   ) {
+    finishAttachmentAxis('accepted', directAxisCandidate.length);
     return markBaseDisplayFinalized(directAxisCandidate, inputSignature);
   }
+  finishAttachmentAxis(
+    directAxisCandidate === strictCandidate ? 'skip' : 'fallback',
+    directAxisCandidate === strictCandidate ? 0 : directAxisCandidate.length,
+  );
+  const finishAnchor = startTerminalStage('terminal-anchor', finalAttachedCandidate.length);
   const finalTerminalBaselineCandidate = (
     directAxisCandidate !== finalAttachedCandidate
     && directAxisReport.terminalsAttached
@@ -81,6 +124,11 @@ export const runBaseReactFlowFullRouteTerminalPhase = (
   )
     ? finalAxisAnchoredCandidate
     : finalTerminalBaselineCandidate;
+  finishAnchor(
+    finalAxisCandidate === finalTerminalBaselineCandidate ? 'skip' : 'accepted',
+    finalAxisCandidate === finalTerminalBaselineCandidate ? 0 : finalAxisCandidate.length,
+  );
+  const finishPolish = startTerminalStage('terminal-polish', finalAxisCandidate.length);
   const finalPortRoleCandidate = repairAxisMismatchedTerminalsWithBoundedPortRoles(
     finalAxisCandidate,
     repairNodes,
@@ -119,8 +167,45 @@ export const runBaseReactFlowFullRouteTerminalPhase = (
     finalAttachedTransactionCandidate,
   );
   if (finalAttachedTransactionReport.hardClean) {
+    finishPolish('accepted', finalAttachedTransactionCandidate.length);
     return markBaseDisplayFinalized(finalAttachedTransactionCandidate, inputSignature);
   }
+  finishPolish(
+    finalAttachedTransactionCandidate === finalAxisCandidate ? 'skip' : 'fallback',
+    finalAttachedTransactionCandidate === finalAxisCandidate
+      ? 0
+      : finalAttachedTransactionCandidate.length,
+  );
+  const finishFinalize = startTerminalStage(
+    'terminal-finalize',
+    finalAttachedTransactionCandidate.length,
+  );
+  const startFinalizeStage = (
+    phase: Extract<
+      Parameters<typeof startDisplayRoutingPhaseTrace>[0]['phase'],
+      | 'terminal-finalize-orthogonal'
+      | 'terminal-finalize-axis'
+      | 'terminal-finalize-outer-port'
+      | 'terminal-finalize-fail-closed'
+    >,
+  ) => {
+    const metricsBefore = evaluationSession.readMetrics();
+    const timer = startDisplayRoutingPhaseTrace({
+      phase,
+      parentPhase: 'terminal-finalize',
+      candidateCount: finalAttachedTransactionCandidate.length,
+      onTrace: onPhaseTrace,
+    });
+    return (
+      resolution: 'accepted' | 'skip' | 'fallback',
+      changedEdgeCount = 0,
+    ): void => timer.finish(
+      resolution,
+      changedEdgeCount,
+      diffBaseReactFlowEvaluationMetrics(metricsBefore, evaluationSession.readMetrics()),
+    );
+  };
+  const finishOrthogonal = startFinalizeStage('terminal-finalize-orthogonal');
   const finalOrthogonalTransactionCandidate = compactDisplayEdgePaths(
     repairEndpointOrthogonalPaths(finalAttachedTransactionCandidate, repairNodes),
   );
@@ -129,9 +214,18 @@ export const runBaseReactFlowFullRouteTerminalPhase = (
       finalOrthogonalTransactionCandidate,
     );
     if (finalOrthogonalTransactionReport.hardClean) {
+      finishOrthogonal('accepted', finalOrthogonalTransactionCandidate.length);
+      finishFinalize('accepted', finalOrthogonalTransactionCandidate.length);
       return markBaseDisplayFinalized(finalOrthogonalTransactionCandidate, inputSignature);
     }
   }
+  finishOrthogonal(
+    finalOrthogonalTransactionCandidate === finalAttachedTransactionCandidate ? 'skip' : 'fallback',
+    finalOrthogonalTransactionCandidate === finalAttachedTransactionCandidate
+      ? 0
+      : finalOrthogonalTransactionCandidate.length,
+  );
+  const finishAxis = startFinalizeStage('terminal-finalize-axis');
   const finalAxisTransaction = runFinalAxisTransaction({
     attachedCandidate: finalAttachedTransactionCandidate,
     orthogonalCandidate: finalOrthogonalTransactionCandidate,
@@ -139,8 +233,14 @@ export const runBaseReactFlowFullRouteTerminalPhase = (
     repairNodes,
     inputSignature,
   });
-  if (finalAxisTransaction.finalized) return finalAxisTransaction.finalized;
+  if (finalAxisTransaction.finalized) {
+    finishAxis('accepted', finalAttachedTransactionCandidate.length);
+    finishFinalize('accepted', finalAttachedTransactionCandidate.length);
+    return finalAxisTransaction.finalized;
+  }
+  finishAxis('fallback');
   const finalAxisFallbackTransactionCandidate = finalAxisTransaction.anchoredFallback;
+  const finishOuterPort = startFinalizeStage('terminal-finalize-outer-port');
   const finalFallbackTransactionCandidate = finalAxisFallbackTransactionCandidate
     ?? chooseFinalTerminalTransactionCandidate(
       repairNodes,
@@ -154,11 +254,19 @@ export const runBaseReactFlowFullRouteTerminalPhase = (
     64,
   );
   if (finalOuterPortCandidate !== finalFallbackTransactionCandidate) {
+    finishOuterPort('accepted', finalOuterPortCandidate.length);
+    finishFinalize('accepted', finalOuterPortCandidate.length);
     return markBaseDisplayFinalized(finalOuterPortCandidate, inputSignature);
   }
-  return finalizeFailClosedDisplayTransaction(
+  finishOuterPort('skip');
+  const finishFailClosed = startFinalizeStage('terminal-finalize-fail-closed');
+  const failClosedEdges = finalizeFailClosedDisplayTransaction(
     finalFallbackTransactionCandidate,
     repairNodes,
     inputSignature,
+    { deferCompoundRepair: true },
   );
+  finishFailClosed('fallback', failClosedEdges.length);
+  finishFinalize('fallback', failClosedEdges.length);
+  return failClosedEdges;
 };

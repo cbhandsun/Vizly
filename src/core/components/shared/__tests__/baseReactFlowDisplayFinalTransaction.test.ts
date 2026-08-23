@@ -99,6 +99,12 @@ describe('finalizeFailClosedDisplayTransaction', () => {
       microNodes,
       'micro-closure-signature',
     );
+    const deferredCompoundResult = finalizeFailClosedDisplayTransaction(
+      baseline,
+      microNodes,
+      'micro-closure-signature',
+      { deferCompoundRepair: true },
+    );
 
     expect(calculateEdgePathQualityScore(baseline).tinyInteriorDoglegs).toBe(1);
     expect(calculateEdgePathQualityScore(result).tinyInteriorDoglegs).toBe(0);
@@ -111,5 +117,9 @@ describe('finalizeFailClosedDisplayTransaction', () => {
       { x: 300, y: 250 },
     ]);
     expect(result[0].data?.__baseDisplayFinalizedSignature).toBe('micro-closure-signature');
+    expect(getDisplayComputedPath(deferredCompoundResult[0]))
+      .toEqual(getDisplayComputedPath(result[0]));
+    expect(deferredCompoundResult[0].data?.__baseDisplayFinalizedSignature)
+      .toBe('micro-closure-signature');
   });
 });
