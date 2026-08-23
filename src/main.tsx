@@ -7,6 +7,7 @@ import './main/configureCoreRuntimes';
 import './main/configureAuthRuntime';
 import { initializeApplicationRuntime } from './main/bootstrapApplication';
 import { installVitePreloadErrorRecovery } from './main/preloadErrorRecovery';
+import { prewarmDisplayRoutingForLocation } from './main/prewarmDisplayRouting';
 import App from './App';
 import './index.css'; // Tailwind CSS
 import './main.css'; // 保留您项目全局的基础CSS
@@ -16,6 +17,7 @@ import './i18n';
 
 installVitePreloadErrorRecovery();
 initializeApplicationRuntime();
+void prewarmDisplayRoutingForLocation(window.location);
 
 /**
  * 函数级注释：应用入口渲染

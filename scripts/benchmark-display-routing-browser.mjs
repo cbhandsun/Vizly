@@ -68,9 +68,53 @@ for (let index = 0; index < sampleCount; index += 1) {
 const dragNodeIds = [...new Set(samples.flatMap(sample => (
   Array.isArray(sample.dragCases) ? sample.dragCases.map(item => item.nodeId) : []
 )))].sort();
+const initialNodeIds = [...new Set(samples.flatMap(sample => (
+  Array.isArray(sample.initialRoutes) ? sample.initialRoutes.map(item => item.nodeId) : []
+)))].sort();
 const summary = {
   sampleCount,
   initialRoute: summarizeDisplayRoutingSamples(samples.flatMap(sample => sample.initialRouteMs ?? [])),
+  initialCases: Object.fromEntries(initialNodeIds.map(nodeId => {
+    const cases = samples.flatMap(sample => sample.initialRoutes ?? [])
+      .filter(item => item.nodeId === nodeId);
+    const resolutions = Object.fromEntries([...new Set(cases.map(item => item.workerResolution))]
+      .filter(value => typeof value === 'string')
+      .sort()
+      .map(resolution => [resolution, cases.filter(item => (
+        item.workerResolution === resolution
+      )).length]));
+    return [nodeId, {
+      route: summarizeDisplayRoutingSamples(cases.map(item => item.routeMs)),
+      resolutions,
+      workerStartCount: cases.reduce((total, item) => total + (item.workerStartCount ?? 0), 0),
+      workerAbortCount: cases.reduce((total, item) => total + (item.workerAbortCount ?? 0), 0),
+      scheduledToWorker: summarizeDisplayRoutingSamples(
+        cases.map(item => item.scheduledToWorkerMs),
+      ),
+      workerRequestDelay: summarizeDisplayRoutingSamples(
+        cases.map(item => item.workerRequestDelayMs),
+      ),
+      workerRoundTrip: summarizeDisplayRoutingSamples(cases.map(item => item.workerRoundTripMs)),
+      workerCompute: summarizeDisplayRoutingSamples(cases.map(item => item.workerDurationMs)),
+      workerDeliveryWait: summarizeDisplayRoutingSamples(
+        cases.map(item => item.workerDeliveryWaitMs),
+      ),
+      workerBoundaryParse: summarizeDisplayRoutingSamples(
+        cases.map(item => item.workerBoundaryParseMs),
+      ),
+      parsedToFinal: summarizeDisplayRoutingSamples(cases.map(item => item.parsedToFinalMs)),
+      totalRoute: summarizeDisplayRoutingSamples(cases.map(item => item.totalRouteMs)),
+      phases: Object.fromEntries([...new Set(cases.flatMap(item => (
+        item.phaseTrace?.map(trace => trace.phase) ?? []
+      )))].map(phase => [phase, summarizeDisplayRoutingSamples(cases.flatMap(item => (
+        item.phaseTrace?.filter(trace => trace.phase === phase)
+          .map(trace => trace.exclusiveDurationMs) ?? []
+      )))])
+        .filter(([, value]) => value)
+        .sort((left, right) => right[1].p95Ms - left[1].p95Ms)
+        .slice(0, 12)),
+    }];
+  })),
   dragCases: Object.fromEntries(dragNodeIds.map(nodeId => {
     const cases = samples.flatMap(sample => sample.dragCases ?? [])
       .filter(item => item.nodeId === nodeId);

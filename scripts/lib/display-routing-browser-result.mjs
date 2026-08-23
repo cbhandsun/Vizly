@@ -23,6 +23,48 @@ export const buildDisplayRoutingMachineResult = (results) => ({
   initialRouteMs: Array.isArray(results)
     ? results.map(result => finiteMetric(result?.initial?.routeMs))
     : [],
+  initialRoutes: Array.isArray(results) ? results.map(result => ({
+    nodeId: typeof result?.nodeId === 'string' ? result.nodeId.slice(0, 128) : '<invalid>',
+    routeMs: finiteMetric(result?.initial?.routeMs),
+    workerResolution: typeof result?.initial?.workerResolution === 'string'
+      ? result.initial.workerResolution.slice(0, 32)
+      : null,
+    workerStartCount: finiteMetric(result?.initial?.workerStartCount),
+    workerAbortCount: finiteMetric(result?.initial?.workerAbortCount),
+    scheduledToWorkerMs: Number.isFinite(result?.initial?.scheduledAt)
+      && Number.isFinite(result?.initial?.workerStartedAt)
+      ? Math.max(0, result.initial.workerStartedAt - result.initial.scheduledAt)
+      : null,
+    workerRequestDelayMs: Number.isFinite(result?.initial?.workerStartedAt)
+      && Number.isFinite(result?.initial?.workerRequestAt)
+      ? Math.max(0, result.initial.workerRequestAt - result.initial.workerStartedAt)
+      : null,
+    workerRoundTripMs: Number.isFinite(result?.initial?.workerRequestAt)
+      && Number.isFinite(result?.initial?.workerResponseAt)
+      ? Math.max(0, result.initial.workerResponseAt - result.initial.workerRequestAt)
+      : null,
+    workerDurationMs: finiteMetric(result?.initial?.workerDurationMs),
+    workerDeliveryWaitMs: Number.isFinite(result?.initial?.workerRequestAt)
+      && Number.isFinite(result?.initial?.workerResponseAt)
+      && Number.isFinite(result?.initial?.workerDurationMs)
+      ? Math.max(
+        0,
+        result.initial.workerResponseAt
+          - result.initial.workerRequestAt
+          - result.initial.workerDurationMs,
+      )
+      : null,
+    workerBoundaryParseMs: Number.isFinite(result?.initial?.workerResponseAt)
+      && Number.isFinite(result?.initial?.workerResponseParsedAt)
+      ? Math.max(0, result.initial.workerResponseParsedAt - result.initial.workerResponseAt)
+      : null,
+    parsedToFinalMs: Number.isFinite(result?.initial?.workerResponseParsedAt)
+      && Number.isFinite(result?.initial?.finalAppliedAt)
+      ? Math.max(0, result.initial.finalAppliedAt - result.initial.workerResponseParsedAt)
+      : null,
+    totalRouteMs: finiteMetric(result?.initial?.totalRouteMs),
+    phaseTrace: projectPhaseTrace(result?.initial?.phaseTrace),
+  })) : [],
   dragCases: Array.isArray(results) ? results.map((result) => {
     const localRoute = result?.incremental?.response?.phaseTrace
       ?.find(trace => trace?.phase === 'local-route');

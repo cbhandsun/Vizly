@@ -109,6 +109,7 @@ type DisplayWorkerIdleListeners = {
 };
 
 const displayWorkerIdleListeners = new WeakMap<Worker, DisplayWorkerIdleListeners>();
+const eagerDisplayWorkerRef: MutableRefObject<Worker | null> = { current: null };
 
 export const resolveBaseReactFlowDisplayQualityPolicy = ({
   nodeCount,
@@ -258,6 +259,14 @@ const ensureBaseReactFlowDisplayWorker = (
 ): Worker | null => {
   if (typeof window === 'undefined' || typeof Worker === 'undefined') return null;
   if (workerRef.current) return workerRef.current;
+  if (workerRef !== eagerDisplayWorkerRef && eagerDisplayWorkerRef.current) {
+    const eagerWorker = eagerDisplayWorkerRef.current;
+    detachBaseReactFlowDisplayWorkerIdleListeners(eagerWorker);
+    eagerDisplayWorkerRef.current = null;
+    workerRef.current = eagerWorker;
+    armBaseReactFlowDisplayWorkerIdleListeners(eagerWorker, workerRef);
+    return eagerWorker;
+  }
   try {
     const worker = new Worker(new URL('./baseReactFlowDisplayEdges.worker.ts', import.meta.url), {
       type: 'module',
@@ -279,6 +288,15 @@ const ensureBaseReactFlowDisplayWorker = (
 export const prewarmBaseReactFlowDisplayWorker = (
   workerRef: MutableRefObject<Worker | null>,
 ): boolean => ensureBaseReactFlowDisplayWorker(workerRef) !== null;
+
+// This module is loaded with the flowchart route, before the canvas effects run.
+// Starting the module worker here overlaps its fetch/compile cost with React and
+// node measurement; the first mounted canvas adopts the same worker instance.
+// Other canvases still receive independently owned workers through the normal
+// ensure path, so request listeners and disposal remain single-owner.
+if (typeof window !== 'undefined' && typeof Worker !== 'undefined') {
+  ensureBaseReactFlowDisplayWorker(eagerDisplayWorkerRef);
+}
 
 /** Releases both request-idle guards and the worker owned by a canvas hook. */
 export const disposeBaseReactFlowDisplayWorker = (

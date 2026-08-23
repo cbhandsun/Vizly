@@ -106,8 +106,14 @@ const waitForValue = async (session, expression, timeoutMs = WAIT_TIMEOUT_MS) =>
 
 const initialReadyExpression = `(() => {
   const routing = window.__vizlyBaseReactFlowDisplayRouting || {};
+  const requests = window.__vizlyRoutingRequests || [];
+  const responses = window.__vizlyRoutingResponses || [];
+  const request = [...requests].reverse().find(item => item?.requestId === routing.requestId);
+  const response = [...responses].reverse().find(item => item?.requestId === routing.requestId);
   return routing.stage === 'final-applied'
     && routing.workerAbortCount === 0
+    && request
+    && response
     && document.querySelectorAll('.react-flow__edge').length === 14
     && typeof routing.outputRouteSignature === 'string'
     ? {
@@ -116,6 +122,14 @@ const initialReadyExpression = `(() => {
       workerStartCount: routing.workerStartCount,
       workerAbortCount: routing.workerAbortCount,
       workerResolution: routing.workerResolution,
+      scheduledAt: routing.scheduledAt,
+      workerStartedAt: routing.workerStartedAt,
+      workerRequestAt: request.__browserCapturedAt,
+      workerResponseAt: response.__browserCapturedAt,
+      workerResponseParsedAt: routing.workerResponseParsedAt,
+      finalAppliedAt: routing.finalAppliedAt,
+      totalRouteMs: routing.totalRouteMs,
+      workerDurationMs: response.workerDurationMs,
       phaseTrace: routing.phaseTrace,
     }
     : null;
