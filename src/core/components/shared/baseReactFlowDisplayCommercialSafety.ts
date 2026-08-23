@@ -59,11 +59,15 @@ export const closeBaseReactFlowFinalCommercialSafety = <T extends Edge[]>({
     candidateCount: edges.length,
     onTrace: onPhaseTrace,
   });
+  let noopCacheHit = false;
   const repairedEdges = canReuseClosure
     ? edges
     : repairBaseReactFlowFinalSafetyClosure(edges, nodes, {
       eligibleEdgeIds,
       evaluation,
+      onNoopCacheHit: () => {
+        noopCacheHit = true;
+      },
     });
   const closedEdges = canReuseClosure || (
     evaluation.hardReport(repairedEdges).hardClean
@@ -77,7 +81,7 @@ export const closeBaseReactFlowFinalCommercialSafety = <T extends Edge[]>({
     ? repairedEdges
     : edges;
   timer.finish(
-    canReuseClosure
+    canReuseClosure || noopCacheHit
       ? 'hit'
       : doBaseReactFlowDisplayRoutesMatchExactly(edges, closedEdges) ? 'skip' : 'accepted',
   );

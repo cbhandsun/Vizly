@@ -44,13 +44,12 @@ import {
   traceSkippedFinalCommercialDetours,
   traceSkippedFinalEndpointPhases,
 } from './baseReactFlowDisplayFinalEndpointOrder';
-import { repairBaseReactFlowFinalSafetyClosure } from './baseReactFlowDisplayFinalSafetyClosure';
-import { auditBaseReactFlowFinalSafetyClosure } from './baseReactFlowDisplayFinalSafetyAudit';
 import {
   canReuseBaseReactFlowFinalCommercialSafety,
   closeBaseReactFlowFinalCommercialSafety,
   commitBaseReactFlowFinalCommercialSafety,
 } from './baseReactFlowDisplayCommercialSafety';
+import { runBaseReactFlowFinalSafetyClosure } from './baseReactFlowDisplayFinalSafetyRun';
 import { fastDisplayHardSafetyIsClean, repairFastDisplayHardSafety } from './baseReactFlowFastEdgeSafety';
 import { commercialEdgeDetoursDoNotRegress } from './baseReactFlowDisplayCommercialDetourGuard';
 import {
@@ -173,30 +172,19 @@ const finalizeContainerClearanceResponse = (
     endpointOrderedCandidate,
     finalHardQualityIsClean,
   );
-  const closureTimer = startDisplayRoutingPhaseTrace({
-    phase: 'final-safety-closure',
-    candidateCount: orderedEdges.length,
-    onTrace: options.onPhaseTrace,
+  const finalSafety = runBaseReactFlowFinalSafetyClosure({
+    edges: orderedEdges,
+    eligibleEdgeIds: options.eligibleEdgeIds,
+    evaluation: finalEvaluation,
+    nodes: repairNodes,
+    onPhaseTrace: options.onPhaseTrace,
+    routeResolution: response.routeResolution,
   });
-  const safetyAudit = auditBaseReactFlowFinalSafetyClosure(
-    orderedEdges,
-    repairNodes,
-    finalEvaluation,
-    options.onPhaseTrace,
-  );
-  const endpointDefectDelegated = response.routeResolution === 'incremental-route'
-    && safetyAudit.endpointDefectOnly;
-  const safetyClosedEdges = safetyAudit.canSkip || endpointDefectDelegated
-    ? orderedEdges
-    : repairBaseReactFlowFinalSafetyClosure(
-      orderedEdges,
-      repairNodes,
-      {
-        eligibleEdgeIds: options.eligibleEdgeIds,
-        evaluation: finalEvaluation,
-      },
-    );
-  closureTimer.finish(safetyClosedEdges === orderedEdges ? 'skip' : 'accepted');
+  const {
+    edges: safetyClosedEdges,
+    endpointDefectDelegated,
+    safetyAudit,
+  } = finalSafety;
   const safetyClosedHardClean = finalHardQualityIsClean(safetyClosedEdges);
   // Re-apply a changed preferred trunk only after hard closure.
   const closureChangedRoutes = safetyClosedEdges !== orderedEdges

@@ -34,11 +34,29 @@ import {
   type DisplaySegment,
   withDisplayComputedPath,
 } from './baseReactFlowDisplayGeometry';
+import { createBaseReactFlowFinalSafetyNoopCache } from './baseReactFlowDisplayFinalSafetyNoopCache';
 
 export type BaseReactFlowFinalSafetyClosureOptions = Readonly<{
   eligibleEdgeIds?: ReadonlySet<string>;
   evaluation?: BaseReactFlowFinalEndpointEvaluation;
+  onNoopCacheHit?: () => void;
 }>;
+
+const finalSafetyNoopCacheByEvaluation = new WeakMap<
+  BaseReactFlowFinalEndpointEvaluation,
+  ReturnType<typeof createBaseReactFlowFinalSafetyNoopCache>
+>();
+
+const resolveFinalSafetyNoopCache = (
+  evaluation?: BaseReactFlowFinalEndpointEvaluation,
+): ReturnType<typeof createBaseReactFlowFinalSafetyNoopCache> | null => {
+  if (!evaluation) return null;
+  const cached = finalSafetyNoopCacheByEvaluation.get(evaluation);
+  if (cached) return cached;
+  const created = createBaseReactFlowFinalSafetyNoopCache();
+  finalSafetyNoopCacheByEvaluation.set(evaluation, created);
+  return created;
+};
 
 const sameEdgeReferences = (first: readonly Edge[], second: readonly Edge[]): boolean => (
   first === second
@@ -455,6 +473,15 @@ export const repairBaseReactFlowFinalSafetyClosure = <T extends Edge[]>(
   options: BaseReactFlowFinalSafetyClosureOptions = {},
 ): T => {
   if (edges.length === 0 || nodes.length === 0) return edges;
+  const finalSafetyNoopCache = resolveFinalSafetyNoopCache(options.evaluation);
+  if (finalSafetyNoopCache?.has(edges, nodes, options.eligibleEdgeIds)) {
+    options.onNoopCacheHit?.();
+    return edges;
+  }
+  const rememberNoop = (): T => {
+    finalSafetyNoopCache?.remember(edges, nodes, options.eligibleEdgeIds);
+    return edges;
+  };
   let initialTrueTrunks: readonly SameSideEndpointTrunkIdentity[] | undefined;
   const getInitialTrueTrunks = (): readonly SameSideEndpointTrunkIdentity[] => {
     initialTrueTrunks ??= (
@@ -472,7 +499,7 @@ export const repairBaseReactFlowFinalSafetyClosure = <T extends Edge[]>(
       getInitialTrueTrunks,
     )
   );
-  if (candidateIsAccepted(edges)) return edges;
+  if (candidateIsAccepted(edges)) return rememberNoop();
 
   const baselineReport = options.evaluation?.hardReport(edges)
     ?? getDisplayHardQualityGateReport(edges, nodes, 'polished');
@@ -499,7 +526,7 @@ export const repairBaseReactFlowFinalSafetyClosure = <T extends Edge[]>(
         )
       ),
     });
-    if (sameEdgeReferences(edges, nearTrunkCandidate)) return edges;
+    if (sameEdgeReferences(edges, nearTrunkCandidate)) return rememberNoop();
     if (candidateIsAccepted(nearTrunkCandidate)) return nearTrunkCandidate as T;
   }
 
@@ -642,5 +669,5 @@ export const repairBaseReactFlowFinalSafetyClosure = <T extends Edge[]>(
     }
   }
 
-  return edges;
+  return rememberNoop();
 };
