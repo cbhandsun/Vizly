@@ -32,6 +32,7 @@ export interface AutoSaveOptions {
     onSaveSuccess?: () => void;
     onSaveError?: (error: Error) => void;
     getMetadata?: () => unknown;
+    getRoutingSnapshot?: () => unknown;
 }
 
 const createAutoSaveScopeKey = (storageKey: string, diagramId?: string) => (
@@ -45,6 +46,7 @@ const createAutoSaveContentKey = (
     nodes: Node[],
     edges: Edge[],
     metadata: unknown,
+    routingSnapshot: unknown,
 ) => JSON.stringify({
     storageKey,
     diagramId: diagramId ?? null,
@@ -52,6 +54,7 @@ const createAutoSaveContentKey = (
     nodes,
     edges,
     metadata,
+    routingSnapshot,
 });
 
 /** GC: remove autosave entries not accessed in 7 days */
@@ -93,6 +96,7 @@ export const useAutoSave = (
         onSaveSuccess,
         onSaveError,
         getMetadata,
+        getRoutingSnapshot,
     } = options;
 
     const [saveState, setSaveState] = useState<AutoSaveState>({
@@ -147,6 +151,7 @@ export const useAutoSave = (
             const currentNodes = nodesRef.current;
             const currentEdges = edgesRef.current;
             const metadata = getMetadata?.();
+            const routingSnapshot = getRoutingSnapshot?.();
             const contentKey = createAutoSaveContentKey(
                 storageKey,
                 diagramId,
@@ -154,6 +159,7 @@ export const useAutoSave = (
                 currentNodes,
                 currentEdges,
                 metadata,
+                routingSnapshot,
             );
             if (contentKey === lastSavedContentRef.current) {
                 return;
@@ -169,6 +175,7 @@ export const useAutoSave = (
                 edges: currentEdges,
                 timestamp: now,
                 metadata,
+                routingSnapshot,
             });
 
             if (!data) {
@@ -213,7 +220,16 @@ export const useAutoSave = (
                 appMessage.error(`Auto-save failed: ${errorMsg}`);
             }
         }
-    }, [storageKey, diagramId, routingVersion, onSaveSuccess, onSaveError, getMetadata, scopeKey]);
+    }, [
+        storageKey,
+        diagramId,
+        routingVersion,
+        onSaveSuccess,
+        onSaveError,
+        getMetadata,
+        getRoutingSnapshot,
+        scopeKey,
+    ]);
 
     useLayoutEffect(() => {
         saveRef.current = save;
@@ -249,6 +265,7 @@ export const useAutoSave = (
             const currentEdges = edgesRef.current;
             if (!currentNodes || !enabled) return;
             const metadata = getMetadata?.();
+            const routingSnapshot = getRoutingSnapshot?.();
             const contentKey = createAutoSaveContentKey(
                 storageKey,
                 diagramId,
@@ -256,6 +273,7 @@ export const useAutoSave = (
                 currentNodes,
                 currentEdges,
                 metadata,
+                routingSnapshot,
             );
             if (contentKey === lastSavedContentRef.current) return; // 无变化无需写入
             try {
@@ -267,6 +285,7 @@ export const useAutoSave = (
                     timestamp: Date.now(),
                     requiresRecoveryReview: true,
                     metadata,
+                    routingSnapshot,
                 });
                 if (!data) return;
                 localStorage.setItem(storageKey, JSON.stringify(data));
@@ -277,13 +296,32 @@ export const useAutoSave = (
         };
         window.addEventListener('beforeunload', handleBeforeUnload);
         return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-    }, [enabled, storageKey, diagramId, routingVersion, getMetadata, scopeKey]);
+    }, [
+        enabled,
+        storageKey,
+        diagramId,
+        routingVersion,
+        getMetadata,
+        getRoutingSnapshot,
+        scopeKey,
+    ]);
 
     // Manual save trigger
     const saveNow = useCallback(() => save(), [save]);
 
     // Load saved data, also refreshes lastAccessedAt to prevent GC expiry
-    const loadSaved = useCallback((): Pick<AutoSavePayload, 'diagramId' | 'routingVersion' | 'nodes' | 'edges' | 'isFreshSeed' | 'requiresRecoveryReview' | 'timestamp' | 'metadata'> | null => {
+    const loadSaved = useCallback((): Pick<
+        AutoSavePayload,
+        | 'diagramId'
+        | 'routingVersion'
+        | 'nodes'
+        | 'edges'
+        | 'routingSnapshot'
+        | 'isFreshSeed'
+        | 'requiresRecoveryReview'
+        | 'timestamp'
+        | 'metadata'
+    > | null => {
         try {
             const saved = localStorage.getItem(storageKey);
             if (!saved) return null;
@@ -313,6 +351,7 @@ export const useAutoSave = (
                 data.nodes,
                 data.edges,
                 data.metadata,
+                data.routingSnapshot,
             );
             setSaveState({
                 lastSaved: data.timestamp ?? null,
@@ -325,6 +364,7 @@ export const useAutoSave = (
                 routingVersion: data.routingVersion,
                 nodes: data.nodes || [],
                 edges: data.edges || [],
+                routingSnapshot: data.routingSnapshot,
                 isFreshSeed: !!data.isFreshSeed,
                 requiresRecoveryReview: !!data.requiresRecoveryReview,
                 timestamp: data.timestamp,   // required for isFreshSeed TTL check

@@ -241,7 +241,7 @@ describe('mergePresetExplicitEdgeHandles', () => {
     expect(merged.edges[0].markerEnd).toBeUndefined();
   });
 
-  it('invalidates legacy preset routes but leaves current and user-only routes intact', () => {
+  it('removes durable automatic geometry from legacy, current, and user-only edges', () => {
     const legacyPath = [{ x: 191, y: 742 }, { x: -24, y: 742 }];
     const legacy = mergePresetExplicitEdgeHandles({
       nodes: [{ id: 'A' }, { id: 'B' }],
@@ -263,7 +263,8 @@ describe('mergePresetExplicitEdgeHandles', () => {
       data: { label: 'business' },
     });
     expect(legacy.edges[0].data.computedPath).toBeUndefined();
-    expect(legacy.edges[1].data.computedPath).toEqual(legacyPath);
+    expect(legacy.edges[1].type).toBe('advanced-smart-step');
+    expect(legacy.edges[1].data.computedPath).toBeUndefined();
     expect(legacy.edges[1].className).toBe('user-authored vizly-edge-role-feedback');
 
     const current = mergePresetExplicitEdgeHandles({
@@ -275,8 +276,8 @@ describe('mergePresetExplicitEdgeHandles', () => {
       }],
     }, { edges: [{ id: 'preset-edge', type: 'main' }] });
 
-    expect(current.edges[0].type).toBe('stablePath');
-    expect(current.edges[0].data.computedPath).toEqual(legacyPath);
+    expect(current.edges[0].type).toBe('advanced-smart-step');
+    expect(current.edges[0].data.computedPath).toBeUndefined();
   });
 });
 

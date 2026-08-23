@@ -6,6 +6,7 @@
 import type { Node, Edge, Position as ReactFlowPosition, XYPosition } from '@xyflow/react';
 import type { CSSProperties } from 'react';
 import type { Theme } from '../themes/types/ThemeTypes';
+import type { RoutingOnlyDocumentSnapshot } from '../routing/persistedRoutingCandidate';
 
 // === 基础类型定义 ===
 
@@ -252,6 +253,8 @@ export interface StandardDiagramData {
   layout: LayoutMetadata;
   theme: ThemeMetadata;
   config?: LayoutConfig;
+  /** Untrusted routing geometry is revalidated by Canvas against current identity before use. */
+  routingSnapshot?: RoutingOnlyDocumentSnapshot;
   metadata?: {
     title?: string;
     description?: string;

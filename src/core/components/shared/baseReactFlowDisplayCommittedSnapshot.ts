@@ -1,12 +1,20 @@
 import type { Edge, Node } from '@xyflow/react';
 
 import {
+  createPersistedRoutingCandidate,
+  createRoutingOnlyDocumentSnapshot,
+  type RoutingOnlyDocumentSnapshot,
+} from '../../routing/persistedRoutingCandidate';
+import { EDGE_ROUTING_CACHE_VERSION } from '../../routing/routingVersion';
+
+import {
   baseReactFlowDisplayOutputRouteSignatureMatches,
   isBaseReactFlowDisplayOutputRouteSignature,
 } from './baseReactFlowDisplayCache';
 import { isBaseReactFlowDisplayGeometryDigest } from './baseReactFlowDisplayInputIdentity';
 import {
   mergeBaseReactFlowDisplayEdgePatches,
+  sanitizeBaseReactFlowDisplayCachePatches,
   sanitizeBaseReactFlowTrustedDisplayPatches,
 } from './baseReactFlowDisplayRoutingTransaction';
 import { projectBaseReactFlowDisplayWorkerInput } from './baseReactFlowDisplayWorkerProjection';
@@ -16,6 +24,7 @@ import {
   isDisplayRoutingWorkerSessionRef,
   type RoutingWorkerSessionRef,
 } from './baseReactFlowDisplayRoutingSession';
+import { publishBaseReactFlowPrecompiledCommittedRoute } from './baseReactFlowPrecompiledCaptureMode';
 
 const MAX_COMMITTED_DISPLAY_SNAPSHOTS = 16;
 const INPUT_SIGNATURE_PATTERN = /^\d{1,10}$/;
@@ -47,6 +56,8 @@ export const doesBaseReactFlowDisplayCommittedBaselineMatchIdentity = (
 
 const committedDisplaySnapshots =
   new Map<string, BaseReactFlowDisplayCommittedSnapshotBaseline>();
+let committedSnapshotBySourceEdges =
+  new WeakMap<Edge[], BaseReactFlowDisplayCommittedSnapshotBaseline>();
 
 const snapshotKey = (inputSignature: string, inputGeometryDigest: string): string => (
   `${inputSignature}\u0000${inputGeometryDigest}`
@@ -91,17 +102,49 @@ export const writeBaseReactFlowDisplayCommittedSnapshot = ({
   outputRouteSignature: string | null;
   workerSessionRef?: RoutingWorkerSessionRef;
 }): boolean => {
+  const snapshot = createCommittedSnapshot({
+    inputSignature,
+    inputGeometryDigest,
+    sourceEdges,
+    sourceNodes,
+    displayPatches,
+    outputRouteSignature,
+    workerSessionRef,
+  });
+  if (!snapshot) return false;
+  rememberSnapshot(snapshotKey(inputSignature, inputGeometryDigest), snapshot);
+  committedSnapshotBySourceEdges.set(sourceEdges, snapshot);
+  return true;
+};
+
+const createCommittedSnapshot = ({
+  inputSignature,
+  inputGeometryDigest,
+  sourceEdges,
+  sourceNodes,
+  displayPatches,
+  outputRouteSignature,
+  workerSessionRef,
+}: {
+  inputSignature: string;
+  inputGeometryDigest: string;
+  sourceEdges: Edge[];
+  sourceNodes: Node[];
+  displayPatches: Edge[];
+  outputRouteSignature: string | null;
+  workerSessionRef?: RoutingWorkerSessionRef;
+}): BaseReactFlowDisplayCommittedSnapshotBaseline | null => {
   if (
     !hasValidIdentity(inputSignature, inputGeometryDigest)
     || !isBaseReactFlowDisplayOutputRouteSignature(outputRouteSignature)
-  ) return false;
+  ) return null;
   const safePatches = sanitizeBaseReactFlowTrustedDisplayPatches(sourceEdges, displayPatches);
-  if (!safePatches) return false;
+  if (!safePatches) return null;
   const replayedEdges = mergeBaseReactFlowDisplayEdgePatches(sourceEdges, safePatches);
   if (
     !replayedEdges
     || !baseReactFlowDisplayOutputRouteSignatureMatches(replayedEdges, outputRouteSignature)
-  ) return false;
+  ) return null;
   const projectedInput = projectBaseReactFlowDisplayWorkerInput({
     edges: sourceEdges,
     nodes: sourceNodes,
@@ -112,7 +155,7 @@ export const writeBaseReactFlowDisplayCommittedSnapshot = ({
     && workerSessionRef.outputRouteSignature === outputRouteSignature
     ? workerSessionRef
     : undefined;
-  rememberSnapshot(snapshotKey(inputSignature, inputGeometryDigest), {
+  return {
     inputSignature,
     inputGeometryDigest,
     nodes: projectedInput.nodes,
@@ -120,8 +163,7 @@ export const writeBaseReactFlowDisplayCommittedSnapshot = ({
     displayPatches: safePatches,
     outputRouteSignature,
     ...(safeWorkerSessionRef ? { workerSessionRef: safeWorkerSessionRef } : {}),
-  });
-  return true;
+  };
 };
 
 export const readBaseReactFlowDisplayCommittedSnapshot = ({
@@ -155,6 +197,7 @@ export const readBaseReactFlowDisplayCommittedSnapshot = ({
     edges: snapshot.sourceEdges,
     nodes: snapshot.nodes,
   });
+  committedSnapshotBySourceEdges.set(sourceEdges, snapshot);
   return {
     edges,
     outputRouteSignature: snapshot.outputRouteSignature,
@@ -181,15 +224,62 @@ export const commitBaseReactFlowDisplaySnapshot = (options: {
   displayPatches: Edge[];
   outputRouteSignature: string | null;
   workerSessionRef?: RoutingWorkerSessionRef;
+  precompiledCapturePresetId?: string | null;
 }): BaseReactFlowDisplayCommittedSnapshotBaseline | null => {
-  if (!writeBaseReactFlowDisplayCommittedSnapshot(options)) return null;
-  return readBaseReactFlowDisplayCommittedSnapshot({
-    inputSignature: options.inputSignature,
-    inputGeometryDigest: options.inputGeometryDigest,
-    sourceEdges: options.sourceEdges,
-  })?.baseline ?? null;
+  const snapshot = createCommittedSnapshot(options);
+  if (!snapshot) return null;
+  rememberSnapshot(
+    snapshotKey(options.inputSignature, options.inputGeometryDigest),
+    snapshot,
+  );
+  committedSnapshotBySourceEdges.set(options.sourceEdges, snapshot);
+  if (options.precompiledCapturePresetId) {
+    publishBaseReactFlowPrecompiledCommittedRoute({
+      presetId: options.precompiledCapturePresetId,
+      inputSignature: options.inputSignature,
+      inputGeometryDigest: options.inputGeometryDigest,
+      outputRouteSignature: snapshot.outputRouteSignature,
+      sourceEdges: options.sourceEdges,
+      displayPatches: options.displayPatches,
+    });
+  }
+  return snapshot;
 };
 
 export const clearBaseReactFlowDisplayCommittedSnapshots = (): void => {
   committedDisplaySnapshots.clear();
+  committedSnapshotBySourceEdges = new WeakMap<Edge[], BaseReactFlowDisplayCommittedSnapshotBaseline>();
+};
+
+/**
+ * Creates a portable routing-only snapshot only from geometry that Canvas has
+ * atomically committed for this exact source-edge collection. Display paint,
+ * marker, label, selection, and business metadata are never serialized here.
+ */
+export const createBaseReactFlowRoutingOnlyDocumentSnapshot = (
+  sourceEdges: Edge[],
+): RoutingOnlyDocumentSnapshot | null => {
+  const snapshot = committedSnapshotBySourceEdges.get(sourceEdges);
+  if (!snapshot || snapshot.sourceEdges.length !== sourceEdges.length) return null;
+  const safePatches = sanitizeBaseReactFlowDisplayCachePatches(
+    sourceEdges,
+    snapshot.displayPatches,
+  );
+  if (!safePatches) return null;
+  const replayedEdges = mergeBaseReactFlowDisplayEdgePatches(sourceEdges, safePatches);
+  if (
+    !replayedEdges
+    || !baseReactFlowDisplayOutputRouteSignatureMatches(
+      replayedEdges,
+      snapshot.outputRouteSignature,
+    )
+  ) return null;
+  const candidate = createPersistedRoutingCandidate({
+    routingVersion: EDGE_ROUTING_CACHE_VERSION,
+    inputSignature: snapshot.inputSignature,
+    inputGeometryDigest: snapshot.inputGeometryDigest,
+    outputRouteSignature: snapshot.outputRouteSignature,
+    patches: safePatches,
+  });
+  return candidate ? createRoutingOnlyDocumentSnapshot(candidate) : null;
 };

@@ -6,6 +6,11 @@ import {
     isFlowchartClipboardTextWithinBounds,
     parseClipboardJson,
 } from '../flowchartClipboard';
+import {
+    createPersistedRoutingCandidate,
+    createRoutingOnlyDocumentSnapshot,
+} from '../../routing/persistedRoutingCandidate';
+import { EDGE_ROUTING_CACHE_VERSION } from '../../routing/routingVersion';
 
 describe('flowchartClipboard', () => {
     it('copies a selected subgraph with all connecting edges', () => {
@@ -96,6 +101,63 @@ describe('flowchartClipboard', () => {
         });
 
         expect(result?.nodes[0].data).toEqual({});
+    });
+
+    it('separates routing-only geometry from imported business edges', () => {
+        const candidate = createPersistedRoutingCandidate({
+            routingVersion: EDGE_ROUTING_CACHE_VERSION,
+            inputSignature: '1234',
+            inputGeometryDigest: `geometry-v1:${'a'.repeat(32)}`,
+            outputRouteSignature: 'route-v2:1:2:0123456789abcdef',
+            writtenAt: 42,
+            patches: [{
+                id: 'edge',
+                source: 'a',
+                target: 'a',
+                data: { computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }] },
+            }],
+        });
+        if (!candidate) throw new Error('expected a valid routing fixture');
+        const routingSnapshot = createRoutingOnlyDocumentSnapshot(candidate);
+        if (!routingSnapshot) throw new Error('expected a valid routing snapshot');
+
+        const result = coerceClipboardData({
+            nodes: [{ id: 'a', position: { x: 0, y: 0 } }],
+            edges: [{
+                id: 'edge',
+                source: 'a',
+                target: 'a',
+                type: 'stablePath',
+                sourceHandle: 'right',
+                data: {
+                    label: 'business',
+                    computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
+                    layoutPathLocked: true,
+                },
+            }],
+            routingSnapshot,
+        });
+
+        expect(result?.routingSnapshot).toEqual(routingSnapshot);
+        expect(result?.edges[0]).toMatchObject({
+            type: 'advanced-smart-step',
+            data: { label: 'business' },
+        });
+        expect(result?.edges[0].sourceHandle).toBeUndefined();
+        expect(result?.edges[0].data?.computedPath).toBeUndefined();
+    });
+
+    it('opens legacy business data while ignoring an invalid routing snapshot', () => {
+        const result = coerceClipboardData({
+            nodes: [{ id: 'a', position: { x: 0, y: 0 } }],
+            edges: [],
+            routingSnapshot: { schema: 'unknown', candidate: {} },
+        });
+
+        expect(result).toEqual({
+            nodes: [{ id: 'a', position: { x: 0, y: 0 }, data: {} }],
+            edges: [],
+        });
     });
 
     it('rejects nodes without finite positions', () => {

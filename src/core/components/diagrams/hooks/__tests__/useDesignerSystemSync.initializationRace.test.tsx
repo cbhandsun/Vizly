@@ -19,6 +19,7 @@ interface SavedCanvas {
   requiresRecoveryReview?: boolean;
   timestamp: number;
   metadata?: unknown;
+  routingSnapshot?: unknown;
 }
 
 const mocks = vi.hoisted(() => {
@@ -27,15 +28,20 @@ const mocks = vi.hoisted(() => {
   const marks: string[] = [];
   const initializedIds = new Set<string>();
   const autoSaveEnabledValues: boolean[] = [];
+  const registeredBridges = new Map<string, Record<string, unknown>>();
+  const routingSnapshot = { schema: 'routing-test-snapshot' };
 
   return {
     marks,
     initializedIds,
     autoSaveEnabledValues,
+    registeredBridges,
+    routingSnapshot,
     loadSaved: vi.fn<() => SavedCanvas | null>(() => null),
     clearSaved: vi.fn(),
     saveNow: vi.fn(),
     recalculateAutosaveNodeSizes: vi.fn(async (nodes: Node[]) => nodes),
+    registerRoutingCandidate: vi.fn(),
     loadStandardPresetCanvas: vi.fn(),
     logPresetFailure: vi.fn(),
     getLookup(id: string) {
@@ -106,19 +112,24 @@ vi.mock('../designerSystemSyncLogging', () => ({
 }));
 
 vi.mock('../../../../utils/flowDataBridge', () => ({
-  registerFlowDataBridge: () => () => undefined,
+  registerFlowDataBridge: (id: string, entry: Record<string, unknown>) => {
+    mocks.registeredBridges.set(id, entry);
+    return () => mocks.registeredBridges.delete(id);
+  },
   registerFlowDesignerCloudOpener: () => () => undefined,
+}));
+
+vi.mock('../../../shared/baseReactFlowDisplayCommittedSnapshot', () => ({
+  createBaseReactFlowRoutingOnlyDocumentSnapshot: () => mocks.routingSnapshot,
+}));
+
+vi.mock('../../../../routing/routingDocumentCandidateRegistry', () => ({
+  registerRoutingOnlyDocumentCandidate: mocks.registerRoutingCandidate,
 }));
 
 vi.mock('../../../../utils/animateLayoutTransition', () => ({
   cancelLayoutTransition: vi.fn(),
   suspendLayoutTransitions: vi.fn(),
-}));
-
-vi.mock('../../../../services/EdgeRoutingCoordinator', () => ({
-  EdgeRoutingCoordinator: {
-    getInstance: () => ({ freeze: vi.fn(), unfreeze: vi.fn() }),
-  },
 }));
 
 vi.mock('../designerFlowDataBridgeProjection', () => ({
@@ -181,10 +192,12 @@ describe('useDesignerSystemSync initialization race safety', () => {
     mocks.marks.length = 0;
     mocks.initializedIds.clear();
     mocks.autoSaveEnabledValues.length = 0;
+    mocks.registeredBridges.clear();
     mocks.loadSaved.mockReset().mockReturnValue(null);
     mocks.clearSaved.mockClear();
     mocks.saveNow.mockClear();
     mocks.recalculateAutosaveNodeSizes.mockReset().mockImplementation(async (nodes: Node[]) => nodes);
+    mocks.registerRoutingCandidate.mockReset();
     mocks.loadStandardPresetCanvas.mockReset();
     mocks.logPresetFailure.mockClear();
     mocks.loadStandardPresetCanvas.mockImplementation((id: string) => {
@@ -222,6 +235,19 @@ describe('useDesignerSystemSync initialization race safety', () => {
     );
     return { ...hook, setNodes, setEdges };
   };
+
+  it('exposes only the Canvas committed routing snapshot to save bridges', () => {
+    renderSync('diagram-routing-snapshot');
+
+    const bridge = mocks.registeredBridges.get('diagram-routing-snapshot');
+    expect(bridge).toBeDefined();
+    expect(bridge?.routingSnapshot).toBe(mocks.routingSnapshot);
+    expect((bridge?.getCanvasSnapshot as (() => unknown) | undefined)?.()).toEqual({
+      nodes: [],
+      edges: [],
+      routingSnapshot: mocks.routingSnapshot,
+    });
+  });
 
   it('keeps the latest diagram when an older preset finishes last', async () => {
     const { rerender, setNodes } = renderSync('diagram-a');
@@ -297,12 +323,14 @@ describe('useDesignerSystemSync initialization race safety', () => {
 
   it('restores a standard-preset autosave instead of clearing it', async () => {
     const restoredCanvas = canvasFor('restored-standard-node');
+    const routingSnapshot = { schema: 'autosave-routing-candidate' };
     mocks.loadSaved.mockReturnValue({
       diagramId: 'blank-canvas-template',
       nodes: restoredCanvas.nodes,
       edges: restoredCanvas.edges,
       timestamp: Date.now(),
       isFreshSeed: false,
+      routingSnapshot,
     });
 
     const { setNodes } = renderSync('blank-canvas-template');
@@ -318,6 +346,8 @@ describe('useDesignerSystemSync initialization race safety', () => {
     expect(committedNodeIds).toEqual(['restored-standard-node']);
     expect(mocks.clearSaved).not.toHaveBeenCalled();
     expect(mocks.loadStandardPresetCanvas).not.toHaveBeenCalled();
+    expect(mocks.registerRoutingCandidate).toHaveBeenCalledOnce();
+    expect(mocks.registerRoutingCandidate).toHaveBeenCalledWith(routingSnapshot);
   });
 
   it.each([

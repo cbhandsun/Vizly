@@ -32,21 +32,24 @@ export const useBaseReactFlowCachedDisplayCandidate = ({
   bypassReusableRoutes,
   hasCommittedFinalDisplayEntry,
   inputSignature,
+  inputGeometryDigest,
   edges,
 }: {
   routingGeometryReady: boolean;
   bypassReusableRoutes: boolean;
   hasCommittedFinalDisplayEntry: boolean;
   inputSignature: string;
+  inputGeometryDigest: string;
   edges: Edge[];
 }): Edge[] | null => {
   const cachedEntry = useMemo(() => (
     routingGeometryReady && !bypassReusableRoutes && !hasCommittedFinalDisplayEntry
-      ? readBaseReactFlowDisplayEdgesCacheEntry(inputSignature)
+      ? readBaseReactFlowDisplayEdgesCacheEntry(inputSignature, inputGeometryDigest)
       : null
   ), [
     bypassReusableRoutes,
     hasCommittedFinalDisplayEntry,
+    inputGeometryDigest,
     inputSignature,
     routingGeometryReady,
   ]);
@@ -61,6 +64,7 @@ export const useBaseReactFlowPrecompiledPreviewGate = ({
   routingGeometryReady,
   forceFreshFullRoute,
   hasCommittedFinalDisplayEntry,
+  hasDocumentCandidate = false,
   inputSignature,
   inputGeometryDigest,
   nodes,
@@ -72,6 +76,7 @@ export const useBaseReactFlowPrecompiledPreviewGate = ({
   routingGeometryReady: boolean;
   forceFreshFullRoute: boolean;
   hasCommittedFinalDisplayEntry: boolean;
+  hasDocumentCandidate?: boolean;
   inputSignature: string;
   inputGeometryDigest: string;
   nodes: Node[];
@@ -124,7 +129,7 @@ export const useBaseReactFlowPrecompiledPreviewGate = ({
   ]);
 
   const currentPreview = preview?.identity === identity ? preview : null;
-  return hasCandidate && currentPreview?.status !== 'miss';
+  return hasDocumentCandidate || (hasCandidate && currentPreview?.status !== 'miss');
 };
 
 export const useBaseReactFlowResolvedDisplayEdges = ({

@@ -6,6 +6,7 @@ import type {
   StandardNodeData,
   ThemeMetadata,
 } from '../models/DiagramModels';
+import { parseRoutingOnlyDocumentSnapshot } from '../routing/persistedRoutingCandidate';
 
 export type CoerceIssueLevel = 'warn' | 'error';
 
@@ -268,6 +269,7 @@ export const coerceToStandardDiagramDataWithReport = (
   const theme = isPlainRecord(raw.theme) ? ({ ...defaultTheme(), ...raw.theme } as ThemeMetadata) : defaultTheme();
   const metadata = rawMetadata;
   const config = sanitizeRecord(raw.config);
+  const routingSnapshot = parseRoutingOnlyDocumentSnapshot(raw.routingSnapshot);
 
   const diagram = {
     id,
@@ -279,6 +281,7 @@ export const coerceToStandardDiagramDataWithReport = (
     ...(Array.isArray(raw.groups) ? { groups } : {}),
     layout,
     theme,
+    ...(routingSnapshot ? { routingSnapshot } : {}),
     ...(metadata ? { metadata } : {}),
     ...(config ? { config } : {})
   } as StandardDiagramData;

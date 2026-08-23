@@ -20,6 +20,7 @@ import {
     logDesignerSystemSyncStaleAutosaveDetected,
     logDesignerSystemSyncStandardDataToCanvasFailure,
 } from './designerSystemSyncLogging';
+import { registerRoutingOnlyDocumentCandidate } from '../../../routing/routingDocumentCandidateRegistry';
 
 const PLUGIN_EMPTY_CANVAS_IDS = new Set(['flowchart']);
 
@@ -124,12 +125,14 @@ export const useDesignerInitialDiagramLoad = ({
                 }),
             ]).then(([recalculatedNodes, routingModule]) => {
                 commitInitialization(() => {
+                    if (saved.routingSnapshot) {
+                        registerRoutingOnlyDocumentCandidate(saved.routingSnapshot);
+                    }
                     cancelLayoutTransition(setNodes);
                     setNodes(recalculatedNodes);
                     setEdges(restoredEdges);
                     needsInitialFitView.current = true;
                     routingModule?.EdgeRoutingCoordinator.getInstance().freeze();
-
                     if (saved.isFreshSeed) {
                         messageApi?.success(t('designer.initialLoad.templateLoaded'));
                         clearDesignerFreshSeedFlag(`flowchart-autosave-v2-${id || 'default'}`);

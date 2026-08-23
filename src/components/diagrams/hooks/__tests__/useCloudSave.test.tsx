@@ -89,6 +89,7 @@ interface TestBridge {
     name: string;
     nodes: Array<{ id: string }>;
     edges: unknown[];
+    routingSnapshot?: unknown;
     metadata?: {
         title?: string;
         cloud?: {
@@ -333,6 +334,10 @@ describe('useCloudSave', () => {
 
     it('saves successfully and writes the cloud identity back to the bridge', async () => {
         const bridge = createBridge();
+        bridge.routingSnapshot = {
+            schema: 'vizly-routing-only-document-v1',
+            candidate: { routingVersion: 'test-routing-version' },
+        };
         bridgeMocks.get.mockReturnValue(bridge);
         const { result } = renderHook(() => useCloudSave('diagram-1', '客户流程'));
 
@@ -343,7 +348,11 @@ describe('useCloudSave', () => {
         expect(storageMocks.provider.saveDiagram).toHaveBeenCalledWith(expect.objectContaining({
             id: bridge.id,
             title: '客户流程',
-            content: expect.objectContaining({ id: bridge.id, name: '客户流程' }),
+            content: expect.objectContaining({
+                id: bridge.id,
+                name: '客户流程',
+                routingSnapshot: bridge.routingSnapshot,
+            }),
         }));
         expect(bridge.metadata?.cloud).toEqual({
             provider: 'supabase',

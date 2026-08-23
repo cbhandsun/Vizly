@@ -25,6 +25,7 @@ import {
     type FlowDataBridgeEntry,
 } from '../../../utils/flowDataBridge';
 import type { StandardDiagramData } from '../../../models/DiagramModels';
+import { createBaseReactFlowRoutingOnlyDocumentSnapshot } from '../../shared/baseReactFlowDisplayCommittedSnapshot';
 
 export interface UseDesignerSystemSyncProps {
     id?: string;
@@ -92,6 +93,7 @@ export function useDesignerSystemSync({
             getCanvasSnapshot: () => ({
                 nodes: nodesRef.current,
                 edges: edgesRef.current,
+                routingSnapshot: createBaseReactFlowRoutingOnlyDocumentSnapshot(edgesRef.current) ?? undefined,
             }),
         };
 
@@ -107,6 +109,10 @@ export function useDesignerSystemSync({
             edges: {
                 enumerable: true,
                 get: () => projectDesignerStandardEdges(edgesRef.current),
+            },
+            routingSnapshot: {
+                enumerable: true,
+                get: () => createBaseReactFlowRoutingOnlyDocumentSnapshot(edgesRef.current) ?? undefined,
             },
         });
             
@@ -463,6 +469,9 @@ export function useDesignerSystemSync({
         onSaveSuccess: undefined,
         onSaveError: (error) => logDesignerSystemSyncAutoSaveFailure(error),
         getMetadata: getAutoSaveMetadata,
+        getRoutingSnapshot: () => (
+            createBaseReactFlowRoutingOnlyDocumentSnapshot(edgesRef.current) ?? undefined
+        ),
     });
 
     // Only debounce after the active diagram has completed initialization.

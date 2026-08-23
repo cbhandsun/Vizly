@@ -7,7 +7,7 @@ import {
 
 export type BaseReactFlowDisplayCandidateResolution = Readonly<{
   candidateEdges: Edge[] | null;
-  source: 'persistent' | 'precompiled' | 'miss';
+  source: 'document' | 'persistent' | 'precompiled' | 'miss';
 }>;
 
 export type BaseReactFlowPrecompiledCandidateLoader = (
@@ -28,14 +28,16 @@ export const resolveBaseReactFlowPrecompiledCandidateTimeoutMs = (value: number)
 
 /**
  * Resolves external display candidates before a worker job starts. A generated
- * precompiled artifact is tried first so an invalid persistent candidate cannot
- * force an expensive full route when a versioned artifact exists. Persistent
- * data remains the fallback for registry misses, failures, and bounded timeouts.
+ * precompiled artifact is tried first so an older document or persistent
+ * candidate cannot restore a superseded detour when a versioned artifact exists.
+ * Document and persistent data are fallbacks for misses, failures, and bounded
+ * timeouts. Every returned candidate is still validated inside the Worker job.
  * Callers must treat `null` as a stale/aborted schedule and must not start a
  * worker for it.
  */
 export const resolveBaseReactFlowDisplayCandidate = async ({
   input,
+  documentCandidateEdges,
   persistentCandidateEdges,
   signal,
   isCurrent,
@@ -44,6 +46,7 @@ export const resolveBaseReactFlowDisplayCandidate = async ({
   loadTimeoutMs = PRECOMPILED_CANDIDATE_LOAD_TIMEOUT_MS,
 }: {
   input: BaseReactFlowPrecompiledRouteLookupInput;
+  documentCandidateEdges?: Edge[] | null;
   persistentCandidateEdges: Edge[] | null;
   signal: AbortSignal;
   isCurrent: () => boolean;
@@ -55,7 +58,6 @@ export const resolveBaseReactFlowDisplayCandidate = async ({
   if (!allowExternalCandidates) {
     return { candidateEdges: null, source: 'miss' };
   }
-
   type LoadOutcome =
     | { kind: 'loaded'; candidateEdges: Edge[] | null }
     | { kind: 'timeout' }
@@ -85,6 +87,9 @@ export const resolveBaseReactFlowDisplayCandidate = async ({
   if (signal.aborted || !isCurrent()) return null;
   const candidateEdges = outcome.kind === 'loaded' ? outcome.candidateEdges : null;
   if (candidateEdges) return { candidateEdges, source: 'precompiled' };
+  if (documentCandidateEdges) {
+    return { candidateEdges: documentCandidateEdges, source: 'document' };
+  }
   if (persistentCandidateEdges) {
     return { candidateEdges: persistentCandidateEdges, source: 'persistent' };
   }

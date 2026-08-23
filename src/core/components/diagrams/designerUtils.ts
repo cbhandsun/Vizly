@@ -296,6 +296,16 @@ export const canvasToPureStandardData = (
 };
 
 import { PluginRegistry } from '../../services/PluginRegistry';
+import { registerRoutingOnlyDocumentCandidate } from '../../routing/routingDocumentCandidateRegistry';
+
+const finalizeStandardDataCanvasResult = (
+    data: StandardDiagramData,
+    nodes: Node[],
+    edges: Edge[],
+): { nodes: Node[]; edges: Edge[] } => {
+    if (data.routingSnapshot) registerRoutingOnlyDocumentCandidate(data.routingSnapshot);
+    return { nodes: stripHiddenCanvasNodes(nodes), edges };
+};
 
 /**
  * Converts StandardDiagramData back to React Flow nodes/edges for editing.
@@ -596,12 +606,11 @@ export const standardDataToCanvas = async (
                     subDomainOrder: data.layout?.subDomainOrder,
                 };
                 const result = await strategy.calculateLayout(nodes, edges, layoutOptions);
-                return {
-                    nodes: stripHiddenCanvasNodes(result.nodes),
+                return finalizeStandardDataCanvasResult(data, result.nodes,
                     // [FIX] 若布局策略返回空 edges（例如所有 source/target 均不在 idMap 中），
                     // 回退到原始 edges，避免模版连线被意外丢失。
-                    edges: (result.edges && result.edges.length > 0) ? result.edges : edges
-                };
+                    (result.edges && result.edges.length > 0) ? result.edges : edges,
+                );
             } catch (err) {
                 logDesignerUtilsDomainLayoutFailure(err);
                 // 回退到下面的扁平 dagre
@@ -645,7 +654,7 @@ export const standardDataToCanvas = async (
 
     }
 
-    return { nodes: stripHiddenCanvasNodes(nodes), edges };
+    return finalizeStandardDataCanvasResult(data, nodes, edges);
 };
 
 /**

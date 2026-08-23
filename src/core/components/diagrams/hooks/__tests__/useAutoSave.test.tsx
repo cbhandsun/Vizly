@@ -5,6 +5,11 @@ import type { Edge, Node } from '@xyflow/react';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createAutoSavePayload } from '../../../../utils/autoSaveStorage';
+import {
+    createPersistedRoutingCandidate,
+    createRoutingOnlyDocumentSnapshot,
+} from '../../../../routing/persistedRoutingCandidate';
+import { EDGE_ROUTING_CACHE_VERSION } from '../../../../routing/routingVersion';
 import { useAutoSave } from '../useAutoSave';
 
 const AutoSaveProbe: React.FC<{
@@ -16,6 +21,7 @@ const AutoSaveProbe: React.FC<{
     enabled?: boolean;
     onReady?: (api: ReturnType<typeof useAutoSave>) => void;
     getMetadata?: () => unknown;
+    getRoutingSnapshot?: () => unknown;
 }> = ({
     nodes,
     edges = [],
@@ -25,6 +31,7 @@ const AutoSaveProbe: React.FC<{
     enabled = false,
     onReady,
     getMetadata,
+    getRoutingSnapshot,
 }) => {
     const api = useAutoSave(nodes, edges, {
         enabled,
@@ -32,6 +39,7 @@ const AutoSaveProbe: React.FC<{
         diagramId,
         routingVersion,
         getMetadata,
+        getRoutingSnapshot,
     });
 
     useEffect(() => {
@@ -143,6 +151,41 @@ describe('useAutoSave', () => {
         act(() => {
             expect(api?.loadSaved()).toMatchObject({ routingVersion: 'routing-v-current' });
         });
+    });
+
+    it('persists and restores a validated routing-only local snapshot', async () => {
+        const candidate = createPersistedRoutingCandidate({
+            routingVersion: EDGE_ROUTING_CACHE_VERSION,
+            inputSignature: '1357',
+            inputGeometryDigest: `geometry-v1:${'1'.repeat(32)}`,
+            outputRouteSignature: 'route-v2:1:2:0123456789abcdef',
+            writtenAt: 42,
+            patches: [{
+                id: 'edge-1',
+                source: 'node-1',
+                target: 'node-1',
+                type: 'stablePath',
+                data: { computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }] },
+            }],
+        });
+        if (!candidate) throw new Error('expected a valid candidate fixture');
+        const routingSnapshot = createRoutingOnlyDocumentSnapshot(candidate);
+        if (!routingSnapshot) throw new Error('expected a valid routing snapshot fixture');
+        let api: ReturnType<typeof useAutoSave> | undefined;
+        render(
+            <AutoSaveProbe
+                nodes={[{ id: 'node-1', position: { x: 0, y: 0 }, data: {} }]}
+                getRoutingSnapshot={() => routingSnapshot}
+                onReady={(nextApi) => { api = nextApi; }}
+            />
+        );
+
+        await waitFor(() => expect(api).toBeDefined());
+        await act(async () => { await api?.saveNow(); });
+
+        expect(JSON.parse(localStorage.getItem('flowchart-autosave-v2-test') || '{}'))
+            .toMatchObject({ routingSnapshot });
+        act(() => expect(api?.loadSaved()?.routingSnapshot).toEqual(routingSnapshot));
     });
 
     it('saves identical content when the active diagram scope changes', async () => {

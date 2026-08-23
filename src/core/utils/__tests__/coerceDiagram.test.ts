@@ -3,8 +3,48 @@ import {
   coerceToStandardDiagramData,
   coerceToStandardDiagramDataWithReport,
 } from '../coerceDiagram';
+import {
+  createPersistedRoutingCandidate,
+  createRoutingOnlyDocumentSnapshot,
+} from '../../routing/persistedRoutingCandidate';
+import { EDGE_ROUTING_CACHE_VERSION } from '../../routing/routingVersion';
 
 describe('coerceDiagram', () => {
+  it('preserves only a current, bounded routing-only document snapshot', () => {
+    const candidate = createPersistedRoutingCandidate({
+      routingVersion: EDGE_ROUTING_CACHE_VERSION,
+      inputSignature: '1234',
+      inputGeometryDigest: `geometry-v1:${'a'.repeat(32)}`,
+      outputRouteSignature: 'route-v2:1:2:0123456789abcdef',
+      writtenAt: 42,
+      patches: [{
+        id: 'edge-1',
+        source: 'node-1',
+        target: 'node-1',
+        data: { computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }] },
+      }],
+    });
+    if (!candidate) throw new Error('expected a valid routing fixture');
+    const routingSnapshot = createRoutingOnlyDocumentSnapshot(candidate);
+    if (!routingSnapshot) throw new Error('expected a valid routing snapshot');
+    const input = {
+      id: 'diagram',
+      name: 'Diagram',
+      nodes: [{ id: 'node-1', description: 'Node', domain: 'ops' }],
+      edges: [],
+    };
+
+    expect(coerceToStandardDiagramData({ ...input, routingSnapshot }, { id: 'fallback' }))
+      .toMatchObject({ routingSnapshot });
+    expect(coerceToStandardDiagramData({
+      ...input,
+      routingSnapshot: {
+        ...routingSnapshot,
+        candidate: { ...candidate, routingVersion: 'old' },
+      },
+    }, { id: 'fallback' }).routingSnapshot).toBeUndefined();
+  });
+
   it('sanitizes dangerous keys and does not preserve unbounded raw diagram fields', () => {
     const diagram = coerceToStandardDiagramData(JSON.parse(`{
       "id": " diagram-1 ",

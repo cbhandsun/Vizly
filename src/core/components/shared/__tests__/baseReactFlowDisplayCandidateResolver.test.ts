@@ -57,6 +57,27 @@ describe('baseReactFlowDisplayCandidateResolver', () => {
     expect(load).toHaveBeenCalledOnce();
   });
 
+  it('uses a document candidate only after the current precompiled artifact misses', async () => {
+    const documentCandidate = [{ ...candidateEdges[0], sourceHandle: 'bottom' }];
+    await expect(resolveBaseReactFlowDisplayCandidate({
+      input,
+      documentCandidateEdges: documentCandidate,
+      persistentCandidateEdges: [{ ...candidateEdges[0], sourceHandle: 'left' }],
+      signal: new AbortController().signal,
+      isCurrent: () => true,
+      loadPrecompiledCandidate: vi.fn(async () => null),
+    })).resolves.toEqual({ candidateEdges: documentCandidate, source: 'document' });
+
+    await expect(resolveBaseReactFlowDisplayCandidate({
+      input,
+      documentCandidateEdges: documentCandidate,
+      persistentCandidateEdges: null,
+      signal: new AbortController().signal,
+      isCurrent: () => true,
+      loadPrecompiledCandidate: vi.fn(async () => candidateEdges),
+    })).resolves.toEqual({ candidateEdges, source: 'precompiled' });
+  });
+
   it('falls back to a persistent candidate on an artifact miss or bounded timeout', async () => {
     await expect(resolveBaseReactFlowDisplayCandidate({
       input,

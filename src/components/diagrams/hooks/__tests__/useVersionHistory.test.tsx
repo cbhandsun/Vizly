@@ -41,6 +41,11 @@ vi.mock('@/core/utils/antdStaticBridge', () => ({
 }));
 
 import { useVersionHistory } from '../useVersionHistory';
+import {
+    createPersistedRoutingCandidate,
+    createRoutingOnlyDocumentSnapshot,
+} from '@/core/routing/persistedRoutingCandidate';
+import { EDGE_ROUTING_CACHE_VERSION } from '@/core/routing/routingVersion';
 
 const originalNodes: Node[] = [{
     id: 'original-node',
@@ -48,6 +53,24 @@ const originalNodes: Node[] = [{
     data: { label: 'Original' },
 }];
 const originalEdges: Edge[] = [];
+
+const routingCandidate = createPersistedRoutingCandidate({
+    routingVersion: EDGE_ROUTING_CACHE_VERSION,
+    inputSignature: '4321',
+    inputGeometryDigest: `geometry-v1:${'e'.repeat(32)}`,
+    outputRouteSignature: 'route-v2:1:2:0123456789abcdef',
+    writtenAt: 42,
+    patches: [{
+        id: 'edge-1',
+        source: 'original-node',
+        target: 'original-node',
+        type: 'stablePath',
+        data: { computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }] },
+    }],
+});
+if (!routingCandidate) throw new Error('expected valid routing candidate fixture');
+const routingSnapshot = createRoutingOnlyDocumentSnapshot(routingCandidate);
+if (!routingSnapshot) throw new Error('expected valid routing snapshot fixture');
 
 const previewNodes: Node[] = [{
     id: 'preview-node',
@@ -406,7 +429,11 @@ describe('useVersionHistory', () => {
             id: 'diagram-1',
             nodes: [{ id: 'standard-node', metadata: { canvasPosition: { x: 0, y: 0 } } }],
             edges: [],
-            getCanvasSnapshot: vi.fn(() => ({ nodes: originalNodes, edges: originalEdges })),
+            getCanvasSnapshot: vi.fn(() => ({
+                nodes: originalNodes,
+                edges: originalEdges,
+                routingSnapshot,
+            })),
         };
         (window as unknown as { __flowDataBridge: Record<string, typeof bridge> }).__flowDataBridge = { 'diagram-1': bridge };
         const { result } = renderHook(() => useVersionHistory('diagram-1'));
@@ -420,7 +447,7 @@ describe('useVersionHistory', () => {
         expect(saved).toBe(true);
         expect(storageMocks.saveVersion).toHaveBeenCalledWith(
             'diagram-1',
-            { nodes: originalNodes, edges: originalEdges },
+            { nodes: originalNodes, edges: originalEdges, routingSnapshot },
             '发布候选版本',
         );
         expect(bridge.getCanvasSnapshot).toHaveBeenCalledTimes(1);

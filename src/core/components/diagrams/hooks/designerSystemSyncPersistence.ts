@@ -264,13 +264,11 @@ export const mergePresetExplicitEdgeHandles = <T>(saved: T, preset: unknown): T 
     const savedEdge = rawEdge as unknown as Edge<DiagramEdgeData>;
     const presetEdge = presetById.get(String(savedEdge.id));
     const edgeWithPresentation = mergePresetEdgePresentation(savedEdge, presetEdge);
-    const edge = presetEdge
-      ? invalidateStalePresetEdgeAutomaticRoute(
-        edgeWithPresentation,
-        presetEdge,
-        savedRoutingVersion,
-      )
-      : edgeWithPresentation;
+    const edge = invalidateStalePresetEdgeAutomaticRoute(
+      edgeWithPresentation,
+      presetEdge,
+      savedRoutingVersion,
+    );
     const hasPresetExplicitHandles = Boolean(presetEdge?.sourceHandle || presetEdge?.targetHandle);
     const existingSource = edge.sourceHandle ? expandHandle(String(edge.sourceHandle)) : edge.sourceHandle;
     const existingTarget = edge.targetHandle ? expandHandle(String(edge.targetHandle)) : edge.targetHandle;

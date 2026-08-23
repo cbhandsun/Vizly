@@ -8,6 +8,11 @@ import {
     refreshAutoSaveAccess,
     shouldCollectAutoSave,
 } from '../autoSaveStorage';
+import {
+    createPersistedRoutingCandidate,
+    createRoutingOnlyDocumentSnapshot,
+} from '../../routing/persistedRoutingCandidate';
+import { EDGE_ROUTING_CACHE_VERSION } from '../../routing/routingVersion';
 
 describe('autoSaveStorage', () => {
     it('accepts valid autosave payloads and preserves safe metadata fields', () => {
@@ -135,6 +140,54 @@ describe('autoSaveStorage', () => {
         });
 
         expect(payload?.edges).toEqual([expect.objectContaining({ id: 'ok' })]);
+    });
+
+    it('stores automatic geometry only in a parsed routing-only snapshot', () => {
+        const candidate = createPersistedRoutingCandidate({
+            routingVersion: EDGE_ROUTING_CACHE_VERSION,
+            inputSignature: '2468',
+            inputGeometryDigest: `geometry-v1:${'f'.repeat(32)}`,
+            outputRouteSignature: 'route-v2:1:2:0123456789abcdef',
+            writtenAt: 42,
+            patches: [{
+                id: 'edge-1',
+                source: 'node-1',
+                target: 'node-1',
+                type: 'stablePath',
+                data: { computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }] },
+            }],
+        });
+        if (!candidate) throw new Error('expected a valid candidate fixture');
+        const routingSnapshot = createRoutingOnlyDocumentSnapshot(candidate);
+        if (!routingSnapshot) throw new Error('expected a valid routing snapshot fixture');
+
+        const payload = createAutoSavePayload({
+            nodes: [{ id: 'node-1', position: { x: 0, y: 0 }, data: {} }],
+            edges: [{
+                id: 'edge-1',
+                source: 'node-1',
+                target: 'node-1',
+                type: 'stablePath',
+                data: {
+                    owner: 'orders',
+                    computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
+                },
+            }],
+            routingSnapshot,
+            timestamp: 42,
+        });
+
+        expect(payload?.routingSnapshot).toEqual(routingSnapshot);
+        expect(payload?.edges[0]).toMatchObject({
+            type: 'advanced-smart-step',
+            data: { owner: 'orders' },
+        });
+        expect(payload?.edges[0].data).not.toHaveProperty('computedPath');
+        expect(createAutoSavePayload({
+            nodes: [{ id: 'node-1', position: { x: 0, y: 0 }, data: {} }],
+            edges: [],
+            routingSnapshot: { schema: 'forged' },
+        })?.routingSnapshot).toBeUndefined();
     });
 
     it('refreshes access times and marks stale or invalid entries for collection', () => {

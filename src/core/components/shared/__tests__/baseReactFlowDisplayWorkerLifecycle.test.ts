@@ -4,6 +4,7 @@ import type { Edge } from '@xyflow/react';
 import {
   computeBaseReactFlowDisplayEdgesInWorker,
   repairBaseReactFlowDisplayEdgesInWorker,
+  requestBaseReactFlowDisplayEdgesWorker,
   resolveBaseReactFlowDisplayWorkerTimeoutMs,
 } from '../baseReactFlowDisplayWorkerClient';
 import {
@@ -18,6 +19,8 @@ import {
 } from '../baseReactFlowDisplayEdgeCore';
 import {
   clearBaseReactFlowDisplayCommittedSnapshots,
+  commitBaseReactFlowDisplaySnapshot,
+  createBaseReactFlowRoutingOnlyDocumentSnapshot,
   doesBaseReactFlowDisplayCommittedBaselineMatchIdentity,
   readBaseReactFlowDisplayCommittedSnapshot,
   writeBaseReactFlowDisplayCommittedSnapshot,
@@ -89,6 +92,57 @@ afterEach(() => {
 });
 
 describe('baseReactFlowDisplayWorker lifecycle', () => {
+  it('merges a routing-only response while retaining current visual metadata', async () => {
+    const harness = installWorkerHarness();
+    const sourceEdges: Edge[] = [{
+      id: 'edge',
+      source: 'source',
+      target: 'target',
+      label: 'current visual metadata',
+      data: {},
+    }];
+    const pending = requestBaseReactFlowDisplayEdgesWorker({
+      workerRef: { current: null },
+      request: {
+        operation: 'route',
+        requestId: 'routing-patch-response',
+        edges: sourceEdges,
+        nodes: [],
+        enableSmartEdges: true,
+        smartEdgePadding: 20,
+        isLargeGraph: false,
+        displayEdgeEpoch: 1,
+        qualityMode: 'full',
+      },
+      qualityMode: 'full',
+      timeoutMs: 1_000,
+    });
+    harness.emitMessage({
+      requestId: 'routing-patch-response',
+      routingPatches: [{
+        id: 'edge',
+        source: 'source',
+        target: 'target',
+        data: { computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }] },
+      }],
+      hardClean: true,
+      routeResolution: 'full-route',
+    });
+    await expect(pending).resolves.toMatchObject({
+      workerResponseParsedAt: expect.any(Number),
+      routingPatches: [{
+        id: 'edge',
+        source: 'source',
+        target: 'target',
+        data: { computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }] },
+      }],
+      edges: [{
+        ...sourceEdges[0],
+        data: { computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }] },
+      }],
+    });
+  });
+
   it('returns a non-clean repair candidate when the layout transaction owns the hard gate', async () => {
     const edges = [{ id: 'edge', source: 'source', target: 'target' }];
     const harness = installWorkerHarness();
@@ -334,12 +388,109 @@ describe('baseReactFlowDisplayWorker lifecycle', () => {
 
     expect(changeSet).toMatchObject({
       reason: 'node-drag',
+      classification: 'geometry',
       changedNodeIds: ['tms'],
       topologyChanged: false,
       geometryChanged: true,
     });
     expect(closure.mutableEdgeIds).toEqual(incidentEdges.map(edge => edge.id).sort());
     expect(closure.contextEdgeIds).toEqual(siblingEdges.map(edge => edge.id).sort());
+  });
+
+  it('commits one validated snapshot without a write-then-read replay', () => {
+    const sourceEdges: Edge[] = [{
+      id: 'edge',
+      source: 'source',
+      target: 'target',
+      data: { computedPath: [{ x: 0, y: 0 }, { x: 20, y: 0 }] },
+    }];
+    const routedEdges: Edge[] = [{
+      ...sourceEdges[0],
+      type: 'stablePath',
+      data: { computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }] },
+    }];
+    const displayPatches = createBaseReactFlowDisplayEdgePatches(sourceEdges, routedEdges);
+    const outputRouteSignature = computeBaseReactFlowDisplayOutputRouteSignature(routedEdges);
+    if (!displayPatches || !outputRouteSignature) {
+      throw new Error('expected a valid committed display snapshot');
+    }
+
+    const committed = commitBaseReactFlowDisplaySnapshot({
+      inputSignature: '321',
+      inputGeometryDigest: `geometry-v1:${'b'.repeat(32)}`,
+      sourceEdges,
+      sourceNodes: [],
+      displayPatches,
+      outputRouteSignature,
+    });
+    expect(committed).not.toBeNull();
+    expect(committed?.displayPatches).not.toBe(displayPatches);
+
+    const mutablePath = (displayPatches[0].data as Record<string, unknown>).computedPath;
+    if (Array.isArray(mutablePath)) mutablePath[1] = { x: 999, y: 999 };
+    expect((committed?.displayPatches[0].data as Record<string, unknown>).computedPath).toEqual([
+      { x: 0, y: 0 },
+      { x: 100, y: 0 },
+    ]);
+    expect(readBaseReactFlowDisplayCommittedSnapshot({
+      inputSignature: '321',
+      inputGeometryDigest: `geometry-v1:${'b'.repeat(32)}`,
+      sourceEdges,
+    })?.outputRouteSignature).toBe(outputRouteSignature);
+  });
+
+  it('exports routing-only document geometry only for the exact committed source collection', () => {
+    const sourceEdges: Edge[] = [{
+      id: 'edge',
+      source: 'source',
+      target: 'target',
+      label: 'business label',
+      markerEnd: 'business marker',
+      data: { owner: 'orders' },
+    }];
+    const routedEdges: Edge[] = [{
+      ...sourceEdges[0],
+      type: 'stablePath',
+      data: {
+        ...sourceEdges[0].data,
+        computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
+      },
+    }];
+    const displayPatches = createBaseReactFlowDisplayEdgePatches(sourceEdges, routedEdges);
+    const outputRouteSignature = computeBaseReactFlowDisplayOutputRouteSignature(routedEdges);
+    if (!displayPatches || !outputRouteSignature) {
+      throw new Error('expected a valid routing-only snapshot fixture');
+    }
+    expect(commitBaseReactFlowDisplaySnapshot({
+      inputSignature: '654',
+      inputGeometryDigest: `geometry-v1:${'c'.repeat(32)}`,
+      sourceEdges,
+      sourceNodes: [],
+      displayPatches,
+      outputRouteSignature,
+    })).not.toBeNull();
+
+    const documentSnapshot = createBaseReactFlowRoutingOnlyDocumentSnapshot(sourceEdges);
+    expect(documentSnapshot).toMatchObject({
+      schema: 'vizly-routing-only-document-v1',
+      candidate: {
+        inputSignature: '654',
+        outputRouteSignature,
+        patches: [{
+          id: 'edge',
+          source: 'source',
+          target: 'target',
+          type: 'stablePath',
+          data: { computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }] },
+        }],
+      },
+    });
+    expect(documentSnapshot?.candidate.patches[0]).not.toHaveProperty('label');
+    expect(documentSnapshot?.candidate.patches[0]).not.toHaveProperty('markerEnd');
+    expect(documentSnapshot?.candidate.patches[0].data).not.toHaveProperty('owner');
+    expect(createBaseReactFlowRoutingOnlyDocumentSnapshot([...sourceEdges])).toBeNull();
+    clearBaseReactFlowDisplayCommittedSnapshots();
+    expect(createBaseReactFlowRoutingOnlyDocumentSnapshot(sourceEdges)).toBeNull();
   });
 
   it('classifies resize, port policy, container, and topology changes deterministically', () => {

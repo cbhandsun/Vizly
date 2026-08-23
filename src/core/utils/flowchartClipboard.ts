@@ -1,8 +1,15 @@
 import type { Edge, Node } from '@xyflow/react';
 
+import {
+    parseRoutingOnlyDocumentSnapshot,
+    type RoutingOnlyDocumentSnapshot,
+} from '../routing/persistedRoutingCandidate';
+import { stripRoutingOwnedDocumentEdge } from '../routing/routingDocumentSanitizer';
+
 export interface ClipboardData {
     nodes: Node[];
     edges: Edge[];
+    routingSnapshot?: RoutingOnlyDocumentSnapshot;
 }
 
 export interface ClipboardCoerceOptions {
@@ -170,13 +177,13 @@ const coerceEdge = (value: unknown, nodeIds: Set<string>, opts: Required<Clipboa
     const target = record.target.trim();
     if (!nodeIds.has(source) || !nodeIds.has(target)) return null;
 
-    return {
+    return stripRoutingOwnedDocumentEdge({
         ...record,
         id: record.id.trim(),
         source,
         target,
         data: sanitizeRecord(record.data) ?? undefined,
-    } as Edge;
+    } as Edge);
 };
 
 export const coerceClipboardData = (value: unknown, options: ClipboardCoerceOptions = {}): ClipboardData | null => {
@@ -212,7 +219,12 @@ export const coerceClipboardData = (value: unknown, options: ClipboardCoerceOpti
         }, [])
         : [];
 
-    return { nodes, edges };
+    const routingSnapshot = parseRoutingOnlyDocumentSnapshot(record.routingSnapshot);
+    return {
+        nodes,
+        edges,
+        ...(routingSnapshot ? { routingSnapshot } : {}),
+    };
 };
 
 export const parseClipboardJson = (text: string): ClipboardData | null => {

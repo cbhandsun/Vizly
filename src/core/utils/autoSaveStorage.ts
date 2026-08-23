@@ -1,5 +1,6 @@
 import type { Edge, Node } from '@xyflow/react';
 import { coerceClipboardData } from './flowchartClipboard';
+import type { RoutingOnlyDocumentSnapshot } from '../routing/persistedRoutingCandidate';
 
 export const AUTOSAVE_PREFIX = 'flowchart-autosave-v2-';
 export const AUTOSAVE_GC_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -20,6 +21,7 @@ export interface AutoSavePayload {
     routingVersion?: string;
     nodes: Node[];
     edges: Edge[];
+    routingSnapshot?: RoutingOnlyDocumentSnapshot;
     timestamp?: number;
     lastAccessedAt?: number;
     version: '1.0';
@@ -88,7 +90,11 @@ export const coerceAutoSavePayload = (value: unknown): AutoSavePayload | null =>
     const edgesRaw = Array.isArray(value.edges) ? value.edges : [];
     const clipboardData = nodesRaw.length === 0
         ? { nodes: [] as Node[], edges: [] as Edge[] }
-        : coerceClipboardData({ nodes: nodesRaw, edges: edgesRaw });
+        : coerceClipboardData({
+            nodes: nodesRaw,
+            edges: edgesRaw,
+            routingSnapshot: value.routingSnapshot,
+        });
 
     if (!clipboardData) return null;
 
@@ -102,6 +108,9 @@ export const coerceAutoSavePayload = (value: unknown): AutoSavePayload | null =>
         ...(routingVersion ? { routingVersion } : {}),
         nodes: clipboardData.nodes,
         edges: clipboardData.edges,
+        ...(clipboardData.routingSnapshot
+            ? { routingSnapshot: clipboardData.routingSnapshot }
+            : {}),
         ...(timestamp !== undefined ? { timestamp } : {}),
         ...(lastAccessedAt !== undefined ? { lastAccessedAt } : {}),
         version: '1.0',
@@ -117,6 +126,7 @@ export const createAutoSavePayload = (params: {
     routingVersion?: string;
     nodes: unknown[];
     edges: unknown[];
+    routingSnapshot?: unknown;
     timestamp?: number;
     isFreshSeed?: boolean;
     requiresRecoveryReview?: boolean;
@@ -129,6 +139,7 @@ export const createAutoSavePayload = (params: {
         routingVersion: params.routingVersion,
         nodes: params.nodes,
         edges: params.edges,
+        routingSnapshot: params.routingSnapshot,
         timestamp: now,
         lastAccessedAt: now,
         version: '1.0',

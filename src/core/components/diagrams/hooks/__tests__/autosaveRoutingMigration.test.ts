@@ -1,7 +1,6 @@
 import type { Edge } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
 
-import { EDGE_ROUTING_CACHE_VERSION } from '../../../../routing/routingVersion';
 import { invalidateStalePresetEdgeAutomaticRoute } from '../autosaveRoutingMigration';
 
 describe('invalidateStalePresetEdgeAutomaticRoute', () => {
@@ -68,13 +67,16 @@ describe('invalidateStalePresetEdgeAutomaticRoute', () => {
     expect(migrated.data?.computedPath).toBeUndefined();
   });
 
-  it('keeps current-version route geometry by reference', () => {
+  it('removes current-version automatic geometry from the durable edge object too', () => {
     const edge = staleEdge();
-    expect(invalidateStalePresetEdgeAutomaticRoute(
+    const migrated = invalidateStalePresetEdgeAutomaticRoute(
       edge,
       { id: edge.id, type: 'main' },
-      EDGE_ROUTING_CACHE_VERSION,
-    )).toBe(edge);
+      'current-routing-version',
+    );
+    expect(migrated).not.toBe(edge);
+    expect(migrated.type).toBe('advanced-smart-step');
+    expect(migrated.data?.computedPath).toBeUndefined();
   });
 
   it('preserves explicitly authored terminal roles during migration', () => {
