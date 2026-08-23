@@ -56,6 +56,7 @@ export const DISPLAY_ROUTING_PHASE_NAMES = [
   'residual-loop-shortcut',
   'residual-exact-selection',
   'residual-polish-selection',
+  'residual-micro-baseline',
   'residual-micro-derivative',
   'residual-endpoint-derivative',
   'residual-obstacle-selection',

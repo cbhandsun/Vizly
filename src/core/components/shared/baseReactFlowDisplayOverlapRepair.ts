@@ -137,6 +137,7 @@ export const repairResidualDisplayOverlaps = <T extends Edge[]>(
       | 'residual-loop-shortcut'
       | 'residual-exact-selection'
       | 'residual-polish-selection'
+      | 'residual-micro-baseline'
       | 'residual-micro-derivative'
       | 'residual-endpoint-derivative'
       | 'residual-obstacle-selection'
@@ -196,7 +197,7 @@ export const repairResidualDisplayOverlaps = <T extends Edge[]>(
   ): T => {
     const diagnostics = createDisplayMicroCleanupDiagnostics();
     return runTracedRepair(
-      'residual-micro-derivative',
+      'residual-micro-baseline',
       baseline,
       () => repairDisplayMicroArtifacts(baseline, undefined, diagnostics) as T,
       parentPhase,
