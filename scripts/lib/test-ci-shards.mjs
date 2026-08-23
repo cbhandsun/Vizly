@@ -25,6 +25,7 @@ export const TEST_CI_SHARD_GROUPS = Object.freeze({
   ]),
   flow: Object.freeze([
     'test:ci:core-components-shared-bounded-seed-policy',
+    'test:ci:core-components-shared-cold-performance',
     'test:ci:core-components-shared-flow',
     'test:ci:core-components-shared-flow-quality',
     'test:ci:core-components-shared-flow-logistics',

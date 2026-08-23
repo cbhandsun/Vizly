@@ -16,11 +16,16 @@ import { PRECOMPILED_DISPLAY_ROUTE_TARGETS } from './lib/precompiled-display-rou
 import { hashPrecompiledDisplayRouteSource } from './lib/precompiled-display-route-source-hash.mjs';
 import { computePrecompiledDisplayRoutingSourceHash } from './lib/precompiled-display-route-source-set.mjs';
 import { auditPrecompiledDisplayRouteCommercialQuality } from './lib/precompiled-display-route-commercial-quality.mjs';
+import {
+  buildPrecompiledDisplayRoutePerformanceResult,
+  PRECOMPILED_DISPLAY_ROUTE_RESULT_PREFIX,
+} from './lib/precompiled-display-route-performance.mjs';
 
 const ROOT = resolve(process.cwd());
 const BASE_URL = String(process.env.PRECOMPILED_ROUTE_BASE_URL || '').trim().replace(/\/$/, '');
 const CHECK_MODE = process.argv.includes('--check');
 const TRACE_ALL = process.argv.includes('--trace-all');
+const MACHINE_MODE = process.argv.includes('--machine');
 const GENERATED_DIR = resolve(ROOT, 'src/core/components/shared/generated');
 const ARTIFACT_DIR = resolve(GENERATED_DIR, 'precompiledRoutes');
 const MANIFEST_PATH = resolve(GENERATED_DIR, 'baseReactFlowPrecompiledRouteManifest.json');
@@ -297,6 +302,7 @@ const captureTarget = async (session, target, source, routingVersion) => {
       workerStartCount: routing.workerStartCount,
       workerAbortCount: routing.workerAbortCount,
       routeMs: routing.routeMs,
+      phaseTrace: routing.phaseTrace,
     },
   };
 };
@@ -440,6 +446,12 @@ const main = async () => {
     await assertFileContents(MANIFEST_PATH, manifestContents, 'Precompiled route manifest');
     await assertFileContents(LOADERS_PATH, loaderContents, 'Precompiled route loader registry');
     console.log(`Reproduced ${entries.length} precompiled route artifact(s) from production preview.`);
+    if (MACHINE_MODE) {
+      console.log(
+        `${PRECOMPILED_DISPLAY_ROUTE_RESULT_PREFIX}`
+        + JSON.stringify(buildPrecompiledDisplayRoutePerformanceResult(captures)),
+      );
+    }
     return;
   }
   for (const [artifactFile, contents] of artifactContents) {
