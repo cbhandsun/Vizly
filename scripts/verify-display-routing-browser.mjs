@@ -31,6 +31,7 @@ import { assertDisplayRoutingVisualScaleAudit } from './lib/display-routing-brow
 import { assertDisplayRoutingProductionPreview } from './lib/display-routing-production-preview.mjs';
 import { verifyDisplayRoutingThemeMatrix } from './lib/display-routing-browser-theme-matrix.mjs';
 import { verifyDisplayRoutingInteractionStates } from './lib/display-routing-browser-interaction-audit.mjs';
+import { DISPLAY_ROUTING_EXPORT_CAPTURE_SCRIPT, formatDisplayRoutingExportMatrix, verifyDisplayRoutingExportMatrix } from './lib/display-routing-browser-export-audit.mjs';
 
 const BASE_URL = String(process.env.PRECOMPILED_ROUTE_BASE_URL || '')
   .trim()
@@ -574,6 +575,9 @@ const verifyNormalRenderedObstacleAudit = async () => withPrecompiledRouteBrowse
     await session.send('Page.addScriptToEvaluateOnNewDocument', {
       source: DISPLAY_ROUTING_BROWSER_CAPTURE_SCRIPT,
     });
+    if (!COLLECT_PERFORMANCE_SAMPLES) {
+      await session.send('Page.addScriptToEvaluateOnNewDocument', { source: DISPLAY_ROUTING_EXPORT_CAPTURE_SCRIPT });
+    }
     const url = `${BASE_URL}/?canonicalPreset=${encodeURIComponent(LOGISTICS_PRESET_ID)}`
       + `&browserVerification=normal-${Date.now()}`
       + `#/?diagram=${encodeURIComponent(LOGISTICS_PRESET_ID)}`;
@@ -627,7 +631,15 @@ const verifyNormalRenderedObstacleAudit = async () => withPrecompiledRouteBrowse
       verifyInteractionStates: () => verifyDisplayRoutingInteractionStates(session),
       verifyVisualScales: () => verifyFixedVisualScales(session, route.outputRouteSignature),
     });
-    return { route, audit, stability, visualScales, themeMatrix };
+    const exportMatrix = COLLECT_PERFORMANCE_SAMPLES ? [] : await verifyDisplayRoutingExportMatrix({
+      session,
+      expectedSignature: route.outputRouteSignature,
+      expectedWorkerStartCount: stability.workerStartCount,
+      expectedWorkerAbortCount: stability.workerAbortCount,
+      expectedLogicalEdgeCount: 14,
+      requireLicensedExports: process.env.DISPLAY_ROUTING_REQUIRE_LICENSED_EXPORTS === '1',
+    });
+    return { route, audit, stability, visualScales, themeMatrix, exportMatrix };
   },
 );
 
@@ -774,6 +786,8 @@ const main = async () => {
       `${item.id}/${item.interactions.maximumPaintMs.toFixed(1)}ms-max-paint`
     )).join(', ')}.`);
   }
+  const exportLine = formatDisplayRoutingExportMatrix(normal.exportMatrix);
+  if (exportLine) console.log(exportLine);
   const machineResult = buildDisplayRoutingMachineResult(results);
   if (EMIT_MACHINE_RESULT) {
     console.log(`DISPLAY_ROUTING_BROWSER_RESULT=${JSON.stringify(machineResult)}`);

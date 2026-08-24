@@ -10,6 +10,7 @@ const SAFE_EXPORT_EXTENSIONS = new Set<ExportFileExtension>(['png', 'pdf', 'svg'
 
 const SAFE_RASTER_EXPORT_DATA_URL = /^data:image\/(?:png|gif);base64,[a-z0-9+/=\s]+$/i;
 const SAFE_SVG_DATA_URL_PREFIX = /^data:image\/svg\+xml(?:;charset=[\w-]+)?(?:;base64)?,/i;
+const SAFE_EXPORT_BLOB_URL = /^blob:(?:(?:https?:\/\/[^/\s]+)|null)\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const UNSAFE_SVG_MARKUP = /<(?:script|iframe|object|embed|link|meta)\b|(?:^|[\s<])on[a-z]+\s*=|javascript\s*:|data\s*:\s*text\/html/i;
 
 export interface NormalizedExportBounds {
@@ -98,11 +99,12 @@ export const buildExportFileName = (diagramId: string | undefined, ext: ExportFi
 };
 
 /**
- * 触发基于 Data URL 的浏览器下载
+ * 触发经过边界校验的浏览器导出下载。
  */
 export const triggerDownload = (dataUrl: string, fileName: string) => {
-  if (!isSafeExportDataUrl(dataUrl)) {
-    throw new Error('Unsafe export data URL');
+  const isBoundedBlobUrl = typeof dataUrl === 'string' && SAFE_EXPORT_BLOB_URL.test(dataUrl);
+  if (!isSafeExportDataUrl(dataUrl) && !isBoundedBlobUrl) {
+    throw new Error('Unsafe export URL');
   }
   const link = document.createElement('a');
   link.href = dataUrl;
@@ -114,5 +116,8 @@ export const triggerDownload = (dataUrl: string, fileName: string) => {
     link.click();
   } finally {
     link.remove();
+    if (isBoundedBlobUrl) {
+      window.setTimeout(() => URL.revokeObjectURL(dataUrl), 0);
+    }
   }
 };

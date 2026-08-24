@@ -87,8 +87,29 @@ describe('exportUtils', () => {
   });
 
   it('throws before creating a download link for unsafe data URLs', () => {
-    expect(() => triggerDownload('javascript:alert(1)', 'bad.png')).toThrow('Unsafe export data URL');
+    expect(() => triggerDownload('javascript:alert(1)', 'bad.png')).toThrow('Unsafe export URL');
+    expect(() => triggerDownload('blob:https://example.com/not-valid', 'bad.png')).toThrow('Unsafe export URL');
     expect(document.querySelector('a')).toBeNull();
+  });
+
+  it('downloads and revokes a bounded application-owned blob URL', async () => {
+    vi.useFakeTimers();
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+    const href = 'blob:http://127.0.0.1:4173/12345678-1234-4234-8234-123456789abc';
+    try {
+      triggerDownload(href, 'diagram.png');
+
+      expect(click).toHaveBeenCalledOnce();
+      expect(document.querySelector('a')).toBeNull();
+      expect(revoke).not.toHaveBeenCalled();
+      await vi.runAllTimersAsync();
+      expect(revoke).toHaveBeenCalledWith(href);
+    } finally {
+      click.mockRestore();
+      revoke.mockRestore();
+      vi.useRealTimers();
+    }
   });
 
   it('skips invalid hide selectors and always restores previously hidden elements', async () => {
