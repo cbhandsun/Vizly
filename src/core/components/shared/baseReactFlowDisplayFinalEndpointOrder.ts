@@ -43,12 +43,14 @@ import {
 import {
   countChangedRoutingItems,
   startDisplayRoutingPhaseTrace,
-  type DisplayRoutingPhaseTrace,
 } from './baseReactFlowDisplayRoutingTrace';
 import { buildSiblingTerminalObstacleSkirtCandidates } from './baseReactFlowDisplaySiblingTerminalObstacleRepair';
-import type { SameSideEndpointTrunkIdentity } from '../../strategies/shared/edgeFinalSameSideEndpointOrderRepair';
 import { repairBaseReactFlowConnectedSourceMicroArtifacts } from './baseReactFlowDisplayConnectedSourceMicroRepair';
 import { startBaseReactFlowObstacleClosureTrace } from './baseReactFlowDisplayObstacleClosureTrace';
+import {
+  exactTrueTrunkSignature,
+  traceSkippedFinalEndpointPhases,
+} from './baseReactFlowDisplayFinalEndpointTrace';
 
 export { finalSameSideTrueTrunksDoNotRegress } from './baseReactFlowDisplayTrueTrunkContract';
 export {
@@ -56,37 +58,7 @@ export {
   traceSkippedFinalCommercialDetours,
 } from './baseReactFlowDisplayCommercialDetourRepair';
 export type { BaseReactFlowFinalEndpointOrderOptions } from './baseReactFlowDisplayFinalEndpointGate';
-
-const exactTrueTrunkSignature = (
-  trunks: readonly SameSideEndpointTrunkIdentity[],
-): string => JSON.stringify(trunks.map(trunk => [
-  trunk.nodeId,
-  trunk.role,
-  trunk.side,
-  [...trunk.edgeIds].sort(),
-  Math.round(trunk.commonStemLength * 1_000) / 1_000,
-]).sort((first, second) => JSON.stringify(first).localeCompare(JSON.stringify(second))));
-
-export const traceSkippedFinalEndpointPhases = (
-  candidateCount: number,
-  onPhaseTrace?: (trace: DisplayRoutingPhaseTrace) => void,
-  includeSeed = false,
-  parentPhase?: BaseReactFlowFinalEndpointOrderOptions['traceParentPhase'],
-): void => {
-  const phases = [
-    'final-endpoint-topology',
-    'final-endpoint-order',
-    'final-endpoint-closure',
-  ] as const;
-  for (const phase of includeSeed ? ['final-endpoint-seed', ...phases] as const : phases) {
-    startDisplayRoutingPhaseTrace({
-      phase,
-      ...(parentPhase ? { parentPhase } : {}),
-      candidateCount,
-      onTrace: onPhaseTrace,
-    }).finish('skip');
-  }
-};
+export { traceSkippedFinalEndpointPhases } from './baseReactFlowDisplayFinalEndpointTrace';
 
 const commitPostTrunkBranchObstacleCandidate = (
   baseline: Edge[],
