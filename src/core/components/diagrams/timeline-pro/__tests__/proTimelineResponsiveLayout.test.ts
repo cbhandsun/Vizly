@@ -32,7 +32,7 @@ describe('professional timeline responsive layout', () => {
     });
 
     it('keeps desktop timeline content below the floating product toolbar', () => {
-        expect(css).toMatch(/\.pro-timeline-workspace\s*\{[\s\S]*?top:\s*calc\(72px \+ env\(safe-area-inset-top, 0px\)\);/);
+        expect(css).toMatch(/\.pro-timeline-workspace\s*\{[\s\S]*?top:\s*calc\(36px \+ env\(safe-area-inset-top, 0px\)\);/);
         expect(css).toMatch(/\.pro-timeline-task-header-actions\s*\{[\s\S]*?display:\s*inline-flex;/);
     });
 
