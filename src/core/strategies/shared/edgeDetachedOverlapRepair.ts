@@ -11,8 +11,8 @@ import {
   type QualityEvaluationBudget,
 } from './edgeDetachedOverlapEvaluationCache';
 
-import { countRoutingObstacleHits } from './edgeWaypointCandidateRepair';
 import { buildDetachedOuterBypassCandidates } from './edgeDetachedOuterBypass';
+import { createRoutingObstacleGate } from './edgeDetachedObstacleGate';
 import {
   createDetachedOverlapStateEvaluationContext,
   scoreDetachedOverlapState,
@@ -25,7 +25,6 @@ import type {
 
 import {
   type Point,
-  type Rect,
   type PathSegmentRef,
   getEdgePath,
   withComputedPath,
@@ -214,31 +213,7 @@ export function hasShortHairpin(path: Point[]): boolean {
   return false;
 }
 
-export function createRoutingObstacleGate(
-  edges: Edge[],
-  obstacles: Map<string, Rect>,
-): RoutingObstacleGate {
-  const hitsByPath = new WeakMap<Point[], Map<number, number>>();
-  const hitsFor = (path: Point[], edgeIndex: number): number => {
-    let byEdge = hitsByPath.get(path);
-    if (!byEdge) {
-      byEdge = new Map<number, number>();
-      hitsByPath.set(path, byEdge);
-    }
-    const cached = byEdge.get(edgeIndex);
-    if (cached !== undefined) return cached;
-    const edge = edges[edgeIndex];
-    const hits = edge ? countRoutingObstacleHits(path, edge, obstacles) : Number.POSITIVE_INFINITY;
-    byEdge.set(edgeIndex, hits);
-    return hits;
-  };
-
-  return (baselinePaths, candidatePaths, changedIndexes) => changedIndexes.every(edgeIndex => (
-    candidatePaths[edgeIndex]
-    && baselinePaths[edgeIndex]
-    && hitsFor(candidatePaths[edgeIndex], edgeIndex) <= hitsFor(baselinePaths[edgeIndex], edgeIndex)
-  ));
-}
+export { createRoutingObstacleGate } from './edgeDetachedObstacleGate';
 
 const toBoundedPositiveInteger = (value: unknown, fallback: number): number => {
   const parsed = Number(value);
@@ -284,7 +259,11 @@ export function separateDetachedParallelOverlaps(
   }
 
   const nodeById = new Map(nodes.map(node => [node.id, node] as const));
-  const routingObstacleGate = createRoutingObstacleGate(edges, getRoutingObstacles(nodes));
+  const routingObstacleGate = createRoutingObstacleGate(
+    edges,
+    getRoutingObstacles(nodes),
+    options.diagnostics,
+  );
 
   let changed = false;
   for (let iteration = 0; iteration < maxIterations; iteration += 1) {

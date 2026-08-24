@@ -2,6 +2,7 @@ import type { Edge } from '@xyflow/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { createQualityEvaluationBudget } from '../edgeDetachedOverlapEvaluationCache';
+import { createRoutingObstacleGate } from '../edgeDetachedObstacleGate';
 import {
   calculateEdgePathQualityScore,
   type EdgePathQualityEvaluationContext,
@@ -26,6 +27,19 @@ const unusedStateEvaluation = (): never => {
 };
 
 describe('createQualityEvaluationBudget', () => {
+  it('reuses obstacle results for cloned exact candidate geometry', () => {
+    const edges = candidateEdges();
+    const diagnostics = { cacheHitCount: 0 };
+    const gate = createRoutingObstacleGate(edges, new Map(), diagnostics);
+    const path = [{ x: 0, y: 40 }, { x: 200, y: 40 }];
+    const clone = () => path.map(point => ({ ...point }));
+
+    expect(gate([clone()], [clone()], [0])).toBe(true);
+    expect(diagnostics.cacheHitCount).toBe(1);
+    expect(gate([clone()], [clone()], [0])).toBe(true);
+    expect(diagnostics.cacheHitCount).toBe(3);
+  });
+
   it('reuses an exact incremental score while still charging every request to the budget', () => {
     const edges = candidateEdges();
     const score = calculateEdgePathQualityScore(edges);
