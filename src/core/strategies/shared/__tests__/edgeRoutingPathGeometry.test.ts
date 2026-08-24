@@ -20,6 +20,7 @@ import {
   reduceEdgeCrossingsWithWaypoints,
   repairSharedTrunkAwareCrossings,
 } from '../edgeRoutingWaypointRefinement';
+import { createRoutingWaypointSegmentGroupIndex } from '../edgeRoutingWaypointSegmentIndex';
 
 const node = (id: string, x: number, y: number, parentId?: string): Node => ({
   id,
@@ -29,6 +30,32 @@ const node = (id: string, x: number, y: number, parentId?: string): Node => ({
 });
 
 describe('edge routing module boundaries', () => {
+  it('indexes only waypoint segment groups that can contribute an exact relation', () => {
+    const index = createRoutingWaypointSegmentGroupIndex([
+      [{ a: { x: 1_000, y: 1_000 }, b: { x: 1_100, y: 1_000 } }],
+      [{ a: { x: 50, y: -50 }, b: { x: 50, y: 50 } }],
+      [{ a: { x: 20, y: 1 }, b: { x: 80, y: 1 } }],
+    ]);
+
+    const query = index.queryPotentialGroupIndexes([
+      { a: { x: 0, y: 0 }, b: { x: 100, y: 0 } },
+    ]);
+    expect([...query.groupIndexes].sort((first, second) => first - second)).toEqual([1, 2]);
+    expect(query.scannedSegmentCount).toBeLessThan(3);
+
+    const unsupported = index.queryPotentialGroupIndexes([
+      { a: { x: 0, y: 0 }, b: { x: 100, y: 100 } },
+    ]);
+    expect([...unsupported.groupIndexes].sort((first, second) => first - second))
+      .toEqual([0, 1, 2]);
+
+    const nonFinite = index.queryPotentialGroupIndexes([
+      { a: { x: Number.NaN, y: 0 }, b: { x: 100, y: 0 } },
+    ]);
+    expect([...nonFinite.groupIndexes].sort((first, second) => first - second))
+      .toEqual([0, 1, 2]);
+  });
+
   it('keeps the pipeline compatibility exports bound to the extracted implementations', () => {
     expect(computeAbsolutePositionFromPipeline).toBe(computeAbsolutePosition);
     expect(setAbsolutePositionsFromPipeline).toBe(setAbsolutePositions);
@@ -166,11 +193,19 @@ describe('edge routing module boundaries', () => {
     const bounded = reduceEdgeCrossingsWithWaypoints(edges, nodes, 'TB', {
       diagnostics: boundedDiagnostics,
     });
+    const unindexedDiagnostics = createEdgeWaypointRefinementDiagnostics();
+    const unindexed = reduceEdgeCrossingsWithWaypoints(edges, nodes, 'TB', {
+      diagnostics: unindexedDiagnostics,
+      disableSegmentIndex: true,
+    });
     expect(bounded).toEqual(exhaustive);
+    expect(bounded).toEqual(unindexed);
     expect(boundedDiagnostics.lowerBoundRejectionCount).toBeGreaterThan(0);
     expect(boundedDiagnostics.scannedNodeCount)
       .toBeLessThan(exhaustiveDiagnostics.scannedNodeCount);
     expect(boundedDiagnostics.scannedSegmentCount)
       .toBeLessThanOrEqual(exhaustiveDiagnostics.scannedSegmentCount);
+    expect(boundedDiagnostics.scannedSegmentCount)
+      .toBeLessThanOrEqual(unindexedDiagnostics.scannedSegmentCount);
   });
 });

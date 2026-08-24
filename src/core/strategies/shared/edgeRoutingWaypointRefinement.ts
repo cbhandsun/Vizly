@@ -33,6 +33,10 @@ import {
   preservesSharedTrunk,
   type RoutingWaypointCandidateAxes,
 } from './edgeWaypointCandidateRepair';
+import {
+  createRoutingWaypointSegmentGroupIndex,
+  type RoutingWaypointSegmentGroupIndex,
+} from './edgeRoutingWaypointSegmentIndex';
 
 export type EdgeWaypointRefinementDiagnostics = {
   processedCandidateEdgeCount: number;
@@ -391,6 +395,8 @@ function scorePathCandidate(
   baseLength: number,
   diagnostics?: EdgeWaypointRefinementDiagnostics,
   improvementCutoff?: number,
+  acceptedSegmentIndex?: RoutingWaypointSegmentGroupIndex,
+  originalSegmentIndex?: RoutingWaypointSegmentGroupIndex,
 ): number {
   const segments = toEdgeRoutingSegments(path);
   let scannedNodeCount = 0;
@@ -419,7 +425,17 @@ function scorePathCandidate(
   let crossingsAccepted = 0;
   let crossingsAll = 0;
   let overlap = 0;
-  for (const otherSegments of acceptedSegments) {
+  const acceptedQuery = acceptedSegmentIndex?.queryPotentialGroupIndexes(segments);
+  const originalQuery = originalSegmentIndex?.queryPotentialGroupIndexes(segments);
+  scannedSegmentCount += acceptedQuery?.scannedSegmentCount ?? 0;
+  scannedSegmentCount += originalQuery?.scannedSegmentCount ?? 0;
+  const relevantAcceptedSegments = acceptedQuery
+    ? acceptedSegments.filter((_, index) => acceptedQuery.groupIndexes.has(index))
+    : acceptedSegments;
+  const relevantOriginalSegments = originalQuery
+    ? originalSegments.filter((_, index) => originalQuery.groupIndexes.has(index))
+    : originalSegments;
+  for (const otherSegments of relevantAcceptedSegments) {
     scannedEdgePairCount += 1;
     scannedSegmentCount += segments.length * otherSegments.length;
     for (const first of segments) {
@@ -433,7 +449,7 @@ function scorePathCandidate(
       return finishScore(cutoff ?? obstacleScore, true);
     }
   }
-  for (const otherSegments of originalSegments) {
+  for (const otherSegments of relevantOriginalSegments) {
     scannedEdgePairCount += 1;
     scannedSegmentCount += segments.length * otherSegments.length;
     for (const first of segments) {
@@ -490,6 +506,7 @@ export function reduceEdgeCrossingsWithWaypoints(
     preferredAxes?: RoutingWaypointCandidateAxes;
     diagnostics?: EdgeWaypointRefinementDiagnostics;
     disableScoreLowerBoundPruning?: boolean;
+    disableSegmentIndex?: boolean;
   } = {},
 ): Edge[] {
   if (edges.length < 1) return edges;
@@ -550,6 +567,12 @@ export function reduceEdgeCrossingsWithWaypoints(
     const otherSegments = Array.from(originalSegmentsById.entries())
       .filter(([id]) => id !== edge.id)
       .map(([, segments]) => segments);
+    const acceptedSegmentIndex = options.disableSegmentIndex
+      ? undefined
+      : createRoutingWaypointSegmentGroupIndex(acceptedSegments);
+    const originalSegmentIndex = options.disableSegmentIndex
+      ? undefined
+      : createRoutingWaypointSegmentGroupIndex(otherSegments);
     const baseLength = pathLength(path);
     const edgeVisualContext = createEdgeVisualContext(edge, nodeVisualContext);
     const obstacleEvaluation = createRoutingObstacleEvaluationContext(edge, obstacles);
@@ -569,6 +592,9 @@ export function reduceEdgeCrossingsWithWaypoints(
       bestObstacleHits,
       baseLength,
       options.diagnostics,
+      undefined,
+      acceptedSegmentIndex,
+      originalSegmentIndex,
     );
     for (const candidate of candidates.slice(1)) {
       if (!preservesSharedTrunk(candidate, path, edge, buddyGroups, obstacles)) continue;
@@ -587,6 +613,8 @@ export function reduceEdgeCrossingsWithWaypoints(
         baseLength,
         options.diagnostics,
         options.disableScoreLowerBoundPruning ? undefined : bestScore - 5,
+        acceptedSegmentIndex,
+        originalSegmentIndex,
       );
       if (score < bestScore - 5) {
         bestScore = score;
