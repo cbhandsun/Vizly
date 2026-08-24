@@ -1,9 +1,45 @@
 import { describe, expect, it } from 'vitest';
 import type { Edge, Node } from '@xyflow/react';
 
-import { generateWaypointCandidates } from '../edgeWaypointCandidateRepair';
+import {
+  createSharedTrunkPreservationContext,
+  generateWaypointCandidates,
+  preservesSharedTrunk,
+  preservesSharedTrunkWithContext,
+} from '../edgeWaypointCandidateRepair';
 
 describe('topology-preferred waypoint candidates', () => {
+  it('keeps cached shared-trunk preservation identical to direct evaluation', () => {
+    const original = [
+      { x: 0, y: 0 },
+      { x: 0, y: 60 },
+      { x: 180, y: 60 },
+      { x: 180, y: 180 },
+    ];
+    const edge: Edge = { id: 'fan', source: 'source', target: 'target' };
+    const groups = [{ type: 'o2m' as const, edgeIds: new Set(['fan']) }];
+    const obstacles = new Map([
+      ['blocker', { x: -20, y: 20, width: 40, height: 40 }],
+    ]);
+    const context = createSharedTrunkPreservationContext(
+      original,
+      edge,
+      groups,
+      obstacles,
+    );
+    const candidates = [
+      original,
+      [{ x: 0, y: 0 }, { x: 0, y: 30 }, { x: 220, y: 30 }, { x: 180, y: 180 }],
+      [{ x: 0, y: 0 }, { x: 40, y: 0 }, { x: 180, y: 60 }, { x: 180, y: 180 }],
+    ];
+
+    for (const candidate of candidates) {
+      expect(preservesSharedTrunkWithContext(candidate, context)).toBe(
+        preservesSharedTrunk(candidate, original, edge, groups, obstacles),
+      );
+    }
+  });
+
   it('reuses an authoritative node-risk result without rescanning node geometry', () => {
     let geometryReads = 0;
     const measured = {

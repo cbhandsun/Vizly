@@ -27,10 +27,11 @@ import {
 import { repairSameNodeInOutCrossings } from './edgeSameNodeRoleRepair';
 import {
   createRoutingObstacleEvaluationContext,
+  createSharedTrunkPreservationContext,
   generateWaypointCandidates,
   pathHasNodeRoutingRisk,
   pathHasVisualComplexityRisk,
-  preservesSharedTrunk,
+  preservesSharedTrunkWithContext,
   type RoutingWaypointCandidateAxes,
 } from './edgeWaypointCandidateRepair';
 import {
@@ -610,6 +611,12 @@ export function reduceEdgeCrossingsWithWaypoints(
       knownNodeRoutingRisk: hasNodeRisk,
       preferredAxes: options.preferredAxes,
     });
+    const sharedTrunkContext = createSharedTrunkPreservationContext(
+      path,
+      edge,
+      buddyGroups,
+      obstacles,
+    );
     if (options.diagnostics) options.diagnostics.generatedCandidateCount += candidates.length;
     let bestPath = path;
     let bestObstacleHits = obstacleEvaluation.countUnrelatedObstacleHits(path);
@@ -627,7 +634,7 @@ export function reduceEdgeCrossingsWithWaypoints(
       originalSegmentIndex,
     );
     for (const candidate of candidates.slice(1)) {
-      if (!preservesSharedTrunk(candidate, path, edge, buddyGroups, obstacles)) continue;
+      if (!preservesSharedTrunkWithContext(candidate, sharedTrunkContext)) continue;
       const candidateObstacleHits = obstacleEvaluation.countUnrelatedObstacleHits(
         candidate,
         bestObstacleHits,

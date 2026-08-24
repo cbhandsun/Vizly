@@ -666,7 +666,11 @@ export function generateWaypointCandidates(
     .slice(0, options.includeNodeAwareLanes ? 260 : 140);
 }
 
-function edgeHasBuddyType(edgeId: string, groups: BuddyGroup[], type: BuddyGroup['type']): boolean {
+function edgeHasBuddyType(
+  edgeId: string,
+  groups: readonly BuddyGroup[],
+  type: BuddyGroup['type'],
+): boolean {
   return groups.some(group => group.type === type && group.edgeIds.has(edgeId));
 }
 
@@ -691,6 +695,80 @@ function endpointTrunkHitsUnrelatedObstacle(anchor: Point, join: Point, edge: Ed
   return false;
 }
 
+export type SharedTrunkPreservationContext = Readonly<{
+  allowShortSourceStub: boolean;
+  allowShortTargetStub: boolean;
+  hasSourceFanOut: boolean;
+  hasTargetFanIn: boolean;
+  original: Point[];
+}>;
+
+export const createSharedTrunkPreservationContext = (
+  original: Point[],
+  edge: Edge,
+  groups: readonly BuddyGroup[],
+  obstacles: Map<string, Rect>,
+): SharedTrunkPreservationContext => {
+  const hasSourceFanOut = edgeHasBuddyType(edge.id, groups, 'o2m');
+  const hasTargetFanIn = edgeHasBuddyType(edge.id, groups, 'm2o');
+  const allowShortBridgeStub = hasSourceFanOut && hasTargetFanIn;
+  return {
+    allowShortSourceStub: allowShortBridgeStub || (
+      hasSourceFanOut
+      && original.length >= 3
+      && endpointTrunkHitsUnrelatedObstacle(original[0], original[1], edge, obstacles)
+    ),
+    allowShortTargetStub: allowShortBridgeStub || (
+      hasTargetFanIn
+      && original.length >= 3
+      && endpointTrunkHitsUnrelatedObstacle(
+        original[original.length - 1],
+        original[original.length - 2],
+        edge,
+        obstacles,
+      )
+    ),
+    hasSourceFanOut,
+    hasTargetFanIn,
+    original,
+  };
+};
+
+export const preservesSharedTrunkWithContext = (
+  candidate: Point[],
+  context: SharedTrunkPreservationContext,
+): boolean => {
+  const {
+    allowShortSourceStub,
+    allowShortTargetStub,
+    hasSourceFanOut,
+    hasTargetFanIn,
+    original,
+  } = context;
+  if (original.length < 3 || candidate.length < 3) return true;
+  if (hasSourceFanOut) {
+    if (!pointNear(candidate[0], original[0], 1)) return false;
+    if (!preservesEndpointTrunk(
+      original[0],
+      original[1],
+      candidate[1],
+      allowShortSourceStub,
+    )) return false;
+  }
+  if (hasTargetFanIn) {
+    const originalEnd = original[original.length - 1];
+    const candidateEnd = candidate[candidate.length - 1];
+    if (!pointNear(candidateEnd, originalEnd, 1)) return false;
+    if (!preservesEndpointTrunk(
+      originalEnd,
+      original[original.length - 2],
+      candidate[candidate.length - 2],
+      allowShortTargetStub,
+    )) return false;
+  }
+  return true;
+};
+
 export function preservesSharedTrunk(
   candidate: Point[],
   original: Point[],
@@ -698,24 +776,8 @@ export function preservesSharedTrunk(
   groups: BuddyGroup[],
   obstacles: Map<string, Rect>,
 ): boolean {
-  if (original.length < 3 || candidate.length < 3) return true;
-  const hasSourceFanOut = edgeHasBuddyType(edge.id, groups, 'o2m');
-  const hasTargetFanIn = edgeHasBuddyType(edge.id, groups, 'm2o');
-  const allowShortBridgeStub = hasSourceFanOut && hasTargetFanIn;
-
-  if (hasSourceFanOut) {
-    if (!pointNear(candidate[0], original[0], 1)) return false;
-    const allowShortSourceStub = allowShortBridgeStub || endpointTrunkHitsUnrelatedObstacle(original[0], original[1], edge, obstacles);
-    if (!preservesEndpointTrunk(original[0], original[1], candidate[1], allowShortSourceStub)) return false;
-  }
-  if (hasTargetFanIn) {
-    const originalEnd = original[original.length - 1];
-    const candidateEnd = candidate[candidate.length - 1];
-    if (!pointNear(candidateEnd, originalEnd, 1)) return false;
-    const originalJoin = original[original.length - 2];
-    const candidateJoin = candidate[candidate.length - 2];
-    const allowShortTargetStub = allowShortBridgeStub || endpointTrunkHitsUnrelatedObstacle(originalEnd, originalJoin, edge, obstacles);
-    if (!preservesEndpointTrunk(originalEnd, originalJoin, candidateJoin, allowShortTargetStub)) return false;
-  }
-  return true;
+  return preservesSharedTrunkWithContext(
+    candidate,
+    createSharedTrunkPreservationContext(original, edge, groups, obstacles),
+  );
 }

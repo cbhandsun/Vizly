@@ -3,10 +3,11 @@ import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
 import { buildPipelineBuddyGroups } from './edgeRoutingTopology';
 import {
   countUnrelatedObstacleHits,
+  createSharedTrunkPreservationContext,
   generateWaypointCandidates,
   pathHasVisualComplexityRisk,
   pathHasNodeRoutingRisk,
-  preservesSharedTrunk,
+  preservesSharedTrunkWithContext,
 } from './edgeWaypointCandidateRepair';
 import {
   createEdgePathQualityEvaluationContext,
@@ -535,6 +536,9 @@ export function repairDisplayContainerBoundaryClearanceRisks(
       path,
       currentEdges,
     );
+    const sharedTrunkContext = requiresSharedTrunkPreservation
+      ? createSharedTrunkPreservationContext(path, edge, buddyGroups, obstacles)
+      : null;
     let bestEdges = currentEdges;
     let bestPath = path;
     let bestContainerRisk = baselineContainerRisk;
@@ -548,8 +552,8 @@ export function repairDisplayContainerBoundaryClearanceRisks(
       if (candidateContainerRisk >= bestContainerRisk - 1) continue;
       if (!hasCompatibleTerminalSegments(path, compacted)) continue;
       if (
-        requiresSharedTrunkPreservation
-        && !preservesSharedTrunk(compacted, path, edge, buddyGroups, obstacles)
+        sharedTrunkContext
+        && !preservesSharedTrunkWithContext(compacted, sharedTrunkContext)
       ) continue;
       if (countUnrelatedObstacleHits(compacted, edge, obstacles) > baselineObstacleHits) continue;
 
@@ -670,6 +674,12 @@ export function repairDisplaySoftQualityRisks(
     const candidates = buildSoftQualityCandidates(path, layoutDirection, nodes, containers, edge, {
       maxCandidates: maxCandidatesPerEdge,
     });
+    const sharedTrunkContext = createSharedTrunkPreservationContext(
+      path,
+      edge,
+      buddyGroups,
+      obstacles,
+    );
     const rankedCandidates = baselineObstacleHits > 0
       ? [
         candidates[0],
@@ -693,7 +703,7 @@ export function repairDisplaySoftQualityRisks(
         && !candidateImprovesVisualRisk(bestPath, compacted)
       ) continue;
       if (!hasCompatibleTerminalSegments(path, compacted)) continue;
-      if (!preservesSharedTrunk(compacted, path, edge, buddyGroups, obstacles)) continue;
+      if (!preservesSharedTrunkWithContext(compacted, sharedTrunkContext)) continue;
       if (candidateObstacleHits > baselineObstacleHits) continue;
       if (candidateContainerRisk > initialContainerRisk + 1) continue;
 
