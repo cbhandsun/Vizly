@@ -35,6 +35,8 @@ export const DISPLAY_ROUTING_PHASE_NAMES = [
   'seed-terminal-gate',
   'quality',
   'quality-global-route',
+  'quality-global-route-waypoint',
+  'quality-global-route-detached',
   'quality-topology-seed',
   'quality-topology',
   'quality-topology-endpoints',
@@ -187,7 +189,7 @@ export const DISPLAY_ROUTING_PHASE_NAMES = [
 // One aggregate entry per declared phase plus headroom for the small number of
 // phases that can run under two explicit parents. Repeated work is folded by
 // the Worker recorder, so the bound no longer truncates late final-gate phases.
-export const DISPLAY_ROUTING_PHASE_TRACE_LIMIT = 189;
+export const DISPLAY_ROUTING_PHASE_TRACE_LIMIT = 191;
 
 export const DISPLAY_ROUTING_PHASE_RESOLUTIONS = [
   'hit',
@@ -278,6 +280,8 @@ const DISPLAY_ROUTING_PHASE_PARENTS: Readonly<
   'seed-terminal-axis': 'seed',
   'seed-terminal-gate': 'seed',
   'quality-global-route': 'quality',
+  'quality-global-route-waypoint': 'quality-global-route',
+  'quality-global-route-detached': 'quality-global-route',
   'quality-topology-seed': 'quality',
   'quality-topology': 'quality',
   'quality-topology-endpoints': 'quality-topology',

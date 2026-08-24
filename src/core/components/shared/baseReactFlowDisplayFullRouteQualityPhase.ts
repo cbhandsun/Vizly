@@ -101,6 +101,11 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
     onTrace: onPhaseTrace,
   });
   const globalRouteDiagnostics = createEdgeWaypointRefinementDiagnostics();
+  const waypointRouteTimer = startDisplayRoutingPhaseTrace({
+    phase: 'quality-global-route-waypoint',
+    candidateCount: topologySeed.edges.length,
+    onTrace: onPhaseTrace,
+  });
   const globallyRoutedEdges = canReusePreparedGlobalRouting
     ? topologySeed.edges
     : reduceEdgeCrossingsWithWaypoints(
@@ -116,6 +121,24 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
         diagnostics: globalRouteDiagnostics,
       },
     );
+  waypointRouteTimer.finish(
+    canReusePreparedGlobalRouting
+      ? 'hit'
+      : (globallyRoutedEdges === topologySeed.edges ? 'skip' : 'accepted'),
+    countChangedRoutingItems(topologySeed.edges, globallyRoutedEdges),
+    {
+      candidateCount: globalRouteDiagnostics.generatedCandidateCount,
+      evaluationCount: globalRouteDiagnostics.evaluationCount,
+      scannedNodeCount: globalRouteDiagnostics.scannedNodeCount,
+      scannedSegmentCount: globalRouteDiagnostics.scannedSegmentCount,
+      scannedEdgePairCount: globalRouteDiagnostics.scannedEdgePairCount,
+    },
+  );
+  const detachedRouteTimer = startDisplayRoutingPhaseTrace({
+    phase: 'quality-global-route-detached',
+    candidateCount: globallyRoutedEdges.length,
+    onTrace: onPhaseTrace,
+  });
   const detachedRoutedEdges = reusePreparedGlobalRouting
     ? globallyRoutedEdges
     : separateLargeDetachedParallelOverlapsIfNeeded(
@@ -124,16 +147,15 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
       96,
       DISPLAY_DETACHED_OVERLAP_REPAIR_OPTIONS,
     );
+  detachedRouteTimer.finish(
+    reusePreparedGlobalRouting
+      ? 'hit'
+      : (detachedRoutedEdges === globallyRoutedEdges ? 'skip' : 'accepted'),
+    countChangedRoutingItems(globallyRoutedEdges, detachedRoutedEdges),
+  );
   globalRouteTimer.finish(
     detachedRoutedEdges === normalizedEdges ? 'skip' : 'accepted',
     detachedRoutedEdges === normalizedEdges ? 0 : detachedRoutedEdges.length,
-    {
-      candidateCount: globalRouteDiagnostics.generatedCandidateCount,
-      evaluationCount: globalRouteDiagnostics.evaluationCount,
-      scannedNodeCount: globalRouteDiagnostics.scannedNodeCount,
-      scannedSegmentCount: globalRouteDiagnostics.scannedSegmentCount,
-      scannedEdgePairCount: globalRouteDiagnostics.scannedEdgePairCount,
-    },
   );
   const topologyTimer = startDisplayRoutingPhaseTrace({
     phase: 'quality-topology',
