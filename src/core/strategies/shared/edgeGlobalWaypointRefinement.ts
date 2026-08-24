@@ -1,13 +1,13 @@
 import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
 
 import { refineOrthogonalWaypointsDetailed } from '../../algorithms/orthogonalWaypointRefiner';
-import { buildPipelineBuddyGroups } from './edgeRoutingTopology';
 import {
-  createPathCandidateEvaluationContext,
-  sharesEndpoint,
-  type GlobalEdgeWaypointRefinementOptions,
-  type PathCandidateEvaluationContext,
-} from './edgeGlobalWaypointCandidateEvaluation';
+  createGlobalEdgeWaypointNodeContext,
+  queryGlobalEdgeWaypointObstacles,
+  type GlobalEdgeWaypointNodeContext,
+} from './edgeGlobalWaypointNodeContext';
+import { buildPipelineBuddyGroups } from './edgeRoutingTopology';
+import { createRoutingWaypointSegmentGroupIndex } from './edgeRoutingWaypointSegmentIndex';
 import {
   addAxisCandidate,
   axisOf,
@@ -25,8 +25,8 @@ import {
   parallelOverlapLength,
   pathEquals,
   pathLength,
-  routingObstacles,
   sameEndpoints,
+  segmentIntersectsRect,
   segmentLength,
   segmentRange,
   shiftCandidatesAwayFromCrossing,
@@ -100,11 +100,170 @@ function shiftCandidatesAwayFromLaneBand(
     .filter((candidate): candidate is Point[] => candidate !== null);
 }
 
-export {
-  createGlobalEdgeWaypointRefinementDiagnostics,
-  type GlobalEdgeWaypointRefinementDiagnostics,
-  type GlobalEdgeWaypointRefinementOptions,
-} from './edgeGlobalWaypointCandidateEvaluation';
+type PathCandidateMetrics = {
+  strictCrossings: number;
+  unrelatedCrossings: number;
+  visualUnrelatedCrossings: number;
+  unrelatedOverlap: number;
+  obstacleHits: number;
+  turnbacks: number;
+  bends: number;
+  length: number;
+  score: number;
+};
+
+type PathCandidateEvaluationContext = {
+  evaluate: (path: Point[]) => PathCandidateMetrics;
+};
+
+export type GlobalEdgeWaypointRefinementDiagnostics = {
+  evaluationCount: number;
+  scannedEdgePairCount: number;
+  scannedNodeCount: number;
+  scannedSegmentCount: number;
+};
+
+export const createGlobalEdgeWaypointRefinementDiagnostics = (
+): GlobalEdgeWaypointRefinementDiagnostics => ({
+  evaluationCount: 0,
+  scannedEdgePairCount: 0,
+  scannedNodeCount: 0,
+  scannedSegmentCount: 0,
+});
+
+export type GlobalEdgeWaypointRefinementOptions = Readonly<{
+  diagnostics?: GlobalEdgeWaypointRefinementDiagnostics;
+  disableSegmentIndex?: boolean;
+  disableVisualRectIndex?: boolean;
+  nodeContext?: GlobalEdgeWaypointNodeContext;
+}>;
+
+const toVisualSegments = (path: Point[]): Segment[] => path
+  .slice(1)
+  .map((b, index) => ({ a: path[index], b }));
+
+function createPathCandidateEvaluationContext(
+  edge: Edge,
+  key: string,
+  workingPaths: Map<string, Point[]>,
+  edgeByKey: Map<string, Edge>,
+  nodeContext: GlobalEdgeWaypointNodeContext,
+  options: GlobalEdgeWaypointRefinementOptions = {},
+): PathCandidateEvaluationContext {
+  const otherPaths = [...workingPaths.entries()]
+    .filter(([otherKey]) => otherKey !== key)
+    .map(([otherKey, otherPath]) => {
+      const otherEdge = edgeByKey.get(otherKey);
+      return {
+        segments: toSegments(otherPath),
+        visualSegments: toVisualSegments(otherPath),
+        unrelated: Boolean(otherEdge && !sharesEndpoint(edge, otherEdge)),
+      };
+    });
+  const segmentGroupIndex = options.disableSegmentIndex
+    ? undefined
+    : createRoutingWaypointSegmentGroupIndex(
+      otherPaths.map(other => other.visualSegments),
+    );
+  const cache = new WeakMap<Point[], PathCandidateMetrics>();
+
+  return {
+    evaluate: (path: Point[]): PathCandidateMetrics => {
+      const cached = cache.get(path);
+      if (cached) return cached;
+      const segments = toSegments(path);
+      const visualSegments = toVisualSegments(path);
+      const segmentQuery = segmentGroupIndex?.queryPotentialGroupIndexes(visualSegments);
+      const candidateOtherPaths = segmentQuery
+        ? otherPaths.filter((_, index) => segmentQuery.groupIndexes.has(index))
+        : otherPaths;
+      let strictCrossings = 0;
+      let unrelatedCrossingCount = 0;
+      let visualUnrelatedCrossingCount = 0;
+      let unrelatedOverlap = 0;
+      let obstacleHitCount = 0;
+
+      if (options.diagnostics) {
+        options.diagnostics.evaluationCount += 1;
+        options.diagnostics.scannedSegmentCount += segmentQuery?.scannedSegmentCount ?? 0;
+      }
+      for (const other of candidateOtherPaths) {
+        if (options.diagnostics) {
+          options.diagnostics.scannedEdgePairCount += 1;
+          options.diagnostics.scannedSegmentCount += segments.length * other.segments.length;
+        }
+        for (const first of segments) {
+          for (const second of other.segments) {
+            if (strictCrosses(first, second)) {
+              strictCrossings += 1;
+              if (other.unrelated) unrelatedCrossingCount += 1;
+            }
+            if (other.unrelated) {
+              const overlap = parallelOverlapLength(first, second);
+              if (overlap > MIN_INTERIOR_LEG) unrelatedOverlap += overlap - MIN_INTERIOR_LEG;
+            }
+          }
+        }
+        if (other.unrelated) {
+          if (options.diagnostics) {
+            options.diagnostics.scannedSegmentCount += visualSegments.length
+              * other.visualSegments.length;
+          }
+          for (const first of visualSegments) {
+            for (const second of other.visualSegments) {
+              if (visualStrictCrosses(first, second)) visualUnrelatedCrossingCount += 1;
+            }
+          }
+        }
+      }
+      for (const segment of segments) {
+        const obstacleQuery = queryGlobalEdgeWaypointObstacles({
+          context: nodeContext,
+          disableIndex: options.disableVisualRectIndex === true,
+          edge,
+          segment,
+        });
+        if (options.diagnostics) {
+          options.diagnostics.scannedNodeCount += obstacleQuery.scannedNodeCount;
+        }
+        for (const rect of obstacleQuery.rects) {
+          if (segmentIntersectsRect(segment, rect)) obstacleHitCount += 1;
+        }
+      }
+
+      const turnbacks = turnbackCount(path);
+      const bends = bendCount(path);
+      const length = pathLength(path);
+      const metrics: PathCandidateMetrics = {
+        strictCrossings,
+        unrelatedCrossings: unrelatedCrossingCount,
+        visualUnrelatedCrossings: visualUnrelatedCrossingCount,
+        unrelatedOverlap,
+        obstacleHits: obstacleHitCount,
+        turnbacks,
+        bends,
+        length,
+        score: unrelatedCrossingCount * 10000
+          + visualUnrelatedCrossingCount * 9000
+          + strictCrossings * 7000
+          + unrelatedOverlap * 80
+          + obstacleHitCount * 5000
+          + turnbacks * 500
+          + bends * 40
+          + length,
+      };
+      cache.set(path, metrics);
+      return metrics;
+    },
+  };
+}
+
+function sharesEndpoint(first: Edge, second: Edge): boolean {
+  return first.source === second.source
+    || first.source === second.target
+    || first.target === second.source
+    || first.target === second.target;
+}
 
 function inferEndpointSide(point: Point, rect: Rect): Side | null {
   const candidates = ([
@@ -240,14 +399,9 @@ function candidateImproves(
 }
 
 function safeToAcceptCandidate(
-  edge: Edge,
-  key: string,
   original: Point[],
   candidate: Point[],
-  workingPaths: Map<string, Point[]>,
-  edgeByKey: Map<string, Edge>,
-  obstacles: Map<string, Rect>,
-  evaluationContext = createPathCandidateEvaluationContext(edge, key, workingPaths, edgeByKey, obstacles),
+  evaluationContext: PathCandidateEvaluationContext,
 ): boolean {
   if (!sameEndpoints(original, candidate)) return false;
   if (!isStrictlyOrthogonal(candidate)) return false;
@@ -302,15 +456,10 @@ function samePoint(first: Point | undefined, second: Point | undefined): boolean
 }
 
 function safeToAcceptEndpointSlideCandidate(
-  edge: Edge,
-  key: string,
   original: Point[],
   candidate: Point[],
   slidingEndpoint: 'source' | 'target',
-  workingPaths: Map<string, Point[]>,
-  edgeByKey: Map<string, Edge>,
-  obstacles: Map<string, Rect>,
-  evaluationContext = createPathCandidateEvaluationContext(edge, key, workingPaths, edgeByKey, obstacles),
+  evaluationContext: PathCandidateEvaluationContext,
 ): boolean {
   if (slidingEndpoint === 'source' && !samePoint(original[original.length - 1], candidate[candidate.length - 1])) return false;
   if (slidingEndpoint === 'target' && !samePoint(original[0], candidate[0])) return false;
@@ -425,13 +574,8 @@ function endpointSlideCandidatesAwayFromCrossing(
 }
 
 function pathQualityScore(
-  edge: Edge,
-  key: string,
   path: Point[],
-  workingPaths: Map<string, Point[]>,
-  edgeByKey: Map<string, Edge>,
-  obstacles: Map<string, Rect>,
-  evaluationContext = createPathCandidateEvaluationContext(edge, key, workingPaths, edgeByKey, obstacles),
+  evaluationContext: PathCandidateEvaluationContext,
 ): number {
   return evaluationContext.evaluate(path).score;
 }
@@ -442,10 +586,10 @@ function findBestInteriorCrossingShiftCandidate(
   path: Point[],
   workingPaths: Map<string, Point[]>,
   edgeByKey: Map<string, Edge>,
-  obstacles: Map<string, Rect>,
-  nodeById: Map<string, ReactFlowNode>,
+  nodeContext: GlobalEdgeWaypointNodeContext,
   options: GlobalEdgeWaypointRefinementOptions,
 ): Point[] | null {
+  const { nodeById, obstacles } = nodeContext;
   let evaluationContext: PathCandidateEvaluationContext | null = null;
   let baselineScore: number | null = null;
   const getEvaluationContext = (): PathCandidateEvaluationContext => {
@@ -454,21 +598,13 @@ function findBestInteriorCrossingShiftCandidate(
       key,
       workingPaths,
       edgeByKey,
-      obstacles,
+      nodeContext,
       options,
     );
     return evaluationContext;
   };
   const getBaselineScore = (): number => {
-    baselineScore ??= pathQualityScore(
-      edge,
-      key,
-      path,
-      workingPaths,
-      edgeByKey,
-      obstacles,
-      getEvaluationContext(),
-    );
+    baselineScore ??= pathQualityScore(path, getEvaluationContext());
     return baselineScore;
   };
   let best: Point[] | null = null;
@@ -514,24 +650,11 @@ function findBestInteriorCrossingShiftCandidate(
           seenCandidates.add(candidateKey);
           const context = getEvaluationContext();
           if (!safeToAcceptCandidate(
-            edge,
-            key,
             path,
             candidate,
-            workingPaths,
-            edgeByKey,
-            obstacles,
             context,
           )) continue;
-          const score = pathQualityScore(
-            edge,
-            key,
-            candidate,
-            workingPaths,
-            edgeByKey,
-            obstacles,
-            context,
-          );
+          const score = pathQualityScore(candidate, context);
           const comparisonScore = bestScore ?? getBaselineScore();
           if (score < comparisonScore) {
             best = candidate;
@@ -545,27 +668,14 @@ function findBestInteriorCrossingShiftCandidate(
             seenCandidates.add(candidateKey);
             const context = getEvaluationContext();
             if (!safeToAcceptEndpointSlideCandidate(
-              edge,
-              key,
               path,
               endpointCandidate.path,
               endpointCandidate.endpoint,
-              workingPaths,
-              edgeByKey,
-              obstacles,
               context,
             )) {
               continue;
             }
-            const score = pathQualityScore(
-              edge,
-              key,
-              endpointCandidate.path,
-              workingPaths,
-              edgeByKey,
-              obstacles,
-              context,
-            );
+            const score = pathQualityScore(endpointCandidate.path, context);
             const comparisonScore = bestScore ?? getBaselineScore();
             if (score < comparisonScore) {
               best = endpointCandidate.path;
@@ -598,11 +708,11 @@ export function refineGlobalEdgeWaypoints(
   });
   if (paths.size === 0) return edges;
 
-  const softObstacles = [...routingObstacles(nodes).values()];
+  const nodeContext = options.nodeContext ?? createGlobalEdgeWaypointNodeContext(nodes);
   const refined = refineOrthogonalWaypointsDetailed(paths, {
     buddyGroups: buildPipelineBuddyGroups(edges),
     hardObstacles: [],
-    softObstacles,
+    softObstacles: nodeContext.softObstacles,
     spacing: DEFAULT_SPACING,
     maxPasses: 2,
     maxEdgesPerPass: 48,
@@ -622,8 +732,6 @@ export function refineGlobalEdgeWaypoints(
     },
   });
 
-  const obstacles = routingObstacles(nodes);
-  const nodeById = new Map(nodes.map(node => [node.id, node] as const));
   const workingPaths = new Map(paths);
   const acceptedPaths = new Map<string, Point[]>();
 
@@ -641,17 +749,12 @@ export function refineGlobalEdgeWaypoints(
         key,
         workingPaths,
         edgeByKey,
-        obstacles,
+        nodeContext,
         options,
       );
       if (!safeToAcceptCandidate(
-        edge,
-        key,
         original,
         normalized,
-        workingPaths,
-        edgeByKey,
-        obstacles,
         evaluationContext,
       )) return;
 
@@ -673,8 +776,7 @@ export function refineGlobalEdgeWaypoints(
         current,
         workingPaths,
         edgeByKey,
-        obstacles,
-        nodeById,
+        nodeContext,
         options,
       );
       if (!candidate || pathEquals(current, candidate)) return;

@@ -2,6 +2,9 @@ import type { Edge, Node } from '@xyflow/react';
 
 import { repairEndpointOrthogonalPaths } from '../../strategies/shared/edgeEndpointPathRepair';
 import {
+  createGlobalEdgeWaypointNodeContext,
+} from '../../strategies/shared/edgeGlobalWaypointNodeContext';
+import {
   createGlobalEdgeWaypointRefinementDiagnostics,
   refineGlobalEdgeWaypoints,
 } from '../../strategies/shared/edgeGlobalWaypointRefinement';
@@ -40,6 +43,7 @@ export const createDisplayQualityGlobalRefineSession = ({
 }): DisplayQualityGlobalRefineSession => {
   const normalizedFixedPoints = new Set<string>();
   const rawFixedPoints = new Set<string>();
+  const nodeContext = createGlobalEdgeWaypointNodeContext(nodes);
   return {
     run: ({ edges, normalize = true, phase }) => {
       const timer = startDisplayRoutingPhaseTrace({
@@ -54,7 +58,7 @@ export const createDisplayQualityGlobalRefineSession = ({
         return edges;
       }
       const diagnostics = createGlobalEdgeWaypointRefinementDiagnostics();
-      const refined = refineGlobalEdgeWaypoints(edges, nodes, { diagnostics });
+      const refined = refineGlobalEdgeWaypoints(edges, nodes, { diagnostics, nodeContext });
       const result = normalize ? repairEndpointOrthogonalPaths(refined, nodes) : refined;
       if (
         inputSignature
