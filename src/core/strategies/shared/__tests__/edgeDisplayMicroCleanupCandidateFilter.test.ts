@@ -145,6 +145,27 @@ describe('localMicroCandidateCanImproveQuality', () => {
     expect(second).toMatchObject({ cacheHitCount: 1, evaluatedCandidateCount: 0 });
   });
 
+  it('does not construct node-aware safety state for an exact no-op', () => {
+    const edges = [{
+      id: 'lazy-safety-noop-edge',
+      source: 'lazy-safety-source',
+      target: 'lazy-safety-target',
+      data: { computedPath: [{ x: 0, y: 0 }, { x: 120, y: 0 }] },
+    }];
+    let safetyFactoryCalls = 0;
+
+    const result = repairDisplayMicroArtifacts(edges, () => {
+      safetyFactoryCalls += 1;
+      return {
+        baseline: { obstacleHits: 0, attachedTerminals: 1, anchoredTerminals: 1 },
+        evaluate: () => ({ obstacleHits: 0, attachedTerminals: 1, anchoredTerminals: 1 }),
+      };
+    });
+
+    expect(result).toBe(edges);
+    expect(safetyFactoryCalls).toBe(0);
+  });
+
   it('limits derivative cleanup to the changed edge set', () => {
     const tinyStair = (id: string, offset: number) => ({
       id,

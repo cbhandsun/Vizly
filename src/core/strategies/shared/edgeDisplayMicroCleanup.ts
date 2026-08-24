@@ -55,6 +55,7 @@ import {
   type DisplayMicroCleanupDiagnostics,
   type DisplayMicroCleanupOptions,
   type DisplayMicroCleanupSafetyContext,
+  type DisplayMicroCleanupSafetyContextInput,
   type DisplayMicroCleanupSafetyScore,
 } from './edgeDisplayMicroCleanupTypes';
 
@@ -67,6 +68,7 @@ export type {
   DisplayMicroCleanupDiagnostics,
   DisplayMicroCleanupOptions,
   DisplayMicroCleanupSafetyContext,
+  DisplayMicroCleanupSafetyContextInput,
   DisplayMicroCleanupSafetyScore,
 };
 
@@ -420,7 +422,7 @@ const selectMicroCandidateLaneExtrema = (
 
 export function repairDisplayMicroArtifacts(
   edges: Edge[],
-  safetyContext?: DisplayMicroCleanupSafetyContext,
+  safetyContextInput?: DisplayMicroCleanupSafetyContextInput,
   diagnostics?: DisplayMicroCleanupDiagnostics,
   options?: DisplayMicroCleanupOptions,
 ): Edge[] {
@@ -464,13 +466,18 @@ export function repairDisplayMicroArtifacts(
     // A safety-constrained no-op cannot prove that the unconstrained search is
     // also a no-op. The reverse is safe: constraints only reject candidates,
     // so an unconstrained fixed point may be reused by a safety-aware caller.
-    if (noOpInputSignature && !safetyContext) {
+    if (noOpInputSignature && !safetyContextInput) {
       displayMicroCleanupNoopCache.remember(noOpInputSignature);
     }
     return finishDiagnostics(edges);
   };
   const initialQuality = calculateEdgePathQualityScore(edges);
   if (!displayMicroCleanupNeedsRepair(edges, initialQuality)) return rememberNoOp();
+
+  const safetyContext: DisplayMicroCleanupSafetyContext | undefined =
+    typeof safetyContextInput === 'function'
+      ? safetyContextInput()
+      : safetyContextInput;
 
   let currentEdges = edges;
   const candidateBudget = resolveMicroCandidateBudget(edges.length);

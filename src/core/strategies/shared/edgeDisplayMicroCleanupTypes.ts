@@ -42,6 +42,15 @@ export type DisplayMicroCleanupSafetyContext = Readonly<{
   ) => DisplayMicroCleanupSafetyScore;
 }>;
 
+/**
+ * A safety evaluator can be expensive because it snapshots node obstacles and
+ * terminal attachment state. Supplying a factory lets the cleanup prove an
+ * exact geometry no-op before constructing that node-aware context.
+ */
+export type DisplayMicroCleanupSafetyContextInput =
+  | DisplayMicroCleanupSafetyContext
+  | (() => DisplayMicroCleanupSafetyContext);
+
 export type DisplayMicroCleanupOptions = Readonly<{
   /**
    * Restricts a derivative cleanup to edges whose displayed geometry changed

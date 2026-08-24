@@ -107,7 +107,7 @@ export const finalizeFailClosedDisplayTransaction = <T extends Edge[]>(
   const microTimer = startStage('terminal-fail-closed-micro', selectedCandidate.length);
   const microCandidate = repairDisplayMicroArtifacts(
     selectedCandidate,
-    createBaseReactFlowDisplayMicroSafetyContext(selectedCandidate, repairNodes),
+    () => createBaseReactFlowDisplayMicroSafetyContext(selectedCandidate, repairNodes),
     undefined,
     { allowCompoundRepairs: options?.deferCompoundRepair !== true },
   ) as T;
