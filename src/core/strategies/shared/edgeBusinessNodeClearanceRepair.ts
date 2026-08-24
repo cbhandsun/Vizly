@@ -5,6 +5,7 @@ import {
   iterateBusinessNodeClearanceCandidates,
   selectBusinessNodeClearanceCandidatesWithinHitBudget,
 } from './edgeBusinessNodeClearanceCandidateRanking';
+import { createBusinessNodeClearanceCandidateCollection } from './edgeBusinessNodeClearanceCandidateCollection';
 import {
   createEdgePathQualityEvaluationContext,
 } from './edgeStrictCrossingGuard';
@@ -119,21 +120,7 @@ const compactPath = (path: Point[]): Point[] => {
   return compacted;
 };
 
-const clearancePathSignature = (path: readonly Point[]): string => path
-  .map(point => `${point.x}:${point.y}`)
-  .join('|');
-
-export const uniqueBusinessNodeClearancePaths = (
-  paths: readonly Point[][],
-): Point[][] => {
-  const seen = new Set<string>();
-  return paths.filter(path => {
-    const signature = clearancePathSignature(path);
-    if (seen.has(signature)) return false;
-    seen.add(signature);
-    return true;
-  });
-};
+export { uniqueBusinessNodeClearancePaths } from './edgeBusinessNodeClearanceCandidateCollection';
 
 const pointToRectDistance = (point: Point, rect: Rect): number => {
   const dx = Math.max(rect.x - point.x, point.x - (rect.x + rect.width), 0);
@@ -185,7 +172,7 @@ const sourceBranchCornerDetourCandidates = (
   path: Point[],
   rects: Rect[],
   clearance: number,
-): Point[][] => {
+) => {
   if (path.length < 4) return [];
   const start = path[0];
   const corner = path[1];
@@ -489,13 +476,13 @@ const clearanceCandidates = (
   nodes: ReactFlowNode[],
   edge: Edge,
   minimumClearance: number,
-): Point[][] => {
+) => {
   const rects = nodes.flatMap(node => {
     if (node.id === edge.source || node.id === edge.target || CONTAINER_TYPES.has(String(node.type ?? ''))) return [];
     const rect = nodeRect(node);
     return rect ? [rect] : [];
   });
-  const candidates: Point[][] = [];
+  const candidates = createBusinessNodeClearanceCandidateCollection<Point[]>();
   const containerRects = nodes.flatMap(node => {
     if (!CONTAINER_TYPES.has(String(node.type ?? ''))) return [];
     const rect = nodeRect(node);
@@ -505,8 +492,8 @@ const clearanceCandidates = (
     ...LEGACY_LANE_CLEARANCES,
     minimumClearance,
   ])].sort((left, right) => left - right);
-  candidates.push(...cornerDetourCandidates(path, rects, laneClearances));
-  candidates.push(...terminalBranchCornerDetourCandidates(path, rects, minimumClearance));
+  candidates.addAll(cornerDetourCandidates(path, rects, laneClearances));
+  candidates.addAll(terminalBranchCornerDetourCandidates(path, rects, minimumClearance));
   for (let index = 0; index < path.length - 1; index += 1) {
     const start = path[index];
     const end = path[index + 1];
@@ -561,7 +548,7 @@ const clearanceCandidates = (
           minimumClearance,
           detourLane,
         );
-        if (detour) candidates.push(detour);
+        if (detour) candidates.add(detour);
       }
     }
     for (const rect of rects) {
@@ -594,7 +581,7 @@ const clearanceCandidates = (
           )) continue;
 
           const detour = segmentDetourCandidate(path, index, rect, clearance, detourLane);
-          if (detour) candidates.push(detour);
+          if (detour) candidates.add(detour);
 
           if (index > 0 && index < path.length - 2) {
             const originalSegmentStart = axis === 'v' ? start.y : start.x;
@@ -615,13 +602,13 @@ const clearanceCandidates = (
               candidate[index].y = lane;
               candidate[index + 1].y = lane;
             }
-            candidates.push(compactPath(candidate));
+            candidates.add(compactPath(candidate));
           }
         }
       }
     }
   }
-  return candidates;
+  return candidates.read();
 };
 
 const withPath = (edge: Edge, path: Point[]): Edge => {
@@ -716,10 +703,10 @@ export const repairBusinessNodeClearanceRisks = (
         COMMERCIAL_BUSINESS_NODE_CLEARANCE,
       );
       const baselineHits = obstacleContext.countUnrelatedObstacleHits(path);
-      const generatedCandidates = clearanceCandidates(path, nodes, edge, minimumClearance);
-      const uniqueCandidates = uniqueBusinessNodeClearancePaths(generatedCandidates);
+      const candidateCollection = clearanceCandidates(path, nodes, edge, minimumClearance);
+      const uniqueCandidates = candidateCollection.paths;
       if (options.diagnostics) {
-        options.diagnostics.generatedCandidateCount += generatedCandidates.length;
+        options.diagnostics.generatedCandidateCount += candidateCollection.generatedCandidateCount;
         options.diagnostics.uniqueCandidateCount += uniqueCandidates.length;
       }
       const hitEligibleCandidates = selectBusinessNodeClearanceCandidatesWithinHitBudget(

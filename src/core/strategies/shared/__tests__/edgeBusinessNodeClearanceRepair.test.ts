@@ -7,6 +7,7 @@ import {
   repairBusinessNodeClearanceRisks,
   uniqueBusinessNodeClearancePaths,
 } from '../edgeBusinessNodeClearanceRepair';
+import { createBusinessNodeClearanceCandidateCollection } from '../edgeBusinessNodeClearanceCandidateCollection';
 import { calculateEdgePathQualityScore } from '../edgeStrictCrossingGuard';
 import {
   createNodeClearanceEvaluationContext,
@@ -50,6 +51,12 @@ describe('repairBusinessNodeClearanceRisks', () => {
 
     expect(uniqueBusinessNodeClearancePaths([first, duplicate, distinct]))
       .toEqual([first, distinct]);
+    const collection = createBusinessNodeClearanceCandidateCollection();
+    collection.addAll([first, duplicate, distinct]);
+    expect(collection.read()).toEqual({
+      generatedCandidateCount: 3,
+      paths: [first, distinct],
+    });
   });
 
   it('normalizes a sibling branch lane from 41.5px to the 48px commercial boundary', () => {
