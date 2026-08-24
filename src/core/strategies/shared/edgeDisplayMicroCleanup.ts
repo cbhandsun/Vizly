@@ -23,7 +23,6 @@ import {
   segmentDirection,
   pathMicroMetrics,
   microCandidateRank,
-  strictCrossingPairsForEdge,
   compactPath,
   hasSameEndpoints,
   samePoint,
