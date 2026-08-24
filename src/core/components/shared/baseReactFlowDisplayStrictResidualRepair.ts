@@ -2,7 +2,10 @@ import type { Edge, Node } from '@xyflow/react';
 
 import { findStrictCrossings } from '../../strategies/shared/edgeDetachedOverlapRepair';
 import { repairEndpointOrthogonalPaths } from '../../strategies/shared/edgeEndpointPathRepair';
-import { createEdgePathQualityEvaluationContext } from '../../strategies/shared/edgeStrictCrossingGuard';
+import {
+  countStrictEdgeCrossings,
+  createEdgePathQualityEvaluationContext,
+} from '../../strategies/shared/edgeStrictCrossingGuard';
 import { isFinitePoint } from './baseReactFlowDisplayEdgeCore';
 import {
   candidateStrictCrossingsForEdge,
@@ -51,6 +54,16 @@ import {
 
 const MIN_DISPLAY_ENDPOINT_STUB = 48;
 
+export type StrictCrossingRepairDiagnostics = {
+  qualityEvaluationCount: number;
+  nodeContextBuildCount: number;
+};
+
+export const createStrictCrossingRepairDiagnostics = (): StrictCrossingRepairDiagnostics => ({
+  qualityEvaluationCount: 0,
+  nodeContextBuildCount: 0,
+});
+
 const changedDisplayTerminalsRemainAnchored = (
   baseline: readonly Edge[],
   candidate: readonly Edge[],
@@ -59,16 +72,29 @@ const changedDisplayTerminalsRemainAnchored = (
   edge === baseline[index] || snapshot.validateEdge(edge).anchored
 ));
 
-export const repairInternalStrictCrossingLanes = <T extends Edge[]>(edges: T, nodes: Node[]): T => {
+export const repairInternalStrictCrossingLanes = <T extends Edge[]>(
+  edges: T,
+  nodes: Node[],
+  diagnostics?: StrictCrossingRepairDiagnostics,
+): T => {
   let current = edges;
-  const terminalValidation = createDisplayTerminalValidationSnapshot(nodes);
+  let terminalValidation: DisplayTerminalValidationSnapshot | null = null;
   for (let pass = 0; pass < 2; pass += 1) {
-    const qualityContext = createEdgePathQualityEvaluationContext(current);
-    const obstacleContext = createDisplayObstacleEvaluationContext(current, nodes);
-    const baselineQuality = qualityContext.evaluate(current);
-    const baselineStrict = baselineQuality.strictCrossings;
-    const baselineDisplayStrict = displayStrictCrossingsFromKnownQuality(current, baselineQuality);
+    const baselineStrict = countStrictEdgeCrossings(current);
+    const baselineDisplayStrict = displayStrictCrossingsFromKnownQuality(
+      current,
+      { strictCrossings: baselineStrict },
+    );
     if (baselineStrict === 0 && baselineDisplayStrict === 0) break;
+    if (diagnostics) diagnostics.qualityEvaluationCount += 1;
+    const qualityContext = createEdgePathQualityEvaluationContext(current);
+    const baselineQuality = qualityContext.evaluate(current);
+    if (!terminalValidation) {
+      if (diagnostics) diagnostics.nodeContextBuildCount += 1;
+      terminalValidation = createDisplayTerminalValidationSnapshot(nodes);
+    }
+    if (diagnostics) diagnostics.nodeContextBuildCount += 1;
+    const obstacleContext = createDisplayObstacleEvaluationContext(current, nodes);
     const baselineObstacleHits = obstacleContext.evaluate(current);
     const paths = current.map(edge => getDisplayComputedPath(edge));
     const allSegments = extractDisplaySegments(current);
@@ -175,15 +201,29 @@ export const repairInternalStrictCrossingLanes = <T extends Edge[]>(edges: T, no
 };
 
 
-export const repairFinalResidualStrictCrossings = <T extends Edge[]>(edges: T, nodes: Node[]): T => {
+export const repairFinalResidualStrictCrossings = <T extends Edge[]>(
+  edges: T,
+  nodes: Node[],
+  diagnostics?: StrictCrossingRepairDiagnostics,
+): T => {
   let current = edges;
-  const terminalValidation = createDisplayTerminalValidationSnapshot(nodes);
+  let terminalValidation: DisplayTerminalValidationSnapshot | null = null;
   for (let pass = 0; pass < 4; pass += 1) {
+    const baselineStrict = countStrictEdgeCrossings(current);
+    const baselineDisplayStrict = displayStrictCrossingsFromKnownQuality(
+      current,
+      { strictCrossings: baselineStrict },
+    );
+    if (baselineDisplayStrict === 0 && baselineStrict === 0) break;
+    if (diagnostics) diagnostics.qualityEvaluationCount += 1;
     const qualityContext = createEdgePathQualityEvaluationContext(current);
-    const obstacleContext = createDisplayObstacleEvaluationContext(current, nodes);
     const baselineQuality = qualityContext.evaluate(current);
-    const baselineDisplayStrict = displayStrictCrossingsFromKnownQuality(current, baselineQuality);
-    if (baselineDisplayStrict === 0 && baselineQuality.strictCrossings === 0) break;
+    if (!terminalValidation) {
+      if (diagnostics) diagnostics.nodeContextBuildCount += 1;
+      terminalValidation = createDisplayTerminalValidationSnapshot(nodes);
+    }
+    if (diagnostics) diagnostics.nodeContextBuildCount += 1;
+    const obstacleContext = createDisplayObstacleEvaluationContext(current, nodes);
     const baselineObstacleHits = obstacleContext.evaluate(current);
     const terminalStubCleaned = repairTerminalEndpointStrictCrossingStubs(current, nodes) as T;
     if (

@@ -20,6 +20,7 @@ import {
 } from '../baseReactFlowDisplayCrossedSpineSkirtCandidates';
 import { buildSharedTargetOuterBridgeCandidates } from '../baseReactFlowDisplaySharedTargetOuterBridge';
 import {
+  createStrictCrossingRepairDiagnostics,
   repairFinalResidualStrictCrossings,
   repairInternalStrictCrossingLanes,
 } from '../baseReactFlowDisplayStrictResidualRepair';
@@ -53,6 +54,35 @@ const node = (id: string, x: number, y: number, width: number, height: number): 
 });
 
 describe('final residual strict-crossing repair', () => {
+  it('does not construct node-aware repair contexts without a strict-crossing defect', () => {
+    const cleanEdges: Edge[] = [{
+      id: 'clean-edge',
+      source: 'source',
+      target: 'target',
+      data: { computedPath: [{ x: 0, y: 0 }, { x: 120, y: 0 }] },
+    }];
+    const unreadableNodes = new Proxy([] as Node[], {
+      get: () => {
+        throw new Error('node context must remain lazy');
+      },
+    });
+    const internalDiagnostics = createStrictCrossingRepairDiagnostics();
+    const finalDiagnostics = createStrictCrossingRepairDiagnostics();
+
+    expect(repairInternalStrictCrossingLanes(
+      cleanEdges,
+      unreadableNodes,
+      internalDiagnostics,
+    )).toBe(cleanEdges);
+    expect(repairFinalResidualStrictCrossings(
+      cleanEdges,
+      unreadableNodes,
+      finalDiagnostics,
+    )).toBe(cleanEdges);
+    expect(internalDiagnostics).toEqual({ qualityEvaluationCount: 0, nodeContextBuildCount: 0 });
+    expect(finalDiagnostics).toEqual({ qualityEvaluationCount: 0, nodeContextBuildCount: 0 });
+  });
+
   it('skirts a crossed fan-in bundle outside its aggregate boundary', () => {
     const horizontalSpine: DisplaySegment = {
       edgeIndex: 2,

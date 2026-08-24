@@ -15,7 +15,10 @@ import {
   startDisplayRoutingPhaseTrace,
   type DisplayRoutingPhaseTrace,
 } from './baseReactFlowDisplayRoutingTrace';
-import { repairFinalResidualStrictCrossings } from './baseReactFlowDisplayStrictResidualRepair';
+import {
+  createStrictCrossingRepairDiagnostics,
+  repairFinalResidualStrictCrossings,
+} from './baseReactFlowDisplayStrictResidualRepair';
 
 export const finalizeFailClosedDisplayTransaction = <T extends Edge[]>(
   fallbackCandidate: T,
@@ -81,13 +84,19 @@ export const finalizeFailClosedDisplayTransaction = <T extends Edge[]>(
     countChangedRoutingItems(detachedCandidate, localCandidate),
   );
   const strictTimer = startStage('terminal-fail-closed-strict', localCandidate.length);
+  const strictDiagnostics = createStrictCrossingRepairDiagnostics();
   const residualStrictCandidate = repairFinalResidualStrictCrossings(
     localCandidate,
     repairNodes,
+    strictDiagnostics,
   ) as T;
   strictTimer.finish(
     residualStrictCandidate === localCandidate ? 'skip' : 'accepted',
     countChangedRoutingItems(localCandidate, residualStrictCandidate),
+    {
+      evaluationCount: strictDiagnostics.qualityEvaluationCount,
+      scannedNodeCount: strictDiagnostics.nodeContextBuildCount * repairNodes.length,
+    },
   );
   const selectionTimer = startStage(
     'terminal-fail-closed-selection',

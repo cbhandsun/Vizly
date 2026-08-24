@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { calculateEdgePathQualityScore } from '../../../strategies/shared/edgeStrictCrossingGuard';
 import { finalizeFailClosedDisplayTransaction } from '../baseReactFlowDisplayFinalTransaction';
 import { getDisplayComputedPath } from '../baseReactFlowDisplayGeometry';
+import type { DisplayRoutingPhaseTrace } from '../baseReactFlowDisplayRoutingTrace';
 
 const nodes: Array<Node & { positionAbsolute: { x: number; y: number } }> = [
   {
@@ -37,16 +38,23 @@ const edgeWithPath = (computedPath: Array<{ x: number; y: number }>): Edge[] => 
 
 describe('finalizeFailClosedDisplayTransaction', () => {
   it('marks a fully clean terminal transaction as finalized', () => {
+    const traces: DisplayRoutingPhaseTrace[] = [];
     const result = finalizeFailClosedDisplayTransaction(
       edgeWithPath([{ x: 100, y: 50 }, { x: 300, y: 50 }]),
       nodes,
       'clean-signature',
+      { onPhaseTrace: trace => traces.push(trace) },
     );
 
     expect(result[0].data?.__baseDisplayFinalizedSignature).toBe('clean-signature');
     expect(result[0].type).toBe('stablePath');
     expect(result[0].data?.layoutPathLocked).toBe(true);
     expect(result[0].data?._layoutPathLocked).toBe(true);
+    expect(traces.find(trace => trace.phase === 'terminal-fail-closed-strict')).toMatchObject({
+      evaluationCount: 0,
+      scannedNodeCount: 0,
+      resolution: 'skip',
+    });
   });
 
   it('does not finalize a transaction with detached terminals', () => {

@@ -18,7 +18,6 @@ import {
   getEdgePath,
   getSegments,
   hasPairContribution,
-  strictlyCrosses,
 } from './edgePathQualityGeometry';
 import {
   buildQualityEdgeInputSnapshot,
@@ -35,6 +34,7 @@ import {
   collectPotentialChangedEdgePairKeys,
   createReusableEdgePathQualitySegmentIndex,
 } from './edgePathQualitySegmentIndex';
+import { countIndexedStrictSegmentCrossings } from './edgeStrictCrossingIndex';
 
 export { MIN_EDGE_PATH_PENALIZED_OVERLAP } from './edgePathQualityGeometry';
 export type { EdgePathQualityScore } from './edgePathQualityGeometry';
@@ -198,14 +198,7 @@ export function countStrictEdgeCrossings(edges: Edge[]): number {
     strictCrossingCache.set(edges, { signature: snapshot.signature, count: signatureCached });
     return signatureCached;
   }
-  const segments = getSegments(snapshot.paths);
-  let total = 0;
-  for (let i = 0; i < segments.length; i += 1) {
-    for (let j = i + 1; j < segments.length; j += 1) {
-      if (segments[i].edgeIndex === segments[j].edgeIndex) continue;
-      if (strictlyCrosses(segments[i], segments[j])) total += 1;
-    }
-  }
+  const total = countIndexedStrictSegmentCrossings(getSegments(snapshot.paths));
   strictCrossingCache.set(edges, { signature: snapshot.signature, count: total });
   rememberSignatureValue(strictCrossingSignatureCache, snapshot.signature, total);
   return total;
