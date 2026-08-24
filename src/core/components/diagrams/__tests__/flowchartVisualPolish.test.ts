@@ -110,10 +110,10 @@ describe('flowchart visual polish stylesheet', () => {
         const legacyStylesheet = readRelativeFile('../FlowchartDesigner.css');
 
         expect(stylesheet).toContain(
-            '.diagram-root:has(.react-flow__edge:is(:hover, .selected, :focus-visible))',
+            '.diagram-root:has(.react-flow__edge:is(:hover, .selected, :focus, :focus-visible))',
         );
         expect(stylesheet).toMatch(
-            /:has\(\.react-flow__edge:is\(:hover, \.selected, :focus-visible\)\)[\s\S]*?\.react-flow__edge-path:not\(\.shared-trunk-canonical-backbone\)[\s\S]*?\{[^}]*opacity:\s*var\(--flow-visual-edge-peer-opacity\)/s,
+            /:has\(\.react-flow__edge:is\(:hover, \.selected, :focus, :focus-visible\)\)[\s\S]*?\.react-flow__edge-path:not\(\.shared-trunk-canonical-backbone\)[\s\S]*?\{[^}]*opacity:\s*var\(--flow-visual-edge-peer-opacity\)/s,
         );
         expect(stylesheet).toMatch(
             /\.react-flow__edge:hover:not\(:has\(\[data-shared-trunk-state='shared'\]\)\)[\s\S]*?\.react-flow__edge-path\s*\{[^}]*stroke-width:\s*var\(--flow-visual-edge-hover-width\)\s*!important;/s,

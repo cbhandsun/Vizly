@@ -18,10 +18,10 @@ vi.mock('@/core/config/DiagramConfig', () => ({
     },
 }));
 
-vi.mock('@/core/services/EdgeRoutingCoordinator', () => ({
-    EdgeRoutingCoordinator: {
-        getInstance: () => ({ forceClearAllCaches: mocks.forceClearAllCaches }),
-    },
+vi.mock('@/core/ports/edgeRoutingCoordinatorRuntime', () => ({
+    loadEdgeRoutingCoordinator: async () => ({
+        forceClearAllCaches: mocks.forceClearAllCaches,
+    }),
 }));
 
 vi.mock('../useLayoutStrategy', () => ({

@@ -7,7 +7,6 @@ import {
   sharesEndpoint,
   type GlobalEdgeWaypointRefinementOptions,
   type PathCandidateEvaluationContext,
-  type PathCandidateMetrics,
 } from './edgeGlobalWaypointCandidateEvaluation';
 import {
   addAxisCandidate,

@@ -65,12 +65,13 @@ export const useLayoutRoutingTransaction = ({
     // every empty-canvas visit for the complete routing engine.
     const [
       { diagramConfigManager },
-      { EdgeRoutingCoordinator },
+      routingCoordinator,
       displayWorkerModule,
       { stageBaseReactFlowLayoutRouting },
     ] = await Promise.all([
       import('../../../config/DiagramConfig'),
-      import('../../../services/EdgeRoutingCoordinator'),
+      import('../../../ports/edgeRoutingCoordinatorRuntime')
+        .then(({ loadEdgeRoutingCoordinator }) => loadEdgeRoutingCoordinator()),
       import('../../shared/baseReactFlowDisplayWorkerClient'),
       import('../../shared/baseReactFlowLayoutRoutingTransaction'),
     ]);
@@ -103,7 +104,7 @@ export const useLayoutRoutingTransaction = ({
     setLayoutStable?.(false);
     try {
       takeSnapshot(nodesRef.current, edgesRef.current);
-      EdgeRoutingCoordinator.getInstance().forceClearAllCaches();
+      routingCoordinator.forceClearAllCaches();
       // React 18 batches these state updates. The recorded trusted display
       // snapshot is already available when BaseReactFlow observes this graph.
       setNodes(nodes);

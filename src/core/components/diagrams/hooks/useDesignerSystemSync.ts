@@ -44,8 +44,9 @@ export interface UseDesignerSystemSyncProps {
 
 const unfreezeRoutingCoordinator = async (): Promise<void> => {
     try {
-        const { EdgeRoutingCoordinator } = await import('../../../services/EdgeRoutingCoordinator');
-        EdgeRoutingCoordinator.getInstance().unfreeze();
+        const { loadEdgeRoutingCoordinator } = await import('../../../ports/edgeRoutingCoordinatorRuntime');
+        const routingCoordinator = await loadEdgeRoutingCoordinator();
+        routingCoordinator.unfreeze();
     } catch (error) {
         logDesignerSystemSyncImportDataFailure(error);
     }

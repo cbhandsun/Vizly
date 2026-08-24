@@ -104,10 +104,9 @@ export function useAutoRouting({
             applyRoutingProfile(DESIGNER_ROUTING_PROFILE);
         }
         // 用户显式切换后才加载高级路由器；空白画布首屏不需要其完整实现。
-        void import('../../../services/EdgeRoutingCoordinator')
-            .then(({ EdgeRoutingCoordinator }) => {
-                EdgeRoutingCoordinator.getInstance().forceClearAllCaches();
-            })
+        void import('../../../ports/edgeRoutingCoordinatorRuntime')
+            .then(({ loadEdgeRoutingCoordinator }) => loadEdgeRoutingCoordinator())
+            .then(coordinator => coordinator.forceClearAllCaches())
             .catch(logAutoRoutingCacheClearFailure);
 
         // 强刷 Edge 引用，触发 React Flow 和自定义 Edge 组件的全量重绘

@@ -119,11 +119,13 @@ export const useDesignerInitialDiagramLoad = ({
             const restoredEdges = restoredActivePage?.edges ?? saved.edges;
             void Promise.all([
                 recalculateAutosaveNodeSizes(restoredNodes),
-                import('../../../services/EdgeRoutingCoordinator').catch((error) => {
+                import('../../../ports/edgeRoutingCoordinatorRuntime')
+                  .then(({ loadEdgeRoutingCoordinator }) => loadEdgeRoutingCoordinator())
+                  .catch((error) => {
                     logDesignerSystemSyncRoutingFreezeFailure(error);
                     return null;
-                }),
-            ]).then(([recalculatedNodes, routingModule]) => {
+                  }),
+            ]).then(([recalculatedNodes, routingCoordinator]) => {
                 commitInitialization(() => {
                     if (saved.routingSnapshot) {
                         registerRoutingOnlyDocumentCandidate(saved.routingSnapshot);
@@ -132,7 +134,7 @@ export const useDesignerInitialDiagramLoad = ({
                     setNodes(recalculatedNodes);
                     setEdges(restoredEdges);
                     needsInitialFitView.current = true;
-                    routingModule?.EdgeRoutingCoordinator.getInstance().freeze();
+                    routingCoordinator?.freeze();
                     if (saved.isFreshSeed) {
                         messageApi?.success(t('designer.initialLoad.templateLoaded'));
                         clearDesignerFreshSeedFlag(`flowchart-autosave-v2-${id || 'default'}`);
