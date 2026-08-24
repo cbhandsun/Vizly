@@ -128,6 +128,7 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
     countChangedRoutingItems(topologySeed.edges, globallyRoutedEdges),
     {
       candidateCount: globalRouteDiagnostics.generatedCandidateCount,
+      cacheHitCount: globalRouteDiagnostics.cacheHitCount,
       evaluationCount: globalRouteDiagnostics.evaluationCount,
       scannedNodeCount: globalRouteDiagnostics.scannedNodeCount,
       scannedSegmentCount: globalRouteDiagnostics.scannedSegmentCount,

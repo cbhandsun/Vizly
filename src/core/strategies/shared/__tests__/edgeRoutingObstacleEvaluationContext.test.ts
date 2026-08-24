@@ -221,7 +221,7 @@ describe('routing obstacle evaluation context', () => {
     expect(countRoutingObstacleHits(path, testEdge, obstacles)).toBe(expected.routingObstacleHits);
   });
 
-  it('snapshots obstacle geometry without caching path results', () => {
+  it('snapshots obstacle geometry without trusting mutable path identity', () => {
     const sourceRect = { x: 0, y: 0, width: 20, height: 20 };
     const blockRect = { x: 40, y: 10, width: 10, height: 10 };
     const obstacles = new Map<string, Rect>([
@@ -246,6 +246,26 @@ describe('routing obstacle evaluation context', () => {
     path[1] = { x: 0, y: 60 };
     expect(context.countPathHits(path)).not.toBe(snapshot.routingObstacleHits);
     expect(context.evaluate(path)).not.toBe(snapshot);
+  });
+
+  it('reuses exact segment scans across distinct candidate paths', () => {
+    const obstacles = new Map<string, Rect>([
+      ['first', { x: 10, y: 0, width: 10, height: 20 }],
+      ['second', { x: 30, y: 0, width: 10, height: 20 }],
+      ['third', { x: 50, y: 0, width: 10, height: 20 }],
+    ]);
+    const context = createRoutingObstacleEvaluationContext(
+      edge('missing-source', 'missing-target'),
+      obstacles,
+    );
+    const first = [{ x: 0, y: 10 }, { x: 80, y: 10 }];
+    const equivalent = first.map(point => ({ ...point }));
+
+    expect(context.countUnrelatedObstacleHits(first)).toBe(3);
+    expect(context.readMetrics().scannedNodeCount).toBe(3);
+    expect(context.countUnrelatedObstacleHits(equivalent, 0)).toBe(1);
+    expect(context.readMetrics().scannedNodeCount).toBe(3);
+    expect(context.readMetrics().cacheHitCount).toBe(1);
   });
 
   it('stops only after proving that a bounded obstacle threshold was exceeded', () => {

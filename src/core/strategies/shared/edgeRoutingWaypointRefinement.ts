@@ -51,6 +51,7 @@ export type EdgeWaypointRefinementDiagnostics = {
   scannedSegmentCount: number;
   scannedEdgePairCount: number;
   lowerBoundRejectionCount: number;
+  cacheHitCount: number;
 };
 
 export const createEdgeWaypointRefinementDiagnostics = (
@@ -62,6 +63,7 @@ export const createEdgeWaypointRefinementDiagnostics = (
   scannedSegmentCount: 0,
   scannedEdgePairCount: 0,
   lowerBoundRejectionCount: 0,
+  cacheHitCount: 0,
 });
 
 export function repairSharedTrunkAwareCrossings(
@@ -667,7 +669,9 @@ export function reduceEdgeCrossingsWithWaypoints(
         : toEdgeRoutingSegments(bestPath),
     );
     if (options.diagnostics) {
-      options.diagnostics.scannedNodeCount += obstacleEvaluation.readMetrics().scannedNodeCount;
+      const obstacleMetrics = obstacleEvaluation.readMetrics();
+      options.diagnostics.scannedNodeCount += obstacleMetrics.scannedNodeCount;
+      options.diagnostics.cacheHitCount += obstacleMetrics.cacheHitCount;
     }
   }
 

@@ -22,7 +22,7 @@ export type RoutingObstacleEvaluationContext = Readonly<{
   countPathHits: (path: Point[]) => number;
   countUnrelatedObstacleHits: (path: Point[], maximumHits?: number) => number;
   evaluate: (path: Point[]) => RoutingObstacleHitEvaluation;
-  readMetrics: () => Readonly<{ scannedNodeCount: number }>;
+  readMetrics: () => Readonly<{ cacheHitCount: number; scannedNodeCount: number }>;
 }>;
 
 export type NodeClearanceEvaluationContext = Readonly<{
@@ -46,6 +46,7 @@ export type RoutingWaypointCandidateAxes = Readonly<{
 
 const ENDPOINT_INTERIOR_TOLERANCE = 0.51;
 export const BUSINESS_NODE_CLEARANCE = 28;
+const MAX_SEGMENT_HIT_CACHE_ENTRIES = 8_192;
 
 const EPS = 0.5;
 const FLEXIBLE_SHARED_TRUNK_MIN = 24;
@@ -131,6 +132,8 @@ const countPathRectHits = (
   rects: readonly PaddedRectBounds[],
   onNodeScan?: (count: number) => void,
   maximumHits?: number,
+  segmentHitCache?: Map<string, number>,
+  onCacheHit?: () => void,
 ): number => {
   const boundedMaximum = Number.isSafeInteger(maximumHits) && (maximumHits ?? -1) >= 0
     ? maximumHits
@@ -142,6 +145,22 @@ const countPathRectHits = (
     const deltaX = Math.abs(a.x - b.x);
     const deltaY = Math.abs(a.y - b.y);
     if (!(deltaX > EPS || deltaY > EPS)) continue;
+    const segmentKey = Number.isFinite(a.x)
+      && Number.isFinite(a.y)
+      && Number.isFinite(b.x)
+      && Number.isFinite(b.y)
+      ? `${a.x},${a.y}>${b.x},${b.y}`
+      : null;
+    const cachedSegmentHits = segmentKey ? segmentHitCache?.get(segmentKey) : undefined;
+    if (typeof cachedSegmentHits === 'number') {
+      onCacheHit?.();
+      if (boundedMaximum !== undefined && hits + cachedSegmentHits > boundedMaximum) {
+        return boundedMaximum + 1;
+      }
+      hits += cachedSegmentHits;
+      continue;
+    }
+    const hitsBeforeSegment = hits;
 
     if (deltaY < EPS) {
       const y = a.y;
@@ -159,6 +178,11 @@ const countPathRectHits = (
         }
       }
       onNodeScan?.(rects.length);
+      if (
+        segmentKey
+        && segmentHitCache
+        && segmentHitCache.size < MAX_SEGMENT_HIT_CACHE_ENTRIES
+      ) segmentHitCache.set(segmentKey, hits - hitsBeforeSegment);
       continue;
     }
 
@@ -178,6 +202,11 @@ const countPathRectHits = (
         }
       }
       onNodeScan?.(rects.length);
+      if (
+        segmentKey
+        && segmentHitCache
+        && segmentHitCache.size < MAX_SEGMENT_HIT_CACHE_ENTRIES
+      ) segmentHitCache.set(segmentKey, hits - hitsBeforeSegment);
     }
   }
   return hits;
@@ -445,6 +474,7 @@ export function createRoutingObstacleEvaluationContext(
   obstacles: Map<string, Rect>,
 ): RoutingObstacleEvaluationContext {
   let scannedNodeCount = 0;
+  let cacheHitCount = 0;
   const sourceId = edge.source;
   const targetId = edge.target;
   const unrelatedRects: PaddedRectBounds[] = [];
@@ -458,21 +488,48 @@ export function createRoutingObstacleEvaluationContext(
     if (rect) endpointRects.push(paddedRectBounds(rect, -ENDPOINT_INTERIOR_TOLERANCE));
   }
   const routingRects = [...unrelatedRects, ...endpointRects];
+  const unrelatedSegmentHits = new Map<string, number>();
+  const endpointSegmentHits = new Map<string, number>();
+  const routingSegmentHits = new Map<string, number>();
   const recordNodeScans = (count: number) => {
     scannedNodeCount += count;
   };
+  const recordCacheHit = () => {
+    cacheHitCount += 1;
+  };
   const countUnrelatedPathHits = (path: Point[], maximumHits?: number): number => (
-    countPathRectHits(path, unrelatedRects, recordNodeScans, maximumHits)
+    countPathRectHits(
+      path,
+      unrelatedRects,
+      recordNodeScans,
+      maximumHits,
+      unrelatedSegmentHits,
+      recordCacheHit,
+    )
   );
   const countEndpointPathHits = (path: Point[]): number => (
-    countPathRectHits(path, endpointRects, recordNodeScans)
+    countPathRectHits(
+      path,
+      endpointRects,
+      recordNodeScans,
+      undefined,
+      endpointSegmentHits,
+      recordCacheHit,
+    )
   );
 
   return Object.freeze({
     countEndpointNodeTraversalHits: countEndpointPathHits,
-    countPathHits: (path: Point[]): number => countPathRectHits(path, routingRects),
+    countPathHits: (path: Point[]): number => countPathRectHits(
+      path,
+      routingRects,
+      undefined,
+      undefined,
+      routingSegmentHits,
+      recordCacheHit,
+    ),
     countUnrelatedObstacleHits: countUnrelatedPathHits,
-    readMetrics: () => ({ scannedNodeCount }),
+    readMetrics: () => ({ cacheHitCount, scannedNodeCount }),
     evaluate: (path: Point[]): RoutingObstacleHitEvaluation => {
       const unrelatedObstacleHits = countUnrelatedPathHits(path);
       const endpointNodeTraversalHits = countEndpointPathHits(path);
