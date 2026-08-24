@@ -10,15 +10,21 @@ describe('display routing matrix cases', () => {
   it('covers every layout action currently exposed by the flowchart toolbar', () => {
     expect(DISPLAY_ROUTING_LAYOUT_CASES.map(layoutCase => layoutCase.id)).toEqual([
       'domain-compound-elk-tb',
+      'domain-compound-elk-bt',
       'domain-compound-elk-lr',
+      'domain-compound-elk-rl',
       'domain-lanes-tb',
+      'domain-lanes-bt',
       'domain-lanes-lr',
+      'domain-lanes-rl',
       'domain-elk-tb',
       'domain-elk-bt',
       'domain-elk-lr',
       'domain-elk-rl',
       'tree-tb',
+      'tree-bt',
       'tree-lr',
+      'tree-rl',
     ]);
     expect(new Set(DISPLAY_ROUTING_LAYOUT_CASES.map(layoutCase => layoutCase.label)).size)
       .toBe(DISPLAY_ROUTING_LAYOUT_CASES.length);

@@ -107,7 +107,7 @@ describe('flowchartToolbarLayoutMenu', () => {
       .toEqual({ available: false, reason: 'empty' });
   });
 
-  it('exposes ELK layered layouts in all four supported directions', () => {
+  it('exposes every global layered layout in all four supported directions', () => {
     const onStrategyLayout = vi.fn();
     const model = buildFlowchartLayoutMenuModel({
       lastDomainStrategy: 'domain-elk',
@@ -131,7 +131,9 @@ describe('flowchartToolbarLayoutMenu', () => {
     expect(elkRl).toBeDefined();
     expect(collectItems(globalGroup?.children).map(item => item.key)).toEqual([
       'tree-tb',
+      'tree-bt',
       'tree-lr',
+      'tree-rl',
       'force',
       'domain-elk-tb',
       'domain-elk-bt',
@@ -155,6 +157,12 @@ describe('flowchartToolbarLayoutMenu', () => {
     if (typeof elkRl?.onClick === 'function') elkRl.onClick();
     expect(onStrategyLayout).toHaveBeenCalledWith('domain-elk', 'elk-layered', 'BT');
     expect(onStrategyLayout).toHaveBeenCalledWith('domain-elk', 'elk-layered', 'RL');
+    const treeBt = items.find(item => item.key === 'tree-bt');
+    const treeRl = items.find(item => item.key === 'tree-rl');
+    if (typeof treeBt?.onClick === 'function') treeBt.onClick();
+    if (typeof treeRl?.onClick === 'function') treeRl.onClick();
+    expect(onStrategyLayout).toHaveBeenCalledWith('tree', undefined, 'BT');
+    expect(onStrategyLayout).toHaveBeenCalledWith('tree', undefined, 'RL');
   });
 
   it('routes node-layout choices to an engine that implements them', () => {
@@ -226,12 +234,20 @@ describe('flowchartToolbarLayoutMenu', () => {
     });
     const items = collectItems(model.items);
     const compoundLr = items.find(item => item.key === 'domain-compound-elk-lr');
+    const compoundBt = items.find(item => item.key === 'domain-compound-elk-bt');
+    const compoundRl = items.find(item => item.key === 'domain-compound-elk-rl');
 
     expect(compoundLr).toBeDefined();
+    expect(compoundBt).toBeDefined();
+    expect(compoundRl).toBeDefined();
     expect(model.selectedKeys).toEqual(['domain-compound-elk-lr']);
     expect(model.statusText).toBe('复杂流程（保留域·左→右）');
     if (typeof compoundLr?.onClick === 'function') compoundLr.onClick();
     expect(onStrategyLayout).toHaveBeenCalledWith('domain-compound-elk', undefined, 'LR');
+    if (typeof compoundBt?.onClick === 'function') compoundBt.onClick();
+    if (typeof compoundRl?.onClick === 'function') compoundRl.onClick();
+    expect(onStrategyLayout).toHaveBeenCalledWith('domain-compound-elk', undefined, 'BT');
+    expect(onStrategyLayout).toHaveBeenCalledWith('domain-compound-elk', undefined, 'RL');
   });
 
   it('exposes ordered domain lanes without claiming a selectable node arrangement', () => {
@@ -245,12 +261,20 @@ describe('flowchartToolbarLayoutMenu', () => {
     });
     const items = collectItems(model.items);
     const lanesLr = items.find(item => item.key === 'domain-lanes-lr');
+    const lanesBt = items.find(item => item.key === 'domain-lanes-bt');
+    const lanesRl = items.find(item => item.key === 'domain-lanes-rl');
 
     expect(lanesLr).toBeDefined();
+    expect(lanesBt).toBeDefined();
+    expect(lanesRl).toBeDefined();
     expect(model.selectedKeys).toEqual(['domain-lanes-lr']);
     expect(model.statusText).toBe('循环流程泳道（左→右）');
     if (typeof lanesLr?.onClick === 'function') lanesLr.onClick();
     expect(onStrategyLayout).toHaveBeenCalledWith('domain-lanes', undefined, 'LR');
+    if (typeof lanesBt?.onClick === 'function') lanesBt.onClick();
+    if (typeof lanesRl?.onClick === 'function') lanesRl.onClick();
+    expect(onStrategyLayout).toHaveBeenCalledWith('domain-lanes', undefined, 'BT');
+    expect(onStrategyLayout).toHaveBeenCalledWith('domain-lanes', undefined, 'RL');
   });
 
   it('keeps common scenarios visible and separates custom combinations from layout engines', () => {

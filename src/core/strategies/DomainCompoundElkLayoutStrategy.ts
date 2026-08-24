@@ -61,7 +61,13 @@ export class DomainCompoundElkLayoutStrategy extends AbstractElkLayoutStrategy {
     edges: Edge[],
     options: LayoutOptions,
   ): ElkNode {
-    const direction = options.direction === 'LR' ? 'RIGHT' : 'DOWN';
+    const direction = options.direction === 'LR'
+      ? 'RIGHT'
+      : options.direction === 'RL'
+        ? 'LEFT'
+        : options.direction === 'BT'
+          ? 'UP'
+          : 'DOWN';
     const horizontalSpacing = finiteDimension(options.spacing?.horizontal, 120);
     const verticalSpacing = finiteDimension(options.spacing?.vertical, 120);
     const graphOptions = {

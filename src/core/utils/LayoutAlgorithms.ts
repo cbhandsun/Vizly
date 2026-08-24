@@ -19,7 +19,7 @@ export {
 } from './layout/forceLayoutGeometry';
 export type { ForceLayoutOptions } from './layout/forceLayoutGeometry';
 
-export type LayoutDirection = 'TB' | 'LR';
+export type LayoutDirection = 'TB' | 'BT' | 'LR' | 'RL';
 
 export interface LayoutOptions {
     /** 布局方向（仅树形布局使用） */
@@ -61,6 +61,7 @@ export function treeLayout(
     options: LayoutOptions = {},
 ): Map<string, Point> {
     const direction = options.direction || 'TB';
+    const axisDirection = direction === 'LR' || direction === 'RL' ? 'LR' : 'TB';
     const nodeSpacing = options.nodeSpacing || 40;
     const levelSpacing = options.levelSpacing || 80;
 
@@ -105,7 +106,7 @@ export function treeLayout(
         const children = childIds.map(cid => buildTree(cid));
         const subtreeWidth = children.length > 0
             ? children.reduce((sum, c) => sum + c.subtreeWidth, 0) + (children.length - 1) * nodeSpacing
-            : (direction === 'TB' ? w : h);
+            : (axisDirection === 'TB' ? w : h);
         return { id, children, width: w, height: h, x: 0, y: 0, subtreeWidth };
     }
 
@@ -113,7 +114,7 @@ export function treeLayout(
 
     // 布局
     function layout(tree: TreeNode, x: number, y: number): void {
-        if (direction === 'TB') {
+        if (axisDirection === 'TB') {
             tree.x = x + (tree.subtreeWidth - tree.width) / 2;
             tree.y = y;
             let childX = x;
@@ -136,7 +137,7 @@ export function treeLayout(
 
     let offset = 0;
     for (const tree of trees) {
-        if (direction === 'TB') {
+        if (axisDirection === 'TB') {
             layout(tree, offset + 100, 100);
             offset += tree.subtreeWidth + nodeSpacing * 2;
         } else {
@@ -147,16 +148,47 @@ export function treeLayout(
 
     // 孤立节点排列在底部/右侧
     let orphanOffset = 100;
-    const maxVal = Math.max(...Array.from(positions.values()).map(p => direction === 'TB' ? p.y : p.x), 0);
+    const maxVal = Math.max(
+        ...Array.from(positions.values()).map(p => axisDirection === 'TB' ? p.y : p.x),
+        0,
+    );
     for (const n of nodes) {
         if (!positions.has(n.id)) {
             const { width: w, height: h } = getSize(n);
-            if (direction === 'TB') {
+            if (axisDirection === 'TB') {
                 positions.set(n.id, { x: orphanOffset, y: maxVal + levelSpacing * 2 });
                 orphanOffset += w + nodeSpacing;
             } else {
                 positions.set(n.id, { x: maxVal + levelSpacing * 2, y: orphanOffset });
                 orphanOffset += h + nodeSpacing;
+            }
+        }
+    }
+
+    if (direction === 'BT' || direction === 'RL') {
+        const positionedNodes = [...positions.entries()].flatMap(([id, position]) => {
+            const node = nodeMap.get(id);
+            return node ? [{ id, position, size: getSize(node) }] : [];
+        });
+        const minimum = Math.min(...positionedNodes.map(entry => (
+            direction === 'BT' ? entry.position.y : entry.position.x
+        )));
+        const maximum = Math.max(...positionedNodes.map(entry => (
+            direction === 'BT'
+                ? entry.position.y + entry.size.height
+                : entry.position.x + entry.size.width
+        )));
+        if (Number.isFinite(minimum) && Number.isFinite(maximum)) {
+            for (const entry of positionedNodes) {
+                positions.set(entry.id, direction === 'BT'
+                    ? {
+                        x: entry.position.x,
+                        y: minimum + maximum - entry.position.y - entry.size.height,
+                    }
+                    : {
+                        x: minimum + maximum - entry.position.x - entry.size.width,
+                        y: entry.position.y,
+                    });
             }
         }
     }

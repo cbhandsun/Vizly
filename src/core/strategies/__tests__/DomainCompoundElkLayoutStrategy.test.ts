@@ -107,4 +107,19 @@ describe('DomainCompoundElkLayoutStrategy', () => {
       targets: ['b-two-leaf'],
     }]);
   });
+
+  it.each([
+    ['TB', 'DOWN'],
+    ['BT', 'UP'],
+    ['LR', 'RIGHT'],
+    ['RL', 'LEFT'],
+  ] as const)('maps %s to the matching ELK compound direction', (direction, expected) => {
+    const graph = new InspectableDomainCompoundElkLayoutStrategy().buildGraph(
+      [node('source', 'custom', {}), node('target', 'custom', {})],
+      [{ id: 'edge', source: 'source', target: 'target' }],
+      { type: LayoutType.ELK_LAYERED, direction },
+    );
+
+    expect(graph.layoutOptions?.['elk.direction']).toBe(expected);
+  });
 });

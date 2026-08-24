@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { symmetricMindMapLayout } from '../LayoutAlgorithms';
+import { symmetricMindMapLayout, treeLayout } from '../LayoutAlgorithms';
 import { Node, Edge } from '@xyflow/react';
 
 describe('symmetricMindMapLayout', () => {
@@ -49,5 +49,35 @@ describe('symmetricMindMapLayout', () => {
     it('should handle empty nodes array', () => {
         const positions = symmetricMindMapLayout([], []);
         expect(positions.size).toBe(0);
+    });
+});
+
+describe('treeLayout directions', () => {
+    const nodes: Node[] = [
+        {
+            id: 'root', position: { x: 0, y: 0 }, data: {},
+            measured: { width: 120, height: 60 },
+        },
+        {
+            id: 'child', position: { x: 0, y: 0 }, data: {},
+            measured: { width: 100, height: 50 },
+        },
+    ];
+    const edges: Edge[] = [{ id: 'root-child', source: 'root', target: 'child' }];
+
+    it.each([
+        ['TB', 'y', true],
+        ['BT', 'y', false],
+        ['LR', 'x', true],
+        ['RL', 'x', false],
+    ] as const)('places descendants in the requested %s direction', (direction, axis, increasing) => {
+        const positions = treeLayout(nodes, edges, { direction });
+        const root = positions.get('root');
+        const child = positions.get('child');
+
+        expect(root).toBeDefined();
+        expect(child).toBeDefined();
+        if (!root || !child) return;
+        expect(increasing ? child[axis] > root[axis] : child[axis] < root[axis]).toBe(true);
     });
 });

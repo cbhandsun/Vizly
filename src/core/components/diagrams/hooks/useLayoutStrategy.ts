@@ -11,6 +11,7 @@ import {
 import { useLayoutRoutingTransaction } from './useLayoutRoutingTransaction';
 import { clearBaseReactFlowLayoutEdgeRoutingData } from '../../shared/baseReactFlowLayoutEdgeRoutingData';
 import { isDirectedForestLayoutGraph } from './treeLayoutTopology';
+import { calculateLayeredLayoutWithReverse } from './reverseLayeredLayoutGeometry';
 import {
     clearLayoutEdgeRoutingType,
     prepareLayeredLayoutEdges,
@@ -294,7 +295,7 @@ export function useLayoutStrategy({
                 let treeSourceEdges = layoutEdges;
                 if (usesNativeTreeLayout) {
                     const positions = treeLayout(layoutNodes, layoutEdges, {
-                        direction: axisDirection,
+                        direction: dir,
                         ...LAYERED_TREE_ROUTING_SPACING,
                     });
                     newNodes = applyLayout(layoutNodes, positions);
@@ -466,8 +467,8 @@ export function useLayoutStrategy({
                 }
 
                 const layoutOptions: LayoutOptions & {
-                    domainSubGroupDirection: 'TB' | 'LR';
-                    subDomainNodeDirection: 'TB' | 'LR';
+                    domainSubGroupDirection: FlowchartLayoutDirection;
+                    subDomainNodeDirection: FlowchartLayoutDirection;
                 } = {
                     type: strategy.getName() as LayoutOptions['type'],
                     direction: dir,
@@ -485,8 +486,8 @@ export function useLayoutStrategy({
                     subDomainOrder,
                     domainSubGroupDirection: strategyName === 'domain-dagre-sub-horizontal'
                         ? 'LR'
-                        : axisDirection,
-                    subDomainNodeDirection: axisDirection,
+                        : dir,
+                    subDomainNodeDirection: dir,
                 };
                 const legacyFallback = await import('./legacyDomainLayoutFallback');
                 const canUseFlatElkFallback = Boolean(
@@ -499,20 +500,22 @@ export function useLayoutStrategy({
                 let usedDomainCompoundElk = isDomainCompoundElk;
                 let usedDomainDagre = isDomainDagre;
                 const calculateDomainCompoundElkFallback = async (
-                    fallbackDirection: 'TB' | 'LR' = axisDirection,
+                    fallbackDirection: FlowchartLayoutDirection = dir,
                 ) => {
                     const compoundStrategy = await loadDomainCompoundElkStrategy();
-                    const fallbackResult = await compoundStrategy.calculateLayout(
+                    const fallbackResult = await calculateLayeredLayoutWithReverse(
+                        compoundStrategy,
                         layoutNodes,
                         layoutEdges,
                         {
                             ...layoutOptions,
                             type: 'elk-layered' as LayoutOptions['type'],
                             nodeLayout: 'elk-layered' as LayoutOptions['nodeLayout'],
-                            direction: fallbackDirection,
                             spacing: { horizontal: 120, vertical: 120 },
                             edgeRouting: 'ORTHOGONAL',
                         },
+                        fallbackDirection,
+                        true,
                     );
                     usedDomainCompoundElk = true;
                     usedDomainDagre = false;
@@ -551,10 +554,13 @@ export function useLayoutStrategy({
                         edgeRouting: 'ORTHOGONAL' as const,
                     }
                     : layoutOptions;
-                let result = await strategy.calculateLayout(
+                let result = await calculateLayeredLayoutWithReverse(
+                    strategy,
                     layoutNodes,
                     layoutEdges,
                     effectiveLayoutOptions,
+                    dir,
+                    isDomainLane || usedDomainCompoundElk,
                 );
                 if (!usedDomainElk && !usedDomainCompoundElk && !isDomainLane) {
                     const qualityFallback = legacyFallback.resolveLegacyDomainQualityFallback(
