@@ -547,6 +547,7 @@ export function generateWaypointCandidates(
   edge?: Edge,
   options: {
     includeNodeAwareLanes?: boolean;
+    knownNodeRoutingRisk?: boolean;
     preferredAxes?: RoutingWaypointCandidateAxes;
   } = {},
 ): Point[][] {
@@ -584,7 +585,10 @@ export function generateWaypointCandidates(
   );
   for (const x of preferredX) xLanes.add(x);
   for (const y of preferredY) yLanes.add(y);
-  if (pathHasNodeRoutingRisk(base, nodes, edge) || options.includeNodeAwareLanes) {
+  const hasNodeRoutingRisk = typeof options.knownNodeRoutingRisk === 'boolean'
+    ? options.knownNodeRoutingRisk
+    : pathHasNodeRoutingRisk(base, nodes, edge);
+  if (hasNodeRoutingRisk || options.includeNodeAwareLanes) {
     const nodeAwareLanes = buildNodeAwareWaypointLanes(base, nodes, edge);
     for (const x of nodeAwareLanes.x) xLanes.add(x);
     for (const y of nodeAwareLanes.y) yLanes.add(y);

@@ -37,6 +37,10 @@ import {
   createRoutingWaypointSegmentGroupIndex,
   type RoutingWaypointSegmentGroupIndex,
 } from './edgeRoutingWaypointSegmentIndex';
+import {
+  createRoutingWaypointVisualRectIndex,
+  type RoutingWaypointVisualRectIndex,
+} from './edgeRoutingWaypointVisualRectIndex';
 
 export type EdgeWaypointRefinementDiagnostics = {
   processedCandidateEdgeCount: number;
@@ -291,14 +295,19 @@ function scoreContainerBoundaryHug(segment: EdgeRoutingSegment, rect: EdgeRoutin
 
 type NodeVisualContext = Readonly<{
   business: Array<{ id: string; rect: EdgeRoutingRect }>;
+  businessIndex?: RoutingWaypointVisualRectIndex;
   containers: Array<{ id: string; rect: EdgeRoutingRect }>;
+  containerIndex?: RoutingWaypointVisualRectIndex;
 }>;
 
 type EdgeVisualContext = NodeVisualContext & Readonly<{
   relatedContainerIds: ReadonlySet<string>;
 }>;
 
-function buildNodeVisualContext(nodes: ReactFlowNode[]): NodeVisualContext {
+function buildNodeVisualContext(
+  nodes: ReactFlowNode[],
+  disableIndex = false,
+): NodeVisualContext {
   const business: Array<{ id: string; rect: EdgeRoutingRect }> = [];
   const containers: Array<{ id: string; rect: EdgeRoutingRect }> = [];
   for (const node of nodes) {
@@ -310,7 +319,12 @@ function buildNodeVisualContext(nodes: ReactFlowNode[]): NodeVisualContext {
       business.push({ id: node.id, rect });
     }
   }
-  return { business, containers };
+  return {
+    business,
+    businessIndex: disableIndex ? undefined : createRoutingWaypointVisualRectIndex(business),
+    containers,
+    containerIndex: disableIndex ? undefined : createRoutingWaypointVisualRectIndex(containers),
+  };
 }
 
 function createEdgeVisualContext(
@@ -331,16 +345,26 @@ function createEdgeVisualContext(
 
 function scoreVisualSoftConstraints(
   path: EdgeRoutingPoint[],
+  segments: readonly EdgeRoutingSegment[],
   edge: Edge,
   context: EdgeVisualContext,
   baseLength: number,
-): number {
-  const { business, containers, relatedContainerIds } = context;
-  const segments = toEdgeRoutingSegments(path);
-
+  length: number,
+): Readonly<{ score: number; scannedNodeCount: number }> {
+  const {
+    business,
+    businessIndex,
+    containers,
+    containerIndex,
+    relatedContainerIds,
+  } = context;
   let score = 0;
+  let scannedNodeCount = 0;
   for (const segment of segments) {
-    for (const node of business) {
+    const businessQuery = businessIndex?.queryPotentialEntries(segment, 28);
+    const candidateBusinessNodes = businessQuery?.entries ?? business;
+    scannedNodeCount += businessQuery?.scannedNodeCount ?? business.length;
+    for (const node of candidateBusinessNodes) {
       if (node.id === edge.source || node.id === edge.target) continue;
       const distance = segmentToRectDistance(segment, node.rect);
       if (distance < 12) {
@@ -350,7 +374,10 @@ function scoreVisualSoftConstraints(
       }
     }
 
-    for (const container of containers) {
+    const containerQuery = containerIndex?.queryPotentialEntries(segment, 8);
+    const candidateContainers = containerQuery?.entries ?? containers;
+    scannedNodeCount += containerQuery?.scannedNodeCount ?? containers.length;
+    for (const container of candidateContainers) {
       score += scoreContainerBoundaryHug(segment, container.rect);
       if (relatedContainerIds.has(container.id)) continue;
       const insideLength = segmentInsideRectLength(segment, container.rect);
@@ -360,7 +387,6 @@ function scoreVisualSoftConstraints(
     }
   }
 
-  const length = pathLength(path);
   const manhattan = Math.max(
     1,
     Math.abs(path[0].x - path[path.length - 1].x)
@@ -373,7 +399,7 @@ function scoreVisualSoftConstraints(
   const bends = Math.max(0, path.length - 2);
   if (bends > 6) score += (bends - 6) * 300;
   score += Math.max(0, length - baseLength) * 0.04;
-  return score;
+  return { score, scannedNodeCount };
 }
 
 function pathLength(points: EdgeRoutingPoint[]): number {
@@ -471,18 +497,20 @@ function scorePathCandidate(
   if (rejectsAtLowerBound(relationScore)) {
     return finishScore(cutoff ?? relationScore, true);
   }
-  scannedNodeCount += segments.length
-    * (visualContext.business.length + visualContext.containers.length);
-  const visualScore = scoreVisualSoftConstraints(
+  const length = pathLength(path);
+  const visualResult = scoreVisualSoftConstraints(
     path,
+    segments,
     edge,
     visualContext,
     baseLength,
+    length,
   );
+  scannedNodeCount += visualResult.scannedNodeCount;
+  const visualScore = visualResult.score;
   if (rejectsAtLowerBound(relationScore + visualScore)) {
     return finishScore(cutoff ?? relationScore, true);
   }
-  const length = pathLength(path);
   const bends = Math.max(0, path.length - 2);
   const detour = Math.max(0, length - baseLength);
   return finishScore(obstacleScore
@@ -506,6 +534,7 @@ export function reduceEdgeCrossingsWithWaypoints(
     preferredAxes?: RoutingWaypointCandidateAxes;
     diagnostics?: EdgeWaypointRefinementDiagnostics;
     disableScoreLowerBoundPruning?: boolean;
+    disableNodeVisualIndex?: boolean;
     disableSegmentIndex?: boolean;
   } = {},
 ): Edge[] {
@@ -522,7 +551,7 @@ export function reduceEdgeCrossingsWithWaypoints(
       [edgeId, toEdgeRoutingSegments(path)] as const
     )),
   );
-  const nodeVisualContext = buildNodeVisualContext(nodes);
+  const nodeVisualContext = buildNodeVisualContext(nodes, options.disableNodeVisualIndex);
   const buddyGroups = buildPipelineBuddyGroups(edges);
   const topologyStats = buildEdgeTopologyStats(edges);
 
@@ -578,6 +607,7 @@ export function reduceEdgeCrossingsWithWaypoints(
     const obstacleEvaluation = createRoutingObstacleEvaluationContext(edge, obstacles);
     const candidates = generateWaypointCandidates(path, layoutDirection, nodes, edge, {
       includeNodeAwareLanes: hasSoftRisk,
+      knownNodeRoutingRisk: hasNodeRisk,
       preferredAxes: options.preferredAxes,
     });
     if (options.diagnostics) options.diagnostics.generatedCandidateCount += candidates.length;

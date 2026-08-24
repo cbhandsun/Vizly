@@ -198,8 +198,14 @@ describe('edge routing module boundaries', () => {
       diagnostics: unindexedDiagnostics,
       disableSegmentIndex: true,
     });
+    const fullNodeScanDiagnostics = createEdgeWaypointRefinementDiagnostics();
+    const fullNodeScan = reduceEdgeCrossingsWithWaypoints(edges, nodes, 'TB', {
+      diagnostics: fullNodeScanDiagnostics,
+      disableNodeVisualIndex: true,
+    });
     expect(bounded).toEqual(exhaustive);
     expect(bounded).toEqual(unindexed);
+    expect(bounded).toEqual(fullNodeScan);
     expect(boundedDiagnostics.lowerBoundRejectionCount).toBeGreaterThan(0);
     expect(boundedDiagnostics.scannedNodeCount)
       .toBeLessThan(exhaustiveDiagnostics.scannedNodeCount);
@@ -207,5 +213,7 @@ describe('edge routing module boundaries', () => {
       .toBeLessThanOrEqual(exhaustiveDiagnostics.scannedSegmentCount);
     expect(boundedDiagnostics.scannedSegmentCount)
       .toBeLessThanOrEqual(unindexedDiagnostics.scannedSegmentCount);
+    expect(boundedDiagnostics.scannedNodeCount)
+      .toBeLessThanOrEqual(fullNodeScanDiagnostics.scannedNodeCount);
   });
 });

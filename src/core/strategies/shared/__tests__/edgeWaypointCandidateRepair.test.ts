@@ -1,8 +1,40 @@
 import { describe, expect, it } from 'vitest';
+import type { Edge, Node } from '@xyflow/react';
 
 import { generateWaypointCandidates } from '../edgeWaypointCandidateRepair';
 
 describe('topology-preferred waypoint candidates', () => {
+  it('reuses an authoritative node-risk result without rescanning node geometry', () => {
+    let geometryReads = 0;
+    const measured = {
+      get width() {
+        geometryReads += 1;
+        return 80;
+      },
+      get height() {
+        geometryReads += 1;
+        return 48;
+      },
+    };
+    const nodes: Node[] = [{
+      id: 'unrelated',
+      position: { x: 500, y: 500 },
+      measured,
+      data: {},
+    }];
+    const edge: Edge = { id: 'edge', source: 'source', target: 'target' };
+
+    generateWaypointCandidates(
+      [{ x: 0, y: 0 }, { x: 200, y: 0 }],
+      'LR',
+      nodes,
+      edge,
+      { knownNodeRoutingRisk: false },
+    );
+
+    expect(geometryReads).toBe(0);
+  });
+
   it('adds finite nearby topology axes as bounded orthogonal candidates', () => {
     const candidates = generateWaypointCandidates(
       [
