@@ -33,8 +33,8 @@ import {
 } from './FlowchartDesignerShellRegions';
 import { filterCommentsForPage } from './commentPageScope';
 import { useFlowchartDesignerViewSetup } from './useFlowchartDesignerViewSetup';
-import { FLOWCHART_LOADING_OVERLAY_STYLE } from './flowchartDesignerViewStyles';
 import { resolveDesignerDragRenderPolicy } from './designerDragRenderPolicy';
+import { FlowchartLoadingOverlay } from './FlowchartLoadingOverlay';
 
 export type { FlowchartDesignerViewModel } from './flowchartDesignerViewModel';
 
@@ -320,13 +320,9 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                         pluginId={pluginId}
                         onOpenShapePicker={() => setMobileRequestedPanel('shapes-search')}
                     />}
-                    {isInitialDiagramLoading && (
-                        <div
-                            style={FLOWCHART_LOADING_OVERLAY_STYLE}
-                        >
-                            {t('common.loadingDiagram', '加载图表...')}
-                        </div>
-                    )}
+                    {isInitialDiagramLoading && <FlowchartLoadingOverlay
+                        label={t('common.loadingDiagram', '加载图表...')}
+                    />}
                     <div ref={reactFlowWrapper} style={{ position: 'relative', height: '100%' }}>
                         {editingEnabled && <ContextMenuLayer
                             onAction={handleContextMenuAction}

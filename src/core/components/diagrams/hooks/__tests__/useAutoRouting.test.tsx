@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
     autoPathSelection: true,
+    forceClearAllCaches: vi.fn(),
     handleStrategyLayout: vi.fn(),
     syncAutoPathSelection: vi.fn(),
     applyRoutingProfile: vi.fn(),
@@ -14,6 +15,12 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/core/config/DiagramConfig', () => ({
     diagramConfigManager: {
         getConfig: () => ({ edge: { autoPathSelection: mocks.autoPathSelection } }),
+    },
+}));
+
+vi.mock('@/core/services/EdgeRoutingCoordinator', () => ({
+    EdgeRoutingCoordinator: {
+        getInstance: () => ({ forceClearAllCaches: mocks.forceClearAllCaches }),
     },
 }));
 
@@ -64,6 +71,7 @@ const createOptions = () => {
 describe('useAutoRouting layout preference coordination', () => {
     beforeEach(() => {
         mocks.autoPathSelection = true;
+        mocks.forceClearAllCaches.mockReset();
         mocks.handleStrategyLayout.mockReset();
         mocks.handleStrategyLayout.mockResolvedValue(true);
         mocks.syncAutoPathSelection.mockReset();

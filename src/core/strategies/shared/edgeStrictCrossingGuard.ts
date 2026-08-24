@@ -35,6 +35,7 @@ import {
   createReusableEdgePathQualitySegmentIndex,
 } from './edgePathQualitySegmentIndex';
 import { countIndexedStrictSegmentCrossings } from './edgeStrictCrossingIndex';
+import { readSignatureValue, rememberBoundedSignatureValue } from './boundedSignatureCache';
 
 export { MIN_EDGE_PATH_PENALIZED_OVERLAP } from './edgePathQualityGeometry';
 export type { EdgePathQualityScore } from './edgePathQualityGeometry';
@@ -51,24 +52,6 @@ const QUALITY_SIGNATURE_CACHE_LIMIT = 512;
 const qualityScoreSignatureCache = new Map<string, EdgePathQualityScore>();
 const strictCrossingSignatureCache = new Map<string, number>();
 export const readEdgePairQualityMemoMetrics = readSharedEdgePairQualityMemoMetrics;
-
-function rememberSignatureValue<T>(cache: Map<string, T>, signature: string, value: T): void {
-  if (cache.has(signature)) cache.delete(signature);
-  cache.set(signature, value);
-  while (cache.size > QUALITY_SIGNATURE_CACHE_LIMIT) {
-    const oldest = cache.keys().next().value;
-    if (typeof oldest !== 'string') break;
-    cache.delete(oldest);
-  }
-}
-
-function readSignatureValue<T>(cache: Map<string, T>, signature: string): T | undefined {
-  const value = cache.get(signature);
-  if (typeof value === 'undefined') return undefined;
-  cache.delete(signature);
-  cache.set(signature, value);
-  return value;
-}
 
 type EdgePathQualityDecomposition = {
   edgeSegments: Segment[][];
@@ -157,8 +140,18 @@ function rememberQualityScore(
 ): void {
   qualityScoreCache.set(edges, { signature: snapshot.signature, score });
   strictCrossingCache.set(edges, { signature: snapshot.signature, count: score.strictCrossings });
-  rememberSignatureValue(qualityScoreSignatureCache, snapshot.signature, score);
-  rememberSignatureValue(strictCrossingSignatureCache, snapshot.signature, score.strictCrossings);
+  rememberBoundedSignatureValue(
+    qualityScoreSignatureCache,
+    snapshot.signature,
+    score,
+    QUALITY_SIGNATURE_CACHE_LIMIT,
+  );
+  rememberBoundedSignatureValue(
+    strictCrossingSignatureCache,
+    snapshot.signature,
+    score.strictCrossings,
+    QUALITY_SIGNATURE_CACHE_LIMIT,
+  );
 }
 
 function readQualityScore(
@@ -200,7 +193,12 @@ export function countStrictEdgeCrossings(edges: Edge[]): number {
   }
   const total = countIndexedStrictSegmentCrossings(getSegments(snapshot.paths));
   strictCrossingCache.set(edges, { signature: snapshot.signature, count: total });
-  rememberSignatureValue(strictCrossingSignatureCache, snapshot.signature, total);
+  rememberBoundedSignatureValue(
+    strictCrossingSignatureCache,
+    snapshot.signature,
+    total,
+    QUALITY_SIGNATURE_CACHE_LIMIT,
+  );
   return total;
 }
 
