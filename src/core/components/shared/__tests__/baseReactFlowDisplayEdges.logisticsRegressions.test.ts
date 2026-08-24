@@ -407,6 +407,12 @@ describe('baseReactFlowDisplayEdges logistics regressions', () => {
       JSON.stringify({ quality, phaseTraces }, null, 2),
     ).toBeLessThan(projected.edges.length);
     expect(
+      phaseTraces.find(
+        trace => trace.phase === 'quality-crossing-final-overlap',
+      )?.cacheHitCount,
+      JSON.stringify({ quality, phaseTraces }, null, 2),
+    ).toBeLessThan(1_000);
+    expect(
       phaseTraces.some(trace => trace.phase === 'strict'),
       JSON.stringify({ quality, phaseTraces }, null, 2),
     ).toBe(false);

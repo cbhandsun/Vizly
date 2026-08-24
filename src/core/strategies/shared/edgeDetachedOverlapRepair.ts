@@ -508,8 +508,6 @@ export function separateDetachedParallelOverlaps(
 
           for (const candidatePath of candidatePathsForSegment) {
             if (qualityBudget.exhausted()) break;
-            const candidatePaths = paths.map((path, index) => (index === segment.edgeIndex ? candidatePath : path));
-            if (!routingObstacleGate(paths, candidatePaths, [segment.edgeIndex])) continue;
             const candidateEdgeCrossings = strictCrossingsForEdgeSegments(
               extractPathSegmentRefsForPath(candidatePath, segment.edgeIndex, edges),
               currentSegments,
@@ -517,6 +515,10 @@ export function separateDetachedParallelOverlaps(
               strictCrossingSegmentIndex,
             );
             if (candidateEdgeCrossings > currentEdgeCrossings) continue;
+            const candidatePaths = paths.map((path, index) => (
+              index === segment.edgeIndex ? candidatePath : path
+            ));
+            if (!routingObstacleGate(paths, candidatePaths, [segment.edgeIndex])) continue;
             const candidateEdges = edgesWithPaths(currentEdges, candidatePaths, [segment.edgeIndex]);
             const candidateQualityScore = qualityBudget.evaluateChanged(
               candidateEdges,
