@@ -10,6 +10,7 @@ import {
 import dayjs from 'dayjs';
 import { ProGanttTask, getWorkDaysSigned, useProTimelineEngine, isWeekend } from '../../../hooks/useProTimelineEngine';
 import { useTheme } from '../../../themes/useCoreTheme';
+import { isTimelinePointTaskType } from '../../../algorithms/timelineTaskSemantics';
 import {
     getResourceTaskAccessibleLabel,
     isResourceTaskActivationKey,
@@ -74,7 +75,7 @@ export const ProResourceDrawer: React.FC<ProResourceDrawerProps> = ({
         // 1. 提取所有非 Summary 且具有有效负责人的原子任务 (Milestone 不耗费工期，故也不算进超载，只统计 Phase 和 Event)
         const activeTasks = tasks.filter(t => 
             t.type !== 'summary' && 
-            t.type !== 'milestone' && 
+            !isTimelinePointTaskType(t.type) &&
             t.startDate && 
             t.endDate
         );

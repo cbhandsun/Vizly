@@ -1,6 +1,7 @@
 import type { Edge, Node } from '@xyflow/react';
 
 import type { ProGanttTask } from '../../../hooks/useProTimelineEngine';
+import { isTimelinePointTaskType } from '../../../algorithms/timelineTaskSemantics';
 import { parseDateOnlyTime } from '../../../utils/dateOnly';
 
 export type ProjectedProTimelineTask = ProGanttTask & {
@@ -58,12 +59,13 @@ export const projectProTimelineTasks = (
     const startDate = dateOnlyString(node.data.date);
     if (!startDate && type !== 'summary' && type !== 'phase') return [];
     const explicitEndDate = dateOnlyString(node.data.endDate);
+    const isPointTask = isTimelinePointTaskType(type);
     return [{
       id: node.id,
       name: optionalString(node.data.label, 500) ?? '未命名',
       startDate,
-      endDate: explicitEndDate || startDate,
-      progress: optionalProgress(node.data.progress),
+      endDate: isPointTask ? startDate : explicitEndDate || startDate,
+      progress: isPointTask ? undefined : optionalProgress(node.data.progress),
       dependencies: dependenciesByTarget.get(node.id) ?? [],
       type,
       color: optionalCssColor(node.data.color),

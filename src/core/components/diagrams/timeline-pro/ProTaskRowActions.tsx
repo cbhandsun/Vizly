@@ -3,6 +3,7 @@ import { DeleteOutlined, FlagFilled, FolderOpenOutlined, MoreOutlined, PlusOutli
 import { Dropdown } from 'antd';
 
 interface ProTaskRowActionsProps {
+    canAddChildren: boolean;
     taskName: string;
     primaryColor: string;
     deleteColor: string;
@@ -11,6 +12,7 @@ interface ProTaskRowActionsProps {
 }
 
 export function ProTaskRowActions({
+    canAddChildren,
     taskName,
     primaryColor,
     deleteColor,
@@ -19,9 +21,11 @@ export function ProTaskRowActions({
 }: ProTaskRowActionsProps) {
     const menu = {
         items: [
-            { key: 'phase', icon: <FolderOpenOutlined />, label: '添加子阶段' },
-            { key: 'milestone', icon: <FlagFilled />, label: '添加里程碑' },
-            { type: 'divider' as const },
+            ...(canAddChildren ? [
+                { key: 'phase', icon: <FolderOpenOutlined />, label: '添加子阶段' },
+                { key: 'milestone', icon: <FlagFilled />, label: '添加里程碑' },
+                { type: 'divider' as const },
+            ] : []),
             { key: 'delete', danger: true, icon: <DeleteOutlined />, label: '删除任务' },
         ],
         onClick: ({ key }: { key: string }) => {
@@ -33,18 +37,20 @@ export function ProTaskRowActions({
     return (
         <div className="pro-timeline-row-actions" onClick={(event) => event.stopPropagation()}>
             <div className="pro-timeline-row-actions--desktop">
-                <Dropdown menu={menu} trigger={['click']} placement="bottomRight">
-                    <button
-                        type="button"
-                        aria-haspopup="menu"
-                        aria-label={`为 ${taskName} 添加子项`}
-                        className="pro-timeline-row-action-button"
-                        style={{ color: primaryColor }}
-                        title="添加子项"
-                    >
-                        <PlusOutlined aria-hidden="true" />
-                    </button>
-                </Dropdown>
+                {canAddChildren && (
+                    <Dropdown menu={menu} trigger={['click']} placement="bottomRight">
+                        <button
+                            type="button"
+                            aria-haspopup="menu"
+                            aria-label={`为 ${taskName} 添加子项`}
+                            className="pro-timeline-row-action-button"
+                            style={{ color: primaryColor }}
+                            title="添加子项"
+                        >
+                            <PlusOutlined aria-hidden="true" />
+                        </button>
+                    </Dropdown>
+                )}
                 <button
                     type="button"
                     aria-haspopup="dialog"

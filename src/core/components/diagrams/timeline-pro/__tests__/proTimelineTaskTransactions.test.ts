@@ -97,7 +97,7 @@ describe('pro timeline task transactions', () => {
     });
   });
 
-  it('keeps milestone dates atomic and rejects invalid or duplicate additions', () => {
+  it('keeps event and milestone dates atomic and rejects invalid or duplicate additions', () => {
     const existing = [node('existing')];
     const milestone = createProTimelineTaskAddition(existing, {
       id: 'milestone',
@@ -108,12 +108,40 @@ describe('pro timeline task transactions', () => {
     });
     expect(milestone.nodes[1].data.endDate).toBe('2026-08-29');
 
+    const event = createProTimelineTaskAddition(existing, {
+      id: 'event',
+      label: 'Kickoff',
+      parentId: null,
+      startDate: '2026-08-30',
+      type: 'event',
+    });
+    expect(event.nodes[1].data).toMatchObject({
+      date: '2026-08-30',
+      endDate: '2026-08-30',
+      type: 'event',
+    });
+    expect(event.nodes[1].data).not.toHaveProperty('progress');
+
     expect(createProTimelineTaskAddition(existing, {
       id: 'existing', label: 'Duplicate', parentId: null, startDate: '2026-08-29', type: 'event',
     }).changed).toBe(false);
     expect(createProTimelineTaskAddition(existing, {
       id: 'bad', label: 'Bad date', parentId: null, startDate: 'not-a-date', type: 'event',
     }).changed).toBe(false);
+  });
+
+  it.each(['event', 'milestone'] as const)('rejects %s as a parent container', (parentType) => {
+    const pointParent = node('point-parent');
+    pointParent.data.type = parentType;
+
+    expect(createProTimelineTaskAddition([pointParent], {
+      id: 'child',
+      label: 'Invalid child',
+      parentId: pointParent.id,
+      startDate: '2026-08-29',
+      type: 'phase',
+    }).changed).toBe(false);
+    expect([...getProTimelineAvailableParentIds([pointParent, node('target')], 'target')]).toEqual([]);
   });
 
   it('collects descendants without recursing forever through malformed hierarchy cycles', () => {

@@ -1,5 +1,6 @@
 import type { Edge, Node } from '@xyflow/react';
 
+import { isTimelinePointTaskType } from '../../../algorithms/timelineTaskSemantics';
 import { formatDateOnly, parseDateOnlyTime } from '../../../utils/dateOnly';
 
 export type TimelineDateField = 'date' | 'endDate';
@@ -110,14 +111,13 @@ export const buildTimelineTypeUpdate = (
     const type = readTimelineEditableTaskType(value);
     if (!type) return {};
 
-    if (type === 'milestone') {
+    if (isTimelinePointTaskType(type)) {
         return {
             type,
             endDate: normalizeCanonicalDate(data.date) ?? undefined,
             progress: undefined,
         };
     }
-    if (type === 'event') return { type, progress: undefined };
 
     const startDate = normalizeCanonicalDate(data.date);
     const currentEndDate = normalizeCanonicalDate(data.endDate);
@@ -152,6 +152,10 @@ export const buildTimelineDateUpdate = (
 ): TimelineDateUpdateResult => {
     const normalized = normalizeCanonicalDate(candidate);
     if (!normalized) return { ok: false, reason: 'invalid' };
+
+    if (isTimelinePointTaskType(data.type)) {
+        return { ok: true, updates: { date: normalized, endDate: normalized } };
+    }
 
     const start = field === 'date' ? normalized : normalizeCanonicalDate(data.date);
     const end = field === 'endDate' ? normalized : normalizeCanonicalDate(data.endDate);

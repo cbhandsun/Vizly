@@ -139,6 +139,18 @@ describe('ProTimelinePropertyPanel', () => {
         expect(screen.queryByText('面板属性')).toBeNull();
     });
 
+    it.each(['event', 'milestone'] as const)('keeps %s editing atomic and hides ranged-work controls', (type) => {
+        const pointNode = phaseNode(type);
+        pointNode.data.type = type;
+        const { context } = createHarness([pointNode]);
+
+        render(<ProTimelinePropertyPanel ctx={context} selectedNodes={[pointNode]} selectedEdges={[]} />);
+
+        expect(screen.getByLabelText('Start date')).toBeTruthy();
+        expect(screen.queryByLabelText('End date')).toBeNull();
+        expect(screen.queryByLabelText('Task progress')).toBeNull();
+    });
+
     it('creates one history entry for a continuous text-edit gesture', () => {
         const { context, getNodes } = createHarness();
         render(<ProTimelinePropertyPanel ctx={context} selectedNodes={[phaseNode()]} selectedEdges={[]} />);

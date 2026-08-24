@@ -16,6 +16,7 @@ import ProTaskListPanel from './ProTaskListPanel';
 import { ProResourceDrawer } from './ProResourceDrawer';
 import { useTheme } from '../../../themes/useCoreTheme';
 import { appMessage } from '../../../utils/antdStaticBridge';
+import { isTimelinePointTaskType } from '../../../algorithms/timelineTaskSemantics';
 import { addDaysToDateOnly, parseDateOnlyTime, todayDateOnly } from '../../../utils/dateOnly';
 import { ProTimelineChrome, ProTimelineKeyframes } from './ProTimelineChrome';
 import { projectProTimelineTasks } from './proTimelineTaskProjection';
@@ -291,14 +292,14 @@ export default function ProTimelineCanvas({
               const tStartStr = tgtNode.data.date as string;
               const tEndStr = (tgtNode.data.endDate as string) || tStartStr;
 
-              // milestone 等特殊类型判定
-              const isMilestone = tgtNode.data.type === 'milestone';
+              // 零工期节点可与前置节点落在同一工作日。
+              const isPointTask = isTimelinePointTaskType(tgtNode.data.type);
               const currNode = nodes.find(n => n.id === currId);
-              const isCurrMilestone = currNode?.data.type === 'milestone';
+              const isCurrentPointTask = isTimelinePointTaskType(currNode?.data.type);
 
               // 计算后继任务的最早可能开始日期 minStart
               const minStart = (() => {
-                  if (isMilestone || isCurrMilestone) {
+                  if (isPointTask || isCurrentPointTask) {
                       return adjustToWorkDay(currEnd, 'forward');
                   } else {
                       return adjustToWorkDay(addDaysToDateOnly(currEnd, 1), 'forward');
@@ -310,9 +311,9 @@ export default function ProTimelineCanvas({
 
               // 如果后继任务的当前开始日期比 minStart 还要早，说明被“顶”到了，需要发生向后避让
               if (currentTgtStartValue !== null && minTgtStartValue !== null && currentTgtStartValue < minTgtStartValue) {
-                  const duration = getWorkDays(tStartStr, tEndStr);
+                  const duration = isPointTask ? 0 : getWorkDays(tStartStr, tEndStr);
                   const newTgtStart = minStart;
-                  const newTgtEnd = addWorkDays(newTgtStart, duration);
+                  const newTgtEnd = isPointTask ? newTgtStart : addWorkDays(newTgtStart, duration);
 
                   updatesMap.set(tgtId, { date: newTgtStart, endDate: newTgtEnd });
 
@@ -334,16 +335,18 @@ export default function ProTimelineCanvas({
 
       const oldStartDate = node.data.date as string;
       const oldEndDate = (node.data.endDate as string) || oldStartDate;
+      const isPointTask = isTimelinePointTaskType(node.data.type);
 
       const isMove = newStartDate !== oldStartDate;
       let finalStart: string;
       let finalEnd: string;
 
       if (isMove) {
-          const duration = getWorkDays(oldStartDate, oldEndDate);
+          const duration = isPointTask ? 0 : getWorkDays(oldStartDate, oldEndDate);
           finalStart = adjustToWorkDay(newStartDate, 'forward');
-          finalEnd = addWorkDays(finalStart, duration);
+          finalEnd = isPointTask ? finalStart : addWorkDays(finalStart, duration);
       } else {
+          if (isPointTask) return;
           finalStart = oldStartDate;
           const proposedDuration = getWorkDays(finalStart, newEndDate);
           const duration = Math.max(1, proposedDuration);
@@ -363,11 +366,12 @@ export default function ProTimelineCanvas({
 
       const currentStart = node.data.date as string;
       const currentEnd = (node.data.endDate as string) || currentStart;
+      const isPointTask = isTimelinePointTaskType(node.data.type);
       const targetStart = updates.startDate || currentStart;
       const targetEnd = updates.endDate || currentEnd;
 
       if ('name' in updates) rfUpdates.label = updates.name;
-      if ('progress' in updates) rfUpdates.progress = updates.progress;
+      if ('progress' in updates && !isPointTask) rfUpdates.progress = updates.progress;
       if ('isExpanded' in updates) rfUpdates.isExpanded = updates.isExpanded;
       if ('parentId' in updates) rfUpdates.parentId = updates.parentId;
       if ('assignee' in updates) rfUpdates.assignee = updates.assignee;
@@ -378,7 +382,9 @@ export default function ProTimelineCanvas({
       const finalStart = requestedDateChange ? adjustToWorkDay(targetStart, 'forward') : currentStart;
       const duration = requestedDateChange ? getWorkDays(targetStart, targetEnd) : 0;
       const finalEnd = requestedDateChange
-        ? addWorkDays(finalStart, Math.max(1, duration))
+        ? isPointTask
+          ? finalStart
+          : addWorkDays(finalStart, Math.max(1, duration))
         : currentEnd;
       const dateChanged = finalStart !== currentStart || finalEnd !== currentEnd;
 

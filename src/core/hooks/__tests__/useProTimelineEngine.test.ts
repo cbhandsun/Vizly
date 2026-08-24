@@ -16,6 +16,7 @@ import {
 import {
     addWorkDays,
     adjustToWorkDay,
+    calculateCriticalPath,
     getWorkDays,
     getWorkDaysSigned,
     isWeekend,
@@ -135,7 +136,7 @@ describe('useProTimelineEngine date helpers', () => {
                 name: 'Task',
                 startDate: '2026-07-20',
                 endDate: '2026-07-20',
-                progress: 100,
+                progress: undefined,
                 priority: undefined,
                 color: undefined,
                 status: 'x'.repeat(64),
@@ -149,5 +150,14 @@ describe('useProTimelineEngine date helpers', () => {
                 endDate: '',
             }),
         ]);
+    });
+
+    it('treats legacy ranged events as zero-duration points in critical-path analysis', () => {
+        const result = calculateCriticalPath([
+            { id: 'phase', type: 'phase', startDate: '2026-08-24', endDate: '2026-08-25' },
+            { id: 'event', type: 'event', startDate: '2026-08-24', endDate: '2026-09-30' },
+        ], []);
+
+        expect([...result.criticalPathTaskIds]).toEqual(['phase']);
     });
 });

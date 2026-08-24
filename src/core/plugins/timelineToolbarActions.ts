@@ -1,5 +1,6 @@
 import type { Edge, Node } from '@xyflow/react';
 
+import { isTimelinePointTaskType } from '../algorithms/timelineTaskSemantics';
 import { addDaysToDateOnly, formatDateOnly, parseDateOnlyTime } from '../utils/dateOnly';
 
 export type TimelineAppendType = 'event' | 'phase' | 'milestone';
@@ -82,7 +83,7 @@ export const buildTimelineAppendPlan = ({
             label,
             status: 'pending',
             date: startDate,
-            ...(type === 'event' ? { endDate: startDate } : {}),
+            ...(isTimelinePointTaskType(type) ? { endDate: startDate } : {}),
             ...(type === 'phase' ? {
                 progress: 0,
                 endDate: addDaysToDateOnly(startDate, 14),

@@ -108,6 +108,15 @@ describe('timelinePropertyActions', () => {
             progress: undefined,
         });
         expect(buildTimelineTypeUpdate({
+            date: '2026-08-21',
+            endDate: '2026-08-28',
+            progress: 47,
+        }, 'event')).toEqual({
+            type: 'event',
+            endDate: '2026-08-21',
+            progress: undefined,
+        });
+        expect(buildTimelineTypeUpdate({
             type: 'event',
             date: '2026-08-21',
             endDate: '2026-08-20',
@@ -142,6 +151,14 @@ describe('timelinePropertyActions', () => {
             'endDate',
             '2026-08-25',
         )).toEqual({ ok: true, updates: { endDate: '2026-08-25' } });
+        expect(buildTimelineDateUpdate(
+            { type: 'event', date: '2026-08-10', endDate: '2026-08-20' },
+            'date',
+            '2026-08-25',
+        )).toEqual({
+            ok: true,
+            updates: { date: '2026-08-25', endDate: '2026-08-25' },
+        });
     });
 
     it('deletes descendants and every attached connector while preserving unrelated data', () => {

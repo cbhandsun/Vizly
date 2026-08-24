@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { formatDateOnly, parseDateOnlyTime, todayDateOnly } from '../utils/dateOnly';
+import { isTimelinePointTaskType } from '../algorithms/timelineTaskSemantics';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -375,11 +376,12 @@ export function calculateCriticalPath(
   leafTasks.forEach(t => {
       const dur = getWorkDays(t.startDate, t.endDate);
       const initialES = getWorkDaysSigned(projectStartStr, t.startDate);
+      const isPointTask = isTimelinePointTaskType(t.type);
       nodeMap.set(t.id, {
           id: t.id,
-          duration: t.type === 'milestone' ? 0 : Math.max(1, dur),
+          duration: isPointTask ? 0 : Math.max(1, dur),
           es: initialES,
-          ee: initialES + (t.type === 'milestone' ? 0 : Math.max(1, dur)),
+          ee: initialES + (isPointTask ? 0 : Math.max(1, dur)),
           ls: 0,
           le: 0,
           preds: [],

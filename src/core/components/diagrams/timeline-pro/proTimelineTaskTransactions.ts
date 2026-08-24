@@ -1,5 +1,9 @@
 import type { Edge, Node } from '@xyflow/react';
 
+import {
+  isTimelinePointTaskType,
+  timelineTaskCanContainChildren,
+} from '../../../algorithms/timelineTaskSemantics';
 import { addDaysToDateOnly, parseDateOnlyTime } from '../../../utils/dateOnly';
 
 export type ProTimelineCreatableTaskType = 'event' | 'phase' | 'milestone';
@@ -174,6 +178,7 @@ export const getProTimelineAvailableParentIds = (
   if (excludedIds.size === 0) return new Set<string>();
 
   return new Set(nodes
+    .filter(node => timelineTaskCanContainChildren(node.data.type))
     .map(node => normalizedText(node.id, 200))
     .filter(id => id && !excludedIds.has(id)));
 };
@@ -243,9 +248,12 @@ export const createProTimelineTaskAddition = (
   const parent = request.parentId
     ? nodes.find(node => node.id === request.parentId)
     : undefined;
+  if (request.parentId && (!parent || !timelineTaskCanContainChildren(parent.data.type))) {
+    return { changed: false, createdTaskId: null, nodes: [...nodes] };
+  }
   const parentStartDate = normalizedDateOnly(parent?.data.date);
   const effectiveStartDate = parentStartDate || startDate;
-  const isMilestone = request.type === 'milestone';
+  const isPointTask = isTimelinePointTaskType(request.type);
 
   const updatedNodes = nodes.map(node => {
     const expandedData = parent && node.id === parent.id
@@ -263,10 +271,10 @@ export const createProTimelineTaskAddition = (
     selected: true,
     data: {
       date: effectiveStartDate,
-      endDate: isMilestone ? effectiveStartDate : addDaysToDateOnly(effectiveStartDate, 1),
+      endDate: isPointTask ? effectiveStartDate : addDaysToDateOnly(effectiveStartDate, 1),
       label,
       parentId: parent?.id,
-      progress: 0,
+      ...(isPointTask ? {} : { progress: 0 }),
       status: 'pending',
       type: request.type,
     },

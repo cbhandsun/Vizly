@@ -53,6 +53,7 @@ describe('ProTimelineChrome mobile controls', () => {
     const onDelete = vi.fn();
     render(
       <ProTaskRowActions
+        canAddChildren
         taskName="Launch"
         primaryColor="#1677ff"
         deleteColor="#ff4d4f"
@@ -67,6 +68,24 @@ describe('ProTimelineChrome mobile controls', () => {
     fireEvent.click(await screen.findByRole('menuitem', { name: /删除任务/ }));
     expect(onDelete).toHaveBeenCalledTimes(1);
     expect(onAdd).not.toHaveBeenCalled();
+  });
+
+  it('does not offer child creation for point-in-time events or milestones', async () => {
+    render(
+      <ProTaskRowActions
+        canAddChildren={false}
+        taskName="Release gate"
+        primaryColor="#1677ff"
+        deleteColor="#ff4d4f"
+        onAdd={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: '为 Release gate 添加子项' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Release gate 任务操作' }));
+    expect(await screen.findByRole('menuitem', { name: /删除任务/ })).toBeTruthy();
+    expect(screen.queryByRole('menuitem', { name: /添加子阶段|添加里程碑/ })).toBeNull();
   });
 
   it('extends direct-manipulation targets without changing timeline geometry', () => {

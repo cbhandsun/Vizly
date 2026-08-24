@@ -8,6 +8,7 @@ import { PluginContext } from '../../../types/plugin';
 import { useTheme } from '../../../themes/useCoreTheme';
 import { appMessage } from '../../../utils/antdStaticBridge';
 import { getWorkDaysSigned } from '../../../hooks/useProTimelineEngine';
+import { isTimelinePointTaskType } from '../../../algorithms/timelineTaskSemantics';
 import {
     buildTimelineDateUpdate,
     buildTimelineDeletionPlan,
@@ -377,7 +378,7 @@ const ProTimelinePropertyPanelContent: React.FC<ProTimelinePropertyPanelProps> =
                             </Text>
                         )}
                     </div>
-                    {taskType !== 'milestone' && (
+                    {!isTimelinePointTaskType(taskType) && (
                         <div>
                             <div style={{ fontSize: 12, color: labelColor, marginBottom: 4 }}>{t('plugins.timeline.propertyPanel.fields.endDate')}</div>
                             <DatePicker 

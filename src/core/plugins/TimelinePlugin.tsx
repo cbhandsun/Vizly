@@ -11,7 +11,12 @@ import { Button, Dropdown } from 'antd';
 import ProTimelineCanvas from '../components/diagrams/timeline-pro/ProTimelineCanvas';
 import { ProTimelinePropertyPanel } from '../components/diagrams/timeline-pro/ProTimelinePropertyPanel';
 import { Calendar, Clock } from 'lucide-react';
-import { todayDateOnly } from '../utils/dateOnly';
+import { formatDateOnly, parseDateOnlyTime, todayDateOnly } from '../utils/dateOnly';
+import {
+  coerceTimelineTaskKind,
+  isTimelinePointTaskType,
+  timelineTaskSupportsProgress,
+} from '../algorithms/timelineTaskSemantics';
 import { validateProTimelineDependencyConnection } from '../components/diagrams/timeline-pro/proTimelineDependencyConnection';
 import { useTranslation } from 'react-i18next';
 import i18n from '@/i18n';
@@ -22,16 +27,45 @@ import './TimelinePlugin.css';
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value && typeof value === 'object' && !Array.isArray(value));
 
+const readCanonicalTimelineDate = (value: unknown): string | null => {
+  if (typeof value !== 'string') return null;
+  const candidate = value.trim();
+  const time = parseDateOnlyTime(candidate);
+  return time !== null && formatDateOnly(new Date(time)) === candidate ? candidate : null;
+};
+
 const migrateTimelineNode = (value: unknown): unknown => {
   if (!isRecord(value)) return value;
   const data = isRecord(value.data) ? value.data : {};
+  const type = coerceTimelineTaskKind(data.type);
+  const date = readCanonicalTimelineDate(data.date) ?? todayDateOnly();
+  const endCandidate = readCanonicalTimelineDate(data.endDate);
+  const endDate = isTimelinePointTaskType(type)
+    ? date
+    : endCandidate && endCandidate >= date
+      ? endCandidate
+      : date;
+  const progressCandidate = typeof data.progress === 'number'
+    ? data.progress
+    : typeof data.progress === 'string' && data.progress.trim()
+      ? Number(data.progress)
+      : Number.NaN;
+  const progress = Number.isFinite(progressCandidate)
+    ? Math.min(100, Math.max(0, progressCandidate))
+    : 0;
+  const status = data.status === 'active' || data.status === 'done' ? data.status : 'pending';
+  const normalizedData: Record<string, unknown> = {
+    ...data,
+    type,
+    status,
+    date,
+    endDate,
+  };
+  if (timelineTaskSupportsProgress(type)) normalizedData.progress = progress;
+  else delete normalizedData.progress;
   return {
     ...value,
-    data: {
-      ...data,
-      status: typeof data.status === 'string' && data.status ? data.status : 'pending',
-      date: typeof data.date === 'string' && data.date ? data.date : todayDateOnly(),
-    },
+    data: normalizedData,
   };
 };
 
@@ -40,7 +74,7 @@ export class TimelinePlugin implements DiagramTypePlugin {
   get name() {
     return i18n.t('plugins.timeline.title');
   }
-  version = '1.1.0';
+  version = '1.2.0';
   get description() {
     return i18n.t('plugins.timeline.description');
   }
@@ -63,9 +97,7 @@ export class TimelinePlugin implements DiagramTypePlugin {
       if (!isRecord(data)) return data;
       const migratedData: Record<string, unknown> = { ...data };
       
-      // Example Migration: From 1.0 (or undefined) to 1.1
-      // Clean up legacy node properties or enforce new schema defaults
-      if (!fromVersion || fromVersion === '1.0') {
+      if (fromVersion !== this.version) {
           if (Array.isArray(migratedData.nodes)) {
               migratedData.nodes = migratedData.nodes.map(migrateTimelineNode);
           }

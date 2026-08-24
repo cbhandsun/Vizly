@@ -15,7 +15,7 @@ const timelineNode = (
 });
 
 describe('buildTimelineAppendPlan', () => {
-    it('creates a selected one-workday event and moves a weekend fallback forward', () => {
+    it('creates a selected zero-duration event and moves a weekend fallback forward', () => {
         const plan = buildTimelineAppendPlan({
             nodes: [],
             type: 'event',
@@ -73,6 +73,7 @@ describe('buildTimelineAppendPlan', () => {
 
         expect(plan.node.data).toMatchObject({
             date: '2026-08-12',
+            endDate: '2026-08-12',
             label: 'New milestone',
             type: 'milestone',
         });

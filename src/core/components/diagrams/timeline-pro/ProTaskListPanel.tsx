@@ -7,6 +7,10 @@ import { useTheme } from '../../../themes/useCoreTheme';
 import { todayDateOnly } from '../../../utils/dateOnly';
 import type { Theme } from '../../../themes/types/ThemeTypes';
 import {
+    isTimelinePointTaskType,
+    timelineTaskCanContainChildren,
+} from '../../../algorithms/timelineTaskSemantics';
+import {
     getProTaskAccessibleName,
     getProTaskListKeyboardWidth,
     normalizeProTaskListWidth,
@@ -146,7 +150,7 @@ export default function ProTaskListPanel({
 
     // 计算每个任务的工期天数 (Helper for edit compute)
     const getDuration = useCallback((t: ProGanttTask) => {
-        if (t.type === 'milestone') return 0;
+        if (isTimelinePointTaskType(t.type)) return 0;
         if (!t.startDate || !t.endDate) return null;
         return getWorkDays(t.startDate, t.endDate);
     }, []);
@@ -162,13 +166,17 @@ export default function ProTaskListPanel({
                     onTaskUpdate?.(id, { name: editValue.trim() });
                 } else if (field === 'startDate' && editValue) {
                     const oldDur = getDuration(task) || 1;
-                    if (task.type === 'milestone') {
+                    if (isTimelinePointTaskType(task.type)) {
                         onTaskUpdate?.(id, { startDate: editValue, endDate: editValue });
                     } else {
                         const newEnd = addWorkDays(editValue, oldDur);
                         onTaskUpdate?.(id, { startDate: editValue, endDate: newEnd });
                     }
                 } else if (field === 'duration') {
+                    if (isTimelinePointTaskType(task.type)) {
+                        setEditingCell(null);
+                        return;
+                    }
                     const num = parseInt(editValue, 10);
                     if (!isNaN(num) && num >= 0) {
                         const start = task.startDate || todayDateOnly();
@@ -274,6 +282,7 @@ export default function ProTaskListPanel({
                     
                     const depth = task._computed?.depth || 0;
                     const hasChildren = task._computed?.hasChildren;
+                    const isPointTask = isTimelinePointTaskType(type);
                     const isExpanded = task.isExpanded !== false;
                     const isVisible = task._computed?.isVisible !== false;
                     const accessibleTaskName = getProTaskAccessibleName(task.name);
@@ -414,6 +423,7 @@ export default function ProTaskListPanel({
 
                             {showRowActions ? (
                                 <ProTaskRowActions
+                                    canAddChildren={timelineTaskCanContainChildren(type)}
                                     taskName={accessibleTaskName}
                                     primaryColor={primaryColor}
                                     deleteColor={theme?.palette?.error?.main || '#ff4d4f'}
@@ -582,14 +592,14 @@ export default function ProTaskListPanel({
                                 className="pro-timeline-task-column--secondary"
                                 style={{
                                     width: 44, textAlign: 'right', fontSize: 11,
-                                    color: (duration !== null && !hasChildren) ? headerTextColor : disabledTextColor,
+                                    color: (duration !== null && !hasChildren && !isPointTask) ? headerTextColor : disabledTextColor,
                                     fontWeight: duration !== null ? 500 : 400,
                                     flexShrink: 0, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
-                                    cursor: hasChildren ? 'not-allowed' : 'text'
+                                    cursor: hasChildren || isPointTask ? 'not-allowed' : 'text'
                                 }}
                                 onDoubleClick={(e) => {
                                     e.stopPropagation();
-                                    if (!hasChildren) {
+                                    if (!hasChildren && !isPointTask) {
                                         setEditingCell({ id: task.id, field: 'duration', value: String(duration ?? 1) });
                                     }
                                 }}
