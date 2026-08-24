@@ -18,6 +18,7 @@ import {
   createEdgeWaypointRefinementDiagnostics,
   reduceEdgeCrossingsWithWaypoints,
 } from '../../strategies/shared/edgeRoutingPipeline';
+import { collectDisplayRoutingAffectedEdgeIndexes } from './baseReactFlowDisplayChangedEdgePromotion';
 import { repairStrictBypassesIfNeeded } from './baseReactFlowDisplayObstacleRepair';
 import {
   DISPLAY_BOUNDED_DETACHED_OVERLAP_REPAIR_OPTIONS,
@@ -260,18 +261,27 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
       evaluationCount: initialDoglegDiagnostics.qualityEvaluationCount,
     },
   );
-  const finalCrossingSweepEdges = globalRefineSession.run({
-    edges: doglegRepairedEdges,
-    phase: 'quality-crossing-global-refine-dogleg',
-    normalize: false,
-  });
+  const doglegCandidateEdgeIndexes = collectDisplayRoutingAffectedEdgeIndexes(
+    finalGloballyRefinedEdges,
+    doglegRepairedEdges,
+  );
+  const finalCrossingSweepEdges = doglegCandidateEdgeIndexes.length === 0
+    ? doglegRepairedEdges
+    : globalRefineSession.run({
+      edges: doglegRepairedEdges,
+      mutableEdgeIndexes: doglegCandidateEdgeIndexes,
+      phase: 'quality-crossing-global-refine-dogleg',
+      normalize: false,
+    });
   const finalDoglegTimer = startDisplayRoutingPhaseTrace({
     phase: 'quality-crossing-global-refine-dogleg-final',
     candidateCount: finalCrossingSweepEdges.length,
     onTrace: recordCrossingPhaseTrace,
   });
   const finalDoglegDiagnostics = createLocalDoglegRepairDiagnostics();
-  const repairedEdges = repairDoglegs(finalCrossingSweepEdges, finalDoglegDiagnostics);
+  const repairedEdges = finalCrossingSweepEdges === doglegRepairedEdges
+    ? finalCrossingSweepEdges
+    : repairDoglegs(finalCrossingSweepEdges, finalDoglegDiagnostics);
   finalDoglegTimer.finish(
     repairedEdges === finalCrossingSweepEdges ? 'skip' : 'accepted',
     countChangedRoutingItems(finalCrossingSweepEdges, repairedEdges),

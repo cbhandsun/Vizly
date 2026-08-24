@@ -393,6 +393,20 @@ describe('baseReactFlowDisplayEdges logistics regressions', () => {
       scannedEdgePairCount: 0,
     });
     expect(
+      phaseTraces.find(
+        trace => trace.phase === 'quality-crossing-global-refine-dogleg',
+      ),
+      JSON.stringify({ quality, phaseTraces }, null, 2),
+    ).toMatchObject({
+      candidateCount: expect.any(Number),
+    });
+    expect(
+      phaseTraces.find(
+        trace => trace.phase === 'quality-crossing-global-refine-dogleg',
+      )?.candidateCount,
+      JSON.stringify({ quality, phaseTraces }, null, 2),
+    ).toBeLessThan(projected.edges.length);
+    expect(
       phaseTraces.some(trace => trace.phase === 'strict'),
       JSON.stringify({ quality, phaseTraces }, null, 2),
     ).toBe(false);

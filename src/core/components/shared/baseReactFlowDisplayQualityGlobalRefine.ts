@@ -29,10 +29,21 @@ type GlobalRefinePhase = Extract<
 export type DisplayQualityGlobalRefineSession = Readonly<{
   run: (args: Readonly<{
     edges: Edge[];
+    mutableEdgeIndexes?: readonly number[];
     normalize?: boolean;
     phase: GlobalRefinePhase;
   }>) => Edge[];
 }>;
+
+const normalizeDisplayQualityMutableEdgeIndexes = (
+  edgeCount: number,
+  mutableEdgeIndexes: readonly number[] | undefined,
+): number[] | undefined => {
+  if (mutableEdgeIndexes === undefined) return undefined;
+  return [...new Set(mutableEdgeIndexes)]
+    .filter(index => Number.isInteger(index) && index >= 0 && index < edgeCount)
+    .sort((left, right) => left - right);
+};
 
 export const createDisplayQualityGlobalRefineSession = ({
   nodes,
@@ -45,25 +56,46 @@ export const createDisplayQualityGlobalRefineSession = ({
   const rawFixedPoints = new Set<string>();
   const nodeContext = createGlobalEdgeWaypointNodeContext(nodes);
   return {
-    run: ({ edges, normalize = true, phase }) => {
+    run: ({ edges, mutableEdgeIndexes, normalize = true, phase }) => {
+      const normalizedMutableEdgeIndexes = normalizeDisplayQualityMutableEdgeIndexes(
+        edges.length,
+        mutableEdgeIndexes,
+      );
       const timer = startDisplayRoutingPhaseTrace({
         phase,
-        candidateCount: edges.length,
+        candidateCount: normalizedMutableEdgeIndexes?.length ?? edges.length,
         onTrace: onPhaseTrace,
       });
       const fixedPoints = normalize ? normalizedFixedPoints : rawFixedPoints;
       const inputSignature = computeBaseReactFlowDisplayOutputRouteSignature(edges);
-      if (inputSignature && fixedPoints.has(inputSignature)) {
+      const fixedPointKey = inputSignature
+        ? `${inputSignature}|${normalizedMutableEdgeIndexes?.join(',') ?? '*'}`
+        : null;
+      if (fixedPointKey && fixedPoints.has(fixedPointKey)) {
         timer.finish('hit', 0, { cacheHitCount: 1 });
         return edges;
       }
       const diagnostics = createGlobalEdgeWaypointRefinementDiagnostics();
-      const refined = refineGlobalEdgeWaypoints(edges, nodes, { diagnostics, nodeContext });
-      const result = normalize ? repairEndpointOrthogonalPaths(refined, nodes) : refined;
+      const refined = refineGlobalEdgeWaypoints(edges, nodes, {
+        diagnostics,
+        mutableEdgeIndexes: normalizedMutableEdgeIndexes,
+        nodeContext,
+      });
+      const endpointRepaired = normalize
+        ? repairEndpointOrthogonalPaths(refined, nodes)
+        : refined;
+      const mutableIndexSet = normalizedMutableEdgeIndexes
+        ? new Set(normalizedMutableEdgeIndexes)
+        : null;
+      const result = mutableIndexSet && endpointRepaired !== refined
+        ? endpointRepaired.map((edge, index) => (
+          mutableIndexSet.has(index) ? edge : (refined[index] ?? edge)
+        ))
+        : endpointRepaired;
       if (
-        inputSignature
+        fixedPointKey
         && computeBaseReactFlowDisplayOutputRouteSignature(result) === inputSignature
-      ) fixedPoints.add(inputSignature);
+      ) fixedPoints.add(fixedPointKey);
       timer.finish(
         result === edges ? 'skip' : 'accepted',
         countChangedRoutingItems(edges, result),

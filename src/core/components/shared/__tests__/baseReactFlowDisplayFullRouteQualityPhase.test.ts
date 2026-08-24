@@ -4,11 +4,13 @@ import { describe, expect, it } from 'vitest';
 import { shouldMaterializeDetachedMicroAlternative } from '../baseReactFlowDisplayFullRouteQualityPhase';
 import { selectDisplayQualityInitialDetachedOverlapOptions } from '../baseReactFlowDisplayQualityCrossingCandidates';
 import {
-  changedDisplayPathIndexes,
-  collectResidualMicroCandidateEdgeIndexes,
   DISPLAY_BOUNDED_DETACHED_OVERLAP_REPAIR_OPTIONS,
   DISPLAY_DETACHED_OVERLAP_REPAIR_OPTIONS,
 } from '../baseReactFlowDisplayOverlapRepair';
+import {
+  changedDisplayPathIndexes,
+  collectDisplayRoutingAffectedEdgeIndexes,
+} from '../baseReactFlowDisplayChangedEdgePromotion';
 import { createDisplayQualityGlobalRefineSession } from '../baseReactFlowDisplayQualityGlobalRefine';
 import { repairBaseReactFlowQualityStructuralCrossings } from '../baseReactFlowDisplayQualityStructuralCrossing';
 
@@ -105,7 +107,7 @@ describe('baseReactFlowDisplayFullRouteQualityPhase', () => {
       baseline[1],
     ];
 
-    expect(collectResidualMicroCandidateEdgeIndexes(baseline, derivative))
+    expect(collectDisplayRoutingAffectedEdgeIndexes(baseline, derivative))
       .toEqual([0, 1]);
   });
 
@@ -116,7 +118,11 @@ describe('baseReactFlowDisplayFullRouteQualityPhase', () => {
       target: 'target',
       data: { computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }] },
     }];
-    const traces: Array<{ resolution: string; cacheHitCount?: number }> = [];
+    const traces: Array<{
+      resolution: string;
+      cacheHitCount?: number;
+      candidateCount?: number;
+    }> = [];
     const session = createDisplayQualityGlobalRefineSession({
       nodes: [],
       onPhaseTrace: trace => traces.push(trace),
@@ -124,19 +130,29 @@ describe('baseReactFlowDisplayFullRouteQualityPhase', () => {
 
     const first = session.run({
       edges,
+      mutableEdgeIndexes: [0],
       normalize: false,
       phase: 'quality-crossing-global-refine-fixed-point',
     });
     const equivalentEdges = edges.map(edge => ({ ...edge, data: { ...edge.data } }));
     const second = session.run({
       edges: equivalentEdges,
+      mutableEdgeIndexes: [0, 0],
       normalize: false,
       phase: 'quality-crossing-global-refine-dogleg',
+    });
+    const third = session.run({
+      edges: equivalentEdges,
+      normalize: false,
+      phase: 'quality-crossing-global-refine-fixed-point',
     });
 
     expect(first).toBe(edges);
     expect(second).toBe(equivalentEdges);
-    expect(traces.map(trace => trace.resolution)).toEqual(['skip', 'hit']);
+    expect(third).toBe(equivalentEdges);
+    expect(traces.map(trace => trace.resolution)).toEqual(['skip', 'hit', 'skip']);
+    expect(traces.map(trace => trace.candidateCount)).toEqual([1, 1, 1]);
     expect(traces[1]?.cacheHitCount).toBe(1);
+    expect(traces[2]?.cacheHitCount).toBe(0);
   });
 });

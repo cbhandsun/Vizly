@@ -119,4 +119,17 @@ describe('global edge waypoint refinement indexes', () => {
       expect(indexedDiagnostics.scannedNodeCount).toBeLessThan(fullScanDiagnostics.scannedNodeCount);
     }
   });
+
+  it('keeps non-mutable edges frozen while using them as crossing context', () => {
+    const edges = createEdges(point => point);
+    const fullyRefined = refineGlobalEdgeWaypoints(edges, []);
+    const primaryOnly = refineGlobalEdgeWaypoints(edges, [], {
+      mutableEdgeIndexes: [0, 0, -1, Number.NaN, edges.length],
+    });
+
+    expect(primaryOnly[0]?.data?.computedPath).toEqual(fullyRefined[0]?.data?.computedPath);
+    expect(primaryOnly[1]).toBe(edges[1]);
+    expect(refineGlobalEdgeWaypoints(edges, [], { mutableEdgeIndexes: [] })).toBe(edges);
+    expect(refineGlobalEdgeWaypoints(edges, [], { mutableEdgeIndexes: [-1] })).toBe(edges);
+  });
 });

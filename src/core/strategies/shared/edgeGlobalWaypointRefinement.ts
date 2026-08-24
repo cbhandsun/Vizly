@@ -114,6 +114,7 @@ export type GlobalEdgeWaypointRefinementOptions = Readonly<{
   disablePathGeometryCache?: boolean;
   disableSegmentIndex?: boolean;
   disableVisualRectIndex?: boolean;
+  mutableEdgeIndexes?: readonly number[];
   nodeContext?: GlobalEdgeWaypointNodeContext;
 }>;
 
@@ -560,6 +561,15 @@ export function refineGlobalEdgeWaypoints(
 ): Edge[] {
   if (edges.length === 0) return edges;
 
+  const mutableEdgeIndexes = options.mutableEdgeIndexes === undefined
+    ? null
+    : new Set(
+      options.mutableEdgeIndexes.filter(index => (
+        Number.isInteger(index) && index >= 0 && index < edges.length
+      )),
+    );
+  if (mutableEdgeIndexes?.size === 0) return edges;
+
   const paths = new Map<string, Point[]>();
   const edgeByKey = new Map<string, Edge>();
   edges.forEach((edge, index) => {
@@ -572,8 +582,17 @@ export function refineGlobalEdgeWaypoints(
   if (paths.size === 0) return edges;
 
   const nodeContext = options.nodeContext ?? createGlobalEdgeWaypointNodeContext(nodes);
+  const fixedEdgeIds = mutableEdgeIndexes
+    ? new Set(
+      edges
+        .map((edge, index) => ({ index, key: edgeKey(edge, index) }))
+        .filter(item => !mutableEdgeIndexes.has(item.index))
+        .map(item => item.key),
+    )
+    : undefined;
   const refined = refineOrthogonalWaypointsDetailed(paths, {
     buddyGroups: buildPipelineBuddyGroups(edges),
+    fixedEdgeIds,
     hardObstacles: [],
     softObstacles: nodeContext.softObstacles,
     spacing: DEFAULT_SPACING,
@@ -605,6 +624,7 @@ export function refineGlobalEdgeWaypoints(
 
   if (refined.summary.changedEdgeIds.length > 0) {
     edges.forEach((edge, index) => {
+      if (mutableEdgeIndexes && !mutableEdgeIndexes.has(index)) return;
       const key = edgeKey(edge, index);
       const original = paths.get(key);
       const candidate = refined.paths.get(key);
@@ -638,6 +658,7 @@ export function refineGlobalEdgeWaypoints(
   for (let pass = 0; pass < 2; pass += 1) {
     let changed = false;
     edges.forEach((edge, index) => {
+      if (mutableEdgeIndexes && !mutableEdgeIndexes.has(index)) return;
       const key = edgeKey(edge, index);
       const current = workingPaths.get(key);
       if (!current) return;
