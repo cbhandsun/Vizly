@@ -138,6 +138,7 @@ const summary = {
       ),
       parsedToFinal: summarizeDisplayRoutingSamples(cases.map(item => item.parsedToFinalMs)),
       localRoute: summarizeDisplayRoutingSamples(cases.map(item => item.localRouteMs)),
+      workerStartCount: cases.reduce((total, item) => total + (item.workerStartCount ?? 0), 0),
       fallbackCount: cases.filter(item => item.fallbackLevel !== 'none').length,
       abortCount: cases.reduce((total, item) => total + (item.workerAbortCount ?? 0), 0),
       phases: Object.fromEntries([...new Set(cases.flatMap(item => (

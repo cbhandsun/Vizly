@@ -56,21 +56,83 @@ export const EXPECTED_INCREMENTAL_DISPLAY_ROUTING_PHASE_SEQUENCES = Object.freez
   REPAIRED_INCREMENTAL_DISPLAY_ROUTING_PHASES,
 ]);
 
-const INCREMENTAL_DIAGNOSTIC_PHASES = new Set([
-  'local-reconnect-seed',
-  'local-reconnect-candidates',
-  'local-fast-fallback',
-]);
+const REQUIRED_INCREMENTAL_DISPLAY_ROUTING_PHASES = new Set(
+  EXPECTED_INCREMENTAL_DISPLAY_ROUTING_PHASE_SEQUENCES.flat(),
+);
 
 export const displayRoutingIncrementalPhaseTraceIsComplete = phaseTrace => {
   if (!Array.isArray(phaseTrace)) return false;
-  const phases = phaseTrace
-    .map(trace => trace?.phase)
-    .filter(phase => !INCREMENTAL_DIAGNOSTIC_PHASES.has(phase));
+  const phases = [];
+  for (const trace of phaseTrace) {
+    if (!trace || typeof trace.phase !== 'string') return false;
+    if (REQUIRED_INCREMENTAL_DISPLAY_ROUTING_PHASES.has(trace.phase)) {
+      phases.push(trace.phase);
+      continue;
+    }
+    // Defect-driven subphases can grow independently from the stable phase
+    // contract. Only explicit child traces are supplemental; unknown root
+    // phases still fail closed.
+    if (typeof trace.parentPhase !== 'string' || trace.parentPhase.length === 0) {
+      return false;
+    }
+  }
   return EXPECTED_INCREMENTAL_DISPLAY_ROUTING_PHASE_SEQUENCES.some(expected => (
     phases.length === expected.length
     && expected.every((phase, index) => phases[index] === phase)
   ));
+};
+
+export const assertDisplayRoutingDragResult = (
+  dragCase,
+  result,
+  { includeRequestDiagnostics = false } = {},
+) => {
+  const diagnostics = JSON.stringify(includeRequestDiagnostics
+    ? { dragCase, debugRequest: result?.debugRequest, boundedCandidates: result?.boundedCandidates }
+    : { dragCase, result }, null, 2);
+  if (result?.mutableEdgeCount !== dragCase?.expectedMutableCount) {
+    throw new Error(`Unexpected mutable closure:\n${diagnostics}`);
+  }
+  if (
+    result?.response?.hardClean !== true
+    || result.response.routeResolution !== 'incremental-route'
+    || result.response.fallbackLevel !== 'none'
+    || result?.routing?.fallbackLevel !== 'none'
+    || result.routing.workerAbortCount !== 0
+  ) {
+    throw new Error(`Incremental route did not commit cleanly:\n${diagnostics}`);
+  }
+  if (
+    result.capturedRequestCount !== 1
+    || result.capturedResponseCount !== 1
+    || result.routing.workerStartCountDelta !== 1
+    || result.routing.workerAbortCountDelta !== 0
+  ) {
+    throw new Error(`Incremental route was not a single Worker transaction:\n${diagnostics}`);
+  }
+  if (
+    dragCase.expectedAffectedCount !== undefined
+    && result.response.affectedEdgeCount !== dragCase.expectedAffectedCount
+  ) {
+    throw new Error(`Unexpected affected edge count:\n${diagnostics}`);
+  }
+  if (
+    result.response.edgeCount !== 14
+    || result.renderedEdgeCount !== 14
+    || result.renderedEdgesWithPathCount !== 14
+    || !/^route-v2:\d{1,3}:\d{1,6}:[0-9a-f]{16}$/.test(
+      result.routing.outputRouteSignature || '',
+    )
+  ) {
+    throw new Error(`Final render did not match the committed route:\n${diagnostics}`);
+  }
+  if (
+    !displayRoutingIncrementalPhaseTraceIsComplete(result.response.phaseTrace)
+    || !result.response.phaseTrace.slice(0, 3)
+      .every(trace => trace.resolution === 'accepted')
+  ) {
+    throw new Error(`Incremental phase trace was incomplete:\n${diagnostics}`);
+  }
 };
 
 export const summarizeSlowestDisplayRoutingPhases = (phaseTrace, limit = 5) => {
@@ -154,6 +216,10 @@ export const assertDisplayRoutingPerformanceBudget = (
 };
 
 export const assertDisplayRoutingPerformanceSummaryBudget = summary => {
+  const expectedSampleCount = Number.isInteger(summary?.sampleCount)
+    && summary.sampleCount > 0
+    ? summary.sampleCount
+    : null;
   const measurements = [
     ['initialRoute', summary?.initialRoute?.p95Ms, DISPLAY_ROUTING_P95_BUDGET_MS.initialRoute],
   ];
@@ -169,10 +235,24 @@ export const assertDisplayRoutingPerformanceSummaryBudget = summary => {
   const exceeded = measurements.filter(([, value, budget]) => (
     !Number.isFinite(value) || value > budget
   ));
-  if (exceeded.length === 0) return measurements;
-  throw new Error(`Routing p95 performance budget exceeded:\n${JSON.stringify({
+  const lifecycleViolations = Object.entries(summary?.dragCases ?? {}).flatMap(
+    ([nodeId, dragCase]) => [
+      dragCase?.workerStartCount === expectedSampleCount
+        ? null
+        : [`${nodeId}.workerStartCount`, dragCase?.workerStartCount, expectedSampleCount],
+      dragCase?.abortCount === 0
+        ? null
+        : [`${nodeId}.abortCount`, dragCase?.abortCount, 0],
+      dragCase?.fallbackCount === 0
+        ? null
+        : [`${nodeId}.fallbackCount`, dragCase?.fallbackCount, 0],
+    ].filter(Boolean),
+  );
+  if (exceeded.length === 0 && lifecycleViolations.length === 0) return measurements;
+  throw new Error(`Routing performance or lifecycle budget exceeded:\n${JSON.stringify({
     sampleCount: summary?.sampleCount ?? null,
     budgets: DISPLAY_ROUTING_P95_BUDGET_MS,
     exceeded,
+    lifecycleViolations,
   }, null, 2)}`);
 };

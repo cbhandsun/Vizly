@@ -9,8 +9,8 @@ import {
   readVisibleDisplayRoutingNodeRect,
 } from './lib/display-routing-browser-geometry.mjs';
 import {
+  assertDisplayRoutingDragResult,
   assertDisplayRoutingPerformanceBudget,
-  displayRoutingIncrementalPhaseTraceIsComplete,
 } from './lib/display-routing-browser-performance.mjs';
 import {
   buildDisplayRoutingMachineResult,
@@ -244,6 +244,7 @@ const finalIncrementalExpression = nodeId => `(() => {
     && task.startedAt + task.durationMs >= request.__browserCapturedAt
   ));
   const routing = window.__vizlyBaseReactFlowDisplayRouting || {};
+  const counterBaseline = window.__vizlyIncrementalRoutingCounterBaseline || {};
   if (
     !response
     || routing.stage !== 'final-applied'
@@ -254,6 +255,8 @@ const finalIncrementalExpression = nodeId => `(() => {
   );
   return {
     requestId: request.requestId,
+    capturedRequestCount: requests.length,
+    capturedResponseCount: responses.length,
     debugRequest: ${INCLUDE_INCREMENTAL_REQUEST_DIAGNOSTICS ? `{
       changeSet: request.changeSet,
       mutableEdgeIds: request.mutableEdgeIds,
@@ -332,6 +335,14 @@ const finalIncrementalExpression = nodeId => `(() => {
       geometryBarrierSamples: routing.geometryBarrierSamples,
       workerStartCount: routing.workerStartCount,
       workerAbortCount: routing.workerAbortCount,
+      workerStartCountDelta: Number.isFinite(routing.workerStartCount)
+        && Number.isFinite(counterBaseline.workerStartCount)
+        ? routing.workerStartCount - counterBaseline.workerStartCount
+        : null,
+      workerAbortCountDelta: Number.isFinite(routing.workerAbortCount)
+        && Number.isFinite(counterBaseline.workerAbortCount)
+        ? routing.workerAbortCount - counterBaseline.workerAbortCount
+        : null,
       workerResolution: routing.workerResolution,
       affectedEdgeCount: routing.affectedEdgeCount,
       fallbackLevel: routing.fallbackLevel,
@@ -550,47 +561,6 @@ const verifyFixedVisualScales = async (session, expectedSignature) => {
   return results;
 };
 
-const assertDragResult = (dragCase, result) => {
-  const diagnostics = JSON.stringify(INCLUDE_INCREMENTAL_REQUEST_DIAGNOSTICS
-    ? { dragCase, debugRequest: result.debugRequest, boundedCandidates: result.boundedCandidates }
-    : { dragCase, result }, null, 2);
-  if (result.mutableEdgeCount !== dragCase.expectedMutableCount) {
-    throw new Error(`Unexpected mutable closure:\n${diagnostics}`);
-  }
-  if (
-    result.response.hardClean !== true
-    || result.response.routeResolution !== 'incremental-route'
-    || result.response.fallbackLevel !== 'none'
-    || result.routing.fallbackLevel !== 'none'
-    || result.routing.workerAbortCount !== 0
-  ) {
-    throw new Error(`Incremental route did not commit cleanly:\n${diagnostics}`);
-  }
-  if (
-    dragCase.expectedAffectedCount !== undefined
-    && result.response.affectedEdgeCount !== dragCase.expectedAffectedCount
-  ) {
-    throw new Error(`Unexpected affected edge count:\n${diagnostics}`);
-  }
-  if (
-    result.response.edgeCount !== 14
-    || result.renderedEdgeCount !== 14
-    || result.renderedEdgesWithPathCount !== 14
-    || !/^route-v2:\d{1,3}:\d{1,6}:[0-9a-f]{16}$/.test(
-      result.routing.outputRouteSignature || '',
-    )
-  ) {
-    throw new Error(`Final render did not match the committed route:\n${diagnostics}`);
-  }
-  if (
-    !displayRoutingIncrementalPhaseTraceIsComplete(result.response.phaseTrace)
-    || !result.response.phaseTrace.slice(0, 3)
-      .every(trace => trace.resolution === 'accepted')
-  ) {
-    throw new Error(`Incremental phase trace was incomplete:\n${diagnostics}`);
-  }
-};
-
 const verifyNormalRenderedObstacleAudit = async () => withPrecompiledRouteBrowser(
   async session => {
     await session.send('Emulation.setDeviceMetricsOverride', {
@@ -743,7 +713,9 @@ const main = async () => {
       incremental.finalToObservedMs = Number.isFinite(incremental.routing.finalAppliedAt)
         ? observedAt - incremental.routing.finalAppliedAt
         : null;
-      assertDragResult(dragCase, incremental);
+      assertDisplayRoutingDragResult(dragCase, incremental, {
+        includeRequestDiagnostics: INCLUDE_INCREMENTAL_REQUEST_DIAGNOSTICS,
+      });
       const incrementalRenderedObstacleAudit = await waitForRenderedObstacleAudit(
         session,
         `${dragCase.nodeId} incremental route`,

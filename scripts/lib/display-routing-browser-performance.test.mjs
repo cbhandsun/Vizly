@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  assertDisplayRoutingDragResult,
   assertDisplayRoutingPerformanceBudget,
   assertDisplayRoutingPerformanceSummaryBudget,
   displayRoutingIncrementalPhaseTraceIsComplete,
@@ -21,7 +22,50 @@ const incremental = overrides => ({
   ...overrides,
 });
 
+const validDragResult = overrides => ({
+  mutableEdgeCount: 6,
+  capturedRequestCount: 1,
+  capturedResponseCount: 1,
+  response: {
+    hardClean: true,
+    routeResolution: 'incremental-route',
+    fallbackLevel: 'none',
+    affectedEdgeCount: 6,
+    edgeCount: 14,
+    phaseTrace: EXPECTED_INCREMENTAL_DISPLAY_ROUTING_PHASE_SEQUENCES[0]
+      .map((phase, index) => ({ phase, resolution: index < 3 ? 'accepted' : 'skip' })),
+  },
+  routing: {
+    fallbackLevel: 'none',
+    workerAbortCount: 0,
+    workerStartCountDelta: 1,
+    workerAbortCountDelta: 0,
+    outputRouteSignature: 'route-v2:14:61:6eaf7510f9eb1652',
+  },
+  renderedEdgeCount: 14,
+  renderedEdgesWithPathCount: 14,
+  ...overrides,
+});
+
 describe('display routing browser performance budget', () => {
+  it('requires one clean atomic Worker transaction for a drag result', () => {
+    const dragCase = { expectedMutableCount: 6, expectedAffectedCount: 6 };
+    expect(assertDisplayRoutingDragResult(dragCase, validDragResult())).toBeUndefined();
+    expect(() => assertDisplayRoutingDragResult(
+      dragCase,
+      validDragResult({ capturedRequestCount: 2 }),
+    )).toThrow(/single Worker transaction/);
+    expect(() => assertDisplayRoutingDragResult(
+      dragCase,
+      validDragResult({
+        routing: {
+          ...validDragResult().routing,
+          workerStartCountDelta: 2,
+        },
+      }),
+    )).toThrow(/single Worker transaction/);
+  });
+
   it('accepts only the complete fast or repaired incremental phase sequence', () => {
     for (const phases of EXPECTED_INCREMENTAL_DISPLAY_ROUTING_PHASE_SEQUENCES) {
       expect(displayRoutingIncrementalPhaseTraceIsComplete(
@@ -30,13 +74,25 @@ describe('display routing browser performance budget', () => {
       const withLocalDiagnostics = phases.flatMap(phase => (
         phase === 'local-route'
           ? [
-            { phase: 'local-reconnect-seed' },
-            { phase: 'local-reconnect-candidates' },
+            { phase: 'local-reconnect-seed', parentPhase: 'local-route' },
+            { phase: 'local-reconnect-candidates', parentPhase: 'local-route' },
             { phase },
           ]
           : [{ phase }]
       ));
       expect(displayRoutingIncrementalPhaseTraceIsComplete(withLocalDiagnostics)).toBe(true);
+      const withEndpointDiagnostics = phases.flatMap(phase => (
+        phase === 'final-endpoint-closure'
+          ? [
+            {
+              phase: 'final-endpoint-closure-residual',
+              parentPhase: 'final-endpoint-closure',
+            },
+            { phase },
+          ]
+          : [{ phase }]
+      ));
+      expect(displayRoutingIncrementalPhaseTraceIsComplete(withEndpointDiagnostics)).toBe(true);
     }
     const incomplete = EXPECTED_INCREMENTAL_DISPLAY_ROUTING_PHASE_SEQUENCES[0]
       .slice(0, -1)
@@ -44,6 +100,10 @@ describe('display routing browser performance budget', () => {
     expect(displayRoutingIncrementalPhaseTraceIsComplete(incomplete)).toBe(false);
     expect(displayRoutingIncrementalPhaseTraceIsComplete(null)).toBe(false);
     expect(displayRoutingIncrementalPhaseTraceIsComplete([{ phase: 'unexpected' }])).toBe(false);
+    expect(displayRoutingIncrementalPhaseTraceIsComplete([
+      ...EXPECTED_INCREMENTAL_DISPLAY_ROUTING_PHASE_SEQUENCES[0].map(phase => ({ phase })),
+      { phase: 'unexpected-root' },
+    ])).toBe(false);
   });
 
   it('summarizes valid slow phases without mutating the worker trace', () => {
@@ -126,6 +186,9 @@ describe('display routing browser performance budget', () => {
           releaseToFinal: { p95Ms: 290 },
           workerToFinal: { p95Ms: 290 },
           localRoute: { p95Ms: 140 },
+          workerStartCount: 30,
+          abortCount: 0,
+          fallbackCount: 0,
         },
       },
     };
@@ -144,6 +207,24 @@ describe('display routing browser performance budget', () => {
         },
       },
     })).toThrow(/releaseToFinal/);
+    expect(() => assertDisplayRoutingPerformanceSummaryBudget({
+      ...summary,
+      dragCases: {
+        wms: {
+          ...summary.dragCases.wms,
+          workerStartCount: 31,
+        },
+      },
+    })).toThrow(/workerStartCount/);
+    expect(() => assertDisplayRoutingPerformanceSummaryBudget({
+      ...summary,
+      dragCases: {
+        wms: {
+          ...summary.dragCases.wms,
+          fallbackCount: 1,
+        },
+      },
+    })).toThrow(/fallbackCount/);
   });
 
   it('projects only bounded aggregate browser measurements', () => {
@@ -178,7 +259,7 @@ describe('display routing browser performance budget', () => {
         workerBoundaryParseMs: 4,
         parsedToFinalMs: 11,
         mutableEdgeCount: 4,
-        routing: { workerAbortCount: 0 },
+        routing: { workerStartCountDelta: 1, workerAbortCountDelta: 0 },
         response: {
           affectedEdgeCount: 4,
           fallbackLevel: 'none',
@@ -233,6 +314,7 @@ describe('display routing browser performance budget', () => {
         mutableEdgeCount: 4,
         affectedEdgeCount: 4,
         fallbackLevel: 'none',
+        workerStartCount: 1,
         workerAbortCount: 0,
         phaseTrace: [{
           phase: 'local-route',

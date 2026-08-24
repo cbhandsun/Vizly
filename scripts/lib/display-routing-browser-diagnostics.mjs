@@ -1,6 +1,11 @@
 import { readDisplayRoutingViewportZoom } from './display-routing-browser-geometry.mjs';
 
 export const prepareDisplayRoutingIncrementalCapture = session => session.evaluate(`(() => {
+  const routing = window.__vizlyBaseReactFlowDisplayRouting || {};
+  window.__vizlyIncrementalRoutingCounterBaseline = {
+    workerStartCount: Number.isFinite(routing.workerStartCount) ? routing.workerStartCount : 0,
+    workerAbortCount: Number.isFinite(routing.workerAbortCount) ? routing.workerAbortCount : 0,
+  };
   window.__vizlyRoutingRequests = [];
   window.__vizlyRoutingResponses = [];
   window.__vizlyRouteSamplingEnabled = false;

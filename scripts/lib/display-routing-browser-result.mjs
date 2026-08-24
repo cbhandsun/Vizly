@@ -85,7 +85,8 @@ export const buildDisplayRoutingMachineResult = (results) => ({
       mutableEdgeCount: finiteMetric(result?.incremental?.mutableEdgeCount),
       affectedEdgeCount: finiteMetric(result?.incremental?.response?.affectedEdgeCount),
       fallbackLevel: result?.incremental?.response?.fallbackLevel === 'none' ? 'none' : 'full',
-      workerAbortCount: finiteMetric(result?.incremental?.routing?.workerAbortCount),
+      workerStartCount: finiteMetric(result?.incremental?.routing?.workerStartCountDelta),
+      workerAbortCount: finiteMetric(result?.incremental?.routing?.workerAbortCountDelta),
       phaseTrace: projectPhaseTrace(result?.incremental?.response?.phaseTrace),
     };
   }) : [],
