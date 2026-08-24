@@ -36,11 +36,13 @@ describe('createQualityEvaluationBudget', () => {
       evaluateChanged,
       evaluateStateChanged: unusedStateEvaluation,
     };
-    const budget = createQualityEvaluationBudget(2);
+    const diagnostics = { evaluationCount: 99, cacheHitCount: 99 };
+    const budget = createQualityEvaluationBudget(2, diagnostics);
 
     expect(budget.evaluateChanged(edges, context, [0])).toBe(score);
     expect(budget.evaluateChanged(edges, context, [0])).toBe(score);
     expect(evaluateChanged).toHaveBeenCalledTimes(1);
+    expect(diagnostics).toEqual({ evaluationCount: 1, cacheHitCount: 1 });
     expect(budget.exhausted()).toBe(true);
     expect(budget.evaluateChanged(edges, context, [0])).toBeNull();
   });

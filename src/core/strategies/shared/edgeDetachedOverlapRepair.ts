@@ -258,7 +258,10 @@ export function separateDetachedParallelOverlaps(
   const maxResidualPasses = toBoundedPositiveInteger(options.maxResidualPasses, 4);
   const qualityOnly = options.qualityOnly === true;
   const enableActionableSubthresholdRepair = minOverlap <= 24 && edges.length <= 8;
-  const qualityBudget = createQualityEvaluationBudget(maxQualityEvaluations);
+  const qualityBudget = createQualityEvaluationBudget(
+    maxQualityEvaluations,
+    options.diagnostics,
+  );
 
   const initialQuality = qualityBudget.evaluate(edges);
   if (!initialQuality) return edges;

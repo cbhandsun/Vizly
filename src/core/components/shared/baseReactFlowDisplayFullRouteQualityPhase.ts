@@ -46,6 +46,7 @@ import {
   createDisplayTopologyFirstSeed,
 } from './baseReactFlowDisplayTopologyFirstSeed';
 import {
+  createDetachedRepairDiagnostics,
   repairBoundedQualityPolishMicroArtifacts,
   separateLargeDetachedParallelOverlapsIfNeeded,
   shouldMaterializeDetachedMicroAlternative,
@@ -139,19 +140,24 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
     candidateCount: globallyRoutedEdges.length,
     onTrace: onPhaseTrace,
   });
+  const detachedRouteDiagnostics = createDetachedRepairDiagnostics();
   const detachedRoutedEdges = reusePreparedGlobalRouting
     ? globallyRoutedEdges
     : separateLargeDetachedParallelOverlapsIfNeeded(
       globallyRoutedEdges,
       repairNodes,
       96,
-      DISPLAY_DETACHED_OVERLAP_REPAIR_OPTIONS,
+      {
+        ...DISPLAY_DETACHED_OVERLAP_REPAIR_OPTIONS,
+        diagnostics: detachedRouteDiagnostics,
+      },
     );
   detachedRouteTimer.finish(
     reusePreparedGlobalRouting
       ? 'hit'
       : (detachedRoutedEdges === globallyRoutedEdges ? 'skip' : 'accepted'),
     countChangedRoutingItems(globallyRoutedEdges, detachedRoutedEdges),
+    detachedRouteDiagnostics,
   );
   globalRouteTimer.finish(
     detachedRoutedEdges === normalizedEdges ? 'skip' : 'accepted',

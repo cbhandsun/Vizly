@@ -655,15 +655,18 @@ describe('separateDetachedParallelOverlaps', () => {
       maxResidualPasses: 4,
       maxQualityEvaluations: 2,
     });
+    const diagnostics = { evaluationCount: 0, cacheHitCount: 0 };
     const repairedWithinLargerBudget = separateDetachedParallelOverlaps(edges, [], 16, {
       maxIterations: 0,
       maxResidualPasses: 4,
       maxQualityEvaluations: 64,
+      diagnostics,
     });
 
     expect(budgetExhaustedAtResidualBaseline).toEqual(edges);
     expect(calculateEdgePathQualityScore(edges).reverseOverlap).toBeGreaterThan(0);
     expect(calculateEdgePathQualityScore(repairedWithinLargerBudget).reverseOverlap).toBe(0);
+    expect(diagnostics.evaluationCount).toBeGreaterThan(0);
   });
 
 });

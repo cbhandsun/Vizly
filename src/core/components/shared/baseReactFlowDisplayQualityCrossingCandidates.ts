@@ -11,7 +11,10 @@ import {
   DISPLAY_BOUNDED_DETACHED_OVERLAP_REPAIR_OPTIONS,
   DISPLAY_DETACHED_OVERLAP_REPAIR_OPTIONS,
 } from './baseReactFlowDisplayOverlapRepair';
-import { separateLargeDetachedParallelOverlapsIfNeeded } from './baseReactFlowDisplayQualityPolishSupport';
+import {
+  createDetachedRepairDiagnostics,
+  separateLargeDetachedParallelOverlapsIfNeeded,
+} from './baseReactFlowDisplayQualityPolishSupport';
 import type { DisplayQualityGlobalRefineSession } from './baseReactFlowDisplayQualityGlobalRefine';
 import { repairSharedTargetEntryStrictCrossingsIfNeeded } from './baseReactFlowDisplaySharedTargetEntry';
 import {
@@ -73,15 +76,20 @@ export const createDisplayQualityCrossingCandidates = ({
     candidateCount: detachedTargetEdges.length,
     onTrace: onPhaseTrace,
   });
+  const detachedOverlapDiagnostics = createDetachedRepairDiagnostics();
   const detachedPreparedOverlapEdges = separateLargeDetachedParallelOverlapsIfNeeded(
     detachedTargetEdges,
     nodes,
     16,
-    selectDisplayQualityInitialDetachedOverlapOptions(useBoundedLargeRepair),
+    {
+      ...selectDisplayQualityInitialDetachedOverlapOptions(useBoundedLargeRepair),
+      diagnostics: detachedOverlapDiagnostics,
+    },
   );
   detachedOverlapTimer.finish(
     detachedPreparedOverlapEdges === detachedTargetEdges ? 'skip' : 'accepted',
     countChangedRoutingItems(detachedTargetEdges, detachedPreparedOverlapEdges),
+    detachedOverlapDiagnostics,
   );
   const detachedEndpointTimer = startDisplayRoutingPhaseTrace({
     phase: 'quality-crossing-final-prepare-detached-endpoint',
@@ -127,15 +135,20 @@ export const createDisplayQualityCrossingCandidates = ({
     candidateCount: doglegTargetEdges.length,
     onTrace: onPhaseTrace,
   });
+  const doglegOverlapDiagnostics = createDetachedRepairDiagnostics();
   const doglegOverlapEdges = separateLargeDetachedParallelOverlapsIfNeeded(
     doglegTargetEdges,
     nodes,
     16,
-    DISPLAY_DETACHED_OVERLAP_REPAIR_OPTIONS,
+    {
+      ...DISPLAY_DETACHED_OVERLAP_REPAIR_OPTIONS,
+      diagnostics: doglegOverlapDiagnostics,
+    },
   );
   doglegOverlapTimer.finish(
     doglegOverlapEdges === doglegTargetEdges ? 'skip' : 'accepted',
     countChangedRoutingItems(doglegTargetEdges, doglegOverlapEdges),
+    doglegOverlapDiagnostics,
   );
   const doglegEndpointTimer = startDisplayRoutingPhaseTrace({
     phase: 'quality-crossing-final-prepare-dogleg-endpoint',
@@ -242,19 +255,26 @@ export const createDisplayQualityCrossingCandidates = ({
     candidateCount: preOverlapEdges.length,
     onTrace: onPhaseTrace,
   });
+  const finalOverlapDiagnostics = createDetachedRepairDiagnostics();
   const detachedOverlapEdges = separateLargeDetachedParallelOverlapsIfNeeded(
     preOverlapEdges,
     nodes,
     16,
-    DISPLAY_DETACHED_OVERLAP_REPAIR_OPTIONS,
+    {
+      ...DISPLAY_DETACHED_OVERLAP_REPAIR_OPTIONS,
+      diagnostics: finalOverlapDiagnostics,
+    },
   );
   const crossingRepairEdges = keepIfNoNewStrictCrossings(
     preOverlapEdges,
     detachedOverlapEdges,
   );
   overlapTimer.finish(
-    crossingRepairEdges === preOverlapEdges ? 'skip' : 'accepted',
-    countChangedRoutingItems(preOverlapEdges, crossingRepairEdges),
+    detachedOverlapEdges === preOverlapEdges
+      ? 'skip'
+      : (crossingRepairEdges === preOverlapEdges ? 'rejected' : 'accepted'),
+    countChangedRoutingItems(preOverlapEdges, detachedOverlapEdges),
+    finalOverlapDiagnostics,
   );
 
   const selectionTimer = startDisplayRoutingPhaseTrace({

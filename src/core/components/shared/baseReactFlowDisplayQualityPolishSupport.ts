@@ -1,6 +1,7 @@
 import type { Edge, Node } from '@xyflow/react';
 
 import { separateDetachedParallelOverlaps } from '../../strategies/shared/edgeDetachedOverlapRepair';
+import type { QualityEvaluationBudgetDiagnostics } from '../../strategies/shared/edgeDetachedOverlapEvaluationCache';
 import {
   repairDisplayMicroArtifacts,
   type DisplayMicroCleanupDiagnostics,
@@ -28,6 +29,11 @@ export const boundedQualityPolishNeedsMicroRepair = (
 export const shouldMaterializeDetachedMicroAlternative = (
   useBoundedLargeRepair: boolean,
 ): boolean => useBoundedLargeRepair;
+
+export const createDetachedRepairDiagnostics = (): QualityEvaluationBudgetDiagnostics => ({
+  evaluationCount: 0,
+  cacheHitCount: 0,
+});
 
 const DETACHED_NOOP_CACHE_LIMIT = 128;
 const detachedNoopCacheByRepair = new WeakMap<

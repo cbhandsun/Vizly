@@ -18,6 +18,11 @@ export type QualityEvaluationBudget = {
   ) => EdgePathQualityScore | null;
 };
 
+export type QualityEvaluationBudgetDiagnostics = {
+  evaluationCount: number;
+  cacheHitCount: number;
+};
+
 const pathSignature = (path: readonly Point[]): string => (
   path.map(point => `${point.x}:${point.y}`).join('|')
 );
@@ -39,8 +44,15 @@ const changedEdgesSignature = (
  * Caches exact incremental scores inside one baseline context while preserving the
  * public evaluation budget: cache hits still consume one requested evaluation.
  */
-export function createQualityEvaluationBudget(maxQualityEvaluations: number): QualityEvaluationBudget {
+export function createQualityEvaluationBudget(
+  maxQualityEvaluations: number,
+  diagnostics?: QualityEvaluationBudgetDiagnostics,
+): QualityEvaluationBudget {
   let qualityEvaluations = 0;
+  if (diagnostics) {
+    diagnostics.evaluationCount = 0;
+    diagnostics.cacheHitCount = 0;
+  }
   const incrementalQualityCache = new WeakMap<
     EdgePathQualityEvaluationContext,
     Map<string, EdgePathQualityScore>
@@ -51,6 +63,7 @@ export function createQualityEvaluationBudget(maxQualityEvaluations: number): Qu
     evaluate: (candidateEdges) => {
       if (qualityEvaluations >= maxQualityEvaluations) return null;
       qualityEvaluations += 1;
+      if (diagnostics) diagnostics.evaluationCount += 1;
       return calculateEdgePathQualityScore(candidateEdges);
     },
     evaluateChanged: (candidateEdges, context, changedIndexes) => {
@@ -63,7 +76,11 @@ export function createQualityEvaluationBudget(maxQualityEvaluations: number): Qu
       }
       const cacheKey = changedEdgesSignature(candidateEdges, changedIndexes);
       const cached = contextCache.get(cacheKey);
-      if (cached) return cached;
+      if (cached) {
+        if (diagnostics) diagnostics.cacheHitCount += 1;
+        return cached;
+      }
+      if (diagnostics) diagnostics.evaluationCount += 1;
       const score = context.evaluateChanged(candidateEdges, changedIndexes);
       contextCache.set(cacheKey, score);
       return score;

@@ -1,6 +1,7 @@
 import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
 
 import type { Point } from './edgeDetachedOverlapCandidates';
+import type { QualityEvaluationBudgetDiagnostics } from './edgeDetachedOverlapEvaluationCache';
 
 export type RoutingObstacleGate = (
   baselinePaths: Point[][],
@@ -44,4 +45,6 @@ export interface DetachedParallelOverlapRepairOptions {
   maxQualityEvaluations?: number;
   maxResidualPasses?: number;
   qualityOnly?: boolean;
+  /** Caller-owned aggregate counters; never contains route or user content. */
+  diagnostics?: QualityEvaluationBudgetDiagnostics;
 }
