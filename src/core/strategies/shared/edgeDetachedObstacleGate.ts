@@ -2,7 +2,10 @@ import type { Edge } from '@xyflow/react';
 
 import type { Point, Rect } from './edgeDetachedOverlapCandidates';
 import type { RoutingObstacleGate } from './edgeDetachedOverlapRepairTypes';
-import { countRoutingObstacleHits } from './edgeWaypointCandidateRepair';
+import {
+  createRoutingObstacleEvaluationContext,
+  type RoutingObstacleEvaluationContext,
+} from './edgeWaypointCandidateRepair';
 
 type ObstacleGateCacheDiagnostics = {
   cacheHitCount: number;
@@ -33,6 +36,16 @@ export const createRoutingObstacleGate = (
 ): RoutingObstacleGate => {
   const hitsByPath = new WeakMap<Point[], Map<number, number>>();
   const hitsByGeometry = new Map<string, number>();
+  const obstacleEvaluationByEdge = new Map<number, RoutingObstacleEvaluationContext>();
+  const evaluationFor = (edgeIndex: number): RoutingObstacleEvaluationContext | null => {
+    const cached = obstacleEvaluationByEdge.get(edgeIndex);
+    if (cached) return cached;
+    const edge = edges[edgeIndex];
+    if (!edge) return null;
+    const evaluation = createRoutingObstacleEvaluationContext(edge, obstacles);
+    obstacleEvaluationByEdge.set(edgeIndex, evaluation);
+    return evaluation;
+  };
   const hitsFor = (path: Point[], edgeIndex: number): number => {
     let byEdge = hitsByPath.get(path);
     if (!byEdge) {
@@ -52,10 +65,8 @@ export const createRoutingObstacleGate = (
       if (diagnostics) diagnostics.cacheHitCount += 1;
       return geometryCached;
     }
-    const edge = edges[edgeIndex];
-    const hits = edge
-      ? countRoutingObstacleHits(path, edge, obstacles)
-      : Number.POSITIVE_INFINITY;
+    const evaluation = evaluationFor(edgeIndex);
+    const hits = evaluation?.countPathHits(path) ?? Number.POSITIVE_INFINITY;
     byEdge.set(edgeIndex, hits);
     if (geometryKey !== null && hitsByGeometry.size < MAX_GEOMETRY_CACHE_ENTRIES) {
       hitsByGeometry.set(geometryKey, hits);

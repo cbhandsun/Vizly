@@ -27,6 +27,34 @@ const unusedStateEvaluation = (): never => {
 };
 
 describe('createQualityEvaluationBudget', () => {
+  it('builds the immutable obstacle evaluation context once per edge', () => {
+    class CountingObstacleMap extends Map<string, { x: number; y: number; width: number; height: number }> {
+      iterationCount = 0;
+
+      override [Symbol.iterator](): MapIterator<[string, { x: number; y: number; width: number; height: number }]> {
+        this.iterationCount += 1;
+        return super[Symbol.iterator]();
+      }
+    }
+
+    const obstacles = new CountingObstacleMap([
+      ['business-node', { x: 80, y: 20, width: 40, height: 40 }],
+    ]);
+    const gate = createRoutingObstacleGate(candidateEdges(), obstacles);
+
+    expect(gate(
+      [[{ x: 0, y: 0 }, { x: 200, y: 0 }]],
+      [[{ x: 0, y: 80 }, { x: 200, y: 80 }]],
+      [0],
+    )).toBe(true);
+    expect(gate(
+      [[{ x: 0, y: 100 }, { x: 200, y: 100 }]],
+      [[{ x: 0, y: 120 }, { x: 200, y: 120 }]],
+      [0],
+    )).toBe(true);
+    expect(obstacles.iterationCount).toBe(1);
+  });
+
   it('reuses obstacle results for cloned exact candidate geometry', () => {
     const edges = candidateEdges();
     const diagnostics = { cacheHitCount: 0 };
