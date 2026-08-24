@@ -641,6 +641,10 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
     const repaired = repairBaseReactFlowMeasuredDisplayEdgesWithReport(
       finalized.edges,
       request.nodes,
+      undefined,
+      false,
+      recordPhaseTrace,
+      false,
     );
     repairTimer.finish(repaired.report.hardClean ? 'accepted' : 'rejected', repaired.edges.length);
     return completeResponse(finalizeContainerClearanceResponse({

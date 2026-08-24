@@ -7,6 +7,7 @@ import {
   repairBaseReactFlowMeasuredDisplayEdgesWithReport,
 } from '../baseReactFlowDisplayMeasuredRepair';
 import { getDisplayHardQualityGateReport } from '../baseReactFlowDisplayQualityGates';
+import type { DisplayRoutingPhaseTrace } from '../baseReactFlowDisplayRoutingTrace';
 
 const nodes: Node[] = [
   {
@@ -184,9 +185,13 @@ describe('measured display repair outcome', () => {
     expect(initial.quality.hairpins).toBe(1);
     expect(initial.quality.unexplainedRelatedOverlap).toBe(143);
 
+    const phaseTrace: DisplayRoutingPhaseTrace[] = [];
     const outcome = repairBaseReactFlowMeasuredDisplayEdgesWithReport(
       browserEdges,
       browserNodes,
+      undefined,
+      false,
+      trace => phaseTrace.push(trace),
     );
 
     expect(outcome.report, JSON.stringify(outcome.report)).toMatchObject({
@@ -194,6 +199,13 @@ describe('measured display repair outcome', () => {
       terminalsAttached: true,
       terminalsAnchored: true,
     });
+    expect(phaseTrace).toContainEqual(expect.objectContaining({
+      phase: 'measured-repair-normalize',
+      parentPhase: 'measured-repair',
+    }));
+    expect(phaseTrace.filter(trace => trace.phase.startsWith('measured-repair-')).every(
+      trace => trace.parentPhase === 'measured-repair',
+    )).toBe(true);
   });
 
   it('closes the anchored WMS allocation residual transaction', () => {

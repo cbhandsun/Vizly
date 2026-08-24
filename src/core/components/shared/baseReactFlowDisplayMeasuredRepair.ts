@@ -23,7 +23,6 @@ import {
   displayEdgesHaveNodeAttachedTerminals,
   keepNodeAnchoredTerminalCandidates,
 } from './baseReactFlowTerminalAxisRepair';
-import { getDisplayHardQualityGateReport } from './baseReactFlowDisplayQualityGates';
 import { DISPLAY_FINAL_OVERLAP_OBSTACLE_REPAIR_OPTIONS } from './baseReactFlowDisplayRenderPipeline';
 import { getBaseReactFlowMeasuredRepairNeeds } from './baseReactFlowDisplayMeasuredRepairPlan';
 import { repairSharedPortAndTinyTerminalLanes } from './baseReactFlowDisplaySharedPortLaneRepair';
@@ -31,8 +30,13 @@ import { repairAxisMismatchedTerminalsWithBoundedPortRoles } from './baseReactFl
 import { repairDisplayLoopShortcuts } from './baseReactFlowDisplayLoopShortcutRepair';
 import { repairDisplayMicroArtifacts } from '../../strategies/shared/edgeDisplayMicroCleanup';
 import { createBaseReactFlowDisplayMicroSafetyContext } from './baseReactFlowDisplayMicroSafety';
+import { createBaseDisplayHardGateMemo } from './baseReactFlowDisplayHardGateMemo';
+import { createDisplayTerminalValidationSnapshot } from './baseReactFlowTerminalValidation';
 import {
+  countChangedRoutingItems,
   startDisplayRoutingPhaseTrace,
+  type DisplayRoutingPhaseMetrics,
+  type DisplayRoutingPhaseName,
   type DisplayRoutingPhaseTrace,
 } from './baseReactFlowDisplayRoutingTrace';
 
@@ -72,6 +76,7 @@ export const repairBaseReactFlowMeasuredDisplayEdgesWithReport = (
   initialEvaluation?: BaseReactFlowMeasuredDisplayInitialEvaluation,
   deferStrictDominatedResult = false,
   onPhaseTrace?: (trace: DisplayRoutingPhaseTrace) => void,
+  allowCompoundResidualClosure = true,
 ): BaseReactFlowMeasuredDisplayRepairOutcome => {
   const trustedInitialEvaluation = initialEvaluation?.edges === edges
     && initialEvaluation.inputNodes === nodes
@@ -81,6 +86,13 @@ export const repairBaseReactFlowMeasuredDisplayEdgesWithReport = (
     nodes,
     new Map(nodes.map(node => [node.id, node] as const)),
   );
+  const hardGateMemo = createBaseDisplayHardGateMemo(
+    repairNodes,
+    createDisplayTerminalValidationSnapshot(repairNodes),
+  );
+  if (trustedInitialEvaluation) {
+    hardGateMemo.rememberReport(edges, trustedInitialEvaluation.report);
+  }
   const reportFor = (
     candidate: Edge[],
     previousEdges?: Edge[],
@@ -90,7 +102,7 @@ export const repairBaseReactFlowMeasuredDisplayEdgesWithReport = (
       && previousReport
       && sameEdgeReferences(candidate, previousEdges)
       ? previousReport
-      : getDisplayHardQualityGateReport(candidate, repairNodes, 'polished')
+      : hardGateMemo.getReport(candidate, repairNodes, 'polished')
   );
   const outcomeFor = (
     candidate: Edge[],
@@ -107,10 +119,19 @@ export const repairBaseReactFlowMeasuredDisplayEdgesWithReport = (
       trustedInitialEvaluation?.report,
     );
   }
+  const normalizeTimer = startDisplayRoutingPhaseTrace({
+    phase: 'measured-repair-normalize',
+    candidateCount: edges.length,
+    onTrace: onPhaseTrace,
+  });
   const compacted = compactDisplayEdgePaths(repairTerminalBoundaryStairs(
     anchorComputedDisplayEdgeEndpoints(edges, repairNodes),
     repairNodes,
   ));
+  normalizeTimer.finish(
+    sameEdgeReferences(compacted, edges) ? 'skip' : 'accepted',
+    countChangedRoutingItems(edges, compacted),
+  );
   let current = compacted;
   const compactedReport = reportFor(
     compacted,
@@ -134,58 +155,84 @@ export const repairBaseReactFlowMeasuredDisplayEdgesWithReport = (
     currentReport = nextReport;
     return nextReport.hardClean;
   };
+  type MeasuredStagePhase = Extract<
+    DisplayRoutingPhaseName,
+    | 'measured-repair-lanes'
+    | 'measured-repair-obstacle'
+    | 'measured-repair-overlap'
+    | 'measured-repair-strict'
+    | 'measured-repair-terminal'
+    | 'measured-repair-fallback'
+  >;
+  const diffMetrics = (
+    before: ReturnType<typeof hardGateMemo.readMetrics>,
+    after: ReturnType<typeof hardGateMemo.readMetrics>,
+  ): DisplayRoutingPhaseMetrics => ({
+    evaluationCount: Math.max(0, after.evaluationCount - before.evaluationCount),
+    cacheHitCount: Math.max(0, after.cacheHitCount - before.cacheHitCount),
+    scannedNodeCount: Math.max(0, after.scannedNodeCount - before.scannedNodeCount),
+    scannedEdgePairCount: Math.max(
+      0,
+      after.scannedEdgePairCount - before.scannedEdgePairCount,
+    ),
+  });
+  const runStage = (
+    phase: MeasuredStagePhase,
+    createCandidate: () => Edge[],
+  ): boolean => {
+    const baseline = current;
+    const metricsBefore = hardGateMemo.readMetrics();
+    const timer = startDisplayRoutingPhaseTrace({
+      phase,
+      candidateCount: baseline.length,
+      onTrace: onPhaseTrace,
+    });
+    const hardClean = acceptStage(createCandidate());
+    timer.finish(
+      hardClean ? 'accepted' : sameEdgeReferences(baseline, current) ? 'skip' : 'fallback',
+      countChangedRoutingItems(baseline, current),
+      diffMetrics(metricsBefore, hardGateMemo.readMetrics()),
+    );
+    return hardClean;
+  };
 
   if (
     currentReport.quality.reverseOverlap > 0
     || currentReport.quality.unexplainedRelatedOverlap > 0
     || currentReport.quality.tinyInteriorDoglegs > 0
   ) {
-    if (acceptStage(repairSharedPortAndTinyTerminalLanes(current, repairNodes, 8))) {
+    if (runStage('measured-repair-lanes', () => (
+      repairSharedPortAndTinyTerminalLanes(current, repairNodes, 8)
+    ))) {
       return outcomeFor(current, current, currentReport);
     }
   }
 
   if (getBaseReactFlowMeasuredRepairNeeds(currentReport).obstacle) {
-    const obstacleTimer = startDisplayRoutingPhaseTrace({
-      phase: 'final-clearance',
-      candidateCount: current.length,
-      onTrace: onPhaseTrace,
-    });
-    const obstacleHardClean = acceptStage(repairDisplayObstacleHits(
+    const obstacleHardClean = runStage('measured-repair-obstacle', () => repairDisplayObstacleHits(
       current,
       repairNodes,
       layoutDirection,
       DISPLAY_FINAL_OVERLAP_OBSTACLE_REPAIR_OPTIONS,
     ));
-    obstacleTimer.finish(obstacleHardClean ? 'accepted' : 'fallback', current.length);
     if (obstacleHardClean) return outcomeFor(current, current, currentReport);
     if (deferStrictDominatedResult && isStrictDominatedMeasuredReport(currentReport)) {
       return outcomeFor(current, current, currentReport);
     }
   }
   if (getBaseReactFlowMeasuredRepairNeeds(currentReport).overlap) {
-    const overlapTimer = startDisplayRoutingPhaseTrace({
-      phase: 'incremental-closure',
-      candidateCount: current.length,
-      onTrace: onPhaseTrace,
-    });
-    const overlapHardClean = acceptStage(repairResidualDisplayOverlaps(
+    const overlapHardClean = runStage('measured-repair-overlap', () => repairResidualDisplayOverlaps(
       current,
       repairNodes,
       DISPLAY_BOUNDED_DETACHED_OVERLAP_REPAIR_OPTIONS,
       DISPLAY_BOUNDED_RESIDUAL_OVERLAP_REPAIR_OPTIONS,
     ));
-    overlapTimer.finish(overlapHardClean ? 'accepted' : 'fallback', current.length);
     if (overlapHardClean) return outcomeFor(current, current, currentReport);
   }
   if (getBaseReactFlowMeasuredRepairNeeds(currentReport).strict) {
-    const strictTimer = startDisplayRoutingPhaseTrace({
-      phase: 'strict-primary',
-      candidateCount: current.length,
-      onTrace: onPhaseTrace,
-    });
-    const strictHardClean = acceptStage(repairFinalResidualStrictCrossings(current, repairNodes));
-    strictTimer.finish(strictHardClean ? 'accepted' : 'fallback', current.length);
+    const strictHardClean = runStage('measured-repair-strict', () => (
+      repairFinalResidualStrictCrossings(current, repairNodes)
+    ));
     if (strictHardClean) {
       return outcomeFor(current, current, currentReport);
     }
@@ -193,14 +240,16 @@ export const repairBaseReactFlowMeasuredDisplayEdgesWithReport = (
   if (getBaseReactFlowMeasuredRepairNeeds(currentReport).terminal) {
     const beforeTerminal = current;
     const terminalRoleBudget = Math.min(512, Math.max(64, current.length * 12));
-    if (acceptStage(compactDisplayEdgePaths(
+    if (runStage('measured-repair-terminal', () => compactDisplayEdgePaths(
       repairAxisMismatchedTerminalsWithBoundedPortRoles(
         current,
         repairNodes,
         terminalRoleBudget,
       ),
     ))) return outcomeFor(current, current, currentReport);
-    if (acceptStage(repairTerminalHandleAxisCrossings(current, repairNodes))) {
+    if (runStage('measured-repair-terminal', () => (
+      repairTerminalHandleAxisCrossings(current, repairNodes)
+    ))) {
       return outcomeFor(current, current, currentReport);
     }
     if (
@@ -209,12 +258,14 @@ export const repairBaseReactFlowMeasuredDisplayEdgesWithReport = (
       || currentReport.quality.tinyInteriorDoglegs > 0
       || currentReport.quality.hairpins > 0
     ) {
-      if (acceptStage(repairSharedPortAndTinyTerminalLanes(current, repairNodes, 12))) {
+      if (runStage('measured-repair-terminal', () => (
+        repairSharedPortAndTinyTerminalLanes(current, repairNodes, 12)
+      ))) {
         return outcomeFor(current, current, currentReport);
       }
     }
     if (getBaseReactFlowMeasuredRepairNeeds(currentReport).overlap) {
-      if (acceptStage(repairResidualDisplayOverlaps(
+      if (runStage('measured-repair-terminal', () => repairResidualDisplayOverlaps(
         current,
         repairNodes,
         DISPLAY_BOUNDED_DETACHED_OVERLAP_REPAIR_OPTIONS,
@@ -226,11 +277,11 @@ export const repairBaseReactFlowMeasuredDisplayEdgesWithReport = (
       current,
       repairNodes,
     );
-    if (acceptStage(terminalSafeCandidate)) {
+    if (runStage('measured-repair-terminal', () => terminalSafeCandidate)) {
       return outcomeFor(current, current, currentReport);
     }
     if (getBaseReactFlowMeasuredRepairNeeds(currentReport).terminal) {
-      if (acceptStage(compactDisplayEdgePaths(
+      if (runStage('measured-repair-terminal', () => compactDisplayEdgePaths(
         repairAxisMismatchedTerminalsWithBoundedPortRoles(
           current,
           repairNodes,
@@ -241,7 +292,7 @@ export const repairBaseReactFlowMeasuredDisplayEdgesWithReport = (
     for (let closurePass = 0; closurePass < 2; closurePass += 1) {
       const passStart = current;
       if (getBaseReactFlowMeasuredRepairNeeds(currentReport).overlap) {
-        if (acceptStage(repairResidualDisplayOverlaps(
+        if (runStage('measured-repair-terminal', () => repairResidualDisplayOverlaps(
           current,
           repairNodes,
           DISPLAY_BOUNDED_DETACHED_OVERLAP_REPAIR_OPTIONS,
@@ -253,11 +304,11 @@ export const repairBaseReactFlowMeasuredDisplayEdgesWithReport = (
         current,
         repairNodes,
       );
-      if (acceptStage(closureSafeCandidate)) {
+      if (runStage('measured-repair-terminal', () => closureSafeCandidate)) {
         return outcomeFor(current, current, currentReport);
       }
       if (getBaseReactFlowMeasuredRepairNeeds(currentReport).terminal) {
-        if (acceptStage(compactDisplayEdgePaths(
+        if (runStage('measured-repair-terminal', () => compactDisplayEdgePaths(
           repairAxisMismatchedTerminalsWithBoundedPortRoles(
             current,
             repairNodes,
@@ -271,12 +322,19 @@ export const repairBaseReactFlowMeasuredDisplayEdgesWithReport = (
       !sameEdgeReferences(current, beforeTerminal)
       && getBaseReactFlowMeasuredRepairNeeds(currentReport).strict
     ) {
-      if (acceptStage(compactDisplayEdgePaths(
+      if (runStage('measured-repair-terminal', () => compactDisplayEdgePaths(
         repairFinalResidualStrictCrossings(current, repairNodes),
       ))) return outcomeFor(current, current, currentReport);
     }
   }
 
+  const fallbackTimer = startDisplayRoutingPhaseTrace({
+    phase: 'measured-repair-fallback',
+    candidateCount: current.length,
+    onTrace: onPhaseTrace,
+  });
+  const fallbackBaseline = current;
+  const fallbackMetricsBefore = hardGateMemo.readMetrics();
   const fastRepaired = repairFastDisplayHardSafety(current, repairNodes);
   const fastAnchoredRepaired = keepNodeAnchoredTerminalCandidates(
     fastRepaired,
@@ -287,10 +345,20 @@ export const repairBaseReactFlowMeasuredDisplayEdgesWithReport = (
     repairFinalResidualStrictCrossings(fastAnchoredRepaired, repairNodes),
   );
   const fastStrictReport = reportFor(fastStrictRepaired);
+  fallbackTimer.finish(
+    fastStrictReport.hardClean ? 'accepted' : 'fallback',
+    countChangedRoutingItems(fallbackBaseline, fastStrictRepaired),
+    diffMetrics(fallbackMetricsBefore, hardGateMemo.readMetrics()),
+  );
   if (fastStrictReport.hardClean) {
     return outcomeFor(fastStrictRepaired, fastStrictRepaired, fastStrictReport);
   }
 
+  const selectionTimer = startDisplayRoutingPhaseTrace({
+    phase: 'measured-repair-selection',
+    candidateCount: stageCandidates.length + 4,
+    onTrace: onPhaseTrace,
+  });
   const selected = chooseFinalObstacleAwarePolishCandidate(
     repairNodes,
     compacted,
@@ -307,8 +375,13 @@ export const repairBaseReactFlowMeasuredDisplayEdgesWithReport = (
     compacted,
     compactedReport,
   );
+  selectionTimer.finish(
+    sameEdgeReferences(anchoredSelected, compacted) ? 'skip' : 'accepted',
+    countChangedRoutingItems(compacted, anchoredSelected),
+  );
   if (
-    displayEdgesHaveNodeAttachedTerminals(anchoredSelected, repairNodes)
+    allowCompoundResidualClosure
+    && displayEdgesHaveNodeAttachedTerminals(anchoredSelected, repairNodes)
     && (
       anchoredSelectedReport.quality.strictCrossings > 0
       || anchoredSelectedReport.quality.hairpins > 0
@@ -316,6 +389,12 @@ export const repairBaseReactFlowMeasuredDisplayEdgesWithReport = (
       || anchoredSelectedReport.quality.unexplainedRelatedOverlap > 0
     )
   ) {
+    const residualTimer = startDisplayRoutingPhaseTrace({
+      phase: 'measured-repair-residual',
+      candidateCount: anchoredSelected.length,
+      onTrace: onPhaseTrace,
+    });
+    const residualMetricsBefore = hardGateMemo.readMetrics();
     const loopClosed = repairDisplayLoopShortcuts(
       anchoredSelected,
       repairNodes,
@@ -341,6 +420,11 @@ export const repairBaseReactFlowMeasuredDisplayEdgesWithReport = (
     );
     const residualClosedReport = reportFor(residualClosed);
     if (residualClosedReport.hardClean) {
+      residualTimer.finish(
+        'accepted',
+        countChangedRoutingItems(anchoredSelected, residualClosed),
+        diffMetrics(residualMetricsBefore, hardGateMemo.readMetrics()),
+      );
       return outcomeFor(residualClosed, residualClosed, residualClosedReport);
     }
     const baselineQuality = anchoredSelectedReport.quality;
@@ -368,8 +452,18 @@ export const repairBaseReactFlowMeasuredDisplayEdgesWithReport = (
       || residualQuality.tinyInteriorDoglegs < baselineQuality.tinyInteriorDoglegs
       || residualQuality.hairpins < baselineQuality.hairpins;
     if (hardDefectsDoNotRegress && hardDefectsImprove) {
+      residualTimer.finish(
+        'accepted',
+        countChangedRoutingItems(anchoredSelected, residualClosed),
+        diffMetrics(residualMetricsBefore, hardGateMemo.readMetrics()),
+      );
       return outcomeFor(residualClosed, residualClosed, residualClosedReport);
     }
+    residualTimer.finish(
+      'rejected',
+      countChangedRoutingItems(anchoredSelected, residualClosed),
+      diffMetrics(residualMetricsBefore, hardGateMemo.readMetrics()),
+    );
   }
   if (displayEdgesHaveNodeAttachedTerminals(anchoredSelected, repairNodes)) {
     return outcomeFor(anchoredSelected, anchoredSelected, anchoredSelectedReport);

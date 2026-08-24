@@ -340,7 +340,14 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
     });
 
     expect(repairSpy).toHaveBeenCalledOnce();
-    expect(repairSpy).toHaveBeenCalledWith(uncleanEdges, nodes);
+    expect(repairSpy).toHaveBeenCalledWith(
+      uncleanEdges,
+      nodes,
+      undefined,
+      false,
+      expect.any(Function),
+      false,
+    );
     expect(response).toMatchObject({
       requestId: 'worker-full-route-repaired',
       edges,
