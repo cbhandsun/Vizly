@@ -56,6 +56,7 @@ import {
   shouldMaterializeDetachedMicroAlternative,
   shouldUseBoundedQualityResidualRepair,
 } from './baseReactFlowDisplayQualityPolishSupport';
+import { createDisplayQualityGlobalRefineSession } from './baseReactFlowDisplayQualityGlobalRefine';
 
 export {
   boundedQualityPolishNeedsMicroRepair,
@@ -209,13 +210,25 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
     candidateCount: endpointLaneNudgedEdges.length,
     onTrace: recordCrossingPhaseTrace,
   });
-  const globallyRefinedEdges = repairEndpointOrthogonalPaths(
-    refineGlobalEdgeWaypoints(endpointLaneNudgedEdges, repairNodes),
-    repairNodes,
-  );
-  const finalGloballyRefinedEdges = refineGlobalEdgeWaypoints(globallyRefinedEdges, repairNodes);
+  const globalRefineSession = createDisplayQualityGlobalRefineSession({
+    nodes: repairNodes,
+    onPhaseTrace: recordCrossingPhaseTrace,
+  });
+  const globallyRefinedEdges = globalRefineSession.run({
+    edges: endpointLaneNudgedEdges,
+    phase: 'quality-crossing-global-refine-initial',
+  });
+  const finalGloballyRefinedEdges = globalRefineSession.run({
+    edges: globallyRefinedEdges,
+    phase: 'quality-crossing-global-refine-fixed-point',
+    normalize: false,
+  });
   const doglegRepairedEdges = repairLocalDoglegArtifacts(finalGloballyRefinedEdges, repairNodes);
-  const finalCrossingSweepEdges = refineGlobalEdgeWaypoints(doglegRepairedEdges, repairNodes);
+  const finalCrossingSweepEdges = globalRefineSession.run({
+    edges: doglegRepairedEdges,
+    phase: 'quality-crossing-global-refine-dogleg',
+    normalize: false,
+  });
   const repairedEdges = repairLocalDoglegArtifacts(finalCrossingSweepEdges, repairNodes);
   const finalTargetQualityEdges = repairEndpointOrthogonalPaths(
     synthesizeSharedTargetTrunks(repairedEdges, { nodes: repairNodes }),
@@ -250,17 +263,17 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
     ),
     repairNodes,
   );
-  const finalCrossingQualityEdges = repairEndpointOrthogonalPaths(
-    refineGlobalEdgeWaypoints(finalEndpointQualityEdges, repairNodes),
-    repairNodes,
-  );
+  const finalCrossingQualityEdges = globalRefineSession.run({
+    edges: finalEndpointQualityEdges,
+    phase: 'quality-crossing-final-candidates-global',
+  });
   const finalTargetEntryQualityEdges = repairSharedTargetEntryStrictCrossingsIfNeeded(
     finalCrossingQualityEdges,
   );
-  const finalGlobalCrossingCandidate = repairEndpointOrthogonalPaths(
-    refineGlobalEdgeWaypoints(finalTargetEntryQualityEdges, repairNodes),
-    repairNodes,
-  );
+  const finalGlobalCrossingCandidate = globalRefineSession.run({
+    edges: finalTargetEntryQualityEdges,
+    phase: 'quality-crossing-final-candidates-post-shared',
+  });
   const finalSharedCrossingCandidate = repairEndpointOrthogonalPaths(
     repairSharedTrunkAwareCrossings(finalGlobalCrossingCandidate, repairNodes),
     repairNodes,
@@ -274,10 +287,10 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
   );
   const finalPostSharedGlobalCandidate = keepIfNoNewStrictCrossings(
     finalEndpointLaneCandidate,
-    repairEndpointOrthogonalPaths(
-      refineGlobalEdgeWaypoints(finalEndpointLaneCandidate, repairNodes),
-      repairNodes,
-    ),
+    globalRefineSession.run({
+      edges: finalEndpointLaneCandidate,
+      phase: 'quality-crossing-final-candidates-post-lane',
+    }),
   );
   const finalPostGlobalEndpointLaneCandidate = keepIfNoNewStrictCrossings(
     finalPostSharedGlobalCandidate,

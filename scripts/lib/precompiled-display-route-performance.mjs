@@ -15,6 +15,7 @@ const MAX_COUNTER = 1_000_000_000;
 const PRESET_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,127}$/;
 const PHASE_PATTERN = /^[a-z0-9][a-z0-9-]{0,127}$/;
 const ROUTE_RESOLUTIONS = new Set(['full-route', 'full-route-repaired']);
+const PHASE_RESOLUTIONS = new Set(['hit', 'skip', 'accepted', 'rejected', 'fallback']);
 
 const isRecord = value => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 const finiteDuration = value => (
@@ -39,7 +40,15 @@ const projectPhaseTrace = value => {
       : boundedToken(trace.parentPhase, PHASE_PATTERN);
     const durationMs = finiteDuration(trace.durationMs);
     const exclusiveDurationMs = finiteDuration(trace.exclusiveDurationMs);
-    if (!phase || (trace.parentPhase != null && !parentPhase) || durationMs == null) {
+    const resolution = PHASE_RESOLUTIONS.has(trace.resolution) ? trace.resolution : null;
+    const changedEdgeCount = boundedCounter(trace.changedEdgeCount);
+    if (
+      !phase
+      || (trace.parentPhase != null && !parentPhase)
+      || durationMs == null
+      || !resolution
+      || changedEdgeCount == null
+    ) {
       throw new Error('Cold-route phase trace contains invalid aggregate data');
     }
     return {
@@ -53,6 +62,8 @@ const projectPhaseTrace = value => {
       scannedSegmentCount: boundedCounter(trace.scannedSegmentCount) ?? 0,
       scannedEdgePairCount: boundedCounter(trace.scannedEdgePairCount) ?? 0,
       candidateCount: boundedCounter(trace.candidateCount) ?? 0,
+      changedEdgeCount,
+      resolution,
     };
   });
 };

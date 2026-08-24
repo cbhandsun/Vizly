@@ -21,6 +21,8 @@ const capture = (presetId, routeMs, extra = {}) => ({
       durationMs: routeMs / 2,
       exclusiveDurationMs: routeMs / 3,
       candidateCount: 14,
+      changedEdgeCount: 3,
+      resolution: 'accepted',
       privateNodeName: 'must-not-survive',
     }],
     ...extra,
@@ -48,6 +50,8 @@ describe('precompiled display route cold performance', () => {
         durationMs: 350,
         exclusiveDurationMs: 700 / 3,
         candidateCount: 14,
+        changedEdgeCount: 3,
+        resolution: 'accepted',
       }],
     });
     expect(JSON.stringify(result)).not.toContain('must-not-survive');
@@ -69,6 +73,14 @@ describe('precompiled display route cold performance', () => {
     ])).toThrow(/invalid measurement/);
     expect(() => buildPrecompiledDisplayRoutePerformanceResult([
       capture('safe', 10, { phaseTrace: [{ phase: '../unsafe', durationMs: 1 }] }),
+    ])).toThrow(/invalid aggregate/);
+    expect(() => buildPrecompiledDisplayRoutePerformanceResult([
+      capture('safe', 10, { phaseTrace: [{
+        phase: 'quality',
+        durationMs: 1,
+        changedEdgeCount: 0,
+        resolution: 'forged',
+      }] }),
     ])).toThrow(/invalid aggregate/);
     expect(() => parsePrecompiledDisplayRoutePerformanceResult(null)).toThrow(/malformed/);
     expect(() => parsePrecompiledDisplayRoutePerformanceResult({ presets: [{

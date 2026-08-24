@@ -1,3 +1,4 @@
+import type { Edge } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
 
 import { shouldMaterializeDetachedMicroAlternative } from '../baseReactFlowDisplayFullRouteQualityPhase';
@@ -5,6 +6,7 @@ import {
   changedDisplayPathIndexes,
   collectResidualMicroCandidateEdgeIndexes,
 } from '../baseReactFlowDisplayOverlapRepair';
+import { createDisplayQualityGlobalRefineSession } from '../baseReactFlowDisplayQualityGlobalRefine';
 
 describe('baseReactFlowDisplayFullRouteQualityPhase', () => {
   it('does not duplicate the micro repair family after endpoint-first progress', () => {
@@ -62,5 +64,36 @@ describe('baseReactFlowDisplayFullRouteQualityPhase', () => {
 
     expect(collectResidualMicroCandidateEdgeIndexes(baseline, derivative))
       .toEqual([0, 1]);
+  });
+
+  it('reuses only an identical request-local global-refine input', () => {
+    const edges: Edge[] = [{
+      id: 'edge',
+      source: 'source',
+      target: 'target',
+      data: { computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }] },
+    }];
+    const traces: Array<{ resolution: string; cacheHitCount?: number }> = [];
+    const session = createDisplayQualityGlobalRefineSession({
+      nodes: [],
+      onPhaseTrace: trace => traces.push(trace),
+    });
+
+    const first = session.run({
+      edges,
+      normalize: false,
+      phase: 'quality-crossing-global-refine-fixed-point',
+    });
+    const equivalentEdges = edges.map(edge => ({ ...edge, data: { ...edge.data } }));
+    const second = session.run({
+      edges: equivalentEdges,
+      normalize: false,
+      phase: 'quality-crossing-global-refine-dogleg',
+    });
+
+    expect(first).toBe(edges);
+    expect(second).toBe(equivalentEdges);
+    expect(traces.map(trace => trace.resolution)).toEqual(['skip', 'hit']);
+    expect(traces[1]?.cacheHitCount).toBe(1);
   });
 });
