@@ -107,6 +107,7 @@ export const finalizeBaseReactFlowDisplayEdgesWithReport = <T extends Edge[]>(
   exactReport?: BaseReactFlowDisplayExactReport,
   onPhaseTrace?: (trace: DisplayRoutingPhaseTrace) => void,
   deferStrictOnlyMeasuredRepair = false,
+  allowCompoundMeasuredResidualClosure = true,
 ): BaseReactFlowDisplayFinalizerOutcome<T> => {
   const trustedEvaluation = resolveTrustedInitialEvaluation(
     fullRouteEdges,
@@ -174,6 +175,7 @@ export const finalizeBaseReactFlowDisplayEdgesWithReport = <T extends Edge[]>(
       },
       deferStrictOnlyMeasuredRepair,
       onPhaseTrace,
+      allowCompoundMeasuredResidualClosure,
     );
     routedEdges = measuredOutcome.edges as T;
     routedReport = measuredOutcome.report;

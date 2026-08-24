@@ -630,6 +630,9 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
     fullRouteEdges,
     request.nodes,
     exactReport,
+    recordPhaseTrace,
+    false,
+    false,
   );
   finalizerTimer.finish(finalized.report.hardClean ? 'accepted' : 'fallback', finalized.edges.length);
   if (!finalized.report.hardClean) {
