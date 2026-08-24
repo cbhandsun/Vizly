@@ -97,16 +97,17 @@ export function repairSharedTrunkAwareCrossings(
   for (const [edgeId, path] of repaired) {
     if (path) repairedPaths.set(edgeId, path);
   }
+  const repairedSegmentsByEdgeId = new Map(
+    [...repairedPaths].map(([edgeId, path]) => [edgeId, toEdgeRoutingSegments(path)] as const),
+  );
 
   return inputEdges.map(edge => {
     const path = repaired.get(edge.id);
     const original = edgePaths.get(edge.id);
     if (!path || !original || edgeRoutingPathsEqual(path, original)) return edge;
-    const originalAgainstRepaired = new Map(repairedPaths);
-    originalAgainstRepaired.set(edge.id, original);
     if (
-      strictCrossingCountForEdgePath(path, edge, repairedPaths, edgesById)
-      > strictCrossingCountForEdgePath(original, edge, originalAgainstRepaired, edgesById)
+      strictCrossingCountForEdgePath(path, edge, repairedSegmentsByEdgeId, edgesById)
+      > strictCrossingCountForEdgePath(original, edge, repairedSegmentsByEdgeId, edgesById)
     ) {
       return edge;
     }
@@ -117,17 +118,17 @@ export function repairSharedTrunkAwareCrossings(
 function strictCrossingCountForEdgePath(
   path: EdgeRoutingPoint[],
   edge: Edge,
-  paths: Map<string, EdgeRoutingPoint[]>,
+  segmentsByEdgeId: ReadonlyMap<string, readonly EdgeRoutingSegment[]>,
   edgesById: Map<string, Edge>,
 ): number {
   const segments = toEdgeRoutingSegments(path);
   let crossings = 0;
-  for (const [otherId, otherPath] of paths) {
+  for (const [otherId, otherSegments] of segmentsByEdgeId) {
     if (otherId === edge.id) continue;
     const other = edgesById.get(otherId);
     if (!other || other.source === edge.source || other.target === edge.target) continue;
     for (const first of segments) {
-      for (const second of toEdgeRoutingSegments(otherPath)) {
+      for (const second of otherSegments) {
         crossings += edgeRoutingSegmentRelation(first, second).crossings;
       }
     }
