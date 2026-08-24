@@ -9,17 +9,13 @@ import { repairEndpointOrthogonalPaths } from '../../strategies/shared/edgeEndpo
 import { refineGlobalEdgeWaypoints } from '../../strategies/shared/edgeGlobalWaypointRefinement';
 import { repairLocalDoglegArtifacts } from '../../strategies/shared/edgeLocalDoglegRepair';
 import { repairReverseFlowBypassCrossings } from '../../strategies/shared/edgeReverseFlowBypassRepair';
-import { repairSameNodeInOutCrossings } from '../../strategies/shared/edgeSameNodeRoleRepair';
 import {
   calculateEdgePathQualityScore,
   chooseFewestStrictCrossings,
   countStrictEdgeCrossings,
   keepIfNoNewStrictCrossings,
 } from '../../strategies/shared/edgeStrictCrossingGuard';
-import {
-  synthesizeSharedEndpointTrunks,
-  synthesizeSharedTargetTrunks,
-} from '../../strategies/shared/edgeSharedTrunkSynthesis';
+import { synthesizeSharedTargetTrunks } from '../../strategies/shared/edgeSharedTrunkSynthesis';
 import {
   createEdgeWaypointRefinementDiagnostics,
   reduceEdgeCrossingsWithWaypoints,
@@ -49,7 +45,6 @@ import { createDisplayRoutingTopologyWaypointAxes } from './baseReactFlowDisplay
 import { repairSharedTargetEntryStrictCrossingsIfNeeded } from './baseReactFlowDisplaySharedTargetEntry';
 import {
   createDisplayTopologyFirstSeed,
-  repairDisplayEndpointOrthogonalPathsTwice,
 } from './baseReactFlowDisplayTopologyFirstSeed';
 import {
   repairBoundedQualityPolishMicroArtifacts,
@@ -58,6 +53,7 @@ import {
   shouldUseBoundedQualityResidualRepair,
 } from './baseReactFlowDisplayQualityPolishSupport';
 import { createDisplayQualityGlobalRefineSession } from './baseReactFlowDisplayQualityGlobalRefine';
+import { repairDisplayQualityTopology } from './baseReactFlowDisplayQualityTopology';
 
 export {
   boundedQualityPolishNeedsMicroRepair,
@@ -149,30 +145,13 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
     && !hasHardDisplayOverlapRisk(topologySeed.quality);
   const sameNodeRoleRepairedEdges = topologySeedIsCleanFixedPoint
     ? detachedRoutedEdges
-    : (() => {
-      const routedEndpointEdges = topologySeedRemainsCurrent
-        ? detachedRoutedEdges
-        : repairDisplayEndpointOrthogonalPathsTwice(detachedRoutedEdges, repairNodes);
-      const initialTrunkEdges = synthesizeSharedEndpointTrunks(routedEndpointEdges, { nodes: repairNodes });
-      const localTrunkEdges = repairLocalDoglegArtifacts(initialTrunkEdges, repairNodes);
-      const secondaryTrunkEdges = synthesizeSharedEndpointTrunks(localTrunkEdges, { nodes: repairNodes });
-      const secondaryDetachedEdges = reusePreparedGlobalRouting
-        ? secondaryTrunkEdges
-        : separateLargeDetachedParallelOverlapsIfNeeded(
-          secondaryTrunkEdges,
-          repairNodes,
-          24,
-          DISPLAY_DETACHED_OVERLAP_REPAIR_OPTIONS,
-        );
-      const trunkAwareEdges = synthesizeSharedEndpointTrunks(secondaryDetachedEdges, { nodes: repairNodes });
-      const endpointRepairedEdges = repairDisplayEndpointOrthogonalPathsTwice(trunkAwareEdges, repairNodes);
-      const targetTrunkEdges = synthesizeSharedTargetTrunks(endpointRepairedEdges, { nodes: repairNodes });
-      const finalEndpointRepairedEdges = repairDisplayEndpointOrthogonalPathsTwice(targetTrunkEdges, repairNodes);
-      return repairEndpointOrthogonalPaths(
-        repairSameNodeInOutCrossings(finalEndpointRepairedEdges, repairNodes),
-        repairNodes,
-      );
-    })();
+    : repairDisplayQualityTopology({
+      edges: detachedRoutedEdges,
+      nodes: repairNodes,
+      topologySeedRemainsCurrent,
+      reusePreparedGlobalRouting,
+      onPhaseTrace,
+    });
   topologyTimer.finish(
     sameNodeRoleRepairedEdges === detachedRoutedEdges ? 'skip' : 'accepted',
     sameNodeRoleRepairedEdges === detachedRoutedEdges ? 0 : sameNodeRoleRepairedEdges.length,

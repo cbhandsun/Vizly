@@ -209,6 +209,62 @@ describe('baseReactFlowDisplayWorkerProtocol', () => {
     })]);
   });
 
+  it('derives exclusive topology work from its bounded child phases', () => {
+    const child = (
+      phase: Extract<DisplayRoutingPhaseTrace['phase'],
+        | 'quality-topology-endpoints'
+        | 'quality-topology-trunks'
+        | 'quality-topology-trunks-initial'
+        | 'quality-topology-trunks-dogleg'
+        | 'quality-topology-trunks-secondary'
+        | 'quality-topology-detached'
+        | 'quality-topology-finalize'>,
+      durationMs: number,
+    ): DisplayRoutingPhaseTrace => ({
+      phase,
+      durationMs,
+      candidateCount: 14,
+      changedEdgeCount: 14,
+      resolution: 'accepted',
+    });
+    const traces = finalizeDisplayRoutingPhaseTrace([{
+      phase: 'quality-topology',
+      durationMs: 60,
+      candidateCount: 14,
+      changedEdgeCount: 14,
+      resolution: 'accepted',
+    }, child('quality-topology-endpoints', 10),
+    child('quality-topology-trunks', 20),
+    child('quality-topology-detached', 5),
+    child('quality-topology-finalize', 15)]);
+
+    expect(traces[0]).toMatchObject({
+      phase: 'quality-topology',
+      exclusiveDurationMs: 10,
+    });
+    expect(traces.slice(1).every(trace => (
+      trace.parentPhase === 'quality-topology'
+      && trace.exclusiveDurationMs === trace.durationMs
+    ))).toBe(true);
+
+    const trunkTraces = finalizeDisplayRoutingPhaseTrace([{
+      phase: 'quality-topology-trunks',
+      durationMs: 50,
+      candidateCount: 14,
+      changedEdgeCount: 14,
+      resolution: 'accepted',
+    }, child('quality-topology-trunks-initial', 20),
+    child('quality-topology-trunks-dogleg', 5),
+    child('quality-topology-trunks-secondary', 15)]);
+    expect(trunkTraces[0]).toMatchObject({
+      parentPhase: 'quality-topology',
+      exclusiveDurationMs: 10,
+    });
+    expect(trunkTraces.slice(1).every(trace => (
+      trace.parentPhase === 'quality-topology-trunks'
+    ))).toBe(true);
+  });
+
   it('parses validate-or-route candidates and degrades malformed candidates to a reroute', () => {
     const valid = parseDisplayEdgesWorkerRequest({
       ...validRepairRequest,

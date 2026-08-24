@@ -37,6 +37,13 @@ export const DISPLAY_ROUTING_PHASE_NAMES = [
   'quality-global-route',
   'quality-topology-seed',
   'quality-topology',
+  'quality-topology-endpoints',
+  'quality-topology-trunks',
+  'quality-topology-trunks-initial',
+  'quality-topology-trunks-dogleg',
+  'quality-topology-trunks-secondary',
+  'quality-topology-detached',
+  'quality-topology-finalize',
   'quality-crossing-sweeps',
   'quality-crossing-structural',
   'quality-crossing-global-refine',
@@ -151,7 +158,7 @@ export const DISPLAY_ROUTING_PHASE_NAMES = [
 // One aggregate entry per declared phase plus headroom for the small number of
 // phases that can run under two explicit parents. Repeated work is folded by
 // the Worker recorder, so the bound no longer truncates late final-gate phases.
-export const DISPLAY_ROUTING_PHASE_TRACE_LIMIT = 152;
+export const DISPLAY_ROUTING_PHASE_TRACE_LIMIT = 156;
 
 export const DISPLAY_ROUTING_PHASE_RESOLUTIONS = [
   'hit',
@@ -244,6 +251,13 @@ const DISPLAY_ROUTING_PHASE_PARENTS: Readonly<
   'quality-global-route': 'quality',
   'quality-topology-seed': 'quality',
   'quality-topology': 'quality',
+  'quality-topology-endpoints': 'quality-topology',
+  'quality-topology-trunks': 'quality-topology',
+  'quality-topology-trunks-initial': 'quality-topology-trunks',
+  'quality-topology-trunks-dogleg': 'quality-topology-trunks',
+  'quality-topology-trunks-secondary': 'quality-topology-trunks',
+  'quality-topology-detached': 'quality-topology',
+  'quality-topology-finalize': 'quality-topology',
   'quality-crossing-sweeps': 'quality',
   'quality-crossing-structural': 'quality-crossing-sweeps',
   'quality-crossing-global-refine': 'quality-crossing-sweeps',

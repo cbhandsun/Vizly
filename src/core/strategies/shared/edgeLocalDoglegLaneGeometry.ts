@@ -1,6 +1,6 @@
 import type { Edge } from '@xyflow/react';
 
-import type { Point, Rect } from './edgeLocalDoglegGeometry';
+import type { OrthogonalSegment, Point, Rect } from './edgeLocalDoglegGeometry';
 import {
   EPS,
   MIN_CONTRACTED_OUTER_LANE,
@@ -13,6 +13,19 @@ import {
   strictCross,
   toSegments,
 } from './edgeLocalDoglegGeometry';
+
+const resolveOtherSegments = (
+  pathByEdgeKey: Map<string, Point[]>,
+  edgeKey: string,
+  snapshot?: readonly OrthogonalSegment[],
+): readonly OrthogonalSegment[] => {
+  if (snapshot) return snapshot;
+  const segments: OrthogonalSegment[] = [];
+  for (const [otherKey, otherPath] of pathByEdgeKey) {
+    if (otherKey !== edgeKey) segments.push(...toSegments(otherPath));
+  }
+  return segments;
+};
 
 export function isOnHorizontalSide(point: Point, rect: Rect): boolean {
   return Math.abs(point.y - rect.y) <= SIDE_MATCH_TOLERANCE
@@ -47,18 +60,15 @@ export function verticalStrictCrossingCoordinates(
   y2: number,
   edgeKey: string,
   pathByEdgeKey: Map<string, Point[]>,
+  otherSegments?: readonly OrthogonalSegment[],
 ): number[] {
   const values = new Set<number>();
   const probeA = { x, y: y1 };
   const probeB = { x, y: y2 };
-  for (const [otherKey, otherPath] of pathByEdgeKey) {
-    if (otherKey === edgeKey) continue;
-    for (let index = 0; index < otherPath.length - 1; index += 1) {
-      const a = otherPath[index];
-      const b = otherPath[index + 1];
-      if (axisOf(a, b) === 'h' && strictCross(probeA, probeB, a, b)) {
-        values.add(Math.round(a.y));
-      }
+  for (const segment of resolveOtherSegments(pathByEdgeKey, edgeKey, otherSegments)) {
+    if (axisOf(segment.a, segment.b) === 'h'
+      && strictCross(probeA, probeB, segment.a, segment.b)) {
+      values.add(Math.round(segment.a.y));
     }
   }
   return [...values].sort((a, b) => Math.abs(a - y1) - Math.abs(b - y1));
@@ -70,18 +80,15 @@ export function horizontalStrictCrossingCoordinates(
   x2: number,
   edgeKey: string,
   pathByEdgeKey: Map<string, Point[]>,
+  otherSegments?: readonly OrthogonalSegment[],
 ): number[] {
   const values = new Set<number>();
   const probeA = { x: x1, y };
   const probeB = { x: x2, y };
-  for (const [otherKey, otherPath] of pathByEdgeKey) {
-    if (otherKey === edgeKey) continue;
-    for (let index = 0; index < otherPath.length - 1; index += 1) {
-      const a = otherPath[index];
-      const b = otherPath[index + 1];
-      if (axisOf(a, b) === 'v' && strictCross(probeA, probeB, a, b)) {
-        values.add(Math.round(a.x));
-      }
+  for (const segment of resolveOtherSegments(pathByEdgeKey, edgeKey, otherSegments)) {
+    if (axisOf(segment.a, segment.b) === 'v'
+      && strictCross(probeA, probeB, segment.a, segment.b)) {
+      values.add(Math.round(segment.a.x));
     }
   }
   return [...values].sort((a, b) => Math.abs(a - x1) - Math.abs(b - x1));
@@ -166,6 +173,7 @@ export function buildHorizontalBridgeYValues(
   laneX: number,
   pathByEdgeKey: Map<string, Point[]>,
   edgeKey: string,
+  otherSegments?: readonly OrthogonalSegment[],
 ): number[] {
   const previous = points[index - 1];
   const a = points[index];
@@ -176,9 +184,7 @@ export function buildHorizontalBridgeYValues(
   let mustMoveBridge = false;
   const bridgeMinX = Math.min(a.x, laneX);
   const bridgeMaxX = Math.max(a.x, laneX);
-  for (const [otherKey, otherPath] of pathByEdgeKey) {
-    if (otherKey === edgeKey) continue;
-    for (const segment of toSegments(otherPath)) {
+  for (const segment of resolveOtherSegments(pathByEdgeKey, edgeKey, otherSegments)) {
       const segmentAxis = axisOf(segment.a, segment.b);
       if (segmentAxis === 'v') {
         const x = segment.a.x;
@@ -200,7 +206,6 @@ export function buildHorizontalBridgeYValues(
           addInteriorAxisValue(values, c.y >= a.y ? y + clearance : y - clearance, previous.y, c.y);
         }
       }
-    }
   }
   if (!mustMoveBridge) values.add(Math.round(a.y));
   return [...values];
@@ -212,6 +217,7 @@ export function buildVerticalBridgeXValues(
   laneY: number,
   pathByEdgeKey: Map<string, Point[]>,
   edgeKey: string,
+  otherSegments?: readonly OrthogonalSegment[],
 ): number[] {
   const previous = points[index - 1];
   const a = points[index];
@@ -222,9 +228,7 @@ export function buildVerticalBridgeXValues(
   let mustMoveBridge = false;
   const bridgeMinY = Math.min(a.y, laneY);
   const bridgeMaxY = Math.max(a.y, laneY);
-  for (const [otherKey, otherPath] of pathByEdgeKey) {
-    if (otherKey === edgeKey) continue;
-    for (const segment of toSegments(otherPath)) {
+  for (const segment of resolveOtherSegments(pathByEdgeKey, edgeKey, otherSegments)) {
       const segmentAxis = axisOf(segment.a, segment.b);
       if (segmentAxis === 'h') {
         const y = segment.a.y;
@@ -246,7 +250,6 @@ export function buildVerticalBridgeXValues(
           addInteriorAxisValue(values, c.x >= a.x ? x + clearance : x - clearance, previous.x, c.x);
         }
       }
-    }
   }
   if (!mustMoveBridge) values.add(Math.round(a.x));
   return [...values];
@@ -259,6 +262,7 @@ export function buildOuterLaneContractionCandidates(
   edgeKey: string,
   pathByEdgeKey: Map<string, Point[]>,
   obstacles: Map<string, Rect>,
+  otherSegments?: readonly OrthogonalSegment[],
 ): Point[][] {
   const a = points[index];
   const b = points[index + 1];
@@ -287,9 +291,7 @@ export function buildOuterLaneContractionCandidates(
           addOuterLaneCandidate(values, rect.x + rect.width + clearance, laneX, mainMin, mainMax);
         }
       }
-      for (const [otherKey, otherPath] of pathByEdgeKey) {
-        if (otherKey === edgeKey) continue;
-        for (const segment of toSegments(otherPath)) {
+      for (const segment of resolveOtherSegments(pathByEdgeKey, edgeKey, otherSegments)) {
           if (axisOf(segment.a, segment.b) !== 'h') continue;
           if (segment.a.y <= Math.min(b.y, c.y) + EPS || segment.a.y >= Math.max(b.y, c.y) - EPS) continue;
           const minX = Math.min(segment.a.x, segment.b.x);
@@ -298,10 +300,16 @@ export function buildOuterLaneContractionCandidates(
             addOuterLaneCandidate(values, minX - clearance, laneX, mainMin, mainMax);
             addOuterLaneCandidate(values, maxX + clearance, laneX, mainMin, mainMax);
           }
-        }
       }
       for (const value of values) {
-        for (const entryY of buildHorizontalBridgeYValues(points, index, value, pathByEdgeKey, edgeKey)) {
+        for (const entryY of buildHorizontalBridgeYValues(
+          points,
+          index,
+          value,
+          pathByEdgeKey,
+          edgeKey,
+          otherSegments,
+        )) {
           const shifted = points.map(point => ({ ...point }));
           shifted[index].y = entryY;
           shifted[index + 1] = { x: value, y: entryY };
@@ -331,9 +339,7 @@ export function buildOuterLaneContractionCandidates(
           addOuterLaneCandidate(values, rect.y + rect.height + clearance, laneY, mainMin, mainMax);
         }
       }
-      for (const [otherKey, otherPath] of pathByEdgeKey) {
-        if (otherKey === edgeKey) continue;
-        for (const segment of toSegments(otherPath)) {
+      for (const segment of resolveOtherSegments(pathByEdgeKey, edgeKey, otherSegments)) {
           if (axisOf(segment.a, segment.b) !== 'v') continue;
           if (segment.a.x <= Math.min(b.x, c.x) + EPS || segment.a.x >= Math.max(b.x, c.x) - EPS) continue;
           const minY = Math.min(segment.a.y, segment.b.y);
@@ -342,10 +348,16 @@ export function buildOuterLaneContractionCandidates(
             addOuterLaneCandidate(values, minY - clearance, laneY, mainMin, mainMax);
             addOuterLaneCandidate(values, maxY + clearance, laneY, mainMin, mainMax);
           }
-        }
       }
       for (const value of values) {
-        for (const entryX of buildVerticalBridgeXValues(points, index, value, pathByEdgeKey, edgeKey)) {
+        for (const entryX of buildVerticalBridgeXValues(
+          points,
+          index,
+          value,
+          pathByEdgeKey,
+          edgeKey,
+          otherSegments,
+        )) {
           const shifted = points.map(point => ({ ...point }));
           shifted[index].x = entryX;
           shifted[index + 1] = { x: entryX, y: value };

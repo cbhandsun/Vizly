@@ -1,6 +1,6 @@
 import type { Edge } from '@xyflow/react';
 
-import type { Point, Rect } from './edgeLocalDoglegGeometry';
+import type { OrthogonalSegment, Point, Rect } from './edgeLocalDoglegGeometry';
 import {
   EPS,
   MIN_ENDPOINT_CHANNEL_NOISE,
@@ -15,6 +15,7 @@ import {
   localVisualNoise,
   segmentLength,
   slideEndpointOnSide,
+  toSegments,
 } from './edgeLocalDoglegGeometry';
 import {
   horizontalStrictCrossingCoordinates,
@@ -214,6 +215,7 @@ export function buildEndpointTinyCornerLaneCandidates(
   edgeKey: string,
   pathByEdgeKey: Map<string, Point[]>,
   sourceRect: Rect | null,
+  otherSegments?: readonly OrthogonalSegment[],
 ): Point[][] {
   if (index !== 1 || !sourceRect || points.length < 6) return [];
   const start = points[0];
@@ -244,7 +246,9 @@ export function buildEndpointTinyCornerLaneCandidates(
   const candidates: Point[][] = [];
 
   if (firstAxis === 'h') {
-    const laneValues = strictCrossingBoundaryLaneValues('x', e.x, a.y, e.y, edgeKey, pathByEdgeKey);
+    const laneValues = strictCrossingBoundaryLaneValues(
+      'x', e.x, a.y, e.y, edgeKey, pathByEdgeKey, otherSegments,
+    );
     for (const laneX of laneValues) {
       for (const direction of [-1, 1]) {
         for (const offset of endpointOffsets) {
@@ -265,7 +269,9 @@ export function buildEndpointTinyCornerLaneCandidates(
     return candidates;
   }
 
-  const laneValues = strictCrossingBoundaryLaneValues('y', e.y, a.x, e.x, edgeKey, pathByEdgeKey);
+  const laneValues = strictCrossingBoundaryLaneValues(
+    'y', e.y, a.x, e.x, edgeKey, pathByEdgeKey, otherSegments,
+  );
   for (const laneY of laneValues) {
     for (const direction of [-1, 1]) {
       for (const offset of endpointOffsets) {
@@ -293,15 +299,15 @@ export function strictCrossingBoundaryLaneValues(
   rangeEnd: number,
   edgeKey: string,
   pathByEdgeKey: Map<string, Point[]>,
+  otherSegments?: readonly OrthogonalSegment[],
 ): number[] {
   const values = new Set<number>();
   const minRange = Math.min(rangeStart, rangeEnd);
   const maxRange = Math.max(rangeStart, rangeEnd);
-  for (const [otherKey, otherPath] of pathByEdgeKey) {
-    if (otherKey === edgeKey) continue;
-    for (let index = 0; index < otherPath.length - 1; index += 1) {
-      const a = otherPath[index];
-      const b = otherPath[index + 1];
+  const segments = otherSegments ?? [...pathByEdgeKey]
+    .filter(([otherKey]) => otherKey !== edgeKey)
+    .flatMap(([, otherPath]) => toSegments(otherPath));
+  for (const { a, b } of segments) {
       const axis = axisOf(a, b);
       if (!axis) continue;
       if (coordinateAxis === 'x') {
@@ -323,7 +329,6 @@ export function strictCrossingBoundaryLaneValues(
         values.add(Math.round(Math.min(a.y, b.y)));
         values.add(Math.round(Math.max(a.y, b.y)));
       }
-    }
   }
   return [...values];
 }
@@ -395,6 +400,7 @@ export function buildEndpointChannelBypassCandidates(
   pathByEdgeKey: Map<string, Point[]>,
   sourceRect: Rect | null,
   targetRect: Rect | null,
+  otherSegments?: readonly OrthogonalSegment[],
 ): Point[][] {
   if (!sourceRect || !targetRect || points.length < 4 || localVisualNoise(points) < MIN_ENDPOINT_CHANNEL_NOISE) {
     return [];
@@ -408,7 +414,9 @@ export function buildEndpointChannelBypassCandidates(
     const endY = end.y;
     const sourceCoordinates = nodeSideCoordinates(sourceRect, 'x', start.x);
     for (const sourceX of sourceCoordinates) {
-      const directCrossings = verticalStrictCrossingCoordinates(sourceX, startY, endY, edgeKey, pathByEdgeKey);
+      const directCrossings = verticalStrictCrossingCoordinates(
+        sourceX, startY, endY, edgeKey, pathByEdgeKey, otherSegments,
+      );
       if (directCrossings.length === 0) continue;
       const movedStart = slideEndpointOnSide(start, sourceRect, 'v', sourceX);
       if (!movedStart) continue;
@@ -437,7 +445,9 @@ export function buildEndpointChannelBypassCandidates(
     const endX = end.x;
     const sourceCoordinates = nodeSideCoordinates(sourceRect, 'y', start.y);
     for (const sourceY of sourceCoordinates) {
-      const directCrossings = horizontalStrictCrossingCoordinates(sourceY, startX, endX, edgeKey, pathByEdgeKey);
+      const directCrossings = horizontalStrictCrossingCoordinates(
+        sourceY, startX, endX, edgeKey, pathByEdgeKey, otherSegments,
+      );
       if (directCrossings.length === 0) continue;
       const movedStart = slideEndpointOnSide(start, sourceRect, 'h', sourceY);
       if (!movedStart) continue;

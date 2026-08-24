@@ -13,6 +13,7 @@ const asRecord = (value: unknown): Record<string, unknown> => (
 );
 
 export type EdgePathInteractionContext = {
+  otherSegments: readonly OrthogonalSegment[];
   countCrossings: (segments: readonly OrthogonalSegment[]) => number;
   countParallelOverlap: (segments: readonly OrthogonalSegment[]) => number;
 };
@@ -283,6 +284,7 @@ export function createEdgePathInteractionContext(
     }
   }
   return {
+    otherSegments: Object.freeze(otherSegments),
     countCrossings(segments: readonly OrthogonalSegment[]): number {
       let total = 0;
       for (const segment of segments) {

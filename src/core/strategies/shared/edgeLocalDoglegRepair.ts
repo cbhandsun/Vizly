@@ -62,6 +62,22 @@ import {
   type EdgePathQualityEvaluationContext,
 } from './edgeStrictCrossingGuard';
 
+export type LocalDoglegRepairDiagnostics = {
+  riskyEdgeCount: number;
+  processedEdgeCount: number;
+  passCount: number;
+  candidateCount: number;
+  qualityEvaluationCount: number;
+};
+
+export const createLocalDoglegRepairDiagnostics = (): LocalDoglegRepairDiagnostics => ({
+  riskyEdgeCount: 0,
+  processedEdgeCount: 0,
+  passCount: 0,
+  candidateCount: 0,
+  qualityEvaluationCount: 0,
+});
+
 function findBestLocalDoglegCandidate(
   path: Point[],
   edge: Edge,
@@ -76,7 +92,10 @@ function findBestLocalDoglegCandidate(
   obstacleContext: EdgeObstacleInteractionContext,
   qualityContext: EdgePathQualityEvaluationContext,
   interactionContext = createEdgePathInteractionContext(edgeKey, pathByEdgeKey),
+  diagnostics?: LocalDoglegRepairDiagnostics,
 ): Point[] | null {
+  let candidateCount = 0;
+  let qualityEvaluationCount = 0;
   const currentLength = pathLength(path);
   const currentBends = bendCount(path);
   const currentSegments = toSegments(path);
@@ -98,6 +117,7 @@ function findBestLocalDoglegCandidate(
 
   const tryCandidate = (candidate: Point[] | null, options: { preserveEndpoints?: boolean } = {}) => {
     if (!candidate) return;
+    candidateCount += 1;
     const preserveEndpoints = options.preserveEndpoints !== false;
     const snapshot = createLocalDoglegCandidateSnapshot(candidate);
     const normalized = snapshot.path;
@@ -111,6 +131,7 @@ function findBestLocalDoglegCandidate(
     const crossings = interactionContext.countCrossings(snapshot.segments);
     if (crossings > currentCrossings || crossings > bestCrossings) return;
     const candidateEdges = candidateBuffer.withPath(normalized);
+    qualityEvaluationCount += 1;
     const candidateQuality = qualityContext.evaluateChanged(candidateEdges, [edgeIndex]);
     const tinyGateCleanup = currentQuality.tinyInteriorDoglegs > 0
       && candidateQuality.tinyInteriorDoglegs < currentQuality.tinyInteriorDoglegs
@@ -193,13 +214,22 @@ function findBestLocalDoglegCandidate(
     pathByEdgeKey,
     sourceRect,
     targetRect,
+    interactionContext.otherSegments,
   )) {
     tryCandidate(candidate, { preserveEndpoints: false });
   }
 
   for (let index = 1; index + 3 < path.length - 1; index += 1) {
     tryCandidate(buildStepCandidate(path, index));
-    for (const candidate of buildOuterLaneContractionCandidates(path, index, edge, edgeKey, pathByEdgeKey, obstacles)) {
+    for (const candidate of buildOuterLaneContractionCandidates(
+      path,
+      index,
+      edge,
+      edgeKey,
+      pathByEdgeKey,
+      obstacles,
+      interactionContext.otherSegments,
+    )) {
       tryCandidate(candidate);
     }
   }
@@ -218,6 +248,7 @@ function findBestLocalDoglegCandidate(
       edgeKey,
       pathByEdgeKey,
       sourceRect,
+      interactionContext.otherSegments,
     )) {
       tryCandidate(candidate, { preserveEndpoints: false });
     }
@@ -241,6 +272,10 @@ function findBestLocalDoglegCandidate(
     tryCandidate(buildFiveSegmentHairpinCollapseCandidate(path, index));
   }
 
+  if (diagnostics) {
+    diagnostics.candidateCount += candidateCount;
+    diagnostics.qualityEvaluationCount += qualityEvaluationCount;
+  }
   return bestPath;
 }
 
@@ -257,10 +292,12 @@ function repairPath(
   targetRect: Rect | null,
   obstacleContext: EdgeObstacleInteractionContext,
   qualityContext: EdgePathQualityEvaluationContext,
+  diagnostics?: LocalDoglegRepairDiagnostics,
 ): Point[] {
   let current = compactPath(path);
   const interactionContext = createEdgePathInteractionContext(edgeKey, pathByEdgeKey);
   for (let pass = 0; pass < 6; pass += 1) {
+    if (diagnostics) diagnostics.passCount += 1;
     const candidate = findBestLocalDoglegCandidate(
       current,
       edge,
@@ -275,6 +312,7 @@ function repairPath(
       obstacleContext,
       qualityContext,
       interactionContext,
+      diagnostics,
     );
     if (!candidate || pathEquals(candidate, current)) break;
     current = candidate;
@@ -461,7 +499,11 @@ export function widenReadableSideStepArtifacts(edges: Edge[], nodes: ReactFlowNo
   return changed ? widenedEdges : edges;
 }
 
-export function repairLocalDoglegArtifacts(edges: Edge[], nodes: ReactFlowNode[]): Edge[] {
+export function repairLocalDoglegArtifacts(
+  edges: Edge[],
+  nodes: ReactFlowNode[],
+  diagnostics?: LocalDoglegRepairDiagnostics,
+): Edge[] {
   if (edges.length === 0) return edges;
 
   const pathByEdgeKey = new Map<string, Point[]>();
@@ -472,6 +514,7 @@ export function repairLocalDoglegArtifacts(edges: Edge[], nodes: ReactFlowNode[]
     if (path.length >= 2) pathByEdgeKey.set(edgeKeys[index], path);
     if (path.length >= 4 && hasLocalDoglegRisk(path)) riskyEdgeKeys.add(edgeKeys[index]);
   });
+  if (diagnostics) diagnostics.riskyEdgeCount += riskyEdgeKeys.size;
   if (pathByEdgeKey.size === 0 || riskyEdgeKeys.size === 0) return edges;
 
   const obstacles = getRoutingObstacles(nodes);
@@ -481,6 +524,7 @@ export function repairLocalDoglegArtifacts(edges: Edge[], nodes: ReactFlowNode[]
     const edgeKey = edgeKeys[index];
     const path = pathByEdgeKey.get(edgeKey);
     if (!path || path.length < 4 || !riskyEdgeKeys.has(edgeKey)) return edge;
+    if (diagnostics) diagnostics.processedEdgeCount += 1;
     const sourceRect = nodeRect(nodeById.get(edge.source));
     const targetRect = nodeRect(nodeById.get(edge.target));
     const obstacleContext = createEdgeObstacleInteractionContext(edge, obstacles);
@@ -499,6 +543,7 @@ export function repairLocalDoglegArtifacts(edges: Edge[], nodes: ReactFlowNode[]
       targetRect,
       obstacleContext,
       qualityContext,
+      diagnostics,
     );
     let finalRepaired = repairRemainingTinyArtifactsWithMaze(
       repaired,
@@ -529,6 +574,7 @@ export function repairLocalDoglegArtifacts(edges: Edge[], nodes: ReactFlowNode[]
         targetRect,
         obstacleContext,
         qualityContext,
+        diagnostics,
       );
     }
     if (pathEquals(path, finalRepaired)) return edge;
