@@ -296,21 +296,29 @@ const TimelineSmartActionBar: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
         }));
     };
 
-    const handleMenuClick = ({ key }: { key: string }) => {
-        if (key === 'event' || key === 'phase' || key === 'milestone') {
-            handleAppendNode(key);
-        }
-    };
-
     return (
         <Dropdown
             trigger={['click']}
             menu={{
-                onClick: handleMenuClick,
                 items: [
-                    { key: 'event', icon: <Clock aria-hidden="true" size={16} color="#1890ff" strokeWidth={2} />, label: t('plugins.timeline.labels.event') },
-                    { key: 'phase', icon: <Calendar aria-hidden="true" size={16} color="#52c41a" strokeWidth={2} />, label: t('plugins.timeline.labels.phase') },
-                    { key: 'milestone', icon: <FlagOutlined aria-hidden="true" style={{ color: '#cf1322' }} />, label: t('plugins.timeline.labels.milestone') },
+                    {
+                        key: 'event',
+                        icon: <Clock aria-hidden="true" size={16} color="#1890ff" strokeWidth={2} />,
+                        label: t('plugins.timeline.labels.event'),
+                        onClick: () => handleAppendNode('event'),
+                    },
+                    {
+                        key: 'phase',
+                        icon: <Calendar aria-hidden="true" size={16} color="#52c41a" strokeWidth={2} />,
+                        label: t('plugins.timeline.labels.phase'),
+                        onClick: () => handleAppendNode('phase'),
+                    },
+                    {
+                        key: 'milestone',
+                        icon: <FlagOutlined aria-hidden="true" style={{ color: '#cf1322' }} />,
+                        label: t('plugins.timeline.labels.milestone'),
+                        onClick: () => handleAppendNode('milestone'),
+                    },
                 ],
             }}
         >

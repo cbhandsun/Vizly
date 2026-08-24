@@ -161,6 +161,43 @@ describe('TimelinePlugin toolbar accessibility and history', () => {
         expect(messageMocks.success).toHaveBeenCalledWith('New event added');
     });
 
+    it('creates a zero-duration milestone when its menu item is clicked', async () => {
+        const context = createContext();
+        render(<>{getCreationControls(context)}</>);
+
+        fireEvent.click(screen.getByRole('button', { name: '新建时间线任务' }));
+        fireEvent.click(await screen.findByRole('menuitem', { name: 'New milestone' }));
+
+        expect(context.takeSnapshot).toHaveBeenCalledTimes(1);
+        const updateNodes = vi.mocked(context.setNodes).mock.calls[0]?.[0];
+        expect(typeof updateNodes).toBe('function');
+        if (typeof updateNodes === 'function') {
+            const appended = updateNodes([sourceNode])[1];
+            expect(appended).toMatchObject({
+                type: 'timelineNode',
+                selected: true,
+                data: {
+                    type: 'milestone',
+                    label: 'New milestone',
+                    status: 'pending',
+                },
+            });
+            expect(appended.data.date).toBe(appended.data.endDate);
+            expect(appended.data).not.toHaveProperty('progress');
+        }
+
+        const updateEdges = vi.mocked(context.setEdges).mock.calls[0]?.[0];
+        expect(typeof updateEdges).toBe('function');
+        if (typeof updateEdges === 'function') {
+            expect(updateEdges([])[0]).toMatchObject({
+                source: 'source',
+                target: expect.stringMatching(/^tl-node-/),
+                type: 'smoothstep',
+            });
+        }
+        expect(messageMocks.success).toHaveBeenCalledWith('New milestone added');
+    });
+
     it('keeps each toolbar action at the commercial touch target', () => {
         const css = readFileSync(resolve('src/core/plugins/TimelinePlugin.css'), 'utf8');
         expect(css).toMatch(/\.timeline-plugin-toolbar__action\.ant-btn[\s\S]*?min-height: var\(--commercial-touch-target, 44px\)/);
