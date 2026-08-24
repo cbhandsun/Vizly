@@ -8,7 +8,6 @@ import { repairEndpointLaneCrossings } from '../../strategies/shared/edgeEndpoin
 import { repairEndpointOrthogonalPaths } from '../../strategies/shared/edgeEndpointPathRepair';
 import { refineGlobalEdgeWaypoints } from '../../strategies/shared/edgeGlobalWaypointRefinement';
 import { createLocalDoglegRepairDiagnostics } from '../../strategies/shared/edgeLocalDoglegRepair';
-import { repairReverseFlowBypassCrossings } from '../../strategies/shared/edgeReverseFlowBypassRepair';
 import {
   calculateEdgePathQualityScore,
   chooseFewestStrictCrossings,
@@ -18,7 +17,6 @@ import { synthesizeSharedTargetTrunks } from '../../strategies/shared/edgeShared
 import {
   createEdgeWaypointRefinementDiagnostics,
   reduceEdgeCrossingsWithWaypoints,
-  repairSharedTrunkAwareCrossings,
 } from '../../strategies/shared/edgeRoutingPipeline';
 import { repairStrictBypassesIfNeeded } from './baseReactFlowDisplayObstacleRepair';
 import {
@@ -56,6 +54,7 @@ import { createDisplayQualityGlobalRefineSession } from './baseReactFlowDisplayQ
 import { createDisplayQualityDoglegRepairSession } from './baseReactFlowDisplayQualityDoglegSession';
 import { createDisplayQualityCrossingCandidates } from './baseReactFlowDisplayQualityCrossingCandidates';
 import { repairDisplayQualityTopology } from './baseReactFlowDisplayQualityTopology';
+import { repairBaseReactFlowQualityStructuralCrossings } from './baseReactFlowDisplayQualityStructuralCrossing';
 
 export {
   boundedQualityPolishNeedsMicroRepair,
@@ -202,26 +201,11 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
     candidateCount: sameNodeRoleRepairedEdges.length,
     onTrace: recordCrossingPhaseTrace,
   });
-  const reverseFlowBypassEdges = repairEndpointOrthogonalPaths(
-    repairReverseFlowBypassCrossings(sameNodeRoleRepairedEdges, repairNodes),
-    repairNodes,
-  );
-  const finalCrossingRepairedEdges = repairEndpointOrthogonalPaths(
-    repairSharedTrunkAwareCrossings(reverseFlowBypassEdges, repairNodes),
-    repairNodes,
-  );
-  const finalReverseFlowBypassEdges = repairEndpointOrthogonalPaths(
-    repairReverseFlowBypassCrossings(finalCrossingRepairedEdges, repairNodes),
-    repairNodes,
-  );
-  const finalDisplayCrossingRepairedEdges = repairEndpointOrthogonalPaths(
-    repairSharedTrunkAwareCrossings(finalReverseFlowBypassEdges, repairNodes),
-    repairNodes,
-  );
-  const endpointLaneNudgedEdges = repairEndpointLaneCrossings(
-    finalDisplayCrossingRepairedEdges,
-    repairNodes,
-  );
+  const endpointLaneNudgedEdges = repairBaseReactFlowQualityStructuralCrossings({
+    edges: sameNodeRoleRepairedEdges,
+    nodes: repairNodes,
+    onPhaseTrace: recordCrossingPhaseTrace,
+  });
   structuralCrossingTimer.finish(
     endpointLaneNudgedEdges === sameNodeRoleRepairedEdges ? 'skip' : 'accepted',
     endpointLaneNudgedEdges === sameNodeRoleRepairedEdges ? 0 : endpointLaneNudgedEdges.length,

@@ -48,6 +48,11 @@ export const DISPLAY_ROUTING_PHASE_NAMES = [
   'quality-topology-finalize',
   'quality-crossing-sweeps',
   'quality-crossing-structural',
+  'quality-crossing-structural-reverse-initial',
+  'quality-crossing-structural-shared-initial',
+  'quality-crossing-structural-reverse-final',
+  'quality-crossing-structural-shared-final',
+  'quality-crossing-structural-endpoint-lane',
   'quality-crossing-global-refine',
   'quality-crossing-global-refine-initial',
   'quality-crossing-global-refine-fixed-point',
@@ -189,7 +194,7 @@ export const DISPLAY_ROUTING_PHASE_NAMES = [
 // One aggregate entry per declared phase plus headroom for the small number of
 // phases that can run under two explicit parents. Repeated work is folded by
 // the Worker recorder, so the bound no longer truncates late final-gate phases.
-export const DISPLAY_ROUTING_PHASE_TRACE_LIMIT = 191;
+export const DISPLAY_ROUTING_PHASE_TRACE_LIMIT = 196;
 
 export const DISPLAY_ROUTING_PHASE_RESOLUTIONS = [
   'hit',
@@ -293,6 +298,11 @@ const DISPLAY_ROUTING_PHASE_PARENTS: Readonly<
   'quality-topology-finalize': 'quality-topology',
   'quality-crossing-sweeps': 'quality',
   'quality-crossing-structural': 'quality-crossing-sweeps',
+  'quality-crossing-structural-reverse-initial': 'quality-crossing-structural',
+  'quality-crossing-structural-shared-initial': 'quality-crossing-structural',
+  'quality-crossing-structural-reverse-final': 'quality-crossing-structural',
+  'quality-crossing-structural-shared-final': 'quality-crossing-structural',
+  'quality-crossing-structural-endpoint-lane': 'quality-crossing-structural',
   'quality-crossing-global-refine': 'quality-crossing-sweeps',
   'quality-crossing-global-refine-initial': 'quality-crossing-global-refine',
   'quality-crossing-global-refine-fixed-point': 'quality-crossing-global-refine',

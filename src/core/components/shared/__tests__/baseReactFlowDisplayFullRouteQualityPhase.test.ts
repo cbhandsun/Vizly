@@ -10,8 +10,41 @@ import {
   DISPLAY_DETACHED_OVERLAP_REPAIR_OPTIONS,
 } from '../baseReactFlowDisplayOverlapRepair';
 import { createDisplayQualityGlobalRefineSession } from '../baseReactFlowDisplayQualityGlobalRefine';
+import { repairBaseReactFlowQualityStructuralCrossings } from '../baseReactFlowDisplayQualityStructuralCrossing';
 
 describe('baseReactFlowDisplayFullRouteQualityPhase', () => {
+  it('reports each structural crossing repair stage without changing a clean route', () => {
+    const edges: Edge[] = [{
+      id: 'edge',
+      source: 'source',
+      target: 'target',
+      data: { computedPath: [{ x: 50, y: 60 }, { x: 50, y: 200 }] },
+    }];
+    const nodes = [
+      { id: 'source', position: { x: 0, y: 0 }, width: 100, height: 60, data: {} },
+      { id: 'target', position: { x: 0, y: 200 }, width: 100, height: 60, data: {} },
+    ];
+    const traces: Array<{ phase: string; parentPhase?: string }> = [];
+
+    const result = repairBaseReactFlowQualityStructuralCrossings({
+      edges,
+      nodes,
+      onPhaseTrace: trace => traces.push(trace),
+    });
+
+    expect(result).toBe(edges);
+    expect(traces.map(trace => trace.phase)).toEqual([
+      'quality-crossing-structural-reverse-initial',
+      'quality-crossing-structural-shared-initial',
+      'quality-crossing-structural-reverse-final',
+      'quality-crossing-structural-shared-final',
+      'quality-crossing-structural-endpoint-lane',
+    ]);
+    expect(traces.every(trace => (
+      trace.parentPhase === 'quality-crossing-structural'
+    ))).toBe(true);
+  });
+
   it('bounds the speculative initial detached candidate for large routes', () => {
     expect(selectDisplayQualityInitialDetachedOverlapOptions(true))
       .toBe(DISPLAY_BOUNDED_DETACHED_OVERLAP_REPAIR_OPTIONS);
