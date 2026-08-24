@@ -21,6 +21,7 @@ import {
   synthesizeSharedTargetTrunks,
 } from '../../strategies/shared/edgeSharedTrunkSynthesis';
 import {
+  createEdgeWaypointRefinementDiagnostics,
   reduceEdgeCrossingsWithWaypoints,
   repairSharedTrunkAwareCrossings,
 } from '../../strategies/shared/edgeRoutingPipeline';
@@ -100,6 +101,7 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
     candidateCount: normalizedEdges.length,
     onTrace: onPhaseTrace,
   });
+  const globalRouteDiagnostics = createEdgeWaypointRefinementDiagnostics();
   const globallyRoutedEdges = canReusePreparedGlobalRouting
     ? topologySeed.edges
     : reduceEdgeCrossingsWithWaypoints(
@@ -112,6 +114,7 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
           topologyPlan,
           useBoundedLargeRepair,
         ),
+        diagnostics: globalRouteDiagnostics,
       },
     );
   const detachedRoutedEdges = reusePreparedGlobalRouting
@@ -125,6 +128,13 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
   globalRouteTimer.finish(
     detachedRoutedEdges === normalizedEdges ? 'skip' : 'accepted',
     detachedRoutedEdges === normalizedEdges ? 0 : detachedRoutedEdges.length,
+    {
+      candidateCount: globalRouteDiagnostics.generatedCandidateCount,
+      evaluationCount: globalRouteDiagnostics.evaluationCount,
+      scannedNodeCount: globalRouteDiagnostics.scannedNodeCount,
+      scannedSegmentCount: globalRouteDiagnostics.scannedSegmentCount,
+      scannedEdgePairCount: globalRouteDiagnostics.scannedEdgePairCount,
+    },
   );
   const topologyTimer = startDisplayRoutingPhaseTrace({
     phase: 'quality-topology',

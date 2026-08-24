@@ -34,6 +34,27 @@ import {
   type RoutingWaypointCandidateAxes,
 } from './edgeWaypointCandidateRepair';
 
+export type EdgeWaypointRefinementDiagnostics = {
+  processedCandidateEdgeCount: number;
+  generatedCandidateCount: number;
+  evaluationCount: number;
+  scannedNodeCount: number;
+  scannedSegmentCount: number;
+  scannedEdgePairCount: number;
+  lowerBoundRejectionCount: number;
+};
+
+export const createEdgeWaypointRefinementDiagnostics = (
+): EdgeWaypointRefinementDiagnostics => ({
+  processedCandidateEdgeCount: 0,
+  generatedCandidateCount: 0,
+  evaluationCount: 0,
+  scannedNodeCount: 0,
+  scannedSegmentCount: 0,
+  scannedEdgePairCount: 0,
+  lowerBoundRejectionCount: 0,
+});
+
 export function repairSharedTrunkAwareCrossings(
   edges: Edge[],
   nodes: ReactFlowNode[],
@@ -368,12 +389,39 @@ function scorePathCandidate(
   visualContext: EdgeVisualContext,
   obstacleHits: number,
   baseLength: number,
+  diagnostics?: EdgeWaypointRefinementDiagnostics,
+  improvementCutoff?: number,
 ): number {
   const segments = toEdgeRoutingSegments(path);
+  let scannedNodeCount = 0;
+  let scannedSegmentCount = 0;
+  let scannedEdgePairCount = 0;
+  const cutoff = typeof improvementCutoff === 'number' && Number.isFinite(improvementCutoff)
+    ? improvementCutoff
+    : undefined;
+  const finishScore = (score: number, rejectedAtLowerBound = false): number => {
+    if (diagnostics) {
+      diagnostics.evaluationCount += 1;
+      diagnostics.scannedNodeCount += scannedNodeCount;
+      diagnostics.scannedSegmentCount += scannedSegmentCount;
+      diagnostics.scannedEdgePairCount += scannedEdgePairCount;
+      if (rejectedAtLowerBound) diagnostics.lowerBoundRejectionCount += 1;
+    }
+    return score;
+  };
+  const rejectsAtLowerBound = (lowerBound: number): boolean => (
+    cutoff !== undefined && lowerBound >= cutoff
+  );
+  const obstacleScore = obstacleHits * 120000;
+  if (rejectsAtLowerBound(obstacleScore)) {
+    return finishScore(cutoff ?? obstacleScore, true);
+  }
   let crossingsAccepted = 0;
   let crossingsAll = 0;
   let overlap = 0;
   for (const otherSegments of acceptedSegments) {
+    scannedEdgePairCount += 1;
+    scannedSegmentCount += segments.length * otherSegments.length;
     for (const first of segments) {
       for (const second of otherSegments) {
         const relation = edgeRoutingSegmentRelation(first, second);
@@ -381,8 +429,13 @@ function scorePathCandidate(
         overlap += relation.overlap;
       }
     }
+    if (rejectsAtLowerBound(obstacleScore + crossingsAccepted * 2600)) {
+      return finishScore(cutoff ?? obstacleScore, true);
+    }
   }
   for (const otherSegments of originalSegments) {
+    scannedEdgePairCount += 1;
+    scannedSegmentCount += segments.length * otherSegments.length;
     for (const first of segments) {
       for (const second of otherSegments) {
         const relation = edgeRoutingSegmentRelation(first, second);
@@ -390,19 +443,40 @@ function scorePathCandidate(
         overlap += relation.overlap * 0.25;
       }
     }
+    if (rejectsAtLowerBound(
+      obstacleScore + crossingsAccepted * 2600 + crossingsAll * 360,
+    )) return finishScore(cutoff ?? obstacleScore, true);
   }
 
+  const relationScore = obstacleScore
+    + crossingsAccepted * 2600
+    + crossingsAll * 360
+    + overlap * 12;
+  if (rejectsAtLowerBound(relationScore)) {
+    return finishScore(cutoff ?? relationScore, true);
+  }
+  scannedNodeCount += segments.length
+    * (visualContext.business.length + visualContext.containers.length);
+  const visualScore = scoreVisualSoftConstraints(
+    path,
+    edge,
+    visualContext,
+    baseLength,
+  );
+  if (rejectsAtLowerBound(relationScore + visualScore)) {
+    return finishScore(cutoff ?? relationScore, true);
+  }
   const length = pathLength(path);
   const bends = Math.max(0, path.length - 2);
   const detour = Math.max(0, length - baseLength);
-  return obstacleHits * 120000
+  return finishScore(obstacleScore
     + crossingsAccepted * 2600
     + crossingsAll * 360
     + overlap * 12
-    + scoreVisualSoftConstraints(path, edge, visualContext, baseLength)
+    + visualScore
     + bends * 10
     + length * 0.015
-    + detour * 0.08;
+    + detour * 0.08);
 }
 
 export function reduceEdgeCrossingsWithWaypoints(
@@ -414,6 +488,8 @@ export function reduceEdgeCrossingsWithWaypoints(
     onlySoftRiskEdges?: boolean;
     maxCandidateEdges?: number;
     preferredAxes?: RoutingWaypointCandidateAxes;
+    diagnostics?: EdgeWaypointRefinementDiagnostics;
+    disableScoreLowerBoundPruning?: boolean;
   } = {},
 ): Edge[] {
   if (edges.length < 1) return edges;
@@ -469,6 +545,7 @@ export function reduceEdgeCrossingsWithWaypoints(
       continue;
     }
     processedCandidateEdges += 1;
+    if (options.diagnostics) options.diagnostics.processedCandidateEdgeCount += 1;
 
     const otherSegments = Array.from(originalSegmentsById.entries())
       .filter(([id]) => id !== edge.id)
@@ -480,6 +557,7 @@ export function reduceEdgeCrossingsWithWaypoints(
       includeNodeAwareLanes: hasSoftRisk,
       preferredAxes: options.preferredAxes,
     });
+    if (options.diagnostics) options.diagnostics.generatedCandidateCount += candidates.length;
     let bestPath = path;
     let bestObstacleHits = obstacleEvaluation.countUnrelatedObstacleHits(path);
     let bestScore = scorePathCandidate(
@@ -490,10 +568,14 @@ export function reduceEdgeCrossingsWithWaypoints(
       edgeVisualContext,
       bestObstacleHits,
       baseLength,
+      options.diagnostics,
     );
     for (const candidate of candidates.slice(1)) {
       if (!preservesSharedTrunk(candidate, path, edge, buddyGroups, obstacles)) continue;
-      const candidateObstacleHits = obstacleEvaluation.countUnrelatedObstacleHits(candidate);
+      const candidateObstacleHits = obstacleEvaluation.countUnrelatedObstacleHits(
+        candidate,
+        bestObstacleHits,
+      );
       if (candidateObstacleHits > bestObstacleHits) continue;
       const score = scorePathCandidate(
         candidate,
@@ -503,6 +585,8 @@ export function reduceEdgeCrossingsWithWaypoints(
         edgeVisualContext,
         candidateObstacleHits,
         baseLength,
+        options.diagnostics,
+        options.disableScoreLowerBoundPruning ? undefined : bestScore - 5,
       );
       if (score < bestScore - 5) {
         bestScore = score;
@@ -516,6 +600,9 @@ export function reduceEdgeCrossingsWithWaypoints(
         ? originalSegmentsById.get(edge.id) ?? toEdgeRoutingSegments(bestPath)
         : toEdgeRoutingSegments(bestPath),
     );
+    if (options.diagnostics) {
+      options.diagnostics.scannedNodeCount += obstacleEvaluation.readMetrics().scannedNodeCount;
+    }
   }
 
   const reduced = edges.map(edge => {

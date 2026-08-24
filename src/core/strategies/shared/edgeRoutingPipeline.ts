@@ -51,6 +51,7 @@ import {
   edgeTopologyPriority,
 } from './edgeRoutingTopology';
 import {
+  createEdgeWaypointRefinementDiagnostics,
   reduceEdgeCrossingsWithWaypoints,
   repairSharedTrunkAwareCrossings,
   repairSharedTrunkAwareObstacles,
@@ -68,6 +69,7 @@ import {
 
 export {
   computeAbsolutePosition,
+  createEdgeWaypointRefinementDiagnostics,
   reduceEdgeCrossingsWithWaypoints,
   repairSharedTrunkAwareCrossings,
   setAbsolutePositions,

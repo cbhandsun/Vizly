@@ -247,4 +247,25 @@ describe('routing obstacle evaluation context', () => {
     expect(context.countPathHits(path)).not.toBe(snapshot.routingObstacleHits);
     expect(context.evaluate(path)).not.toBe(snapshot);
   });
+
+  it('stops only after proving that a bounded obstacle threshold was exceeded', () => {
+    const obstacles = new Map<string, Rect>([
+      ['first', { x: 10, y: 0, width: 10, height: 20 }],
+      ['second', { x: 30, y: 0, width: 10, height: 20 }],
+      ['third', { x: 50, y: 0, width: 10, height: 20 }],
+    ]);
+    const path = [{ x: 0, y: 10 }, { x: 80, y: 10 }];
+    const testEdge = edge('missing-source', 'missing-target');
+    const bounded = createRoutingObstacleEvaluationContext(testEdge, obstacles);
+    const exhaustive = createRoutingObstacleEvaluationContext(testEdge, obstacles);
+
+    expect(bounded.countUnrelatedObstacleHits(path, 0)).toBe(1);
+    expect(bounded.readMetrics().scannedNodeCount).toBe(1);
+    expect(exhaustive.countUnrelatedObstacleHits(path)).toBe(3);
+    expect(exhaustive.readMetrics().scannedNodeCount).toBe(3);
+    expect(createRoutingObstacleEvaluationContext(testEdge, obstacles)
+      .countUnrelatedObstacleHits(path, 3)).toBe(3);
+    expect(createRoutingObstacleEvaluationContext(testEdge, obstacles)
+      .countUnrelatedObstacleHits(path, Number.NaN)).toBe(3);
+  });
 });

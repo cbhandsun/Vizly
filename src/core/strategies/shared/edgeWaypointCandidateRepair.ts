@@ -16,7 +16,7 @@ export type RoutingObstacleHitEvaluation = Readonly<{
 export type RoutingObstacleEvaluationContext = Readonly<{
   countEndpointNodeTraversalHits: (path: Point[]) => number;
   countPathHits: (path: Point[]) => number;
-  countUnrelatedObstacleHits: (path: Point[]) => number;
+  countUnrelatedObstacleHits: (path: Point[], maximumHits?: number) => number;
   evaluate: (path: Point[]) => RoutingObstacleHitEvaluation;
   readMetrics: () => Readonly<{ scannedNodeCount: number }>;
 }>;
@@ -139,7 +139,11 @@ const countPathRectHits = (
   path: Point[],
   rects: readonly PaddedRectBounds[],
   onNodeScan?: (count: number) => void,
+  maximumHits?: number,
 ): number => {
+  const boundedMaximum = Number.isSafeInteger(maximumHits) && (maximumHits ?? -1) >= 0
+    ? maximumHits
+    : undefined;
   let hits = 0;
   for (let index = 0; index < path.length - 1; index += 1) {
     const a = path[index];
@@ -152,11 +156,18 @@ const countPathRectHits = (
       const y = a.y;
       const segmentStart = Math.min(a.x, b.x);
       const segmentEnd = Math.max(a.x, b.x);
-      onNodeScan?.(rects.length);
-      for (const rect of rects) {
+      for (let rectIndex = 0; rectIndex < rects.length; rectIndex += 1) {
+        const rect = rects[rectIndex];
         if (y <= rect.y1 || y >= rect.y2) continue;
-        if (Math.max(segmentStart, rect.x1) < Math.min(segmentEnd, rect.x2)) hits += 1;
+        if (Math.max(segmentStart, rect.x1) < Math.min(segmentEnd, rect.x2)) {
+          hits += 1;
+          if (boundedMaximum !== undefined && hits > boundedMaximum) {
+            onNodeScan?.(rectIndex + 1);
+            return hits;
+          }
+        }
       }
+      onNodeScan?.(rects.length);
       continue;
     }
 
@@ -164,11 +175,18 @@ const countPathRectHits = (
       const x = a.x;
       const segmentStart = Math.min(a.y, b.y);
       const segmentEnd = Math.max(a.y, b.y);
-      onNodeScan?.(rects.length);
-      for (const rect of rects) {
+      for (let rectIndex = 0; rectIndex < rects.length; rectIndex += 1) {
+        const rect = rects[rectIndex];
         if (x <= rect.x1 || x >= rect.x2) continue;
-        if (Math.max(segmentStart, rect.y1) < Math.min(segmentEnd, rect.y2)) hits += 1;
+        if (Math.max(segmentStart, rect.y1) < Math.min(segmentEnd, rect.y2)) {
+          hits += 1;
+          if (boundedMaximum !== undefined && hits > boundedMaximum) {
+            onNodeScan?.(rectIndex + 1);
+            return hits;
+          }
+        }
       }
+      onNodeScan?.(rects.length);
     }
   }
   return hits;
@@ -468,8 +486,8 @@ export function createRoutingObstacleEvaluationContext(
   const recordNodeScans = (count: number) => {
     scannedNodeCount += count;
   };
-  const countUnrelatedPathHits = (path: Point[]): number => (
-    countPathRectHits(path, unrelatedRects, recordNodeScans)
+  const countUnrelatedPathHits = (path: Point[], maximumHits?: number): number => (
+    countPathRectHits(path, unrelatedRects, recordNodeScans, maximumHits)
   );
   const countEndpointPathHits = (path: Point[]): number => (
     countPathRectHits(path, endpointRects, recordNodeScans)
@@ -492,8 +510,14 @@ export function createRoutingObstacleEvaluationContext(
   });
 }
 
-export function countUnrelatedObstacleHits(path: Point[], edge: Edge, obstacles: Map<string, Rect>): number {
-  return createRoutingObstacleEvaluationContext(edge, obstacles).countUnrelatedObstacleHits(path);
+export function countUnrelatedObstacleHits(
+  path: Point[],
+  edge: Edge,
+  obstacles: Map<string, Rect>,
+  maximumHits?: number,
+): number {
+  return createRoutingObstacleEvaluationContext(edge, obstacles)
+    .countUnrelatedObstacleHits(path, maximumHits);
 }
 
 /**

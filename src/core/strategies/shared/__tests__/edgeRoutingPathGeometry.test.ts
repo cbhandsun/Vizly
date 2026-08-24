@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   computeAbsolutePosition as computeAbsolutePositionFromPipeline,
+  createEdgeWaypointRefinementDiagnostics as createDiagnosticsFromPipeline,
   reduceEdgeCrossingsWithWaypoints as reduceEdgeCrossingsFromPipeline,
   repairSharedTrunkAwareCrossings as repairSharedTrunkFromPipeline,
   setAbsolutePositions as setAbsolutePositionsFromPipeline,
@@ -15,6 +16,7 @@ import {
   setAbsolutePositions,
 } from '../edgeRoutingPathGeometry';
 import {
+  createEdgeWaypointRefinementDiagnostics,
   reduceEdgeCrossingsWithWaypoints,
   repairSharedTrunkAwareCrossings,
 } from '../edgeRoutingWaypointRefinement';
@@ -30,6 +32,7 @@ describe('edge routing module boundaries', () => {
   it('keeps the pipeline compatibility exports bound to the extracted implementations', () => {
     expect(computeAbsolutePositionFromPipeline).toBe(computeAbsolutePosition);
     expect(setAbsolutePositionsFromPipeline).toBe(setAbsolutePositions);
+    expect(createDiagnosticsFromPipeline).toBe(createEdgeWaypointRefinementDiagnostics);
     expect(reduceEdgeCrossingsFromPipeline).toBe(reduceEdgeCrossingsWithWaypoints);
     expect(repairSharedTrunkFromPipeline).toBe(repairSharedTrunkAwareCrossings);
   });
@@ -105,5 +108,69 @@ describe('edge routing module boundaries', () => {
     expect(sanitizeComputedPaths([edge])[0]).toBe(edge);
     const emptyEdges: Edge[] = [];
     expect(reduceEdgeCrossingsWithWaypoints(emptyEdges, [], 'TB')).toBe(emptyEdges);
+  });
+
+  it('reports bounded aggregate candidate and scan work without graph identifiers', () => {
+    const diagnostics = createEdgeWaypointRefinementDiagnostics();
+    const edges: Edge[] = [
+      {
+        id: 'first',
+        source: 'source-a',
+        target: 'target-a',
+        data: { computedPath: [{ x: 0, y: 40 }, { x: 240, y: 40 }] },
+      },
+      {
+        id: 'second',
+        source: 'source-b',
+        target: 'target-b',
+        data: { computedPath: [{ x: 120, y: 0 }, { x: 120, y: 160 }] },
+      },
+    ];
+    const nodes: Array<Node & { positionAbsolute: { x: number; y: number } }> = [
+      {
+        id: 'unrelated',
+        position: { x: 96, y: 24 },
+        positionAbsolute: { x: 96, y: 24 },
+        width: 48,
+        height: 48,
+        measured: { width: 48, height: 48 },
+        data: {},
+      },
+    ];
+
+    reduceEdgeCrossingsWithWaypoints(edges, nodes, 'TB', { diagnostics });
+
+    expect(diagnostics.processedCandidateEdgeCount).toBe(2);
+    expect(diagnostics.generatedCandidateCount).toBeGreaterThan(2);
+    expect(diagnostics.evaluationCount).toBeGreaterThan(0);
+    expect(diagnostics.evaluationCount).toBeLessThanOrEqual(diagnostics.generatedCandidateCount);
+    expect(diagnostics.scannedNodeCount).toBeGreaterThan(0);
+    expect(diagnostics.scannedSegmentCount).toBeGreaterThan(0);
+    expect(diagnostics.scannedEdgePairCount).toBeGreaterThan(0);
+    expect(Object.keys(diagnostics).sort()).toEqual([
+      'evaluationCount',
+      'generatedCandidateCount',
+      'lowerBoundRejectionCount',
+      'processedCandidateEdgeCount',
+      'scannedEdgePairCount',
+      'scannedNodeCount',
+      'scannedSegmentCount',
+    ]);
+
+    const exhaustiveDiagnostics = createEdgeWaypointRefinementDiagnostics();
+    const exhaustive = reduceEdgeCrossingsWithWaypoints(edges, nodes, 'TB', {
+      diagnostics: exhaustiveDiagnostics,
+      disableScoreLowerBoundPruning: true,
+    });
+    const boundedDiagnostics = createEdgeWaypointRefinementDiagnostics();
+    const bounded = reduceEdgeCrossingsWithWaypoints(edges, nodes, 'TB', {
+      diagnostics: boundedDiagnostics,
+    });
+    expect(bounded).toEqual(exhaustive);
+    expect(boundedDiagnostics.lowerBoundRejectionCount).toBeGreaterThan(0);
+    expect(boundedDiagnostics.scannedNodeCount)
+      .toBeLessThan(exhaustiveDiagnostics.scannedNodeCount);
+    expect(boundedDiagnostics.scannedSegmentCount)
+      .toBeLessThanOrEqual(exhaustiveDiagnostics.scannedSegmentCount);
   });
 });
