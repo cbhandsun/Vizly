@@ -338,6 +338,37 @@ describe('baseReactFlowDisplayWorkerProtocol', () => {
     ))).toBe(true);
   });
 
+  it('derives exclusive fail-closed work without exposing route content', () => {
+    const trace = (
+      phase: DisplayRoutingPhaseTrace['phase'],
+      durationMs: number,
+    ): DisplayRoutingPhaseTrace => ({
+      phase,
+      durationMs,
+      candidateCount: 14,
+      changedEdgeCount: 0,
+      resolution: 'skip',
+    });
+    const traces = finalizeDisplayRoutingPhaseTrace([
+      trace('terminal-finalize-fail-closed', 70),
+      trace('terminal-fail-closed-normalize', 5),
+      trace('terminal-fail-closed-overlap', 10),
+      trace('terminal-fail-closed-local', 8),
+      trace('terminal-fail-closed-strict', 12),
+      trace('terminal-fail-closed-selection', 6),
+      trace('terminal-fail-closed-micro', 9),
+      trace('terminal-fail-closed-gate', 4),
+    ]);
+
+    expect(traces[0]).toMatchObject({
+      parentPhase: 'terminal-finalize',
+      exclusiveDurationMs: 16,
+    });
+    expect(traces.slice(1).every(({ parentPhase }) => (
+      parentPhase === 'terminal-finalize-fail-closed'
+    ))).toBe(true);
+  });
+
   it('parses validate-or-route candidates and degrades malformed candidates to a reroute', () => {
     const valid = parseDisplayEdgesWorkerRequest({
       ...validRepairRequest,

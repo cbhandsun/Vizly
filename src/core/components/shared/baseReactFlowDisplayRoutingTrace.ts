@@ -118,6 +118,13 @@ export const DISPLAY_ROUTING_PHASE_NAMES = [
   'terminal-finalize-axis',
   'terminal-finalize-outer-port',
   'terminal-finalize-fail-closed',
+  'terminal-fail-closed-normalize',
+  'terminal-fail-closed-overlap',
+  'terminal-fail-closed-local',
+  'terminal-fail-closed-strict',
+  'terminal-fail-closed-selection',
+  'terminal-fail-closed-micro',
+  'terminal-fail-closed-gate',
   'finalizer',
   'measured-repair',
   'measured-repair-normalize',
@@ -175,7 +182,7 @@ export const DISPLAY_ROUTING_PHASE_NAMES = [
 // One aggregate entry per declared phase plus headroom for the small number of
 // phases that can run under two explicit parents. Repeated work is folded by
 // the Worker recorder, so the bound no longer truncates late final-gate phases.
-export const DISPLAY_ROUTING_PHASE_TRACE_LIMIT = 176;
+export const DISPLAY_ROUTING_PHASE_TRACE_LIMIT = 184;
 
 export const DISPLAY_ROUTING_PHASE_RESOLUTIONS = [
   'hit',
@@ -334,6 +341,13 @@ const DISPLAY_ROUTING_PHASE_PARENTS: Readonly<
   'terminal-finalize-axis': 'terminal-finalize',
   'terminal-finalize-outer-port': 'terminal-finalize',
   'terminal-finalize-fail-closed': 'terminal-finalize',
+  'terminal-fail-closed-normalize': 'terminal-finalize-fail-closed',
+  'terminal-fail-closed-overlap': 'terminal-finalize-fail-closed',
+  'terminal-fail-closed-local': 'terminal-finalize-fail-closed',
+  'terminal-fail-closed-strict': 'terminal-finalize-fail-closed',
+  'terminal-fail-closed-selection': 'terminal-finalize-fail-closed',
+  'terminal-fail-closed-micro': 'terminal-finalize-fail-closed',
+  'terminal-fail-closed-gate': 'terminal-finalize-fail-closed',
   'measured-repair': 'finalizer',
   'measured-repair-normalize': 'measured-repair',
   'measured-repair-lanes': 'measured-repair',
