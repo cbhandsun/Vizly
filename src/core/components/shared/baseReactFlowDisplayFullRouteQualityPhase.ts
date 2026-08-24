@@ -13,7 +13,6 @@ import {
   calculateEdgePathQualityScore,
   chooseFewestStrictCrossings,
   countStrictEdgeCrossings,
-  keepIfNoNewStrictCrossings,
 } from '../../strategies/shared/edgeStrictCrossingGuard';
 import { synthesizeSharedTargetTrunks } from '../../strategies/shared/edgeSharedTrunkSynthesis';
 import {
@@ -42,7 +41,6 @@ import {
 } from './baseReactFlowDisplayRoutingTrace';
 import type { BaseReactFlowFullRouteContext } from './baseReactFlowDisplayFullRouteTypes';
 import { createDisplayRoutingTopologyWaypointAxes } from './baseReactFlowDisplayRoutingTopologyPlan';
-import { repairSharedTargetEntryStrictCrossingsIfNeeded } from './baseReactFlowDisplaySharedTargetEntry';
 import {
   createDisplayTopologyFirstSeed,
 } from './baseReactFlowDisplayTopologyFirstSeed';
@@ -54,6 +52,7 @@ import {
 } from './baseReactFlowDisplayQualityPolishSupport';
 import { createDisplayQualityGlobalRefineSession } from './baseReactFlowDisplayQualityGlobalRefine';
 import { createDisplayQualityDoglegRepairSession } from './baseReactFlowDisplayQualityDoglegSession';
+import { createDisplayQualityCrossingCandidates } from './baseReactFlowDisplayQualityCrossingCandidates';
 import { repairDisplayQualityTopology } from './baseReactFlowDisplayQualityTopology';
 
 export {
@@ -231,98 +230,13 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
     finalTargetQualityEdges === endpointLaneNudgedEdges ? 'skip' : 'accepted',
     finalTargetQualityEdges === endpointLaneNudgedEdges ? 0 : finalTargetQualityEdges.length,
   );
-  const finalCrossingCandidatesTimer = startDisplayRoutingPhaseTrace({
-    phase: 'quality-crossing-final-candidates',
-    candidateCount: finalTargetQualityEdges.length,
-    onTrace: recordCrossingPhaseTrace,
+  const finalQualityCandidateEdges = createDisplayQualityCrossingCandidates({
+    edges: finalTargetQualityEdges,
+    nodes: repairNodes,
+    repairDoglegs,
+    globalRefineSession,
+    onPhaseTrace: recordCrossingPhaseTrace,
   });
-  const finalDetachedQualityEdges = repairEndpointOrthogonalPaths(
-    separateLargeDetachedParallelOverlapsIfNeeded(
-      repairSharedTargetEntryStrictCrossingsIfNeeded(finalTargetQualityEdges),
-      repairNodes,
-      16,
-      DISPLAY_DETACHED_OVERLAP_REPAIR_OPTIONS,
-    ),
-    repairNodes,
-  );
-  const finalEndpointQualityEdges = repairEndpointOrthogonalPaths(
-    separateLargeDetachedParallelOverlapsIfNeeded(
-      repairSharedTargetEntryStrictCrossingsIfNeeded(
-        repairDoglegs(finalDetachedQualityEdges),
-      ),
-      repairNodes,
-      16,
-      DISPLAY_DETACHED_OVERLAP_REPAIR_OPTIONS,
-    ),
-    repairNodes,
-  );
-  const finalCrossingQualityEdges = globalRefineSession.run({
-    edges: finalEndpointQualityEdges,
-    phase: 'quality-crossing-final-candidates-global',
-  });
-  const finalTargetEntryQualityEdges = repairSharedTargetEntryStrictCrossingsIfNeeded(
-    finalCrossingQualityEdges,
-  );
-  const finalGlobalCrossingCandidate = globalRefineSession.run({
-    edges: finalTargetEntryQualityEdges,
-    phase: 'quality-crossing-final-candidates-post-shared',
-  });
-  const finalSharedCrossingCandidate = repairEndpointOrthogonalPaths(
-    repairSharedTrunkAwareCrossings(finalGlobalCrossingCandidate, repairNodes),
-    repairNodes,
-  );
-  const finalEndpointLaneCandidate = keepIfNoNewStrictCrossings(
-    finalSharedCrossingCandidate,
-    repairEndpointOrthogonalPaths(
-      repairEndpointLaneCrossings(finalSharedCrossingCandidate, repairNodes),
-      repairNodes,
-    ),
-  );
-  const finalPostSharedGlobalCandidate = keepIfNoNewStrictCrossings(
-    finalEndpointLaneCandidate,
-    globalRefineSession.run({
-      edges: finalEndpointLaneCandidate,
-      phase: 'quality-crossing-final-candidates-post-lane',
-    }),
-  );
-  const finalPostGlobalEndpointLaneCandidate = keepIfNoNewStrictCrossings(
-    finalPostSharedGlobalCandidate,
-    repairEndpointOrthogonalPaths(
-      repairEndpointLaneCrossings(finalPostSharedGlobalCandidate, repairNodes),
-      repairNodes,
-    ),
-  );
-  const finalPreOverlapRepairCandidate = keepIfNoNewStrictCrossings(
-    finalPostGlobalEndpointLaneCandidate,
-    repairEndpointOrthogonalPaths(finalPostGlobalEndpointLaneCandidate, repairNodes),
-  );
-  const finalDetachedOverlapCandidate = separateLargeDetachedParallelOverlapsIfNeeded(
-    finalPreOverlapRepairCandidate,
-    repairNodes,
-    16,
-    DISPLAY_DETACHED_OVERLAP_REPAIR_OPTIONS,
-  );
-  const finalCrossingRepairCandidate = keepIfNoNewStrictCrossings(
-    finalPreOverlapRepairCandidate,
-    finalDetachedOverlapCandidate,
-  );
-  const finalQualityCandidateEdges = chooseFewestStrictCrossings(
-    finalDetachedQualityEdges,
-    finalEndpointQualityEdges,
-    finalCrossingQualityEdges,
-    finalTargetEntryQualityEdges,
-    finalGlobalCrossingCandidate,
-    finalSharedCrossingCandidate,
-    finalEndpointLaneCandidate,
-    finalPostSharedGlobalCandidate,
-    finalPostGlobalEndpointLaneCandidate,
-    finalPreOverlapRepairCandidate,
-    finalCrossingRepairCandidate,
-  );
-  finalCrossingCandidatesTimer.finish(
-    finalQualityCandidateEdges === finalTargetQualityEdges ? 'skip' : 'accepted',
-    finalQualityCandidateEdges === finalTargetQualityEdges ? 0 : finalQualityCandidateEdges.length,
-  );
   crossingSweepTimer.finish(
     finalQualityCandidateEdges === sameNodeRoleRepairedEdges ? 'skip' : 'accepted',
     finalQualityCandidateEdges === sameNodeRoleRepairedEdges

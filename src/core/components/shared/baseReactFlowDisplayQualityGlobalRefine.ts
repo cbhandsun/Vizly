@@ -20,19 +20,21 @@ type GlobalRefinePhase = Extract<
   | 'quality-crossing-final-candidates-post-lane'
 >;
 
+export type DisplayQualityGlobalRefineSession = Readonly<{
+  run: (args: Readonly<{
+    edges: Edge[];
+    normalize?: boolean;
+    phase: GlobalRefinePhase;
+  }>) => Edge[];
+}>;
+
 export const createDisplayQualityGlobalRefineSession = ({
   nodes,
   onPhaseTrace,
 }: {
   nodes: Node[];
   onPhaseTrace?: (trace: DisplayRoutingPhaseTrace) => void;
-}): Readonly<{
-  run: (args: Readonly<{
-    edges: Edge[];
-    normalize?: boolean;
-    phase: GlobalRefinePhase;
-  }>) => Edge[];
-}> => {
+}): DisplayQualityGlobalRefineSession => {
   const normalizedFixedPoints = new Set<string>();
   const rawFixedPoints = new Set<string>();
   return {

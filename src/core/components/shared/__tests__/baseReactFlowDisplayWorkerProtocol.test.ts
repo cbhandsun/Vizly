@@ -265,6 +265,48 @@ describe('baseReactFlowDisplayWorkerProtocol', () => {
     ))).toBe(true);
   });
 
+  it('derives exclusive final crossing candidate work from nested child phases', () => {
+    const trace = (
+      phase: DisplayRoutingPhaseTrace['phase'],
+      durationMs: number,
+    ): DisplayRoutingPhaseTrace => ({
+      phase,
+      durationMs,
+      candidateCount: 14,
+      changedEdgeCount: 0,
+      resolution: 'skip',
+    });
+    const traces = finalizeDisplayRoutingPhaseTrace([
+      trace('quality-crossing-final-candidates', 100),
+      trace('quality-crossing-final-prepare', 20),
+      trace('quality-crossing-final-shared-lane', 40),
+      trace('quality-crossing-final-candidates-post-shared', 10),
+      trace('quality-crossing-final-candidates-post-lane', 10),
+      trace('quality-crossing-final-overlap', 10),
+      trace('quality-crossing-final-selection', 5),
+      trace('quality-crossing-final-candidates-global', 10),
+    ]);
+
+    expect(traces.find(({ phase }) => (
+      phase === 'quality-crossing-final-candidates'
+    ))).toMatchObject({
+      parentPhase: 'quality-crossing-sweeps',
+      exclusiveDurationMs: 15,
+    });
+    expect(traces.find(({ phase }) => (
+      phase === 'quality-crossing-final-shared-lane'
+    ))).toMatchObject({
+      parentPhase: 'quality-crossing-final-candidates',
+      exclusiveDurationMs: 20,
+    });
+    expect(traces.filter(({ phase }) => (
+      phase === 'quality-crossing-final-candidates-post-shared'
+      || phase === 'quality-crossing-final-candidates-post-lane'
+    )).every(({ parentPhase }) => (
+      parentPhase === 'quality-crossing-final-shared-lane'
+    ))).toBe(true);
+  });
+
   it('parses validate-or-route candidates and degrades malformed candidates to a reroute', () => {
     const valid = parseDisplayEdgesWorkerRequest({
       ...validRepairRequest,
