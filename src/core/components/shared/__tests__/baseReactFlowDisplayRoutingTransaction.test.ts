@@ -529,6 +529,7 @@ describe('baseReactFlowDisplayRoutingTransaction', () => {
         businessMetadata: { owner: 'current' },
         computedPath: [{ x: 0, y: 0 }, { x: 50, y: 0 }],
         elkPath: [{ x: 0, y: 0 }, { x: 50, y: 0 }],
+        h: ';0,0;',
         sharedTrunkAware: false,
         sharedTrunkSynthesized: false,
         isTreeBus: false,
@@ -546,6 +547,7 @@ describe('baseReactFlowDisplayRoutingTransaction', () => {
         businessMetadata: { owner: 'worker' },
         computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
         elkPath: undefined,
+        h: ';25,0;',
         sharedTrunkAware: true,
         sharedTrunkSynthesized: true,
         isTreeBus: true,
@@ -574,6 +576,7 @@ describe('baseReactFlowDisplayRoutingTransaction', () => {
     expect(merged!.displayPatches[0].data).toEqual({
       computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
       elkPath: undefined,
+      h: ';25,0;',
       treeRouting: {
         effectiveSourceHandle: 'right',
         effectiveTargetHandle: 'left',
@@ -596,6 +599,26 @@ describe('baseReactFlowDisplayRoutingTransaction', () => {
     expect((replayed?.[0].data as any).sharedTrunkAware).toBe(true);
     expect((replayed?.[0].data as any).sharedTrunkSynthesized).toBe(true);
     expect((replayed?.[0].data as any).isTreeBus).toBe(true);
+  });
+
+  it('fails closed for malformed trusted line-hop routing carriers', () => {
+    const source: Edge[] = [{ id: 'edge', source: 'source', target: 'target' }];
+    const createPatch = (h: unknown): Edge => ({
+      ...source[0],
+      data: {
+        computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
+        h,
+      },
+    });
+
+    expect(sanitizeBaseReactFlowTrustedDisplayPatches(source, [createPatch(';25,0;')]))
+      .toEqual([createPatch(';25,0;')]);
+    expect(sanitizeBaseReactFlowTrustedDisplayPatches(source, [createPatch('x'.repeat(129))]))
+      .toBeNull();
+    expect(sanitizeBaseReactFlowTrustedDisplayPatches(source, [createPatch(25)]))
+      .toBeNull();
+    expect(sanitizeBaseReactFlowDisplayCachePatches(source, [createPatch(';25,0;')]))
+      .toEqual([{ ...source[0], data: { computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }] } }]);
   });
 
   it('stores only routing changes and merges them onto the latest edge metadata', () => {

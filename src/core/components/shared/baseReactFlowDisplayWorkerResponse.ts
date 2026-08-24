@@ -1,8 +1,13 @@
 import { lockFinalDisplayComputedPaths } from './baseReactFlowDisplayEdgeCore';
 import { analyzeFinalDisplayRenderContract } from './baseReactFlowDisplayCandidateValidation';
 import { getDisplayHardQualityGateReport } from './baseReactFlowDisplayQualityGates';
-import type { BaseDisplayBoundedCandidateReport } from './baseReactFlowDisplayEvaluation';
+import {
+  displayHardQualityReportGeometryIsClean,
+  type BaseDisplayBoundedCandidateReport,
+} from './baseReactFlowDisplayEvaluation';
 import { countDisplayBusinessNodeCommercialClearanceViolations } from './baseReactFlowDisplayBusinessNodeClearance';
+import { compactDisplayEdgePaths } from './baseReactFlowDisplayGeometry';
+import { calculateEdgePathQualityScoreExact } from '../../strategies/shared/edgePathQualityFullScan';
 import type {
   DisplayEdgesWorkerRequest,
   DisplayEdgesWorkerResponse,
@@ -11,13 +16,18 @@ import type {
 export const getExactDisplayHardReport = (
   edges: NonNullable<DisplayEdgesWorkerResponse['edges']>,
   repairNodes: DisplayEdgesWorkerRequest['nodes'],
-  existingReport?: BaseDisplayBoundedCandidateReport,
 ): BaseDisplayBoundedCandidateReport => {
-  const baseHardReport = existingReport ?? getDisplayHardQualityGateReport(
+  const cachedHardReport = getDisplayHardQualityGateReport(
     edges,
     repairNodes,
     'polished',
   );
+  const baseHardReport: BaseDisplayBoundedCandidateReport = {
+    ...cachedHardReport,
+    quality: calculateEdgePathQualityScoreExact(compactDisplayEdgePaths(edges)),
+  };
+  baseHardReport.hardClean = displayHardQualityReportGeometryIsClean(baseHardReport)
+    && baseHardReport.terminalsAnchored;
   const commercialClearanceViolations = countDisplayBusinessNodeCommercialClearanceViolations(
     edges,
     repairNodes,
@@ -32,13 +42,11 @@ export const getExactDisplayHardReport = (
 export const withExactDisplayHardReport = (
   response: DisplayEdgesWorkerResponse,
   repairNodes: DisplayEdgesWorkerRequest['nodes'],
-  existingReport?: BaseDisplayBoundedCandidateReport,
 ): DisplayEdgesWorkerResponse => {
   if (!response.edges) return response;
   const hardReport = getExactDisplayHardReport(
     response.edges,
     repairNodes,
-    existingReport,
   );
   return {
     ...response,
@@ -62,6 +70,5 @@ export const finalizeStableIncrementalDisplayResponse = (
   return withExactDisplayHardReport(
     { ...response, edges: lockedEdges },
     repairNodes,
-    hardReport,
   );
 };

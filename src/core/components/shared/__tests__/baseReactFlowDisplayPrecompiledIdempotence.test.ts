@@ -4,9 +4,15 @@ import { describe, expect, it } from 'vitest';
 import logisticsStandardData from '../../../../data/standardized/LogisticsStandardData.json';
 import type { StandardDiagramData } from '../../../models/DiagramModels';
 import { standardDataToCanvas } from '../../diagrams/designerUtils';
-import { computeBaseReactFlowDisplayEdgeEpoch } from '../baseReactFlowDisplayEdgeCore';
+import {
+  computeBaseReactFlowDisplayEdgeEpoch,
+  withDisplayAbsolutePositions,
+} from '../baseReactFlowDisplayEdgeCore';
 import { computeBaseReactFlowDisplayOutputRouteSignature } from '../baseReactFlowDisplayCache';
+import { doesDisplayCandidateMatchSourceGraph } from '../baseReactFlowDisplayCandidateValidation';
+import { auditBaseReactFlowDisplayCommercialQuality } from '../baseReactFlowDisplayCommercialQuality';
 import { computeBaseReactFlowDisplayEdgesWorkerResponse } from '../baseReactFlowDisplayEdges.worker';
+import { getDisplayHardQualityGateReport } from '../baseReactFlowDisplayQualityGates';
 import {
   parseBaseReactFlowPrecompiledRouteArtifact,
   sanitizeBaseReactFlowPrecompiledRoutePatches,
@@ -77,6 +83,32 @@ describe('BaseReactFlow precompiled route stability', () => {
     }, null, 2);
     expect(mergedSignature, diagnostics).toBe(entry.outputRouteSignature);
     expect(mergeTrustedBaseReactFlowPrecompiledRouteArtifact(request.edges, entry)).toEqual(merged);
+    const repairNodes = withDisplayAbsolutePositions(
+      request.nodes,
+      new Map(request.nodes.map(node => [node.id, node] as const)),
+    );
+    const candidateHardReport = getDisplayHardQualityGateReport(merged, repairNodes, 'polished');
+    const commercialIssues = auditBaseReactFlowDisplayCommercialQuality(merged);
+    const replayRequest = parseDisplayEdgesWorkerRequest({
+      ...request,
+      operation: 'validate-or-route',
+      requestId: 'generated-demand-allocation-replay',
+      candidateEdges: merged,
+      candidateSource: 'precompiled',
+    });
+    expect(replayRequest).not.toBeNull();
+    if (!replayRequest) return;
+    const replay = computeBaseReactFlowDisplayEdgesWorkerResponse(replayRequest);
+    const replayDiagnostics = JSON.stringify({
+      sourceMatches: doesDisplayCandidateMatchSourceGraph(request.edges, merged),
+      candidateHardReport,
+      commercialIssues,
+      routeResolution: replay.routeResolution,
+    }, null, 2);
+    expect(doesDisplayCandidateMatchSourceGraph(request.edges, merged), replayDiagnostics).toBe(true);
+    expect(candidateHardReport.hardClean, replayDiagnostics).toBe(true);
+    expect(commercialIssues, replayDiagnostics).toEqual([]);
+    expect(replay.routeResolution, replayDiagnostics).toBe('validated-candidate');
   });
 
   it('accepts a freshly generated Logistics full route without rewriting it', async () => {

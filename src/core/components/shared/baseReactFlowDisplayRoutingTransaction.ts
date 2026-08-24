@@ -295,6 +295,16 @@ const sanitizeBaseReactFlowRoutingPatches = (
         }
       }
       if (options.allowRouterIntent) {
+        if (hasOwn(patch.data, 'h')) {
+          const lineHops = patch.data.h;
+          if (typeof lineHops === 'undefined' && options.allowUndefinedRoutingValues) {
+            safeData.h = undefined;
+          } else if (typeof lineHops === 'string' && lineHops.length <= 128) {
+            safeData.h = lineHops;
+          } else {
+            return null;
+          }
+        }
         for (const key of ['sharedTrunkAware', 'sharedTrunkSynthesized', 'isTreeBus'] as const) {
           if (!hasOwn(patch.data, key)) continue;
           const intent = patch.data[key];

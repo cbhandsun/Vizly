@@ -330,17 +330,22 @@ const finalizeContainerClearanceResponse = (
       preferredEdges: finalizedResponse.edges,
     });
     const stabilizedEdges = stabilizedResponse.edges;
+    const exactFinalizedResponse = withExactDisplayHardReport(
+      finalizedResponse,
+      repairNodes,
+    );
     const finalizedCommercialClearanceIsClean = finalizedResponse.edges
       ? displayBusinessNodeCommercialClearanceIsClean(finalizedResponse.edges, repairNodes)
       : false;
+    // Commercial clearance is a final hard contract. A bounded 48px closure
+    // must outrank the soft detour guard when the baseline is commercially
+    // dirty; otherwise stabilization resurrects the near-node route it was
+    // invoked to replace. It must also replace an exact hard-dirty baseline.
     return stabilizedEdges
       && stabilizedResponse.hardClean === true
       && (
-        // Commercial clearance is a final hard contract. A bounded 48px
-        // closure must outrank the soft detour guard when the baseline is
-        // commercially dirty; otherwise stabilization resurrects the exact
-        // near-node route it was invoked to replace.
-        !finalizedCommercialClearanceIsClean
+        exactFinalizedResponse.hardClean !== true
+        || !finalizedCommercialClearanceIsClean
         || commercialEdgeDetoursDoNotRegress(
           finalizedResponse.edges ?? [],
           stabilizedEdges,
@@ -348,16 +353,11 @@ const finalizeContainerClearanceResponse = (
         )
       )
       ? stabilizedResponse
-      : withExactDisplayHardReport(
-        finalizedResponse,
-        repairNodes,
-        finalizedResponse.hardReport,
-      );
+      : exactFinalizedResponse;
   }
   return withExactDisplayHardReport(
     finalizedResponse,
     repairNodes,
-    finalizedResponse.hardReport,
   );
 };
 
@@ -476,6 +476,9 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
   const candidateHardReport = candidateEdges && candidateRepairNodes
     ? getDisplayHardQualityGateReport(candidateEdges, candidateRepairNodes, 'polished')
     : null;
+  if (candidateHardReport && candidateHardReport.hardClean !== true) {
+    onBoundedCandidate?.(candidateHardReport);
+  }
   if (
     candidateEdges
     && candidateMatchesSource
@@ -495,7 +498,6 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
     const {
       renderContractIsLocked,
       lockedRouteMatches,
-      lockedHardGateInputsMatch,
     } = analyzeFinalDisplayRenderContract(
       candidateEdges,
       lockedCandidateEdges,
@@ -536,9 +538,6 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
           routeResolution: 'repaired-candidate',
         },
         candidateRepairNodes,
-        candidateSource === 'precompiled' || lockedHardGateInputsMatch
-          ? candidateHardReport
-          : undefined,
       ));
     }
     return completeResponse(finalizeContainerClearanceResponse(validatedCandidateResponse, request.nodes, {

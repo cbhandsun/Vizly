@@ -220,15 +220,17 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
         computedPath: [{ x: 100, y: 30 }, { x: 200, y: 80 }, { x: 300, y: 30 }],
       },
     }));
+    let invalidCandidateReportCount = 0;
     const invalid = computeBaseReactFlowDisplayEdgesWorkerResponse({
       operation: 'validate-or-route',
       requestId: 'validate-invalid-cache',
       candidateEdges: invalidCandidate,
       candidateSource: 'persistent',
       ...routeInput,
-    });
+    }, () => { invalidCandidateReportCount += 1; });
     expect(invalid.error).toBeUndefined();
     expect(invalid.edges).not.toEqual(invalidCandidate);
+    expect(invalidCandidateReportCount).toBeGreaterThan(0);
 
     const stale = computeBaseReactFlowDisplayEdgesWorkerResponse({
       operation: 'validate-or-route',

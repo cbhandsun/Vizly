@@ -14,7 +14,6 @@ import {
   calculateEdgePairQuality,
   calculateSingleEdgeQuality,
   countNonOrthogonalSegments,
-  emptyScore,
   getEdgePath,
   getSegments,
   hasPairContribution,
@@ -34,6 +33,10 @@ import {
   collectPotentialChangedEdgePairKeys,
   createReusableEdgePathQualitySegmentIndex,
 } from './edgePathQualitySegmentIndex';
+import {
+  calculateEdgePathQualityDecomposition,
+  type EdgePathQualityDecomposition,
+} from './edgePathQualityFullScan';
 import { countIndexedStrictSegmentCrossings } from './edgeStrictCrossingIndex';
 import { readSignatureValue, rememberBoundedSignatureValue } from './boundedSignatureCache';
 
@@ -52,13 +55,6 @@ const QUALITY_SIGNATURE_CACHE_LIMIT = 512;
 const qualityScoreSignatureCache = new Map<string, EdgePathQualityScore>();
 const strictCrossingSignatureCache = new Map<string, number>();
 export const readEdgePairQualityMemoMetrics = readSharedEdgePairQualityMemoMetrics;
-
-type EdgePathQualityDecomposition = {
-  edgeSegments: Segment[][];
-  edgeScores: EdgePathQualityScore[];
-  pairScores: Map<number, PairQualityContribution>;
-  score: EdgePathQualityScore;
-};
 
 const EDGE_PATH_QUALITY_STATE = Symbol('edge-path-quality-state');
 
@@ -87,12 +83,6 @@ const qualityDecompositionCache = new BoundedEvaluationLruCache<EdgePathQualityD
   pairSlots: 16_384,
 });
 
-/**
- * The graph signature includes every input currently consumed by the quality
- * scorer: path coordinates, source/target relationships, and shared-trunk
- * intent. The cached value contains only derived numeric geometry and never
- * retains Edge objects or their arbitrary data payloads.
- */
 function getEdgePathQualityDecomposition(
   edges: Edge[],
   snapshot: QualityInputSnapshot,
@@ -101,34 +91,14 @@ function getEdgePathQualityDecomposition(
   const cached = qualityDecompositionCache.get(snapshot.signature);
   if (cached) return cached;
 
-  const edgeSegments = snapshot.paths.map(buildEdgeSegments);
-  const edgeScores = snapshot.paths.map(calculateSingleEdgeQuality);
-  const pairScores = new Map<number, PairQualityContribution>();
-  const score = emptyScore();
-  const edgeCount = edges.length;
-
-  for (const edgeScore of edgeScores) addScore(score, edgeScore);
-  for (let firstIndex = 0; firstIndex < edgeCount; firstIndex += 1) {
-    for (let secondIndex = firstIndex + 1; secondIndex < edgeCount; secondIndex += 1) {
-      if (scanMetrics) scanMetrics.scannedEdgePairCount += 1;
-      const pairScore = calculateEdgePairQuality(
-        edges[firstIndex],
-        edges[secondIndex],
-        edgeSegments[firstIndex],
-        edgeSegments[secondIndex],
-      );
-      if (hasPairContribution(pairScore)) {
-        pairScores.set(firstIndex * edgeCount + secondIndex, pairScore);
-        addPairContribution(score, pairScore);
-      }
-    }
-  }
-
-  const decomposition = { edgeSegments, edgeScores, pairScores, score };
+  const decomposition = calculateEdgePathQualityDecomposition(edges, snapshot, scanMetrics);
   qualityDecompositionCache.set(snapshot.signature, decomposition, {
-    edges: edgeCount,
-    segments: edgeSegments.reduce((total, segments) => total + segments.length, 0),
-    pairs: pairScores.size,
+    edges: edges.length,
+    segments: decomposition.edgeSegments.reduce(
+      (total, segments) => total + segments.length,
+      0,
+    ),
+    pairs: decomposition.pairScores.size,
   });
   return decomposition;
 }

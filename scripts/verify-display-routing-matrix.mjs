@@ -161,8 +161,25 @@ const verifyPreset = target => withPrecompiledRouteBrowser(async session => {
       trace?.phase === 'candidate-validation' && trace?.resolution === 'hit'
     ));
   if (!usedValidatedExternalCandidate) {
+    const candidateFailures = await session.evaluate(`(() => (
+      (window.__vizlyRoutingResponses || []).flatMap(item => {
+        const report = item?.boundedCandidate;
+        if (!report || typeof report !== 'object') return [];
+        return [{
+          candidate: report.candidate,
+          hardClean: report.hardClean,
+          obstacleHits: report.obstacleHits,
+          terminalsAttached: report.terminalsAttached,
+          terminalsAnchored: report.terminalsAnchored,
+          quality: report.quality,
+          minimumClearanceViolations: report.minimumClearanceViolations,
+          commercialClearanceViolations: report.commercialClearanceViolations,
+        }];
+      })
+    ))()`);
     throw new Error(`${target.presetId} did not use its validated precompiled route:\n${JSON.stringify({
       responseResolution: route.response.routeResolution,
+      candidateFailures,
       routing: route.routing,
       requestInputSignature: route.request?.inputSignature,
       requestInputGeometryDigest: route.request?.inputGeometryDigest,
