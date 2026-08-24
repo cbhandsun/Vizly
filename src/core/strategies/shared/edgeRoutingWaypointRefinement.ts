@@ -26,7 +26,7 @@ import {
 } from './edgeRoutingPathGeometry';
 import { repairSameNodeInOutCrossings } from './edgeSameNodeRoleRepair';
 import {
-  countUnrelatedObstacleHits,
+  createRoutingObstacleEvaluationContext,
   generateWaypointCandidates,
   pathHasNodeRoutingRisk,
   pathHasVisualComplexityRisk,
@@ -366,7 +366,7 @@ function scorePathCandidate(
   originalSegments: readonly EdgeRoutingSegment[][],
   edge: Edge,
   visualContext: EdgeVisualContext,
-  obstacles: Map<string, EdgeRoutingRect>,
+  obstacleHits: number,
   baseLength: number,
 ): number {
   const segments = toEdgeRoutingSegments(path);
@@ -391,8 +391,6 @@ function scorePathCandidate(
       }
     }
   }
-
-  const obstacleHits = countUnrelatedObstacleHits(path, edge, obstacles);
 
   const length = pathLength(path);
   const bends = Math.max(0, path.length - 2);
@@ -477,24 +475,25 @@ export function reduceEdgeCrossingsWithWaypoints(
       .map(([, segments]) => segments);
     const baseLength = pathLength(path);
     const edgeVisualContext = createEdgeVisualContext(edge, nodeVisualContext);
+    const obstacleEvaluation = createRoutingObstacleEvaluationContext(edge, obstacles);
     const candidates = generateWaypointCandidates(path, layoutDirection, nodes, edge, {
       includeNodeAwareLanes: hasSoftRisk,
       preferredAxes: options.preferredAxes,
     });
     let bestPath = path;
+    let bestObstacleHits = obstacleEvaluation.countUnrelatedObstacleHits(path);
     let bestScore = scorePathCandidate(
       path,
       acceptedSegments,
       otherSegments,
       edge,
       edgeVisualContext,
-      obstacles,
+      bestObstacleHits,
       baseLength,
     );
-    let bestObstacleHits = countUnrelatedObstacleHits(path, edge, obstacles);
     for (const candidate of candidates.slice(1)) {
       if (!preservesSharedTrunk(candidate, path, edge, buddyGroups, obstacles)) continue;
-      const candidateObstacleHits = countUnrelatedObstacleHits(candidate, edge, obstacles);
+      const candidateObstacleHits = obstacleEvaluation.countUnrelatedObstacleHits(candidate);
       if (candidateObstacleHits > bestObstacleHits) continue;
       const score = scorePathCandidate(
         candidate,
@@ -502,7 +501,7 @@ export function reduceEdgeCrossingsWithWaypoints(
         otherSegments,
         edge,
         edgeVisualContext,
-        obstacles,
+        candidateObstacleHits,
         baseLength,
       );
       if (score < bestScore - 5) {
