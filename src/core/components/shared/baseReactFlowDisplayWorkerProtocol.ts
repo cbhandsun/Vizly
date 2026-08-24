@@ -652,6 +652,7 @@ export const parseDisplayEdgesWorkerResponse = (
       : isDisplayEdgesWorkerEdgeList(value.routingPatches))
     || !phaseTrace
     || hardReport === null
+    || hardReport === undefined
     || (workerDurationMs !== undefined && (
       !isFiniteNumber(workerDurationMs)
       || workerDurationMs < 0
@@ -660,7 +661,7 @@ export const parseDisplayEdgesWorkerResponse = (
     || !incrementalMetadataIsValid
     || !sessionMetadataIsValid
     || typeof value.hardClean !== 'boolean'
-    || (hardReport !== undefined && hardReport.hardClean !== value.hardClean)
+    || hardReport.hardClean !== value.hardClean
     || (
       value.routeResolution !== 'validated-candidate'
       && value.routeResolution !== 'repaired-candidate'

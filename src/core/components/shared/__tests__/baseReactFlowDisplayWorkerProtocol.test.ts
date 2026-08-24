@@ -13,6 +13,7 @@ import {
 import { createDisplayRoutingIdentity } from '../baseReactFlowDisplayRoutingSession';
 import { createDisplayRoutingPhaseRecorder } from '../baseReactFlowDisplayWorkerTraceRecorder';
 import { createDisplayEdgesTransportResponse } from '../baseReactFlowDisplayWorkerScope';
+import type { BaseDisplayBoundedCandidateReport } from '../baseReactFlowDisplayEvaluation';
 
 const nodes = [
   { id: 'source', position: { x: 0, y: 0 }, data: {} },
@@ -32,6 +33,32 @@ const validRepairRequest = {
   repairMode: 'bounded',
 } as const;
 
+const cleanHardReport = {
+  candidate: 'polished',
+  hardClean: true,
+  obstacleHits: 0,
+  terminalsAttached: true,
+  terminalsAnchored: true,
+  minimumClearanceViolations: 0,
+  minimumClearanceViolationEdgeIds: [],
+  commercialClearanceViolations: 0,
+  quality: {
+    nonOrthogonalSegments: 0,
+    strictCrossings: 0,
+    reverseOverlap: 0,
+    unrelatedOverlap: 0,
+    relatedOverlap: 0,
+    unexplainedRelatedOverlap: 0,
+    shortEndpointStubs: 0,
+    tinyInteriorDoglegs: 0,
+    hairpins: 0,
+    backtrackPenalty: 0,
+    detourPenalty: 0,
+    bends: 0,
+    totalLength: 100,
+  },
+} satisfies BaseDisplayBoundedCandidateReport;
+
 describe('baseReactFlowDisplayWorkerProtocol', () => {
   it('compacts incremental transport to routing patches and rejects ambiguous carriers', () => {
     const sourceEdges = validRepairRequest.edges.map(edge => ({
@@ -46,6 +73,7 @@ describe('baseReactFlowDisplayWorkerProtocol', () => {
       requestId: 'incremental-transport',
       edges: routedEdges,
       hardClean: true,
+      hardReport: cleanHardReport,
       routeResolution: 'incremental-route',
       affectedEdgeCount: 1,
       fallbackLevel: 'none',
@@ -171,6 +199,7 @@ describe('baseReactFlowDisplayWorkerProtocol', () => {
       requestId: 'route-trace',
       edges: validRepairRequest.edges,
       hardClean: true,
+      hardReport: cleanHardReport,
       routeResolution: 'full-route',
       phaseTrace: traces,
     }, 'route-trace')).not.toBeNull();
@@ -549,6 +578,12 @@ describe('baseReactFlowDisplayWorkerProtocol', () => {
       routeResolution: 'repair',
       workerDurationMs: 12.5,
     }, 'repair-1')).toMatchObject({ hardReport, workerDurationMs: 12.5 });
+    expect(parseDisplayEdgesWorkerResponse({
+      requestId: 'repair-missing-report',
+      edges: validEdges,
+      hardClean: true,
+      routeResolution: 'repair',
+    }, 'repair-missing-report')).toBeNull();
     for (const workerDurationMs of [Number.NaN, -1, 600_001, '12']) {
       expect(parseDisplayEdgesWorkerResponse({
         requestId: 'repair-1',
@@ -593,6 +628,7 @@ describe('baseReactFlowDisplayWorkerProtocol', () => {
       requestId: 'route-1',
       edges: validEdges,
       hardClean: true,
+      hardReport,
       routeResolution: 'full-route-repaired',
       phaseTrace: [{
         phase: 'measured-repair',
@@ -654,6 +690,7 @@ describe('baseReactFlowDisplayWorkerProtocol', () => {
       requestId: 'route-1',
       edges: validEdges,
       hardClean: true,
+      hardReport,
       routeResolution: 'full-route',
       phaseTrace: boundedPhaseTrace,
     }, 'route-1')).not.toBeNull();
@@ -668,6 +705,7 @@ describe('baseReactFlowDisplayWorkerProtocol', () => {
       requestId: 'candidate-1',
       edges: validEdges,
       hardClean: true,
+      hardReport,
       routeResolution: 'repaired-candidate',
       phaseTrace: [],
     }, 'candidate-1')).toMatchObject({
@@ -677,6 +715,7 @@ describe('baseReactFlowDisplayWorkerProtocol', () => {
       requestId: 'incremental-1',
       edges: validEdges,
       hardClean: true,
+      hardReport,
       routeResolution: 'incremental-route',
       affectedEdgeCount: 1,
       fallbackLevel: 'none',

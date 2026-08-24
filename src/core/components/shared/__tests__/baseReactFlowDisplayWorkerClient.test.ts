@@ -26,6 +26,48 @@ type WorkerHarnessRequest = {
   candidatePatches?: Array<Record<string, unknown>> | null;
 };
 
+const cleanHardReport = {
+  candidate: 'polished',
+  hardClean: true,
+  obstacleHits: 0,
+  terminalsAttached: true,
+  terminalsAnchored: true,
+  commercialClearanceViolations: 0,
+  quality: {
+    nonOrthogonalSegments: 0,
+    strictCrossings: 0,
+    reverseOverlap: 0,
+    unrelatedOverlap: 0,
+    relatedOverlap: 0,
+    unexplainedRelatedOverlap: 0,
+    shortEndpointStubs: 0,
+    tinyInteriorDoglegs: 0,
+    hairpins: 0,
+    backtrackPenalty: 0,
+    detourPenalty: 0,
+    bends: 0,
+    totalLength: 100,
+  },
+} as const;
+
+const withRequiredHardReport = (response: unknown): unknown => {
+  if (!response || typeof response !== 'object' || Array.isArray(response)) return response;
+  const record = response as Record<string, unknown>;
+  if (
+    ('edges' in record || 'routingPatches' in record)
+    && typeof record.hardClean === 'boolean'
+    && !('hardReport' in record)
+  ) {
+    return {
+      ...record,
+      hardReport: record.hardClean
+        ? cleanHardReport
+        : { ...cleanHardReport, hardClean: false },
+    };
+  }
+  return response;
+};
+
 const installWorkerHarness = (
   onPost: (
     request: WorkerHarnessRequest,
@@ -59,7 +101,7 @@ const installWorkerHarness = (
       posted.push(request);
       onPost(request, (response) => {
         queueMicrotask(() => {
-          this.emit('message', { data: response } as MessageEvent);
+          this.emit('message', { data: withRequiredHardReport(response) } as MessageEvent);
         });
       }, type => this.listenerCount(type));
     }
@@ -132,12 +174,14 @@ describe('baseReactFlowDisplayWorkerClient', () => {
       requestId: 'repair-1',
       edges: validEdges,
       hardClean: true,
+      hardReport: cleanHardReport,
       routeResolution: 'repair',
     }, 'repair-1')).not.toBeNull();
     expect(parseDisplayEdgesWorkerResponse({
       requestId: 'route-1',
       edges: validEdges,
       hardClean: true,
+      hardReport: cleanHardReport,
       routeResolution: 'full-route-repaired',
     }, 'route-1')).not.toBeNull();
     expect(parseDisplayEdgesWorkerResponse({
@@ -282,6 +326,7 @@ describe('baseReactFlowDisplayWorkerClient', () => {
                 requestId: message.requestId,
                 edges: [{ id: 'edge', source: 'source', target: 'target' }],
                 hardClean: true,
+                hardReport: cleanHardReport,
                 routeResolution: 'full-route-repaired',
               },
             } as MessageEvent);
