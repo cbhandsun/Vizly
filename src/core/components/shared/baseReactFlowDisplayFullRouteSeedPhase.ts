@@ -11,6 +11,7 @@ import {
 import {
   displayHardQualityGatesAreClean,
 } from './baseReactFlowDisplayQualityGates';
+import { doesDisplayCandidateMatchSourceGraph } from './baseReactFlowDisplayCandidateValidation';
 import {
   resolveDisplayQualityBudget,
   type BaseDisplayBoundedCandidateReport,
@@ -49,6 +50,7 @@ export const prepareBaseReactFlowFullRouteSeed = ({
   isLargeGraph,
   displayEdgeEpoch,
   forceFullQuality = false,
+  preparedInteractiveEdges,
   reusePreparedGlobalRouting = false,
   skipBoundedAttempt = false,
   skipFinalizedReuse = false,
@@ -113,7 +115,12 @@ export const prepareBaseReactFlowFullRouteSeed = ({
     ?? createBaseReactFlowFinalEndpointEvaluation(repairNodes);
   // Keep the prepared seed paired with normalized routes through render finalization;
   // otherwise raw locked paths can overwrite obstacle-safe pre-display output.
-  const routeSeedEdges = selectBaseReactFlowFullRouteSeedEdges(edges, preparedBoundedEdges);
+  const trustedInteractiveEdges = preparedInteractiveEdges
+    && doesDisplayCandidateMatchSourceGraph(edges, preparedInteractiveEdges)
+    ? preparedInteractiveEdges
+    : null;
+  const preparedRouteSeed = preparedBoundedEdges ?? trustedInteractiveEdges;
+  const routeSeedEdges = selectBaseReactFlowFullRouteSeedEdges(edges, preparedRouteSeed);
   const initialGateTimer = startDisplayRoutingPhaseTrace({
     phase: 'seed-initial-gate',
     candidateCount: routeSeedEdges.length,
@@ -182,6 +189,7 @@ export const prepareBaseReactFlowFullRouteSeed = ({
 
   const canReusePreparedGlobalRouting = reusePreparedGlobalRouting
     || preparedBoundedEdges !== null
+    || trustedInteractiveEdges !== null
     || (skipBoundedAttempt && (normalizedEdges.length > 24 || repairNodes.length > 40));
 
   return {

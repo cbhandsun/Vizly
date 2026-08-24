@@ -88,6 +88,52 @@ describe('bounded pre-display handoff', () => {
     expect(preparedEdges).toEqual(preparedSnapshot);
   });
 
+  it('reuses only a source-matched interactive candidate as the full-route seed', () => {
+    const rawEdges: Edge[] = [{
+      id: 'interactive-seed',
+      source: 'source',
+      target: 'target',
+      data: {
+        computedPath: [{ x: 100, y: 230 }, { x: 300, y: 30 }],
+      },
+    }];
+    const preparedInteractiveEdges: Edge[] = [{
+      ...rawEdges[0],
+      data: {
+        computedPath: [
+          { x: 100, y: 230 },
+          { x: 180, y: 230 },
+          { x: 181, y: 30 },
+          { x: 300, y: 30 },
+        ],
+      },
+    }];
+    const prepare = (candidate: Edge[]) => prepareBaseReactFlowFullRouteSeed({
+      edges: rawEdges,
+      preparedInteractiveEdges: candidate,
+      nodes: baseNodes,
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: false,
+      forceFullQuality: true,
+      skipBoundedAttempt: true,
+      skipFinalizedReuse: true,
+      displayEdgeEpoch: 1,
+    });
+
+    const matched = prepare(preparedInteractiveEdges);
+    expect(matched.kind).toBe('continue');
+    if (matched.kind !== 'continue') return;
+    expect(matched.context.routeSeedEdges).toBe(preparedInteractiveEdges);
+    expect(matched.context.canReusePreparedGlobalRouting).toBe(true);
+    expect(matched.context.reusePreparedGlobalRouting).toBe(false);
+
+    const mismatched = prepare([{ ...preparedInteractiveEdges[0], id: 'stale-edge' }]);
+    expect(mismatched.kind).toBe('continue');
+    if (mismatched.kind !== 'continue') return;
+    expect(mismatched.context.routeSeedEdges).toBe(rawEdges);
+  });
+
   it('requests a prepared seed instead of allowing a recursive full-route fallback', () => {
     const edges: Edge[] = Array.from({ length: 25 }, (_, index) => ({
       id: `edge-${index}`,

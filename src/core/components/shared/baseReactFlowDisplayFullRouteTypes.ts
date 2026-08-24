@@ -17,6 +17,8 @@ export type BaseReactFlowDisplayEdgesArgs = {
   displayEdgeEpoch: number;
   /** Honors an explicit worker full-quality request below the extreme graph cap. */
   forceFullQuality?: boolean;
+  /** Same-job interactive candidate; source shape is revalidated before reuse. */
+  preparedInteractiveEdges?: Edge[];
   reusePreparedGlobalRouting?: boolean;
   skipBoundedAttempt?: boolean;
   skipFinalizedReuse?: boolean;

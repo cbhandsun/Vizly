@@ -1,3 +1,5 @@
+import type { Edge } from '@xyflow/react';
+
 import {
   lockFinalDisplayComputedPaths,
   withDisplayAbsolutePositions,
@@ -559,6 +561,7 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
     displayEdgeEpoch: request.displayEdgeEpoch,
   };
   let escalatedFromInteractive = false;
+  let preparedInteractiveEdges: Edge[] | undefined;
   if (request.qualityMode === 'interactive') {
     const interactiveTimer = startDisplayRoutingPhaseTrace({
       phase: 'quality',
@@ -589,6 +592,7 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
     // when its exact final report is dirty, so the UI still receives at most
     // one atomic, hard-gated response.
     escalatedFromInteractive = true;
+    preparedInteractiveEdges = interactiveResponse.edges;
   }
 
   const repairNodes = withDisplayAbsolutePositions(
@@ -599,6 +603,7 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
   const fullRouteEdges = createBaseReactFlowFullRouteEdges({
     ...commonInput,
     forceFullQuality: request.qualityMode === 'full' || escalatedFromInteractive,
+    preparedInteractiveEdges,
     onPhaseTrace: recordPhaseTrace,
     createPreDisplayFinalEdges: (preDisplayArgs) => {
       let boundedReport: BaseDisplayBoundedCandidateReport | undefined;
