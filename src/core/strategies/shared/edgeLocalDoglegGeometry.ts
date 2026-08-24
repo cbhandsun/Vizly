@@ -14,13 +14,19 @@ const asRecord = (value: unknown): Record<string, unknown> => (
 
 export type EdgePathInteractionContext = {
   otherSegments: readonly OrthogonalSegment[];
-  countCrossings: (segments: readonly OrthogonalSegment[]) => number;
+  countCrossings: (
+    segments: readonly OrthogonalSegment[],
+    maximumInclusive?: number,
+  ) => number;
   countParallelOverlap: (segments: readonly OrthogonalSegment[]) => number;
 };
 
 export type EdgeObstacleInteractionContext = {
   countPathHits: (path: readonly Point[]) => number;
-  countSegmentHits: (segments: readonly OrthogonalSegment[]) => number;
+  countSegmentHits: (
+    segments: readonly OrthogonalSegment[],
+    maximumInclusive?: number,
+  ) => number;
 };
 
 export type LocalDoglegCandidateSnapshot = {
@@ -285,11 +291,15 @@ export function createEdgePathInteractionContext(
   }
   return {
     otherSegments: Object.freeze(otherSegments),
-    countCrossings(segments: readonly OrthogonalSegment[]): number {
+    countCrossings(
+      segments: readonly OrthogonalSegment[],
+      maximumInclusive = Number.POSITIVE_INFINITY,
+    ): number {
       let total = 0;
       for (const segment of segments) {
         for (const otherSegment of otherSegments) {
           if (strictCross(segment.a, segment.b, otherSegment.a, otherSegment.b)) total += 1;
+          if (total > maximumInclusive) return total;
         }
       }
       return total;
@@ -523,10 +533,14 @@ export function createEdgeObstacleInteractionContext(
       }
       return hits;
     },
-    countSegmentHits(segments: readonly OrthogonalSegment[]): number {
+    countSegmentHits(
+      segments: readonly OrthogonalSegment[],
+      maximumInclusive = Number.POSITIVE_INFINITY,
+    ): number {
       let hits = 0;
       for (const segment of segments) {
         hits += countSegmentObstacleHits(segment.a, segment.b, obstacleIndex);
+        if (hits > maximumInclusive) return hits;
       }
       return hits;
     },

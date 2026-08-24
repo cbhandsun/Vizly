@@ -68,6 +68,7 @@ export type LocalDoglegRepairDiagnostics = {
   passCount: number;
   candidateCount: number;
   qualityEvaluationCount: number;
+  cacheHitCount: number;
 };
 
 export const createLocalDoglegRepairDiagnostics = (): LocalDoglegRepairDiagnostics => ({
@@ -76,6 +77,7 @@ export const createLocalDoglegRepairDiagnostics = (): LocalDoglegRepairDiagnosti
   passCount: 0,
   candidateCount: 0,
   qualityEvaluationCount: 0,
+  cacheHitCount: 0,
 });
 
 function findBestLocalDoglegCandidate(
@@ -123,12 +125,18 @@ function findBestLocalDoglegCandidate(
     const normalized = snapshot.path;
     if (normalized.length < 2) return;
     if (preserveEndpoints && !hasSameEndpoints(path, normalized)) return;
-    const obstacleHits = obstacleContext.countSegmentHits(snapshot.segments);
+    const obstacleHits = obstacleContext.countSegmentHits(
+      snapshot.segments,
+      Math.min(currentObstacleHits, bestObstacleHits),
+    );
     if (obstacleHits > currentObstacleHits || obstacleHits > bestObstacleHits) return;
 
     const length = snapshot.length;
     const bends = snapshot.bends;
-    const crossings = interactionContext.countCrossings(snapshot.segments);
+    const crossings = interactionContext.countCrossings(
+      snapshot.segments,
+      Math.min(currentCrossings, bestCrossings),
+    );
     if (crossings > currentCrossings || crossings > bestCrossings) return;
     const candidateEdges = candidateBuffer.withPath(normalized);
     qualityEvaluationCount += 1;

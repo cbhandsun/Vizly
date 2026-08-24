@@ -3,7 +3,7 @@ import type { Edge, Node } from '@xyflow/react';
 import { repairEndpointOrthogonalPaths } from '../../strategies/shared/edgeEndpointPathRepair';
 import {
   createLocalDoglegRepairDiagnostics,
-  repairLocalDoglegArtifacts,
+  type LocalDoglegRepairDiagnostics,
 } from '../../strategies/shared/edgeLocalDoglegRepair';
 import { repairSameNodeInOutCrossings } from '../../strategies/shared/edgeSameNodeRoleRepair';
 import {
@@ -24,12 +24,14 @@ export const repairDisplayQualityTopology = ({
   nodes,
   topologySeedRemainsCurrent,
   reusePreparedGlobalRouting,
+  repairDoglegs,
   onPhaseTrace,
 }: Readonly<{
   edges: Edge[];
   nodes: Node[];
   topologySeedRemainsCurrent: boolean;
   reusePreparedGlobalRouting: boolean;
+  repairDoglegs: (edges: Edge[], diagnostics?: LocalDoglegRepairDiagnostics) => Edge[];
   onPhaseTrace?: (trace: DisplayRoutingPhaseTrace) => void;
 }>): Edge[] => {
   const endpointTimer = startDisplayRoutingPhaseTrace({
@@ -66,9 +68,8 @@ export const repairDisplayQualityTopology = ({
     onTrace: onPhaseTrace,
   });
   const doglegDiagnostics = createLocalDoglegRepairDiagnostics();
-  const localTrunkEdges = repairLocalDoglegArtifacts(
+  const localTrunkEdges = repairDoglegs(
     initialTrunkEdges,
-    nodes,
     doglegDiagnostics,
   );
   doglegTimer.finish(
@@ -77,6 +78,7 @@ export const repairDisplayQualityTopology = ({
     {
       candidateCount: doglegDiagnostics.candidateCount,
       evaluationCount: doglegDiagnostics.qualityEvaluationCount,
+      cacheHitCount: doglegDiagnostics.cacheHitCount,
     },
   );
   const secondaryTrunkTimer = startDisplayRoutingPhaseTrace({

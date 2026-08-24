@@ -5,7 +5,11 @@ import {
   createLocalDoglegRepairDiagnostics,
   repairLocalDoglegArtifacts,
 } from '../edgeLocalDoglegRepair';
-import { createEdgePathInteractionContext } from '../edgeLocalDoglegGeometry';
+import {
+  createEdgeObstacleInteractionContext,
+  createEdgePathInteractionContext,
+  toSegments,
+} from '../edgeLocalDoglegGeometry';
 import { buildOuterLaneContractionCandidates } from '../edgeLocalDoglegLaneGeometry';
 
 const nodes: Node[] = [
@@ -40,6 +44,7 @@ describe('local dogleg repair diagnostics', () => {
     expect(diagnostics.candidateCount).toBeGreaterThan(0);
     expect(diagnostics.qualityEvaluationCount).toBeGreaterThan(0);
     expect(Object.keys(diagnostics).sort()).toEqual([
+      'cacheHitCount',
       'candidateCount',
       'passCount',
       'processedEdgeCount',
@@ -94,5 +99,31 @@ describe('local dogleg repair diagnostics', () => {
       snapshot.otherSegments,
     )).toEqual(exhaustive);
     expect(Object.isFrozen(snapshot.otherSegments)).toBe(true);
+  });
+
+  it('returns an exact count below a bound and stops only after proving rejection', () => {
+    const paths = new Map([
+      ['current', [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }]],
+      ['peer-a', [{ x: 50, y: -20 }, { x: 50, y: 120 }]],
+      ['peer-b', [{ x: 75, y: -20 }, { x: 75, y: 120 }]],
+    ]);
+    const segments = toSegments(paths.get('current') ?? []);
+    const interactions = createEdgePathInteractionContext('current', paths);
+    expect(interactions.countCrossings(segments)).toBe(2);
+    expect(interactions.countCrossings(segments, 0)).toBeGreaterThan(0);
+    expect(interactions.countCrossings(segments, 2)).toBe(2);
+
+    const obstacles = new Map([
+      ['source', { x: -20, y: -20, width: 20, height: 20 }],
+      ['target', { x: 100, y: 100, width: 20, height: 20 }],
+      ['block-a', { x: 30, y: -10, width: 10, height: 20 }],
+      ['block-b', { x: 60, y: -10, width: 10, height: 20 }],
+    ]);
+    const obstacleContext = createEdgeObstacleInteractionContext({
+      id: 'current', source: 'source', target: 'target', data: {},
+    }, obstacles);
+    expect(obstacleContext.countSegmentHits(segments)).toBe(2);
+    expect(obstacleContext.countSegmentHits(segments, 0)).toBeGreaterThan(0);
+    expect(obstacleContext.countSegmentHits(segments, 2)).toBe(2);
   });
 });

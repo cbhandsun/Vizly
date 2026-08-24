@@ -7,7 +7,7 @@ import {
 import { repairEndpointLaneCrossings } from '../../strategies/shared/edgeEndpointLaneNudgeRepair';
 import { repairEndpointOrthogonalPaths } from '../../strategies/shared/edgeEndpointPathRepair';
 import { refineGlobalEdgeWaypoints } from '../../strategies/shared/edgeGlobalWaypointRefinement';
-import { repairLocalDoglegArtifacts } from '../../strategies/shared/edgeLocalDoglegRepair';
+import { createLocalDoglegRepairDiagnostics } from '../../strategies/shared/edgeLocalDoglegRepair';
 import { repairReverseFlowBypassCrossings } from '../../strategies/shared/edgeReverseFlowBypassRepair';
 import {
   calculateEdgePathQualityScore,
@@ -53,6 +53,7 @@ import {
   shouldUseBoundedQualityResidualRepair,
 } from './baseReactFlowDisplayQualityPolishSupport';
 import { createDisplayQualityGlobalRefineSession } from './baseReactFlowDisplayQualityGlobalRefine';
+import { createDisplayQualityDoglegRepairSession } from './baseReactFlowDisplayQualityDoglegSession';
 import { repairDisplayQualityTopology } from './baseReactFlowDisplayQualityTopology';
 
 export {
@@ -78,6 +79,8 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
   onPhaseTrace,
   topologyPlan,
 }: BaseReactFlowFullRouteContext): Edge[] => {
+  const doglegRepairSession = createDisplayQualityDoglegRepairSession(repairNodes);
+  const repairDoglegs = doglegRepairSession.run;
   const topologySeedTimer = startDisplayRoutingPhaseTrace({
     phase: 'quality-topology-seed',
     candidateCount: normalizedEdges.length,
@@ -150,6 +153,7 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
       nodes: repairNodes,
       topologySeedRemainsCurrent,
       reusePreparedGlobalRouting,
+      repairDoglegs,
       onPhaseTrace,
     });
   topologyTimer.finish(
@@ -212,13 +216,13 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
     phase: 'quality-crossing-global-refine-fixed-point',
     normalize: false,
   });
-  const doglegRepairedEdges = repairLocalDoglegArtifacts(finalGloballyRefinedEdges, repairNodes);
+  const doglegRepairedEdges = repairDoglegs(finalGloballyRefinedEdges);
   const finalCrossingSweepEdges = globalRefineSession.run({
     edges: doglegRepairedEdges,
     phase: 'quality-crossing-global-refine-dogleg',
     normalize: false,
   });
-  const repairedEdges = repairLocalDoglegArtifacts(finalCrossingSweepEdges, repairNodes);
+  const repairedEdges = repairDoglegs(finalCrossingSweepEdges);
   const finalTargetQualityEdges = repairEndpointOrthogonalPaths(
     synthesizeSharedTargetTrunks(repairedEdges, { nodes: repairNodes }),
     repairNodes,
@@ -244,7 +248,7 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
   const finalEndpointQualityEdges = repairEndpointOrthogonalPaths(
     separateLargeDetachedParallelOverlapsIfNeeded(
       repairSharedTargetEntryStrictCrossingsIfNeeded(
-        repairLocalDoglegArtifacts(finalDetachedQualityEdges, repairNodes),
+        repairDoglegs(finalDetachedQualityEdges),
       ),
       repairNodes,
       16,
@@ -414,10 +418,16 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
         onTrace: recordPolishPhaseTrace,
       })
     : null;
-  const finalLocalPolishCandidate = repairLocalDoglegArtifacts(finalQualityEdges, repairNodes);
+  const localPolishDiagnostics = createLocalDoglegRepairDiagnostics();
+  const finalLocalPolishCandidate = repairDoglegs(finalQualityEdges, localPolishDiagnostics);
   localPolishTimer?.finish(
     finalLocalPolishCandidate === finalQualityEdges ? 'skip' : 'accepted',
     finalLocalPolishCandidate === finalQualityEdges ? 0 : finalQualityEdges.length,
+    {
+      candidateCount: localPolishDiagnostics.candidateCount,
+      evaluationCount: localPolishDiagnostics.qualityEvaluationCount,
+      cacheHitCount: localPolishDiagnostics.cacheHitCount,
+    },
   );
   const detachedPolishTimer = recordPolishPhaseTrace
     ? startDisplayRoutingPhaseTrace({
@@ -449,7 +459,7 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
     : null;
   const finalDetachedLocalPolishCandidate = useBoundedLargeRepair
     ? finalDetachedPolishCandidate
-    : repairLocalDoglegArtifacts(finalDetachedPolishCandidate, repairNodes);
+    : repairDoglegs(finalDetachedPolishCandidate);
   detachedLocalPolishTimer?.finish(
     finalDetachedLocalPolishCandidate === finalDetachedPolishCandidate ? 'skip' : 'accepted',
     finalDetachedLocalPolishCandidate === finalDetachedPolishCandidate
@@ -496,7 +506,7 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
     );
   const finalLocalAfterDetachedCandidate = useBoundedLargeRepair
     ? finalEndpointPolishCandidate
-    : repairLocalDoglegArtifacts(finalEndpointPolishCandidate, repairNodes);
+    : repairDoglegs(finalEndpointPolishCandidate);
   const finalEndpointAfterLocalCandidate = useBoundedLargeRepair
     ? finalLocalAfterDetachedCandidate
     : repairEndpointOrthogonalPaths(finalLocalAfterDetachedCandidate, repairNodes);
