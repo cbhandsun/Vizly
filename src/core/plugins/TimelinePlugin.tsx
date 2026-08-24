@@ -6,8 +6,8 @@ import {
   SidebarPanel
 } from '../types/plugin';
 
-import { FlagOutlined, CheckCircleFilled, SyncOutlined, MinusCircleOutlined } from '@ant-design/icons';
-import { Button, Tooltip } from 'antd';
+import { FlagOutlined, CheckCircleFilled, SyncOutlined, MinusCircleOutlined, PlusOutlined } from '@ant-design/icons';
+import { Button, Dropdown } from 'antd';
 import ProTimelineCanvas from '../components/diagrams/timeline-pro/ProTimelineCanvas';
 import { ProTimelinePropertyPanel } from '../components/diagrams/timeline-pro/ProTimelinePropertyPanel';
 import { Calendar, Clock } from 'lucide-react';
@@ -115,12 +115,12 @@ export class TimelinePlugin implements DiagramTypePlugin {
   getNodeTypes() { return {}; }
   getEdgeTypes() { return {}; }
   
-  contributeToolbar(ctx: PluginContext) {
-      return <TimelineSmartActionBar ctx={ctx} />;
+  contributeToolbar(_ctx: PluginContext) {
+      return null;
   }
 
   contributeCanvasComponents(ctx: PluginContext) {
-      return <ProTimelineCanvas ctx={ctx} />;
+      return <ProTimelineCanvas ctx={ctx} creationControls={<TimelineSmartActionBar ctx={ctx} />} />;
   }
 
   contributeSidebarPanels(_ctx: PluginContext): SidebarPanel[] {
@@ -264,18 +264,31 @@ const TimelineSmartActionBar: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
         }));
     };
 
+    const handleMenuClick = ({ key }: { key: string }) => {
+        if (key === 'event' || key === 'phase' || key === 'milestone') {
+            handleAppendNode(key);
+        }
+    };
+
     return (
-        <div className="timeline-plugin-toolbar">
-            <Tooltip title={t('plugins.timeline.toolbar.addEvent')}>
-                <Button className="timeline-plugin-toolbar__action" type="text" aria-label={t('plugins.timeline.toolbar.addEvent')} icon={<Clock aria-hidden="true" size={16} color="#1890ff" strokeWidth={2} />} onClick={() => handleAppendNode('event')} />
-            </Tooltip>
-            <Tooltip title={t('plugins.timeline.toolbar.addPhase')}>
-                <Button className="timeline-plugin-toolbar__action" type="text" aria-label={t('plugins.timeline.toolbar.addPhase')} icon={<Calendar aria-hidden="true" size={16} color="#52c41a" strokeWidth={2} />} onClick={() => handleAppendNode('phase')} />
-            </Tooltip>
-            <Tooltip title={t('plugins.timeline.toolbar.addMilestone')}>
-                <Button className="timeline-plugin-toolbar__action" type="text" aria-label={t('plugins.timeline.toolbar.addMilestone')} icon={<FlagOutlined aria-hidden="true" style={{ color: '#cf1322' }} />} onClick={() => handleAppendNode('milestone')} />
-            </Tooltip>
-        </div>
+        <Dropdown
+            trigger={['click']}
+            menu={{
+                onClick: handleMenuClick,
+                items: [
+                    { key: 'event', icon: <Clock aria-hidden="true" size={16} color="#1890ff" strokeWidth={2} />, label: t('plugins.timeline.labels.event') },
+                    { key: 'phase', icon: <Calendar aria-hidden="true" size={16} color="#52c41a" strokeWidth={2} />, label: t('plugins.timeline.labels.phase') },
+                    { key: 'milestone', icon: <FlagOutlined aria-hidden="true" style={{ color: '#cf1322' }} />, label: t('plugins.timeline.labels.milestone') },
+                ],
+            }}
+        >
+            <Button
+                className="timeline-plugin-toolbar__action"
+                type="text"
+                aria-label="新建时间线任务"
+                icon={<PlusOutlined aria-hidden="true" />}
+            />
+        </Dropdown>
     );
 };
 

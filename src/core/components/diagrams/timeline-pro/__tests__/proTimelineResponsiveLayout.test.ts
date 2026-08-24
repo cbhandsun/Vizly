@@ -31,6 +31,11 @@ describe('professional timeline responsive layout', () => {
         expect(css).toMatch(/\.pro-timeline-workspace\s*\{[\s\S]*?bottom:\s*calc\(164px \+ env\(safe-area-inset-bottom, 0px\)\);/);
     });
 
+    it('keeps desktop timeline content below the floating product toolbar', () => {
+        expect(css).toMatch(/\.pro-timeline-workspace\s*\{[\s\S]*?top:\s*calc\(72px \+ env\(safe-area-inset-top, 0px\)\);/);
+        expect(css).toMatch(/\.pro-timeline-task-header-actions\s*\{[\s\S]*?display:\s*inline-flex;/);
+    });
+
     it('preserves useful canvas width and keeps timeline chrome visible on narrow screens', () => {
         expect(css).toMatch(/\.pro-timeline-task-list\s*\{[\s\S]*?width:\s*min\(280px, 48vw\) !important;/);
         expect(css).toMatch(/\.pro-timeline-task-column--secondary,[\s\S]*?\.pro-timeline-task-resize-handle\s*\{[\s\S]*?display:\s*none !important;/);

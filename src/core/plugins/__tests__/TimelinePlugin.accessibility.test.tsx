@@ -10,6 +10,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PluginContext } from '../../types/plugin';
 import { TimelinePlugin } from '../TimelinePlugin';
 
+vi.stubGlobal('ResizeObserver', class ResizeObserverStub {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+});
+
 const messageMocks = vi.hoisted(() => ({
     success: vi.fn(),
 }));
@@ -65,6 +71,12 @@ const createContext = (nodes: Node[] = [sourceNode], edges: Edge[] = []): Plugin
     addNode: vi.fn(() => 'added-node'),
 });
 
+const getCreationControls = (context: PluginContext): React.ReactNode => {
+    const canvas = new TimelinePlugin().contributeCanvasComponents(context);
+    if (!React.isValidElement<{ creationControls?: React.ReactNode }>(canvas)) return null;
+    return canvas.props.creationControls;
+};
+
 describe('TimelinePlugin toolbar accessibility and history', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -86,15 +98,9 @@ describe('TimelinePlugin toolbar accessibility and history', () => {
         });
     });
 
-    it('exposes only the three unique, named creation actions', () => {
+    it('removes creation controls from the floating top toolbar', () => {
         const context = createContext();
-        render(<>{new TimelinePlugin().contributeToolbar(context)}</>);
-
-        expect(screen.getByRole('button', { name: 'Add event' })).toBeTruthy();
-        expect(screen.getByRole('button', { name: 'Add phase' })).toBeTruthy();
-        expect(screen.getByRole('button', { name: 'Add milestone' })).toBeTruthy();
-        expect(screen.queryByRole('button', { name: '今天居中' })).toBeNull();
-        expect(screen.queryByRole('button', { name: '适应全部' })).toBeNull();
+        expect(new TimelinePlugin().contributeToolbar(context)).toBeNull();
     });
 
     it('passes the controlled plugin state into the replacement timeline canvas', () => {
@@ -107,11 +113,26 @@ describe('TimelinePlugin toolbar accessibility and history', () => {
         }
     });
 
-    it('snapshots, localizes, selects, and confirms an appended event', () => {
+    it('exposes creation as one compact menu inside the task header', async () => {
         const context = createContext();
-        render(<>{new TimelinePlugin().contributeToolbar(context)}</>);
+        render(<>{getCreationControls(context)}</>);
 
-        fireEvent.click(screen.getByRole('button', { name: 'Add event' }));
+        expect(screen.getByRole('button', { name: '新建时间线任务' })).toBeTruthy();
+        expect(screen.queryByText('New event')).toBeNull();
+
+        fireEvent.click(screen.getByRole('button', { name: '新建时间线任务' }));
+
+        expect(await screen.findByText('New event')).toBeTruthy();
+        expect(screen.getByText('New phase')).toBeTruthy();
+        expect(screen.getByText('New milestone')).toBeTruthy();
+    });
+
+    it('snapshots, localizes, selects, and confirms an appended event', async () => {
+        const context = createContext();
+        render(<>{getCreationControls(context)}</>);
+
+        fireEvent.click(screen.getByRole('button', { name: '新建时间线任务' }));
+        fireEvent.click(await screen.findByText('New event'));
 
         expect(context.takeSnapshot).toHaveBeenCalledTimes(1);
         expect(context.addNode).not.toHaveBeenCalled();

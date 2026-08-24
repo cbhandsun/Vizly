@@ -42,7 +42,13 @@ import './ProTimelineCanvas.css';
 
 const HEADER_HEIGHT = 52;
 
-export default function ProTimelineCanvas({ ctx }: { ctx: PluginContext }) {
+export default function ProTimelineCanvas({
+  ctx,
+  creationControls,
+}: {
+  ctx: PluginContext;
+  creationControls?: React.ReactNode;
+}) {
   const { 
     panX, panY, setPanByDelta, setPan, setZoom, zoomLevel, dateToX, 
     xToDate, pixelsPerDay, viewMode, setViewMode,
@@ -470,6 +476,7 @@ export default function ProTimelineCanvas({ ctx }: { ctx: PluginContext }) {
             onTaskAdd={handleTaskAdd}
             onTaskDelete={handleTaskDelete}
             cyclicTaskIds={cyclicTaskIds}
+            headerActions={creationControls}
         />
 
         {/* ===== 右侧时间轴区 ===== */}

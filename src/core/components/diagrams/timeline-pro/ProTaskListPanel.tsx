@@ -42,6 +42,7 @@ export interface ProTaskListPanelProps {
     onTaskAdd?: (parentId: string | null, type: 'phase' | 'milestone') => void;
     onTaskDelete?: (id: string) => void;
     cyclicTaskIds?: Set<string>;
+    headerActions?: React.ReactNode;
 }
 
 const HEADER_HEIGHT = 52;
@@ -55,7 +56,7 @@ const getTypeIcons = (theme: Theme | null): Record<string, React.ReactNode> => (
 
 export default function ProTaskListPanel({
     tasks, edges = [], width, onWidthChange, hoveredTaskId, onHoverTask, onClickTask, selectedTaskId, selectedTaskIds, onScrollTopChange,
-    onTaskExpandToggle, onTaskUpdate, onTaskAdd, onTaskDelete, cyclicTaskIds
+    onTaskExpandToggle, onTaskUpdate, onTaskAdd, onTaskDelete, cyclicTaskIds, headerActions
 }: ProTaskListPanelProps) {
     const [isResizing, setIsResizing] = useState(false);
     const [editingCell, setEditingCell] = useState<ProTaskEditingCellState | null>(null);
@@ -249,6 +250,7 @@ export default function ProTaskListPanel({
                 flexShrink: 0,
             }}>
                 <span className="pro-timeline-task-column--name" style={{ flex: 1, minWidth: 120 }}>任务名称</span>
+                {headerActions ? <div className="pro-timeline-task-header-actions">{headerActions}</div> : null}
                 <span className="pro-timeline-task-column--secondary" style={{ width: 75, textAlign: 'left', paddingLeft: 8 }}>负责人</span>
                 <span className="pro-timeline-task-column--secondary" style={{ width: 65, textAlign: 'center' }}>优先级</span>
                 <span className="pro-timeline-task-column--secondary" style={{ width: 80, textAlign: 'right', paddingRight: 8 }}>开始</span>
