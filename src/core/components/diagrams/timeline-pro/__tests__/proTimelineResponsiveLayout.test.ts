@@ -27,12 +27,12 @@ describe('professional timeline responsive layout', () => {
     });
 
     it('reserves the mobile top toolbar and bottom editing controls', () => {
-        expect(css).toMatch(/@media \(max-width: 768px\)[\s\S]*?\.pro-timeline-workspace\s*\{[\s\S]*?top:\s*calc\(96px \+ env\(safe-area-inset-top, 0px\)\);/);
+        expect(css).toMatch(/@media \(max-width: 768px\)[\s\S]*?\.pro-timeline-workspace\s*\{[\s\S]*?top:\s*calc\(64px \+ env\(safe-area-inset-top, 0px\)\);/);
         expect(css).toMatch(/\.pro-timeline-workspace\s*\{[\s\S]*?bottom:\s*calc\(164px \+ env\(safe-area-inset-bottom, 0px\)\);/);
     });
 
     it('keeps desktop timeline content below the floating product toolbar', () => {
-        expect(css).toMatch(/\.pro-timeline-workspace\s*\{[\s\S]*?top:\s*calc\(36px \+ env\(safe-area-inset-top, 0px\)\);/);
+        expect(css).toMatch(/\.pro-timeline-workspace\s*\{[\s\S]*?top:\s*calc\(52px \+ env\(safe-area-inset-top, 0px\)\);/);
         expect(css).toMatch(/\.pro-timeline-task-header-actions\s*\{[\s\S]*?display:\s*inline-flex;/);
     });
 

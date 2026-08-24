@@ -1,6 +1,6 @@
 .pro-timeline-workspace {
     position: absolute;
-    top: calc(36px + env(safe-area-inset-top, 0px));
+    top: calc(52px + env(safe-area-inset-top, 0px));
     right: 0;
     bottom: 0;
     left: 0;
@@ -296,7 +296,7 @@
 
 @media (max-width: 768px) {
     .pro-timeline-workspace {
-        top: calc(96px + env(safe-area-inset-top, 0px));
+        top: calc(64px + env(safe-area-inset-top, 0px));
         bottom: calc(164px + env(safe-area-inset-bottom, 0px));
     }
 
