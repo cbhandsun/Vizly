@@ -31,6 +31,26 @@ export const selectDisplayQualityInitialDetachedOverlapOptions = (
     : DISPLAY_DETACHED_OVERLAP_REPAIR_OPTIONS
 );
 
+export const selectDisplayQualityFinalOverlapOptions = (
+  useBoundedLargeRepair: boolean,
+  edgeCount: number,
+): typeof DISPLAY_DETACHED_OVERLAP_REPAIR_OPTIONS => {
+  if (useBoundedLargeRepair) return DISPLAY_BOUNDED_DETACHED_OVERLAP_REPAIR_OPTIONS;
+  const maxQualityEvaluations = Math.max(
+    32,
+    Math.min(
+      DISPLAY_DETACHED_OVERLAP_REPAIR_OPTIONS.maxQualityEvaluations,
+      edgeCount * 4,
+    ),
+  );
+  return maxQualityEvaluations === DISPLAY_DETACHED_OVERLAP_REPAIR_OPTIONS.maxQualityEvaluations
+    ? DISPLAY_DETACHED_OVERLAP_REPAIR_OPTIONS
+    : {
+      ...DISPLAY_DETACHED_OVERLAP_REPAIR_OPTIONS,
+      maxQualityEvaluations,
+    };
+};
+
 export const createDisplayQualityCrossingCandidates = ({
   edges,
   nodes,
@@ -261,7 +281,10 @@ export const createDisplayQualityCrossingCandidates = ({
     nodes,
     16,
     {
-      ...DISPLAY_DETACHED_OVERLAP_REPAIR_OPTIONS,
+      ...selectDisplayQualityFinalOverlapOptions(
+        useBoundedLargeRepair,
+        preOverlapEdges.length,
+      ),
       diagnostics: finalOverlapDiagnostics,
     },
   );
