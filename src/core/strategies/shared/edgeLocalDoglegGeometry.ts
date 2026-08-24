@@ -1,5 +1,7 @@
 import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
 
+import { createOrthogonalSegmentCrossingIndex } from './edgeLocalDoglegSegmentIndex';
+
 export type Point = { x: number; y: number };
 export type Rect = { x: number; y: number; width: number; height: number };
 export type Axis = 'h' | 'v';
@@ -286,15 +288,23 @@ export function createEdgePathInteractionContext(
   for (const [otherKey, otherPath] of pathByEdgeKey) {
     if (otherKey === edgeKey) continue;
     for (const segment of toSegments(otherPath)) {
-      otherSegments.push({ a: { ...segment.a }, b: { ...segment.b } });
+      otherSegments.push(Object.freeze({
+        a: Object.freeze({ ...segment.a }),
+        b: Object.freeze({ ...segment.b }),
+      }));
     }
   }
+  const crossingIndex = createOrthogonalSegmentCrossingIndex(otherSegments);
   return {
     otherSegments: Object.freeze(otherSegments),
     countCrossings(
       segments: readonly OrthogonalSegment[],
       maximumInclusive = Number.POSITIVE_INFINITY,
     ): number {
+      if (crossingIndex) {
+        const indexedCount = crossingIndex.countCrossings(segments, maximumInclusive);
+        if (indexedCount !== null) return indexedCount;
+      }
       let total = 0;
       for (const segment of segments) {
         for (const otherSegment of otherSegments) {
