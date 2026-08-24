@@ -106,13 +106,14 @@ export const separateLargeDetachedParallelOverlapsIfNeeded = <T extends Edge[]>(
   minOverlap: number,
   options: NonNullable<Parameters<typeof separateDetachedParallelOverlaps>[3]>,
   repair: typeof separateDetachedParallelOverlaps = separateDetachedParallelOverlaps,
+  evaluateQuality: typeof calculateEdgePathQualityScore = calculateEdgePathQualityScore,
 ): T => {
   // Above the detached repair's search threshold, a hard-overlap-clean report
   // is the repair's exact no-op condition. Keep the small-graph cleanup path.
-  if (canSkipLargeDetachedOverlapRepair(
-    edges.length,
-    calculateEdgePathQualityScore(edges),
-  )) return edges;
+  if (
+    edges.length > 24
+    && canSkipLargeDetachedOverlapRepair(edges.length, evaluateQuality(edges))
+  ) return edges;
   const cacheKey = detachedRepairNoopCacheKey(edges, nodes, minOverlap, options);
   if (cacheKey && readDetachedRepairNoop(repair, cacheKey)) return edges;
   const repaired = repair(edges, nodes, minOverlap, options) as T;

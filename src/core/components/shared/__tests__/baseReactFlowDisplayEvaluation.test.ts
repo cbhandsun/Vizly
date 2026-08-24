@@ -287,8 +287,23 @@ describe('baseReactFlowDisplayEvaluation', () => {
       16,
       {},
       detachedRepair,
+      vi.fn(() => cleanQuality),
     )).toBe(cleanEdges);
     expect(detachedRepair).not.toHaveBeenCalled();
+
+    const smallRepair = vi.fn((candidate: Edge[]) => candidate);
+    const unusedSmallQualityEvaluation = vi.fn(() => cleanQuality);
+    const smallEdges = cleanEdges.slice(0, 14);
+    expect(separateLargeDetachedParallelOverlapsIfNeeded(
+      smallEdges,
+      [],
+      16,
+      {},
+      smallRepair,
+      unusedSmallQualityEvaluation,
+    )).toBe(smallEdges);
+    expect(unusedSmallQualityEvaluation).not.toHaveBeenCalled();
+    expect(smallRepair).toHaveBeenCalledOnce();
 
     const tinyDoglegQuality = calculateEdgePathQualityScore([
       edge([
