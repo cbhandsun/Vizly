@@ -235,6 +235,7 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
     nodes: repairNodes,
     repairDoglegs,
     globalRefineSession,
+    useBoundedLargeRepair,
     onPhaseTrace: recordCrossingPhaseTrace,
   });
   crossingSweepTimer.finish(

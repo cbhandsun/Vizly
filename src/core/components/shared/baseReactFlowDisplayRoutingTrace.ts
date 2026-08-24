@@ -52,7 +52,20 @@ export const DISPLAY_ROUTING_PHASE_NAMES = [
   'quality-crossing-global-refine-dogleg',
   'quality-crossing-final-candidates',
   'quality-crossing-final-prepare',
+  'quality-crossing-final-prepare-detached',
+  'quality-crossing-final-prepare-detached-target',
+  'quality-crossing-final-prepare-detached-overlap',
+  'quality-crossing-final-prepare-detached-endpoint',
+  'quality-crossing-final-prepare-dogleg',
+  'quality-crossing-final-prepare-dogleg-local',
+  'quality-crossing-final-prepare-dogleg-target',
+  'quality-crossing-final-prepare-dogleg-overlap',
+  'quality-crossing-final-prepare-dogleg-endpoint',
   'quality-crossing-final-shared-lane',
+  'quality-crossing-final-shared-target',
+  'quality-crossing-final-shared-trunk',
+  'quality-crossing-final-lane-initial',
+  'quality-crossing-final-lane-final',
   'quality-crossing-final-overlap',
   'quality-crossing-final-selection',
   'quality-crossing-final-candidates-global',
@@ -162,7 +175,7 @@ export const DISPLAY_ROUTING_PHASE_NAMES = [
 // One aggregate entry per declared phase plus headroom for the small number of
 // phases that can run under two explicit parents. Repeated work is folded by
 // the Worker recorder, so the bound no longer truncates late final-gate phases.
-export const DISPLAY_ROUTING_PHASE_TRACE_LIMIT = 160;
+export const DISPLAY_ROUTING_PHASE_TRACE_LIMIT = 176;
 
 export const DISPLAY_ROUTING_PHASE_RESOLUTIONS = [
   'hit',
@@ -270,7 +283,20 @@ const DISPLAY_ROUTING_PHASE_PARENTS: Readonly<
   'quality-crossing-global-refine-dogleg': 'quality-crossing-global-refine',
   'quality-crossing-final-candidates': 'quality-crossing-sweeps',
   'quality-crossing-final-prepare': 'quality-crossing-final-candidates',
+  'quality-crossing-final-prepare-detached': 'quality-crossing-final-prepare',
+  'quality-crossing-final-prepare-detached-target': 'quality-crossing-final-prepare-detached',
+  'quality-crossing-final-prepare-detached-overlap': 'quality-crossing-final-prepare-detached',
+  'quality-crossing-final-prepare-detached-endpoint': 'quality-crossing-final-prepare-detached',
+  'quality-crossing-final-prepare-dogleg': 'quality-crossing-final-prepare',
+  'quality-crossing-final-prepare-dogleg-local': 'quality-crossing-final-prepare-dogleg',
+  'quality-crossing-final-prepare-dogleg-target': 'quality-crossing-final-prepare-dogleg',
+  'quality-crossing-final-prepare-dogleg-overlap': 'quality-crossing-final-prepare-dogleg',
+  'quality-crossing-final-prepare-dogleg-endpoint': 'quality-crossing-final-prepare-dogleg',
   'quality-crossing-final-shared-lane': 'quality-crossing-final-candidates',
+  'quality-crossing-final-shared-target': 'quality-crossing-final-shared-lane',
+  'quality-crossing-final-shared-trunk': 'quality-crossing-final-shared-lane',
+  'quality-crossing-final-lane-initial': 'quality-crossing-final-shared-lane',
+  'quality-crossing-final-lane-final': 'quality-crossing-final-shared-lane',
   'quality-crossing-final-overlap': 'quality-crossing-final-candidates',
   'quality-crossing-final-selection': 'quality-crossing-final-candidates',
   'quality-crossing-final-candidates-global': 'quality-crossing-final-candidates',

@@ -279,7 +279,20 @@ describe('baseReactFlowDisplayWorkerProtocol', () => {
     const traces = finalizeDisplayRoutingPhaseTrace([
       trace('quality-crossing-final-candidates', 100),
       trace('quality-crossing-final-prepare', 20),
+      trace('quality-crossing-final-prepare-detached', 8),
+      trace('quality-crossing-final-prepare-detached-target', 1),
+      trace('quality-crossing-final-prepare-detached-overlap', 3),
+      trace('quality-crossing-final-prepare-detached-endpoint', 2),
+      trace('quality-crossing-final-prepare-dogleg', 7),
+      trace('quality-crossing-final-prepare-dogleg-local', 2),
+      trace('quality-crossing-final-prepare-dogleg-target', 1),
+      trace('quality-crossing-final-prepare-dogleg-overlap', 2),
+      trace('quality-crossing-final-prepare-dogleg-endpoint', 1),
       trace('quality-crossing-final-shared-lane', 40),
+      trace('quality-crossing-final-shared-target', 3),
+      trace('quality-crossing-final-shared-trunk', 4),
+      trace('quality-crossing-final-lane-initial', 5),
+      trace('quality-crossing-final-lane-final', 6),
       trace('quality-crossing-final-candidates-post-shared', 10),
       trace('quality-crossing-final-candidates-post-lane', 10),
       trace('quality-crossing-final-overlap', 10),
@@ -297,7 +310,25 @@ describe('baseReactFlowDisplayWorkerProtocol', () => {
       phase === 'quality-crossing-final-shared-lane'
     ))).toMatchObject({
       parentPhase: 'quality-crossing-final-candidates',
-      exclusiveDurationMs: 20,
+      exclusiveDurationMs: 2,
+    });
+    expect(traces.find(({ phase }) => (
+      phase === 'quality-crossing-final-prepare'
+    ))).toMatchObject({
+      parentPhase: 'quality-crossing-final-candidates',
+      exclusiveDurationMs: 5,
+    });
+    expect(traces.find(({ phase }) => (
+      phase === 'quality-crossing-final-prepare-detached'
+    ))).toMatchObject({
+      parentPhase: 'quality-crossing-final-prepare',
+      exclusiveDurationMs: 2,
+    });
+    expect(traces.find(({ phase }) => (
+      phase === 'quality-crossing-final-prepare-dogleg'
+    ))).toMatchObject({
+      parentPhase: 'quality-crossing-final-prepare',
+      exclusiveDurationMs: 1,
     });
     expect(traces.filter(({ phase }) => (
       phase === 'quality-crossing-final-candidates-post-shared'

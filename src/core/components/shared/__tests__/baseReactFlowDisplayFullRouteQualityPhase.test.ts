@@ -2,13 +2,23 @@ import type { Edge } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
 
 import { shouldMaterializeDetachedMicroAlternative } from '../baseReactFlowDisplayFullRouteQualityPhase';
+import { selectDisplayQualityInitialDetachedOverlapOptions } from '../baseReactFlowDisplayQualityCrossingCandidates';
 import {
   changedDisplayPathIndexes,
   collectResidualMicroCandidateEdgeIndexes,
+  DISPLAY_BOUNDED_DETACHED_OVERLAP_REPAIR_OPTIONS,
+  DISPLAY_DETACHED_OVERLAP_REPAIR_OPTIONS,
 } from '../baseReactFlowDisplayOverlapRepair';
 import { createDisplayQualityGlobalRefineSession } from '../baseReactFlowDisplayQualityGlobalRefine';
 
 describe('baseReactFlowDisplayFullRouteQualityPhase', () => {
+  it('bounds the speculative initial detached candidate for large routes', () => {
+    expect(selectDisplayQualityInitialDetachedOverlapOptions(true))
+      .toBe(DISPLAY_BOUNDED_DETACHED_OVERLAP_REPAIR_OPTIONS);
+    expect(selectDisplayQualityInitialDetachedOverlapOptions(false))
+      .toBe(DISPLAY_DETACHED_OVERLAP_REPAIR_OPTIONS);
+  });
+
   it('does not duplicate the micro repair family after endpoint-first progress', () => {
     expect(shouldMaterializeDetachedMicroAlternative(false)).toBe(false);
     expect(shouldMaterializeDetachedMicroAlternative(true)).toBe(true);
