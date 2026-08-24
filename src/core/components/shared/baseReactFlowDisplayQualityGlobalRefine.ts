@@ -1,7 +1,10 @@
 import type { Edge, Node } from '@xyflow/react';
 
 import { repairEndpointOrthogonalPaths } from '../../strategies/shared/edgeEndpointPathRepair';
-import { refineGlobalEdgeWaypoints } from '../../strategies/shared/edgeGlobalWaypointRefinement';
+import {
+  createGlobalEdgeWaypointRefinementDiagnostics,
+  refineGlobalEdgeWaypoints,
+} from '../../strategies/shared/edgeGlobalWaypointRefinement';
 import { computeBaseReactFlowDisplayOutputRouteSignature } from './baseReactFlowDisplayCache';
 import {
   countChangedRoutingItems,
@@ -50,7 +53,8 @@ export const createDisplayQualityGlobalRefineSession = ({
         timer.finish('hit', 0, { cacheHitCount: 1 });
         return edges;
       }
-      const refined = refineGlobalEdgeWaypoints(edges, nodes);
+      const diagnostics = createGlobalEdgeWaypointRefinementDiagnostics();
+      const refined = refineGlobalEdgeWaypoints(edges, nodes, { diagnostics });
       const result = normalize ? repairEndpointOrthogonalPaths(refined, nodes) : refined;
       if (
         inputSignature
@@ -59,6 +63,12 @@ export const createDisplayQualityGlobalRefineSession = ({
       timer.finish(
         result === edges ? 'skip' : 'accepted',
         countChangedRoutingItems(edges, result),
+        {
+          evaluationCount: diagnostics.evaluationCount,
+          scannedEdgePairCount: diagnostics.scannedEdgePairCount,
+          scannedNodeCount: diagnostics.scannedNodeCount,
+          scannedSegmentCount: diagnostics.scannedSegmentCount,
+        },
       );
       return result;
     },

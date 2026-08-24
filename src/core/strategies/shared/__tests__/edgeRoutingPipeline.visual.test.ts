@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Edge, Node } from '@xyflow/react';
 import {
+  createGlobalEdgeWaypointRefinementDiagnostics,
   refineGlobalEdgeWaypoints,
 } from '../edgeGlobalWaypointRefinement';
 import { repairSameNodeInOutCrossings } from '../edgeSameNodeRoleRepair';
@@ -184,7 +185,15 @@ describe('reduceEdgeCrossingsWithWaypoints visual soft constraints', () => {
       },
     ];
 
-    const [refined, verticalA, verticalB] = refineGlobalEdgeWaypoints(edges, []);
+    const diagnostics = createGlobalEdgeWaypointRefinementDiagnostics();
+    const indexed = refineGlobalEdgeWaypoints(edges, [], { diagnostics });
+    const exhaustive = refineGlobalEdgeWaypoints(edges, [], { disableSegmentIndex: true });
+    expect(indexed).toEqual(exhaustive);
+    expect(diagnostics.evaluationCount).toBeGreaterThan(0);
+    expect(diagnostics.scannedEdgePairCount).toBeGreaterThan(0);
+    expect(diagnostics.scannedSegmentCount).toBeGreaterThan(0);
+
+    const [refined, verticalA, verticalB] = indexed;
     const refinedPath = (refined.data?.computedPath ?? []) as Array<{ x: number; y: number }>;
 
     expect((refined.data as any).globalWaypointRefined).toBe(true);

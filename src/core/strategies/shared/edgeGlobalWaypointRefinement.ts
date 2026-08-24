@@ -2,6 +2,7 @@ import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
 
 import { refineOrthogonalWaypointsDetailed } from '../../algorithms/orthogonalWaypointRefiner';
 import { buildPipelineBuddyGroups } from './edgeRoutingTopology';
+import { createRoutingWaypointSegmentGroupIndex } from './edgeRoutingWaypointSegmentIndex';
 import {
   addAxisCandidate,
   axisOf,
@@ -111,6 +112,26 @@ type PathCandidateEvaluationContext = {
   evaluate: (path: Point[]) => PathCandidateMetrics;
 };
 
+export type GlobalEdgeWaypointRefinementDiagnostics = {
+  evaluationCount: number;
+  scannedEdgePairCount: number;
+  scannedNodeCount: number;
+  scannedSegmentCount: number;
+};
+
+export const createGlobalEdgeWaypointRefinementDiagnostics = (
+): GlobalEdgeWaypointRefinementDiagnostics => ({
+  evaluationCount: 0,
+  scannedEdgePairCount: 0,
+  scannedNodeCount: 0,
+  scannedSegmentCount: 0,
+});
+
+export type GlobalEdgeWaypointRefinementOptions = Readonly<{
+  diagnostics?: GlobalEdgeWaypointRefinementDiagnostics;
+  disableSegmentIndex?: boolean;
+}>;
+
 const toVisualSegments = (path: Point[]): Segment[] => {
   const segments: Segment[] = [];
   for (let index = 0; index < path.length - 1; index += 1) {
@@ -125,6 +146,7 @@ function createPathCandidateEvaluationContext(
   workingPaths: Map<string, Point[]>,
   edgeByKey: Map<string, Edge>,
   obstacles: Map<string, Rect>,
+  options: GlobalEdgeWaypointRefinementOptions = {},
 ): PathCandidateEvaluationContext {
   const otherPaths = [...workingPaths.entries()]
     .filter(([otherKey]) => otherKey !== key)
@@ -139,6 +161,11 @@ function createPathCandidateEvaluationContext(
   const relevantObstacles = [...obstacles.entries()]
     .filter(([nodeId]) => nodeId !== edge.source && nodeId !== edge.target)
     .map(([, rect]) => rect);
+  const segmentGroupIndex = options.disableSegmentIndex
+    ? undefined
+    : createRoutingWaypointSegmentGroupIndex(
+      otherPaths.map(other => other.visualSegments),
+    );
   const cache = new WeakMap<Point[], PathCandidateMetrics>();
 
   return {
@@ -147,13 +174,25 @@ function createPathCandidateEvaluationContext(
       if (cached) return cached;
       const segments = toSegments(path);
       const visualSegments = toVisualSegments(path);
+      const segmentQuery = segmentGroupIndex?.queryPotentialGroupIndexes(visualSegments);
+      const candidateOtherPaths = segmentQuery
+        ? otherPaths.filter((_, index) => segmentQuery.groupIndexes.has(index))
+        : otherPaths;
       let strictCrossings = 0;
       let unrelatedCrossingCount = 0;
       let visualUnrelatedCrossingCount = 0;
       let unrelatedOverlap = 0;
       let obstacleHitCount = 0;
 
-      for (const other of otherPaths) {
+      if (options.diagnostics) {
+        options.diagnostics.evaluationCount += 1;
+        options.diagnostics.scannedSegmentCount += segmentQuery?.scannedSegmentCount ?? 0;
+      }
+      for (const other of candidateOtherPaths) {
+        if (options.diagnostics) {
+          options.diagnostics.scannedEdgePairCount += 1;
+          options.diagnostics.scannedSegmentCount += segments.length * other.segments.length;
+        }
         for (const first of segments) {
           for (const second of other.segments) {
             if (strictCrosses(first, second)) {
@@ -167,12 +206,19 @@ function createPathCandidateEvaluationContext(
           }
         }
         if (other.unrelated) {
+          if (options.diagnostics) {
+            options.diagnostics.scannedSegmentCount += visualSegments.length
+              * other.visualSegments.length;
+          }
           for (const first of visualSegments) {
             for (const second of other.visualSegments) {
               if (visualStrictCrosses(first, second)) visualUnrelatedCrossingCount += 1;
             }
           }
         }
+      }
+      if (options.diagnostics) {
+        options.diagnostics.scannedNodeCount += segments.length * relevantObstacles.length;
       }
       for (const segment of segments) {
         for (const rect of relevantObstacles) {
@@ -552,6 +598,7 @@ function findBestInteriorCrossingShiftCandidate(
   edgeByKey: Map<string, Edge>,
   obstacles: Map<string, Rect>,
   nodeById: Map<string, ReactFlowNode>,
+  options: GlobalEdgeWaypointRefinementOptions,
 ): Point[] | null {
   let evaluationContext: PathCandidateEvaluationContext | null = null;
   let baselineScore: number | null = null;
@@ -562,6 +609,7 @@ function findBestInteriorCrossingShiftCandidate(
       workingPaths,
       edgeByKey,
       obstacles,
+      options,
     );
     return evaluationContext;
   };
@@ -686,7 +734,11 @@ function findBestInteriorCrossingShiftCandidate(
   return best;
 }
 
-export function refineGlobalEdgeWaypoints(edges: Edge[], nodes: ReactFlowNode[]): Edge[] {
+export function refineGlobalEdgeWaypoints(
+  edges: Edge[],
+  nodes: ReactFlowNode[],
+  options: GlobalEdgeWaypointRefinementOptions = {},
+): Edge[] {
   if (edges.length === 0) return edges;
 
   const paths = new Map<string, Point[]>();
@@ -738,7 +790,24 @@ export function refineGlobalEdgeWaypoints(edges: Edge[], nodes: ReactFlowNode[])
 
       const normalized = enforceMinimumEndpointStubs(candidate, original);
       if (pathEquals(original, normalized)) return;
-      if (!safeToAcceptCandidate(edge, key, original, normalized, workingPaths, edgeByKey, obstacles)) return;
+      const evaluationContext = createPathCandidateEvaluationContext(
+        edge,
+        key,
+        workingPaths,
+        edgeByKey,
+        obstacles,
+        options,
+      );
+      if (!safeToAcceptCandidate(
+        edge,
+        key,
+        original,
+        normalized,
+        workingPaths,
+        edgeByKey,
+        obstacles,
+        evaluationContext,
+      )) return;
 
       workingPaths.set(key, normalized);
       acceptedPaths.set(key, normalized);
@@ -760,6 +829,7 @@ export function refineGlobalEdgeWaypoints(edges: Edge[], nodes: ReactFlowNode[])
         edgeByKey,
         obstacles,
         nodeById,
+        options,
       );
       if (!candidate || pathEquals(current, candidate)) return;
 
