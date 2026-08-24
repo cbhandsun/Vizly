@@ -415,7 +415,7 @@
     pointer-events: none !important;
 }
 
-.diagram-root .react-flow__edge:is(:hover, .selected, :focus-visible)
+.diagram-root .react-flow__edge:is(:hover, .selected, :focus, :focus-visible)
     .react-flow__edge-path.shared-trunk-accent-trace {
     stroke: var(--flow-visual-accent) !important;
     stroke-width: var(--vizly-shared-trace-width, 3.5px) !important;
@@ -464,18 +464,18 @@
 
 /* Trace hierarchy: the active route stays structurally prominent while peers
    recede without changing their geometry, handles, or path signatures. */
-.diagram-root:has(.react-flow__edge:is(:hover, .selected, :focus-visible))
-    .react-flow__edge:not(:is(:hover, .selected, :focus-visible))
+.diagram-root:has(.react-flow__edge:is(:hover, .selected, :focus, :focus-visible))
+    .react-flow__edge:not(:is(:hover, .selected, :focus, :focus-visible))
     .react-flow__edge-path:not(.shared-trunk-canonical-backbone):not(
         .shared-trunk-terminal-marker-carrier
     ):not(.shared-trunk-accent-trace):not(.shared-trunk-junction),
-.diagram-root:has(.react-flow__edge:is(:hover, .selected, :focus-visible))
-    .react-flow__edge:not(:is(:hover, .selected, :focus-visible))
+.diagram-root:has(.react-flow__edge:is(:hover, .selected, :focus, :focus-visible))
+    .react-flow__edge:not(:is(:hover, .selected, :focus, :focus-visible))
     .vizly-edge-contrast-underlay:not(.shared-trunk-canonical-backbone-underlay):not(
         .shared-trunk-accent-trace-underlay
     ):not(.shared-trunk-junction-underlay) {
     opacity: var(--flow-visual-edge-peer-opacity) !important;
-    transition: opacity 130ms ease;
+    transition: opacity 80ms ease;
 }
 
 .diagram-root .edge-glow-path {

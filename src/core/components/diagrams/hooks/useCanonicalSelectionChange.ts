@@ -1,4 +1,10 @@
-import { useCallback, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
+import {
+    startTransition,
+    useCallback,
+    type Dispatch,
+    type MutableRefObject,
+    type SetStateAction,
+} from 'react';
 import type { Edge, Node } from '@xyflow/react';
 
 import { useDiagramStore } from '../../../store/useDiagramStore';
@@ -25,8 +31,13 @@ export const useCanonicalSelectionChange = ({
     const canonicalNodes = canonicalizeSelectionById(nodes, nodesRef.current);
     const canonicalEdges = canonicalizeSelectionById(edges, edgesRef.current);
 
-    setSelectedNodes(canonicalNodes);
-    setSelectedEdges(canonicalEdges);
+    // React Flow's controlled edge update is the urgent visual commit. Sidebar,
+    // toolbar and scoped-selection projections may render substantially more UI,
+    // so keep them in a transition to avoid delaying the selected edge paint.
+    startTransition(() => {
+        setSelectedNodes(canonicalNodes);
+        setSelectedEdges(canonicalEdges);
+    });
 
     const diagramStore = useDiagramStore.getState();
     diagramStore.setSelectedNodes(canonicalNodes);

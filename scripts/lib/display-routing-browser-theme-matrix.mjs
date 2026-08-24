@@ -80,6 +80,7 @@ export const verifyDisplayRoutingThemeMatrix = async ({
   expectedWorkerStartCount,
   expectedWorkerAbortCount,
   initialVisualScales,
+  verifyInteractionStates,
   verifyVisualScales,
 }) => {
   const results = [];
@@ -95,12 +96,21 @@ export const verifyDisplayRoutingThemeMatrix = async ({
     const visualScales = index === 0 && Array.isArray(initialVisualScales)
       ? initialVisualScales
       : await verifyVisualScales(themeCase.id);
+    const interactions = await verifyInteractionStates(themeCase.id);
+    assertDisplayRoutingThemeState({
+      themeCase,
+      state: await readThemeState(session),
+      expectedSignature,
+      expectedWorkerStartCount,
+      expectedWorkerAbortCount,
+    });
     results.push({
       id: themeCase.id,
       mode: state.dataTheme,
       primary: normalizeColor(state.primary),
       workerStartCount: state.workerStartCount,
       visualScales,
+      interactions,
     });
   }
   return results;

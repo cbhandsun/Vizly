@@ -18,7 +18,7 @@ describe('edge contrast paint CSS states', () => {
       /\.shared-trunk-canonical-backbone\s*\{[^}]*stroke:\s*var\(--vizly-shared-canonical-stroke\)\s*!important;[^}]*opacity:\s*var\(--vizly-shared-canonical-opacity\)\s*!important;[^}]*filter:\s*none\s*!important;/s,
     );
     expect(stylesheet).toMatch(
-      /\.react-flow__edge:is\(:hover, \.selected, :focus-visible\)[^{]*\.shared-trunk-accent-trace\s*\{[^}]*stroke:\s*var\(--flow-visual-accent\)\s*!important;[^}]*opacity:\s*1\s*!important;/s,
+      /\.react-flow__edge:is\(:hover, \.selected, :focus, :focus-visible\)[^{]*\.shared-trunk-accent-trace\s*\{[^}]*stroke:\s*var\(--flow-visual-accent\)\s*!important;[^}]*opacity:\s*1\s*!important;/s,
     );
     expect(stylesheet).toContain("not(:has([data-shared-trunk-state='shared']))");
     expect(stylesheet).toContain(':not(.shared-trunk-canonical-backbone)');
@@ -32,8 +32,9 @@ describe('edge contrast paint CSS states', () => {
       /\.shared-trunk-junction\s*\{[^}]*stroke:\s*var\(--vizly-shared-junction-stroke\)\s*!important;[^}]*opacity:\s*1\s*!important;[^}]*pointer-events:\s*none\s*!important;/s,
     );
     expect(stylesheet).toMatch(
-      /\.react-flow__edge:not\(:is\(:hover, \.selected, :focus-visible\)\)[^{]*\.react-flow__edge-path:not\(\.shared-trunk-canonical-backbone\)/s,
+      /\.react-flow__edge:not\(:is\(:hover, \.selected, :focus, :focus-visible\)\)[^{]*\.react-flow__edge-path:not\(\.shared-trunk-canonical-backbone\)/s,
     );
+    expect(stylesheet).toMatch(/transition:\s*opacity 80ms ease/);
     expect(stylesheet).toMatch(/--flow-visual-edge-peer-opacity:\s*0\.78/);
     expect(stylesheet).not.toMatch(/\.react-flow__edge\s*\{[^}]*opacity:\s*0\.42/s);
   });
