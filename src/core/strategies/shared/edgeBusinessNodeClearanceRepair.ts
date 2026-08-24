@@ -20,12 +20,19 @@ export interface BusinessNodeClearanceCandidateValidation {
   changedEdgeIndex: number;
 }
 
+export interface BusinessNodeClearanceRepairDiagnostics {
+  generatedCandidateCount: number;
+  uniqueCandidateCount: number;
+}
+
 export interface BusinessNodeClearanceRepairOptions {
   eligibleEdgeIds?: ReadonlySet<string>;
   minimumClearance?: number;
   /** Allows one temporary point crossing when the caller owns a strict closure. */
   allowTransientStrictCrossing?: boolean;
   validateCandidate?: (context: BusinessNodeClearanceCandidateValidation) => boolean;
+  /** Aggregate-only counters; never contains path, node, or user content. */
+  diagnostics?: BusinessNodeClearanceRepairDiagnostics;
 }
 
 const EPS = 0.5;
@@ -107,6 +114,22 @@ const compactPath = (path: Point[]): Point[] => {
   }
   compacted.push(deduped[deduped.length - 1]);
   return compacted;
+};
+
+const clearancePathSignature = (path: readonly Point[]): string => path
+  .map(point => `${point.x}:${point.y}`)
+  .join('|');
+
+export const uniqueBusinessNodeClearancePaths = (
+  paths: readonly Point[][],
+): Point[][] => {
+  const seen = new Set<string>();
+  return paths.filter(path => {
+    const signature = clearancePathSignature(path);
+    if (seen.has(signature)) return false;
+    seen.add(signature);
+    return true;
+  });
 };
 
 const pointToRectDistance = (point: Point, rect: Rect): number => {
@@ -631,6 +654,10 @@ export const repairBusinessNodeClearanceRisks = (
   nodes: ReactFlowNode[],
   options: BusinessNodeClearanceRepairOptions = {},
 ): Edge[] => {
+  if (options.diagnostics) {
+    options.diagnostics.generatedCandidateCount = 0;
+    options.diagnostics.uniqueCandidateCount = 0;
+  }
   const minimumClearance = Number.isFinite(options.minimumClearance)
     ? Math.max(
       MINIMUM_BUSINESS_NODE_CLEARANCE,
@@ -686,8 +713,14 @@ export const repairBusinessNodeClearanceRisks = (
         COMMERCIAL_BUSINESS_NODE_CLEARANCE,
       );
       const baselineHits = obstacleContext.countUnrelatedObstacleHits(path);
+      const generatedCandidates = clearanceCandidates(path, nodes, edge, minimumClearance);
+      const uniqueCandidates = uniqueBusinessNodeClearancePaths(generatedCandidates);
+      if (options.diagnostics) {
+        options.diagnostics.generatedCandidateCount += generatedCandidates.length;
+        options.diagnostics.uniqueCandidateCount += uniqueCandidates.length;
+      }
       const rankedCandidates = iterateBusinessNodeClearanceCandidates(
-        clearanceCandidates(path, nodes, edge, minimumClearance).map(candidatePath => ({
+        uniqueCandidates.map(candidatePath => ({
           candidate: candidatePath,
           risk: clearanceContext.score(candidatePath, minimumClearance),
           commercialRisk: clearanceContext.score(

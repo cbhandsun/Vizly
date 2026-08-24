@@ -2,6 +2,8 @@ import type { Edge, Node } from '@xyflow/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { createBaseReactFlowFinalEndpointEvaluation } from '../baseReactFlowDisplayFinalEndpointEvaluation';
+import { startBaseReactFlowObstacleClosureTrace } from '../baseReactFlowDisplayObstacleClosureTrace';
+import type { DisplayRoutingPhaseTrace } from '../baseReactFlowDisplayRoutingTrace';
 import { createBaseReactFlowFinalEndpointResidualRepair } from '../baseReactFlowDisplayFinalEndpointResidualRepair';
 import { commercialEdgeDetoursDoNotRegress } from '../baseReactFlowDisplayCommercialDetourGuard';
 import { createDisplayWorkerFinalEvaluation } from '../baseReactFlowDisplayWorkerFinalEvaluation';
@@ -39,6 +41,31 @@ const edges: Edge[] = [
 ];
 
 describe('createBaseReactFlowFinalEndpointEvaluation', () => {
+  it('reports duplicate clearance candidates as request-local trace cache hits', () => {
+    const evaluation = createBaseReactFlowFinalEndpointEvaluation(nodes);
+    const traces: DisplayRoutingPhaseTrace[] = [];
+    const finish = startBaseReactFlowObstacleClosureTrace({
+      phase: 'final-endpoint-closure-obstacles-post-trunk',
+      candidateCount: edges.length,
+      evaluation,
+      onPhaseTrace: trace => traces.push(trace),
+    });
+
+    evaluation.hardReport(edges);
+    finish(edges, edges, {
+      generatedCandidateCount: 10,
+      uniqueCandidateCount: 7,
+    });
+
+    const trace = traces[0];
+    expect(trace).toMatchObject({
+      candidateCount: 10,
+      cacheHitCount: 3,
+      changedEdgeCount: 0,
+      resolution: 'skip',
+    });
+  });
+
   it('uses the exact hard report to skip a clean residual strict pass', () => {
     const evaluation = createBaseReactFlowFinalEndpointEvaluation(nodes);
     expect(evaluation.hardReport(edges).quality.strictCrossings).toBe(0);

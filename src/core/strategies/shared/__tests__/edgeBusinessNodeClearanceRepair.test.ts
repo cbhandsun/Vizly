@@ -5,6 +5,7 @@ import {
   COMMERCIAL_BUSINESS_NODE_CLEARANCE,
   COMMERCIAL_BUSINESS_NODE_ROUTING_CLEARANCE,
   repairBusinessNodeClearanceRisks,
+  uniqueBusinessNodeClearancePaths,
 } from '../edgeBusinessNodeClearanceRepair';
 import { calculateEdgePathQualityScore } from '../edgeStrictCrossingGuard';
 import {
@@ -17,6 +18,15 @@ const pathFor = (edge: Edge): Array<{ x: number; y: number }> => (
 );
 
 describe('repairBusinessNodeClearanceRisks', () => {
+  it('keeps the first occurrence of each exact candidate geometry', () => {
+    const first = [{ x: 0, y: 0 }, { x: 100, y: 0 }];
+    const duplicate = first.map(point => ({ ...point }));
+    const distinct = [{ x: 0, y: 0 }, { x: 0, y: 100 }];
+
+    expect(uniqueBusinessNodeClearancePaths([first, duplicate, distinct]))
+      .toEqual([first, distinct]);
+  });
+
   it('normalizes a sibling branch lane from 41.5px to the 48px commercial boundary', () => {
     const nodes: Node[] = [
       { id: 'order-input', position: { x: 102, y: 1534 }, data: {}, measured: { width: 190, height: 96 } },

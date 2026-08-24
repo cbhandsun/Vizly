@@ -13,6 +13,7 @@ import {
 } from '../../strategies/shared/edgePreferredSourceTrunkRepair';
 import {
   repairBusinessNodeClearanceRisks,
+  type BusinessNodeClearanceRepairDiagnostics,
 } from '../../strategies/shared/edgeBusinessNodeClearanceRepair';
 import { repairDisplayMicroArtifacts } from '../../strategies/shared/edgeDisplayMicroCleanup';
 import { createBaseReactFlowDisplayMicroSafetyContext } from './baseReactFlowDisplayMicroSafety';
@@ -33,7 +34,6 @@ import { buildSharedEndpointTrunkSynthesisCandidates } from './baseReactFlowDisp
 import { repairDisplayLoopShortcuts } from './baseReactFlowDisplayLoopShortcutRepair';
 import {
   createBaseReactFlowFinalEndpointEvaluation,
-  diffBaseReactFlowEvaluationMetrics,
   type BaseReactFlowFinalEndpointEvaluation,
 } from './baseReactFlowDisplayFinalEndpointEvaluation';
 import {
@@ -48,6 +48,7 @@ import {
 import { buildSiblingTerminalObstacleSkirtCandidates } from './baseReactFlowDisplaySiblingTerminalObstacleRepair';
 import type { SameSideEndpointTrunkIdentity } from '../../strategies/shared/edgeFinalSameSideEndpointOrderRepair';
 import { repairBaseReactFlowConnectedSourceMicroArtifacts } from './baseReactFlowDisplayConnectedSourceMicroRepair';
+import { startBaseReactFlowObstacleClosureTrace } from './baseReactFlowDisplayObstacleClosureTrace';
 
 export { finalSameSideTrueTrunksDoNotRegress } from './baseReactFlowDisplayTrueTrunkContract';
 export {
@@ -92,6 +93,7 @@ const commitPostTrunkBranchObstacleCandidate = (
   repairNodes: Node[],
   options: BaseReactFlowFinalEndpointOrderOptions,
   evaluation: BaseReactFlowFinalEndpointEvaluation,
+  diagnostics?: BusinessNodeClearanceRepairDiagnostics,
 ): Edge[] => {
   if (evaluation.hardReport(baseline).obstacleHits === 0) return baseline;
   return repairBusinessNodeClearanceRisks(baseline, repairNodes, {
@@ -103,6 +105,7 @@ const commitPostTrunkBranchObstacleCandidate = (
       options,
       evaluation,
     ),
+    diagnostics,
   });
 };
 
@@ -597,32 +600,31 @@ export const repairBaseReactFlowFinalEndpointOrder = <T extends Edge[]>(
     countChangedRoutingItems(beforeTrunkClosure, repaired),
   );
   const obstacleClosureTimer = closureStage('final-endpoint-closure-obstacles');
-  const obstacleClosureStage = (phase: Extract<
-    Parameters<typeof startDisplayRoutingPhaseTrace>[0]['phase'],
-    | 'final-endpoint-closure-obstacles-post-trunk'
-    | 'final-endpoint-closure-obstacles-sibling'
-    | 'final-endpoint-closure-obstacles-micro'
-  >) => {
-    const metricsBefore = evaluation.readMetrics();
-    const timer = startDisplayRoutingPhaseTrace({
-      phase,
-      parentPhase: 'final-endpoint-closure-obstacles',
-      candidateCount: repaired.length,
-      onTrace: options.onPhaseTrace,
-    });
-    return (baseline: Edge[], candidate: Edge[]): void => timer.finish(
-      candidate === baseline ? 'skip' : 'accepted',
-      countChangedRoutingItems(baseline, candidate),
-      diffBaseReactFlowEvaluationMetrics(metricsBefore, evaluation.readMetrics()),
-    );
-  };
+  const obstacleClosureStage = (phase: Parameters<
+    typeof startBaseReactFlowObstacleClosureTrace
+  >[0]['phase']) => startBaseReactFlowObstacleClosureTrace({
+    phase,
+    candidateCount: repaired.length,
+    evaluation,
+    onPhaseTrace: options.onPhaseTrace,
+  });
   const beforeObstacleClosure = repaired;
   const beforePostTrunkObstacle = repaired;
   const finishPostTrunkObstacle = obstacleClosureStage(
     'final-endpoint-closure-obstacles-post-trunk',
   );
-  repaired = commitPostTrunkBranchObstacleCandidate(repaired, repairNodes, options, evaluation);
-  finishPostTrunkObstacle(beforePostTrunkObstacle, repaired);
+  const postTrunkObstacleDiagnostics: BusinessNodeClearanceRepairDiagnostics = {
+    generatedCandidateCount: 0,
+    uniqueCandidateCount: 0,
+  };
+  repaired = commitPostTrunkBranchObstacleCandidate(
+    repaired,
+    repairNodes,
+    options,
+    evaluation,
+    postTrunkObstacleDiagnostics,
+  );
+  finishPostTrunkObstacle(beforePostTrunkObstacle, repaired, postTrunkObstacleDiagnostics);
   const beforeSiblingObstacle = repaired;
   const finishSiblingObstacle = obstacleClosureStage(
     'final-endpoint-closure-obstacles-sibling',
