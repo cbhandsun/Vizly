@@ -24,21 +24,18 @@ describe('precompiled display routing source set', () => {
     ])).not.toBe(baseline);
   });
 
-  it('is stable across LF, CRLF, and legacy CR checkouts', () => {
-    const entries = [{
-      path: 'src/core/routing/a.ts',
-      source: 'export const a = 1;\nexport const b = 2;\n',
-    }];
-    const baseline = hashPrecompiledDisplayRoutingSourceEntries(entries);
+  it('frames LF, CRLF, and legacy CR source with the same normalized length', () => {
+    const entry = { path: 'src/core/routing/a.ts', source: 'first\nsecond\n' };
+    const baseline = hashPrecompiledDisplayRoutingSourceEntries([entry]);
 
-    expect(hashPrecompiledDisplayRoutingSourceEntries(entries.map(entry => ({
+    expect(hashPrecompiledDisplayRoutingSourceEntries([{
       ...entry,
-      source: entry.source.replace(/\n/g, '\r\n'),
-    })))).toBe(baseline);
-    expect(hashPrecompiledDisplayRoutingSourceEntries(entries.map(entry => ({
+      source: 'first\r\nsecond\r\n',
+    }])).toBe(baseline);
+    expect(hashPrecompiledDisplayRoutingSourceEntries([{
       ...entry,
-      source: entry.source.replace(/\n/g, '\r'),
-    })))).toBe(baseline);
+      source: 'first\rsecond\r',
+    }])).toBe(baseline);
   });
 
   it('rejects empty, duplicate, and unsafe entries', () => {

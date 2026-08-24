@@ -1,7 +1,10 @@
 import { readFile, readdir } from 'node:fs/promises';
 import { join, relative, resolve, sep } from 'node:path';
 
-import { hashPrecompiledDisplayRouteSource } from './precompiled-display-route-source-hash.mjs';
+import {
+  hashPrecompiledDisplayRouteSource,
+  normalizePrecompiledDisplayRouteSource,
+} from './precompiled-display-route-source-hash.mjs';
 
 const ROUTING_SOURCE_SCOPES = Object.freeze([
   { directory: 'src/core/algorithms', pattern: /\.ts$/ },
@@ -55,7 +58,7 @@ export const hashPrecompiledDisplayRoutingSourceEntries = entries => {
     }
     return {
       path: entry.path.replaceAll('\\', '/'),
-      source: entry.source.replace(/\r\n?/g, '\n'),
+      source: normalizePrecompiledDisplayRouteSource(entry.source),
     };
   }).sort((first, second) => first.path.localeCompare(second.path));
   if (new Set(normalized.map(entry => entry.path)).size !== normalized.length) {
