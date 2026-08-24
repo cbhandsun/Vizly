@@ -445,12 +445,44 @@ export function findDetachedParallelOverlaps(paths: Point[][], edges: Edge[], mi
     current.push(segment);
     segmentsByEdgeIndex.set(segment.edgeIndex, current);
   }
+  const horizontalByY = segments
+    .filter(segment => segment.axis === 'h')
+    .sort((first, second) => first.a.y - second.a.y);
+  const verticalByX = segments
+    .filter(segment => segment.axis === 'v')
+    .sort((first, second) => first.a.x - second.a.x);
+  const lowerBoundCoordinate = (
+    candidates: readonly PathSegmentRef[],
+    value: number,
+    coordinate: (segment: PathSegmentRef) => number,
+  ): number => {
+    let lower = 0;
+    let upper = candidates.length;
+    while (lower < upper) {
+      const middle = lower + Math.floor((upper - lower) / 2);
+      if (coordinate(candidates[middle]) < value) lower = middle + 1;
+      else upper = middle;
+    }
+    return lower;
+  };
   const hits: DetachedOverlapHit[] = [];
-  for (let i = 0; i < segments.length; i += 1) {
-    for (let j = i + 1; j < segments.length; j += 1) {
-      const first = segments[i];
-      const second = segments[j];
-      if (first.edgeIndex === second.edgeIndex || first.axis !== second.axis) continue;
+  for (const first of segments) {
+    const parallel = first.axis === 'h' ? horizontalByY : verticalByX;
+    const coordinate = first.axis === 'h'
+      ? (segment: PathSegmentRef) => segment.a.y
+      : (segment: PathSegmentRef) => segment.a.x;
+    const line = coordinate(first);
+    const start = lowerBoundCoordinate(
+      parallel,
+      line - VISUAL_PARALLEL_LANE_TOLERANCE,
+      coordinate,
+    );
+    for (let index = start; index < parallel.length; index += 1) {
+      const second = parallel[index];
+      if (coordinate(second) > line + VISUAL_PARALLEL_LANE_TOLERANCE) break;
+      // Every cross-edge segment pair is visited from both sides. The edge
+      // order keeps one exact evaluation without relying on object identity.
+      if (second.edgeIndex <= first.edgeIndex) continue;
       const overlap = segmentOverlap(first, second);
       if (isEndpointSharedTrunkOverlap(
         first,
