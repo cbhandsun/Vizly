@@ -13,7 +13,32 @@ export type BusinessNodeClearanceBaselineRank = Readonly<{
   risk: number;
 }>;
 
+export type BusinessNodeClearanceCandidateWithHits<T> = Readonly<{
+  candidate: T;
+  hits: number;
+}>;
+
 const RISK_TOLERANCE = 0.5;
+
+/**
+ * Rejects candidates that cannot beat the baseline before callers perform the
+ * more expensive commercial and local-clearance scoring. The ranker always
+ * rejects a candidate with more obstacle hits than its current best, whose
+ * initial hit count is the baseline budget.
+ */
+export const selectBusinessNodeClearanceCandidatesWithinHitBudget = <T>(
+  candidates: readonly T[],
+  maximumHits: number,
+  countHits: (candidate: T, maximumHits: number) => number,
+): BusinessNodeClearanceCandidateWithHits<T>[] => {
+  if (!Number.isSafeInteger(maximumHits) || maximumHits < 0) return [];
+  return candidates.flatMap(candidate => {
+    const hits = countHits(candidate, maximumHits);
+    return Number.isSafeInteger(hits) && hits >= 0 && hits <= maximumHits
+      ? [{ candidate, hits }]
+      : [];
+  });
+};
 
 const canReplace = <T>(
   best: BusinessNodeClearanceCandidateRank<T>,

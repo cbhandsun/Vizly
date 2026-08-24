@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   iterateBusinessNodeClearanceCandidates,
   rankBusinessNodeClearanceCandidates,
+  selectBusinessNodeClearanceCandidatesWithinHitBudget,
   type BusinessNodeClearanceCandidateRank,
 } from '../edgeBusinessNodeClearanceCandidateRanking';
 
@@ -20,6 +21,26 @@ const candidate = (
 });
 
 describe('rankBusinessNodeClearanceCandidates', () => {
+  it('prunes candidates above the baseline hit budget before expensive scoring', () => {
+    const countHits = vi.fn((entry: { hits: number }, maximumHits: number) => (
+      entry.hits > maximumHits ? maximumHits + 1 : entry.hits
+    ));
+    const candidates = [{ id: 'clean', hits: 0 }, { id: 'worse', hits: 3 }];
+
+    expect(selectBusinessNodeClearanceCandidatesWithinHitBudget(
+      candidates,
+      1,
+      countHits,
+    )).toEqual([{ candidate: candidates[0], hits: 0 }]);
+    expect(countHits).toHaveBeenCalledWith(candidates[0], 1);
+    expect(countHits).toHaveBeenCalledWith(candidates[1], 1);
+    expect(selectBusinessNodeClearanceCandidatesWithinHitBudget(
+      candidates,
+      Number.POSITIVE_INFINITY,
+      countHits,
+    )).toEqual([]);
+  });
+
   it('orders exact local winners before hard-gate fallback candidates', () => {
     const ranked = rankBusinessNodeClearanceCandidates([
       candidate('risk-improvement', { risk: 4 }),

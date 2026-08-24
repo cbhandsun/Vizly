@@ -1,5 +1,9 @@
 import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
 import type { BuddyGroup } from '../../algorithms/globalChannelRouting';
+import {
+  segmentIntersectsClearanceRect,
+  segmentToClearanceRectDistance,
+} from './edgeNodeClearanceGeometry';
 
 type Point = { x: number; y: number };
 type Rect = { x: number; y: number; width: number; height: number };
@@ -23,6 +27,11 @@ export type RoutingObstacleEvaluationContext = Readonly<{
 
 export type NodeClearanceEvaluationContext = Readonly<{
   score: (path: Point[], minimumClearance?: number) => number;
+  scorePair: (
+    path: Point[],
+    firstMinimumClearance: number,
+    secondMinimumClearance: number,
+  ) => readonly [number, number];
 }>;
 
 export type NodeClearanceGraphEvaluationContext = Readonly<{
@@ -110,24 +119,6 @@ function isContainerNode(node: ReactFlowNode): boolean {
   return CONTAINER_NODE_TYPES.has(String(node.type ?? ''));
 }
 
-function segmentIntersectsRect(segment: Segment, rect: Rect, padding = 10): boolean {
-  const x1 = rect.x - padding;
-  const y1 = rect.y - padding;
-  const x2 = rect.x + rect.width + padding;
-  const y2 = rect.y + rect.height + padding;
-  if (Math.abs(segment.a.y - segment.b.y) < EPS) {
-    const y = segment.a.y;
-    if (y <= y1 || y >= y2) return false;
-    return Math.max(Math.min(segment.a.x, segment.b.x), x1) < Math.min(Math.max(segment.a.x, segment.b.x), x2);
-  }
-  if (Math.abs(segment.a.x - segment.b.x) < EPS) {
-    const x = segment.a.x;
-    if (x <= x1 || x >= x2) return false;
-    return Math.max(Math.min(segment.a.y, segment.b.y), y1) < Math.min(Math.max(segment.a.y, segment.b.y), y2);
-  }
-  return false;
-}
-
 const paddedRectBounds = (rect: Rect, padding: number): PaddedRectBounds => ({
   x1: rect.x - padding,
   y1: rect.y - padding,
@@ -192,47 +183,6 @@ const countPathRectHits = (
   return hits;
 };
 
-function distancePointToSegment(point: Point, segment: Segment): number {
-  const dx = segment.b.x - segment.a.x;
-  const dy = segment.b.y - segment.a.y;
-  const lenSq = dx * dx + dy * dy;
-  const t = lenSq === 0
-    ? 0
-    : Math.max(0, Math.min(1, ((point.x - segment.a.x) * dx + (point.y - segment.a.y) * dy) / lenSq));
-  return Math.hypot(point.x - (segment.a.x + dx * t), point.y - (segment.a.y + dy * t));
-}
-
-function segmentToRectDistance(segment: Segment, rect: Rect): number {
-  const axis = axisOf(segment.a, segment.b);
-  if (axis) {
-    const segmentMinX = Math.min(segment.a.x, segment.b.x);
-    const segmentMaxX = Math.max(segment.a.x, segment.b.x);
-    const segmentMinY = Math.min(segment.a.y, segment.b.y);
-    const segmentMaxY = Math.max(segment.a.y, segment.b.y);
-    const deltaX = Math.max(
-      rect.x - segmentMaxX,
-      segmentMinX - (rect.x + rect.width),
-      0,
-    );
-    const deltaY = Math.max(
-      rect.y - segmentMaxY,
-      segmentMinY - (rect.y + rect.height),
-      0,
-    );
-    if (deltaX === 0) return deltaY;
-    if (deltaY === 0) return deltaX;
-    return Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-  }
-  if (segmentIntersectsRect(segment, rect, 0)) return 0;
-  const corners = [
-    { x: rect.x, y: rect.y },
-    { x: rect.x + rect.width, y: rect.y },
-    { x: rect.x + rect.width, y: rect.y + rect.height },
-    { x: rect.x, y: rect.y + rect.height },
-  ];
-  return Math.min(...corners.map(corner => distancePointToSegment(corner, segment)));
-}
-
 const normalizeNodeClearance = (minimumClearance: number): number => (
   Number.isFinite(minimumClearance)
     ? Math.max(0, minimumClearance)
@@ -254,11 +204,30 @@ export function createNodeClearanceEvaluationContext(
       let risk = 0;
       for (const segment of toSegments(path)) {
         for (const rect of nodeRects) {
-          const clearance = segmentToRectDistance(segment, rect);
+          const clearance = segmentToClearanceRectDistance(segment, rect);
           risk += Math.max(0, requiredClearance - clearance);
         }
       }
       return risk;
+    },
+    scorePair(
+      path: Point[],
+      firstMinimumClearance: number,
+      secondMinimumClearance: number,
+    ): readonly [number, number] {
+      if (nodeRects.length === 0) return [0, 0];
+      const firstRequiredClearance = normalizeNodeClearance(firstMinimumClearance);
+      const secondRequiredClearance = normalizeNodeClearance(secondMinimumClearance);
+      let firstRisk = 0;
+      let secondRisk = 0;
+      for (const segment of toSegments(path)) {
+        for (const rect of nodeRects) {
+          const clearance = segmentToClearanceRectDistance(segment, rect);
+          firstRisk += Math.max(0, firstRequiredClearance - clearance);
+          secondRisk += Math.max(0, secondRequiredClearance - clearance);
+        }
+      }
+      return [firstRisk, secondRisk];
     },
   });
 }
@@ -309,7 +278,10 @@ export function createNodeClearanceGraphEvaluationContext(
         for (const node of nearbyNodes(segment, requiredClearance)) {
           scannedNodeCount += 1;
           if (node.id === edge.source || node.id === edge.target) continue;
-          risk += Math.max(0, requiredClearance - segmentToRectDistance(segment, node.rect));
+          risk += Math.max(
+            0,
+            requiredClearance - segmentToClearanceRectDistance(segment, node.rect),
+          );
         }
       }
       return risk;
@@ -456,10 +428,13 @@ export function pathHasNodeRoutingRisk(path: Point[], nodes: ReactFlowNode[] | u
   for (const segment of toSegments(path)) {
     for (const node of nodeRects) {
       if (node.id === edge.source || node.id === edge.target) {
-        if (segmentIntersectsRect(segment, node.rect, 0)) return true;
+        if (segmentIntersectsClearanceRect(segment, node.rect, 0)) return true;
         continue;
       }
-      if (segmentIntersectsRect(segment, node.rect, 8) || segmentToRectDistance(segment, node.rect) < 16) return true;
+      if (
+        segmentIntersectsClearanceRect(segment, node.rect, 8)
+        || segmentToClearanceRectDistance(segment, node.rect) < 16
+      ) return true;
     }
   }
   return false;
@@ -690,7 +665,11 @@ function endpointTrunkHitsUnrelatedObstacle(anchor: Point, join: Point, edge: Ed
   if (!axis) return false;
   const segment = { a: anchor, b: join };
   for (const [nodeId, rect] of obstacles) {
-    if (nodeId !== edge.source && nodeId !== edge.target && segmentIntersectsRect(segment, rect, 12)) return true;
+    if (
+      nodeId !== edge.source
+      && nodeId !== edge.target
+      && segmentIntersectsClearanceRect(segment, rect, 12)
+    ) return true;
   }
   return false;
 }

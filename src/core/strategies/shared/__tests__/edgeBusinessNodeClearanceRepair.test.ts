@@ -9,6 +9,7 @@ import {
 } from '../edgeBusinessNodeClearanceRepair';
 import { calculateEdgePathQualityScore } from '../edgeStrictCrossingGuard';
 import {
+  createNodeClearanceEvaluationContext,
   createNodeClearanceGraphEvaluationContext,
   scoreNodeClearanceRisk,
 } from '../edgeWaypointCandidateRepair';
@@ -18,6 +19,30 @@ const pathFor = (edge: Edge): Array<{ x: number; y: number }> => (
 );
 
 describe('repairBusinessNodeClearanceRisks', () => {
+  it('scores routing and commercial clearance in one parity-preserving scan', () => {
+    const nodes: Node[] = [
+      { id: 'source', position: { x: 0, y: 0 }, data: {}, measured: { width: 40, height: 40 } },
+      { id: 'blocker', position: { x: 100, y: 40 }, data: {}, measured: { width: 60, height: 60 } },
+      { id: 'target', position: { x: 240, y: 0 }, data: {}, measured: { width: 40, height: 40 } },
+    ];
+    const edge: Edge = { id: 'edge', source: 'source', target: 'target' };
+    const path = [{ x: 40, y: 20 }, { x: 240, y: 20 }];
+    const context = createNodeClearanceEvaluationContext(nodes, edge);
+
+    expect(context.scorePair(
+      path,
+      COMMERCIAL_BUSINESS_NODE_ROUTING_CLEARANCE,
+      COMMERCIAL_BUSINESS_NODE_CLEARANCE,
+    )).toEqual([
+      context.score(path, COMMERCIAL_BUSINESS_NODE_ROUTING_CLEARANCE),
+      context.score(path, COMMERCIAL_BUSINESS_NODE_CLEARANCE),
+    ]);
+    expect(context.scorePair(path, Number.NaN, Number.POSITIVE_INFINITY)).toEqual([
+      context.score(path, Number.NaN),
+      context.score(path, Number.POSITIVE_INFINITY),
+    ]);
+  });
+
   it('keeps the first occurrence of each exact candidate geometry', () => {
     const first = [{ x: 0, y: 0 }, { x: 100, y: 0 }];
     const duplicate = first.map(point => ({ ...point }));

@@ -1,7 +1,10 @@
 import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
 
 import type { EdgePathQualityScore } from './edgePathQualityGeometry';
-import { iterateBusinessNodeClearanceCandidates } from './edgeBusinessNodeClearanceCandidateRanking';
+import {
+  iterateBusinessNodeClearanceCandidates,
+  selectBusinessNodeClearanceCandidatesWithinHitBudget,
+} from './edgeBusinessNodeClearanceCandidateRanking';
 import {
   createEdgePathQualityEvaluationContext,
 } from './edgeStrictCrossingGuard';
@@ -707,9 +710,9 @@ export const repairBusinessNodeClearanceRisks = (
         ?? createRoutingObstacleEvaluationContext(edge, obstacles);
       const qualityContext = createEdgePathQualityEvaluationContext(current);
       const baselineQuality = qualityContext.evaluate(current);
-      const baselineRisk = clearanceContext.score(path, minimumClearance);
-      const baselineCommercialRisk = clearanceContext.score(
+      const [baselineRisk, baselineCommercialRisk] = clearanceContext.scorePair(
         path,
+        minimumClearance,
         COMMERCIAL_BUSINESS_NODE_CLEARANCE,
       );
       const baselineHits = obstacleContext.countUnrelatedObstacleHits(path);
@@ -719,22 +722,34 @@ export const repairBusinessNodeClearanceRisks = (
         options.diagnostics.generatedCandidateCount += generatedCandidates.length;
         options.diagnostics.uniqueCandidateCount += uniqueCandidates.length;
       }
+      const hitEligibleCandidates = selectBusinessNodeClearanceCandidatesWithinHitBudget(
+        uniqueCandidates,
+        baselineHits,
+        (candidatePath, maximumHits) => obstacleContext.countUnrelatedObstacleHits(
+          candidatePath,
+          maximumHits,
+        ),
+      );
       const rankedCandidates = iterateBusinessNodeClearanceCandidates(
-        uniqueCandidates.map(candidatePath => ({
-          candidate: candidatePath,
-          risk: clearanceContext.score(candidatePath, minimumClearance),
-          commercialRisk: clearanceContext.score(
-            candidatePath,
+        hitEligibleCandidates.map(({ candidate, hits }) => {
+          const [risk, commercialRisk] = clearanceContext.scorePair(
+            candidate,
+            minimumClearance,
             COMMERCIAL_BUSINESS_NODE_CLEARANCE,
-          ),
-          hits: obstacleContext.countUnrelatedObstacleHits(candidatePath),
-          length: candidatePath.slice(1).reduce((total, point, index) => (
-            total
-              + Math.abs(point.x - candidatePath[index].x)
-              + Math.abs(point.y - candidatePath[index].y)
-          ), 0),
-          bendCount: Math.max(0, candidatePath.length - 2),
-        })),
+          );
+          return {
+            candidate,
+            risk,
+            commercialRisk,
+            hits,
+            length: candidate.slice(1).reduce((total, point, index) => (
+              total
+                + Math.abs(point.x - candidate[index].x)
+                + Math.abs(point.y - candidate[index].y)
+            ), 0),
+            bendCount: Math.max(0, candidate.length - 2),
+          };
+        }),
         {
           hits: baselineHits,
           risk: baselineRisk,
