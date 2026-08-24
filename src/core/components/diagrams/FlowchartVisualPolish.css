@@ -415,6 +415,12 @@
     pointer-events: none !important;
 }
 
+/* Interaction paint must complete inside the 100ms input-feedback budget and
+   must not leave a partially painted trace after the state becomes inactive. */
+.diagram-root .react-flow__edge .react-flow__edge-path.shared-trunk-accent-trace {
+    transition: none;
+}
+
 .diagram-root .react-flow__edge:is(:hover, .selected, :focus, :focus-visible)
     .react-flow__edge-path.shared-trunk-accent-trace {
     stroke: var(--flow-visual-accent) !important;

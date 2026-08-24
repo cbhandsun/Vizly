@@ -37,6 +37,19 @@ export const assertDisplayRoutingInteractionPaint = ({ kind, state, durationMs }
   })}`);
 };
 
+export const assertDisplayRoutingInteractionReset = state => {
+  const valid = state
+    && state.activeEdgeCount === 0
+    && state.visibleTraceCount === 0
+    && state.runningAnimationCount === 0;
+  if (valid) return state;
+  throw new Error(`Display-routing interaction reset failed: ${JSON.stringify({
+    activeEdgeCount: state?.activeEdgeCount ?? null,
+    visibleTraceCount: state?.visibleTraceCount ?? null,
+    runningAnimationCount: state?.runningAnimationCount ?? null,
+  })}`);
+};
+
 const fitViewport = session => session.evaluate(`(async () => {
   const instance = window.reactFlowInstance;
   if (!instance || typeof instance.fitView !== 'function') return false;
@@ -166,6 +179,55 @@ const waitForPersistentSelectedPaint = async (session, edgeIndex, durationMs) =>
   return assertDisplayRoutingInteractionPaint({ kind: 'selected', state, durationMs });
 };
 
+const waitForInteractionReset = async session => {
+  const state = await session.evaluate(`(async () => {
+    const wrappers = [...document.querySelectorAll(${JSON.stringify(EDGE_WRAPPER_SELECTOR)})];
+    const nextPaint = () => new Promise(resolve => requestAnimationFrame(resolve));
+    await nextPaint();
+    await nextPaint();
+    const edgeAnimations = [...new Set(wrappers.flatMap(wrapper => (
+      typeof wrapper.getAnimations === 'function'
+        ? wrapper.getAnimations({ subtree: true })
+        : []
+    )))].filter(animation => animation.playState === 'running' || animation.playState === 'pending');
+    if (edgeAnimations.length > 0) {
+      await Promise.race([
+        Promise.allSettled(edgeAnimations.map(animation => animation.finished)),
+        new Promise(resolve => setTimeout(resolve, 500)),
+      ]);
+    }
+    await nextPaint();
+    await nextPaint();
+    const runningAnimations = [...new Set(wrappers.flatMap(wrapper => (
+      typeof wrapper.getAnimations === 'function'
+        ? wrapper.getAnimations({ subtree: true })
+        : []
+    )))].filter(animation => animation.playState === 'running' || animation.playState === 'pending');
+    const traceIsVisible = trace => {
+      const style = getComputedStyle(trace);
+      const opacity = Number.parseFloat(style.opacity || '0');
+      return Number.isFinite(opacity)
+        && opacity > 0.001
+        && style.display !== 'none'
+        && style.visibility !== 'hidden';
+    };
+    return {
+      activeEdgeCount: wrappers.filter(wrapper => (
+        wrapper.matches(':hover')
+        || wrapper.matches(':focus')
+        || wrapper.matches(':focus-visible')
+        || wrapper.classList.contains('selected')
+      )).length,
+      visibleTraceCount: wrappers.reduce((count, wrapper) => (
+        count + [...wrapper.querySelectorAll(${JSON.stringify(TRACE_SELECTOR)})]
+          .filter(traceIsVisible).length
+      ), 0),
+      runningAnimationCount: runningAnimations.length,
+    };
+  })()`);
+  return assertDisplayRoutingInteractionReset(state);
+};
+
 export const verifyDisplayRoutingInteractionStates = async session => {
   if (await fitViewport(session) !== true) throw new Error('Unable to fit interaction audit viewport');
   const target = await findVisibleInteractionTarget(session);
@@ -218,6 +280,7 @@ export const verifyDisplayRoutingInteractionStates = async session => {
   await session.send('Input.dispatchKeyEvent', {
     type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27,
   });
+  await waitForInteractionReset(session);
   return {
     focusMs: focus.durationMs,
     hoverMs: hover.durationMs,

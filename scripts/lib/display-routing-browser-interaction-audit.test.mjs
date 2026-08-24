@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { assertDisplayRoutingInteractionPaint } from './display-routing-browser-interaction-audit.mjs';
+import {
+  assertDisplayRoutingInteractionPaint,
+  assertDisplayRoutingInteractionReset,
+} from './display-routing-browser-interaction-audit.mjs';
 
 const state = {
   hovered: false,
@@ -36,5 +39,27 @@ describe('display routing browser interaction audit', () => {
       state: { ...state, hovered: true, ...overrides },
       durationMs,
     })).toThrow(/paint failed/);
+  });
+
+  it('accepts a fully settled interaction state', () => {
+    const resetState = {
+      activeEdgeCount: 0,
+      visibleTraceCount: 0,
+      runningAnimationCount: 0,
+    };
+    expect(assertDisplayRoutingInteractionReset(resetState)).toBe(resetState);
+  });
+
+  it.each([
+    ['active edge', { activeEdgeCount: 1 }],
+    ['visible trace', { visibleTraceCount: 1 }],
+    ['running animation', { runningAnimationCount: 1 }],
+  ])('fails closed when reset leaves an %s', (_name, overrides) => {
+    expect(() => assertDisplayRoutingInteractionReset({
+      activeEdgeCount: 0,
+      visibleTraceCount: 0,
+      runningAnimationCount: 0,
+      ...overrides,
+    })).toThrow(/interaction reset failed/);
   });
 });

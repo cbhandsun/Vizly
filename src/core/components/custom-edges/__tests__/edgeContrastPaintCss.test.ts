@@ -20,6 +20,9 @@ describe('edge contrast paint CSS states', () => {
     expect(stylesheet).toMatch(
       /\.react-flow__edge:is\(:hover, \.selected, :focus, :focus-visible\)[^{]*\.shared-trunk-accent-trace\s*\{[^}]*stroke:\s*var\(--flow-visual-accent\)\s*!important;[^}]*opacity:\s*1\s*!important;/s,
     );
+    expect(stylesheet).toMatch(
+      /\.react-flow__edge \.react-flow__edge-path\.shared-trunk-accent-trace\s*\{[^}]*transition:\s*none;/s,
+    );
     expect(stylesheet).toContain("not(:has([data-shared-trunk-state='shared']))");
     expect(stylesheet).toContain(':not(.shared-trunk-canonical-backbone)');
     expect(stylesheet).toContain(':not(.shared-trunk-accent-trace)');
