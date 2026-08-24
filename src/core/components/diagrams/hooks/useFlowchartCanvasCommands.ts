@@ -28,6 +28,7 @@ import { runFlowchartSmartOptimize } from '../flowchartSmartOptimize';
 import type { NodeDataUpdate } from '../../../types/diagram-updates';
 import type { NodeTemplate } from './useNodeTemplates';
 import { findFlowchartTemplateById } from '../flowchartTemplateSelection';
+import type { FlowchartLayoutDirection } from '../flowchartLayoutStrategyMode';
 
 type TemplateApplyOptions = Parameters<typeof applyFlowchartTemplate>[0];
 
@@ -41,7 +42,7 @@ interface UseFlowchartCanvasCommandsOptions {
     handleStrategyLayout: (
         strategyName: string,
         nodeLayout?: string,
-        direction?: 'TB' | 'LR',
+        direction?: FlowchartLayoutDirection,
     ) => void | Promise<void>;
     isReadonly: boolean;
     showGrid: boolean;

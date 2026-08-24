@@ -30,7 +30,19 @@ import {
     resolveLayoutDomainOrder,
     shouldPromoteDomainDagreRouteCandidate,
     shouldRetryRejectedDomainLayoutWithCompoundElk,
+    type FlowchartLayoutDirection,
 } from '../flowchartLayoutStrategyMode';
+import {
+    LAYERED_TREE_ROUTING_SPACING,
+    loadDomainCompoundElkStrategy,
+    loadDomainElkStrategy,
+} from './layoutStrategyRuntime';
+
+export {
+    LAYERED_TREE_ROUTING_SPACING,
+    loadDomainCompoundElkStrategy,
+    loadDomainElkStrategy,
+} from './layoutStrategyRuntime';
 
 
 interface UseLayoutStrategyParams {
@@ -53,28 +65,6 @@ const asRecord = (value: unknown): Record<string, unknown> => (
 
 type RuntimePositionedLayoutNode = Node & {
     positionAbsolute?: unknown;
-};
-
-export const LAYERED_TREE_ROUTING_SPACING = Object.freeze({
-    // Same-rank edges also need two 48px terminal stubs.
-    nodeSpacing: 120,
-    // Two 48px commercial terminal stubs plus a 24px shared channel.
-    levelSpacing: 120,
-});
-
-let domainElkStrategyPromise: Promise<ILayoutStrategy> | undefined;
-let domainCompoundElkStrategyPromise: Promise<ILayoutStrategy> | undefined;
-
-export const loadDomainElkStrategy = (): Promise<ILayoutStrategy> => {
-    domainElkStrategyPromise ??= import('../../../strategies/DomainElkLayoutStrategy')
-        .then(({ DomainElkLayoutStrategy }) => new DomainElkLayoutStrategy());
-    return domainElkStrategyPromise;
-};
-
-export const loadDomainCompoundElkStrategy = (): Promise<ILayoutStrategy> => {
-    domainCompoundElkStrategyPromise ??= import('../../../strategies/DomainCompoundElkLayoutStrategy')
-        .then(({ DomainCompoundElkLayoutStrategy }) => new DomainCompoundElkLayoutStrategy());
-    return domainCompoundElkStrategyPromise;
 };
 
 /** React Flow runtime geometry must not override a newly staged layout. */
@@ -219,7 +209,7 @@ export function useLayoutStrategy({
     // lastDomainStrategy is retained as a public compatibility name, but it
     // represents the active top-level layout strategy (domain-aware or global).
     const [lastDomainStrategy, setLastDomainStrategy] = useState<string>('domain-dagre');
-    const [lastDomainDirection, setLastDomainDirection] = useState<'TB' | 'LR'>('TB');
+    const [lastDomainDirection, setLastDomainDirection] = useState<FlowchartLayoutDirection>('TB');
     // Remember the domain-internal arrangement across temporary global modes.
     const [lastNodeLayout, setLastNodeLayout] = useState<string>('dagre');
 
@@ -242,11 +232,16 @@ export function useLayoutStrategy({
      * 统一布局入口（对齐 SVG 版 handleAutoLayout）
      * strategyName: 'tree' | 'force' | 'domain-vertical' | 'domain-horizontal' | 'domain-dagre' | 'domain-dagre-sub-horizontal' | 'domain-lanes'
      * nodeLayout: 'flow' | 'grid' | 'horizontal' | 'vertical' | 'dagre'
-     * direction: 'TB' | 'LR'
+     * direction: 'TB' | 'BT' | 'LR' | 'RL'
      * ═══════════════════════════════════════════════════════════════ */
-    const handleStrategyLayout = useCallback(async (strategyName: string, nodeLayout?: string, direction?: 'TB' | 'LR') => {
+    const handleStrategyLayout = useCallback(async (
+        strategyName: string,
+        nodeLayout?: string,
+        direction?: FlowchartLayoutDirection,
+    ) => {
         const dir = direction || 'TB';
         const appliedDirection = dir;
+        const axisDirection = dir === 'LR' || dir === 'RL' ? 'LR' : 'TB';
         let appliedStrategyName = strategyName;
         let appliedNodeLayout = nodeLayout;
 
@@ -299,7 +294,7 @@ export function useLayoutStrategy({
                 let treeSourceEdges = layoutEdges;
                 if (usesNativeTreeLayout) {
                     const positions = treeLayout(layoutNodes, layoutEdges, {
-                        direction: dir,
+                        direction: axisDirection,
                         ...LAYERED_TREE_ROUTING_SPACING,
                     });
                     newNodes = applyLayout(layoutNodes, positions);
@@ -333,7 +328,7 @@ export function useLayoutStrategy({
                 // ⭐ 路由感知后处理：优化节点位置以改善连线质量
                 const treeResult = usesNativeTreeLayout
                     ? refineLayout(treeResultRaw, layoutEdges, {
-                        direction: dir,
+                        direction: axisDirection,
                         enableChannelSpacing: true,
                         enableCrossingMinimization: true,
                         enableNodeNudging: false,
@@ -380,7 +375,7 @@ export function useLayoutStrategy({
                 // ⭐ 路由感知后处理
                 const forceResult = forceEngine === 'force'
                     ? refineLayout(forceResultRaw, layoutEdges, {
-                        direction: dir,
+                        direction: axisDirection,
                         enableChannelSpacing: true,
                         enableCrossingMinimization: true,
                         enableNodeNudging: false,
@@ -488,8 +483,10 @@ export function useLayoutStrategy({
                     domainPlacement: isDomainLane ? 'ordered-lanes' : 'topology',
                     domainOrder,
                     subDomainOrder,
-                    domainSubGroupDirection: strategyName === 'domain-dagre-sub-horizontal' ? 'LR' : dir,
-                    subDomainNodeDirection: dir,
+                    domainSubGroupDirection: strategyName === 'domain-dagre-sub-horizontal'
+                        ? 'LR'
+                        : axisDirection,
+                    subDomainNodeDirection: axisDirection,
                 };
                 const legacyFallback = await import('./legacyDomainLayoutFallback');
                 const canUseFlatElkFallback = Boolean(
@@ -502,7 +499,7 @@ export function useLayoutStrategy({
                 let usedDomainCompoundElk = isDomainCompoundElk;
                 let usedDomainDagre = isDomainDagre;
                 const calculateDomainCompoundElkFallback = async (
-                    fallbackDirection: 'TB' | 'LR' = appliedDirection,
+                    fallbackDirection: 'TB' | 'LR' = axisDirection,
                 ) => {
                     const compoundStrategy = await loadDomainCompoundElkStrategy();
                     const fallbackResult = await compoundStrategy.calculateLayout(
@@ -594,7 +591,7 @@ export function useLayoutStrategy({
                         candidateUsesElk: boolean,
                         candidateUsesCompoundElk: boolean,
                         candidateUsesDomainDagre: boolean,
-                        candidateDirection: 'TB' | 'LR',
+                        candidateDirection: FlowchartLayoutDirection,
                     ) => {
                         // Preserve non-flow nodes; semantic containers are
                         // regenerated by the domain-aware strategy itself.

@@ -5,6 +5,7 @@ import {
     findFlowchartEditorCommandExportButton,
     readFlowchartEditorCommandWindowSize,
 } from './flowchartEditorCommand';
+import type { FlowchartLayoutDirection } from './flowchartLayoutStrategyMode';
 import {
     applyFlowchartSummarySelection,
     runFlowchartSummaryInsert,
@@ -64,7 +65,11 @@ export const createFlowchartDesignerCommandEventHandler = ({
     confirmClearCanvas,
 }: {
     handleSmartLayout: () => void;
-    handleStrategyLayout: (engineName: string, nodeLayout: string | undefined, direction: 'LR' | 'TB') => void;
+    handleStrategyLayout: (
+        engineName: string,
+        nodeLayout: string | undefined,
+        direction: FlowchartLayoutDirection,
+    ) => void;
     handleExport: () => void;
     setAiChatVisible: (visible: boolean) => void;
     setActiveRightTab: (tab: string) => void;

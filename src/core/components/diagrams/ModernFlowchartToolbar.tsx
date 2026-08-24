@@ -21,6 +21,7 @@ import { FlowchartCreationTools } from './FlowchartCreationTools';
 import { resolveFlowchartToolbarHistoryCount } from './flowchartToolbarHistoryPresentation';
 import { DropdownMenuTriggerButton } from './DropdownMenuTriggerButton';
 import { buildFlowchartLayoutMenuModel } from './flowchartToolbarLayoutMenu';
+import type { FlowchartLayoutDirection } from './flowchartLayoutStrategyMode';
 import { buildToolModeMenuItems, resolveActiveToolModeKey } from './flowchartToolbarToolModeMenu';
 import { getFlowchartZoomControlState } from './flowchartZoomControlState';
 import { useKeyboardAccessibleDropdown } from './hooks/useKeyboardAccessibleDropdown';
@@ -51,13 +52,17 @@ interface FlowchartToolbarProps {
     onShowShortcuts: () => void;
     onShowCanvasSearch?: () => void;
     /** 域感知策略布局回调（统一入口） */
-    onStrategyLayout?: (strategyName: string, nodeLayout?: string, direction?: 'TB' | 'LR') => void;
+    onStrategyLayout?: (
+        strategyName: string,
+        nodeLayout?: string,
+        direction?: FlowchartLayoutDirection,
+    ) => void;
     /** 根据当前图结构选择低风险布局预设 */
     onSmartLayout?: () => void | Promise<void>;
     /** 当前选中的域布局策略 */
     lastDomainStrategy?: string;
     /** 当前选中的域布局方向 */
-    lastDomainDirection?: 'TB' | 'LR';
+    lastDomainDirection?: FlowchartLayoutDirection;
     /** 当前选中的域内节点排布 */
     lastNodeLayout?: string;
     layoutBusy?: boolean;

@@ -107,7 +107,7 @@ describe('flowchartToolbarLayoutMenu', () => {
       .toEqual({ available: false, reason: 'empty' });
   });
 
-  it('exposes ELK layered layouts in both supported directions', () => {
+  it('exposes ELK layered layouts in all four supported directions', () => {
     const onStrategyLayout = vi.fn();
     const model = buildFlowchartLayoutMenuModel({
       lastDomainStrategy: 'domain-elk',
@@ -118,19 +118,25 @@ describe('flowchartToolbarLayoutMenu', () => {
     });
     const items = collectItems(model.items);
     const elkTb = items.find(item => item.key === 'domain-elk-tb');
+    const elkBt = items.find(item => item.key === 'domain-elk-bt');
     const elkLr = items.find(item => item.key === 'domain-elk-lr');
+    const elkRl = items.find(item => item.key === 'domain-elk-rl');
     const globalGroup = items.find(item => item.key === 'group-tree');
     const domainGroup = items.find(item => item.key === 'group-domain');
     const legacyDagreLr = items.find(item => item.key === 'domain-dagre-lr');
 
     expect(elkTb).toBeDefined();
+    expect(elkBt).toBeDefined();
     expect(elkLr).toBeDefined();
+    expect(elkRl).toBeDefined();
     expect(collectItems(globalGroup?.children).map(item => item.key)).toEqual([
       'tree-tb',
       'tree-lr',
       'force',
       'domain-elk-tb',
+      'domain-elk-bt',
       'domain-elk-lr',
+      'domain-elk-rl',
     ]);
     expect(collectItems(domainGroup?.children).map(item => item.key)).not.toContain('domain-elk-tb');
     expect(legacyDagreLr).toBeUndefined();
@@ -138,11 +144,17 @@ describe('flowchartToolbarLayoutMenu', () => {
     expect(model.selectedKeys).not.toContain('node-elk');
     expect(model.statusText).not.toContain(' + ');
     expect(resolveActiveDomainLayoutKey('domain-elk', 'TB')).toBe('domain-elk-tb');
+    expect(resolveActiveDomainLayoutKey('domain-elk', 'BT')).toBe('domain-elk-bt');
+    expect(resolveNodeLayoutHostStrategy('domain-elk', 'RL')).toBe('domain-horizontal');
 
     const click = elkLr?.onClick;
     expect(typeof click).toBe('function');
     if (typeof click === 'function') click();
     expect(onStrategyLayout).toHaveBeenCalledWith('domain-elk', 'elk-layered', 'LR');
+    if (typeof elkBt?.onClick === 'function') elkBt.onClick();
+    if (typeof elkRl?.onClick === 'function') elkRl.onClick();
+    expect(onStrategyLayout).toHaveBeenCalledWith('domain-elk', 'elk-layered', 'BT');
+    expect(onStrategyLayout).toHaveBeenCalledWith('domain-elk', 'elk-layered', 'RL');
   });
 
   it('routes node-layout choices to an engine that implements them', () => {

@@ -5,6 +5,7 @@ import {
     createCustomDomainLayoutCommand,
     resolveCustomDomainLayoutDirection,
     usesSelectableDomainNodeArrangement,
+    type FlowchartLayoutDirection,
 } from './flowchartLayoutStrategyMode';
 
 type ToolbarMenuItem = Extract<
@@ -20,11 +21,15 @@ type TranslateLayoutLabel = (key: string, fallback: string) => string;
 
 interface BuildFlowchartLayoutMenuModelOptions {
     customDomainLayoutAvailable?: boolean;
-    lastDomainDirection?: 'TB' | 'LR';
+    lastDomainDirection?: FlowchartLayoutDirection;
     lastDomainStrategy?: string;
     lastNodeLayout?: string;
     onSmartLayout?: () => void | Promise<void>;
-    onStrategyLayout?: (strategyName: string, nodeLayout?: string, direction?: 'TB' | 'LR') => void;
+    onStrategyLayout?: (
+        strategyName: string,
+        nodeLayout?: string,
+        direction?: FlowchartLayoutDirection,
+    ) => void;
     translate: TranslateLayoutLabel;
 }
 
@@ -42,7 +47,7 @@ const stripDecorativePrefix = (label: string): string => (
 
 export const resolveActiveDomainLayoutKey = (
     lastDomainStrategy?: string,
-    lastDomainDirection?: 'TB' | 'LR',
+    lastDomainDirection?: FlowchartLayoutDirection,
 ): string | undefined => {
     if (!lastDomainStrategy) return undefined;
     if (lastDomainStrategy === 'force') return 'force';
@@ -62,7 +67,7 @@ export const resolveActiveDomainLayoutKey = (
  */
 export const resolveNodeLayoutHostStrategy = (
     lastDomainStrategy?: string,
-    lastDomainDirection?: 'TB' | 'LR',
+    lastDomainDirection?: FlowchartLayoutDirection,
 ): 'domain-vertical' | 'domain-horizontal' => createCustomDomainLayoutCommand(
     resolveCustomDomainLayoutDirection(lastDomainStrategy, lastDomainDirection),
     undefined,
@@ -130,7 +135,9 @@ export const buildFlowchartLayoutMenuModel = ({
             '循环流程泳道（左→右）',
         ),
         domainElkTb: translate('designer.flowchart.layout.globalOrthogonalTB', '全图正交分层（上→下）'),
+        domainElkBt: translate('designer.flowchart.layout.globalOrthogonalBT', '全图正交分层（下→上）'),
         domainElkLr: translate('designer.flowchart.layout.globalOrthogonalLR', '全图正交分层（左→右）'),
+        domainElkRl: translate('designer.flowchart.layout.globalOrthogonalRL', '全图正交分层（右→左）'),
         domainDirectionGroup: translate('designer.flowchart.layout.domainDirectionGroup', '域排列方向'),
         domainVertical: translate('designer.flowchart.layout.freeDomainTB', '域纵向排列（上→下）'),
         domainHorizontal: translate('designer.flowchart.layout.freeDomainLR', '域横向排列（左→右）'),
@@ -196,7 +203,9 @@ export const buildFlowchartLayoutMenuModel = ({
         'domain-lanes-tb': labels.domainLanesTb,
         'domain-lanes-lr': labels.domainLanesLr,
         'domain-elk-tb': labels.domainElkTb,
+        'domain-elk-bt': labels.domainElkBt,
         'domain-elk-lr': labels.domainElkLr,
+        'domain-elk-rl': labels.domainElkRl,
         'custom-domain-tb': labels.domainVertical,
         'custom-domain-lr': labels.domainHorizontal,
         'node-flow': labels.nodeFlow,
@@ -293,10 +302,22 @@ export const buildFlowchartLayoutMenuModel = ({
                     <FaSitemap />,
                 ),
                 domainItem(
+                    'domain-elk-bt',
+                    labels.domainElkBt,
+                    () => onStrategyLayout?.('domain-elk', 'elk-layered', 'BT'),
+                    <FaSitemap style={{ transform: 'rotate(180deg)' }} />,
+                ),
+                domainItem(
                     'domain-elk-lr',
                     labels.domainElkLr,
                     () => onStrategyLayout?.('domain-elk', 'elk-layered', 'LR'),
                     <FaSitemap style={{ transform: 'rotate(-90deg)' }} />,
+                ),
+                domainItem(
+                    'domain-elk-rl',
+                    labels.domainElkRl,
+                    () => onStrategyLayout?.('domain-elk', 'elk-layered', 'RL'),
+                    <FaSitemap style={{ transform: 'rotate(90deg)' }} />,
                 ),
             ],
         },

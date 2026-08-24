@@ -74,6 +74,24 @@ describe('prepareLayeredLayoutEdges', () => {
     expect(edge).toMatchObject({ sourceHandle: 'bottom', targetHandle: 'top' });
   });
 
+  it.each([
+    ['BT', { x: 40, y: 180 }, { x: 0, y: 0 }, 'top', 'bottom'],
+    ['RL', { x: 420, y: 0 }, { x: 0, y: 0 }, 'left', 'right'],
+  ] as const)(
+    'keeps a reverse %s edge on its directed terminal axis',
+    (direction, sourcePosition, targetPosition, sourceHandle, targetHandle) => {
+      const reverseNodes = [
+        { id: 'source', position: sourcePosition, width: 200, height: 80, data: {} },
+        { id: 'target', position: targetPosition, width: 200, height: 80, data: {} },
+      ] as Node[];
+      const [edge] = prepareLayeredLayoutEdges(reverseNodes, [{
+        id: 'reverse', source: 'source', target: 'target',
+      }] as Edge[], direction);
+
+      expect(edge).toMatchObject({ sourceHandle, targetHandle });
+    },
+  );
+
   it('uses horizontal candidates for a same-rank edge in a TB layout', () => {
     const [edge] = prepareLayeredLayoutEdges(nodes, [{
       id: 'same-rank',
@@ -281,7 +299,9 @@ describe('prepareLayeredLayoutEdges', () => {
 describe('sanitizeLayoutEdges', () => {
   it.each([
     ['TB', 'bottom', 'top'],
+    ['BT', 'top', 'bottom'],
     ['LR', 'right', 'left'],
+    ['RL', 'left', 'right'],
   ] as const)(
     'assigns directed terminal sides for an unrestricted %s layered edge',
     (direction, sourceHandle, targetHandle) => {

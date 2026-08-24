@@ -1,6 +1,5 @@
 import type { Node } from '@xyflow/react';
-
-type LayoutDirection = 'LR' | 'TB';
+import type { FlowchartLayoutDirection as LayoutDirection } from './flowchartLayoutStrategyMode';
 
 const FLOWCHART_COMMAND_TEXT_MAX_CHARS = 80;
 const FLOWCHART_COMMAND_TEXT_PATTERN = /^[A-Za-z0-9 _+.-]+$/;
@@ -95,7 +94,9 @@ const normalizeStrategyName = (strategy: unknown): string => (
 
 export const resolveFlowchartLayoutDirection = (direction: unknown): LayoutDirection => {
     const rawDirection = typeof direction === 'string' ? direction.trim().toUpperCase() : '';
-    return rawDirection === 'LR' || rawDirection === 'RL' ? 'LR' : 'TB';
+    return rawDirection === 'LR' || rawDirection === 'RL' || rawDirection === 'BT'
+        ? rawDirection
+        : 'TB';
 };
 
 export const resolveFlowchartLayoutEngine = (strategy: unknown): string => {

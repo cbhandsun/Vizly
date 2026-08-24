@@ -3,6 +3,7 @@ import type { Edge, Node } from '@xyflow/react';
 import { withDisplayAbsolutePositions } from '../../shared/baseReactFlowAbsolutePositions';
 import { clearBaseReactFlowLayoutEdgeRoutingData } from '../../shared/baseReactFlowLayoutEdgeRoutingData';
 import { logLayoutOrphanEdgeDropped } from './diagramInteractionLogging';
+import type { FlowchartLayoutDirection } from '../flowchartLayoutStrategyMode';
 
 const asRecord = (value: unknown): Record<string, unknown> => (
     value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -17,7 +18,11 @@ const asRecord = (value: unknown): Record<string, unknown> => (
  * 而 FlowchartNode 只注册了全称 Handle ID ('right'/'left'/'top'/'bottom')
  * 必须先正确映射短格式→全称，再验证有效性
  */
-export function sanitizeLayoutEdges(resultNodes: Node[], resultEdges: Edge[], dir: 'TB' | 'LR'): Edge[] {
+export function sanitizeLayoutEdges(
+    resultNodes: Node[],
+    resultEdges: Edge[],
+    dir: FlowchartLayoutDirection,
+): Edge[] {
     const nodeIdSet = new Set(resultNodes.map(n => n.id));
     const expandHandle = (h: string | null | undefined): string | null => {
         if (!h) return null;
@@ -28,9 +33,10 @@ export function sanitizeLayoutEdges(resultNodes: Node[], resultEdges: Edge[], di
         if (s === 'b' || s === 'bottom') return 'bottom';
         return null;
     };
-    const isH = dir === 'LR';
-    const defSrc = isH ? 'right' : 'bottom';
-    const defTgt = isH ? 'left' : 'top';
+    const isH = dir === 'LR' || dir === 'RL';
+    const reverse = dir === 'BT' || dir === 'RL';
+    const defSrc = isH ? (reverse ? 'left' : 'right') : (reverse ? 'top' : 'bottom');
+    const defTgt = isH ? (reverse ? 'right' : 'left') : (reverse ? 'bottom' : 'top');
     let _orphan = 0, _expanded = 0, _defaulted = 0;
 
     const sanitized = resultEdges
@@ -107,7 +113,7 @@ const getLayoutNodeSize = (node: Node): { width: number; height: number } => ({
 export const resolveLayeredLayoutTerminalHandles = (
     sourceNode: Node,
     targetNode: Node,
-    direction: 'TB' | 'LR',
+    direction: FlowchartLayoutDirection,
 ): LayoutTerminalHandles => {
     const sourceSize = getLayoutNodeSize(sourceNode);
     const targetSize = getLayoutNodeSize(targetNode);
@@ -131,7 +137,8 @@ export const resolveLayeredLayoutTerminalHandles = (
         >= (sourceSize.height + targetSize.height) / 2;
     const longHorizontalSpan = horizontallySeparated
         && Math.abs(deltaX) > Math.abs(deltaY) * 1.5;
-    const useHorizontal = direction === 'LR'
+    const horizontalDirection = direction === 'LR' || direction === 'RL';
+    const useHorizontal = horizontalDirection
         ? horizontallySeparated || !verticallySeparated
         : horizontallySeparated && (!verticallySeparated || longHorizontalSpan);
 
@@ -237,7 +244,7 @@ const resolveLayoutRouteTerminalHandle = (
 export const prepareLayeredLayoutEdges = (
     resultNodes: Node[],
     resultEdges: Edge[],
-    direction: 'TB' | 'LR',
+    direction: FlowchartLayoutDirection,
     options: LayeredLayoutEdgePreparationOptions = {},
 ): Edge[] => {
     const nodeById = new Map(resultNodes.map(node => [node.id, node] as const));

@@ -14,7 +14,9 @@ describe('display routing matrix cases', () => {
       'domain-lanes-tb',
       'domain-lanes-lr',
       'domain-elk-tb',
+      'domain-elk-bt',
       'domain-elk-lr',
+      'domain-elk-rl',
       'tree-tb',
       'tree-lr',
     ]);

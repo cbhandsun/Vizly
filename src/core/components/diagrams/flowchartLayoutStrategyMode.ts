@@ -5,6 +5,7 @@ const GLOBAL_FULL_GRAPH_LAYOUT_STRATEGIES = new Set([
     'elk',
 ]);
 
+export type FlowchartLayoutDirection = 'TB' | 'BT' | 'LR' | 'RL';
 export type FlowchartDomainLayoutDirection = 'TB' | 'LR';
 export type FlowchartDomainNodeArrangement =
     | 'flow'
@@ -37,9 +38,11 @@ export const coerceFlowchartDomainNodeArrangement = (
 
 export const resolveCustomDomainLayoutDirection = (
     strategyName?: string,
-    direction?: FlowchartDomainLayoutDirection,
+    direction?: FlowchartLayoutDirection,
 ): FlowchartDomainLayoutDirection => (
-    strategyName === 'domain-horizontal' || direction === 'LR' ? 'LR' : 'TB'
+    strategyName === 'domain-horizontal' || direction === 'LR' || direction === 'RL'
+        ? 'LR'
+        : 'TB'
 );
 
 /**

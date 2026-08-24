@@ -7,6 +7,7 @@ import { type CommandItem } from '../../../types/plugin';
 import { PluginContext, DiagramTypePlugin } from '../../../types/plugin';
 import { hasMutationLockedNode } from '../nodeLockPolicy';
 import { hasMutationLockedEdge } from '../edgeMutationPolicy';
+import type { FlowchartLayoutDirection } from '../flowchartLayoutStrategyMode';
 
 interface UseDesignerCommandsProps {
     // View
@@ -46,7 +47,11 @@ interface UseDesignerCommandsProps {
     editingEnabled: boolean;
     handleOpenJsonEditor: () => void;
     // Layout
-    handleStrategyLayout: (strategyName: string, nodeLayout?: string, direction?: 'TB' | 'LR') => void;
+    handleStrategyLayout: (
+        strategyName: string,
+        nodeLayout?: string,
+        direction?: FlowchartLayoutDirection,
+    ) => void;
     handleSmartLayout: () => void;
     // UI
     setShowShortcuts: React.Dispatch<React.SetStateAction<boolean>>;

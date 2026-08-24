@@ -26,7 +26,8 @@ describe('flowchartEditorCommand', () => {
     expect(resolveFlowchartLayoutEngine('unknown-layout')).toBe('domain-vertical');
 
     expect(resolveFlowchartLayoutDirection('LR')).toBe('LR');
-    expect(resolveFlowchartLayoutDirection('rl')).toBe('LR');
+    expect(resolveFlowchartLayoutDirection('rl')).toBe('RL');
+    expect(resolveFlowchartLayoutDirection('bt')).toBe('BT');
     expect(resolveFlowchartLayoutDirection('tb')).toBe('TB');
     expect(resolveFlowchartLayoutDirection(undefined)).toBe('TB');
   });
@@ -106,7 +107,8 @@ describe('flowchartEditorCommand', () => {
     });
 
     expect(handled).toBe(true);
-    expect(handleStrategyLayout).toHaveBeenCalledWith('dagre', 'grid', 'LR');
+    expect(handleStrategyLayout).toHaveBeenCalledWith('dagre', 'grid', 'RL');
+    expect(resolveFlowchartLayoutDirection('BT')).toBe('BT');
   });
 
   it('adds a viewport-centered node for add-node commands', () => {
