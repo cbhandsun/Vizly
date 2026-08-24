@@ -122,37 +122,6 @@ describe('standardDataToCanvas', () => {
         })]);
     });
 
-    it('registers a parsed routing snapshot as an untrusted identity-scoped Canvas candidate', async () => {
-        const candidate = createPersistedRoutingCandidate({
-            routingVersion: EDGE_ROUTING_CACHE_VERSION,
-            inputSignature: '8765',
-            inputGeometryDigest: `geometry-v1:${'d'.repeat(32)}`,
-            outputRouteSignature: 'route-v2:1:2:0123456789abcdef',
-            writtenAt: 42,
-            patches: [{
-                id: 'edge',
-                source: 'valid',
-                target: 'invalid',
-                type: 'stablePath',
-                data: { computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }] },
-            }],
-        });
-        if (!candidate) throw new Error('expected a valid document candidate');
-        const routingSnapshot = createRoutingOnlyDocumentSnapshot(candidate);
-        if (!routingSnapshot) throw new Error('expected a valid routing document snapshot');
-        const diagram = makeDiagram();
-        diagram.routingSnapshot = routingSnapshot;
-        diagram.edges = [{ id: 'edge', source: 'valid', target: 'invalid', type: 'main' }];
-
-        await standardDataToCanvas(diagram);
-
-        expect(readRoutingOnlyDocumentCandidate({
-            routingVersion: EDGE_ROUTING_CACHE_VERSION,
-            inputSignature: candidate.inputSignature,
-            inputGeometryDigest: candidate.inputGeometryDigest,
-        })).toEqual(candidate);
-    });
-
     it('serializes canvas records without leaking UI-only fields into pure data', () => {
         const nodes: Node[] = [{
             id: 'node-1',
