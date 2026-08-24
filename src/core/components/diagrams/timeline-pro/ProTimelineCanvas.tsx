@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react';
-import { useNodes, useEdges, useReactFlow } from '@xyflow/react';
+import type { PluginContext } from '../../../types/plugin';
 import { 
   useProTimelineEngine, 
   calculateSwimlanes, 
@@ -37,18 +37,19 @@ import {
   createProTimelineTaskDeletion,
 } from './proTimelineTaskTransactions';
 import { PRO_TASK_ROW_HEIGHT as ROW_HEIGHT } from './proTaskLayerGeometry';
+import { PRO_TASK_LIST_DEFAULT_WIDTH } from './proTaskListInteraction';
 import './ProTimelineCanvas.css';
 
 const HEADER_HEIGHT = 52;
 
-export default function ProTimelineCanvas() {
+export default function ProTimelineCanvas({ ctx }: { ctx: PluginContext }) {
   const { 
     panX, panY, setPanByDelta, setPan, setZoom, zoomLevel, dateToX, 
     xToDate, pixelsPerDay, viewMode, setViewMode,
     showCriticalPath, showBaseline, toggleCriticalPath, toggleBaseline
   } = useProTimelineEngine();
   const timelineRef = useRef<HTMLDivElement>(null);
-  const [panelWidth, setPanelWidth] = useState(380);
+  const [panelWidth, setPanelWidth] = useState(PRO_TASK_LIST_DEFAULT_WIDTH);
   const [hoveredTaskId, setHoveredTaskId] = useState<string | null>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [showResourceDrawer, setShowResourceDrawer] = useState(false);
@@ -79,18 +80,22 @@ export default function ProTimelineCanvas() {
     const shadowColor = isDark ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0.08)';
     const todayBaseColor = theme?.palette?.error?.main || '#ff4d4f';
   
-  const nodes = useNodes();
-  const edges = useEdges();
+  const { nodes, edges, setNodes, setEdges } = ctx;
   const hasBaseline = useMemo(
     () => hasProTimelineBaseline(nodes.map(node => node.data)),
     [nodes],
   );
-  const { updateNodeData, setNodes, setEdges } = useReactFlow();
+  const updateNodeData = useCallback((nodeId: string, updates: Record<string, unknown>) => {
+      setNodes(currentNodes => currentNodes.map(node => node.id === nodeId ? {
+          ...node,
+          data: { ...node.data, ...updates },
+      } : node));
+  }, [setNodes]);
   const {
       handleDeleteDependency,
       handleUpdateDependency,
       onTaskConnect,
-  } = useProTimelineDependencyActions();
+  } = useProTimelineDependencyActions({ nodes, edges, setEdges });
 
   const handleSaveBaseline = useCallback(() => {
       const transaction = createProTimelineBaselineSnapshot(nodes);

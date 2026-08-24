@@ -51,6 +51,13 @@ export class TimelinePlugin implements DiagramTypePlugin {
 
   replacesDefaultCanvas = true;
   hideDefaultSidebar = true;
+  hideContextToolbar = true;
+  hideMiniMap = true;
+  hideGridControls = true;
+  hideLayoutControls = true;
+  hideFlowFocusControls = true;
+  hideZoomControls = true;
+  hideCenterIsland = true;
   
   async migrate<T>(data: T, fromVersion: string | undefined): Promise<T> {
       if (!isRecord(data)) return data;
@@ -112,8 +119,8 @@ export class TimelinePlugin implements DiagramTypePlugin {
       return <TimelineSmartActionBar ctx={ctx} />;
   }
 
-  contributeCanvasComponents(_ctx: PluginContext) {
-      return <ProTimelineCanvas />;
+  contributeCanvasComponents(ctx: PluginContext) {
+      return <ProTimelineCanvas ctx={ctx} />;
   }
 
   contributeSidebarPanels(_ctx: PluginContext): SidebarPanel[] {

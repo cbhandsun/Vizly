@@ -309,6 +309,11 @@ describe('FlowchartDesigner shell regions', () => {
             isMobile: false,
             leftDrawerOpen: true,
         })).toBe(false);
+        expect(shouldShowFlowchartOnboarding({
+            ...onboardingState,
+            isMobile: false,
+            pluginReplacesDefaultCanvas: true,
+        })).toBe(false);
     });
 
     it('isolates plugin sidebar panels and honors sidebar visibility', () => {

@@ -62,12 +62,28 @@ const createContext = (nodes: Node[] = [sourceNode], edges: Edge[] = []): Plugin
     takeSnapshot: vi.fn(),
     updateNodesBatch: vi.fn(),
     updateEdgesBatch: vi.fn(),
-    addNode: vi.fn(),
+    addNode: vi.fn(() => 'added-node'),
 });
 
 describe('TimelinePlugin toolbar accessibility and history', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+    });
+
+    it('opts out of React Flow chrome that conflicts with the timeline canvas', () => {
+        const plugin = new TimelinePlugin();
+
+        expect(plugin).toMatchObject({
+            replacesDefaultCanvas: true,
+            hideDefaultSidebar: true,
+            hideContextToolbar: true,
+            hideMiniMap: true,
+            hideGridControls: true,
+            hideLayoutControls: true,
+            hideFlowFocusControls: true,
+            hideZoomControls: true,
+            hideCenterIsland: true,
+        });
     });
 
     it('exposes only the three unique, named creation actions', () => {
@@ -81,6 +97,16 @@ describe('TimelinePlugin toolbar accessibility and history', () => {
         expect(screen.queryByRole('button', { name: '适应全部' })).toBeNull();
     });
 
+    it('passes the controlled plugin state into the replacement timeline canvas', () => {
+        const context = createContext();
+        const canvas = new TimelinePlugin().contributeCanvasComponents(context);
+
+        expect(React.isValidElement<{ ctx?: PluginContext }>(canvas)).toBe(true);
+        if (React.isValidElement<{ ctx?: PluginContext }>(canvas)) {
+            expect(canvas.props.ctx).toBe(context);
+        }
+    });
+
     it('snapshots, localizes, selects, and confirms an appended event', () => {
         const context = createContext();
         render(<>{new TimelinePlugin().contributeToolbar(context)}</>);
@@ -88,12 +114,13 @@ describe('TimelinePlugin toolbar accessibility and history', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Add event' }));
 
         expect(context.takeSnapshot).toHaveBeenCalledTimes(1);
+        expect(context.addNode).not.toHaveBeenCalled();
+
         const updateNodes = vi.mocked(context.setNodes).mock.calls[0]?.[0];
         expect(typeof updateNodes).toBe('function');
         if (typeof updateNodes === 'function') {
             const updatedNodes = updateNodes([sourceNode]);
-            expect(updatedNodes).toHaveLength(2);
-            expect(updatedNodes[0]?.selected).toBe(false);
+            expect(updatedNodes[0]).toMatchObject({ id: 'source', selected: false });
             expect(updatedNodes[1]).toMatchObject({
                 type: 'timelineNode',
                 selected: true,
@@ -106,6 +133,7 @@ describe('TimelinePlugin toolbar accessibility and history', () => {
         if (typeof updateEdges === 'function') {
             expect(updateEdges([])[0]).toMatchObject({
                 source: 'source',
+                target: expect.stringMatching(/^tl-node-/),
                 type: 'smoothstep',
             });
         }

@@ -16,6 +16,7 @@ import {
     resolveWorkspaceLocalModifiedAt,
     WORKSPACE_UNKNOWN_TIMESTAMP,
 } from '../workspaceModifiedAt';
+import { todayDateOnly } from '../../core/utils/dateOnly';
 
 const NOW = Date.parse('2026-08-21T12:00:00.000Z');
 const storageWith = (raw: string | null): Pick<Storage, 'getItem'> => ({ getItem: () => raw });
@@ -226,6 +227,13 @@ describe('diagramManagementPage helpers', () => {
             id: 'root',
             type: 'timelineNode',
             domain: 'timeline',
+            data: {
+                label: 'Project Launch',
+                type: 'milestone',
+                status: 'pending',
+                date: todayDateOnly(),
+                endDate: todayDateOnly(),
+            },
         });
 
         const mindMap = createTemplateSeed('mindmap', { mindMapRootTopic: '中心主题' });

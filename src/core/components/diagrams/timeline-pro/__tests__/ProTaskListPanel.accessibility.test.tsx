@@ -302,9 +302,9 @@ describe('ProTaskListPanel accessibility', () => {
         renderPanel({ onWidthChange, width: 380 });
 
         const separator = screen.getByRole('separator', { name: '调整任务列表宽度' });
-        expect(separator.getAttribute('aria-valuenow')).toBe('380');
+        expect(separator.getAttribute('aria-valuenow')).toBe('420');
         fireEvent.keyDown(separator, { key: 'ArrowRight' });
-        expect(onWidthChange).toHaveBeenCalledWith(400);
+        expect(onWidthChange).toHaveBeenCalledWith(440);
     });
 
     it('uses an accessible recoverable confirmation before deleting a task', async () => {
@@ -339,25 +339,25 @@ describe('ProTaskListPanel accessibility', () => {
 
 describe('task list interaction boundaries', () => {
     it.each([
-        [380, 380],
-        [0, 280],
-        [-1, 280],
+        [480, 480],
+        [0, 420],
+        [-1, 420],
         [9999, 650],
-        [Number.POSITIVE_INFINITY, 380],
-        ['380', 380],
-        [undefined, 380],
+        [Number.POSITIVE_INFINITY, 480],
+        ['480', 480],
+        [undefined, 480],
     ])('normalizes width %j', (value, expected) => {
         expect(normalizeProTaskListWidth(value)).toBe(expected);
     });
 
     it.each([
-        [380, 'ArrowLeft', 360],
-        [380, 'ArrowRight', 400],
-        [280, 'ArrowLeft', 280],
+        [480, 'ArrowLeft', 460],
+        [480, 'ArrowRight', 500],
+        [420, 'ArrowLeft', 420],
         [650, 'ArrowRight', 650],
-        [380, 'Home', 280],
-        [380, 'End', 650],
-        [380, 'Escape', null],
+        [480, 'Home', 420],
+        [480, 'End', 650],
+        [480, 'Escape', null],
         [undefined, null, null],
     ])('steps width %j with key %j', (width, key, expected) => {
         expect(getProTaskListKeyboardWidth(width, key)).toBe(expected);

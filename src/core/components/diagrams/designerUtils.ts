@@ -386,6 +386,7 @@ export const standardDataToCanvas = async (
             return;
         }
         const metadata = n.metadata || {};
+        const persistedNodeData = isRecord(n.data) ? n.data : {};
         const metadataStyle = resolveCanvasStyle(metadata.style);
         const shape = optionalString(metadata.shape) || 'rectangle';
         const description = n.description || '';
@@ -450,6 +451,7 @@ export const standardDataToCanvas = async (
             parentId: n.parentId || (hasCanvasPositions ? optionalString(metadata.parentId) : undefined),
             extent: (n.parentId || (hasCanvasPositions && optionalString(metadata.parentId))) ? 'parent' as const : undefined,
             data: {
+                ...persistedNodeData,
                 label,
                 description,
                 domain: n.domain,

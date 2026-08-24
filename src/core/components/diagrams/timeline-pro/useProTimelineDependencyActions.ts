@@ -1,5 +1,5 @@
-import { useCallback, useMemo } from 'react';
-import { useEdges, useNodes, useReactFlow, type Edge } from '@xyflow/react';
+import { useCallback, useMemo, type Dispatch, type SetStateAction } from 'react';
+import type { Edge, Node } from '@xyflow/react';
 import { appMessage } from '../../../utils/antdStaticBridge';
 import {
     validateProTimelineDependencyConnection,
@@ -8,10 +8,17 @@ import {
 } from './proTimelineDependencyConnection';
 import { requestProTimelineSnapshot } from './proTimelineHistory';
 
-export function useProTimelineDependencyActions() {
-    const nodes = useNodes();
-    const edges = useEdges();
-    const { setEdges } = useReactFlow();
+interface ProTimelineDependencyActionsOptions {
+    nodes: Node[];
+    edges: Edge[];
+    setEdges: Dispatch<SetStateAction<Edge[]>>;
+}
+
+export function useProTimelineDependencyActions({
+    nodes,
+    edges,
+    setEdges,
+}: ProTimelineDependencyActionsOptions) {
     const tasks = useMemo(() => nodes.map((node) => ({
         id: node.id,
         startDate: node.data?.date ?? node.data?.startDate,

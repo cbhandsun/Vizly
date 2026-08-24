@@ -2,6 +2,7 @@ import type { DiagramMetadata } from '../services/storage/types';
 import type { StandardDiagramData } from '@/core/models/DiagramModels';
 import type { ManageStorageProvider } from '@/components/ui/ManageTopToolbar';
 import { safeLog } from '@/core/utils/consoleCleanup';
+import { todayDateOnly } from '@/core/utils/dateOnly';
 import { redactSensitiveLogValue } from '@/core/utils/logSecurity';
 import { coerceRemoteTemplateMetadata, type RemoteTemplateMetadata } from '@/core/utils/remoteTemplateMetadata';
 import { resolveWorkspaceLocalModifiedAt } from './workspaceModifiedAt';
@@ -263,7 +264,8 @@ export const createTemplateSeed = (
                 theme: { name: 'light', displayName: 'Light Theme', domains: {} }
             };
         }
-        case 'timeline':
+        case 'timeline': {
+            const startDate = todayDateOnly();
             return {
                 id: crypto.randomUUID(),
                 name: 'Project Timeline',
@@ -275,12 +277,19 @@ export const createTemplateSeed = (
                     domain: 'timeline',
                     description: 'Project Launch',
                     position: { x: 0, y: 0 },
-                    data: { label: 'Project Launch', type: 'gantt' }
+                    data: {
+                        label: 'Project Launch',
+                        type: 'milestone',
+                        status: 'pending',
+                        date: startDate,
+                        endDate: startDate,
+                    }
                 }],
                 edges: [],
                 layout: { type: 'custom', direction: 'LR', spacing: { horizontal: 50, vertical: 20 }, padding: { horizontal: 20, vertical: 20 } },
                 theme: { name: 'light', displayName: 'Light Theme', domains: {} }
             };
+        }
         case 'blank':
             return {
                 id: crypto.randomUUID(),

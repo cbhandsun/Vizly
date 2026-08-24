@@ -293,6 +293,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                         visible={shouldShowFlowchartOnboarding({
                             isMobile,
                             pluginId,
+                            pluginReplacesDefaultCanvas: activePlugin?.replacesDefaultCanvas === true,
                             isInitialDiagramLoading,
                             onboardingDismissed,
                             leftDrawerOpen,
@@ -307,7 +308,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                         onDismiss={() => dismissFlowchartOnboarding(setOnboardingDismissed)}
                     />}
                     {editingEnabled && <FlowchartEmptyState
-                        visible={pluginId !== 'mindmap' && !isInitialDiagramLoading && nodes.length === 0 && !jsonEditorVisible && !isDragging && !isConnecting && !quickAddMenu?.visible}
+                        visible={pluginId !== 'mindmap' && activePlugin?.replacesDefaultCanvas !== true && !isInitialDiagramLoading && nodes.length === 0 && !jsonEditorVisible && !isDragging && !isConnecting && !quickAddMenu?.visible}
                         pluginId={pluginId}
                         onOpenShapePicker={() => setMobileRequestedPanel('shapes-search')}
                     />}

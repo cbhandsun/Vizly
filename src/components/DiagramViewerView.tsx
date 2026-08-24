@@ -18,6 +18,7 @@ import { ErrorBoundary } from './ui/ErrorBoundary';
 import { subscribeMindMapAIConfigRequest } from '@/core/components/mindmap-v2/mindMapAIConfigEvent';
 import { CloudSaveAuthRecovery } from './diagrams/CloudSaveAuthRecovery';
 import { loadLayoutPresetMapForDiagram } from '@/data/standardized/layoutPresetMapLoader';
+import { shouldHideDiagramViewerCenterIsland } from './diagramViewerChrome';
 
 const RoutingDebugPanel = import.meta.env.DEV
     ? lazy(() => import('./debug/RoutingDebugPanel').then(module => ({ default: module.RoutingDebugPanel })))
@@ -227,7 +228,7 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
                     showExport: true,
                     showThemeSelector: false,
                     showStyleSwitcher: false,
-                    hideCenterIsland: resolvedPluginId === 'mindmap',
+                    hideCenterIsland: shouldHideDiagramViewerCenterIsland(resolvedPluginId),
                     leftChildren: (switcherOpen) => (
                             <div className="flex items-center max-w-[240px]">
                                 <TemplateCascaderMenu

@@ -1,6 +1,7 @@
 interface FlowchartOnboardingVisibilityOptions {
     isMobile: boolean;
     pluginId: string;
+    pluginReplacesDefaultCanvas?: boolean;
     isInitialDiagramLoading: boolean;
     onboardingDismissed: boolean;
     leftDrawerOpen: boolean;
@@ -14,6 +15,7 @@ interface FlowchartOnboardingVisibilityOptions {
 export const shouldShowFlowchartOnboarding = ({
     isMobile,
     pluginId,
+    pluginReplacesDefaultCanvas = false,
     isInitialDiagramLoading,
     onboardingDismissed,
     leftDrawerOpen,
@@ -25,6 +27,7 @@ export const shouldShowFlowchartOnboarding = ({
 }: FlowchartOnboardingVisibilityOptions): boolean => (
     !isMobile
     && pluginId !== 'mindmap'
+    && !pluginReplacesDefaultCanvas
     && !isInitialDiagramLoading
     && !onboardingDismissed
     && !leftDrawerOpen
