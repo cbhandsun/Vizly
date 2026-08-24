@@ -25,7 +25,10 @@ const candidate = () => createPersistedRoutingCandidate({
     source: 'source',
     target: 'target',
     type: 'stablePath',
-    data: { computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }] },
+    data: {
+      computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
+      h: ';50,0;',
+    },
   }],
 });
 
@@ -69,6 +72,16 @@ describe('routing-only document snapshot', () => {
         }],
       },
     })).toBeNull();
+    expect(parseRoutingOnlyDocumentSnapshot({
+      ...snapshot,
+      candidate: {
+        ...current,
+        patches: [{
+          ...current.patches[0],
+          data: { ...current.patches[0].data, h: ';1e2,0;' },
+        }],
+      },
+    })).toBeNull();
   });
 
   it('strips routing geometry while preserving business and manual metadata', () => {
@@ -83,6 +96,7 @@ describe('routing-only document snapshot', () => {
       data: {
         label: 'business label',
         computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
+        h: ';50,0;',
         layoutPathLocked: true,
         autoSource: true,
         autoTarget: true,

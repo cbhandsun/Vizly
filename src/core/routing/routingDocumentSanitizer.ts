@@ -4,6 +4,7 @@ const ROUTING_OWNED_EDGE_DATA_KEYS = [
   'computedPath',
   'elkPath',
   'treeRouting',
+  'h',
   'algorithm',
   'layoutPathLocked',
   '_layoutPathLocked',

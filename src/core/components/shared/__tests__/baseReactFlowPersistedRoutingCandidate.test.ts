@@ -20,6 +20,7 @@ const patches: Edge[] = [{
   targetHandle: 'left',
   data: {
     computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
+    h: ';50,0;',
   },
 }];
 const expectation = { routingVersion, inputSignature, inputGeometryDigest };
@@ -95,6 +96,13 @@ describe('persisted routing-only candidate boundary', () => {
     expect(parseBaseReactFlowPersistedRoutingCandidate({
       ...base,
       patches: [{ ...patches[0], label: 'business-label' }],
+    }, expectation)).toBeNull();
+    expect(parseBaseReactFlowPersistedRoutingCandidate({
+      ...base,
+      patches: [{
+        ...patches[0],
+        data: { ...patches[0].data, h: ';1e2,0;' },
+      }],
     }, expectation)).toBeNull();
     expect(parseBaseReactFlowPersistedRoutingCandidate({
       ...base,

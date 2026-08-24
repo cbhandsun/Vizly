@@ -34,6 +34,7 @@ describe('baseReactFlowDocumentRouteCandidate', () => {
       data: {
         ...sourceEdges[0].data,
         computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
+        h: ';50,0;',
       },
     }];
     const patches = createBaseReactFlowDisplayEdgePatches(sourceEdges, routedEdges);
@@ -64,6 +65,7 @@ describe('baseReactFlowDocumentRouteCandidate', () => {
       data: {
         owner: 'current owner',
         computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
+        h: ';50,0;',
       },
     });
     expect(loadBaseReactFlowDocumentRouteCandidate({

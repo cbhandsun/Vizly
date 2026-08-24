@@ -1,5 +1,6 @@
 import type { Edge } from '@xyflow/react';
 
+import { parseRoutingLineHops } from '../../routing/routingLineHops';
 import { edgeRoutingQualityIntentToken } from '../../strategies/shared/edgeRoutingQualityIntent';
 import {
   baseReactFlowDisplayOutputRouteSignatureMatches,
@@ -294,17 +295,17 @@ const sanitizeBaseReactFlowRoutingPatches = (
           }
         }
       }
-      if (options.allowRouterIntent) {
-        if (hasOwn(patch.data, 'h')) {
-          const lineHops = patch.data.h;
-          if (typeof lineHops === 'undefined' && options.allowUndefinedRoutingValues) {
-            safeData.h = undefined;
-          } else if (typeof lineHops === 'string' && lineHops.length <= 128) {
-            safeData.h = lineHops;
-          } else {
-            return null;
-          }
+      if (hasOwn(patch.data, 'h')) {
+        const lineHops = patch.data.h;
+        if (typeof lineHops === 'undefined' && options.allowUndefinedRoutingValues) {
+          safeData.h = undefined;
+        } else {
+          const safeLineHops = parseRoutingLineHops(lineHops);
+          if (!safeLineHops) return null;
+          safeData.h = safeLineHops;
         }
+      }
+      if (options.allowRouterIntent) {
         for (const key of ['sharedTrunkAware', 'sharedTrunkSynthesized', 'isTreeBus'] as const) {
           if (!hasOwn(patch.data, key)) continue;
           const intent = patch.data[key];

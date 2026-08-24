@@ -618,7 +618,9 @@ describe('baseReactFlowDisplayRoutingTransaction', () => {
     expect(sanitizeBaseReactFlowTrustedDisplayPatches(source, [createPatch(25)]))
       .toBeNull();
     expect(sanitizeBaseReactFlowDisplayCachePatches(source, [createPatch(';25,0;')]))
-      .toEqual([{ ...source[0], data: { computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }] } }]);
+      .toEqual([createPatch(';25,0;')]);
+    expect(sanitizeBaseReactFlowDisplayCachePatches(source, [createPatch(';1e2,0;')]))
+      .toBeNull();
   });
 
   it('stores only routing changes and merges them onto the latest edge metadata', () => {

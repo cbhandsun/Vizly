@@ -420,6 +420,13 @@ describe('baseReactFlowPrecompiledRouteRegistry', () => {
         data: { ...(patches[0].data || {}), h: 'x'.repeat(129) },
       }],
     }],
+    ['malformed line-hop identity', {
+      ...artifact,
+      patches: [{
+        ...patches[0],
+        data: { ...(patches[0].data || {}), h: ';1e2,0;' },
+      }],
+    }],
     ['unknown quality intent', {
       ...artifact,
       patches: [{

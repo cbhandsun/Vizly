@@ -480,6 +480,7 @@ describe('baseReactFlowDisplayWorker lifecycle', () => {
       data: {
         ...sourceEdges[0].data,
         computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
+        h: ';50,0;',
       },
     }];
     const displayPatches = createBaseReactFlowDisplayEdgePatches(sourceEdges, routedEdges);
@@ -508,7 +509,10 @@ describe('baseReactFlowDisplayWorker lifecycle', () => {
           source: 'source',
           target: 'target',
           type: 'stablePath',
-          data: { computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }] },
+          data: {
+            computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
+            h: ';50,0;',
+          },
         }],
       },
     });

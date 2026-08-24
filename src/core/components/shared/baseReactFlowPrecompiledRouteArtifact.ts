@@ -1,5 +1,6 @@
 import type { Edge } from '@xyflow/react';
 
+import { parseRoutingLineHops } from '../../routing/routingLineHops';
 import {
   BASE_DISPLAY_ROUTING_VERSION,
   isBaseReactFlowDisplayOutputRouteSignature,
@@ -104,7 +105,7 @@ const isRoutingDataPatch = (value: unknown, pointBudget: { total: number }): boo
   }
   if (
     typeof value.h !== 'undefined'
-    && (typeof value.h !== 'string' || value.h.length > 128)
+    && !parseRoutingLineHops(value.h)
   ) return false;
   if (
     typeof value.computedPath !== 'undefined'

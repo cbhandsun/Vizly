@@ -1,6 +1,7 @@
 import type { Edge } from '@xyflow/react';
 
 import { EDGE_ROUTING_CACHE_VERSION } from './routingVersion';
+import { parseRoutingLineHops } from './routingLineHops';
 
 export const PERSISTED_ROUTING_CANDIDATE_SCHEMA = 'vizly-routing-only-candidate-v1';
 export const ROUTING_ONLY_DOCUMENT_SNAPSHOT_SCHEMA = 'vizly-routing-only-document-v1';
@@ -23,7 +24,7 @@ const PATCH_KEYS = new Set([
   'targetHandle',
   'data',
 ]);
-const DATA_KEYS = new Set(['computedPath', 'elkPath', 'treeRouting']);
+const DATA_KEYS = new Set(['computedPath', 'elkPath', 'treeRouting', 'h']);
 const TREE_KEYS = new Set(['effectiveSourceHandle', 'effectiveTargetHandle', 'points']);
 const POINT_KEYS = new Set(['x', 'y']);
 const CANDIDATE_KEYS = new Set([
@@ -129,6 +130,11 @@ const parsePatch = (
       pointBudget.total += path.length;
       if (pointBudget.total > MAX_TOTAL_PATH_POINTS) return null;
       data[key] = path;
+    }
+    if ('h' in value.data) {
+      const lineHops = parseRoutingLineHops(value.data.h);
+      if (!lineHops) return null;
+      data.h = lineHops;
     }
     if ('treeRouting' in value.data) {
       if (!isRecord(value.data.treeRouting) || !hasOnlyKeys(value.data.treeRouting, TREE_KEYS)) {
