@@ -3,11 +3,16 @@ import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
 import { refineOrthogonalWaypointsDetailed } from '../../algorithms/orthogonalWaypointRefiner';
 import {
   createGlobalEdgeWaypointNodeContext,
-  queryGlobalEdgeWaypointObstacles,
   type GlobalEdgeWaypointNodeContext,
 } from './edgeGlobalWaypointNodeContext';
 import { buildPipelineBuddyGroups } from './edgeRoutingTopology';
-import { createRoutingWaypointSegmentGroupIndex } from './edgeRoutingWaypointSegmentIndex';
+import {
+  createGlobalWaypointPathGeometry,
+  createPathCandidateEvaluationContext,
+  type GlobalEdgeWaypointRefinementDiagnostics,
+  type GlobalWaypointPathGeometry,
+  type PathCandidateEvaluationContext,
+} from './edgeGlobalWaypointCandidateEvaluation';
 import {
   addAxisCandidate,
   axisOf,
@@ -26,7 +31,6 @@ import {
   pathEquals,
   pathLength,
   sameEndpoints,
-  segmentIntersectsRect,
   segmentLength,
   segmentRange,
   shiftCandidatesAwayFromCrossing,
@@ -34,7 +38,6 @@ import {
   shiftInteriorSegment,
   SIDE_TOLERANCE,
   strictCrosses,
-  toSegments,
   turnbackCount,
   visualStrictCrosses,
   type Point,
@@ -49,6 +52,7 @@ function shiftCandidatesAwayFromLaneBand(
   segmentIndex: number,
   workingPaths: Map<string, Point[]>,
   edgeByKey: Map<string, Edge>,
+  geometryByKey: ReadonlyMap<string, GlobalWaypointPathGeometry>,
   obstacles: Map<string, Rect>,
 ): Point[][] {
   if (segmentIndex <= 0 || segmentIndex >= path.length - 2) return [];
@@ -62,7 +66,9 @@ function shiftCandidatesAwayFromLaneBand(
   for (const [otherKey, otherPath] of workingPaths) {
     const other = edgeByKey.get(otherKey);
     if (!other || other === edge || sharesEndpoint(edge, other)) continue;
-    for (const otherSegment of toSegments(otherPath)) {
+    const otherSegments = geometryByKey.get(otherKey)?.segments
+      ?? createGlobalWaypointPathGeometry(otherPath).segments;
+    for (const otherSegment of otherSegments) {
       const otherAxis = axisOf(otherSegment.a, otherSegment.b);
       if (!otherAxis || otherAxis === axis) continue;
 
@@ -100,163 +106,16 @@ function shiftCandidatesAwayFromLaneBand(
     .filter((candidate): candidate is Point[] => candidate !== null);
 }
 
-type PathCandidateMetrics = {
-  strictCrossings: number;
-  unrelatedCrossings: number;
-  visualUnrelatedCrossings: number;
-  unrelatedOverlap: number;
-  obstacleHits: number;
-  turnbacks: number;
-  bends: number;
-  length: number;
-  score: number;
-};
-
-type PathCandidateEvaluationContext = {
-  evaluate: (path: Point[]) => PathCandidateMetrics;
-};
-
-export type GlobalEdgeWaypointRefinementDiagnostics = {
-  evaluationCount: number;
-  scannedEdgePairCount: number;
-  scannedNodeCount: number;
-  scannedSegmentCount: number;
-};
-
-export const createGlobalEdgeWaypointRefinementDiagnostics = (
-): GlobalEdgeWaypointRefinementDiagnostics => ({
-  evaluationCount: 0,
-  scannedEdgePairCount: 0,
-  scannedNodeCount: 0,
-  scannedSegmentCount: 0,
-});
+export { createGlobalEdgeWaypointRefinementDiagnostics } from './edgeGlobalWaypointCandidateEvaluation';
+export type { GlobalEdgeWaypointRefinementDiagnostics } from './edgeGlobalWaypointCandidateEvaluation';
 
 export type GlobalEdgeWaypointRefinementOptions = Readonly<{
   diagnostics?: GlobalEdgeWaypointRefinementDiagnostics;
+  disablePathGeometryCache?: boolean;
   disableSegmentIndex?: boolean;
   disableVisualRectIndex?: boolean;
   nodeContext?: GlobalEdgeWaypointNodeContext;
 }>;
-
-const toVisualSegments = (path: Point[]): Segment[] => path
-  .slice(1)
-  .map((b, index) => ({ a: path[index], b }));
-
-function createPathCandidateEvaluationContext(
-  edge: Edge,
-  key: string,
-  workingPaths: Map<string, Point[]>,
-  edgeByKey: Map<string, Edge>,
-  nodeContext: GlobalEdgeWaypointNodeContext,
-  options: GlobalEdgeWaypointRefinementOptions = {},
-): PathCandidateEvaluationContext {
-  const otherPaths = [...workingPaths.entries()]
-    .filter(([otherKey]) => otherKey !== key)
-    .map(([otherKey, otherPath]) => {
-      const otherEdge = edgeByKey.get(otherKey);
-      return {
-        segments: toSegments(otherPath),
-        visualSegments: toVisualSegments(otherPath),
-        unrelated: Boolean(otherEdge && !sharesEndpoint(edge, otherEdge)),
-      };
-    });
-  const segmentGroupIndex = options.disableSegmentIndex
-    ? undefined
-    : createRoutingWaypointSegmentGroupIndex(
-      otherPaths.map(other => other.visualSegments),
-    );
-  const cache = new WeakMap<Point[], PathCandidateMetrics>();
-
-  return {
-    evaluate: (path: Point[]): PathCandidateMetrics => {
-      const cached = cache.get(path);
-      if (cached) return cached;
-      const segments = toSegments(path);
-      const visualSegments = toVisualSegments(path);
-      const segmentQuery = segmentGroupIndex?.queryPotentialGroupIndexes(visualSegments);
-      const candidateOtherPaths = segmentQuery
-        ? otherPaths.filter((_, index) => segmentQuery.groupIndexes.has(index))
-        : otherPaths;
-      let strictCrossings = 0;
-      let unrelatedCrossingCount = 0;
-      let visualUnrelatedCrossingCount = 0;
-      let unrelatedOverlap = 0;
-      let obstacleHitCount = 0;
-
-      if (options.diagnostics) {
-        options.diagnostics.evaluationCount += 1;
-        options.diagnostics.scannedSegmentCount += segmentQuery?.scannedSegmentCount ?? 0;
-      }
-      for (const other of candidateOtherPaths) {
-        if (options.diagnostics) {
-          options.diagnostics.scannedEdgePairCount += 1;
-          options.diagnostics.scannedSegmentCount += segments.length * other.segments.length;
-        }
-        for (const first of segments) {
-          for (const second of other.segments) {
-            if (strictCrosses(first, second)) {
-              strictCrossings += 1;
-              if (other.unrelated) unrelatedCrossingCount += 1;
-            }
-            if (other.unrelated) {
-              const overlap = parallelOverlapLength(first, second);
-              if (overlap > MIN_INTERIOR_LEG) unrelatedOverlap += overlap - MIN_INTERIOR_LEG;
-            }
-          }
-        }
-        if (other.unrelated) {
-          if (options.diagnostics) {
-            options.diagnostics.scannedSegmentCount += visualSegments.length
-              * other.visualSegments.length;
-          }
-          for (const first of visualSegments) {
-            for (const second of other.visualSegments) {
-              if (visualStrictCrosses(first, second)) visualUnrelatedCrossingCount += 1;
-            }
-          }
-        }
-      }
-      for (const segment of segments) {
-        const obstacleQuery = queryGlobalEdgeWaypointObstacles({
-          context: nodeContext,
-          disableIndex: options.disableVisualRectIndex === true,
-          edge,
-          segment,
-        });
-        if (options.diagnostics) {
-          options.diagnostics.scannedNodeCount += obstacleQuery.scannedNodeCount;
-        }
-        for (const rect of obstacleQuery.rects) {
-          if (segmentIntersectsRect(segment, rect)) obstacleHitCount += 1;
-        }
-      }
-
-      const turnbacks = turnbackCount(path);
-      const bends = bendCount(path);
-      const length = pathLength(path);
-      const metrics: PathCandidateMetrics = {
-        strictCrossings,
-        unrelatedCrossings: unrelatedCrossingCount,
-        visualUnrelatedCrossings: visualUnrelatedCrossingCount,
-        unrelatedOverlap,
-        obstacleHits: obstacleHitCount,
-        turnbacks,
-        bends,
-        length,
-        score: unrelatedCrossingCount * 10000
-          + visualUnrelatedCrossingCount * 9000
-          + strictCrossings * 7000
-          + unrelatedOverlap * 80
-          + obstacleHitCount * 5000
-          + turnbacks * 500
-          + bends * 40
-          + length,
-      };
-      cache.set(path, metrics);
-      return metrics;
-    },
-  };
-}
 
 function sharesEndpoint(first: Edge, second: Edge): boolean {
   return first.source === second.source
@@ -586,6 +445,7 @@ function findBestInteriorCrossingShiftCandidate(
   path: Point[],
   workingPaths: Map<string, Point[]>,
   edgeByKey: Map<string, Edge>,
+  geometryByKey: ReadonlyMap<string, GlobalWaypointPathGeometry>,
   nodeContext: GlobalEdgeWaypointNodeContext,
   options: GlobalEdgeWaypointRefinementOptions,
 ): Point[] | null {
@@ -598,6 +458,7 @@ function findBestInteriorCrossingShiftCandidate(
       key,
       workingPaths,
       edgeByKey,
+      geometryByKey,
       nodeContext,
       options,
     );
@@ -617,7 +478,8 @@ function findBestInteriorCrossingShiftCandidate(
     const other = edgeByKey.get(otherKey);
     if (!other) continue;
     const relatedByEndpoint = sharesEndpoint(edge, other);
-    const otherSegments = toSegments(otherPath);
+    const otherSegments = geometryByKey.get(otherKey)?.segments
+      ?? createGlobalWaypointPathGeometry(otherPath).segments;
 
     for (let segmentIndex = 0; segmentIndex < path.length - 1; segmentIndex += 1) {
       if (!axisOf(path[segmentIndex], path[segmentIndex + 1])) continue;
@@ -635,6 +497,7 @@ function findBestInteriorCrossingShiftCandidate(
             segmentIndex,
             workingPaths,
             edgeByKey,
+            geometryByKey,
             obstacles,
           );
           laneBandCandidates.set(segmentIndex, bandCandidates);
@@ -733,6 +596,11 @@ export function refineGlobalEdgeWaypoints(
   });
 
   const workingPaths = new Map(paths);
+  const geometryByKey = options.disablePathGeometryCache
+    ? new Map<string, GlobalWaypointPathGeometry>()
+    : new Map<string, GlobalWaypointPathGeometry>(
+      [...workingPaths].map(([key, path]) => [key, createGlobalWaypointPathGeometry(path)]),
+    );
   const acceptedPaths = new Map<string, Point[]>();
 
   if (refined.summary.changedEdgeIds.length > 0) {
@@ -749,6 +617,7 @@ export function refineGlobalEdgeWaypoints(
         key,
         workingPaths,
         edgeByKey,
+        geometryByKey,
         nodeContext,
         options,
       );
@@ -759,6 +628,9 @@ export function refineGlobalEdgeWaypoints(
       )) return;
 
       workingPaths.set(key, normalized);
+      if (!options.disablePathGeometryCache) {
+        geometryByKey.set(key, createGlobalWaypointPathGeometry(normalized));
+      }
       acceptedPaths.set(key, normalized);
     });
   }
@@ -776,12 +648,16 @@ export function refineGlobalEdgeWaypoints(
         current,
         workingPaths,
         edgeByKey,
+        geometryByKey,
         nodeContext,
         options,
       );
       if (!candidate || pathEquals(current, candidate)) return;
 
       workingPaths.set(key, candidate);
+      if (!options.disablePathGeometryCache) {
+        geometryByKey.set(key, createGlobalWaypointPathGeometry(candidate));
+      }
       acceptedPaths.set(key, candidate);
       changed = true;
     });

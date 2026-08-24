@@ -1,5 +1,9 @@
 import type { Edge } from '@xyflow/react';
 
+import {
+  queryGlobalEdgeWaypointObstacles,
+  type GlobalEdgeWaypointNodeContext,
+} from './edgeGlobalWaypointNodeContext';
 import { createRoutingWaypointSegmentGroupIndex } from './edgeRoutingWaypointSegmentIndex';
 import {
   bendCount,
@@ -12,11 +16,10 @@ import {
   turnbackCount,
   visualStrictCrosses,
   type Point,
-  type Rect,
   type Segment,
 } from './edgeGlobalWaypointGeometry';
 
-export type PathCandidateMetrics = {
+type PathCandidateMetrics = {
   strictCrossings: number;
   unrelatedCrossings: number;
   visualUnrelatedCrossings: number;
@@ -28,9 +31,14 @@ export type PathCandidateMetrics = {
   score: number;
 };
 
-export type PathCandidateEvaluationContext = {
+export type GlobalWaypointPathGeometry = Readonly<{
+  segments: Segment[];
+  visualSegments: Segment[];
+}>;
+
+export type PathCandidateEvaluationContext = Readonly<{
   evaluate: (path: Point[]) => PathCandidateMetrics;
-};
+}>;
 
 export type GlobalEdgeWaypointRefinementDiagnostics = {
   evaluationCount: number;
@@ -38,6 +46,12 @@ export type GlobalEdgeWaypointRefinementDiagnostics = {
   scannedNodeCount: number;
   scannedSegmentCount: number;
 };
+
+type CandidateEvaluationOptions = Readonly<{
+  diagnostics?: GlobalEdgeWaypointRefinementDiagnostics;
+  disableSegmentIndex?: boolean;
+  disableVisualRectIndex?: boolean;
+}>;
 
 export const createGlobalEdgeWaypointRefinementDiagnostics = (
 ): GlobalEdgeWaypointRefinementDiagnostics => ({
@@ -47,47 +61,40 @@ export const createGlobalEdgeWaypointRefinementDiagnostics = (
   scannedSegmentCount: 0,
 });
 
-export type GlobalEdgeWaypointRefinementOptions = Readonly<{
-  diagnostics?: GlobalEdgeWaypointRefinementDiagnostics;
-  disableSegmentIndex?: boolean;
-}>;
+export const createGlobalWaypointPathGeometry = (
+  path: Point[],
+): GlobalWaypointPathGeometry => ({
+  segments: toSegments(path),
+  visualSegments: path.slice(1).map((b, index) => ({ a: path[index], b })),
+});
 
-const toVisualSegments = (path: Point[]): Segment[] => {
-  const segments: Segment[] = [];
-  for (let index = 0; index < path.length - 1; index += 1) {
-    segments.push({ a: path[index], b: path[index + 1] });
-  }
-  return segments;
-};
+const sharesEndpoint = (first: Edge, second: Edge): boolean => (
+  first.source === second.source
+  || first.source === second.target
+  || first.target === second.source
+  || first.target === second.target
+);
 
-export function sharesEndpoint(first: Edge, second: Edge): boolean {
-  return first.source === second.source
-    || first.source === second.target
-    || first.target === second.source
-    || first.target === second.target;
-}
-
-export function createPathCandidateEvaluationContext(
+export const createPathCandidateEvaluationContext = (
   edge: Edge,
   key: string,
   workingPaths: Map<string, Point[]>,
   edgeByKey: Map<string, Edge>,
-  obstacles: Map<string, Rect>,
-  options: GlobalEdgeWaypointRefinementOptions = {},
-): PathCandidateEvaluationContext {
+  geometryByKey: ReadonlyMap<string, GlobalWaypointPathGeometry>,
+  nodeContext: GlobalEdgeWaypointNodeContext,
+  options: CandidateEvaluationOptions = {},
+): PathCandidateEvaluationContext => {
   const otherPaths = [...workingPaths.entries()]
     .filter(([otherKey]) => otherKey !== key)
     .map(([otherKey, otherPath]) => {
       const otherEdge = edgeByKey.get(otherKey);
+      const geometry = geometryByKey.get(otherKey)
+        ?? createGlobalWaypointPathGeometry(otherPath);
       return {
-        segments: toSegments(otherPath),
-        visualSegments: toVisualSegments(otherPath),
+        ...geometry,
         unrelated: Boolean(otherEdge && !sharesEndpoint(edge, otherEdge)),
       };
     });
-  const relevantObstacles = [...obstacles.entries()]
-    .filter(([nodeId]) => nodeId !== edge.source && nodeId !== edge.target)
-    .map(([, rect]) => rect);
   const segmentGroupIndex = options.disableSegmentIndex
     ? undefined
     : createRoutingWaypointSegmentGroupIndex(
@@ -99,8 +106,7 @@ export function createPathCandidateEvaluationContext(
     evaluate: (path: Point[]): PathCandidateMetrics => {
       const cached = cache.get(path);
       if (cached) return cached;
-      const segments = toSegments(path);
-      const visualSegments = toVisualSegments(path);
+      const { segments, visualSegments } = createGlobalWaypointPathGeometry(path);
       const segmentQuery = segmentGroupIndex?.queryPotentialGroupIndexes(visualSegments);
       const candidateOtherPaths = segmentQuery
         ? otherPaths.filter((_, index) => segmentQuery.groupIndexes.has(index))
@@ -144,11 +150,17 @@ export function createPathCandidateEvaluationContext(
           }
         }
       }
-      if (options.diagnostics) {
-        options.diagnostics.scannedNodeCount += segments.length * relevantObstacles.length;
-      }
       for (const segment of segments) {
-        for (const rect of relevantObstacles) {
+        const obstacleQuery = queryGlobalEdgeWaypointObstacles({
+          context: nodeContext,
+          disableIndex: options.disableVisualRectIndex === true,
+          edge,
+          segment,
+        });
+        if (options.diagnostics) {
+          options.diagnostics.scannedNodeCount += obstacleQuery.scannedNodeCount;
+        }
+        for (const rect of obstacleQuery.rects) {
           if (segmentIntersectsRect(segment, rect)) obstacleHitCount += 1;
         }
       }
@@ -178,4 +190,4 @@ export function createPathCandidateEvaluationContext(
       return metrics;
     },
   };
-}
+};

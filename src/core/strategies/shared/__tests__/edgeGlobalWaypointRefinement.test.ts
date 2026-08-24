@@ -99,6 +99,7 @@ describe('global edge waypoint refinement indexes', () => {
       const nodes = createNodes(transform);
       const indexedDiagnostics = createGlobalEdgeWaypointRefinementDiagnostics();
       const fullScanDiagnostics = createGlobalEdgeWaypointRefinementDiagnostics();
+      const uncachedDiagnostics = createGlobalEdgeWaypointRefinementDiagnostics();
       const indexed = refineGlobalEdgeWaypoints(edges, nodes, {
         diagnostics: indexedDiagnostics,
       });
@@ -106,9 +107,15 @@ describe('global edge waypoint refinement indexes', () => {
         diagnostics: fullScanDiagnostics,
         disableVisualRectIndex: true,
       });
+      const uncached = refineGlobalEdgeWaypoints(edges, nodes, {
+        diagnostics: uncachedDiagnostics,
+        disablePathGeometryCache: true,
+      });
 
       expect(routeGeometry(indexed)).toEqual(routeGeometry(fullScan));
+      expect(routeGeometry(indexed)).toEqual(routeGeometry(uncached));
       expect(indexedDiagnostics.evaluationCount).toBe(fullScanDiagnostics.evaluationCount);
+      expect(indexedDiagnostics).toEqual(uncachedDiagnostics);
       expect(indexedDiagnostics.scannedNodeCount).toBeLessThan(fullScanDiagnostics.scannedNodeCount);
     }
   });
