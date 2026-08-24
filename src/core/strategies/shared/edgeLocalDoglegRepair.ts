@@ -60,7 +60,18 @@ import {
 import {
   createEdgePathQualityEvaluationContext,
   type EdgePathQualityEvaluationContext,
+  type EdgePathQualityScore,
 } from './edgeStrictCrossingGuard';
+
+const MAX_LOCAL_QUALITY_CACHE_ENTRIES = 4_096;
+
+const exactCandidatePathKey = (path: readonly Point[]): string | null => {
+  if (path.length > 256) return null;
+  for (const point of path) {
+    if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) return null;
+  }
+  return path.map(point => `${point.x}:${point.y}`).join('|');
+};
 
 export type LocalDoglegRepairDiagnostics = {
   riskyEdgeCount: number;
@@ -116,6 +127,7 @@ function findBestLocalDoglegCandidate(
   let bestTerminalStubScore = terminalStubScore(path);
   let bestVisualNoise = localVisualNoise(path);
   let bestQuality = currentQuality;
+  const qualityByCandidatePath = new Map<string, EdgePathQualityScore>();
 
   const tryCandidate = (candidate: Point[] | null, options: { preserveEndpoints?: boolean } = {}) => {
     if (!candidate) return;
@@ -138,9 +150,21 @@ function findBestLocalDoglegCandidate(
       Math.min(currentCrossings, bestCrossings),
     );
     if (crossings > currentCrossings || crossings > bestCrossings) return;
-    const candidateEdges = candidateBuffer.withPath(normalized);
-    qualityEvaluationCount += 1;
-    const candidateQuality = qualityContext.evaluateChanged(candidateEdges, [edgeIndex]);
+    const candidateKey = exactCandidatePathKey(normalized);
+    let candidateQuality = candidateKey === null
+      ? undefined
+      : qualityByCandidatePath.get(candidateKey);
+    if (candidateQuality) {
+      if (diagnostics) diagnostics.cacheHitCount += 1;
+    } else {
+      const candidateEdges = candidateBuffer.withPath(normalized);
+      qualityEvaluationCount += 1;
+      candidateQuality = qualityContext.evaluateChanged(candidateEdges, [edgeIndex]);
+      if (
+        candidateKey !== null
+        && qualityByCandidatePath.size < MAX_LOCAL_QUALITY_CACHE_ENTRIES
+      ) qualityByCandidatePath.set(candidateKey, candidateQuality);
+    }
     const tinyGateCleanup = currentQuality.tinyInteriorDoglegs > 0
       && candidateQuality.tinyInteriorDoglegs < currentQuality.tinyInteriorDoglegs
       && candidateQuality.hairpins <= currentQuality.hairpins + 2
