@@ -4,26 +4,21 @@ import {
   segmentIntersectsClearanceRect,
   segmentToClearanceRectDistance,
 } from './edgeNodeClearanceGeometry';
+export {
+  countEndpointNodeTraversalHits,
+  countRoutingObstacleHits,
+  countUnrelatedObstacleHits,
+  createRoutingObstacleEvaluationContext,
+} from './edgeRoutingObstacleEvaluation';
+export type {
+  RoutingObstacleEvaluationContext,
+  RoutingObstacleHitEvaluation,
+} from './edgeRoutingObstacleEvaluation';
 
 type Point = { x: number; y: number };
 type Rect = { x: number; y: number; width: number; height: number };
 type PositionedNode = ReactFlowNode & { positionAbsolute?: Point };
 type Segment = { a: Point; b: Point };
-type PaddedRectBounds = { x1: number; y1: number; x2: number; y2: number };
-
-export type RoutingObstacleHitEvaluation = Readonly<{
-  endpointNodeTraversalHits: number;
-  routingObstacleHits: number;
-  unrelatedObstacleHits: number;
-}>;
-
-export type RoutingObstacleEvaluationContext = Readonly<{
-  countEndpointNodeTraversalHits: (path: Point[]) => number;
-  countPathHits: (path: Point[]) => number;
-  countUnrelatedObstacleHits: (path: Point[], maximumHits?: number) => number;
-  evaluate: (path: Point[]) => RoutingObstacleHitEvaluation;
-  readMetrics: () => Readonly<{ cacheHitCount: number; scannedNodeCount: number }>;
-}>;
 
 export type NodeClearanceEvaluationContext = Readonly<{
   score: (path: Point[], minimumClearance?: number) => number;
@@ -44,9 +39,7 @@ export type RoutingWaypointCandidateAxes = Readonly<{
   y: readonly number[];
 }>;
 
-const ENDPOINT_INTERIOR_TOLERANCE = 0.51;
 export const BUSINESS_NODE_CLEARANCE = 28;
-const MAX_SEGMENT_HIT_CACHE_ENTRIES = 8_192;
 
 const EPS = 0.5;
 const FLEXIBLE_SHARED_TRUNK_MIN = 24;
@@ -119,98 +112,6 @@ function nodeRect(node: ReactFlowNode): Rect | null {
 function isContainerNode(node: ReactFlowNode): boolean {
   return CONTAINER_NODE_TYPES.has(String(node.type ?? ''));
 }
-
-const paddedRectBounds = (rect: Rect, padding: number): PaddedRectBounds => ({
-  x1: rect.x - padding,
-  y1: rect.y - padding,
-  x2: rect.x + rect.width + padding,
-  y2: rect.y + rect.height + padding,
-});
-
-const countPathRectHits = (
-  path: Point[],
-  rects: readonly PaddedRectBounds[],
-  onNodeScan?: (count: number) => void,
-  maximumHits?: number,
-  segmentHitCache?: Map<string, number>,
-  onCacheHit?: () => void,
-): number => {
-  const boundedMaximum = Number.isSafeInteger(maximumHits) && (maximumHits ?? -1) >= 0
-    ? maximumHits
-    : undefined;
-  let hits = 0;
-  for (let index = 0; index < path.length - 1; index += 1) {
-    const a = path[index];
-    const b = path[index + 1];
-    const deltaX = Math.abs(a.x - b.x);
-    const deltaY = Math.abs(a.y - b.y);
-    if (!(deltaX > EPS || deltaY > EPS)) continue;
-    const segmentKey = Number.isFinite(a.x)
-      && Number.isFinite(a.y)
-      && Number.isFinite(b.x)
-      && Number.isFinite(b.y)
-      ? `${a.x},${a.y}>${b.x},${b.y}`
-      : null;
-    const cachedSegmentHits = segmentKey ? segmentHitCache?.get(segmentKey) : undefined;
-    if (typeof cachedSegmentHits === 'number') {
-      onCacheHit?.();
-      if (boundedMaximum !== undefined && hits + cachedSegmentHits > boundedMaximum) {
-        return boundedMaximum + 1;
-      }
-      hits += cachedSegmentHits;
-      continue;
-    }
-    const hitsBeforeSegment = hits;
-
-    if (deltaY < EPS) {
-      const y = a.y;
-      const segmentStart = Math.min(a.x, b.x);
-      const segmentEnd = Math.max(a.x, b.x);
-      for (let rectIndex = 0; rectIndex < rects.length; rectIndex += 1) {
-        const rect = rects[rectIndex];
-        if (y <= rect.y1 || y >= rect.y2) continue;
-        if (Math.max(segmentStart, rect.x1) < Math.min(segmentEnd, rect.x2)) {
-          hits += 1;
-          if (boundedMaximum !== undefined && hits > boundedMaximum) {
-            onNodeScan?.(rectIndex + 1);
-            return hits;
-          }
-        }
-      }
-      onNodeScan?.(rects.length);
-      if (
-        segmentKey
-        && segmentHitCache
-        && segmentHitCache.size < MAX_SEGMENT_HIT_CACHE_ENTRIES
-      ) segmentHitCache.set(segmentKey, hits - hitsBeforeSegment);
-      continue;
-    }
-
-    if (deltaX < EPS) {
-      const x = a.x;
-      const segmentStart = Math.min(a.y, b.y);
-      const segmentEnd = Math.max(a.y, b.y);
-      for (let rectIndex = 0; rectIndex < rects.length; rectIndex += 1) {
-        const rect = rects[rectIndex];
-        if (x <= rect.x1 || x >= rect.x2) continue;
-        if (Math.max(segmentStart, rect.y1) < Math.min(segmentEnd, rect.y2)) {
-          hits += 1;
-          if (boundedMaximum !== undefined && hits > boundedMaximum) {
-            onNodeScan?.(rectIndex + 1);
-            return hits;
-          }
-        }
-      }
-      onNodeScan?.(rects.length);
-      if (
-        segmentKey
-        && segmentHitCache
-        && segmentHitCache.size < MAX_SEGMENT_HIT_CACHE_ENTRIES
-      ) segmentHitCache.set(segmentKey, hits - hitsBeforeSegment);
-    }
-  }
-  return hits;
-};
 
 const normalizeNodeClearance = (minimumClearance: number): number => (
   Number.isFinite(minimumClearance)
@@ -467,109 +368,6 @@ export function pathHasNodeRoutingRisk(path: Point[], nodes: ReactFlowNode[] | u
     }
   }
   return false;
-}
-
-export function createRoutingObstacleEvaluationContext(
-  edge: Edge,
-  obstacles: Map<string, Rect>,
-): RoutingObstacleEvaluationContext {
-  let scannedNodeCount = 0;
-  let cacheHitCount = 0;
-  const sourceId = edge.source;
-  const targetId = edge.target;
-  const unrelatedRects: PaddedRectBounds[] = [];
-  for (const [nodeId, rect] of obstacles) {
-    if (nodeId === sourceId || nodeId === targetId) continue;
-    unrelatedRects.push(paddedRectBounds(rect, 8));
-  }
-  const endpointRects: PaddedRectBounds[] = [];
-  for (const nodeId of new Set([sourceId, targetId])) {
-    const rect = obstacles.get(nodeId);
-    if (rect) endpointRects.push(paddedRectBounds(rect, -ENDPOINT_INTERIOR_TOLERANCE));
-  }
-  const routingRects = [...unrelatedRects, ...endpointRects];
-  const unrelatedSegmentHits = new Map<string, number>();
-  const endpointSegmentHits = new Map<string, number>();
-  const routingSegmentHits = new Map<string, number>();
-  const recordNodeScans = (count: number) => {
-    scannedNodeCount += count;
-  };
-  const recordCacheHit = () => {
-    cacheHitCount += 1;
-  };
-  const countUnrelatedPathHits = (path: Point[], maximumHits?: number): number => (
-    countPathRectHits(
-      path,
-      unrelatedRects,
-      recordNodeScans,
-      maximumHits,
-      unrelatedSegmentHits,
-      recordCacheHit,
-    )
-  );
-  const countEndpointPathHits = (path: Point[]): number => (
-    countPathRectHits(
-      path,
-      endpointRects,
-      recordNodeScans,
-      undefined,
-      endpointSegmentHits,
-      recordCacheHit,
-    )
-  );
-
-  return Object.freeze({
-    countEndpointNodeTraversalHits: countEndpointPathHits,
-    countPathHits: (path: Point[]): number => countPathRectHits(
-      path,
-      routingRects,
-      undefined,
-      undefined,
-      routingSegmentHits,
-      recordCacheHit,
-    ),
-    countUnrelatedObstacleHits: countUnrelatedPathHits,
-    readMetrics: () => ({ cacheHitCount, scannedNodeCount }),
-    evaluate: (path: Point[]): RoutingObstacleHitEvaluation => {
-      const unrelatedObstacleHits = countUnrelatedPathHits(path);
-      const endpointNodeTraversalHits = countEndpointPathHits(path);
-      return Object.freeze({
-        endpointNodeTraversalHits,
-        routingObstacleHits: unrelatedObstacleHits + endpointNodeTraversalHits,
-        unrelatedObstacleHits,
-      });
-    },
-  });
-}
-
-export function countUnrelatedObstacleHits(
-  path: Point[],
-  edge: Edge,
-  obstacles: Map<string, Rect>,
-  maximumHits?: number,
-): number {
-  return createRoutingObstacleEvaluationContext(edge, obstacles)
-    .countUnrelatedObstacleHits(path, maximumHits);
-}
-
-/**
- * Counts route segments that enter the interior of their own source or target node.
- *
- * Endpoint nodes cannot be treated like ordinary padded obstacles because a valid route must
- * touch their boundary. The boundary itself is therefore allowed, while any segment that crosses
- * the open node interior is a hard routing failure. This catches terminal boundary slides that
- * turn back through the node after leaving a declared handle.
- */
-export function countEndpointNodeTraversalHits(
-  path: Point[],
-  edge: Edge,
-  obstacles: Map<string, Rect>,
-): number {
-  return createRoutingObstacleEvaluationContext(edge, obstacles).countEndpointNodeTraversalHits(path);
-}
-
-export function countRoutingObstacleHits(path: Point[], edge: Edge, obstacles: Map<string, Rect>): number {
-  return createRoutingObstacleEvaluationContext(edge, obstacles).countPathHits(path);
 }
 
 export function generateWaypointCandidates(

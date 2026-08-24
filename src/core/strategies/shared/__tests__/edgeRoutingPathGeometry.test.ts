@@ -174,7 +174,9 @@ describe('edge routing module boundaries', () => {
     expect(diagnostics.scannedNodeCount).toBeGreaterThan(0);
     expect(diagnostics.scannedSegmentCount).toBeGreaterThan(0);
     expect(diagnostics.scannedEdgePairCount).toBeGreaterThan(0);
+    expect(diagnostics.cacheHitCount).toBeGreaterThan(0);
     expect(Object.keys(diagnostics).sort()).toEqual([
+      'cacheHitCount',
       'evaluationCount',
       'generatedCandidateCount',
       'lowerBoundRejectionCount',
