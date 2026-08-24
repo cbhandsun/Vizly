@@ -29,6 +29,7 @@ import {
 } from './lib/display-routing-cpu-profile.mjs';
 import { assertDisplayRoutingVisualScaleAudit } from './lib/display-routing-browser-visual-audit.mjs';
 import { assertDisplayRoutingProductionPreview } from './lib/display-routing-production-preview.mjs';
+import { verifyDisplayRoutingThemeMatrix } from './lib/display-routing-browser-theme-matrix.mjs';
 
 const BASE_URL = String(process.env.PRECOMPILED_ROUTE_BASE_URL || '')
   .trim()
@@ -616,7 +617,15 @@ const verifyNormalRenderedObstacleAudit = async () => withPrecompiledRouteBrowse
       session,
       route.outputRouteSignature,
     );
-    return { route, audit, stability, visualScales };
+    const themeMatrix = COLLECT_PERFORMANCE_SAMPLES ? [] : await verifyDisplayRoutingThemeMatrix({
+      session,
+      expectedSignature: route.outputRouteSignature,
+      expectedWorkerStartCount: stability.workerStartCount,
+      expectedWorkerAbortCount: stability.workerAbortCount,
+      initialVisualScales: visualScales,
+      verifyVisualScales: () => verifyFixedVisualScales(session, route.outputRouteSignature),
+    });
+    return { route, audit, stability, visualScales, themeMatrix };
   },
 );
 
@@ -758,6 +767,9 @@ const main = async () => {
   console.log(`visual-scales: ${normal.visualScales.map(audit => (
     `${audit.name}=${audit.zoom.toFixed(3)}x/${audit.visibleLabelCount}labels`
   )).join(', ')}.`);
+  if (normal.themeMatrix.length > 0) {
+    console.log(`themes: ${normal.themeMatrix.map(item => item.id).join(', ')}.`);
+  }
   const machineResult = buildDisplayRoutingMachineResult(results);
   if (EMIT_MACHINE_RESULT) {
     console.log(`DISPLAY_ROUTING_BROWSER_RESULT=${JSON.stringify(machineResult)}`);
