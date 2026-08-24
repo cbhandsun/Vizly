@@ -1,5 +1,6 @@
 import type { Edge, Node } from '@xyflow/react';
 
+import { ROUTING_IDENTIFIER_MAX_LENGTH } from '../../routing/routingBoundaryLimits';
 import type { BaseDisplayBoundedCandidateReport } from './baseReactFlowDisplayEvaluation';
 import {
   isDisplayRoutingPhaseTrace,
@@ -30,7 +31,6 @@ export type {
 
 const MAX_REQUEST_ID_LENGTH = 4_096;
 export const DISPLAY_WORKER_MAX_GRAPH_ITEMS = 10_000;
-const MAX_IDENTIFIER_LENGTH = 20_000;
 const MAX_SMART_EDGE_PADDING = 10_000;
 export const DISPLAY_WORKER_MAX_PATH_POINTS = 2_000;
 export const DISPLAY_WORKER_MAX_TOTAL_PATH_POINTS = 200_000;
@@ -258,16 +258,19 @@ const hasSafeDisplayEdgePaths = (
 };
 
 const isOptionalBoundedString = (value: unknown): boolean => (
-  value == null || (typeof value === 'string' && value.length <= MAX_IDENTIFIER_LENGTH)
+  value == null || (
+    typeof value === 'string'
+    && value.length <= ROUTING_IDENTIFIER_MAX_LENGTH
+  )
 );
 
 const isDisplayEdge = (value: unknown, budget: DisplayValueBudget): value is Edge => {
   if (!isRecord(value)) return false;
   if (!Object.keys(value).every(key => DISPLAY_EDGE_KEYS.has(key))) return false;
   if (
-    !isBoundedString(value.id, MAX_IDENTIFIER_LENGTH)
-    || !isBoundedString(value.source, MAX_IDENTIFIER_LENGTH)
-    || !isBoundedString(value.target, MAX_IDENTIFIER_LENGTH)
+    !isBoundedString(value.id, ROUTING_IDENTIFIER_MAX_LENGTH)
+    || !isBoundedString(value.source, ROUTING_IDENTIFIER_MAX_LENGTH)
+    || !isBoundedString(value.target, ROUTING_IDENTIFIER_MAX_LENGTH)
   ) return false;
   if (
     !isOptionalBoundedString(value.sourceHandle)
@@ -312,7 +315,10 @@ const hasSafeDimensions = (
 };
 
 const isDisplayNode = (value: unknown, budget: DisplayValueBudget): value is Node => {
-  if (!isRecord(value) || !isBoundedString(value.id, MAX_IDENTIFIER_LENGTH)) return false;
+  if (
+    !isRecord(value)
+    || !isBoundedString(value.id, ROUTING_IDENTIFIER_MAX_LENGTH)
+  ) return false;
   if (!Object.keys(value).every(key => DISPLAY_NODE_KEYS.has(key))) return false;
   if (!isOptionalBoundedString(value.type) || !isOptionalBoundedString(value.parentId)) return false;
   if (!isFinitePoint(value.position)) return false;
@@ -531,7 +537,9 @@ const isBoundedCandidate = (value: unknown): value is BaseDisplayBoundedCandidat
     && (
       !Array.isArray(clearanceEdgeIds)
       || clearanceEdgeIds.length > 32
-      || !clearanceEdgeIds.every(edgeId => isBoundedString(edgeId, MAX_IDENTIFIER_LENGTH))
+      || !clearanceEdgeIds.every(edgeId => (
+        isBoundedString(edgeId, ROUTING_IDENTIFIER_MAX_LENGTH)
+      ))
     )
   ) return false;
   const pairs = value.unrelatedOverlapPairs;
@@ -540,8 +548,8 @@ const isBoundedCandidate = (value: unknown): value is BaseDisplayBoundedCandidat
     && pairs.length <= DISPLAY_WORKER_MAX_GRAPH_ITEMS
     && pairs.every(pair => (
       isRecord(pair)
-      && isBoundedString(pair.firstId, MAX_IDENTIFIER_LENGTH)
-      && isBoundedString(pair.secondId, MAX_IDENTIFIER_LENGTH)
+      && isBoundedString(pair.firstId, ROUTING_IDENTIFIER_MAX_LENGTH)
+      && isBoundedString(pair.secondId, ROUTING_IDENTIFIER_MAX_LENGTH)
       && isFiniteNumber(pair.overlap)
       && pair.overlap >= 0
       && pair.overlap <= MAX_QUALITY_METRIC

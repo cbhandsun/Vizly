@@ -4,6 +4,7 @@ import {
   parseDisplayEdgesWorkerRequest,
   parseDisplayEdgesWorkerResponse,
 } from '../baseReactFlowDisplayWorkerProtocol';
+import { ROUTING_IDENTIFIER_MAX_LENGTH } from '../../../routing/routingBoundaryLimits';
 import {
   DISPLAY_ROUTING_PHASE_TRACE_LIMIT,
   finalizeDisplayRoutingPhaseTrace,
@@ -528,6 +529,17 @@ describe('baseReactFlowDisplayWorkerProtocol', () => {
       ...incrementalRequest,
       changeSet: {
         ...incrementalRequest.changeSet,
+        changedNodeIds: ['x'.repeat(ROUTING_IDENTIFIER_MAX_LENGTH + 1)],
+      },
+    })).toBeNull();
+    expect(parseDisplayEdgesWorkerRequest({
+      ...incrementalRequest,
+      mutableEdgeIds: ['x'.repeat(ROUTING_IDENTIFIER_MAX_LENGTH + 1)],
+    })).toBeNull();
+    expect(parseDisplayEdgesWorkerRequest({
+      ...incrementalRequest,
+      changeSet: {
+        ...incrementalRequest.changeSet,
         classification: 'style-only',
       },
     })).toBeNull();
@@ -654,6 +666,27 @@ describe('baseReactFlowDisplayWorkerProtocol', () => {
         source: 'source',
         target: 'target',
       })),
+    })).toBeNull();
+    const maximumIdentifier = 'x'.repeat(ROUTING_IDENTIFIER_MAX_LENGTH);
+    expect(parseDisplayEdgesWorkerRequest({
+      ...validRepairRequest,
+      edges: [{ id: maximumIdentifier, source: 'source', target: 'target' }],
+    })).not.toBeNull();
+    expect(parseDisplayEdgesWorkerRequest({
+      ...validRepairRequest,
+      edges: [{
+        id: `${maximumIdentifier}x`,
+        source: 'source',
+        target: 'target',
+      }],
+    })).toBeNull();
+    expect(parseDisplayEdgesWorkerRequest({
+      ...validRepairRequest,
+      nodes: [{
+        id: `${maximumIdentifier}x`,
+        position: { x: 0, y: 0 },
+        data: {},
+      }],
     })).toBeNull();
   });
 

@@ -2,12 +2,12 @@ import type { Edge } from '@xyflow/react';
 
 import { EDGE_ROUTING_CACHE_VERSION } from './routingVersion';
 import { parseRoutingLineHops } from './routingLineHops';
+import { ROUTING_IDENTIFIER_MAX_LENGTH } from './routingBoundaryLimits';
 
 export const PERSISTED_ROUTING_CANDIDATE_SCHEMA = 'vizly-routing-only-candidate-v1';
 export const ROUTING_ONLY_DOCUMENT_SNAPSHOT_SCHEMA = 'vizly-routing-only-document-v1';
 
 const MAX_PATCHES = 300;
-const MAX_IDENTIFIER_LENGTH = 500;
 const MAX_TOKEN_LENGTH = 20_000;
 const MAX_PATH_POINTS = 2_000;
 const MAX_TOTAL_PATH_POINTS = 200_000;
@@ -72,7 +72,9 @@ const hasOnlyKeys = (value: Record<string, unknown>, keys: ReadonlySet<string>):
 );
 
 const isIdentifier = (value: unknown): value is string => (
-  typeof value === 'string' && value.length > 0 && value.length <= MAX_IDENTIFIER_LENGTH
+  typeof value === 'string'
+  && value.length > 0
+  && value.length <= ROUTING_IDENTIFIER_MAX_LENGTH
 );
 
 const parseToken = (value: unknown): string | null | undefined => {

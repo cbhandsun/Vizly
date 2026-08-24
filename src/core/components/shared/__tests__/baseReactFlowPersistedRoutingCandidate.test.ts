@@ -6,6 +6,7 @@ import {
   createBaseReactFlowPersistedRoutingCandidate,
   parseBaseReactFlowPersistedRoutingCandidate,
 } from '../baseReactFlowPersistedRoutingCandidate';
+import { ROUTING_IDENTIFIER_MAX_LENGTH } from '../../../routing/routingBoundaryLimits';
 
 const routingVersion = 'routing-test-v1';
 const inputSignature = '12345';
@@ -109,6 +110,13 @@ describe('persisted routing-only candidate boundary', () => {
       patches: Array.from({ length: 301 }, (_, index) => ({
         id: `edge-${index}`, source: 'source', target: 'target',
       })),
+    }, expectation)).toBeNull();
+    expect(parseBaseReactFlowPersistedRoutingCandidate({
+      ...base,
+      patches: [{
+        ...patches[0],
+        id: 'x'.repeat(ROUTING_IDENTIFIER_MAX_LENGTH + 1),
+      }],
     }, expectation)).toBeNull();
     expect(parseBaseReactFlowPersistedRoutingCandidate({
       ...base,

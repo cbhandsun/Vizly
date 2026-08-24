@@ -1,7 +1,7 @@
 import type { BaseReactFlowRoutingChangeSet } from './baseReactFlowDisplayRoutingChangeSet';
+import { ROUTING_IDENTIFIER_MAX_LENGTH } from '../../routing/routingBoundaryLimits';
 
 const MAX_GRAPH_ITEMS = 10_000;
-const MAX_IDENTIFIER_LENGTH = 20_000;
 const ROUTING_CHANGE_REASONS = new Set<BaseReactFlowRoutingChangeSet['reason']>([
   'node-drag',
   'node-resize',
@@ -35,7 +35,7 @@ const parseIdentifierList = (value: unknown): string[] | null => {
     if (
       typeof item !== 'string'
       || item.length === 0
-      || item.length > MAX_IDENTIFIER_LENGTH
+      || item.length > ROUTING_IDENTIFIER_MAX_LENGTH
       || identifiers.has(item)
     ) return null;
     identifiers.add(item);
