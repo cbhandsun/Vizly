@@ -1,6 +1,7 @@
 import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
 
 import type { EdgePathQualityScore } from './edgePathQualityGeometry';
+import { rankBusinessNodeClearanceCandidates } from './edgeBusinessNodeClearanceCandidateRanking';
 import {
   createEdgePathQualityEvaluationContext,
 } from './edgeStrictCrossingGuard';
@@ -685,29 +686,30 @@ export const repairBusinessNodeClearanceRisks = (
         COMMERCIAL_BUSINESS_NODE_CLEARANCE,
       );
       const baselineHits = obstacleContext.countUnrelatedObstacleHits(path);
-      let bestEdges = current;
-      let bestHits = baselineHits;
-      let bestRisk = baselineRisk;
-      let bestCommercialRisk = baselineCommercialRisk;
-      let bestBendCount = Number.POSITIVE_INFINITY;
-      let bestLength = Number.POSITIVE_INFINITY;
-      for (const candidatePath of clearanceCandidates(path, nodes, edge, minimumClearance)) {
-        const candidateRisk = clearanceContext.score(
-          candidatePath,
-          minimumClearance,
-        );
-        const candidateCommercialRisk = clearanceContext.score(
-          candidatePath,
-          COMMERCIAL_BUSINESS_NODE_CLEARANCE,
-        );
-        const candidateHits = obstacleContext.countUnrelatedObstacleHits(candidatePath);
-        if (candidateHits > bestHits) continue;
-        if (candidateCommercialRisk > bestCommercialRisk + 0.5) continue;
-        if (
-          candidateHits === bestHits
-          && Math.abs(candidateCommercialRisk - bestCommercialRisk) <= 0.5
-          && candidateRisk >= bestRisk - 0.5
-        ) continue;
+      const rankedCandidates = rankBusinessNodeClearanceCandidates(
+        clearanceCandidates(path, nodes, edge, minimumClearance).map(candidatePath => ({
+          candidate: candidatePath,
+          risk: clearanceContext.score(candidatePath, minimumClearance),
+          commercialRisk: clearanceContext.score(
+            candidatePath,
+            COMMERCIAL_BUSINESS_NODE_CLEARANCE,
+          ),
+          hits: obstacleContext.countUnrelatedObstacleHits(candidatePath),
+          length: candidatePath.slice(1).reduce((total, point, index) => (
+            total
+              + Math.abs(point.x - candidatePath[index].x)
+              + Math.abs(point.y - candidatePath[index].y)
+          ), 0),
+          bendCount: Math.max(0, candidatePath.length - 2),
+        })),
+        {
+          hits: baselineHits,
+          risk: baselineRisk,
+          commercialRisk: baselineCommercialRisk,
+        },
+      );
+      for (const rankedCandidate of rankedCandidates) {
+        const candidatePath = rankedCandidate.candidate;
         const candidateEdges = current.slice();
         candidateEdges[edgeIndex] = withPath(edge, candidatePath);
         const candidateQuality = qualityContext.evaluateChanged(candidateEdges, [edgeIndex]);
@@ -721,36 +723,9 @@ export const repairBusinessNodeClearanceRisks = (
           candidateEdges,
           changedEdgeIndex: edgeIndex,
         })) continue;
-        const length = candidatePath.slice(1).reduce((total, point, index) => (
-          total + Math.abs(point.x - candidatePath[index].x) + Math.abs(point.y - candidatePath[index].y)
-        ), 0);
-        const bendCount = Math.max(0, candidatePath.length - 2);
-        if (
-          candidateHits < bestHits
-          || candidateCommercialRisk < bestCommercialRisk - 0.5
-          || (
-            Math.abs(candidateCommercialRisk - bestCommercialRisk) <= 0.5
-            && candidateRisk < bestRisk - 0.5
-          )
-          || (
-            candidateHits === bestHits
-            && Math.abs(candidateCommercialRisk - bestCommercialRisk) <= 0.5
-            && Math.abs(candidateRisk - bestRisk) <= 0.5
-            && (
-              bendCount < bestBendCount
-              || (bendCount === bestBendCount && length < bestLength)
-            )
-          )
-        ) {
-          bestEdges = candidateEdges;
-          bestHits = candidateHits;
-          bestRisk = candidateRisk;
-          bestCommercialRisk = candidateCommercialRisk;
-          bestBendCount = bendCount;
-          bestLength = length;
-        }
+        current = candidateEdges;
+        break;
       }
-      current = bestEdges;
     }
     if (current === passBaseline || current.every((edge, index) => edge === passBaseline[index])) break;
   }
