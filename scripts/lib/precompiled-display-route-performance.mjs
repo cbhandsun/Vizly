@@ -151,14 +151,36 @@ export const parsePrecompiledDisplayRouteSampleCount = value => {
   return parsed;
 };
 
-export const summarizePrecompiledDisplayRoutePerformance = (samples, expectedSampleCount) => {
+export const parsePrecompiledDisplayRouteBenchmarkPresetIds = value => {
+  if (typeof value === 'undefined' || String(value).trim() === '') {
+    return Object.keys(PRECOMPILED_DISPLAY_ROUTE_P95_BUDGET_MS).sort();
+  }
+  const presetId = boundedToken(String(value).trim(), PRESET_ID_PATTERN);
+  if (!presetId || !(presetId in PRECOMPILED_DISPLAY_ROUTE_P95_BUDGET_MS)) {
+    throw new Error('PRECOMPILED_ROUTE_PRESET_ID must identify one known bounded preset');
+  }
+  return [presetId];
+};
+
+export const summarizePrecompiledDisplayRoutePerformance = (
+  samples,
+  expectedSampleCount,
+  requestedPresetIds = Object.keys(PRECOMPILED_DISPLAY_ROUTE_P95_BUDGET_MS).sort(),
+) => {
   if (
     !Array.isArray(samples)
     || !Number.isSafeInteger(expectedSampleCount)
     || expectedSampleCount < 1
     || samples.length !== expectedSampleCount
   ) throw new Error('Cold-route benchmark is missing independent samples');
-  const presetIds = Object.keys(PRECOMPILED_DISPLAY_ROUTE_P95_BUDGET_MS).sort();
+  if (
+    !Array.isArray(requestedPresetIds)
+    || requestedPresetIds.length === 0
+    || requestedPresetIds.length > 32
+    || new Set(requestedPresetIds).size !== requestedPresetIds.length
+    || requestedPresetIds.some(presetId => !(presetId in PRECOMPILED_DISPLAY_ROUTE_P95_BUDGET_MS))
+  ) throw new Error('Cold-route benchmark preset selection is invalid');
+  const presetIds = [...requestedPresetIds].sort();
   const presets = {};
   for (const presetId of presetIds) {
     const cases = samples.map(sample => (
@@ -195,13 +217,19 @@ export const summarizePrecompiledDisplayRoutePerformance = (samples, expectedSam
 };
 
 export const assertPrecompiledDisplayRoutePerformanceBudget = summary => {
-  const exceeded = Object.entries(PRECOMPILED_DISPLAY_ROUTE_P95_BUDGET_MS)
-    .map(([presetId, budgetMs]) => ({
+  const presetEntries = Object.entries(summary?.presets ?? {});
+  if (presetEntries.length === 0) throw new Error('Cold routing performance summary is empty');
+  const exceeded = presetEntries
+    .map(([presetId]) => ({
       presetId,
-      budgetMs,
+      budgetMs: PRECOMPILED_DISPLAY_ROUTE_P95_BUDGET_MS[presetId],
       p95Ms: summary?.presets?.[presetId]?.route?.p95Ms,
     }))
-    .filter(item => !Number.isFinite(item.p95Ms) || item.p95Ms > item.budgetMs);
+    .filter(item => (
+      !Number.isFinite(item.budgetMs)
+      || !Number.isFinite(item.p95Ms)
+      || item.p95Ms > item.budgetMs
+    ));
   if (exceeded.length > 0) {
     throw new Error(`Cold routing p95 performance budget exceeded:\n${JSON.stringify({
       sampleCount: summary?.sampleCount ?? null,

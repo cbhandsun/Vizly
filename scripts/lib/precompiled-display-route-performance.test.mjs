@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   assertPrecompiledDisplayRoutePerformanceBudget,
   buildPrecompiledDisplayRoutePerformanceResult,
+  parsePrecompiledDisplayRouteBenchmarkPresetIds,
   parsePrecompiledDisplayRouteSampleCount,
   parsePrecompiledDisplayRoutePerformanceResult,
   selectPrecompiledDisplayRouteCaptureTargets,
@@ -139,6 +140,20 @@ describe('precompiled display route cold performance', () => {
     }
   });
 
+  it('validates focused benchmark preset selection', () => {
+    expect(parsePrecompiledDisplayRouteBenchmarkPresetIds(undefined)).toEqual([
+      'logistics-architecture-v1',
+      'wms-demand-allocation-strategy-v2',
+      'wms-process-flow-v1',
+    ]);
+    expect(parsePrecompiledDisplayRouteBenchmarkPresetIds(
+      ' logistics-architecture-v1 ',
+    )).toEqual(['logistics-architecture-v1']);
+    for (const value of ['../private', 'unknown-route']) {
+      expect(() => parsePrecompiledDisplayRouteBenchmarkPresetIds(value)).toThrow(/known bounded/);
+    }
+  });
+
   it('reports median, p95, max and enforces the locked p95 budgets', () => {
     const samples = Array.from({ length: 30 }, (_, index) => sample(650 + index));
     const summary = summarizePrecompiledDisplayRoutePerformance(samples, 30);
@@ -152,6 +167,16 @@ describe('precompiled display route cold performance', () => {
       sampleCount: 30,
     });
     expect(assertPrecompiledDisplayRoutePerformanceBudget(summary)).toBe(true);
+    const focusedSamples = samples.map(result => ({
+      presets: result.presets.filter(item => item.presetId === 'logistics-architecture-v1'),
+    }));
+    const focused = summarizePrecompiledDisplayRoutePerformance(
+      focusedSamples,
+      30,
+      ['logistics-architecture-v1'],
+    );
+    expect(Object.keys(focused.presets)).toEqual(['logistics-architecture-v1']);
+    expect(assertPrecompiledDisplayRoutePerformanceBudget(focused)).toBe(true);
     const overBudget = summarizePrecompiledDisplayRoutePerformance(
       Array.from({ length: 30 }, () => sample(751)),
       30,

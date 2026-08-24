@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 
 import {
   assertPrecompiledDisplayRoutePerformanceBudget,
+  parsePrecompiledDisplayRouteBenchmarkPresetIds,
   parsePrecompiledDisplayRoutePerformanceResult,
   parsePrecompiledDisplayRouteSampleCount,
   PRECOMPILED_DISPLAY_ROUTE_RESULT_PREFIX,
@@ -10,10 +11,19 @@ import {
 
 const MAX_CHILD_OUTPUT_BYTES = 4 * 1024 * 1024;
 
+const requestedPresetId = process.env.PRECOMPILED_ROUTE_PRESET_ID;
+const presetIds = parsePrecompiledDisplayRouteBenchmarkPresetIds(requestedPresetId);
+const focusedMeasurement = typeof requestedPresetId === 'string'
+  && requestedPresetId.trim().length > 0;
+
 const runOneSample = sampleIndex => new Promise((resolve, reject) => {
   const child = spawn(
     process.execPath,
-    ['scripts/generate-precompiled-display-routes.mjs', '--check', '--machine'],
+    [
+      'scripts/generate-precompiled-display-routes.mjs',
+      focusedMeasurement ? '--measure-only' : '--check',
+      '--machine',
+    ],
     {
       cwd: process.cwd(),
       env: {
@@ -66,6 +76,6 @@ for (let index = 0; index < sampleCount; index += 1) {
   process.stdout.write(`cold-routing sample ${index + 1}/${sampleCount} complete\n`);
 }
 
-const summary = summarizePrecompiledDisplayRoutePerformance(samples, sampleCount);
+const summary = summarizePrecompiledDisplayRoutePerformance(samples, sampleCount, presetIds);
 process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
 assertPrecompiledDisplayRoutePerformanceBudget(summary);
