@@ -162,6 +162,7 @@ describe('baseReactFlowDisplayEvaluation', () => {
       needsTerminalRepair: true,
       needsStrictCrossingRepair: false,
       needsOverlapRepair: false,
+      terminalClosureEligible: true,
     });
     expect(createDisplayRoutingDefectPlan({
       candidate: 'polished',
@@ -175,6 +176,20 @@ describe('baseReactFlowDisplayEvaluation', () => {
       needsStrictCrossingRepair: true,
       needsOverlapRepair: true,
       needsMicroRepair: true,
+      onlyTerminalAxisDefects: false,
+      terminalClosureEligible: false,
+    });
+    expect(createDisplayRoutingDefectPlan({
+      candidate: 'polished',
+      hardClean: false,
+      terminalsAttached: true,
+      terminalsAnchored: true,
+      obstacleHits: 2,
+      quality: { ...quality, tinyInteriorDoglegs: 2, hairpins: 1 },
+    })).toMatchObject({
+      needsObstacleRepair: true,
+      needsMicroRepair: true,
+      terminalClosureEligible: true,
       onlyTerminalAxisDefects: false,
     });
     expect(displayRoutingQualityNeedsMicroRepair(quality)).toBe(false);

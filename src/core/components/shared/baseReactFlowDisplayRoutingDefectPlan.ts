@@ -10,6 +10,7 @@ export type RoutingDefectPlan = Readonly<{
   needsTerminalRepair: boolean;
   needsMicroRepair: boolean;
   onlyTerminalAxisDefects: boolean;
+  terminalClosureEligible: boolean;
 }>;
 
 export const displayRoutingQualityNeedsMicroRepair = (
@@ -42,6 +43,16 @@ export const createDisplayRoutingDefectPlan = (
     && quality.shortEndpointStubs === 0
     && quality.tinyInteriorDoglegs === 0
     && quality.hairpins === 0;
+  const terminalClosureEligible = !report.hardClean
+    && report.terminalsAttached
+    && quality.nonOrthogonalSegments === 0
+    && quality.strictCrossings === 0
+    && !needsOverlapRepair
+    && (
+      report.obstacleHits > 0
+      || needsTerminalRepair
+      || needsMicroRepair
+    );
   return {
     hardClean: report.hardClean,
     needsObstacleRepair: report.obstacleHits > 0,
@@ -50,5 +61,6 @@ export const createDisplayRoutingDefectPlan = (
     needsTerminalRepair,
     needsMicroRepair,
     onlyTerminalAxisDefects,
+    terminalClosureEligible,
   };
 };

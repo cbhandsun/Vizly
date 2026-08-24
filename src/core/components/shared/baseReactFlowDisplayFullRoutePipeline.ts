@@ -171,6 +171,31 @@ export const createBaseReactFlowFullRouteEdges = (args: BaseReactFlowDisplayEdge
     ),
   );
 
+  const postRenderDefectPlan = createDisplayRoutingDefectPlan(
+    context.evaluationSession.hardReport(postRenderResult.edges),
+  );
+  if (postRenderResult.edges.length <= 24 && postRenderDefectPlan.terminalClosureEligible) {
+    const terminalTimer = startDisplayRoutingPhaseTrace({
+      phase: 'terminal',
+      candidateCount,
+      onTrace: args.onPhaseTrace,
+    });
+    const terminalMetricsBefore = context.evaluationSession.readMetrics();
+    const terminalEdges = runBaseReactFlowFullRouteTerminalPhase(
+      context,
+      postRenderResult.edges,
+    );
+    terminalTimer.finish(
+      'accepted',
+      terminalEdges.length,
+      diffBaseReactFlowEvaluationMetrics(
+        terminalMetricsBefore,
+        context.evaluationSession.readMetrics(),
+      ),
+    );
+    return terminalEdges;
+  }
+
   const strictTimer = startDisplayRoutingPhaseTrace({
     phase: 'strict',
     candidateCount,
