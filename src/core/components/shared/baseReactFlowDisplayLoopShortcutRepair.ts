@@ -51,6 +51,17 @@ import {
 
 export { buildStrictBlockingTerminalLaneShiftVariants } from './baseReactFlowDisplayLoopShortcutCandidates';
 
+export type DisplayLoopShortcutRepairDiagnostics = {
+  candidateEdgeCount: number;
+  qualityEvaluationCount: number;
+};
+
+export const createDisplayLoopShortcutRepairDiagnostics = (
+): DisplayLoopShortcutRepairDiagnostics => ({
+  candidateEdgeCount: 0,
+  qualityEvaluationCount: 0,
+});
+
 const hardLoopDefectsDoNotRegress = (
   baseline: EdgePathQualityScore,
   candidate: EdgePathQualityScore,
@@ -227,13 +238,19 @@ export const repairDisplayLoopShortcuts = <T extends Edge[]>(
   nodes: Node[],
   maxQualityEvaluations = 32,
   closeStrictCandidate?: (candidate: T) => T,
+  diagnostics?: DisplayLoopShortcutRepairDiagnostics,
 ): T => {
+  if (diagnostics) {
+    diagnostics.candidateEdgeCount = 0;
+    diagnostics.qualityEvaluationCount = 0;
+  }
   if (maxQualityEvaluations <= 0 || edges.length === 0) return edges;
   const qualityContext = createEdgePathQualityEvaluationContext(edges);
   const obstacleContext = createDisplayObstacleEvaluationContext(edges, nodes);
   const terminalSnapshot = createDisplayTerminalValidationSnapshot(nodes);
   const nodeById = new Map(nodes.map(node => [node.id, node] as const));
   const baselineQuality = qualityContext.evaluate(edges);
+  if (diagnostics) diagnostics.qualityEvaluationCount += 1;
   const hasExcessiveDetour = hasCommerciallyExcessiveDetour(edges);
   const detourPolishMode = hasExcessiveDetour
     && baselineQuality.nonOrthogonalSegments === 0
@@ -303,6 +320,7 @@ export const repairDisplayLoopShortcuts = <T extends Edge[]>(
       || second.pointCount - first.pointCount
       || first.edgeIndex - second.edgeIndex
     ));
+  if (diagnostics) diagnostics.candidateEdgeCount = rankedEdgeIndexes.length;
 
   let best = edges;
   let bestQuality = baselineQuality;
@@ -320,6 +338,7 @@ export const repairDisplayLoopShortcuts = <T extends Edge[]>(
   const considerCandidate = (candidate: T, changedIndexes: number[]): boolean => {
     if (evaluations >= maxQualityEvaluations) return false;
     evaluations += 1;
+    if (diagnostics) diagnostics.qualityEvaluationCount += 1;
     const allChangedIndexes = collectChangedIndexes(candidate, changedIndexes);
     const candidateQuality = qualityContext.evaluateChanged(candidate, allChangedIndexes);
     if (!hardLoopDefectsDoNotRegress(baselineQuality, candidateQuality)) return false;
@@ -370,6 +389,7 @@ export const repairDisplayLoopShortcuts = <T extends Edge[]>(
     ) return false;
     const allChangedIndexes = collectChangedIndexes(candidate, changedIndexes);
     const candidateQuality = qualityContext.evaluateChanged(candidate, allChangedIndexes);
+    if (diagnostics) diagnostics.qualityEvaluationCount += 1;
     if (
       candidateQuality.strictCrossings <= baselineQuality.strictCrossings
       || candidateQuality.strictCrossings > baselineQuality.strictCrossings + 2

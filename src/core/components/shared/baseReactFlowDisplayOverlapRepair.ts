@@ -37,7 +37,10 @@ import {
   visualPolishHardQualityDoesNotRegress,
 } from './baseReactFlowDisplayEvaluation';
 import { buildObstacleSkirtCandidates } from './baseReactFlowDisplayObstacleCandidates';
-import { repairDisplayLoopShortcuts } from './baseReactFlowDisplayLoopShortcutRepair';
+import {
+  createDisplayLoopShortcutRepairDiagnostics,
+  repairDisplayLoopShortcuts,
+} from './baseReactFlowDisplayLoopShortcutRepair';
 import { buildNearParallelLaneNudgePaths } from './baseReactFlowDisplayNearParallelCandidates';
 import {
   collectExactThresholdResidualPairs,
@@ -220,10 +223,22 @@ export const repairResidualDisplayOverlaps = <T extends Edge[]>(
     ? { detectExistingBridgeCrossings: false }
     : undefined;
   const terminalValidation = createDisplayTerminalValidationSnapshot(nodes);
+  const loopShortcutDiagnostics = createDisplayLoopShortcutRepairDiagnostics();
   const rawLoopShortened = runTracedRepair(
     'residual-loop-shortcut',
     edges,
-    () => repairDisplayLoopShortcuts(edges, nodes, 32) as T,
+    () => repairDisplayLoopShortcuts(
+      edges,
+      nodes,
+      32,
+      undefined,
+      loopShortcutDiagnostics,
+    ) as T,
+    traceOptions?.parentPhase,
+    () => ({
+      candidateCount: loopShortcutDiagnostics.candidateEdgeCount,
+      evaluationCount: loopShortcutDiagnostics.qualityEvaluationCount,
+    }),
   );
   const loopShortened = displayTerminalValidationDoesNotRegress(
     edges,

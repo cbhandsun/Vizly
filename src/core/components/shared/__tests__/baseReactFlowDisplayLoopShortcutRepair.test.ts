@@ -20,6 +20,7 @@ import {
 import { withDisplayComputedPath } from '../baseReactFlowDisplayGeometry';
 import {
   buildStrictBlockingTerminalLaneShiftVariants,
+  createDisplayLoopShortcutRepairDiagnostics,
   repairDisplayLoopShortcuts,
 } from '../baseReactFlowDisplayLoopShortcutRepair';
 import { withDisplayPortBridge } from '../baseReactFlowDisplayTerminalPortCandidates';
@@ -66,9 +67,12 @@ describe('display loop shortcut repair', () => {
     expect(baselineQuality.unrelatedOverlap).toBe(39);
     expect(baselineQuality.hairpins).toBe(1);
 
-    const shortened = repairDisplayLoopShortcuts(edges, nodes, 32);
+    const diagnostics = createDisplayLoopShortcutRepairDiagnostics();
+    const shortened = repairDisplayLoopShortcuts(edges, nodes, 32, undefined, diagnostics);
     const shortenedQuality = calculateEdgePathQualityScore(shortened);
     expect(shortened).not.toBe(edges);
+    expect(diagnostics.candidateEdgeCount).toBeGreaterThan(0);
+    expect(diagnostics.qualityEvaluationCount).toBeGreaterThan(1);
     expect(shortenedQuality.hairpins).toBe(0);
     const repaired = shortened;
     const repairedQuality = calculateEdgePathQualityScore(repaired);
