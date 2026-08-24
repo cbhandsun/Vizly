@@ -338,6 +338,35 @@ describe('baseReactFlowDisplayWorkerProtocol', () => {
     ))).toBe(true);
   });
 
+  it('attributes global-refine setup and normalization to direct child phases', () => {
+    const trace = (
+      phase: DisplayRoutingPhaseTrace['phase'],
+      durationMs: number,
+    ): DisplayRoutingPhaseTrace => ({
+      phase,
+      durationMs,
+      candidateCount: 14,
+      changedEdgeCount: 0,
+      resolution: 'skip',
+    });
+    const traces = finalizeDisplayRoutingPhaseTrace([
+      trace('quality-crossing-global-refine', 170),
+      trace('quality-crossing-global-refine-context', 2),
+      trace('quality-crossing-global-refine-initial', 40),
+      trace('quality-crossing-global-refine-fixed-point', 30),
+      trace('quality-crossing-global-refine-dogleg-initial', 10),
+      trace('quality-crossing-global-refine-dogleg', 25),
+      trace('quality-crossing-global-refine-dogleg-final', 5),
+      trace('quality-crossing-global-refine-shared-target', 20),
+      trace('quality-crossing-global-refine-endpoint', 10),
+    ]);
+
+    expect(traces[0]).toMatchObject({ exclusiveDurationMs: 28 });
+    expect(traces.slice(1).every(({ parentPhase }) => (
+      parentPhase === 'quality-crossing-global-refine'
+    ))).toBe(true);
+  });
+
   it('derives exclusive fail-closed work without exposing route content', () => {
     const trace = (
       phase: DisplayRoutingPhaseTrace['phase'],

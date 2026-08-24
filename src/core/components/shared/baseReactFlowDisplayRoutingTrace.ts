@@ -50,6 +50,11 @@ export const DISPLAY_ROUTING_PHASE_NAMES = [
   'quality-crossing-global-refine-initial',
   'quality-crossing-global-refine-fixed-point',
   'quality-crossing-global-refine-dogleg',
+  'quality-crossing-global-refine-context',
+  'quality-crossing-global-refine-dogleg-initial',
+  'quality-crossing-global-refine-dogleg-final',
+  'quality-crossing-global-refine-shared-target',
+  'quality-crossing-global-refine-endpoint',
   'quality-crossing-final-candidates',
   'quality-crossing-final-prepare',
   'quality-crossing-final-prepare-detached',
@@ -182,7 +187,7 @@ export const DISPLAY_ROUTING_PHASE_NAMES = [
 // One aggregate entry per declared phase plus headroom for the small number of
 // phases that can run under two explicit parents. Repeated work is folded by
 // the Worker recorder, so the bound no longer truncates late final-gate phases.
-export const DISPLAY_ROUTING_PHASE_TRACE_LIMIT = 184;
+export const DISPLAY_ROUTING_PHASE_TRACE_LIMIT = 189;
 
 export const DISPLAY_ROUTING_PHASE_RESOLUTIONS = [
   'hit',
@@ -288,6 +293,11 @@ const DISPLAY_ROUTING_PHASE_PARENTS: Readonly<
   'quality-crossing-global-refine-initial': 'quality-crossing-global-refine',
   'quality-crossing-global-refine-fixed-point': 'quality-crossing-global-refine',
   'quality-crossing-global-refine-dogleg': 'quality-crossing-global-refine',
+  'quality-crossing-global-refine-context': 'quality-crossing-global-refine',
+  'quality-crossing-global-refine-dogleg-initial': 'quality-crossing-global-refine',
+  'quality-crossing-global-refine-dogleg-final': 'quality-crossing-global-refine',
+  'quality-crossing-global-refine-shared-target': 'quality-crossing-global-refine',
+  'quality-crossing-global-refine-endpoint': 'quality-crossing-global-refine',
   'quality-crossing-final-candidates': 'quality-crossing-sweeps',
   'quality-crossing-final-prepare': 'quality-crossing-final-candidates',
   'quality-crossing-final-prepare-detached': 'quality-crossing-final-prepare',

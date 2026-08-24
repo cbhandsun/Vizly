@@ -36,6 +36,7 @@ import {
 } from './baseReactFlowDisplayEvaluation';
 import { finalSameSideTrueTrunksDoNotRegress } from './baseReactFlowDisplayFinalEndpointOrder';
 import {
+  countChangedRoutingItems,
   startDisplayRoutingPhaseTrace,
   type DisplayRoutingPhaseTrace,
 } from './baseReactFlowDisplayRoutingTrace';
@@ -202,10 +203,16 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
     candidateCount: endpointLaneNudgedEdges.length,
     onTrace: recordCrossingPhaseTrace,
   });
+  const globalRefineContextTimer = startDisplayRoutingPhaseTrace({
+    phase: 'quality-crossing-global-refine-context',
+    candidateCount: repairNodes.length,
+    onTrace: recordCrossingPhaseTrace,
+  });
   const globalRefineSession = createDisplayQualityGlobalRefineSession({
     nodes: repairNodes,
     onPhaseTrace: recordCrossingPhaseTrace,
   });
+  globalRefineContextTimer.finish('accepted');
   const globallyRefinedEdges = globalRefineSession.run({
     edges: endpointLaneNudgedEdges,
     phase: 'quality-crossing-global-refine-initial',
@@ -215,16 +222,70 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
     phase: 'quality-crossing-global-refine-fixed-point',
     normalize: false,
   });
-  const doglegRepairedEdges = repairDoglegs(finalGloballyRefinedEdges);
+  const initialDoglegTimer = startDisplayRoutingPhaseTrace({
+    phase: 'quality-crossing-global-refine-dogleg-initial',
+    candidateCount: finalGloballyRefinedEdges.length,
+    onTrace: recordCrossingPhaseTrace,
+  });
+  const initialDoglegDiagnostics = createLocalDoglegRepairDiagnostics();
+  const doglegRepairedEdges = repairDoglegs(
+    finalGloballyRefinedEdges,
+    initialDoglegDiagnostics,
+  );
+  initialDoglegTimer.finish(
+    doglegRepairedEdges === finalGloballyRefinedEdges ? 'skip' : 'accepted',
+    countChangedRoutingItems(finalGloballyRefinedEdges, doglegRepairedEdges),
+    {
+      cacheHitCount: initialDoglegDiagnostics.cacheHitCount,
+      candidateCount: initialDoglegDiagnostics.candidateCount,
+      evaluationCount: initialDoglegDiagnostics.qualityEvaluationCount,
+    },
+  );
   const finalCrossingSweepEdges = globalRefineSession.run({
     edges: doglegRepairedEdges,
     phase: 'quality-crossing-global-refine-dogleg',
     normalize: false,
   });
-  const repairedEdges = repairDoglegs(finalCrossingSweepEdges);
+  const finalDoglegTimer = startDisplayRoutingPhaseTrace({
+    phase: 'quality-crossing-global-refine-dogleg-final',
+    candidateCount: finalCrossingSweepEdges.length,
+    onTrace: recordCrossingPhaseTrace,
+  });
+  const finalDoglegDiagnostics = createLocalDoglegRepairDiagnostics();
+  const repairedEdges = repairDoglegs(finalCrossingSweepEdges, finalDoglegDiagnostics);
+  finalDoglegTimer.finish(
+    repairedEdges === finalCrossingSweepEdges ? 'skip' : 'accepted',
+    countChangedRoutingItems(finalCrossingSweepEdges, repairedEdges),
+    {
+      cacheHitCount: finalDoglegDiagnostics.cacheHitCount,
+      candidateCount: finalDoglegDiagnostics.candidateCount,
+      evaluationCount: finalDoglegDiagnostics.qualityEvaluationCount,
+    },
+  );
+  const sharedTargetTimer = startDisplayRoutingPhaseTrace({
+    phase: 'quality-crossing-global-refine-shared-target',
+    candidateCount: repairedEdges.length,
+    onTrace: recordCrossingPhaseTrace,
+  });
+  const sharedTargetEdges = synthesizeSharedTargetTrunks(repairedEdges, {
+    nodes: repairNodes,
+  });
+  sharedTargetTimer.finish(
+    sharedTargetEdges === repairedEdges ? 'skip' : 'accepted',
+    countChangedRoutingItems(repairedEdges, sharedTargetEdges),
+  );
+  const endpointTimer = startDisplayRoutingPhaseTrace({
+    phase: 'quality-crossing-global-refine-endpoint',
+    candidateCount: sharedTargetEdges.length,
+    onTrace: recordCrossingPhaseTrace,
+  });
   const finalTargetQualityEdges = repairEndpointOrthogonalPaths(
-    synthesizeSharedTargetTrunks(repairedEdges, { nodes: repairNodes }),
+    sharedTargetEdges,
     repairNodes,
+  );
+  endpointTimer.finish(
+    finalTargetQualityEdges === sharedTargetEdges ? 'skip' : 'accepted',
+    countChangedRoutingItems(sharedTargetEdges, finalTargetQualityEdges),
   );
   globalRefineTimer.finish(
     finalTargetQualityEdges === endpointLaneNudgedEdges ? 'skip' : 'accepted',
