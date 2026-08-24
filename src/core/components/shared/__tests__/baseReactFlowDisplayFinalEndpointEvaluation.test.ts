@@ -54,14 +54,17 @@ describe('createBaseReactFlowFinalEndpointEvaluation', () => {
     evaluation.hardReport(edges);
     finish(edges, edges, {
       generatedCandidateCount: 10,
+      qualityContextBuildCount: 2,
+      qualityContextCacheHitCount: 4,
       uniqueCandidateCount: 7,
     });
 
     const trace = traces[0];
     expect(trace).toMatchObject({
       candidateCount: 10,
-      cacheHitCount: 3,
+      cacheHitCount: 7,
       changedEdgeCount: 0,
+      evaluationCount: 3,
       resolution: 'skip',
     });
   });

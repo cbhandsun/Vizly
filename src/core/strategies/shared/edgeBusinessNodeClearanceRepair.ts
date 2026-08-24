@@ -26,6 +26,8 @@ export interface BusinessNodeClearanceCandidateValidation {
 
 export interface BusinessNodeClearanceRepairDiagnostics {
   generatedCandidateCount: number;
+  qualityContextBuildCount: number;
+  qualityContextCacheHitCount: number;
   uniqueCandidateCount: number;
 }
 
@@ -646,6 +648,8 @@ export const repairBusinessNodeClearanceRisks = (
 ): Edge[] => {
   if (options.diagnostics) {
     options.diagnostics.generatedCandidateCount = 0;
+    options.diagnostics.qualityContextBuildCount = 0;
+    options.diagnostics.qualityContextCacheHitCount = 0;
     options.diagnostics.uniqueCandidateCount = 0;
   }
   const minimumClearance = Number.isFinite(options.minimumClearance)
@@ -669,6 +673,23 @@ export const repairBusinessNodeClearanceRisks = (
     createRoutingObstacleEvaluationContext(edge, obstacles),
   ] as const));
   let current = edges;
+  let qualityBaselineEdges: Edge[] | null = null;
+  let qualityContext: ReturnType<typeof createEdgePathQualityEvaluationContext> | null = null;
+  let baselineQuality: EdgePathQualityScore | null = null;
+  const getQualityBaseline = (): Readonly<{
+    context: ReturnType<typeof createEdgePathQualityEvaluationContext>;
+    score: EdgePathQualityScore;
+  }> => {
+    if (qualityBaselineEdges === current && qualityContext && baselineQuality) {
+      if (options.diagnostics) options.diagnostics.qualityContextCacheHitCount += 1;
+      return { context: qualityContext, score: baselineQuality };
+    }
+    qualityBaselineEdges = current;
+    qualityContext = createEdgePathQualityEvaluationContext(current);
+    baselineQuality = qualityContext.evaluate(current);
+    if (options.diagnostics) options.diagnostics.qualityContextBuildCount += 1;
+    return { context: qualityContext, score: baselineQuality };
+  };
   const maxPasses = Math.min(64, Math.max(4, current.length));
   for (let pass = 0; pass < maxPasses; pass += 1) {
     const passBaseline = current;
@@ -695,8 +716,7 @@ export const repairBusinessNodeClearanceRisks = (
         ?? createNodeClearanceEvaluationContext(nodes, edge);
       const obstacleContext = obstacleContextByEdgeId.get(edge.id)
         ?? createRoutingObstacleEvaluationContext(edge, obstacles);
-      const qualityContext = createEdgePathQualityEvaluationContext(current);
-      const baselineQuality = qualityContext.evaluate(current);
+      const qualityBaseline = getQualityBaseline();
       const [baselineRisk, baselineCommercialRisk] = clearanceContext.scorePair(
         path,
         minimumClearance,
@@ -747,9 +767,12 @@ export const repairBusinessNodeClearanceRisks = (
         const candidatePath = rankedCandidate.candidate;
         const candidateEdges = current.slice();
         candidateEdges[edgeIndex] = withPath(edge, candidatePath);
-        const candidateQuality = qualityContext.evaluateChanged(candidateEdges, [edgeIndex]);
+        const candidateQuality = qualityBaseline.context.evaluateChanged(
+          candidateEdges,
+          [edgeIndex],
+        );
         if (!hardQualityDoesNotRegress(
-          baselineQuality,
+          qualityBaseline.score,
           candidateQuality,
           options.allowTransientStrictCrossing === true,
         )) continue;

@@ -567,4 +567,32 @@ describe('repairBusinessNodeClearanceRisks', () => {
     expect(validationCalls).toBeGreaterThan(0);
     expect(repaired).toBe(edges);
   });
+
+  it('reuses the exact quality baseline while rejected siblings leave it unchanged', () => {
+    const nodes: Node[] = [
+      { id: 'source', position: { x: 0, y: 0 }, data: {}, measured: { width: 80, height: 60 } },
+      { id: 'blocker', position: { x: 180, y: 10 }, data: {}, measured: { width: 80, height: 80 } },
+      { id: 'target', position: { x: 400, y: 0 }, data: {}, measured: { width: 80, height: 60 } },
+    ];
+    const computedPath = [{ x: 80, y: 30 }, { x: 400, y: 30 }];
+    const edges: Edge[] = ['first', 'second'].map(id => ({
+      id,
+      source: 'source',
+      target: 'target',
+      data: { computedPath },
+    }));
+    const diagnostics = {
+      generatedCandidateCount: 0,
+      qualityContextBuildCount: 0,
+      qualityContextCacheHitCount: 0,
+      uniqueCandidateCount: 0,
+    };
+
+    expect(repairBusinessNodeClearanceRisks(edges, nodes, {
+      diagnostics,
+      validateCandidate: () => false,
+    })).toBe(edges);
+    expect(diagnostics.qualityContextBuildCount).toBe(1);
+    expect(diagnostics.qualityContextCacheHitCount).toBe(1);
+  });
 });

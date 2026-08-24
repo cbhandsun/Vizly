@@ -615,6 +615,8 @@ export const repairBaseReactFlowFinalEndpointOrder = <T extends Edge[]>(
   );
   const postTrunkObstacleDiagnostics: BusinessNodeClearanceRepairDiagnostics = {
     generatedCandidateCount: 0,
+    qualityContextBuildCount: 0,
+    qualityContextCacheHitCount: 0,
     uniqueCandidateCount: 0,
   };
   repaired = commitPostTrunkBranchObstacleCandidate(
