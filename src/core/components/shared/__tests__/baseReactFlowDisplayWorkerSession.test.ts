@@ -23,6 +23,9 @@ import {
   readDisplayRoutingWorkerSession,
   writeDisplayRoutingWorkerSession,
 } from '../baseReactFlowDisplayWorkerSession';
+import { createTestDisplayHardReport } from './baseReactFlowDisplayWorkerTestFixtures';
+
+const cleanHardReport = createTestDisplayHardReport(true, 200);
 
 const nodes: Node[] = [{
   id: 'source',
@@ -88,6 +91,7 @@ describe('display routing Worker-private session', () => {
         requestId: 'bounded-session-trace',
         edges,
         hardClean: true,
+        hardReport: cleanHardReport,
         routeResolution: 'full-route',
         phaseTrace,
       },

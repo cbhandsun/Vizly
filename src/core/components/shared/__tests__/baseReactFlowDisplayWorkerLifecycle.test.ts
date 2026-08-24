@@ -24,6 +24,16 @@ import {
   createBaseReactFlowRoutingAffectedClosure,
   createBaseReactFlowRoutingChangeSet,
 } from '../baseReactFlowDisplayRoutingChangeSet';
+import {
+  computeDisplayRoutingHardReportDigest,
+  isDisplayRoutingHardReportDigest,
+} from '../baseReactFlowDisplayHardReportDigest';
+import {
+  createTestDisplayHardReport,
+  withRequiredTestDisplayHardReport,
+} from './baseReactFlowDisplayWorkerTestFixtures';
+
+const cleanHardReport = createTestDisplayHardReport();
 
 const installWorkerHarness = () => {
   const terminate = vi.fn();
@@ -63,7 +73,7 @@ const installWorkerHarness = () => {
     },
     emitMessage: (data: unknown) => {
       for (const listener of activeListeners?.get('message') ?? []) {
-        listener({ data } as MessageEvent);
+        listener({ data: withRequiredTestDisplayHardReport(data) } as MessageEvent);
       }
     },
   };
@@ -76,6 +86,25 @@ afterEach(() => {
 });
 
 describe('baseReactFlowDisplayWorker lifecycle', () => {
+  it('binds committed hard-report digests to exact gate metrics', () => {
+    const reordered = {
+      ...cleanHardReport,
+      minimumClearanceViolationEdgeIds: ['edge-b', 'edge-a'],
+    };
+    const normalized = {
+      ...cleanHardReport,
+      minimumClearanceViolationEdgeIds: ['edge-a', 'edge-b'],
+    };
+    const digest = computeDisplayRoutingHardReportDigest(reordered);
+    expect(digest).toBe(computeDisplayRoutingHardReportDigest(normalized));
+    expect(isDisplayRoutingHardReportDigest(digest)).toBe(true);
+    expect(computeDisplayRoutingHardReportDigest({
+      ...cleanHardReport,
+      quality: { ...cleanHardReport.quality, strictCrossings: 1 },
+    })).not.toBe(digest);
+    expect(isDisplayRoutingHardReportDigest('hard-report-v1:unsafe')).toBe(false);
+  });
+
   it('merges a routing-only response while retaining current visual metadata', async () => {
     const harness = installWorkerHarness();
     const sourceEdges: Edge[] = [{
@@ -188,6 +217,7 @@ describe('baseReactFlowDisplayWorker lifecycle', () => {
       sourceNodes: [],
       displayPatches,
       outputRouteSignature,
+      hardReport: cleanHardReport,
     })).toBe(true);
 
     const mutablePath = (displayPatches?.[0].data as Record<string, unknown>)?.computedPath;
@@ -252,6 +282,7 @@ describe('baseReactFlowDisplayWorker lifecycle', () => {
       sourceNodes: [],
       displayPatches,
       outputRouteSignature,
+      hardReport: cleanHardReport,
     })).toBe(false);
     expect(writeBaseReactFlowDisplayCommittedSnapshot({
       inputSignature: '1',
@@ -260,6 +291,7 @@ describe('baseReactFlowDisplayWorker lifecycle', () => {
       sourceNodes: [],
       displayPatches,
       outputRouteSignature,
+      hardReport: cleanHardReport,
     })).toBe(false);
 
     for (let index = 0; index < 17; index += 1) {
@@ -270,6 +302,7 @@ describe('baseReactFlowDisplayWorker lifecycle', () => {
         sourceNodes: [],
         displayPatches,
         outputRouteSignature,
+        hardReport: cleanHardReport,
       })).toBe(true);
     }
     expect(readBaseReactFlowDisplayCommittedSnapshot({
@@ -406,9 +439,18 @@ describe('baseReactFlowDisplayWorker lifecycle', () => {
       sourceNodes: [],
       displayPatches,
       outputRouteSignature,
+      hardReport: cleanHardReport,
     });
     expect(committed).not.toBeNull();
     expect(committed?.displayPatches).not.toBe(displayPatches);
+    expect(committed?.identity).toEqual({
+      routingVersion: expect.any(String),
+      inputSignature: '321',
+      inputGeometryDigest: `geometry-v1:${'b'.repeat(32)}`,
+    });
+    expect(committed?.routingPatches).toBe(committed?.displayPatches);
+    expect(committed?.projectedSourceGeometry.edges).toBe(committed?.sourceEdges);
+    expect(committed?.hardReportDigest).toMatch(/^hard-report-v1:[0-9a-f]{16}$/);
 
     const mutablePath = (displayPatches[0].data as Record<string, unknown>).computedPath;
     if (Array.isArray(mutablePath)) mutablePath[1] = { x: 999, y: 999 };
@@ -452,6 +494,7 @@ describe('baseReactFlowDisplayWorker lifecycle', () => {
       sourceNodes: [],
       displayPatches,
       outputRouteSignature,
+      hardReport: cleanHardReport,
     })).not.toBeNull();
 
     const documentSnapshot = createBaseReactFlowRoutingOnlyDocumentSnapshot(sourceEdges);

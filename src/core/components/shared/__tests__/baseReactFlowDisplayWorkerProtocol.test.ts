@@ -13,7 +13,7 @@ import {
 import { createDisplayRoutingIdentity } from '../baseReactFlowDisplayRoutingSession';
 import { createDisplayRoutingPhaseRecorder } from '../baseReactFlowDisplayWorkerTraceRecorder';
 import { createDisplayEdgesTransportResponse } from '../baseReactFlowDisplayWorkerScope';
-import type { BaseDisplayBoundedCandidateReport } from '../baseReactFlowDisplayEvaluation';
+import { createTestDisplayHardReport } from './baseReactFlowDisplayWorkerTestFixtures';
 
 const nodes = [
   { id: 'source', position: { x: 0, y: 0 }, data: {} },
@@ -33,31 +33,7 @@ const validRepairRequest = {
   repairMode: 'bounded',
 } as const;
 
-const cleanHardReport = {
-  candidate: 'polished',
-  hardClean: true,
-  obstacleHits: 0,
-  terminalsAttached: true,
-  terminalsAnchored: true,
-  minimumClearanceViolations: 0,
-  minimumClearanceViolationEdgeIds: [],
-  commercialClearanceViolations: 0,
-  quality: {
-    nonOrthogonalSegments: 0,
-    strictCrossings: 0,
-    reverseOverlap: 0,
-    unrelatedOverlap: 0,
-    relatedOverlap: 0,
-    unexplainedRelatedOverlap: 0,
-    shortEndpointStubs: 0,
-    tinyInteriorDoglegs: 0,
-    hairpins: 0,
-    backtrackPenalty: 0,
-    detourPenalty: 0,
-    bends: 0,
-    totalLength: 100,
-  },
-} satisfies BaseDisplayBoundedCandidateReport;
+const cleanHardReport = createTestDisplayHardReport();
 
 describe('baseReactFlowDisplayWorkerProtocol', () => {
   it('compacts incremental transport to routing patches and rejects ambiguous carriers', () => {

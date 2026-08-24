@@ -11,6 +11,7 @@ import {
   seedBaseReactFlowStagedLayoutEdges,
 } from '../baseReactFlowLayoutRoutingTransaction';
 import { projectBaseReactFlowDisplayWorkerInput } from '../baseReactFlowDisplayWorkerProjection';
+import { createTestDisplayHardReport } from './baseReactFlowDisplayWorkerTestFixtures';
 
 const nodes: Node[] = [
   {
@@ -65,6 +66,7 @@ const createWorkerResult = (hardClean: boolean) => {
     routingPatches,
     projectedEdges: projected.edges,
     hardClean,
+    hardReport: createTestDisplayHardReport(hardClean, 140),
     routeResolution: 'full-route' as const,
     phaseTrace: [],
   };
@@ -385,6 +387,7 @@ describe('baseReactFlowLayoutRoutingTransaction', () => {
           },
         }],
         hardClean: true,
+        hardReport: createTestDisplayHardReport(true, 120),
         routeResolution: 'full-route',
         phaseTrace: [],
       },

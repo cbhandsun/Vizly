@@ -439,11 +439,11 @@ export const useBaseReactFlowDisplayRouting = ({
           smartEdgePadding: activeRoutingInput.smartEdgePadding,
           isLargeGraph: activeRoutingInput.isLargeGraph,
           displayEdgeEpoch: activeRoutingInput.displayEdgeEpoch,
-          baselineInputSignature: incrementalPlan.baseline.inputSignature,
-          baselineInputGeometryDigest: incrementalPlan.baseline.inputGeometryDigest,
-          baselineNodes: incrementalPlan.baseline.nodes,
-          baselineSourceEdges: incrementalPlan.baseline.sourceEdges,
-          baselinePatches: incrementalPlan.baseline.displayPatches,
+          baselineInputSignature: incrementalPlan.baseline.identity.inputSignature,
+          baselineInputGeometryDigest: incrementalPlan.baseline.identity.inputGeometryDigest,
+          baselineNodes: incrementalPlan.baseline.projectedSourceGeometry.nodes,
+          baselineSourceEdges: incrementalPlan.baseline.projectedSourceGeometry.edges,
+          baselinePatches: incrementalPlan.baseline.routingPatches,
           baselineOutputRouteSignature: incrementalPlan.baseline.outputRouteSignature,
           baselineSessionRef: incrementalPlan.baseline.workerSessionRef,
           nextInputSignature: displayEdgeCacheSignature,
@@ -523,7 +523,7 @@ export const useBaseReactFlowDisplayRouting = ({
           routeResolution: workerResult.routeResolution,
           routesMatch: routesMatchExactly,
         });
-        if (!canCommitFinalResult) {
+        if (!canCommitFinalResult || !workerResult.hardReport) {
           updateDisplayRoutingDebugState({
             stage: 'final-quality-rejected',
             signature: displayEdgeCacheSignature,
@@ -551,6 +551,7 @@ export const useBaseReactFlowDisplayRouting = ({
             sourceNodes: latestRoutingInput.nodes,
             displayPatches: mergedTransactions.displayPatches,
             outputRouteSignature: mergedOutputRouteSignature,
+            hardReport: workerResult.hardReport,
             workerSessionRef: workerResult.sessionRef,
             precompiledCapturePresetId: precompiledRegenerationPresetId,
           });

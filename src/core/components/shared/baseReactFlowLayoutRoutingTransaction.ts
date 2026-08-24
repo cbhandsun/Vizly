@@ -5,6 +5,7 @@ import { computeBaseReactFlowDisplayOutputRouteSignature } from './baseReactFlow
 import {
   readBaseReactFlowDisplayCommittedSnapshot,
   writeBaseReactFlowDisplayCommittedSnapshot,
+  type RoutingCommittedSnapshot,
 } from './baseReactFlowDisplayCommittedSnapshot';
 import { anchorComputedDisplayEdgeEndpoints } from './baseReactFlowDisplayEndpointAnchoring';
 import { lockFinalDisplayComputedPaths } from './baseReactFlowDisplayEdgeConversions';
@@ -136,7 +137,7 @@ export const commitBaseReactFlowStagedLayoutRoutingResult = ({
   smartEdgePadding?: number;
   isLargeGraph?: boolean;
 }): BaseReactFlowLayoutRoutingCommit | null => {
-  if (!Array.isArray(workerResult.routingPatches)) return null;
+  if (!Array.isArray(workerResult.routingPatches) || !workerResult.hardReport) return null;
   const workerInputRoutingPatches = createBaseReactFlowDisplayEdgePatches(
     sourceEdges,
     workerResult.projectedEdges,
@@ -167,6 +168,7 @@ export const commitBaseReactFlowStagedLayoutRoutingResult = ({
     enableSmartEdges,
     smartEdgePadding,
     isLargeGraph,
+    hardReport: workerResult.hardReport,
   })) return null;
   return { routedEdges: merged.edges };
 };
@@ -178,6 +180,8 @@ const writeBaseReactFlowStagedLayoutSnapshot = ({
   enableSmartEdges,
   smartEdgePadding,
   isLargeGraph,
+  hardReport,
+  hardReportDigest,
 }: {
   sourceEdges: Edge[];
   routedEdges: Edge[];
@@ -185,7 +189,15 @@ const writeBaseReactFlowStagedLayoutSnapshot = ({
   enableSmartEdges: boolean;
   smartEdgePadding: number;
   isLargeGraph: boolean;
+  hardReport?: NonNullable<BaseReactFlowDisplayWorkerResult['hardReport']>;
+  hardReportDigest?: RoutingCommittedSnapshot['hardReportDigest'];
 }): boolean => {
+  const hardReportIdentity = hardReport
+    ? { hardReport }
+    : hardReportDigest
+      ? { hardReportDigest }
+      : null;
+  if (!hardReportIdentity) return false;
   const outputRouteSignature = computeBaseReactFlowDisplayOutputRouteSignature(routedEdges);
   const displayPatches = createBaseReactFlowDisplayEdgePatches(routedEdges, routedEdges);
   if (!outputRouteSignature || !displayPatches) return false;
@@ -211,6 +223,7 @@ const writeBaseReactFlowStagedLayoutSnapshot = ({
       sourceNodes,
       displayPatches: patches,
       outputRouteSignature,
+      ...hardReportIdentity,
     });
   };
   const primaryWritten = writeSnapshot(routedEdges, displayPatches);
@@ -262,6 +275,7 @@ export const stageBaseReactFlowLayoutRouting = async ({
   const cachedEdges = cached
     ? lockFinalDisplayComputedPaths(cached.edges, projectedSource.nodes)
     : null;
+  const cachedHardReportDigest = cached?.baseline.hardReportDigest;
   if (cachedEdges && writeBaseReactFlowStagedLayoutSnapshot({
     sourceEdges: unseededSourceEdges,
     routedEdges: cachedEdges,
@@ -269,6 +283,7 @@ export const stageBaseReactFlowLayoutRouting = async ({
     enableSmartEdges,
     smartEdgePadding,
     isLargeGraph,
+    hardReportDigest: cachedHardReportDigest,
   })) {
     return { routedEdges: cachedEdges };
   }

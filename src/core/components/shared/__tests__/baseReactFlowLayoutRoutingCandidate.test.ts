@@ -24,6 +24,7 @@ import {
 } from '../baseReactFlowLayoutRoutingTransaction';
 import { getDisplayHardQualityGateReport } from '../baseReactFlowDisplayQualityGates';
 import { createBaseReactFlowDisplayEdgePatches } from '../baseReactFlowDisplayWorkerClient';
+import { createTestDisplayHardReport } from './baseReactFlowDisplayWorkerTestFixtures';
 
 const nodes: Node[] = [
   {
@@ -55,6 +56,7 @@ const successfulResult = (candidateEdges: Edge[]) => ({
   routingPatches: createBaseReactFlowDisplayEdgePatches(candidateEdges, candidateEdges),
   projectedEdges: candidateEdges,
   hardClean: true,
+  hardReport: createTestDisplayHardReport(),
   routeResolution: 'repair' as const,
   phaseTrace: [],
 });
@@ -176,6 +178,7 @@ describe('baseReactFlow layout routing candidate sequence', () => {
     workerMocks.repair.mockImplementationOnce(async ({ edges: candidateEdges }: { edges: Edge[] }) => ({
       ...successfulResult(candidateEdges),
       hardClean: false,
+      hardReport: createTestDisplayHardReport(false),
     }));
     workerMocks.compute.mockImplementation(async ({ edges: candidateEdges }: {
       edges: Edge[];
@@ -226,12 +229,14 @@ describe('baseReactFlow layout routing candidate sequence', () => {
     }) => ({
       ...successfulResult(candidateEdges),
       hardClean: false,
+      hardReport: createTestDisplayHardReport(false),
     }));
     workerMocks.compute.mockImplementation(async ({ edges: candidateEdges }: {
       edges: Edge[];
     }) => ({
       ...successfulResult(candidateEdges),
       hardClean: false,
+      hardReport: createTestDisplayHardReport(false),
       routeResolution: 'full-route' as const,
     }));
 

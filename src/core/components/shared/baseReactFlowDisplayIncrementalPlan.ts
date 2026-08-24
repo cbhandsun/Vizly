@@ -35,18 +35,18 @@ export const createBaseReactFlowDisplayIncrementalPlan = ({
   if (
     !baseline
     || (
-      baseline.inputSignature === nextInputSignature
-      && baseline.inputGeometryDigest === nextInputGeometryDigest
+      baseline.identity.inputSignature === nextInputSignature
+      && baseline.identity.inputGeometryDigest === nextInputGeometryDigest
     )
   ) return null;
   const baselineEdges = mergeBaseReactFlowDisplayEdgePatches(
-    baseline.sourceEdges,
-    baseline.displayPatches,
+    baseline.projectedSourceGeometry.edges,
+    baseline.routingPatches,
   );
   if (!baselineEdges) return null;
   const changeSet = createBaseReactFlowRoutingChangeSet({
-    previousNodes: baseline.nodes,
-    previousEdges: baseline.sourceEdges,
+    previousNodes: baseline.projectedSourceGeometry.nodes,
+    previousEdges: baseline.projectedSourceGeometry.edges,
     nextNodes,
     nextEdges,
     reasonHint: draggedNodeIds.length > 0 ? 'node-drag' : 'unknown',
@@ -60,7 +60,7 @@ export const createBaseReactFlowDisplayIncrementalPlan = ({
   ) return null;
   const affectedClosure = createBaseReactFlowRoutingAffectedClosure({
     changeSet,
-    previousNodes: baseline.nodes,
+    previousNodes: baseline.projectedSourceGeometry.nodes,
     nextNodes,
     baselineEdges,
     nextEdges,

@@ -2,6 +2,7 @@ import type { Edge } from '@xyflow/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { requestBaseReactFlowDisplayEdgesWorker } from '../baseReactFlowDisplayWorkerClient';
+import { createTestDisplayHardReport } from './baseReactFlowDisplayWorkerTestFixtures';
 
 const installWorkerHarness = () => {
   let activeListeners: Map<string, Set<EventListener>> | null = null;
@@ -74,6 +75,7 @@ describe('display Worker routing-only response boundary', () => {
         },
       }],
       hardClean: true,
+      hardReport: createTestDisplayHardReport(),
       routeResolution: 'full-route',
     });
 
