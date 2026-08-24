@@ -5,6 +5,7 @@ import {
   buildPrecompiledDisplayRoutePerformanceResult,
   parsePrecompiledDisplayRouteSampleCount,
   parsePrecompiledDisplayRoutePerformanceResult,
+  selectPrecompiledDisplayRouteCaptureTargets,
   summarizePrecompiledDisplayRoutePerformance,
 } from './precompiled-display-route-performance.mjs';
 
@@ -36,6 +37,42 @@ const sample = (logisticsMs = 700) => buildPrecompiledDisplayRoutePerformanceRes
 ]);
 
 describe('precompiled display route cold performance', () => {
+  it('selects one known preset for no-write measurement mode', () => {
+    const targets = [
+      { presetId: 'first-route', sourcePath: 'first.json' },
+      { presetId: 'logistics-architecture-v1', sourcePath: 'logistics.json' },
+    ];
+    expect(selectPrecompiledDisplayRouteCaptureTargets({
+      measureOnly: false,
+      checkMode: false,
+      presetId: undefined,
+      targets,
+    })).toBe(targets);
+    expect(selectPrecompiledDisplayRouteCaptureTargets({
+      measureOnly: true,
+      checkMode: false,
+      presetId: ' logistics-architecture-v1 ',
+      targets,
+    })).toEqual([targets[1]]);
+  });
+
+  it('fails closed for invalid focused measurement configuration', () => {
+    const targets = [{ presetId: 'known-route', sourcePath: 'known.json' }];
+    const select = overrides => selectPrecompiledDisplayRouteCaptureTargets({
+      measureOnly: true,
+      checkMode: false,
+      presetId: 'known-route',
+      targets,
+      ...overrides,
+    });
+    expect(() => select({ presetId: '' })).toThrow(/bounded lowercase preset id/);
+    expect(() => select({ presetId: '../private' })).toThrow(/bounded lowercase preset id/);
+    expect(() => select({ presetId: 'unknown-route' })).toThrow(/Unknown/);
+    expect(() => select({ checkMode: true })).toThrow(/cannot be combined/);
+    expect(() => select({ measureOnly: false, presetId: 'known-route' })).toThrow(/only valid/);
+    expect(() => select({ targets: [] })).toThrow(/bounded non-empty/);
+  });
+
   it('projects only bounded aggregate measurements', () => {
     const result = sample();
     expect(result.presets).toHaveLength(3);

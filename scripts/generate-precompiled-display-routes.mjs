@@ -19,6 +19,7 @@ import { auditPrecompiledDisplayRouteCommercialQuality } from './lib/precompiled
 import {
   buildPrecompiledDisplayRoutePerformanceResult,
   PRECOMPILED_DISPLAY_ROUTE_RESULT_PREFIX,
+  selectPrecompiledDisplayRouteCaptureTargets,
 } from './lib/precompiled-display-route-performance.mjs';
 
 const ROOT = resolve(process.cwd());
@@ -26,6 +27,7 @@ const BASE_URL = String(process.env.PRECOMPILED_ROUTE_BASE_URL || '').trim().rep
 const CHECK_MODE = process.argv.includes('--check');
 const TRACE_ALL = process.argv.includes('--trace-all');
 const MACHINE_MODE = process.argv.includes('--machine');
+const MEASURE_ONLY = process.argv.includes('--measure-only');
 const GENERATED_DIR = resolve(ROOT, 'src/core/components/shared/generated');
 const ARTIFACT_DIR = resolve(GENERATED_DIR, 'precompiledRoutes');
 const MANIFEST_PATH = resolve(GENERATED_DIR, 'baseReactFlowPrecompiledRouteManifest.json');
@@ -275,16 +277,18 @@ const captureTarget = async (session, target, source, routingVersion) => {
       : [];
     console.log(`All phases for ${preset.id}: ${JSON.stringify(allPhases)}`);
   }
-  const seedGatePhases = Array.isArray(routing.phaseTrace)
-    ? routing.phaseTrace.filter(trace => (
-      trace.phase === 'seed-initial-gate'
-    ))
-    : [];
-  console.log(`Seed gates for ${preset.id}: ${JSON.stringify(seedGatePhases)}`);
-  const residualPhases = Array.isArray(routing.phaseTrace)
-    ? routing.phaseTrace.filter(trace => trace.phase.startsWith('residual-'))
-    : [];
-  console.log(`Residual phases for ${preset.id}: ${JSON.stringify(residualPhases)}`);
+  if (!MEASURE_ONLY || TRACE_ALL) {
+    const seedGatePhases = Array.isArray(routing.phaseTrace)
+      ? routing.phaseTrace.filter(trace => (
+        trace.phase === 'seed-initial-gate'
+      ))
+      : [];
+    console.log(`Seed gates for ${preset.id}: ${JSON.stringify(seedGatePhases)}`);
+    const residualPhases = Array.isArray(routing.phaseTrace)
+      ? routing.phaseTrace.filter(trace => trace.phase.startsWith('residual-'))
+      : [];
+    console.log(`Residual phases for ${preset.id}: ${JSON.stringify(residualPhases)}`);
+  }
   return {
     presetId: preset.id,
     artifact: {
@@ -367,11 +371,15 @@ const assertFileContents = async (path, expected, label) => {
 };
 
 const main = async () => {
+  const captureTargets = selectPrecompiledDisplayRouteCaptureTargets({
+    measureOnly: MEASURE_ONLY,
+    checkMode: CHECK_MODE,
+    presetId: process.env.PRECOMPILED_ROUTE_PRESET_ID,
+    targets: PRECOMPILED_DISPLAY_ROUTE_TARGETS,
+  });
   await assertProductionPreview();
   const routingVersion = await readRoutingVersion();
-  const identitySourceHash = hashPrecompiledDisplayRouteSource(await readFile(INPUT_IDENTITY_PATH, 'utf8'));
-  const routingSourceHash = await computePrecompiledDisplayRoutingSourceHash(ROOT);
-  const sources = await Promise.all(PRECOMPILED_DISPLAY_ROUTE_TARGETS.map(async target => ({
+  const sources = await Promise.all(captureTargets.map(async target => ({
     target,
     source: await readFile(resolve(ROOT, target.sourcePath), 'utf8'),
   })));
@@ -383,6 +391,23 @@ const main = async () => {
     }
     return generated;
   });
+  if (MEASURE_ONLY) {
+    if (captures.some(capture => (
+      !isFreshFullRouteResolution(capture.measurement.workerResolution)
+    ))) {
+      throw new Error('Focused measurement did not compute a fresh full route');
+    }
+    console.log(`Measured ${captures.length} precompiled route preset without writing artifacts.`);
+    if (MACHINE_MODE) {
+      console.log(
+        `${PRECOMPILED_DISPLAY_ROUTE_RESULT_PREFIX}`
+        + JSON.stringify(buildPrecompiledDisplayRoutePerformanceResult(captures)),
+      );
+    }
+    return;
+  }
+  const identitySourceHash = hashPrecompiledDisplayRouteSource(await readFile(INPUT_IDENTITY_PATH, 'utf8'));
+  const routingSourceHash = await computePrecompiledDisplayRoutingSourceHash(ROOT);
   await mkdir(ARTIFACT_DIR, { recursive: true });
   const entries = [];
   const artifactContents = new Map();

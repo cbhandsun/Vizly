@@ -28,6 +28,35 @@ const boundedToken = (value, pattern) => (
   typeof value === 'string' && pattern.test(value) ? value : null
 );
 
+export const selectPrecompiledDisplayRouteCaptureTargets = ({
+  measureOnly,
+  checkMode,
+  presetId,
+  targets,
+}) => {
+  if (!Array.isArray(targets) || targets.length === 0 || targets.length > 32) {
+    throw new Error('Precompiled route targets must be a bounded non-empty array');
+  }
+  const requestedPresetId = typeof presetId === 'string' ? presetId.trim() : '';
+  if (!measureOnly) {
+    if (requestedPresetId) {
+      throw new Error('PRECOMPILED_ROUTE_PRESET_ID is only valid with --measure-only');
+    }
+    return targets;
+  }
+  if (checkMode) throw new Error('--measure-only cannot be combined with --check');
+  if (!boundedToken(requestedPresetId, PRESET_ID_PATTERN)) {
+    throw new Error(
+      'PRECOMPILED_ROUTE_PRESET_ID must be a bounded lowercase preset id in --measure-only mode',
+    );
+  }
+  const selected = targets.find(target => target?.presetId === requestedPresetId);
+  if (!selected) {
+    throw new Error(`Unknown precompiled route preset id ${requestedPresetId}`);
+  }
+  return [selected];
+};
+
 const projectPhaseTrace = value => {
   if (!Array.isArray(value) || value.length > MAX_TRACE_ENTRIES) {
     throw new Error('Cold-route phase trace is missing or exceeds its bounded limit');
