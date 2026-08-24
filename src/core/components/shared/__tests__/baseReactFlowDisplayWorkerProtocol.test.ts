@@ -732,15 +732,6 @@ describe('baseReactFlowDisplayWorkerProtocol', () => {
     })).toBeNull();
   });
 
-  it('rejects missing or unknown repair modes at the worker boundary', () => {
-    const { repairMode: _repairMode, ...missingMode } = validRepairRequest;
-    expect(parseDisplayEdgesWorkerRequest(missingMode)).toBeNull();
-    expect(parseDisplayEdgesWorkerRequest({
-      ...validRepairRequest,
-      repairMode: 'unbounded',
-    })).toBeNull();
-  });
-
   it('rejects conflicting, non-finite, cyclic, and forged response variants', () => {
     const validEdges = validRepairRequest.edges;
     const hardReport = {

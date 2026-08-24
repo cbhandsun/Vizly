@@ -1,7 +1,7 @@
 import type { Edge, Node } from '@xyflow/react';
 
 import { ROUTING_IDENTIFIER_MAX_LENGTH } from '../../routing/routingBoundaryLimits';
-import type { BaseDisplayBoundedCandidateReport } from './baseReactFlowDisplayEvaluation';
+import { isDisplayWorkerBoundedCandidateReport } from './baseReactFlowDisplayWorkerQualityProtocol';
 import {
   isDisplayRoutingPhaseTrace,
   parseDisplayRoutingPhaseTrace,
@@ -40,7 +40,6 @@ const MAX_ARRAY_ITEMS = 2_000;
 const MAX_OBJECT_KEYS = 120;
 const MAX_TOTAL_DATA_VALUES = 1_000_000;
 const MAX_STRING_LENGTH = 20_000;
-const MAX_QUALITY_METRIC = 1_000_000_000_000_000;
 const INPUT_SIGNATURE_PATTERN = /^\d{1,10}$/;
 const GEOMETRY_DIGEST_PATTERN = /^geometry-v1:[0-9a-f]{32}$/;
 const OUTPUT_ROUTE_SIGNATURE_PATTERN = /^route-v2:\d{1,3}:\d{1,6}:[0-9a-f]{16}$/;
@@ -72,22 +71,6 @@ const DISPLAY_NODE_KEYS = new Set([
   'data',
 ]);
 const UNSAFE_OBJECT_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
-
-const QUALITY_KEYS = [
-  'nonOrthogonalSegments',
-  'strictCrossings',
-  'reverseOverlap',
-  'unrelatedOverlap',
-  'relatedOverlap',
-  'unexplainedRelatedOverlap',
-  'shortEndpointStubs',
-  'tinyInteriorDoglegs',
-  'hairpins',
-  'backtrackPenalty',
-  'detourPenalty',
-  'bends',
-  'totalLength',
-] as const;
 
 export type DisplayQualityMode = 'full' | 'interactive';
 export type DisplayEdgesWorkerCandidateSource = 'persistent' | 'precompiled';
@@ -490,72 +473,6 @@ export const parseDisplayEdgesWorkerRequest = (
   return { ...routeRequest, operation: 'route' };
 };
 
-const isBoundedCandidate = (value: unknown): value is BaseDisplayBoundedCandidateReport => {
-  if (!isRecord(value)) return false;
-  const quality = value.quality;
-  if (!((value.candidate === 'terminal-lane' || value.candidate === 'polished')
-    && typeof value.hardClean === 'boolean'
-    && typeof value.terminalsAttached === 'boolean'
-    && typeof value.terminalsAnchored === 'boolean'
-    && isFiniteNumber(value.obstacleHits)
-    && value.obstacleHits >= 0
-    && value.obstacleHits <= MAX_QUALITY_METRIC
-    && isRecord(quality))) return false;
-  const qualityKeys = Object.keys(quality);
-  if (
-    qualityKeys.length !== QUALITY_KEYS.length
-    || !qualityKeys.every(key => (QUALITY_KEYS as readonly string[]).includes(key))
-    || !QUALITY_KEYS.every((key) => {
-      const metric = quality[key];
-      return isFiniteNumber(metric) && metric >= 0 && metric <= MAX_QUALITY_METRIC;
-    })
-  ) return false;
-  const clearanceViolations = value.minimumClearanceViolations;
-  if (
-    typeof clearanceViolations !== 'undefined'
-    && (
-      !Number.isSafeInteger(clearanceViolations)
-      || (clearanceViolations as number) < 0
-      || (clearanceViolations as number) > DISPLAY_WORKER_MAX_GRAPH_ITEMS
-    )
-  ) return false;
-  const commercialClearanceViolations = value.commercialClearanceViolations;
-  if (
-    typeof commercialClearanceViolations !== 'undefined'
-    && (
-      !Number.isSafeInteger(commercialClearanceViolations)
-      || (commercialClearanceViolations as number) < 0
-      || (commercialClearanceViolations as number) > DISPLAY_WORKER_MAX_GRAPH_ITEMS
-    )
-  ) return false;
-  if ((commercialClearanceViolations as number | undefined) !== undefined
-    && (commercialClearanceViolations as number) > 0
-    && value.hardClean === true) return false;
-  const clearanceEdgeIds = value.minimumClearanceViolationEdgeIds;
-  if (
-    typeof clearanceEdgeIds !== 'undefined'
-    && (
-      !Array.isArray(clearanceEdgeIds)
-      || clearanceEdgeIds.length > 32
-      || !clearanceEdgeIds.every(edgeId => (
-        isBoundedString(edgeId, ROUTING_IDENTIFIER_MAX_LENGTH)
-      ))
-    )
-  ) return false;
-  const pairs = value.unrelatedOverlapPairs;
-  if (typeof pairs === 'undefined') return true;
-  return Array.isArray(pairs)
-    && pairs.length <= DISPLAY_WORKER_MAX_GRAPH_ITEMS
-    && pairs.every(pair => (
-      isRecord(pair)
-      && isBoundedString(pair.firstId, ROUTING_IDENTIFIER_MAX_LENGTH)
-      && isBoundedString(pair.secondId, ROUTING_IDENTIFIER_MAX_LENGTH)
-      && isFiniteNumber(pair.overlap)
-      && pair.overlap >= 0
-      && pair.overlap <= MAX_QUALITY_METRIC
-    ));
-};
-
 /** Validates a response before the main thread merges worker-owned geometry. */
 export const parseDisplayEdgesWorkerResponse = (
   value: unknown,
@@ -606,7 +523,7 @@ export const parseDisplayEdgesWorkerResponse = (
       || typeof value.sessionRef !== 'undefined'
       || typeof value.workerDurationMs !== 'undefined'
     ) return null;
-    return isBoundedCandidate(value.boundedCandidate)
+    return isDisplayWorkerBoundedCandidateReport(value.boundedCandidate)
       ? { requestId: expectedRequestId, boundedCandidate: value.boundedCandidate }
       : null;
   }
@@ -632,7 +549,7 @@ export const parseDisplayEdgesWorkerResponse = (
     : parseDisplayRoutingPhaseTrace(value.phaseTrace);
   const hardReport = typeof value.hardReport === 'undefined'
     ? undefined
-    : (isBoundedCandidate(value.hardReport) ? value.hardReport : null);
+    : (isDisplayWorkerBoundedCandidateReport(value.hardReport) ? value.hardReport : null);
   const workerDurationMs = typeof value.workerDurationMs === 'undefined'
     ? undefined
     : value.workerDurationMs;
