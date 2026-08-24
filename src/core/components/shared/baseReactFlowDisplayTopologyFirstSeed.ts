@@ -62,6 +62,14 @@ export const createDisplayTopologyFirstSeed = (
   topologyPlan: RoutingTopologyPlan,
 ): DisplayTopologyFirstSeedResult => {
   if (topologyPlan.groups.length === 0) return { edges, applied: false };
+  const topologyMemberIndexes = new Set(
+    topologyPlan.groups.flatMap(group => group.memberEdgeIndexes),
+  );
+  const topologyMembersAreLockedLayoutPaths = topologyMemberIndexes.size > 0
+    && [...topologyMemberIndexes].every(index => (
+      edges[index]?.data?.layoutPathLocked === true
+    ));
+  if (topologyMembersAreLockedLayoutPaths) return { edges, applied: false };
 
   const endpointEdges = repairDisplayEndpointOrthogonalPathsTwice(edges, nodes);
   const sourceTrunkEdges = synthesizeSharedEndpointTrunks(endpointEdges, { nodes });

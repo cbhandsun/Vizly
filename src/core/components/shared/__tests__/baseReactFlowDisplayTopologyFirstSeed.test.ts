@@ -30,6 +30,22 @@ const emptyPlan: RoutingTopologyPlan = {
   corridors: [],
 };
 
+const sharedPlan: RoutingTopologyPlan = {
+  ...emptyPlan,
+  groups: [{
+    kind: 'source',
+    endpointId: 'source',
+    side: 'right',
+    sector: 'e',
+    flowRole: 'neutral',
+    topologyPattern: 'o2m',
+    trunkMode: 'single',
+    laneDemand: 2,
+    memberEdgeIndexes: [0, 1],
+    dualRoleMemberIndexes: [],
+  }],
+};
+
 describe('baseReactFlowDisplayTopologyFirstSeed', () => {
   it('preserves exact input identity when the topology plan has no shared group', () => {
     const edges = [edge('first', 0), edge('second', 100)];
@@ -47,6 +63,19 @@ describe('baseReactFlowDisplayTopologyFirstSeed', () => {
 
     expect(displayTopologyFirstSeedDoesNotRegress(baseline, regressingCandidate)).toBe(false);
     expect(displayTopologyFirstSeedDoesNotRegress(baseline, baseline)).toBe(true);
+  });
+
+  it('does not replace a complete locked layout baseline with an optional topology seed', () => {
+    const lockedEdges = [edge('first', 0), edge('second', 100)].map(candidate => ({
+      ...candidate,
+      data: { ...candidate.data, layoutPathLocked: true },
+    }));
+
+    expect(createDisplayTopologyFirstSeed(lockedEdges, [], sharedPlan)).toEqual({
+      edges: lockedEdges,
+      applied: false,
+    });
+    expect(createDisplayTopologyFirstSeed(lockedEdges, [], sharedPlan).edges).toBe(lockedEdges);
   });
 
 });

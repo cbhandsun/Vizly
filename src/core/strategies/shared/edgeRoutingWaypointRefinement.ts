@@ -264,10 +264,16 @@ function scoreContainerBoundaryHug(segment: EdgeRoutingSegment, rect: EdgeRoutin
   return 0;
 }
 
-function buildNodeVisualContext(nodes: ReactFlowNode[]): {
+type NodeVisualContext = Readonly<{
   business: Array<{ id: string; rect: EdgeRoutingRect }>;
   containers: Array<{ id: string; rect: EdgeRoutingRect }>;
-} {
+}>;
+
+type EdgeVisualContext = NodeVisualContext & Readonly<{
+  relatedContainerIds: ReadonlySet<string>;
+}>;
+
+function buildNodeVisualContext(nodes: ReactFlowNode[]): NodeVisualContext {
   const business: Array<{ id: string; rect: EdgeRoutingRect }> = [];
   const containers: Array<{ id: string; rect: EdgeRoutingRect }> = [];
   for (const node of nodes) {
@@ -282,23 +288,30 @@ function buildNodeVisualContext(nodes: ReactFlowNode[]): {
   return { business, containers };
 }
 
-function scoreVisualSoftConstraints(
-  path: EdgeRoutingPoint[],
+function createEdgeVisualContext(
   edge: Edge,
-  nodes: ReactFlowNode[],
-  baseLength: number,
-): number {
-  const { business, containers } = buildNodeVisualContext(nodes);
-  const segments = toEdgeRoutingSegments(path);
-  const sourceRect = business.find(node => node.id === edge.source)?.rect;
-  const targetRect = business.find(node => node.id === edge.target)?.rect;
+  context: NodeVisualContext,
+): EdgeVisualContext {
+  const sourceRect = context.business.find(node => node.id === edge.source)?.rect;
+  const targetRect = context.business.find(node => node.id === edge.target)?.rect;
   const relatedContainerIds = new Set<string>();
-  for (const container of containers) {
+  for (const container of context.containers) {
     if ((sourceRect && pointInRect(rectCenter(sourceRect), container.rect))
       || (targetRect && pointInRect(rectCenter(targetRect), container.rect))) {
       relatedContainerIds.add(container.id);
     }
   }
+  return { ...context, relatedContainerIds };
+}
+
+function scoreVisualSoftConstraints(
+  path: EdgeRoutingPoint[],
+  edge: Edge,
+  context: EdgeVisualContext,
+  baseLength: number,
+): number {
+  const { business, containers, relatedContainerIds } = context;
+  const segments = toEdgeRoutingSegments(path);
 
   let score = 0;
   for (const segment of segments) {
@@ -349,10 +362,10 @@ function pathLength(points: EdgeRoutingPoint[]): number {
 
 function scorePathCandidate(
   path: EdgeRoutingPoint[],
-  acceptedPaths: EdgeRoutingPoint[][],
-  originalPaths: EdgeRoutingPoint[][],
+  acceptedSegments: readonly EdgeRoutingSegment[][],
+  originalSegments: readonly EdgeRoutingSegment[][],
   edge: Edge,
-  nodes: ReactFlowNode[],
+  visualContext: EdgeVisualContext,
   obstacles: Map<string, EdgeRoutingRect>,
   baseLength: number,
 ): number {
@@ -360,18 +373,18 @@ function scorePathCandidate(
   let crossingsAccepted = 0;
   let crossingsAll = 0;
   let overlap = 0;
-  for (const otherPath of acceptedPaths) {
+  for (const otherSegments of acceptedSegments) {
     for (const first of segments) {
-      for (const second of toEdgeRoutingSegments(otherPath)) {
+      for (const second of otherSegments) {
         const relation = edgeRoutingSegmentRelation(first, second);
         crossingsAccepted += relation.crossings;
         overlap += relation.overlap;
       }
     }
   }
-  for (const otherPath of originalPaths) {
+  for (const otherSegments of originalSegments) {
     for (const first of segments) {
-      for (const second of toEdgeRoutingSegments(otherPath)) {
+      for (const second of otherSegments) {
         const relation = edgeRoutingSegmentRelation(first, second);
         crossingsAll += relation.crossings;
         overlap += relation.overlap * 0.25;
@@ -388,7 +401,7 @@ function scorePathCandidate(
     + crossingsAccepted * 2600
     + crossingsAll * 360
     + overlap * 12
-    + scoreVisualSoftConstraints(path, edge, nodes, baseLength)
+    + scoreVisualSoftConstraints(path, edge, visualContext, baseLength)
     + bends * 10
     + length * 0.015
     + detour * 0.08;
@@ -413,6 +426,12 @@ export function reduceEdgeCrossingsWithWaypoints(
     if (path.length >= 2) originalPathsById.set(edge.id, path);
   }
   if (originalPathsById.size < 1) return edges;
+  const originalSegmentsById = new Map(
+    [...originalPathsById].map(([edgeId, path]) => (
+      [edgeId, toEdgeRoutingSegments(path)] as const
+    )),
+  );
+  const nodeVisualContext = buildNodeVisualContext(nodes);
   const buddyGroups = buildPipelineBuddyGroups(edges);
   const topologyStats = buildEdgeTopologyStats(edges);
 
@@ -429,7 +448,7 @@ export function reduceEdgeCrossingsWithWaypoints(
       return pathLength(first.path) - pathLength(second.path);
     });
 
-  const acceptedPaths: EdgeRoutingPoint[][] = [];
+  const acceptedSegments: EdgeRoutingSegment[][] = [];
   const chosenPaths = new Map<string, EdgeRoutingPoint[]>();
   let processedCandidateEdges = 0;
 
@@ -438,25 +457,26 @@ export function reduceEdgeCrossingsWithWaypoints(
     const hasSoftRisk = pathHasVisualComplexityRisk(path);
     if (options.onlyNodeRiskEdges && !hasNodeRisk) {
       chosenPaths.set(edge.id, path);
-      acceptedPaths.push(path);
+      acceptedSegments.push(originalSegmentsById.get(edge.id) ?? toEdgeRoutingSegments(path));
       continue;
     }
     if (options.onlySoftRiskEdges && !hasNodeRisk && !hasSoftRisk) {
       chosenPaths.set(edge.id, path);
-      acceptedPaths.push(path);
+      acceptedSegments.push(originalSegmentsById.get(edge.id) ?? toEdgeRoutingSegments(path));
       continue;
     }
     if (options.maxCandidateEdges && processedCandidateEdges >= options.maxCandidateEdges) {
       chosenPaths.set(edge.id, path);
-      acceptedPaths.push(path);
+      acceptedSegments.push(originalSegmentsById.get(edge.id) ?? toEdgeRoutingSegments(path));
       continue;
     }
     processedCandidateEdges += 1;
 
-    const others = Array.from(originalPathsById.entries())
+    const otherSegments = Array.from(originalSegmentsById.entries())
       .filter(([id]) => id !== edge.id)
-      .map(([, otherPath]) => otherPath);
+      .map(([, segments]) => segments);
     const baseLength = pathLength(path);
+    const edgeVisualContext = createEdgeVisualContext(edge, nodeVisualContext);
     const candidates = generateWaypointCandidates(path, layoutDirection, nodes, edge, {
       includeNodeAwareLanes: hasSoftRisk,
       preferredAxes: options.preferredAxes,
@@ -464,10 +484,10 @@ export function reduceEdgeCrossingsWithWaypoints(
     let bestPath = path;
     let bestScore = scorePathCandidate(
       path,
-      acceptedPaths,
-      others,
+      acceptedSegments,
+      otherSegments,
       edge,
-      nodes,
+      edgeVisualContext,
       obstacles,
       baseLength,
     );
@@ -478,10 +498,10 @@ export function reduceEdgeCrossingsWithWaypoints(
       if (candidateObstacleHits > bestObstacleHits) continue;
       const score = scorePathCandidate(
         candidate,
-        acceptedPaths,
-        others,
+        acceptedSegments,
+        otherSegments,
         edge,
-        nodes,
+        edgeVisualContext,
         obstacles,
         baseLength,
       );
@@ -492,7 +512,11 @@ export function reduceEdgeCrossingsWithWaypoints(
       }
     }
     chosenPaths.set(edge.id, bestPath);
-    acceptedPaths.push(bestPath);
+    acceptedSegments.push(
+      bestPath === path
+        ? originalSegmentsById.get(edge.id) ?? toEdgeRoutingSegments(bestPath)
+        : toEdgeRoutingSegments(bestPath),
+    );
   }
 
   const reduced = edges.map(edge => {
