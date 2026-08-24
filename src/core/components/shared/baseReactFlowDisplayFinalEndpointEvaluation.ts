@@ -10,6 +10,11 @@ import { countRenderUnsafeEndpointStubs } from './baseReactFlowDisplayEndpointSt
 import { createBaseDisplayHardGateMemo } from './baseReactFlowDisplayHardGateMemo';
 import { createDisplayTerminalValidationSnapshot } from './baseReactFlowTerminalValidation';
 import { getDisplayTerminalValidationReport } from './baseReactFlowTerminalValidation';
+import { computeBaseReactFlowDisplayOutputRouteSignature } from './baseReactFlowDisplayCache';
+import {
+  createBaseReactFlowChangedHardReportEvaluation,
+  type BaseReactFlowChangedHardReportEvaluation,
+} from './baseReactFlowDisplayChangedHardReport';
 
 export type BaseReactFlowFinalEndpointEvaluation = Readonly<{
   nodes: Node[];
@@ -17,6 +22,11 @@ export type BaseReactFlowFinalEndpointEvaluation = Readonly<{
   hardReport: (edges: readonly Edge[]) => ReturnType<
     ReturnType<typeof createBaseDisplayHardGateMemo>['getReport']
   >;
+  hardReportChanged: (
+    baselineEdges: readonly Edge[],
+    candidateEdges: readonly Edge[],
+    changedEdgeIndexes: readonly number[],
+  ) => ReturnType<ReturnType<typeof createBaseDisplayHardGateMemo>['getReport']>;
   passageOrder: (edges: readonly Edge[]) => ReturnType<typeof auditFinalSameSidePassageOrder>;
   rememberHardReport: (
     edges: readonly Edge[],
@@ -75,6 +85,16 @@ export const createBaseReactFlowFinalEndpointEvaluation = (
     ReturnType<typeof getDisplayTerminalValidationReport>
   >();
   const unsafeStubsByEdges = new WeakMap<readonly Edge[], number>();
+  const changedHardReportByBaseline = new WeakMap<
+    readonly Edge[],
+    Readonly<{
+      routeSignature: string;
+      evaluation: BaseReactFlowChangedHardReportEvaluation;
+    }>
+  >();
+  let changedHardReportEvaluationCount = 0;
+  let changedHardReportScannedNodeCount = 0;
+  let changedHardReportScannedEdgePairCount = 0;
 
   return {
     nodes,
@@ -92,6 +112,48 @@ export const createBaseReactFlowFinalEndpointEvaluation = (
     },
     hardReport(edges) {
       return hardGateMemo.getReport(edges.slice(), nodes, 'polished');
+    },
+    hardReportChanged(baselineEdges, candidateEdges, changedEdgeIndexes) {
+      const remembered = hardGateMemo.getRememberedReport(candidateEdges, 'polished');
+      if (remembered) return remembered;
+      const routeSignature = computeBaseReactFlowDisplayOutputRouteSignature([...baselineEdges]);
+      if (!routeSignature) return hardGateMemo.getReport(candidateEdges.slice(), nodes, 'polished');
+      const cached = changedHardReportByBaseline.get(baselineEdges);
+      const reusesEvaluation = cached?.routeSignature === routeSignature;
+      const evaluation = reusesEvaluation
+        ? cached.evaluation
+        : createBaseReactFlowChangedHardReportEvaluation(
+          [...baselineEdges],
+          nodes,
+          terminalSnapshot,
+        );
+      if (cached?.routeSignature !== routeSignature) {
+        changedHardReportByBaseline.set(baselineEdges, { routeSignature, evaluation });
+      }
+      const before = reusesEvaluation
+        ? evaluation.readMetrics()
+        : { evaluationCount: 0, scannedNodeCount: 0, scannedEdgePairCount: 0 };
+      const report = evaluation.evaluate(
+        [...candidateEdges],
+        changedEdgeIndexes,
+        'polished',
+      );
+      const after = evaluation.readMetrics();
+      changedHardReportEvaluationCount += Math.max(
+        0,
+        after.evaluationCount - before.evaluationCount,
+      );
+      changedHardReportScannedNodeCount += Math.max(
+        0,
+        after.scannedNodeCount - before.scannedNodeCount,
+      );
+      changedHardReportScannedEdgePairCount += Math.max(
+        0,
+        after.scannedEdgePairCount - before.scannedEdgePairCount,
+      );
+      if (!report) return hardGateMemo.getReport(candidateEdges.slice(), nodes, 'polished');
+      hardGateMemo.rememberReport(candidateEdges, report);
+      return report;
     },
     passageOrder(edges) {
       const cached = passageOrderByEdges.get(edges);
@@ -129,10 +191,14 @@ export const createBaseReactFlowFinalEndpointEvaluation = (
     readMetrics() {
       const hardGateMetrics = hardGateMemo.readMetrics();
       return {
-        evaluationCount: evaluationCount + hardGateMetrics.evaluationCount,
+        evaluationCount: evaluationCount
+          + hardGateMetrics.evaluationCount
+          + changedHardReportEvaluationCount,
         cacheHitCount: cacheHitCount + hardGateMetrics.cacheHitCount,
-        scannedNodeCount: hardGateMetrics.scannedNodeCount,
-        scannedEdgePairCount: hardGateMetrics.scannedEdgePairCount,
+        scannedNodeCount: hardGateMetrics.scannedNodeCount
+          + changedHardReportScannedNodeCount,
+        scannedEdgePairCount: hardGateMetrics.scannedEdgePairCount
+          + changedHardReportScannedEdgePairCount,
       };
     },
   };

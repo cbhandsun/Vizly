@@ -242,6 +242,12 @@ export type EdgePathQualityEvaluationContext = {
   ) => EdgePathQualityEvaluationState;
 };
 
+export type EdgePathQualityEvaluationInitializationMetrics = {
+  cacheHit: boolean;
+  scannedEdgePairCount: number;
+  scannedSegmentCount: number;
+};
+
 const MAX_INCREMENTAL_QUALITY_EDGE_CHANGES = 8;
 const qualityEvaluationContextCache = new WeakMap<Edge[], {
   signature: string;
@@ -255,10 +261,18 @@ const qualityEvaluationContextCache = new WeakMap<Edge[], {
  */
 export function createEdgePathQualityEvaluationContext(
   baseline: Edge[],
+  initializationMetrics?: EdgePathQualityEvaluationInitializationMetrics,
 ): EdgePathQualityEvaluationContext {
   const baselineSnapshot = buildQualityInputSnapshot(baseline);
   const cached = qualityEvaluationContextCache.get(baseline);
-  if (cached?.signature === baselineSnapshot.signature) return cached.context;
+  if (cached?.signature === baselineSnapshot.signature) {
+    if (initializationMetrics) {
+      initializationMetrics.cacheHit = true;
+      initializationMetrics.scannedEdgePairCount = 0;
+      initializationMetrics.scannedSegmentCount = 0;
+    }
+    return cached.context;
+  }
 
   const metrics = {
     pairCacheHitCount: 0,
@@ -697,6 +711,11 @@ export function createEdgePathQualityEvaluationContext(
     signature: baselineSnapshot.signature,
     context,
   });
+  if (initializationMetrics) {
+    initializationMetrics.cacheHit = false;
+    initializationMetrics.scannedEdgePairCount = metrics.scannedEdgePairCount;
+    initializationMetrics.scannedSegmentCount = metrics.scannedSegmentCount;
+  }
   return context;
 }
 

@@ -16,6 +16,10 @@ type HardGateEvaluator = (
 
 export type BaseDisplayHardGateMemo = {
   getReport: HardGateEvaluator;
+  getRememberedReport: (
+    edges: readonly Edge[],
+    candidate: BaseDisplayBoundedCandidateReport['candidate'],
+  ) => BaseDisplayBoundedCandidateReport | undefined;
   rememberReport: (
     edges: readonly Edge[],
     report: BaseDisplayBoundedCandidateReport,
@@ -46,6 +50,14 @@ export const createBaseDisplayHardGateMemo = (
   let scannedEdgePairCount = 0;
 
   return {
+    getRememberedReport(edges, candidate) {
+      const routeSignature = computeBaseReactFlowDisplayOutputRouteSignature([...edges]);
+      if (!routeSignature) return undefined;
+      const cached = reportByRoute.get(routeSignature);
+      if (!cached) return undefined;
+      cacheHitCount += 1;
+      return cached.candidate === candidate ? cached : { ...cached, candidate };
+    },
     rememberReport(edges, report) {
       const routeSignature = computeBaseReactFlowDisplayOutputRouteSignature([...edges]);
       if (!routeSignature) return false;

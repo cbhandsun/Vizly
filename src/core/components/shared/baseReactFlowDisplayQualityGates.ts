@@ -28,7 +28,7 @@ type DisplayEpochNode = Node & {
   positionAbsolute?: { x: number; y: number };
 };
 
-const evaluateDisplayTerminalHardGates = (
+export const evaluateDisplayTerminalHardGates = (
   edges: Edge[],
   nodes: Node[],
   snapshot = createDisplayTerminalValidationSnapshot(nodes),

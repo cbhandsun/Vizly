@@ -127,6 +127,42 @@ describe('createBaseReactFlowFinalEndpointEvaluation', () => {
     expect(evaluation.hardReport(candidate)).not.toBe(evaluation.hardReport(edges));
   });
 
+  it('keeps changed-index hard reports in exact parity with a full evaluation', () => {
+    const candidate: Edge[] = edges.map((edge, index) => index === 0 ? {
+      ...edge,
+      data: {
+        ...edge.data,
+        computedPath: [
+          { x: 50, y: 60 },
+          { x: 80, y: 60 },
+          { x: 80, y: 220 },
+          { x: 50, y: 220 },
+        ],
+      },
+    } : edge);
+    const incremental = createBaseReactFlowFinalEndpointEvaluation(nodes);
+    const full = createBaseReactFlowFinalEndpointEvaluation(nodes);
+
+    expect(incremental.hardReportChanged(edges, candidate, [0]))
+      .toEqual(full.hardReport(candidate));
+    expect(incremental.hardReport(candidate))
+      .toBe(incremental.hardReportChanged(edges, candidate, [0]));
+    expect(incremental.readMetrics().evaluationCount).toBeGreaterThan(0);
+  });
+
+  it('falls back to a full hard report when immutable changes are not fully declared', () => {
+    const candidate = edges.map(edge => ({
+      ...edge,
+      data: { ...edge.data },
+    }));
+    const incremental = createBaseReactFlowFinalEndpointEvaluation(nodes);
+    const full = createBaseReactFlowFinalEndpointEvaluation(nodes);
+
+    expect(incremental.hardReportChanged(edges, candidate, [0]))
+      .toEqual(full.hardReport(candidate));
+    expect(incremental.readMetrics()).toMatchObject({ evaluationCount: 1 });
+  });
+
   it('primes only the exact route signature with existing hard-gate evidence', () => {
     const sourceEvaluation = createBaseReactFlowFinalEndpointEvaluation(nodes);
     const report = sourceEvaluation.hardReport(edges);

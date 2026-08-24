@@ -53,7 +53,11 @@ const passesBaseReactFlowFinalDisplayHardQualityGate = (
     > evaluation.unsafeEndpointStubs(baselineEdges)
   ) return false;
   const baselineReport = evaluation.hardReport(baselineEdges);
-  const candidateReport = evaluation.hardReport(candidateEdges);
+  const candidateReport = evaluation.hardReportChanged(
+    baselineEdges,
+    candidateEdges,
+    changedEdgeIndexes,
+  );
   if (
     baselineReport.hardClean
     && !commercialEdgeDetoursDoNotRegress(

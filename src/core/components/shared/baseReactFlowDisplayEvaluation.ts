@@ -316,6 +316,11 @@ type CachedDisplayObstacleEvaluationContext = {
   context: DisplayObstacleEvaluationContext;
 };
 
+export type DisplayObstacleEvaluationInitializationMetrics = {
+  cacheHit: boolean;
+  scannedNodeCount: number;
+};
+
 // Both keys are weak and each live (edges, nodes) pair retains only its latest
 // exact input signature, so repeated routing stages can reuse analysis without
 // keeping prior graph snapshots alive.
@@ -331,6 +336,7 @@ const displayObstacleEdgesSignature = (edges: Edge[]): string => JSON.stringify(
 export const createDisplayObstacleEvaluationContext = (
   baseline: Edge[],
   nodes: Node[],
+  initializationMetrics?: DisplayObstacleEvaluationInitializationMetrics,
 ): DisplayObstacleEvaluationContext => {
   const edgeSignature = displayObstacleEdgesSignature(baseline);
   const hitContext = createDisplayObstacleHitContext(nodes);
@@ -340,8 +346,15 @@ export const createDisplayObstacleEvaluationContext = (
   if (
     cached?.edgeSignature === edgeSignature
     && cached.nodeSignature === nodeSignature
-  ) return cached.context;
+  ) {
+    if (initializationMetrics) {
+      initializationMetrics.cacheHit = true;
+      initializationMetrics.scannedNodeCount = 0;
+    }
+    return cached.context;
+  }
 
+  const hitMetricsBefore = hitContext.readMetrics();
   const baselineSignatures = baseline.map(displayObstacleEdgeSignature);
   const baselineHits = baseline.map(edge => countDisplayEdgeObstacleHits(edge, hitContext));
   const baselineTotal = baselineHits.reduce((total, hits) => total + hits, 0);
@@ -415,6 +428,13 @@ export const createDisplayObstacleEvaluationContext = (
     ?? new WeakMap<Node[], CachedDisplayObstacleEvaluationContext>();
   nextCachedByNodes.set(nodes, { edgeSignature, nodeSignature, context });
   if (!cachedByNodes) displayObstacleEvaluationContextCache.set(baseline, nextCachedByNodes);
+  if (initializationMetrics) {
+    initializationMetrics.cacheHit = false;
+    initializationMetrics.scannedNodeCount = Math.max(
+      0,
+      hitContext.readMetrics().scannedNodeCount - hitMetricsBefore.scannedNodeCount,
+    );
+  }
   return context;
 };
 
