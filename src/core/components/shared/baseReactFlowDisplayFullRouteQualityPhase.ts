@@ -230,11 +230,17 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
     edges: endpointLaneNudgedEdges,
     phase: 'quality-crossing-global-refine-initial',
   });
-  const finalGloballyRefinedEdges = globalRefineSession.run({
-    edges: globallyRefinedEdges,
+  const globalFixedPointTimer = startDisplayRoutingPhaseTrace({
     phase: 'quality-crossing-global-refine-fixed-point',
-    normalize: false,
+    candidateCount: globallyRefinedEdges.length,
+    onTrace: recordCrossingPhaseTrace,
   });
+  // The global refinement kernel already performs two bounded passes over the
+  // complete route. Later defect-specific global passes run after dogleg,
+  // shared-trunk, and lane mutations, so an immediate third pass here repeats
+  // the same unchanged search space without closing a new defect family.
+  const finalGloballyRefinedEdges = globallyRefinedEdges;
+  globalFixedPointTimer.finish('skip');
   const initialDoglegTimer = startDisplayRoutingPhaseTrace({
     phase: 'quality-crossing-global-refine-dogleg-initial',
     candidateCount: finalGloballyRefinedEdges.length,

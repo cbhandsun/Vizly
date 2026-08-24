@@ -380,6 +380,18 @@ describe('baseReactFlowDisplayEdges logistics regressions', () => {
       phaseTraces.find(trace => trace.phase === 'post-render-residual'),
       JSON.stringify({ quality, phaseTraces }, null, 2),
     ).toMatchObject({ resolution: 'skip' });
+    expect(
+      phaseTraces.find(
+        trace => trace.phase === 'quality-crossing-global-refine-fixed-point',
+      ),
+      JSON.stringify({ quality, phaseTraces }, null, 2),
+    ).toMatchObject({
+      resolution: 'skip',
+      evaluationCount: 0,
+      scannedNodeCount: 0,
+      scannedSegmentCount: 0,
+      scannedEdgePairCount: 0,
+    });
     expect(durationMs, JSON.stringify({ quality, phaseTraces, paths }, null, 2)).toBeLessThan(3_000);
   }, 30_000);
 
