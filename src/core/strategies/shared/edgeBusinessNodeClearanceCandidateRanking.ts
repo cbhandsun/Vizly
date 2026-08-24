@@ -54,9 +54,20 @@ const canReplace = <T>(
 export const rankBusinessNodeClearanceCandidates = <T>(
   candidates: readonly BusinessNodeClearanceCandidateRank<T>[],
   baseline: BusinessNodeClearanceBaselineRank,
-): BusinessNodeClearanceCandidateRank<T>[] => {
+): BusinessNodeClearanceCandidateRank<T>[] => [
+  ...iterateBusinessNodeClearanceCandidates(candidates, baseline),
+];
+
+/**
+ * Lazily yields the same winner sequence as the complete ranker. Consumers
+ * that accept an early candidate avoid ranking alternatives that can no longer
+ * affect the committed route.
+ */
+export function* iterateBusinessNodeClearanceCandidates<T>(
+  candidates: readonly BusinessNodeClearanceCandidateRank<T>[],
+  baseline: BusinessNodeClearanceBaselineRank,
+): Generator<BusinessNodeClearanceCandidateRank<T>, void, undefined> {
   const remaining = [...candidates];
-  const ranked: BusinessNodeClearanceCandidateRank<T>[] = [];
   while (remaining.length > 0) {
     let best: BusinessNodeClearanceCandidateRank<T> = {
       candidate: remaining[0].candidate,
@@ -73,8 +84,7 @@ export const rankBusinessNodeClearanceCandidates = <T>(
       bestIndex = index;
     }
     if (bestIndex < 0) break;
-    ranked.push(best);
     remaining.splice(bestIndex, 1);
+    yield best;
   }
-  return ranked;
-};
+}

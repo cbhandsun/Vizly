@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  iterateBusinessNodeClearanceCandidates,
   rankBusinessNodeClearanceCandidates,
   type BusinessNodeClearanceCandidateRank,
 } from '../edgeBusinessNodeClearanceCandidateRanking';
@@ -40,5 +41,32 @@ describe('rankBusinessNodeClearanceCandidates', () => {
     ], { hits: 1, commercialRisk: 10, risk: 10 });
 
     expect(ranked.map(entry => entry.candidate)).toEqual(['first', 'second']);
+  });
+
+  it('does not rank unused alternatives after an accepted first winner', () => {
+    let candidateReads = 0;
+    const candidates = [
+      candidate('first', { hits: 0, commercialRisk: 0, risk: 0 }),
+      candidate('second', { hits: 0, commercialRisk: 1, risk: 1 }),
+      candidate('third', { hits: 0, commercialRisk: 2, risk: 2 }),
+    ].map(entry => ({
+      ...entry,
+      get hits() {
+        candidateReads += 1;
+        return entry.hits;
+      },
+    }));
+    const iterator = iterateBusinessNodeClearanceCandidates(candidates, {
+      hits: 1,
+      commercialRisk: 10,
+      risk: 10,
+    });
+
+    expect(iterator.next().value?.candidate).toBe('first');
+    const readsAfterFirstWinner = candidateReads;
+    iterator.return();
+
+    expect(readsAfterFirstWinner).toBeGreaterThan(0);
+    expect(candidateReads).toBe(readsAfterFirstWinner);
   });
 });

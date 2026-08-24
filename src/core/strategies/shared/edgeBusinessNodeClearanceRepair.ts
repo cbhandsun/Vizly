@@ -1,7 +1,7 @@
 import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
 
 import type { EdgePathQualityScore } from './edgePathQualityGeometry';
-import { rankBusinessNodeClearanceCandidates } from './edgeBusinessNodeClearanceCandidateRanking';
+import { iterateBusinessNodeClearanceCandidates } from './edgeBusinessNodeClearanceCandidateRanking';
 import {
   createEdgePathQualityEvaluationContext,
 } from './edgeStrictCrossingGuard';
@@ -686,7 +686,7 @@ export const repairBusinessNodeClearanceRisks = (
         COMMERCIAL_BUSINESS_NODE_CLEARANCE,
       );
       const baselineHits = obstacleContext.countUnrelatedObstacleHits(path);
-      const rankedCandidates = rankBusinessNodeClearanceCandidates(
+      const rankedCandidates = iterateBusinessNodeClearanceCandidates(
         clearanceCandidates(path, nodes, edge, minimumClearance).map(candidatePath => ({
           candidate: candidatePath,
           risk: clearanceContext.score(candidatePath, minimumClearance),
