@@ -104,6 +104,7 @@ function findBestLocalDoglegCandidate(
   targetRect: Rect | null,
   obstacleContext: EdgeObstacleInteractionContext,
   qualityContext: EdgePathQualityEvaluationContext,
+  qualityByCandidatePath: Map<string, EdgePathQualityScore>,
   interactionContext = createEdgePathInteractionContext(edgeKey, pathByEdgeKey),
   diagnostics?: LocalDoglegRepairDiagnostics,
 ): Point[] | null {
@@ -117,7 +118,19 @@ function findBestLocalDoglegCandidate(
   const currentObstacleHits = obstacleContext.countPathHits(path);
   const currentEdges = edgesWithCurrentPaths(edges, edgeKeys, pathByEdgeKey, { index: edgeIndex, path });
   const candidateBuffer = createChangedEdgePathEvaluationBuffer(currentEdges, edgeIndex);
-  const currentQuality = qualityContext.evaluateChanged(currentEdges, [edgeIndex]);
+  const currentPathKey = exactCandidatePathKey(path);
+  let currentQuality = currentPathKey === null
+    ? undefined
+    : qualityByCandidatePath.get(currentPathKey);
+  if (currentQuality) {
+    if (diagnostics) diagnostics.cacheHitCount += 1;
+  } else {
+    currentQuality = qualityContext.evaluateChanged(currentEdges, [edgeIndex]);
+    if (
+      currentPathKey !== null
+      && qualityByCandidatePath.size < MAX_LOCAL_QUALITY_CACHE_ENTRIES
+    ) qualityByCandidatePath.set(currentPathKey, currentQuality);
+  }
   let bestPath: Point[] | null = null;
   let bestLength = currentLength;
   let bestBends = currentBends;
@@ -127,8 +140,6 @@ function findBestLocalDoglegCandidate(
   let bestTerminalStubScore = terminalStubScore(path);
   let bestVisualNoise = localVisualNoise(path);
   let bestQuality = currentQuality;
-  const qualityByCandidatePath = new Map<string, EdgePathQualityScore>();
-
   const tryCandidate = (candidate: Point[] | null, options: { preserveEndpoints?: boolean } = {}) => {
     if (!candidate) return;
     candidateCount += 1;
@@ -324,6 +335,7 @@ function repairPath(
   targetRect: Rect | null,
   obstacleContext: EdgeObstacleInteractionContext,
   qualityContext: EdgePathQualityEvaluationContext,
+  qualityByCandidatePath: Map<string, EdgePathQualityScore>,
   diagnostics?: LocalDoglegRepairDiagnostics,
 ): Point[] {
   let current = compactPath(path);
@@ -343,6 +355,7 @@ function repairPath(
       targetRect,
       obstacleContext,
       qualityContext,
+      qualityByCandidatePath,
       interactionContext,
       diagnostics,
     );
@@ -562,6 +575,7 @@ export function repairLocalDoglegArtifacts(
     const obstacleContext = createEdgeObstacleInteractionContext(edge, obstacles);
     const qualityBaselineEdges = edgesWithCurrentPaths(edges, edgeKeys, pathByEdgeKey);
     const qualityContext = createEdgePathQualityEvaluationContext(qualityBaselineEdges);
+    const qualityByCandidatePath = new Map<string, EdgePathQualityScore>();
     const repaired = repairPath(
       path,
       edge,
@@ -575,6 +589,7 @@ export function repairLocalDoglegArtifacts(
       targetRect,
       obstacleContext,
       qualityContext,
+      qualityByCandidatePath,
       diagnostics,
     );
     let finalRepaired = repairRemainingTinyArtifactsWithMaze(
@@ -606,6 +621,7 @@ export function repairLocalDoglegArtifacts(
         targetRect,
         obstacleContext,
         qualityContext,
+        qualityByCandidatePath,
         diagnostics,
       );
     }
