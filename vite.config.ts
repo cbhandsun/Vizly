@@ -15,6 +15,7 @@ import {
   matchesFlowchartDesignerStartupModule,
   matchesFlowchartDesignerMicroModule,
   matchesFlowchartRuntimeModule,
+  productionChunkFileNames,
 } from './vite-plugins/buildChunkGroups'
 import { createDisplayRoutingChunkClassifier } from './vite-plugins/displayRoutingChunkClassifier'
 import coverageThresholds from './scripts/coverage-thresholds.json'
@@ -379,6 +380,7 @@ export default defineConfig({
     chunkSizeWarningLimit: 1500,
     rollupOptions: {
       output: {
+        chunkFileNames: productionChunkFileNames,
         codeSplitting: {
           groups: [
             {

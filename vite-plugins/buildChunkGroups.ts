@@ -123,3 +123,14 @@ export const matchesFlowchartDesignerMicroModule = (id: string): boolean => {
   const normalized = normalizeModuleId(id).split('?', 1)[0];
   return [...FLOWCHART_DESIGNER_MICRO_MODULES].some(suffix => normalized.endsWith(suffix));
 };
+
+/**
+ * Preserve diagnostic names for production workers and routing chunks while
+ * keeping ordinary lazy import specifiers compact. Content hashes remain the
+ * cache identity in both cases.
+ */
+export const productionChunkFileNames = (chunk: { name: string }): string => (
+  chunk.name.includes('worker') || chunk.name.startsWith('display-routing')
+    ? 'assets/[name]-[hash].js'
+    : 'assets/c-[hash].js'
+);

@@ -14,6 +14,7 @@ import {
   matchesFlowchartDesignerStartupModule,
   matchesFlowchartDesignerMicroModule,
   matchesFlowchartRuntimeModule,
+  productionChunkFileNames,
 } from '../../../../vite-plugins/buildChunkGroups';
 import {
   classifyDisplayRoutingChunkGraph,
@@ -142,6 +143,15 @@ describe('display routing chunk classifier', () => {
 });
 
 describe('sharedModuleWorkers Vite plugin', () => {
+  it('keeps diagnostic routing chunk names while compacting ordinary lazy chunks', () => {
+    expect(productionChunkFileNames({ name: 'baseReactFlowDisplayEdges.worker' }))
+      .toBe('assets/[name]-[hash].js');
+    expect(productionChunkFileNames({ name: 'display-routing-shared' }))
+      .toBe('assets/[name]-[hash].js');
+    expect(productionChunkFileNames({ name: 'FlowchartDesigner' }))
+      .toBe('assets/c-[hash].js');
+  });
+
   it.each([
     'consoleCleanup.ts',
     'logSecurity.ts',
