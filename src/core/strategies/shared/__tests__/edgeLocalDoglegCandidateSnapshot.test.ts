@@ -4,9 +4,11 @@ import { describe, expect, it } from 'vitest';
 import {
   bendCount,
   compactPath,
+  countTinyInteriorSegments,
   createEdgeObstacleInteractionContext,
   createLocalDoglegCandidateSnapshot,
   getRoutingObstacles,
+  hasTinyInteriorSegment,
   pathLength,
   segmentIntersectsRect,
   toSegments,
@@ -39,6 +41,31 @@ function expectSnapshotParity(input: Point[]): void {
 }
 
 describe('local dogleg candidate snapshots', () => {
+  it('counts only finite orthogonal tiny interior segments', () => {
+    expect(countTinyInteriorSegments([])).toBe(0);
+    expect(countTinyInteriorSegments([
+      { x: 0, y: 0 },
+      { x: 0, y: 80 },
+      { x: 8, y: 80 },
+      { x: 8, y: 140 },
+      { x: 80, y: 140 },
+      { x: 80, y: 200 },
+    ])).toBe(1);
+    expect(countTinyInteriorSegments([
+      { x: 0, y: 0 },
+      { x: 0, y: 80 },
+      { x: 20, y: 100 },
+      { x: 20, y: 140 },
+      { x: Number.NaN, y: 140 },
+    ])).toBe(0);
+    expect(hasTinyInteriorSegment([
+      { x: 0, y: 0 },
+      { x: 0, y: 80 },
+      { x: 8, y: 80 },
+      { x: 8, y: 140 },
+    ])).toBe(true);
+  });
+
   it('matches the legacy geometry for empty, invalid, and mixed-axis paths', () => {
     expectSnapshotParity([]);
     expectSnapshotParity([{ x: 0, y: 0 }]);

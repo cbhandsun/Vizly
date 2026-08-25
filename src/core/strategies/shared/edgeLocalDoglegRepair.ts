@@ -37,6 +37,7 @@ import {
   axisOf,
   bendCount,
   compactPath,
+  countTinyInteriorSegments,
   createChangedEdgePathEvaluationBuffer,
   createEdgeObstacleInteractionContext,
   createEdgePathInteractionContext,
@@ -139,6 +140,8 @@ function findBestLocalDoglegCandidate(
   let bestObstacleHits = currentObstacleHits;
   let bestTerminalStubScore = terminalStubScore(path);
   let bestVisualNoise = localVisualNoise(path);
+  const currentTinyInteriorSegments = countTinyInteriorSegments(path);
+  let bestTinyInteriorSegments = currentTinyInteriorSegments;
   let bestQuality = currentQuality;
   const tryCandidate = (candidate: Point[] | null, options: { preserveEndpoints?: boolean } = {}) => {
     if (!candidate) return;
@@ -161,6 +164,39 @@ function findBestLocalDoglegCandidate(
       Math.min(currentCrossings, bestCrossings),
     );
     if (crossings > currentCrossings || crossings > bestCrossings) return;
+    const parallelOverlap = interactionContext.countParallelOverlap(snapshot.segments);
+    const stubScore = terminalStubScore(normalized);
+    const visualNoise = localVisualNoise(normalized);
+    const tinyInteriorSegments = countTinyInteriorSegments(normalized);
+    const fewerCrossings = crossings < bestCrossings;
+    const fewerParallelOverlap = parallelOverlap < bestParallelOverlap;
+    const fewerObstacleHits = obstacleHits < bestObstacleHits;
+    const shorter = length < bestLength - MIN_LENGTH_SAVING;
+    const simpler = bends < bestBends && length <= bestLength + MIN_LENGTH_SAVING;
+    const visuallyCleaner = visualNoise < bestVisualNoise
+      && bends <= bestBends + 2
+      && length <= bestLength + MAX_VISUAL_POLISH_LENGTH_PENALTY;
+    const hardTinyCleanup = bestVisualNoise > 0
+      && visualNoise < bestVisualNoise
+      && bends <= bestBends + 2
+      && length <= bestLength + MAX_TINY_CLEANUP_LENGTH_PENALTY;
+    const fewerTinyDoglegs = tinyInteriorSegments < bestTinyInteriorSegments
+      && bends <= bestBends + 4
+      && length <= bestLength + MAX_TINY_CLEANUP_LENGTH_PENALTY;
+    const betterTerminalStub = bestTerminalStubScore < MIN_TERMINAL_STUB
+      && stubScore > bestTerminalStubScore + MIN_LENGTH_SAVING
+      && length <= bestLength + MAX_TERMINAL_STUB_LENGTH_PENALTY;
+    if (
+      !fewerCrossings
+      && !fewerParallelOverlap
+      && !fewerObstacleHits
+      && !shorter
+      && !simpler
+      && !visuallyCleaner
+      && !hardTinyCleanup
+      && !fewerTinyDoglegs
+      && !betterTerminalStub
+    ) return;
     const candidateKey = exactCandidatePathKey(normalized);
     let candidateQuality = candidateKey === null
       ? undefined
@@ -197,10 +233,6 @@ function findBestLocalDoglegCandidate(
       || (!tinyGateCleanup && candidateQuality.hairpins > currentQuality.hairpins)
       || (!tinyGateCleanup && candidateQuality.hairpins > bestQuality.hairpins)
     ) return;
-    const parallelOverlap = interactionContext.countParallelOverlap(snapshot.segments);
-
-    const stubScore = terminalStubScore(normalized);
-    const visualNoise = localVisualNoise(normalized);
     const tinyCleanupRelatedOverlapAllowance = tinyGateCleanup || (bestVisualNoise > 0 && visualNoise < bestVisualNoise)
       ? MAX_TINY_CLEANUP_RELATED_OVERLAP_PENALTY
       : 0;
@@ -208,24 +240,6 @@ function findBestLocalDoglegCandidate(
       candidateQuality.relatedOverlap > currentQuality.relatedOverlap + tinyCleanupRelatedOverlapAllowance
       || candidateQuality.relatedOverlap > bestQuality.relatedOverlap + tinyCleanupRelatedOverlapAllowance
     ) return;
-    const fewerCrossings = crossings < bestCrossings;
-    const fewerParallelOverlap = parallelOverlap < bestParallelOverlap;
-    const fewerObstacleHits = obstacleHits < bestObstacleHits;
-    const shorter = length < bestLength - MIN_LENGTH_SAVING;
-    const simpler = bends < bestBends && length <= bestLength + MIN_LENGTH_SAVING;
-    const visuallyCleaner = visualNoise < bestVisualNoise
-      && bends <= bestBends + 2
-      && length <= bestLength + MAX_VISUAL_POLISH_LENGTH_PENALTY;
-    const hardTinyCleanup = bestVisualNoise > 0
-      && visualNoise < bestVisualNoise
-      && bends <= bestBends + 2
-      && length <= bestLength + MAX_TINY_CLEANUP_LENGTH_PENALTY;
-    const fewerTinyDoglegs = candidateQuality.tinyInteriorDoglegs < bestQuality.tinyInteriorDoglegs
-      && bends <= bestBends + 4
-      && length <= bestLength + MAX_TINY_CLEANUP_LENGTH_PENALTY;
-    const betterTerminalStub = bestTerminalStubScore < MIN_TERMINAL_STUB
-      && stubScore > bestTerminalStubScore + MIN_LENGTH_SAVING
-      && length <= bestLength + MAX_TERMINAL_STUB_LENGTH_PENALTY;
     if (
       !fewerCrossings
       && !fewerParallelOverlap
@@ -246,6 +260,7 @@ function findBestLocalDoglegCandidate(
     bestObstacleHits = obstacleHits;
     bestTerminalStubScore = stubScore;
     bestVisualNoise = visualNoise;
+    bestTinyInteriorSegments = tinyInteriorSegments;
     bestQuality = candidateQuality;
   };
 

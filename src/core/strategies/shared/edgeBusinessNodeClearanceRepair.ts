@@ -16,7 +16,7 @@ import {
   createEdgePathQualityEvaluationContext,
 } from './edgeStrictCrossingGuard';
 import {
-  createNodeClearanceEvaluationContext,
+  createNodeClearanceGraphEvaluationContext,
   createRoutingObstacleEvaluationContext,
 } from './edgeWaypointCandidateRepair';
 
@@ -631,10 +631,7 @@ export const repairBusinessNodeClearanceRisks = (
     : COMMERCIAL_BUSINESS_NODE_ROUTING_CLEARANCE;
   const rectContext = createBusinessNodeClearanceRectContext(nodes);
   const obstacles = new Map(rectContext.obstacles);
-  const clearanceContextByEdgeId = new Map(edges.map(edge => [
-    edge.id,
-    createNodeClearanceEvaluationContext(nodes, edge),
-  ] as const));
+  const clearanceContext = createNodeClearanceGraphEvaluationContext(nodes);
   const obstacleContextByEdgeId = new Map(edges.map(edge => [
     edge.id,
     createRoutingObstacleEvaluationContext(edge, obstacles),
@@ -667,10 +664,11 @@ export const repairBusinessNodeClearanceRisks = (
       .filter(edge => !options.eligibleEdgeIds || options.eligibleEdgeIds.has(edge.id))
       .map(edge => ({
         edge,
-        risk: clearanceContextByEdgeId.get(edge.id)?.score(
+        risk: clearanceContext.score(
           edgePath(edge),
+          edge,
           minimumClearance,
-        ) ?? 0,
+        ),
       }))
       .filter(entry => entry.risk > 0)
       .sort((first, second) => second.risk - first.risk)
@@ -682,13 +680,12 @@ export const repairBusinessNodeClearanceRisks = (
       const edge = current[edgeIndex];
       if (!edge) continue;
       const path = edgePath(edge);
-      const clearanceContext = clearanceContextByEdgeId.get(edge.id)
-        ?? createNodeClearanceEvaluationContext(nodes, edge);
       const obstacleContext = obstacleContextByEdgeId.get(edge.id)
         ?? createRoutingObstacleEvaluationContext(edge, obstacles);
       const qualityBaseline = getQualityBaseline();
       const [baselineRisk, baselineCommercialRisk] = clearanceContext.scorePair(
         path,
+        edge,
         minimumClearance,
         COMMERCIAL_BUSINESS_NODE_CLEARANCE,
       );
@@ -726,6 +723,7 @@ export const repairBusinessNodeClearanceRisks = (
         hitEligibleCandidates.map(({ candidate, hits }) => {
           const [risk, commercialRisk] = clearanceContext.scorePair(
             candidate,
+            edge,
             minimumClearance,
             COMMERCIAL_BUSINESS_NODE_CLEARANCE,
           );

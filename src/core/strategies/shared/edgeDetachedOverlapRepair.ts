@@ -343,28 +343,28 @@ export function separateDetachedParallelOverlaps(
             : []),
           ...pairClearances.flatMap(clearance => endpointBypassCoordinates(hit.b, hit.a, clearance)),
         ])].slice(0, narrowSmallOverlapSearch ? 4 : 18);
-        for (const firstCoordinate of firstCoordinates) {
-          if (qualityBudget.exhausted()) break;
-          const firstBypass = bypassEndpointParallelOverlapAtCoordinate(
+        const firstBypasses = firstCoordinates
+          .map(coordinate => bypassEndpointParallelOverlapAtCoordinate(
             paths[hit.a.edgeIndex],
             hit.a,
-            firstCoordinate,
-          );
-          if (!firstBypass) continue;
-          for (const secondCoordinate of secondCoordinates) {
+            coordinate,
+          ))
+          .filter((candidate): candidate is Point[] => candidate !== null);
+        const secondBypasses = secondCoordinates
+          .map(coordinate => bypassEndpointParallelOverlapAtCoordinate(
+            paths[hit.b.edgeIndex],
+            hit.b,
+            coordinate,
+          ))
+          .filter((candidate): candidate is Point[] => candidate !== null);
+        const changedIndexes = [hit.a.edgeIndex, hit.b.edgeIndex];
+        for (const firstBypass of firstBypasses) {
+          if (qualityBudget.exhausted()) break;
+          for (const secondBypass of secondBypasses) {
             if (qualityBudget.exhausted()) break;
-            const secondBypass = bypassEndpointParallelOverlapAtCoordinate(
-              paths[hit.b.edgeIndex],
-              hit.b,
-              secondCoordinate,
-            );
-            if (!secondBypass) continue;
-            const candidatePaths = paths.map((path, index) => {
-              if (index === hit.a.edgeIndex) return firstBypass;
-              if (index === hit.b.edgeIndex) return secondBypass;
-              return path;
-            });
-            const changedIndexes = [...new Set([hit.a.edgeIndex, hit.b.edgeIndex])];
+            const candidatePaths = paths.slice();
+            candidatePaths[hit.a.edgeIndex] = firstBypass;
+            candidatePaths[hit.b.edgeIndex] = secondBypass;
             if (!routingObstacleGate(paths, candidatePaths, changedIndexes)) continue;
             const candidateEdges = edgesWithPaths(currentEdges, candidatePaths, changedIndexes);
             const candidateQualityScore = qualityBudget.evaluateChanged(

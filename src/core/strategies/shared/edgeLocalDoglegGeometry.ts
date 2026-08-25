@@ -235,13 +235,18 @@ export function localVisualNoise(points: Point[]): number {
 }
 
 export function hasTinyInteriorSegment(points: Point[]): boolean {
+  return countTinyInteriorSegments(points) > 0;
+}
+
+export function countTinyInteriorSegments(points: Point[]): number {
+  let count = 0;
   for (let index = 1; index < points.length - 2; index += 1) {
     const axis = axisOf(points[index], points[index + 1]);
     if (!axis) continue;
     const length = segmentLength(points[index], points[index + 1]);
-    if (length > EPS && length < TINY_INTERIOR_SEGMENT) return true;
+    if (length > EPS && length < TINY_INTERIOR_SEGMENT) count += 1;
   }
-  return false;
+  return count;
 }
 
 export function toSegments(points: Point[]): OrthogonalSegment[] {

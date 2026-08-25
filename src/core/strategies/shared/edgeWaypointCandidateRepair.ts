@@ -31,6 +31,12 @@ export type NodeClearanceEvaluationContext = Readonly<{
 
 export type NodeClearanceGraphEvaluationContext = Readonly<{
   score: (path: Point[], edge: Edge, minimumClearance?: number) => number;
+  scorePair: (
+    path: Point[],
+    edge: Edge,
+    firstMinimumClearance: number,
+    secondMinimumClearance: number,
+  ) => readonly [number, number];
   readMetrics: () => Readonly<{ scannedNodeCount: number }>;
 }>;
 
@@ -167,23 +173,27 @@ export function createNodeClearanceGraphEvaluationContext(
   nodes: ReactFlowNode[],
 ): NodeClearanceGraphEvaluationContext {
   const nodeRects = businessRects(nodes);
+  const useSpatialIndex = nodeRects.length > 128;
   const cellSize = 128;
   const grid = new Map<string, typeof nodeRects>();
-  for (const node of nodeRects) {
-    const minCellX = Math.floor(node.rect.x / cellSize);
-    const maxCellX = Math.floor((node.rect.x + node.rect.width) / cellSize);
-    const minCellY = Math.floor(node.rect.y / cellSize);
-    const maxCellY = Math.floor((node.rect.y + node.rect.height) / cellSize);
-    for (let cellX = minCellX; cellX <= maxCellX; cellX += 1) {
-      for (let cellY = minCellY; cellY <= maxCellY; cellY += 1) {
-        const key = `${cellX},${cellY}`;
-        const bucket = grid.get(key);
-        if (bucket) bucket.push(node);
-        else grid.set(key, [node]);
+  if (useSpatialIndex) {
+    for (const node of nodeRects) {
+      const minCellX = Math.floor(node.rect.x / cellSize);
+      const maxCellX = Math.floor((node.rect.x + node.rect.width) / cellSize);
+      const minCellY = Math.floor(node.rect.y / cellSize);
+      const maxCellY = Math.floor((node.rect.y + node.rect.height) / cellSize);
+      for (let cellX = minCellX; cellX <= maxCellX; cellX += 1) {
+        for (let cellY = minCellY; cellY <= maxCellY; cellY += 1) {
+          const key = `${cellX},${cellY}`;
+          const bucket = grid.get(key);
+          if (bucket) bucket.push(node);
+          else grid.set(key, [node]);
+        }
       }
     }
   }
   const nearbyNodes = (segment: Segment, clearance: number): typeof nodeRects => {
+    if (!useSpatialIndex) return nodeRects;
     const minCellX = Math.floor((Math.min(segment.a.x, segment.b.x) - clearance) / cellSize);
     const maxCellX = Math.floor((Math.max(segment.a.x, segment.b.x) + clearance) / cellSize);
     const minCellY = Math.floor((Math.min(segment.a.y, segment.b.y) - clearance) / cellSize);
@@ -196,7 +206,9 @@ export function createNodeClearanceGraphEvaluationContext(
         for (const node of grid.get(`${cellX},${cellY}`) ?? []) candidates.add(node);
       }
     }
-    return [...candidates];
+    // Preserve the source node order so floating-point accumulation and every
+    // downstream rank remain byte-for-byte equivalent to the exhaustive scan.
+    return nodeRects.filter(node => candidates.has(node));
   };
   let scannedNodeCount = 0;
   return Object.freeze({
@@ -215,6 +227,29 @@ export function createNodeClearanceGraphEvaluationContext(
         }
       }
       return risk;
+    },
+    scorePair(
+      path: Point[],
+      edge: Edge,
+      firstMinimumClearance: number,
+      secondMinimumClearance: number,
+    ): readonly [number, number] {
+      if (nodeRects.length === 0) return [0, 0];
+      const firstRequiredClearance = normalizeNodeClearance(firstMinimumClearance);
+      const secondRequiredClearance = normalizeNodeClearance(secondMinimumClearance);
+      const queryClearance = Math.max(firstRequiredClearance, secondRequiredClearance);
+      let firstRisk = 0;
+      let secondRisk = 0;
+      for (const segment of toSegments(path)) {
+        for (const node of nearbyNodes(segment, queryClearance)) {
+          scannedNodeCount += 1;
+          if (node.id === edge.source || node.id === edge.target) continue;
+          const clearance = segmentToClearanceRectDistance(segment, node.rect);
+          firstRisk += Math.max(0, firstRequiredClearance - clearance);
+          secondRisk += Math.max(0, secondRequiredClearance - clearance);
+        }
+      }
+      return [firstRisk, secondRisk];
     },
     readMetrics: () => ({ scannedNodeCount }),
   });

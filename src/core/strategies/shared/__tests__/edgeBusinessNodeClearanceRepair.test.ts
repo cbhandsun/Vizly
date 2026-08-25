@@ -44,6 +44,39 @@ describe('repairBusinessNodeClearanceRisks', () => {
     ]);
   });
 
+  it('keeps indexed score pairs identical while excluding distant business nodes', () => {
+    const nodes: Node[] = [
+      { id: 'source', position: { x: 0, y: 0 }, data: {}, measured: { width: 40, height: 40 } },
+      { id: 'near', position: { x: 100, y: 40 }, data: {}, measured: { width: 60, height: 60 } },
+      { id: 'target', position: { x: 240, y: 0 }, data: {}, measured: { width: 40, height: 40 } },
+      ...Array.from({ length: 128 }, (_, index): Node => ({
+        id: `distant-${index}`,
+        position: { x: 10_000 + index * 160, y: 10_000 },
+        data: {},
+        measured: { width: 60, height: 60 },
+      })),
+    ];
+    const edge: Edge = { id: 'edge', source: 'source', target: 'target' };
+    const path = [{ x: 40, y: 20 }, { x: 240, y: 20 }];
+    const exhaustive = createNodeClearanceEvaluationContext(nodes, edge);
+    const indexed = createNodeClearanceGraphEvaluationContext(nodes);
+
+    expect(indexed.scorePair(
+      path,
+      edge,
+      COMMERCIAL_BUSINESS_NODE_ROUTING_CLEARANCE,
+      COMMERCIAL_BUSINESS_NODE_CLEARANCE,
+    )).toEqual(exhaustive.scorePair(
+      path,
+      COMMERCIAL_BUSINESS_NODE_ROUTING_CLEARANCE,
+      COMMERCIAL_BUSINESS_NODE_CLEARANCE,
+    ));
+    expect(indexed.readMetrics().scannedNodeCount).toBeLessThan(nodes.length - 2);
+    expect(indexed.scorePair(path, edge, Number.NaN, Number.POSITIVE_INFINITY)).toEqual(
+      exhaustive.scorePair(path, Number.NaN, Number.POSITIVE_INFINITY),
+    );
+  });
+
   it('keeps the first occurrence of each exact candidate geometry', () => {
     const first = [{ x: 0, y: 0 }, { x: 100, y: 0 }];
     const duplicate = first.map(point => ({ ...point }));
