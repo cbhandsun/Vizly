@@ -189,7 +189,7 @@ describe('baseReactFlowDisplayEvaluation', () => {
     })).toMatchObject({
       needsObstacleRepair: true,
       needsMicroRepair: true,
-      terminalClosureEligible: true,
+      terminalClosureEligible: false,
       onlyTerminalAxisDefects: false,
     });
     expect(displayRoutingQualityNeedsMicroRepair(quality)).toBe(false);

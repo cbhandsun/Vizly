@@ -45,12 +45,12 @@ export const createDisplayRoutingDefectPlan = (
     && quality.hairpins === 0;
   const terminalClosureEligible = !report.hardClean
     && report.terminalsAttached
+    && report.obstacleHits === 0
     && quality.nonOrthogonalSegments === 0
     && quality.strictCrossings === 0
     && !needsOverlapRepair
     && (
-      report.obstacleHits > 0
-      || needsTerminalRepair
+      needsTerminalRepair
       || needsMicroRepair
     );
   return {

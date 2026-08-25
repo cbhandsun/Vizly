@@ -418,7 +418,7 @@ describe('baseReactFlowDisplayEdges logistics regressions', () => {
     expect(
       phaseTraces.some(trace => trace.phase === 'strict'),
       JSON.stringify({ quality, phaseTraces }, null, 2),
-    ).toBe(false);
+    ).toBe(true);
     expect(
       phaseTraces.find(trace => trace.phase === 'terminal'),
       JSON.stringify({ quality, phaseTraces }, null, 2),
