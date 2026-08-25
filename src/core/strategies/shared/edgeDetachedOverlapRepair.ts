@@ -10,6 +10,7 @@ import {
   createQualityEvaluationBudget,
   type QualityEvaluationBudget,
 } from './edgeDetachedOverlapEvaluationCache';
+import { createDetachedOverlapCandidateDedup } from './edgeDetachedOverlapCandidateDedup';
 
 import { buildDetachedOuterBypassCandidates } from './edgeDetachedOuterBypass';
 import { createRoutingObstacleGate } from './edgeDetachedObstacleGate';
@@ -289,6 +290,7 @@ export function separateDetachedParallelOverlaps(
     if (qualityBudget.exhausted()) break;
     const currentEdges = edgesWithPaths(edges, paths);
     const qualityEvaluationContext = createEdgePathQualityEvaluationContext(currentEdges);
+    const candidateDedup = createDetachedOverlapCandidateDedup<EdgePathQualityScore>();
     const currentQualityScore = qualityBudget.evaluate(currentEdges);
     if (!currentQualityScore) break;
     const currentActionableOverlapScore = enableActionableSubthresholdRepair
@@ -365,13 +367,20 @@ export function separateDetachedParallelOverlaps(
             const candidatePaths = paths.slice();
             candidatePaths[hit.a.edgeIndex] = firstBypass;
             candidatePaths[hit.b.edgeIndex] = secondBypass;
-            if (!routingObstacleGate(paths, candidatePaths, changedIndexes)) continue;
-            const candidateEdges = edgesWithPaths(currentEdges, candidatePaths, changedIndexes);
-            const candidateQualityScore = qualityBudget.evaluateChanged(
-              candidateEdges,
-              qualityEvaluationContext,
+            const candidateEvaluation = candidateDedup.evaluate(
+              candidatePaths,
               changedIndexes,
+              narrowSmallOverlapSearch ? 'narrow' : 'regular',
+              () => routingObstacleGate(paths, candidatePaths, changedIndexes),
+              () => qualityBudget.evaluateChanged(
+                edgesWithPaths(currentEdges, candidatePaths, changedIndexes),
+                qualityEvaluationContext,
+                changedIndexes,
+              ),
+              qualityBudget.consumeCachedRequest,
             );
+            if (!candidateEvaluation.obstacleAccepted) continue;
+            const candidateQualityScore = candidateEvaluation.quality;
             if (!candidateQualityScore) break;
             if (candidateQualityScore.strictCrossings > currentQualityScore.strictCrossings) continue;
             if (narrowSmallOverlapSearch) {
@@ -518,13 +527,20 @@ export function separateDetachedParallelOverlaps(
             const candidatePaths = paths.map((path, index) => (
               index === segment.edgeIndex ? candidatePath : path
             ));
-            if (!routingObstacleGate(paths, candidatePaths, [segment.edgeIndex])) continue;
-            const candidateEdges = edgesWithPaths(currentEdges, candidatePaths, [segment.edgeIndex]);
-            const candidateQualityScore = qualityBudget.evaluateChanged(
-              candidateEdges,
-              qualityEvaluationContext,
+            const candidateEvaluation = candidateDedup.evaluate(
+              candidatePaths,
               [segment.edgeIndex],
+              narrowSmallOverlapSearch ? 'narrow' : 'regular',
+              () => routingObstacleGate(paths, candidatePaths, [segment.edgeIndex]),
+              () => qualityBudget.evaluateChanged(
+                edgesWithPaths(currentEdges, candidatePaths, [segment.edgeIndex]),
+                qualityEvaluationContext,
+                [segment.edgeIndex],
+              ),
+              qualityBudget.consumeCachedRequest,
             );
+            if (!candidateEvaluation.obstacleAccepted) continue;
+            const candidateQualityScore = candidateEvaluation.quality;
             if (!candidateQualityScore) break;
             if (narrowSmallOverlapSearch) {
               if (enableActionableSubthresholdRepair) {
@@ -634,6 +650,7 @@ function repairResidualReverseOrUnrelatedOverlap(
 ): Point[][] | null {
   const currentEdges = edgesWithPaths(edges, paths);
   const qualityEvaluationContext = createEdgePathQualityEvaluationContext(currentEdges);
+  const candidateDedup = createDetachedOverlapCandidateDedup<EdgePathQualityScore>();
   const currentQuality = qualityBudget.evaluate(currentEdges);
   if (!currentQuality) return null;
   const hits = findDetachedParallelOverlaps(paths, edges, minOverlap)
@@ -720,13 +737,20 @@ function repairResidualReverseOrUnrelatedOverlap(
           ) > currentEdgeCrossings) continue;
 
           const candidatePaths = paths.map((path, index) => (index === segment.edgeIndex ? candidatePath : path));
-          if (!routingObstacleGate(paths, candidatePaths, [segment.edgeIndex])) continue;
-          const candidateEdges = edgesWithPaths(currentEdges, candidatePaths, [segment.edgeIndex]);
-          const candidateQuality = qualityBudget.evaluateChanged(
-            candidateEdges,
-            qualityEvaluationContext,
+          const candidateEvaluation = candidateDedup.evaluate(
+            candidatePaths,
             [segment.edgeIndex],
+            'regular',
+            () => routingObstacleGate(paths, candidatePaths, [segment.edgeIndex]),
+            () => qualityBudget.evaluateChanged(
+              edgesWithPaths(currentEdges, candidatePaths, [segment.edgeIndex]),
+              qualityEvaluationContext,
+              [segment.edgeIndex],
+            ),
+            qualityBudget.consumeCachedRequest,
           );
+          if (!candidateEvaluation.obstacleAccepted) continue;
+          const candidateQuality = candidateEvaluation.quality;
           if (!candidateQuality) return bestPaths;
           if (!hardQualityDoesNotRegress(candidateQuality, currentQuality)) continue;
           const candidateActionableOverlapScore = useActionableOverlapScore

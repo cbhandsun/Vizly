@@ -10,6 +10,7 @@ import { getEdgePath, type Point } from './edgeDetachedOverlapCandidates';
 
 export type QualityEvaluationBudget = {
   exhausted: () => boolean;
+  consumeCachedRequest: () => boolean;
   evaluate: (candidateEdges: Edge[]) => EdgePathQualityScore | null;
   evaluateChanged: (
     candidateEdges: Edge[],
@@ -60,6 +61,12 @@ export function createQualityEvaluationBudget(
 
   return {
     exhausted: () => qualityEvaluations >= maxQualityEvaluations,
+    consumeCachedRequest: () => {
+      if (qualityEvaluations >= maxQualityEvaluations) return false;
+      qualityEvaluations += 1;
+      if (diagnostics) diagnostics.cacheHitCount += 1;
+      return true;
+    },
     evaluate: (candidateEdges) => {
       if (qualityEvaluations >= maxQualityEvaluations) return null;
       qualityEvaluations += 1;
