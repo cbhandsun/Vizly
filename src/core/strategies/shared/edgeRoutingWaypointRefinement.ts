@@ -42,6 +42,7 @@ import {
   createRoutingWaypointVisualRectIndex,
   type RoutingWaypointVisualRectIndex,
 } from './edgeRoutingWaypointVisualRectIndex';
+import { createRoutingWaypointSegmentMemo } from './edgeRoutingWaypointSegmentMemo';
 
 export type EdgeWaypointRefinementDiagnostics = {
   processedCandidateEdgeCount: number;
@@ -306,6 +307,12 @@ type NodeVisualContext = Readonly<{
 
 type EdgeVisualContext = NodeVisualContext & Readonly<{
   relatedContainerIds: ReadonlySet<string>;
+  segmentScoreMemo?: ReturnType<typeof createRoutingWaypointSegmentMemo<VisualSegmentScore>>;
+}>;
+
+type VisualSegmentScore = Readonly<{
+  scannedNodeCount: number;
+  score: number;
 }>;
 
 function buildNodeVisualContext(
@@ -334,6 +341,7 @@ function buildNodeVisualContext(
 function createEdgeVisualContext(
   edge: Edge,
   context: NodeVisualContext,
+  disableSegmentScoreMemo = false,
 ): EdgeVisualContext {
   const sourceRect = context.business.find(node => node.id === edge.source)?.rect;
   const targetRect = context.business.find(node => node.id === edge.target)?.rect;
@@ -344,7 +352,13 @@ function createEdgeVisualContext(
       relatedContainerIds.add(container.id);
     }
   }
-  return { ...context, relatedContainerIds };
+  return {
+    ...context,
+    relatedContainerIds,
+    segmentScoreMemo: disableSegmentScoreMemo
+      ? undefined
+      : createRoutingWaypointSegmentMemo<VisualSegmentScore>(),
+  };
 }
 
 function scoreVisualSoftConstraints(
@@ -354,7 +368,7 @@ function scoreVisualSoftConstraints(
   context: EdgeVisualContext,
   baseLength: number,
   length: number,
-): Readonly<{ score: number; scannedNodeCount: number }> {
+): Readonly<{ score: number; scannedNodeCount: number; cacheHitCount: number }> {
   const {
     business,
     businessIndex,
@@ -364,31 +378,44 @@ function scoreVisualSoftConstraints(
   } = context;
   let score = 0;
   let scannedNodeCount = 0;
+  let cacheHitCount = 0;
   for (const segment of segments) {
-    const businessQuery = businessIndex?.queryPotentialEntries(segment, 28);
-    const candidateBusinessNodes = businessQuery?.entries ?? business;
-    scannedNodeCount += businessQuery?.scannedNodeCount ?? business.length;
-    for (const node of candidateBusinessNodes) {
-      if (node.id === edge.source || node.id === edge.target) continue;
-      const distance = segmentToRectDistance(segment, node.rect);
-      if (distance < 12) {
-        score += (12 - distance) * 120;
-      } else if (distance < 28) {
-        score += (28 - distance) * 18;
+    const calculateSegmentScore = (): VisualSegmentScore => {
+      let segmentScore = 0;
+      let segmentScannedNodeCount = 0;
+      const businessQuery = businessIndex?.queryPotentialEntries(segment, 28);
+      const candidateBusinessNodes = businessQuery?.entries ?? business;
+      segmentScannedNodeCount += businessQuery?.scannedNodeCount ?? business.length;
+      for (const node of candidateBusinessNodes) {
+        if (node.id === edge.source || node.id === edge.target) continue;
+        const distance = segmentToRectDistance(segment, node.rect);
+        if (distance < 12) {
+          segmentScore += (12 - distance) * 120;
+        } else if (distance < 28) {
+          segmentScore += (28 - distance) * 18;
+        }
       }
-    }
 
-    const containerQuery = containerIndex?.queryPotentialEntries(segment, 8);
-    const candidateContainers = containerQuery?.entries ?? containers;
-    scannedNodeCount += containerQuery?.scannedNodeCount ?? containers.length;
-    for (const container of candidateContainers) {
-      score += scoreContainerBoundaryHug(segment, container.rect);
-      if (relatedContainerIds.has(container.id)) continue;
-      const insideLength = segmentInsideRectLength(segment, container.rect);
-      if (insideLength > 80) {
-        score += (insideLength - 80) * 18;
+      const containerQuery = containerIndex?.queryPotentialEntries(segment, 8);
+      const candidateContainers = containerQuery?.entries ?? containers;
+      segmentScannedNodeCount += containerQuery?.scannedNodeCount ?? containers.length;
+      for (const container of candidateContainers) {
+        segmentScore += scoreContainerBoundaryHug(segment, container.rect);
+        if (relatedContainerIds.has(container.id)) continue;
+        const insideLength = segmentInsideRectLength(segment, container.rect);
+        if (insideLength > 80) {
+          segmentScore += (insideLength - 80) * 18;
+        }
       }
-    }
+      return { score: segmentScore, scannedNodeCount: segmentScannedNodeCount };
+    };
+    const segmentResult = context.segmentScoreMemo?.getOrCreate(
+      segment,
+      calculateSegmentScore,
+    ) ?? { value: calculateSegmentScore(), cacheHit: false };
+    score += segmentResult.value.score;
+    if (segmentResult.cacheHit) cacheHitCount += 1;
+    else scannedNodeCount += segmentResult.value.scannedNodeCount;
   }
 
   const manhattan = Math.max(
@@ -403,7 +430,7 @@ function scoreVisualSoftConstraints(
   const bends = Math.max(0, path.length - 2);
   if (bends > 6) score += (bends - 6) * 300;
   score += Math.max(0, length - baseLength) * 0.04;
-  return { score, scannedNodeCount };
+  return { score, scannedNodeCount, cacheHitCount };
 }
 
 function pathLength(points: EdgeRoutingPoint[]): number {
@@ -432,6 +459,7 @@ function scorePathCandidate(
   let scannedNodeCount = 0;
   let scannedSegmentCount = 0;
   let scannedEdgePairCount = 0;
+  let cacheHitCount = 0;
   const cutoff = typeof improvementCutoff === 'number' && Number.isFinite(improvementCutoff)
     ? improvementCutoff
     : undefined;
@@ -441,6 +469,7 @@ function scorePathCandidate(
       diagnostics.scannedNodeCount += scannedNodeCount;
       diagnostics.scannedSegmentCount += scannedSegmentCount;
       diagnostics.scannedEdgePairCount += scannedEdgePairCount;
+      diagnostics.cacheHitCount += cacheHitCount;
       if (rejectedAtLowerBound) diagnostics.lowerBoundRejectionCount += 1;
     }
     return score;
@@ -511,6 +540,7 @@ function scorePathCandidate(
     length,
   );
   scannedNodeCount += visualResult.scannedNodeCount;
+  cacheHitCount += visualResult.cacheHitCount;
   const visualScore = visualResult.score;
   if (rejectsAtLowerBound(relationScore + visualScore)) {
     return finishScore(cutoff ?? relationScore, true);
@@ -539,6 +569,7 @@ export function reduceEdgeCrossingsWithWaypoints(
     diagnostics?: EdgeWaypointRefinementDiagnostics;
     disableScoreLowerBoundPruning?: boolean;
     disableNodeVisualIndex?: boolean;
+    disableVisualSegmentScoreMemo?: boolean;
     disableSegmentIndex?: boolean;
   } = {},
 ): Edge[] {
@@ -607,7 +638,11 @@ export function reduceEdgeCrossingsWithWaypoints(
       ? undefined
       : createRoutingWaypointSegmentGroupIndex(otherSegments);
     const baseLength = pathLength(path);
-    const edgeVisualContext = createEdgeVisualContext(edge, nodeVisualContext);
+    const edgeVisualContext = createEdgeVisualContext(
+      edge,
+      nodeVisualContext,
+      options.disableVisualSegmentScoreMemo,
+    );
     const obstacleEvaluation = createRoutingObstacleEvaluationContext(edge, obstacles);
     const candidates = generateWaypointCandidates(path, layoutDirection, nodes, edge, {
       includeNodeAwareLanes: hasSoftRisk,

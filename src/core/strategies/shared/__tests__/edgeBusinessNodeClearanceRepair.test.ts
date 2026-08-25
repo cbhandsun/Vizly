@@ -77,6 +77,58 @@ describe('repairBusinessNodeClearanceRisks', () => {
     );
   });
 
+  it('reuses exact segment clearance scores without changing graph results', () => {
+    const nodes: Node[] = [
+      { id: 'source', position: { x: 0, y: 0 }, data: {}, measured: { width: 40, height: 40 } },
+      { id: 'blocker', position: { x: 100, y: 40 }, data: {}, measured: { width: 60, height: 60 } },
+      { id: 'target', position: { x: 240, y: 0 }, data: {}, measured: { width: 40, height: 40 } },
+    ];
+    const edge: Edge = { id: 'edge', source: 'source', target: 'target' };
+    const firstPath = [{ x: 40, y: 20 }, { x: 160, y: 20 }, { x: 160, y: 120 }];
+    const secondPath = [{ x: 40, y: 20 }, { x: 160, y: 20 }, { x: 240, y: 20 }];
+    const memoized = createNodeClearanceGraphEvaluationContext(nodes);
+    const uncached = createNodeClearanceGraphEvaluationContext(nodes, {
+      disableSegmentMemo: true,
+    });
+
+    const memoizedScores = [firstPath, secondPath].map(path => memoized.scorePair(
+      path,
+      edge,
+      COMMERCIAL_BUSINESS_NODE_ROUTING_CLEARANCE,
+      COMMERCIAL_BUSINESS_NODE_CLEARANCE,
+    ));
+    const uncachedScores = [firstPath, secondPath].map(path => uncached.scorePair(
+      path,
+      edge,
+      COMMERCIAL_BUSINESS_NODE_ROUTING_CLEARANCE,
+      COMMERCIAL_BUSINESS_NODE_CLEARANCE,
+    ));
+
+    expect(memoizedScores).toEqual(uncachedScores);
+    expect(memoized.readMetrics().cacheHitCount).toBeGreaterThan(0);
+    expect(memoized.readMetrics().scannedNodeCount)
+      .toBeLessThan(uncached.readMetrics().scannedNodeCount);
+  });
+
+  it('invalidates segment scores when a reused edge object changes terminals', () => {
+    const nodes: Node[] = [
+      { id: 'source', position: { x: 0, y: 0 }, data: {}, measured: { width: 40, height: 40 } },
+      { id: 'blocker', position: { x: 100, y: 40 }, data: {}, measured: { width: 60, height: 60 } },
+      { id: 'target', position: { x: 240, y: 0 }, data: {}, measured: { width: 40, height: 40 } },
+    ];
+    const edge: Edge = { id: 'edge', source: 'source', target: 'target' };
+    const path = [{ x: 40, y: 20 }, { x: 240, y: 20 }];
+    const context = createNodeClearanceGraphEvaluationContext(nodes);
+
+    context.score(path, edge, COMMERCIAL_BUSINESS_NODE_CLEARANCE);
+    edge.target = 'blocker';
+
+    expect(context.score(path, edge, COMMERCIAL_BUSINESS_NODE_CLEARANCE)).toBe(
+      createNodeClearanceGraphEvaluationContext(nodes, { disableSegmentMemo: true })
+        .score(path, edge, COMMERCIAL_BUSINESS_NODE_CLEARANCE),
+    );
+  });
+
   it('keeps the first occurrence of each exact candidate geometry', () => {
     const first = [{ x: 0, y: 0 }, { x: 100, y: 0 }];
     const duplicate = first.map(point => ({ ...point }));
@@ -616,6 +668,8 @@ describe('repairBusinessNodeClearanceRisks', () => {
     }));
     const diagnostics = {
       candidateCollectionCacheHitCount: 0,
+      clearanceScoreCacheHitCount: 0,
+      clearanceScannedNodeCount: 0,
       generatedCandidateCount: 0,
       qualityContextBuildCount: 0,
       qualityContextCacheHitCount: 0,
@@ -629,5 +683,7 @@ describe('repairBusinessNodeClearanceRisks', () => {
     expect(diagnostics.qualityContextBuildCount).toBe(1);
     expect(diagnostics.qualityContextCacheHitCount).toBe(1);
     expect(diagnostics.candidateCollectionCacheHitCount).toBe(1);
+    expect(diagnostics.clearanceScoreCacheHitCount).toBeGreaterThan(0);
+    expect(diagnostics.clearanceScannedNodeCount).toBeGreaterThan(0);
   });
 });

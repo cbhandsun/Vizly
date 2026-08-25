@@ -54,6 +54,8 @@ describe('createBaseReactFlowFinalEndpointEvaluation', () => {
     evaluation.hardReport(edges);
     finish(edges, edges, {
       candidateCollectionCacheHitCount: 5,
+      clearanceScoreCacheHitCount: 0,
+      clearanceScannedNodeCount: 0,
       generatedCandidateCount: 10,
       qualityContextBuildCount: 2,
       qualityContextCacheHitCount: 4,

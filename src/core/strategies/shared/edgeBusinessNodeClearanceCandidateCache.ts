@@ -2,6 +2,8 @@ import type { Point } from './edgeDetachedOverlapCandidates';
 
 export interface BusinessNodeClearanceRepairDiagnostics {
   candidateCollectionCacheHitCount: number;
+  clearanceScoreCacheHitCount: number;
+  clearanceScannedNodeCount: number;
   generatedCandidateCount: number;
   qualityContextBuildCount: number;
   qualityContextCacheHitCount: number;
@@ -13,6 +15,8 @@ export const resetBusinessNodeClearanceRepairDiagnostics = (
 ): void => {
   if (!diagnostics) return;
   diagnostics.candidateCollectionCacheHitCount = 0;
+  diagnostics.clearanceScoreCacheHitCount = 0;
+  diagnostics.clearanceScannedNodeCount = 0;
   diagnostics.generatedCandidateCount = 0;
   diagnostics.qualityContextBuildCount = 0;
   diagnostics.qualityContextCacheHitCount = 0;

@@ -73,4 +73,50 @@ describe('waypoint node visual index parity', () => {
     expect(indexedDiagnostics.scannedNodeCount)
       .toBeLessThan(fullScanDiagnostics.scannedNodeCount);
   });
+
+  it('preserves candidate selection while reusing exact segment visual scores', () => {
+    const edges: Edge[] = [
+      routedEdge('first', 'source-a', 'target-a', [
+        { x: 0, y: 0 },
+        { x: 0, y: 160 },
+        { x: 480, y: 160 },
+        { x: 480, y: 420 },
+      ]),
+      routedEdge('second', 'source-b', 'target-b', [
+        { x: 240, y: -80 },
+        { x: 240, y: 500 },
+      ]),
+    ];
+    const nodes: Node[] = [
+      {
+        id: 'nearby-business',
+        type: 'task',
+        position: { x: 300, y: 120 },
+        measured: { width: 96, height: 56 },
+        data: {},
+      },
+      {
+        id: 'containing-domain',
+        type: 'group',
+        position: { x: -520, y: -520 },
+        measured: { width: 1_520, height: 1_520 },
+        data: {},
+      },
+    ];
+    const memoizedDiagnostics = createEdgeWaypointRefinementDiagnostics();
+    const uncachedDiagnostics = createEdgeWaypointRefinementDiagnostics();
+
+    const memoized = reduceEdgeCrossingsWithWaypoints(edges, nodes, 'TB', {
+      diagnostics: memoizedDiagnostics,
+    });
+    const uncached = reduceEdgeCrossingsWithWaypoints(edges, nodes, 'TB', {
+      diagnostics: uncachedDiagnostics,
+      disableVisualSegmentScoreMemo: true,
+    });
+
+    expect(memoized).toEqual(uncached);
+    expect(memoizedDiagnostics.evaluationCount).toBe(uncachedDiagnostics.evaluationCount);
+    expect(memoizedDiagnostics.cacheHitCount).toBeGreaterThan(uncachedDiagnostics.cacheHitCount);
+    expect(memoizedDiagnostics.scannedNodeCount).toBeLessThan(uncachedDiagnostics.scannedNodeCount);
+  });
 });

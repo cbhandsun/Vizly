@@ -770,5 +770,10 @@ export const repairBusinessNodeClearanceRisks = (
     }
     if (current === passBaseline || current.every((edge, index) => edge === passBaseline[index])) break;
   }
+  if (options.diagnostics) {
+    const clearanceMetrics = clearanceContext.readMetrics();
+    options.diagnostics.clearanceScoreCacheHitCount = clearanceMetrics.cacheHitCount;
+    options.diagnostics.clearanceScannedNodeCount = clearanceMetrics.scannedNodeCount;
+  }
   return current;
 };

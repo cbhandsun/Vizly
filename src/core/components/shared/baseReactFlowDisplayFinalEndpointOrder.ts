@@ -587,6 +587,8 @@ export const repairBaseReactFlowFinalEndpointOrder = <T extends Edge[]>(
   );
   const postTrunkObstacleDiagnostics: BusinessNodeClearanceRepairDiagnostics = {
     candidateCollectionCacheHitCount: 0,
+    clearanceScoreCacheHitCount: 0,
+    clearanceScannedNodeCount: 0,
     generatedCandidateCount: 0,
     qualityContextBuildCount: 0,
     qualityContextCacheHitCount: 0,

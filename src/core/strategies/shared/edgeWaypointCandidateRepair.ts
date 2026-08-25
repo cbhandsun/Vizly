@@ -4,6 +4,7 @@ import {
   segmentIntersectsClearanceRect,
   segmentToClearanceRectDistance,
 } from './edgeNodeClearanceGeometry';
+import { createRoutingWaypointSegmentMemo } from './edgeRoutingWaypointSegmentMemo';
 export {
   countEndpointNodeTraversalHits,
   countRoutingObstacleHits,
@@ -37,7 +38,7 @@ export type NodeClearanceGraphEvaluationContext = Readonly<{
     firstMinimumClearance: number,
     secondMinimumClearance: number,
   ) => readonly [number, number];
-  readMetrics: () => Readonly<{ scannedNodeCount: number }>;
+  readMetrics: () => Readonly<{ cacheHitCount: number; scannedNodeCount: number }>;
 }>;
 
 export type RoutingWaypointCandidateAxes = Readonly<{
@@ -52,6 +53,7 @@ const FLEXIBLE_SHARED_TRUNK_MIN = 24;
 const SEVERE_DETOUR_RATIO = 2.5;
 const SOFT_DETOUR_RATIO = 1.8;
 const EXCESSIVE_BENDS = 6;
+const MAX_CLEARANCE_SEGMENT_MEMOS_PER_EDGE = 16;
 const CONTAINER_NODE_TYPES = new Set([
   'titleGroup',
   'subGroup',
@@ -171,6 +173,7 @@ export function createNodeClearanceEvaluationContext(
 /** Builds business-node geometry once for whole-graph clearance audits. */
 export function createNodeClearanceGraphEvaluationContext(
   nodes: ReactFlowNode[],
+  options: Readonly<{ disableSegmentMemo?: boolean }> = {},
 ): NodeClearanceGraphEvaluationContext {
   const nodeRects = businessRects(nodes);
   const useSpatialIndex = nodeRects.length > 128;
@@ -211,22 +214,87 @@ export function createNodeClearanceGraphEvaluationContext(
     return nodeRects.filter(node => candidates.has(node));
   };
   let scannedNodeCount = 0;
+  let cacheHitCount = 0;
+  type SegmentClearanceScore = Readonly<{
+    firstRisk: number;
+    scannedNodeCount: number;
+    secondRisk: number;
+  }>;
+  type EdgeClearanceMemoContext = {
+    memoByClearance: Map<
+      string,
+      ReturnType<typeof createRoutingWaypointSegmentMemo<SegmentClearanceScore>>
+    >;
+    sourceId: string;
+    targetId: string;
+  };
+  const memoByEdge = new WeakMap<Edge, EdgeClearanceMemoContext>();
+  const scoreSegments = (
+    path: Point[],
+    edge: Edge,
+    firstRequiredClearance: number,
+    secondRequiredClearance: number,
+  ): readonly [number, number] => {
+    let firstRisk = 0;
+    let secondRisk = 0;
+    let memoContext = memoByEdge.get(edge);
+    if (
+      !memoContext
+      || memoContext.sourceId !== edge.source
+      || memoContext.targetId !== edge.target
+    ) {
+      memoContext = {
+        memoByClearance: new Map(),
+        sourceId: edge.source,
+        targetId: edge.target,
+      };
+      memoByEdge.set(edge, memoContext);
+    }
+    const { memoByClearance } = memoContext;
+    const clearanceKey = `${firstRequiredClearance},${secondRequiredClearance}`;
+    let segmentMemo = memoByClearance.get(clearanceKey);
+    if (!segmentMemo) {
+      segmentMemo = createRoutingWaypointSegmentMemo<SegmentClearanceScore>();
+      if (memoByClearance.size < MAX_CLEARANCE_SEGMENT_MEMOS_PER_EDGE) {
+        memoByClearance.set(clearanceKey, segmentMemo);
+      }
+    }
+    for (const segment of toSegments(path)) {
+      const calculate = (): SegmentClearanceScore => {
+        let segmentFirstRisk = 0;
+        let segmentSecondRisk = 0;
+        let segmentScannedNodeCount = 0;
+        for (const node of nearbyNodes(
+          segment,
+          Math.max(firstRequiredClearance, secondRequiredClearance),
+        )) {
+          segmentScannedNodeCount += 1;
+          if (node.id === edge.source || node.id === edge.target) continue;
+          const clearance = segmentToClearanceRectDistance(segment, node.rect);
+          segmentFirstRisk += Math.max(0, firstRequiredClearance - clearance);
+          segmentSecondRisk += Math.max(0, secondRequiredClearance - clearance);
+        }
+        return {
+          firstRisk: segmentFirstRisk,
+          secondRisk: segmentSecondRisk,
+          scannedNodeCount: segmentScannedNodeCount,
+        };
+      };
+      const result = options.disableSegmentMemo
+        ? { value: calculate(), cacheHit: false }
+        : segmentMemo.getOrCreate(segment, calculate);
+      firstRisk += result.value.firstRisk;
+      secondRisk += result.value.secondRisk;
+      if (result.cacheHit) cacheHitCount += 1;
+      else scannedNodeCount += result.value.scannedNodeCount;
+    }
+    return [firstRisk, secondRisk];
+  };
   return Object.freeze({
     score(path: Point[], edge: Edge, minimumClearance = BUSINESS_NODE_CLEARANCE): number {
       if (nodeRects.length === 0) return 0;
       const requiredClearance = normalizeNodeClearance(minimumClearance);
-      let risk = 0;
-      for (const segment of toSegments(path)) {
-        for (const node of nearbyNodes(segment, requiredClearance)) {
-          scannedNodeCount += 1;
-          if (node.id === edge.source || node.id === edge.target) continue;
-          risk += Math.max(
-            0,
-            requiredClearance - segmentToClearanceRectDistance(segment, node.rect),
-          );
-        }
-      }
-      return risk;
+      return scoreSegments(path, edge, requiredClearance, requiredClearance)[0];
     },
     scorePair(
       path: Point[],
@@ -237,21 +305,9 @@ export function createNodeClearanceGraphEvaluationContext(
       if (nodeRects.length === 0) return [0, 0];
       const firstRequiredClearance = normalizeNodeClearance(firstMinimumClearance);
       const secondRequiredClearance = normalizeNodeClearance(secondMinimumClearance);
-      const queryClearance = Math.max(firstRequiredClearance, secondRequiredClearance);
-      let firstRisk = 0;
-      let secondRisk = 0;
-      for (const segment of toSegments(path)) {
-        for (const node of nearbyNodes(segment, queryClearance)) {
-          scannedNodeCount += 1;
-          if (node.id === edge.source || node.id === edge.target) continue;
-          const clearance = segmentToClearanceRectDistance(segment, node.rect);
-          firstRisk += Math.max(0, firstRequiredClearance - clearance);
-          secondRisk += Math.max(0, secondRequiredClearance - clearance);
-        }
-      }
-      return [firstRisk, secondRisk];
+      return scoreSegments(path, edge, firstRequiredClearance, secondRequiredClearance);
     },
-    readMetrics: () => ({ scannedNodeCount }),
+    readMetrics: () => ({ cacheHitCount, scannedNodeCount }),
   });
 }
 
