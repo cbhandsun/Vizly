@@ -349,12 +349,12 @@ function repairPath(
   sourceRect: Rect | null,
   targetRect: Rect | null,
   obstacleContext: EdgeObstacleInteractionContext,
+  interactionContext: ReturnType<typeof createEdgePathInteractionContext>,
   qualityContext: EdgePathQualityEvaluationContext,
   qualityByCandidatePath: Map<string, EdgePathQualityScore>,
   diagnostics?: LocalDoglegRepairDiagnostics,
 ): Point[] {
   let current = compactPath(path);
-  const interactionContext = createEdgePathInteractionContext(edgeKey, pathByEdgeKey);
   for (let pass = 0; pass < 6; pass += 1) {
     if (diagnostics) diagnostics.passCount += 1;
     const candidate = findBestLocalDoglegCandidate(
@@ -443,6 +443,7 @@ function repairRemainingTinyArtifactsWithMaze(
   sourceRect: Rect | null,
   targetRect: Rect | null,
   obstacleContext: EdgeObstacleInteractionContext,
+  interactionContext: ReturnType<typeof createEdgePathInteractionContext>,
   qualityContext: EdgePathQualityEvaluationContext,
 ): Point[] {
   const currentNoise = localVisualNoise(path);
@@ -459,7 +460,6 @@ function repairRemainingTinyArtifactsWithMaze(
   const normalized = snapshot.path;
   if (normalized.length < 2) return path;
   if (obstacleContext.countSegmentHits(snapshot.segments) > 0) return path;
-  const interactionContext = createEdgePathInteractionContext(edgeKey, pathByEdgeKey);
   if (
     interactionContext.countCrossings(snapshot.segments)
     > interactionContext.countCrossings(toSegments(path))
@@ -588,6 +588,7 @@ export function repairLocalDoglegArtifacts(
     const sourceRect = nodeRect(nodeById.get(edge.source));
     const targetRect = nodeRect(nodeById.get(edge.target));
     const obstacleContext = createEdgeObstacleInteractionContext(edge, obstacles);
+    const interactionContext = createEdgePathInteractionContext(edgeKey, pathByEdgeKey);
     const qualityBaselineEdges = edgesWithCurrentPaths(edges, edgeKeys, pathByEdgeKey);
     const qualityContext = createEdgePathQualityEvaluationContext(qualityBaselineEdges);
     const qualityByCandidatePath = new Map<string, EdgePathQualityScore>();
@@ -603,6 +604,7 @@ export function repairLocalDoglegArtifacts(
       sourceRect,
       targetRect,
       obstacleContext,
+      interactionContext,
       qualityContext,
       qualityByCandidatePath,
       diagnostics,
@@ -619,6 +621,7 @@ export function repairLocalDoglegArtifacts(
       sourceRect,
       targetRect,
       obstacleContext,
+      interactionContext,
       qualityContext,
     );
     if (!pathEquals(repaired, finalRepaired)) {
@@ -635,10 +638,15 @@ export function repairLocalDoglegArtifacts(
         sourceRect,
         targetRect,
         obstacleContext,
+        interactionContext,
         qualityContext,
         qualityByCandidatePath,
         diagnostics,
       );
+    }
+    if (diagnostics) {
+      diagnostics.cacheHitCount += obstacleContext.readMetrics().cacheHitCount
+        + interactionContext.readMetrics().cacheHitCount;
     }
     if (pathEquals(path, finalRepaired)) return edge;
     changed = true;

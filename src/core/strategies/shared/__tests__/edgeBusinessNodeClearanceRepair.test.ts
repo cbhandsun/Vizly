@@ -77,6 +77,39 @@ describe('repairBusinessNodeClearanceRisks', () => {
     );
   });
 
+  it('indexes candidate-heavy small graphs without changing clearance scores', () => {
+    const nodes: Node[] = [
+      { id: 'source', position: { x: 0, y: 0 }, data: {}, measured: { width: 40, height: 40 } },
+      { id: 'near', position: { x: 100, y: 40 }, data: {}, measured: { width: 60, height: 60 } },
+      { id: 'target', position: { x: 240, y: 0 }, data: {}, measured: { width: 40, height: 40 } },
+      { id: 'distant-a', position: { x: 10_000, y: 10_000 }, data: {}, measured: { width: 60, height: 60 } },
+      { id: 'distant-b', position: { x: -10_000, y: -10_000 }, data: {}, measured: { width: 60, height: 60 } },
+    ];
+    const edge: Edge = { id: 'edge', source: 'source', target: 'target' };
+    const path = [{ x: 40, y: 20 }, { x: 240, y: 20 }];
+    const indexed = createNodeClearanceGraphEvaluationContext(nodes, {
+      disableSegmentMemo: true,
+    });
+    const exhaustive = createNodeClearanceGraphEvaluationContext(nodes, {
+      disableSegmentMemo: true,
+      disableSpatialIndex: true,
+    });
+
+    expect(indexed.scorePair(
+      path,
+      edge,
+      COMMERCIAL_BUSINESS_NODE_ROUTING_CLEARANCE,
+      COMMERCIAL_BUSINESS_NODE_CLEARANCE,
+    )).toEqual(exhaustive.scorePair(
+      path,
+      edge,
+      COMMERCIAL_BUSINESS_NODE_ROUTING_CLEARANCE,
+      COMMERCIAL_BUSINESS_NODE_CLEARANCE,
+    ));
+    expect(indexed.readMetrics().scannedNodeCount)
+      .toBeLessThan(exhaustive.readMetrics().scannedNodeCount);
+  });
+
   it('reuses exact segment clearance scores without changing graph results', () => {
     const nodes: Node[] = [
       { id: 'source', position: { x: 0, y: 0 }, data: {}, measured: { width: 40, height: 40 } },

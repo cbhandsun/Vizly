@@ -115,6 +115,7 @@ describe('local dogleg repair diagnostics', () => {
     expect(interactions.countCrossings(segments)).toBe(2);
     expect(interactions.countCrossings(segments, 0)).toBeGreaterThan(0);
     expect(interactions.countCrossings(segments, 2)).toBe(2);
+    expect(interactions.readMetrics().cacheHitCount).toBeGreaterThan(0);
 
     const obstacles = new Map([
       ['source', { x: -20, y: -20, width: 20, height: 20 }],
@@ -128,5 +129,46 @@ describe('local dogleg repair diagnostics', () => {
     expect(obstacleContext.countSegmentHits(segments)).toBe(2);
     expect(obstacleContext.countSegmentHits(segments, 0)).toBeGreaterThan(0);
     expect(obstacleContext.countSegmentHits(segments, 2)).toBe(2);
+    expect(obstacleContext.readMetrics().cacheHitCount).toBeGreaterThan(0);
+  });
+
+  it('keeps segment-memo interaction results identical to uncached evaluation', () => {
+    const paths = new Map([
+      ['current', [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }]],
+      ['peer-a', [{ x: 50, y: -20 }, { x: 50, y: 120 }]],
+      ['peer-b', [{ x: 0, y: 40 }, { x: 120, y: 40 }]],
+    ]);
+    const candidates = [
+      ...toSegments(paths.get('current') ?? []),
+      { a: { x: 0, y: 80 }, b: { x: 100, y: 80 } },
+    ];
+    const memoized = createEdgePathInteractionContext('current', paths);
+    const uncached = createEdgePathInteractionContext('current', paths, {
+      disableSegmentMemo: true,
+    });
+
+    expect(memoized.countCrossings(candidates)).toBe(uncached.countCrossings(candidates));
+    expect(memoized.countCrossings(candidates, 0)).toBeGreaterThan(0);
+    expect(memoized.countParallelOverlap(candidates))
+      .toBe(uncached.countParallelOverlap(candidates));
+    memoized.countCrossings(candidates);
+    memoized.countParallelOverlap(candidates);
+    expect(memoized.readMetrics().cacheHitCount).toBeGreaterThan(0);
+
+    const edge: Edge = { id: 'current', source: 'source', target: 'target', data: {} };
+    const obstacles = new Map([
+      ['source', { x: -20, y: -20, width: 20, height: 20 }],
+      ['target', { x: 100, y: 100, width: 20, height: 20 }],
+      ['block', { x: 30, y: -10, width: 10, height: 20 }],
+    ]);
+    const memoizedObstacles = createEdgeObstacleInteractionContext(edge, obstacles);
+    const uncachedObstacles = createEdgeObstacleInteractionContext(edge, obstacles, {
+      disableSegmentMemo: true,
+    });
+    expect(memoizedObstacles.countSegmentHits(candidates))
+      .toBe(uncachedObstacles.countSegmentHits(candidates));
+    expect(memoizedObstacles.countPathHits(paths.get('current') ?? []))
+      .toBe(uncachedObstacles.countPathHits(paths.get('current') ?? []));
+    expect(memoizedObstacles.readMetrics().cacheHitCount).toBeGreaterThan(0);
   });
 });

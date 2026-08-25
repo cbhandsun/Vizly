@@ -1,6 +1,7 @@
 import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
 
 import { createOrthogonalSegmentCrossingIndex } from './edgeLocalDoglegSegmentIndex';
+import { createRoutingWaypointSegmentMemo } from './edgeRoutingWaypointSegmentMemo';
 
 export type Point = { x: number; y: number };
 export type Rect = { x: number; y: number; width: number; height: number };
@@ -21,6 +22,7 @@ export type EdgePathInteractionContext = {
     maximumInclusive?: number,
   ) => number;
   countParallelOverlap: (segments: readonly OrthogonalSegment[]) => number;
+  readMetrics: () => Readonly<{ cacheHitCount: number }>;
 };
 
 export type EdgeObstacleInteractionContext = {
@@ -29,6 +31,7 @@ export type EdgeObstacleInteractionContext = {
     segments: readonly OrthogonalSegment[],
     maximumInclusive?: number,
   ) => number;
+  readMetrics: () => Readonly<{ cacheHitCount: number }>;
 };
 
 export type LocalDoglegCandidateSnapshot = {
@@ -288,6 +291,7 @@ export function createLocalDoglegCandidateSnapshot(points: Point[]): LocalDogleg
 export function createEdgePathInteractionContext(
   edgeKey: string,
   pathByEdgeKey: Map<string, Point[]>,
+  options: Readonly<{ disableSegmentMemo?: boolean }> = {},
 ): EdgePathInteractionContext {
   const otherSegments: OrthogonalSegment[] = [];
   for (const [otherKey, otherPath] of pathByEdgeKey) {
@@ -300,34 +304,62 @@ export function createEdgePathInteractionContext(
     }
   }
   const crossingIndex = createOrthogonalSegmentCrossingIndex(otherSegments);
+  const crossingCountBySegment = createRoutingWaypointSegmentMemo<{ count: number }>();
+  const parallelOverlapBySegment = createRoutingWaypointSegmentMemo<{ count: number }>();
+  let cacheHitCount = 0;
+  const countSegmentCrossings = (segment: OrthogonalSegment): number => {
+    const calculate = () => {
+      if (crossingIndex) {
+        const indexedCount = crossingIndex.countCrossings([segment]);
+        if (indexedCount !== null) return { count: indexedCount };
+      }
+      let count = 0;
+      for (const otherSegment of otherSegments) {
+        if (strictCross(segment.a, segment.b, otherSegment.a, otherSegment.b)) count += 1;
+      }
+      return { count };
+    };
+    const result = options.disableSegmentMemo
+      ? { value: calculate(), cacheHit: false }
+      : crossingCountBySegment.getOrCreate(segment, calculate);
+    if (result.cacheHit) cacheHitCount += 1;
+    return result.value.count;
+  };
+  const countSegmentParallelOverlap = (segment: OrthogonalSegment): number => {
+    const calculate = () => {
+      let count = 0;
+      for (const otherSegment of otherSegments) {
+        count += segmentParallelOverlap(segment, otherSegment);
+      }
+      return { count };
+    };
+    const result = options.disableSegmentMemo
+      ? { value: calculate(), cacheHit: false }
+      : parallelOverlapBySegment.getOrCreate(segment, calculate);
+    if (result.cacheHit) cacheHitCount += 1;
+    return result.value.count;
+  };
   return {
     otherSegments: Object.freeze(otherSegments),
     countCrossings(
       segments: readonly OrthogonalSegment[],
       maximumInclusive = Number.POSITIVE_INFINITY,
     ): number {
-      if (crossingIndex) {
-        const indexedCount = crossingIndex.countCrossings(segments, maximumInclusive);
-        if (indexedCount !== null) return indexedCount;
-      }
       let total = 0;
       for (const segment of segments) {
-        for (const otherSegment of otherSegments) {
-          if (strictCross(segment.a, segment.b, otherSegment.a, otherSegment.b)) total += 1;
-          if (total > maximumInclusive) return total;
-        }
+        total += countSegmentCrossings(segment);
+        if (total > maximumInclusive) return total;
       }
       return total;
     },
     countParallelOverlap(segments: readonly OrthogonalSegment[]): number {
       let total = 0;
       for (const segment of segments) {
-        for (const otherSegment of otherSegments) {
-          total += segmentParallelOverlap(segment, otherSegment);
-        }
+        total += countSegmentParallelOverlap(segment);
       }
       return Math.round(total);
     },
+    readMetrics: () => ({ cacheHitCount }),
   };
 }
 
@@ -528,6 +560,7 @@ function countSegmentObstacleHits(
 export function createEdgeObstacleInteractionContext(
   edge: Edge,
   obstacles: Map<string, Rect>,
+  options: Readonly<{ disableSegmentMemo?: boolean }> = {},
 ): EdgeObstacleInteractionContext {
   const bounds = Object.freeze(Array.from(obstacles, ([nodeId, rect]) => {
     if (nodeId === edge.source || nodeId === edge.target) return null;
@@ -539,12 +572,24 @@ export function createEdgeObstacleInteractionContext(
     });
   }).filter((value): value is PaddedObstacleBounds => value !== null));
   const obstacleIndex = createPaddedObstacleIndex(bounds);
+  const hitCountBySegment = createRoutingWaypointSegmentMemo<{ count: number }>();
+  let cacheHitCount = 0;
+  const countHits = (segment: OrthogonalSegment): number => {
+    const calculate = () => ({
+      count: countSegmentObstacleHits(segment.a, segment.b, obstacleIndex),
+    });
+    const result = options.disableSegmentMemo
+      ? { value: calculate(), cacheHit: false }
+      : hitCountBySegment.getOrCreate(segment, calculate);
+    if (result.cacheHit) cacheHitCount += 1;
+    return result.value.count;
+  };
 
   return {
     countPathHits(path: readonly Point[]): number {
       let hits = 0;
       for (let index = 0; index < path.length - 1; index += 1) {
-        hits += countSegmentObstacleHits(path[index], path[index + 1], obstacleIndex);
+        hits += countHits({ a: path[index], b: path[index + 1] });
       }
       return hits;
     },
@@ -554,11 +599,12 @@ export function createEdgeObstacleInteractionContext(
     ): number {
       let hits = 0;
       for (const segment of segments) {
-        hits += countSegmentObstacleHits(segment.a, segment.b, obstacleIndex);
+        hits += countHits(segment);
         if (hits > maximumInclusive) return hits;
       }
       return hits;
     },
+    readMetrics: () => ({ cacheHitCount }),
   };
 }
 

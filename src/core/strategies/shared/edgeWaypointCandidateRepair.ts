@@ -5,6 +5,7 @@ import {
   segmentToClearanceRectDistance,
 } from './edgeNodeClearanceGeometry';
 import { createRoutingWaypointSegmentMemo } from './edgeRoutingWaypointSegmentMemo';
+import { createRoutingWaypointVisualRectIndex } from './edgeRoutingWaypointVisualRectIndex';
 export {
   countEndpointNodeTraversalHits,
   countRoutingObstacleHits,
@@ -173,45 +174,20 @@ export function createNodeClearanceEvaluationContext(
 /** Builds business-node geometry once for whole-graph clearance audits. */
 export function createNodeClearanceGraphEvaluationContext(
   nodes: ReactFlowNode[],
-  options: Readonly<{ disableSegmentMemo?: boolean }> = {},
+  options: Readonly<{
+    disableSegmentMemo?: boolean;
+    disableSpatialIndex?: boolean;
+  }> = {},
 ): NodeClearanceGraphEvaluationContext {
   const nodeRects = businessRects(nodes);
-  const useSpatialIndex = nodeRects.length > 128;
-  const cellSize = 128;
-  const grid = new Map<string, typeof nodeRects>();
-  if (useSpatialIndex) {
-    for (const node of nodeRects) {
-      const minCellX = Math.floor(node.rect.x / cellSize);
-      const maxCellX = Math.floor((node.rect.x + node.rect.width) / cellSize);
-      const minCellY = Math.floor(node.rect.y / cellSize);
-      const maxCellY = Math.floor((node.rect.y + node.rect.height) / cellSize);
-      for (let cellX = minCellX; cellX <= maxCellX; cellX += 1) {
-        for (let cellY = minCellY; cellY <= maxCellY; cellY += 1) {
-          const key = `${cellX},${cellY}`;
-          const bucket = grid.get(key);
-          if (bucket) bucket.push(node);
-          else grid.set(key, [node]);
-        }
-      }
-    }
-  }
-  const nearbyNodes = (segment: Segment, clearance: number): typeof nodeRects => {
-    if (!useSpatialIndex) return nodeRects;
-    const minCellX = Math.floor((Math.min(segment.a.x, segment.b.x) - clearance) / cellSize);
-    const maxCellX = Math.floor((Math.max(segment.a.x, segment.b.x) + clearance) / cellSize);
-    const minCellY = Math.floor((Math.min(segment.a.y, segment.b.y) - clearance) / cellSize);
-    const maxCellY = Math.floor((Math.max(segment.a.y, segment.b.y) + clearance) / cellSize);
-    const cellCount = (maxCellX - minCellX + 1) * (maxCellY - minCellY + 1);
-    if (!Number.isFinite(cellCount) || cellCount > 4096) return nodeRects;
-    const candidates = new Set<(typeof nodeRects)[number]>();
-    for (let cellX = minCellX; cellX <= maxCellX; cellX += 1) {
-      for (let cellY = minCellY; cellY <= maxCellY; cellY += 1) {
-        for (const node of grid.get(`${cellX},${cellY}`) ?? []) candidates.add(node);
-      }
-    }
-    // Preserve the source node order so floating-point accumulation and every
-    // downstream rank remain byte-for-byte equivalent to the exhaustive scan.
-    return nodeRects.filter(node => candidates.has(node));
+  const spatialIndex = options.disableSpatialIndex
+    ? undefined
+    : createRoutingWaypointVisualRectIndex(nodeRects);
+  const nearbyNodes = (
+    segment: Segment,
+    clearance: number,
+  ): readonly (typeof nodeRects)[number][] => {
+    return spatialIndex?.queryPotentialEntries(segment, clearance).entries ?? nodeRects;
   };
   let scannedNodeCount = 0;
   let cacheHitCount = 0;
