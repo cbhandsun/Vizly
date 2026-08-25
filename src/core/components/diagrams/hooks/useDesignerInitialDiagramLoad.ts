@@ -16,7 +16,6 @@ import {
 import {
     logDesignerSystemSyncAutosaveRecalculationFailure,
     logDesignerSystemSyncDataRegistryImportFailure,
-    logDesignerSystemSyncRoutingFreezeFailure,
     logDesignerSystemSyncStaleAutosaveDetected,
     logDesignerSystemSyncStandardDataToCanvasFailure,
 } from './designerSystemSyncLogging';
@@ -117,15 +116,7 @@ export const useDesignerInitialDiagramLoad = ({
             const restoredActivePage = restoreAutoSaveMetadata?.(saved.metadata);
             const restoredNodes = restoredActivePage?.nodes ?? saved.nodes;
             const restoredEdges = restoredActivePage?.edges ?? saved.edges;
-            void Promise.all([
-                recalculateAutosaveNodeSizes(restoredNodes),
-                import('../../../ports/edgeRoutingCoordinatorRuntime')
-                  .then(({ loadEdgeRoutingCoordinator }) => loadEdgeRoutingCoordinator())
-                  .catch((error) => {
-                    logDesignerSystemSyncRoutingFreezeFailure(error);
-                    return null;
-                  }),
-            ]).then(([recalculatedNodes, routingCoordinator]) => {
+            void recalculateAutosaveNodeSizes(restoredNodes).then((recalculatedNodes) => {
                 commitInitialization(() => {
                     if (saved.routingSnapshot) {
                         registerRoutingOnlyDocumentCandidate(saved.routingSnapshot);
@@ -134,7 +125,6 @@ export const useDesignerInitialDiagramLoad = ({
                     setNodes(recalculatedNodes);
                     setEdges(restoredEdges);
                     needsInitialFitView.current = true;
-                    routingCoordinator?.freeze();
                     if (saved.isFreshSeed) {
                         messageApi?.success(t('designer.initialLoad.templateLoaded'));
                         clearDesignerFreshSeedFlag(`flowchart-autosave-v2-${id || 'default'}`);

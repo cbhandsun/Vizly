@@ -7,8 +7,8 @@
  * - node-add/delete: 节点增删
  * - edge-add/delete: 边增删
  * 
- * RF 版已有 EdgeRoutingCoordinator 负责 debounce 刷新，
- * 但缺少事件分类和优先级机制。本 hook 补充该能力：
+ * React Flow 版由 Canvas Routing Session 负责原子路由提交，
+ * 本 hook 只补充调用方事件分类和优先级机制：
  * - 高优事件（drag-end, layout-change）→ 立即刷新
  * - 低优事件（theme-change, zoom）→ 延迟刷新
  * - 批量事件合并（多个 node-add）→ 仅触发一次

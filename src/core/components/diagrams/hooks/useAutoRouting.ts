@@ -3,7 +3,6 @@ import { Edge, Node, ReactFlowInstance } from '@xyflow/react';
 import { diagramConfigManager, EdgeConfig } from '@/core/config/DiagramConfig';
 import { useLayoutStrategy } from './useLayoutStrategy';
 import { syncAutoPathSelection, applyRoutingProfile, DESIGNER_ROUTING_PROFILE } from './useSmartRoutingConfig';
-import { logAutoRoutingCacheClearFailure } from './diagramInteractionLogging';
 
 interface UseAutoRoutingOptions {
     setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
@@ -103,12 +102,6 @@ export function useAutoRouting({
         if (autoRoutingEnabled) {
             applyRoutingProfile(DESIGNER_ROUTING_PROFILE);
         }
-        // 用户显式切换后才加载高级路由器；空白画布首屏不需要其完整实现。
-        void import('../../../ports/edgeRoutingCoordinatorRuntime')
-            .then(({ loadEdgeRoutingCoordinator }) => loadEdgeRoutingCoordinator())
-            .then(coordinator => coordinator.forceClearAllCaches())
-            .catch(logAutoRoutingCacheClearFailure);
-
         // 强刷 Edge 引用，触发 React Flow 和自定义 Edge 组件的全量重绘
         // 这是必要的，因为如果不修改 edge 对象的引用，React Flow 内部可能因为
         // graphVersion 未变而跳过渲染，导致开启/关闭“自动布线”后画面没有立刻反映变化。

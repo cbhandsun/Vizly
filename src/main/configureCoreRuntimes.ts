@@ -2,12 +2,6 @@ import { isStandardPresetId } from '@/data/standardized/presetMetadata';
 import { configureApplicationDiagramRuntime } from '@/core/ports/applicationDiagramRuntime';
 import { configureMindMapAIRuntime } from '@/core/ports/mindMapAIRuntime';
 import type { MindMapAIChatResponse } from '@/core/ports/mindMapAIRuntime';
-import { configureEdgeRoutingCoordinatorRuntime } from '@/core/ports/edgeRoutingCoordinatorRuntime';
-
-configureEdgeRoutingCoordinatorRuntime(async () => {
-  const { EdgeRoutingCoordinator } = await import('@/core/services/EdgeRoutingCoordinator');
-  return EdgeRoutingCoordinator.getInstance();
-});
 
 configureApplicationDiagramRuntime({
   isStandardPresetId: (id) => isStandardPresetId(typeof id === 'string' ? id : undefined),

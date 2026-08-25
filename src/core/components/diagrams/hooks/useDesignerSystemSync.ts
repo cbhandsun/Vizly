@@ -42,16 +42,6 @@ export interface UseDesignerSystemSyncProps {
     restoreAutoSaveMetadata?: (metadata: unknown) => { nodes: Node[]; edges: Edge[] } | null;
 }
 
-const unfreezeRoutingCoordinator = async (): Promise<void> => {
-    try {
-        const { loadEdgeRoutingCoordinator } = await import('../../../ports/edgeRoutingCoordinatorRuntime');
-        const routingCoordinator = await loadEdgeRoutingCoordinator();
-        routingCoordinator.unfreeze();
-    } catch (error) {
-        logDesignerSystemSyncImportDataFailure(error);
-    }
-};
-
 export function useDesignerSystemSync({
     id, diagramIdForExport, nodes, edges, setNodes, setEdges,
     reactFlowInstance, isDragging, pluginId, messageApi,
@@ -515,29 +505,23 @@ export function useDesignerSystemSync({
         if (needsInitialFitView.current && reactFlowInstance) {
             needsInitialFitView.current = false;
 
-            // [COLD-START FIX] 等节点被 React Flow 测量后解冻路由器。
-            // freeze() 阻止了节点测量期间的所有 A* 计算（避免 23892次 openSet 迭代），
-            // 所有 route() 请求已积压在 latestRequests 中。
-            // unfreeze() 会将它们全部标脏，然后触发一次性批量计算。
+            // Routing Session waits for measured geometry through its own
+            // geometry barrier; the legacy per-edge coordinator no longer owns
+            // a second freeze/unfreeze lifecycle.
             const triggerRoutingAfterMeasure = () => {
                 const currentNodes = reactFlowInstance.getNodes();
                 const allMeasured = currentNodes.length > 0 &&
                     currentNodes.every((node) => (node.measured?.width && node.measured.width > 0) || node.width);
 
                 if (allMeasured) {
-                    // 节点已被 RF 测量，解冻路由器 → 积压请求立即批量计算
-                    void unfreezeRoutingCoordinator().finally(() => {
-                        window.dispatchEvent(new CustomEvent('diagramControl', { detail: { action: 'fit' } }));
-                    });
+                    window.dispatchEvent(new CustomEvent('diagramControl', { detail: { action: 'fit' } }));
                 } else {
                     // 节点尚未测量完毕，先把视口大致定到中心，稍后重试
                     const { width: cw, height: ch } = readReactFlowCanvasSize();
                     reactFlowInstance.setViewport({ x: cw / 2 - 100, y: ch / 2 - 100, zoom: 1 });
                     setTimeout(() => {
-                        // 350ms 后 RF 应已完成测量，解冻并 fit
-                        void unfreezeRoutingCoordinator().finally(() => {
-                            window.dispatchEvent(new CustomEvent('diagramControl', { detail: { action: 'fit' } }));
-                        });
+                        // 350ms 后 RF 应已完成测量，再执行 fit。
+                        window.dispatchEvent(new CustomEvent('diagramControl', { detail: { action: 'fit' } }));
                     }, 350);
                 }
             };

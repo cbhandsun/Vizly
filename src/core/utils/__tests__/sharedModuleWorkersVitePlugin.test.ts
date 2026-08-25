@@ -295,7 +295,7 @@ const worker = new Worker(new URL('./baseReactFlowDisplayEdges.worker.ts', impor
     )).toBe(false);
   });
 
-  it('loads the full routing engine only after an explicit layout or measured-canvas action', () => {
+  it('keeps diagram hooks on the Canvas Routing Session without a legacy coordinator', () => {
     const layoutHookSource = readFileSync(resolve(
       process.cwd(),
       'src/core/components/diagrams/hooks/useLayoutRoutingTransaction.ts',
@@ -315,12 +315,10 @@ const worker = new Worker(new URL('./baseReactFlowDisplayEdges.worker.ts', impor
 
     expect(layoutHookSource).toContain("import('../../shared/baseReactFlowLayoutRoutingTransaction')");
     expect(layoutHookSource).not.toContain("from '../../shared/baseReactFlowLayoutRoutingTransaction'");
-    expect(systemSyncSource).toContain("await import('../../../ports/edgeRoutingCoordinatorRuntime')");
-    expect(initialLoadSource).toContain("import('../../../ports/edgeRoutingCoordinatorRuntime')");
-    expect(autoRoutingSource).toContain("import('../../../ports/edgeRoutingCoordinatorRuntime')");
-    expect(systemSyncSource).not.toContain("../../../services/EdgeRoutingCoordinator");
-    expect(initialLoadSource).not.toContain("../../../services/EdgeRoutingCoordinator");
-    expect(autoRoutingSource).not.toContain("../../../services/EdgeRoutingCoordinator");
+    for (const source of [layoutHookSource, systemSyncSource, initialLoadSource, autoRoutingSource]) {
+      expect(source).not.toContain('edgeRoutingCoordinatorRuntime');
+      expect(source).not.toContain('EdgeRoutingCoordinator');
+    }
   });
 
   it('loads only the active locale on the initial application path', () => {

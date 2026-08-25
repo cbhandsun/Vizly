@@ -81,11 +81,6 @@ describe('routingLogging', () => {
     logging.logIncrementalVisibilityGraphObstacleMissingAdd('obs-3');
     logging.logVisibilityGraphCachePrebuildDisabled();
     logging.logLPNudgeOptimizeFailure(new Error('token=lp-secret'));
-    logging.logEdgeRoutingCoordinatorParallelPoolInitFailure(new Error('token=pool-secret'));
-    logging.logEdgeRoutingCoordinatorSerialRoutingFailure('edge-7', new Error('token=route-secret'));
-    logging.logEdgeRoutingCoordinatorBatchRoutingFailure(new Error('password=batch-secret'));
-    logging.logEdgeRoutingCoordinatorParallelFallback(new Error('api_key=parallel-secret'));
-    logging.logEdgeRoutingCoordinatorGlobalNudgeFailure(new Error('Bearer nudge-secret'));
 
     const errorPayload = JSON.stringify(safeLogState.error.mock.calls);
     const warnPayload = JSON.stringify(safeLogState.warn.mock.calls);
@@ -115,13 +110,7 @@ describe('routingLogging', () => {
     expect(warnPayload).toContain('[IncrementalVG] Obstacle obs-3 not found. Adding it.');
     expect(warnPayload).toContain('[VGCache] Prebuild disabled in config');
     expect(errorPayload).toContain('LPNudge optimize failed');
-    expect(warnPayload).toContain('[EdgeRoutingCoordinator] Failed to initialize parallel pool:');
-    expect(errorPayload).toContain('[Coordinator] Serial routing failed for edge-7:');
-    expect(errorPayload).toContain('[EdgeRoutingCoordinator] batchRouteDirtyEdges failed:');
-    expect(errorPayload).toContain('[P0 Parallel] Failed, falling back to serial:');
-    expect(errorPayload).toContain('[GlobalNudge] Channel routing failed, falling back to original paths:');
     expect(errorPayload).toContain('[redacted]');
-    expect(warnPayload).toContain('[redacted]');
     expect(errorPayload).not.toContain('edge-secret');
     expect(errorPayload).not.toContain('worker-init-secret');
     expect(errorPayload).not.toContain('worker-runtime-secret');
@@ -136,11 +125,6 @@ describe('routingLogging', () => {
     expect(errorPayload).not.toContain('astar-secret');
     expect(errorPayload).not.toContain('trunk-secret');
     expect(errorPayload).not.toContain('lp-secret');
-    expect(warnPayload).not.toContain('pool-secret');
-    expect(errorPayload).not.toContain('route-secret');
-    expect(errorPayload).not.toContain('batch-secret');
-    expect(errorPayload).not.toContain('parallel-secret');
-    expect(errorPayload).not.toContain('nudge-secret');
   });
 
   it('logs non-sensitive routing diagnostics with safeLog', async () => {
@@ -150,12 +134,6 @@ describe('routingLogging', () => {
     logging.logWorkerPoolUnknownJobMessage();
     logging.logPathfindingWorkerBatchTimeout(0, 10_000, 3);
     logging.logRoutingWorkerDebug('route dbg');
-    logging.logEdgeRoutingCoordinatorCachesCleared();
-    logging.logEdgeRoutingCoordinatorCachesCleared(9);
-    logging.logEdgeRoutingCoordinatorNoLatestRequest('edge-42');
-    logging.logEdgeRoutingCoordinatorMissingResult('edge-9', 2);
-    logging.logEdgeRoutingCoordinatorParallelIncomplete(4, 3);
-    logging.logEdgeRoutingCoordinatorDebugToolsReady();
 
     expect(safeLogState.warn).toHaveBeenCalledWith('[WorkerPool] Ignoring malformed worker message');
     expect(safeLogState.warn).toHaveBeenCalledWith('[WorkerPool] Ignoring worker message for unknown job');
@@ -163,18 +141,5 @@ describe('routingLogging', () => {
       '[WorkerPool] Worker 0 batch execution timed out after 10s; falling back to serial routing for 3 job(s).'
     );
     expect(safeLogState.debug).toHaveBeenCalledWith('route dbg');
-    expect(safeLogState.warn).toHaveBeenCalledWith(
-      '[EdgeRoutingCoordinator] forceDebugReRoute: no latest request for edge',
-      'edge-42'
-    );
-    expect(safeLogState.info).toHaveBeenCalledWith('[EdgeRoutingCoordinator] All caches cleared. Edges will re-route.');
-    expect(safeLogState.info).toHaveBeenCalledWith('[EdgeRoutingCoordinator] All caches cleared. graphVersion=9');
-    expect(safeLogState.info).toHaveBeenCalledWith(
-      '[Vizly Dev] Routing debug tools available: window.__vizly_routing__.clearCache()'
-    );
-    expect(safeLogState.error).toHaveBeenCalledWith('[Coordinator] Missing result for edge edge-9 at index 2');
-    expect(safeLogState.error).toHaveBeenCalledWith(
-      '[EdgeRoutingCoordinator] Parallel routing returned incomplete results. Expected 4, got 3'
-    );
   });
 });

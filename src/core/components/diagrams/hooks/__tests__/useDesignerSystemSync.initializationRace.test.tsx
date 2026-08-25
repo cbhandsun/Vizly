@@ -127,13 +127,6 @@ vi.mock('../../../../routing/routingDocumentCandidateRegistry', () => ({
   registerRoutingOnlyDocumentCandidate: mocks.registerRoutingCandidate,
 }));
 
-vi.mock('../../../../ports/edgeRoutingCoordinatorRuntime', () => ({
-  loadEdgeRoutingCoordinator: async () => ({
-    freeze: vi.fn(),
-    unfreeze: vi.fn(),
-  }),
-}));
-
 vi.mock('../../../../utils/animateLayoutTransition', () => ({
   cancelLayoutTransition: vi.fn(),
   suspendLayoutTransitions: vi.fn(),

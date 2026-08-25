@@ -6,7 +6,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
     autoPathSelection: true,
-    forceClearAllCaches: vi.fn(),
     handleStrategyLayout: vi.fn(),
     syncAutoPathSelection: vi.fn(),
     applyRoutingProfile: vi.fn(),
@@ -16,12 +15,6 @@ vi.mock('@/core/config/DiagramConfig', () => ({
     diagramConfigManager: {
         getConfig: () => ({ edge: { autoPathSelection: mocks.autoPathSelection } }),
     },
-}));
-
-vi.mock('@/core/ports/edgeRoutingCoordinatorRuntime', () => ({
-    loadEdgeRoutingCoordinator: async () => ({
-        forceClearAllCaches: mocks.forceClearAllCaches,
-    }),
 }));
 
 vi.mock('../useLayoutStrategy', () => ({
@@ -71,25 +64,18 @@ const createOptions = () => {
 describe('useAutoRouting layout preference coordination', () => {
     beforeEach(() => {
         mocks.autoPathSelection = true;
-        mocks.forceClearAllCaches.mockReset();
         mocks.handleStrategyLayout.mockReset();
         mocks.handleStrategyLayout.mockResolvedValue(true);
         mocks.syncAutoPathSelection.mockReset();
         mocks.applyRoutingProfile.mockReset();
     });
 
-    it('does not load or clear the advanced routing cache on initial mount', () => {
-        renderHook(() => useAutoRouting(createOptions()));
-
-        expect(mocks.forceClearAllCaches).not.toHaveBeenCalled();
-    });
-
-    it('clears the advanced routing cache after an explicit preference change', async () => {
+    it('synchronizes an explicit preference change without a second cache owner', async () => {
         const { result } = renderHook(() => useAutoRouting(createOptions()));
 
         act(() => result.current.setAutoRoutingEnabled(false));
 
-        await waitFor(() => expect(mocks.forceClearAllCaches).toHaveBeenCalledTimes(1));
+        await waitFor(() => expect(mocks.syncAutoPathSelection).toHaveBeenLastCalledWith(false));
     });
 
     it('does not let a late layout completion overwrite a newer manual routing choice', async () => {

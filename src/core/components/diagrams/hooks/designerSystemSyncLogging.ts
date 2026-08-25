@@ -24,10 +24,6 @@ export const logDesignerSystemSyncAutosaveRecalculationFailure = (error: unknown
   safeLog.error('[DesignerSystemSync] autosave size recalculation failed:', redactSensitiveLogValue(error));
 };
 
-export const logDesignerSystemSyncRoutingFreezeFailure = (error: unknown): void => {
-  safeLog.warn('[DesignerSystemSync] routing freeze unavailable:', redactSensitiveLogValue(error));
-};
-
 export const logDesignerSystemSyncStandardDataToCanvasFailure = (source: string, error: unknown): void => {
   safeLog.error(
     `[DesignerSystemSync] standardDataToCanvas failed (${source}):`,
