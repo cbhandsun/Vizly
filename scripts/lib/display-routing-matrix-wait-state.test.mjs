@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { summarizeDisplayRoutingWaitState } from './display-routing-matrix-wait-state.mjs';
+import {
+  displayRoutingWaitStateHasTerminalFailure,
+  summarizeDisplayRoutingWaitState,
+} from './display-routing-matrix-wait-state.mjs';
 
 describe('display routing matrix wait-state summary', () => {
   it('keeps bounded routing metrics while dropping geometry and user-authored content', () => {
@@ -8,6 +11,11 @@ describe('display routing matrix wait-state summary', () => {
       stage: 'worker-response',
       workerStartCount: 1,
       userLabel: 'private node name',
+      phaseProgressTrace: [{
+        phase: 'quality',
+        durationMs: 18,
+        privateGeometry: [{ x: 1, y: 2 }],
+      }],
     }, [{
       routeResolution: 'full-route-repaired',
       hardClean: false,
@@ -28,7 +36,11 @@ describe('display routing matrix wait-state summary', () => {
     }], 26);
 
     expect(summary).toMatchObject({
-      routing: { stage: 'worker-response', workerStartCount: 1 },
+      routing: {
+        stage: 'worker-response',
+        workerStartCount: 1,
+        phaseProgressTrace: [{ phase: 'quality', durationMs: 18 }],
+      },
       responseCount: 1,
       lastResponse: {
         routeResolution: 'full-route-repaired',
@@ -59,5 +71,18 @@ describe('display routing matrix wait-state summary', () => {
       durationMs: undefined,
     }));
     expect(summary.renderedEdgeCount).toBeUndefined();
+  });
+
+  it('recognizes only fail-fast terminal routing states', () => {
+    expect(displayRoutingWaitStateHasTerminalFailure({
+      routing: { stage: 'worker-timeout' },
+    })).toBe(true);
+    expect(displayRoutingWaitStateHasTerminalFailure({
+      routing: { stage: 'worker-rejected' },
+    })).toBe(true);
+    expect(displayRoutingWaitStateHasTerminalFailure({
+      routing: { stage: 'worker-start' },
+    })).toBe(false);
+    expect(displayRoutingWaitStateHasTerminalFailure({})).toBe(false);
   });
 });

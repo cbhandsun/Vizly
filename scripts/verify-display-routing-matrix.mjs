@@ -20,7 +20,10 @@ import {
   DISPLAY_ROUTING_LAYOUT_CASES,
   parseDisplayRoutingMatrixCase,
 } from './lib/display-routing-matrix-cases.mjs';
-import { summarizeDisplayRoutingWaitState } from './lib/display-routing-matrix-wait-state.mjs';
+import {
+  displayRoutingWaitStateHasTerminalFailure,
+  summarizeDisplayRoutingWaitState,
+} from './lib/display-routing-matrix-wait-state.mjs';
 import { assertDisplayRoutingVisualScaleAudit } from './lib/display-routing-browser-visual-audit.mjs';
 
 const BASE_URL = String(process.env.PRECOMPILED_ROUTE_BASE_URL || '').trim().replace(/\/$/, '');
@@ -50,6 +53,17 @@ const waitForValue = async (session, expression, label) => {
   while (Date.now() < deadline) {
     const value = await session.evaluate(expression);
     if (value) return value;
+    const state = await session.evaluate(`(() => {
+      const summarize = ${summarizeDisplayRoutingWaitState.toString()};
+      return summarize(
+        window.__vizlyBaseReactFlowDisplayRouting || {},
+        window.__vizlyRoutingResponses || [],
+        document.querySelectorAll('.react-flow__edge').length,
+      );
+    })()`);
+    if (displayRoutingWaitStateHasTerminalFailure(state)) {
+      throw new Error(`Routing failed while waiting for ${label}:\n${JSON.stringify(state, null, 2)}`);
+    }
     await delay(100);
   }
   const state = await session.evaluate(`(() => {

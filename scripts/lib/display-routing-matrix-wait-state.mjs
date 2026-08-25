@@ -17,7 +17,27 @@ export const summarizeDisplayRoutingWaitState = (routingValue, responseValue, ed
   const report = record(response.hardReport);
   const quality = record(report.quality);
   const traces = Array.isArray(response.phaseTrace) ? response.phaseTrace.slice(-24) : [];
+  const progressTraces = Array.isArray(routing.phaseProgressTrace)
+    ? routing.phaseProgressTrace.slice(-24)
+    : [];
   const metric = key => finite(quality[key]);
+  const projectTrace = (value) => {
+    const trace = record(value);
+    return {
+      phase: token(trace.phase),
+      parentPhase: token(trace.parentPhase),
+      durationMs: finite(trace.durationMs),
+      exclusiveDurationMs: finite(trace.exclusiveDurationMs),
+      candidateCount: integer(trace.candidateCount),
+      changedEdgeCount: integer(trace.changedEdgeCount),
+      evaluationCount: integer(trace.evaluationCount),
+      cacheHitCount: integer(trace.cacheHitCount),
+      scannedNodeCount: integer(trace.scannedNodeCount),
+      scannedSegmentCount: integer(trace.scannedSegmentCount),
+      scannedEdgePairCount: integer(trace.scannedEdgePairCount),
+      resolution: token(trace.resolution),
+    };
+  };
   return {
     routing: {
       stage: token(routing.stage),
@@ -28,6 +48,7 @@ export const summarizeDisplayRoutingWaitState = (routingValue, responseValue, ed
       workerAbortCount: integer(routing.workerAbortCount),
       geometryBarrierResolution: token(routing.geometryBarrierResolution),
       geometryBarrierMs: finite(routing.geometryBarrierMs),
+      phaseProgressTrace: progressTraces.map(projectTrace),
     },
     responseCount: responses.length,
     lastResponse: {
@@ -53,24 +74,22 @@ export const summarizeDisplayRoutingWaitState = (routingValue, responseValue, ed
           hairpins: metric('hairpins'),
         },
       },
-      phaseTrace: traces.map(value => {
-        const trace = record(value);
-        return {
-          phase: token(trace.phase),
-          parentPhase: token(trace.parentPhase),
-          durationMs: finite(trace.durationMs),
-          exclusiveDurationMs: finite(trace.exclusiveDurationMs),
-          candidateCount: integer(trace.candidateCount),
-          changedEdgeCount: integer(trace.changedEdgeCount),
-          evaluationCount: integer(trace.evaluationCount),
-          cacheHitCount: integer(trace.cacheHitCount),
-          scannedNodeCount: integer(trace.scannedNodeCount),
-          scannedSegmentCount: integer(trace.scannedSegmentCount),
-          scannedEdgePairCount: integer(trace.scannedEdgePairCount),
-          resolution: token(trace.resolution),
-        };
-      }),
+      phaseTrace: traces.map(projectTrace),
     },
     renderedEdgeCount: integer(edgeCountValue),
   };
 };
+
+const TERMINAL_FAILURE_STAGES = new Set([
+  'final-quality-rejected',
+  'latest-shape-mismatch',
+  'worker-error',
+  'worker-message-error',
+  'worker-rejected',
+  'worker-response-error',
+  'worker-timeout',
+]);
+
+export const displayRoutingWaitStateHasTerminalFailure = state => (
+  TERMINAL_FAILURE_STAGES.has(state?.routing?.stage)
+);
