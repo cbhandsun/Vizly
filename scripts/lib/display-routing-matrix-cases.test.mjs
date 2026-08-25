@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createDisplayRoutingMatrixCaseIds,
   DISPLAY_ROUTING_LAYOUT_CASES,
+  DISPLAY_ROUTING_TOPOLOGY_CASE_ID,
   findDisplayRoutingMenuElementByKey,
   parseDisplayRoutingMatrixCase,
 } from './display-routing-matrix-cases.mjs';
@@ -38,6 +39,8 @@ describe('display routing matrix cases', () => {
       .toBe('canonical-preset');
     expect(parseDisplayRoutingMatrixCase(' domain-lanes-tb ', knownCaseIds))
       .toBe('domain-lanes-tb');
+    expect(parseDisplayRoutingMatrixCase(DISPLAY_ROUTING_TOPOLOGY_CASE_ID, knownCaseIds))
+      .toBe(DISPLAY_ROUTING_TOPOLOGY_CASE_ID);
     expect(parseDisplayRoutingMatrixCase('', knownCaseIds)).toBe('');
     expect(parseDisplayRoutingMatrixCase(undefined, knownCaseIds)).toBe('');
   });

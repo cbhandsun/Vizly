@@ -1,5 +1,7 @@
 const MAX_MATRIX_CASE_ID_LENGTH = 128;
 
+export const DISPLAY_ROUTING_TOPOLOGY_CASE_ID = 'topology-edit-cycle';
+
 export const DISPLAY_ROUTING_LAYOUT_CASES = Object.freeze([
   Object.freeze({ id: 'domain-compound-elk-tb', label: '复杂流程（保留域·上→下）' }),
   Object.freeze({ id: 'domain-compound-elk-bt', label: '复杂流程（保留域·下→上）' }),
@@ -22,6 +24,7 @@ export const DISPLAY_ROUTING_LAYOUT_CASES = Object.freeze([
 export const createDisplayRoutingMatrixCaseIds = presetIds => new Set([
   ...presetIds,
   ...DISPLAY_ROUTING_LAYOUT_CASES.map(layoutCase => layoutCase.id),
+  DISPLAY_ROUTING_TOPOLOGY_CASE_ID,
 ]);
 
 export const parseDisplayRoutingMatrixCase = (rawValue, knownCaseIds) => {

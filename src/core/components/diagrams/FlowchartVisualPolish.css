@@ -20,9 +20,10 @@
     --flow-visual-edge-label-text: #334155;
     --flow-visual-edge-hover-width: 2.25px;
     --flow-visual-edge-selected-width: 2.75px;
-    /* Retain a visible hierarchy without dropping standard semantic strokes
-       below the 3:1 non-text contrast floor on light canvases. */
-    --flow-visual-edge-peer-opacity: 0.78;
+    /* The active edge already owns an accent trace. Keep peer paint opaque so
+       semantic strokes and their contrast underlays remain above the 3:1
+       non-text contrast floor in every interaction state. */
+    --flow-visual-edge-peer-opacity: 1;
 }
 
 /* Nodes: preserve semantic fills while removing decorative glare and bounce. */

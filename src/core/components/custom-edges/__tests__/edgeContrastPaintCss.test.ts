@@ -38,7 +38,8 @@ describe('edge contrast paint CSS states', () => {
       /\.react-flow__edge:not\(:is\(:hover, \.selected, :focus, :focus-visible\)\)[^{]*\.react-flow__edge-path:not\(\.shared-trunk-canonical-backbone\)/s,
     );
     expect(stylesheet).toMatch(/transition:\s*opacity 80ms ease/);
-    expect(stylesheet).toMatch(/--flow-visual-edge-peer-opacity:\s*0\.78/);
+    expect(stylesheet).toMatch(/--flow-visual-edge-peer-opacity:\s*1/);
+    expect(stylesheet).not.toMatch(/--flow-visual-edge-peer-opacity:\s*0\.[0-9]+/);
     expect(stylesheet).not.toMatch(/\.react-flow__edge\s*\{[^}]*opacity:\s*0\.42/s);
   });
 

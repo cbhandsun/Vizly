@@ -19,6 +19,8 @@ export type BaseReactFlowDisplayEdgesArgs = {
   forceFullQuality?: boolean;
   /** Same-job interactive candidate; source shape is revalidated before reuse. */
   preparedInteractiveEdges?: Edge[];
+  /** Worker-only seed support for a newly connected edge with no renderer metadata yet. */
+  seedUnroutedFlowEdges?: boolean;
   reusePreparedGlobalRouting?: boolean;
   skipBoundedAttempt?: boolean;
   skipFinalizedReuse?: boolean;

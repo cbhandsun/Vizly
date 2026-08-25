@@ -11,6 +11,7 @@ import {
   computeBaseReactFlowDisplayOutputRouteSignature,
 } from '../baseReactFlowDisplayEdgeCore';
 import {
+  canReuseBaseReactFlowDisplayCommittedSnapshot,
   clearBaseReactFlowDisplayCommittedSnapshots,
   commitBaseReactFlowDisplaySnapshot,
   createBaseReactFlowRoutingOnlyDocumentSnapshot,
@@ -255,6 +256,32 @@ describe('baseReactFlowDisplayWorker lifecycle', () => {
     expect(doesBaseReactFlowDisplayCommittedBaselineMatchIdentity(
       secondHit?.baseline ?? null,
       '124',
+      `geometry-v1:${'a'.repeat(32)}`,
+    )).toBe(false);
+    expect(canReuseBaseReactFlowDisplayCommittedSnapshot(
+      null,
+      secondHit,
+      '123',
+      `geometry-v1:${'a'.repeat(32)}`,
+    )).toBe(true);
+    expect(canReuseBaseReactFlowDisplayCommittedSnapshot(
+      secondHit?.baseline ?? null,
+      secondHit,
+      '123',
+      `geometry-v1:${'a'.repeat(32)}`,
+    )).toBe(true);
+    const differentActiveBaseline = secondHit?.baseline ? {
+      ...secondHit.baseline,
+      identity: {
+        ...secondHit.baseline.identity,
+        inputSignature: '124',
+      },
+      inputSignature: '124',
+    } : null;
+    expect(canReuseBaseReactFlowDisplayCommittedSnapshot(
+      differentActiveBaseline,
+      secondHit,
+      '123',
       `geometry-v1:${'a'.repeat(32)}`,
     )).toBe(false);
   });

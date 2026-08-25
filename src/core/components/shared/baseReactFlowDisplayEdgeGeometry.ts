@@ -141,12 +141,22 @@ export const compactOrthogonalPath = (path: Array<{ x: number; y: number }>): Ar
 export const synthesizeStableFallbackPath = ({
   edge,
   nodeById,
+  allowUnroutedFlowEdge = false,
 }: {
   edge: Edge;
   nodeById: Map<string, Node>;
+  allowUnroutedFlowEdge?: boolean;
 }): Edge => {
   const data = asRecord(edge.data);
-  if (String(edge.type || '').toLowerCase() !== 'stablepath') return edge;
+  const edgeType = String(edge.type || '').toLowerCase();
+  const isStablePath = edgeType === 'stablepath';
+  const isUnroutedFlowEdge = allowUnroutedFlowEdge && [
+    '',
+    'advanced-smart-step',
+    'default',
+    'smoothstep',
+  ].includes(edgeType);
+  if (!isStablePath && !isUnroutedFlowEdge) return edge;
   if (Array.isArray(data.computedPath) && data.computedPath.length >= 2 && data.computedPath.every(isFinitePoint)) {
     return edge;
   }

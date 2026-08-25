@@ -297,4 +297,112 @@ describe('Logistics incremental display routing', () => {
     expect(report?.hardClean, diagnostics).toBe(true);
     expect(clearanceRisks, diagnostics).toEqual([]);
   }, 120_000);
+
+  it('routes a newly connected bare edge inside the topology fallback transaction', async () => {
+    const entry = Object.entries(GENERATED_BASE_REACT_FLOW_PRECOMPILED_ROUTE_LOADERS)
+      .find(([, descriptor]) => descriptor.presetId === 'logistics-architecture-v1');
+    if (!entry) throw new Error('expected the Logistics precompiled loader');
+    const [inputSignature, descriptor] = entry;
+    const artifact = parseBaseReactFlowPrecompiledRouteArtifact(
+      getGeneratedPrecompiledRouteArtifactForTest('logistics-architecture-v1'), {
+      inputSignature,
+      inputGeometryDigest: descriptor.geometryDigest,
+      sourceHash: descriptor.sourceHash,
+    });
+    if (!artifact) throw new Error('expected the Logistics artifact to parse');
+
+    const sourceEdges = await createBrowserSourceEdges();
+    const baselineEdges = mergeBaseReactFlowDisplayEdgePatches(sourceEdges, artifact.edges);
+    if (!baselineEdges) throw new Error('expected the Logistics artifact patches to merge');
+    const nodes = withAbsoluteNodePositions(browserLogisticsNodes);
+    const addedEdge: Edge = {
+      id: 'xy-edge__wcsright-bmsleft',
+      source: 'wcs',
+      target: 'bms',
+    };
+    const nextEdges = [...sourceEdges, addedEdge];
+    const baselinePatches = createBaseReactFlowDisplayEdgePatches(sourceEdges, baselineEdges);
+    const baselineOutputRouteSignature = computeBaseReactFlowDisplayOutputRouteSignature(
+      baselineEdges,
+    );
+    if (!baselinePatches || !baselineOutputRouteSignature) {
+      throw new Error('expected a valid Logistics incremental baseline');
+    }
+    const baselineIdentity = computeBaseReactFlowDisplayInputIdentityBundle({
+      nodes,
+      edges: sourceEdges,
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: false,
+    });
+    const nextIdentity = computeBaseReactFlowDisplayInputIdentityBundle({
+      nodes,
+      edges: nextEdges,
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: false,
+    });
+    const changeSet = createBaseReactFlowRoutingChangeSet({
+      previousNodes: nodes,
+      previousEdges: sourceEdges,
+      nextNodes: nodes,
+      nextEdges,
+      reasonHint: 'edge-add',
+    });
+    const affectedClosure = createBaseReactFlowRoutingAffectedClosure({
+      changeSet,
+      previousNodes: nodes,
+      nextNodes: nodes,
+      baselineEdges,
+      nextEdges,
+    });
+    const response = computeBaseReactFlowDisplayEdgesWorkerResponse({
+      operation: 'incremental-route',
+      requestId: 'logistics-edge-add-topology-fallback',
+      edges: nextEdges,
+      nodes,
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: false,
+      displayEdgeEpoch: computeBaseReactFlowDisplayEdgeEpoch({ nodes, edges: nextEdges }),
+      qualityMode: 'full',
+      baselineInputSignature: baselineIdentity.cacheSignature,
+      baselineInputGeometryDigest: baselineIdentity.geometryDigest,
+      baselineNodes: nodes,
+      baselineSourceEdges: sourceEdges,
+      baselinePatches,
+      baselineOutputRouteSignature,
+      nextInputSignature: nextIdentity.cacheSignature,
+      nextInputGeometryDigest: nextIdentity.geometryDigest,
+      changeSet,
+      mutableEdgeIds: affectedClosure.mutableEdgeIds,
+      contextEdgeIds: affectedClosure.contextEdgeIds,
+    });
+    const report = response.edges ? getExactDisplayHardReport(response.edges, nodes) : null;
+    const routedAddedEdge = response.edges?.find(edge => edge.id === addedEdge.id);
+    const addedPath = routedAddedEdge ? getDisplayComputedPath(routedAddedEdge) : [];
+    const diagnostics = JSON.stringify({
+      changeSet,
+      affectedClosure,
+      response: {
+        hardClean: response.hardClean,
+        routeResolution: response.routeResolution,
+        fallbackLevel: response.fallbackLevel,
+        affectedEdgeCount: response.affectedEdgeCount,
+        phaseTrace: response.phaseTrace,
+      },
+      report,
+      addedPath,
+    }, null, 2);
+
+    expect(changeSet, diagnostics).toMatchObject({
+      classification: 'topology',
+      reason: 'edge-add',
+      topologyChanged: true,
+    });
+    expect(response.fallbackLevel, diagnostics).toBe('full');
+    expect(response.hardClean, diagnostics).toBe(true);
+    expect(report?.hardClean, diagnostics).toBe(true);
+    expect(addedPath.length, diagnostics).toBeGreaterThanOrEqual(2);
+  }, 120_000);
 });

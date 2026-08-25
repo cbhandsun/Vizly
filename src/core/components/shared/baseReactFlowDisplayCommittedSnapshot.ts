@@ -80,6 +80,29 @@ export const doesBaseReactFlowDisplayCommittedBaselineMatchIdentity = (
   && baseline.identity.inputGeometryDigest === inputGeometryDigest
 );
 
+/**
+ * A historical L0 entry may bootstrap a canvas or serve the identity that is
+ * already active. It must not replace a different active baseline during an
+ * edit transition: that would turn undoing a topology edit into an unobserved
+ * cache replay and skip the required atomic Worker transaction.
+ */
+export const canReuseBaseReactFlowDisplayCommittedSnapshot = (
+  activeBaseline: BaseReactFlowDisplayCommittedSnapshotBaseline | null,
+  candidate: BaseReactFlowDisplayCommittedSnapshotHit | null,
+  inputSignature: string,
+  inputGeometryDigest: string,
+): candidate is BaseReactFlowDisplayCommittedSnapshotHit => (
+  candidate !== null
+  && (
+    activeBaseline === null
+    || doesBaseReactFlowDisplayCommittedBaselineMatchIdentity(
+      activeBaseline,
+      inputSignature,
+      inputGeometryDigest,
+    )
+  )
+);
+
 const committedDisplaySnapshots =
   new Map<string, BaseReactFlowDisplayCommittedSnapshotBaseline>();
 let committedSnapshotBySourceEdges =

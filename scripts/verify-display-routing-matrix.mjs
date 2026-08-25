@@ -18,6 +18,7 @@ import {
 import {
   createDisplayRoutingMatrixCaseIds,
   DISPLAY_ROUTING_LAYOUT_CASES,
+  DISPLAY_ROUTING_TOPOLOGY_CASE_ID,
   findDisplayRoutingMenuElementByKey,
   parseDisplayRoutingMatrixCase,
 } from './lib/display-routing-matrix-cases.mjs';
@@ -26,6 +27,9 @@ import {
   summarizeDisplayRoutingWaitState,
 } from './lib/display-routing-matrix-wait-state.mjs';
 import { assertDisplayRoutingVisualScaleAudit } from './lib/display-routing-browser-visual-audit.mjs';
+import {
+  verifyDisplayRoutingTopologyMatrix,
+} from './lib/display-routing-browser-topology-matrix.mjs';
 
 const BASE_URL = String(process.env.PRECOMPILED_ROUTE_BASE_URL || '').trim().replace(/\/$/, '');
 const WAIT_TIMEOUT_MS = 120_000;
@@ -335,4 +339,17 @@ for (const layoutCase of DISPLAY_ROUTING_LAYOUT_CASES) {
     layoutResults.push(await verifyLayout(layoutCase));
   }
 }
-console.log(JSON.stringify({ presetResults, layoutResults }, null, 2));
+const topologyResults = [];
+if (!REQUESTED_CASE || REQUESTED_CASE === DISPLAY_ROUTING_TOPOLOGY_CASE_ID) {
+  topologyResults.push(await verifyDisplayRoutingTopologyMatrix({
+    baseUrl: BASE_URL,
+    prepareSession,
+    waitForInitialRoute: (session, label) => waitForValue(
+      session,
+      readFinalRouteExpression(''),
+      `${label} initial route`,
+    ),
+    auditFinalSvg,
+  }));
+}
+console.log(JSON.stringify({ presetResults, layoutResults, topologyResults }, null, 2));

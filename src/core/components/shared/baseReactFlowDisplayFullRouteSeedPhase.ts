@@ -51,6 +51,7 @@ export const prepareBaseReactFlowFullRouteSeed = ({
   displayEdgeEpoch,
   forceFullQuality = false,
   preparedInteractiveEdges,
+  seedUnroutedFlowEdges = false,
   reusePreparedGlobalRouting = false,
   skipBoundedAttempt = false,
   skipFinalizedReuse = false,
@@ -156,7 +157,11 @@ export const prepareBaseReactFlowFullRouteSeed = ({
   }
   const normalizedEdges = routeSeedEdges
     .map((rawEdge) => normalizeBaseEdge({ edge: rawEdge, nodeById, displayEdgeEpoch }))
-    .map((edge) => synthesizeStableFallbackPath({ edge, nodeById }));
+    .map((edge) => synthesizeStableFallbackPath({
+      edge,
+      nodeById,
+      allowUnroutedFlowEdge: seedUnroutedFlowEdges,
+    }));
   const layoutDirection = typeof normalizedEdges[0]?.data?.layoutDirection === 'string'
     ? normalizedEdges[0].data.layoutDirection
     : 'TB';

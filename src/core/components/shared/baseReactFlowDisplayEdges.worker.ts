@@ -556,6 +556,7 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
     smartEdgePadding: request.smartEdgePadding,
     isLargeGraph: request.isLargeGraph,
     forceFullQuality: request.qualityMode === 'full',
+    seedUnroutedFlowEdges: true,
     displayEdgeEpoch: request.displayEdgeEpoch,
   };
   let escalatedFromInteractive = false;
