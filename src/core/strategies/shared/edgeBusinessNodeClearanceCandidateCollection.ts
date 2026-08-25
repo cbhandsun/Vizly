@@ -16,20 +16,29 @@ export const uniqueBusinessNodeClearancePaths = <T extends Point[]>(
   });
 };
 
-export const createBusinessNodeClearanceCandidateCollection = <T extends Point[]>() => {
+/**
+ * Applies an optional exact gate at first-seen insertion time. This preserves
+ * the same order as collecting, deduplicating, and filtering the complete
+ * candidate list while allowing rejected path arrays to be released early.
+ */
+export const createBusinessNodeClearanceCandidateCollection = <T extends Point[]>(
+  accept: (path: T) => boolean = () => true,
+) => {
   const paths: T[] = [];
   const seen = new Set<string>();
   let generatedCandidateCount = 0;
+  let uniqueCandidateCount = 0;
   const add = (path: T): void => {
     generatedCandidateCount += 1;
     const signature = pathSignature(path);
     if (seen.has(signature)) return;
     seen.add(signature);
-    paths.push(path);
+    uniqueCandidateCount += 1;
+    if (accept(path)) paths.push(path);
   };
   return {
     add,
     addAll: (candidates: readonly T[]): void => candidates.forEach(add),
-    read: () => ({ generatedCandidateCount, paths }),
+    read: () => ({ generatedCandidateCount, paths, uniqueCandidateCount }),
   };
 };

@@ -6,6 +6,7 @@ import { startBaseReactFlowObstacleClosureTrace } from '../baseReactFlowDisplayO
 import type { DisplayRoutingPhaseTrace } from '../baseReactFlowDisplayRoutingTrace';
 import { createBaseReactFlowFinalEndpointResidualRepair } from '../baseReactFlowDisplayFinalEndpointResidualRepair';
 import { commercialEdgeDetoursDoNotRegress } from '../baseReactFlowDisplayCommercialDetourGuard';
+import { isExactSingleImmutableEdgeReplacement } from '../baseReactFlowDisplayFinalEndpointGate';
 import { createDisplayWorkerFinalEvaluation } from '../baseReactFlowDisplayWorkerFinalEvaluation';
 
 const nodes: Node[] = [
@@ -41,6 +42,22 @@ const edges: Edge[] = [
 ];
 
 describe('createBaseReactFlowFinalEndpointEvaluation', () => {
+  it('only treats one fully declared immutable edge replacement as an exact obstacle delta', () => {
+    const replacement = { ...edges[0], data: { ...edges[0].data } };
+    const candidate = [replacement, edges[1]];
+
+    expect(isExactSingleImmutableEdgeReplacement(edges, candidate, [0])).toBe(true);
+    expect(isExactSingleImmutableEdgeReplacement(edges, [...candidate], [0, 0])).toBe(false);
+    expect(isExactSingleImmutableEdgeReplacement(edges, [replacement, { ...edges[1] }], [0]))
+      .toBe(false);
+    expect(isExactSingleImmutableEdgeReplacement(edges, [
+      { ...replacement, id: 'different' },
+      edges[1],
+    ], [0])).toBe(false);
+    expect(isExactSingleImmutableEdgeReplacement(edges, candidate, [0.5])).toBe(false);
+    expect(isExactSingleImmutableEdgeReplacement(edges, candidate, [2])).toBe(false);
+  });
+
   it('reports duplicate clearance candidates as request-local trace cache hits', () => {
     const evaluation = createBaseReactFlowFinalEndpointEvaluation(nodes);
     const traces: DisplayRoutingPhaseTrace[] = [];

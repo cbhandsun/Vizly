@@ -34,6 +34,21 @@ export type BaseReactFlowFinalEndpointOrderOptions = Readonly<{
   evaluation?: BaseReactFlowFinalEndpointEvaluation;
 }>;
 
+export const isExactSingleImmutableEdgeReplacement = (
+  baselineEdges: readonly Edge[],
+  candidateEdges: readonly Edge[],
+  changedEdgeIndexes: readonly number[],
+): boolean => changedEdgeIndexes.length === 1
+  && Number.isInteger(changedEdgeIndexes[0])
+  && baselineEdges.length === candidateEdges.length
+  && changedEdgeIndexes[0] >= 0
+  && changedEdgeIndexes[0] < baselineEdges.length
+  && baselineEdges.every((edge, index) => (
+    index === changedEdgeIndexes[0]
+      ? edge.id === candidateEdges[index]?.id
+      : edge === candidateEdges[index]
+  ));
+
 const passesBaseReactFlowFinalDisplayHardQualityGate = (
   baselineEdges: readonly Edge[],
   candidateEdges: readonly Edge[],
@@ -66,13 +81,22 @@ const passesBaseReactFlowFinalDisplayHardQualityGate = (
       changedEdgeIndexes,
     )
   ) return false;
-  if (!changedEdgesObstacleHitsDoNotRegress(
+  if (candidateReport.obstacleHits > baselineReport.obstacleHits) return false;
+  const isExactSingleEdgeChange = isExactSingleImmutableEdgeReplacement(
+    baselineEdges,
+    candidateEdges,
+    changedEdgeIndexes,
+  );
+  // For one immutable edge replacement, the exact aggregate hard report and
+  // the per-edge obstacle delta are identical because all other contributions
+  // are unchanged. Multi-edge transactions retain the per-edge guard so an
+  // improvement cannot offset a sibling regression.
+  if (!isExactSingleEdgeChange && !changedEdgesObstacleHitsDoNotRegress(
     baselineEdges,
     candidateEdges,
     changedEdgeIndexes,
     evaluation.nodes,
   )) return false;
-  if (candidateReport.obstacleHits > baselineReport.obstacleHits) return false;
   if (baselineReport.terminalsAttached && !candidateReport.terminalsAttached) return false;
   if (baselineReport.terminalsAnchored && !candidateReport.terminalsAnchored) return false;
   if (candidateReport.quality.strictCrossings > baselineReport.quality.strictCrossings) {

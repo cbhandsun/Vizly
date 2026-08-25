@@ -3,14 +3,15 @@ import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
 import type { EdgePathQualityScore } from './edgePathQualityGeometry';
 import {
   iterateBusinessNodeClearanceCandidates,
-  selectBusinessNodeClearanceCandidatesWithinHitBudget,
 } from './edgeBusinessNodeClearanceCandidateRanking';
 import {
   createBusinessNodeClearanceCandidateCache,
   resetBusinessNodeClearanceRepairDiagnostics,
   type BusinessNodeClearanceRepairDiagnostics,
 } from './edgeBusinessNodeClearanceCandidateCache';
-import { createBusinessNodeClearanceCandidateCollection } from './edgeBusinessNodeClearanceCandidateCollection';
+import {
+  createBusinessNodeClearanceCandidateCollection,
+} from './edgeBusinessNodeClearanceCandidateCollection';
 import { createBusinessNodeClearanceRectContext } from './edgeBusinessNodeClearanceRectContext';
 import {
   createEdgePathQualityEvaluationContext,
@@ -464,8 +465,16 @@ const clearanceCandidates = (
   rects: Rect[],
   containerRects: Rect[],
   minimumClearance: number,
+  maximumHits: number,
+  countHits: (candidate: Point[], maximumHits: number) => number,
 ) => {
-  const candidates = createBusinessNodeClearanceCandidateCollection<Point[]>();
+  const hitByCandidate = new WeakMap<Point[], number>();
+  const candidates = createBusinessNodeClearanceCandidateCollection<Point[]>(candidate => {
+    const hits = countHits(candidate, maximumHits);
+    if (!Number.isSafeInteger(hits) || hits < 0 || hits > maximumHits) return false;
+    hitByCandidate.set(candidate, hits);
+    return true;
+  });
   const laneClearances = [...new Set([
     ...LEGACY_LANE_CLEARANCES,
     minimumClearance,
@@ -586,7 +595,15 @@ const clearanceCandidates = (
       }
     }
   }
-  return candidates.read();
+  const result = candidates.read();
+  return {
+    candidates: result.paths.map(candidate => ({
+      candidate,
+      hits: hitByCandidate.get(candidate) ?? maximumHits + 1,
+    })),
+    generatedCandidateCount: result.generatedCandidateCount,
+    uniqueCandidateCount: result.uniqueCandidateCount,
+  };
 };
 
 const withPath = (edge: Edge, path: Point[]): Edge => {
@@ -700,27 +717,23 @@ export const repairBusinessNodeClearanceRisks = (
           rectContext.rectsForTerminals(edge.source, edge.target),
           rectContext.containerRects,
           minimumClearance,
+          baselineHits,
+          (candidatePath, maximumHits) => obstacleContext.countUnrelatedObstacleHits(
+            candidatePath,
+            maximumHits,
+          ),
         ),
       });
       const candidateCollection = candidateCollectionResult.value;
       if (candidateCollectionResult.cacheHit && options.diagnostics) {
         options.diagnostics.candidateCollectionCacheHitCount += 1;
       }
-      const uniqueCandidates = candidateCollection.paths;
       if (options.diagnostics) {
         options.diagnostics.generatedCandidateCount += candidateCollection.generatedCandidateCount;
-        options.diagnostics.uniqueCandidateCount += uniqueCandidates.length;
+        options.diagnostics.uniqueCandidateCount += candidateCollection.uniqueCandidateCount;
       }
-      const hitEligibleCandidates = selectBusinessNodeClearanceCandidatesWithinHitBudget(
-        uniqueCandidates,
-        baselineHits,
-        (candidatePath, maximumHits) => obstacleContext.countUnrelatedObstacleHits(
-          candidatePath,
-          maximumHits,
-        ),
-      );
       const rankedCandidates = iterateBusinessNodeClearanceCandidates(
-        hitEligibleCandidates.map(({ candidate, hits }) => {
+        candidateCollection.candidates.map(({ candidate, hits }) => {
           const [risk, commercialRisk] = clearanceContext.scorePair(
             candidate,
             edge,

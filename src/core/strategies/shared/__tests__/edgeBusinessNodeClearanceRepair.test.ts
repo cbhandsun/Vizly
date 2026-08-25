@@ -8,6 +8,7 @@ import {
   uniqueBusinessNodeClearancePaths,
 } from '../edgeBusinessNodeClearanceRepair';
 import { createBusinessNodeClearanceCandidateCollection } from '../edgeBusinessNodeClearanceCandidateCollection';
+import { selectBusinessNodeClearanceCandidatesWithinHitBudget } from '../edgeBusinessNodeClearanceCandidateRanking';
 import { calculateEdgePathQualityScore } from '../edgeStrictCrossingGuard';
 import {
   createNodeClearanceEvaluationContext,
@@ -174,7 +175,50 @@ describe('repairBusinessNodeClearanceRisks', () => {
     expect(collection.read()).toEqual({
       generatedCandidateCount: 3,
       paths: [first, distinct],
+      uniqueCandidateCount: 2,
     });
+  });
+
+  it('streams the exact unique candidate order through an early gate', () => {
+    const first = [{ x: 0, y: 0 }, { x: 100, y: 0 }];
+    const duplicate = first.map(point => ({ ...point }));
+    const rejected = [{ x: 0, y: 0 }, { x: 0, y: 100 }];
+    const last = [{ x: 0, y: 0 }, { x: -100, y: 0 }];
+    const reads: typeof first[] = [];
+    const collection = createBusinessNodeClearanceCandidateCollection<typeof first>(path => {
+      reads.push(path);
+      return path !== rejected;
+    });
+
+    collection.addAll([first, duplicate, rejected, last]);
+
+    expect(collection.read()).toEqual({
+      generatedCandidateCount: 4,
+      paths: [first, last],
+      uniqueCandidateCount: 3,
+    });
+    expect(reads).toEqual([first, rejected, last]);
+  });
+
+  it('keeps the streamed hit gate in parity with collect, deduplicate, then select', () => {
+    const first = [{ x: 0, y: 0 }, { x: 100, y: 0 }];
+    const duplicate = first.map(point => ({ ...point }));
+    const rejected = [{ x: 0, y: 0 }, { x: 0, y: 100 }];
+    const last = [{ x: 0, y: 0 }, { x: -100, y: 0 }];
+    const inputs = [first, duplicate, rejected, last];
+    const hitCount = (path: typeof first): number => path === rejected ? 2 : path === last ? 1 : 0;
+    const legacy = selectBusinessNodeClearanceCandidatesWithinHitBudget(
+      uniqueBusinessNodeClearancePaths(inputs),
+      1,
+      hitCount,
+    ).map(entry => entry.candidate);
+    const streamed = createBusinessNodeClearanceCandidateCollection<typeof first>(
+      path => hitCount(path) <= 1,
+    );
+
+    streamed.addAll(inputs);
+
+    expect(streamed.read().paths).toEqual(legacy);
   });
 
   it('normalizes a sibling branch lane from 41.5px to the 48px commercial boundary', () => {
