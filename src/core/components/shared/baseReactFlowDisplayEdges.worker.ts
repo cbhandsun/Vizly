@@ -5,9 +5,7 @@ import {
   withDisplayAbsolutePositions,
 } from './baseReactFlowDisplayEdgeCore';
 import {
-  createBaseReactFlowDisplayExactReport,
   finalizeBaseReactFlowDisplayEdgesWithReport,
-  type BaseReactFlowDisplayExactReport,
 } from './baseReactFlowDisplayFinalizer';
 import { createBaseReactFlowFullRouteEdges } from './baseReactFlowDisplayFullRoutePipeline';
 import type { BaseDisplayBoundedCandidateReport } from './baseReactFlowDisplayEvaluation';
@@ -35,6 +33,7 @@ import {
   startDisplayRoutingPhaseTrace,
   type DisplayRoutingPhaseTrace,
 } from './baseReactFlowDisplayRoutingTrace';
+import { createBaseReactFlowFullRouteEvaluationSession } from './baseReactFlowDisplayFullRouteEvaluationSession';
 import {
   createDisplayRoutingFallbackMetadata,
   createDisplayRoutingPhaseRecorder,
@@ -594,37 +593,29 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
     preparedInteractiveEdges = interactiveResponse.edges;
   }
 
-  const repairNodes = withDisplayAbsolutePositions(
-    request.nodes,
-    new Map(request.nodes.map(node => [node.id, node] as const)),
-  );
-  let exactReport: BaseReactFlowDisplayExactReport | undefined;
+  const fullRouteSession = createBaseReactFlowFullRouteEvaluationSession(request.nodes);
+  const { evaluation: fullRouteEvaluation, repairNodes } = fullRouteSession;
   const fullRouteEdges = createBaseReactFlowFullRouteEdges({
     ...commonInput,
     forceFullQuality: request.qualityMode === 'full' || escalatedFromInteractive,
     preparedInteractiveEdges,
     onPhaseTrace: recordPhaseTrace,
+    evaluationSession: fullRouteEvaluation,
     createPreDisplayFinalEdges: (preDisplayArgs) => {
-      let boundedReport: BaseDisplayBoundedCandidateReport | undefined;
-      const boundedEdges = createBaseReactFlowPreDisplayFinalEdges({
+      return createBaseReactFlowPreDisplayFinalEdges({
         ...preDisplayArgs,
         onBoundedCandidate: (report) => {
-          boundedReport = report;
           preDisplayArgs.onBoundedCandidate?.(report);
           onBoundedCandidate?.(report);
         },
       });
-      if (boundedReport) {
-        exactReport = createBaseReactFlowDisplayExactReport(
-          boundedEdges,
-          request.nodes,
-          repairNodes,
-          boundedReport,
-        );
-      }
-      return boundedEdges;
     },
   });
+  // Preserve the request-local exact proof produced by the full-route
+  // transaction. The finalizer and later closure still validate every route,
+  // but they no longer rebuild the same node/pair scan merely because the
+  // candidate crossed a module boundary.
+  const exactReport = fullRouteSession.exactReport(fullRouteEdges);
   const finalizerTimer = startDisplayRoutingPhaseTrace({
     phase: 'finalizer',
     candidateCount: fullRouteEdges.length,
@@ -648,7 +639,12 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
     const repaired = repairBaseReactFlowMeasuredDisplayEdgesWithReport(
       finalized.edges,
       request.nodes,
-      undefined,
+      {
+        edges: finalized.edges,
+        inputNodes: request.nodes,
+        repairNodes,
+        report: finalized.report,
+      },
       false,
       recordPhaseTrace,
       false,
@@ -662,6 +658,8 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
       phaseTrace,
       ...incrementalFallbackMetadata,
     }, request.nodes, {
+      initialHardReport: repaired.report,
+      initialHardReportEdges: repaired.edges,
       isLargeGraph: request.isLargeGraph,
       onPhaseTrace: recordPhaseTrace,
       preferredEdges: request.edges,
@@ -675,6 +673,8 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
     phaseTrace,
     ...incrementalFallbackMetadata,
   }, request.nodes, {
+    initialHardReport: finalized.report,
+    initialHardReportEdges: finalized.edges,
     isLargeGraph: request.isLargeGraph,
     onPhaseTrace: recordPhaseTrace,
     preferredEdges: request.edges,

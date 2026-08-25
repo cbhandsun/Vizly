@@ -277,6 +277,11 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
     });
 
     expect(finalizeSpy).toHaveBeenCalledTimes(1);
+    expect(finalizeSpy.mock.calls[0]?.[2]).toMatchObject({
+      inputNodes: nodes,
+      outputRouteSignature: expect.stringMatching(/^route-v2:/),
+      report: expect.objectContaining({ candidate: 'polished' }),
+    });
     expect(workerResponse).toMatchObject({
       requestId: 'worker-direct-parity',
       edges: direct,
@@ -345,7 +350,11 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
     expect(repairSpy).toHaveBeenCalledWith(
       uncleanEdges,
       nodes,
-      undefined,
+      expect.objectContaining({
+        edges: uncleanEdges,
+        inputNodes: nodes,
+        report: uncleanReport,
+      }),
       false,
       expect.any(Function),
       false,
