@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   displayRoutingFinalSvgGeometryIsClean,
+  readDisplayRoutingNodeDragTarget,
   readDisplayRoutingNodePanGesture,
   readDisplayRoutingNodeGeometryParity,
   readDisplayRoutingViewportZoom,
@@ -185,6 +186,23 @@ describe('display routing browser geometry', () => {
     });
   });
 
+  it('selects an exposed point when the rendered node center is covered', () => {
+    const exposedChild = {};
+    const coveringElement = {};
+    const node = {
+      getAttribute: () => 'tms',
+      getBoundingClientRect: () => rect(300, 180, 100, 60),
+      contains: candidate => candidate === exposedChild,
+    };
+    vi.stubGlobal('document', {
+      querySelectorAll: () => [node],
+      querySelector: () => ({ getBoundingClientRect: () => rect(0, 0, 754, 480) }),
+      elementFromPoint: (x, y) => x === 350 && y === 210 ? coveringElement : exposedChild,
+    });
+
+    expect(readDisplayRoutingNodeDragTarget('tms')).toEqual({ x: 335, y: 210 });
+  });
+
   it('waits while auto-fit leaves the target outside the pane', () => {
     const pane = { getBoundingClientRect: () => rect(0, 0, 754, 480) };
     const node = {
@@ -222,8 +240,10 @@ describe('display routing browser geometry', () => {
     });
 
     expect(readVisibleDisplayRoutingNodeRect('tms')).toBeNull();
+    expect(readDisplayRoutingNodeDragTarget('tms')).toBeNull();
     expect(readDisplayRoutingNodePanGesture('tms')).toBeNull();
     expect(readVisibleDisplayRoutingNodeRect('')).toBeNull();
+    expect(readDisplayRoutingNodeDragTarget('')).toBeNull();
     expect(readVisibleDisplayRoutingNodeRect('x'.repeat(501))).toBeNull();
   });
 

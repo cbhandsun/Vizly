@@ -2,11 +2,11 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 import { withPrecompiledRouteBrowser } from './lib/precompiled-display-route-cdp.mjs';
 import {
+  readDisplayRoutingNodeDragTarget,
   readDisplayRoutingNodePanGesture,
   readDisplayRoutingVisualScaleAudit,
   readRenderedDisplayEdgeNodeIntersections,
   replayDisplayRoutingResponseEdges,
-  readVisibleDisplayRoutingNodeRect,
 } from './lib/display-routing-browser-geometry.mjs';
 import {
   assertDisplayRoutingDragResult,
@@ -123,20 +123,20 @@ const initialReadyExpression = `(() => {
 })()`;
 
 const dragNode = async (session, nodeId, beforeRelease = null) => {
-  const visibleRectExpression = `(() => {
-    const readVisibleNodeRect = ${readVisibleDisplayRoutingNodeRect.toString()};
-    return readVisibleNodeRect(${JSON.stringify(nodeId)});
+  const dragTargetExpression = `(() => {
+    const readNodeDragTarget = ${readDisplayRoutingNodeDragTarget.toString()};
+    return readNodeDragTarget(${JSON.stringify(nodeId)});
   })()`;
   const panGestureExpression = `(() => {
     const readNodePanGesture = ${readDisplayRoutingNodePanGesture.toString()};
     return readNodePanGesture(${JSON.stringify(nodeId)});
   })()`;
-  let rect = await session.evaluate(visibleRectExpression);
-  for (let attempt = 0; !rect && attempt < 8; attempt += 1) {
+  let target = await session.evaluate(dragTargetExpression);
+  for (let attempt = 0; !target && attempt < 8; attempt += 1) {
     const gesture = await session.evaluate(panGestureExpression);
     if (!gesture) {
       await delay(100);
-      rect = await session.evaluate(visibleRectExpression);
+      target = await session.evaluate(dragTargetExpression);
       continue;
     }
     await session.send('Input.dispatchMouseEvent', {
@@ -172,12 +172,12 @@ const dragNode = async (session, nodeId, beforeRelease = null) => {
       clickCount: 1,
     });
     await delay(150);
-    rect = await session.evaluate(visibleRectExpression);
+    target = await session.evaluate(dragTargetExpression);
   }
-  rect ??= await waitForValue(session, visibleRectExpression);
+  target ??= await waitForValue(session, dragTargetExpression);
   const viewportZoom = await readDisplayRoutingViewportZoomFromSession(session);
-  const startX = rect.x + rect.width / 2;
-  const startY = rect.y + rect.height / 2;
+  const startX = target.x;
+  const startY = target.y;
   const endX = startX + 40 * viewportZoom;
   const endY = startY + 12 * viewportZoom;
   const hitStack = await session.evaluate(`(() => (

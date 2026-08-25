@@ -18,6 +18,7 @@ import {
 import {
   createDisplayRoutingMatrixCaseIds,
   DISPLAY_ROUTING_LAYOUT_CASES,
+  findDisplayRoutingMenuElementByKey,
   parseDisplayRoutingMatrixCase,
 } from './lib/display-routing-matrix-cases.mjs';
 import {
@@ -234,18 +235,22 @@ const clickLayout = async (session, layoutCase) => {
   if (!opened) throw new Error('Layout menu trigger was not found');
   await delay(300);
   const clickVisibleItem = () => session.evaluate(`(() => {
-    const expected = ${JSON.stringify(layoutCase.label)};
-    const item = Array.from(document.querySelectorAll('.ant-dropdown-menu-item'))
-      .find(candidate => candidate.textContent?.trim() === expected);
+    const findByKey = ${findDisplayRoutingMenuElementByKey.toString()};
+    const item = findByKey(
+      document.querySelectorAll('.flowchart-layout-menu [data-menu-id]'),
+      ${JSON.stringify(layoutCase.id)},
+    );
     item?.click();
     return item ? Date.now() : null;
   })()`);
   let clicked = await clickVisibleItem();
   if (!clicked) {
     const submenuCenter = await session.evaluate(`(() => {
-      const item = Array.from(document.querySelectorAll(
-        '.flowchart-layout-menu .ant-dropdown-menu-submenu-title',
-      )).find(candidate => candidate.textContent?.includes('更多布局引擎'));
+      const findByKey = ${findDisplayRoutingMenuElementByKey.toString()};
+      const item = findByKey(
+        document.querySelectorAll('.flowchart-layout-menu [data-menu-id]'),
+        'more-layout-engines',
+      );
       if (!item) return null;
       const rect = item.getBoundingClientRect();
       return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };

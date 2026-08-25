@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createDisplayRoutingMatrixCaseIds,
   DISPLAY_ROUTING_LAYOUT_CASES,
+  findDisplayRoutingMenuElementByKey,
   parseDisplayRoutingMatrixCase,
 } from './display-routing-matrix-cases.mjs';
 
@@ -48,5 +49,26 @@ describe('display routing matrix cases', () => {
       .toThrowError('Unknown DISPLAY_ROUTING_MATRIX_CASE');
     expect(() => parseDisplayRoutingMatrixCase('x'.repeat(10_000), knownCaseIds))
       .toThrowError('Unknown DISPLAY_ROUTING_MATRIX_CASE');
+  });
+
+  it('finds Ant menu actions by stable key without depending on translated text', () => {
+    const translatedTreeItem = {
+      getAttribute: name => name === 'data-menu-id' ? 'rc-menu-uuid-tree-lr' : null,
+      textContent: 'Tree (left to right)',
+    };
+    const unrelatedItem = {
+      getAttribute: name => name === 'data-menu-id' ? 'rc-menu-uuid-tree-tb' : null,
+    };
+
+    expect(findDisplayRoutingMenuElementByKey(
+      [unrelatedItem, translatedTreeItem],
+      'tree-lr',
+    )).toBe(translatedTreeItem);
+    expect(findDisplayRoutingMenuElementByKey([translatedTreeItem], 'tree-rl')).toBeNull();
+    expect(findDisplayRoutingMenuElementByKey([translatedTreeItem], '')).toBeNull();
+    expect(findDisplayRoutingMenuElementByKey(
+      [translatedTreeItem],
+      'x'.repeat(10_000),
+    )).toBeNull();
   });
 });

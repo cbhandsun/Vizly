@@ -33,3 +33,14 @@ export const parseDisplayRoutingMatrixCase = (rawValue, knownCaseIds) => {
   }
   return candidate;
 };
+
+export const findDisplayRoutingMenuElementByKey = (elements, rawKey) => {
+  if (typeof rawKey !== 'string' || rawKey.length === 0 || rawKey.length > 128) {
+    return null;
+  }
+  const suffix = `-${rawKey}`;
+  return [...elements].find(element => (
+    typeof element?.getAttribute === 'function'
+    && String(element.getAttribute('data-menu-id') || '').endsWith(suffix)
+  )) ?? null;
+};
