@@ -240,4 +240,71 @@ describe('bounded pre-display handoff', () => {
 
     expect(second).toBe(first);
   });
+
+  it('reports only the edges changed by the full-quality phase', () => {
+    const edges: Edge[] = [
+      {
+        id: 'quality-repair',
+        source: 'source-a',
+        target: 'target-a',
+        sourceHandle: 'bottom',
+        targetHandle: 'top',
+        type: 'advanced-smart-step',
+        data: {
+          computedPath: [
+            { x: 50, y: 60 },
+            { x: 80, y: 120 },
+            { x: 50, y: 240 },
+          ],
+          layoutPathLocked: true,
+          layoutDirection: 'TB',
+        },
+      },
+      {
+        id: 'quality-stable',
+        source: 'source-b',
+        target: 'target-b',
+        sourceHandle: 'bottom',
+        targetHandle: 'top',
+        type: 'advanced-smart-step',
+        data: {
+          computedPath: [
+            { x: 550, y: 60 },
+            { x: 550, y: 240 },
+          ],
+          layoutPathLocked: true,
+          layoutDirection: 'TB',
+        },
+      },
+    ];
+    const nodes = [
+      { id: 'source-a', position: { x: 0, y: 0 }, measured: { width: 100, height: 60 }, data: {} },
+      { id: 'target-a', position: { x: 0, y: 240 }, measured: { width: 100, height: 60 }, data: {} },
+      { id: 'source-b', position: { x: 500, y: 0 }, measured: { width: 100, height: 60 }, data: {} },
+      { id: 'target-b', position: { x: 500, y: 240 }, measured: { width: 100, height: 60 }, data: {} },
+    ];
+    const traces: Array<{
+      phase: string;
+      changedEdgeCount?: number;
+      resolution: string;
+    }> = [];
+
+    createBaseReactFlowFullRouteEdges({
+      edges,
+      nodes,
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: false,
+      forceFullQuality: true,
+      skipBoundedAttempt: true,
+      skipFinalizedReuse: true,
+      displayEdgeEpoch: computeBaseReactFlowDisplayEdgeEpoch({ nodes, edges }),
+      onPhaseTrace: trace => traces.push(trace),
+    });
+
+    expect(traces.find(trace => trace.phase === 'quality'), JSON.stringify(traces)).toMatchObject({
+      changedEdgeCount: 1,
+      resolution: 'accepted',
+    });
+  });
 });

@@ -14,6 +14,7 @@ import type {
 } from './baseReactFlowDisplayFullRouteTypes';
 import { diffBaseReactFlowEvaluationMetrics } from './baseReactFlowDisplayFinalEndpointEvaluation';
 import {
+  countChangedRoutingItems,
   startDisplayRoutingPhaseTrace,
   type DisplayRoutingPhaseTrace,
 } from './baseReactFlowDisplayRoutingTrace';
@@ -92,9 +93,13 @@ export const createBaseReactFlowFullRouteEdges = (args: BaseReactFlowDisplayEdge
       return earlyClosedEdges;
     }
   }
+  const qualityChangedEdgeCount = countChangedRoutingItems(
+    context.normalizedEdges,
+    qualityEdges,
+  );
   qualityTimer.finish(
-    'accepted',
-    qualityEdges.length,
+    qualityChangedEdgeCount === 0 ? 'skip' : 'accepted',
+    qualityChangedEdgeCount,
     diffBaseReactFlowEvaluationMetrics(
       qualityMetricsBefore,
       context.evaluationSession.readMetrics(),
